@@ -12,10 +12,16 @@ Changes:
 --------
 - Add caching of remote WPS requests according to ``request-options.yml`` and request header ``Cache-Control`` to allow
   reduced query of pre-fetched WPS client definition.
+- Add OpenAPI schema examples for some of the most common responses.
+- Add missing schema definitions for WPS XML requests and responses.
+- Improve schema self-validation with their specified default values.
+- Add explicit options usage and expected parsing results for all test variations of OpenAPI schemas generation and
+  ``colander`` object arguments for future reference in ``tests.wps_restapi.test_colander_extras``.
 
 Fixes:
 ------
-- No change.
+- Fix erroneous tags in job inputs schemas.
+- Fix handling of deeply nested schema validator raising for invalid format within optional parent schema.
 
 `3.0.0 <https://github.com/crim-ca/weaver/tree/3.0.0>`_ (2021-03-16)
 ========================================================================

@@ -829,13 +829,13 @@ class Process(Base):
 
     @property
     def jobControlOptions(self):  # noqa: N802
-        # type: () -> Optional[List[str]]
-        return self.get("jobControlOptions")
+        # type: () -> List[str]
+        return self.get("jobControlOptions", [])
 
     @property
     def outputTransmission(self):  # noqa: N802
-        # type: () -> Optional[List[str]]
-        return self.get("outputTransmission")
+        # type: () -> List[str]
+        return self.get("outputTransmission", [])
 
     @property
     def processDescriptionURL(self):  # noqa: N802

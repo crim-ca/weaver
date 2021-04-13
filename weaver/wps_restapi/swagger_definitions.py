@@ -4,9 +4,11 @@ so that one can update the swagger without touching any other files after the in
 """
 # pylint: disable=C0103,invalid-name
 
+import os
 from typing import TYPE_CHECKING
 
-from colander import DateTime, Email, OneOf, Range, Regex, drop
+import yaml
+from colander import DateTime, Email, OneOf, Range, Regex, drop, required
 from cornice import Service
 
 from weaver import __meta__
@@ -15,15 +17,15 @@ from weaver.execute import (
     EXECUTE_CONTROL_OPTION_ASYNC,
     EXECUTE_CONTROL_OPTIONS,
     EXECUTE_MODE_ASYNC,
-    EXECUTE_MODE_AUTO,
     EXECUTE_MODE_OPTIONS,
+    EXECUTE_RESPONSE_DOCUMENT,
     EXECUTE_RESPONSE_OPTIONS,
-    EXECUTE_RESPONSE_RAW,
     EXECUTE_TRANSMISSION_MODE_OPTIONS,
     EXECUTE_TRANSMISSION_MODE_REFERENCE
 )
 from weaver.formats import (
     ACCEPT_LANGUAGE_EN_CA,
+    ACCEPT_LANGUAGE_EN_US,
     ACCEPT_LANGUAGES,
     CONTENT_TYPE_ANY,
     CONTENT_TYPE_APP_JSON,
@@ -50,6 +52,7 @@ from weaver.sort import JOB_SORT_VALUES, QUOTE_SORT_VALUES, SORT_CREATED, SORT_I
 from weaver.status import JOB_STATUS_CATEGORIES, STATUS_ACCEPTED, STATUS_COMPLIANT_OGC
 from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_VALUES
 from weaver.wps_restapi.colander_extras import (
+    AllOfKeywordSchema,
     AnyOfKeywordSchema,
     ExtendedBoolean as Boolean,
     ExtendedFloat as Float,
@@ -64,7 +67,8 @@ from weaver.wps_restapi.colander_extras import (
     PermissiveMappingSchema,
     SchemeURL,
     SemanticVersion,
-    StringRange
+    StringRange,
+    XMLObject
 )
 from weaver.wps_restapi.utils import wps_restapi_base_path
 
@@ -83,6 +87,7 @@ API_DOCS = {
     "description": "{} documentation".format(__meta__.__title__),
     "url": __meta__.__documentation_url__
 }
+DOC_URL = "{}/en/latest".format(__meta__.__documentation_url__)
 
 CWL_VERSION = "v1.1"
 CWL_REPO_URL = "https://github.com/common-workflow-language"
@@ -104,6 +109,23 @@ IO_INFO_IDS = (
 
 OGC_API_REPO_URL = "https://github.com/opengeospatial/ogcapi-processes"
 OGC_API_SCHEMA_URL = "https://raw.githubusercontent.com/opengeospatial/ogcapi-processes"
+
+#########################################################
+# Examples
+#########################################################
+
+# load examples by file names as keys
+SCHEMA_EXAMPLE_DIR = os.path.join(os.path.dirname(__file__), "examples")
+EXAMPLES = {}
+for name in os.listdir(SCHEMA_EXAMPLE_DIR):
+    path = os.path.join(SCHEMA_EXAMPLE_DIR, name)
+    ext = os.path.splitext(name)[-1]
+    with open(path, "r") as f:
+        if ext in [".json", ".yaml", ".yml"]:
+            EXAMPLES[name] = yaml.safe_load(f)  # both JSON/YAML
+        else:
+            EXAMPLES[name] = f.read()
+
 
 #########################################################
 # API tags
@@ -492,7 +514,9 @@ class AdditionalParametersList(ExtendedSequenceSchema):
 
 
 class Content(ExtendedMappingSchema):
-    href = ReferenceURL(description="URL to CWL file.", title="href",
+    href = ReferenceURL(description="URL to CWL file.", title="OWSContentURL",
+                        default=drop,       # if invalid, drop it completely,
+                        missing=required,   # but still mark as 'required' for parent objects
                         example="http://some.host/applications/cwl/multisensor_ndvi.cwl")
 
 
@@ -502,7 +526,7 @@ class Offering(ExtendedMappingSchema):
 
 
 class OWSContext(ExtendedMappingSchema):
-    description = "OGC Web Service definition with references to contained application (see also 'executionUnit')."
+    description = "OGC Web Service definition from an URL reference."
     title = "owsContext"
     offering = Offering()
 
@@ -514,19 +538,15 @@ class DescriptionBase(ExtendedMappingSchema):
 
 
 class DescriptionOWS(ExtendedMappingSchema):
-    owsContext = OWSContext()
+    owsContext = OWSContext(missing=drop)
 
 
 class DescriptionExtra(ExtendedMappingSchema):
     additionalParameters = AdditionalParametersList(missing=drop)
 
 
-class DescriptionType(AnyOfKeywordSchema):
-    _any_of = [
-        DescriptionBase(default={}),
-        DescriptionOWS(missing=drop),
-        DescriptionExtra(missing=drop),
-    ]
+class DescriptionType(DescriptionBase, DescriptionExtra):
+    pass
 
 
 class ProcessDescriptionMeta(ExtendedMappingSchema):
@@ -536,6 +556,16 @@ class ProcessDescriptionMeta(ExtendedMappingSchema):
         description="Keywords applied to the process for search and categorization purposes.")
     metadata = MetadataList(
         default=[],
+        description="External references to documentation or metadata sources relevant to the process.")
+
+
+class ProcessDeployMeta(ExtendedMappingSchema):
+    # don't require fields at all for process deployment, default to empty if omitted
+    keywords = KeywordList(
+        missing=drop, default=[],
+        description="Keywords applied to the process for search and categorization purposes.")
+    metadata = MetadataList(
+        missing=drop, default=[],
         description="External references to documentation or metadata sources relevant to the process.")
 
 
@@ -553,8 +583,10 @@ class MinOccursDefinition(OneOfKeywordSchema):
     title = "MinOccurs"
     example = 1
     _one_of = [
-        ExtendedSchemaNode(Integer(), validator=Range(min=0)),
-        ExtendedSchemaNode(String(), validator=StringRange(min=0)),
+        ExtendedSchemaNode(Integer(), validator=Range(min=0),
+                           description="Positive integer."),
+        ExtendedSchemaNode(String(), validator=StringRange(min=0), pattern="^[0-9]+$",
+                           description="Numerical string representing a positive integer."),
     ]
 
 
@@ -563,8 +595,10 @@ class MaxOccursDefinition(OneOfKeywordSchema):
     title = "MaxOccurs"
     example = 1
     _one_of = [
-        ExtendedSchemaNode(Integer(), validator=Range(min=0)),
-        ExtendedSchemaNode(String(), validator=StringRange(min=0)),
+        ExtendedSchemaNode(Integer(), validator=Range(min=0),
+                           description="Positive integer."),
+        ExtendedSchemaNode(String(), validator=StringRange(min=0), pattern="^[0-9]+$",
+                           description="Numerical string representing a positive integer."),
         ExtendedSchemaNode(String(), validator=OneOf(["unbounded"])),
     ]
 
@@ -574,8 +608,7 @@ class WithMinMaxOccurs(ExtendedMappingSchema):
     maxOccurs = MaxOccursDefinition(missing=drop)
 
 
-class ProcessDescriptionType(DescriptionType, ProcessDescriptionMeta):
-    title = "ProcessDescription"
+class ProcessDescriptionType(DescriptionType, DescriptionOWS):
     id = ProcessIdentifier()
 
 
@@ -781,101 +814,66 @@ class OutputDescriptionList(ExtendedSequenceSchema):
 
 class JobExecuteModeEnum(ExtendedSchemaNode):
     schema_type = String
-
-    def __init__(self, *_, **kwargs):
-        kwargs.pop("validator", None)   # ignore passed argument and enforce the validator
-        super(JobExecuteModeEnum, self).__init__(
-            self.schema_type(),
-            title=kwargs.get("title", "mode"),
-            default=kwargs.get("default", EXECUTE_MODE_AUTO),
-            example=kwargs.get("example", EXECUTE_MODE_ASYNC),
-            validator=OneOf(EXECUTE_MODE_OPTIONS),
-            **kwargs)
+    title = "JobExecuteMode"
+    # no default to enforce required input as per OGC-API schemas
+    # https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/execute.yaml
+    # default = EXECUTE_MODE_AUTO
+    example = EXECUTE_MODE_ASYNC
+    validator = OneOf(EXECUTE_MODE_OPTIONS)
 
 
 class JobControlOptionsEnum(ExtendedSchemaNode):
     schema_type = String
-
-    def __init__(self, *_, **kwargs):
-        kwargs.pop("validator", None)   # ignore passed argument and enforce the validator
-        super(JobControlOptionsEnum, self).__init__(
-            self.schema_type(),
-            title="jobControlOptions",
-            default=kwargs.get("default", EXECUTE_CONTROL_OPTION_ASYNC),
-            example=kwargs.get("example", EXECUTE_CONTROL_OPTION_ASYNC),
-            validator=OneOf(EXECUTE_CONTROL_OPTIONS),
-            **kwargs)
+    title = "JobControlOptions"
+    default = EXECUTE_CONTROL_OPTION_ASYNC
+    example = EXECUTE_CONTROL_OPTION_ASYNC
+    validator = OneOf(EXECUTE_CONTROL_OPTIONS)
 
 
 class JobResponseOptionsEnum(ExtendedSchemaNode):
     schema_type = String
-
-    def __init__(self, *_, **kwargs):
-        kwargs.pop("validator", None)   # ignore passed argument and enforce the validator
-        super(JobResponseOptionsEnum, self).__init__(
-            self.schema_type(),
-            title=kwargs.get("title", "response"),
-            default=kwargs.get("default", EXECUTE_RESPONSE_RAW),
-            example=kwargs.get("example", EXECUTE_RESPONSE_RAW),
-            validator=OneOf(EXECUTE_RESPONSE_OPTIONS),
-            **kwargs)
+    title = "JobResponseOptions"
+    # no default to enforce required input as per OGC-API schemas
+    # https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/execute.yaml
+    # default = EXECUTE_RESPONSE_DOCUMENT
+    example = EXECUTE_RESPONSE_DOCUMENT
+    validator = OneOf(EXECUTE_RESPONSE_OPTIONS)
 
 
 class TransmissionModeEnum(ExtendedSchemaNode):
     schema_type = String
-
-    def __init__(self, *_, **kwargs):
-        kwargs.pop("validator", None)   # ignore passed argument and enforce the validator
-        super(TransmissionModeEnum, self).__init__(
-            self.schema_type(),
-            title=kwargs.get("title", "transmissionMode"),
-            default=kwargs.get("default", EXECUTE_TRANSMISSION_MODE_REFERENCE),
-            example=kwargs.get("example", EXECUTE_TRANSMISSION_MODE_REFERENCE),
-            validator=OneOf(EXECUTE_TRANSMISSION_MODE_OPTIONS),
-            **kwargs)
+    title = "TransmissionMode"
+    default = EXECUTE_TRANSMISSION_MODE_REFERENCE
+    example = EXECUTE_TRANSMISSION_MODE_REFERENCE
+    validator = OneOf(EXECUTE_TRANSMISSION_MODE_OPTIONS)
 
 
 class JobStatusEnum(ExtendedSchemaNode):
     schema_type = String
-
-    def __init__(self, *_, **kwargs):
-        kwargs.pop("validator", None)   # ignore passed argument and enforce the validator
-        super(JobStatusEnum, self).__init__(
-            self.schema_type(),
-            default=kwargs.get("default", None),
-            example=kwargs.get("example", STATUS_ACCEPTED),
-            validator=OneOf(JOB_STATUS_CATEGORIES[STATUS_COMPLIANT_OGC]),
-            **kwargs)
+    title = "JobStatus"
+    default = STATUS_ACCEPTED
+    example = STATUS_ACCEPTED
+    validator = OneOf(JOB_STATUS_CATEGORIES[STATUS_COMPLIANT_OGC])
 
 
 class JobSortEnum(ExtendedSchemaNode):
     schema_type = String
-
-    def __init__(self, *_, **kwargs):
-        kwargs.pop("validator", None)   # ignore passed argument and enforce the validator
-        super(JobSortEnum, self).__init__(
-            String(),
-            default=kwargs.get("default", SORT_CREATED),
-            example=kwargs.get("example", SORT_CREATED),
-            validator=OneOf(JOB_SORT_VALUES),
-            **kwargs)
+    title = "JobSortingMethod"
+    default = SORT_CREATED
+    example = SORT_CREATED
+    validator = OneOf(JOB_SORT_VALUES)
 
 
 class QuoteSortEnum(ExtendedSchemaNode):
     schema_type = String
-
-    def __init__(self, *_, **kwargs):
-        kwargs.pop("validator", None)  # ignore passed argument and enforce the validator
-        super(QuoteSortEnum, self).__init__(
-            self.schema_type(),
-            default=kwargs.get("default", SORT_ID),
-            example=kwargs.get("example", SORT_PROCESS),
-            validator=OneOf(QUOTE_SORT_VALUES),
-            **kwargs)
+    title = "QuoteSortingMethod"
+    default = SORT_ID
+    example = SORT_PROCESS
+    validator = OneOf(QUOTE_SORT_VALUES)
 
 
 class LaunchJobQuerystring(ExtendedMappingSchema):
-    tags = ExtendedSchemaNode(String(), default=None, missing=drop,
+    tags = ExtendedSchemaNode(String(), title="JobTags", default=None, missing=drop,
                               description="Comma separated tags that can be used to filter jobs later")
 
 
@@ -896,27 +894,27 @@ class Visibility(ExtendedMappingSchema):
 
 class ProcessPath(ExtendedMappingSchema):
     # FIXME: support versioning with <id:tag> (https://github.com/crim-ca/weaver/issues/107)
-    process_id = AnyIdentifier(description="The process identifier.")
+    process_id = AnyIdentifier(description="Process identifier.", example="jsonarray2netcdf")
 
 
 class ProviderPath(ExtendedMappingSchema):
-    provider_id = AnyIdentifier(description="The provider identifier")
+    provider_id = AnyIdentifier(description="Remote provider identifier.", example="hummingbird")
 
 
 class JobPath(ExtendedMappingSchema):
-    job_id = UUID(description="The job id")
+    job_id = UUID(description="Job ID", example="14c68477-c3ed-4784-9c0f-a4c9e1344db5")
 
 
 class BillPath(ExtendedMappingSchema):
-    bill_id = UUID(description="The bill id")
+    bill_id = UUID(description="Bill ID")
 
 
 class QuotePath(ExtendedMappingSchema):
-    quote_id = UUID(description="The quote id")
+    quote_id = UUID(description="Quote ID")
 
 
 class ResultPath(ExtendedMappingSchema):
-    result_id = UUID(description="The result id")
+    result_id = UUID(description="Result ID")
 
 
 #########################################################
@@ -948,33 +946,718 @@ class RedocUIEndpoint(ExtendedMappingSchema):
     pass
 
 
+class OWSNamespace(XMLObject):
+    prefix = "ows"
+    namespace = "http://www.opengis.net/ows/1.1"
+
+
+class WPSNamespace(XMLObject):
+    prefix = "wps"
+    namespace = "http://www.opengis.net/wps/1.0.0"
+
+
+class XMLNamespace(XMLObject):
+    prefix = "xml"
+
+
+class XMLReferenceAttribute(ExtendedSchemaNode, XMLObject):
+    schema_type = String
+    attribute = True
+    name = "href"
+    prefix = "xlink"
+    format = "url"
+
+
+class MimeTypeAttribute(ExtendedSchemaNode, XMLObject):
+    schema_type = String
+    attribute = True
+    name = "mimeType"
+    prefix = drop
+    example = CONTENT_TYPE_APP_JSON
+
+
+class EncodingAttribute(ExtendedSchemaNode, XMLObject):
+    schema_type = String
+    attribute = True
+    name = "encoding"
+    prefix = drop
+    example = "UTF-8"
+
+
+class OWSVersion(ExtendedSchemaNode, OWSNamespace):
+    schema_type = String
+    name = "Version"
+    default = "1.0.0"
+    example = "1.0.0"
+
+
+class OWSAcceptVersions(ExtendedSequenceSchema, OWSNamespace):
+    description = "Accepted versions to produce the response."
+    name = "AcceptVersions"
+    item = OWSVersion()
+
+
+class OWSLanguage(ExtendedSchemaNode, OWSNamespace):
+    description = "Desired language to produce the response."
+    schema_type = String
+    name = "Language"
+    default = ACCEPT_LANGUAGE_EN_US
+    example = ACCEPT_LANGUAGE_EN_CA
+
+
+class OWSLanguageAttribute(OWSLanguage):
+    description = "RFC-4646 language code of the human-readable text."
+    name = "language"
+    attribute = True
+
+
+class OWSService(ExtendedSchemaNode, OWSNamespace):
+    description = "Desired service to produce the response (SHOULD be 'WPS')."
+    schema_type = String
+    name = "service"
+    attribute = True
+    default = ACCEPT_LANGUAGE_EN_US
+    example = ACCEPT_LANGUAGE_EN_CA
+
+
+class WPSServiceAttribute(ExtendedSchemaNode, XMLObject):
+    schema_type = String
+    name = "service"
+    attribute = True
+    default = "WPS"
+    example = "WPS"
+
+
+class WPSVersionAttribute(ExtendedSchemaNode, XMLObject):
+    schema_type = String
+    name = "version"
+    attribute = True
+    default = "1.0.0"
+    example = "1.0.0"
+
+
+class WPSLanguageAttribute(ExtendedSchemaNode, XMLNamespace):
+    schema_type = String
+    name = "lang"
+    attribute = True
+    default = ACCEPT_LANGUAGE_EN_US
+    example = ACCEPT_LANGUAGE_EN_CA
+
+
 class WPSParameters(ExtendedMappingSchema):
     service = ExtendedSchemaNode(String(), example="WPS", description="Service selection.",
                                  validator=OneOfCaseInsensitive(["WPS"]))
     request = ExtendedSchemaNode(String(), example="GetCapabilities", description="WPS operation to accomplish",
                                  validator=OneOfCaseInsensitive(["GetCapabilities", "DescribeProcess", "Execute"]))
     version = Version(exaple="1.0.0", default="1.0.0", validator=OneOf(["1.0.0", "2.0.0", "2.0"]))
-    identifier = ExtendedSchemaNode(String(), exaple="hello", description="Process identifier.", missing=drop)
-    data_inputs = ExtendedSchemaNode(String(), name="DataInputs", missing=drop, example="message=hi",
+    identifier = ExtendedSchemaNode(String(), exaple="hello", missing=drop,
+                                    example="example-process,another-process",
+                                    description="Single or comma-separated list of process identifiers to describe, "
+                                                "and single one for execution.")
+    data_inputs = ExtendedSchemaNode(String(), name="DataInputs", missing=drop,
+                                     example="message=hi&names=user1,user2&value=1",
                                      description="Process execution inputs provided as Key-Value Pairs (KVP).")
 
 
-class WPSBody(ExtendedMappingSchema):
-    content = ExtendedSchemaNode(String(), description="XML data inputs provided for WPS POST request.")
+class WPSOperationGetNoContent(ExtendedMappingSchema):
+    description = "No content body provided (GET requests)."
+    default = {}
+
+
+class WPSOperationPost(ExtendedMappingSchema):
+    schema_ref = "http://schemas.opengis.net/wps/1.0.0/common/RequestBaseType.xsd"
+    accepted_versions = OWSAcceptVersions(missing=drop, default="1.0.0")
+    language = OWSLanguageAttribute(missing=drop)
+    service = OWSService()
+
+
+class WPSGetCapabilitiesPost(WPSOperationPost, WPSNamespace):
+    schema_ref = "http://schemas.opengis.net/wps/1.0.0/wpsGetCapabilities_request.xsd"
+    name = "GetCapabilities"
+    title = "GetCapabilities"
+
+
+class OWSIdentifier(ExtendedSchemaNode, OWSNamespace):
+    schema_type = String
+    name = "Identifier"
+
+
+class OWSIdentifierList(ExtendedSequenceSchema, OWSNamespace):
+    name = "Identifiers"
+    item = OWSIdentifier()
+
+
+class OWSTitle(ExtendedSchemaNode, OWSNamespace):
+    schema_type = String
+    name = "Title"
+
+
+class OWSAbstract(ExtendedSchemaNode, OWSNamespace):
+    schema_type = String
+    name = "Abstract"
+
+
+class OWSMetadataLink(ExtendedSchemaNode, XMLObject):
+    schema_name = "Metadata"
+    schema_type = String
+    attribute = True
+    name = "Metadata"
+    prefix = "xlink"
+    example = "WPS"
+    wrapped = False  # metadata xlink at same level as other items
+
+
+class OWSMetadata(ExtendedSequenceSchema, OWSNamespace):
+    schema_type = String
+    name = "Metadata"
+    title = OWSMetadataLink(missing=drop)
+
+
+class WPSDescribeProcessPost(WPSOperationPost, WPSNamespace):
+    schema_ref = "http://schemas.opengis.net/wps/1.0.0/wpsDescribeProcess_request.xsd"
+    name = "DescribeProcess"
+    title = "DescribeProcess"
+    identifier = OWSIdentifierList(
+        description="Single or comma-separated list of process identifier to describe.",
+        example="example"
+    )
+
+
+class WPSExecuteDataInputs(ExtendedMappingSchema, WPSNamespace):
+    description = "XML data inputs provided for WPS POST request (Execute)."
+    name = "DataInputs"
+    title = "DataInputs"
+    # FIXME: missing details about 'DataInputs'
+
+
+class WPSExecutePost(WPSOperationPost, WPSNamespace):
+    schema_ref = "http://schemas.opengis.net/wps/1.0.0/wpsExecute_request.xsd"
+    name = "Execute"
+    title = "Execute"
+    identifier = OWSIdentifier(description="Identifier of the process to execute with data inputs.")
+    dataInputs = WPSExecuteDataInputs(description="Data inputs to be provided for process execution.")
+
+
+class WPSRequestBody(OneOfKeywordSchema):
+    _one_of = [
+        WPSExecutePost(),
+        WPSDescribeProcessPost(),
+        WPSGetCapabilitiesPost(),
+    ]
+    examples = {
+        "Execute": {
+            "summary": "Execute request example.",
+            "value": EXAMPLES["wps_execute_request.xml"]
+        }
+    }
 
 
 class WPSHeaders(ExtendedMappingSchema):
     accept = AcceptHeader(missing=drop)
 
 
-class WPSEndpoint(ExtendedMappingSchema):
+class WPSEndpointGet(ExtendedMappingSchema):
     header = WPSHeaders()
     querystring = WPSParameters()
-    body = WPSBody()
+    body = WPSOperationGetNoContent(missing=drop)
 
 
-class WPSXMLSuccessBodySchema(ExtendedMappingSchema):
+class WPSEndpointPost(ExtendedMappingSchema):
+    header = WPSHeaders()
+    body = WPSRequestBody()
+
+
+class XMLBooleanAttribute(ExtendedSchemaNode, XMLObject):
+    schema_type = Boolean
+    attribute = True
+
+
+class XMLString(ExtendedSchemaNode, XMLObject):
+    schema_type = String
+
+
+class OWSString(ExtendedSchemaNode, OWSNamespace):
+    schema_type = String
+
+
+class OWSKeywordList(ExtendedSequenceSchema, OWSNamespace):
+    title = "OWSKeywords"
+    keyword = OWSString(name="Keyword", title="OWSKeyword", example="Weaver")
+
+
+class OWSType(ExtendedMappingSchema, OWSNamespace):
+    schema_type = String
+    name = "Type"
+    example = "theme"
+    additionalProperties = {
+        "codeSpace": {
+            "type": "string",
+            "example": "ISOTC211/19115",
+            "xml": {"attribute": True}
+        }
+    }
+
+
+class OWSPhone(ExtendedMappingSchema, OWSNamespace):
+    name = "Phone"
+    voice = OWSString(name="Voice", title="OWSVoice", example="1-234-567-8910", missing=drop)
+    facsimile = OWSString(name="Facsimile", title="OWSFacsimile", missing=drop)
+
+
+class OWSAddress(ExtendedMappingSchema, OWSNamespace):
+    name = "Address"
+    delivery_point = OWSString(name="DeliveryPoint", title="OWSDeliveryPoint",
+                               example="123 Place Street", missing=drop)
+    city = OWSString(name="City", title="OWSCity", example="Nowhere", missing=drop)
+    country = OWSString(name="Country", title="OWSCountry", missing=drop)
+    admin_area = OWSString(name="AdministrativeArea", title="AdministrativeArea", missing=drop)
+    postal_code = OWSString(name="PostalCode", title="OWSPostalCode", example="A1B 2C3", missing=drop)
+    email = OWSString(name="ElectronicMailAddress", title="OWSElectronicMailAddress",
+                      example="mail@me.com", validator=Email, missing=drop)
+
+
+class OWSContactInfo(ExtendedMappingSchema, OWSNamespace):
+    name = "ContactInfo"
+    phone = OWSPhone(missing=drop)
+    address = OWSAddress(missing=drop)
+
+
+class OWSServiceContact(ExtendedMappingSchema, OWSNamespace):
+    name = "ServiceContact"
+    individual = OWSString(name="IndividualName", title="OWSIndividualName", example="John Smith", missing=drop)
+    position = OWSString(name="PositionName", title="OWSPositionName", example="One Man Team", missing=drop)
+    contact = OWSContactInfo(missing=drop, default={})
+
+
+class OWSServiceProvider(ExtendedMappingSchema, OWSNamespace):
+    description = "Details about the institution providing the service."
+    name = "ServiceProvider"
+    title = "ServiceProvider"
+    provider_name = OWSString(name="ProviderName", title="OWSProviderName", example="EXAMPLE")
+    provider_site = OWSString(name="ProviderName", title="OWSProviderName", example="http://schema-example.com")
+    contact = OWSServiceContact(required=False, defalult={})
+
+
+class WPSDescriptionType(ExtendedMappingSchema, OWSNamespace):
+    schema_ref = "http://schemas.opengis.net/wps/1.0.0/common/DescriptionType.xsd"
+    name = "DescriptionType"
+    _title = OWSTitle(description="Title of the service.", example="Weaver")
+    abstract = OWSAbstract(description="Detail about the service.", example="Weaver WPS example schema.", missing=drop)
+    metadata = OWSMetadata(description="Metadata of the service.", example="Weaver WPS example schema.", missing=drop)
+
+
+class OWSServiceIdentification(WPSDescriptionType, OWSNamespace):
+    name = "ServiceIdentification"
+    title = "ServiceIdentification"
+    keywords = OWSKeywordList(name="Keywords")
+    type = OWSType()
+    svc_type = OWSString(name="ServiceType", title="ServiceType", example="WPS")
+    svc_type_ver1 = OWSString(name="ServiceTypeVersion", title="ServiceTypeVersion", example="1.0.0")
+    svc_type_ver2 = OWSString(name="ServiceTypeVersion", title="ServiceTypeVersion", example="2.0.0")
+    fees = OWSString(name="Fees", title="Fees", example="NONE", missing=drop, default="NONE")
+    access = OWSString(name="AccessConstraints", title="AccessConstraints",
+                       example="NONE", missing=drop, default="NONE")
+    provider = OWSServiceProvider()
+
+
+class OWSOperationName(ExtendedSchemaNode, OWSNamespace):
+    schema_type = String
+    attribute = True
+    name = "name"
+    example = "GetCapabilities"
+    validator = OneOf(["GetCapabilities", "DescribeProcess", "Execute"])
+
+
+class OperationLink(ExtendedSchemaNode, XMLObject):
+    schema_type = String
+    attribute = True
+    name = "href"
+    prefix = "xlink"
+    example = "http://schema-example.com/wps"
+
+
+class OperationRequest(ExtendedMappingSchema, OWSNamespace):
+    href = OperationLink()
+
+
+class OWS_HTTP(ExtendedMappingSchema, OWSNamespace):
+    get = OperationRequest(name="Get", title="OWSGet")
+    post = OperationRequest(name="Post", title="OWSPost")
+
+
+class OWS_DCP(ExtendedMappingSchema, OWSNamespace):
+    http = OWS_HTTP(name="HTTP", missing=drop)
+    https = OWS_HTTP(name="HTTPS", missing=drop)
+
+
+class Operation(ExtendedMappingSchema, OWSNamespace):
+    name = OWSOperationName()
+    dcp = OWS_DCP()
+
+
+class OperationsMetadata(ExtendedSequenceSchema, OWSNamespace):
+    name = "OperationsMetadata"
+    op = Operation()
+
+
+class ProcessVersion(ExtendedSchemaNode, WPSNamespace):
+    schema_type = String
+    attribute = True
+
+
+class OWSProcessSummary(ExtendedMappingSchema, WPSNamespace):
+    version = ProcessVersion(name="processVersion", default="None", example="1.2",
+                             description="Version of the corresponding process summary.")
+    identifier = OWSIdentifier(example="example", description="Identifier to refer to the process.")
+    _title = OWSTitle(example="Example Process", description="Title of the process.")
+    abstract = OWSAbstract(example="Process for example schema.", description="Detail about the process.")
+
+
+class WPSProcessOfferings(ExtendedSequenceSchema, WPSNamespace):
+    name = "ProcessOfferings"
+    title = "ProcessOfferings"
+    process = OWSProcessSummary(name="Process")
+
+
+class WPSLanguagesType(ExtendedSequenceSchema, WPSNamespace):
+    title = "LanguagesType"
+    wrapped = False
+    lang = OWSLanguage(name="Language")
+
+
+class WPSLanguageSpecification(ExtendedMappingSchema, WPSNamespace):
+    name = "Languages"
+    title = "Languages"
+    default = OWSLanguage(name="Default")
+    supported = WPSLanguagesType(name="Supported")
+
+
+class WPSResponseBaseType(PermissiveMappingSchema, WPSNamespace):
+    schema_ref = "http://schemas.opengis.net/wps/1.0.0/common/ResponseBaseType.xsd"
+    service = WPSServiceAttribute()
+    version = WPSVersionAttribute()
+    lang = WPSLanguageAttribute()
+
+
+class WPSProcessVersion(ExtendedSchemaNode, WPSNamespace):
+    schema_ref = "http://schemas.opengis.net/wps/1.0.0/common/ProcessVersion.xsd"
+    schema_type = String
+    description = "Release version of this Process."
+    name = "processVersion"
+    attribute = True
+
+
+class WPSInputDescriptionType(WPSDescriptionType):
+    identifier = OWSIdentifier(description="Unique identifier of the input.")
+    # override below to have different examples/descriptions
+    _title = OWSTitle(description="Human readable representation of the process input.")
+    abstract = OWSAbstract(missing=drop)
+    metadata = OWSMetadata(missing=drop)
+
+
+class WPSLiteralInputType(ExtendedMappingSchema, XMLObject):
     pass
+
+
+class WPSLiteralData(WPSLiteralInputType):
+    name = "LiteralData"
+
+
+class WPSCRSsType(ExtendedMappingSchema, WPSNamespace):
+    crs = XMLString(name="CRS", description="Coordinate Reference System")
+
+
+class WPSSupportedCRS(ExtendedSequenceSchema):
+    crs = WPSCRSsType(name="CRS")
+
+
+class WPSSupportedCRSType(ExtendedMappingSchema, WPSNamespace):
+    name = "SupportedCRSsType"
+    default = WPSCRSsType(name="Default")
+    supported = WPSSupportedCRS(name="Supported")
+
+
+class WPSBoundingBoxData(ExtendedMappingSchema, XMLObject):
+    data = WPSSupportedCRSType(name="BoundingBoxData")
+
+
+class WPSFormatDefinition(ExtendedMappingSchema, XMLObject):
+    mime_type = XMLString(name="MimeType", default=CONTENT_TYPE_TEXT_PLAIN, example=CONTENT_TYPE_TEXT_PLAIN)
+    encoding = XMLString(name="Encoding", missing=drop, example="base64")
+    schema = XMLString(name="Schema", missing=drop)
+
+
+class WPSFileFormat(ExtendedMappingSchema, XMLObject):
+    name = "Format"
+    format = WPSFormatDefinition()
+
+
+class WPSFormatList(ExtendedSequenceSchema):
+    format = WPSFileFormat()
+
+
+class WPSComplexInputType(ExtendedMappingSchema, WPSNamespace):
+    max_mb = XMLString(name="maximumMegabytes", attribute=True)
+    defaults = WPSFileFormat(name="Default")
+    supported = WPSFormatList(name="Supported")
+
+
+class WPSComplexData(ExtendedMappingSchema, XMLObject):
+    data = WPSComplexInputType(name="ComplexData")
+
+
+class WPSInputFormChoice(OneOfKeywordSchema):
+    title = "InputFormChoice"
+    _one_of = [
+        WPSComplexData(),
+        WPSLiteralData(),
+        WPSBoundingBoxData(),
+    ]
+
+
+class WPSMinOccursAttribute(MinOccursDefinition, XMLObject):
+    name = "minOccurs"
+    attribute = True
+
+
+class WPSMaxOccursAttribute(MinOccursDefinition, XMLObject):
+    name = "maxOccurs"
+    prefix = drop
+    attribute = True
+
+
+class WPSDataInputDescription(ExtendedMappingSchema):
+    min_occurs = WPSMinOccursAttribute()
+    max_occurs = WPSMaxOccursAttribute()
+
+
+class WPSDataInputItem(AllOfKeywordSchema, WPSNamespace):
+    _all_of = [
+        WPSInputDescriptionType(),
+        WPSInputFormChoice(),
+        WPSDataInputDescription(),
+    ]
+
+
+class WPSDataInputs(ExtendedSequenceSchema, WPSNamespace):
+    name = "DataInputs"
+    title = "DataInputs"
+    input = WPSDataInputItem()
+
+
+class WPSOutputDescriptionType(WPSDescriptionType):
+    name = "OutputDescriptionType"
+    title = "OutputDescriptionType"
+    identifier = OWSIdentifier(description="Unique identifier of the output.")
+    # override below to have different examples/descriptions
+    _title = OWSTitle(description="Human readable representation of the process output.")
+    abstract = OWSAbstract(missing=drop)
+    metadata = OWSMetadata(missing=drop)
+
+
+class ProcessOutputs(ExtendedSequenceSchema, WPSNamespace):
+    name = "ProcessOutputs"
+    title = "ProcessOutputs"
+    output = WPSOutputDescriptionType()
+
+
+class WPSGetCapabilities(WPSResponseBaseType):
+    schema_ref = "http://schemas.opengis.net/wps/1.0.0/wpsGetCapabilities_response.xsd"
+    name = "Capabilities"
+    title = "Capabilities"  # not to be confused by 'GetCapabilities' used for request
+    svc = OWSServiceIdentification()
+    ops = OperationsMetadata()
+    offering = WPSProcessOfferings()
+    languages = WPSLanguageSpecification()
+
+
+class WPSProcessDescriptionType(WPSResponseBaseType, WPSProcessVersion):
+    name = "ProcessDescriptionType"
+    description = "Description of the requested process by identifier."
+    store = XMLBooleanAttribute(name="storeSupported", example=True, default=True)
+    status = XMLBooleanAttribute(name="statusSupported", example=True, default=True)
+    inputs = WPSDataInputs()
+    outputs = ProcessOutputs()
+
+
+class WPSProcessDescriptionList(ExtendedSequenceSchema, WPSNamespace):
+    name = "ProcessDescriptions"
+    title = "ProcessDescriptions"
+    description = "Listing of process description for every requested identifier."
+    wrapped = False
+    process = WPSProcessDescriptionType()
+
+
+class WPSDescribeProcess(WPSResponseBaseType):
+    schema_ref = "http://schemas.opengis.net/wps/1.0.0/wpsDescribeProcess_response.xsd"
+    name = "DescribeProcess"
+    title = "DescribeProcess"
+    process = WPSProcessDescriptionList()
+
+
+class WPSStatusLocationAttribute(ExtendedSchemaNode, XMLObject):
+    schema_type = String
+    name = "statusLocation"
+    prefix = drop
+    attribute = True
+    format = "file"
+
+
+class WPSServiceInstanceAttribute(ExtendedSchemaNode, XMLObject):
+    schema_type = String
+    name = "serviceInstance"
+    prefix = drop
+    attribute = True
+    format = "url"
+
+
+class CreationTimeAttribute(ExtendedSchemaNode, XMLObject):
+    schema_type = DateTime
+    name = "creationTime"
+    title = "CreationTime"
+    prefix = drop
+    attribute = True
+
+
+class WPSStatusSuccess(ExtendedSchemaNode, WPSNamespace):
+    schema_type = String
+    name = "ProcessSucceeded"
+    title = "ProcessSucceeded"
+
+
+class WPSStatusFailed(ExtendedSchemaNode, WPSNamespace):
+    schema_type = String
+    name = "ProcessFailed"
+    title = "ProcessFailed"
+
+
+class WPSStatus(ExtendedMappingSchema, WPSNamespace):
+    name = "Status"
+    title = "Status"
+    creationTime = CreationTimeAttribute()
+    status_success = WPSStatusSuccess(missing=drop)
+    status_failed = WPSStatusFailed(missing=drop)
+
+
+class WPSProcessSummary(ExtendedMappingSchema, WPSNamespace):
+    name = "Process"
+    title = "Process"
+    identifier = OWSIdentifier()
+    _title = OWSTitle()
+    abstract = OWSAbstract(missing=drop)
+
+
+class WPSOutputBase(ExtendedMappingSchema):
+    identifier = OWSIdentifier()
+    _title = OWSTitle()
+    abstract = OWSAbstract(missing=drop)
+
+
+class WPSOutputDefinitionItem(WPSOutputBase, WPSNamespace):
+    name = "Output"
+    # use different title to avoid OpenAPI schema definition clash with 'Output' of 'WPSProcessOutputs'
+    title = "OutputDefinition"
+
+
+class WPSOutputDefinitions(ExtendedSequenceSchema, WPSNamespace):
+    name = "OutputDefinitions"
+    title = "OutputDefinitions"
+    out_def = WPSOutputDefinitionItem()
+
+
+class WPSOutputLiteral(ExtendedMappingSchema):
+    data = ()
+
+
+class WPSReference(ExtendedMappingSchema, WPSNamespace):
+    href = XMLReferenceAttribute()
+    mimeType = MimeTypeAttribute()
+    encoding = EncodingAttribute()
+
+
+class WPSOutputReference(ExtendedMappingSchema):
+    title = "OutputReference"
+    reference = WPSReference(name="Reference")
+
+
+class WPSOutputData(OneOfKeywordSchema):
+    _one_of = [
+        WPSOutputLiteral(),
+        WPSOutputReference(),
+    ]
+
+
+class WPSDataOutputItem(AllOfKeywordSchema, WPSNamespace):
+    name = "Output"
+    # use different title to avoid OpenAPI schema definition clash with 'Output' of 'WPSOutputDefinitions'
+    title = "DataOutput"
+    _all_of = [
+        WPSOutputBase(),
+        WPSOutputData(),
+    ]
+
+
+class WPSProcessOutputs(ExtendedSequenceSchema, WPSNamespace):
+    name = "ProcessOutputs"
+    title = "ProcessOutputs"
+    output = WPSDataOutputItem()
+
+
+class WPSExecuteResponse(WPSResponseBaseType, WPSProcessVersion):
+    schema_ref = "http://schemas.opengis.net/wps/1.0.0/wpsExecute_response.xsd"
+    name = "ExecuteResponse"
+    title = "ExecuteResponse"  # not to be confused by 'Execute' used for request
+    location = WPSStatusLocationAttribute()
+    svc_loc = WPSServiceInstanceAttribute()
+    process = WPSProcessSummary()
+    status = WPSStatus()
+    inputs = WPSDataInputs(missing=drop)          # when lineage is requested only
+    out_def = WPSOutputDefinitions(missing=drop)  # when lineage is requested only
+    outputs = WPSProcessOutputs()
+
+
+class WPSXMLSuccessBodySchema(OneOfKeywordSchema):
+    _one_of = [
+        WPSGetCapabilities(),
+        WPSDescribeProcess(),
+        WPSExecuteResponse(),
+    ]
+
+
+class OWSExceptionCodeAttribute(ExtendedSchemaNode, XMLObject):
+    schema_type = String
+    name = "exceptionCode"
+    title = "Exception"
+    attribute = True
+
+
+class OWSExceptionLocatorAttribute(ExtendedSchemaNode, XMLObject):
+    schema_type = String
+    name = "locator"
+    attribute = True
+
+
+class OWSExceptionText(ExtendedSchemaNode, OWSNamespace):
+    schema_type = String
+    name = "ExceptionText"
+
+
+class OWSException(ExtendedMappingSchema, OWSNamespace):
+    name = "Exception"
+    title = "Exception"
+    code = OWSExceptionCodeAttribute(example="MissingParameterValue")
+    locator = OWSExceptionLocatorAttribute(default="None", example="service")
+    text = OWSExceptionText(example="Missing service")
+
+
+class OWSExceptionReport(ExtendedMappingSchema, OWSNamespace):
+    name = "ExceptionReport"
+    title = "ExceptionReport"
+    exception = OWSException()
+
+
+class WPSException(ExtendedMappingSchema):
+    report = OWSExceptionReport()
 
 
 class OkWPSResponse(ExtendedMappingSchema):
@@ -983,14 +1666,10 @@ class OkWPSResponse(ExtendedMappingSchema):
     body = WPSXMLSuccessBodySchema()
 
 
-class WPSXMLErrorBodySchema(ExtendedMappingSchema):
-    pass
-
-
 class ErrorWPSResponse(ExtendedMappingSchema):
     description = "Unhandled error occurred on WPS endpoint."
     header = XmlHeader()
-    body = WPSXMLErrorBodySchema()
+    body = WPSException()
 
 
 class ProviderEndpoint(ProviderPath):
@@ -1152,11 +1831,11 @@ class ProviderCapabilitiesSchema(ExtendedMappingSchema):
 
 
 class TransmissionModeList(ExtendedSequenceSchema):
-    transmissionMode = TransmissionModeEnum(missing=drop)
+    transmissionMode = TransmissionModeEnum()
 
 
 class JobControlOptionsList(ExtendedSequenceSchema):
-    jobControlOption = JobControlOptionsEnum(missing=drop)
+    jobControlOption = JobControlOptionsEnum()
 
 
 class ExceptionReportType(ExtendedMappingSchema):
@@ -1164,11 +1843,11 @@ class ExceptionReportType(ExtendedMappingSchema):
     description = ExtendedSchemaNode(String(), missing=drop)
 
 
-class ProcessSummary(ProcessDescriptionType):
+class ProcessSummary(ProcessDescriptionType, ProcessDescriptionMeta):
     """WPS process definition."""
     version = Version(missing=drop)
-    jobControlOptions = JobControlOptionsList(missing=drop)
-    outputTransmission = TransmissionModeList(missing=drop)
+    jobControlOptions = JobControlOptionsList(missing=[])
+    outputTransmission = TransmissionModeList(missing=[])
     processDescriptionURL = URL(description="Process description endpoint.",
                                 missing=drop, title="processDescriptionURL")
 
@@ -1181,12 +1860,29 @@ class ProcessCollection(ExtendedMappingSchema):
     processes = ProcessSummaryList()
 
 
-class Process(ProcessDescriptionType):
-    title = "Process"
-    inputs = InputTypeList(missing=drop)
-    outputs = OutputDescriptionList(missing=drop)
-    visibility = VisibilityValue(missing=drop)
+class ProcessInfo(ExtendedMappingSchema):
     executeEndpoint = URL(description="Endpoint where the process can be executed from.", missing=drop)
+
+
+class Process(ProcessInfo, ProcessDescriptionType, ProcessDescriptionMeta):
+    inputs = InputTypeList(description="Inputs definition of the process.")
+    outputs = OutputDescriptionList(description="Outputs definition of the process.")
+    visibility = VisibilityValue(missing=drop)
+
+
+class ProcessDeployment(ProcessDescriptionType, ProcessDeployMeta):
+    # allowed undefined I/O during deploy because of reference from owsContext or executionUnit
+    inputs = InputTypeList(
+        missing=drop, title="DeploymentInputs",
+        description="Additional definitions for process inputs to extend generated details by the referred package. "
+                    "These are optional as they can mostly be inferred from the 'executionUnit', but allow specific "
+                    "overrides (see '{}/package.html#correspondence-between-cwl-and-wps-fields')".format(DOC_URL))
+    outputs = OutputDescriptionList(
+        missing=drop, title="DeploymentInputs",
+        description="Additional definitions for process outputs to extend generated details by the referred package. "
+                    "These are optional as they can mostly be inferred from the 'executionUnit', but allow specific "
+                    "overrides (see '{}/package.html#correspondence-between-cwl-and-wps-fields')".format(DOC_URL))
+    visibility = VisibilityValue(missing=drop)
 
 
 class ProcessOutputDescriptionSchema(ExtendedMappingSchema):
@@ -1291,8 +1987,8 @@ class DismissedJobSchema(ExtendedMappingSchema):
 class QuoteProcessParametersSchema(ExtendedMappingSchema):
     inputs = InputTypeList(missing=drop)
     outputs = OutputDescriptionList(missing=drop)
-    mode = JobExecuteModeEnum(missing=drop)
-    response = JobResponseOptionsEnum(missing=drop)
+    mode = JobExecuteModeEnum()
+    response = JobResponseOptionsEnum()
 
 
 class AlternateQuotation(ExtendedMappingSchema):
@@ -1350,15 +2046,17 @@ class InputList(ExtendedSequenceSchema):
 
 
 class Execute(ExtendedMappingSchema):
+    # permit unspecified inputs for processes that could technically allow no-inputs definition (CWL),
+    # but very unlikely/unusual in real world scenarios (possible case: constant endpoint fetcher?)
     inputs = InputList(missing=drop)
     outputs = OutputList()
-    mode = ExtendedSchemaNode(String(), validator=OneOf(EXECUTE_MODE_OPTIONS))
+    mode = JobExecuteModeEnum()
     notification_email = ExtendedSchemaNode(
         String(),
         missing=drop,
         validator=Email(),
         description="Optionally send a notification email when the job is done.")
-    response = ExtendedSchemaNode(String(), validator=OneOf(EXECUTE_RESPONSE_OPTIONS))
+    response = JobResponseOptionsEnum()
 
 
 class Quotation(ExtendedMappingSchema):
@@ -1871,10 +2569,17 @@ class ProcessesSchema(ExtendedSequenceSchema):
     provider_processes_service = ProcessInputDescriptionSchema()
 
 
-class JobOutput(OneOfKeywordSchema, OutputDataType):
+class JobOutputValue(OneOfKeywordSchema):
     _one_of = [
         Reference(tilte="JobOutputReference"),
         AnyLiteralDataType(title="JobOutputLiteral")
+    ]
+
+
+class JobOutput(AllOfKeywordSchema):
+    _all_of = [
+        OutputDataType(),
+        JobOutputValue(),
     ]
 
 
@@ -2039,17 +2744,25 @@ class ExecutionUnitList(ExtendedSequenceSchema):
     )
 
 
-class ProcessOffering(ExtendedMappingSchema):
+class ProcessOfferingBase(ExtendedMappingSchema):
     process = Process()
     processVersion = Version(title="processVersion", missing=drop)
     jobControlOptions = JobControlOptionsList(missing=drop)
     outputTransmission = TransmissionModeList(missing=drop)
 
 
+class ProcessOffering(ProcessOfferingBase):
+    process = Process()
+
+
+class ProcessDeploymentOffering(ProcessOfferingBase):
+    process = ProcessDeployment()
+
+
 class ProcessDescriptionChoiceType(OneOfKeywordSchema):
     _one_of = [
         Reference(),
-        ProcessOffering()
+        ProcessDeploymentOffering()
     ]
 
 
@@ -2080,7 +2793,7 @@ class GetJobsQueries(ExtendedMappingSchema):
     page = ExtendedSchemaNode(Integer(), missing=drop, default=0, validator=Range(min=0))
     limit = ExtendedSchemaNode(Integer(), missing=drop, default=10)
     status = JobStatusEnum(missing=drop)
-    process = AnyIdentifier(missing=drop, default=None)
+    process = AnyIdentifier(missing=None)
     provider = ExtendedSchemaNode(String(), missing=drop, default=None)
     sort = JobSortEnum(missing=drop)
     tags = ExtendedSchemaNode(String(), missing=drop, default=None,
@@ -2131,7 +2844,7 @@ class ProcessQuoteEndpoint(ProcessPath, QuotePath):
 class GetQuotesQueries(ExtendedMappingSchema):
     page = ExtendedSchemaNode(Integer(), missing=drop, default=0)
     limit = ExtendedSchemaNode(Integer(), missing=drop, default=10)
-    process = AnyIdentifier(missing=drop, default=None)
+    process = AnyIdentifier(missing=None)
     sort = QuoteSortEnum(missing=drop)
 
 
@@ -2205,7 +2918,8 @@ class OWSErrorCode(ExtendedSchemaNode):
 
 class OWSExceptionResponse(ExtendedMappingSchema):
     """Error content in XML format"""
-    code = OWSErrorCode()
+    description = "OWS formatted exception."
+    code = OWSErrorCode(example="NoSuchProcess")
     locator = ExtendedSchemaNode(String(), example="identifier",
                                  description="Indication of the element that caused the error.")
     message = ExtendedSchemaNode(String(), example="Invalid process ID.",
@@ -2214,11 +2928,25 @@ class OWSExceptionResponse(ExtendedMappingSchema):
 
 class ErrorJsonResponseBodySchema(ExtendedMappingSchema):
     code = OWSErrorCode()
-    description = ExtendedSchemaNode(String(), description="", example="Process identifier is invalid.")
+    description = ExtendedSchemaNode(String(), description="Detail about the cause of error.")
     error = ErrorDetail(missing=drop)
+    exception = OWSExceptionResponse(missing=drop)
 
 
-class UnauthorizedJsonResponseSchema(ExtendedMappingSchema):
+class ForbiddenProcessAccessResponseSchema(ExtendedMappingSchema):
+    description = "Referenced process is not accessible."
+    header = ResponseHeaders()
+    body = ErrorJsonResponseBodySchema()
+
+
+class ForbiddenProviderAccessResponseSchema(ExtendedMappingSchema):
+    description = "Referenced provider is not accessible."
+    header = ResponseHeaders()
+    body = ErrorJsonResponseBodySchema()
+
+
+class InternalServerErrorResponseSchema(ExtendedMappingSchema):
+    description = "Unhandled internal server error."
     header = ResponseHeaders()
     body = ErrorJsonResponseBodySchema()
 
@@ -2258,26 +2986,14 @@ class OkGetProvidersListResponse(ExtendedMappingSchema):
     body = ProvidersSchema()
 
 
-class InternalServerErrorGetProvidersListResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during providers listing."
-
-
 class OkGetProviderCapabilitiesSchema(ExtendedMappingSchema):
     header = ResponseHeaders()
     body = ProviderCapabilitiesSchema()
 
 
-class InternalServerErrorGetProviderCapabilitiesResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during provider capabilities request."
-
-
 class NoContentDeleteProviderSchema(ExtendedMappingSchema):
     header = ResponseHeaders()
     body = NoContent()
-
-
-class InternalServerErrorDeleteProviderResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during provider removal."
 
 
 class NotImplementedDeleteProviderResponse(ExtendedMappingSchema):
@@ -2287,10 +3003,6 @@ class NotImplementedDeleteProviderResponse(ExtendedMappingSchema):
 class OkGetProviderProcessesSchema(ExtendedMappingSchema):
     header = ResponseHeaders()
     body = ProcessesSchema()
-
-
-class InternalServerErrorGetProviderProcessesListResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during provider processes listing."
 
 
 class GetProcessesQuery(ExtendedMappingSchema):
@@ -2313,10 +3025,6 @@ class OkGetProcessesListResponse(ExtendedMappingSchema):
     body = ProcessCollection()
 
 
-class InternalServerErrorGetProcessesListResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during processes listing."
-
-
 class OkPostProcessDeployBodySchema(ExtendedMappingSchema):
     deploymentDone = ExtendedSchemaNode(Boolean(), default=False, example=True,
                                         description="Indicates if the process was successfully deployed.")
@@ -2330,10 +3038,6 @@ class OkPostProcessesResponse(ExtendedMappingSchema):
     body = OkPostProcessDeployBodySchema()
 
 
-class InternalServerErrorPostProcessesResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during process deployment."
-
-
 class BadRequestGetProcessInfoResponse(ExtendedMappingSchema):
     description = "Missing process identifier."
     body = NoContent()
@@ -2344,26 +3048,14 @@ class OkGetProcessInfoResponse(ExtendedMappingSchema):
     body = ProcessOffering()
 
 
-class InternalServerErrorGetProcessResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during process description."
-
-
 class OkGetProcessPackageSchema(ExtendedMappingSchema):
     header = ResponseHeaders()
     body = NoContent()
 
 
-class InternalServerErrorGetProcessPackageResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during process package description."
-
-
 class OkGetProcessPayloadSchema(ExtendedMappingSchema):
     header = ResponseHeaders()
     body = NoContent()
-
-
-class InternalServerErrorGetProcessPayloadResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during process payload description."
 
 
 class ProcessVisibilityResponseBodySchema(ExtendedMappingSchema):
@@ -2375,17 +3067,15 @@ class OkGetProcessVisibilitySchema(ExtendedMappingSchema):
     body = ProcessVisibilityResponseBodySchema()
 
 
-class InternalServerErrorGetProcessVisibilityResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during process visibility retrieval."
-
-
 class OkPutProcessVisibilitySchema(ExtendedMappingSchema):
     header = ResponseHeaders()
     body = ProcessVisibilityResponseBodySchema()
 
 
-class InternalServerErrorPutProcessVisibilityResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during process visibility update."
+class ForbiddenVisibilityUpdateResponseSchema(ExtendedMappingSchema):
+    description = "Visibility value modification not allowed."
+    header = ResponseHeaders()
+    body = ErrorJsonResponseBodySchema()
 
 
 class OkDeleteProcessUndeployBodySchema(ExtendedMappingSchema):
@@ -2401,26 +3091,14 @@ class OkDeleteProcessResponse(ExtendedMappingSchema):
     body = OkDeleteProcessUndeployBodySchema()
 
 
-class InternalServerErrorDeleteProcessResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during process deletion."
-
-
 class OkGetProviderProcessDescriptionResponse(ExtendedMappingSchema):
     header = ResponseHeaders()
     body = ProcessDescriptionBodySchema()
 
 
-class InternalServerErrorGetProviderProcessResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during provider process description."
-
-
 class CreatedPostProvider(ExtendedMappingSchema):
     header = ResponseHeaders()
     body = ProviderSummarySchema()
-
-
-class InternalServerErrorPostProviderResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during provider process registration."
 
 
 class NotImplementedPostProviderResponse(ExtendedMappingSchema):
@@ -2430,14 +3108,6 @@ class NotImplementedPostProviderResponse(ExtendedMappingSchema):
 class CreatedLaunchJobResponse(ExtendedMappingSchema):
     header = ResponseHeaders()
     body = CreatedJobStatusSchema()
-
-
-class InternalServerErrorPostProcessJobResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during process job submission."
-
-
-class InternalServerErrorPostProviderProcessJobResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during process job submission."
 
 
 class OkGetProcessJobResponse(ExtendedMappingSchema):
@@ -2455,17 +3125,9 @@ class OkGetQueriedJobsResponse(ExtendedMappingSchema):
     body = GetQueriedJobsSchema()
 
 
-class InternalServerErrorGetJobsResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during jobs listing."
-
-
 class OkDismissJobResponse(ExtendedMappingSchema):
     header = ResponseHeaders()
     body = DismissedJobSchema()
-
-
-class InternalServerErrorDeleteJobResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during job dismiss request."
 
 
 class OkGetJobStatusResponse(ExtendedMappingSchema):
@@ -2473,8 +3135,16 @@ class OkGetJobStatusResponse(ExtendedMappingSchema):
     body = JobStatusInfo()
 
 
-class InternalServerErrorGetJobStatusResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during provider process description."
+class NotFoundJobResponseSchema(ExtendedMappingSchema):
+    description = "Job reference UUID cannot be found."
+    examples = {
+        "JobNotFound": {
+            "summary": "Example response when specified job reference cannot be found.",
+            "value": EXAMPLES["job_not_found.json"]
+        }
+    }
+    header = ResponseHeaders()
+    body = ErrorJsonResponseBodySchema()
 
 
 class OkGetJobInputsResponse(ExtendedMappingSchema):
@@ -2496,21 +3166,9 @@ class OkGetJobResultsResponse(ExtendedMappingSchema):
     body = Result()
 
 
-class InternalServerErrorGetJobResultsResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during job results listing."
-
-
-class InternalServerErrorGetJobOutputResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during job results listing."
-
-
 class CreatedQuoteExecuteResponse(ExtendedMappingSchema):
     header = ResponseHeaders()
     body = CreatedQuotedJobStatusSchema()
-
-
-class InternalServerErrorPostQuoteExecuteResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during quote job execution."
 
 
 class CreatedQuoteRequestResponse(ExtendedMappingSchema):
@@ -2518,17 +3176,9 @@ class CreatedQuoteRequestResponse(ExtendedMappingSchema):
     body = QuoteSchema()
 
 
-class InternalServerErrorPostQuoteRequestResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during quote submission."
-
-
 class OkGetQuoteInfoResponse(ExtendedMappingSchema):
     header = ResponseHeaders()
     body = QuoteSchema()
-
-
-class InternalServerErrorGetQuoteInfoResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during quote retrieval."
 
 
 class OkGetQuoteListResponse(ExtendedMappingSchema):
@@ -2536,17 +3186,9 @@ class OkGetQuoteListResponse(ExtendedMappingSchema):
     body = QuotationListSchema()
 
 
-class InternalServerErrorGetQuoteListResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during quote listing."
-
-
 class OkGetBillDetailResponse(ExtendedMappingSchema):
     header = ResponseHeaders()
     body = BillSchema()
-
-
-class InternalServerErrorGetBillInfoResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during bill retrieval."
 
 
 class OkGetBillListResponse(ExtendedMappingSchema):
@@ -2554,17 +3196,9 @@ class OkGetBillListResponse(ExtendedMappingSchema):
     body = BillListSchema()
 
 
-class InternalServerErrorGetBillListResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during bill listing."
-
-
 class OkGetJobExceptionsResponse(ExtendedMappingSchema):
     header = ResponseHeaders()
     body = JobExceptionsSchema()
-
-
-class InternalServerErrorGetJobExceptionsResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during job exceptions listing."
 
 
 class OkGetJobLogsResponse(ExtendedMappingSchema):
@@ -2572,215 +3206,271 @@ class OkGetJobLogsResponse(ExtendedMappingSchema):
     body = JobLogsSchema()
 
 
-class InternalServerErrorGetJobLogsResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during job logs listing."
-
-
 get_api_frontpage_responses = {
     "200": OkGetFrontpageResponse(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorResponseSchema(),
 }
 get_openapi_json_responses = {
     "200": OkGetSwaggerJSONResponse(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorResponseSchema(),
 }
 get_api_swagger_ui_responses = {
     "200": OkGetSwaggerUIResponse(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorResponseSchema(),
 }
 get_api_redoc_ui_responses = {
     "200": OkGetRedocUIResponse(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorResponseSchema(),
 }
 get_api_versions_responses = {
     "200": OkGetVersionsResponse(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorResponseSchema(),
 }
 get_api_conformance_responses = {
     "200": OkGetConformanceResponse(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized")
+    "500": InternalServerErrorResponseSchema(),
 }
 get_processes_responses = {
-    "200": OkGetProcessesListResponse(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "500": InternalServerErrorGetProcessesListResponse(),
+    "200": OkGetProcessesListResponse(description="success", examples={
+        "ProcessesList": {
+            "summary": "Listing of local processes registered in Weaver.",
+            "value": EXAMPLES["local_process_listing.json"],
+        }
+    }),
+    "500": InternalServerErrorResponseSchema(),
 }
 post_processes_responses = {
     "201": OkPostProcessesResponse(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
-    "500": InternalServerErrorPostProcessesResponse(),
+    "500": InternalServerErrorResponseSchema(),
 }
 get_process_responses = {
-    "200": OkGetProcessInfoResponse(description="success"),
+    "200": OkGetProcessInfoResponse(description="success", examples={
+        "ProcessDescription": {
+            "summary": "Description of a local process registered in Weaver.",
+            "value": EXAMPLES["local_process_description.json"],
+        }
+    }),
     "400": BadRequestGetProcessInfoResponse(),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
-    "500": InternalServerErrorGetProcessResponse(),
+    "500": InternalServerErrorResponseSchema(),
 }
 get_process_package_responses = {
-    "200": OkGetProcessPackageSchema(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
-    "500": InternalServerErrorGetProcessPackageResponse(),
+    "200": OkGetProcessPackageSchema(description="success", examples={
+        "PackageCWL": {
+            "summary": "CWL Application Package definition of the local process.",
+            "value": EXAMPLES["local_process_package.json"],
+        }
+    }),
+    "403": ForbiddenProcessAccessResponseSchema(),
+    "500": InternalServerErrorResponseSchema(),
 }
 get_process_payload_responses = {
-    "200": OkGetProcessPayloadSchema(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
-    "500": InternalServerErrorGetProcessPayloadResponse(),
+    "200": OkGetProcessPayloadSchema(description="success", examples={
+        "Payload": {
+            "summary": "Payload employed during process deployment and registration.",
+            "value": EXAMPLES["local_process_payload.json"],
+        }
+    }),
+    "403": ForbiddenProcessAccessResponseSchema(),
+    "500": InternalServerErrorResponseSchema(),
 }
 get_process_visibility_responses = {
     "200": OkGetProcessVisibilitySchema(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
-    "500": InternalServerErrorGetProcessVisibilityResponse(),
+    "403": ForbiddenProcessAccessResponseSchema(),
+    "500": InternalServerErrorResponseSchema(),
 }
 put_process_visibility_responses = {
     "200": OkPutProcessVisibilitySchema(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
-    "500": InternalServerErrorPutProcessVisibilityResponse(),
+    "403": ForbiddenVisibilityUpdateResponseSchema(),
+    "500": InternalServerErrorResponseSchema(),
 }
 delete_process_responses = {
     "200": OkDeleteProcessResponse(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
-    "500": InternalServerErrorDeleteProcessResponse(),
+    "403": ForbiddenProcessAccessResponseSchema(),
+    "500": InternalServerErrorResponseSchema(),
 }
 get_providers_list_responses = {
-    "200": OkGetProvidersListResponse(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
-    "500": InternalServerErrorGetProvidersListResponse(),
+    "200": OkGetProvidersListResponse(description="success", examples={
+        "ProviderList": {
+            "summary": "Listing of registered remote providers.",
+            "value": EXAMPLES["provider_listing.json"],
+        }
+    }),
+    "403": ForbiddenProviderAccessResponseSchema(),
+    "500": InternalServerErrorResponseSchema(),
 }
 get_provider_responses = {
-    "200": OkGetProviderCapabilitiesSchema(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
-    "500": InternalServerErrorGetProviderCapabilitiesResponse(),
+    "200": OkGetProviderCapabilitiesSchema(description="success", examples={
+        "ProviderDescription": {
+            "summary": "Description of a registered remote WPS provider.",
+            "value": EXAMPLES["provider_description.json"],
+        }
+    }),
+    "403": ForbiddenProviderAccessResponseSchema(),
+    "500": InternalServerErrorResponseSchema(),
 }
 delete_provider_responses = {
     "204": NoContentDeleteProviderSchema(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
-    "500": InternalServerErrorDeleteProviderResponse(),
+    "403": ForbiddenProviderAccessResponseSchema(),
+    "500": InternalServerErrorResponseSchema(),
     "501": NotImplementedDeleteProviderResponse(),
 }
 get_provider_processes_responses = {
     "200": OkGetProviderProcessesSchema(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
-    "500": InternalServerErrorGetProviderProcessesListResponse(),
+    "403": ForbiddenProviderAccessResponseSchema(),
+    "500": InternalServerErrorResponseSchema(),
 }
 get_provider_process_responses = {
-    "200": OkGetProviderProcessDescriptionResponse(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
-    "500": InternalServerErrorGetProviderProcessResponse(),
+    "200": OkGetProviderProcessDescriptionResponse(description="success", examples={
+        "ProviderProcessWPS": {
+            "summary": "Description of a remote WPS provider process converted to OGC-API Processes format.",
+            "value": EXAMPLES["provider_process_description.json"]
+        }
+    }),
+    "403": ForbiddenProviderAccessResponseSchema(),
+    "500": InternalServerErrorResponseSchema(),
 }
 post_provider_responses = {
     "201": CreatedPostProvider(description="success"),
     "400": ExtendedMappingSchema(description=OWSMissingParameterValue.description),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
-    "500": InternalServerErrorPostProviderResponse(),
+    "403": ForbiddenProviderAccessResponseSchema(),
+    "500": InternalServerErrorResponseSchema(),
     "501": NotImplementedPostProviderResponse(),
 }
 post_provider_process_job_responses = {
     "201": CreatedLaunchJobResponse(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
-    "500": InternalServerErrorPostProviderProcessJobResponse(),
+    "403": ForbiddenProviderAccessResponseSchema(),
+    "500": InternalServerErrorResponseSchema(),
 }
 post_process_jobs_responses = {
     "201": CreatedLaunchJobResponse(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
-    "500": InternalServerErrorPostProcessJobResponse(),
+    "403": ForbiddenProviderAccessResponseSchema(),
+    "500": InternalServerErrorResponseSchema(),
 }
 get_all_jobs_responses = {
-    "200": OkGetQueriedJobsResponse(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
-    "500": InternalServerErrorGetJobsResponse(),
+    "200": OkGetQueriedJobsResponse(description="success", examples={
+        "JobListing": {
+            "summary": "Job ID listing with default queries.",
+            "value": EXAMPLES["jobs_listing.json"]
+        }
+    }),
+    "500": InternalServerErrorResponseSchema(),
 }
 get_single_job_status_responses = {
-    "200": OkGetJobStatusResponse(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
-    "500": InternalServerErrorGetJobStatusResponse(),
+    "200": OkGetJobStatusResponse(description="success", examples={
+        "JobStatusSuccess": {
+            "summary": "Successful job status response.",
+            "value": EXAMPLES["job_status_success.json"]},
+        "JobStatusFailure": {
+            "summary": "Failed job status response.",
+            "value": EXAMPLES["job_status_failed.json"],
+        }
+    }),
+    "404": NotFoundJobResponseSchema(),
+    "500": InternalServerErrorResponseSchema(),
 }
 delete_job_responses = {
     "200": OkDismissJobResponse(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
-    "500": InternalServerErrorDeleteJobResponse(),
+    "404": NotFoundJobResponseSchema(),
+    "500": InternalServerErrorResponseSchema(),
 }
 get_job_inputs_responses = {
-    "200": OkGetJobInputsResponse(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
-    "500": InternalServerErrorGetJobResultsResponse(),
+    "200": OkGetJobInputsResponse(description="success", examples={
+        "JobInputs": {
+            "summary": "Submitted job input values at for process execution.",
+            "value": EXAMPLES["job_inputs.json"],
+        }
+    }),
+    "404": NotFoundJobResponseSchema(),
+    "500": InternalServerErrorResponseSchema(),
 }
 get_job_outputs_responses = {
-    "200": OkGetJobOutputsResponse(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
-    "500": InternalServerErrorGetJobOutputResponse(),
+    "200": OkGetJobOutputsResponse(description="success", examples={
+        "JobOutputs": {
+            "summary": "Obtained job outputs values following process execution.",
+            "value": EXAMPLES["job_outputs.json"],
+        }
+    }),
+    "404": NotFoundJobResponseSchema(),
+    "500": InternalServerErrorResponseSchema(),
 }
 get_result_redirect_responses = {
-    "308": RedirectResultResponse(description="redirect"),
+    "308": RedirectResultResponse(description="Redirects '/result' (without 's') to corresponding '/results' path."),
 }
 get_job_results_responses = {
-    "200": OkGetJobResultsResponse(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "500": InternalServerErrorGetJobResultsResponse(),
+    "200": OkGetJobResultsResponse(description="success", examples={
+        "JobResults": {
+            "summary": "Obtained job results.",
+            "value": EXAMPLES["job_results.json"],
+        }
+    }),
+    "404": NotFoundJobResponseSchema(),
+    "500": InternalServerErrorResponseSchema(),
 }
 get_exceptions_responses = {
-    "200": OkGetJobExceptionsResponse(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
-    "500": InternalServerErrorGetJobExceptionsResponse(),
+    "200": OkGetJobExceptionsResponse(description="success", examples={
+        "JobExceptions": {
+            "summary": "Job exceptions that occurred during failing process execution.",
+            "value": EXAMPLES["job_exceptions.json"],
+        }
+    }),
+    "404": NotFoundJobResponseSchema(),
+    "500": InternalServerErrorResponseSchema(),
 }
 get_logs_responses = {
-    "200": OkGetJobLogsResponse(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
-    "500": InternalServerErrorGetJobLogsResponse(),
+    "200": OkGetJobLogsResponse(description="success", examples={
+        "JobLogs": {
+            "summary": "Job logs registered and captured throughout process execution.",
+            "value": EXAMPLES["job_logs.json"],
+        }
+    }),
+    "404": NotFoundJobResponseSchema(),
+    "500": InternalServerErrorResponseSchema(),
 }
 get_quote_list_responses = {
     "200": OkGetQuoteListResponse(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "500": InternalServerErrorGetQuoteListResponse(),
+    "500": InternalServerErrorResponseSchema(),
 }
 get_quote_responses = {
     "200": OkGetQuoteInfoResponse(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "500": InternalServerErrorGetQuoteInfoResponse(),
+    "500": InternalServerErrorResponseSchema(),
 }
 post_quotes_responses = {
     "201": CreatedQuoteRequestResponse(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "500": InternalServerErrorPostQuoteRequestResponse(),
+    "500": InternalServerErrorResponseSchema(),
 }
 post_quote_responses = {
     "201": CreatedQuoteExecuteResponse(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "500": InternalServerErrorPostQuoteExecuteResponse(),
+    "500": InternalServerErrorResponseSchema(),
 }
 get_bill_list_responses = {
     "200": OkGetBillListResponse(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "500": InternalServerErrorGetBillListResponse(),
+    "500": InternalServerErrorResponseSchema(),
 }
 get_bill_responses = {
     "200": OkGetBillDetailResponse(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "500": InternalServerErrorGetBillInfoResponse(),
+    "500": InternalServerErrorResponseSchema(),
 }
 wps_responses = {
-    "200": OkWPSResponse(),
+    "200": OkWPSResponse(examples={
+        "GetCapabilities": {
+            "summary": "GetCapabilities example response.",
+            "value": EXAMPLES["wps_getcapabilities.xml"]
+        },
+        "DescribeProcess": {
+            "summary": "DescribeProcess example response.",
+            "value": EXAMPLES["wps_describeprocess.xml"]
+        },
+        "Execute": {
+            "summary": "Execute example response.",
+            "value": EXAMPLES["wps_execute_response.xml"]
+        }
+    }),
+    "400": ErrorWPSResponse(examples={
+        "MissingParameterError": {
+            "summary": "Error report in case of missing request parameter.",
+            "value": EXAMPLES["wps_missing_parameter.xml"],
+        }
+    }),
     "500": ErrorWPSResponse(),
 }
 

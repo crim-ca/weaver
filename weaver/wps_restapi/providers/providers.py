@@ -51,7 +51,7 @@ def get_provider_services(request):
 
 @sd.providers_service.get(tags=[sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
                           schema=sd.GetProviders(), response_schemas=sd.get_providers_list_responses)
-@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetProvidersListResponse.description)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_providers(request):
     """
     Lists registered providers.
@@ -98,7 +98,7 @@ def get_service(request):
 
 @sd.providers_service.post(tags=[sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
                            schema=sd.PostProvider(), response_schemas=sd.post_provider_responses)
-@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorPostProviderResponse.description)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def add_provider(request):
     """
     Add a provider.
@@ -125,7 +125,7 @@ def add_provider(request):
 
 @sd.provider_service.delete(tags=[sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
                             schema=sd.ProviderEndpoint(), response_schemas=sd.delete_provider_responses)
-@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorDeleteProviderResponse.description)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def remove_provider(request):
     """
     Remove a provider.
@@ -142,7 +142,7 @@ def remove_provider(request):
 
 @sd.provider_service.get(tags=[sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
                          schema=sd.ProviderEndpoint(), response_schemas=sd.get_provider_responses)
-@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetProviderCapabilitiesResponse.description)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_provider(request):
     """
     Get a provider definition (GetCapabilities).

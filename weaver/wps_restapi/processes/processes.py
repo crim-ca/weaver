@@ -39,7 +39,7 @@ LOGGER = logging.getLogger(__name__)
 @sd.provider_jobs_service.post(tags=[sd.TAG_PROVIDERS, sd.TAG_PROVIDERS, sd.TAG_EXECUTE, sd.TAG_JOBS],
                                renderer=OUTPUT_FORMAT_JSON, schema=sd.PostProviderProcessJobRequest(),
                                response_schemas=sd.post_provider_process_job_responses)
-@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorPostProviderProcessJobResponse.description)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def submit_provider_job(request):
     """
     Execute a remote provider process.
@@ -67,7 +67,7 @@ def list_remote_processes(service, request):
 @sd.provider_processes_service.get(tags=[sd.TAG_PROVIDERS, sd.TAG_PROCESSES, sd.TAG_PROVIDERS, sd.TAG_GETCAPABILITIES],
                                    renderer=OUTPUT_FORMAT_JSON, schema=sd.ProviderEndpoint(),
                                    response_schemas=sd.get_provider_processes_responses)
-@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetProviderProcessesListResponse.description)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_provider_processes(request):
     """
     Retrieve available provider processes (GetCapabilities).
@@ -99,7 +99,7 @@ def describe_provider_process(request):
 @sd.provider_process_service.get(tags=[sd.TAG_PROVIDERS, sd.TAG_PROCESSES, sd.TAG_PROVIDERS, sd.TAG_DESCRIBEPROCESS],
                                  renderer=OUTPUT_FORMAT_JSON, schema=sd.ProviderProcessEndpoint(),
                                  response_schemas=sd.get_provider_process_responses)
-@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetProviderProcessResponse.description)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_provider_process(request):
     """
     Retrieve a process description (DescribeProcess).
@@ -134,7 +134,7 @@ def get_processes_filtered_by_valid_schemas(request):
 
 @sd.processes_service.get(schema=sd.GetProcessesEndpoint(), tags=[sd.TAG_PROCESSES, sd.TAG_GETCAPABILITIES],
                           response_schemas=sd.get_processes_responses)
-@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetProcessesListResponse.description)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_processes(request):
     """
     List registered processes (GetCapabilities). Optionally list both local and provider processes.
@@ -173,7 +173,7 @@ def get_processes(request):
 
 @sd.processes_service.post(tags=[sd.TAG_PROCESSES, sd.TAG_DEPLOY], renderer=OUTPUT_FORMAT_JSON,
                            schema=sd.PostProcessesEndpoint(), response_schemas=sd.post_processes_responses)
-@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorPostProcessesResponse.description)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def add_local_process(request):
     """
     Register a local process.
@@ -183,7 +183,7 @@ def add_local_process(request):
 
 @sd.process_service.get(tags=[sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS], renderer=OUTPUT_FORMAT_JSON,
                         schema=sd.ProcessEndpoint(), response_schemas=sd.get_process_responses)
-@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetProcessResponse.description)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_local_process(request):
     """
     Get a registered local process information (DescribeProcess).
@@ -199,7 +199,7 @@ def get_local_process(request):
 
 @sd.process_package_service.get(tags=[sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS], renderer=OUTPUT_FORMAT_JSON,
                                 schema=sd.ProcessPackageEndpoint(), response_schemas=sd.get_process_package_responses)
-@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetProcessPackageResponse.description)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_local_process_package(request):
     """
     Get a registered local process package definition.
@@ -210,7 +210,7 @@ def get_local_process_package(request):
 
 @sd.process_payload_service.get(tags=[sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS], renderer=OUTPUT_FORMAT_JSON,
                                 schema=sd.ProcessPayloadEndpoint(), response_schemas=sd.get_process_payload_responses)
-@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetProcessPayloadResponse.description)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_local_process_payload(request):
     """
     Get a registered local process payload definition.
@@ -222,7 +222,7 @@ def get_local_process_payload(request):
 @sd.process_visibility_service.get(tags=[sd.TAG_PROCESSES, sd.TAG_VISIBILITY], renderer=OUTPUT_FORMAT_JSON,
                                    schema=sd.ProcessVisibilityGetEndpoint(),
                                    response_schemas=sd.get_process_visibility_responses)
-@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetProcessVisibilityResponse.description)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_process_visibility(request):
     """
     Get the visibility of a registered local process.
@@ -234,7 +234,7 @@ def get_process_visibility(request):
 @sd.process_visibility_service.put(tags=[sd.TAG_PROCESSES, sd.TAG_VISIBILITY], renderer=OUTPUT_FORMAT_JSON,
                                    schema=sd.ProcessVisibilityPutEndpoint(),
                                    response_schemas=sd.put_process_visibility_responses)
-@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorPutProcessVisibilityResponse.description)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def set_process_visibility(request):
     """
     Set the visibility of a registered local process.
@@ -265,7 +265,7 @@ def set_process_visibility(request):
 
 @sd.process_service.delete(tags=[sd.TAG_PROCESSES, sd.TAG_DEPLOY], renderer=OUTPUT_FORMAT_JSON,
                            schema=sd.ProcessEndpoint(), response_schemas=sd.delete_process_responses)
-@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorDeleteProcessResponse.description)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def delete_local_process(request):
     """
     Unregister a local process.
@@ -283,7 +283,7 @@ def delete_local_process(request):
 
 @sd.process_jobs_service.post(tags=[sd.TAG_PROCESSES, sd.TAG_EXECUTE, sd.TAG_JOBS], renderer=OUTPUT_FORMAT_JSON,
                               schema=sd.PostProcessJobsEndpoint(), response_schemas=sd.post_process_jobs_responses)
-@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorPostProcessJobResponse.description)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def submit_local_job(request):
     """
     Execute a process registered locally. The execution occurs where the WPS location was defined during deployment.

@@ -19,7 +19,7 @@ from weaver.exceptions import (
     ServiceNotFound,
     log_unhandled_exceptions
 )
-from weaver.formats import OUTPUT_FORMAT_JSON
+from weaver.formats import CONTENT_TYPE_TEXT_PLAIN, OUTPUT_FORMAT_JSON, get_format
 from weaver.owsexceptions import OWSNotFound
 from weaver.processes.convert import any2wps_literal_datatype
 from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
@@ -49,7 +49,7 @@ def get_job(request):
     try:
         job = store.fetch_by_id(job_id)
     except JobNotFound:
-        raise OWSNotFound(code="NoSuchJob", description="Could not find job with specified 'job_id'.")
+        raise OWSNotFound(code="NoSuchJob", locator="JobID", description="Could not find job with specified 'job_id'.")
 
     provider_id = request.matchdict.get("provider_id", job.service)
     process_id = request.matchdict.get("process_id", job.process)
@@ -57,11 +57,13 @@ def get_job(request):
     if job.service != provider_id:
         raise OWSNotFound(
             code="NoSuchProvider",
+            locator="provider",
             description="Could not find job corresponding to specified 'provider_id'."
         )
     if job.process != process_id:
         raise OWSNotFound(
             code="NoSuchProcess",
+            locator="process",
             description="Could not find job corresponding to specified 'process_id'."
         )
     return job
@@ -100,7 +102,9 @@ def get_results(job, container, value_key=None, ogc_api=False):
         elif value_key:
             out_key = value_key
         output = {out_key: value}
-        if "mimeType" in result and rtype == "href":  # required for the rest to be there, other fields optional
+        if rtype == "href":  # required for the rest to be there, other fields optional
+            if "mimeType" not in result:
+                result["mimeType"] = get_format(value, default=CONTENT_TYPE_TEXT_PLAIN).mime_type
             output["format"] = {fmt_key: result["mimeType"]}
             for field in ["encoding", "schema"]:
                 if field in result:
@@ -185,7 +189,7 @@ def validate_service_process(request):
                               schema=sd.GetProviderJobsEndpoint(), response_schemas=sd.get_all_jobs_responses)
 @sd.jobs_service.get(tags=[sd.TAG_JOBS], renderer=OUTPUT_FORMAT_JSON,
                      schema=sd.GetJobsEndpoint(), response_schemas=sd.get_all_jobs_responses)
-@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetJobsResponse.description)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_queried_jobs(request):
     """
     Retrieve the list of jobs which can be filtered, sorted, paged and categorized using query parameters.
@@ -236,7 +240,7 @@ def get_queried_jobs(request):
                     schema=sd.JobEndpoint(), response_schemas=sd.get_single_job_status_responses)
 @sd.process_job_service.get(tags=[sd.TAG_PROCESSES, sd.TAG_JOBS, sd.TAG_STATUS], renderer=OUTPUT_FORMAT_JSON,
                             schema=sd.GetProcessJobEndpoint(), response_schemas=sd.get_single_job_status_responses)
-@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetJobStatusResponse.description)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_job_status(request):
     """
     Retrieve the status of a job.
@@ -252,7 +256,7 @@ def get_job_status(request):
                        schema=sd.JobEndpoint(), response_schemas=sd.delete_job_responses)
 @sd.process_job_service.delete(tags=[sd.TAG_PROCESSES, sd.TAG_JOBS, sd.TAG_DISMISS], renderer=OUTPUT_FORMAT_JSON,
                                schema=sd.DeleteProcessJobEndpoint(), response_schemas=sd.delete_job_responses)
-@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorDeleteJobResponse.description)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def cancel_job(request):
     """
     Dismiss a job.
@@ -274,13 +278,13 @@ def cancel_job(request):
     })
 
 
-@sd.provider_inputs_service.get(tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES], renderer=OUTPUT_FORMAT_JSON,
+@sd.provider_inputs_service.get(tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
                                 schema=sd.ProviderInputsEndpoint(), response_schemas=sd.get_job_inputs_responses)
 @sd.process_inputs_service.get(tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES], renderer=OUTPUT_FORMAT_JSON,
                                schema=sd.ProcessInputsEndpoint(), response_schemas=sd.get_job_inputs_responses)
-@sd.job_inputs_service.get(tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES], renderer=OUTPUT_FORMAT_JSON,
+@sd.job_inputs_service.get(tags=[sd.TAG_JOBS, sd.TAG_RESULTS], renderer=OUTPUT_FORMAT_JSON,
                            schema=sd.JobInputsEndpoint(), response_schemas=sd.get_job_inputs_responses)
-@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetJobResultsResponse.description)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_job_inputs(request):
     # type: (Request) -> HTTPException
     """
@@ -299,7 +303,7 @@ def get_job_inputs(request):
                                 schema=sd.ProcessOutputsEndpoint(), response_schemas=sd.get_job_outputs_responses)
 @sd.job_outputs_service.get(tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES], renderer=OUTPUT_FORMAT_JSON,
                             schema=sd.JobOutputsEndpoint(), response_schemas=sd.get_job_outputs_responses)
-@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetJobResultsResponse.description)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_job_outputs(request):
     # type: (Request) -> HTTPException
     """
@@ -318,7 +322,7 @@ def get_job_outputs(request):
                                 schema=sd.ProcessResultsEndpoint(), response_schemas=sd.get_job_results_responses)
 @sd.job_results_service.get(tags=[sd.TAG_JOBS, sd.TAG_RESULTS], renderer=OUTPUT_FORMAT_JSON,
                             schema=sd.JobResultsEndpoint(), response_schemas=sd.get_job_results_responses)
-@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetJobResultsResponse.description)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_job_results(request):
     # type: (Request) -> HTTPException
     """
@@ -343,7 +347,7 @@ def get_job_results(request):
                                schema=sd.JobExceptionsEndpoint(), response_schemas=sd.get_exceptions_responses)
 @sd.process_exceptions_service.get(tags=[sd.TAG_JOBS, sd.TAG_EXCEPTIONS, sd.TAG_PROCESSES], renderer=OUTPUT_FORMAT_JSON,
                                    schema=sd.ProcessExceptionsEndpoint(), response_schemas=sd.get_exceptions_responses)
-@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetJobExceptionsResponse.description)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_job_exceptions(request):
     """
     Retrieve the exceptions of a job.
@@ -359,7 +363,7 @@ def get_job_exceptions(request):
                          schema=sd.JobLogsEndpoint(), response_schemas=sd.get_logs_responses)
 @sd.process_logs_service.get(tags=[sd.TAG_JOBS, sd.TAG_LOGS, sd.TAG_PROCESSES], renderer=OUTPUT_FORMAT_JSON,
                              schema=sd.ProcessLogsEndpoint(), response_schemas=sd.get_logs_responses)
-@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetJobLogsResponse.description)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_job_logs(request):
     """
     Retrieve the logs of a job.
@@ -378,7 +382,7 @@ def get_job_logs(request):
 @sd.job_result_service.get(tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_DEPRECATED],
                            renderer=OUTPUT_FORMAT_JSON, schema=sd.JobResultEndpoint(),
                            response_schemas=sd.get_result_redirect_responses)
-@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetJobOutputResponse.description)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def redirect_job_result(request):
     """
     Deprecated job result endpoint that is now returned by corresponding outputs path with added links.

@@ -139,7 +139,7 @@ class SchemeURL(colander.Regex):
         :class:`colander.url` [remote http(s)/ftp(s)]
         :class:`colander.file_uri` [local file://]
     """
-    def __init__(self, schemes=None, msg=None, flags=re.IGNORECASE):  #
+    def __init__(self, schemes=None, msg=None, flags=re.IGNORECASE):
         if not schemes:
             schemes = [""]
         if not msg:
@@ -203,6 +203,40 @@ class ExtendedString(colander.String):
     pass
 
 
+class XMLObject(object):
+    """
+    Object that provides mapping to known XML extensions for OpenAPI schema definition.
+
+    Name of the schema definition in the OpenAPI will use :prop:`prefix` and the schema class name.
+    Prefix can be omitted from the schema definition name by setting it to :class:`colander.drop`.
+    The value of ``title`` provided as option or
+
+    .. seealso::
+        - https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.3.md#user-content-xml-object
+        - https://swagger.io/docs/specification/data-models/representing-xml/
+    """
+    attribute = None    # define the corresponding node object as attribute instead of field
+    name = None         # name of the attribute, or default to the class name of the object
+    namespace = None    # location of "xmlns:<prefix> <location>" specification
+    prefix = None       # prefix of the namespace
+    wrapped = None      # used to wrap array elements called "<name>" within a block called "<name>s"
+
+    @property
+    def xml(self):
+        spec = {}
+        if isinstance(self.attribute, bool):
+            spec["attribute"] = self.attribute
+        if isinstance(self.name, str):
+            spec["name"] = self.name
+        if isinstance(self.namespace, str):
+            spec["namespace"] = self.namespace
+        if isinstance(self.prefix, str):
+            spec["prefix"] = self.prefix
+        if self.wrapped:  # only add if True to avoid over-populate spec, default is False
+            spec["wrapped"] = self.wrapped
+        return spec or None
+
+
 class ExtendedNodeInterface(object):
     _extension = None  # type: str
 
@@ -237,22 +271,54 @@ class ExtendedSchemaBase(colander.SchemaNode, metaclass=ExtendedSchemaMeta):
         raise NotImplementedError("Using SchemaNode for a field requires 'schema_type' definition.")
 
     def __init__(self, *args, **kwargs):
+        schema_name = _get_node_name(self, schema_name=True)
         schema_type = _get_schema_type(self, check=True)
-        if isinstance(schema_type, (colander.Mapping, colander.Sequence)):
+        if isinstance(self, XMLObject):
+            if isinstance(self.title, str):
+                title = self.title
+            else:
+                title = kwargs.get("title", schema_name)
+            # pylint: disable=no-member
+            if self.prefix is not colander.drop:
+                title = "{}:{}".format(self.prefix or "xml", title)
+            kwargs["title"] = title
+        elif isinstance(schema_type, (colander.Mapping, colander.Sequence)):
             if self.title in ["", colander.required] and not kwargs.get("title"):
-                kwargs["title"] = _get_node_name(self, schema_name=True)
+                kwargs["title"] = schema_name
 
         if self.validator is None and isinstance(schema_type, colander.String):
-            format = kwargs.pop("format", getattr(self, "format", None))
+            _format = kwargs.pop("format", getattr(self, "format", None))
             pattern = kwargs.pop("pattern", getattr(self, "pattern", None))
             if isinstance(pattern, str):
                 self.validator = colander.Regex(pattern)
             elif isinstance(pattern, colander.Regex):
                 self.validator = pattern
-            elif format in STRING_FORMATTERS:
-                self.validator = STRING_FORMATTERS[format]["validator"]
+            elif _format in STRING_FORMATTERS:
+                self.validator = STRING_FORMATTERS[_format]["validator"]
 
-        super(ExtendedSchemaBase, self).__init__(*args, **kwargs)
+        default = kwargs.get("default", colander.null)
+        if self.default is colander.null and default is not colander.null:
+            self.default = default
+        if self.default is not colander.null and self.missing is not colander.drop:
+            self.missing = self.default  # setting value makes 'self.required' return False, but doesn't drop it
+
+        try:
+            super(ExtendedSchemaBase, self).__init__(*args, **kwargs)
+            ExtendedSchemaBase._validate(self)
+        except Exception as exc:
+            raise SchemaNodeTypeError("Invalid schema definition for [{}]".format(schema_name)) from exc
+
+    @staticmethod
+    def _validate(node):
+        if node.default and node.validator not in [colander.null, None]:
+            try:
+                node.validator(node, node.default)
+            except (colander.Invalid, TypeError):
+                if node.default is not colander.drop:
+                    raise SchemaNodeTypeError(
+                        "Default value [{!s}] of [{!s}] is not valid against its own validator.".format(
+                            node.default, _get_node_name(node, schema_name=True))
+                    )
 
 
 class DropableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
@@ -624,8 +690,7 @@ class ExtendedSchemaNode(DefaultSchemaNode, DropableSchemaNode, VariableSchemaNo
     def schema_type():
         raise NotImplementedError("Using SchemaNode for a field requires 'schema_type' definition.")
 
-    def deserialize(self, cstruct):
-        schema_type = _get_schema_type(self)
+    def _deserialize_extensions(self, cstruct):
         result = cstruct
         # process extensions to infer alternative parameter/property values
         # node extensions order is important as they can impact the following ones
@@ -636,33 +701,47 @@ class ExtendedSchemaNode(DefaultSchemaNode, DropableSchemaNode, VariableSchemaNo
                 # if result is to drop though, we are sure that nothing else must be done
                 break
             result = node._deserialize_impl(self, result)
+        return result
 
-        # process usual base operation with extended result
-        if result not in (colander.drop, colander.null):
-            # when processing mapping/sequence, if the result is an empty container, return the default instead
-            # this is to avoid returning many empty containers in case upper level keywords (oneOf, anyOf, etc.)
-            # need to discriminate between them
-            # empty container means that none of the sub-schemas/fields where matched against input structure
-            if isinstance(schema_type, colander.Mapping):
-                # skip already preprocessed variable mapping from above VariableSchemaNode deserialize
-                # otherwise, following 'normal' schema deserialize could convert valid structure into null
-                if self.has_variables():
-                    return result
-                result = colander.MappingSchema.deserialize(self, result)
-            elif isinstance(schema_type, colander.Sequence):
-                result = colander.SequenceSchema.deserialize(self, result)
-            else:
-                # special cases for JSON conversion and string dump, serialize parsable string timestamps
-                #   deserialize causes Date/DateTime/Time to become Python datetime, and result raises if not string
-                #   employ serialize instead which provides the desired conversion from predefined datetime to string
-                if isinstance(schema_type, (colander.Date, colander.DateTime, colander.Time)):
-                    if not isinstance(result, str):
-                        result = colander.SchemaNode.serialize(self, result)
+    def deserialize(self, cstruct):
+        schema_type = _get_schema_type(self)
+        result = ExtendedSchemaNode._deserialize_extensions(self, cstruct)
+
+        try:
+            # process usual base operation with extended result
+            if result not in (colander.drop, colander.null):
+                # when processing mapping/sequence, if the result is an empty container, return the default instead
+                # this is to avoid returning many empty containers in case upper level keywords (oneOf, anyOf, etc.)
+                # need to discriminate between them
+                # empty container means that none of the sub-schemas/fields where matched against input structure
+                if isinstance(schema_type, colander.Mapping):
+                    # skip already preprocessed variable mapping from above VariableSchemaNode deserialize
+                    # otherwise, following 'normal' schema deserialize could convert valid structure into null
+                    if self.has_variables():
+                        return result
+                    result = colander.MappingSchema.deserialize(self, result)
+                elif isinstance(schema_type, colander.Sequence):
+                    result = colander.SequenceSchema.deserialize(self, result)
                 else:
-                    result = colander.SchemaNode.deserialize(self, result)
-            result = self.default if result is colander.null else result
+                    # special cases for JSON conversion and string dump, serialize parsable string timestamps
+                    #   deserialize causes Date/DateTime/Time to become Python datetime, and result raises if not string
+                    #   employ serialize instead which provides the desired conversion from datetime objects to string
+                    if isinstance(schema_type, (colander.Date, colander.DateTime, colander.Time)):
+                        if not isinstance(result, str):
+                            result = colander.SchemaNode.serialize(self, result)
+                    else:
+                        result = colander.SchemaNode.deserialize(self, result)
+                result = self.default if result is colander.null else result
+        except colander.Invalid:
+            # if children schema raised invalid but parent specifically requested
+            # to be dropped by default and is not required, silently discard the whole structure
+            if self.default is colander.drop:
+                return colander.drop
+            raise
+
         if result is colander.null and self.missing is colander.required:
             raise colander.Invalid(node=self, msg=self.missing_msg)
+
         return result
 
 
@@ -693,6 +772,13 @@ class ExtendedSequenceSchema(DefaultSchemaNode, DropableSchemaNode, colander.Seq
         - :class:`ExtendedMappingSchema`
     """
     schema_type = colander.SequenceSchema.schema_type
+
+    def __init__(self, *args, **kwargs):
+        super(ExtendedSequenceSchema, self).__init__(*args, **kwargs)
+        self._validate()
+
+    def _validate(self):  # pylint: disable=arguments-differ
+        ExtendedSchemaBase._validate(self.children[0])
 
 
 class DropableMappingSchema(DropableSchemaNode, colander.MappingSchema):
@@ -740,6 +826,14 @@ class ExtendedMappingSchema(
         - :class:`PermissiveMappingSchema`
     """
     schema_type = colander.MappingSchema.schema_type
+
+    def __init__(self, *args, **kwargs):
+        super(ExtendedMappingSchema, self).__init__(*args, **kwargs)
+        self._validate_nodes()
+
+    def _validate_nodes(self):
+        for node in self.children:
+            ExtendedSchemaBase._validate(node)
 
 
 class PermissiveMappingSchema(ExtendedMappingSchema):
@@ -861,6 +955,10 @@ class KeywordMapper(ExtendedMappingSchema):
                     "but different ones were found '{}'.".format(schema_name, keyword, node_types)
                 )
 
+        ExtendedMappingSchema._validate_nodes(self)
+        for node in children:
+            ExtendedSchemaBase._validate(node)
+
     @abstractmethod
     def _deserialize_keyword(self, cstruct):
         """
@@ -902,7 +1000,7 @@ class KeywordMapper(ExtendedMappingSchema):
     def deserialize(self, cstruct):
         if cstruct is colander.null:
             if self.required and not VariableSchemaNode.is_variable(self):
-                raise colander.Invalid(self, "Missing required fields.")
+                raise colander.Invalid(self, "Missing required field.")
             return ExtendedSchemaNode.deserialize(self, colander.null)
         # first process the keyword subnodes
         result = self._deserialize_keyword(cstruct)
@@ -1418,21 +1516,23 @@ class OneOfKeywordTypeConverter(KeywordTypeConverter):
                     raise ConversionTypeError(
                         "Unknown base type to convert oneOf schema item is no a mapping: {}".format(type(schema_node))
                     )
+                # specific oneOf sub-item, will be processed by itself during dispatch of sub-item of allOf
+                # rewrite the title of that new sub-item schema from the original title to avoid conflict
+                schema_title = _get_node_name(schema_node, schema_name=True)
                 # generate the new nested definition of keywords using schema node bases and children
                 item_title = _get_node_name(item_obj, schema_name=True)
-                # fields that are required and shared across all the oneOf sub-items
+                # NOTE: to avoid potential conflict of schema reference definitions with other existing ones,
+                #       use an invalid character that cannot exist in Python class name defining the schema titles
+                one_of_title = schema_title + "." + item_title
+                shared_title = schema_title + ".Shared"
+                obj_req_title = item_title + ".AllOf"
+                # fields that are shared across all the oneOf sub-items
                 # pass down the original title of that object to refer to that schema reference
-                obj_req_share = ExtendedMappingSchema(title=item_title)
-                obj_req_share.children = schema_node.children
-                # specific oneOf sub-item, will be processed by itself during dispatch of sub-item of allOf
-                # rewrite the title of that new sub-item schema from the original to avoid conflict
-                schema_title = _get_node_name(schema_node, schema_name=True)
+                obj_shared = ExtendedMappingSchema(title=shared_title)
+                obj_shared.children = schema_node.children
                 obj_one_of = item_obj.clone()
-                # NOTE: to avoid potential conflict of schema reference with other existing ones,
-                #       use an invalid character that cannot exist in schema class name defining titles
-                obj_one_of.title = schema_title + "." + item_title
-                obj_req_title = item_title + "All"
-                all_of = AllOfKeywordSchema(title=obj_req_title, _all_of=[obj_req_share, obj_one_of])
+                obj_one_of.title = one_of_title
+                all_of = AllOfKeywordSchema(title=obj_req_title, _all_of=[obj_shared, obj_one_of])
                 obj_converted = self.dispatcher(all_of)
             else:
                 obj_converted = self.dispatcher(item_obj)
@@ -1578,6 +1678,13 @@ class OAS3TypeConversionDispatcher(TypeConversionDispatcher):
                     converted["title"] = schema_node.title
                 else:
                     converted["title"] = schema_node.name
+
+        if converted.get("default") is colander.drop:
+            converted.pop("default")
+
+        xml = getattr(schema_node, "xml", None)
+        if isinstance(xml, dict):
+            converted["xml"] = xml
 
         return converted
 
