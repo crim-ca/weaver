@@ -103,3 +103,288 @@ def test_oneof_nested_dict_list():
         else:
             raise AssertionError("Should have raised invalid schema from deserialize of '{!s}' with {!s}, but got {!s}"
                                  .format(ce._get_node_name(test_schema), test_value, result))
+
+
+class FieldTestString(ce.ExtendedSchemaNode):
+    schema_type = colander.String
+
+
+class Mapping(ce.ExtendedMappingSchema):
+    test = FieldTestString()
+    schema_expected = {
+        "type": "object",
+        "title": "Mapping",
+        "required": ["test"],
+        "properties": {
+            "test": {
+                "title": "test",
+                "type": "string",
+            }
+        }
+    }
+
+
+class Default(ce.ExtendedMappingSchema):
+    test = FieldTestString(default="test")
+    schema_expected = {
+        "type": "object",
+        "title": "Default",
+        "properties": {
+            "test": {
+                "default": "test",
+                "title": "test",
+                "type": "string",
+            }
+        }
+    }
+
+
+class Missing(ce.ExtendedMappingSchema):
+    test = FieldTestString(missing=colander.drop)
+    schema_expected = {
+        "type": "object",
+        "title": "Missing",
+        "properties": {
+            "test": {
+                "title": "test",
+                "type": "string",
+            }
+        }
+    }
+
+
+class DefaultMissing(ce.ExtendedMappingSchema):
+    test = FieldTestString(default="test", missing=colander.drop)
+    schema_expected = {
+        "type": "object",
+        "title": "DefaultMissing",
+        "properties": {
+            "test": {
+                "default": "test",
+                "title": "test",
+                "type": "string",
+            }
+        }
+    }
+
+
+class DefaultMissingValidator(ce.ExtendedMappingSchema):
+    test = FieldTestString(default="test", missing=colander.drop, validator=colander.OneOf(["test"]))
+    schema_expected = {
+        "type": "object",
+        "title": "DefaultMissingValidator",
+        "properties": {
+            "test": {
+                "default": "test",
+                "title": "test",
+                "type": "string",
+                "enum": ["test"],
+            }
+        }
+    }
+
+
+class Validator(ce.ExtendedMappingSchema):
+    test = FieldTestString(validator=colander.OneOf(["test"]))
+    schema_expected = {
+        "type": "object",
+        "title": "Validator",
+        "required": ["test"],
+        "properties": {
+            "test": {
+                "title": "test",
+                "type": "string",
+                "enum": ["test"],
+            }
+        }
+    }
+
+
+class DefaultDropValidator(ce.ExtendedMappingSchema):
+    """Definition that will allow only the specific validator values, or drops the content silently."""
+    test = FieldTestString(default=colander.drop, validator=colander.OneOf(["test"]))
+    schema_expected = {
+        "type": "object",
+        "title": "DefaultDropValidator",
+        "properties": {
+            "test": {
+                "title": "test",
+                "type": "string",
+                "enum": ["test"],
+            }
+        }
+    }
+
+
+class DefaultDropRequired(ce.ExtendedMappingSchema):
+    """
+    Definition that will allow only the specific validator values, or drops the full content silently.
+    One top of that, ensures that the resulting OpenAPI schema defines it as required instead of optional
+    when default is usually specified.
+
+    This allows dropping invalid values that failed validation and not employ any default, while letting know
+    in the OpenAPI specification that for a nested definition of required elements, they will be used only if
+    correctly provided, or completely ignored as optional.
+    """
+    test = FieldTestString(default=colander.drop, missing=colander.required, validator=colander.OneOf(["test"]))
+    schema_expected = {
+        "type": "object",
+        "title": "DefaultDropRequired",
+        "required": ["test"],
+        "properties": {
+            "test": {
+                "title": "test",
+                "type": "string",
+                "enum": ["test"],
+            }
+        }
+    }
+
+
+class DefaultValidator(ce.ExtendedMappingSchema):
+    """
+    Functionality that we want most of the time to make an 'optional' but validated value.
+
+    When value is explicitly provided, raise if invalid according to condition.
+    Otherwise, use default if omitted.
+    """
+    test = FieldTestString(default="test", validator=colander.OneOf(["test"]))
+    schema_expected = {
+        "type": "object",
+        "title": "DefaultValidator",
+        "properties": {
+            "test": {
+                "default": "test",
+                "title": "test",
+                "type": "string",
+                "enum": ["test"],
+            }
+        }
+    }
+
+
+class MissingValidator(ce.ExtendedMappingSchema):
+    test = FieldTestString(missing=colander.drop, validator=colander.OneOf(["test"]))
+    schema_expected = {
+        "type": "object",
+        "title": "MissingValidator",
+        "properties": {
+            "test": {
+                "title": "test",
+                "type": "string",
+                "enum": ["test"],
+            }
+        }
+    }
+
+
+def test_invalid_schema_mismatch_default_validator():
+    try:
+        class TestBad(ce.ExtendedSchemaNode):
+            schema_type = colander.String
+            default = "bad-value-not-in-one-of"
+            validator = colander.OneOf(["test"])
+
+        TestBad()
+    except ce.SchemaNodeTypeError:
+        pass
+    else:
+        pytest.fail("Erroneous schema must raise immediately if default doesn't conform to its own validator.")
+    try:
+        class DefaultValidatorBad(ce.ExtendedMappingSchema):
+            test = FieldTestString(default="bad-value-not-in-one-of", validator=colander.OneOf(["test"]))
+
+        DefaultValidatorBad()
+    except ce.SchemaNodeTypeError:
+        pass
+    else:
+        pytest.fail("Erroneous schema must raise immediately if default doesn't conform to its own validator.")
+
+
+def test_schema_default_missing_validator_combinations():
+    """
+    Validate resulting deserialization of mappings according to parameter combinations and parsed data.
+
+    .. seealso::
+        :func:`test_schema_default_missing_validator_openapi`
+    """
+    test_schemas = [
+        (Mapping, {}, colander.Invalid),                    # required but missing
+        (Mapping, {"test": None}, colander.Invalid),        # wrong value schema-type
+        (Mapping, {"test": "random"}, {"test": "random"}),  # uses the value as is if provided because no validator
+        (Default, {}, {"test": "test"}),                    # default+required adds the value if omitted
+        (Default, {"test": None}, {"test": "test"}),        # default+required sets the value if null
+        (Default, {"test": "random"}, {"test": "random"}),  # default+required uses the value as is if provided
+        (Missing, {}, {}),                                  # missing only drops the value if omitted
+        (Missing, {"test": None}, {}),
+        (Missing, {"test": "random"}, {"test": "random"}),
+        (DefaultMissing, {}, {"test": "test"}),             # default+missing ignores drops and sets omitted value
+        (DefaultMissing, {"test": None}, {}),
+        (DefaultMissing, {"test": "random"}, {"test": "random"}),
+        (Validator, {}, colander.Invalid),
+        (Validator, {"test": None}, colander.Invalid),
+        (Validator, {"test": "bad"}, colander.Invalid),
+        (Validator, {"test": "test"}, {"test": "test"}),
+        (DefaultValidator, {}, {"test": "test"}),
+        (DefaultValidator, {"test": None}, {"test": "test"}),
+        (DefaultValidator, {"test": "bad"}, colander.Invalid),
+        (DefaultValidator, {"test": "test"}, {"test": "test"}),
+        (DefaultMissingValidator, {}, {"test": "test"}),    # default+missing ignores drop and sets default if omitted
+        (DefaultMissingValidator, {"test": None}, {}),
+        # (DefaultMissingValidator, {"test": "bad"}, {}),
+        (DefaultMissingValidator, {"test": "bad"}, colander.Invalid),
+        (DefaultMissingValidator, {"test": "test"}, {"test": "test"}),
+        (MissingValidator, {}, {}),
+        (MissingValidator, {"test": None}, {}),
+        # (MissingValidator, {"test": "bad"}, {}),
+        (MissingValidator, {"test": "bad"}, colander.Invalid),
+        (MissingValidator, {"test": "test"}, {"test": "test"}),
+        (DefaultDropRequired, {}, {}),
+        (DefaultDropRequired, {"test": None}, {}),
+        (DefaultDropRequired, {"test": "bad"}, {}),
+        (DefaultDropRequired, {"test": "test"}, {"test": "test"}),
+        (DefaultDropValidator, {}, {}),
+        (DefaultDropValidator, {"test": None}, {}),
+        (DefaultDropValidator, {"test": "bad"}, {}),
+        (DefaultDropValidator, {"test": "test"}, {"test": "test"}),
+    ]
+
+    for test_schema, test_value, test_expect in test_schemas:
+        try:
+            result = test_schema().deserialize(test_value)
+            if test_expect is colander.Invalid:
+                pytest.fail("Expected invalid format from [{}] with [{}]".format(test_schema.__name__, test_value))
+            assert result == test_expect, "Bad result from [{}] with [{}]".format(test_schema.__name__, test_value)
+        except colander.Invalid:
+            if test_expect is colander.Invalid:
+                pass
+            else:
+                pytest.fail("Expected valid format from [{}] with [{}]".format(test_schema.__name__, test_value))
+
+
+def test_schema_default_missing_validator_openapi():
+    """
+    Validate that resulting OpenAPI schema are as expected while still providing advanced deserialization features.
+
+    Resulting schema are very similar can often cannot be distinguished for some variants, but the various combination
+    of values for ``default``, ``missing`` and ``validator`` will provide very distinct behavior during parsing.
+
+    .. seealso::
+        :func:`test_schema_default_missing_validator_combinations`
+    """
+    converter = ce.ObjectTypeConverter(ce.OAS3TypeConversionDispatcher())
+    test_schemas = [
+        Mapping,
+        Missing,
+        Default,
+        Validator,
+        DefaultMissing,
+        DefaultValidator,
+        MissingValidator,
+        DefaultMissingValidator,
+        DefaultDropValidator,
+        DefaultDropRequired,
+    ]
+    for schema in test_schemas:
+        converted = converter.convert_type(schema())
+        assert converted == schema.schema_expected, "Schema for [{}] not as expected".format(schema.__name__)

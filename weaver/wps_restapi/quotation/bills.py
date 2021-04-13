@@ -13,7 +13,7 @@ LOGGER = logging.getLogger(__name__)
 
 @sd.bills_service.get(tags=[sd.TAG_BILL_QUOTE], renderer=OUTPUT_FORMAT_JSON,
                       schema=sd.BillsEndpoint(), response_schemas=sd.get_bill_list_responses)
-@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetBillListResponse.description)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_bill_list(request):
     """
     Get list of bills IDs.
@@ -25,7 +25,7 @@ def get_bill_list(request):
 
 @sd.bill_service.get(tags=[sd.TAG_BILL_QUOTE], renderer=OUTPUT_FORMAT_JSON,
                      schema=sd.BillEndpoint(), response_schemas=sd.get_bill_responses)
-@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetBillInfoResponse.description)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_bill_info(request):
     """
     Get bill information.

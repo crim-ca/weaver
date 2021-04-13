@@ -1,0 +1,13 @@
+{
+  "description": "Could not find job with specified 'job_id'.",
+  "code": "NoSuchJob",
+  "error": {
+    "code": 404,
+    "status": "404 Not Found"
+  },
+  "exception": {
+    "code": "NoSuchJob",
+    "locator": "JobID",
+    "message": "Could not find job with specified 'job_id'."
+  }
+}

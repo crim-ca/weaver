@@ -1,0 +1,18 @@
+{
+  "providers": [
+    {
+      "id": "finch",
+      "title": "Finch",
+      "abstract": "A Web Processing Service for Climate Indicators",
+      "url": "http://schema-example.com/providers/finch",
+      "public": true
+    },
+    {
+      "id": "hummingbird",
+      "title": "Hummingbird 0.5_dev",
+      "abstract": "WPS processes for general tools used in the climate science community like cdo and compliance checker.",
+      "url": "http://schema-example.com/providers/hummingbird",
+      "public": false
+    }
+  ]
+}

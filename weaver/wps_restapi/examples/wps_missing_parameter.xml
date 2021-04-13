@@ -1,0 +1,7 @@
+<ows:ExceptionReport
+        xsi:schemaLocation="http://www.opengis.net/ows/1.1 http://schemas.opengis.net/ows/1.1.0/owsExceptionReport.xsd"
+        version="1.0.0">
+    <ows:Exception exceptionCode="MissingParameterValue" locator="request">
+        <ows:ExceptionText>Missing request value</ows:ExceptionText>
+    </ows:Exception>
+</ows:ExceptionReport>
