@@ -3,6 +3,7 @@ Utility methods for various TestCase setup operations.
 """
 import contextlib
 import os
+import pkg_resources
 import tempfile
 import uuid
 import warnings
@@ -243,6 +244,16 @@ def get_setting(env_var_name, app=None, setting_name=None):
                 if val != null:
                     return val
     return null
+
+
+def get_module_version(module):
+    # type: (Any) -> str
+    if not isinstance(module, str):
+        version = getattr(module, "__version__", None)
+        if version is not None:
+            return version
+        module = module.__name__
+    return pkg_resources.get_distribution(module).version
 
 
 def init_weaver_service(registry):
