@@ -10,6 +10,17 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+`3.1.0 <https://github.com/crim-ca/weaver/tree/3.1.0>`_ (2021-04-23)
+========================================================================
+
+Changes:
+--------
 - Add caching of remote WPS requests according to ``request-options.yml`` and request header ``Cache-Control`` to allow
   reduced query of pre-fetched WPS client definition.
 - Add ``POST /processes/{}/execution`` endpoint that mimics its jobs counterpart to respect `OGC-API Processes` updates
