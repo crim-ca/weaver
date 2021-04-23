@@ -190,6 +190,8 @@ process_outputs_service = Service(name="process_outputs", path=process_service.p
 process_exceptions_service = Service(name="process_exceptions", path=process_service.path + job_exceptions_service.path)
 process_logs_service = Service(name="process_logs", path=process_service.path + job_logs_service.path)
 
+process_execution_service = Service(name="process_execution", path=process_service.path + "/execution")
+
 providers_service = Service(name="providers", path="/providers")
 provider_service = Service(name="provider", path=providers_service.path + "/{provider_id}")
 provider_processes_service = Service(name="provider_processes", path=provider_service.path + processes_service.path)
