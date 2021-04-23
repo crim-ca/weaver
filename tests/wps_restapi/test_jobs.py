@@ -3,6 +3,7 @@ import json
 import unittest
 import warnings
 from collections import OrderedDict
+from distutils.version import LooseVersion
 from typing import TYPE_CHECKING
 
 import mock
@@ -10,6 +11,7 @@ import pyramid.testing
 import pytest
 
 from tests.utils import (
+    get_module_version,
     get_test_weaver_app,
     mocked_process_job_runner,
     mocked_remote_wps,
@@ -131,9 +133,15 @@ class WpsRestApiJobsTest(unittest.TestCase):
 
     def get_job_request_auth_mock(self, user_id):
         is_admin = self.user_admin_id == user_id
+        if LooseVersion(get_module_version("pyramid")) >= LooseVersion("2"):
+            authn_policy_class = "pyramid.security.SecurityAPIMixin"
+            authz_policy_class = "pyramid.security.SecurityAPIMixin"
+        else:
+            authn_policy_class = "pyramid.security.AuthenticationAPIMixin"
+            authz_policy_class = "pyramid.security.AuthorizationAPIMixin"
         return tuple([
-            mock.patch("pyramid.security.AuthenticationAPIMixin.authenticated_userid", new_callable=lambda: user_id),
-            mock.patch("pyramid.request.AuthorizationAPIMixin.has_permission", return_value=is_admin),
+            mock.patch("{}.authenticated_userid".format(authn_policy_class), new_callable=lambda: user_id),
+            mock.patch("{}.has_permission".format(authz_policy_class), return_value=is_admin),
         ])
 
     @staticmethod
