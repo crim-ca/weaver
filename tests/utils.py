@@ -3,7 +3,6 @@ Utility methods for various TestCase setup operations.
 """
 import contextlib
 import os
-import pkg_resources
 import tempfile
 import uuid
 import warnings
@@ -15,6 +14,7 @@ import colander
 # Note: do NOT import 'boto3' here otherwise 'moto' will not be able to mock it effectively
 import mock
 import moto
+import pkg_resources
 import pyramid_celery
 from owslib.wps import Languages, WebProcessingService
 from pyramid import testing
