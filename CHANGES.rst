@@ -26,6 +26,8 @@ Fixes:
 ------
 - Fix erroneous tags in job inputs schemas.
 - Fix handling of deeply nested schema validator raising for invalid format within optional parent schema.
+- Fix retrieval of database connection from registry reference.
+- Fix test mock according to installed ``pyramid`` version to avoid error with modified mixin implementations.
 
 `3.0.0 <https://github.com/crim-ca/weaver/tree/3.0.0>`_ (2021-03-16)
 ========================================================================

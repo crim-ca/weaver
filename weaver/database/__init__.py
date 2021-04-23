@@ -20,7 +20,7 @@ def get_db(container, reset_connection=False):
     any container that can retrieve it to accomplish reference reset. Otherwise, any settings container can be provided.
     """
     registry = get_registry(container, nothrow=True)
-    if not reset_connection and registry and registry.db:
+    if not reset_connection and registry and isinstance(getattr(registry, "db", None), MongoDatabase):
         return registry.db
     database = MongoDatabase(container)
     if reset_connection:
