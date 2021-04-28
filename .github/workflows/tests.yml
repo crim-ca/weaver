@@ -24,8 +24,10 @@ jobs:
 
   # see: https://github.com/actions/setup-python
   tests:
-    needs: skip_duplicate
-    if: ${{ needs.skip_duplicate.outputs.should_skip != 'true' }}
+    # FIXME: https://github.com/fkirc/skip-duplicate-actions/issues/90
+    #   disable for now because the tests never run... somehow similar config works in Magpie...
+    # needs: skip_duplicate
+    # if: ${{ needs.skip_duplicate.outputs.should_skip != 'true' }}
     runs-on: ${{ matrix.os }}
     continue-on-error: ${{ matrix.allow-failure }}
     env:
