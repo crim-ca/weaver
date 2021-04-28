@@ -34,6 +34,7 @@ jobs:
     # reference: https://github.com/wip/action
     # mark PRs with 'WIP' in title as pending
     # then, block merge of these branches using [settings->branches->master->status check with 'WIP' action]
+    if: ${{ github.event_name == 'pull_request' }}  # WIP only works during PRs
     runs-on: ubuntu-latest
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
