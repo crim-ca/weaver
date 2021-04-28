@@ -32,11 +32,12 @@ jobs:
           LABEL_MAPPINGS_FILE: .github/labeler-files.yml
   wip:
     # reference: https://github.com/wip/action
-    # mark PRs with 'WIP' in title as pending
-    # then, block merge of these branches using [settings->branches->master->status check with 'WIP' action]
+    # mark PRs with following keywords in the title: wip, work in progress, :construction:
+    # blocks merge of these branches using requirement:
+    #   [Settings > Branch > master > Protect matching branches > Require > check status with "WIP (action)"]
     if: ${{ github.event_name == 'pull_request' }}  # WIP only works during PRs
     runs-on: ubuntu-latest
-    env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: wip/action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
