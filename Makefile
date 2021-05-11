@@ -456,10 +456,10 @@ $(FIXES): fix-%: install-dev fix-%-only
 fix: fix-all 	## alias for 'fix-all' target
 
 .PHONY: fix-only
-fix-only: $(addsuffix -only, $(FIXES))
+fix-only: $(addsuffix -only, $(FIXES))	## run all automatic fixes without development dependencies pre-install
 
 .PHONY: fix-all
-fix-all: install-dev $(FIXES)  ## fix all code check problems automatically
+fix-all: install-dev $(FIXES)  ## fix all code check problems automatically after install of development dependencies
 
 .PHONY: fix-imports-only
 fix-imports-only: mkdir-reports	## apply import code checks corrections
@@ -494,7 +494,7 @@ fix-docf-only: mkdir-reports  ## fix some PEP8 code documentation style problems
 		1> >(tee "$(REPORTS_DIR)/fixed-docf.txt")'
 
 .PHONY: fixme-list-only
-fixme-list-only: mkdir-reports  	## run linting code style checks
+fixme-list-only: mkdir-reports  	## attempt auto-fix all linting code styles errors reported by 'check-lint'
 	@echo "Listing code that requires fixes..."
 	@echo '[MISCELLANEOUS]\nnotes=FIXME,TODO,HACK' > "$(REPORTS_DIR)/fixmerc"
 	@bash -c '$(CONDA_CMD) \
@@ -507,12 +507,12 @@ fixme-list-only: mkdir-reports  	## run linting code style checks
 		1> >(tee "$(REPORTS_DIR)/fixme.txt")'
 
 .PHONY: fixme-list
-fixme-list: install-dev fixme-list-only
+fixme-list: install-dev fixme-list-only  ## attempt auto-fix of linting code styles errors after dependencies install
 
 ## -- Documentation targets ----------------------------------------------------------------------------------------- ##
 
-.PHONY: docs-build	## generate HTML documentation with Sphinx
-docs-build: clean-docs
+.PHONY: docs-build
+docs-build: clean-docs	## generate HTML documentation with Sphinx
 	@echo "Generating docs with Sphinx..."
 	@bash -c '$(CONDA_CMD) $(MAKE) -C "$(APP_ROOT)/docs" html'
 
