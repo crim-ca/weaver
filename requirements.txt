@@ -46,11 +46,7 @@ pyramid_mako
 python-dateutil
 pyramid_rewrite
 pytz
-# no viable pywps version with Python>3.5 dependencies
-# use '4.2.4' plus a few commits that provide fix, but not yet released
-# FIXME: https://github.com/geopython/pywps/issues/568
-## git+https://github.com/fmigneault/pywps.git@799fb14f31533630ce08c171f844294730861b1a#egg=pywps
-git+https://github.com/geopython/pywps.git@pywps-4.4#egg=pywps
+pywps==4.4.3
 pyyaml>=5.2
 requests
 requests_file

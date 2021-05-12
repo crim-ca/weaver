@@ -1171,8 +1171,8 @@ class WpsPackage(Process):
         #   since href is already handled (pulled and staged locally), use it directly to avoid double fetch with CWL
         #   validate using the internal '_file' instead of 'file' otherwise we trigger the fetch
         #   normally, file should be pulled an this check should fail
-        if input_definition._file and os.path.isfile(input_definition._file):     # noqa: W0212
-            input_location = input_definition._file                               # noqa: W0212
+        if input_definition._iohandler._file and os.path.isfile(input_definition._iohandler._file):  # noqa: W0212
+            input_location = input_definition._iohandler._file                                       # noqa: W0212
         # if source type is data, we actually need to call 'data' (without fetch of remote file, already fetched)
         # value of 'file' in this case points to a local file path where the wanted link was dumped as raw data
         if input_definition.source_type == SOURCE_TYPE.DATA:
