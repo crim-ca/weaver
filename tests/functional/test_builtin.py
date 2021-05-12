@@ -35,7 +35,7 @@ class BuiltinAppTest(WpsPackageConfigBase):
         # register builtin processes from scratch to have clean state
         self.process_store.clear_processes()
         register_builtin_processes(self.settings)
-    
+
     def test_processes_jobControlOptions(self):
         resp = self.app.get("/processes", headers=self.json_headers)
         assert resp.status_code == 200
