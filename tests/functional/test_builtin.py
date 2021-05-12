@@ -35,6 +35,13 @@ class BuiltinAppTest(WpsPackageConfigBase):
         # register builtin processes from scratch to have clean state
         self.process_store.clear_processes()
         register_builtin_processes(self.settings)
+    
+    def test_processes_jobControlOptions(self):
+        resp = self.app.get("/processes", headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.content_type in CONTENT_TYPE_APP_JSON
+        assert isinstance(resp.json["processes"], list)
+        assert all([len(process['jobControlOptions']) > 0 for process in resp.json["processes"]])
 
     def test_jsonarray2netcdf_describe(self):
         resp = self.app.get("/processes/jsonarray2netcdf", headers=self.json_headers)
