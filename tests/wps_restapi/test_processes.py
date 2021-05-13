@@ -22,6 +22,7 @@ from tests.utils import (
 from weaver.exceptions import JobNotFound, ProcessNotFound
 from weaver.execute import (
     EXECUTE_CONTROL_OPTION_ASYNC,
+    EXECUTE_CONTROL_OPTION_SYNC,
     EXECUTE_MODE_ASYNC,
     EXECUTE_MODE_SYNC,
     EXECUTE_RESPONSE_DOCUMENT,
@@ -116,7 +117,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                 "process": {
                     "id": process_id,
                     "title": "Test process '{}'.".format(process_id),
-                }
+                },
             },
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication",
             "executionUnit": [
@@ -126,7 +127,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                 #   hostname cannot have underscores according to [RFC-1123](https://www.ietf.org/rfc/rfc1123.txt)
                 #   schema validator of Reference URL will appropriately raise such invalid string
                 {"href": "http://weaver.test/{}.cwl".format(process_id)}
-            ]
+            ],
         }
 
     @staticmethod
@@ -166,6 +167,38 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         processes_id = [p["id"] for p in resp.json["processes"]]
         assert self.process_public.identifier in processes_id
         assert self.process_private.identifier not in processes_id
+
+    def test_set_jobControlOptions_async_execute(self):
+        path = "/processes"
+        process_name = self.fully_qualified_test_process_name()
+        process_data = self.get_process_deploy_template(process_name)
+        process_data["processDescription"]["jobControlOptions"] = [EXECUTE_CONTROL_OPTION_ASYNC]
+        package_mock = mocked_process_package()
+        with contextlib.ExitStack() as stack:
+            for pkg in package_mock:
+                stack.enter_context(pkg)
+            resp = self.app.post_json(path, params=process_data, headers=self.json_headers, expect_errors=True)
+            assert resp.status_code == 201
+            assert resp.json["processSummary"]["id"] == process_name
+
+        process = self.process_store.fetch_by_id(process_name)
+        assert EXECUTE_CONTROL_OPTION_ASYNC in process["jobControlOptions"]
+
+    def test_set_jobControlOptions_sync_execute(self):
+        path = "/processes"
+        process_name = self.fully_qualified_test_process_name()
+        process_data = self.get_process_deploy_template(process_name)
+        process_data["processDescription"]["jobControlOptions"] = [EXECUTE_CONTROL_OPTION_SYNC]
+        package_mock = mocked_process_package()
+        with contextlib.ExitStack() as stack:
+            for pkg in package_mock:
+                stack.enter_context(pkg)
+            resp = self.app.post_json(path, params=process_data, headers=self.json_headers, expect_errors=True)
+            assert resp.status_code == 201
+            assert resp.json["processSummary"]["id"] == process_name
+
+        process = self.process_store.fetch_by_id(process_name)
+        assert EXECUTE_CONTROL_OPTION_SYNC in process["jobControlOptions"]
 
     def test_get_processes_invalid_schemas_handled(self):
         path = "/processes"
