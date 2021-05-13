@@ -117,7 +117,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                 "process": {
                     "id": process_id,
                     "title": "Test process '{}'.".format(process_id),
-                },
+                }
             },
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication",
             "executionUnit": [
@@ -127,7 +127,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                 #   hostname cannot have underscores according to [RFC-1123](https://www.ietf.org/rfc/rfc1123.txt)
                 #   schema validator of Reference URL will appropriately raise such invalid string
                 {"href": "http://weaver.test/{}.cwl".format(process_id)}
-            ],
+            ]
         }
 
     @staticmethod
