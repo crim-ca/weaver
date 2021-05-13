@@ -160,7 +160,8 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             assert "version" in process and isinstance(process["version"], str)
             assert "keywords" in process and isinstance(process["keywords"], list)
             assert "metadata" in process and isinstance(process["metadata"], list)
-            assert len(process["jobControlOptions"]) == 1 and 'async-execute' in process["jobControlOptions"]
+            assert len(process["jobControlOptions"]
+                       ) == 1 and EXECUTE_CONTROL_OPTION_ASYNC in process["jobControlOptions"]
 
         processes_id = [p["id"] for p in resp.json["processes"]]
         assert self.process_public.identifier in processes_id
