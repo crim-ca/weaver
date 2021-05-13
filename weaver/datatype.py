@@ -56,6 +56,7 @@ class Base(dict):
     Explicitly overridden ``getter``/``setter`` attributes are called instead of ``dict``-key ``get``/``set``-item
     to ensure corresponding checks and/or value adjustments are executed before applying it to the sub-``dict``.
     """
+
     def __setattr__(self, item, value):
         # use the existing property setter if defined
         prop = getattr(type(self), item)

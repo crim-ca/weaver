@@ -176,6 +176,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
     """
     Registry for processes. Uses `MongoDB` to store processes and attributes.
     """
+
     def __init__(self, *args, **kwargs):
         db_args, db_kwargs = MongodbStore.get_args_kwargs(*args, **kwargs)
         StoreProcesses.__init__(self)
@@ -387,6 +388,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
     """
     Registry for process jobs tracking. Uses `MongoDB` to store job attributes.
     """
+
     def __init__(self, *args, **kwargs):
         db_args, db_kwargs = MongodbStore.get_args_kwargs(*args, **kwargs)
         StoreJobs.__init__(self)
@@ -637,6 +639,7 @@ class MongodbQuoteStore(StoreQuotes, MongodbStore):
     """
     Registry for quotes. Uses `MongoDB` to store quote attributes.
     """
+
     def __init__(self, *args, **kwargs):
         db_args, db_kwargs = MongodbStore.get_args_kwargs(*args, **kwargs)
         StoreQuotes.__init__(self)
@@ -708,6 +711,7 @@ class MongodbBillStore(StoreBills, MongodbStore):
     """
     Registry for bills. Uses `MongoDB` to store bill attributes.
     """
+
     def __init__(self, *args, **kwargs):
         db_args, db_kwargs = MongodbStore.get_args_kwargs(*args, **kwargs)
         StoreBills.__init__(self)
