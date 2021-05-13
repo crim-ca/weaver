@@ -19,6 +19,8 @@ Fixes:
   (specifically `commit 343d825 <https://github.com/geopython/pywps/commit/343d82539576b1e73eee3102654749c3d3137cff>`_),
   which broke the ``ComplexInput`` work-around to avoid useless of file URLs
   (see issue `#526 <https://github.com/geopython/pywps/issues/526>`_).
+- Fix default execution mode specification in process job control options
+  (fixes `#182 <https://github.com/opengeospatial/ogcapi-processes/pull/182>`_).
 
 `3.1.0 <https://github.com/crim-ca/weaver/tree/3.1.0>`_ (2021-04-23)
 ========================================================================

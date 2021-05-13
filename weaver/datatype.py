@@ -832,8 +832,8 @@ class Process(Base):
     def jobControlOptions(self):  # noqa: N802
         # type: () -> List[str]
         self.setdefault("jobControlOptions", [EXECUTE_CONTROL_OPTION_ASYNC])
-        if len(self["jobControlOptions"]) > 0:
-            self["jobControlOptions"] = [EXECUTE_CONTROL_OPTION_ASYNC]
+        if len(self["jobControlOptions"]) == 0:
+            self["jobControlOptions"].append(EXECUTE_CONTROL_OPTION_ASYNC)
         return self.get("jobControlOptions")
 
     @property
