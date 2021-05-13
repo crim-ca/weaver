@@ -469,12 +469,24 @@ fix-imports-only: mkdir-reports	## apply import code checks corrections
 		isort --recursive $(APP_ROOT) \
 		1> >(tee "$(REPORTS_DIR)/fixed-imports.txt")'
 
+# FIXME: https://github.com/PyCQA/pycodestyle/issues/996
+# Tool "pycodestyle" doesn't respect "# noqa: E241" locally, but "flake8" and other tools do.
+# Because "autopep8" uses "pycodestyle", it is impossible to disable locally extra spaces (as in tests to align values).
+# Override the codes here from "setup.cfg" because "autopep8" also uses the "flake8" config, and we want to preserve
+# global detection of those errors (typos, bad indents), unless explicitly added and excluded for readability purposes.
+# WARNING: this will cause inconsistencies between what 'check-lint' detects and what 'fix-lint' can actually fix
+_DEFAULT_SETUP_ERROR := E126,E226,E402,F401,W503,W504
+_EXTRA_SETUP_ERROR := E241
+
 .PHONY: fix-lint-only
 fix-lint-only: mkdir-reports  ## fix some PEP8 code style problems automatically
 	@echo "Fixing PEP8 code style problems..."
 	@-rm -fr "$(REPORTS_DIR)/fixed-lint.txt"
 	@bash -c '$(CONDA_CMD) \
-		autopep8 -v -j 0 -i -r $(APP_ROOT) \
+		autopep8 \
+		 	--global-config "$(APP_ROOT)/setup.cfg" \
+		 	--ignore "$(_DEFAULT_SETUP_ERROR),$(_EXTRA_SETUP_ERROR)" \
+			-v -j 0 -i -r $(APP_ROOT) \
 		1> >(tee "$(REPORTS_DIR)/fixed-lint.txt")'
 
 # FIXME: move parameters to setup.cfg when implemented (https://github.com/myint/docformatter/issues/10)
