@@ -194,28 +194,36 @@ def get_queried_jobs(request):
     """
     Retrieve the list of jobs which can be filtered, sorted, paged and categorized using query parameters.
     """
+
     settings = get_settings(request)
     service, process = validate_service_process(request)
-    detail = asbool(request.params.get("detail", False))
-    page = request.params.get("page", "0")
-    page = int(page) if str.isnumeric(page) else 0
-    limit = request.params.get("limit", "10")
-    limit = int(limit) if str.isnumeric(limit) else 10
-    email = request.params.get("notification_email", None)
-    filters = {
-        "page": page,
-        "limit": limit,
-        # split by comma and filter empty stings
-        "tags": list(filter(lambda s: s, request.params.get("tags", "").split(","))),
-        "access": request.params.get("access", None),
-        "status": request.params.get("status", None),
-        "sort": request.params.get("sort", sort.SORT_CREATED),
-        "notification_email": encrypt_email(email, settings) if email else None,
-        # service and process can be specified by query (short route) or by path (full route)
-        "process": process,
-        "service": service,
-    }
-    groups = request.params.get("groups", "")
+
+    filters = {**request.params, "process": process}
+
+    filters["detail"] = asbool(request.params.get("detail"))
+
+    if request.params.get("notification_email", False):
+        filters["notification_email"] = request.params["notification_email"]
+
+    if request.params.get("datetime_interval", False):
+        filters["datetime_interval"] = request.params["datetime_interval"].replace(' ','+')
+
+    filters = sd.GetJobsQueries().deserialize(filters)
+
+    limit = filters["limit"]
+    page = filters["page"]
+    detail = asbool(filters.get("detail", False))
+    groups = filters["groups"]
+
+    filters["tags"] = list(filter(lambda s: s, filters.get("tags").split(",")))
+    filters["notification_email"] = encrypt_email(filters["notification_email"], settings) if filters.get("notification_email", False) else None
+    filters["service"] = service
+    filters["access"] = request.params.get("access", None)
+    filters["status"] = request.params.get("status", None)
+
+    del filters["detail"]
+    del filters["groups"]
+
     groups = groups.split(",") if groups else None
     store = get_db(request).get_store(StoreJobs)
     items, total = store.find_jobs(request=request, group_by=groups, **filters)

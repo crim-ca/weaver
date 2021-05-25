@@ -2,6 +2,7 @@
 Stores to read/write data to from/to `MongoDB` using pymongo.
 """
 
+from dateutil import parser as dateparser
 import logging
 from typing import TYPE_CHECKING
 
@@ -42,6 +43,7 @@ from weaver.sort import (
     SORT_USER
 )
 from weaver.status import JOB_STATUS_CATEGORIES, STATUS_ACCEPTED, map_status
+from weaver.store import datetime_interval_parser
 from weaver.store.base import StoreBills, StoreJobs, StoreProcesses, StoreQuotes, StoreServices
 from weaver.utils import get_base_url, get_sane_name, get_weaver_url, islambda, now
 from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC, VISIBILITY_VALUES
@@ -405,6 +407,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
                  access=None,               # type: Optional[str]
                  notification_email=None,   # type: Optional[str]
                  accept_language=None,      # type: Optional[str]
+                 created_date=None,         # type: Optional[str]
                  ):                         # type: (...) -> Job
         """
         Creates a new :class:`Job` and stores it in mongodb.
@@ -422,6 +425,9 @@ class MongodbJobStore(StoreJobs, MongodbStore):
                 tags.append(EXECUTE_MODE_SYNC)
             if not access:
                 access = VISIBILITY_PRIVATE
+
+            created = dateparser.parse(created_date) if created_date else now()
+
             new_job = Job({
                 "task_id": task_id,
                 "user_id": user_id,
@@ -432,7 +438,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
                 "execute_async": execute_async,
                 "is_workflow": is_workflow,
                 "is_local": is_local,
-                "created": now(),
+                "created": created,
                 "tags": list(set(tags)),  # remove duplicates
                 "access": access,
                 "notification_email": notification_email,
@@ -499,6 +505,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
                   sort=None,                # type: Optional[str]
                   page=0,                   # type: int
                   limit=10,                 # type: int
+                  datetime_interval=None,   # type: Optional[str]
                   group_by=None,            # type: Optional[Union[str, List[str]]]
                   request=None,             # type: Optional[Request]
                   ):                        # type: (...) -> Union[JobListAndCount, JobCategoriesAndCount]
@@ -515,6 +522,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
         :param sort: field which is used for sorting results (default: creation date, descending).
         :param page: page number to return when using result paging (only when not using ``group_by``).
         :param limit: number of jobs per page when using result paging (only when not using ``group_by``).
+        :param datetime_interval: field witch is used for filtering data by creation date with a given date or interval of date.
         :param group_by: one or many fields specifying categories to form matching groups of jobs (paging disabled).
 
         :returns: (list of jobs matching paging OR list of {categories, list of jobs, count}) AND total of matched job
@@ -581,6 +589,26 @@ class MongodbJobStore(StoreJobs, MongodbStore):
 
         if service is not None:
             search_filters["service"] = service
+
+
+        if datetime_interval is not None:
+            datetime_interval = datetime_interval_parser(datetime_interval)
+            query = {}
+
+            try:
+                if datetime_interval.get("after", False):
+                    query["$gte"] = datetime_interval["after"]
+
+                if datetime_interval.get("before", False):
+                    query["$lte"] = datetime_interval["before"]
+                
+                if datetime_interval.get("match", False):
+                    query = datetime_interval["match"]
+
+            except Exception as ex:
+                raise JobRegistrationError("Error occurred during datetime job filtering: [{}]".format(repr(ex)))
+            
+            search_filters["created"] = query
 
         if sort is None:
             sort = SORT_CREATED

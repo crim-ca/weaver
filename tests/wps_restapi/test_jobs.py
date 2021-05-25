@@ -1,4 +1,5 @@
 import contextlib
+from dateutil import parser as dateparser
 import json
 import unittest
 import warnings
@@ -18,7 +19,8 @@ from tests.utils import (
     setup_config_with_mongodb,
     setup_mongodb_jobstore,
     setup_mongodb_processstore,
-    setup_mongodb_servicestore
+    setup_mongodb_servicestore,
+    generate_test_datetimes
 )
 from weaver.datatype import Job, Service
 from weaver.execute import EXECUTE_MODE_ASYNC, EXECUTE_RESPONSE_DOCUMENT, EXECUTE_TRANSMISSION_MODE_REFERENCE
@@ -31,6 +33,7 @@ from weaver.status import (
     STATUS_FAILED,
     STATUS_SUCCEEDED
 )
+from weaver.store import DATETIME_INTERVAL_CLOSED_SYMBOL, DATETIME_INTERVAL_OPEN_START_SYMBOL, DATETIME_INTERVAL_OPEN_END_SYMBOL
 from weaver.utils import get_path_kvp
 from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC
 from weaver.warning import TimeZoneInfoAlreadySetWarning
@@ -39,6 +42,7 @@ from weaver.wps_restapi import swagger_definitions as sd
 if TYPE_CHECKING:
     from typing import Iterable, List, Tuple, Union
 
+TEST_DATE_INTERVALL = generate_test_datetimes()
 
 class WpsRestApiJobsTest(unittest.TestCase):
     @classmethod
@@ -95,21 +99,21 @@ class WpsRestApiJobsTest(unittest.TestCase):
                       user_id=self.user_admin_id, status=STATUS_FAILED, progress=55, access=VISIBILITY_PRIVATE)
         # job public/private service/process combinations
         self.make_job(task_id="5555-5555-5555-5555",
-                      process=self.process_public.identifier, service=self.service_public.name,
+                      process=self.process_public.identifier, service=self.service_public.name, created_date=TEST_DATE_INTERVALL[0],
                       user_id=self.user_editor1_id, status=STATUS_FAILED, progress=99, access=VISIBILITY_PUBLIC)
         self.make_job(task_id="6666-6666-6666-6666",
-                      process=self.process_private.identifier, service=self.service_public.name,
+                      process=self.process_private.identifier, service=self.service_public.name, created_date=TEST_DATE_INTERVALL[1],
                       user_id=self.user_editor1_id, status=STATUS_FAILED, progress=99, access=VISIBILITY_PUBLIC)
         self.make_job(task_id="7777-7777-7777-7777",
-                      process=self.process_public.identifier, service=self.service_private.name,
+                      process=self.process_public.identifier, service=self.service_private.name, created_date=TEST_DATE_INTERVALL[2],
                       user_id=self.user_editor1_id, status=STATUS_FAILED, progress=99, access=VISIBILITY_PUBLIC)
         self.make_job(task_id="8888-8888-8888-8888",
-                      process=self.process_private.identifier, service=self.service_private.name,
+                      process=self.process_private.identifier, service=self.service_private.name, created_date=TEST_DATE_INTERVALL[3],
                       user_id=self.user_editor1_id, status=STATUS_FAILED, progress=99, access=VISIBILITY_PUBLIC)
 
-    def make_job(self, task_id, process, service, user_id, status, progress, access):
+    def make_job(self, task_id, process, service, user_id, status, progress, access, created_date=None):
         job = self.job_store.save_job(task_id=task_id, process=process, service=service, is_workflow=False,
-                                      user_id=user_id, execute_async=True, access=access)
+                                      user_id=user_id, execute_async=True, access=access, created_date=created_date)
         job.status = status
         if status in JOB_STATUS_CATEGORIES[STATUS_CATEGORY_FINISHED]:
             job.mark_finished()
@@ -503,3 +507,89 @@ class WpsRestApiJobsTest(unittest.TestCase):
                 job_match = all(job in job_ids for job in resp.json["jobs"])
                 test_values = dict(path=path, access=access, user_id=user_id)
                 assert job_match, self.message_with_jobs_diffs(resp.json["jobs"], job_ids, test_values, index=i)
+
+    def test_jobs_list_with_limit_client(self):
+        limit_parameter = 20
+        path = get_path_kvp(sd.jobs_service.path, limit=limit_parameter)
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        assert "limit" in resp.json and isinstance(resp.json["limit"], int)
+        assert resp.json["limit"] == limit_parameter
+        assert len(resp.json["jobs"]) <= limit_parameter
+
+    def test_jobs_list_with_limit_api(self):
+        resp = self.app.get(sd.jobs_service.path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        assert "limit" in resp.json and isinstance(resp.json["limit"], int)
+        assert len(resp.json["jobs"]) <= resp.json["limit"]
+    
+    def test_not_required_fields(self):
+        uri = sd.openapi_json_service.path
+        resp = self.app.get(uri, headers=self.json_headers)
+        assert not resp.json["parameters"]["page"]["required"]
+        assert not resp.json["parameters"]["limit"]["required"]
+
+    def test_jobs_datetime_before(self):
+        datetime_before = DATETIME_INTERVAL_OPEN_START_SYMBOL+TEST_DATE_INTERVALL[0]
+        path = get_path_kvp(sd.jobs_service.path, datetime_interval=datetime_before)
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        assert len(resp.json["jobs"]) == 4
+        for job in resp.json["jobs"]:
+            base_uri = sd.jobs_service.path + "/{}".format(job)
+            path =  get_path_kvp(base_uri)
+            resp = self.app.get(path, headers=self.json_headers)
+            assert resp.status_code == 200
+            assert resp.content_type == CONTENT_TYPE_APP_JSON
+            assert dateparser.parse(resp.json["created"]) <= dateparser.parse(datetime_before.replace(DATETIME_INTERVAL_OPEN_START_SYMBOL,""))
+
+    def test_jobs_datetime_after(self):
+        datetime_after = str(TEST_DATE_INTERVALL[2]+DATETIME_INTERVAL_OPEN_END_SYMBOL)
+        path = get_path_kvp(sd.jobs_service.path, datetime_interval=datetime_after)
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        assert len(resp.json["jobs"]) == 2
+        for job in resp.json["jobs"]:
+            base_uri = sd.jobs_service.path + "/{}".format(job)
+            path =  get_path_kvp(base_uri)
+            resp = self.app.get(path, headers=self.json_headers)
+            assert resp.status_code == 200
+            assert resp.content_type == CONTENT_TYPE_APP_JSON
+            assert dateparser.parse(resp.json["created"]) >= dateparser.parse(datetime_after.replace(DATETIME_INTERVAL_OPEN_END_SYMBOL,""))
+    
+    def test_jobs_datetime_interval(self):
+        datetime_interval = TEST_DATE_INTERVALL[1]+DATETIME_INTERVAL_CLOSED_SYMBOL+TEST_DATE_INTERVALL[3]
+        path = get_path_kvp(sd.jobs_service.path, datetime_interval=datetime_interval)
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == CONTENT_TYPE_APP_JSON
+
+        datetime_after, datetime_before = datetime_interval.split(DATETIME_INTERVAL_CLOSED_SYMBOL)
+        assert len(resp.json["jobs"]) == 3
+        for job in resp.json["jobs"]:
+            base_uri = sd.jobs_service.path + "/{}".format(job)
+            path =  get_path_kvp(base_uri)
+            resp = self.app.get(path, headers=self.json_headers)
+            assert resp.status_code == 200
+            assert resp.content_type == CONTENT_TYPE_APP_JSON
+            assert dateparser.parse(resp.json["created"]) >= dateparser.parse(datetime_after)
+            assert dateparser.parse(resp.json["created"]) <= dateparser.parse(datetime_before)
+    
+    def test_jobs_datetime_match(self):
+        datetime_match = TEST_DATE_INTERVALL[1]
+        path = get_path_kvp(sd.jobs_service.path, datetime_interval=datetime_match)
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        assert len(resp.json["jobs"]) == 1
+        for job in resp.json["jobs"]:
+            base_uri = sd.jobs_service.path + "/{}".format(job)
+            path =  get_path_kvp(base_uri)
+            resp = self.app.get(path, headers=self.json_headers)
+            assert resp.status_code == 200
+            assert resp.content_type == CONTENT_TYPE_APP_JSON
+            assert dateparser.parse(resp.json["created"]) == dateparser.parse(datetime_match)

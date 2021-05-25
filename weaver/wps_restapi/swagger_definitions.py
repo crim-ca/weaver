@@ -228,6 +228,18 @@ class URL(ExtendedSchemaNode):
     format = "url"
 
 
+class DATETIME_INTERVAL(ExtendedSchemaNode):
+    schema_type = String
+    description = "DateTime name pattern."
+
+    regex_datetime = r"(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d+)?(([+-]\d\d:\d\d)|Z)?)"
+    regex_interval_closed = r"{i}\/{i}".format(i=regex_datetime)
+    regex_interval_open_start = r"\.\.\/{}".format(regex_datetime)
+    regex_interval_open_end = r"{}\/\.\.".format(regex_datetime)
+
+    pattern = "^{}|{}|{}|{}$".format(regex_datetime, regex_interval_closed, regex_interval_open_start, regex_interval_open_end)
+
+
 class S3Bucket(ExtendedSchemaNode):
     schema_type = String
     description = "S3 bucket shorthand URL representation [s3://<bucket>/<job-uuid>/<output>.ext]"
@@ -1947,7 +1959,7 @@ class CreatedQuotedJobStatusSchema(CreatedJobStatusSchema):
 
 class GetPagingJobsSchema(ExtendedMappingSchema):
     jobs = JobCollection()
-    limit = ExtendedSchemaNode(Integer(), default=10)
+    limit = ExtendedSchemaNode(Integer(), missing=10, default=10, validator=Range(min=0, max=10000))
     page = ExtendedSchemaNode(Integer(), validator=Range(min=0))
 
 
@@ -2788,17 +2800,19 @@ class PostProcessJobsEndpoint(ProcessPath):
 
 class GetJobsQueries(ExtendedMappingSchema):
     detail = ExtendedSchemaNode(Boolean(), description="Provide job details instead of IDs.",
-                                default=False, example=True, missing=drop)
+                                default=False, example=True, missing=False)
     groups = ExtendedSchemaNode(String(),
                                 description="Comma-separated list of grouping fields with which to list jobs.",
-                                default=False, example="process,service", missing=drop)
-    page = ExtendedSchemaNode(Integer(), missing=drop, default=0, validator=Range(min=0))
-    limit = ExtendedSchemaNode(Integer(), missing=drop, default=10)
+                                default=False, example="process,service", missing=False)
+    page = ExtendedSchemaNode(Integer(), missing=0, default=0, validator=Range(min=0))
+    limit = ExtendedSchemaNode(Integer(), missing=10, default=10, validator=Range(min=0, max=10000))
+    datetime_interval = DATETIME_INTERVAL(missing=None, default=None)
     status = JobStatusEnum(missing=drop)
     process = AnyIdentifier(missing=None)
     provider = ExtendedSchemaNode(String(), missing=drop, default=None)
     sort = JobSortEnum(missing=drop)
-    tags = ExtendedSchemaNode(String(), missing=drop, default=None,
+    notification_email = ExtendedSchemaNode(String(), missing=drop, validator=Email())
+    tags = ExtendedSchemaNode(String(), missing="", default="",
                               description="Comma-separated values of tags assigned to jobs")
 
 
@@ -2845,7 +2859,7 @@ class ProcessQuoteEndpoint(ProcessPath, QuotePath):
 
 class GetQuotesQueries(ExtendedMappingSchema):
     page = ExtendedSchemaNode(Integer(), missing=drop, default=0)
-    limit = ExtendedSchemaNode(Integer(), missing=drop, default=10)
+    limit = ExtendedSchemaNode(Integer(), missing=10, default=10, validator=Range(min=0, max=10000))
     process = AnyIdentifier(missing=None)
     sort = QuoteSortEnum(missing=drop)
 

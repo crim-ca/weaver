@@ -145,6 +145,7 @@ class StoreJobs(StoreInterface):
                   sort=None,                # type: Optional[str]
                   page=0,                   # type: int
                   limit=10,                 # type: int
+                  datetime_interval=None,   # type: Optional[str]
                   group_by=None,            # type: Optional[Union[str, List[str]]]
                   request=None,             # type: Optional[Request]
                   ):                        # type: (...) -> Union[JobListAndCount, JobCategoriesAndCount]

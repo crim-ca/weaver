@@ -2,6 +2,7 @@
 Utility methods for various TestCase setup operations.
 """
 import contextlib
+from datetime import date
 import os
 import tempfile
 import uuid
@@ -549,3 +550,12 @@ def mocked_aws_s3_bucket_test_file(bucket_name, file_name, file_content="Test fi
         tmp_file.flush()
         s3.upload_file(Bucket=bucket_name, Filename=tmp_file.name, Key=file_name)
     return "s3://{}/{}".format(bucket_name, file_name)
+
+
+def generate_test_datetimes():
+    # type: () -> List[str]
+    """
+    Generates a list of dummy datetimes for testing.
+    """
+    year = date.today().year + 1
+    return ["{}-0{}-02T03:32:38.487000+00:00".format(year, month) for month in range(1,5)]
