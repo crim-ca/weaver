@@ -4,9 +4,9 @@ Stores to read/write data to from/to `MongoDB` using pymongo.
 
 import logging
 from typing import TYPE_CHECKING
-from dateutil import parser as dateparser
 
 import pymongo
+from dateutil import parser as dateparser
 from pymongo import ASCENDING, DESCENDING
 from pymongo.errors import DuplicateKeyError
 from pyramid.request import Request

@@ -5,13 +5,14 @@ import warnings
 from collections import OrderedDict
 from distutils.version import LooseVersion
 from typing import TYPE_CHECKING
-from dateutil import parser as dateparser
 
 import mock
 import pyramid.testing
 import pytest
+from dateutil import parser as dateparser
 
 from tests.utils import (
+    generate_test_datetimes,
     get_module_version,
     get_test_weaver_app,
     mocked_process_job_runner,
@@ -19,8 +20,7 @@ from tests.utils import (
     setup_config_with_mongodb,
     setup_mongodb_jobstore,
     setup_mongodb_processstore,
-    setup_mongodb_servicestore,
-    generate_test_datetimes
+    setup_mongodb_servicestore
 )
 from weaver.datatype import Job, Service
 from weaver.execute import EXECUTE_MODE_ASYNC, EXECUTE_RESPONSE_DOCUMENT, EXECUTE_TRANSMISSION_MODE_REFERENCE
@@ -35,8 +35,8 @@ from weaver.status import (
 )
 from weaver.store import (
     DATETIME_INTERVAL_CLOSED_SYMBOL,
-    DATETIME_INTERVAL_OPEN_START_SYMBOL,
-    DATETIME_INTERVAL_OPEN_END_SYMBOL
+    DATETIME_INTERVAL_OPEN_END_SYMBOL,
+    DATETIME_INTERVAL_OPEN_START_SYMBOL
 )
 from weaver.utils import get_path_kvp
 from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC
