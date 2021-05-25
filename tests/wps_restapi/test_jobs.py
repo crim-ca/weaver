@@ -33,7 +33,7 @@ from weaver.status import (
     STATUS_FAILED,
     STATUS_SUCCEEDED
 )
-from weaver.store import (
+from weaver.wps_restapi.swagger_definitions import (
     DATETIME_INTERVAL_CLOSED_SYMBOL,
     DATETIME_INTERVAL_OPEN_END_SYMBOL,
     DATETIME_INTERVAL_OPEN_START_SYMBOL
@@ -45,8 +45,6 @@ from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
     from typing import Iterable, List, Tuple, Union
-
-TEST_DATE_INTERVALL = generate_test_datetimes()
 
 
 class WpsRestApiJobsTest(unittest.TestCase):
@@ -60,6 +58,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         cls.config = setup_config_with_mongodb(settings=settings)
         cls.app = get_test_weaver_app(config=cls.config)
         cls.json_headers = {"Accept": CONTENT_TYPE_APP_JSON, "Content-Type": CONTENT_TYPE_APP_JSON}
+        cls.datetime_interval = generate_test_datetimes()
 
     @classmethod
     def tearDownClass(cls):
@@ -104,21 +103,24 @@ class WpsRestApiJobsTest(unittest.TestCase):
                       user_id=self.user_admin_id, status=STATUS_FAILED, progress=55, access=VISIBILITY_PRIVATE)
         # job public/private service/process combinations
         self.make_job(task_id="5555-5555-5555-5555", process=self.process_public.identifier,
-                      service=self.service_public.name, created_date=TEST_DATE_INTERVALL[0],
+                      service=self.service_public.name, created=self.datetime_interval[0],
                       user_id=self.user_editor1_id, status=STATUS_FAILED, progress=99, access=VISIBILITY_PUBLIC)
         self.make_job(task_id="6666-6666-6666-6666", process=self.process_private.identifier,
-                      service=self.service_public.name, created_date=TEST_DATE_INTERVALL[1],
+                      service=self.service_public.name, created=self.datetime_interval[1],
                       user_id=self.user_editor1_id, status=STATUS_FAILED, progress=99, access=VISIBILITY_PUBLIC)
         self.make_job(task_id="7777-7777-7777-7777", process=self.process_public.identifier,
-                      service=self.service_private.name, created_date=TEST_DATE_INTERVALL[2],
+                      service=self.service_private.name, created=self.datetime_interval[2],
                       user_id=self.user_editor1_id, status=STATUS_FAILED, progress=99, access=VISIBILITY_PUBLIC)
         self.make_job(task_id="8888-8888-8888-8888", process=self.process_private.identifier,
-                      service=self.service_private.name, created_date=TEST_DATE_INTERVALL[3],
+                      service=self.service_private.name, created=self.datetime_interval[3],
                       user_id=self.user_editor1_id, status=STATUS_FAILED, progress=99, access=VISIBILITY_PUBLIC)
 
-    def make_job(self, task_id, process, service, user_id, status, progress, access, created_date=None):
+    def make_job(self, task_id, process, service, user_id, status, progress, access, created=None):
+
+        created = dateparser.parse(created) if created else None
+
         job = self.job_store.save_job(task_id=task_id, process=process, service=service, is_workflow=False,
-                                      user_id=user_id, execute_async=True, access=access, created_date=created_date)
+                                      user_id=user_id, execute_async=True, access=access, created=created)
         job.status = status
         if status in JOB_STATUS_CATEGORIES[STATUS_CATEGORY_FINISHED]:
             job.mark_finished()
@@ -537,7 +539,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         assert not resp.json["parameters"]["limit"]["required"]
 
     def test_jobs_datetime_before(self):
-        datetime_before = DATETIME_INTERVAL_OPEN_START_SYMBOL+TEST_DATE_INTERVALL[0]
+        datetime_before = DATETIME_INTERVAL_OPEN_START_SYMBOL + self.datetime_interval[0]
         path = get_path_kvp(sd.jobs_service.path, datetime_interval=datetime_before)
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
@@ -553,7 +555,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
                 datetime_before.replace(DATETIME_INTERVAL_OPEN_START_SYMBOL, ""))
 
     def test_jobs_datetime_after(self):
-        datetime_after = str(TEST_DATE_INTERVALL[2]+DATETIME_INTERVAL_OPEN_END_SYMBOL)
+        datetime_after = str(self.datetime_interval[2] + DATETIME_INTERVAL_OPEN_END_SYMBOL)
         path = get_path_kvp(sd.jobs_service.path, datetime_interval=datetime_after)
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
@@ -569,7 +571,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
                 datetime_after.replace(DATETIME_INTERVAL_OPEN_END_SYMBOL, ""))
 
     def test_jobs_datetime_interval(self):
-        datetime_interval = TEST_DATE_INTERVALL[1]+DATETIME_INTERVAL_CLOSED_SYMBOL+TEST_DATE_INTERVALL[3]
+        datetime_interval = self.datetime_interval[1] + DATETIME_INTERVAL_CLOSED_SYMBOL+self.datetime_interval[3]
         path = get_path_kvp(sd.jobs_service.path, datetime_interval=datetime_interval)
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
@@ -587,7 +589,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
             assert dateparser.parse(resp.json["created"]) <= dateparser.parse(datetime_before)
 
     def test_jobs_datetime_match(self):
-        datetime_match = TEST_DATE_INTERVALL[1]
+        datetime_match = self.datetime_interval[1]
         path = get_path_kvp(sd.jobs_service.path, datetime_interval=datetime_match)
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200

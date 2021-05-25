@@ -6,6 +6,7 @@ so that one can update the swagger without touching any other files after the in
 
 import os
 from typing import TYPE_CHECKING
+from dateutil import parser as dateparser
 
 import yaml
 from colander import DateTime, Email, OneOf, Range, Regex, drop, required
@@ -109,6 +110,10 @@ IO_INFO_IDS = (
 
 OGC_API_REPO_URL = "https://github.com/opengeospatial/ogcapi-processes"
 OGC_API_SCHEMA_URL = "https://raw.githubusercontent.com/opengeospatial/ogcapi-processes"
+
+DATETIME_INTERVAL_CLOSED_SYMBOL = "/"
+DATETIME_INTERVAL_OPEN_START_SYMBOL = "../"
+DATETIME_INTERVAL_OPEN_END_SYMBOL = "/.."
 
 #########################################################
 # Examples
@@ -228,10 +233,14 @@ class URL(ExtendedSchemaNode):
     format = "url"
 
 
-class DATETIME_INTERVAL(ExtendedSchemaNode):
+class DateTimeInterval(ExtendedSchemaNode):
     schema_type = String
-    description = "DateTime name pattern."
-
+    description = "DateTime format against ogcapi, \
+                    to get values before a certain date-time use '../' before the date-time \
+                    to get values after a certain date-time use '/..' after the date-time like the example \
+                    to get values between two date-times use '/' between the date-times \
+                    to get values with a specific date-time just pass the datetime"
+    example = "2022-03-02T03:32:38.487000+00:00/.."
     regex_datetime = r"(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d+)?(([+-]\d\d:\d\d)|Z)?)"
     regex_interval_closed = r"{i}\/{i}".format(i=regex_datetime)
     regex_interval_open_start = r"\.\.\/{}".format(regex_datetime)
@@ -2807,8 +2816,8 @@ class GetJobsQueries(ExtendedMappingSchema):
                                 default=False, example="process,service", missing=False)
     page = ExtendedSchemaNode(Integer(), missing=0, default=0, validator=Range(min=0))
     limit = ExtendedSchemaNode(Integer(), missing=10, default=10, validator=Range(min=0, max=10000))
-    datetime_interval = DATETIME_INTERVAL(missing=None, default=None)
-    status = JobStatusEnum(missing=drop)
+    datetime_interval = DateTimeInterval(missing=None, default=None)
+    status = JobStatusEnum(missing=None)
     process = AnyIdentifier(missing=None)
     provider = ExtendedSchemaNode(String(), missing=drop, default=None)
     sort = JobSortEnum(missing=drop)
@@ -3501,3 +3510,25 @@ def service_api_route_info(service_api, settings):
     # type: (Service, SettingsType) -> ViewInfo
     api_base = wps_restapi_base_path(settings)
     return {"name": service_api.name, "pattern": "{base}{path}".format(base=api_base, path=service_api.path)}
+
+
+def datetime_interval_parser(datetime_interval):
+
+    parsed_datetime = {}
+
+    if datetime_interval.startswith(DATETIME_INTERVAL_OPEN_START_SYMBOL):
+        datetime_interval = datetime_interval.replace(DATETIME_INTERVAL_OPEN_START_SYMBOL, "")
+        parsed_datetime["before"] = dateparser.parse(datetime_interval)
+
+    elif datetime_interval.endswith(DATETIME_INTERVAL_OPEN_END_SYMBOL):
+        datetime_interval = datetime_interval.replace(DATETIME_INTERVAL_OPEN_END_SYMBOL, "")
+        parsed_datetime["after"] = dateparser.parse(datetime_interval)
+
+    elif DATETIME_INTERVAL_CLOSED_SYMBOL in datetime_interval:
+        datetime_interval = datetime_interval.split(DATETIME_INTERVAL_CLOSED_SYMBOL)
+        parsed_datetime["after"] = dateparser.parse(datetime_interval[0])
+        parsed_datetime["before"] = dateparser.parse(datetime_interval[-1])
+    else:
+        parsed_datetime["match"] = dateparser.parse(datetime_interval)
+
+    return parsed_datetime

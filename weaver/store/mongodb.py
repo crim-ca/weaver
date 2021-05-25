@@ -43,7 +43,7 @@ from weaver.sort import (
     SORT_USER
 )
 from weaver.status import JOB_STATUS_CATEGORIES, STATUS_ACCEPTED, map_status
-from weaver.store import datetime_interval_parser
+from weaver.wps_restapi.swagger_definitions import datetime_interval_parser
 from weaver.store.base import StoreBills, StoreJobs, StoreProcesses, StoreQuotes, StoreServices
 from weaver.utils import get_base_url, get_sane_name, get_weaver_url, islambda, now
 from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC, VISIBILITY_VALUES
@@ -407,7 +407,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
                  access=None,               # type: Optional[str]
                  notification_email=None,   # type: Optional[str]
                  accept_language=None,      # type: Optional[str]
-                 created_date=None,         # type: Optional[str]
+                 created=None,         # type: Optional[str]
                  ):                         # type: (...) -> Job
         """
         Creates a new :class:`Job` and stores it in mongodb.
@@ -426,8 +426,6 @@ class MongodbJobStore(StoreJobs, MongodbStore):
             if not access:
                 access = VISIBILITY_PRIVATE
 
-            created = dateparser.parse(created_date) if created_date else now()
-
             new_job = Job({
                 "task_id": task_id,
                 "user_id": user_id,
@@ -438,7 +436,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
                 "execute_async": execute_async,
                 "is_workflow": is_workflow,
                 "is_local": is_local,
-                "created": created,
+                "created": created if created else now(),
                 "tags": list(set(tags)),  # remove duplicates
                 "access": access,
                 "notification_email": notification_email,

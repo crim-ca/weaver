@@ -202,18 +202,15 @@ def get_queried_jobs(request):
 
     filters["detail"] = asbool(request.params.get("detail"))
 
-    if request.params.get("notification_email", False):
-        filters["notification_email"] = request.params["notification_email"]
-
     if request.params.get("datetime_interval", False):
+        # replace white space with '+' since request.params replaces '+' with whitespaces when parsing
         filters["datetime_interval"] = request.params["datetime_interval"].replace(" ", "+")
 
     filters = sd.GetJobsQueries().deserialize(filters)
 
-    limit = filters["limit"]
-    page = filters["page"]
+
     detail = asbool(filters.get("detail", False))
-    groups = filters["groups"]
+    groups = filters["groups"].split(",") if filters["groups"] else None
 
     filters["tags"] = list(filter(lambda s: s, filters.get("tags").split(",")))
     filters["notification_email"] = encrypt_email(
@@ -222,10 +219,9 @@ def get_queried_jobs(request):
     filters["access"] = request.params.get("access", None)
     filters["status"] = request.params.get("status", None)
 
-    del filters["detail"]
-    del filters["groups"]
+    filters.pop("detail", None)
+    filters.pop("groups", None)
 
-    groups = groups.split(",") if groups else None
     store = get_db(request).get_store(StoreJobs)
     items, total = store.find_jobs(request=request, group_by=groups, **filters)
     body = {"total": total}
@@ -238,7 +234,7 @@ def get_queried_jobs(request):
             grouped_jobs["jobs"] = _job_list(grouped_jobs["jobs"])
         body.update({"groups": items})
     else:
-        body.update({"jobs": _job_list(items), "page": page, "limit": limit})
+        body.update({"jobs": _job_list(items), "page": filters["page"], "limit": filters["limit"]})
     body = sd.GetQueriedJobsSchema().deserialize(body)
     return HTTPOk(json=body)
 

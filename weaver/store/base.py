@@ -111,7 +111,7 @@ class StoreJobs(StoreInterface):
                  access=None,               # type: Optional[str]
                  notification_email=None,   # type: Optional[str]
                  accept_language=None,      # type: Optional[str]
-                 created_date=None,         # type: Optional[str]
+                 created=None,         # type: Optional[str]
                  ):                         # type: (...) -> Job
         raise NotImplementedError
 
