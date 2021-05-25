@@ -558,4 +558,4 @@ def generate_test_datetimes():
     Generates a list of dummy datetimes for testing.
     """
     year = date.today().year + 1
-    return ["{}-0{}-02T03:32:38.487000+00:00".format(year, month) for month in range(1,5)]
+    return ["{}-0{}-02T03:32:38.487000+00:00".format(year, month) for month in range(1, 5)]

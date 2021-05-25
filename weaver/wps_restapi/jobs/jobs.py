@@ -206,7 +206,7 @@ def get_queried_jobs(request):
         filters["notification_email"] = request.params["notification_email"]
 
     if request.params.get("datetime_interval", False):
-        filters["datetime_interval"] = request.params["datetime_interval"].replace(' ','+')
+        filters["datetime_interval"] = request.params["datetime_interval"].replace(' ', '+')
 
     filters = sd.GetJobsQueries().deserialize(filters)
 
@@ -216,7 +216,8 @@ def get_queried_jobs(request):
     groups = filters["groups"]
 
     filters["tags"] = list(filter(lambda s: s, filters.get("tags").split(",")))
-    filters["notification_email"] = encrypt_email(filters["notification_email"], settings) if filters.get("notification_email", False) else None
+    filters["notification_email"] = encrypt_email(
+        filters["notification_email"], settings) if filters.get("notification_email", False) else None
     filters["service"] = service
     filters["access"] = request.params.get("access", None)
     filters["status"] = request.params.get("status", None)

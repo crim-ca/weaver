@@ -590,7 +590,6 @@ class MongodbJobStore(StoreJobs, MongodbStore):
         if service is not None:
             search_filters["service"] = service
 
-
         if datetime_interval is not None:
             datetime_interval = datetime_interval_parser(datetime_interval)
             query = {}
@@ -601,13 +600,13 @@ class MongodbJobStore(StoreJobs, MongodbStore):
 
                 if datetime_interval.get("before", False):
                     query["$lte"] = datetime_interval["before"]
-                
+
                 if datetime_interval.get("match", False):
                     query = datetime_interval["match"]
 
             except Exception as ex:
                 raise JobRegistrationError("Error occurred during datetime job filtering: [{}]".format(repr(ex)))
-            
+
             search_filters["created"] = query
 
         if sort is None:

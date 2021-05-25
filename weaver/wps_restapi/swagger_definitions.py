@@ -237,7 +237,8 @@ class DATETIME_INTERVAL(ExtendedSchemaNode):
     regex_interval_open_start = r"\.\.\/{}".format(regex_datetime)
     regex_interval_open_end = r"{}\/\.\.".format(regex_datetime)
 
-    pattern = "^{}|{}|{}|{}$".format(regex_datetime, regex_interval_closed, regex_interval_open_start, regex_interval_open_end)
+    pattern = "^{}|{}|{}|{}$".format(regex_datetime, regex_interval_closed,
+                                     regex_interval_open_start, regex_interval_open_end)
 
 
 class S3Bucket(ExtendedSchemaNode):
