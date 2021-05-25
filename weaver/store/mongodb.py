@@ -2,9 +2,9 @@
 Stores to read/write data to from/to `MongoDB` using pymongo.
 """
 
-from dateutil import parser as dateparser
 import logging
 from typing import TYPE_CHECKING
+from dateutil import parser as dateparser
 
 import pymongo
 from pymongo import ASCENDING, DESCENDING

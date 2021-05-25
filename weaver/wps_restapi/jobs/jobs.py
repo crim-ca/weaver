@@ -7,7 +7,7 @@ from pyramid.settings import asbool
 from pyramid_celery import celery_app as app
 
 from notify import encrypt_email
-from weaver import sort, status
+from weaver import status
 from weaver.database import get_db
 from weaver.datatype import Job
 from weaver.exceptions import (
@@ -206,7 +206,7 @@ def get_queried_jobs(request):
         filters["notification_email"] = request.params["notification_email"]
 
     if request.params.get("datetime_interval", False):
-        filters["datetime_interval"] = request.params["datetime_interval"].replace(' ', '+')
+        filters["datetime_interval"] = request.params["datetime_interval"].replace(" ", "+")
 
     filters = sd.GetJobsQueries().deserialize(filters)
 

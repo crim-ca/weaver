@@ -1,11 +1,11 @@
 import contextlib
-from dateutil import parser as dateparser
 import json
 import unittest
 import warnings
 from collections import OrderedDict
 from distutils.version import LooseVersion
 from typing import TYPE_CHECKING
+from dateutil import parser as dateparser
 
 import mock
 import pyramid.testing
