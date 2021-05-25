@@ -98,17 +98,17 @@ class WpsRestApiJobsTest(unittest.TestCase):
         self.make_job(task_id="4444-4444-4444-4444", process=self.process_public.identifier, service=None,
                       user_id=self.user_admin_id, status=STATUS_FAILED, progress=55, access=VISIBILITY_PRIVATE)
         # job public/private service/process combinations
-        self.make_job(task_id="5555-5555-5555-5555",
-                      process=self.process_public.identifier, service=self.service_public.name, created_date=TEST_DATE_INTERVALL[0],
+        self.make_job(task_id="5555-5555-5555-5555", process=self.process_public.identifier,
+                      service=self.service_public.name, created_date=TEST_DATE_INTERVALL[0],
                       user_id=self.user_editor1_id, status=STATUS_FAILED, progress=99, access=VISIBILITY_PUBLIC)
-        self.make_job(task_id="6666-6666-6666-6666",
-                      process=self.process_private.identifier, service=self.service_public.name, created_date=TEST_DATE_INTERVALL[1],
+        self.make_job(task_id="6666-6666-6666-6666",process=self.process_private.identifier, 
+                      service=self.service_public.name, created_date=TEST_DATE_INTERVALL[1],
                       user_id=self.user_editor1_id, status=STATUS_FAILED, progress=99, access=VISIBILITY_PUBLIC)
-        self.make_job(task_id="7777-7777-7777-7777",
-                      process=self.process_public.identifier, service=self.service_private.name, created_date=TEST_DATE_INTERVALL[2],
+        self.make_job(task_id="7777-7777-7777-7777",process=self.process_public.identifier,
+                      service=self.service_private.name, created_date=TEST_DATE_INTERVALL[2],
                       user_id=self.user_editor1_id, status=STATUS_FAILED, progress=99, access=VISIBILITY_PUBLIC)
-        self.make_job(task_id="8888-8888-8888-8888",
-                      process=self.process_private.identifier, service=self.service_private.name, created_date=TEST_DATE_INTERVALL[3],
+        self.make_job(task_id="8888-8888-8888-8888", process=self.process_private.identifier,
+                      service=self.service_private.name, created_date=TEST_DATE_INTERVALL[3],
                       user_id=self.user_editor1_id, status=STATUS_FAILED, progress=99, access=VISIBILITY_PUBLIC)
 
     def make_job(self, task_id, process, service, user_id, status, progress, access, created_date=None):
@@ -524,7 +524,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         assert resp.content_type == CONTENT_TYPE_APP_JSON
         assert "limit" in resp.json and isinstance(resp.json["limit"], int)
         assert len(resp.json["jobs"]) <= resp.json["limit"]
-    
+
     def test_not_required_fields(self):
         uri = sd.openapi_json_service.path
         resp = self.app.get(uri, headers=self.json_headers)

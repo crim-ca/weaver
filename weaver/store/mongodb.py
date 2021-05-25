@@ -522,7 +522,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
         :param sort: field which is used for sorting results (default: creation date, descending).
         :param page: page number to return when using result paging (only when not using ``group_by``).
         :param limit: number of jobs per page when using result paging (only when not using ``group_by``).
-        :param datetime_interval: field witch is used for filtering data by creation date with a given date or interval of date.
+        :param datetime_interval: field used for filtering data by creation date with a given date or interval of date.
         :param group_by: one or many fields specifying categories to form matching groups of jobs (paging disabled).
 
         :returns: (list of jobs matching paging OR list of {categories, list of jobs, count}) AND total of matched job
