@@ -33,7 +33,11 @@ from weaver.status import (
     STATUS_FAILED,
     STATUS_SUCCEEDED
 )
-from weaver.store import DATETIME_INTERVAL_CLOSED_SYMBOL, DATETIME_INTERVAL_OPEN_START_SYMBOL, DATETIME_INTERVAL_OPEN_END_SYMBOL
+from weaver.store import (
+    DATETIME_INTERVAL_CLOSED_SYMBOL,
+    DATETIME_INTERVAL_OPEN_START_SYMBOL,
+    DATETIME_INTERVAL_OPEN_END_SYMBOL
+)
 from weaver.utils import get_path_kvp
 from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC
 from weaver.warning import TimeZoneInfoAlreadySetWarning
@@ -43,6 +47,7 @@ if TYPE_CHECKING:
     from typing import Iterable, List, Tuple, Union
 
 TEST_DATE_INTERVALL = generate_test_datetimes()
+
 
 class WpsRestApiJobsTest(unittest.TestCase):
     @classmethod
@@ -101,10 +106,10 @@ class WpsRestApiJobsTest(unittest.TestCase):
         self.make_job(task_id="5555-5555-5555-5555", process=self.process_public.identifier,
                       service=self.service_public.name, created_date=TEST_DATE_INTERVALL[0],
                       user_id=self.user_editor1_id, status=STATUS_FAILED, progress=99, access=VISIBILITY_PUBLIC)
-        self.make_job(task_id="6666-6666-6666-6666",process=self.process_private.identifier, 
+        self.make_job(task_id="6666-6666-6666-6666", process=self.process_private.identifier,
                       service=self.service_public.name, created_date=TEST_DATE_INTERVALL[1],
                       user_id=self.user_editor1_id, status=STATUS_FAILED, progress=99, access=VISIBILITY_PUBLIC)
-        self.make_job(task_id="7777-7777-7777-7777",process=self.process_public.identifier,
+        self.make_job(task_id="7777-7777-7777-7777", process=self.process_public.identifier,
                       service=self.service_private.name, created_date=TEST_DATE_INTERVALL[2],
                       user_id=self.user_editor1_id, status=STATUS_FAILED, progress=99, access=VISIBILITY_PUBLIC)
         self.make_job(task_id="8888-8888-8888-8888", process=self.process_private.identifier,
