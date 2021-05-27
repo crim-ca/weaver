@@ -33,15 +33,15 @@ from weaver.status import (
     STATUS_FAILED,
     STATUS_SUCCEEDED
 )
+from weaver.utils import get_path_kvp
+from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC
+from weaver.warning import TimeZoneInfoAlreadySetWarning
+from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.swagger_definitions import (
     DATETIME_INTERVAL_CLOSED_SYMBOL,
     DATETIME_INTERVAL_OPEN_END_SYMBOL,
     DATETIME_INTERVAL_OPEN_START_SYMBOL
 )
-from weaver.utils import get_path_kvp
-from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC
-from weaver.warning import TimeZoneInfoAlreadySetWarning
-from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
     from typing import Iterable, List, Tuple, Union
@@ -469,7 +469,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         path_jobs_user_req_tests = [
             # pylint: disable=C0301,line-too-long
             # URI               ACCESS              USER                    EXPECTED JOBS
-            (uri_direct_jobs,   None,               None,                   public_jobs),                               # noqa: E241,E501
+                        (uri_direct_jobs,   None,               None,                   public_jobs),                               # noqa: E241,E501
             (uri_direct_jobs,   None,               self.user_editor1_id,   editor1_all_jobs),                          # noqa: E241,E501
             (uri_direct_jobs,   None,               self.user_admin_id,     self.job_info),                             # noqa: E241,E501
             (uri_direct_jobs,   VISIBILITY_PRIVATE, None,                   public_jobs),                               # noqa: E241,E501
@@ -540,7 +540,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
 
     def test_jobs_datetime_before(self):
         datetime_before = DATETIME_INTERVAL_OPEN_START_SYMBOL + self.datetime_interval[0]
-        path = get_path_kvp(sd.jobs_service.path, datetime_interval=datetime_before)
+        path = get_path_kvp(sd.jobs_service.path, datetime=datetime_before)
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
         assert resp.content_type == CONTENT_TYPE_APP_JSON
@@ -556,7 +556,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
 
     def test_jobs_datetime_after(self):
         datetime_after = str(self.datetime_interval[2] + DATETIME_INTERVAL_OPEN_END_SYMBOL)
-        path = get_path_kvp(sd.jobs_service.path, datetime_interval=datetime_after)
+        path = get_path_kvp(sd.jobs_service.path, datetime=datetime_after)
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
         assert resp.content_type == CONTENT_TYPE_APP_JSON
@@ -571,8 +571,8 @@ class WpsRestApiJobsTest(unittest.TestCase):
                 datetime_after.replace(DATETIME_INTERVAL_OPEN_END_SYMBOL, ""))
 
     def test_jobs_datetime_interval(self):
-        datetime_interval = self.datetime_interval[1] + DATETIME_INTERVAL_CLOSED_SYMBOL+self.datetime_interval[3]
-        path = get_path_kvp(sd.jobs_service.path, datetime_interval=datetime_interval)
+        datetime_interval = self.datetime_interval[1] + DATETIME_INTERVAL_CLOSED_SYMBOL + self.datetime_interval[3]
+        path = get_path_kvp(sd.jobs_service.path, datetime=datetime_interval)
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
         assert resp.content_type == CONTENT_TYPE_APP_JSON
@@ -590,7 +590,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
 
     def test_jobs_datetime_match(self):
         datetime_match = self.datetime_interval[1]
-        path = get_path_kvp(sd.jobs_service.path, datetime_interval=datetime_match)
+        path = get_path_kvp(sd.jobs_service.path, datetime=datetime_match)
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
         assert resp.content_type == CONTENT_TYPE_APP_JSON
@@ -602,3 +602,15 @@ class WpsRestApiJobsTest(unittest.TestCase):
             assert resp.status_code == 200
             assert resp.content_type == CONTENT_TYPE_APP_JSON
             assert dateparser.parse(resp.json["created"]) == dateparser.parse(datetime_match)
+
+    def test_jobs_datetime_invalid(self):
+        datetime_invalid = "2022-31-12 23:59:59"
+        path = get_path_kvp(sd.jobs_service.path, datetime=datetime_invalid)
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 422
+
+    def test_jobs_datetime_interval_invalid(self):
+        datetime_interval = self.datetime_interval[3] + DATETIME_INTERVAL_CLOSED_SYMBOL + self.datetime_interval[1]
+        path = get_path_kvp(sd.jobs_service.path, datetime=datetime_interval)
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 422

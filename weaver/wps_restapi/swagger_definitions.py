@@ -6,11 +6,11 @@ so that one can update the swagger without touching any other files after the in
 
 import os
 from typing import TYPE_CHECKING
-from dateutil import parser as dateparser
 
 import yaml
 from colander import DateTime, Email, OneOf, Range, Regex, drop, required
 from cornice import Service
+from dateutil import parser as dateparser
 
 from weaver import __meta__
 from weaver.config import WEAVER_CONFIGURATION_EMS
@@ -905,6 +905,10 @@ class VisibilityValue(ExtendedSchemaNode):
     schema_type = String
     validator = OneOf(VISIBILITY_VALUES)
     example = VISIBILITY_PUBLIC
+
+
+class JobAccess(VisibilityValue):
+    pass
 
 
 class Visibility(ExtendedMappingSchema):
@@ -2816,11 +2820,12 @@ class GetJobsQueries(ExtendedMappingSchema):
                                 default=False, example="process,service", missing=False)
     page = ExtendedSchemaNode(Integer(), missing=0, default=0, validator=Range(min=0))
     limit = ExtendedSchemaNode(Integer(), missing=10, default=10, validator=Range(min=0, max=10000))
-    datetime_interval = DateTimeInterval(missing=None, default=None)
-    status = JobStatusEnum(missing=None)
+    datetime = DateTimeInterval(missing=None, default=None)
+    status = JobStatusEnum(missing=None, default=None)
     process = AnyIdentifier(missing=None)
-    provider = ExtendedSchemaNode(String(), missing=drop, default=None)
+    service = ExtendedSchemaNode(String(), missing=None, default=None)
     sort = JobSortEnum(missing=drop)
+    access = JobAccess(missing=None, default=None)
     notification_email = ExtendedSchemaNode(String(), missing=drop, validator=Email())
     tags = ExtendedSchemaNode(String(), missing="", default="",
                               description="Comma-separated values of tags assigned to jobs")
@@ -2957,6 +2962,12 @@ class ErrorJsonResponseBodySchema(ExtendedMappingSchema):
     description = ExtendedSchemaNode(String(), description="Detail about the cause of error.")
     error = ErrorDetail(missing=drop)
     exception = OWSExceptionResponse(missing=drop)
+
+
+class UnprocessableEntityResponseSchema(ExtendedMappingSchema):
+    description = "Wrong format of given parameters."
+    header = ResponseHeaders()
+    body = ErrorJsonResponseBodySchema()
 
 
 class ForbiddenProcessAccessResponseSchema(ExtendedMappingSchema):
@@ -3379,6 +3390,7 @@ get_all_jobs_responses = {
             "value": EXAMPLES["jobs_listing.json"]
         }
     }),
+    "422": UnprocessableEntityResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_single_job_status_responses = {

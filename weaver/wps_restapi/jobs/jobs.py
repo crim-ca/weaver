@@ -1,7 +1,15 @@
 from typing import TYPE_CHECKING
 
 from celery.utils.log import get_task_logger
-from pyramid.httpexceptions import HTTPBadRequest, HTTPNotFound, HTTPOk, HTTPPermanentRedirect, HTTPUnauthorized
+from colander import Invalid
+from pyramid.httpexceptions import (
+    HTTPBadRequest,
+    HTTPNotFound,
+    HTTPOk,
+    HTTPPermanentRedirect,
+    HTTPUnauthorized,
+    HTTPUnprocessableEntity
+)
 from pyramid.request import Request
 from pyramid.settings import asbool
 from pyramid_celery import celery_app as app
@@ -27,6 +35,7 @@ from weaver.utils import get_any_id, get_any_value, get_settings
 from weaver.visibility import VISIBILITY_PUBLIC
 from weaver.wps.utils import get_wps_output_url
 from weaver.wps_restapi import swagger_definitions as sd
+from weaver.wps_restapi.swagger_definitions import datetime_interval_parser
 
 if TYPE_CHECKING:
     from typing import List, Optional, Tuple, Union
@@ -198,45 +207,57 @@ def get_queried_jobs(request):
     settings = get_settings(request)
     service, process = validate_service_process(request)
 
-    filters = {**request.params, "process": process}
+    filters = {**request.params, "process": process, "service": service}
 
     filters["detail"] = asbool(request.params.get("detail"))
 
-    if request.params.get("datetime_interval", False):
+    if request.params.get("datetime", False):
         # replace white space with '+' since request.params replaces '+' with whitespaces when parsing
-        filters["datetime_interval"] = request.params["datetime_interval"].replace(" ", "+")
+        filters["datetime"] = request.params["datetime"].replace(" ", "+")
 
-    filters = sd.GetJobsQueries().deserialize(filters)
+    try:
+        filters = sd.GetJobsQueries().deserialize(filters)
+    except Invalid as ex:
+        raise HTTPUnprocessableEntity(json={
+            "code": Invalid.__name__,
+            "description": str(ex)
+        })
 
-
-    detail = asbool(filters.get("detail", False))
-    groups = filters["groups"].split(",") if filters["groups"] else None
-
-    filters["tags"] = list(filter(lambda s: s, filters.get("tags").split(",")))
-    filters["notification_email"] = encrypt_email(
-        filters["notification_email"], settings) if filters.get("notification_email", False) else None
-    filters["service"] = service
-    filters["access"] = request.params.get("access", None)
-    filters["status"] = request.params.get("status", None)
-
-    filters.pop("detail", None)
-    filters.pop("groups", None)
-
-    store = get_db(request).get_store(StoreJobs)
-    items, total = store.find_jobs(request=request, group_by=groups, **filters)
-    body = {"total": total}
-
-    def _job_list(jobs):
-        return [j.json(settings) if detail else j.id for j in jobs]
-
-    if groups:
-        for grouped_jobs in items:
-            grouped_jobs["jobs"] = _job_list(grouped_jobs["jobs"])
-        body.update({"groups": items})
     else:
-        body.update({"jobs": _job_list(items), "page": filters["page"], "limit": filters["limit"]})
-    body = sd.GetQueriedJobsSchema().deserialize(body)
-    return HTTPOk(json=body)
+
+        detail = filters.pop("detail", False)
+        groups = filters.pop("groups", "").split(",") if filters["groups"] else filters.pop("groups", None)
+
+        filters["tags"] = list(filter(lambda s: s, filters.get("tags").split(",")))
+        filters["notification_email"] = encrypt_email(
+            filters["notification_email"], settings) if filters.get("notification_email", False) else None
+        filters["datetime"] = datetime_interval_parser(filters["datetime"]) if filters.get("datetime", False) else None
+
+        if (filters["datetime"]
+                and filters["datetime"].get("before", False)
+                and filters["datetime"].get("after", False)
+                and filters["datetime"]["after"] > filters["datetime"]["before"]):
+
+            raise HTTPUnprocessableEntity(json={
+                "code": "InvalidDateFormat",
+                "description": "Datetime at the start of the interval must be less than the datetime at the end."
+            })
+
+        store = get_db(request).get_store(StoreJobs)
+        items, total = store.find_jobs(request=request, group_by=groups, **filters)
+        body = {"total": total}
+
+        def _job_list(jobs):
+            return [j.json(settings) if detail else j.id for j in jobs]
+
+        if groups:
+            for grouped_jobs in items:
+                grouped_jobs["jobs"] = _job_list(grouped_jobs["jobs"])
+            body.update({"groups": items})
+        else:
+            body.update({"jobs": _job_list(items), "page": filters["page"], "limit": filters["limit"]})
+        body = sd.GetQueriedJobsSchema().deserialize(body)
+        return HTTPOk(json=body)
 
 
 @sd.provider_job_service.get(tags=[sd.TAG_JOBS, sd.TAG_STATUS, sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
