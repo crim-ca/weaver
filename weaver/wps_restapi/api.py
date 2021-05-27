@@ -205,10 +205,8 @@ def api_conformance(request):  # noqa: F811
         # "http://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/callback",
         # FIXME: https://github.com/crim-ca/weaver/issues/228
         # "http://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/dismiss",
-        "https://github.com/opengeospatial/ogcapi-common/blob/Working/collections/ \
-            requirements/collections/REQ_rc-limit-response.adoc",
-        "https://github.com/opengeospatial/ogcapi-common/blob/Working/collections/ \
-            requirements/collections/REQ_rc-time-collections-response.adoc",
+        "https://github.com/opengeospatial/ogcapi-common/blob/Working/collections/requirements/collections/REQ_rc-limit-response.adoc",  # noqa
+        "https://github.com/opengeospatial/ogcapi-common/blob/Working/collections/requirements/collections/REQ_rc-time-collections-response.adoc",  # noqa
 
     ]}
     return HTTPOk(json=conformance)
