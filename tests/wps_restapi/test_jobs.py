@@ -469,7 +469,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         path_jobs_user_req_tests = [
             # pylint: disable=C0301,line-too-long
             # URI               ACCESS              USER                    EXPECTED JOBS
-                        (uri_direct_jobs,   None,               None,                   public_jobs),                               # noqa: E241,E501
+            (uri_direct_jobs,   None,               None,                   public_jobs),                               # noqa: E241,E501
             (uri_direct_jobs,   None,               self.user_editor1_id,   editor1_all_jobs),                          # noqa: E241,E501
             (uri_direct_jobs,   None,               self.user_admin_id,     self.job_info),                             # noqa: E241,E501
             (uri_direct_jobs,   VISIBILITY_PRIVATE, None,                   public_jobs),                               # noqa: E241,E501
