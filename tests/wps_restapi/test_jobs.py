@@ -3,6 +3,7 @@ import json
 import unittest
 import warnings
 from collections import OrderedDict
+from datetime import date
 from distutils.version import LooseVersion
 from typing import TYPE_CHECKING
 
@@ -12,7 +13,6 @@ import pytest
 from dateutil import parser as dateparser
 
 from tests.utils import (
-    generate_test_datetimes,
     get_module_version,
     get_test_weaver_app,
     mocked_process_job_runner,
@@ -58,7 +58,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         cls.config = setup_config_with_mongodb(settings=settings)
         cls.app = get_test_weaver_app(config=cls.config)
         cls.json_headers = {"Accept": CONTENT_TYPE_APP_JSON, "Content-Type": CONTENT_TYPE_APP_JSON}
-        cls.datetime_interval = generate_test_datetimes()
+        cls.datetime_interval = cls.generate_test_datetimes()
 
     @classmethod
     def tearDownClass(cls):
@@ -154,6 +154,15 @@ class WpsRestApiJobsTest(unittest.TestCase):
             mock.patch("{}.authenticated_userid".format(authn_policy_class), new_callable=lambda: user_id),
             mock.patch("{}.has_permission".format(authz_policy_class), return_value=is_admin),
         ])
+
+    @staticmethod
+    def generate_test_datetimes():
+        # type: () -> List[str]
+        """
+        Generates a list of dummy datetimes for testing.
+        """
+        year = date.today().year + 1
+        return ["{}-0{}-02T03:32:38.487000+00:00".format(year, month) for month in range(1, 5)]
 
     @staticmethod
     def check_job_format(job):
@@ -515,10 +524,10 @@ class WpsRestApiJobsTest(unittest.TestCase):
                 test_values = dict(path=path, access=access, user_id=user_id)
                 assert job_match, self.message_with_jobs_diffs(resp.json["jobs"], job_ids, test_values, index=i)
 
-    def test_jobs_list_with_limit_client(self):
+    def test_jobs_list_with_limit_api(self):
         """
         .. seealso::
-            - `/req/collections/rc-links
+            - `/req/collections/rc-limit-response
                 <https://github.com/opengeospatial/ogcapi-common/blob/master/collections/requirements/collections/REQ_rc-limit-response.adoc>`_
         """
         limit_parameter = 20
@@ -530,10 +539,10 @@ class WpsRestApiJobsTest(unittest.TestCase):
         assert resp.json["limit"] == limit_parameter
         assert len(resp.json["jobs"]) <= limit_parameter
 
-    def test_jobs_list_with_limit_api(self):
+    def test_jobs_list_with_limit_openapi_schema(self):
         """
         .. seealso::
-            - `/req/collections/rc-links
+            - `/req/collections/rc-limit-response
                 <https://github.com/opengeospatial/ogcapi-common/blob/master/collections/requirements/collections/REQ_rc-limit-response.adoc>`_
         """
         resp = self.app.get(sd.jobs_service.path, headers=self.json_headers)
@@ -551,7 +560,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
     def test_jobs_datetime_before(self):
         """
         .. seealso::
-            - `/req/collections/rc-links
+            - `/req/collections/rc-time-collections-response
                 <https://github.com/opengeospatial/ogcapi-common/blob/master/collections/requirements/collections/REQ_rc-time-collections-response.adoc>`_
         """
         datetime_before = DATETIME_INTERVAL_OPEN_START_SYMBOL + self.datetime_interval[0]
@@ -572,7 +581,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
     def test_jobs_datetime_after(self):
         """
         .. seealso::
-            - `/req/collections/rc-links
+            - `/req/collections/rc-time-collections-response
                 <https://github.com/opengeospatial/ogcapi-common/blob/master/collections/requirements/collections/REQ_rc-time-collections-response.adoc>`_
         """
         datetime_after = str(self.datetime_interval[2] + DATETIME_INTERVAL_OPEN_END_SYMBOL)
@@ -593,7 +602,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
     def test_jobs_datetime_interval(self):
         """
         .. seealso::
-            - `/req/collections/rc-links
+            - `/req/collections/rc-time-collections-response
                 <https://github.com/opengeospatial/ogcapi-common/blob/master/collections/requirements/collections/REQ_rc-time-collections-response.adoc>`_
         """
         datetime_interval = self.datetime_interval[1] + DATETIME_INTERVAL_CLOSED_SYMBOL + self.datetime_interval[3]
@@ -616,7 +625,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
     def test_jobs_datetime_match(self):
         """
         .. seealso::
-            - `/req/collections/rc-links
+            - `/req/collections/rc-time-collections-response
                 <https://github.com/opengeospatial/ogcapi-common/blob/master/collections/requirements/collections/REQ_rc-time-collections-response.adoc>`_
         """
         datetime_match = self.datetime_interval[1]
@@ -636,8 +645,11 @@ class WpsRestApiJobsTest(unittest.TestCase):
     def test_jobs_datetime_invalid(self):
         """
         .. seealso::
-            - `/req/collections/rc-links
+            - `/req/collections/rc-time-collections-response
                 <https://github.com/opengeospatial/ogcapi-common/blob/master/collections/requirements/collections/REQ_rc-time-collections-response.adoc>`_
+
+        datetime_invalid is not formated against the rfc3339 datetime format,
+        for more details refer to https://datatracker.ietf.org/doc/html/rfc3339#section-5.6
         """
         datetime_invalid = "2022-31-12 23:59:59"
         path = get_path_kvp(sd.jobs_service.path, datetime=datetime_invalid)
@@ -647,8 +659,11 @@ class WpsRestApiJobsTest(unittest.TestCase):
     def test_jobs_datetime_interval_invalid(self):
         """
         .. seealso::
-            - `/req/collections/rc-links
+            - `/req/collections/rc-time-collections-response
                 <https://github.com/opengeospatial/ogcapi-common/blob/master/collections/requirements/collections/REQ_rc-time-collections-response.adoc>`_
+
+        datetime_invalid represents a datetime interval where the limit dates are inverted,
+        the minimun is greather than the maximum datetime limit
         """
         datetime_interval = self.datetime_interval[3] + DATETIME_INTERVAL_CLOSED_SYMBOL + self.datetime_interval[1]
         path = get_path_kvp(sd.jobs_service.path, datetime=datetime_interval)
@@ -658,8 +673,10 @@ class WpsRestApiJobsTest(unittest.TestCase):
     def test_jobs_datetime_before_invalid(self):
         """
         .. seealso::
-            - `/req/collections/rc-links
+            - `/req/collections/rc-time-collections-response
                 <https://github.com/opengeospatial/ogcapi-common/blob/master/collections/requirements/collections/REQ_rc-time-collections-response.adoc>`_
+
+        datetime_before represents a bad open range datetime interval
         """
         datetime_before = "./" + self.datetime_interval[3]
         path = get_path_kvp(sd.jobs_service.path, datetime=datetime_before)

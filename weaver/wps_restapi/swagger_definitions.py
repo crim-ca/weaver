@@ -74,7 +74,7 @@ from weaver.wps_restapi.colander_extras import (
 from weaver.wps_restapi.utils import wps_restapi_base_path
 
 if TYPE_CHECKING:
-    from weaver.typedefs import SettingsType, TypedDict
+    from weaver.typedefs import Datetime, DatetimeIntervalType, SettingsType, TypedDict
 
     ViewInfo = TypedDict("ViewInfo", {"name": str, "pattern": str})
 
@@ -235,11 +235,11 @@ class URL(ExtendedSchemaNode):
 
 class DateTimeInterval(ExtendedSchemaNode):
     schema_type = String
-    description = "DateTime format against ogcapi, \
-                    to get values before a certain date-time use '../' before the date-time \
-                    to get values after a certain date-time use '/..' after the date-time like the example \
-                    to get values between two date-times use '/' between the date-times \
-                    to get values with a specific date-time just pass the datetime"
+    description = "DateTime format against OGC-API - Processes,\n\
+        to get values before a certain date-time use '../' before the date-time,\n\
+        to get values after a certain date-time use '/..' after the date-time like the example,\n\
+        to get values between two date-times use '/' between the date-times,\n\
+        to get values with a specific date-time just pass the datetime"
     example = "2022-03-02T03:32:38.487000+00:00/.."
     regex_datetime = r"(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d+)?(([+-]\d\d:\d\d)|Z)?)"
     regex_interval_closed = r"{i}\/{i}".format(i=regex_datetime)
@@ -2814,20 +2814,20 @@ class PostProcessJobsEndpoint(ProcessPath):
 
 class GetJobsQueries(ExtendedMappingSchema):
     detail = ExtendedSchemaNode(Boolean(), description="Provide job details instead of IDs.",
-                                default=False, example=True, missing=False)
+                                default=False, example=True, missing=drop)
     groups = ExtendedSchemaNode(String(),
                                 description="Comma-separated list of grouping fields with which to list jobs.",
-                                default=False, example="process,service", missing=False)
+                                default=False, example="process,service", missing=drop)
     page = ExtendedSchemaNode(Integer(), missing=0, default=0, validator=Range(min=0))
     limit = ExtendedSchemaNode(Integer(), missing=10, default=10, validator=Range(min=0, max=10000))
-    datetime = DateTimeInterval(missing=None, default=None)
-    status = JobStatusEnum(missing=None, default=None)
-    process = AnyIdentifier(missing=None)
-    service = ExtendedSchemaNode(String(), missing=None, default=None)
+    datetime = DateTimeInterval(missing=drop, default=None)
+    status = JobStatusEnum(missing=drop, default=None)
+    process = AnyIdentifier(missing=drop)
+    provider = ExtendedSchemaNode(String(), missing=drop, default=None)
     sort = JobSortEnum(missing=drop)
-    access = JobAccess(missing=None, default=None)
+    access = JobAccess(missing=drop, default=None)
     notification_email = ExtendedSchemaNode(String(), missing=drop, validator=Email())
-    tags = ExtendedSchemaNode(String(), missing="", default="",
+    tags = ExtendedSchemaNode(String(), missing=drop, default=None,
                               description="Comma-separated values of tags assigned to jobs")
 
 
@@ -3525,7 +3525,8 @@ def service_api_route_info(service_api, settings):
 
 
 def datetime_interval_parser(datetime_interval):
-
+    # type: (Datetime) -> DatetimeIntervalType
+    """This function parse a given datetime or interval into a dictionary that will be easy for database process"""
     parsed_datetime = {}
 
     if datetime_interval.startswith(DATETIME_INTERVAL_OPEN_START_SYMBOL):

@@ -207,7 +207,7 @@ def get_queried_jobs(request):
     settings = get_settings(request)
     service, process = validate_service_process(request)
 
-    filters = {**request.params, "process": process, "service": service}
+    filters = {**request.params, "process": process, "provider": service}
 
     filters["detail"] = asbool(request.params.get("detail"))
 
@@ -226,17 +226,20 @@ def get_queried_jobs(request):
     else:
 
         detail = filters.pop("detail", False)
-        groups = filters.pop("groups", "").split(",") if filters["groups"] else filters.pop("groups", None)
+        groups = filters.pop("groups", "").split(",") if filters.get("groups", False) else filters.pop("groups", None)
 
-        filters["tags"] = list(filter(lambda s: s, filters.get("tags").split(",")))
+        filters["tags"] = list(filter(lambda s: s, filters["tags"].split(",") if filters.get("tags", False) else ""))
         filters["notification_email"] = encrypt_email(
             filters["notification_email"], settings) if filters.get("notification_email", False) else None
         filters["datetime"] = datetime_interval_parser(filters["datetime"]) if filters.get("datetime", False) else None
+        filters["service"] = filters.pop("provider", None)
 
-        if (filters["datetime"]
+        if (
+                filters["datetime"]
                 and filters["datetime"].get("before", False)
                 and filters["datetime"].get("after", False)
-                and filters["datetime"]["after"] > filters["datetime"]["before"]):
+                and filters["datetime"]["after"] > filters["datetime"]["before"]
+        ):
 
             raise HTTPUnprocessableEntity(json={
                 "code": "InvalidDateFormat",

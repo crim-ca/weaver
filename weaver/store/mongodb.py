@@ -51,7 +51,7 @@ if TYPE_CHECKING:
     from typing import Any, Callable, Dict, List, Optional, Tuple, Union
     from pymongo.collection import Collection
 
-    from weaver.store.base import JobCategoriesAndCount, JobListAndCount
+    from weaver.store.base import Datetime, DatetimeIntervalType, JobCategoriesAndCount, JobListAndCount
     from weaver.typedefs import AnyProcess, AnyProcessType
 
 LOGGER = logging.getLogger(__name__)
@@ -405,7 +405,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
                  access=None,               # type: Optional[str]
                  notification_email=None,   # type: Optional[str]
                  accept_language=None,      # type: Optional[str]
-                 created=None,         # type: Optional[str]
+                 created=None,              # type: Datetime
                  ):                         # type: (...) -> Job
         """
         Creates a new :class:`Job` and stores it in mongodb.
@@ -501,7 +501,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
                   sort=None,                # type: Optional[str]
                   page=0,                   # type: int
                   limit=10,                 # type: int
-                  datetime=None,            # type: Optional[Dict]
+                  datetime=None,            # type: Optional[DatetimeIntervalType]
                   group_by=None,            # type: Optional[Union[str, List[str]]]
                   request=None,             # type: Optional[Request]
                   ):                        # type: (...) -> Union[JobListAndCount, JobCategoriesAndCount]

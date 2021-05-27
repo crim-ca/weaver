@@ -41,6 +41,7 @@ if TYPE_CHECKING:
 
     # pylint: disable=C0103,invalid-name
     Number = Union[int, float]
+    Datetime = Optional[str]
     ValueType = Union[str, Number, bool]
     AnyValue = Optional[ValueType]
     AnyValueType = AnyValue  # alias
@@ -114,3 +115,8 @@ if TYPE_CHECKING:
 
     # update_status(provider, message, progress, status)
     UpdateStatusPartialFunction = Callable[[str, str, int, AnyStatusType], None]
+
+    # others
+    DatetimeIntervalType = TypedDict("DatetimeIntervalType",
+                                     {"before": Datetime, "after": Datetime,
+                                      "match": Datetime, }, total=False)
