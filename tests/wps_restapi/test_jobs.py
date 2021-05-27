@@ -519,7 +519,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         """
         .. seealso::
             - `/req/collections/rc-links
-                <https://github.com/opengeospatial/ogcapi-common/blob/Working/collections/requirements/collections/REQ_rc-limit-response.adoc>`_
+                <https://github.com/opengeospatial/ogcapi-common/blob/master/collections/requirements/collections/REQ_rc-limit-response.adoc>`_
         """
         limit_parameter = 20
         path = get_path_kvp(sd.jobs_service.path, limit=limit_parameter)
@@ -534,7 +534,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         """
         .. seealso::
             - `/req/collections/rc-links
-                <https://github.com/opengeospatial/ogcapi-common/blob/Working/collections/requirements/collections/REQ_rc-limit-response.adoc>`_
+                <https://github.com/opengeospatial/ogcapi-common/blob/master/collections/requirements/collections/REQ_rc-limit-response.adoc>`_
         """
         resp = self.app.get(sd.jobs_service.path, headers=self.json_headers)
         assert resp.status_code == 200
@@ -552,7 +552,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         """
         .. seealso::
             - `/req/collections/rc-links
-                <https://github.com/opengeospatial/ogcapi-common/blob/Working/collections/requirements/collections/REQ_rc-time-collections-response.adoc>`_
+                <https://github.com/opengeospatial/ogcapi-common/blob/master/collections/requirements/collections/REQ_rc-time-collections-response.adoc>`_
         """
         datetime_before = DATETIME_INTERVAL_OPEN_START_SYMBOL + self.datetime_interval[0]
         path = get_path_kvp(sd.jobs_service.path, datetime=datetime_before)
@@ -573,7 +573,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         """
         .. seealso::
             - `/req/collections/rc-links
-                <https://github.com/opengeospatial/ogcapi-common/blob/Working/collections/requirements/collections/REQ_rc-time-collections-response.adoc>`_
+                <https://github.com/opengeospatial/ogcapi-common/blob/master/collections/requirements/collections/REQ_rc-time-collections-response.adoc>`_
         """
         datetime_after = str(self.datetime_interval[2] + DATETIME_INTERVAL_OPEN_END_SYMBOL)
         path = get_path_kvp(sd.jobs_service.path, datetime=datetime_after)
@@ -594,7 +594,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         """
         .. seealso::
             - `/req/collections/rc-links
-                <https://github.com/opengeospatial/ogcapi-common/blob/Working/collections/requirements/collections/REQ_rc-time-collections-response.adoc>`_
+                <https://github.com/opengeospatial/ogcapi-common/blob/master/collections/requirements/collections/REQ_rc-time-collections-response.adoc>`_
         """
         datetime_interval = self.datetime_interval[1] + DATETIME_INTERVAL_CLOSED_SYMBOL + self.datetime_interval[3]
         path = get_path_kvp(sd.jobs_service.path, datetime=datetime_interval)
@@ -617,7 +617,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         """
         .. seealso::
             - `/req/collections/rc-links
-                <https://github.com/opengeospatial/ogcapi-common/blob/Working/collections/requirements/collections/REQ_rc-time-collections-response.adoc>`_
+                <https://github.com/opengeospatial/ogcapi-common/blob/master/collections/requirements/collections/REQ_rc-time-collections-response.adoc>`_
         """
         datetime_match = self.datetime_interval[1]
         path = get_path_kvp(sd.jobs_service.path, datetime=datetime_match)
@@ -637,7 +637,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         """
         .. seealso::
             - `/req/collections/rc-links
-                <https://github.com/opengeospatial/ogcapi-common/blob/Working/collections/requirements/collections/REQ_rc-time-collections-response.adoc>`_
+                <https://github.com/opengeospatial/ogcapi-common/blob/master/collections/requirements/collections/REQ_rc-time-collections-response.adoc>`_
         """
         datetime_invalid = "2022-31-12 23:59:59"
         path = get_path_kvp(sd.jobs_service.path, datetime=datetime_invalid)
@@ -648,7 +648,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         """
         .. seealso::
             - `/req/collections/rc-links
-                <https://github.com/opengeospatial/ogcapi-common/blob/Working/collections/requirements/collections/REQ_rc-time-collections-response.adoc>`_
+                <https://github.com/opengeospatial/ogcapi-common/blob/master/collections/requirements/collections/REQ_rc-time-collections-response.adoc>`_
         """
         datetime_interval = self.datetime_interval[3] + DATETIME_INTERVAL_CLOSED_SYMBOL + self.datetime_interval[1]
         path = get_path_kvp(sd.jobs_service.path, datetime=datetime_interval)
@@ -659,7 +659,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         """
         .. seealso::
             - `/req/collections/rc-links
-                <https://github.com/opengeospatial/ogcapi-common/blob/Working/collections/requirements/collections/REQ_rc-time-collections-response.adoc>`_
+                <https://github.com/opengeospatial/ogcapi-common/blob/master/collections/requirements/collections/REQ_rc-time-collections-response.adoc>`_
         """
         datetime_before = "./" + self.datetime_interval[3]
         path = get_path_kvp(sd.jobs_service.path, datetime=datetime_before)

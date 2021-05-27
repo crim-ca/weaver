@@ -178,6 +178,7 @@ def api_conformance(request):  # noqa: F811
     # type: (Request) -> HTTPException
     """Weaver specification conformance information."""
     # TODO: follow updates with https://github.com/geopython/pygeoapi/issues/198
+    ogcapi_common = "https://github.com/opengeospatial/ogcapi-common"
     conformance = {"conformsTo": [
         # "http://www.opengis.net/spec/wfs-1/3.0/req/core",
         # "http://www.opengis.net/spec/wfs-1/3.0/req/oas30",
@@ -205,8 +206,8 @@ def api_conformance(request):  # noqa: F811
         # "http://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/callback",
         # FIXME: https://github.com/crim-ca/weaver/issues/228
         # "http://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/dismiss",
-        "https://github.com/opengeospatial/ogcapi-common/blob/Working/collections/requirements/collections/REQ_rc-limit-response.adoc",  # noqa
-        "https://github.com/opengeospatial/ogcapi-common/blob/Working/collections/requirements/collections/REQ_rc-time-collections-response.adoc",  # noqa
+        ogcapi_common+"/blob/master/collections/requirements/collections/REQ_rc-limit-response.adoc",
+        ogcapi_common+"/blob/master/collections/requirements/collections/REQ_rc-time-collections-response.adoc",
 
     ]}
     return HTTPOk(json=conformance)
