@@ -41,7 +41,6 @@ if TYPE_CHECKING:
 
     # pylint: disable=C0103,invalid-name
     Number = Union[int, float]
-    Datetime = Optional[str]
     ValueType = Union[str, Number, bool]
     AnyValue = Optional[ValueType]
     AnyValueType = AnyValue  # alias
@@ -118,5 +117,5 @@ if TYPE_CHECKING:
 
     # others
     DatetimeIntervalType = TypedDict("DatetimeIntervalType",
-                                     {"before": Datetime, "after": Datetime,
-                                      "match": Datetime, }, total=False)
+                                     {"before": str, "after": str,
+                                      "match": str, }, total=False)

@@ -190,11 +190,11 @@ def api_conformance(request):  # noqa: F811
     # - https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/transactions/standard/recommendations
     # - https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/workflows/standard/requirements
     # - https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/workflows/standard/recommendations
-    
+
     ows_wps1 = "http://schemas.opengis.net/wps/1.0.0"
     ows_wps2 = "http://www.opengis.net/spec/WPS/2.0"
     ogcapi_common = "https://github.com/opengeospatial/ogcapi-common"
-    ogcapi_processes = "http://www.opengis.net/spec/ogcapi-processes-1/1.0
+    ogcapi_processes = "http://www.opengis.net/spec/ogcapi-processes-1/1.0"
     conformance = {"conformsTo": [
         # "http://www.opengis.net/spec/wfs-1/3.0/req/core",
         # "http://www.opengis.net/spec/wfs-1/3.0/req/oas30",
@@ -222,11 +222,11 @@ def api_conformance(request):  # noqa: F811
         # "http://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/callback",
         # FIXME: https://github.com/crim-ca/weaver/issues/228
         # "http://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/dismiss",
-        ogcapi_common + "/req/collections/rc-limit-response",
-        ogcapi_common + "/req/collections/rc-time-collections-response"
         # FIXME: https://github.com/crim-ca/weaver/issues/231
         #  List all supported requirements, recommendations and abstract tests
         ogcapi_processes + "/req/core/process",
+        ogcapi_common + "/req/collections/rc-limit-response",
+        ogcapi_common + "/req/collections/rc-time-collections-response"
     ]}
     return HTTPOk(json=conformance)
 

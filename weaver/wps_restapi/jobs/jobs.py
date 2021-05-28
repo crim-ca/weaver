@@ -229,8 +229,10 @@ def get_queried_jobs(request):
         groups = filters.pop("groups", "").split(",") if filters.get("groups", False) else filters.pop("groups", None)
 
         filters["tags"] = list(filter(lambda s: s, filters["tags"].split(",") if filters.get("tags", False) else ""))
-        filters["notification_email"] = encrypt_email(
-            filters["notification_email"], settings) if filters.get("notification_email", False) else None
+        filters["notification_email"] = (
+            encrypt_email(filters["notification_email"], settings)
+            if filters.get("notification_email", False) else None
+        )
         filters["datetime"] = datetime_interval_parser(filters["datetime"]) if filters.get("datetime", False) else None
         filters["service"] = filters.pop("provider", None)
 
@@ -240,7 +242,6 @@ def get_queried_jobs(request):
                 and filters["datetime"].get("after", False)
                 and filters["datetime"]["after"] > filters["datetime"]["before"]
         ):
-
             raise HTTPUnprocessableEntity(json={
                 "code": "InvalidDateFormat",
                 "description": "Datetime at the start of the interval must be less than the datetime at the end."

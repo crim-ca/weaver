@@ -2,11 +2,12 @@ import abc
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    import datetime
     from typing import Any, Dict, List, Optional, Tuple, Union
     from pyramid.request import Request
     from pywps import Process as ProcessWPS
     from weaver.datatype import Bill, Job, Process, Quote, Service
-    from weaver.typedefs import AnyValue, Datetime, DatetimeIntervalType
+    from weaver.typedefs import AnyValue, DatetimeIntervalType
 
     JobListAndCount = Tuple[List[Job], int]
     JobCategory = Dict[str, Union[AnyValue, Job]]
@@ -111,7 +112,7 @@ class StoreJobs(StoreInterface):
                  access=None,               # type: Optional[str]
                  notification_email=None,   # type: Optional[str]
                  accept_language=None,      # type: Optional[str]
-                 created=None,              # type: Datetime
+                 created=None,              # type: Optional[datetime.datetime]
                  ):                         # type: (...) -> Job
         raise NotImplementedError
 
