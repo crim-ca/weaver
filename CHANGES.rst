@@ -10,7 +10,9 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add reference link to ReadTheDocs URL of `Weaver` in API landing page.
+- Add references to `OGC-API Processes` requirements and recommendations for eventual conformance listing
+  (relates to `#231 <https://github.com/crim-ca/weaver/issues/231>`_).
 
 Fixes:
 ------
@@ -21,6 +23,7 @@ Fixes:
   (see issue `#526 <https://github.com/geopython/pywps/issues/526>`_).
 - Fix default execution mode specification in process job control options
   (fixes `#182 <https://github.com/opengeospatial/ogcapi-processes/pull/182>`_).
+- Fix old OGC-API WPS REST bindings link in landing page for the more recent `OGC-API Processes` specification.
 
 `3.1.0 <https://github.com/crim-ca/weaver/tree/3.1.0>`_ (2021-04-23)
 ========================================================================

@@ -77,7 +77,7 @@ def api_frontpage_body(settings):
     weaver_links = [
         {"href": weaver_url, "rel": "self", "type": CONTENT_TYPE_APP_JSON, "title": "This document"},
         {"href": weaver_conform_url, "rel": "conformance", "type": CONTENT_TYPE_APP_JSON,
-         "title": "WPS conformance classes implemented by this service."},
+         "title": "Conformance classes implemented by this service."},
     ]
     if weaver_api:
         weaver_links.extend([
@@ -130,6 +130,10 @@ def api_frontpage_body(settings):
                 doc_type = CONTENT_TYPE_TEXT_PLAIN  # default most basic type
             weaver_links.append({"href": weaver_api_doc, "rel": "documentation", "type": doc_type,
                                  "title": "API reference documentation about this service."})
+        else:
+            weaver_links.append({"href": __meta__.__documentation_url__, "rel": "documentation",
+                                 "type": CONTENT_TYPE_TEXT_HTML,
+                                 "title": "API reference documentation about this service."})
     if weaver_wps:
         weaver_links.extend([
             {"href": weaver_wps_url,
@@ -177,16 +181,28 @@ def api_versions(request):  # noqa: F811
 def api_conformance(request):  # noqa: F811
     # type: (Request) -> HTTPException
     """Weaver specification conformance information."""
-    # TODO: follow updates with https://github.com/geopython/pygeoapi/issues/198
+    # see references:
+    # - https://github.com/opengeospatial/ogcapi-common/tree/Working/collections/requirements
+    # - https://github.com/opengeospatial/ogcapi-common/tree/Working/collections/recommendations
+    # - https://github.com/opengeospatial/ogcapi-processes/tree/master/core/requirements
+    # - https://github.com/opengeospatial/ogcapi-processes/tree/master/core/recommendations
+    # - https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/transactions/standard/requirements
+    # - https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/transactions/standard/recommendations
+    # - https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/workflows/standard/requirements
+    # - https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/workflows/standard/recommendations
+    
+    ows_wps1 = "http://schemas.opengis.net/wps/1.0.0"
+    ows_wps2 = "http://www.opengis.net/spec/WPS/2.0"
     ogcapi_common = "https://github.com/opengeospatial/ogcapi-common"
+    ogcapi_processes = "http://www.opengis.net/spec/ogcapi-processes-1/1.0
     conformance = {"conformsTo": [
         # "http://www.opengis.net/spec/wfs-1/3.0/req/core",
         # "http://www.opengis.net/spec/wfs-1/3.0/req/oas30",
         # "http://www.opengis.net/spec/wfs-1/3.0/req/html",
         # "http://www.opengis.net/spec/wfs-1/3.0/req/geojson",
-        "http://schemas.opengis.net/wps/1.0.0/",
-        "http://schemas.opengis.net/wps/2.0/",
-        "http://www.opengis.net/spec/WPS/2.0/req/service/binding/rest-json/core",
+        ows_wps1 + "/",
+        ows_wps2 + "/",
+        ows_wps2 + "/req/service/binding/rest-json/core",
         # "http://www.opengis.net/spec/WPS/2.0/req/service/binding/rest-json/oas30",
         # "http://www.opengis.net/spec/WPS/2.0/req/service/binding/rest-json/html"
         "https://github.com/opengeospatial/wps-rest-binding",  # old reference for bw-compat
@@ -195,20 +211,22 @@ def api_conformance(request):  # noqa: F811
         # see other references:
         #   https://github.com/crim-ca/weaver/issues/53
         # https://htmlpreview.github.io/?https://github.com/opengeospatial/ogcapi-processes/blob/master/docs/18-062.html
-        "http://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/core",
-        "http://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/ogc-process-description",
-        "http://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/json",
+        ogcapi_processes + "/conf/core",
+        ogcapi_processes + "/conf/ogc-process-description",
+        ogcapi_processes + "/conf/json",
         # FIXME: https://github.com/crim-ca/weaver/issues/210
         # "http://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/html",
-        "http://www.opengis.net/spec/ogcapi-processes-1/1.0/req/oas30",  # OpenAPI 3.0
-        "http://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/job-list",
+        ogcapi_processes + "/req/oas30",  # OpenAPI 3.0
+        ogcapi_processes + "/conf/job-list",
         # FIXME: https://github.com/crim-ca/weaver/issues/230
         # "http://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/callback",
         # FIXME: https://github.com/crim-ca/weaver/issues/228
         # "http://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/dismiss",
         ogcapi_common + "/req/collections/rc-limit-response",
         ogcapi_common + "/req/collections/rc-time-collections-response"
-
+        # FIXME: https://github.com/crim-ca/weaver/issues/231
+        #  List all supported requirements, recommendations and abstract tests
+        ogcapi_processes + "/req/core/process",
     ]}
     return HTTPOk(json=conformance)
 
