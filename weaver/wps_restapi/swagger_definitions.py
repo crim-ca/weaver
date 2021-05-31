@@ -235,11 +235,13 @@ class URL(ExtendedSchemaNode):
 
 class DateTimeInterval(ExtendedSchemaNode):
     schema_type = String
-    description = "DateTime format against OGC-API - Processes,\
-    to get values before a certain date-time use '../' before the date-time,\
-    to get values after a certain date-time use '/..' after the date-time like the example,\
-    to get values between two date-times use '/' between the date-times,\
-    to get values with a specific date-time just pass the datetime."
+    description = (
+        "DateTime format against OGC-API - Processes,\
+        to get values before a certain date-time use '../' before the date-time,\
+        to get values after a certain date-time use '/..' after the date-time like the example,\
+        to get values between two date-times use '/' between the date-times,\
+        to get values with a specific date-time just pass the datetime."
+    )
     example = "2022-03-02T03:32:38.487000+00:00/.."
     regex_datetime = r"(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d+)?(([+-]\d\d:\d\d)|Z)?)"
     regex_interval_closed = r"{i}\/{i}".format(i=regex_datetime)
@@ -3526,7 +3528,7 @@ def service_api_route_info(service_api, settings):
 
 def datetime_interval_parser(datetime_interval):
     # type: (str) -> DatetimeIntervalType
-    """This function parse a given datetime or interval into a dictionary that will be easy for database process"""
+    """This function parses a given datetime or interval into a dictionary that will be easy for database process."""
     parsed_datetime = {}
 
     if datetime_interval.startswith(DATETIME_INTERVAL_OPEN_START_SYMBOL):

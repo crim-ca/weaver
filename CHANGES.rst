@@ -13,6 +13,10 @@ Changes:
 - Add reference link to ReadTheDocs URL of `Weaver` in API landing page.
 - Add references to `OGC-API Processes` requirements and recommendations for eventual conformance listing
   (relates to `#231 <https://github.com/crim-ca/weaver/issues/231>`_).
+- Add datetime parameters for job searches queries
+  (relates to `#236 <https://github.com/crim-ca/weaver/issues/236>`_).
+- Add limit validation and integration for jobs in retrieve queries
+  (relates to `#237 <https://github.com/crim-ca/weaver/issues/237>`_).
 
 Fixes:
 ------
