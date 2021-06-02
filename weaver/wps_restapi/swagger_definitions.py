@@ -236,11 +236,11 @@ class URL(ExtendedSchemaNode):
 class DateTimeInterval(ExtendedSchemaNode):
     schema_type = String
     description = (
-        "DateTime format against OGC-API - Processes,\
-        to get values before a certain date-time use '../' before the date-time,\
-        to get values after a certain date-time use '/..' after the date-time like the example,\
-        to get values between two date-times use '/' between the date-times,\
-        to get values with a specific date-time just pass the datetime."
+        "DateTime format against OGC-API - Processes,"
+        "to get values before a certain date-time use '../' before the date-time,"
+        "to get values after a certain date-time use '/..' after the date-time like the example,"
+        "to get values between two date-times use '/' between the date-times,"
+        "to get values with a specific date-time just pass the datetime."
     )
     example = "2022-03-02T03:32:38.487000+00:00/.."
     regex_datetime = r"(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d+)?(([+-]\d\d:\d\d)|Z)?)"
