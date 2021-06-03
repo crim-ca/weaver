@@ -24,6 +24,8 @@ Fixes:
 - Fix default execution mode specification in process job control options
   (fixes `#182 <https://github.com/opengeospatial/ogcapi-processes/pull/182>`_).
 - Fix old OGC-API WPS REST bindings link in landing page for the more recent `OGC-API Processes` specification.
+- Fix invalid deserialization of schemas using ``not`` keyword that would result in all fields returned instead of
+  limiting them to the expected fields from the schema definitions for ``LiteralInputType`` in process description.
 
 `3.1.0 <https://github.com/crim-ca/weaver/tree/3.1.0>`_ (2021-04-23)
 ========================================================================
