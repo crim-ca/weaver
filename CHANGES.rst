@@ -26,6 +26,8 @@ Fixes:
 - Fix old OGC-API WPS REST bindings link in landing page for the more recent `OGC-API Processes` specification.
 - Fix invalid deserialization of schemas using ``not`` keyword that would result in all fields returned instead of
   limiting them to the expected fields from the schema definitions for ``LiteralInputType`` in process description.
+- Adjust ``InputType`` and ``OutputType`` schemas to use ``allOf`` instead of ``anyOf`` definition since all sub-schemas
+  that define them must be combined, with their respectively required or optional fields.
 
 `3.1.0 <https://github.com/crim-ca/weaver/tree/3.1.0>`_ (2021-04-23)
 ========================================================================

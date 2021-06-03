@@ -803,8 +803,8 @@ class OutputTypeDefinition(OneOfKeywordSchema):
     ]
 
 
-class OutputType(AnyOfKeywordSchema):
-    _any_of = [
+class OutputType(AllOfKeywordSchema):
+    _all_of = [
         OutputTypeDefinition(),
         OutputDescriptionType(),
     ]
