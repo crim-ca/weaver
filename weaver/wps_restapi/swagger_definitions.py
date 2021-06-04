@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 import yaml
 from colander import DateTime, Email, OneOf, Range, Regex, drop, required
 from cornice import Service
+from dateutil import parser as dateparser
 
 from weaver import __meta__
 from weaver.config import WEAVER_CONFIGURATION_EMS
@@ -73,7 +74,7 @@ from weaver.wps_restapi.colander_extras import (
 from weaver.wps_restapi.utils import wps_restapi_base_path
 
 if TYPE_CHECKING:
-    from weaver.typedefs import SettingsType, TypedDict
+    from weaver.typedefs import DatetimeIntervalType, SettingsType, TypedDict
 
     ViewInfo = TypedDict("ViewInfo", {"name": str, "pattern": str})
 
@@ -109,6 +110,10 @@ IO_INFO_IDS = (
 
 OGC_API_REPO_URL = "https://github.com/opengeospatial/ogcapi-processes"
 OGC_API_SCHEMA_URL = "https://raw.githubusercontent.com/opengeospatial/ogcapi-processes"
+
+DATETIME_INTERVAL_CLOSED_SYMBOL = "/"
+DATETIME_INTERVAL_OPEN_START_SYMBOL = "../"
+DATETIME_INTERVAL_OPEN_END_SYMBOL = "/.."
 
 #########################################################
 # Examples
@@ -226,6 +231,25 @@ class URL(ExtendedSchemaNode):
     schema_type = String
     description = "URL reference."
     format = "url"
+
+
+class DateTimeInterval(ExtendedSchemaNode):
+    schema_type = String
+    description = (
+        "DateTime format against OGC-API - Processes, "
+        "to get values before a certain date-time use '../' before the date-time, "
+        "to get values after a certain date-time use '/..' after the date-time like the example, "
+        "to get values between two date-times use '/' between the date-times, "
+        "to get values with a specific date-time just pass the datetime. "
+    )
+    example = "2022-03-02T03:32:38.487000+00:00/.."
+    regex_datetime = r"(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d+)?(([+-]\d\d:\d\d)|Z)?)"
+    regex_interval_closed = r"{i}\/{i}".format(i=regex_datetime)
+    regex_interval_open_start = r"\.\.\/{}".format(regex_datetime)
+    regex_interval_open_end = r"{}\/\.\.".format(regex_datetime)
+
+    pattern = "^{}|{}|{}|{}$".format(regex_datetime, regex_interval_closed,
+                                     regex_interval_open_start, regex_interval_open_end)
 
 
 class S3Bucket(ExtendedSchemaNode):
@@ -883,6 +907,10 @@ class VisibilityValue(ExtendedSchemaNode):
     schema_type = String
     validator = OneOf(VISIBILITY_VALUES)
     example = VISIBILITY_PUBLIC
+
+
+class JobAccess(VisibilityValue):
+    pass
 
 
 class Visibility(ExtendedMappingSchema):
@@ -1947,7 +1975,7 @@ class CreatedQuotedJobStatusSchema(CreatedJobStatusSchema):
 
 class GetPagingJobsSchema(ExtendedMappingSchema):
     jobs = JobCollection()
-    limit = ExtendedSchemaNode(Integer(), default=10)
+    limit = ExtendedSchemaNode(Integer(), missing=10, default=10, validator=Range(min=0, max=10000))
     page = ExtendedSchemaNode(Integer(), validator=Range(min=0))
 
 
@@ -2792,12 +2820,15 @@ class GetJobsQueries(ExtendedMappingSchema):
     groups = ExtendedSchemaNode(String(),
                                 description="Comma-separated list of grouping fields with which to list jobs.",
                                 default=False, example="process,service", missing=drop)
-    page = ExtendedSchemaNode(Integer(), missing=drop, default=0, validator=Range(min=0))
-    limit = ExtendedSchemaNode(Integer(), missing=drop, default=10)
-    status = JobStatusEnum(missing=drop)
-    process = AnyIdentifier(missing=None)
+    page = ExtendedSchemaNode(Integer(), missing=0, default=0, validator=Range(min=0))
+    limit = ExtendedSchemaNode(Integer(), missing=10, default=10, validator=Range(min=0, max=10000))
+    datetime = DateTimeInterval(missing=drop, default=None)
+    status = JobStatusEnum(missing=drop, default=None)
+    process = AnyIdentifier(missing=drop)
     provider = ExtendedSchemaNode(String(), missing=drop, default=None)
     sort = JobSortEnum(missing=drop)
+    access = JobAccess(missing=drop, default=None)
+    notification_email = ExtendedSchemaNode(String(), missing=drop, validator=Email())
     tags = ExtendedSchemaNode(String(), missing=drop, default=None,
                               description="Comma-separated values of tags assigned to jobs")
 
@@ -2845,7 +2876,7 @@ class ProcessQuoteEndpoint(ProcessPath, QuotePath):
 
 class GetQuotesQueries(ExtendedMappingSchema):
     page = ExtendedSchemaNode(Integer(), missing=drop, default=0)
-    limit = ExtendedSchemaNode(Integer(), missing=drop, default=10)
+    limit = ExtendedSchemaNode(Integer(), missing=10, default=10, validator=Range(min=0, max=10000))
     process = AnyIdentifier(missing=None)
     sort = QuoteSortEnum(missing=drop)
 
@@ -2933,6 +2964,12 @@ class ErrorJsonResponseBodySchema(ExtendedMappingSchema):
     description = ExtendedSchemaNode(String(), description="Detail about the cause of error.")
     error = ErrorDetail(missing=drop)
     exception = OWSExceptionResponse(missing=drop)
+
+
+class UnprocessableEntityResponseSchema(ExtendedMappingSchema):
+    description = "Wrong format of given parameters."
+    header = ResponseHeaders()
+    body = ErrorJsonResponseBodySchema()
 
 
 class ForbiddenProcessAccessResponseSchema(ExtendedMappingSchema):
@@ -3355,6 +3392,7 @@ get_all_jobs_responses = {
             "value": EXAMPLES["jobs_listing.json"]
         }
     }),
+    "422": UnprocessableEntityResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_single_job_status_responses = {
@@ -3486,3 +3524,26 @@ def service_api_route_info(service_api, settings):
     # type: (Service, SettingsType) -> ViewInfo
     api_base = wps_restapi_base_path(settings)
     return {"name": service_api.name, "pattern": "{base}{path}".format(base=api_base, path=service_api.path)}
+
+
+def datetime_interval_parser(datetime_interval):
+    # type: (str) -> DatetimeIntervalType
+    """This function parses a given datetime or interval into a dictionary that will be easy for database process."""
+    parsed_datetime = {}
+
+    if datetime_interval.startswith(DATETIME_INTERVAL_OPEN_START_SYMBOL):
+        datetime_interval = datetime_interval.replace(DATETIME_INTERVAL_OPEN_START_SYMBOL, "")
+        parsed_datetime["before"] = dateparser.parse(datetime_interval)
+
+    elif datetime_interval.endswith(DATETIME_INTERVAL_OPEN_END_SYMBOL):
+        datetime_interval = datetime_interval.replace(DATETIME_INTERVAL_OPEN_END_SYMBOL, "")
+        parsed_datetime["after"] = dateparser.parse(datetime_interval)
+
+    elif DATETIME_INTERVAL_CLOSED_SYMBOL in datetime_interval:
+        datetime_interval = datetime_interval.split(DATETIME_INTERVAL_CLOSED_SYMBOL)
+        parsed_datetime["after"] = dateparser.parse(datetime_interval[0])
+        parsed_datetime["before"] = dateparser.parse(datetime_interval[-1])
+    else:
+        parsed_datetime["match"] = dateparser.parse(datetime_interval)
+
+    return parsed_datetime
