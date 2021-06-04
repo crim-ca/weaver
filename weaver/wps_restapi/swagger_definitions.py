@@ -768,8 +768,8 @@ class InputTypeDefinition(OneOfKeywordSchema):
     ]
 
 
-class InputType(AnyOfKeywordSchema):
-    _any_of = [
+class InputType(AllOfKeywordSchema):
+    _all_of = [
         InputDescriptionType(),
         InputTypeDefinition(),
         WithMinMaxOccurs(),
@@ -803,8 +803,8 @@ class OutputTypeDefinition(OneOfKeywordSchema):
     ]
 
 
-class OutputType(AnyOfKeywordSchema):
-    _any_of = [
+class OutputType(AllOfKeywordSchema):
+    _all_of = [
         OutputTypeDefinition(),
         OutputDescriptionType(),
     ]
