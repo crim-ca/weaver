@@ -80,6 +80,8 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install Dependencies
+        # install package and dependencies directly,
+        # skip sys/conda setup to use active python
         run: make install-pkg install-dev version
       - name: Display Packages
         run: pip freeze
