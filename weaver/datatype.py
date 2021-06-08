@@ -15,7 +15,7 @@ from owslib.wps import Process as ProcessOWS, WPSException
 from pywps import Process as ProcessWPS
 
 from weaver.exceptions import ProcessInstanceError
-from weaver.execute import EXECUTE_CONTROL_OPTION_ASYNC
+from weaver.execute import EXECUTE_CONTROL_OPTION_ASYNC, EXECUTE_CONTROL_OPTIONS
 from weaver.formats import ACCEPT_LANGUAGE_EN_US, CONTENT_TYPE_APP_JSON
 from weaver.processes.convert import ows2json, wps2json_io
 from weaver.processes.types import (
@@ -832,6 +832,9 @@ class Process(Base):
     def jobControlOptions(self):  # noqa: N802
         # type: () -> List[str]
         self.setdefault("jobControlOptions", [EXECUTE_CONTROL_OPTION_ASYNC])
+        if not isinstance(self["jobControlOptions"], list):  # eg: None, bw-compat
+            self["jobControlOptions"] = [EXECUTE_CONTROL_OPTION_ASYNC]
+        self["jobControlOptions"] = [mode for mode in self["jobControlOptions"] if mode in EXECUTE_CONTROL_OPTIONS]
         if len(self["jobControlOptions"]) == 0:
             self["jobControlOptions"].append(EXECUTE_CONTROL_OPTION_ASYNC)
         return self.get("jobControlOptions")

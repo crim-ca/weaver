@@ -14,7 +14,8 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Fix backward compatibility of pre-deployed processes that did not define ``jobControlOptions`` that is now required.
+  Missing definition are substituted in-place by default ``["execute-async"]`` mode.
 
 `3.2.0 <https://github.com/crim-ca/weaver/tree/3.2.0>`_ (2021-06-08)
 ========================================================================
