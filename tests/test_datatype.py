@@ -54,8 +54,8 @@ def test_process_job_control_options_resolution():
     ]:
         assert test_process.jobControlOptions == [EXECUTE_CONTROL_OPTION_ASYNC]
     # other valid definitions should be preserved as is
-    p = Process(id="test-{}".format(uuid.uuid4()), package={}, jobControlOptions=[EXECUTE_CONTROL_OPTION_SYNC])
-    assert p.jobControlOptions == [EXECUTE_CONTROL_OPTION_SYNC]
-    p = Process(id="test-{}".format(uuid.uuid4()), package={}, jobControlOptions=[EXECUTE_CONTROL_OPTION_SYNC,
-                                                                                  EXECUTE_CONTROL_OPTION_ASYNC])
-    assert p.jobControlOptions == [EXECUTE_CONTROL_OPTION_SYNC, EXECUTE_CONTROL_OPTION_ASYNC]
+    proc = Process(id="test-{}".format(uuid.uuid4()), package={}, jobControlOptions=[EXECUTE_CONTROL_OPTION_SYNC])
+    assert proc.jobControlOptions == [EXECUTE_CONTROL_OPTION_SYNC]
+    proc = Process(id="test-{}".format(uuid.uuid4()), package={}, jobControlOptions=[EXECUTE_CONTROL_OPTION_SYNC,
+                                                                                     EXECUTE_CONTROL_OPTION_ASYNC])
+    assert proc.jobControlOptions == [EXECUTE_CONTROL_OPTION_SYNC, EXECUTE_CONTROL_OPTION_ASYNC]
