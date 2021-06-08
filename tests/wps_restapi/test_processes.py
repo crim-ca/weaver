@@ -215,7 +215,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
 
         # change value that will trigger schema error on check
         process = self.process_store.fetch_by_id(process_name)
-        process["jobControlOptions"] = "random"  # invalid
+        process["outputTransmission"] = "random"  # invalid (don't use jobControlOptions fixed in-place)
         process["visibility"] = VISIBILITY_PUBLIC
         self.process_store.save_process(process, overwrite=True)
 
