@@ -10,6 +10,17 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+`3.2.0 <https://github.com/crim-ca/weaver/tree/3.2.0>`_ (2021-06-08)
+========================================================================
+
+Changes:
+--------
 - Add reference link to ReadTheDocs URL of `Weaver` in API landing page.
 - Add references to `OGC-API Processes` requirements and recommendations for eventual conformance listing
   (relates to `#231 <https://github.com/crim-ca/weaver/issues/231>`_).
