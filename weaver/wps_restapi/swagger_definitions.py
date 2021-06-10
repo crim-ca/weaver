@@ -8,7 +8,7 @@ import os
 from typing import TYPE_CHECKING
 
 import yaml
-from colander import DateTime, Email, OneOf, Range, Regex, drop, required
+from colander import DateTime, Email, OneOf, Range, Regex, SequenceSchema, drop, required
 from cornice import Service
 
 from weaver import __meta__
@@ -715,6 +715,40 @@ class AnyLiteralType(OneOfKeywordSchema):
         ExtendedSchemaNode(Boolean()),
         ExtendedSchemaNode(String()),
     ]
+
+
+class SequenceStringType(SequenceSchema):
+    value = ExtendedSchemaNode(String())
+
+
+class SequenceBooleanType(SequenceSchema):
+    value = ExtendedSchemaNode(Boolean())
+
+
+class SequenceNumberType(SequenceSchema):
+    value = ExtendedSchemaNode(Float())
+
+
+class ArrayLiteralType(OneOfKeywordSchema):
+    """
+    .. seealso::
+        - :class:`SequenceNumberType`
+        - :class:`SequenceBooleanType`
+        - :class:`SequenceStringType`
+    """
+    _one_of = [
+        SequenceNumberType(),
+        SequenceBooleanType(),
+        SequenceStringType()
+    ]
+
+
+class ArrayLiteralDataType(ExtendedMappingSchema):
+    data = ArrayLiteralType()
+
+
+class ArrayLiteralValueType(ExtendedMappingSchema):
+    value = ArrayLiteralType()
 
 
 class AnyLiteralDataType(ExtendedMappingSchema):
@@ -2026,13 +2060,16 @@ class Reference(ExtendedMappingSchema):
 class AnyType(OneOfKeywordSchema):
     """Permissive variants that we attempt to parse automatically."""
     _one_of = [
+
+        ArrayLiteralValueType(),
+        ArrayLiteralDataType(),
         # literal data with 'data' key
         AnyLiteralDataType(),
         # same with 'value' key (OGC specification)
         AnyLiteralValueType(),
         # HTTP references with various keywords
         LiteralReference(),
-        Reference(),
+        Reference()
     ]
 
 

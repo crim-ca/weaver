@@ -96,7 +96,9 @@ def get_results(job, container, value_key=None, ogc_api=False):
         if rtype == "href":
             # fix paths relative to instance endpoint, but leave explicit links as is (eg: S3 bucket, remote HTTP, etc.)
             if value.startswith("/"):
-                value = wps_url + str(value).lstrip("/")
+                value = str(value).lstrip("/")
+            if "://" not in value:
+                value = wps_url + value
         elif ogc_api:
             out_key = "value"
         elif value_key:

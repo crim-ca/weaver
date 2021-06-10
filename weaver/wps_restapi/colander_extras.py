@@ -176,6 +176,12 @@ class SemanticVersion(colander.Regex):
 
 
 class ExtendedBoolean(colander.Boolean):
+
+    def __init__(self, *args, true_choices=None, **kwargs):
+        if true_choices is None:
+            true_choices = ("true", "1")
+        super(ExtendedBoolean, self).__init__(true_choices=true_choices, *args, **kwargs)
+
     def serialize(self, node, cstruct):  # pylint: disable=W0221
         result = super(ExtendedBoolean, self).serialize(node, cstruct)
         if result is not colander.null:

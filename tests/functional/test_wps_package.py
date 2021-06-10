@@ -8,8 +8,11 @@ Local test web application is employed to run operations by mocking external req
     - :mod:`tests.processes.wps_package`.
 """
 import contextlib
+import json
 import logging
 import os
+import tempfile
+from inspect import cleandoc
 
 import colander
 import pytest
@@ -912,6 +915,123 @@ class WpsPackageAppTest(WpsPackageConfigBase):
                 assert proc_in_res in (proc_in_exp, str(proc_in_exp)), \
                     "Field '{}' of input '{}'({}) is expected to be '{}' but was '{}'" \
                     .format(field, process_input, i, proc_in_exp, proc_in_res)
+
+    def test_execute_job_with_array_input(self):
+        """
+        The test validates job can receive an array as input and process it as expected
+        """
+        cwl = {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "baseCommand": ["python3", "script.py"],
+            "inputs":
+              {
+                    "test_int_array": {"type": {"type": "array", "items": "int"}},
+                    "test_float_array": {"type": {"type": "array", "items": "float"}},
+                    "test_string_array": {"type": {"type": "array", "items": "string"}},
+                    "test_int_value": "int",
+                    "test_string_value": "string",
+                    "test_float_value": "float"
+            },
+            "requirements": {
+                CWL_REQUIREMENT_INIT_WORKDIR: {
+                    "listing": [
+                        {
+                            "entryname": "script.py",
+                            "entry": cleandoc("""
+                                import json
+                                input = $(inputs)
+                                for key, value in input.items():
+                                    if isinstance(value, list):
+                                        if all(isinstance(val, int) for val in value):
+                                            value = map(lambda v: v+1, value)
+                                        elif all(isinstance(val, float) for val in value):
+                                            value = map(lambda v: v+0.5, value)
+                                        elif all(isinstance(val, bool) for val in value):
+                                            value = map(lambda v: not v, value)
+                                        elif all(isinstance(val, str) for val in value):
+                                            value = map(lambda v: v.upper(), value)
+                                        input[key] = ";".join(map(str, value))
+                                    elif isinstance(value, str):
+                                        input[key] = value.upper()
+                                    elif isinstance(value, bool):
+                                        input[key] = not value
+                                    elif isinstance(value, int):
+                                        input[key] = value+1
+                                    elif isinstance(value, float):
+                                        input[key] = value+0.5
+                                json.dump(input, open("tmp.txt","w"))
+                                """)
+                        }
+                    ]
+                }
+            },
+            "outputs": [{"id": "output_test", "type": "File", "outputBinding": {"glob": "tmp.txt"}}],
+        }
+        body = {
+            "processDescription": {
+                "process": {
+                    "id": self._testMethodName,
+                    "title": "some title",
+                    "abstract": "this is a test",
+                },
+            },
+            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "executionUnit": [{"unit": cwl}],
+        }
+        try:
+            desc, _ = self.deploy_process(body)
+        except colander.Invalid:
+            self.fail("Test")
+
+        assert desc["process"] is not None
+
+        exec_body = {
+            "mode": EXECUTE_MODE_ASYNC,
+            "response": EXECUTE_RESPONSE_DOCUMENT,
+            "inputs":
+            [
+                {"id": "test_int_array", "value": [10, 20, 30, 40, 50]},
+                {"id": "test_float_array", "value": [10.03, 20.03, 30.03, 40.03, 50.03]},
+                {"id": "test_string_array", "value": ["this", "is", "a", "test"]},
+                {"id": "test_int_value", "value": 2923},
+                {"id": "test_string_value", "value": "stringtest"},
+                {"id": "test_float_value", "value": 389.73}
+            ],
+            "outputs": [
+                {"id": "output_test", "type": "File"},
+            ]
+        }
+
+        with contextlib.ExitStack() as stack_exec:
+            for mock_exec in mocked_execute_process():
+                stack_exec.enter_context(mock_exec)
+            proc_url = "/processes/{}/jobs".format(self._testMethodName)
+            resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
+                                       data=exec_body, headers=self.json_headers, only_local=True)
+            assert resp.status_code in [200, 201], "Failed with: [{}]\nReason:\n{}".format(resp.status_code, resp.json)
+            status_url = resp.json.get("location")
+
+        results = self.monitor_job(status_url)
+        outputs = self.get_outputs(status_url)
+
+        tmpdir = tempfile.gettempdir()
+        job_id = status_url.split("/")[-1]
+        tmpfile = "{}/{}/tmp.txt".format(tmpdir, job_id)
+
+        try:
+            processed_values = json.load(open(tmpfile, "r"))
+        except FileNotFoundError:
+            raise FileNotFoundError
+        except Exception as e:
+            self.fail("An error occured during the reading of the file: {}".format(e))
+
+        assert processed_values["test_int_array"] == "11;21;31;41;51"
+        assert processed_values["test_float_array"] == "10.53;20.53;30.53;40.53;50.53"
+        assert processed_values["test_string_array"] == "THIS;IS;A;TEST"
+        assert processed_values["test_int_value"] == 2924
+        assert processed_values["test_string_value"] == "STRINGTEST"
+        assert processed_values["test_float_value"] == 390.23
 
     # FIXME: test not working
     #   same payloads sent directly to running weaver properly raise invalid schema -> bad request error
