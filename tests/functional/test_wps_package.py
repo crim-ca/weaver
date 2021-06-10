@@ -1020,8 +1020,8 @@ class WpsPackageAppTest(WpsPackageConfigBase):
             processed_values = json.load(open(tmpfile, "r"))
         except FileNotFoundError:
             raise FileNotFoundError
-        except Exception as e:
-            self.fail("An error occured during the reading of the file: {}".format(e))
+        except Exception as exception:
+            self.fail("An error occured during the reading of the file: {}".format(exception))
 
         assert processed_values["test_int_array"] == "11;21;31;41;51"
         assert processed_values["test_float_array"] == "10.53;20.53;30.53;40.53;50.53"
