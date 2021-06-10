@@ -1012,7 +1012,6 @@ class WpsPackageAppTest(WpsPackageConfigBase):
             assert resp.status_code in [200, 201], "Failed with: [{}]\nReason:\n{}".format(resp.status_code, resp.json)
             status_url = resp.json.get("location")
 
-
         tmpdir = tempfile.gettempdir()
         job_id = status_url.split("/")[-1]
         tmpfile = "{}/{}/tmp.txt".format(tmpdir, job_id)
