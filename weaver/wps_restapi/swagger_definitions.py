@@ -625,9 +625,9 @@ class OWSContext(ExtendedMappingSchema):
 
 
 class DescriptionBase(ExtendedMappingSchema):
-    title = ExtendedSchemaNode(String(), missing=drop, description="Short name definition of the process.")
-    abstract = ExtendedSchemaNode(String(), missing=drop, description="Detailed explanation of the process operation.")
-    links = LinkList(missing=drop, description="References to endpoints with information related to the process.")
+    title = ExtendedSchemaNode(String(), missing=drop, description="Short human-readable name of the object.")
+    description = ExtendedSchemaNode(String(), missing=drop, description="Detailed explanation of the object.")
+    links = LinkList(missing=drop, description="References to endpoints with information related to object.")
 
 
 class DescriptionOWS(ExtendedMappingSchema):
@@ -2005,21 +2005,17 @@ class OutputList(ExtendedSequenceSchema):
     output = Output()
 
 
-class ProviderSummarySchema(ExtendedMappingSchema):
+class ProviderSummarySchema(DescriptionType):
     """WPS provider summary definition."""
     id = ExtendedSchemaNode(String())
     url = URL(description="Endpoint of the provider.")
-    title = ExtendedSchemaNode(String())
-    abstract = ExtendedSchemaNode(String())
     public = ExtendedSchemaNode(Boolean())
 
 
-class ProviderCapabilitiesSchema(ExtendedMappingSchema):
+class ProviderCapabilitiesSchema(DescriptionType):
     """WPS provider capabilities."""
     id = ExtendedSchemaNode(String())
     url = URL(description="WPS GetCapabilities URL of the provider.")
-    title = ExtendedSchemaNode(String())
-    abstract = ExtendedSchemaNode(String())
     contact = ExtendedSchemaNode(String())
     type = ExtendedSchemaNode(String())
 
@@ -2058,13 +2054,19 @@ class ProcessInfo(ExtendedMappingSchema):
     executeEndpoint = URL(description="Endpoint where the process can be executed from.", missing=drop)
 
 
-class Process(ProcessInfo, ProcessDescriptionType, ProcessDescriptionMeta):
+class Process(ProcessSummary, ProcessInfo):
     inputs = DescribeInputTypeList(description="Inputs definition of the process.")
     outputs = DescribeOutputTypeList(description="Outputs definition of the process.")
     visibility = VisibilityValue(missing=drop)
 
 
 class ProcessDeployment(ProcessDescriptionType, ProcessDeployMeta):
+    # explicit "abstract" handling for bw-compat, new versions should use "description"
+    # only allowed in deploy to support older servers that report abstract (or parsed from WPS-1/2)
+    # recent OGC-API v1+ will usually provide directly "description" as per the specification
+    abstract = ExtendedSchemaNode(String(), missing=drop, deprecated=True,
+                                  description="Detailed explanation of the process being deployed. "
+                                              "[Deprecated] Consider using 'description' instead.")
     # allowed undefined I/O during deploy because of reference from owsContext or executionUnit
     inputs = DeployInputTypeList(
         missing=drop, title="DeploymentInputs",
@@ -2081,11 +2083,11 @@ class ProcessDeployment(ProcessDescriptionType, ProcessDeployMeta):
 
 class ProcessDescriptionOutputSchema(ExtendedMappingSchema):
     """WPS process output definition."""
+    id = ExtendedSchemaNode(String())
+    title = ExtendedSchemaNode(String())
+    abstract = ExtendedSchemaNode(String())
     dataType = ExtendedSchemaNode(String())
     defaultValue = ExtendedMappingSchema()
-    id = ExtendedSchemaNode(String())
-    abstract = ExtendedSchemaNode(String())
-    title = ExtendedSchemaNode(String())
 
 
 class JobStatusInfo(ExtendedMappingSchema):
@@ -2835,8 +2837,14 @@ class DeploymentResult(ExtendedMappingSchema):
     processSummary = ProcessSummary()
 
 
-class ProcessDescriptionBodySchema(ExtendedMappingSchema):
-    process = ProcessDescriptionSchema()
+# CHANGE:
+# 'process' contents is now directly returned at the root of the 'ProcessDescription' response
+# 'ProcessSummary' contents are also provided on top of items in 'ProcessDescription' body
+#
+# class ProcessDescriptionBodySchema(ExtendedMappingSchema):
+#    process = ProcessDescriptionSchema()
+class ProcessDescriptionBodySchema(ProcessSummary, ProcessDescriptionSchema):
+    pass
 
 
 class ProvidersSchema(ExtendedSequenceSchema):
@@ -3029,8 +3037,19 @@ class ProcessOfferingBase(ExtendedMappingSchema):
     outputTransmission = TransmissionModeList(missing=drop)
 
 
-class ProcessOffering(ProcessOfferingBase):
-    process = Process()
+class ProcessOffering(Process):
+    # CHANGE: process contents now directly at the root
+    # process = Process()
+
+    def deserialize(self, cstruct):
+        """
+        Define preferred key ordering.
+        """
+        result = super(ProcessOffering, self).deserialize(cstruct)
+        key_order = ["id", "title", "version", "description", "keywords", "metadata", "inputs", "outputs", "links"]
+        offering = {field: result.pop(field, None) for field in key_order}
+        offering.update({field: value for field, value in result.items()})
+        return offering
 
 
 class ProcessDeploymentOffering(ProcessOfferingBase):
@@ -3776,7 +3795,9 @@ def service_api_route_info(service_api, settings):
 
 def datetime_interval_parser(datetime_interval):
     # type: (str) -> DatetimeIntervalType
-    """This function parses a given datetime or interval into a dictionary that will be easy for database process."""
+    """
+    This function parses a given datetime or interval into a dictionary that will be easy for database process.
+    """
     parsed_datetime = {}
 
     if datetime_interval.startswith(DATETIME_INTERVAL_OPEN_START_SYMBOL):

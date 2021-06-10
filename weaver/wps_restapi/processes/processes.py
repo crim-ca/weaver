@@ -163,7 +163,7 @@ def get_processes(request):
                 for i, provider in enumerate(services):
                     processes = list_remote_processes(provider, request)
                     response_body["providers"][i].update({
-                        "processes": processes if detail else [get_any_id(proc) for proc in processes.json()]
+                        "processes": processes if detail else [get_any_id(proc) for proc in processes]
                     })
         return HTTPOk(json=response_body)
     # FIXME: handle colander invalid directly in tween (https://github.com/crim-ca/weaver/issues/112)

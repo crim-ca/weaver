@@ -8,6 +8,7 @@ XML = lxml.etree._Element  # noqa
 if TYPE_CHECKING:
     import os
     import typing
+    from datetime import datetime
     from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Type, Union
     if hasattr(typing, "TypedDict"):
         from typing import TypedDict  # pylint: disable=E0611,no-name-in-module
@@ -117,5 +118,4 @@ if TYPE_CHECKING:
 
     # others
     DatetimeIntervalType = TypedDict("DatetimeIntervalType",
-                                     {"before": str, "after": str,
-                                      "match": str, }, total=False)
+                                     {"before": datetime, "after": datetime, "match": datetime}, total=False)

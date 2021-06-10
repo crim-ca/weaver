@@ -222,6 +222,9 @@ def deploy_process_from_payload(payload, container, overwrite=False):
         process_info["owsContext"] = {"offering": {"content": {"href": str(reference)}}}
     elif isinstance(ows_context, dict):
         process_info["owsContext"] = ows_context
+    # bw-compat abstract/description (see: ProcessDeployment schema)
+    if "description" not in process_info or not process_info["description"]:
+        process_info["description"] = process_info.get("abstract", "")
 
     # FIXME: handle colander invalid directly in tween (https://github.com/crim-ca/weaver/issues/112)
     try:

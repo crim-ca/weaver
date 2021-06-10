@@ -16,8 +16,14 @@ from owslib.wps import Process as ProcessOWS, WPSException
 from pywps import Process as ProcessWPS
 
 from weaver.exceptions import ProcessInstanceError
-from weaver.execute import EXECUTE_CONTROL_OPTION_ASYNC, EXECUTE_CONTROL_OPTIONS, EXECUTE_TRANSMISSION_MODE_REFERENCE
-from weaver.processes.convert import get_field, null, ows2json, wps2json_io
+from weaver.execute import (
+    EXECUTE_CONTROL_OPTION_ASYNC,
+    EXECUTE_CONTROL_OPTIONS,
+    EXECUTE_TRANSMISSION_MODE_OPTIONS,
+    EXECUTE_TRANSMISSION_MODE_REFERENCE
+)
+from weaver.formats import ACCEPT_LANGUAGE_EN_CA, CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML
+from weaver.processes.convert import ows2json, wps2json_io
 from weaver.processes.types import (
     PROCESS_APPLICATION,
     PROCESS_BUILTIN,
@@ -676,12 +682,11 @@ class Job(Base):
             response = lxml.etree.tostring(response)
         self["response"] = response
 
-    def _job_url(self, settings):
-        base_job_url = get_wps_restapi_base_url(settings)
+    def _job_url(self, base_url=None):
         if self.service is not None:
-            base_job_url += sd.provider_service.path.format(provider_id=self.service)
+            base_url += sd.provider_service.path.format(provider_id=self.service)
         job_path = sd.process_job_service.path.format(process_id=self.process, job_id=self.id)
-        return "{base_job_url}{job_path}".format(base_job_url=base_job_url, job_path=job_path)
+        return "{base_job_url}{job_path}".format(base_job_url=base_url, job_path=job_path)
 
     def links(self, container=None, self_link=None):
         # type: (Optional[AnySettingsContainer], Optional[str]) -> JSON
@@ -693,10 +698,14 @@ class Job(Base):
         :param container: object that helps retrieve instance details, namely the host URL.
         :param self_link: name of a section that represents the current link that will be returned.
         """
-        settings = get_settings(container) if container else {}
-        job_url = self._job_url(settings)
+        settings = get_settings(container)
+        base_url = get_wps_restapi_base_url(settings)
+        job_url = self._job_url(base_url)
+        job_list = "{}/{}".format(base_url, sd.jobs_service.path)
         job_links_body = {"links": [
             {"href": job_url, "rel": "status", "title": "Job status."},
+            {"href": job_url, "rel": "monitor", "title": "Job monitoring location."},
+            {"href": job_list, "rel": "collection", "title": "List of submitted jobs."}
         ]}
         job_links = ["logs", "inputs"]
         if self.status in JOB_STATUS_CATEGORIES[STATUS_CATEGORY_FINISHED]:
@@ -715,6 +724,9 @@ class Job(Base):
             self_link_body = {"href": job_url, "title": "Job status."}
         self_link_body["rel"] = "self"
         job_links_body["links"].append(self_link_body)
+        link_meta = {"type": CONTENT_TYPE_APP_JSON, "hreflang": ACCEPT_LANGUAGE_EN_CA}
+        for link in job_links_body["links"]:
+            link.update(link_meta)
         return job_links_body
 
     def json(self, container=None, self_link=None):     # pylint: disable=W0221,arguments-differ
@@ -906,7 +918,13 @@ class Process(Base):
     @property
     def outputTransmission(self):  # noqa: N802
         # type: () -> List[str]
-        self.setdefault("outputTransmission", [EXECUTE_TRANSMISSION_MODE_REFERENCE])
+        out = self.setdefault("outputTransmission", [EXECUTE_TRANSMISSION_MODE_REFERENCE])
+        if not isinstance(out, list):  # eg: None, bw-compat
+            out = [EXECUTE_TRANSMISSION_MODE_REFERENCE]
+        out = [mode for mode in out if mode in EXECUTE_TRANSMISSION_MODE_OPTIONS]
+        if len(out) == 0:
+            out.append(EXECUTE_TRANSMISSION_MODE_REFERENCE)
+        self["outputTransmission"] = out
         return dict.__getitem__(self, "outputTransmission")
 
     @property
@@ -1068,26 +1086,46 @@ class Process(Base):
         """
         return sd.Process().deserialize(self.dict())
 
+    def links(self, container=None):
+        # type: (Optional[AnySettingsContainer]) -> JSON
+        """Obtains the JSON links section of many response body for the process.
+
+        :param container: object that helps retrieve instance details, namely the host URL.
+        """
+        settings = get_settings(container)
+        base_url = get_wps_restapi_base_url(settings)
+        proc_desc = sd.process_service.path.format(process_id=self.id)
+        proc_list = sd.processes_service.path
+        proc_exec = sd.process_execution_service.path.format(process_id=self.id)
+        links = [
+            {"href": base_url + proc_desc, "rel": "self", "title": "Process description."},
+            {"href": base_url + proc_desc, "rel": "process-desc", "title": "Process description."},
+            {"href": base_url + proc_exec, "rel": "execute", "title": "Process execution endpoint for job submission."},
+            {"href": base_url + proc_list, "rel": "collection", "title": "List of registered processes."}
+        ]
+        if self.processEndpointWPS1:
+            wps_url = "{}?service=WPS&request=GetCapabilities".format(self.processEndpointWPS1)
+            links.append({"href": wps_url, "rel": "service-desc",
+                          "type": CONTENT_TYPE_APP_XML, "title": "Service definition."})
+        for link in links:
+            link.setdefault("type", CONTENT_TYPE_APP_JSON)
+            link.setdefault("hreflang", ACCEPT_LANGUAGE_EN_CA)
+        return {"links": links}
+
     def offering(self):
         # type: () -> JSON
         """
         Obtains the JSON serializable offering representation of the process.
         """
-        process_offering = {"process": self.dict()}
-        if self.version:
-            process_offering.update({"processVersion": self.version})
-        if self.jobControlOptions:
-            process_offering.update({"jobControlOptions": self.jobControlOptions})
-        if self.outputTransmission:
-            process_offering.update({"outputTransmission": self.outputTransmission})
-        return sd.ProcessOffering().deserialize(process_offering)
+        process = self.dict()
+        process.update(self.links())
+        return sd.ProcessOffering().deserialize(process)
 
     def summary(self):
         # type: () -> JSON
         """
         Obtains the JSON serializable summary representation of the process.
         """
-        return sd.ProcessSummary().deserialize(self.dict())
 
     @staticmethod
     def from_wps(wps_process, **extra_params):

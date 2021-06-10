@@ -24,4 +24,4 @@ def get_wps_restapi_base_url(container):
         weaver_url = get_weaver_url(settings)
         restapi_path = wps_restapi_base_path(settings)
         weaver_rest_url = weaver_url + restapi_path
-    return weaver_rest_url
+    return weaver_rest_url.rstrip("/").strip()
