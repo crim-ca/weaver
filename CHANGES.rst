@@ -13,6 +13,9 @@ Changes:
 - Add reference link to ReadTheDocs URL of `Weaver` in API landing page.
 - Add references to `OGC-API Processes` requirements and recommendations for eventual conformance listing
   (relates to `#231 <https://github.com/crim-ca/weaver/issues/231>`_).
+- Updated the format of the URL for the job results.
+- Add support for array type as job inputs
+  (relates to `#233 <https://github.com/crim-ca/weaver/issues/233>`_).
 
 Fixes:
 ------
