@@ -1,6 +1,8 @@
+import uuid
 from copy import deepcopy
 
 from weaver.datatype import Process
+from weaver.execute import EXECUTE_CONTROL_OPTION_ASYNC, EXECUTE_CONTROL_OPTION_SYNC
 
 
 def test_package_encode_decode():
@@ -40,3 +42,20 @@ def test_package_encode_decode():
     assert "$namespace" not in process_package_encoded["executionUnits"][0]["unit"]
     assert _replace_specials("$namespace") in process_package_encoded["executionUnits"][0]["unit"]
     assert package == process.package, "package obtained from the process method should be the original decoded version"
+
+
+def test_process_job_control_options_resolution():
+    # invalid or matching default mode should be corrected to default async list
+    for test_process in [
+        Process(id="test-{}".format(uuid.uuid4()), package={}, jobControlOptions=None),
+        Process(id="test-{}".format(uuid.uuid4()), package={}, jobControlOptions=[None]),
+        Process(id="test-{}".format(uuid.uuid4()), package={}, jobControlOptions=[]),
+        Process(id="test-{}".format(uuid.uuid4()), package={}, jobControlOptions=[EXECUTE_CONTROL_OPTION_ASYNC]),
+    ]:
+        assert test_process.jobControlOptions == [EXECUTE_CONTROL_OPTION_ASYNC]
+    # other valid definitions should be preserved as is
+    proc = Process(id="test-{}".format(uuid.uuid4()), package={}, jobControlOptions=[EXECUTE_CONTROL_OPTION_SYNC])
+    assert proc.jobControlOptions == [EXECUTE_CONTROL_OPTION_SYNC]
+    proc = Process(id="test-{}".format(uuid.uuid4()), package={}, jobControlOptions=[EXECUTE_CONTROL_OPTION_SYNC,
+                                                                                     EXECUTE_CONTROL_OPTION_ASYNC])
+    assert proc.jobControlOptions == [EXECUTE_CONTROL_OPTION_SYNC, EXECUTE_CONTROL_OPTION_ASYNC]

@@ -10,11 +10,38 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+`3.2.1 <https://github.com/crim-ca/weaver/tree/3.2.1>`_ (2021-06-08)
+========================================================================
+
+Changes:
+--------
+- No change.
+
+Fixes:
+------
+- Fix backward compatibility of pre-deployed processes that did not define ``jobControlOptions`` that is now required.
+  Missing definition are substituted in-place by default ``["execute-async"]`` mode.
+
+`3.2.0 <https://github.com/crim-ca/weaver/tree/3.2.0>`_ (2021-06-08)
+========================================================================
+
+Changes:
+--------
 - Add reference link to ReadTheDocs URL of `Weaver` in API landing page.
 - Add references to `OGC-API Processes` requirements and recommendations for eventual conformance listing
   (relates to `#231 <https://github.com/crim-ca/weaver/issues/231>`_).
 - In order to align with OpenAPI `boolean` type definitions, non explicit `boolean` values will not be automatically 
   converted to `bool` anymore. They will require explicit `false|true`.
+- Add ``datetime`` query parameter for job searches queries
+  (relates to `#236 <https://github.com/crim-ca/weaver/issues/236>`_).
+- Add ``limit`` query parameter validation and integration for jobs in retrieve queries
+  (relates to `#237 <https://github.com/crim-ca/weaver/issues/237>`_).
 
 Fixes:
 ------
@@ -30,6 +57,10 @@ Fixes:
   URL was incorrectly handled by not prepended the required base URL location.
 - Add support for array type as job inputs
   (relates to `#233 <https://github.com/crim-ca/weaver/issues/233>`_).
+- Fix invalid deserialization of schemas using ``not`` keyword that would result in all fields returned instead of
+  limiting them to the expected fields from the schema definitions for ``LiteralInputType`` in process description.
+- Adjust ``InputType`` and ``OutputType`` schemas to use ``allOf`` instead of ``anyOf`` definition since all sub-schemas
+  that define them must be combined, with their respectively required or optional fields.
 
 `3.1.0 <https://github.com/crim-ca/weaver/tree/3.1.0>`_ (2021-04-23)
 ========================================================================

@@ -52,8 +52,15 @@ IANA_TAR = IANA_NAMESPACE + ":" + CONTENT_TYPE_APP_TAR  # noqa # pylint: disable
 IANA_ZIP = IANA_NAMESPACE + ":" + CONTENT_TYPE_APP_ZIP  # noqa # pylint: disable=unused-variable
 
 KNOWN_PROCESS_DESCRIPTION_FIELDS = {
-    "id", "title", "abstract", "inputs", "outputs", "executeEndpoint", "keywords", "metadata", "visibility"
+    "id", "title", "abstract", "keywords", "metadata", "inputs", "outputs", "executeEndpoint", "visibility"
 }
+# intersection of fields in InputType and specific sub-schema LiteralInputType
+KNOWN_PROCESS_DESCRIPTION_INPUT_DATA_FIELDS = {
+    "id", "title", "abstract", "keywords", "metadata", "links", "literalDataDomains", "additionalParameters",
+    "minOccurs", "maxOccurs"
+}
+# corresponding schemas of input, but min/max occurs not expected
+KNOWN_PROCESS_DESCRIPTION_OUTPUT_DATA_FIELDS = KNOWN_PROCESS_DESCRIPTION_INPUT_DATA_FIELDS - {"minOccurs", "maxOccurs"}
 
 LOGGER = logging.getLogger(__name__)
 
@@ -139,6 +146,11 @@ class WpsPackageAppTest(WpsPackageConfigBase):
         assert "maxOccurs" not in desc["process"]["outputs"][0]
         assert "format" not in desc["process"]["outputs"][0]
         assert len(set(desc["process"].keys()) - KNOWN_PROCESS_DESCRIPTION_FIELDS) == 0
+        # make sure that deserialization of literal fields did not produce over-verbose metadata
+        for p_input in desc["process"]["inputs"]:
+            assert len(set(p_input) - KNOWN_PROCESS_DESCRIPTION_INPUT_DATA_FIELDS) == 0
+        for p_output in desc["process"]["outputs"]:
+            assert len(set(p_output) - KNOWN_PROCESS_DESCRIPTION_OUTPUT_DATA_FIELDS) == 0
 
     def test_literal_io_from_package_and_offering(self):
         """
