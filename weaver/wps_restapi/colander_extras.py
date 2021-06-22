@@ -1435,7 +1435,9 @@ class NotKeywordSchema(KeywordMapper):
     """
     Allows specifying specific schema conditions that fails underlying schema definition validation if present.
 
-    This is equivalent to OpenAPI object mapping with ``additionalProperties: false``, but is more explicit in
+    Corresponds to the ``not`` specifier of `OpenAPI` specification.
+
+    This is equivalent to `OpenAPI` object mapping with ``additionalProperties: false``, but is more explicit in
     the definition of invalid or conflicting field names with explicit definitions during deserialization.
 
     Example::
@@ -1449,8 +1451,20 @@ class NotKeywordSchema(KeywordMapper):
         class MappingWithoutType(NotKeywordSchema, RequiredItem):
             _not = [MappingWithType()]
 
+        class MappingOnlyNotType(NotKeywordSchema):
+            _not = [MappingWithType()]
+
         # following will raise invalid error even if 'item' is valid because 'type' is also present
         MappingWithoutType().deserialize({"type": "invalid", "item": "valid"})
+
+        # following will return successfully with only 'item' because 'type' was not present
+        MappingWithoutType().deserialize({"item": "valid", "value": "ignore"})
+        # result: {"item": "valid"}
+
+        # following will return an empty mapping dropping 'item' since it only needs to ensure 'type' was not present,
+        # but did not provide any additional fields requirement from other class inheritances
+        MappingOnlyNotType().deserialize({"item": "valid"})
+        # result: {}
 
     .. seealso::
         - :class:`OneOfKeywordSchema`
@@ -1470,7 +1484,7 @@ class NotKeywordSchema(KeywordMapper):
 
     def _deserialize_keyword(self, cstruct):
         """
-        Test each possible case, raise if any corresponding schema was successfully validated.
+        Raise if any sub-node schema that should NOT be present was successfully validated.
         """
         invalid_not = dict()
         for schema_class in self._not:  # noqa
@@ -1486,7 +1500,10 @@ class NotKeywordSchema(KeywordMapper):
         if invalid_not:
             message = "Value contains not allowed fields from schema conditions: {}".format(invalid_not)
             raise colander.Invalid(node=self, msg=message, value=cstruct)
-        return cstruct
+        # If schema was a plain NotKeywordSchema, the result will be empty as it serves only to validate
+        # that the subnodes are not present. Otherwise, if it derives from other mapping classes, apply them.
+        # If deserialization was not applied here, everything in the original cstruct would bubble up.
+        return ExtendedMappingSchema.deserialize(self, cstruct)
 
 
 class KeywordTypeConverter(TypeConverter):

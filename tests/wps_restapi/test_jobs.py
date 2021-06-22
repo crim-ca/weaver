@@ -3,12 +3,14 @@ import json
 import unittest
 import warnings
 from collections import OrderedDict
+from datetime import date
 from distutils.version import LooseVersion
 from typing import TYPE_CHECKING
 
 import mock
 import pyramid.testing
 import pytest
+from dateutil import parser as dateparser
 
 from tests.utils import (
     get_module_version,
@@ -35,6 +37,11 @@ from weaver.utils import get_path_kvp
 from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC
 from weaver.warning import TimeZoneInfoAlreadySetWarning
 from weaver.wps_restapi import swagger_definitions as sd
+from weaver.wps_restapi.swagger_definitions import (
+    DATETIME_INTERVAL_CLOSED_SYMBOL,
+    DATETIME_INTERVAL_OPEN_END_SYMBOL,
+    DATETIME_INTERVAL_OPEN_START_SYMBOL
+)
 
 if TYPE_CHECKING:
     from typing import Iterable, List, Tuple, Union
@@ -51,6 +58,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         cls.config = setup_config_with_mongodb(settings=settings)
         cls.app = get_test_weaver_app(config=cls.config)
         cls.json_headers = {"Accept": CONTENT_TYPE_APP_JSON, "Content-Type": CONTENT_TYPE_APP_JSON}
+        cls.datetime_interval = cls.generate_test_datetimes()
 
     @classmethod
     def tearDownClass(cls):
@@ -94,22 +102,25 @@ class WpsRestApiJobsTest(unittest.TestCase):
         self.make_job(task_id="4444-4444-4444-4444", process=self.process_public.identifier, service=None,
                       user_id=self.user_admin_id, status=STATUS_FAILED, progress=55, access=VISIBILITY_PRIVATE)
         # job public/private service/process combinations
-        self.make_job(task_id="5555-5555-5555-5555",
-                      process=self.process_public.identifier, service=self.service_public.name,
+        self.make_job(task_id="5555-5555-5555-5555", process=self.process_public.identifier,
+                      service=self.service_public.name, created=self.datetime_interval[0],
                       user_id=self.user_editor1_id, status=STATUS_FAILED, progress=99, access=VISIBILITY_PUBLIC)
-        self.make_job(task_id="6666-6666-6666-6666",
-                      process=self.process_private.identifier, service=self.service_public.name,
+        self.make_job(task_id="6666-6666-6666-6666", process=self.process_private.identifier,
+                      service=self.service_public.name, created=self.datetime_interval[1],
                       user_id=self.user_editor1_id, status=STATUS_FAILED, progress=99, access=VISIBILITY_PUBLIC)
-        self.make_job(task_id="7777-7777-7777-7777",
-                      process=self.process_public.identifier, service=self.service_private.name,
+        self.make_job(task_id="7777-7777-7777-7777", process=self.process_public.identifier,
+                      service=self.service_private.name, created=self.datetime_interval[2],
                       user_id=self.user_editor1_id, status=STATUS_FAILED, progress=99, access=VISIBILITY_PUBLIC)
-        self.make_job(task_id="8888-8888-8888-8888",
-                      process=self.process_private.identifier, service=self.service_private.name,
+        self.make_job(task_id="8888-8888-8888-8888", process=self.process_private.identifier,
+                      service=self.service_private.name, created=self.datetime_interval[3],
                       user_id=self.user_editor1_id, status=STATUS_FAILED, progress=99, access=VISIBILITY_PUBLIC)
 
-    def make_job(self, task_id, process, service, user_id, status, progress, access):
+    def make_job(self, task_id, process, service, user_id, status, progress, access, created=None):
+
+        created = dateparser.parse(created) if created else None
+
         job = self.job_store.save_job(task_id=task_id, process=process, service=service, is_workflow=False,
-                                      user_id=user_id, execute_async=True, access=access)
+                                      user_id=user_id, execute_async=True, access=access, created=created)
         job.status = status
         if status in JOB_STATUS_CATEGORIES[STATUS_CATEGORY_FINISHED]:
             job.mark_finished()
@@ -143,6 +154,15 @@ class WpsRestApiJobsTest(unittest.TestCase):
             mock.patch("{}.authenticated_userid".format(authn_policy_class), new_callable=lambda: user_id),
             mock.patch("{}.has_permission".format(authz_policy_class), return_value=is_admin),
         ])
+
+    @staticmethod
+    def generate_test_datetimes():
+        # type: () -> List[str]
+        """
+        Generates a list of dummy datetimes for testing.
+        """
+        year = date.today().year + 1
+        return ["{}-0{}-02T03:32:38.487000+00:00".format(year, month) for month in range(1, 5)]
 
     @staticmethod
     def check_job_format(job):
@@ -503,3 +523,162 @@ class WpsRestApiJobsTest(unittest.TestCase):
                 job_match = all(job in job_ids for job in resp.json["jobs"])
                 test_values = dict(path=path, access=access, user_id=user_id)
                 assert job_match, self.message_with_jobs_diffs(resp.json["jobs"], job_ids, test_values, index=i)
+
+    def test_jobs_list_with_limit_api(self):
+        """
+        .. seealso::
+            - `/req/collections/rc-limit-response
+                <https://github.com/opengeospatial/ogcapi-common/blob/master/collections/requirements/collections/REQ_rc-limit-response.adoc>`_
+        """
+        limit_parameter = 20
+        path = get_path_kvp(sd.jobs_service.path, limit=limit_parameter)
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        assert "limit" in resp.json and isinstance(resp.json["limit"], int)
+        assert resp.json["limit"] == limit_parameter
+        assert len(resp.json["jobs"]) <= limit_parameter
+
+    def test_jobs_list_with_limit_openapi_schema(self):
+        """
+        .. seealso::
+            - `/req/collections/rc-limit-response
+                <https://github.com/opengeospatial/ogcapi-common/blob/master/collections/requirements/collections/REQ_rc-limit-response.adoc>`_
+        """
+        resp = self.app.get(sd.jobs_service.path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        assert "limit" in resp.json and isinstance(resp.json["limit"], int)
+        assert len(resp.json["jobs"]) <= resp.json["limit"]
+
+    def test_not_required_fields(self):
+        uri = sd.openapi_json_service.path
+        resp = self.app.get(uri, headers=self.json_headers)
+        assert not resp.json["parameters"]["page"]["required"]
+        assert not resp.json["parameters"]["limit"]["required"]
+
+    def test_jobs_datetime_before(self):
+        """
+        .. seealso::
+            - `/req/collections/rc-time-collections-response
+                <https://github.com/opengeospatial/ogcapi-common/blob/master/collections/requirements/collections/REQ_rc-time-collections-response.adoc>`_
+        """
+        datetime_before = DATETIME_INTERVAL_OPEN_START_SYMBOL + self.datetime_interval[0]
+        path = get_path_kvp(sd.jobs_service.path, datetime=datetime_before)
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        assert len(resp.json["jobs"]) == 4
+        for job in resp.json["jobs"]:
+            base_uri = sd.jobs_service.path + "/{}".format(job)
+            path = get_path_kvp(base_uri)
+            resp = self.app.get(path, headers=self.json_headers)
+            assert resp.status_code == 200
+            assert resp.content_type == CONTENT_TYPE_APP_JSON
+            assert dateparser.parse(resp.json["created"]) <= dateparser.parse(
+                datetime_before.replace(DATETIME_INTERVAL_OPEN_START_SYMBOL, ""))
+
+    def test_jobs_datetime_after(self):
+        """
+        .. seealso::
+            - `/req/collections/rc-time-collections-response
+                <https://github.com/opengeospatial/ogcapi-common/blob/master/collections/requirements/collections/REQ_rc-time-collections-response.adoc>`_
+        """
+        datetime_after = str(self.datetime_interval[2] + DATETIME_INTERVAL_OPEN_END_SYMBOL)
+        path = get_path_kvp(sd.jobs_service.path, datetime=datetime_after)
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        assert len(resp.json["jobs"]) == 2
+        for job in resp.json["jobs"]:
+            base_uri = sd.jobs_service.path + "/{}".format(job)
+            path = get_path_kvp(base_uri)
+            resp = self.app.get(path, headers=self.json_headers)
+            assert resp.status_code == 200
+            assert resp.content_type == CONTENT_TYPE_APP_JSON
+            assert dateparser.parse(resp.json["created"]) >= dateparser.parse(
+                datetime_after.replace(DATETIME_INTERVAL_OPEN_END_SYMBOL, ""))
+
+    def test_jobs_datetime_interval(self):
+        """
+        .. seealso::
+            - `/req/collections/rc-time-collections-response
+                <https://github.com/opengeospatial/ogcapi-common/blob/master/collections/requirements/collections/REQ_rc-time-collections-response.adoc>`_
+        """
+        datetime_interval = self.datetime_interval[1] + DATETIME_INTERVAL_CLOSED_SYMBOL + self.datetime_interval[3]
+        path = get_path_kvp(sd.jobs_service.path, datetime=datetime_interval)
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == CONTENT_TYPE_APP_JSON
+
+        datetime_after, datetime_before = datetime_interval.split(DATETIME_INTERVAL_CLOSED_SYMBOL)
+        assert len(resp.json["jobs"]) == 3
+        for job in resp.json["jobs"]:
+            base_uri = sd.jobs_service.path + "/{}".format(job)
+            path = get_path_kvp(base_uri)
+            resp = self.app.get(path, headers=self.json_headers)
+            assert resp.status_code == 200
+            assert resp.content_type == CONTENT_TYPE_APP_JSON
+            assert dateparser.parse(resp.json["created"]) >= dateparser.parse(datetime_after)
+            assert dateparser.parse(resp.json["created"]) <= dateparser.parse(datetime_before)
+
+    def test_jobs_datetime_match(self):
+        """
+        .. seealso::
+            - `/req/collections/rc-time-collections-response
+                <https://github.com/opengeospatial/ogcapi-common/blob/master/collections/requirements/collections/REQ_rc-time-collections-response.adoc>`_
+        """
+        datetime_match = self.datetime_interval[1]
+        path = get_path_kvp(sd.jobs_service.path, datetime=datetime_match)
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        assert len(resp.json["jobs"]) == 1
+        for job in resp.json["jobs"]:
+            base_uri = sd.jobs_service.path + "/{}".format(job)
+            path = get_path_kvp(base_uri)
+            resp = self.app.get(path, headers=self.json_headers)
+            assert resp.status_code == 200
+            assert resp.content_type == CONTENT_TYPE_APP_JSON
+            assert dateparser.parse(resp.json["created"]) == dateparser.parse(datetime_match)
+
+    def test_jobs_datetime_invalid(self):
+        """
+        .. seealso::
+            - `/req/collections/rc-time-collections-response
+                <https://github.com/opengeospatial/ogcapi-common/blob/master/collections/requirements/collections/REQ_rc-time-collections-response.adoc>`_
+
+        datetime_invalid is not formated against the rfc3339 datetime format,
+        for more details refer to https://datatracker.ietf.org/doc/html/rfc3339#section-5.6
+        """
+        datetime_invalid = "2022-31-12 23:59:59"
+        path = get_path_kvp(sd.jobs_service.path, datetime=datetime_invalid)
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 422
+
+    def test_jobs_datetime_interval_invalid(self):
+        """
+        .. seealso::
+            - `/req/collections/rc-time-collections-response
+                <https://github.com/opengeospatial/ogcapi-common/blob/master/collections/requirements/collections/REQ_rc-time-collections-response.adoc>`_
+
+        datetime_invalid represents a datetime interval where the limit dates are inverted,
+        the minimun is greather than the maximum datetime limit
+        """
+        datetime_interval = self.datetime_interval[3] + DATETIME_INTERVAL_CLOSED_SYMBOL + self.datetime_interval[1]
+        path = get_path_kvp(sd.jobs_service.path, datetime=datetime_interval)
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 422
+
+    def test_jobs_datetime_before_invalid(self):
+        """
+        .. seealso::
+            - `/req/collections/rc-time-collections-response
+                <https://github.com/opengeospatial/ogcapi-common/blob/master/collections/requirements/collections/REQ_rc-time-collections-response.adoc>`_
+
+        datetime_before represents a bad open range datetime interval
+        """
+        datetime_before = "./" + self.datetime_interval[3]
+        path = get_path_kvp(sd.jobs_service.path, datetime=datetime_before)
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 422
