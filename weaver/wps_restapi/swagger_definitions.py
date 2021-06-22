@@ -8,7 +8,7 @@ import os
 from typing import TYPE_CHECKING
 
 import yaml
-from colander import DateTime, Email, OneOf, Range, Regex, SequenceSchema, drop, required
+from colander import DateTime, Email, OneOf, Range, Regex, drop, required
 from cornice import Service
 
 from weaver import __meta__
@@ -717,25 +717,19 @@ class AnyLiteralType(OneOfKeywordSchema):
     ]
 
 
-class SequenceStringType(SequenceSchema):
+class SequenceStringType(ExtendedSequenceSchema):
     value = ExtendedSchemaNode(String())
 
 
-class SequenceBooleanType(SequenceSchema):
+class SequenceBooleanType(ExtendedSequenceSchema):
     value = ExtendedSchemaNode(Boolean())
 
 
-class SequenceNumberType(SequenceSchema):
+class SequenceNumberType(ExtendedSequenceSchema):
     value = ExtendedSchemaNode(Float())
 
 
 class ArrayLiteralType(OneOfKeywordSchema):
-    """
-    .. seealso::
-        - :class:`SequenceNumberType`
-        - :class:`SequenceBooleanType`
-        - :class:`SequenceStringType`
-    """
     _one_of = [
         SequenceNumberType(),
         SequenceBooleanType(),
@@ -775,7 +769,7 @@ class LiteralDataDomainConstraints(OneOfKeywordSchema, LiteralDataDomainDefiniti
         AllowedValues,
         AllowedRanges,
         ValuesReference,
-        AnyValue,  # must be last because it"s the most permissive (always valid, default)
+        AnyValue,  # must be last because it's the most permissive (always valid, default)
     ]
 
 
@@ -2057,12 +2051,23 @@ class Reference(ExtendedMappingSchema):
     bodyReference = ReferenceURL(missing=drop)
 
 
+class ArrayReference(ExtendedSequenceSchema):
+    item = Reference()
+
+
+class ArrayReferenceValueType(ExtendedMappingSchema):
+    value = ArrayReference()
+
+
 class AnyType(OneOfKeywordSchema):
     """Permissive variants that we attempt to parse automatically."""
     _one_of = [
-
-        ArrayLiteralValueType(),
+        # Array of literal data with 'data' key
         ArrayLiteralDataType(),
+        # same with 'value' key (OGC specification)
+        ArrayLiteralValueType(),
+        # Array of HTTP references with various keywords
+        ArrayReferenceValueType(),
         # literal data with 'data' key
         AnyLiteralDataType(),
         # same with 'value' key (OGC specification)

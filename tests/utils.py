@@ -384,7 +384,7 @@ def mocked_sub_requests(app, function, *args, only_local=False, **kwargs):
         return _resp
 
     # permit schema validation against 'mock' scheme during test only
-    mock_file_regex = mock.PropertyMock(return_value=colander.Regex(r"^(file|mock://)?(?:/|[/?]\S+)$"))
+    mock_file_regex = mock.PropertyMock(return_value=colander.Regex(r"^((file|mock)://)?(?:/|[/?]\S+)$"))
     with contextlib.ExitStack() as stack:
         stack.enter_context(mock.patch("requests.request", side_effect=mocked_app_request))
         stack.enter_context(mock.patch("requests.Session.request", side_effect=mocked_app_request))
@@ -549,3 +549,25 @@ def mocked_aws_s3_bucket_test_file(bucket_name, file_name, file_content="Test fi
         tmp_file.flush()
         s3.upload_file(Bucket=bucket_name, Filename=tmp_file.name, Key=file_name)
     return "s3://{}/{}".format(bucket_name, file_name)
+
+
+def mocked_http_test_file(dirname, file_url, file_content="This is a generated file for http test"):
+    # type: (str,str,str) -> str
+    """
+    Generates a test file reference from dummy data
+    """
+    path = dirname+file_url.split("localhost")[-1]
+    with open(path, "w") as tmp_file:
+        tmp_file.write(file_content)
+    return path
+
+
+def mocked_file_test(dirname, file_path, file_content="This is a generated file for file test"):
+    # type: (str,str,str) -> str
+    """
+    Generates a test file reference from dummy data
+    """
+    path = dirname+"/"+file_path
+    with open(path, "w") as tmp_file:
+        tmp_file.write(file_content)
+    return "file://{}".format(path)

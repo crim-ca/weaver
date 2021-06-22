@@ -177,10 +177,17 @@ class SemanticVersion(colander.Regex):
 
 class ExtendedBoolean(colander.Boolean):
 
-    def __init__(self, *args, true_choices=None, **kwargs):
+    def __init__(self, *args, true_choices=None, fase_choices=None, **kwargs):
+        """
+        The arguments true_choices and false_choices are defined as `"true"` and `"false"` since
+        colander converts the value to string lowercase to compare with other thruty/falsy values it should accept.
+        Do NOT add other values like "1" to avoid conflict with Integer type for schemas that support both variants.
+        """
         if true_choices is None:
-            true_choices = ("true", "1")
-        super(ExtendedBoolean, self).__init__(true_choices=true_choices, *args, **kwargs)
+            true_choices = ("true")
+        if fase_choices is None:
+            false_choices = ("false")
+        super(ExtendedBoolean, self).__init__(true_choices=true_choices, false_choices=false_choices, *args, **kwargs)
 
     def serialize(self, node, cstruct):  # pylint: disable=W0221
         result = super(ExtendedBoolean, self).serialize(node, cstruct)

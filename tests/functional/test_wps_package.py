@@ -11,7 +11,6 @@ import contextlib
 import json
 import logging
 import os
-import tempfile
 from inspect import cleandoc
 
 import colander
@@ -26,6 +25,8 @@ from tests.utils import (
     mocked_aws_s3,
     mocked_aws_s3_bucket_test_file,
     mocked_execute_process,
+    mocked_file_test,
+    mocked_http_test_file,
     mocked_sub_requests
 )
 from weaver.execute import EXECUTE_MODE_ASYNC, EXECUTE_RESPONSE_DOCUMENT, EXECUTE_TRANSMISSION_MODE_REFERENCE
@@ -65,6 +66,7 @@ class WpsPackageAppTest(WpsPackageConfigBase):
             "weaver.wps": True,
             "weaver.wps_path": "/ows/wps",
             "weaver.wps_restapi_path": "/",
+            "weaver.wps_output_dir": "/tmp",  # nosec: B108 # don't care hardcoded for test
         }
         super(WpsPackageAppTest, cls).setUpClass()
 
@@ -915,7 +917,8 @@ class WpsPackageAppTest(WpsPackageConfigBase):
                 assert proc_in_res in (proc_in_exp, str(proc_in_exp)), \
                     "Field '{}' of input '{}'({}) is expected to be '{}' but was '{}'" \
                     .format(field, process_input, i, proc_in_exp, proc_in_res)
-
+    @mocked_aws_credentials
+    @mocked_aws_s3
     def test_execute_job_with_array_input(self):
         """
         The test validates job can receive an array as input and process it as expected
@@ -929,9 +932,13 @@ class WpsPackageAppTest(WpsPackageConfigBase):
                     "test_int_array": {"type": {"type": "array", "items": "int"}},
                     "test_float_array": {"type": {"type": "array", "items": "float"}},
                     "test_string_array": {"type": {"type": "array", "items": "string"}},
+                    "test_reference_array": {"type": {"type": "array", "items": "File"}},
                     "test_int_value": "int",
+                    "test_float_value": "float",
                     "test_string_value": "string",
-                    "test_float_value": "float"
+                    "test_reference_http_value": "File",
+                    "test_reference_file_value": "File",
+                    "test_reference_s3_value": "File"
             },
             "requirements": {
                 CWL_REQUIREMENT_INIT_WORKDIR: {
@@ -940,6 +947,7 @@ class WpsPackageAppTest(WpsPackageConfigBase):
                             "entryname": "script.py",
                             "entry": cleandoc("""
                                 import json
+                                import os
                                 input = $(inputs)
                                 for key, value in input.items():
                                     if isinstance(value, list):
@@ -951,7 +959,21 @@ class WpsPackageAppTest(WpsPackageConfigBase):
                                             value = map(lambda v: not v, value)
                                         elif all(isinstance(val, str) for val in value):
                                             value = map(lambda v: v.upper(), value)
+                                        elif all(isinstance(val, dict) for val in value):
+                                            def tmp(value):
+                                                path_ = value.get('path')
+                                                if path_ and os.path.exists(path_):
+                                                    with open (path_, 'r') as file_:
+                                                        filedata = file_.read()
+                                                return filedata.upper()
+                                            value = map(tmp, value)
                                         input[key] = ";".join(map(str, value))
+                                    elif isinstance(value, dict):
+                                        path_ = value.get('path')
+                                        if path_ and os.path.exists(path_):
+                                            with open (path_, 'r') as file_:
+                                                filedata = file_.read()
+                                            input[key] = filedata.upper()
                                     elif isinstance(value, str):
                                         input[key] = value.upper()
                                     elif isinstance(value, bool):
@@ -986,6 +1008,24 @@ class WpsPackageAppTest(WpsPackageConfigBase):
 
         assert desc["process"] is not None
 
+        test_bucket_ref = mocked_aws_s3_bucket_test_file(
+            "wps-process-test-bucket",
+            "input_file_s3.txt",
+            "This is a generated file for s3 test"
+        )
+
+        test_http_ref = mocked_http_test_file(
+            self.settings["weaver.wps_output_dir"],
+            "http://localhost/input_file_http.txt",
+            "This is a generated file for http test"
+        )
+
+        test_file_ref = mocked_file_test(
+            self.settings["weaver.wps_output_dir"],
+            "input_file_ref.txt",
+            "This is a generated file for file test"
+        )
+
         exec_body = {
             "mode": EXECUTE_MODE_ASYNC,
             "response": EXECUTE_RESPONSE_DOCUMENT,
@@ -994,9 +1034,18 @@ class WpsPackageAppTest(WpsPackageConfigBase):
                 {"id": "test_int_array", "value": [10, 20, 30, 40, 50]},
                 {"id": "test_float_array", "value": [10.03, 20.03, 30.03, 40.03, 50.03]},
                 {"id": "test_string_array", "value": ["this", "is", "a", "test"]},
+                {"id": "test_reference_array",
+                 "value": [{"href": test_file_ref},
+                           {"href": test_http_ref},
+                           {"href": test_bucket_ref}
+                           ]
+                 },
                 {"id": "test_int_value", "value": 2923},
+                {"id": "test_float_value", "value": 389.73},
                 {"id": "test_string_value", "value": "stringtest"},
-                {"id": "test_float_value", "value": 389.73}
+                {"id": "test_reference_http_value", "href": test_http_ref},
+                {"id": "test_reference_file_value", "href": test_file_ref},
+                {"id": "test_reference_s3_value", "href": test_bucket_ref}
             ],
             "outputs": [
                 {"id": "output_test", "type": "File"},
@@ -1012,23 +1061,29 @@ class WpsPackageAppTest(WpsPackageConfigBase):
             assert resp.status_code in [200, 201], "Failed with: [{}]\nReason:\n{}".format(resp.status_code, resp.json)
             status_url = resp.json.get("location")
 
-        tmpdir = tempfile.gettempdir()
-        job_id = status_url.split("/")[-1]
-        tmpfile = "{}/{}/tmp.txt".format(tmpdir, job_id)
+        results = self.monitor_job(status_url)
+
+        job_output_file = results.get("output_test")["href"].split("/", 3)[-1]
+        tmpfile = "{}/{}".format(self.settings["weaver.wps_output_dir"], job_output_file)
 
         try:
             processed_values = json.load(open(tmpfile, "r"))
         except FileNotFoundError:
-            raise FileNotFoundError
+            self.fail("Output file [{}] was not found where it was expected to resume test".format(tmpfile))
         except Exception as exception:
             self.fail("An error occured during the reading of the file: {}".format(exception))
-
         assert processed_values["test_int_array"] == "11;21;31;41;51"
         assert processed_values["test_float_array"] == "10.53;20.53;30.53;40.53;50.53"
         assert processed_values["test_string_array"] == "THIS;IS;A;TEST"
+        assert processed_values["test_reference_array"] == ("THIS IS A GENERATED FILE FOR FILE TEST;"
+                                                            "THIS IS A GENERATED FILE FOR HTTP TEST;"
+                                                            "THIS IS A GENERATED FILE FOR S3 TEST")
         assert processed_values["test_int_value"] == 2924
-        assert processed_values["test_string_value"] == "STRINGTEST"
         assert processed_values["test_float_value"] == 390.23
+        assert processed_values["test_string_value"] == "STRINGTEST"
+        assert processed_values["test_reference_s3_value"] == "THIS IS A GENERATED FILE FOR S3 TEST"
+        assert processed_values["test_reference_http_value"] == "THIS IS A GENERATED FILE FOR HTTP TEST"
+        assert processed_values["test_reference_file_value"] == "THIS IS A GENERATED FILE FOR FILE TEST"
 
     # FIXME: test not working
     #   same payloads sent directly to running weaver properly raise invalid schema -> bad request error
