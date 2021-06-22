@@ -941,7 +941,7 @@ class WpsPackageAppTest(WpsPackageConfigBase):
             "class": "CommandLineTool",
             "baseCommand": ["python3", "script.py"],
             "inputs":
-            { 
+            {
                 "test_int_array": {"type": {"type": "array", "items": "int"}},
                 "test_float_array": {"type": {"type": "array", "items": "float"}},
                 "test_string_array": {"type": {"type": "array", "items": "string"}},
