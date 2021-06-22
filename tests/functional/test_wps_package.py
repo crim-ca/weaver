@@ -928,17 +928,17 @@ class WpsPackageAppTest(WpsPackageConfigBase):
             "class": "CommandLineTool",
             "baseCommand": ["python3", "script.py"],
             "inputs":
-              {
-                    "test_int_array": {"type": {"type": "array", "items": "int"}},
-                    "test_float_array": {"type": {"type": "array", "items": "float"}},
-                    "test_string_array": {"type": {"type": "array", "items": "string"}},
-                    "test_reference_array": {"type": {"type": "array", "items": "File"}},
-                    "test_int_value": "int",
-                    "test_float_value": "float",
-                    "test_string_value": "string",
-                    "test_reference_http_value": "File",
-                    "test_reference_file_value": "File",
-                    "test_reference_s3_value": "File"
+            {
+                "test_int_array": {"type": {"type": "array", "items": "int"}},
+                "test_float_array": {"type": {"type": "array", "items": "float"}},
+                "test_string_array": {"type": {"type": "array", "items": "string"}},
+                "test_reference_array": {"type": {"type": "array", "items": "File"}},
+                "test_int_value": "int",
+                "test_float_value": "float",
+                "test_string_value": "string",
+                "test_reference_http_value": "File",
+                "test_reference_file_value": "File",
+                "test_reference_s3_value": "File"
             },
             "requirements": {
                 CWL_REQUIREMENT_INIT_WORKDIR: {
