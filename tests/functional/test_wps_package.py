@@ -929,6 +929,7 @@ class WpsPackageAppTest(WpsPackageConfigBase):
                 assert proc_in_res in (proc_in_exp, str(proc_in_exp)), \
                     "Field '{}' of input '{}'({}) is expected to be '{}' but was '{}'" \
                     .format(field, process_input, i, proc_in_exp, proc_in_res)
+
     @mocked_aws_credentials
     @mocked_aws_s3
     def test_execute_job_with_array_input(self):
@@ -940,7 +941,7 @@ class WpsPackageAppTest(WpsPackageConfigBase):
             "class": "CommandLineTool",
             "baseCommand": ["python3", "script.py"],
             "inputs":
-            {
+            { 
                 "test_int_array": {"type": {"type": "array", "items": "int"}},
                 "test_float_array": {"type": {"type": "array", "items": "float"}},
                 "test_string_array": {"type": {"type": "array", "items": "string"}},
