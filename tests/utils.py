@@ -394,19 +394,20 @@ def mocked_sub_requests(app, function, *args, only_local=False, **kwargs):
         return _resp
 
     def mocked_http_test_file_(**kwargs):
-        inputs = kwargs["data"].get("inputs", []) if kwargs.get("data", False) else []
-        for input_ in inputs:
-            if "test_reference_http_value" in input_.values():
-                input_["href"] = tempfile.gettempdir() + input_["href"].split("localhost")[-1]
-            if "test_reference_array" in input_.values():
-                input_["value"] = [
-                    {"href": tempfile.gettempdir() + value.split("localhost")[-1]}
-                    if value.startswith("http") or value.startswith("https")
-                    else {"href": value}
-                    for value in list(map(lambda x: x["href"], input_["value"]))
-                ]
-        if inputs:
-            kwargs["data"]["inputs"] = inputs
+        if isinstance(kwargs, dict):
+            inputs = kwargs["data"].get("inputs", []) if kwargs.get("data", False) else []
+            for input_ in inputs:
+                if "test_reference_http_value" in input_.values():
+                    input_["href"] = tempfile.gettempdir() + input_["href"].split("localhost")[-1]
+                if "test_reference_array" in input_.values():
+                    input_["value"] = [
+                        {"href": tempfile.gettempdir() + value.split("localhost")[-1]}
+                        if value.startswith("http") or value.startswith("https")
+                        else {"href": value}
+                        for value in list(map(lambda x: x["href"], input_["value"]))
+                    ]
+            if inputs:
+                kwargs["data"]["inputs"] = inputs
 
         return kwargs
 
