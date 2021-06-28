@@ -179,9 +179,10 @@ class ExtendedBoolean(colander.Boolean):
 
     def __init__(self, *args, true_choices=None, fase_choices=None, **kwargs):
         """
-        The arguments true_choices and false_choices are defined as `"true"` and `"false"` since
-        colander converts the value to string lowercase to compare with other thruty/falsy values it should accept.
-        Do NOT add other values like "1" to avoid conflict with Integer type for schemas that support both variants.
+        The arguments :paramref:`true_choices` and :paramref:`false_choices`
+        are defined as ``"true"`` and ``"false"`` since :mod:`colander` converts the value to string lowercase
+        to compare with other thruty/falsy values it should accept. Do NOT add other values like ``"1"``
+        to avoid conflict with ``Integer`` type for schemas that support both variants.
         """
         if true_choices is None:
             true_choices = ("true")

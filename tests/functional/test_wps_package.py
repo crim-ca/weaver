@@ -21,12 +21,11 @@ from tests import resources
 from tests.functional.utils import WpsPackageConfigBase
 from tests.utils import (
     MOCK_AWS_REGION,
+    generate_tmp_file_ref_tests,
     mocked_aws_credentials,
     mocked_aws_s3,
     mocked_aws_s3_bucket_test_file,
     mocked_execute_process,
-    mocked_file_test,
-    mocked_http_test_file,
     mocked_sub_requests
 )
 from weaver.execute import EXECUTE_MODE_ASYNC, EXECUTE_RESPONSE_DOCUMENT, EXECUTE_TRANSMISSION_MODE_REFERENCE
@@ -41,7 +40,11 @@ from weaver.formats import (
     IANA_NAMESPACE,
     get_cwl_file_format
 )
-from weaver.processes.constants import CWL_REQUIREMENT_APP_BUILTIN, CWL_REQUIREMENT_INIT_WORKDIR
+from weaver.processes.constants import (
+    CWL_REQUIREMENT_APP_BUILTIN,
+    CWL_REQUIREMENT_APP_DOCKER,
+    CWL_REQUIREMENT_INIT_WORKDIR
+)
 from weaver.utils import get_any_value
 
 EDAM_PLAIN = EDAM_NAMESPACE + ":" + EDAM_MAPPING[CONTENT_TYPE_TEXT_PLAIN]
@@ -936,13 +939,16 @@ class WpsPackageAppTest(WpsPackageConfigBase):
         """
         The test validates job can receive an array as input and process it as expected
         """
+        path_ = "{}/tmp.txt".format(self.settings["weaver.wps_output_dir"])
+        if os.path.exists(path_):
+            os.remove(path_)
         cwl = {
             "cwlVersion": "v1.0",
             "class": "CommandLineTool",
             "baseCommand": ["python3", "script.py"],
             "inputs":
             {
-                "test_int_array": {"type": {"type": "array", "items": "int"}},
+                "test_int_array": {"type": {"type": "array", "items": "int"}, "inputBinding": {"position": 1}},
                 "test_float_array": {"type": {"type": "array", "items": "float"}},
                 "test_string_array": {"type": {"type": "array", "items": "string"}},
                 "test_reference_array": {"type": {"type": "array", "items": "File"}},
@@ -954,6 +960,9 @@ class WpsPackageAppTest(WpsPackageConfigBase):
                 "test_reference_s3_value": "File"
             },
             "requirements": {
+                CWL_REQUIREMENT_APP_DOCKER: {
+                    "dockerPull": "python:3.7-alpine"
+                },
                 CWL_REQUIREMENT_INIT_WORKDIR: {
                     "listing": [
                         {
@@ -995,7 +1004,7 @@ class WpsPackageAppTest(WpsPackageConfigBase):
                                         input[key] = value+1
                                     elif isinstance(value, float):
                                         input[key] = value+0.5
-                                json.dump(input, open("tmp.txt","w"))
+                                json.dump(input, open("./tmp.txt","w"))
                                 """)
                         }
                     ]
@@ -1027,15 +1036,17 @@ class WpsPackageAppTest(WpsPackageConfigBase):
             "This is a generated file for s3 test"
         )
 
-        test_http_ref = mocked_http_test_file(
+        test_http_ref = generate_tmp_file_ref_tests(
             self.settings["weaver.wps_output_dir"],
             "http://localhost/input_file_http.txt",
+            "http",
             "This is a generated file for http test"
         )
 
-        test_file_ref = mocked_file_test(
+        test_file_ref = generate_tmp_file_ref_tests(
             self.settings["weaver.wps_output_dir"],
             "input_file_ref.txt",
+            "file",
             "This is a generated file for file test"
         )
 
@@ -1057,6 +1068,7 @@ class WpsPackageAppTest(WpsPackageConfigBase):
                 {"id": "test_float_value", "value": 389.73},
                 {"id": "test_string_value", "value": "stringtest"},
                 {"id": "test_reference_http_value", "href": test_http_ref},
+                # {"id": "test_reference_http_value", "href": "https://localhost/input_file_http.txt"},
                 {"id": "test_reference_file_value", "href": test_file_ref},
                 {"id": "test_reference_s3_value", "href": test_bucket_ref}
             ],

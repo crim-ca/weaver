@@ -14,7 +14,8 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Fixed the format of the output file URL. When the prefix ``/`` was not present, 
+  URL was incorrectly handled by not prepending the required base URL location.
 
 `3.2.1 <https://github.com/crim-ca/weaver/tree/3.2.1>`_ (2021-06-08)
 ========================================================================
@@ -53,8 +54,6 @@ Fixes:
 - Fix default execution mode specification in process job control options
   (fixes `#182 <https://github.com/opengeospatial/ogcapi-processes/pull/182>`_).
 - Fix old OGC-API WPS REST bindings link in landing page for the more recent `OGC-API Processes` specification.
-- Updated the format of the URL for the job results.When the prefix `/` was not present, 
-  URL was incorrectly handled by not prepended the required base URL location.
 - Add support for array type as job inputs
   (relates to `#233 <https://github.com/crim-ca/weaver/issues/233>`_).
 - Fix invalid deserialization of schemas using ``not`` keyword that would result in all fields returned instead of

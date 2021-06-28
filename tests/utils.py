@@ -371,17 +371,44 @@ def mocked_sub_requests(app, function, *args, only_local=False, **kwargs):
 
         url, func, req_kwargs = _parse_for_app_req(method, url, **req_kwargs)
         redirects = req_kwargs.pop("allow_redirects", True)
-        if not url.startswith("mock://"):
-            _resp = func(url, expect_errors=True, **req_kwargs)
-        else:
+        inputs = req_kwargs.get("inputs") if req_kwargs.get("data", False) else []
+        for input_ in inputs:
+            if "test_reference_http_value" in input_.values():
+                input_["href"] = tempfile.gettempdir() + input_["href"].split("localhost")[-1]
+            if "test_reference_array" in input_.values():
+                input_["value"] = [
+                    tempfile.gettempdir() + value.split("localhost")[-1]
+                    for value in input_["value"]
+                    if value.startswith("http") or value.startswith("https")
+                ]
+        if url.startswith("mock://"):
             path = get_url_without_query(url.replace("mock://", ""))
             _resp = mocked_file_response(path, url)
+        else:
+            _resp = func(url, expect_errors=True, **req_kwargs)
         if redirects:
             # must handle redirects manually with TestApp
             while 300 <= _resp.status_code < 400:
                 _resp = _resp.follow()
         _patch_response_methods(_resp, url)
         return _resp
+
+    def mocked_http_test_file_(**kwargs):
+        inputs = kwargs["data"].get("inputs", []) if kwargs.get("data", False) else []
+        for input_ in inputs:
+            if "test_reference_http_value" in input_.values():
+                input_["href"] = tempfile.gettempdir() + input_["href"].split("localhost")[-1]
+            if "test_reference_array" in input_.values():
+                input_["value"] = [
+                    {"href": tempfile.gettempdir() + value.split("localhost")[-1]}
+                    if value.startswith("http") or value.startswith("https")
+                    else {"href": value}
+                    for value in list(map(lambda x: x["href"], input_["value"]))
+                ]
+        if inputs:
+            kwargs["data"]["inputs"] = inputs
+
+        return kwargs
 
     # permit schema validation against 'mock' scheme during test only
     mock_file_regex = mock.PropertyMock(return_value=colander.Regex(r"^((file|mock)://)?(?:/|[/?]\S+)$"))
@@ -390,6 +417,7 @@ def mocked_sub_requests(app, function, *args, only_local=False, **kwargs):
         stack.enter_context(mock.patch("requests.Session.request", side_effect=mocked_app_request))
         stack.enter_context(mock.patch("requests.sessions.Session.request", side_effect=mocked_app_request))
         stack.enter_context(mock.patch.object(FileLocal, "validator", new_callable=mock_file_regex))
+        kwargs = mocked_http_test_file_(**kwargs)
         req_url, req_func, kwargs = _parse_for_app_req(function, *args, **kwargs)
         kwargs.setdefault("expect_errors", True)
         resp = req_func(req_url, **kwargs)
@@ -551,23 +579,12 @@ def mocked_aws_s3_bucket_test_file(bucket_name, file_name, file_content="Test fi
     return "s3://{}/{}".format(bucket_name, file_name)
 
 
-def mocked_http_test_file(dirname, file_url, file_content="This is a generated file for http test"):
-    # type: (str,str,str) -> str
+def generate_tmp_file_ref_tests(dirname, file_path, hreftype, file_content="This is a generated file for href test"):
+    # type: (str,str,str,str) -> str
     """
-    Generates a test file reference from dummy data
+    Generates a test file reference from dummy data for http and file href types
     """
-    path = dirname+file_url.split("localhost")[-1]
+    path = dirname+"/"+file_path if hreftype == "file" else dirname + file_path.split("localhost")[-1]
     with open(path, "w") as tmp_file:
         tmp_file.write(file_content)
-    return path
-
-
-def mocked_file_test(dirname, file_path, file_content="This is a generated file for file test"):
-    # type: (str,str,str) -> str
-    """
-    Generates a test file reference from dummy data
-    """
-    path = dirname+"/"+file_path
-    with open(path, "w") as tmp_file:
-        tmp_file.write(file_content)
-    return "file://{}".format(path)
+    return "file://{}".format(path) if hreftype == "file" else file_path

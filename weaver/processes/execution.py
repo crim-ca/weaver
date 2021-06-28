@@ -119,8 +119,11 @@ def execute_process(self, job_id, url, headers=None):
 
                 # we need to support file:// scheme but PyWPS doesn't like them so remove the scheme file://
                 input_values = [
+                    # when value is an array of dict that each contain a file reference
                     (get_any_value(val)[7:] if str(get_any_value(val)).startswith("file://") else get_any_value(val))
-                    if isinstance(val, dict) else (val[7:] if str(val).startswith("file://") else val)
+                    if isinstance(val, dict) else
+                    # when value is directly a single dict with file reference
+                    (val[7:] if str(val).startswith("file://") else val)
                     for val in input_values
                 ]
 
