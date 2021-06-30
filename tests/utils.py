@@ -30,7 +30,7 @@ from weaver.database import get_db
 from weaver.datatype import Service
 from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_XML
 from weaver.store.mongodb import MongodbJobStore, MongodbProcessStore, MongodbServiceStore
-from weaver.utils import get_path_kvp, get_url_without_query, get_weaver_url, null
+from weaver.utils import fetch_file, get_path_kvp, get_url_without_query, get_weaver_url, null
 from weaver.warning import MissingParameterWarning, UnsupportedOperationWarning
 
 if TYPE_CHECKING:
@@ -46,6 +46,7 @@ if TYPE_CHECKING:
     MockPatch = mock._patch  # noqa
 
 MOCK_AWS_REGION = "us-central-1"
+MOCK_HTTP_REF = "http://mock.localhost"
 
 
 def ignore_warning_regex(func, warning_message_regex, warning_categories=DeprecationWarning):
@@ -371,16 +372,6 @@ def mocked_sub_requests(app, function, *args, only_local=False, **kwargs):
 
         url, func, req_kwargs = _parse_for_app_req(method, url, **req_kwargs)
         redirects = req_kwargs.pop("allow_redirects", True)
-        inputs = req_kwargs.get("inputs") if req_kwargs.get("data", False) else []
-        for input_ in inputs:
-            if "test_reference_http_value" in input_.values():
-                input_["href"] = tempfile.gettempdir() + input_["href"].split("localhost")[-1]
-            if "test_reference_array" in input_.values():
-                input_["value"] = [
-                    tempfile.gettempdir() + value.split("localhost")[-1]
-                    for value in input_["value"]
-                    if value.startswith("http") or value.startswith("https")
-                ]
         if url.startswith("mock://"):
             path = get_url_without_query(url.replace("mock://", ""))
             _resp = mocked_file_response(path, url)
@@ -393,24 +384,6 @@ def mocked_sub_requests(app, function, *args, only_local=False, **kwargs):
         _patch_response_methods(_resp, url)
         return _resp
 
-    def mocked_http_test_file_(**kwargs):
-        if isinstance(kwargs, dict):
-            inputs = kwargs["data"].get("inputs", []) if kwargs.get("data", False) else []
-            for input_ in inputs:
-                if "test_reference_http_value" in input_.values():
-                    input_["href"] = tempfile.gettempdir() + input_["href"].split("localhost")[-1]
-                if "test_reference_array" in input_.values():
-                    input_["value"] = [
-                        {"href": tempfile.gettempdir() + value.split("localhost")[-1]}
-                        if value.startswith("http") or value.startswith("https")
-                        else {"href": value}
-                        for value in list(map(lambda x: x["href"], input_["value"]))
-                    ]
-            if inputs:
-                kwargs["data"]["inputs"] = inputs
-
-        return kwargs
-
     # permit schema validation against 'mock' scheme during test only
     mock_file_regex = mock.PropertyMock(return_value=colander.Regex(r"^((file|mock)://)?(?:/|[/?]\S+)$"))
     with contextlib.ExitStack() as stack:
@@ -418,7 +391,6 @@ def mocked_sub_requests(app, function, *args, only_local=False, **kwargs):
         stack.enter_context(mock.patch("requests.Session.request", side_effect=mocked_app_request))
         stack.enter_context(mock.patch("requests.sessions.Session.request", side_effect=mocked_app_request))
         stack.enter_context(mock.patch.object(FileLocal, "validator", new_callable=mock_file_regex))
-        kwargs = mocked_http_test_file_(**kwargs)
         req_url, req_func, kwargs = _parse_for_app_req(function, *args, **kwargs)
         kwargs.setdefault("expect_errors", True)
         resp = req_func(req_url, **kwargs)
@@ -580,12 +552,36 @@ def mocked_aws_s3_bucket_test_file(bucket_name, file_name, file_content="Test fi
     return "s3://{}/{}".format(bucket_name, file_name)
 
 
-def generate_tmp_file_ref_tests(dirname, file_path, hreftype, file_content="This is a generated file for href test"):
-    # type: (str,str,str,str) -> str
+def mocked_http_file(test_func):
+    # type: (Callable[[...], Any]) -> Callable
+    """
+    Mocked http file for http reference test
+
+    .. seealso::
+        - :func:`mocked_reference_test_file`
+    """
+    def mocked_file_request(file_reference, file_outdir, **kwargs):
+        if file_reference and file_reference.startswith(MOCK_HTTP_REF):
+            file_reference = file_reference.replace(MOCK_HTTP_REF, "")
+        file_path = fetch_file(file_reference, file_outdir, **kwargs)
+        return file_path
+
+    def wrapped(*args, **kwargs):
+        with mock.patch("weaver.processes.wps_package.fetch_file", side_effect=mocked_file_request):
+            return test_func(*args, **kwargs)
+    return wrapped
+
+
+def mocked_reference_test_file(file_name, href_type, file_content="This is a generated file for href test"):
+    # type: (str,str,str) -> str
     """
     Generates a test file reference from dummy data for http and file href types
+
+    .. seealso::
+        - :func:`mocked_http_file`
     """
-    path = dirname+"/"+file_path if hreftype == "file" else dirname + file_path.split("localhost")[-1]
+    tmpdir = tempfile.mkdtemp()
+    path = os.path.join(tmpdir, file_name)
     with open(path, "w") as tmp_file:
         tmp_file.write(file_content)
-    return "file://{}".format(path) if hreftype == "file" else file_path
+    return "file://{}".format(path) if href_type == "file" else os.path.join(MOCK_HTTP_REF, path)

@@ -21,11 +21,12 @@ from tests import resources
 from tests.functional.utils import WpsPackageConfigBase
 from tests.utils import (
     MOCK_AWS_REGION,
-    generate_tmp_file_ref_tests,
     mocked_aws_credentials,
     mocked_aws_s3,
     mocked_aws_s3_bucket_test_file,
     mocked_execute_process,
+    mocked_http_file,
+    mocked_reference_test_file,
     mocked_sub_requests
 )
 from weaver.execute import EXECUTE_MODE_ASYNC, EXECUTE_RESPONSE_DOCUMENT, EXECUTE_TRANSMISSION_MODE_REFERENCE
@@ -935,6 +936,7 @@ class WpsPackageAppTest(WpsPackageConfigBase):
 
     @mocked_aws_credentials
     @mocked_aws_s3
+    @mocked_http_file
     def test_execute_job_with_array_input(self):
         """
         The test validates job can receive an array as input and process it as expected
@@ -1036,15 +1038,13 @@ class WpsPackageAppTest(WpsPackageConfigBase):
             "This is a generated file for s3 test"
         )
 
-        test_http_ref = generate_tmp_file_ref_tests(
-            self.settings["weaver.wps_output_dir"],
-            "http://localhost/input_file_http.txt",
+        test_http_ref = mocked_reference_test_file(
+            "input_file_http.txt",
             "http",
             "This is a generated file for http test"
         )
 
-        test_file_ref = generate_tmp_file_ref_tests(
-            self.settings["weaver.wps_output_dir"],
+        test_file_ref = mocked_reference_test_file(
             "input_file_ref.txt",
             "file",
             "This is a generated file for file test"
@@ -1068,7 +1068,6 @@ class WpsPackageAppTest(WpsPackageConfigBase):
                 {"id": "test_float_value", "value": 389.73},
                 {"id": "test_string_value", "value": "stringtest"},
                 {"id": "test_reference_http_value", "href": test_http_ref},
-                # {"id": "test_reference_http_value", "href": "https://localhost/input_file_http.txt"},
                 {"id": "test_reference_file_value", "href": test_file_ref},
                 {"id": "test_reference_s3_value", "href": test_bucket_ref}
             ],
