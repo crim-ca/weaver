@@ -34,8 +34,8 @@ Fixes:
 
 Changes:
 --------
-- Add reference link to ReadTheDocs URL of ``Weaver`` in API landing page.
-- Add references to ``OGC-API Processes`` requirements and recommendations for eventual conformance listing
+- Add reference link to ReadTheDocs URL of `Weaver` in API landing page.
+- Add references to `OGC-API Processes` requirements and recommendations for eventual conformance listing
   (relates to `#231 <https://github.com/crim-ca/weaver/issues/231>`_).
 - In order to align with OpenAPI ``boolean`` type definitions, non explicit ``boolean`` values will not be automatically 
   converted to ``bool`` anymore. They will require explicit ``false|true``.
@@ -54,7 +54,7 @@ Fixes:
 - Fix default execution mode specification in process job control options
   (fixes `#182 <https://github.com/opengeospatial/ogcapi-processes/pull/182>`_).
 - Fix old OGC-API WPS REST bindings link in landing page for the more recent `OGC-API Processes` specification.
-- Updated the format of the URL for the job results.When the prefix `/` was not present, 
+- Updated the format of the URL for the job results. When the prefix ``/`` was not present, 
   URL was incorrectly handled by not prepending the required base URL location.
 - Add support for array type as job inputs
   (relates to `#233 <https://github.com/crim-ca/weaver/issues/233>`_).
