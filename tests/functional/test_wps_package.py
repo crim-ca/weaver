@@ -939,11 +939,8 @@ class WpsPackageAppTest(WpsPackageConfigBase):
     @mocked_http_file
     def test_execute_job_with_array_input(self):
         """
-        The test validates job can receive an array as input and process it as expected
+        The test validates job can receive an array as input and process it as expected.
         """
-        path_ = "{}/tmp.txt".format(self.settings["weaver.wps_output_dir"])
-        if os.path.exists(path_):
-            os.remove(path_)
         cwl = {
             "cwlVersion": "v1.0",
             "class": "CommandLineTool",
