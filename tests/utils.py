@@ -556,7 +556,7 @@ def mocked_http_file(test_func):
     # type: (Callable[[...], Any]) -> Callable
     """
     Creates a mock of the function `fetch_file`, to fetch a generated file locally, for test purposes only.
-    For instance, calling this function with :func:`mocked_http_file` decorator 
+    For instance, calling this function with :func:`mocked_http_file` decorator
     will effectively employ the mocked `fetch_file` and return a generated local file.
 
     .. seealso::
