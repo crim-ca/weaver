@@ -821,7 +821,15 @@ class Process(Base):
     @property
     def inputs(self):
         # type: () -> Optional[List[Dict[str, Any]]]
-        return self.get("inputs")
+        inputs = self.get("inputs")
+        for input_ in inputs:
+            maxOccurs = input_.get("maxOccurs", False)
+            minOccurs = input_.get("minOccurs", False)
+            if minOccurs:
+                input_["minOccurs"] = int(minOccurs)
+            if maxOccurs and maxOccurs != "unbounded":
+                input_["maxOccurs"] = int(maxOccurs)
+        return inputs
 
     @property
     def outputs(self):
