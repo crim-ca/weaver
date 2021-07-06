@@ -16,7 +16,12 @@ from pywps.inout.inputs import LiteralInput
 from tests.utils import setup_mongodb_processstore
 from weaver.datatype import Process
 from weaver.processes import opensearch
-from weaver.processes.constants import OPENSEARCH_AOI, OPENSEARCH_END_DATE, OPENSEARCH_START_DATE
+from weaver.processes.constants import (
+    CWL_REQUIREMENT_APP_DOCKER,
+    OPENSEARCH_AOI,
+    OPENSEARCH_END_DATE,
+    OPENSEARCH_START_DATE
+)
 from weaver.processes.opensearch import _make_specific_identifier  # noqa: W0212
 from weaver.utils import get_any_id
 from weaver.wps_restapi.processes import processes
@@ -90,11 +95,13 @@ def get_dummy_payload():
 
 
 def get_opensearch_payload():
-    return load_json_test_file("opensearch_deploy.json")
-
-
-def get_opensearch_process():
-    return Process(load_json_test_file("opensearch_process.json"))
+    payload = load_json_test_file("opensearch_deploy.json")
+    payload["execution_unit"]["unit"]["requirements"] = {
+        CWL_REQUIREMENT_APP_DOCKER: {
+            "dockerPull": "alpine:latest"
+        }
+    }
+    return payload
 
 
 def test_transform_execute_parameters_wps():
