@@ -17,7 +17,6 @@ from tests.utils import setup_mongodb_processstore
 from weaver.datatype import Process
 from weaver.processes import opensearch
 from weaver.processes.constants import (
-    CWL_REQUIREMENT_APP_DOCKER,
     OPENSEARCH_AOI,
     OPENSEARCH_END_DATE,
     OPENSEARCH_START_DATE
@@ -95,13 +94,7 @@ def get_dummy_payload():
 
 
 def get_opensearch_payload():
-    payload = load_json_test_file("opensearch_deploy.json")
-    payload["executionUnit"][0]["unit"]["requirements"] = {
-        CWL_REQUIREMENT_APP_DOCKER: {
-            "dockerPull": "alpine:latest"
-        }
-    }
-    return payload
+    return load_json_test_file("opensearch_deploy.json")
 
 
 def test_transform_execute_parameters_wps():
