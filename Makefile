@@ -605,7 +605,7 @@ fix-md-only: mkdir-reports 	## fix Markdown linting problems automatically
 		--rc-path "$(APP_ROOT)/.remarkrc" \
 		--ignore-path "$(APP_ROOT)/.remarkignore" \
 		"$(APP_ROOT)" "$(APP_ROOT)/.*/" \
-		> "$(REPORTS_DIR)/fix-md.txt"
+		2>&1 | tee "$(REPORTS_DIR)/fixed-md.txt"
 
 .PHONY: fix-md
 fix-md: install-npm-remarklint fix-md-only	## fix Markdown linting problems after dependency installation
