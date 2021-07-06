@@ -14,7 +14,8 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Fix ``minOccurs`` and ``maxOccurs`` representation according to `OGC-API`
+  (fixes `#263  <https://github.com/crim-ca/weaver/issues/263>`_).
 
 `3.2.1 <https://github.com/crim-ca/weaver/tree/3.2.1>`_ (2021-06-08)
 ========================================================================
@@ -27,8 +28,6 @@ Fixes:
 ------
 - Fix backward compatibility of pre-deployed processes that did not define ``jobControlOptions`` that is now required.
   Missing definition are substituted in-place by default ``["execute-async"]`` mode.
-- Fix ``minOccurs`` and ``maxOccurs`` representation according to `OGC-API`
-  (fixes `#263  <https://github.com/crim-ca/weaver/issues/263>`_).
 
 `3.2.0 <https://github.com/crim-ca/weaver/tree/3.2.0>`_ (2021-06-08)
 ========================================================================
