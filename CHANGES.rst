@@ -21,7 +21,10 @@ Fixes:
 
 Changes:
 --------
-- No change.
+- Updated the format of the URL for the job results. When the prefix ``/`` was not present, 
+  URL was incorrectly handled by not prepending the required base URL location.
+- Add support for array type as job inputs
+  (relates to `#233 <https://github.com/crim-ca/weaver/issues/233>`_).
 
 Fixes:
 ------
@@ -55,10 +58,6 @@ Fixes:
 - Fix default execution mode specification in process job control options
   (fixes `#182 <https://github.com/opengeospatial/ogcapi-processes/pull/182>`_).
 - Fix old OGC-API WPS REST bindings link in landing page for the more recent `OGC-API Processes` specification.
-- Updated the format of the URL for the job results. When the prefix ``/`` was not present, 
-  URL was incorrectly handled by not prepending the required base URL location.
-- Add support for array type as job inputs
-  (relates to `#233 <https://github.com/crim-ca/weaver/issues/233>`_).
 - Fix invalid deserialization of schemas using ``not`` keyword that would result in all fields returned instead of
   limiting them to the expected fields from the schema definitions for ``LiteralInputType`` in process description.
 - Adjust ``InputType`` and ``OutputType`` schemas to use ``allOf`` instead of ``anyOf`` definition since all sub-schemas
