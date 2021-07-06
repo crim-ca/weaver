@@ -21,8 +21,6 @@ Fixes:
 
 Changes:
 --------
-- Updated the format of the URL for the job results. When the prefix ``/`` was not present, 
-  URL was incorrectly handled by not prepending the required base URL location.
 - Add support for array type as job inputs
   (relates to `#233 <https://github.com/crim-ca/weaver/issues/233>`_).
 
