@@ -555,9 +555,9 @@ def mocked_aws_s3_bucket_test_file(bucket_name, file_name, file_content="Test fi
 def mocked_http_file(test_func):
     # type: (Callable[[...], Any]) -> Callable
     """
-    Creates a mock of the function `fetch_file`, to fetch a generated file locally, for test purposes only.
+    Creates a mock of the function :func:`fetch_file`, to fetch a generated file locally, for test purposes only.
     For instance, calling this function with :func:`mocked_http_file` decorator
-    will effectively employ the mocked `fetch_file` and return a generated local file.
+    will effectively employ the mocked :func:`fetch_file` and return a generated local file.
 
     .. seealso::
         - :func:`mocked_reference_test_file`

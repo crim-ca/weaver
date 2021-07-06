@@ -14,8 +14,7 @@ Changes:
 
 Fixes:
 ------
-- Fixed the format of the output file URL. When the prefix ``/`` was not present, 
-  URL was incorrectly handled by not prepending the required base URL location.
+- No change.
 
 `3.2.1 <https://github.com/crim-ca/weaver/tree/3.2.1>`_ (2021-06-08)
 ========================================================================
@@ -26,6 +25,8 @@ Changes:
 
 Fixes:
 ------
+- Fixed the format of the output file URL. When the prefix ``/`` was not present, 
+  URL was incorrectly handled by not prepending the required base URL location.
 - Fix backward compatibility of pre-deployed processes that did not define ``jobControlOptions`` that is now required.
   Missing definition are substituted in-place by default ``["execute-async"]`` mode.
 
