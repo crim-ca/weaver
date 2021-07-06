@@ -17,6 +17,6 @@
     ["lint-maximum-line-length", 120],
     ["lint-ordered-list-marker-style", "."],
     ["lint-ordered-list-marker-value", "ordered"],
-    ["lint-unordered-list-marker-style", false]
+    ["lint-unordered-list-marker-style", "consistent"]
   ]
 }
