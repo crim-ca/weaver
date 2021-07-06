@@ -24,7 +24,7 @@ A clear and concise description of what you expected to happen.
 If applicable, add screenshots to help explain your problem.
 
 **Context (please complete the following information):**
- - OS: \[e.g. Linux|Windows\] (if running locally)
- - Browser \[e.g. chrome, safari\] (if running as a service)
- - Instance: \[ADES|EMS\] and URL
- - Version \["1.2.3", see `/versions` endpoint\]
+- OS: \[e.g. Linux|Windows\] (if running locally)
+- Browser \[e.g. chrome, safari\] (if running as a service)
+- Instance: \[ADES|EMS\] and URL
+- Version \["1.2.3", see `/versions` endpoint\]

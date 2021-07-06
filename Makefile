@@ -259,9 +259,24 @@ install-npm:    ## install npm package manager and dependencies if they cannot b
 		echo "Binary package manager npm not found. Attempting to install it."; \
 		apt-get install npm \
 	)
+
+.PHONY: install-npm-stylelint
+install-npm-stylelint: install-npm   	## install stylelint dependency for 'check-css' target using npm
 	@[ `npm ls 2>/dev/null | grep stylelint-config-standard | wc -l` = 1 ] || ( \
-		echo "Install required libraries for style checks." && \
+		echo "Install required dependencies for CSS checks." && \
 		npm install stylelint stylelint-config-standard --save-dev \
+	)
+
+.PHONY: install-npm-remarklint
+install-npm-remarklint: install-npm    ## install remark-lint dependency for 'check-md' target using npm
+	@[ `npm ls 2>/dev/null | grep remark-lint | wc -l` = 1 ] || ( \
+		echo "Install required dependencies for Markdown checks." && \
+		npm install --save-dev \
+		 	remark-lint \
+		 	remark-cli \
+		 	remark-lint-maximum-line-length \
+		 	remark-preset-lint-recommended \
+		 	remark-preset-lint-markdown-style-guide \
 	)
 
 ## -- Cleanup targets ----------------------------------------------------------------------------------------------- ##
@@ -417,8 +432,14 @@ coverage: test-coverage  ## alias to run test with coverage analysis
 ## -- [variants '<target>-only' without '-only' suffix are also available with pre-install setup]
 
 # autogen check variants with pre-install of dependencies using the '-only' target references
-CHECKS := pep8 lint security doc8 links imports css
+CHECKS := pep8 lint security doc8 links imports
 CHECKS := $(addprefix check-, $(CHECKS))
+
+# items that should not install python dev packages should be added here instead
+# they must provide their own target/only + with dependency install variants
+CHECKS_NO_PY := css md
+CHECKS_NO_PY := $(addprefix fix-, $(CHECKS_NO_PY))
+CHECKS_ALL := $(FIXES) $(FIXES_NO_PY)
 
 $(CHECKS): check-%: install-dev check-%-only
 
@@ -433,17 +454,17 @@ check: check-all    ## alias for 'check-all' target
 check-only: $(addsuffix -only, $(CHECKS))
 
 .PHONY: check-all
-check-all: install-dev $(CHECKS) 	## run all code checks
+check-all: install-dev $(CHECKS_ALL) 	## check all code linters
 
 .PHONY: check-pep8-only
-check-pep8-only: mkdir-reports 		## run PEP8 code style checks
+check-pep8-only: mkdir-reports 		## check for PEP8 code style issues
 	@echo "Running pep8 code style checks..."
 	@-rm -fr "$(REPORTS_DIR)/check-pep8.txt"
 	@bash -c '$(CONDA_CMD) \
 		flake8 --config="$(APP_ROOT)/setup.cfg" --output-file="$(REPORTS_DIR)/check-pep8.txt" --tee'
 
 .PHONY: check-lint-only
-check-lint-only: mkdir-reports  	## run linting code style checks
+check-lint-only: mkdir-reports  	## check linting of code style
 	@echo "Running linting code style checks..."
 	@-rm -fr "$(REPORTS_DIR)/check-lint.txt"
 	@bash -c '$(CONDA_CMD) \
@@ -455,7 +476,7 @@ check-lint-only: mkdir-reports  	## run linting code style checks
 		1> >(tee "$(REPORTS_DIR)/check-lint.txt")'
 
 .PHONY: check-security-only
-check-security-only: mkdir-reports	## run security code checks
+check-security-only: mkdir-reports	## check for security code issues
 	@echo "Running security code checks..."
 	@-rm -fr "$(REPORTS_DIR)/check-security.txt"
 	@bash -c '$(CONDA_CMD) \
@@ -463,7 +484,7 @@ check-security-only: mkdir-reports	## run security code checks
 		1> >(tee "$(REPORTS_DIR)/check-security.txt")'
 
 .PHONY: check-doc8-only
-check-doc8-only: mkdir-reports	## run doc8 documentation style checks
+check-doc8-only: mkdir-reports	## check documentation style checks
 	@echo "Running doc8 doc style checks..."
 	@-rm -fr "$(REPORTS_DIR)/check-doc8.txt"
 	@bash -c '$(CONDA_CMD) \
@@ -476,7 +497,7 @@ check-links-only:       	## check all external links in documentation for integr
 	@bash -c '$(CONDA_CMD) $(MAKE) -C "$(APP_ROOT)/docs" linkcheck'
 
 .PHONY: check-imports-only
-check-imports-only: mkdir-reports	## run imports code checks
+check-imports-only: mkdir-reports 	## check imports ordering and styles
 	@echo "Running import checks..."
 	@-rm -fr "$(REPORTS_DIR)/check-imports.txt"
 	@bash -c '$(CONDA_CMD) \
@@ -484,16 +505,40 @@ check-imports-only: mkdir-reports	## run imports code checks
 		1> >(tee "$(REPORTS_DIR)/check-imports.txt")'
 
 .PHONY: check-css-only
-check-css-only: mkdir-reports install-npm
+check-css-only: mkdir-reports  	## check CSS linting
 	@echo "Running CSS style checks..."
-	@npx stylelint \
+	@npx --no-install stylelint \
 		--config "$(APP_ROOT)/.stylelintrc.json" \
-		--output-file "$(REPORTS_DIR)/fixed-css.txt" \
+		--output-file "$(REPORTS_DIR)/check-css.txt" \
 		"$(APP_ROOT)/**/*.css"
 
+.PHONY: check-css
+check-css: install-npm-stylelint check-css-only	## check CSS linting after dependency installation
+
+# must pass 2 search paths because '<dir>/.<subdir>' are somehow not correctly detected with only the top-level <dir>
+.PHONY: check-md-only
+check-md-only: mkdir-reports 	## check Markdown linting
+	@echo "Running Markdown style checks..."
+	@npx --no-install remark \
+		--inspect --frail \
+		--silently-ignore \
+		--stdout --color \
+		--rc-path "$(APP_ROOT)/.remarkrc" \
+		--ignore-path "$(APP_ROOT)/.remarkignore" \
+		"$(APP_ROOT)" "$(APP_ROOT)/.*/" \
+		> "$(REPORTS_DIR)/check-md.txt"
+
+.PHONY: check-md
+check-md: install-npm-remarklint check-md-only	## check Markdown linting after dependency installation
+
 # autogen fix variants with pre-install of dependencies using the '-only' target references
-FIXES := imports lint docf css
+FIXES := imports lint docf
 FIXES := $(addprefix fix-, $(FIXES))
+# items that should not install python dev packages should be added here instead
+# they must provide their own target/only + with dependency install variants
+FIXES_NO_PY := css md
+FIXES_NO_PY := $(addprefix fix-, $(FIXES_NO_PY))
+FIXES_ALL := $(FIXES) $(FIXES_NO_PY)
 
 $(FIXES): fix-%: install-dev fix-%-only
 
@@ -504,7 +549,7 @@ fix: fix-all 	## alias for 'fix-all' target
 fix-only: $(addsuffix -only, $(FIXES))	## run all automatic fixes without development dependencies pre-install
 
 .PHONY: fix-all
-fix-all: install-dev $(FIXES)  ## fix all code check problems automatically after install of development dependencies
+fix-all: install-dev $(FIXES_ALL)  ## fix all code check problems automatically after install of dependencies
 
 .PHONY: fix-imports-only
 fix-imports-only: mkdir-reports	## apply import code checks corrections
@@ -539,13 +584,31 @@ fix-docf-only: mkdir-reports  ## fix some PEP8 code documentation style problems
 		1> >(tee "$(REPORTS_DIR)/fixed-docf.txt")'
 
 .PHONY: fix-css-only
-fix-css-only: mkdir-reports install-npm		## fix CSS styles problems automatically
+fix-css-only: mkdir-reports 	## fix CSS linting problems automatically
 	@echo "Fixing CSS style problems..."
 	@npx stylelint \
 		--fix \
 		--config "$(APP_ROOT)/.stylelintrc.json" \
 		--output-file "$(REPORTS_DIR)/fixed-css.txt" \
 		"$(APP_ROOT)/**/*.css"
+
+.PHONY: fix-css
+fix-css: install-npm-stylelint fix-css-only		## fix CSS linting problems after dependency installation
+
+# must pass 2 search paths because '<dir>/.<subdir>' are somehow not correctly detected with only the top-level <dir>
+.PHONY: fix-md-only
+fix-md-only: mkdir-reports 	## fix Markdown linting problems automatically
+	@echo "Running Markdown style checks..."
+	@npx --no-install remark \
+		--output --frail \
+		--silently-ignore \
+		--rc-path "$(APP_ROOT)/.remarkrc" \
+		--ignore-path "$(APP_ROOT)/.remarkignore" \
+		"$(APP_ROOT)" "$(APP_ROOT)/.*/" \
+		> "$(REPORTS_DIR)/fix-md.txt"
+
+.PHONY: fix-md
+fix-md: install-npm-remarklint fix-md-only	## fix Markdown linting problems after dependency installation
 
 ## -- Documentation targets ----------------------------------------------------------------------------------------- ##
 
