@@ -821,15 +821,22 @@ class Process(Base):
     @property
     def inputs(self):
         # type: () -> Optional[List[Dict[str, Any]]]
+        """
+        According to `OGC-API`, ``maxOccurs`` and ``minOccurs`` representations should be:
+            ``maxOccurs``: ``int`` or ``unbounded``
+            ``minOccurs``: ``int``
+
+        .. note::
+        Because of pre-existing/deployed/remote processes, inputs are formated to respect the valid representation.
+        """
+
         inputs = self.get("inputs")
         if inputs is not None:
             for input_ in inputs:
-                maxOccurs = input_.get("maxOccurs", False)
-                minOccurs = input_.get("minOccurs", False)
-                if minOccurs:
-                    input_["minOccurs"] = int(minOccurs)
-                if maxOccurs and maxOccurs != "unbounded":
-                    input_["maxOccurs"] = int(maxOccurs)
+                input_["minOccurs"] = int(input_["minOccurs"])
+                input_["maxOccurs"] = (
+                    int(input_["maxOccurs"]) if input_["maxOccurs"] != "unbounded" else input_["maxOccurs"]
+                )
         return inputs
 
     @property
