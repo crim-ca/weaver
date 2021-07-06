@@ -149,6 +149,22 @@ info:		## display make information
 	@echo "  Download Cache     $(DOWNLOAD_CACHE)"
 	@echo "  Docker Repository  $(DOCKER_REPO)"
 
+.PHONY: fixme-list-only
+fixme-list-only: mkdir-reports  	## list all FIXME/TODO/HACK items that require attention in the code
+	@echo "Listing code that requires fixes..."
+	@echo '[MISCELLANEOUS]\nnotes=FIXME,TODO,HACK' > "$(REPORTS_DIR)/fixmerc"
+	@bash -c '$(CONDA_CMD) \
+		pylint \
+			--disable=all,use-symbolic-message-instead --enable=miscellaneous,W0511 \
+			--score n --persistent n \
+			--rcfile="$(REPORTS_DIR)/fixmerc" \
+			-f colorized \
+			"$(APP_ROOT)/weaver" "$(APP_ROOT)/tests" \
+		1> >(tee "$(REPORTS_DIR)/fixme.txt")'
+
+.PHONY: fixme-list
+fixme-list: install-dev fixme-list-only  ## list all FIXME/TODO/HACK items with pre-installation of dependencies
+
 ## -- Conda targets ------------------------------------------------------------------------------------------------- ##
 
 .PHONY: conda-base
@@ -235,6 +251,18 @@ install-raw:	## install without any requirements or dependencies (suppose everyt
 	@echo "Installing package without dependencies..."
 	@bash -c '$(CONDA_CMD) pip install $(PIP_XARGS) -e "$(APP_ROOT)" --no-deps'
 	@echo "Install package complete."
+
+# install locally to ensure they can be found by config extending them
+.PHONY: install-npm
+install-npm:    ## install npm package manager and dependencies if they cannot be found
+	@[ -f "$(shell which npm)" ] || ( \
+		echo "Binary package manager npm not found. Attempting to install it."; \
+		apt-get install npm \
+	)
+	@[ `npm ls 2>/dev/null | grep stylelint-config-standard | wc -l` = 1 ] || ( \
+		echo "Install required libraries for style checks." && \
+		npm install stylelint stylelint-config-standard --save-dev \
+	)
 
 ## -- Cleanup targets ----------------------------------------------------------------------------------------------- ##
 
@@ -389,7 +417,7 @@ coverage: test-coverage  ## alias to run test with coverage analysis
 ## -- [variants '<target>-only' without '-only' suffix are also available with pre-install setup]
 
 # autogen check variants with pre-install of dependencies using the '-only' target references
-CHECKS := pep8 lint security doc8 links imports
+CHECKS := pep8 lint security doc8 links imports css
 CHECKS := $(addprefix check-, $(CHECKS))
 
 $(CHECKS): check-%: install-dev check-%-only
@@ -455,8 +483,16 @@ check-imports-only: mkdir-reports	## run imports code checks
 		isort --check-only --diff --recursive $(APP_ROOT) \
 		1> >(tee "$(REPORTS_DIR)/check-imports.txt")'
 
+.PHONY: check-css-only
+check-css-only: mkdir-reports install-npm
+	@echo "Running CSS style checks..."
+	@npx stylelint \
+		--config "$(APP_ROOT)/.stylelintrc.json" \
+		--output-file "$(REPORTS_DIR)/fixed-css.txt" \
+		"$(APP_ROOT)/**/*.css"
+
 # autogen fix variants with pre-install of dependencies using the '-only' target references
-FIXES := imports lint docf
+FIXES := imports lint docf css
 FIXES := $(addprefix fix-, $(FIXES))
 
 $(FIXES): fix-%: install-dev fix-%-only
@@ -502,21 +538,14 @@ fix-docf-only: mkdir-reports  ## fix some PEP8 code documentation style problems
 			$(APP_ROOT) \
 		1> >(tee "$(REPORTS_DIR)/fixed-docf.txt")'
 
-.PHONY: fixme-list-only
-fixme-list-only: mkdir-reports  	## attempt auto-fix all linting code styles errors reported by 'check-lint'
-	@echo "Listing code that requires fixes..."
-	@echo '[MISCELLANEOUS]\nnotes=FIXME,TODO,HACK' > "$(REPORTS_DIR)/fixmerc"
-	@bash -c '$(CONDA_CMD) \
-		pylint \
-			--disable=all,use-symbolic-message-instead --enable=miscellaneous,W0511 \
-			--score n --persistent n \
-			--rcfile="$(REPORTS_DIR)/fixmerc" \
-			-f colorized \
-			"$(APP_ROOT)/weaver" "$(APP_ROOT)/tests" \
-		1> >(tee "$(REPORTS_DIR)/fixme.txt")'
-
-.PHONY: fixme-list
-fixme-list: install-dev fixme-list-only  ## attempt auto-fix of linting code styles errors after dependencies install
+.PHONY: fix-css-only
+fix-css-only: mkdir-reports install-npm		## fix CSS styles problems automatically
+	@echo "Fixing CSS style problems..."
+	@npx stylelint \
+		--fix \
+		--config "$(APP_ROOT)/.stylelintrc.json" \
+		--output-file "$(REPORTS_DIR)/fixed-css.txt" \
+		"$(APP_ROOT)/**/*.css"
 
 ## -- Documentation targets ----------------------------------------------------------------------------------------- ##
 

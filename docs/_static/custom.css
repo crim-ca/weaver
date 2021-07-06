@@ -9,13 +9,15 @@
 */
 .code-table tbody tr td {
     vertical-align: top !important;
-    /* max-width: min-content;*/
+
+    /* max-width: min-content; */
 }
 
 /* force code blocks to be a small as possible and centered
    but also revert for tables that already does it across its full width
    (without revert, some horizontal scrollbars for 1px move are displayed)
 */
+
 /*
 div[class^="highlight"] {
     max-width: min-content;
