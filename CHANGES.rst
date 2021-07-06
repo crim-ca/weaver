@@ -14,6 +14,35 @@ Changes:
 
 Fixes:
 ------
+- No change.
+
+`3.2.1 <https://github.com/crim-ca/weaver/tree/3.2.1>`_ (2021-06-08)
+========================================================================
+
+Changes:
+--------
+- No change.
+
+Fixes:
+------
+- Fix backward compatibility of pre-deployed processes that did not define ``jobControlOptions`` that is now required.
+  Missing definition are substituted in-place by default ``["execute-async"]`` mode.
+
+`3.2.0 <https://github.com/crim-ca/weaver/tree/3.2.0>`_ (2021-06-08)
+========================================================================
+
+Changes:
+--------
+- Add reference link to ReadTheDocs URL of `Weaver` in API landing page.
+- Add references to `OGC-API Processes` requirements and recommendations for eventual conformance listing
+  (relates to `#231 <https://github.com/crim-ca/weaver/issues/231>`_).
+- Add ``datetime`` query parameter for job searches queries
+  (relates to `#236 <https://github.com/crim-ca/weaver/issues/236>`_).
+- Add ``limit`` query parameter validation and integration for jobs in retrieve queries
+  (relates to `#237 <https://github.com/crim-ca/weaver/issues/237>`_).
+
+Fixes:
+------
 - Pin ``pywps==4.4.3`` and fix incompatibility introduced by its refactor of I/O base classes in
   `#602 <https://github.com/geopython/pywps/pull/602>`_
   (specifically `commit 343d825 <https://github.com/geopython/pywps/commit/343d82539576b1e73eee3102654749c3d3137cff>`_),
@@ -21,6 +50,11 @@ Fixes:
   (see issue `#526 <https://github.com/geopython/pywps/issues/526>`_).
 - Fix default execution mode specification in process job control options
   (fixes `#182 <https://github.com/opengeospatial/ogcapi-processes/pull/182>`_).
+- Fix old OGC-API WPS REST bindings link in landing page for the more recent `OGC-API Processes` specification.
+- Fix invalid deserialization of schemas using ``not`` keyword that would result in all fields returned instead of
+  limiting them to the expected fields from the schema definitions for ``LiteralInputType`` in process description.
+- Adjust ``InputType`` and ``OutputType`` schemas to use ``allOf`` instead of ``anyOf`` definition since all sub-schemas
+  that define them must be combined, with their respectively required or optional fields.
 
 `3.1.0 <https://github.com/crim-ca/weaver/tree/3.1.0>`_ (2021-04-23)
 ========================================================================

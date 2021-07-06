@@ -9,7 +9,7 @@ MAKEFILE_NAME := $(word $(words $(MAKEFILE_LIST)),$(MAKEFILE_LIST))
 # Application
 APP_ROOT    := $(abspath $(lastword $(MAKEFILE_NAME))/..)
 APP_NAME    := $(shell basename $(APP_ROOT))
-APP_VERSION ?= 3.1.0
+APP_VERSION ?= 3.2.1
 APP_INI     ?= $(APP_ROOT)/config/$(APP_NAME).ini
 DOCKER_REPO ?= pavics/weaver
 #DOCKER_REPO ?= docker-registry.crim.ca/ogc/weaver
@@ -19,38 +19,47 @@ OS_NAME := $(shell uname -s 2>/dev/null || echo "unknown")
 CPU_ARCH := $(shell uname -m 2>/dev/null || uname -p 2>/dev/null || echo "unknown")
 
 # conda
+CONDA_CMD      ?= __EMPTY__
 CONDA_ENV      ?= $(APP_NAME)
 CONDA_HOME     ?= $(HOME)/.conda
 CONDA_ENVS_DIR ?= $(CONDA_HOME)/envs
 CONDA_ENV_PATH := $(CONDA_ENVS_DIR)/$(CONDA_ENV)
-# allow pre-installed conda in Windows bash-like shell
-ifeq ($(findstring MINGW,$(OS_NAME)),MINGW)
-  CONDA_BIN_DIR ?= $(CONDA_HOME)/Scripts
-else
-  CONDA_BIN_DIR ?= $(CONDA_HOME)/bin
-endif
-CONDA_BIN := $(CONDA_BIN_DIR)/conda
-CONDA_ENV_REAL_TARGET_PATH := $(realpath $(CONDA_ENV_PATH))
-CONDA_ENV_REAL_ACTIVE_PATH := $(realpath ${CONDA_PREFIX})
-
-# environment already active - use it directly
-ifneq ("$(CONDA_ENV_REAL_ACTIVE_PATH)", "")
-  CONDA_ENV_MODE := [using active environment]
-  CONDA_ENV := $(notdir $(CONDA_ENV_REAL_ACTIVE_PATH))
+ifneq ($(CONDA_CMD),__EMPTY__)
   CONDA_CMD :=
-endif
-# environment not active but it exists - activate and use it
-ifneq ($(CONDA_ENV_REAL_TARGET_PATH), "")
-  CONDA_ENV := $(notdir $(CONDA_ENV_REAL_TARGET_PATH))
-endif
-# environment not active and not found - create, activate and use it
-ifeq ("$(CONDA_ENV)", "")
-  CONDA_ENV := $(APP_NAME)
-endif
-# update paths for environment activation
-ifeq ("$(CONDA_ENV_REAL_ACTIVE_PATH)", "")
-  CONDA_ENV_MODE := [will activate environment]
-  CONDA_CMD := source "$(CONDA_BIN_DIR)/activate" "$(CONDA_ENV)";
+  CONDA_BIN :=
+  CONDA_ENV :=
+  CONDA_ENV_MODE := [using overridden conda command]
+else
+  CONDA_CMD :=
+  # allow pre-installed conda in Windows bash-like shell
+  ifeq ($(findstring MINGW,$(OS_NAME)),MINGW)
+    CONDA_BIN_DIR ?= $(CONDA_HOME)/Scripts
+  else
+    CONDA_BIN_DIR ?= $(CONDA_HOME)/bin
+  endif
+  CONDA_BIN := $(CONDA_BIN_DIR)/conda
+  CONDA_ENV_REAL_TARGET_PATH := $(realpath $(CONDA_ENV_PATH))
+  CONDA_ENV_REAL_ACTIVE_PATH := $(realpath ${CONDA_PREFIX})
+
+  # environment already active - use it directly
+  ifneq ("$(CONDA_ENV_REAL_ACTIVE_PATH)", "")
+    CONDA_ENV_MODE := [using active environment]
+    CONDA_ENV := $(notdir $(CONDA_ENV_REAL_ACTIVE_PATH))
+    CONDA_CMD :=
+  endif
+  # environment not active but it exists - activate and use it
+  ifneq ($(CONDA_ENV_REAL_TARGET_PATH), "")
+    CONDA_ENV := $(notdir $(CONDA_ENV_REAL_TARGET_PATH))
+  endif
+  # environment not active and not found - create, activate and use it
+  ifeq ("$(CONDA_ENV)", "")
+    CONDA_ENV := $(APP_NAME)
+  endif
+  # update paths for environment activation
+  ifeq ("$(CONDA_ENV_REAL_ACTIVE_PATH)", "")
+    CONDA_ENV_MODE := [will activate environment]
+    CONDA_CMD := source "$(CONDA_BIN_DIR)/activate" "$(CONDA_ENV)";
+  endif
 endif
 DOWNLOAD_CACHE ?= $(APP_ROOT)/downloads
 PYTHON_VERSION ?= `python -c 'import platform; print(platform.python_version())'`

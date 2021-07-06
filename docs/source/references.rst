@@ -47,7 +47,7 @@
 .. |ogc-home| replace:: |ogc| Homepage
 .. _ogc-home: `ogc`_
 .. |ogc-proc-api| replace:: OGC API - Processes
-.. _ogc-proc-api: https://github.com/opengeospatial/wps-rest-binding
+.. _ogc-proc-api: https://github.com/opengeospatial/ogcapi-processes
 .. |pywps| replace:: PyWPS
 .. _pywps: https://github.com/geopython/pywps/
 .. |pywps-status| replace:: Progress and Status Report

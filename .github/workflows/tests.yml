@@ -32,7 +32,7 @@ jobs:
     continue-on-error: ${{ matrix.allow-failure }}
     env:
       # override make command to install directly in active python
-      CONDA_COMMAND: ""
+      CONDA_CMD: ""
     services:
       # Label used to access the service container
       mongodb:
@@ -80,6 +80,8 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install Dependencies
+        # install package and dependencies directly,
+        # skip sys/conda setup to use active python
         run: make install-pkg install-dev version
       - name: Display Packages
         run: pip freeze

@@ -114,3 +114,8 @@ if TYPE_CHECKING:
 
     # update_status(provider, message, progress, status)
     UpdateStatusPartialFunction = Callable[[str, str, int, AnyStatusType], None]
+
+    # others
+    DatetimeIntervalType = TypedDict("DatetimeIntervalType",
+                                     {"before": str, "after": str,
+                                      "match": str, }, total=False)

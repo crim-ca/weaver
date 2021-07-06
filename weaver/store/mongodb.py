@@ -48,10 +48,11 @@ from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC, VISIBILITY_
 from weaver.wps.utils import get_wps_url
 
 if TYPE_CHECKING:
+    import datetime
     from typing import Any, Callable, Dict, List, Optional, Tuple, Union
     from pymongo.collection import Collection
 
-    from weaver.store.base import JobCategoriesAndCount, JobListAndCount
+    from weaver.store.base import DatetimeIntervalType, JobCategoriesAndCount, JobListAndCount
     from weaver.typedefs import AnyProcess, AnyProcessType
 
 LOGGER = logging.getLogger(__name__)
@@ -407,6 +408,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
                  access=None,               # type: Optional[str]
                  notification_email=None,   # type: Optional[str]
                  accept_language=None,      # type: Optional[str]
+                 created=None,              # type: Optional[datetime.datetime]
                  ):                         # type: (...) -> Job
         """
         Creates a new :class:`Job` and stores it in mongodb.
@@ -424,6 +426,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
                 tags.append(EXECUTE_MODE_SYNC)
             if not access:
                 access = VISIBILITY_PRIVATE
+
             new_job = Job({
                 "task_id": task_id,
                 "user_id": user_id,
@@ -434,7 +437,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
                 "execute_async": execute_async,
                 "is_workflow": is_workflow,
                 "is_local": is_local,
-                "created": now(),
+                "created": created if created else now(),
                 "tags": list(set(tags)),  # remove duplicates
                 "access": access,
                 "notification_email": notification_email,
@@ -501,6 +504,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
                   sort=None,                # type: Optional[str]
                   page=0,                   # type: int
                   limit=10,                 # type: int
+                  datetime=None,            # type: Optional[DatetimeIntervalType]
                   group_by=None,            # type: Optional[Union[str, List[str]]]
                   request=None,             # type: Optional[Request]
                   ):                        # type: (...) -> Union[JobListAndCount, JobCategoriesAndCount]
@@ -517,6 +521,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
         :param sort: field which is used for sorting results (default: creation date, descending).
         :param page: page number to return when using result paging (only when not using ``group_by``).
         :param limit: number of jobs per page when using result paging (only when not using ``group_by``).
+        :param datetime: field used for filtering data by creation date with a given date or interval of date.
         :param group_by: one or many fields specifying categories to form matching groups of jobs (paging disabled).
 
         :returns: (list of jobs matching paging OR list of {categories, list of jobs, count}) AND total of matched job
@@ -583,6 +588,20 @@ class MongodbJobStore(StoreJobs, MongodbStore):
 
         if service is not None:
             search_filters["service"] = service
+
+        if datetime is not None:
+            query = {}
+
+            if datetime.get("after", False):
+                query["$gte"] = datetime["after"]
+
+            if datetime.get("before", False):
+                query["$lte"] = datetime["before"]
+
+            if datetime.get("match", False):
+                query = datetime["match"]
+
+            search_filters["created"] = query
 
         if sort is None:
             sort = SORT_CREATED

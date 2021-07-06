@@ -105,6 +105,49 @@ def test_oneof_nested_dict_list():
                                  .format(ce._get_node_name(test_schema), test_value, result))
 
 
+def test_not_keyword_extra_fields_handling():
+    """
+    Using ``not`` keyword without any other schemas must return an empty mapping with additional fields dropped.
+    When providing other schemas, only fields in those inherited definitions should remain.
+    In should raise when matching the ``not`` conditions regardless.
+    """
+
+    class RequiredItem(ce.ExtendedMappingSchema):
+        item = ce.ExtendedSchemaNode(colander.String())
+
+    class MappingWithType(ce.ExtendedMappingSchema):
+        type = ce.ExtendedSchemaNode(colander.String())
+
+    class MappingWithoutType(ce.NotKeywordSchema, RequiredItem):
+        _not = [MappingWithType()]
+
+    class MappingOnlyNotType(ce.NotKeywordSchema):
+        _not = [MappingWithType()]
+
+    value = {"type": "invalid", "item": "valid"}
+    try:
+        result = MappingWithoutType().deserialize(value)
+    except colander.Invalid:
+        pass
+    except Exception:
+        raise AssertionError("Incorrect exception raised from deserialize of '{!s}' with {!s}"
+                             .format(ce._get_node_name(MappingWithoutType), value))
+    else:
+        raise AssertionError("Should have raised invalid schema from deserialize of '{!s}' with {!s}, but got {!s}"
+                             .format(ce._get_node_name(MappingWithoutType), value, result))
+
+    test_cases = [
+        (MappingWithoutType, {"item": "valid", "value": "ignore"}, {"item": "valid"}),
+        (MappingOnlyNotType, {"item": "valid", "value": "ignore"}, {})
+    ]
+    for test_schema, test_value, test_expect in test_cases:
+        try:
+            result = test_schema().deserialize(test_value)
+            assert result == test_expect, "Bad result from [{}] with [{}]".format(test_schema.__name__, test_value)
+        except colander.Invalid:
+            pytest.fail("Expected valid format from [{}] with [{}]".format(test_schema.__name__, test_value))
+
+
 class FieldTestString(ce.ExtendedSchemaNode):
     schema_type = colander.String
 
