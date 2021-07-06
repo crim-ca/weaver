@@ -96,7 +96,7 @@ def get_dummy_payload():
 
 def get_opensearch_payload():
     payload = load_json_test_file("opensearch_deploy.json")
-    payload["execution_unit"]["unit"]["requirements"] = {
+    payload["executionUnit"][0]["unit"]["requirements"] = {
         CWL_REQUIREMENT_APP_DOCKER: {
             "dockerPull": "alpine:latest"
         }
