@@ -1,8 +1,7 @@
 #!/usr/bin/env cwl-runner
 cwlVersion: v1.0
 class: CommandLineTool
-# target the installed python pointing to weaver conda env to allow imports
-baseCommand: ${WEAVER_ROOT_DIR}/bin/python
+baseCommand: python
 arguments: ["${WEAVER_ROOT_DIR}/weaver/processes/builtin/file2string_array.py", "-o", $(runtime.outdir)]
 inputs:
   input:
@@ -15,5 +14,7 @@ outputs:
   output:
     type: File
     format: iana:application/json
+    outputBinding:
+      glob: "output.json"
 $namespaces:
   iana: "https://www.iana.org/assignments/media-types/"
