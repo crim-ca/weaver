@@ -21,10 +21,13 @@ Fixes:
 
 Changes:
 --------
-- No change.
+- Add support for array type as job inputs
+  (relates to `#233 <https://github.com/crim-ca/weaver/issues/233>`_).
 
 Fixes:
 ------
+- Fixed the format of the output file URL. When the prefix ``/`` was not present, 
+  URL was incorrectly handled by not prepending the required base URL location.
 - Fix backward compatibility of pre-deployed processes that did not define ``jobControlOptions`` that is now required.
   Missing definition are substituted in-place by default ``["execute-async"]`` mode.
 
@@ -36,6 +39,8 @@ Changes:
 - Add reference link to ReadTheDocs URL of `Weaver` in API landing page.
 - Add references to `OGC-API Processes` requirements and recommendations for eventual conformance listing
   (relates to `#231 <https://github.com/crim-ca/weaver/issues/231>`_).
+- In order to align with OpenAPI ``boolean`` type definitions, non explicit ``boolean`` values will not be automatically 
+  converted to ``bool`` anymore. They will require explicit ``false|true``.
 - Add ``datetime`` query parameter for job searches queries
   (relates to `#236 <https://github.com/crim-ca/weaver/issues/236>`_).
 - Add ``limit`` query parameter validation and integration for jobs in retrieve queries

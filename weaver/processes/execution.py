@@ -118,7 +118,14 @@ def execute_process(self, job_id, url, headers=None):
                 input_values = process_value if isinstance(process_value, list) else [process_value]
 
                 # we need to support file:// scheme but PyWPS doesn't like them so remove the scheme file://
-                input_values = [val[7:] if str(val).startswith("file://") else val for val in input_values]
+                input_values = [
+                    # when value is an array of dict that each contain a file reference
+                    (get_any_value(val)[7:] if str(get_any_value(val)).startswith("file://") else get_any_value(val))
+                    if isinstance(val, dict) else
+                    # when value is directly a single dict with file reference
+                    (val[7:] if str(val).startswith("file://") else val)
+                    for val in input_values
+                ]
 
                 # need to use ComplexDataInput structure for complex input
                 # need to use literal String for anything else than complex
