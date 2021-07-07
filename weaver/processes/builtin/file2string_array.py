@@ -26,7 +26,7 @@ __abstract__ = __doc__  # NOTE: '__doc__' is fetched directly, this is mostly to
 def main(input_file, output_dir):
     # type: (argparse.FileType, str) -> None
     LOGGER.info("Got arguments: input_file=%s output_dir=%s", input_file, output_dir)
-    output_data = {"output": [input_file]}
+    output_data = [input_file]
     json.dump(output_data, open(os.path.join(output_dir, "output.json"), "w"))
 
 

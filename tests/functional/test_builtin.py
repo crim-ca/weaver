@@ -138,16 +138,18 @@ class BuiltinAppTest(WpsPackageConfigBase):
         assert resp.json["process"]["outputs"][0]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_JSON  # important here
 
     def test_file2string_array_execute(self):
+        tmp_file = None
         dirname = tempfile.gettempdir()
         with contextlib.ExitStack() as stack_exec:
             tmp_text = tempfile.NamedTemporaryFile(dir=dirname, mode="w", suffix=".txt")
             tmp_text = stack_exec.enter_context(tmp_text)  # noqa
             tmp_text.write("Hello World!")
             tmp_text.seek(0)
+            tmp_file = tmp_text.name
             data = {
                 "mode": "async",
                 "response": "document",
-                "inputs": [{"id": "input", "href": tmp_text.name}],
+                "inputs": [{"id": "input", "href": tmp_file}],
                 "outputs": [{"id": "output", "transmissionMode": EXECUTE_TRANSMISSION_MODE_REFERENCE}],
             }
 
@@ -182,7 +184,7 @@ class BuiltinAppTest(WpsPackageConfigBase):
         assert os.path.isfile(real_path)
         with open(real_path, "r") as f:
             out_data = json.load(f)
-        assert out_data == {"output": [fake_file]}
+        assert out_data == {"output": [tmp_file]}
 
         # if everything was valid for results, validate equivalent but differently formatted outputs response
         output_url = job_url + "/outputs"
