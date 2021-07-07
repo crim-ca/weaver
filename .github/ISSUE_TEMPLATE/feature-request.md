@@ -1,15 +1,16 @@
 ---
+
 name: Feature Request
 about: Suggest an idea for this project
-title: "[Feature]"
+title: \[Feature]
 labels: triage/feature
 assignees: fmigneault
 
 ---
 
 **Is your feature request related to a missing implementation or functionality? Please describe.**
-A clear and concise description of what the problem is. 
-Ex. I cannot run this docker container as an application package because [...]
+A clear and concise description of what the problem is.
+Ex. I cannot run this docker container as an application package because \[...]
 
 **Describe the solution you'd like**
 A clear and concise description of what you want to happen.

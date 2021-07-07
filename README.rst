@@ -83,9 +83,9 @@ For more details, see `Configuration`_ section.
     :alt: Code Coverage
     :target: https://codecov.io/gh/crim-ca/weaver
 
-.. |codacy| image:: https://api.codacy.com/project/badge/Grade/4f29419c9c91458ea3f0aa6aff11692c
+.. |codacy| image:: https://app.codacy.com/project/badge/Grade/2b340010b41b4401acc9618a437a43b8
     :alt: Codacy Badge
-    :target: https://app.codacy.com/app/fmigneault/weaver?utm_source=github.com&utm_medium=referral&utm_content=crim-ca/weaver&utm_campaign=Badge_Grade_Dashboard
+    :target: https://app.codacy.com/gh/crim-ca/weaver/dashboard
 
 .. |license| image:: https://img.shields.io/github/license/crim-ca/weaver.svg
     :target: https://github.com/crim-ca/weaver/blob/master/LICENSE.txt
