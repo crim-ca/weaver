@@ -104,6 +104,7 @@ class OneOfCaseInsensitive(colander.OneOf):
     """
     Validator that ensures the given value matches one of the available choices, but allowing case insensitive values.
     """
+
     def __call__(self, node, value):
         if str(value).lower() not in (choice.lower() for choice in self.choices):
             return super(OneOfCaseInsensitive, self).__call__(node, value)
@@ -113,6 +114,7 @@ class StringRange(colander.Range):
     """
     Validator that provides the same functionalities as :class:`colander.Range` for a numerical string value.
     """
+
     def __init__(self, min=None, max=None, **kwargs):
         try:
             if isinstance(min, str):
@@ -139,6 +141,7 @@ class SchemeURL(colander.Regex):
         :class:`colander.url` [remote http(s)/ftp(s)]
         :class:`colander.file_uri` [local file://]
     """
+
     def __init__(self, schemes=None, msg=None, flags=re.IGNORECASE):
         if not schemes:
             schemes = [""]
@@ -875,6 +878,7 @@ class PermissiveMappingSchema(ExtendedMappingSchema):
         This class is only a shorthand definition of ``unknown`` keyword for convenience.
         All :class:`colander.MappingSchema` support this natively.
     """
+
     def __init__(self, *args, **kwargs):
         kwargs["unknown"] = "preserve"
         super(PermissiveMappingSchema, self).__init__(*args, **kwargs)
@@ -1509,6 +1513,7 @@ class NotKeywordSchema(KeywordMapper):
 
 class KeywordTypeConverter(TypeConverter):
     """Generic keyword converter that builds schema with a list of sub-schemas under the keyword."""
+
     def convert_type(self, schema_node):
         keyword = schema_node.get_keyword_name()
         keyword_schema = {
@@ -1531,6 +1536,7 @@ class OneOfKeywordTypeConverter(KeywordTypeConverter):
     .. seealso::
         - :class:`OneOfKeywordSchema`
     """
+
     def convert_type(self, schema_node):
         # type: (OneOfKeywordSchema) -> Dict
         keyword = schema_node.get_keyword_name()
@@ -1599,6 +1605,7 @@ class VariableObjectTypeConverter(ObjectTypeConverter):
     Updates the mapping object's ``additionalProperties`` for each ``properties``
     that a marked as :class:`VariableSchemaNode`.
     """
+
     def convert_type(self, schema_node):
         converted = super(VariableObjectTypeConverter, self).convert_type(schema_node)
         converted.setdefault("additionalProperties", {})
