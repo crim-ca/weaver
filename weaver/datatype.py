@@ -823,8 +823,8 @@ class Process(Base):
         # type: () -> Optional[List[Dict[str, Any]]]
         """
         According to `OGC-API`, ``maxOccurs`` and ``minOccurs`` representations should be:
-            ``maxOccurs``: ``int`` or ``"unbounded"``
-            ``minOccurs``: ``int``
+            - ``maxOccurs``: ``int`` or ``"unbounded"``
+            - ``minOccurs``: ``int``
 
         .. note::
             Because of pre-existing/deployed/remote processes, inputs are formated to respect the valid representation.
