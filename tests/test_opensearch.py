@@ -93,10 +93,6 @@ def get_opensearch_payload():
     return load_json_test_file("opensearch_deploy.json")
 
 
-def get_opensearch_process():
-    return Process(load_json_test_file("opensearch_process.json"))
-
-
 def test_transform_execute_parameters_wps():
     def make_input(id_, value):
         input_ = LiteralInput(id_, "", data_type="string")
