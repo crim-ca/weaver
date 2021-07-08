@@ -1393,10 +1393,6 @@ class WpsPackageAppWithS3BucketTest(WpsPackageConfigBase):
                     ]
                 }
             },
-            "hints": {CWL_REQUIREMENT_APP_BUILTIN: {
-                # ensure remote files are downloaded prior to CWL execution
-                "process": self._testMethodName,
-            }},
             "inputs": [
                 # regardless of reference type, they must be fetched as file before CWL call
                 {"id": "input_with_http", "type": "File"},
