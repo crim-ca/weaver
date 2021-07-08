@@ -41,11 +41,8 @@ from weaver.formats import (
     IANA_NAMESPACE,
     get_cwl_file_format
 )
-from weaver.processes.constants import (
-    CWL_REQUIREMENT_APP_BUILTIN,
-    CWL_REQUIREMENT_APP_DOCKER,
-    CWL_REQUIREMENT_INIT_WORKDIR
-)
+
+from weaver.processes.constants import CWL_REQUIREMENT_APP_DOCKER, CWL_REQUIREMENT_INIT_WORKDIR
 from weaver.utils import get_any_value
 
 EDAM_PLAIN = EDAM_NAMESPACE + ":" + EDAM_MAPPING[CONTENT_TYPE_TEXT_PLAIN]
@@ -1561,6 +1558,9 @@ class WpsPackageAppWithS3BucketTest(WpsPackageConfigBase):
             "baseCommand": "echo",
             "arguments": ["$(runtime.outdir)"],
             "requirements": {
+                CWL_REQUIREMENT_APP_DOCKER: {
+                    "dockerPull": "alpine:latest"
+                },
                 CWL_REQUIREMENT_INIT_WORKDIR: {
                     # directly copy files to output dir in order to retrieve them by glob
                     "listing": [
@@ -1569,10 +1569,6 @@ class WpsPackageAppWithS3BucketTest(WpsPackageConfigBase):
                     ]
                 }
             },
-            "hints": {CWL_REQUIREMENT_APP_BUILTIN: {
-                # ensure remote files are downloaded prior to CWL execution
-                "process": self._testMethodName,
-            }},
             "inputs": [
                 # regardless of reference type, they must be fetched as file before CWL call
                 {"id": "input_with_http", "type": "File"},

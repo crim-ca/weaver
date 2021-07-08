@@ -14,6 +14,11 @@
         }
       }
     },
+    "requirements":{
+      "DockerRequirement": {
+        "dockerPull": "alpine:latest"
+      }
+    },
     "outputs": {
       "output": {
         "type": "File"
