@@ -9,9 +9,11 @@
     "rule": "-"
   },
   "plugins": [
+    "remark-gfm",
     "remark-preset-lint-markdown-style-guide",
     "remark-preset-lint-recommended",
     "remark-lint-list-item-content-indent",
+    "remark-lint-checkbox-content-indent",
     ["lint-fenced-code-marker", "`"],
     ["lint-list-item-indent", "mixed"],
     ["lint-maximum-line-length", 120],
