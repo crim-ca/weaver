@@ -10,11 +10,18 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add support for array type as job inputs
+  (relates to `#233 <https://github.com/crim-ca/weaver/issues/233>`_).
+- Remove automatic conversion of falsy/truthy ``string`` and ``integer`` type definitions to ``boolean`` type
+  to align with OpenAPI ``boolean`` type definitions. Non explicit ``boolean`` values will not be automatically
+  converted to ``bool`` anymore. They will require explicit ``false|true`` values.
 
 Fixes:
 ------
-- No change.
+- Fix ``minOccurs`` and ``maxOccurs`` representation according to `OGC-API`
+  (fixes `#263  <https://github.com/crim-ca/weaver/issues/263>`_).
+- Fixed the format of the output file URL. When the prefix ``/`` was not present,
+  URL was incorrectly handled by not prepending the required base URL location.
 
 `3.2.1 <https://github.com/crim-ca/weaver/tree/3.2.1>`_ (2021-06-08)
 ========================================================================

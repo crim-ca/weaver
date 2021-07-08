@@ -741,6 +741,34 @@ class AnyLiteralType(OneOfKeywordSchema):
     ]
 
 
+class SequenceStringType(ExtendedSequenceSchema):
+    value = ExtendedSchemaNode(String())
+
+
+class SequenceBooleanType(ExtendedSequenceSchema):
+    value = ExtendedSchemaNode(Boolean())
+
+
+class SequenceNumberType(ExtendedSequenceSchema):
+    value = ExtendedSchemaNode(Float())
+
+
+class ArrayLiteralType(OneOfKeywordSchema):
+    _one_of = [
+        SequenceNumberType(),
+        SequenceBooleanType(),
+        SequenceStringType()
+    ]
+
+
+class ArrayLiteralDataType(ExtendedMappingSchema):
+    data = ArrayLiteralType()
+
+
+class ArrayLiteralValueType(ExtendedMappingSchema):
+    value = ArrayLiteralType()
+
+
 class AnyLiteralDataType(ExtendedMappingSchema):
     data = AnyLiteralType()
 
@@ -765,7 +793,7 @@ class LiteralDataDomainConstraints(OneOfKeywordSchema, LiteralDataDomainDefiniti
         AllowedValues,
         AllowedRanges,
         ValuesReference,
-        AnyValue,  # must be last because it"s the most permissive (always valid, default)
+        AnyValue,  # must be last because it's the most permissive (always valid, default)
     ]
 
 
@@ -2051,16 +2079,30 @@ class Reference(ExtendedMappingSchema):
     bodyReference = ReferenceURL(missing=drop)
 
 
+class ArrayReference(ExtendedSequenceSchema):
+    item = Reference()
+
+
+class ArrayReferenceValueType(ExtendedMappingSchema):
+    value = ArrayReference()
+
+
 class AnyType(OneOfKeywordSchema):
     """Permissive variants that we attempt to parse automatically."""
     _one_of = [
+        # Array of literal data with 'data' key
+        ArrayLiteralDataType(),
+        # same with 'value' key (OGC specification)
+        ArrayLiteralValueType(),
+        # Array of HTTP references with various keywords
+        ArrayReferenceValueType(),
         # literal data with 'data' key
         AnyLiteralDataType(),
         # same with 'value' key (OGC specification)
         AnyLiteralValueType(),
         # HTTP references with various keywords
         LiteralReference(),
-        Reference(),
+        Reference()
     ]
 
 

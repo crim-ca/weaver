@@ -33,6 +33,7 @@ CWL_REQUIREMENT_APP_TYPES = frozenset([
     CWL_REQUIREMENT_APP_WPS1,
 ])
 CWL_REQUIREMENT_INIT_WORKDIR = "InitialWorkDirRequirement"
+CWL_REQUIREMENT_APP_DOCKER = "DockerRequirement"
 
 # CWL package types and extensions
 PACKAGE_SIMPLE_TYPES = frozenset(["string", "boolean", "float", "int", "integer", "long", "double"])

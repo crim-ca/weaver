@@ -330,8 +330,8 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert expected_process_id in response_json["process"]["id"]
         assert len(response_json["process"]["inputs"]) == 1
         assert response_json["process"]["inputs"][0]["id"] == "input-1"
-        assert response_json["process"]["inputs"][0]["minOccurs"] == "1"
-        assert response_json["process"]["inputs"][0]["maxOccurs"] == "1"
+        assert response_json["process"]["inputs"][0]["minOccurs"] == 1
+        assert response_json["process"]["inputs"][0]["maxOccurs"] == 1
         assert "formats" not in response_json["process"]["inputs"][0]   # literal data doesn't have "formats"
         assert len(response_json["process"]["outputs"]) == 1
         assert response_json["process"]["outputs"][0]["id"] == "output"

@@ -57,6 +57,7 @@ class Base(dict):
     Explicitly overridden ``getter``/``setter`` attributes are called instead of ``dict``-key ``get``/``set``-item
     to ensure corresponding checks and/or value adjustments are executed before applying it to the sub-``dict``.
     """
+
     def __setattr__(self, item, value):
         # use the existing property setter if defined
         prop = getattr(type(self), item)
@@ -821,7 +822,23 @@ class Process(Base):
     @property
     def inputs(self):
         # type: () -> Optional[List[Dict[str, Any]]]
-        return self.get("inputs")
+        """
+        According to `OGC-API`, ``maxOccurs`` and ``minOccurs`` representations should be:
+            - ``maxOccurs``: ``int`` or ``"unbounded"``
+            - ``minOccurs``: ``int``
+
+        .. note::
+            Because of pre-existing/deployed/remote processes, inputs are formated to respect the valid representation.
+        """
+
+        inputs = self.get("inputs")
+        if inputs is not None:
+            for input_ in inputs:
+                input_["minOccurs"] = int(input_["minOccurs"])
+                input_["maxOccurs"] = (
+                    int(input_["maxOccurs"]) if input_["maxOccurs"] != "unbounded" else input_["maxOccurs"]
+                )
+        return inputs
 
     @property
     def outputs(self):
