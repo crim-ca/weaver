@@ -38,7 +38,6 @@ from weaver.formats import (
     get_cwl_file_format
 )
 from weaver.processes.constants import (
-    CWL_REQUIREMENT_APP_BUILTIN,
     CWL_REQUIREMENT_APP_DOCKER,
     CWL_REQUIREMENT_INIT_WORKDIR
 )
