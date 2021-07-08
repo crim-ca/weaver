@@ -273,8 +273,10 @@ install-npm-remarklint: install-npm    ## install remark-lint dependency for 'ch
 		echo "Install required dependencies for Markdown checks." && \
 		npm install --save-dev \
 		 	remark-lint \
+		 	remark-gfm \
 		 	remark-cli \
 		 	remark-lint-maximum-line-length \
+		 	remark-lint-checkbox-content-indent \
 		 	remark-preset-lint-recommended \
 		 	remark-preset-lint-markdown-style-guide \
 	)
