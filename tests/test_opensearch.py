@@ -16,11 +16,7 @@ from pywps.inout.inputs import LiteralInput
 from tests.utils import setup_mongodb_processstore
 from weaver.datatype import Process
 from weaver.processes import opensearch
-from weaver.processes.constants import (
-    OPENSEARCH_AOI,
-    OPENSEARCH_END_DATE,
-    OPENSEARCH_START_DATE
-)
+from weaver.processes.constants import OPENSEARCH_AOI, OPENSEARCH_END_DATE, OPENSEARCH_START_DATE
 from weaver.processes.opensearch import _make_specific_identifier  # noqa: W0212
 from weaver.utils import get_any_id
 from weaver.wps_restapi.processes import processes

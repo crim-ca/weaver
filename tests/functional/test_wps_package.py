@@ -37,10 +37,7 @@ from weaver.formats import (
     IANA_NAMESPACE,
     get_cwl_file_format
 )
-from weaver.processes.constants import (
-    CWL_REQUIREMENT_APP_DOCKER,
-    CWL_REQUIREMENT_INIT_WORKDIR
-)
+from weaver.processes.constants import CWL_REQUIREMENT_APP_DOCKER, CWL_REQUIREMENT_INIT_WORKDIR
 from weaver.utils import get_any_value
 
 EDAM_PLAIN = EDAM_NAMESPACE + ":" + EDAM_MAPPING[CONTENT_TYPE_TEXT_PLAIN]
