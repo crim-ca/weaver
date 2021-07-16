@@ -68,6 +68,8 @@ Fixes:
   (fixes `#263  <https://github.com/crim-ca/weaver/issues/263>`_).
 - Fixed the format of the output file URL. When the prefix ``/`` was not present,
   URL was incorrectly handled by not prepending the required base URL location.
+- Fix ``weaver.datatype`` objects auto-resolution of fields using either attributes (accessed as ``dict``)
+  or properties (accessed as ``class``) to ensure correct handling of additional operations on them.
 
 `3.2.1 <https://github.com/crim-ca/weaver/tree/3.2.1>`_ (2021-06-08)
 ========================================================================
