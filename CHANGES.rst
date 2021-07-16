@@ -10,6 +10,17 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+`3.3.0 <https://github.com/crim-ca/weaver/tree/3.3.0>`_ (2021-07-16)
+========================================================================
+
+Changes:
+--------
 - Add support for array type as job inputs
   (relates to `#233 <https://github.com/crim-ca/weaver/issues/233>`_).
 - Remove automatic conversion of falsy/truthy ``string`` and ``integer`` type definitions to ``boolean`` type
