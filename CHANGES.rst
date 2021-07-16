@@ -10,7 +10,10 @@ Changes
 
 Changes:
 --------
-- No change.
+- Apply conformance updates to align with expected process description schema from
+  `OGC-API - Processes v1.0-draft6 <https://github.com/opengeospatial/ogcapi-processes/tree/1.0-draft.6>`_.
+  The major change introduced in this case is that process description contents will be directly at the root
+  of the object returned by ``/processes/{id}`` endpoint instead of being nested under ``"process"`` field.
 
 Fixes:
 ------
@@ -47,7 +50,7 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Fix copy of headers when generating the WPS clients created for listing providers capabilities and processes.
 
 `3.3.0 <https://github.com/crim-ca/weaver/tree/3.3.0>`_ (2021-07-16)
 ========================================================================
@@ -59,10 +62,6 @@ Changes:
 - Remove automatic conversion of falsy/truthy ``string`` and ``integer`` type definitions to ``boolean`` type
   to align with OpenAPI ``boolean`` type definitions. Non explicit ``boolean`` values will not be automatically
   converted to ``bool`` anymore. They will require explicit ``false|true`` values.
-- Apply conformance updates to align with expected process description schema from
-  `OGC-API - Processes v1.0-draft6 <https://github.com/opengeospatial/ogcapi-processes/tree/1.0-draft.6>`_.
-  The major change introduced in this case is that process description contents will be directly at the root
-  of the object returned by ``/processes/{id}`` endpoint instead of being nested under ``"process"`` field.
 
 Fixes:
 ------
@@ -70,8 +69,6 @@ Fixes:
   (fixes `#263  <https://github.com/crim-ca/weaver/issues/263>`_).
 - Fixed the format of the output file URL. When the prefix ``/`` was not present,
   URL was incorrectly handled by not prepending the required base URL location.
-- Fix ``weaver.datatype`` objects auto-resolution of fields using either attributes (accessed as ``dict``)
-  or properties (accessed as ``class``) to ensure correct handling of additional operations on them.
 
 `3.2.1 <https://github.com/crim-ca/weaver/tree/3.2.1>`_ (2021-06-08)
 ========================================================================
