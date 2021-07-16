@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Transforms a file input into JSON file containing an array of file references as value.
+Transforms a file input into JSON file containing a string array formed of the single input file reference as value.
 """
 import argparse
 import json
