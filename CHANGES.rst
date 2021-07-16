@@ -61,6 +61,8 @@ Changes:
   converted to ``bool`` anymore. They will require explicit ``false|true`` values.
 - Apply conformance updates to align with expected process description schema from
   `OGC-API - Processes v1.0-draft6 <https://github.com/opengeospatial/ogcapi-processes/tree/1.0-draft.6>`_.
+  The major change introduced in this case is that process description contents will be directly at the root
+  of the object returned by ``/processes/{id}`` endpoint instead of being nested under ``"process"`` field.
 
 Fixes:
 ------
