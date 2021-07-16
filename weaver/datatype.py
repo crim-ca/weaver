@@ -1088,7 +1088,8 @@ class Process(Base):
 
     def links(self, container=None):
         # type: (Optional[AnySettingsContainer]) -> JSON
-        """Obtains the JSON links section of many response body for the process.
+        """
+        Obtains the JSON links section of many response body for the process.
 
         :param container: object that helps retrieve instance details, namely the host URL.
         """
