@@ -20,9 +20,9 @@ Changes:
 
 Fixes:
 ------
-- Fix invalid ``python`` reference in ``file2string_array`` process CWL definition.
+- Fix invalid ``python`` reference location in ``file2string_array`` process CWL definition
+  (fixes `#275 <https://github.com/crim-ca/weaver/issues/275>`_).
 - Fix missing ``version`` field definition for ``file2string_array`` process and set it as ``1.0``.
-- Fix python location error in ``file2string_array`` (fixes `#275 <https://github.com/crim-ca/weaver/issues/275>`_).
 
 `3.3.0 <https://github.com/crim-ca/weaver/tree/3.3.0>`_ (2021-07-16)
 ========================================================================
