@@ -2113,14 +2113,84 @@ class Input(InputDataType, AnyType):
     """
 
 
-class InputList(ExtendedSequenceSchema):
-    input = Input(missing=drop, description="Received input definition during job submission.")
+class ExecuteInputString(ExtendedSchemaNode):
+    schema_type = String
+    title = "String input"
+    description = "Execute input string definition."
+    example = "This is a string"
+
+
+class ExecuteInputInteger(ExtendedSchemaNode):
+    schema_type = Integer
+    title = "Integer input"
+    description = "Execute input integer definition."
+    example = 8
+
+
+class ExecuteInputFloat(ExtendedSchemaNode):
+    schema_type = Float
+    title = "Float input"
+    description = "Execute input float definition."
+    example = 2.45
+
+
+class ExecuteInputTypes(OneOfKeywordSchema):
+    title = "Execute inputs types"
+    description = "Execute input supported types."
+    _one_of = [
+        ExecuteInputInteger(summary="Execute input integer value."),
+        ExecuteInputFloat(summary="Execute input float value."),
+        ExecuteInputString(summary="Execute input string value")
+    ]
+
+
+class ExecuteInputValue(OneOfKeywordSchema):
+    _one_of = [
+        ExecuteInputTypes(),
+        ExtendedMappingSchema()
+    ]
+
+
+class ExecuteInputObject(PermissiveMappingSchema):
+    value = ExecuteInputValue(variable="<input-id>")
+    inputBinding = ExtendedMappingSchema(missing=drop, title="Input Binding",
+                                         description="Defines how to specify the input for the command.")
+
+
+class ExecuteInputListValues(ExtendedSequenceSchema):
+    description = "List of allowed direct Execute values."
+    items = ExecuteInputTypes()
+
+
+class ExecuteInputDict(OneOfKeywordSchema):
+    description = "Execute type definition of the input."
+    _one_of = [
+        ExecuteInputTypes(variable="<input-id>"),
+        ExecuteInputListValues(summary="Execute input list."),
+        ExecuteInputObject(summary="Execute input value definition with parameters."),
+    ]
+
+
+class ExecuteInputMap(PermissiveMappingSchema):
+    input_id = ExecuteInputDict(variable="<input-id>", title="ExecuteInputIdentifier",
+                                description="Received mapping input definition during job submission.")
+
+
+class ExecuteInputList(ExtendedSequenceSchema):
+    input = Input(missing=drop, description="Received list input definition during job submission.")
+
+
+class ExecuteInputsDefinition(OneOfKeywordSchema):
+    _one_of = [
+        ExecuteInputList(missing=drop, description="Package inputs defined as items."),
+        ExecuteInputMap(description="Package inputs defined as mapping."),
+    ]
 
 
 class Execute(ExtendedMappingSchema):
     # permit unspecified inputs for processes that could technically allow no-inputs definition (CWL),
     # but very unlikely/unusual in real world scenarios (possible case: constant endpoint fetcher?)
-    inputs = InputList(missing=drop)
+    inputs = ExecuteInputsDefinition()
     outputs = OutputList()
     mode = JobExecuteModeEnum()
     notification_email = ExtendedSchemaNode(
@@ -2720,7 +2790,7 @@ class Result(ExtendedMappingSchema):
 
 
 class JobInputsSchema(ExtendedMappingSchema):
-    inputs = InputList()
+    inputs = ExecuteInputList()
     links = LinkList(missing=drop)
 
 

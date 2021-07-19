@@ -111,9 +111,15 @@ def execute_process(self, job_id, url, headers=None):
 
         try:
             wps_inputs = list()
-            for process_input in job.inputs:
-                input_id = get_any_id(process_input)
-                process_value = get_any_value(process_input)
+            # parse both dict and list type inputs
+            job_inputs = job.inputs.items() if isinstance(job.inputs, dict) else job.inputs
+            for process_input in job_inputs:
+                if isinstance(process_input, tuple):
+                    input_id = process_input[0]
+                    process_value = process_input[1]
+                else:
+                    input_id = get_any_id(process_input)
+                    process_value = get_any_value(process_input)
                 # in case of array inputs, must repeat (id,value)
                 input_values = process_value if isinstance(process_value, list) else [process_value]
 

@@ -1055,10 +1055,11 @@ class WpsPackageAppTest(WpsPackageConfigBase):
                 {"id": "test_float_array", "value": [10.03, 20.03, 30.03, 40.03, 50.03]},
                 {"id": "test_string_array", "value": ["this", "is", "a", "test"]},
                 {"id": "test_reference_array",
-                 "value": [{"href": test_file_ref},
-                           {"href": test_http_ref},
-                           {"href": test_bucket_ref}
-                           ]
+                    "value": [
+                        {"href": test_file_ref},
+                        {"href": test_http_ref},
+                        {"href": test_bucket_ref}
+                    ]
                  },
                 {"id": "test_int_value", "value": 2923},
                 {"id": "test_float_value", "value": 389.73},
@@ -1104,6 +1105,132 @@ class WpsPackageAppTest(WpsPackageConfigBase):
         assert processed_values["test_reference_s3_value"] == "THIS IS A GENERATED FILE FOR S3 TEST"
         assert processed_values["test_reference_http_value"] == "THIS IS A GENERATED FILE FOR HTTP TEST"
         assert processed_values["test_reference_file_value"] == "THIS IS A GENERATED FILE FOR FILE TEST"
+
+    def test_execute_job_with_inline_input_values(self):
+        """
+        Validates that the job can receive an object and array types inputs and process them as expected.
+        """
+        cwl = {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "baseCommand": ["python3", "script.py"],
+            "inputs": {
+                "stringInput": "string",
+                "integerInput": "int",
+                "doubleInput": "float",
+                "stringArrayInput": {"type": {"type": "array", "items": "string"}},
+                "integerArrayInput": {"type": {"type": "array", "items": "int"}},
+                "floatArrayInput": {"type": {"type": "array", "items": "float"}},
+                "measureStringInput": "string",
+                "measureIntegerInput": "int",
+                "measureFloatInput": "float",
+                "measureFileInput": "File"
+            },
+            "requirements": {
+                CWL_REQUIREMENT_APP_DOCKER: {
+                    "dockerPull": "python:3.7-alpine"
+                },
+                CWL_REQUIREMENT_INIT_WORKDIR: {
+                    "listing": [
+                        {
+                            "entryname": "script.py",
+                            "entry": cleandoc("""
+                                import json
+                                import os
+                                import ast
+                                input = $(inputs)
+                                for key,value in input.items():
+                                    if isinstance(value, dict):
+                                        path_ = value.get('path')
+                                        if path_ and os.path.exists(path_):
+                                            with open (path_, 'r') as file_:
+                                                filedata = file_.read()
+                                            input[key] = ast.literal_eval(filedata.upper())
+                                json.dump(input, open("./tmp.txt","w"))
+                                """)
+                        }
+                    ]
+                }
+            },
+            "outputs": [{"id": "output_test", "type": "File", "outputBinding": {"glob": "tmp.txt"}}],
+        }
+        body = {
+            "processDescription": {
+                "process": {
+                    "id": self._testMethodName,
+                    "title": "some title",
+                    "abstract": "this is a test",
+                },
+            },
+            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "executionUnit": [{"unit": cwl}],
+        }
+        try:
+            desc, _ = self.deploy_process(body)
+        except colander.Invalid:
+            self.fail("Test")
+
+        assert desc["process"] is not None
+        json.dump({"value": {"ref": 1, "measurement": 10.3, "uom": "m"}}, open("/tmp/input_tmp.txt", "w"))
+
+        exec_body = {
+            "mode": EXECUTE_MODE_ASYNC,
+            "response": EXECUTE_RESPONSE_DOCUMENT,
+            "inputs": {
+                "stringInput": "stringtest",
+                "integerInput": 10,
+                "doubleInput": 3.14159,
+                "stringArrayInput": ["1", "2", "3", "4", "5", "6"],
+                "integerArrayInput": [1, 2, 3, 4, 5, 6],
+                "floatArrayInput": [1.45, 2.65, 3.5322, 4.86, 5.57, 6.02],
+                "measureStringInput": {
+                    "value": "this is a test"
+                },
+                "measureIntegerInput": {
+                    "value": 45
+                },
+                "measureFloatInput": {
+                    "value": 10.2
+                },
+                "measureFileInput": {
+                    "href": "file:///tmp/input_tmp.txt"
+                }
+            },
+            "outputs": [
+                {"id": "output_test", "type": "File"},
+            ]
+        }
+
+        with contextlib.ExitStack() as stack_exec:
+            for mock_exec in mocked_execute_process():
+                stack_exec.enter_context(mock_exec)
+            proc_url = "/processes/{}/jobs".format(self._testMethodName)
+            resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
+                                       data=exec_body, headers=self.json_headers, only_local=True)
+            assert resp.status_code in [200, 201], "Failed with: [{}]\nReason:\n{}".format(resp.status_code, resp.json)
+            status_url = resp.json.get("location")
+
+        results = self.monitor_job(status_url)
+
+        job_output_file = results.get("output_test")["href"].split("/", 3)[-1]
+        tmpfile = "{}/{}".format(self.settings["weaver.wps_output_dir"], job_output_file)
+
+        try:
+            processed_values = json.load(open(tmpfile, "r"))
+        except FileNotFoundError:
+            self.fail("Output file [{}] was not found where it was expected to resume test".format(tmpfile))
+        except Exception as exception:
+            self.fail("An error occured during the reading of the file: {}".format(exception))
+        assert processed_values["stringInput"] == "stringtest"
+        assert processed_values["integerInput"] == 10
+        assert processed_values["doubleInput"] == 3.14159
+        assert processed_values["stringArrayInput"] == ["1", "2", "3", "4", "5", "6"]
+        assert processed_values["integerArrayInput"] == [1, 2, 3, 4, 5, 6]
+        assert processed_values["floatArrayInput"] == [1.45, 2.65, 3.5322, 4.86, 5.57, 6.02]
+        assert processed_values["measureStringInput"] == "this is a test"
+        assert processed_values["measureIntegerInput"] == 45
+        assert processed_values["measureFloatInput"] == 10.2
+        assert processed_values["measureFileInput"] == {"VALUE": {"REF": 1, "MEASUREMENT": 10.3, "UOM": "M"}}
 
     # FIXME: test not working
     #   same payloads sent directly to running weaver properly raise invalid schema -> bad request error
