@@ -112,7 +112,7 @@ def execute_process(self, job_id, url, headers=None):
         try:
             wps_inputs = list()
             # parse both dict and list type inputs
-            job_inputs = job.inputs.items() if isinstance(job.inputs, dict) else job.inputs
+            job_inputs = job.inputs.items() if isinstance(job.inputs, dict) else job.get("inputs", [])
             for process_input in job_inputs:
                 if isinstance(process_input, tuple):
                     input_id = process_input[0]

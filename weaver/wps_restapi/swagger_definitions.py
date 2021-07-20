@@ -2190,7 +2190,7 @@ class ExecuteInputsDefinition(OneOfKeywordSchema):
 class Execute(ExtendedMappingSchema):
     # permit unspecified inputs for processes that could technically allow no-inputs definition (CWL),
     # but very unlikely/unusual in real world scenarios (possible case: constant endpoint fetcher?)
-    inputs = ExecuteInputsDefinition()
+    inputs = ExecuteInputsDefinition(missing=drop)
     outputs = OutputList()
     mode = JobExecuteModeEnum()
     notification_email = ExtendedSchemaNode(
