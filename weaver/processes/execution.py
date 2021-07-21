@@ -430,7 +430,9 @@ def submit_job_handler(payload,             # type: JSON
         job_id=job.id)
     body_data = {
         "jobID": job.id,
+        "processID": job.process,
         "status": map_status(STATUS_ACCEPTED),
         "location": location
     }
+    body_data = body_data.update({"providerId": provider_id}) if provider_id else body_data
     return body_data
