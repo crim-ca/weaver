@@ -684,7 +684,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         assert resp.status_code == 422
 
     def test_job_status_response(self):
-        """ Verify the processID value in the job status response """
+        """Verify the processID value in the job status response"""
         body = {
             "outputs": [],
             "mode": EXECUTE_MODE_ASYNC,
