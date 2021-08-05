@@ -184,7 +184,7 @@ class BuiltinAppTest(WpsPackageConfigBase):
         assert os.path.isfile(real_path)
         with open(real_path, "r") as f:
             out_data = json.load(f)
-        assert out_data == {"output": [tmp_file]}
+        assert out_data == [tmp_file]
 
         # if everything was valid for results, validate equivalent but differently formatted outputs response
         output_url = job_url + "/outputs"
