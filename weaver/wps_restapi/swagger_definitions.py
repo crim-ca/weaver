@@ -2177,7 +2177,7 @@ class ExecuteInputMap(PermissiveMappingSchema):
 
 
 class ExecuteInputList(ExtendedSequenceSchema):
-    input = Input(missing=drop, description="Received list input definition during job submission.")
+    input_item = Input(missing=drop, description="Received list input definition during job submission.")
 
 
 class ExecuteInputsDefinition(OneOfKeywordSchema):

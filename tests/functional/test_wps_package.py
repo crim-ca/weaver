@@ -1171,7 +1171,8 @@ class WpsPackageAppTest(WpsPackageConfigBase):
             self.fail("Test")
 
         assert desc["process"] is not None
-        json.dump({"value": {"ref": 1, "measurement": 10.3, "uom": "m"}}, open("/tmp/input_tmp.txt", "w"))
+        with open("/tmp/input_tmp.txt", "w") as f:
+            json.dump({"value": {"ref": 1, "measurement": 10.3, "uom": "m"}}, f)
 
         exec_body = {
             "mode": EXECUTE_MODE_ASYNC,
@@ -1216,7 +1217,8 @@ class WpsPackageAppTest(WpsPackageConfigBase):
         tmpfile = "{}/{}".format(self.settings["weaver.wps_output_dir"], job_output_file)
 
         try:
-            processed_values = json.load(open(tmpfile, "r"))
+            with open(tmpfile, "r") as f:
+                processed_values = json.load(f)
         except FileNotFoundError:
             self.fail("Output file [{}] was not found where it was expected to resume test".format(tmpfile))
         except Exception as exception:
