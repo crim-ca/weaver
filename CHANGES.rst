@@ -26,6 +26,8 @@ Changes:
 - Remove automatic conversion of falsy/truthy ``string`` and ``integer`` type definitions to ``boolean`` type
   to align with OpenAPI ``boolean`` type definitions. Non explicit ``boolean`` values will not be automatically
   converted to ``bool`` anymore. They will require explicit ``false|true`` values.
+- Add missing processID detail in job status info response 
+  (relates to `#270 <https://github.com/crim-ca/weaver/issues/270>`_).
 
 Fixes:
 ------
