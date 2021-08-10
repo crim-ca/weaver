@@ -1028,19 +1028,19 @@ class WpsPackageAppTest(WpsPackageConfigBase):
 
         assert desc["process"] is not None
 
-        test_bucket_ref = mocked_aws_s3_bucket_test_file(
+        test_bucket_ref, _ = mocked_aws_s3_bucket_test_file(
             "wps-process-test-bucket",
             "input_file_s3.txt",
             "This is a generated file for s3 test"
         )
 
-        test_http_ref = mocked_reference_test_file(
+        test_http_ref, _ = mocked_reference_test_file(
             "input_file_http.txt",
             "http",
             "This is a generated file for http test"
         )
 
-        test_file_ref = mocked_reference_test_file(
+        test_file_ref, _ = mocked_reference_test_file(
             "input_file_ref.txt",
             "file",
             "This is a generated file for file test"
@@ -1596,7 +1596,7 @@ class WpsPackageAppWithS3BucketTest(WpsPackageConfigBase):
         input_file_s3 = "input-s3.txt"
         input_file_http = "media-types.txt"  # use some random HTTP location that actually exists (will be fetched)
         test_http_ref = "https://www.iana.org/assignments/media-types/{}".format(input_file_http)
-        test_bucket_ref = mocked_aws_s3_bucket_test_file("wps-process-test-bucket", input_file_s3)
+        test_bucket_ref, _ = mocked_aws_s3_bucket_test_file("wps-process-test-bucket", input_file_s3)
         exec_body = {
             "mode": EXECUTE_MODE_ASYNC,
             "response": EXECUTE_RESPONSE_DOCUMENT,

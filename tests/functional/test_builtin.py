@@ -5,9 +5,16 @@ import tempfile
 from typing import TYPE_CHECKING
 
 import pytest
+import mock
 
 from tests.functional.utils import WpsPackageConfigBase
-from tests.utils import get_settings_from_testapp, mocked_execute_process, mocked_sub_requests
+from tests.utils import (
+    get_settings_from_testapp,
+    mocked_execute_process,
+    mocked_http_file,
+    mocked_reference_test_file,
+    mocked_sub_requests
+)
 from weaver.execute import EXECUTE_TRANSMISSION_MODE_REFERENCE
 from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_NETCDF
 from weaver.processes.builtin import register_builtin_processes
@@ -137,19 +144,15 @@ class BuiltinAppTest(WpsPackageConfigBase):
         assert len(resp.json["process"]["outputs"][0]["formats"]) == 1
         assert resp.json["process"]["outputs"][0]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_JSON  # important here
 
-    def test_file2string_array_execute(self):
-        tmp_file = None
-        dirname = tempfile.gettempdir()
+    # FIXME: must simulate otherwise tmp-file gets fetched and copied to pywps dir, changing output content (wrong path)
+    @mock.patch("weaver.processes.wps_package.WpsPackage.must_fetch", return_value=False)
+    def test_file2string_array_execute(self, __mock):
+        fake_href = "https://random-server.com/fake-data.txt"
         with contextlib.ExitStack() as stack_exec:
-            tmp_text = tempfile.NamedTemporaryFile(dir=dirname, mode="w", suffix=".txt")
-            tmp_text = stack_exec.enter_context(tmp_text)  # noqa
-            tmp_text.write("Hello World!")
-            tmp_text.seek(0)
-            tmp_file = tmp_text.name
             data = {
                 "mode": "async",
                 "response": "document",
-                "inputs": [{"id": "input", "href": tmp_file}],
+                "inputs": [{"id": "input", "href": fake_href}],
                 "outputs": [{"id": "output", "transmissionMode": EXECUTE_TRANSMISSION_MODE_REFERENCE}],
             }
 
@@ -184,7 +187,7 @@ class BuiltinAppTest(WpsPackageConfigBase):
         assert os.path.isfile(real_path)
         with open(real_path, "r") as f:
             out_data = json.load(f)
-        assert out_data == [tmp_file]
+        assert out_data == [fake_href]
 
         # if everything was valid for results, validate equivalent but differently formatted outputs response
         output_url = job_url + "/outputs"
