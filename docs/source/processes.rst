@@ -187,9 +187,9 @@ The difference lies within the referenced :ref:`Application Package` which uses 
 typical :ref:`CWL CommandLineTool`, and therefore, modifies how the process is internally executed.
 
 For ``Workflow`` processes to be deploy-able and executable, it is **mandatory** that `Weaver` is configured as
-:term:`EMS` (see: :ref:`Configuration Settings`). This requirement is due to the nature of workflows that chain
-processes that need to be dispatched to known remote :term:`ADES` servers (see: :ref:`Configuration of Data Sources`
-and `Workflow Operations`_).
+:term:`EMS` or :term:`HYBRID` (see: :ref:`Configuration Settings`). This requirement is due to the nature of workflows
+that chain processes that need to be dispatched to known remote :term:`ADES` servers
+(see: :ref:`Configuration of Data Sources` and `Workflow Operations`_).
 
 Given that a ``Workflow`` process was successfully deployed and that all process steps can be resolved, calling
 its `Execute`_ request will tell `Weaver` to parse the chain of operations and send step process execution requests
@@ -206,7 +206,7 @@ with the appropriate step and message where the error occurred.
     to dispatch the step in this situation. If this impacts you, please vote and indicate your concern on issue
     `#171 <https://github.com/crim-ca/weaver/issues/171>`_.
 
-.. _remote-provider:
+.. _process-remote-provider:
 
 Remote Provider
 --------------------
@@ -256,7 +256,7 @@ An example body of the `register provider`_ request could be as follows:
     }
 
 
-Then, processes of this registered `remote-provider`_ will be accessible. For example, if the referenced service by
+Then, processes of this registered :ref:`remote-provider` will be accessible. For example, if the referenced service by
 the above URL add a WPS process identified by ``my-process``, its JSON description would be obtained with following
 request (`DescribeProviderProcess`_):
 
@@ -524,35 +524,57 @@ the corresponding column can be substituted for a given row when applied with co
 to same operational behaviour. Elements that behave similarly are also presented together in rows to reduce displayed
 combinations.
 
-+-----------+-------------------------------+---------------+-------------------------------------------+
-| |cfg|     | Process Type                  | File Scheme   | Applied Operation                         |
-+===========+===============================+===============+===========================================+
-| *<any>*   | *<any>*                       | |os_scheme|   | Query and re-process [#openseach]_        |
-+-----------+-------------------------------+---------------+-------------------------------------------+
-| `ADES`    | - `WPS-1/2`_                  | |file_scheme| | Convert to |http_scheme| [#file2http]_    |
-|           | - `ESGF-CWT`_                 +---------------+-------------------------------------------+
-|           | - `WPS-REST`_ [#wps3]_        | |http_scheme| | Nothing (left unmodified)                 |
-|           | - `remote-provider`_          +---------------+-------------------------------------------+
-|           |                               | |s3_scheme|   | Fetch and convert to |http_scheme| [#s3]_ |
-|           +-------------------------------+---------------+-------------------------------------------+
-|           | `WPS-REST`_ (`CWL`) [#wps3]_  | |file_scheme| | Nothing (file already local)              |
-|           |                               +---------------+-------------------------------------------+
-|           |                               | |http_scheme| | Fetch and convert to |file_scheme|        |
-|           |                               +---------------+                                           |
-|           |                               | |s3_scheme|   |                                           |
-+-----------+-------------------------------+---------------+-------------------------------------------+
-| `EMS`     | - *<any>*                     | |file_scheme| | Convert to |http_scheme| [#file2http]_    |
-|           | - `Workflow`_ (`CWL`) [#wf]_  +---------------+-------------------------------------------+
-|           |                               | |http_scheme| | Nothing (left unmodified)                 |
-|           |                               +---------------+                                           |
-|           |                               | |s3_scheme|   |                                           |
-+-----------+-------------------------------+---------------+-------------------------------------------+
++-----------+-------------------------------------------+---------------+-------------------------------------------+
+| |cfg|     | Process Type                              | File Scheme   | Applied Operation                         |
++===========+===========================================+===============+===========================================+
+| |any|     | |any|                                     | |os_scheme|   | Query and re-process [#openseach]_        |
++-----------+-------------------------------------------+---------------+-------------------------------------------+
+| |ADES|    | - `WPS-1/2`_                              | |file_scheme| | Convert to |http_scheme| [#file2http]_    |
+|           | - `ESGF-CWT`_                             +---------------+-------------------------------------------+
+|           | - `WPS-REST`_ (remote) [#wps3]_           | |http_scheme| | Nothing (unmodified)                      |
+|           | - :ref:`remote-provider`                  +---------------+-------------------------------------------+
+|           |                                           | |s3_scheme|   | Fetch and convert to |http_scheme| [#s3]_ |
+|           +-------------------------------------------+---------------+-------------------------------------------+
+|           | - `WPS-REST`_ (`CWL`) [#wps3]_            | |file_scheme| | Nothing (file already local)              |
+|           |                                           +---------------+-------------------------------------------+
+|           |                                           | |http_scheme| | Fetch and convert to |file_scheme|        |
+|           |                                           +---------------+                                           |
+|           |                                           | |s3_scheme|   |                                           |
++-----------+-------------------------------------------+---------------+-------------------------------------------+
+| |EMS|     | - |any| (types listed above for |ADES|)   | |file_scheme| | Convert to |http_scheme| [#file2http]_    |
+|           | - `Workflow`_ (`CWL`) [#wf]_              +---------------+-------------------------------------------+
+|           |                                           | |http_scheme| | Nothing (unmodified, step will handle it) |
+|           |                                           +---------------+                                           |
+|           |                                           | |s3_scheme|   |                                           |
++-----------+-------------------------------------------+---------------+-------------------------------------------+
+| |HYBRID|  | |HYBRID| assumes |ADES| role (remote):    | |file_scheme| | Convert to |http_scheme| [#file2http]_    |
+|           | - `WPS-1/2`_                              +---------------+-------------------------------------------+
+|           | - `ESGF-CWT`_                             | |http_scheme| | Nothing (unmodified)                      |
+|           | - `WPS-REST`_ (remote) [#wps3]_           +---------------+-------------------------------------------+
+|           | - :ref:`remote-provider`                  | |s3_scheme|   | Fetch and convert to |http_scheme| [#s3]_ |
+|           +-------------------------------------------+---------------+-------------------------------------------+
+|           | |HYBRID| assumes |ADES| role (local):     | |file_scheme| | Nothing (unmodified)                      |
+|           | - `WPS-REST`_ (`CWL`) [#wps3]_            +---------------+-------------------------------------------+
+|           |                                           | |http_scheme| | Fetch and convert to |file_scheme|        |
+|           |                                           +---------------+                                           |
+|           |                                           | |s3_scheme|   |                                           |
+|           +-------------------------------------------+---------------+-------------------------------------------+
+|           | |HYBRID| assumes |EMS| role:              | |file_scheme| | Convert to |http_scheme| [#file2http]_    |
+|           | - `Workflow`_ (`CWL`) [#wf]_              +---------------+-------------------------------------------+
+|           |                                           | |http_scheme| | Nothing (unmodified, step will handle it) |
+|           |                                           +---------------+                                           |
+|           |                                           | |s3_scheme|   |                                           |
++-----------+-------------------------------------------+---------------+-------------------------------------------+
 
+.. |any| replace:: *<any>*
 .. |cfg| replace:: Configuration
 .. |os_scheme| replace:: ``opensearchfile://``
 .. |http_scheme| replace:: ``http(s)://``
 .. |s3_scheme| replace:: ``s3://``
 .. |file_scheme| replace:: ``file://``
+.. |ADES| replace:: :term:`ADES`
+.. |EMS| replace:: :term:`EMS`
+.. |HYBRID| replace:: :term:`HYBRID`
 
 .. rubric:: Footnotes
 
@@ -568,11 +590,11 @@ combinations.
 
 .. [#wps3]
     When the process refers to a remote :ref:`WPS-REST` process (i.e.: remote :term:`WPS` instance that supports
-    REST bindings but that is not necessarily an :term:`ADES`), `Weaver` simply *wraps* and monitor its remote
+    REST bindings but that is not necessarily an :term:`ADES`), `Weaver` simply *wraps* and monitors its remote
     execution, therefore files are handled just as for any other type of remote :term:`WPS`-like servers. When the
-    process contains an actual :term:`CWL` :ref:`Application Package` that defines a ``CommandLineTool``
-    (including :term:`Docker` images), files are fetched as it will be executed locally. See :ref:`CWL CommandLineTool`,
-    :ref:`WPS-REST` and :ref:`Remote Providers` for further details.
+    process contains an actual :term:`CWL` :ref:`Application Package` that defines a ``CommandLineTool`` class
+    (including applications with :term:`Docker` image requirement), files are fetched as it will be executed locally.
+    See :ref:`CWL CommandLineTool`, :ref:`WPS-REST` and :ref:`Remote Providers` for further details.
 
 .. [#s3]
     When an ``s3://`` file is fetched, is gets downloaded to a temporary ``file://`` location, which is **NOT**
@@ -580,8 +602,9 @@ combinations.
     support :term:`S3` references, only then the file gets converted as in [#file2http]_.
 
 .. [#wf]
-    Workflows are only available on :term:`EMS` instances. Since they chain processes, no fetch is needed as the first
-    sub-step process will do it instead. See :ref:`Workflow` process as well as :ref:`CWL Workflow` for more details.
+    Workflows are only available on :term:`EMS` and :term:`HYBRID` instances. Since they chain processes,
+    no fetch is needed as the sub-step process will do it instead as needed. See :ref:`Workflow` process as well
+    as :ref:`CWL Workflow` for more details.
 
 .. todo::
     method to indicate explicit fetch to override these? (https://github.com/crim-ca/weaver/issues/183)

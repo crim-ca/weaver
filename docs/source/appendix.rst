@@ -10,7 +10,8 @@ Glossary
 
     ADES
         | |ades|
-        | See :ref:`processes` section for details, as well as :term:`EMS` for alternative operation mode.
+        | See :ref:`processes` section for details.
+          Alternative operation modes are described in :ref:`Configuration Settings`.
 
     Application Package
         General term that refers to *"what and how the :term:`Process` will execute"*. Application Packages provide
@@ -39,8 +40,8 @@ Glossary
 
     EMS
         | |ems|
-        | See :ref:`processes` section for details. Alternative mode is :term:`ADES`, which can be selected as defined
-          by the appropriate :ref:`Configuration` parameter.
+        | See :ref:`processes` section for details.
+          Alternative operation modes are described in :ref:`Configuration Settings`.
 
     ESGF
         |esgf|_
@@ -53,6 +54,11 @@ Glossary
         | Often shortened to simply `reference`. Represents either a locally or remotely accessible item, such as a
           file or a :term:`Process` depending on context, that uses explicit ``<protocol>://<host/path>``
           representation to define its location. See also :ref:`File Reference Types` for typical examples.
+
+    HYBRID
+        | Combination of :term:`ADES` and :term:`EMS` operation modes.
+        | See :ref:`processes` section for details.
+          Alternative operation modes are described in :ref:`Configuration Settings`.
 
     I/O
         Inputs and/or Outputs of CWL and/or WPS depending on context.
