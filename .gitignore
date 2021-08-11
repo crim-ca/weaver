@@ -53,6 +53,9 @@ testdata.json
 .pydevproject
 .settings
 
+## VS Code
+*.vscode
+
 ## PyCharm
 *.idea
 
