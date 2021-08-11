@@ -682,3 +682,20 @@ class WpsRestApiJobsTest(unittest.TestCase):
         path = get_path_kvp(sd.jobs_service.path, datetime=datetime_before)
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 422
+
+    def test_job_status_response(self):
+        """Verify the processID value in the job status response"""
+        body = {
+            "outputs": [],
+            "mode": EXECUTE_MODE_ASYNC,
+            "response": EXECUTE_RESPONSE_DOCUMENT,
+        }
+        with contextlib.ExitStack() as stack:
+            for runner in mocked_process_job_runner():
+                stack.enter_context(runner)
+            path = "/processes/{}/jobs".format(self.process_public.identifier)
+            resp = self.app.post_json(path, params=body, headers=self.json_headers)
+            assert resp.status_code == 201
+            assert resp.content_type == CONTENT_TYPE_APP_JSON
+
+        assert resp.json["processID"] == "process-public"

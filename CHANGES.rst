@@ -10,6 +10,8 @@ Changes
 
 Changes:
 --------
+- Add missing processID detail in job status info response 
+  (relates to `#270 <https://github.com/crim-ca/weaver/issues/270>`_).
 - Add support for inputs under mapping for inline values and arrays in process execution
   (relates to `#265 <https://github.com/crim-ca/weaver/issues/265>`_).
 
