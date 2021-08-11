@@ -659,7 +659,7 @@ class WpsPackage(Process):
     log_file = None                 # type: Optional[str]
     log_level = None                # type: Optional[int]
     logger = None                   # type: Optional[logging.Logger]
-    step_packages = None            # type: Optional[List[CWL]]
+    step_packages = None            # type: Optional[Dict[str, str]]
     step_launched = None            # type: Optional[List[str]]
     request = None                  # type: Optional[WPSRequest]
     response = None                 # type: Optional[ExecuteResponse]
