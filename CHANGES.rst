@@ -27,8 +27,6 @@ Changes:
 - Remove automatic conversion of falsy/truthy ``string`` and ``integer`` type definitions to ``boolean`` type
   to align with OpenAPI ``boolean`` type definitions. Non explicit ``boolean`` values will not be automatically
   converted to ``bool`` anymore. They will require explicit ``false|true`` values.
-- Add support for inputs under mapping for inline values and arrays in process execution
-  (relates to `#265 <https://github.com/crim-ca/weaver/issues/265>`_).
 
 Fixes:
 ------
