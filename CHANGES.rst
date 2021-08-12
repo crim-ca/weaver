@@ -14,14 +14,14 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Fix copy of headers when generating the WPS clients created for listing providers capabilities and processes.
 
 `3.4.0 <https://github.com/crim-ca/weaver/tree/3.4.0>`_ (2021-08-11)
 ========================================================================
 
 Changes:
 --------
-- Add missing processID detail in job status info response 
+- Add missing processID detail in job status info response
   (relates to `#270 <https://github.com/crim-ca/weaver/issues/270>`_).
 - Add support for inputs under mapping for inline values and arrays in process execution
   (relates to `#265 <https://github.com/crim-ca/weaver/issues/265>`_).

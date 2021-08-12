@@ -182,7 +182,9 @@ def get_wps_client(url, container=None, verify=None, headers=None, language=None
         headers = headers or {}
     # remove invalid values that should be recomputed by the client as needed
     # employ the provided headers instead of making new ones in order to forward any language/authorization definition
-    headers = deepcopy(headers)  # don't modify original headers for sub-requests for next steps that could use them
+    # copy to avoid modify original headers for sub-requests for next steps that could use them
+    # employ dict() rather than deepcopy since headers that can be an instance of EnvironHeaders cannot be serialized
+    headers = dict(headers)
     for header in ["Accept", "Content-Length", "Content-Type", "Content-Transfer-Encoding"]:
         hdr_low = header.lower()
         for hdr in [header, hdr_low, header.replace("-", "_"), hdr_low.replace("-", "_")]:
