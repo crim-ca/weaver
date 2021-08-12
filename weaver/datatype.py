@@ -875,12 +875,13 @@ class Process(Base):
     @property
     def jobControlOptions(self):  # noqa: N802
         # type: () -> List[str]
-        self.setdefault("jobControlOptions", [EXECUTE_CONTROL_OPTION_ASYNC])
-        if not isinstance(self["jobControlOptions"], list):  # eg: None, bw-compat
-            self["jobControlOptions"] = [EXECUTE_CONTROL_OPTION_ASYNC]
-        self["jobControlOptions"] = [mode for mode in self["jobControlOptions"] if mode in EXECUTE_CONTROL_OPTIONS]
-        if len(self["jobControlOptions"]) == 0:
-            self["jobControlOptions"].append(EXECUTE_CONTROL_OPTION_ASYNC)
+        jco = self.setdefault("jobControlOptions", [EXECUTE_CONTROL_OPTION_ASYNC])
+        if not isinstance(jco, list):  # eg: None, bw-compat
+            jco = [EXECUTE_CONTROL_OPTION_ASYNC]
+        jco = [mode for mode in jco if mode in EXECUTE_CONTROL_OPTIONS]
+        if len(jco) == 0:
+            jco.append(EXECUTE_CONTROL_OPTION_ASYNC)
+        self["jobControlOptions"] = jco
         return dict.__getitem__(self, "jobControlOptions")
 
     @property
