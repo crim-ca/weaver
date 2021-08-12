@@ -2,6 +2,7 @@
 Definitions of types used by tokens.
 """
 import copy
+import inspect
 import traceback
 import uuid
 import warnings
@@ -15,8 +16,11 @@ from owslib.wps import Process as ProcessOWS, WPSException
 from pywps import Process as ProcessWPS
 
 from weaver.exceptions import ProcessInstanceError
-from weaver.execute import EXECUTE_CONTROL_OPTION_ASYNC, EXECUTE_CONTROL_OPTIONS
-from weaver.formats import ACCEPT_LANGUAGE_EN_US, CONTENT_TYPE_APP_JSON
+from weaver.execute import (
+    EXECUTE_CONTROL_OPTION_ASYNC,
+    EXECUTE_CONTROL_OPTIONS,
+    EXECUTE_TRANSMISSION_MODE_REFERENCE
+)
 from weaver.processes.convert import ows2json, wps2json_io
 from weaver.processes.types import (
     PROCESS_APPLICATION,
@@ -59,22 +63,24 @@ class Base(dict):
     """
 
     def __setattr__(self, item, value):
-        # use the existing property setter if defined
+        """
+        Uses an existing property setter if defined in the subclass or employs the default dictionary setter otherwise.
+        """
         prop = getattr(type(self), item)
         if isinstance(prop, property) and prop.fset is not None:
             prop.fset(self, value)  # noqa
-        elif item in self:
-            self[item] = value
         else:
-            raise AttributeError("Can't set attribute '{}'.".format(item))
+            super(Base, self).__setitem__(item, value)
 
-    def __getattr__(self, item):
-        # use existing property getter if defined
+    def __getitem__(self, item):
+        """
+        Uses an existing property getter if defined in the subclass or employs the default dictionary getter otherwise.
+        """
         prop = getattr(type(self), item)
         if isinstance(prop, property) and prop.fget is not None:
-            return prop.fget(self, item)  # noqa
+            return prop.fget(self)  # noqa
         elif item in self:
-            return self[item]
+            return getattr(self, item, None)
         else:
             raise AttributeError("Can't get attribute '{}'.".format(item))
 
@@ -118,6 +124,20 @@ class Base(dict):
         """
         raise NotImplementedError("Method 'params' must be defined for storage item representation.")
 
+    def dict(self):
+        """
+        Generate a dictionary representation of the object, but with inplace resolution of attributes as applicable.
+        """
+        # update any entries by key with their attribute
+        _dict = {key: getattr(self, key, dict.__getitem__(self, key)) for key, val in self.items()}
+        # then, ensure any missing key gets added if a getter property exists for it
+        props = {prop[0] for prop in inspect.getmembers(self) if not prop[0].startswith("_") and prop[0] not in _dict}
+        for key in props:
+            prop = getattr(type(self), key)
+            if isinstance(prop, property) and prop.fget is not None:
+                _dict[key] = prop.fget(self)  # noqa
+        return _dict
+
 
 class Service(Base):
     """
@@ -138,12 +158,12 @@ class Service(Base):
     @property
     def url(self):
         """Service URL."""
-        return self["url"]
+        return dict.__getitem__(self, "url")
 
     @property
     def name(self):
         """Service name."""
-        return self["name"]
+        return dict.__getitem__(self, "name")
 
     @property
     def type(self):
@@ -364,7 +384,7 @@ class Job(Base):
         # type: () -> List[Optional[Dict[str, Any]]]
         if self.get("inputs") is None:
             self["inputs"] = list()
-        return self["inputs"]
+        return dict.__getitem__(self, "inputs")
 
     def _set_inputs(self, inputs):
         # type: (List[Optional[Dict[str, Any]]]) -> None
@@ -560,7 +580,7 @@ class Job(Base):
         # type: () -> List[Optional[Dict[str, Any]]]
         if self.get("results") is None:
             self["results"] = list()
-        return self["results"]
+        return dict.__getitem__(self, "results")
 
     def _set_results(self, results):
         # type: (List[Optional[Dict[str, Any]]]) -> None
@@ -575,7 +595,7 @@ class Job(Base):
         # type: () -> List[Optional[Dict[str, str]]]
         if self.get("exceptions") is None:
             self["exceptions"] = list()
-        return self["exceptions"]
+        return dict.__getitem__(self, "exceptions")
 
     def _set_exceptions(self, exceptions):
         # type: (List[Optional[Dict[str, str]]]) -> None
@@ -590,7 +610,7 @@ class Job(Base):
         # type: () -> List[Dict[str, str]]
         if self.get("logs") is None:
             self["logs"] = list()
-        return self["logs"]
+        return dict.__getitem__(self, "logs")
 
     def _set_logs(self, logs):
         # type: (List[Dict[str, str]]) -> None
@@ -605,7 +625,7 @@ class Job(Base):
         # type: () -> List[Optional[str]]
         if self.get("tags") is None:
             self["tags"] = list()
-        return self["tags"]
+        return dict.__getitem__(self, "tags")
 
     def _set_tags(self, tags):
         # type: (List[Optional[str]]) -> None
@@ -692,9 +712,6 @@ class Job(Base):
         for link_type in job_links:
             link_href = "{job_url}/{res}".format(job_url=job_url, res=link_type)
             job_links_body["links"].append({"href": link_href, "rel": link_type, "title": "Job {}.".format(link_type)})
-        link_meta = {"type": CONTENT_TYPE_APP_JSON, "hreflang": ACCEPT_LANGUAGE_EN_US}
-        for link in job_links_body["links"]:
-            link.update(link_meta)
         if self_link in ["status", "inputs", "outputs", "results", "logs", "exceptions"]:
             self_link_body = list(filter(lambda _link: _link["rel"] == self_link, job_links_body["links"]))[-1]
             self_link_body = copy.deepcopy(self_link_body)
@@ -782,7 +799,7 @@ class Process(Base):
     @property
     def id(self):
         # type: () -> str
-        return self["id"]
+        return dict.__getitem__(self, "id")
 
     @property
     def identifier(self):
@@ -805,9 +822,19 @@ class Process(Base):
         return self.get("abstract", "")
 
     @property
+    def description(self):
+        # OGC-API-Processes v1 field representation
+        # bw-compat with existing processes that defined it as abstract
+        return self.abstract or self.get("description", "")
+
+    @property
     def keywords(self):
         # type: () -> List[str]
-        return self.get("keywords", [])
+        keywords = self.setdefault("keywords", [])
+        if self.type not in keywords:
+            keywords.append(self.type)
+            self["keywords"] = keywords
+        return dict.__getitem__(self, "keywords")
 
     @property
     def metadata(self):
@@ -854,12 +881,13 @@ class Process(Base):
         self["jobControlOptions"] = [mode for mode in self["jobControlOptions"] if mode in EXECUTE_CONTROL_OPTIONS]
         if len(self["jobControlOptions"]) == 0:
             self["jobControlOptions"].append(EXECUTE_CONTROL_OPTION_ASYNC)
-        return self.get("jobControlOptions")
+        return dict.__getitem__(self, "jobControlOptions")
 
     @property
     def outputTransmission(self):  # noqa: N802
         # type: () -> List[str]
-        return self.get("outputTransmission", [])
+        self.setdefault("outputTransmission", [EXECUTE_TRANSMISSION_MODE_REFERENCE])
+        return dict.__getitem__(self, "outputTransmission")
 
     @property
     def processDescriptionURL(self):  # noqa: N802
@@ -1018,14 +1046,14 @@ class Process(Base):
         """
         Obtains the JSON serializable complete representation of the process.
         """
-        return sd.Process().deserialize(self)
+        return sd.Process().deserialize(self.dict())
 
     def offering(self):
         # type: () -> JSON
         """
         Obtains the JSON serializable offering representation of the process.
         """
-        process_offering = {"process": self}
+        process_offering = {"process": self.dict()}
         if self.version:
             process_offering.update({"processVersion": self.version})
         if self.jobControlOptions:
@@ -1039,7 +1067,7 @@ class Process(Base):
         """
         Obtains the JSON serializable summary representation of the process.
         """
-        return sd.ProcessSummary().deserialize(self)
+        return sd.ProcessSummary().deserialize(self.dict())
 
     @staticmethod
     def from_wps(wps_process, **extra_params):
@@ -1171,7 +1199,7 @@ class Quote(Base):
     @property
     def id(self):
         """Quote ID."""
-        return self["id"]
+        return dict.__getitem__(self, "id")
 
     @property
     def title(self):
@@ -1191,12 +1219,12 @@ class Quote(Base):
     @property
     def user(self):
         """User ID requesting the quote"""
-        return self["user"]
+        return dict.__getitem__(self, "user")
 
     @property
     def process(self):
         """WPS Process ID."""
-        return self["process"]
+        return dict.__getitem__(self, "process")
 
     @property
     def estimatedTime(self):  # noqa: N802
@@ -1302,22 +1330,22 @@ class Bill(Base):
     @property
     def id(self):
         """Bill ID."""
-        return self["id"]
+        return dict.__getitem__(self, "id")
 
     @property
     def user(self):
         """User ID"""
-        return self["user"]
+        return dict.__getitem__(self, "user")
 
     @property
     def quote(self):
         """Quote ID."""
-        return self["quote"]
+        return dict.__getitem__(self, "quote")
 
     @property
     def job(self):
         """Job ID."""
-        return self["job"]
+        return dict.__getitem__(self, "job")
 
     @property
     def price(self):
