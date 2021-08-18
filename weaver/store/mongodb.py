@@ -230,11 +230,15 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
         """
         Stores the specified process to the database.
 
+        The operation assumes that any conflicting or duplicate process definition was pre-validated.
+        Parameter ``upsert=True`` can be employed to allow exact replacement and ignoring duplicate errors.
+        When using ``upsert=True``, it is assumed that whichever the result (insert, update, duplicate error)
+        arises, the final result of the stored process should be identical in each case.
+
         .. note::
-            The operation assumes that any conflicting or duplicate process definition was pre-validated.
-            Parameter ``upsert=True`` can be employed to allow exact duplicate replacement without error.
-            This is useful for initialization-time of the storage with default processes that can sporadically
-            generate clash-inserts between multi-threaded/workers applications that all try adding builtin processes.
+            Parameter ``upsert=True`` is useful for initialization-time of the storage with default processes that
+            can sporadically generate clashing-inserts between multi-threaded/workers applications that all try adding
+            builtin processes around the same moment.
         """
         new_process = Process.convert(process, processEndpointWPS1=self.default_wps_endpoint)
         if not isinstance(new_process, Process):
@@ -247,11 +251,17 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
         new_process["visibility"] = new_process.visibility
         if upsert:
             search = {"identifier": new_process["identifier"]}
-            result = self.collection.replace_one(search, new_process.params(), upsert=True)
-            if result.matched_count != 0 and result.modified_count != 0:
+            try:
+                result = self.collection.replace_one(search, new_process.params(), upsert=True)
+                if result.matched_count != 0 and result.modified_count != 0:
+                    LOGGER.warning(
+                        "Duplicate key in collection: {} index: {} ".format(self.collection.full_name, search) +
+                        "was detected during replace with upsert, but permitted for process without modification."
+                    )
+            except DuplicateKeyError:
                 LOGGER.warning(
                     "Duplicate key in collection: {} index: {} ".format(self.collection.full_name, search) +
-                    "was detected during insert, but was permitted for upsert without process parameters modification."
+                    "was detected during internal insert retry, but ignored for process without modification."
                 )
         else:
             self.collection.insert_one(new_process.params())
