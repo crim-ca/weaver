@@ -17,6 +17,11 @@ Fixes:
 - Fix copy of headers when generating the WPS clients created for listing providers capabilities and processes.
 - Fix ``weaver.datatype`` objects auto-resolution of fields using either attributes (accessed as ``dict``)
   or properties (accessed as ``class``) to ensure correct handling of additional operations on them.
+- Fix ``DuplicateKeyError`` that could sporadically arise during initial ``processes`` storage creation
+  when ``builtin`` processes get inserted/updated on launch by parallel worker/threads running the application.
+  Operation is relaxed only for default ``builtin`` to allow equivalent process replacement (``upsert``) instead
+  of only explicit inserts, as they should be pre-validated for duplicate entries, and only new definitions should
+  be registered during this operation (fixes `#246 <https://github.com/crim-ca/weaver/issues/246>`_).
 
 `3.4.0 <https://github.com/crim-ca/weaver/tree/3.4.0>`_ (2021-08-11)
 ========================================================================

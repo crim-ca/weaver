@@ -218,25 +218,43 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
                                  [(param, old_params.get(param), new_params.get(param))
                                   for param in set(new_params) | set(old_params)])
                 if not registered or not duplicate:
-                    self._add_process(process)
+                    self._add_process(process, upsert=True)
             except DuplicateKeyError:
                 if duplicate:
                     LOGGER.debug("Ignore verified duplicate default process definition [%s]", process_id)
                 else:
                     raise
 
-    def _add_process(self, process):
-        # type: (AnyProcess) -> None
+    def _add_process(self, process, upsert=False):
+        # type: (AnyProcess, bool) -> None
+        """
+        Stores the specified process to the database.
+
+        .. note::
+            The operation assumes that any conflicting or duplicate process definition was pre-validated.
+            Parameter ``upsert=True`` can be employed to allow exact duplicate replacement without error.
+            This is useful for initialization-time of the storage with default processes that can sporadically
+            generate clash-inserts between multi-threaded/workers applications that all try adding builtin processes.
+        """
         new_process = Process.convert(process, processEndpointWPS1=self.default_wps_endpoint)
         if not isinstance(new_process, Process):
             raise ProcessInstanceError("Unsupported process type '{}'".format(type(process)))
 
         # apply defaults if not specified
-        new_process["type"] = self._get_process_type(process)
-        new_process["identifier"] = self._get_process_id(process)
-        new_process["processEndpointWPS1"] = self._get_process_endpoint_wps1(process)
+        new_process["type"] = self._get_process_type(new_process)
+        new_process["identifier"] = self._get_process_id(new_process)
+        new_process["processEndpointWPS1"] = self._get_process_endpoint_wps1(new_process)
         new_process["visibility"] = new_process.visibility
-        self.collection.insert_one(new_process.params())
+        if upsert:
+            search = {"identifier": new_process["identifier"]}
+            result = self.collection.replace_one(search, new_process.params(), upsert=True)
+            if result.matched_count != 0 and result.modified_count != 0:
+                LOGGER.warning(
+                    "Duplicate key in collection: {} index: {} ".format(self.collection.full_name, search) +
+                    "was detected during insert, but was permitted for upsert without process parameters modification."
+                )
+        else:
+            self.collection.insert_one(new_process.params())
 
     @staticmethod
     def _get_process_field(process, function_dict):
