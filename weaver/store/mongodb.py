@@ -255,13 +255,15 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
                 result = self.collection.replace_one(search, new_process.params(), upsert=True)
                 if result.matched_count != 0 and result.modified_count != 0:
                     LOGGER.warning(
-                        "Duplicate key in collection: {} index: {} ".format(self.collection.full_name, search) +
-                        "was detected during replace with upsert, but permitted for process without modification."
+                        "Duplicate key in collection: %s index: %s "
+                        "was detected during replace with upsert, but permitted for process without modification.",
+                        self.collection.full_name, search
                     )
             except DuplicateKeyError:
                 LOGGER.warning(
-                    "Duplicate key in collection: {} index: {} ".format(self.collection.full_name, search) +
-                    "was detected during internal insert retry, but ignored for process without modification."
+                    "Duplicate key in collection: %s index: %s "
+                    "was detected during internal insert retry, but ignored for process without modification.",
+                    self.collection.full_name, search
                 )
         else:
             self.collection.insert_one(new_process.params())
