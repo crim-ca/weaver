@@ -468,11 +468,7 @@ class LandingPage(ExtendedMappingSchema):
 
 class FormatMimeType(ExtendedMappingSchema):
     """
-    Used to respect ``mimeType`` field to work with pre-existing processes
-
-    .. seealso::
-        - :class:`FormatSelection`
-        - :class:`DeployFormatDefaultMimeType`
+    Used to respect ``mimeType`` field to work with pre-existing processes.
     """
     title = "Format"
     mimeType = ExtendedSchemaNode(
@@ -483,15 +479,10 @@ class FormatMimeType(ExtendedMappingSchema):
 
 class Format(ExtendedMappingSchema):
     """
-    Used to respect ``mediaType`` field as suggested per `OGC-API`
-
-    .. seealso::
-        - :class:`FormatSelection`
-        - :class:`DeployFormatDefault`
+    Used to respect ``mediaType`` field as suggested per `OGC-API`.
     """
     title = "Format"
-    mediaType = ExtendedSchemaNode(
-        String(), default=CONTENT_TYPE_TEXT_PLAIN, example=CONTENT_TYPE_APP_JSON)
+    mediaType = ExtendedSchemaNode(String(), default=CONTENT_TYPE_TEXT_PLAIN, example=CONTENT_TYPE_APP_JSON)
     schema = ExtendedSchemaNode(String(), missing=drop)
     encoding = ExtendedSchemaNode(String(), missing=drop)
 
@@ -502,8 +493,9 @@ class DeployFormatDefaultMimeType(FormatMimeType, ExtendedMappingSchema):
     one of the known formats by this instance. When executing a job, the best match will be used
     to run the process, and will fallback to the default as last resort.
     """
-    mimeType = ExtendedSchemaNode(
-        String(), example=CONTENT_TYPE_APP_JSON)
+    # The default is override from FormatMimeType since the FormatSelection 'oneOf' always fails,
+    # due to the 'default' value wich is always generated and it cause the presence of both Format and FormatMimeType
+    mimeType = ExtendedSchemaNode(String(), example=CONTENT_TYPE_APP_JSON)
 
 
 class DeployFormatDefault(Format, ExtendedMappingSchema):
@@ -512,20 +504,21 @@ class DeployFormatDefault(Format, ExtendedMappingSchema):
     one of the known formats by this instance. When executing a job, the best match will be used
     to run the process, and will fallback to the default as last resort.
     """
-    mediaType = ExtendedSchemaNode(
-        String(), example=CONTENT_TYPE_APP_JSON)
+    # The default is override from Format since the FormatSelection 'oneOf' always fails,
+    # due to the 'default' value wich is always generated and it cause the presence of both Format and FormatMimeType
+    mediaType = ExtendedSchemaNode(String(), example=CONTENT_TYPE_APP_JSON)
 
 
 class FormatSelection(OneOfKeywordSchema):
     """
-    Validation against ``mimeType`` or ``mediaType`` format
+    Validation against ``mimeType`` or ``mediaType`` format.
 
     .. seealso::
         - :class:`DeployFormatDefault`
         - :class:`DeployFormatDefaultMimeType`
 
     .. note::
-            Format are validated to be retrocompatible with pre-existing/deployed/remote processes
+        Format are validated to be retrocompatible with pre-existing/deployed/remote processes.
     """
     _one_of = [
         DeployFormatDefault(),
@@ -548,10 +541,18 @@ class FormatDefault(ExtendedMappingSchema):
 
 
 class DescribeFormatDescription(Format, FormatExtra, FormatDefault):
+    # NOTE:
+    #  The 'OGC-API' suggest to use 'mediaType' field for FormatType, but retro-compatibility is supported,
+    #  FormatType can be with either old 'mimeType' or new 'mediaType' during deployement,
+    #  but only 'mediaType' is used for description
     pass
 
 
 class DeployFormatDescription(FormatSelection, FormatExtra, FormatDefault):
+    # NOTE:
+    #  The 'OGC-API' suggest to use 'mediaType' field for FormatType, but retro-compatibility is supported,
+    #  FormatType can be with either old 'mimeType' or new 'mediaType' during deployement,
+    #  but only 'mediaType' is used for description
     pass
 
 
@@ -884,7 +885,7 @@ class DescribeInputTypeDefinition(OneOfKeywordSchema):
     _one_of = [
         # NOTE:
         #   LiteralInputType could be used to represent a complex input if the 'format' is missing in
-        #   process deployment definition but is instead provided in CWL definition.
+        #   process description definition but is instead provided in CWL definition.
         #   This use case is still valid because 'format' can be inferred from the combining Process/CWL contents.
         BoundingBoxInputType,
         DescribeComplexInputType,  # should be 2nd to last because very permissive, but requires format at least
@@ -899,7 +900,7 @@ class DeployInputTypeDefinition(OneOfKeywordSchema):
         #   process deployment definition but is instead provided in CWL definition.
         #   This use case is still valid because 'format' can be inferred from the combining Process/CWL contents.
         BoundingBoxInputType,
-        DeployComplexInputType,  # should be 2nd to last because very permissive, but requires format at least
+        DeployComplexInputType,  # should be 2nd to last because very permissive, but requires formats at least
         LiteralInputType,  # must be last because it"s the most permissive (all can default if omitted)
     ]
 
@@ -926,11 +927,11 @@ class DescribeInputTypeList(ExtendedSequenceSchema):
 
 class DeployInputTypeList(ExtendedSequenceSchema):
     """
-    Input validation against `OGC-API` recommendation
+    Input validation against `OGC-API` recommendation.
 
     .. note::
             Format are validated to be backward compatible with pre-existing/deployed/remote processes,
-            it will work with ``mediaType`` and ``mimeType`` formats
+            it will work with ``mediaType`` and ``mimeType`` formats.
     """
     input = DeployInputType()
 
@@ -957,7 +958,7 @@ class DeployComplexOutputType(DeployWithFormats):
 class DescribeOutputTypeDefinition(OneOfKeywordSchema):
     _one_of = [
         BoundingBoxOutputType,
-        DescribeComplexOutputType,  # should be 2nd to last because very permissive, but requires format at least
+        DescribeComplexOutputType,  # should be 2nd to last because very permissive, but requires formats at least
         LiteralOutputType,  # must be last because it's the most permissive (all can default if omitted)
     ]
 
@@ -965,7 +966,7 @@ class DescribeOutputTypeDefinition(OneOfKeywordSchema):
 class DeployOutputTypeDefinition(OneOfKeywordSchema):
     _one_of = [
         BoundingBoxOutputType,
-        DeployComplexOutputType,  # should be 2nd to last because very permissive, but requires format at least
+        DeployComplexOutputType,  # should be 2nd to last because very permissive, but requires formats at least
         LiteralOutputType,  # must be last because it's the most permissive (all can default if omitted)
     ]
 
@@ -990,11 +991,11 @@ class DescribeOutputTypeList(ExtendedSequenceSchema):
 
 class DeployOutputTypeList(ExtendedSequenceSchema):
     """
-    Output validation against `OGC-API` recommendation
+    Output validation against `OGC-API` recommendation.
 
     .. note::
-            Format are validated to be backward compatible with pre-existing/deployed/remote processes,
-            it will work with ``mediaType`` and ``mimeType`` formats
+        Format are validated to be backward compatible with pre-existing/deployed/remote processes,
+        it will work with ``mediaType`` and ``mimeType`` formats.
     """
     output = DeployOutputType()
 

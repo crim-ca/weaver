@@ -367,7 +367,7 @@ class WpsPackageAppTest(WpsPackageConfigBase):
     def test_mediatype_io_format_references(self):
         """
         Test to validates ``mimeType`` is replaced by ``mediaType`` for all descriptions. Also we validate
-        that processes that use ``mimeType`` or ``mediaType`` can be deploy successfully.
+        that processes that use ``mimeType`` or ``mediaType`` can be deployed successfully.
         """
         ns_json, type_json = get_cwl_file_format(CONTENT_TYPE_APP_JSON)
         namespaces = dict(list(ns_json.items()))
@@ -391,7 +391,7 @@ class WpsPackageAppTest(WpsPackageConfigBase):
                             "id": "wps_format_mediaType",
                             "formats": [
                                 {
-                                    "mimeType": CONTENT_TYPE_APP_JSON,
+                                    "mediaType": CONTENT_TYPE_APP_JSON,
                                     "default": True,
                                 }
                             ]
