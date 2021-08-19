@@ -882,7 +882,7 @@ class Process(Base):
             Because of pre-existing/deployed/remote processes, outputs are formated to respect the valid representation.
         """
 
-        outputs = self.get("outputs")
+        outputs = self.get("outputs", [])
         for output_ in outputs:
             output_formats = get_field(output_, "formats", search_variations=False, default=[])
             for fmt in output_formats:
