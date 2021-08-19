@@ -552,7 +552,7 @@ def test_fetch_file_remote_s3_bucket():
         test_file_name = "test-file.txt"
         test_file_data = "dummy file"
         test_bucket_name = "test-fake-bucket"
-        test_bucket_ref = mocked_aws_s3_bucket_test_file(test_bucket_name, test_file_name, test_file_data)
+        test_bucket_ref, _ = mocked_aws_s3_bucket_test_file(test_bucket_name, test_file_name, test_file_data)
         result = fetch_file(test_bucket_ref, tmpdir)
         assert result == os.path.join(tmpdir, test_file_name)
         assert os.path.isfile(result)

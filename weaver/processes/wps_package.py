@@ -720,7 +720,7 @@ class WpsPackage(Process):
         log_file_handler.setFormatter(log_file_formatter)
 
         # prepare package logger
-        self.logger = logging.getLogger("{}.{}".format(LOGGER.name, self.package_id))
+        self.logger = logging.getLogger("{}|{}".format(LOGGER.name, self.package_id))
         self.logger.addHandler(log_file_handler)
         self.logger.setLevel(self.log_level)
 

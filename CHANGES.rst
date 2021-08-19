@@ -10,11 +10,19 @@ Changes
 
 Changes:
 --------
-- No change.
+- | Modify problematic output location and execution methodology of ``file2string_array`` process so it does what
+    it actually advertises in its ``abstract`` description and doesn't result in error after execution.
+  |
+  | This modification actually changes the internal operation accomplished by ``file2string_array`` process
+    since it was attempting to create directly a CWL output of type ``File[]``. This is not yet supported
+    in `Weaver` (see issue `#25 <https://github.com/crim-ca/weaver/issues/25>`_) because `OGC API - Processes`
+    does not allow output multiplicity under a same output ID.
 
 Fixes:
 ------
-- No change.
+- Fix invalid ``python`` reference location in ``file2string_array`` process CWL definition
+  (fixes `#275 <https://github.com/crim-ca/weaver/issues/275>`_).
+- Fix missing ``version`` field definition for ``file2string_array`` process and set it as ``1.0``.
 
 `3.5.0 <https://github.com/crim-ca/weaver/tree/3.5.0>`_ (2021-08-19)
 ========================================================================

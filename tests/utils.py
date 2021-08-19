@@ -34,7 +34,7 @@ from weaver.utils import fetch_file, get_path_kvp, get_url_without_query, get_we
 from weaver.warning import MissingParameterWarning, UnsupportedOperationWarning
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Iterable, List, Optional, Type, Union
+    from typing import Any, Callable, Iterable, List, Optional, Tuple, Type, Union
 
     import botocore.client  # noqa
     from owslib.wps import Process as ProcessOWSWPS
@@ -526,7 +526,7 @@ def mocked_aws_s3(test_func):
 
 
 def mocked_aws_s3_bucket_test_file(bucket_name, file_name, file_content="Test file inside test S3 bucket"):
-    # type: (str,str, str) -> str
+    # type: (str,str, str) -> Tuple[str, str]
     """
     Generates a test file reference from dummy data that will be uploaded to the specified S3 bucket name using the
     provided file key.
@@ -548,16 +548,23 @@ def mocked_aws_s3_bucket_test_file(bucket_name, file_name, file_content="Test fi
     with tempfile.NamedTemporaryFile(mode="w") as tmp_file:
         tmp_file.write(file_content)
         tmp_file.flush()
-        s3.upload_file(Bucket=bucket_name, Filename=tmp_file.name, Key=file_name)
-    return "s3://{}/{}".format(bucket_name, file_name)
+        tmp_path = tmp_file.name
+        s3.upload_file(Bucket=bucket_name, Filename=tmp_path, Key=file_name)
+    tmp_href = "s3://{}/{}".format(bucket_name, file_name)
+    return tmp_href, tmp_path
 
 
 def mocked_http_file(test_func):
     # type: (Callable[[...], Any]) -> Callable
     """
     Creates a mock of the function :func:`fetch_file`, to fetch a generated file locally, for test purposes only.
+
     For instance, calling this function with :func:`mocked_http_file` decorator
     will effectively employ the mocked :func:`fetch_file` and return a generated local file.
+
+    Only file references that employ :py:data:`MOCK_HTTP_REF` as prefix will be mocked during file fetching step.
+    These kind of references can be obtained using the utility function :func:`mocked_reference_test_file`.
+    Other references will employ usual fetching methodology.
 
     .. seealso::
         - :func:`mocked_reference_test_file`
@@ -574,16 +581,26 @@ def mocked_http_file(test_func):
     return wrapped
 
 
-def mocked_reference_test_file(file_name, href_type, file_content="This is a generated file for href test"):
-    # type: (str,str,str) -> str
+def mocked_reference_test_file(file_name, href_type, file_content="test data", stack_context=None):
+    # type: (str, str, str, Optional[contextlib.ExitStack]) -> Tuple[str, str]
     """
     Generates a test file reference from dummy data for http and file href types.
+
+    :param file_name: name of the temporary file to generate.
+    :param href_type: schema type of href (file, http, etc.)
+    :param file_content: contents of the temporary file.
+    :param stack_context: active context for auto-cleanup of temporary directly when closed.
+    :return: tuple of the generated reference and real temporary file path as (href, path)
 
     .. seealso::
         - :func:`mocked_http_file`
     """
-    tmpdir = tempfile.mkdtemp()
-    path = os.path.join(tmpdir, file_name)
+    if isinstance(stack_context, contextlib.ExitStack):
+        tmpdir = stack_context.enter_context(tempfile.TemporaryDirectory())
+    else:
+        tmpdir = tempfile.mkdtemp()
+    path = os.path.abspath(os.path.join(tmpdir, file_name))
     with open(path, "w") as tmp_file:
         tmp_file.write(file_content)
-    return "file://{}".format(path) if href_type == "file" else os.path.join(MOCK_HTTP_REF, path)
+    href = "file://{}".format(path) if href_type == "file" else (MOCK_HTTP_REF + path)
+    return href, path
