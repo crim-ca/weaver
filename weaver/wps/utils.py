@@ -155,7 +155,7 @@ def _describe_process_cached(self, identifier, xml=None):
 def _get_wps_client_cached(url, headers, verify, language):
     # type: (str, HeadersType, bool, Optional[str]) -> WebProcessingService
     LOGGER.debug("Request WPS GetCapabilities to [%s]", url)
-    wps = WebProcessingService(url=url, headers=headers, verify=verify)
+    wps = WebProcessingService(url=url, headers=headers, verify=verify, timeout=5)
     set_wps_language(wps, accept_language=language)
     setattr(wps, "describeprocess_method", wps.describeprocess)  # backup real method, them override with cached
     setattr(wps, "describeprocess", lambda *_, **__: _describe_process_cached(wps, *_, **__))
