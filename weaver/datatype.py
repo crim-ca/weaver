@@ -1127,6 +1127,7 @@ class Process(Base):
         """
         Obtains the JSON serializable summary representation of the process.
         """
+        return sd.ProcessSummary().deserialize(self.dict())
 
     @staticmethod
     def from_wps(wps_process, **extra_params):
