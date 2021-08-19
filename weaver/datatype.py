@@ -23,7 +23,7 @@ from weaver.execute import (
     EXECUTE_TRANSMISSION_MODE_REFERENCE
 )
 from weaver.formats import ACCEPT_LANGUAGE_EN_CA, CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML
-from weaver.processes.convert import ows2json, wps2json_io
+from weaver.processes.convert import get_field, null, ows2json, wps2json_io
 from weaver.processes.types import (
     PROCESS_APPLICATION,
     PROCESS_BUILTIN,
@@ -866,7 +866,7 @@ class Process(Base):
             - ``mediaType``: ``string``
 
         .. note::
-            Because of pre-existing/deployed/remote processes, inputs are formated to respect the valid representation.
+            Because of pre-existing/deployed/remote processes, inputs are formatted to respect valid representation.
         """
 
         inputs = self.get("inputs")
@@ -891,7 +891,7 @@ class Process(Base):
             - ``mediaType``: ``string``
 
         .. note::
-            Because of pre-existing/deployed/remote processes, outputs are formated to respect the valid representation.
+            Because of pre-existing/deployed/remote processes, outputs are formatted to respect valid representation.
         """
 
         outputs = self.get("outputs", [])
