@@ -14,6 +14,17 @@ Changes:
 
 Fixes:
 ------
+- No change.
+
+`3.5.0 <https://github.com/crim-ca/weaver/tree/3.5.0>`_ (2021-08-19)
+========================================================================
+
+Changes:
+--------
+- No change.
+
+Fixes:
+------
 - Fix copy of headers when generating the WPS clients created for listing providers capabilities and processes.
 - Fix ``weaver.datatype`` objects auto-resolution of fields using either attributes (accessed as ``dict``)
   or properties (accessed as ``class``) to ensure correct handling of additional operations on them.
