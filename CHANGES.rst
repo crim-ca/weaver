@@ -29,7 +29,6 @@ Changes:
 
 Fixes:
 ------
-- Fix copy of headers when generating the WPS clients created for listing providers capabilities and processes.
 - Fix ``weaver.datatype`` objects auto-resolution of fields using either attributes (accessed as ``dict``)
   or properties (accessed as ``class``) to ensure correct handling of additional operations on them.
 - Fix ``DuplicateKeyError`` that could sporadically arise during initial ``processes`` storage creation
