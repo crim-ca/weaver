@@ -2193,11 +2193,8 @@ class AlternateQuotationList(ExtendedSequenceSchema):
 
 # same as base Format, but for process/job responses instead of process submission
 # (ie: 'Format' is for allowed/supported formats, this is the result format)
-class DataEncodingAttributes(OneOfKeywordSchema):
-    _one_of = [
-        Format(),
-        FormatMimeType()
-    ]
+class DataEncodingAttributes(FormatSelection):
+    pass
 
 
 class Reference(ExtendedMappingSchema):
