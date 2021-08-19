@@ -467,7 +467,8 @@ class LandingPage(ExtendedMappingSchema):
 
 
 class FormatMimeType(ExtendedMappingSchema):
-    """Used to respect ``mimeType`` field to work with pre-existing processes
+    """
+    Used to respect ``mimeType`` field to work with pre-existing processes
 
     .. seealso::
         - :class:`FormatSelection`
@@ -481,7 +482,8 @@ class FormatMimeType(ExtendedMappingSchema):
 
 
 class Format(ExtendedMappingSchema):
-    """Used to respect ``mediaType`` field as suggested per `OGC-API`
+    """
+    Used to respect ``mediaType`` field as suggested per `OGC-API`
 
     .. seealso::
         - :class:`FormatSelection`
@@ -495,7 +497,8 @@ class Format(ExtendedMappingSchema):
 
 
 class DeployFormatDefaultMimeType(FormatMimeType, ExtendedMappingSchema):
-    """Format for process input are assumed plain text if the MIME-type was omitted and is not
+    """
+    Format for process input are assumed plain text if the MIME-type was omitted and is not
     one of the known formats by this instance. When executing a job, the best match will be used
     to run the process, and will fallback to the default as last resort.
     """
@@ -504,7 +507,8 @@ class DeployFormatDefaultMimeType(FormatMimeType, ExtendedMappingSchema):
 
 
 class DeployFormatDefault(Format, ExtendedMappingSchema):
-    """Format for process input are assumed plain text if the MEDIA-type was omitted and is not
+    """
+    Format for process input are assumed plain text if the MEDIA-type was omitted and is not
     one of the known formats by this instance. When executing a job, the best match will be used
     to run the process, and will fallback to the default as last resort.
     """
@@ -513,7 +517,8 @@ class DeployFormatDefault(Format, ExtendedMappingSchema):
 
 
 class FormatSelection(OneOfKeywordSchema):
-    """Validation against ``mimeType`` or ``mediaType`` format
+    """
+    Validation against ``mimeType`` or ``mediaType`` format
 
     .. seealso::
         - :class:`DeployFormatDefault`
@@ -920,7 +925,8 @@ class DescribeInputTypeList(ExtendedSequenceSchema):
 
 
 class DeployInputTypeList(ExtendedSequenceSchema):
-    """Input validation against `OGC-API` recommendation
+    """
+    Input validation against `OGC-API` recommendation
 
     .. note::
             Format are validated to be backward compatible with pre-existing/deployed/remote processes,
@@ -983,7 +989,8 @@ class DescribeOutputTypeList(ExtendedSequenceSchema):
 
 
 class DeployOutputTypeList(ExtendedSequenceSchema):
-    """Output validation against `OGC-API` recommendation
+    """
+    Output validation against `OGC-API` recommendation
 
     .. note::
             Format are validated to be backward compatible with pre-existing/deployed/remote processes,
