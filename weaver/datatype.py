@@ -16,12 +16,8 @@ from owslib.wps import Process as ProcessOWS, WPSException
 from pywps import Process as ProcessWPS
 
 from weaver.exceptions import ProcessInstanceError
-from weaver.execute import (
-    EXECUTE_CONTROL_OPTION_ASYNC,
-    EXECUTE_CONTROL_OPTIONS,
-    EXECUTE_TRANSMISSION_MODE_REFERENCE
-)
-from weaver.processes.convert import ows2json, wps2json_io
+from weaver.execute import EXECUTE_CONTROL_OPTION_ASYNC, EXECUTE_CONTROL_OPTIONS, EXECUTE_TRANSMISSION_MODE_REFERENCE
+from weaver.processes.convert import get_field, null, ows2json, wps2json_io
 from weaver.processes.types import (
     PROCESS_APPLICATION,
     PROCESS_BUILTIN,
@@ -854,6 +850,9 @@ class Process(Base):
             - ``maxOccurs``: ``int`` or ``"unbounded"``
             - ``minOccurs``: ``int``
 
+        And, ``mediaType`` should be in description as:
+            - ``mediaType``: ``string``
+
         .. note::
             Because of pre-existing/deployed/remote processes, inputs are formated to respect the valid representation.
         """
@@ -861,6 +860,11 @@ class Process(Base):
         inputs = self.get("inputs")
         if inputs is not None:
             for input_ in inputs:
+                input_formats = get_field(input_, "formats", search_variations=False, default=[])
+                for fmt in input_formats:
+                    mime_type = get_field(fmt, "mime_type", pop_found=True, search_variations=True)
+                    if mime_type is not null:
+                        fmt["mediaType"] = mime_type
                 input_["minOccurs"] = int(input_["minOccurs"])
                 input_["maxOccurs"] = (
                     int(input_["maxOccurs"]) if input_["maxOccurs"] != "unbounded" else input_["maxOccurs"]
@@ -870,7 +874,22 @@ class Process(Base):
     @property
     def outputs(self):
         # type: () -> Optional[List[Dict[str, Any]]]
-        return self.get("outputs")
+        """
+        According to `OGC-API`, ``mediaType`` should be in description as:
+            - ``mediaType``: ``string``
+
+        .. note::
+            Because of pre-existing/deployed/remote processes, outputs are formated to respect the valid representation.
+        """
+
+        outputs = self.get("outputs", [])
+        for output_ in outputs:
+            output_formats = get_field(output_, "formats", search_variations=False, default=[])
+            for fmt in output_formats:
+                mime_type = get_field(fmt, "mime_type", pop_found=True, search_variations=True)
+                if mime_type is not null:
+                    fmt["mediaType"] = mime_type
+        return outputs
 
     @property
     def jobControlOptions(self):  # noqa: N802

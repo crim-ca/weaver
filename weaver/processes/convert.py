@@ -112,7 +112,8 @@ WPS_FIELD_MAPPING = {
     "type": ["Type", "data_type", "dataType", "DataType", "Data_Type"],
     "min_occurs": ["minOccurs", "MinOccurs", "Min_Occurs", "minoccurs"],
     "max_occurs": ["maxOccurs", "MaxOccurs", "Max_Occurs", "maxoccurs"],
-    "mime_type": ["mimeType", "MimeType", "mime-type", "Mime-Type", "MIME-Type", "mimetype"],
+    "mime_type": ["mimeType", "MimeType", "mime-type", "Mime-Type", "mimetype",
+                  "mediaType", "MediaType", "media-type", "Media-Type", "mediatype"],
     "encoding": ["Encoding"],
     "href": ["url", "link", "reference"],
 }
@@ -991,6 +992,7 @@ def json2wps_io(io_info, io_select):
         "data",
         "file",
         "mimetype",
+        "mediaType",
         "encoding",
         "schema",
         "asreference",

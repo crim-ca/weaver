@@ -342,7 +342,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         # assert response_json["process"]["outputs"][0]["maxOccurs"] == "1"
         assert isinstance(response_json["process"]["outputs"][0]["formats"], list)
         assert len(response_json["process"]["outputs"][0]["formats"]) == 1
-        assert response_json["process"]["outputs"][0]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_JSON
+        assert response_json["process"]["outputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
 
     def deploy_process_make_visible_and_fetch_deployed(self, deploy_payload, expected_process_id):
         """
