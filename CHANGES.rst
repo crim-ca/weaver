@@ -10,15 +10,30 @@ Changes
 
 Changes:
 --------
-- Apply conformance updates to align with expected process description schema from
+- Apply conformance updates to better align with expected ``ProcessDescription`` schema from
   `OGC-API - Processes v1.0-draft6 <https://github.com/opengeospatial/ogcapi-processes/tree/1.0-draft.6>`_.
-  The major change introduced in this case is that process description contents will be directly at the root
-  of the object returned by ``/processes/{id}`` endpoint instead of being nested under ``"process"`` field.
+  The main change introduced in this case is that process description contents will be directly at the root
+  of the object returned by ``/processes/{id}`` response instead of being nested under ``"process"`` field.
+  Furthermore, ``inputs`` and ``outputs`` definitions are reported as mapping of ``{"<id>": {<parameters>}}`` as
+  specified by OGP-API instead of old listing format ``[{"id": "<id-value>", <key:val parameters>}]``. The old
+  format can still be obtained using request query parameter ``schema=OLD``, and will otherwise use OGC-API by
+  default or when ``schema=OGC``. Note that some duplicated metadata fields are dropped regardless of selected format
+  in favor of OGC-API names. Some examples are ``abstract`` that becomes ``description``, ``processVersion`` that
+  simply becomes ``version``, ``mimeType`` that becomes ``mediaType``, etc. Some of those changes are also reflected
+  by ``ProcessSummary`` during listing of processes, as well as for corresponding provider-related endpoints.
+- Update ``mimeType`` to ``mediaType`` as format type representation according to `OGC-API`
+  (relates to `#211  <https://github.com/crim-ca/weaver/issues/211>`_).
+- Improved naming of many ambiguous and repeated words across schema definitions that did not necessarily interact
+  with each other although making use of similar naming convention, making their interpretation and debugging much
+  more complicated. A stricter naming convention has been applied for consistent Deploy/Describe/Execute-related
+  and Input/Output-related references.
 
 Fixes:
 ------
-- Update ``mimeType`` to ``mediaType`` as format type representation according to `OGC-API`
-  (fixes `#211  <https://github.com/crim-ca/weaver/issues/211>`_).
+- Revert an incorrectly removed schema deserialization operation during generation of the ``ProcessSummary`` employed
+  for populating process listing.
+- Revert an incorrectly modified schema reference that erroneously replaced service provider ``ProcessSummary`` items
+  during their listing by a single ``ProcessInputDescriptionSchema`` (introduced since ``3.0.0``).
 
 `3.5.0 <https://github.com/crim-ca/weaver/tree/3.5.0>`_ (2021-08-19)
 ========================================================================
