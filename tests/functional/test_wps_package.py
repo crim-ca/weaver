@@ -1262,7 +1262,7 @@ class WpsPackageAppTest(WpsPackageConfigBase):
         with contextlib.ExitStack() as stack_exec:
             for mock_exec in mocked_execute_process():
                 stack_exec.enter_context(mock_exec)
-            tmp_file = stack_exec.enter_context(tempfile.NamedTemporaryFile(mode="w", suffix=".json"))
+            tmp_file = stack_exec.enter_context(tempfile.NamedTemporaryFile(mode="w", suffix=".json"))  # noqa
             tmp_file.write(json.dumps({"value": {"ref": 1, "measurement": 10.3, "uom": "m"}}))
             tmp_file.seek(0)
 
