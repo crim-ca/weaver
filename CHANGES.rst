@@ -15,7 +15,7 @@ Changes:
 Fixes:
 ------
 - Update ``mimeType`` to ``mediaType`` as format type representation according to `OGC-API`
-  (fixes `#263  <https://github.com/crim-ca/weaver/issues/211>`_).
+  (fixes `#211  <https://github.com/crim-ca/weaver/issues/211>`_).
 
 `3.5.0 <https://github.com/crim-ca/weaver/tree/3.5.0>`_ (2021-08-19)
 ========================================================================
