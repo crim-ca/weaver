@@ -3,6 +3,7 @@ import json
 import os
 import unittest
 from copy import deepcopy
+from typing import TYPE_CHECKING
 
 import colander
 import pyramid.testing
@@ -36,6 +37,9 @@ from weaver.utils import fully_qualified_name, ows_context_href
 from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC
 from weaver.wps.utils import get_wps_url
 from weaver.wps_restapi import swagger_definitions as sd
+
+if TYPE_CHECKING:
+    from weaver.typedefs import JSON
 
 # simulated remote server with remote processes (mocked with `responses` package)
 TEST_REMOTE_SERVER_URL = "https://remote-server.com"
@@ -108,6 +112,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
 
     @staticmethod
     def get_process_deploy_template(process_id):
+        # type: (str) -> JSON
         """
         Provides deploy process bare minimum template with undefined execution unit.
         To be used in conjunction with `get_process_package_mock` to avoid extra package content-specific validations.
@@ -286,7 +291,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         process_data_tests = [deepcopy(process_data) for _ in range(12)]
         process_data_tests[0].pop("processDescription")
         process_data_tests[1]["processDescription"].pop("process")
-        process_data_tests[2]["processDescription"]["process"].pop("id")
+        process_data_tests[2]["processDescription"]["process"].pop("id")  # noqa
         process_data_tests[3]["processDescription"]["jobControlOptions"] = EXECUTE_CONTROL_OPTION_ASYNC
         process_data_tests[4]["processDescription"]["jobControlOptions"] = [EXECUTE_MODE_ASYNC]  # noqa
         process_data_tests[5].pop("deploymentProfileName")

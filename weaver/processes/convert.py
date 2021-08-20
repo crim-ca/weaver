@@ -887,8 +887,8 @@ def any2wps_literal_datatype(io_type, is_value):
                 return "integer"
             if io_type in ["bool", "boolean"]:
                 return "boolean"
-        LOGGER.warning("Unknown named literal data type: '%s', using default 'string'. "
-                       "Should be one of: ", io_type, list(WPS_LITERAL_DATA_TYPE_NAMES))
+        LOGGER.warning("Unknown named literal data type: '%s', using default 'string'. Should be one of: %s",
+                       io_type, list(WPS_LITERAL_DATA_TYPE_NAMES))
         return "string"
     if is_value and isinstance(io_type, bool):
         return "boolean"
