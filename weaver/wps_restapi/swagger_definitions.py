@@ -139,6 +139,9 @@ PROCESS_DESCRIPTION_FIELD_AFTER = [
 PROCESS_DESCRIPTION_FIELD_FIRST_OLD_SCHEMA = ["process"]
 PROCESS_DESCRIPTION_FIELD_AFTER_OLD_SCHEMA = ["links"]
 
+PROCESS_IO_FIELD_FIRST = ["id", "title", "description", "minOccurs", "maxOccurs"]
+PROCESS_IO_FIELD_AFTER = ["literalDataDomains", "formats", "crs", "bbox"]
+
 #########################################################
 # Examples
 #########################################################
@@ -950,6 +953,9 @@ class DescribeInputType(AllOfKeywordSchema):
         WithMinMaxOccurs(),
     ]
 
+    _sort_first = PROCESS_IO_FIELD_FIRST
+    _sort_after = PROCESS_IO_FIELD_AFTER
+
 
 class DescribeInputTypeWithID(InputIdentifierType, DescribeInputType):
     pass
@@ -964,6 +970,9 @@ class DeployInputType(AllOfKeywordSchema):
         DeployInputTypeDefinition(),
         WithMinMaxOccurs(),
     ]
+
+    _sort_first = PROCESS_IO_FIELD_FIRST
+    _sort_after = PROCESS_IO_FIELD_AFTER
 
 
 class DeployInputTypeWithID(InputIdentifierType, DeployInputType):
@@ -1068,9 +1077,16 @@ class DescribeOutputType(AllOfKeywordSchema):
         DescribeOutputTypeDefinition(),
     ]
 
+    _sort_first = PROCESS_IO_FIELD_FIRST
+    _sort_after = PROCESS_IO_FIELD_AFTER
+
+
+class DescribeOutputTypeWithID(OutputIdentifierType, DescribeOutputType):
+    pass
+
 
 class DescribeOutputTypeList(ExtendedSequenceSchema):
-    output = DescribeOutputType()
+    output = DescribeOutputTypeWithID()
 
 
 # Different definition than 'Describe' such that nested 'complex' type 'formats' can be validated and backward
@@ -1081,6 +1097,9 @@ class DeployOutputType(AllOfKeywordSchema):
         InputOutputDescriptionMeta(),
         DeployOutputTypeDefinition(),
     ]
+
+    _sort_first = PROCESS_IO_FIELD_FIRST
+    _sort_after = PROCESS_IO_FIELD_AFTER
 
 
 class DeployOutputTypeWithID(OutputIdentifierType, DeployOutputType):
@@ -2223,6 +2242,9 @@ class Process(
     inputs = DescribeInputTypeList(description="Inputs definition of the process.")
     outputs = DescribeOutputTypeList(description="Outputs definition of the process.")
 
+    _sort_first = PROCESS_DESCRIPTION_FIELD_FIRST
+    _sort_after = PROCESS_DESCRIPTION_FIELD_AFTER
+
 
 class ProcessDescriptionOLD(ProcessControl, DescriptionLinks):
     """
@@ -2231,19 +2253,8 @@ class ProcessDescriptionOLD(ProcessControl, DescriptionLinks):
     deprecated = True
     process = Process()
 
-    def deserialize(self, cstruct):
-        process = super(ProcessDescriptionOLD, self).deserialize(cstruct)
-        process["process"] = order_deserialize(
-            process["process"],
-            PROCESS_DESCRIPTION_FIELD_FIRST,
-            PROCESS_DESCRIPTION_FIELD_AFTER
-        )
-        offering = order_deserialize(
-            process,
-            PROCESS_DESCRIPTION_FIELD_FIRST_OLD_SCHEMA,
-            PROCESS_DESCRIPTION_FIELD_AFTER_OLD_SCHEMA
-        )
-        return offering
+    _sort_first = PROCESS_DESCRIPTION_FIELD_FIRST_OLD_SCHEMA
+    _sort_after = PROCESS_DESCRIPTION_FIELD_AFTER_OLD_SCHEMA
 
 
 class ProcessDescriptionOGC(ProcessSummary, ProcessContext, ProcessVisibility, ProcessLocations, DescriptionLinks):
@@ -2253,14 +2264,8 @@ class ProcessDescriptionOGC(ProcessSummary, ProcessContext, ProcessVisibility, P
     inputs = DescribeInputTypeMap(description="Inputs definition of the process.")
     outputs = DescribeOutputTypeMap(description="Outputs definition of the process.")
 
-    def deserialize(self, cstruct):
-        result = super(ProcessDescriptionOGC, self).deserialize(cstruct)
-        offering = order_deserialize(
-            result,
-            PROCESS_DESCRIPTION_FIELD_FIRST,
-            PROCESS_DESCRIPTION_FIELD_AFTER
-        )
-        return offering
+    _sort_first = PROCESS_DESCRIPTION_FIELD_FIRST
+    _sort_after = PROCESS_DESCRIPTION_FIELD_AFTER
 
 
 class ProcessDescription(OneOfKeywordSchema):
@@ -3962,32 +3967,3 @@ def datetime_interval_parser(datetime_interval):
         parsed_datetime["match"] = date_parser.parse(datetime_interval)
 
     return parsed_datetime
-
-
-def order_deserialize(cstruct, fields_first=None, fields_after=None):
-    # type: (JSON, Optional[List[str]], Optional[List[str]]) -> JSON
-    """
-    Enforces some convenient ordering of expected fields in deserialized result, regardless of chosen schema variant.
-
-    This function takes care of moving back items in a consistent order for better readability from API responses
-    against different loaded definitions field order from remote servers, local database, pre-deployed processes, etc.
-
-    This way, any field insertion order from both the input ``cstruct`` before deserialization operation, the
-    internal mechanics that :mod:`colander` (and extended OpenAPI schema definitions) employ to process this
-    deserialization, and the ``result`` dictionary fields order all don't matter.
-
-    Using this, the order of inheritance of schema children classes also doesn't matter, allowing us not to worry about
-    placing them in a specific order when editing and joining the already complicated structures of inherited schemas.
-
-    :param cstruct: JSON to be sorted that has already been processed by some ``deserialize`` call with a schema.
-    :param fields_first: ordered list of fields to place first in the result.
-    :param fields_after: ordered list of fields to place last in the result.
-    :returns: results formed from cstruct following order: (<fields_firsts> + <other_fields> + <fields_after>)
-    """
-    fields_first = fields_first if fields_first else []
-    fields_after = fields_after if fields_after else []
-    result = {field: cstruct.pop(field, None) for field in fields_first if field in cstruct}
-    remain = {field: cstruct.pop(field, None) for field in fields_after if field in cstruct}
-    result.update(cstruct)
-    result.update(remain)
-    return result

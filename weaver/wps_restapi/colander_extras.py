@@ -68,7 +68,7 @@ from cornice_swagger.converters.schema import (
 )
 
 if TYPE_CHECKING:
-    from typing import Dict, Iterable, Optional, Type, Union
+    from typing import Any, Dict, Iterable, Optional, Sequence, Type, Union
 
 
 LITERAL_SCHEMA_TYPES = frozenset([
@@ -180,17 +180,17 @@ class SemanticVersion(colander.Regex):
 
 class ExtendedBoolean(colander.Boolean):
 
-    def __init__(self, *args, true_choices=None, fase_choices=None, **kwargs):
+    def __init__(self, *args, true_choices=None, false_choices=None, **kwargs):
         """
         The arguments :paramref:`true_choices` and :paramref:`false_choices`
         are defined as ``"true"`` and ``"false"`` since :mod:`colander` converts the value to string lowercase
-        to compare with other thruty/falsy values it should accept. Do NOT add other values like ``"1"``
+        to compare with other truthy/falsy values it should accept. Do NOT add other values like ``"1"``
         to avoid conflict with ``Integer`` type for schemas that support both variants.
         """
         if true_choices is None:
-            true_choices = ("true")
-        if fase_choices is None:
-            false_choices = ("false")
+            true_choices = ("true", )
+        if false_choices is None:
+            false_choices = ("false", )
         super(ExtendedBoolean, self).__init__(true_choices=true_choices, false_choices=false_choices, *args, **kwargs)
 
     def serialize(self, node, cstruct):  # pylint: disable=W0221
@@ -688,6 +688,74 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
         return result
 
 
+class SortableMappingSchema(ExtendedNodeInterface, ExtendedSchemaBase):
+    """
+    Extended schema nodes that inherit from :class:`colander.Mapping` schema-type can request ordering of
+    fields using :prop:`_sort_first` and :prop:`_sort_after` as list of fields names to sort.
+
+    .. seealso::
+        - :func:`_order_deserialize`
+    """
+
+    _extension = "_ext_sortable"
+    _sort_first = []  # type: Sequence[str]
+    _sort_after = []  # type: Sequence[str]
+
+    def __init__(self, *args, **kwargs):
+        super(SortableMappingSchema, self).__init__(*args, **kwargs)
+        setattr(self, SortableMappingSchema._extension, True)
+
+    # pylint: disable=W0222,signature-differs
+    def deserialize(self, cstruct):
+        return ExtendedSchemaNode.deserialize(self, cstruct)  # noqa
+
+    @staticmethod
+    def schema_type():
+        raise NotImplementedError("Using SchemaNode for a field requires 'schema_type' definition.")
+
+    def _deserialize_impl(self, cstruct):
+        if not getattr(self, SortableMappingSchema._extension, False):
+            return cstruct
+        if not isinstance(cstruct, dict):
+            return cstruct
+
+        sort_first = getattr(self, "_sort_first", [])
+        sort_after = getattr(self, "_sort_after", [])
+        if sort_first or sort_after:
+            return self._order_deserialize(cstruct, sort_first, sort_after)
+        return cstruct
+
+    @staticmethod
+    def _order_deserialize(cstruct, sort_first=None, sort_after=None):
+        # type: (Dict[str, Any], Optional[Sequence[str]], Optional[Sequence[str]]) -> Dict[str, Any]
+        """
+        Enforces some convenient ordering of expected fields in deserialized result, regardless of chosen schema variant.
+
+        This function takes care of moving back items in a consistent order for better readability from API responses
+        against different loaded definitions field order from remote servers, local database, pre-defined objects, etc.
+
+        This way, any field insertion order from both the input ``cstruct`` before deserialization operation, the
+        internal mechanics that :mod:`colander` (and extended OpenAPI schema definitions) employ to process this
+        deserialization, and the ``result`` dictionary fields order all don't matter.
+
+        Using this, the order of inheritance of schema children classes also doesn't matter, removing the need to worry
+        about placing them in any specific order when editing and joining the already complicated structures of inherited
+        schemas.
+
+        :param cstruct: JSON structure to be sorted that has already been processed by a schema's ``deserialize`` call.
+        :param sort_first: ordered list of fields to place first in the result.
+        :param sort_after: ordered list of fields to place last in the result.
+        :returns: results formed from cstruct following order: (<fields_firsts> + <other_fields> + <fields_after>)
+        """
+        sort_first = sort_first if sort_first else []
+        sort_after = sort_after if sort_after else []
+        result = {field: cstruct.pop(field, None) for field in sort_first if field in cstruct}
+        remain = {field: cstruct.pop(field, None) for field in sort_after if field in cstruct}
+        result.update(cstruct)
+        result.update(remain)
+        return result
+
+
 class ExtendedSchemaNode(DefaultSchemaNode, DropableSchemaNode, VariableSchemaNode, ExtendedSchemaBase):
     """
     Combines all :class:`colander.SchemaNode` extensions so that ``default`` keyword is used first to
@@ -759,7 +827,7 @@ class ExtendedSchemaNode(DefaultSchemaNode, DropableSchemaNode, VariableSchemaNo
         if result is colander.null and self.missing is colander.required:
             raise colander.Invalid(node=self, msg=self.missing_msg)
 
-        return result
+        return SortableMappingSchema._deserialize_impl(self, result)
 
 
 class DropableSequenceSchema(DropableSchemaNode, colander.SequenceSchema):
@@ -798,7 +866,7 @@ class ExtendedSequenceSchema(DefaultSchemaNode, DropableSchemaNode, colander.Seq
         ExtendedSchemaBase._validate(self.children[0])
 
 
-class DropableMappingSchema(DropableSchemaNode, colander.MappingSchema):
+class DropableMappingSchema(DropableSchemaNode, SortableMappingSchema, colander.MappingSchema):
     """
     Override the default :class:`colander.MappingSchema` to auto-handle dropping missing field definitions
     when the corresponding value is either ``None``, :class:`colander.null` or :class:`colander.drop`.
@@ -806,7 +874,7 @@ class DropableMappingSchema(DropableSchemaNode, colander.MappingSchema):
     schema_type = colander.MappingSchema.schema_type
 
 
-class DefaultMappingSchema(DefaultSchemaNode, colander.MappingSchema):
+class DefaultMappingSchema(DefaultSchemaNode, SortableMappingSchema, colander.MappingSchema):
     """
     Override the default :class:`colander.MappingSchema` to auto-handle replacing missing entries by
     their specified ``default`` during deserialization.
@@ -826,6 +894,7 @@ class ExtendedMappingSchema(
     DefaultSchemaNode,
     DropableSchemaNode,
     VariableSchemaNode,
+    SortableMappingSchema,
     colander.MappingSchema
 ):
     """
@@ -840,6 +909,7 @@ class ExtendedMappingSchema(
         - :class:`VariableSchemaNode`
         - :class:`ExtendedSchemaNode`
         - :class:`ExtendedSequenceSchema`
+        - :class:`SortableMappingSchema`
         - :class:`PermissiveMappingSchema`
     """
     schema_type = colander.MappingSchema.schema_type
@@ -1027,6 +1097,7 @@ class KeywordMapper(ExtendedMappingSchema):
         if isinstance(result, dict) and self.children:
             mapping_data = super(KeywordMapper, self).deserialize(cstruct)
             result.update(mapping_data)
+        result = SortableMappingSchema._deserialize_impl(self, result)
         return result
 
 

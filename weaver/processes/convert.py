@@ -879,7 +879,7 @@ def any2wps_literal_datatype(io_type, is_value):
     """
     if isinstance(io_type, str):
         if not is_value:
-            if io_type in ["date", "time", "dateTime", "anyURI"]:
+            if io_type in ["string", "date", "time", "dateTime", "anyURI"]:
                 return "string"
             if io_type in ["scale", "angle", "float", "double"]:
                 return "float"

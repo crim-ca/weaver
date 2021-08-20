@@ -300,22 +300,22 @@ class WpsRestApiProcessesTest(unittest.TestCase):
 
     @staticmethod
     def assert_deployed_wps3(response_json, expected_process_id):
-        assert expected_process_id in response_json["process"]["id"]
-        assert len(response_json["process"]["inputs"]) == 1
-        assert response_json["process"]["inputs"][0]["id"] == "input-1"
-        assert response_json["process"]["inputs"][0]["minOccurs"] == 1
-        assert response_json["process"]["inputs"][0]["maxOccurs"] == 1
-        assert "formats" not in response_json["process"]["inputs"][0]   # literal data doesn't have "formats"
-        assert len(response_json["process"]["outputs"]) == 1
-        assert response_json["process"]["outputs"][0]["id"] == "output"
-        assert "minOccurs" not in response_json["process"]["outputs"][0]
-        assert "maxOccurs" not in response_json["process"]["outputs"][0]
+        assert expected_process_id in response_json["id"]
+        assert len(response_json["inputs"]) == 1
+        assert response_json["inputs"][0]["id"] == "input-1"
+        assert response_json["inputs"][0]["minOccurs"] == 1
+        assert response_json["inputs"][0]["maxOccurs"] == 1
+        assert "formats" not in response_json["inputs"][0]   # literal data doesn't have "formats"
+        assert len(response_json["outputs"]) == 1
+        assert response_json["outputs"][0]["id"] == "output"
+        assert "minOccurs" not in response_json["outputs"][0]
+        assert "maxOccurs" not in response_json["outputs"][0]
         # TODO: handling multiple outputs (https://github.com/crim-ca/weaver/issues/25)
-        # assert response_json["process"]["outputs"][0]["minOccurs"] == "1"
-        # assert response_json["process"]["outputs"][0]["maxOccurs"] == "1"
-        assert isinstance(response_json["process"]["outputs"][0]["formats"], list)
-        assert len(response_json["process"]["outputs"][0]["formats"]) == 1
-        assert response_json["process"]["outputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
+        # assert response_json["outputs"][0]["minOccurs"] == "1"
+        # assert response_json["outputs"][0]["maxOccurs"] == "1"
+        assert isinstance(response_json["outputs"][0]["formats"], list)
+        assert len(response_json["outputs"][0]["formats"]) == 1
+        assert response_json["outputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
 
     def deploy_process_make_visible_and_fetch_deployed(self, deploy_payload, expected_process_id):
         """

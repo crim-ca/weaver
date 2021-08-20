@@ -23,6 +23,8 @@ Changes:
   by ``ProcessSummary`` during listing of processes, as well as for corresponding provider-related endpoints.
 - Update ``mimeType`` to ``mediaType`` as format type representation according to `OGC-API`
   (relates to `#211  <https://github.com/crim-ca/weaver/issues/211>`_).
+- Add sorting capability to generate mapping schemas for API responses using overrides of
+  properties ``_sort_first`` and ``_sort_after`` using lists of desired ordered field names.
 - Improved naming of many ambiguous and repeated words across schema definitions that did not necessarily interact
   with each other although making use of similar naming convention, making their interpretation and debugging much
   more complicated. A stricter naming convention has been applied for consistent Deploy/Describe/Execute-related

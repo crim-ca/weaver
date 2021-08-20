@@ -57,24 +57,29 @@ class WpsPackageConfigBase(unittest.TestCase):
         pyramid.testing.tearDown()
 
     @classmethod
-    def deploy_process(cls, payload, describe_schema="OLD"):
+    def describe_process(cls, process_id, describe_schema="OGC"):
+        path = "/processes/{}?schema={}".format(process_id, describe_schema)
+        resp = cls.app.get(path, headers=cls.json_headers)
+        assert resp.status_code == 200
+        return deepcopy(resp.json)
+
+    @classmethod
+    def deploy_process(cls, payload, describe_schema="OGC"):
         # type: (JSON, str) -> JSON
         """
         Deploys a process with :paramref:`payload`.
 
         :returns: resulting tuple of ``(process-description, package)`` JSON responses.
         """
-        path = "/processes"
-        query = {"schema": describe_schema}
-        resp = mocked_sub_requests(cls.app, "post_json", path, params=query, data=payload, headers=cls.json_headers)
+        resp = mocked_sub_requests(cls.app, "post_json", "/processes", data=payload, headers=cls.json_headers)
         assert resp.status_code == 201, "Expected successful deployment.\nError:\n{}".format(resp.text)
         path = resp.json["processSummary"]["processDescriptionURL"]
         body = {"value": VISIBILITY_PUBLIC}
         resp = cls.app.put_json("{}/visibility".format(path), params=body, headers=cls.json_headers)
         assert resp.status_code == 200, "Expected successful visibility.\nError:\n{}".format(resp.text)
         info = []
-        for pkg_url in [path, "{}/package".format(path)]:
-            resp = cls.app.get(pkg_url, headers=cls.json_headers)
+        for info_path in ["{}?schema={}".format(path, describe_schema), "{}/package".format(path)]:
+            resp = cls.app.get(info_path, headers=cls.json_headers)
             assert resp.status_code == 200
             info.append(deepcopy(resp.json))
         return info

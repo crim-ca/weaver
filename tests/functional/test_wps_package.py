@@ -13,6 +13,7 @@ import logging
 import os
 import tempfile
 from inspect import cleandoc
+from typing import TYPE_CHECKING
 
 import colander
 import pytest
@@ -44,6 +45,11 @@ from weaver.formats import (
 )
 from weaver.processes.constants import CWL_REQUIREMENT_APP_DOCKER, CWL_REQUIREMENT_INIT_WORKDIR
 from weaver.utils import get_any_value
+
+if TYPE_CHECKING:
+    from typing import List
+
+    from weaver.typedefs import JSON
 
 EDAM_PLAIN = EDAM_NAMESPACE + ":" + EDAM_MAPPING[CONTENT_TYPE_TEXT_PLAIN]
 EDAM_NETCDF = EDAM_NAMESPACE + ":" + EDAM_MAPPING[CONTENT_TYPE_APP_NETCDF]
@@ -92,7 +98,7 @@ class WpsPackageAppTest(WpsPackageConfigBase):
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
             "executionUnit": [{"unit": cwl}],
         }
-        desc, pkg = self.deploy_process(body)
+        desc, pkg = self.deploy_process(body, describe_schema="OGC")
         assert desc["title"] == title
         assert pkg["label"] == title
 
@@ -129,28 +135,29 @@ class WpsPackageAppTest(WpsPackageConfigBase):
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
             "executionUnit": [{"unit": cwl}],
         }
-        desc, _ = self.deploy_process(body)
+        desc, _ = self.deploy_process(body, describe_schema="OLD")
+        proc = desc["process"]
 
-        assert desc["id"] == self._testMethodName
-        assert desc["title"] == "some title"
-        assert desc["abstract"] == "this is a test"
-        assert isinstance(desc["inputs"], list)
-        assert len(desc["inputs"]) == 1
-        assert desc["inputs"][0]["id"] == "url"
-        assert desc["inputs"][0]["minOccurs"] == 1
-        assert desc["inputs"][0]["maxOccurs"] == 1
-        assert "format" not in desc["inputs"][0]
-        assert isinstance(desc["outputs"], list)
-        assert len(desc["outputs"]) == 1
-        assert desc["outputs"][0]["id"] == "values"
-        assert "minOccurs" not in desc["outputs"][0]
-        assert "maxOccurs" not in desc["outputs"][0]
-        assert "format" not in desc["outputs"][0]
+        assert proc["id"] == self._testMethodName
+        assert proc["title"] == "some title"
+        assert proc["description"] == "this is a test"
+        assert isinstance(proc["inputs"], list)
+        assert len(proc["inputs"]) == 1
+        assert proc["inputs"][0]["id"] == "url"
+        assert proc["inputs"][0]["minOccurs"] == 1
+        assert proc["inputs"][0]["maxOccurs"] == 1
+        assert "format" not in proc["inputs"][0]
+        assert isinstance(proc["outputs"], list)
+        assert len(proc["outputs"]) == 1
+        assert proc["outputs"][0]["id"] == "values"
+        assert "minOccurs" not in proc["outputs"][0]
+        assert "maxOccurs" not in proc["outputs"][0]
+        assert "format" not in proc["outputs"][0]
         assert len(set(desc.keys()) - KNOWN_PROCESS_DESCRIPTION_FIELDS) == 0
         # make sure that deserialization of literal fields did not produce over-verbose metadata
-        for p_input in desc["inputs"]:
+        for p_input in proc["inputs"]:
             assert len(set(p_input) - KNOWN_PROCESS_DESCRIPTION_INPUT_DATA_FIELDS) == 0
-        for p_output in desc["outputs"]:
+        for p_output in proc["outputs"]:
             assert len(set(p_output) - KNOWN_PROCESS_DESCRIPTION_OUTPUT_DATA_FIELDS) == 0
 
     def test_literal_io_from_package_and_offering(self):
@@ -221,26 +228,27 @@ class WpsPackageAppTest(WpsPackageConfigBase):
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
             "executionUnit": [{"unit": cwl}],
         }
-        desc, pkg = self.deploy_process(body)
+        desc, pkg = self.deploy_process(body, describe_schema="OLD")
+        proc = desc["process"]
 
-        assert desc["id"] == self._testMethodName
-        assert desc["title"] == "some title"
-        assert desc["abstract"] == "this is a test"
-        assert isinstance(desc["inputs"], list)
-        assert len(desc["inputs"]) == 2
-        assert desc["inputs"][0]["id"] == "literal_input_only_cwl_minimal"
-        assert desc["inputs"][0]["minOccurs"] == 1
-        assert desc["inputs"][0]["maxOccurs"] == 1
-        assert desc["inputs"][1]["id"] == "literal_input_both_cwl_and_wps"
-        assert desc["inputs"][1]["minOccurs"] == 1
-        assert desc["inputs"][1]["maxOccurs"] == 1
-        assert desc["inputs"][1]["title"] == "Extra detail for I/O both in CWL and WPS", \
+        assert proc["id"] == self._testMethodName
+        assert proc["title"] == "some title"
+        assert proc["description"] == "this is a test"
+        assert isinstance(proc["inputs"], list)
+        assert len(proc["inputs"]) == 2
+        assert proc["inputs"][0]["id"] == "literal_input_only_cwl_minimal"
+        assert proc["inputs"][0]["minOccurs"] == 1
+        assert proc["inputs"][0]["maxOccurs"] == 1
+        assert proc["inputs"][1]["id"] == "literal_input_both_cwl_and_wps"
+        assert proc["inputs"][1]["minOccurs"] == 1
+        assert proc["inputs"][1]["maxOccurs"] == 1
+        assert proc["inputs"][1]["title"] == "Extra detail for I/O both in CWL and WPS", \
             "Additional details defined only in WPS matching CWL I/O by ID should be preserved"
-        assert isinstance(desc["outputs"], list)
-        assert len(desc["outputs"]) == 2
-        assert desc["outputs"][0]["id"] == "literal_output_only_cwl_minimal"
-        assert desc["outputs"][1]["id"] == "literal_output_both_cwl_and_wps"
-        assert desc["outputs"][1]["title"] == "Additional detail only within WPS output", \
+        assert isinstance(proc["outputs"], list)
+        assert len(proc["outputs"]) == 2
+        assert proc["outputs"][0]["id"] == "literal_output_only_cwl_minimal"
+        assert proc["outputs"][1]["id"] == "literal_output_both_cwl_and_wps"
+        assert proc["outputs"][1]["title"] == "Additional detail only within WPS output", \
             "Additional details defined only in WPS matching CWL I/O by ID should be preserved"
 
         assert len(pkg["inputs"]) == 2
@@ -259,6 +267,24 @@ class WpsPackageAppTest(WpsPackageConfigBase):
         #   https://github.com/crim-ca/weaver/issues/50
         # assert pkg["outputs"][1]["label"] == "Additional detail only within WPS output", \
         #     "WPS I/O title should be converted to CWL label of corresponding I/O from additional details"
+
+        desc = self.describe_process(self._testMethodName, describe_schema="OGC")
+        assert desc["id"] == self._testMethodName
+        assert desc["title"] == "some title"
+        assert desc["description"] == "this is a test"
+        assert isinstance(desc["inputs"], dict)
+        assert len(desc["inputs"]) == 2
+        assert desc["inputs"]["literal_input_only_cwl_minimal"]["minOccurs"] == 1
+        assert desc["inputs"]["literal_input_only_cwl_minimal"]["maxOccurs"] == 1
+        assert desc["inputs"]["literal_input_both_cwl_and_wps"]["minOccurs"] == 1
+        assert desc["inputs"]["literal_input_both_cwl_and_wps"]["maxOccurs"] == 1
+        assert isinstance(desc["outputs"], dict)
+        assert len(desc["outputs"]) == 2
+        assert "title" not in desc["outputs"]["literal_output_only_cwl_minimal"], \
+            "No additional title provided should make the field to be omitted completely."
+        assert desc["outputs"]["literal_output_both_cwl_and_wps"]["title"] == \
+            "Additional detail only within WPS output", \
+            "Additional details defined only in WPS matching CWL I/O by ID should be preserved."
 
     def test_complex_io_format_references(self):
         """
@@ -330,40 +356,50 @@ class WpsPackageAppTest(WpsPackageConfigBase):
                 "$namespaces": dict(list(ns_json.items()))
             }}],
         }
-        desc, pkg = self.deploy_process(body)
+        desc, pkg = self.deploy_process(body, describe_schema="OLD")
+        proc = desc["process"]
 
-        assert desc["inputs"][0]["id"] == "wps_only_format_exists"
-        assert len(desc["inputs"][0]["formats"]) == 1
-        assert desc["inputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
+        assert proc["inputs"][0]["id"] == "wps_only_format_exists"
+        assert len(proc["inputs"][0]["formats"]) == 1
+        assert proc["inputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
         assert pkg["inputs"][0]["id"] == "wps_only_format_exists"
         assert pkg["inputs"][0]["type"] == "File"
         # FIXME: back-propagate WPS format to CWL without format specified
         #  (https://github.com/crim-ca/weaver/issues/50)
         # assert pkg["inputs"][0]["format"] == type_json
 
-        assert desc["inputs"][1]["id"] == "wps_only_format_not_exists"
-        assert len(desc["inputs"][1]["formats"]) == 1
-        assert desc["inputs"][1]["formats"][0]["mediaType"] == ct_not_exists
+        assert proc["inputs"][1]["id"] == "wps_only_format_not_exists"
+        assert len(proc["inputs"][1]["formats"]) == 1
+        assert proc["inputs"][1]["formats"][0]["mediaType"] == ct_not_exists
         assert pkg["inputs"][1]["id"] == "wps_only_format_not_exists"
         assert pkg["inputs"][1]["type"] == "File"
         assert "format" not in pkg["inputs"][1], "Non-existing CWL format reference should have been dropped."
 
-        assert desc["inputs"][2]["id"] == "wps_only_format_both"
-        assert len(desc["inputs"][2]["formats"]) == 2
-        assert desc["inputs"][2]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
-        assert desc["inputs"][2]["formats"][1]["mediaType"] == ct_not_exists
+        assert proc["inputs"][2]["id"] == "wps_only_format_both"
+        assert len(proc["inputs"][2]["formats"]) == 2
+        assert proc["inputs"][2]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
+        assert proc["inputs"][2]["formats"][1]["mediaType"] == ct_not_exists
         assert pkg["inputs"][2]["id"] == "wps_only_format_both"
         assert pkg["inputs"][2]["type"] == "File"
         # FIXME: for now we don't even back-propagate, but if we did, must be none because one is unknown reference
         #   (https://github.com/crim-ca/weaver/issues/50)
         assert "format" not in pkg["inputs"][2], "Any non-existing CWL format reference should drop all entries."
 
-        assert desc["inputs"][3]["id"] == "cwl_only_format_exists"
-        assert len(desc["inputs"][3]["formats"]) == 1
-        assert desc["inputs"][3]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
+        assert proc["inputs"][3]["id"] == "cwl_only_format_exists"
+        assert len(proc["inputs"][3]["formats"]) == 1
+        assert proc["inputs"][3]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
         assert pkg["inputs"][3]["id"] == "cwl_only_format_exists"
         assert pkg["inputs"][3]["type"] == "File"
         assert pkg["inputs"][3]["format"] == type_json
+
+        desc = self.describe_process(self._testMethodName, describe_schema="OGC")
+        assert len(desc["inputs"]["wps_only_format_exists"]["formats"]) == 1
+        assert desc["inputs"]["wps_only_format_exists"]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
+        assert len(desc["inputs"]["wps_only_format_not_exists"]["formats"]) == 1
+        assert desc["inputs"]["wps_only_format_not_exists"]["formats"][0]["mediaType"] == ct_not_exists
+        assert len(desc["inputs"]["wps_only_format_both"]["formats"]) == 2
+        assert desc["inputs"]["wps_only_format_both"]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
+        assert desc["inputs"]["wps_only_format_both"]["formats"][1]["mediaType"] == ct_not_exists
 
     def test_mediatype_io_format_references(self):
         """
@@ -443,14 +479,22 @@ class WpsPackageAppTest(WpsPackageConfigBase):
                 }
             }]
         }
-        desc, _ = self.deploy_process(body)
+        desc, _ = self.deploy_process(body, describe_schema="OLD")
+        proc = desc["process"]
+        assert proc["inputs"][0]["id"] == "wps_format_mimeType"
+        assert proc["inputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
+        assert proc["inputs"][1]["id"] == "wps_format_mediaType"
+        assert proc["inputs"][1]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
+        assert proc["outputs"][0]["id"] == "wps_format_mimeType"
+        assert proc["outputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
+        assert proc["outputs"][1]["id"] == "wps_format_mediaType"
+        assert proc["outputs"][1]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
 
-        assert desc["process"]["inputs"][0]["id"] == "wps_format_mimeType"
-        assert desc["process"]["inputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
-        assert desc["process"]["outputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
-        assert desc["process"]["inputs"][1]["id"] == "wps_format_mediaType"
-        assert desc["process"]["inputs"][1]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
-        assert desc["process"]["outputs"][1]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
+        desc = self.describe_process(self._testMethodName, describe_schema="OGC")
+        assert desc["inputs"]["wps_format_mimeType"]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
+        assert desc["inputs"]["wps_format_mediaType"]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
+        assert desc["outputs"]["wps_format_mimeType"]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
+        assert desc["outputs"]["wps_format_mediaType"]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
 
     def test_complex_io_with_multiple_formats_and_defaults(self):
         """
@@ -638,78 +682,79 @@ class WpsPackageAppTest(WpsPackageConfigBase):
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
             "executionUnit": [{"unit": cwl}],
         }
-        desc, pkg = self.deploy_process(body)
+        desc, pkg = self.deploy_process(body, describe_schema="OLD")
+        proc = desc["process"]
 
         # process description input validation
-        assert desc["inputs"][0]["id"] == "single_value_single_format"
-        assert desc["inputs"][0]["minOccurs"] == 1
-        assert desc["inputs"][0]["maxOccurs"] == 1
-        assert len(desc["inputs"][0]["formats"]) == 1
-        assert desc["inputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
-        assert desc["inputs"][0]["formats"][0]["default"] is True  # only format available, auto default
-        assert desc["inputs"][1]["id"] == "multi_value_single_format"
-        assert desc["inputs"][1]["minOccurs"] == 1
-        assert desc["inputs"][1]["maxOccurs"] == "unbounded"
-        assert len(desc["inputs"][1]["formats"]) == 1
-        assert desc["inputs"][1]["formats"][0]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
-        assert desc["inputs"][1]["formats"][0]["default"] is True  # only format available, auto default
-        assert desc["inputs"][2]["id"] == "single_value_single_format_default"
-        assert desc["inputs"][2]["minOccurs"] == 0
-        assert desc["inputs"][2]["maxOccurs"] == 1
-        assert len(desc["inputs"][2]["formats"]) == 1
-        assert desc["inputs"][2]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_NETCDF
-        assert desc["inputs"][2]["formats"][0]["default"] is True  # only format available, auto default
-        assert desc["inputs"][3]["id"] == "multi_value_single_format_default"
-        assert desc["inputs"][3]["minOccurs"] == 0
-        assert desc["inputs"][3]["maxOccurs"] == "unbounded"
-        assert len(desc["inputs"][3]["formats"]) == 1
-        assert desc["inputs"][3]["formats"][0]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
-        assert desc["inputs"][3]["formats"][0]["default"] is True  # only format available, auto default
-        assert desc["inputs"][4]["id"] == "single_value_multi_format"
-        assert desc["inputs"][4]["minOccurs"] == 1
-        assert desc["inputs"][4]["maxOccurs"] == 1
-        assert len(desc["inputs"][4]["formats"]) == 3
-        assert desc["inputs"][4]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
-        assert desc["inputs"][4]["formats"][0]["default"] is True  # no explicit default, uses first
-        assert desc["inputs"][4]["formats"][1]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
-        assert desc["inputs"][4]["formats"][1]["default"] is False
-        assert desc["inputs"][4]["formats"][2]["mediaType"] == CONTENT_TYPE_APP_NETCDF
-        assert desc["inputs"][4]["formats"][2]["default"] is False
-        assert desc["inputs"][5]["id"] == "multi_value_multi_format"
-        assert desc["inputs"][5]["minOccurs"] == 1
-        assert desc["inputs"][5]["maxOccurs"] == "unbounded"
-        assert len(desc["inputs"][5]["formats"]) == 3
-        assert desc["inputs"][5]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_NETCDF
-        assert desc["inputs"][5]["formats"][0]["default"] is False
-        assert desc["inputs"][5]["formats"][1]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
-        assert desc["inputs"][5]["formats"][1]["default"] is True  # specified in process description
-        assert desc["inputs"][5]["formats"][2]["mediaType"] == CONTENT_TYPE_APP_JSON
-        assert desc["inputs"][5]["formats"][2]["default"] is False
-        assert desc["inputs"][6]["id"] == "single_value_multi_format_default"
-        assert desc["inputs"][6]["minOccurs"] == 0
-        assert desc["inputs"][6]["maxOccurs"] == 1
-        assert len(desc["inputs"][6]["formats"]) == 3
-        assert desc["inputs"][6]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
-        assert desc["inputs"][6]["formats"][0]["default"] is True  # no explicit default, uses first
-        assert desc["inputs"][6]["formats"][1]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
-        assert desc["inputs"][6]["formats"][1]["default"] is False
-        assert desc["inputs"][6]["formats"][2]["mediaType"] == CONTENT_TYPE_APP_NETCDF
-        assert desc["inputs"][6]["formats"][2]["default"] is False
-        assert desc["inputs"][7]["id"] == "multi_value_multi_format_default"
-        assert desc["inputs"][7]["minOccurs"] == 0
-        assert desc["inputs"][7]["maxOccurs"] == "unbounded"
-        assert len(desc["inputs"][7]["formats"]) == 3
-        assert desc["inputs"][7]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
-        assert desc["inputs"][7]["formats"][0]["default"] is False
-        assert desc["inputs"][7]["formats"][1]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
-        assert desc["inputs"][7]["formats"][1]["default"] is False
-        assert desc["inputs"][7]["formats"][2]["mediaType"] == CONTENT_TYPE_APP_NETCDF
-        assert desc["inputs"][7]["formats"][2]["default"] is True  # specified in process description
+        assert proc["inputs"][0]["id"] == "single_value_single_format"
+        assert proc["inputs"][0]["minOccurs"] == 1
+        assert proc["inputs"][0]["maxOccurs"] == 1
+        assert len(proc["inputs"][0]["formats"]) == 1
+        assert proc["inputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
+        assert proc["inputs"][0]["formats"][0]["default"] is True  # only format available, auto default
+        assert proc["inputs"][1]["id"] == "multi_value_single_format"
+        assert proc["inputs"][1]["minOccurs"] == 1
+        assert proc["inputs"][1]["maxOccurs"] == "unbounded"
+        assert len(proc["inputs"][1]["formats"]) == 1
+        assert proc["inputs"][1]["formats"][0]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert proc["inputs"][1]["formats"][0]["default"] is True  # only format available, auto default
+        assert proc["inputs"][2]["id"] == "single_value_single_format_default"
+        assert proc["inputs"][2]["minOccurs"] == 0
+        assert proc["inputs"][2]["maxOccurs"] == 1
+        assert len(proc["inputs"][2]["formats"]) == 1
+        assert proc["inputs"][2]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_NETCDF
+        assert proc["inputs"][2]["formats"][0]["default"] is True  # only format available, auto default
+        assert proc["inputs"][3]["id"] == "multi_value_single_format_default"
+        assert proc["inputs"][3]["minOccurs"] == 0
+        assert proc["inputs"][3]["maxOccurs"] == "unbounded"
+        assert len(proc["inputs"][3]["formats"]) == 1
+        assert proc["inputs"][3]["formats"][0]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert proc["inputs"][3]["formats"][0]["default"] is True  # only format available, auto default
+        assert proc["inputs"][4]["id"] == "single_value_multi_format"
+        assert proc["inputs"][4]["minOccurs"] == 1
+        assert proc["inputs"][4]["maxOccurs"] == 1
+        assert len(proc["inputs"][4]["formats"]) == 3
+        assert proc["inputs"][4]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
+        assert proc["inputs"][4]["formats"][0]["default"] is True  # no explicit default, uses first
+        assert proc["inputs"][4]["formats"][1]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert proc["inputs"][4]["formats"][1]["default"] is False
+        assert proc["inputs"][4]["formats"][2]["mediaType"] == CONTENT_TYPE_APP_NETCDF
+        assert proc["inputs"][4]["formats"][2]["default"] is False
+        assert proc["inputs"][5]["id"] == "multi_value_multi_format"
+        assert proc["inputs"][5]["minOccurs"] == 1
+        assert proc["inputs"][5]["maxOccurs"] == "unbounded"
+        assert len(proc["inputs"][5]["formats"]) == 3
+        assert proc["inputs"][5]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_NETCDF
+        assert proc["inputs"][5]["formats"][0]["default"] is False
+        assert proc["inputs"][5]["formats"][1]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert proc["inputs"][5]["formats"][1]["default"] is True  # specified in process description
+        assert proc["inputs"][5]["formats"][2]["mediaType"] == CONTENT_TYPE_APP_JSON
+        assert proc["inputs"][5]["formats"][2]["default"] is False
+        assert proc["inputs"][6]["id"] == "single_value_multi_format_default"
+        assert proc["inputs"][6]["minOccurs"] == 0
+        assert proc["inputs"][6]["maxOccurs"] == 1
+        assert len(proc["inputs"][6]["formats"]) == 3
+        assert proc["inputs"][6]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
+        assert proc["inputs"][6]["formats"][0]["default"] is True  # no explicit default, uses first
+        assert proc["inputs"][6]["formats"][1]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert proc["inputs"][6]["formats"][1]["default"] is False
+        assert proc["inputs"][6]["formats"][2]["mediaType"] == CONTENT_TYPE_APP_NETCDF
+        assert proc["inputs"][6]["formats"][2]["default"] is False
+        assert proc["inputs"][7]["id"] == "multi_value_multi_format_default"
+        assert proc["inputs"][7]["minOccurs"] == 0
+        assert proc["inputs"][7]["maxOccurs"] == "unbounded"
+        assert len(proc["inputs"][7]["formats"]) == 3
+        assert proc["inputs"][7]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
+        assert proc["inputs"][7]["formats"][0]["default"] is False
+        assert proc["inputs"][7]["formats"][1]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert proc["inputs"][7]["formats"][1]["default"] is False
+        assert proc["inputs"][7]["formats"][2]["mediaType"] == CONTENT_TYPE_APP_NETCDF
+        assert proc["inputs"][7]["formats"][2]["default"] is True  # specified in process description
 
         # process description output validation
-        assert isinstance(desc["outputs"], list)
-        assert len(desc["outputs"]) == 2  # FIXME: adjust output count when issue #25 is implemented
-        for output in desc["outputs"]:
+        assert isinstance(proc["outputs"], list)
+        assert len(proc["outputs"]) == 2  # FIXME: adjust output count when issue #25 is implemented
+        for output in proc["outputs"]:
             for field in ["minOccurs", "maxOccurs", "default"]:
                 assert field not in output
             for format_spec in output["formats"]:
@@ -720,27 +765,27 @@ class WpsPackageAppTest(WpsPackageConfigBase):
                     LOGGER.warning("Output [%s] has 'default' key but shouldn't (non-breaking).", output["id"])
                 # assert "default" not in format_spec
 
-        assert desc["outputs"][0]["id"] == "single_value_single_format"
-        assert len(desc["outputs"][0]["formats"]) == 1
-        assert desc["outputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
-        assert desc["outputs"][0]["formats"][0]["default"] is True
-        assert desc["outputs"][1]["id"] == "single_value_multi_format"
-        assert len(desc["outputs"][1]["formats"]) == 3
-        assert desc["outputs"][1]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
-        assert desc["outputs"][1]["formats"][1]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
-        assert desc["outputs"][1]["formats"][2]["mediaType"] == CONTENT_TYPE_APP_NETCDF
-        assert desc["outputs"][1]["formats"][0]["default"] is True   # mandatory
-        assert desc["outputs"][1]["formats"][1].get("default", False) is False  # omission is allowed
-        assert desc["outputs"][1]["formats"][2].get("default", False) is False  # omission is allowed
+        assert proc["outputs"][0]["id"] == "single_value_single_format"
+        assert len(proc["outputs"][0]["formats"]) == 1
+        assert proc["outputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
+        assert proc["outputs"][0]["formats"][0]["default"] is True
+        assert proc["outputs"][1]["id"] == "single_value_multi_format"
+        assert len(proc["outputs"][1]["formats"]) == 3
+        assert proc["outputs"][1]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
+        assert proc["outputs"][1]["formats"][1]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert proc["outputs"][1]["formats"][2]["mediaType"] == CONTENT_TYPE_APP_NETCDF
+        assert proc["outputs"][1]["formats"][0]["default"] is True   # mandatory
+        assert proc["outputs"][1]["formats"][1].get("default", False) is False  # omission is allowed
+        assert proc["outputs"][1]["formats"][2].get("default", False) is False  # omission is allowed
         # FIXME: enable when issue #25 is implemented
-        # assert desc["outputs"][2]["id"] == "multi_value_single_format"
-        # assert len(desc["outputs"][2]["formats"]) == 1
-        # assert desc["outputs"][2]["formats"][0] == CONTENT_TYPE_APP_NETCDF
-        # assert desc["outputs"][3]["id"] == "multi_value_multi_format"
-        # assert len(desc["outputs"][3]["formats"]) == 3
-        # assert desc["outputs"][3]["formats"][0] == CONTENT_TYPE_APP_NETCDF
-        # assert desc["outputs"][3]["formats"][1] == CONTENT_TYPE_TEXT_PLAIN
-        # assert desc["outputs"][3]["formats"][2] == CONTENT_TYPE_APP_JSON
+        # assert proc["outputs"][2]["id"] == "multi_value_single_format"
+        # assert len(proc["outputs"][2]["formats"]) == 1
+        # assert proc["outputs"][2]["formats"][0] == CONTENT_TYPE_APP_NETCDF
+        # assert proc["outputs"][3]["id"] == "multi_value_multi_format"
+        # assert len(proc["outputs"][3]["formats"]) == 3
+        # assert proc["outputs"][3]["formats"][0] == CONTENT_TYPE_APP_NETCDF
+        # assert proc["outputs"][3]["formats"][1] == CONTENT_TYPE_TEXT_PLAIN
+        # assert proc["outputs"][3]["formats"][2] == CONTENT_TYPE_APP_JSON
 
         # package input validation
         assert pkg["inputs"][0]["id"] == "single_value_single_format"
@@ -781,7 +826,7 @@ class WpsPackageAppTest(WpsPackageConfigBase):
         assert pkg["inputs"][7]["default"] == default_file
 
         # package output validation
-        for output in desc["outputs"]:
+        for output in proc["outputs"]:
             assert "default" not in output
         assert pkg["outputs"][0]["id"] == "single_value_single_format"
         assert pkg["outputs"][0]["type"] == "File"
@@ -871,54 +916,55 @@ class WpsPackageAppTest(WpsPackageConfigBase):
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
             "executionUnit": [{"unit": cwl}],
         }
-        desc, pkg = self.deploy_process(body)
+        desc, pkg = self.deploy_process(body, describe_schema="OLD")
+        proc = desc["process"]
 
-        assert desc["inputs"][0]["id"] == "required_literal"
-        assert desc["inputs"][0]["minOccurs"] == 1
-        assert desc["inputs"][0]["maxOccurs"] == 1
-        assert desc["inputs"][1]["id"] == "required_literal_default"
-        assert desc["inputs"][1]["minOccurs"] == 0
-        assert desc["inputs"][1]["maxOccurs"] == 1
-        assert desc["inputs"][2]["id"] == "optional_literal_shortcut"
-        assert desc["inputs"][2]["minOccurs"] == 0
-        assert desc["inputs"][2]["maxOccurs"] == 1
-        assert desc["inputs"][3]["id"] == "optional_literal_explicit"
-        assert desc["inputs"][3]["minOccurs"] == 0
-        assert desc["inputs"][3]["maxOccurs"] == 1
-        assert desc["inputs"][4]["id"] == "required_array_shortcut"
-        assert desc["inputs"][4]["minOccurs"] == 1
-        assert desc["inputs"][4]["maxOccurs"] == "unbounded"
-        assert desc["inputs"][5]["id"] == "required_array_explicit"
-        assert desc["inputs"][5]["minOccurs"] == 1
-        assert desc["inputs"][5]["maxOccurs"] == "unbounded"
-        assert desc["inputs"][6]["id"] == "optional_array_shortcut"
-        assert desc["inputs"][6]["minOccurs"] == 0
-        assert desc["inputs"][6]["maxOccurs"] == "unbounded"
-        assert desc["inputs"][7]["id"] == "optional_array_explicit"
-        assert desc["inputs"][7]["minOccurs"] == 0
-        assert desc["inputs"][7]["maxOccurs"] == "unbounded"
-        assert desc["inputs"][8]["id"] == "required_literal_min_fixed_by_wps"
-        assert desc["inputs"][8]["minOccurs"] == 1
-        assert desc["inputs"][8]["maxOccurs"] == 1
-        assert desc["inputs"][9]["id"] == "optional_literal_min_fixed_by_wps"
-        assert desc["inputs"][9]["minOccurs"] == 0
-        assert desc["inputs"][9]["maxOccurs"] == 1
-        assert desc["inputs"][10]["id"] == "required_array_min_fixed_by_wps"
+        assert proc["inputs"][0]["id"] == "required_literal"
+        assert proc["inputs"][0]["minOccurs"] == 1
+        assert proc["inputs"][0]["maxOccurs"] == 1
+        assert proc["inputs"][1]["id"] == "required_literal_default"
+        assert proc["inputs"][1]["minOccurs"] == 0
+        assert proc["inputs"][1]["maxOccurs"] == 1
+        assert proc["inputs"][2]["id"] == "optional_literal_shortcut"
+        assert proc["inputs"][2]["minOccurs"] == 0
+        assert proc["inputs"][2]["maxOccurs"] == 1
+        assert proc["inputs"][3]["id"] == "optional_literal_explicit"
+        assert proc["inputs"][3]["minOccurs"] == 0
+        assert proc["inputs"][3]["maxOccurs"] == 1
+        assert proc["inputs"][4]["id"] == "required_array_shortcut"
+        assert proc["inputs"][4]["minOccurs"] == 1
+        assert proc["inputs"][4]["maxOccurs"] == "unbounded"
+        assert proc["inputs"][5]["id"] == "required_array_explicit"
+        assert proc["inputs"][5]["minOccurs"] == 1
+        assert proc["inputs"][5]["maxOccurs"] == "unbounded"
+        assert proc["inputs"][6]["id"] == "optional_array_shortcut"
+        assert proc["inputs"][6]["minOccurs"] == 0
+        assert proc["inputs"][6]["maxOccurs"] == "unbounded"
+        assert proc["inputs"][7]["id"] == "optional_array_explicit"
+        assert proc["inputs"][7]["minOccurs"] == 0
+        assert proc["inputs"][7]["maxOccurs"] == "unbounded"
+        assert proc["inputs"][8]["id"] == "required_literal_min_fixed_by_wps"
+        assert proc["inputs"][8]["minOccurs"] == 1
+        assert proc["inputs"][8]["maxOccurs"] == 1
+        assert proc["inputs"][9]["id"] == "optional_literal_min_fixed_by_wps"
+        assert proc["inputs"][9]["minOccurs"] == 0
+        assert proc["inputs"][9]["maxOccurs"] == 1
+        assert proc["inputs"][10]["id"] == "required_array_min_fixed_by_wps"
         # FIXME: https://github.com/crim-ca/weaver/issues/50
         #   `maxOccurs=1` not updated to `maxOccurs="unbounded"` as it is evaluated as a single value,
         #   but it should be considered an array since `minOccurs>1`
         #   (see: https://github.com/crim-ca/weaver/issues/17)
-        assert desc["inputs"][10]["minOccurs"] == 2
-        # assert desc["inputs"][10]["maxOccurs"] == "unbounded"
-        assert desc["inputs"][11]["id"] == "required_array_min_optional_fixed_by_wps"
-        assert desc["inputs"][11]["minOccurs"] == 2
-        # assert desc["inputs"][11]["maxOccurs"] == "unbounded"
-        assert desc["inputs"][12]["id"] == "required_array_max_fixed_by_wps"
-        assert desc["inputs"][12]["minOccurs"] == 1
-        assert desc["inputs"][12]["maxOccurs"] == 10
-        assert desc["inputs"][13]["id"] == "optional_array_max_fixed_by_wps"
-        assert desc["inputs"][13]["minOccurs"] == 0
-        assert desc["inputs"][13]["maxOccurs"] == 10
+        assert proc["inputs"][10]["minOccurs"] == 2
+        # assert proc["inputs"][10]["maxOccurs"] == "unbounded"
+        assert proc["inputs"][11]["id"] == "required_array_min_optional_fixed_by_wps"
+        assert proc["inputs"][11]["minOccurs"] == 2
+        # assert proc["inputs"][11]["maxOccurs"] == "unbounded"
+        assert proc["inputs"][12]["id"] == "required_array_max_fixed_by_wps"
+        assert proc["inputs"][12]["minOccurs"] == 1
+        assert proc["inputs"][12]["maxOccurs"] == 10
+        assert proc["inputs"][13]["id"] == "optional_array_max_fixed_by_wps"
+        assert proc["inputs"][13]["minOccurs"] == 0
+        assert proc["inputs"][13]["maxOccurs"] == 10
 
         assert pkg["inputs"][0]["id"] == "required_literal"
         assert pkg["inputs"][0]["type"] == "string"
@@ -1003,17 +1049,18 @@ class WpsPackageAppTest(WpsPackageConfigBase):
             "executionUnit": [{"unit": cwl}],
         }
         try:
-            desc, _ = self.deploy_process(body)
+            desc, _ = self.deploy_process(body, describe_schema="OLD")
         except colander.Invalid:
             self.fail("MinOccurs/MaxOccurs values defined as valid int/str should not raise an invalid schema error")
 
-        inputs = body["processDescription"]["inputs"]
-        assert isinstance(desc["inputs"], list)
-        assert len(desc["inputs"]) == len(inputs)
+        inputs = body["processDescription"]["inputs"]  # type: List[JSON]
+        proc = desc["process"]
+        assert isinstance(proc["inputs"], list)
+        assert len(proc["inputs"]) == len(inputs)
         for i, process_input in enumerate(inputs):
-            assert desc["inputs"][i]["id"] == process_input["id"]
+            assert proc["inputs"][i]["id"] == process_input["id"]
             for field in ["minOccurs", "maxOccurs"]:
-                proc_in_res = desc["inputs"][i][field]
+                proc_in_res = proc["inputs"][i][field]
                 proc_in_exp = (
                     int(process_input[field]) if str(process_input[field]).isnumeric() else process_input[field]
                 )
@@ -1072,16 +1119,16 @@ class WpsPackageAppTest(WpsPackageConfigBase):
                                                 path_ = value.get('path')
                                                 if path_ and os.path.exists(path_):
                                                     with open (path_, 'r') as file_:
-                                                        filedata = file_.read()
-                                                return filedata.upper()
+                                                        file_data = file_.read()
+                                                return file_data.upper()
                                             value = map(tmp, value)
                                         input[key] = ";".join(map(str, value))
                                     elif isinstance(value, dict):
                                         path_ = value.get('path')
                                         if path_ and os.path.exists(path_):
                                             with open (path_, 'r') as file_:
-                                                filedata = file_.read()
-                                            input[key] = filedata.upper()
+                                                file_data = file_.read()
+                                            input[key] = file_data.upper()
                                     elif isinstance(value, str):
                                         input[key] = value.upper()
                                     elif isinstance(value, bool):
@@ -1110,7 +1157,7 @@ class WpsPackageAppTest(WpsPackageConfigBase):
             "executionUnit": [{"unit": cwl}],
         }
         try:
-            desc, _ = self.deploy_process(body)
+            desc, _ = self.deploy_process(body, describe_schema="OLD")
         except colander.Invalid:
             self.fail("Test")
 
@@ -1151,7 +1198,7 @@ class WpsPackageAppTest(WpsPackageConfigBase):
                  },
                 {"id": "test_int_value", "value": 2923},
                 {"id": "test_float_value", "value": 389.73},
-                {"id": "test_string_value", "value": "stringtest"},
+                {"id": "test_string_value", "value": "string_test"},
                 {"id": "test_reference_http_value", "href": test_http_ref},
                 {"id": "test_reference_file_value", "href": test_file_ref},
                 {"id": "test_reference_s3_value", "href": test_bucket_ref}
@@ -1173,14 +1220,14 @@ class WpsPackageAppTest(WpsPackageConfigBase):
         results = self.monitor_job(status_url)
 
         job_output_file = results.get("output_test")["href"].split("/", 3)[-1]
-        tmpfile = "{}/{}".format(self.settings["weaver.wps_output_dir"], job_output_file)
+        tmp_file = "{}/{}".format(self.settings["weaver.wps_output_dir"], job_output_file)
 
         try:
-            processed_values = json.load(open(tmpfile, "r"))
+            processed_values = json.load(open(tmp_file, "r"))
         except FileNotFoundError:
-            self.fail("Output file [{}] was not found where it was expected to resume test".format(tmpfile))
+            self.fail("Output file [{}] was not found where it was expected to resume test".format(tmp_file))
         except Exception as exception:
-            self.fail("An error occured during the reading of the file: {}".format(exception))
+            self.fail("An error occurred during the reading of the file: {}".format(exception))
         assert processed_values["test_int_array"] == "11;21;31;41;51"
         assert processed_values["test_float_array"] == "10.53;20.53;30.53;40.53;50.53"
         assert processed_values["test_string_array"] == "THIS;IS;A;TEST"
@@ -1189,7 +1236,7 @@ class WpsPackageAppTest(WpsPackageConfigBase):
                                                             "THIS IS A GENERATED FILE FOR S3 TEST")
         assert processed_values["test_int_value"] == 2924
         assert processed_values["test_float_value"] == 390.23
-        assert processed_values["test_string_value"] == "STRINGTEST"
+        assert processed_values["test_string_value"] == "STRING_TEST"
         assert processed_values["test_reference_s3_value"] == "THIS IS A GENERATED FILE FOR S3 TEST"
         assert processed_values["test_reference_http_value"] == "THIS IS A GENERATED FILE FOR HTTP TEST"
         assert processed_values["test_reference_file_value"] == "THIS IS A GENERATED FILE FOR FILE TEST"
@@ -1232,8 +1279,8 @@ class WpsPackageAppTest(WpsPackageConfigBase):
                                         path_ = value.get('path')
                                         if path_ and os.path.exists(path_):
                                             with open (path_, 'r') as file_:
-                                                filedata = file_.read()
-                                            input[key] = ast.literal_eval(filedata.upper())
+                                                file_data = file_.read()
+                                            input[key] = ast.literal_eval(file_data.upper())
                                 json.dump(input, open("./tmp.txt","w"))
                                 """)
                         }
@@ -1254,7 +1301,7 @@ class WpsPackageAppTest(WpsPackageConfigBase):
             "executionUnit": [{"unit": cwl}],
         }
         try:
-            desc, _ = self.deploy_process(body)
+            desc, _ = self.deploy_process(body, describe_schema="OLD")
         except colander.Invalid:
             self.fail("Test")
 
@@ -1312,8 +1359,8 @@ class WpsPackageAppTest(WpsPackageConfigBase):
         except FileNotFoundError:
             self.fail("Output file [{}] was not found where it was expected to resume test".format(tmp_file))
         except Exception as exception:
-            self.fail("An error occured during the reading of the file: {}".format(exception))
-        assert processed_values["stringInput"] == "stringtest"
+            self.fail("An error occurred during the reading of the file: {}".format(exception))
+        assert processed_values["stringInput"] == "string_test"
         assert processed_values["integerInput"] == 10
         assert processed_values["doubleInput"] == 3.14159
         assert processed_values["stringArrayInput"] == ["1", "2", "3", "4", "5", "6"]
@@ -1401,31 +1448,32 @@ class WpsPackageAppTest(WpsPackageConfigBase):
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
             "executionUnit": [{"unit": cwl}],
         }
-        desc, _ = self.deploy_process(body)
-        assert desc["id"] == self._testMethodName
-        assert desc["title"] == "some title"
-        assert desc["abstract"] == "this is a test"
-        assert isinstance(desc["inputs"], list)
-        assert len(desc["inputs"]) == 1
-        assert desc["inputs"][0]["id"] == "url"
-        assert desc["inputs"][0]["minOccurs"] == 1
-        assert desc["inputs"][0]["maxOccurs"] == 1
-        assert isinstance(desc["inputs"][0]["formats"], list)
-        assert len(desc["inputs"][0]["formats"]) == 1
-        assert isinstance(desc["inputs"][0]["formats"][0], dict)
-        assert desc["inputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
-        assert desc["inputs"][0]["formats"][0]["default"] is True
-        assert isinstance(desc["outputs"], list)
-        assert len(desc["outputs"]) == 1
-        assert desc["outputs"][0]["id"] == "files"
-        assert "minOccurs" not in desc["outputs"][0]
-        assert "maxOccurs" not in desc["outputs"][0]
-        assert isinstance(desc["outputs"][0]["formats"], list)
-        assert len(desc["outputs"][0]["formats"]) == 1
-        assert isinstance(desc["outputs"][0]["formats"][0], dict)
-        assert desc["outputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
-        assert desc["outputs"][0]["formats"][0]["default"] is True
-        assert len(set(desc.keys()) - KNOWN_PROCESS_DESCRIPTION_FIELDS) == 0
+        desc, _ = self.deploy_process(body, describe_schema="OLD")
+        proc = desc[""]
+        assert proc["id"] == self._testMethodName
+        assert proc["title"] == "some title"
+        assert proc["description"] == "this is a test"
+        assert isinstance(proc["inputs"], list)
+        assert len(proc["inputs"]) == 1
+        assert proc["inputs"][0]["id"] == "url"
+        assert proc["inputs"][0]["minOccurs"] == 1
+        assert proc["inputs"][0]["maxOccurs"] == 1
+        assert isinstance(proc["inputs"][0]["formats"], list)
+        assert len(proc["inputs"][0]["formats"]) == 1
+        assert isinstance(proc["inputs"][0]["formats"][0], dict)
+        assert proc["inputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert proc["inputs"][0]["formats"][0]["default"] is True
+        assert isinstance(proc["outputs"], list)
+        assert len(proc["outputs"]) == 1
+        assert proc["outputs"][0]["id"] == "files"
+        assert "minOccurs" not in proc["outputs"][0]
+        assert "maxOccurs" not in proc["outputs"][0]
+        assert isinstance(proc["outputs"][0]["formats"], list)
+        assert len(proc["outputs"][0]["formats"]) == 1
+        assert isinstance(proc["outputs"][0]["formats"][0], dict)
+        assert proc["outputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert proc["outputs"][0]["formats"][0]["default"] is True
+        assert len(set(proc.keys()) - KNOWN_PROCESS_DESCRIPTION_FIELDS) == 0
 
     def test_complex_io_from_package_and_offering(self):
         """
@@ -1495,42 +1543,43 @@ class WpsPackageAppTest(WpsPackageConfigBase):
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
             "executionUnit": [{"unit": cwl}],
         }
-        desc, pkg = self.deploy_process(body)
+        desc, pkg = self.deploy_process(body, describe_schema="OLD")
+        proc = desc["process"]
 
-        assert desc["id"] == self._testMethodName
-        assert desc["title"] == "some title"
-        assert desc["abstract"] == "this is a test"
-        assert isinstance(desc["inputs"], list)
-        assert len(desc["inputs"]) == 2
-        assert desc["inputs"][0]["id"] == "complex_input_only_cwl_minimal"
-        assert desc["inputs"][0]["minOccurs"] == 1
-        assert desc["inputs"][0]["maxOccurs"] == 1
-        assert len(desc["inputs"][0]["formats"]) == 1, \
+        assert proc["id"] == self._testMethodName
+        assert proc["title"] == "some title"
+        assert proc["description"] == "this is a test"
+        assert isinstance(proc["inputs"], list)
+        assert len(proc["inputs"]) == 2
+        assert proc["inputs"][0]["id"] == "complex_input_only_cwl_minimal"
+        assert proc["inputs"][0]["minOccurs"] == 1
+        assert proc["inputs"][0]["maxOccurs"] == 1
+        assert len(proc["inputs"][0]["formats"]) == 1, \
             "Default format should be added to process definition when omitted from both CWL and WPS"
-        assert desc["inputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
-        assert desc["inputs"][0]["formats"][0]["default"] is True
-        assert desc["inputs"][1]["id"] == "complex_input_both_cwl_and_wps"
-        assert desc["inputs"][1]["minOccurs"] == 1
-        assert desc["inputs"][1]["maxOccurs"] == 1
-        assert len(desc["inputs"][1]["formats"]) == 1, \
+        assert proc["inputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert proc["inputs"][0]["formats"][0]["default"] is True
+        assert proc["inputs"][1]["id"] == "complex_input_both_cwl_and_wps"
+        assert proc["inputs"][1]["minOccurs"] == 1
+        assert proc["inputs"][1]["maxOccurs"] == 1
+        assert len(proc["inputs"][1]["formats"]) == 1, \
             "Default format should be added to process definition when omitted from both CWL and WPS"
-        assert desc["inputs"][1]["formats"][0]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
-        assert desc["inputs"][1]["formats"][0]["default"] is True
-        assert desc["inputs"][1]["title"] == "Extra detail for I/O both in CWL and WPS", \
+        assert proc["inputs"][1]["formats"][0]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert proc["inputs"][1]["formats"][0]["default"] is True
+        assert proc["inputs"][1]["title"] == "Extra detail for I/O both in CWL and WPS", \
             "Additional details defined only in WPS matching CWL I/O by ID should be preserved"
-        assert isinstance(desc["outputs"], list)
-        assert len(desc["outputs"]) == 2
-        assert desc["outputs"][0]["id"] == "complex_output_only_cwl_minimal"
-        assert len(desc["outputs"][0]["formats"]) == 1, \
+        assert isinstance(proc["outputs"], list)
+        assert len(proc["outputs"]) == 2
+        assert proc["outputs"][0]["id"] == "complex_output_only_cwl_minimal"
+        assert len(proc["outputs"][0]["formats"]) == 1, \
             "Default format should be added to process definition when omitted from both CWL and WPS"
-        assert desc["outputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
-        assert desc["outputs"][0]["formats"][0]["default"] is True
-        assert desc["outputs"][1]["id"] == "complex_output_both_cwl_and_wps"
-        assert len(desc["outputs"][1]["formats"]) == 1, \
+        assert proc["outputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert proc["outputs"][0]["formats"][0]["default"] is True
+        assert proc["outputs"][1]["id"] == "complex_output_both_cwl_and_wps"
+        assert len(proc["outputs"][1]["formats"]) == 1, \
             "Default format should be added to process definition when omitted from both CWL and WPS"
-        assert desc["outputs"][1]["formats"][0]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
-        assert desc["outputs"][1]["formats"][0]["default"] is True
-        assert desc["outputs"][1]["title"] == "Additional detail only within WPS output", \
+        assert proc["outputs"][1]["formats"][0]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert proc["outputs"][1]["formats"][0]["default"] is True
+        assert proc["outputs"][1]["title"] == "Additional detail only within WPS output", \
             "Additional details defined only in WPS matching CWL I/O by ID should be preserved"
 
         assert len(pkg["inputs"]) == 2
@@ -1564,12 +1613,13 @@ class WpsPackageAppTest(WpsPackageConfigBase):
             "executionUnit": [{"href": "mock://{}".format(resources.WPS_LITERAL_COMPLEX_IO)}],
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication"
         }
-        desc, pkg = self.deploy_process(body)
+        desc, pkg = self.deploy_process(body, describe_schema="OLD")
 
         # basic contents validation
         assert "cwlVersion" in pkg
         assert "process" in desc
-        assert desc["id"] == self._testMethodName
+        proc = desc["process"]
+        assert proc["id"] == self._testMethodName
 
         # package I/O validation
         assert "inputs" in pkg
@@ -1605,40 +1655,44 @@ class WpsPackageAppTest(WpsPackageConfigBase):
         assert pkg["outputs"][1]["outputBinding"]["glob"] == "output_log.*"
 
         # process description I/O validation
-        assert len(desc["inputs"]) == 2
-        assert desc["inputs"][0]["id"] == "tasmax"
-        assert desc["inputs"][0]["title"] == "Resource"
-        assert desc["inputs"][0]["abstract"] == "NetCDF Files or archive (tar/zip) containing netCDF files."
-        assert desc["inputs"][0]["minOccurs"] == 1
-        assert desc["inputs"][0]["maxOccurs"] == 1000
-        assert len(desc["inputs"][0]["formats"]) == 1
-        assert desc["inputs"][0]["formats"][0]["default"] is True
-        assert desc["inputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_NETCDF
-        assert desc["inputs"][0]["formats"][0]["encoding"] == "base64"
-        assert desc["inputs"][1]["id"] == "freq"
-        assert desc["inputs"][1]["title"] == "Frequency"
-        assert desc["inputs"][1]["abstract"] == "Resampling frequency"
-        assert desc["inputs"][1]["minOccurs"] == 0
-        assert desc["inputs"][1]["maxOccurs"] == 1
-        assert "formats" not in desc["inputs"][1]
-        assert len(desc["outputs"]) == 2
-        assert desc["outputs"][0]["id"] == "output_netcdf"
-        assert desc["outputs"][0]["title"] == "Function output in netCDF"
-        assert desc["outputs"][0]["abstract"] == "The indicator values computed on the original input grid."
-        assert "minOccurs" not in desc["outputs"][0]
-        assert "maxOccurs" not in desc["outputs"][0]
-        assert len(desc["outputs"][0]["formats"]) == 1
-        assert desc["outputs"][0]["formats"][0]["default"] is True
-        assert desc["outputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_NETCDF
-        assert desc["outputs"][0]["formats"][0]["encoding"] == "base64"
-        assert desc["outputs"][1]["id"] == "output_log"
-        assert desc["outputs"][1]["title"] == "Logging information"
-        assert desc["outputs"][1]["abstract"] == "Collected logs during process run."
-        assert "minOccurs" not in desc["outputs"][1]
-        assert "maxOccurs" not in desc["outputs"][1]
-        assert len(desc["outputs"][1]["formats"]) == 1
-        assert desc["outputs"][1]["formats"][0]["default"] is True
-        assert desc["outputs"][1]["formats"][0]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert len(proc["inputs"]) == 2
+        assert proc["inputs"][0]["id"] == "tasmax"
+        assert proc["inputs"][0]["title"] == "Resource"
+        assert "abstract" not in proc["inputs"][0], "Field 'abstract' should be replaced by 'description'."
+        assert proc["inputs"][0]["description"] == "NetCDF Files or archive (tar/zip) containing netCDF files."
+        assert proc["inputs"][0]["minOccurs"] == 1
+        assert proc["inputs"][0]["maxOccurs"] == 1000
+        assert len(proc["inputs"][0]["formats"]) == 1
+        assert proc["inputs"][0]["formats"][0]["default"] is True
+        assert proc["inputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_NETCDF
+        assert proc["inputs"][0]["formats"][0]["encoding"] == "base64"
+        assert proc["inputs"][1]["id"] == "freq"
+        assert proc["inputs"][1]["title"] == "Frequency"
+        assert "abstract" not in proc["inputs"][1], "Field 'abstract' should be replaced by 'description'."
+        assert proc["inputs"][1]["description"] == "Resampling frequency"
+        assert proc["inputs"][1]["minOccurs"] == 0
+        assert proc["inputs"][1]["maxOccurs"] == 1
+        assert "formats" not in proc["inputs"][1]
+        assert len(proc["outputs"]) == 2
+        assert proc["outputs"][0]["id"] == "output_netcdf"
+        assert proc["outputs"][0]["title"] == "Function output in netCDF"
+        assert "abstract" not in proc["outputs"][0], "Field 'abstract' should be replaced by 'description'."
+        assert proc["outputs"][0]["description"] == "The indicator values computed on the original input grid."
+        assert "minOccurs" not in proc["outputs"][0]
+        assert "maxOccurs" not in proc["outputs"][0]
+        assert len(proc["outputs"][0]["formats"]) == 1
+        assert proc["outputs"][0]["formats"][0]["default"] is True
+        assert proc["outputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_NETCDF
+        assert proc["outputs"][0]["formats"][0]["encoding"] == "base64"
+        assert proc["outputs"][1]["id"] == "output_log"
+        assert proc["outputs"][1]["title"] == "Logging information"
+        assert "abstract" not in proc["inputs"][1], "Field 'abstract' should be replaced by 'description'."
+        assert proc["outputs"][1]["description"] == "Collected logs during process run."
+        assert "minOccurs" not in proc["outputs"][1]
+        assert "maxOccurs" not in proc["outputs"][1]
+        assert len(proc["outputs"][1]["formats"]) == 1
+        assert proc["outputs"][1]["formats"][0]["default"] is True
+        assert proc["outputs"][1]["formats"][0]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
 
     def test_enum_array_and_multi_format_inputs_from_wps_xml_reference(self):
         body = {
@@ -1646,12 +1700,13 @@ class WpsPackageAppTest(WpsPackageConfigBase):
             "executionUnit": [{"href": "mock://{}".format(resources.WPS_ENUM_ARRAY_IO)}],
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication"
         }
-        desc, pkg = self.deploy_process(body)
+        desc, pkg = self.deploy_process(body, describe_schema="OLD")
 
         # basic contents validation
         assert "cwlVersion" in pkg
         assert "process" in desc
-        assert desc["id"] == self._testMethodName
+        proc = desc["process"]
+        assert proc["id"] == self._testMethodName
 
         # package I/O validation
         assert "inputs" in pkg
@@ -1702,36 +1757,39 @@ class WpsPackageAppTest(WpsPackageConfigBase):
         # assert pkg["inputs"][2]["format"][2] == IANA_ZIP
 
         # process description I/O validation
-        assert len(desc["inputs"]) == 3
-        assert desc["inputs"][0]["id"] == "region"
-        assert desc["inputs"][0]["title"] == "Region"
-        assert desc["inputs"][0]["abstract"] == "Country code, see ISO-3166-3"
-        assert desc["inputs"][0]["minOccurs"] == 1
-        assert desc["inputs"][0]["maxOccurs"] == 220
-        assert "formats" not in desc["inputs"][0]
-        assert desc["inputs"][1]["id"] == "mosaic"
-        assert desc["inputs"][1]["title"] == "Union of multiple regions"
-        assert desc["inputs"][1]["abstract"] == \
+        assert len(proc["inputs"]) == 3
+        assert proc["inputs"][0]["id"] == "region"
+        assert proc["inputs"][0]["title"] == "Region"
+        assert "abstract" not in proc["inputs"][0], "Field 'abstract' should be replaced by 'description'."
+        assert proc["inputs"][0]["description"] == "Country code, see ISO-3166-3"
+        assert proc["inputs"][0]["minOccurs"] == 1
+        assert proc["inputs"][0]["maxOccurs"] == 220
+        assert "formats" not in proc["inputs"][0]
+        assert proc["inputs"][1]["id"] == "mosaic"
+        assert proc["inputs"][1]["title"] == "Union of multiple regions"
+        assert "abstract" not in proc["inputs"][1], "Field 'abstract' should be replaced by 'description'."
+        assert proc["inputs"][1]["description"] == \
                "If True, selected regions will be merged into a single geometry."   # noqa
-        assert desc["inputs"][1]["minOccurs"] == 0
-        assert desc["inputs"][1]["maxOccurs"] == 1
-        assert "formats" not in desc["inputs"][1]
-        assert desc["inputs"][2]["id"] == "resource"
-        assert desc["inputs"][2]["title"] == "Resource"
-        assert desc["inputs"][2]["abstract"] == "NetCDF Files or archive (tar/zip) containing NetCDF files."
-        assert desc["inputs"][2]["minOccurs"] == 1
-        assert desc["inputs"][2]["maxOccurs"] == 1000
+        assert proc["inputs"][1]["minOccurs"] == 0
+        assert proc["inputs"][1]["maxOccurs"] == 1
+        assert "formats" not in proc["inputs"][1]
+        assert proc["inputs"][2]["id"] == "resource"
+        assert proc["inputs"][2]["title"] == "Resource"
+        assert "abstract" not in proc["inputs"][2], "Field 'abstract' should be replaced by 'description'."
+        assert proc["inputs"][2]["description"] == "NetCDF Files or archive (tar/zip) containing NetCDF files."
+        assert proc["inputs"][2]["minOccurs"] == 1
+        assert proc["inputs"][2]["maxOccurs"] == 1000
         # note: TAR should remain as literal format in the WPS context (not mapped/added as GZIP when resolved for CWL)
-        assert len(desc["inputs"][2]["formats"]) == 3
-        assert desc["inputs"][2]["formats"][0]["default"] is True
-        assert desc["inputs"][2]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_NETCDF
-        assert "encoding" not in desc["inputs"][2]["formats"][0]  # none specified, so omitted in response
-        assert desc["inputs"][2]["formats"][1]["default"] is False
-        assert desc["inputs"][2]["formats"][1]["mediaType"] == CONTENT_TYPE_APP_TAR
-        assert "encoding" not in desc["inputs"][2]["formats"][1]  # none specified, so omitted in response
-        assert desc["inputs"][2]["formats"][2]["default"] is False
-        assert desc["inputs"][2]["formats"][2]["mediaType"] == CONTENT_TYPE_APP_ZIP
-        assert "encoding" not in desc["inputs"][2]["formats"][2]  # none specified, so omitted in response
+        assert len(proc["inputs"][2]["formats"]) == 3
+        assert proc["inputs"][2]["formats"][0]["default"] is True
+        assert proc["inputs"][2]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_NETCDF
+        assert "encoding" not in proc["inputs"][2]["formats"][0]  # none specified, so omitted in response
+        assert proc["inputs"][2]["formats"][1]["default"] is False
+        assert proc["inputs"][2]["formats"][1]["mediaType"] == CONTENT_TYPE_APP_TAR
+        assert "encoding" not in proc["inputs"][2]["formats"][1]  # none specified, so omitted in response
+        assert proc["inputs"][2]["formats"][2]["default"] is False
+        assert proc["inputs"][2]["formats"][2]["mediaType"] == CONTENT_TYPE_APP_ZIP
+        assert "encoding" not in proc["inputs"][2]["formats"][2]  # none specified, so omitted in response
 
     # FIXME: implement,
     #   need to find a existing WPS with some, or manually write XML
