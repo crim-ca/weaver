@@ -1131,7 +1131,8 @@ class Process(Base):
         # force selection of schema to avoid ambiguity
         if str(schema or "OGC").upper() == "OLD":
             # nested process fields + I/O as lists
-            process.update({"process": process, "links": links})
+            process.update({"process": dict(process)})
+            process.update(links)
             return sd.ProcessDescriptionOLD().deserialize(process)
         # direct process + I/O as mappings
         for io_type in ["inputs", "outputs"]:

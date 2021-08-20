@@ -75,6 +75,8 @@ from weaver.wps_restapi.colander_extras import (
 from weaver.wps_restapi.utils import wps_restapi_base_path
 
 if TYPE_CHECKING:
+    from typing import List, Optional
+
     from weaver.typedefs import DatetimeIntervalType, JSON, SettingsType, TypedDict
 
     ViewInfo = TypedDict("ViewInfo", {"name": str, "pattern": str})
@@ -115,6 +117,27 @@ OGC_API_SCHEMA_URL = "https://raw.githubusercontent.com/opengeospatial/ogcapi-pr
 DATETIME_INTERVAL_CLOSED_SYMBOL = "/"
 DATETIME_INTERVAL_OPEN_START_SYMBOL = "../"
 DATETIME_INTERVAL_OPEN_END_SYMBOL = "/.."
+
+# fields ordering for generation of ProcessDescription body (shared for OGC/OLD schema format)
+PROCESS_DESCRIPTION_FIELD_FIRST = [
+    "id",
+    "title",
+    "version",
+    "description",
+    "keywords",
+    "metadata",
+    "inputs",
+    "outputs"
+]
+PROCESS_DESCRIPTION_FIELD_AFTER = [
+    "processDescriptionURL",
+    "processEndpointWPS1",
+    "executeEndpoint",
+    "links"
+]
+# fields ordering for nested process definition of OLD schema format of ProcessDescription
+PROCESS_DESCRIPTION_FIELD_FIRST_OLD_SCHEMA = ["process"]
+PROCESS_DESCRIPTION_FIELD_AFTER_OLD_SCHEMA = ["links"]
 
 #########################################################
 # Examples
@@ -2201,29 +2224,6 @@ class Process(
     outputs = DescribeOutputTypeList(description="Outputs definition of the process.")
 
 
-def process_description_order_deserialize(process):
-    # type: (JSON) -> JSON
-    """
-    Enforces some convenient ordering of expected fields in process description, regardless of chosen schema variant.
-
-    This function takes care of moving back items in a consistent order for better readability from API responses
-    against different loaded definitions field order from remote servers, local database, pre-deployed processes, etc.
-
-    This way, any field insertion order from both the input ``cstruct`` before deserialization operation, the
-    internal mechanics that :mod:`colander` employs, and the ``result`` dictionary fields order all don't matter.
-
-    Using this, the order of inheritance of schema classes also doesn't matter, allowing us not to worry about such
-    small matter when editing and joining the already complicated structures of inherited schemas.
-    """
-    key_first = ["id", "title", "version", "description", "keywords", "metadata", "inputs", "outputs"]
-    key_after = ["processDescriptionURL", "processEndpoint", "executeEndpoint", "links"]
-    offering = {field: process.pop(field, None) for field in key_first if field in process}
-    remaining = {field: process.pop(field, None) for field in key_after if field in process}
-    offering.update(process)
-    offering.update(remaining)
-    return offering
-
-
 class ProcessDescriptionOLD(ProcessControl, DescriptionLinks):
     """
     Old schema for process description.
@@ -2232,9 +2232,18 @@ class ProcessDescriptionOLD(ProcessControl, DescriptionLinks):
     process = Process()
 
     def deserialize(self, cstruct):
-        result = super(ProcessDescriptionOLD, self).deserialize(cstruct)
-        result["process"] = process_description_order_deserialize(result["process"])
-        return result
+        process = super(ProcessDescriptionOLD, self).deserialize(cstruct)
+        process["process"] = order_deserialize(
+            process["process"],
+            PROCESS_DESCRIPTION_FIELD_FIRST,
+            PROCESS_DESCRIPTION_FIELD_AFTER
+        )
+        offering = order_deserialize(
+            process,
+            PROCESS_DESCRIPTION_FIELD_FIRST_OLD_SCHEMA,
+            PROCESS_DESCRIPTION_FIELD_AFTER_OLD_SCHEMA
+        )
+        return offering
 
 
 class ProcessDescriptionOGC(ProcessSummary, ProcessContext, ProcessVisibility, ProcessLocations, DescriptionLinks):
@@ -2246,7 +2255,12 @@ class ProcessDescriptionOGC(ProcessSummary, ProcessContext, ProcessVisibility, P
 
     def deserialize(self, cstruct):
         result = super(ProcessDescriptionOGC, self).deserialize(cstruct)
-        return process_description_order_deserialize(result)
+        offering = order_deserialize(
+            result,
+            PROCESS_DESCRIPTION_FIELD_FIRST,
+            PROCESS_DESCRIPTION_FIELD_AFTER
+        )
+        return offering
 
 
 class ProcessDescription(OneOfKeywordSchema):
@@ -3948,3 +3962,32 @@ def datetime_interval_parser(datetime_interval):
         parsed_datetime["match"] = date_parser.parse(datetime_interval)
 
     return parsed_datetime
+
+
+def order_deserialize(cstruct, fields_first=None, fields_after=None):
+    # type: (JSON, Optional[List[str]], Optional[List[str]]) -> JSON
+    """
+    Enforces some convenient ordering of expected fields in deserialized result, regardless of chosen schema variant.
+
+    This function takes care of moving back items in a consistent order for better readability from API responses
+    against different loaded definitions field order from remote servers, local database, pre-deployed processes, etc.
+
+    This way, any field insertion order from both the input ``cstruct`` before deserialization operation, the
+    internal mechanics that :mod:`colander` (and extended OpenAPI schema definitions) employ to process this
+    deserialization, and the ``result`` dictionary fields order all don't matter.
+
+    Using this, the order of inheritance of schema children classes also doesn't matter, allowing us not to worry about
+    placing them in a specific order when editing and joining the already complicated structures of inherited schemas.
+
+    :param cstruct: JSON to be sorted that has already been processed by some ``deserialize`` call with a schema.
+    :param fields_first: ordered list of fields to place first in the result.
+    :param fields_after: ordered list of fields to place last in the result.
+    :returns: results formed from cstruct following order: (<fields_firsts> + <other_fields> + <fields_after>)
+    """
+    fields_first = fields_first if fields_first else []
+    fields_after = fields_after if fields_after else []
+    result = {field: cstruct.pop(field, None) for field in fields_first if field in cstruct}
+    remain = {field: cstruct.pop(field, None) for field in fields_after if field in cstruct}
+    result.update(cstruct)
+    result.update(remain)
+    return result
