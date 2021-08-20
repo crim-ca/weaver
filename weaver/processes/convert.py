@@ -55,6 +55,7 @@ from weaver.processes.constants import (
     WPS_COMPLEX_DATA,
     WPS_INPUT,
     WPS_LITERAL,
+    WPS_LITERAL_DATA_TYPE_NAMES,
     WPS_OUTPUT,
     WPS_REFERENCE
 )
@@ -96,7 +97,7 @@ if TYPE_CHECKING:
 
 # WPS object attribute -> all possible *other* naming variations
 WPS_FIELD_MAPPING = {
-    "identifier": ["Identifier", "ID", "id", "Id"],
+    "identifier": ["id", "ID", "Id", "Identifier"],
     "title": ["Title", "Label", "label"],
     "abstract": ["Abstract"],
     "metadata": ["Metadata"],
@@ -886,6 +887,8 @@ def any2wps_literal_datatype(io_type, is_value):
                 return "integer"
             if io_type in ["bool", "boolean"]:
                 return "boolean"
+        LOGGER.warning("Unknown named literal data type: '%s', using default 'string'. "
+                       "Should be one of: ", io_type, list(WPS_LITERAL_DATA_TYPE_NAMES))
         return "string"
     if is_value and isinstance(io_type, bool):
         return "boolean"

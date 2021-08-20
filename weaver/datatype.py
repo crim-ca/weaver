@@ -1113,14 +1113,34 @@ class Process(Base):
             link.setdefault("hreflang", ACCEPT_LANGUAGE_EN_CA)
         return {"links": links}
 
-    def offering(self):
-        # type: () -> JSON
+    def offering(self, schema="OGC"):
+        # type: (str) -> JSON
         """
-        Obtains the JSON serializable offering representation of the process.
+        Obtains the JSON serializable offering/description representation of the process.
+
+        :param schema:
+            One of values defined by :class:`sd.ProcessDescriptionSchemaQuery` to select which
+            process description representation to generate (see each schema for details).
+
+        .. note::
+            Property name ``offering`` is employed to differentiate from the string process ``description`` field.
+            The result of this JSON representation is still the ``ProcessDescription`` schema.
         """
         process = self.dict()
-        process.update(self.links())
-        return sd.ProcessOffering().deserialize(process)
+        links = self.links()
+        # force selection of schema to avoid ambiguity
+        if str(schema or "OGC").upper() == "OLD":
+            # nested process fields + I/O as lists
+            process.update({"process": process, "links": links})
+            return sd.ProcessDescriptionOLD().deserialize(process)
+        # direct process + I/O as mappings
+        for io_type in ["inputs", "outputs"]:
+            process[io_type] = {
+                get_field(io_def, "identifier", search_variations=True, pop_found=True): io_def
+                for io_def in process[io_type]
+            }
+        process.update(links)
+        return sd.ProcessDescriptionOGC().deserialize(process)
 
     def summary(self):
         # type: () -> JSON

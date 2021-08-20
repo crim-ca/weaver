@@ -106,8 +106,9 @@ def get_provider_process(request):
     """
     try:
         process = describe_provider_process(request)
-        process_offering = process.offering()
-        return HTTPOk(json=process_offering)
+        schema = request.params.get("schema")
+        offering = process.offering(schema)
+        return HTTPOk(json=offering)
     # FIXME: handle colander invalid directly in tween (https://github.com/crim-ca/weaver/issues/112)
     except colander.Invalid as ex:
         raise HTTPBadRequest("Invalid schema: [{!s}]".format(ex))
@@ -191,7 +192,9 @@ def get_local_process(request):
     try:
         process = get_process(request=request)
         process["inputs"] = opensearch.replace_inputs_describe_process(process.inputs, process.payload)
-        return HTTPOk(json=process.offering())
+        schema = request.params.get("schema")
+        offering = process.offering(schema)
+        return HTTPOk(json=offering)
     # FIXME: handle colander invalid directly in tween (https://github.com/crim-ca/weaver/issues/112)
     except colander.Invalid as ex:
         raise HTTPBadRequest("Invalid schema: [{!s}]\nValue: [{!s}]".format(ex, ex.value))
