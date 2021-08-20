@@ -2,7 +2,9 @@
 Utility methods for various TestCase setup operations.
 """
 import contextlib
+import functools
 import os
+import re
 import tempfile
 import uuid
 import warnings
@@ -10,12 +12,13 @@ from configparser import ConfigParser
 from inspect import isclass
 from typing import TYPE_CHECKING
 
-import colander
 # Note: do NOT import 'boto3' here otherwise 'moto' will not be able to mock it effectively
+import colander
 import mock
 import moto
 import pkg_resources
 import pyramid_celery
+import responses
 from owslib.wps import Languages, WebProcessingService
 from pyramid import testing
 from pyramid.config import Configurator
@@ -28,7 +31,7 @@ from weaver.app import main as weaver_app
 from weaver.config import WEAVER_CONFIGURATION_DEFAULT, WEAVER_DEFAULT_INI_CONFIG, get_weaver_config_file
 from weaver.database import get_db
 from weaver.datatype import Service
-from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_XML
+from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML, CONTENT_TYPE_TEXT_XML
 from weaver.store.mongodb import MongodbJobStore, MongodbProcessStore, MongodbServiceStore
 from weaver.utils import fetch_file, get_path_kvp, get_url_without_query, get_weaver_url, null
 from weaver.warning import MissingParameterWarning, UnsupportedOperationWarning
@@ -420,6 +423,54 @@ def mocked_remote_wps(processes, languages=None):
         mock.patch.object(WebProcessingService, "processes", new_callable=mock_processes, create=True),
         mock.patch.object(WebProcessingService, "languages", new_callable=mock_languages, create=True),
     )
+
+
+def mocked_remote_server_requests_wp1(
+        resource_file_getcap,                           # type: str
+        resource_files_describe,                        # type: Iterable[str]
+        test_server_wps="https://remote-server.com",    # type: str
+):                                                      # type: (...) -> MockPatch
+    """
+    Mocks a `remote` WPS-1 requests/responses with specified contents from local test resources.
+
+    .. seealso::
+        ``tests/resources`` directory for available XML files to simulate response bodies.
+
+    :param resource_file_getcap: XML file path within test resource directory for server ``GetCapabilities`` result.
+    :param resource_files_describe: XML file path(s) within test resource directory for ``DescribeProcess`` result(s).
+    :param test_server_wps: endpoint where the mocked WPS server should simulate receiving requests and reply from.
+    :returns: decorator that mocks WPS-1 server responses with provided processes and XML contents.
+    """
+    assert isinstance(resource_file_getcap, str)
+    assert isinstance(resource_files_describe, (set, list, tuple)) and len(resource_files_describe) > 0
+    assert os.path.isfile(resource_file_getcap)
+    assert all(os.path.isfile(file) for file in resource_files_describe)
+
+    def mocked_remote_server_wrapper(test):
+        @functools.wraps(test)
+        def mock_requests_wps1(*args, **kwargs):
+            """Mock ``requests`` responses fetching ``test_server_wps`` WPS reference."""
+            xml_header = {"Content-Type": CONTENT_TYPE_APP_XML}
+            with responses.RequestsMock(assert_all_requests_are_fired=False) as mock_resp:
+                with open(resource_file_getcap, "r") as f:
+                    get_cap_xml = f.read()
+                get_cap_url = "{}/wps?service=WPS&request=GetCapabilities&version=1.0.0".format(test_server_wps)
+                mock_resp.add(responses.GET, get_cap_url, body=get_cap_xml, headers=xml_header)
+                for proc_desc_file in resource_files_describe:
+                    with open(proc_desc_file, "r") as f:
+                        describe_xml = f.read()
+                    # assume always first identifier (ignore input/output ones after)
+                    proc_desc_id = re.findall("<ows:Identifier>(.*)</ows:Identifier>", describe_xml)[0]
+                    proc_desc_url = "{}/wps?service=WPS&request=DescribeProcess&identifier={}&version=1.0.0".format(
+                        test_server_wps, proc_desc_id
+                    )
+                    mock_resp.add(responses.GET, proc_desc_url, body=describe_xml, headers=xml_header)
+                    # special case where 'identifier' gets added to 'GetCapabilities', but is simply ignored
+                    getcap_with_proc_id_url = proc_desc_url.replace("DescribeProcess", "GetCapabilities")
+                    mock_resp.add(responses.GET, body=get_cap_xml, headers=xml_header, url=getcap_with_proc_id_url)
+                return test(*args, **kwargs)
+        return mock_requests_wps1
+    return mocked_remote_server_wrapper
 
 
 def mocked_execute_process():

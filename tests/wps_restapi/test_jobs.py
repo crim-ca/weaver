@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 import mock
 import pyramid.testing
 import pytest
-from dateutil import parser as dateparser
+from dateutil import parser as date_parser
 
 from tests.utils import (
     get_module_version,
@@ -117,7 +117,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
 
     def make_job(self, task_id, process, service, user_id, status, progress, access, created=None):
 
-        created = dateparser.parse(created) if created else None
+        created = date_parser.parse(created) if created else None
 
         job = self.job_store.save_job(task_id=task_id, process=process, service=service, is_workflow=False,
                                       user_id=user_id, execute_async=True, access=access, created=created)
@@ -575,7 +575,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
             resp = self.app.get(path, headers=self.json_headers)
             assert resp.status_code == 200
             assert resp.content_type == CONTENT_TYPE_APP_JSON
-            assert dateparser.parse(resp.json["created"]) <= dateparser.parse(
+            assert date_parser.parse(resp.json["created"]) <= date_parser.parse(
                 datetime_before.replace(DATETIME_INTERVAL_OPEN_START_SYMBOL, ""))
 
     def test_jobs_datetime_after(self):
@@ -596,7 +596,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
             resp = self.app.get(path, headers=self.json_headers)
             assert resp.status_code == 200
             assert resp.content_type == CONTENT_TYPE_APP_JSON
-            assert dateparser.parse(resp.json["created"]) >= dateparser.parse(
+            assert date_parser.parse(resp.json["created"]) >= date_parser.parse(
                 datetime_after.replace(DATETIME_INTERVAL_OPEN_END_SYMBOL, ""))
 
     def test_jobs_datetime_interval(self):
@@ -619,8 +619,8 @@ class WpsRestApiJobsTest(unittest.TestCase):
             resp = self.app.get(path, headers=self.json_headers)
             assert resp.status_code == 200
             assert resp.content_type == CONTENT_TYPE_APP_JSON
-            assert dateparser.parse(resp.json["created"]) >= dateparser.parse(datetime_after)
-            assert dateparser.parse(resp.json["created"]) <= dateparser.parse(datetime_before)
+            assert date_parser.parse(resp.json["created"]) >= date_parser.parse(datetime_after)
+            assert date_parser.parse(resp.json["created"]) <= date_parser.parse(datetime_before)
 
     def test_jobs_datetime_match(self):
         """
@@ -640,7 +640,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
             resp = self.app.get(path, headers=self.json_headers)
             assert resp.status_code == 200
             assert resp.content_type == CONTENT_TYPE_APP_JSON
-            assert dateparser.parse(resp.json["created"]) == dateparser.parse(datetime_match)
+            assert date_parser.parse(resp.json["created"]) == date_parser.parse(datetime_match)
 
     def test_jobs_datetime_invalid(self):
         """
@@ -648,7 +648,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
             - `/req/collections/rc-time-collections-response
                 <https://github.com/opengeospatial/ogcapi-common/blob/master/collections/requirements/collections/REQ_rc-time-collections-response.adoc>`_
 
-        datetime_invalid is not formated against the rfc3339 datetime format,
+        datetime_invalid is not formatted against the rfc3339 datetime format,
         for more details refer to https://datatracker.ietf.org/doc/html/rfc3339#section-5.6
         """
         datetime_invalid = "2022-31-12 23:59:59"
@@ -663,7 +663,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
                 <https://github.com/opengeospatial/ogcapi-common/blob/master/collections/requirements/collections/REQ_rc-time-collections-response.adoc>`_
 
         datetime_invalid represents a datetime interval where the limit dates are inverted,
-        the minimun is greather than the maximum datetime limit
+        the minimum is greater than the maximum datetime limit
         """
         datetime_interval = self.datetime_interval[3] + DATETIME_INTERVAL_CLOSED_SYMBOL + self.datetime_interval[1]
         path = get_path_kvp(sd.jobs_service.path, datetime=datetime_interval)

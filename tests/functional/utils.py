@@ -57,14 +57,16 @@ class WpsPackageConfigBase(unittest.TestCase):
         pyramid.testing.tearDown()
 
     @classmethod
-    def deploy_process(cls, payload):
-        # type: (JSON) -> JSON
+    def deploy_process(cls, payload, describe_schema="OLD"):
+        # type: (JSON, str) -> JSON
         """
         Deploys a process with :paramref:`payload`.
 
         :returns: resulting tuple of ``(process-description, package)`` JSON responses.
         """
-        resp = mocked_sub_requests(cls.app, "post_json", "/processes", data=payload, headers=cls.json_headers)
+        path = "/processes"
+        query = {"schema": describe_schema}
+        resp = mocked_sub_requests(cls.app, "post_json", path, params=query, data=payload, headers=cls.json_headers)
         assert resp.status_code == 201, "Expected successful deployment.\nError:\n{}".format(resp.text)
         path = resp.json["processSummary"]["processDescriptionURL"]
         body = {"value": VISIBILITY_PUBLIC}

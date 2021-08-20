@@ -34,6 +34,8 @@ Fixes:
   for populating process listing.
 - Revert an incorrectly modified schema reference that erroneously replaced service provider ``ProcessSummary`` items
   during their listing by a single ``ProcessInputDescriptionSchema`` (introduced since ``3.0.0``).
+- Fix `#203 <https://github.com/crim-ca/weaver/issues/203>`_ with explicit validation test of ``ProcessSummary``
+  schema for providers response.
 
 `3.5.0 <https://github.com/crim-ca/weaver/tree/3.5.0>`_ (2021-08-19)
 ========================================================================
