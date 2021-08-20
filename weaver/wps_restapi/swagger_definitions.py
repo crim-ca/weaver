@@ -493,6 +493,7 @@ class DeployFormatDefaultMimeType(FormatMimeType, ExtendedMappingSchema):
     one of the known formats by this instance. When executing a job, the best match will be used
     to run the process, and will fallback to the default as last resort.
     """
+    # NOTE:
     # The default is override from FormatMimeType since the FormatSelection 'oneOf' always fails,
     # due to the 'default' value wich is always generated and it cause the presence of both Format and FormatMimeType
     mimeType = ExtendedSchemaNode(String(), example=CONTENT_TYPE_APP_JSON)
@@ -504,6 +505,7 @@ class DeployFormatDefault(Format, ExtendedMappingSchema):
     one of the known formats by this instance. When executing a job, the best match will be used
     to run the process, and will fallback to the default as last resort.
     """
+    # NOTE:
     # The default is override from Format since the FormatSelection 'oneOf' always fails,
     # due to the 'default' value wich is always generated and it cause the presence of both Format and FormatMimeType
     mediaType = ExtendedSchemaNode(String(), example=CONTENT_TYPE_APP_JSON)
