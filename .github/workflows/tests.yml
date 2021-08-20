@@ -94,7 +94,7 @@ jobs:
           hash -r
           env | sort
       - name: Run Tests
-        run: make stop ${{ matrix.test-case }}
+        run: make stop ${{ matrix.test-case }}-only
       - name: Upload coverage report
         uses: codecov/codecov-action@v1
         if: ${{ success() && matrix.test-case == 'coverage' }}
