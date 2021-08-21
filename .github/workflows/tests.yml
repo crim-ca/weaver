@@ -44,13 +44,13 @@ jobs:
         os: [ubuntu-latest]
         python-version: ["3.6", "3.7", "3.8"]
         allow-failure: [false]
-        test-case: [test-unit, test-func]
+        test-case: [test-unit-only, test-func-only]
         include:
           # linter tests
           - os: ubuntu-latest
             python-version: 3.7
             allow-failure: false
-            test-case: check
+            test-case: check-only
           # documentation build
           - os: ubuntu-latest
             python-version: 3.7
@@ -60,7 +60,7 @@ jobs:
           - os: ubuntu-latest
             python-version: 3.7
             allow-failure: false
-            test-case: coverage
+            test-case: test-coverage-only
           # smoke test of Docker image
           - os: ubuntu-latest
             python-version: 3.7  # doesn't matter which one (in docker), but match default of repo
@@ -70,20 +70,26 @@ jobs:
           - os: ubuntu-latest
             python-version: 3.7
             allow-failure: true
-            test-case: test-workflow
+            test-case: test-workflow-only
     steps:
       - uses: actions/checkout@v2
         with:
           fetch-depth: "0"
       - name: Setup Python
+        # skip python setup if running with docker
+        if: ${{ matrix.test-case != 'test-docker' }}
         uses: actions/setup-python@v2
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install Dependencies
+        # skip python setup if running with docker
+        if: ${{ matrix.test-case != 'test-docker' }}
         # install package and dependencies directly,
         # skip sys/conda setup to use active python
         run: make install-pkg install-dev version
       - name: Display Packages
+        # skip python setup if running with docker
+        if: ${{ matrix.test-case != 'test-docker' }}
         run: pip freeze
       #- name: Setup Environment Variables
       #  uses: c-py/action-dotenv-to-setenv@v2
@@ -97,7 +103,7 @@ jobs:
         run: make stop ${{ matrix.test-case }}
       - name: Upload coverage report
         uses: codecov/codecov-action@v1
-        if: ${{ success() && matrix.test-case == 'coverage' }}
+        if: ${{ success() && matrix.test-case == 'test-coverage-only' }}
         with:
           files: ./reports/coverage.xml
           fail_ci_if_error: true

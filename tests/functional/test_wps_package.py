@@ -11,6 +11,7 @@ import contextlib
 import json
 import logging
 import os
+import tempfile
 from inspect import cleandoc
 
 import colander
@@ -1257,40 +1258,42 @@ class WpsPackageAppTest(WpsPackageConfigBase):
             self.fail("Test")
 
         assert desc["process"] is not None
-        with open("/tmp/input_tmp.txt", "w") as f:
-            json.dump({"value": {"ref": 1, "measurement": 10.3, "uom": "m"}}, f)
-
-        exec_body = {
-            "mode": EXECUTE_MODE_ASYNC,
-            "response": EXECUTE_RESPONSE_DOCUMENT,
-            "inputs": {
-                "stringInput": "stringtest",
-                "integerInput": 10,
-                "doubleInput": 3.14159,
-                "stringArrayInput": ["1", "2", "3", "4", "5", "6"],
-                "integerArrayInput": [1, 2, 3, 4, 5, 6],
-                "floatArrayInput": [1.45, 2.65, 3.5322, 4.86, 5.57, 6.02],
-                "measureStringInput": {
-                    "value": "this is a test"
-                },
-                "measureIntegerInput": {
-                    "value": 45
-                },
-                "measureFloatInput": {
-                    "value": 10.2
-                },
-                "measureFileInput": {
-                    "href": "file:///tmp/input_tmp.txt"
-                }
-            },
-            "outputs": [
-                {"id": "output_test", "type": "File"},
-            ]
-        }
 
         with contextlib.ExitStack() as stack_exec:
             for mock_exec in mocked_execute_process():
                 stack_exec.enter_context(mock_exec)
+            tmp_file = stack_exec.enter_context(tempfile.NamedTemporaryFile(mode="w", suffix=".json"))  # noqa
+            tmp_file.write(json.dumps({"value": {"ref": 1, "measurement": 10.3, "uom": "m"}}))
+            tmp_file.seek(0)
+
+            exec_body = {
+                "mode": EXECUTE_MODE_ASYNC,
+                "response": EXECUTE_RESPONSE_DOCUMENT,
+                "inputs": {
+                    "stringInput": "stringtest",
+                    "integerInput": 10,
+                    "doubleInput": 3.14159,
+                    "stringArrayInput": ["1", "2", "3", "4", "5", "6"],
+                    "integerArrayInput": [1, 2, 3, 4, 5, 6],
+                    "floatArrayInput": [1.45, 2.65, 3.5322, 4.86, 5.57, 6.02],
+                    "measureStringInput": {
+                        "value": "this is a test"
+                    },
+                    "measureIntegerInput": {
+                        "value": 45
+                    },
+                    "measureFloatInput": {
+                        "value": 10.2
+                    },
+                    "measureFileInput": {
+                        "href": "file://{}".format(tmp_file.name)
+                    }
+                },
+                "outputs": [
+                    {"id": "output_test", "type": "File"},
+                ]
+            }
+
             proc_url = "/processes/{}/jobs".format(self._testMethodName)
             resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
                                        data=exec_body, headers=self.json_headers, only_local=True)
@@ -1300,13 +1303,13 @@ class WpsPackageAppTest(WpsPackageConfigBase):
         results = self.monitor_job(status_url)
 
         job_output_file = results.get("output_test")["href"].split("/", 3)[-1]
-        tmpfile = "{}/{}".format(self.settings["weaver.wps_output_dir"], job_output_file)
+        tmp_file = "{}/{}".format(self.settings["weaver.wps_output_dir"], job_output_file)
 
         try:
-            with open(tmpfile, "r") as f:
+            with open(tmp_file, "r") as f:
                 processed_values = json.load(f)
         except FileNotFoundError:
-            self.fail("Output file [{}] was not found where it was expected to resume test".format(tmpfile))
+            self.fail("Output file [{}] was not found where it was expected to resume test".format(tmp_file))
         except Exception as exception:
             self.fail("An error occured during the reading of the file: {}".format(exception))
         assert processed_values["stringInput"] == "stringtest"
