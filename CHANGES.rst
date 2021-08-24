@@ -51,6 +51,10 @@ Changes:
   <https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/format.yaml>`_) such that only
   URL formatted strings are allowed, or alternatively and explicit JSON definition. Previous definitions that would
   indicate an empty string schema are dropped since ``schema`` is optional.
+- Block unknown and ``builtin`` process types during deployment from the API
+  (fixes `#276  <https://github.com/crim-ca/weaver/issues/276>`_).
+  Type ``builtin`` can only be registered by `Weaver` itself at startup. Other unknown types that have
+  no indication for mapping to an appropriate `Process` implementation are preemptively validated.
 
 Fixes:
 ------

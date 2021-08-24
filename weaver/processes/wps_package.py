@@ -57,6 +57,7 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_ESGF_CWT,
     CWL_REQUIREMENT_APP_TYPES,
     CWL_REQUIREMENT_APP_WPS1,
+    CWL_REQUIREMENT_INIT_WORKDIR,
     WPS_INPUT,
     WPS_OUTPUT
 )
@@ -613,6 +614,35 @@ def _generate_process_with_cwl_from_reference(reference):
     return cwl_package, process_info
 
 
+def _get_requirements(package):
+    # type: () -> Dict[str, Any]
+    """
+    Obtains the first item in `CWL` package ``requirements`` or ``hints`` that corresponds to a `Weaver`-specific
+    application type as defined in :py:data:`CWL_REQUIREMENT_APP_TYPES`.
+    Also verifies if the requirements types are supported.
+
+    :returns: dictionary that minimally has ``class`` field, and optionally other parameters from that requirement.
+    """
+    # package can define requirements and/or hints,
+    # if it's an application, only one CWL_REQUIREMENT_APP_TYPES is allowed,
+    # workflow can have multiple, but they are not explicitly handled
+    reqs = package.get("requirements", {})
+    hints = package.get("hints", {})
+    all_hints = _get_package_requirements_as_class_list(reqs) + _get_package_requirements_as_class_list(hints)
+    app_hints = list(filter(lambda h: any(h["class"].endswith(t) for t in CWL_REQUIREMENT_APP_TYPES), all_hints))
+    if len(app_hints) > 1:
+        raise ValueError("Package 'requirements' and/or 'hints' define too many conflicting values: {}, "
+                         "only one permitted amongst {}.".format(list(app_hints), list(CWL_REQUIREMENT_APP_TYPES)))
+    requirement = app_hints[0] if app_hints else {"class": ""}
+
+    cwl_supported_reqs = [item for item in CWL_REQUIREMENT_APP_TYPES] + [CWL_REQUIREMENT_INIT_WORKDIR]
+    if not all(item.get("class") in cwl_supported_reqs for item in all_hints):
+        raise PackageTypeError(
+            "Invalid requirement, the requirements supported are {0}".format(cwl_supported_reqs))
+
+    return requirement
+
+
 def get_process_definition(process_offering, reference=None, package=None, data_source=None):
     # type: (JSON, Optional[str], Optional[CWL], Optional[str]) -> JSON
     """
@@ -674,6 +704,8 @@ def get_process_definition(process_offering, reference=None, package=None, data_
     package_inputs, package_outputs = try_or_raise_package_error(
         lambda: _merge_package_inputs_outputs(process_inputs, package_inputs, process_outputs, package_outputs),
         reason="Merging of inputs/outputs")
+
+    try_or_raise_package_error(lambda: _get_requirements(package), reason="Validate requirements and hints")
 
     # obtain any retrieved process id if not already provided from upstream process offering, and clean it
     process_id = get_sane_name(get_any_id(process_info), assert_invalid=False)
@@ -1323,18 +1355,7 @@ class WpsPackage(Process):
 
         :returns: dictionary that minimally has ``class`` field, and optionally other parameters from that requirement.
         """
-        # package can define requirements and/or hints,
-        # if it's an application, only one CWL_REQUIREMENT_APP_TYPES is allowed,
-        # workflow can have multiple, but they are not explicitly handled
-        reqs = self.package.get("requirements", {})
-        hints = self.package.get("hints", {})
-        all_hints = _get_package_requirements_as_class_list(reqs) + _get_package_requirements_as_class_list(hints)
-        app_hints = list(filter(lambda h: any(h["class"].endswith(t) for t in CWL_REQUIREMENT_APP_TYPES), all_hints))
-        if len(app_hints) > 1:
-            raise ValueError("Package 'requirements' and/or 'hints' define too many conflicting values: {}, "
-                             "only one permitted amongst {}.".format(list(app_hints), list(CWL_REQUIREMENT_APP_TYPES)))
-        requirement = app_hints[0] if app_hints else {"class": ""}
-        return requirement
+        return _get_requirements(self.package)
 
     def get_job_process_definition(self, jobname, joborder, tool):  # noqa: E811
         # type: (str, JSON, CWL) -> WpsPackage
