@@ -9,13 +9,10 @@ from weaver.datatype import Service
 from weaver.exceptions import ServiceNotFound, log_unhandled_exceptions
 from weaver.formats import OUTPUT_FORMAT_JSON
 from weaver.owsexceptions import OWSMissingParameterValue, OWSNotImplemented
-from weaver.processes.types import PROCESS_WPS_REMOTE
 from weaver.store.base import StoreServices
 from weaver.utils import get_any_id, get_settings, request_extra
 from weaver.warning import NonBreakingExceptionWarning
-from weaver.wps.utils import get_wps_client
 from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
@@ -66,23 +63,6 @@ def get_providers(request):
     return HTTPOk(json={"providers": providers})
 
 
-def get_capabilities(service, request):
-    """
-    GetCapabilities of a wps provider.
-    """
-    wps = get_wps_client(service.url, request)
-    url = get_wps_restapi_base_url(request)
-    return {
-        "id": service.name,
-        "title": wps.identification.title,
-        "abstract": wps.identification.abstract,
-        "url": "{base_url}/providers/{provider_id}".format(base_url=url, provider_id=service.name),
-        "processes": "{base_url}/providers/{provider_id}/processes".format(base_url=url, provider_id=service.name),
-        "type": PROCESS_WPS_REMOTE,
-        "contact": wps.provider.contact.name,
-    }
-
-
 def get_service(request):
     """
     Get the request service using provider_id from the service store.
@@ -101,7 +81,7 @@ def get_service(request):
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def add_provider(request):
     """
-    Add a provider.
+    Register a new service provider.
     """
     store = get_db(request).get_store(StoreServices)
 
@@ -120,7 +100,7 @@ def add_provider(request):
     except NotImplementedError:
         raise OWSNotImplemented(sd.NotImplementedPostProviderResponse.description, value=new_service)
 
-    return HTTPCreated(json=get_capabilities(new_service, request))
+    return HTTPCreated(json=new_service.summary(request))
 
 
 @sd.provider_service.delete(tags=[sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
@@ -128,7 +108,7 @@ def add_provider(request):
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def remove_provider(request):
     """
-    Remove a provider.
+    Remove an existing service provider.
     """
     service, store = get_service(request)
 
@@ -148,4 +128,4 @@ def get_provider(request):
     Get a provider definition (GetCapabilities).
     """
     service, _ = get_service(request)
-    return HTTPOk(json=get_capabilities(service, request))
+    return HTTPOk(json=service.summary(request))

@@ -51,19 +51,6 @@ def submit_provider_job(request):
     return get_job_submission_response(body)
 
 
-def list_remote_processes(service, request):
-    # type: (Service, Request) -> List[Process]
-    """
-    Obtains a list of remote service processes in a compatible :class:`weaver.datatype.Process` format.
-
-    Note: remote processes won't be stored to the local process storage.
-    """
-    # FIXME: support other providers (https://github.com/crim-ca/weaver/issues/130)
-    wps = get_wps_client(service.url, request)
-    settings = get_settings(request)
-    return [Process.convert(process, service, settings) for process in wps.processes]
-
-
 @sd.provider_processes_service.get(tags=[sd.TAG_PROVIDERS, sd.TAG_PROCESSES, sd.TAG_PROVIDERS, sd.TAG_GETCAPABILITIES],
                                    renderer=OUTPUT_FORMAT_JSON, schema=sd.ProviderEndpoint(),
                                    response_schemas=sd.get_provider_processes_responses)
@@ -75,7 +62,7 @@ def get_provider_processes(request):
     provider_id = request.matchdict.get("provider_id")
     store = get_db(request).get_store(StoreServices)
     service = store.fetch_by_name(provider_id)
-    processes = list_remote_processes(service, request)
+    processes = service.processes(request)
     return HTTPOk(json={"processes": [p.summary() for p in processes]})
 
 
@@ -162,7 +149,7 @@ def get_processes(request):
                     "providers": [svc.summary(request) if detail else {"id": svc.name} for svc in services]
                 })
                 for i, provider in enumerate(services):
-                    processes = list_remote_processes(provider, request)
+                    processes = provider.processes(request)
                     response_body["providers"][i].update({
                         "processes": processes if detail else [get_any_id(proc) for proc in processes]
                     })

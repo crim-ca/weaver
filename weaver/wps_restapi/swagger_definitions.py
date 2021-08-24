@@ -142,6 +142,19 @@ PROCESS_DESCRIPTION_FIELD_AFTER_OLD_SCHEMA = ["links"]
 PROCESS_IO_FIELD_FIRST = ["id", "title", "description", "minOccurs", "maxOccurs"]
 PROCESS_IO_FIELD_AFTER = ["literalDataDomains", "formats", "crs", "bbox"]
 
+PROVIDER_DESCRIPTION_FIELD_FIRST = [
+    "id",
+    "title",
+    "version",
+    "description",
+    "url",
+    "type",
+    "public",
+    "keywords",
+    "metadata",
+]
+PROVIDER_DESCRIPTION_FIELD_AFTER = ["links"]
+
 #########################################################
 # Examples
 #########################################################
@@ -672,7 +685,7 @@ class DescriptionType(DescriptionBase, DescriptionLinks, DescriptionExtra):
     pass
 
 
-class DeploymentType(DescriptionType):
+class DeployDescriptionType(DescriptionType):
     deprecated = True
     abstract = ExtendedSchemaNode(
         String(), missing=drop, deprecated=True,
@@ -682,7 +695,7 @@ class DeploymentType(DescriptionType):
     )
 
 
-class ProcessDescriptionMeta(ExtendedMappingSchema):
+class DescriptionMeta(ExtendedMappingSchema):
     # employ empty lists by default if nothing is provided for process description
     keywords = KeywordList(
         default=[],
@@ -975,7 +988,7 @@ class DescribeInputTypeWithID(InputIdentifierType, DescribeInputType):
 # compatible with pre-existing/deployed/remote processes, with either ``mediaType`` and ``mimeType`` formats.
 class DeployInputType(AllOfKeywordSchema):
     _all_of = [
-        DeploymentType(),
+        DeployDescriptionType(),
         InputOutputDescriptionMeta(),
         DeployInputTypeDefinition(),
         WithMinMaxOccurs(),
@@ -1103,7 +1116,7 @@ class DescribeOutputTypeList(ExtendedSequenceSchema):
 # compatible with pre-existing/deployed/remote processes, with either ``mediaType`` and ``mimeType`` formats.
 class DeployOutputType(AllOfKeywordSchema):
     _all_of = [
-        DeploymentType(),
+        DeployDescriptionType(),
         InputOutputDescriptionMeta(),
         DeployOutputTypeDefinition(),
     ]
@@ -2133,10 +2146,18 @@ class ProcessLogsEndpoint(ProcessPath, JobPath):
 ##################################################################
 
 
-class CreateProviderRequestBody(ExtendedMappingSchema):
+class ProviderPublic(ExtendedMappingSchema):
+    public = ExtendedSchemaNode(
+        Boolean(),
+        description="Whether the service is defined as publicly visible. "
+                    "This will not control allowance/denial of requests to the registered endpoint of the service. "
+                    "It only indicates if it should appear during listing of providers."
+    )
+
+
+class CreateProviderRequestBody(ProviderPublic):
     id = AnyIdentifier()
     url = URL(description="Endpoint where to query the provider.")
-    public = ExtendedSchemaNode(Boolean())
 
 
 class InputDataType(InputIdentifierType):
@@ -2161,23 +2182,22 @@ class ExecuteOutputFilterList(ExtendedSequenceSchema):
     output = ExecuteOutputDefinition()
 
 
-class ProviderSummarySchema(DescriptionType):
+class ProviderSummarySchema(DescriptionType, ProviderPublic, DescriptionMeta, DescriptionLinks):
     """
-    WPS provider summary definition.
+    Service provider summary definition.
     """
-    id = ExtendedSchemaNode(String())
-    url = URL(description="Endpoint of the provider.")
-    public = ExtendedSchemaNode(Boolean())
-
-
-class ProviderCapabilitiesSchema(DescriptionType):
-    """
-    WPS provider capabilities.
-    """
-    id = ExtendedSchemaNode(String())
-    url = URL(description="WPS GetCapabilities URL of the provider.")
-    contact = ExtendedSchemaNode(String())
+    id = AnyIdentifier()
+    url = URL(description="Endpoint of the service provider.")
     type = ExtendedSchemaNode(String())
+
+    _sort_first = PROVIDER_DESCRIPTION_FIELD_FIRST
+    _sort_after = PROVIDER_DESCRIPTION_FIELD_AFTER
+
+
+class ProviderCapabilitiesSchema(ProviderSummarySchema):
+    """
+    Service provider detailed capabilities.
+    """
 
 
 class TransmissionModeList(ExtendedSequenceSchema):
@@ -2215,7 +2235,7 @@ class ProcessLocations(ExtendedMappingSchema):
 
 class ProcessSummary(
     ProcessDescriptionType,
-    ProcessDescriptionMeta,
+    DescriptionMeta,
     ProcessControl,
     ProcessLocations,
     DescriptionLinks
@@ -2223,6 +2243,8 @@ class ProcessSummary(
     """
     Summary process definition.
     """
+    _sort_first = PROCESS_DESCRIPTION_FIELD_FIRST
+    _sort_after = PROCESS_DESCRIPTION_FIELD_AFTER
 
 
 class ProcessSummaryList(ExtendedSequenceSchema):
@@ -2241,7 +2263,7 @@ class ProcessVisibility(ExtendedMappingSchema):
 class Process(
     # following are like 'ProcessSummary',
     # except without 'ProcessControl' and 'DescriptionLinks' that are outside of nested 'process'
-    ProcessDescriptionType, ProcessDescriptionMeta,
+    ProcessDescriptionType, DescriptionMeta,
     # following are additional fields only in description, just like for OGC-API ProcessDescription
     ProcessContext, ProcessVisibility, ProcessLocations
 ):

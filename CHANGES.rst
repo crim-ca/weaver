@@ -21,7 +21,7 @@ Changes:
   selected format in favor of OGC-API names. Some examples are ``abstract`` that becomes ``description``,
   ``processVersion`` that simply becomes ``version``, ``mimeType`` that becomes ``mediaType``, etc.
   Some of those changes are also reflected by ``ProcessSummary`` during listing of processes, as well as for
-  corresponding provider-related endpoints.
+  corresponding provider-related endpoints (relates to `#200 <https://github.com/crim-ca/weaver/issues/200>`_).
 - Add backward compatibility support of some metadata fields (``abstract``, ``mimeType``, etc.) for ``Deploy``
   operation of pre-existing processes. When those fields are detected, they are converted inplace in favor of their
   corresponding new names aligned with OGC-API.
@@ -33,6 +33,11 @@ Changes:
   with each other although making use of similar naming convention, making their interpretation and debugging much
   more complicated. A stricter naming convention has been applied for consistent Deploy/Describe/Execute-related
   and Input/Output-related references.
+- Replace ``list_remote_processes`` function by method ``processes`` under the ``Service`` instance.
+- Replace ``get_capabilities`` function by reusing and extending method ``summary`` under the ``Service`` instance.
+- Improve generation of metadata and content validation of ``Service`` provider responses
+  (relates to OGC `#200 <https://github.com/crim-ca/weaver/issues/200>`_
+  and `#266 <https://github.com/crim-ca/weaver/issues/266>`_).
 
 Fixes:
 ------

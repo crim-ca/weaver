@@ -1102,8 +1102,9 @@ def wps2json_io(io_wps):
 
     rename = {
         "identifier": "id",
+        "abstract": "description",
         "supported_formats": "formats",
-        "mime_type": "mimeType",
+        "mime_type": "mediaType",
         "min_occurs": "minOccurs",
         "max_occurs": "maxOccurs",
     }

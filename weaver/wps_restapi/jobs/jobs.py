@@ -171,8 +171,7 @@ def validate_service_process(request):
                 store.fetch_by_id(process_name, visibility=VISIBILITY_PUBLIC)
             # remote process
             else:
-                from weaver.wps_restapi.processes.processes import list_remote_processes
-                processes = list_remote_processes(service, request)
+                processes = service.processes(request)
                 if process_name not in [p.id for p in processes]:
                     raise ProcessNotFound
     except (ServiceNotFound, ProcessNotFound):

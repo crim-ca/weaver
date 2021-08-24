@@ -30,7 +30,8 @@ from weaver.processes.types import (
     PROCESS_TEST,
     PROCESS_WORKFLOW,
     PROCESS_WPS_LOCAL,
-    PROCESS_WPS_REMOTE
+    PROCESS_WPS_REMOTE,
+    PROCESS_WPS_TYPES
 )
 from weaver.status import (
     JOB_STATUS_CATEGORIES,
@@ -51,7 +52,9 @@ from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
     from typing import Any, Dict, List, Optional, Union
-    from pyramid.request import Request
+
+    from owslib.wps import WebProcessingService
+
     from weaver.typedefs import AnyProcess, AnySettingsContainer, Number, CWL, JSON
 
 LOGGER = getLogger(__name__)
@@ -152,6 +155,7 @@ class Service(Base):
             raise TypeError("Service 'name' is required")
         if "url" not in self:
             raise TypeError("Service 'url' is required")
+        self["_wps"] = None
 
     @property
     def id(self):
@@ -170,7 +174,7 @@ class Service(Base):
     @property
     def type(self):
         """Service type."""
-        return self.get("type", "WPS")
+        return self.get("type", PROCESS_WPS_REMOTE)
 
     @property
     def public(self):
@@ -197,25 +201,138 @@ class Service(Base):
             "auth": self.auth
         }
 
-    def summary(self, request):
-        # type: (Request) -> Optional[JSON]
-        try:
-            if self.type.lower() != "wps":
-                return None  # FIXME: not implemented
+    def wps(self, container=None, **kwargs):
+        # type: (AnySettingsContainer, Any) -> WebProcessingService
+        """
+        Obtain the remote WPS service definition and metadata.
 
-            wps = get_wps_client(self.url, request)
-            url = "{}/providers/{}".format(get_wps_restapi_base_url(request), self.name)
-            return {
-                "id": self.name,
-                "title": getattr(wps.identification, "title", ""),
-                "abstract": getattr(wps.identification, "abstract", ""),
-                "url": url,
-                "public": self.public,
+        Stores the reference locally to avoid re-fetching it needlessly for future reference.
+        """
+        _wps = self.get("_wps")
+        if _wps is None:
+            # client retrieval could also be cached if recently fetched an not yet invalidated
+            self["_wps"] = _wps = get_wps_client(self.url, container=container, **kwargs)
+        return _wps
+
+    def links(self, container):
+        # type: (AnySettingsContainer) -> List[JSON]
+        """
+        Obtains the links relevant to the service provider.
+        """
+        wps = self.wps(container=container)
+        wps_lang = wps.language
+        wps_url = "{}?service=WPS&request=GetCapabilities".format(wps.url)
+        svc_url = "{}/providers/{}".format(get_wps_restapi_base_url(container), self.name)
+        proc_url = "{}/processes".format(svc_url)
+        return [
+            {
+                "rel": "service-desc",
+                "title": "Service description (GetCapabilities).",
+                "href": wps_url,
+                "hreflang": wps_lang,
+                "type": CONTENT_TYPE_APP_XML,
+            },
+            {
+                "rel": "service",
+                "title": "Service definition.",
+                "href": svc_url,
+                "hreflang": wps_lang,
+                "type": CONTENT_TYPE_APP_JSON,
+            },
+            {
+                "rel": "self",
+                "title": "Service definition.",
+                "href": svc_url,
+                "hreflang": ACCEPT_LANGUAGE_EN_CA,
+                "type": CONTENT_TYPE_APP_JSON,
+            },
+            {
+                "rel": "processes",
+                "title": "Listing of processes provided by this service.",
+                "href": proc_url,
+                "hreflang": ACCEPT_LANGUAGE_EN_CA,
+                "type": CONTENT_TYPE_APP_JSON,
+            },
+        ]
+
+    def metadata(self, container):
+        # type: (AnySettingsContainer) -> List[JSON]
+        """
+        Obtains the metadata relevant to the service provider.
+        """
+        wps = self.wps(container=container)
+        wps_lang = wps.language
+        # FIXME: add more metadata retrieved from 'wps.identification' and 'wps.provider.contact' (?)
+        #        if so, should be included only in "long description", while "summary" only returns below info
+        return [
+            {
+                "type": "provider-name",
+                "title": "Provider Name",
+                "role": "http://www.opengis.net/eoc/applicationContext/providerMetadata",
+                "value": wps.provider.name,
+                "lang": wps_lang
+            },
+            {
+                "type": "provider-site",
+                "title": "Provider Name",
+                "role": "http://www.opengis.net/eoc/applicationContext/providerMetadata",
+                "value": wps.provider.url,
+                "lang": wps_lang
+            },
+            {
+                "type": "contact-name",
+                "title": "Contact Name",
+                "role": "http://www.opengis.net/eoc/applicationContext/providerMetadata",
+                "value": wps.provider.contact.name,
+                "lang": wps_lang
             }
+        ]
+
+    def keywords(self, container=None):
+        # type: (AnySettingsContainer) -> List[str]
+        """
+        Obtains the keywords relevant to the service provider.
+        """
+        wps = self.wps(container=container)
+        return wps.identification.keywords
+
+    def summary(self, container):
+        # type: (AnySettingsContainer) -> Optional[JSON]
+        try:
+            # FIXME: not implemented (https://github.com/crim-ca/weaver/issues/130)
+            if self.type.lower() not in PROCESS_WPS_TYPES:
+                return None
+            wps = self.wps(container)
+            data = {
+                "id": self.name,
+                "title": getattr(wps.identification, "title", None),
+                "description": getattr(wps.identification, "abstract", None),
+                "url": self.url,  # remote URL (bw-compat, also in links)
+                "type": PROCESS_WPS_REMOTE,
+                "public": self.public,
+                "keywords": self.keywords(container),
+                "metadata": self.metadata(container),
+                "links": self.links(container),
+            }
+            return sd.ProviderSummarySchema().deserialize(data)
         except Exception as exc:
             msg = "Exception occurred while fetching wps {0} : {1!r}".format(self.url, exc)
             warnings.warn(msg, NonBreakingExceptionWarning)
         return None
+
+    def processes(self, container):
+        # type: (AnySettingsContainer) -> List[Process]
+        """
+        Obtains a list of remote service processes in a compatible :class:`weaver.datatype.Process` format.
+
+        Note: remote processes won't be stored to the local process storage.
+        """
+        # FIXME: support other providers (https://github.com/crim-ca/weaver/issues/130)
+        if self.type.lower() not in PROCESS_WPS_TYPES:
+            return []
+        wps = self.wps(container)
+        settings = get_settings(container)
+        return [Process.convert(process, self, settings) for process in wps.processes]
 
 
 class Job(Base):
