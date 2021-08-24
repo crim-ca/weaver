@@ -338,7 +338,8 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         resp = self.app.put_json("{}/visibility".format(proc_url), params=body, headers=self.json_headers)
         assert resp.status_code == 200
 
-        resp = self.app.get(proc_url, headers=self.json_headers)
+        proc_query = {"schema": "OLD"}
+        resp = self.app.get(proc_url, params=proc_query, headers=self.json_headers)
         assert resp.status_code == 200
         self.assert_deployed_wps3(resp.json, expected_process_id)
 
@@ -663,7 +664,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
 
     def test_set_process_visibility_success(self):
         test_process = self.process_private.identifier
-        path_describe = "/processes/{}".format(test_process)
+        path_describe = "/processes/{}?schema=OLD".format(test_process)
         path_visibility = "{}/visibility".format(path_describe)
 
         # validate cannot be found before

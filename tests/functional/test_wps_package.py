@@ -153,12 +153,21 @@ class WpsPackageAppTest(WpsPackageConfigBase):
         assert "minOccurs" not in proc["outputs"][0]
         assert "maxOccurs" not in proc["outputs"][0]
         assert "format" not in proc["outputs"][0]
-        assert len(set(desc.keys()) - KNOWN_PROCESS_DESCRIPTION_FIELDS) == 0
+        expect = KNOWN_PROCESS_DESCRIPTION_FIELDS
+        fields = set(desc.keys()) - KNOWN_PROCESS_DESCRIPTION_FIELDS
+        assert len(fields) == 0, \
+            "Unexpected fields found:\n  Unknown: {}\n  Expected: {}".format(list(fields), list(expect))
         # make sure that deserialization of literal fields did not produce over-verbose metadata
         for p_input in proc["inputs"]:
-            assert len(set(p_input) - KNOWN_PROCESS_DESCRIPTION_INPUT_DATA_FIELDS) == 0
+            fields = set(p_input) - expect
+            expect = KNOWN_PROCESS_DESCRIPTION_INPUT_DATA_FIELDS
+            assert len(fields) == 0, \
+                "Unexpected fields found:\n  Unknown: {}\n  Expected: {}".format(list(fields), list(expect))
         for p_output in proc["outputs"]:
-            assert len(set(p_output) - KNOWN_PROCESS_DESCRIPTION_OUTPUT_DATA_FIELDS) == 0
+            expect = KNOWN_PROCESS_DESCRIPTION_OUTPUT_DATA_FIELDS
+            fields = set(p_output) - expect
+            assert len(fields) == 0, \
+                "Unexpected fields found:\n  Unknown: {}\n  Expected: {}".format(list(fields), list(expect))
 
     def test_literal_io_from_package_and_offering(self):
         """
@@ -1449,7 +1458,7 @@ class WpsPackageAppTest(WpsPackageConfigBase):
             "executionUnit": [{"unit": cwl}],
         }
         desc, _ = self.deploy_process(body, describe_schema="OLD")
-        proc = desc[""]
+        proc = desc["process"]
         assert proc["id"] == self._testMethodName
         assert proc["title"] == "some title"
         assert proc["description"] == "this is a test"
@@ -1473,7 +1482,10 @@ class WpsPackageAppTest(WpsPackageConfigBase):
         assert isinstance(proc["outputs"][0]["formats"][0], dict)
         assert proc["outputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
         assert proc["outputs"][0]["formats"][0]["default"] is True
-        assert len(set(proc.keys()) - KNOWN_PROCESS_DESCRIPTION_FIELDS) == 0
+        expect = KNOWN_PROCESS_DESCRIPTION_FIELDS
+        fields = set(proc.keys()) - expect
+        assert len(fields) == 0, \
+            "Unexpected fields found:\n  Unknown: {}\n  Expected: {}".format(list(fields), list(expect))
 
     def test_complex_io_from_package_and_offering(self):
         """

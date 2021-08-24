@@ -12,15 +12,19 @@ Changes:
 --------
 - Apply conformance updates to better align with expected ``ProcessDescription`` schema from
   `OGC-API - Processes v1.0-draft6 <https://github.com/opengeospatial/ogcapi-processes/tree/1.0-draft.6>`_.
-  The main change introduced in this case is that process description contents will be directly at the root
+  The principal change introduced in this case is that process description contents will be directly at the root
   of the object returned by ``/processes/{id}`` response instead of being nested under ``"process"`` field.
   Furthermore, ``inputs`` and ``outputs`` definitions are reported as mapping of ``{"<id>": {<parameters>}}`` as
   specified by OGP-API instead of old listing format ``[{"id": "<id-value>", <key:val parameters>}]``. The old
-  format can still be obtained using request query parameter ``schema=OLD``, and will otherwise use OGC-API by
-  default or when ``schema=OGC``. Note that some duplicated metadata fields are dropped regardless of selected format
-  in favor of OGC-API names. Some examples are ``abstract`` that becomes ``description``, ``processVersion`` that
-  simply becomes ``version``, ``mimeType`` that becomes ``mediaType``, etc. Some of those changes are also reflected
-  by ``ProcessSummary`` during listing of processes, as well as for corresponding provider-related endpoints.
+  nested and listing format can still be obtained using request query parameter ``schema=OLD``, and will otherwise use
+  OGC-API by default or when ``schema=OGC``. Note that some duplicated metadata fields are dropped regardless of
+  selected format in favor of OGC-API names. Some examples are ``abstract`` that becomes ``description``,
+  ``processVersion`` that simply becomes ``version``, ``mimeType`` that becomes ``mediaType``, etc.
+  Some of those changes are also reflected by ``ProcessSummary`` during listing of processes, as well as for
+  corresponding provider-related endpoints.
+- Add backward compatibility support of some metadata fields (``abstract``, ``mimeType``, etc.) for ``Deploy``
+  operation of pre-existing processes. When those fields are detected, they are converted inplace in favor of their
+  corresponding new names aligned with OGC-API.
 - Update ``mimeType`` to ``mediaType`` as format type representation according to `OGC-API`
   (relates to `#211  <https://github.com/crim-ca/weaver/issues/211>`_).
 - Add sorting capability to generate mapping schemas for API responses using overrides of

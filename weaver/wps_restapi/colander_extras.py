@@ -729,18 +729,18 @@ class SortableMappingSchema(ExtendedNodeInterface, ExtendedSchemaBase):
     def _order_deserialize(cstruct, sort_first=None, sort_after=None):
         # type: (Dict[str, Any], Optional[Sequence[str]], Optional[Sequence[str]]) -> Dict[str, Any]
         """
-        Enforces some convenient ordering of expected fields in deserialized result, regardless of chosen schema variant.
+        Enforces ordering of expected fields in deserialized result, regardless of specified children/inherited schema.
 
         This function takes care of moving back items in a consistent order for better readability from API responses
         against different loaded definitions field order from remote servers, local database, pre-defined objects, etc.
 
-        This way, any field insertion order from both the input ``cstruct`` before deserialization operation, the
+        This way, any field insertion order from both the input ``cstruct`` following deserialization operation, the
         internal mechanics that :mod:`colander` (and extended OpenAPI schema definitions) employ to process this
-        deserialization, and the ``result`` dictionary fields order all don't matter.
+        deserialization, and the ``result`` dictionary fields order obtained from it all don't matter.
 
         Using this, the order of inheritance of schema children classes also doesn't matter, removing the need to worry
-        about placing them in any specific order when editing and joining the already complicated structures of inherited
-        schemas.
+        about placing classes in any specific order when editing and joining the already complicated structures of
+        inherited schemas.
 
         :param cstruct: JSON structure to be sorted that has already been processed by a schema's ``deserialize`` call.
         :param sort_first: ordered list of fields to place first in the result.

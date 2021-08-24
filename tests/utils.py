@@ -454,14 +454,14 @@ def mocked_remote_server_requests_wp1(
             with responses.RequestsMock(assert_all_requests_are_fired=False) as mock_resp:
                 with open(resource_file_getcap, "r") as f:
                     get_cap_xml = f.read()
-                get_cap_url = "{}/wps?service=WPS&request=GetCapabilities&version=1.0.0".format(test_server_wps)
+                get_cap_url = "{}?service=WPS&request=GetCapabilities&version=1.0.0".format(test_server_wps)
                 mock_resp.add(responses.GET, get_cap_url, body=get_cap_xml, headers=xml_header)
                 for proc_desc_file in resource_files_describe:
                     with open(proc_desc_file, "r") as f:
                         describe_xml = f.read()
                     # assume always first identifier (ignore input/output ones after)
                     proc_desc_id = re.findall("<ows:Identifier>(.*)</ows:Identifier>", describe_xml)[0]
-                    proc_desc_url = "{}/wps?service=WPS&request=DescribeProcess&identifier={}&version=1.0.0".format(
+                    proc_desc_url = "{}?service=WPS&request=DescribeProcess&identifier={}&version=1.0.0".format(
                         test_server_wps, proc_desc_id
                     )
                     mock_resp.add(responses.GET, proc_desc_url, body=describe_xml, headers=xml_header)

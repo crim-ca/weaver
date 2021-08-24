@@ -888,11 +888,12 @@ def request_extra(method,                       # type: str
     caching_args = (_request_cached, region, *request_args)
     for retry, delay in enumerate(request_delta):
         if retry:
-            if retry_after and resp and resp.status_code in [HTTPTooManyRequests.code]:
+            code = resp.status_code
+            if retry_after and resp and code in [HTTPTooManyRequests.code]:
                 after = resp.headers.get("Retry-After", "")
                 delay = int(after) if str(after).isdigit() else 0
-                LOGGER.debug("Received header [Retry-After=%ss] for [%s %s]", after, method, url)
-            LOGGER.debug("Retrying failed request after delay=%s for [%s %s]", delay, method, url)
+                LOGGER.debug("Received header [Retry-After=%ss] (code=%s) for [%s %s]", after, code, method, url)
+            LOGGER.debug("Retrying failed request (code=%s) after delay=%ss for [%s %s]", code, delay, method, url)
             time.sleep(delay)
         try:
             if no_cache:

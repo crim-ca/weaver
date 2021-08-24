@@ -99,7 +99,7 @@ if TYPE_CHECKING:
 WPS_FIELD_MAPPING = {
     "identifier": ["id", "ID", "Id", "Identifier"],
     "title": ["Title", "Label", "label"],
-    "abstract": ["Abstract"],
+    "abstract": ["description", "Description", "Abstract"],
     "metadata": ["Metadata"],
     "keywords": ["Keywords"],
     "allowed_values": ["AllowedValues", "allowedValues", "allowedvalues", "Allowed_Values", "Allowedvalues"],

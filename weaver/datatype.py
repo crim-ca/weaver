@@ -881,6 +881,9 @@ class Process(Base):
                 input_["maxOccurs"] = (
                     int(input_["maxOccurs"]) if input_["maxOccurs"] != "unbounded" else input_["maxOccurs"]
                 )
+                input_desc = get_field(input_, "abstract", search_variations=True, pop_found=True)
+                if input_desc:
+                    input_["description"] = input_desc
         return inputs
 
     @property
@@ -901,6 +904,10 @@ class Process(Base):
                 mime_type = get_field(fmt, "mime_type", pop_found=True, search_variations=True)
                 if mime_type is not null:
                     fmt["mediaType"] = mime_type
+
+            output_desc = get_field(output_, "abstract", search_variations=True, pop_found=True)
+            if output_desc:
+                output_["description"] = output_desc
         return outputs
 
     @property

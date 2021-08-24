@@ -672,6 +672,16 @@ class DescriptionType(DescriptionBase, DescriptionLinks, DescriptionExtra):
     pass
 
 
+class DeploymentType(DescriptionType):
+    deprecated = True
+    abstract = ExtendedSchemaNode(
+        String(), missing=drop, deprecated=True,
+        description="Description of the object. Will be replaced by 'description' field if not already provided. "
+                    "Preserved for backward compatibility of pre-existing process deployment. "
+                    "Consider using 'description' directly instead."
+    )
+
+
 class ProcessDescriptionMeta(ExtendedMappingSchema):
     # employ empty lists by default if nothing is provided for process description
     keywords = KeywordList(
@@ -965,7 +975,7 @@ class DescribeInputTypeWithID(InputIdentifierType, DescribeInputType):
 # compatible with pre-existing/deployed/remote processes, with either ``mediaType`` and ``mimeType`` formats.
 class DeployInputType(AllOfKeywordSchema):
     _all_of = [
-        DescriptionType(),
+        DeploymentType(),
         InputOutputDescriptionMeta(),
         DeployInputTypeDefinition(),
         WithMinMaxOccurs(),
@@ -1093,7 +1103,7 @@ class DescribeOutputTypeList(ExtendedSequenceSchema):
 # compatible with pre-existing/deployed/remote processes, with either ``mediaType`` and ``mimeType`` formats.
 class DeployOutputType(AllOfKeywordSchema):
     _all_of = [
-        DescriptionType(),
+        DeploymentType(),
         InputOutputDescriptionMeta(),
         DeployOutputTypeDefinition(),
     ]
