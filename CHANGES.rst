@@ -47,6 +47,8 @@ Fixes:
   during their listing by a single ``ProcessInputDescriptionSchema`` (introduced since ``3.0.0``).
 - Fix `#203 <https://github.com/crim-ca/weaver/issues/203>`_ with explicit validation test of ``ProcessSummary``
   schema for providers response.
+- Fix failing ``minOccurs`` and ``maxOccurs`` generation from a remote provider ``Process`` to support `OGC-API` format
+  (relates to `#263  <https://github.com/crim-ca/weaver/issues/263>`_).
 
 `3.5.0 <https://github.com/crim-ca/weaver/tree/3.5.0>`_ (2021-08-19)
 ========================================================================

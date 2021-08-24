@@ -991,13 +991,13 @@ class Process(Base):
             for input_ in inputs:
                 input_formats = get_field(input_, "formats", search_variations=False, default=[])
                 for fmt in input_formats:
-                    mime_type = get_field(fmt, "mime_type", pop_found=True, search_variations=True)
+                    mime_type = get_field(fmt, "mime_type", search_variations=True, pop_found=True)
                     if mime_type is not null:
                         fmt["mediaType"] = mime_type
-                input_["minOccurs"] = int(input_["minOccurs"])
-                input_["maxOccurs"] = (
-                    int(input_["maxOccurs"]) if input_["maxOccurs"] != "unbounded" else input_["maxOccurs"]
-                )
+                input_min = get_field(input_, "min_occurs", search_variations=True, pop_found=True, default=1)
+                input_max = get_field(input_, "max_occurs", search_variations=True, pop_found=True, default=1)
+                input_["minOccurs"] = int(input_min)
+                input_["maxOccurs"] = int(input_max) if input_max != "unbounded" else input_max
                 input_desc = get_field(input_, "abstract", search_variations=True, pop_found=True)
                 if input_desc:
                     input_["description"] = input_desc
