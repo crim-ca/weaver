@@ -38,6 +38,10 @@ Changes:
 - Improve generation of metadata and content validation of ``Service`` provider responses
   (relates to OGC `#200 <https://github.com/crim-ca/weaver/issues/200>`_
   and `#266 <https://github.com/crim-ca/weaver/issues/266>`_).
+- Add query parameter ``detail`` to providers listing request to allow listing of names instead of their summary
+  (similarly to the processes endpoint query parameter).
+- Add query parameter ``check`` to providers listing request to retrieve all registered ``Service`` regardless of
+  their URL endpoint availability at the moment the request is executed (less metadata is retrieved in that case).
 
 Fixes:
 ------
@@ -49,6 +53,7 @@ Fixes:
   schema for providers response.
 - Fix failing ``minOccurs`` and ``maxOccurs`` generation from a remote provider ``Process`` to support `OGC-API` format
   (relates to `#263  <https://github.com/crim-ca/weaver/issues/263>`_).
+- Fix schemas references and apply deserialization to providers listing request.
 
 `3.5.0 <https://github.com/crim-ca/weaver/tree/3.5.0>`_ (2021-08-19)
 ========================================================================

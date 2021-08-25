@@ -144,7 +144,7 @@ def get_processes(request):
             queries = parse_request_query(request)
             # FIXME: many steps below suppose that everything goes well...
             if "providers" in queries and asbool(queries["providers"][0]) is True:
-                services = get_provider_services(request)
+                services = get_provider_services(request)  # must fetch for listing of available processes
                 response_body.update({
                     "providers": [svc.summary(request) if detail else {"id": svc.name} for svc in services]
                 })

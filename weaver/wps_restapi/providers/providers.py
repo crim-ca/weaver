@@ -3,6 +3,7 @@ import warnings
 from typing import TYPE_CHECKING
 
 from pyramid.httpexceptions import HTTPCreated, HTTPNoContent, HTTPNotFound, HTTPOk
+from pyramid.settings import asbool
 
 from weaver.database import get_db
 from weaver.datatype import Service
@@ -18,26 +19,32 @@ LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from typing import List
 
-    from pyramid.request import Request
+    from weaver.typedefs import AnySettingsContainer
 
 
-def get_provider_services(request):
-    # type: (Request) -> List[Service]
+def get_provider_services(container, check=True):
+    # type: (AnySettingsContainer, bool) -> List[Service]
     """
     Obtain the list of remote provider services.
+
+    :param container: definition to retrieve settings and database connection.
+    :param check: request that all provider services are remotely accessible to fetch metadata from them.
     """
-    settings = get_settings(request)
+    settings = get_settings(container)
     store = get_db(settings).get_store(StoreServices)
     providers = []
+    if not check:
+        LOGGER.info("Skipping remote provider service check. Accessibility of listed services will not be validated.")
     for service in store.list_services():
         # pre-check service location
         # status can be 500 because of missing query params, but faster skip of invalid references
         # this avoids long pending connexions that never resolve because of down server
         try:
-            resp = request_extra("head", service.url, timeout=1, settings=settings)
-            if resp.status_code == 404:
-                LOGGER.warning("Skipping unresponsive service (%s) [%s]", service.name, service.url)
-                continue
+            if check:
+                resp = request_extra("head", service.url, timeout=1, settings=settings)
+                if resp.status_code == 404:
+                    LOGGER.warning("Skipping unresponsive service (%s) [%s]", service.name, service.url)
+                    continue
         except Exception as exc:
             msg = "Exception occurred while fetching wps {0} : {1!r}".format(service.url, exc)
             warnings.warn(msg, NonBreakingExceptionWarning)
@@ -53,14 +60,16 @@ def get_providers(request):
     """
     Lists registered providers.
     """
-
-    reachable_services = get_provider_services(request)
+    detail = asbool(request.params.get("detail", True))
+    check = asbool(request.params.get("check", True))
+    reachable_services = get_provider_services(request, check=check)
     providers = []
     for service in reachable_services:
-        summary = service.summary(request)
+        summary = service.summary(request, fetch=check) if detail else service.name
         if summary:
             providers.append(summary)
-    return HTTPOk(json={"providers": providers})
+    data = {"checked": check, "providers": providers}
+    return HTTPOk(json=sd.ProvidersBodySchema().deserialize(data))
 
 
 def get_service(request):

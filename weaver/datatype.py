@@ -9,6 +9,7 @@ import warnings
 from datetime import datetime, timedelta
 from logging import ERROR, INFO, Logger, getLevelName, getLogger
 from typing import TYPE_CHECKING
+from urllib.parse import urljoin, urlparse
 
 import lxml.etree
 from dateutil.parser import parse as dt_parse
@@ -214,17 +215,24 @@ class Service(Base):
             self["_wps"] = _wps = get_wps_client(self.url, container=container, **kwargs)
         return _wps
 
-    def links(self, container):
-        # type: (AnySettingsContainer) -> List[JSON]
+    def links(self, container, fetch=True):
+        # type: (AnySettingsContainer, bool) -> List[JSON]
         """
         Obtains the links relevant to the service provider.
         """
-        wps = self.wps(container=container)
-        wps_lang = wps.language
-        wps_url = "{}?service=WPS&request=GetCapabilities".format(wps.url)
+        if fetch:
+            wps = self.wps(container=container)
+            wps_lang = wps.language
+            wps_url = wps.url
+        else:
+            wps_url = self.url
+            wps_lang = ACCEPT_LANGUAGE_EN_CA  # assume, cannot validate
+
+        wps_url = urljoin(wps_url, urlparse(wps_url).path)
+        wps_url = "{}?service=WPS&request=GetCapabilities".format(wps_url)
         svc_url = "{}/providers/{}".format(get_wps_restapi_base_url(container), self.name)
         proc_url = "{}/processes".format(svc_url)
-        return [
+        links = [
             {
                 "rel": "service-desc",
                 "title": "Service description (GetCapabilities).",
@@ -236,7 +244,7 @@ class Service(Base):
                 "rel": "service",
                 "title": "Service definition.",
                 "href": svc_url,
-                "hreflang": wps_lang,
+                "hreflang": ACCEPT_LANGUAGE_EN_CA,
                 "type": CONTENT_TYPE_APP_JSON,
             },
             {
@@ -254,6 +262,7 @@ class Service(Base):
                 "type": CONTENT_TYPE_APP_JSON,
             },
         ]
+        return links
 
     def metadata(self, container):
         # type: (AnySettingsContainer) -> List[JSON]
@@ -264,7 +273,7 @@ class Service(Base):
         wps_lang = wps.language
         # FIXME: add more metadata retrieved from 'wps.identification' and 'wps.provider.contact' (?)
         #        if so, should be included only in "long description", while "summary" only returns below info
-        return [
+        meta = [
             {
                 "type": "provider-name",
                 "title": "Provider Name",
@@ -287,6 +296,7 @@ class Service(Base):
                 "lang": wps_lang
             }
         ]
+        return meta
 
     def keywords(self, container=None):
         # type: (AnySettingsContainer) -> List[str]
@@ -296,24 +306,38 @@ class Service(Base):
         wps = self.wps(container=container)
         return wps.identification.keywords
 
-    def summary(self, container):
-        # type: (AnySettingsContainer) -> Optional[JSON]
+    def summary(self, container, fetch=True):
+        # type: (AnySettingsContainer, bool) -> Optional[JSON]
+        """
+        Obtain the summary information from the provider service.
+
+        When metadata fetching is disabled, the generated summary will contain only information available locally.
+
+        :param container: employed to retrieve application settings.
+        :param fetch: indicates whether metadata should be fetched from remote.
+        :return: generated summary information.
+        """
         try:
             # FIXME: not implemented (https://github.com/crim-ca/weaver/issues/130)
             if self.type.lower() not in PROCESS_WPS_TYPES:
                 return None
-            wps = self.wps(container)
+            # basic information always available (local)
             data = {
                 "id": self.name,
-                "title": getattr(wps.identification, "title", None),
-                "description": getattr(wps.identification, "abstract", None),
                 "url": self.url,  # remote URL (bw-compat, also in links)
                 "type": PROCESS_WPS_REMOTE,
                 "public": self.public,
-                "keywords": self.keywords(container),
-                "metadata": self.metadata(container),
-                "links": self.links(container),
+                "links": self.links(container, fetch=fetch),
             }
+            # retrieve more metadata from remote if possible and requested
+            if fetch:
+                wps = self.wps(container)
+                data.update({
+                    "title": getattr(wps.identification, "title", None),
+                    "description": getattr(wps.identification, "abstract", None),
+                    "keywords": self.keywords(container),
+                    "metadata": self.metadata(container),
+                })
             return sd.ProviderSummarySchema().deserialize(data)
         except Exception as exc:
             msg = "Exception occurred while fetching wps {0} : {1!r}".format(self.url, exc)

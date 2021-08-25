@@ -3043,8 +3043,29 @@ class DeploymentResult(ExtendedMappingSchema):
     processSummary = ProcessSummary()
 
 
-class ProvidersSchema(ExtendedSequenceSchema):
-    providers_service = ProviderSummarySchema()
+class ProvidersListSchema(ExtendedSequenceSchema):
+    provider_service = ProviderSummarySchema()
+
+
+class ProviderNamesSchema(ExtendedSequenceSchema):
+    provider_name = AnyIdentifier()
+
+
+class ProviderListing(OneOfKeywordSchema):
+    _one_of = [
+        ProvidersListSchema(description="Listing of provider summary details retrieved from remote service."),
+        ProviderNamesSchema(description="Listing of provider names, possibly unvalidated from remote service."),
+    ]
+
+
+class ProvidersBodySchema(ExtendedMappingSchema):
+    checked = ExtendedSchemaNode(
+        Boolean(),
+        description="Indicates if the listed providers have been validated and are accessible from registered URL. "
+                    "In such case, provider metadata was partially retrieved from remote services and is accessible. "
+                    "Otherwise, only local metadata is provided and service availability is not guaranteed."
+    )
+    providers = ProviderListing(description="Providers listing according to specified query parameters.")
 
 
 class ProviderProcessesSchema(ExtendedSequenceSchema):
@@ -3354,7 +3375,21 @@ class PostProcessQuoteRequestEndpoint(ProcessPath, QuotePath):
 # ################################################################
 
 
+class ProvidersQuerySchema(ExtendedMappingSchema):
+    detail = ExtendedSchemaNode(
+        Boolean(), example=True, default=True, missing=drop,
+        description="Return summary details about each provider, or simply their IDs."
+    )
+    check = ExtendedSchemaNode(
+        Boolean(), example=True, default=True, missing=drop,
+        description="List only reachable providers, dropping unresponsive ones that cannot be checked for listing. "
+                    "Otherwise, all registered providers are listed regardless of their availability. When requesting "
+                    "details, less metadata will be provided since it will not be fetched from remote services."
+    )
+
+
 class GetProviders(ExtendedMappingSchema):
+    querystring = ProvidersQuerySchema()
     header = RequestHeaders()
 
 
@@ -3466,7 +3501,7 @@ class OkGetConformanceResponse(ExtendedMappingSchema):
 
 class OkGetProvidersListResponse(ExtendedMappingSchema):
     header = ResponseHeaders()
-    body = ProvidersSchema()
+    body = ProvidersBodySchema()
 
 
 class OkGetProviderCapabilitiesSchema(ExtendedMappingSchema):
@@ -3782,6 +3817,10 @@ get_providers_list_responses = {
         "ProviderList": {
             "summary": "Listing of registered remote providers.",
             "value": EXAMPLES["provider_listing.json"],
+        },
+        "ProviderNames": {
+            "summary": "Listing of registered providers names without validation.",
+            "value": EXAMPLES["provider_names.json"],
         }
     }),
     "403": ForbiddenProviderAccessResponseSchema(),
