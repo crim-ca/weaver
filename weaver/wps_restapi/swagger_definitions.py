@@ -1005,7 +1005,7 @@ class DeployInputTypeWithID(InputIdentifierType, DeployInputType):
 # for [{id: "", ...}] representation within ProcessDescription (OLD schema)
 class DescribeInputTypeList(ExtendedSequenceSchema):
     """
-    Complete definition of an input ID and its parameters.
+    Listing of process inputs descriptions.
     """
     input = DescribeInputTypeWithID()
 
@@ -1013,7 +1013,7 @@ class DescribeInputTypeList(ExtendedSequenceSchema):
 # for {"<id>": {...}} representation within ProcessDescription (OGC schema)
 class DescribeInputTypeMap(PermissiveMappingSchema):
     """
-    Definition of all process inputs under mapping.
+    Description of all process inputs under mapping.
     """
     input_id = DescribeInputType(
         variable="<input-id>",
@@ -1024,7 +1024,7 @@ class DescribeInputTypeMap(PermissiveMappingSchema):
 # for [{id: "", ...}] representation within ProcessDeployment (OLD schema)
 class DeployInputTypeList(ExtendedSequenceSchema):
     """
-    Input validation against `OGC-API` recommendation.
+    Listing of process input definitions to deploy.
     """
     input = DeployInputTypeWithID()
 
@@ -1082,17 +1082,6 @@ class DeployOutputTypeDefinition(OneOfKeywordSchema):
     ]
 
 
-# for {"<id>": {...}} representation within ProcessDescription (OGC schema)
-class DescribeOutputTypeMap(PermissiveMappingSchema):
-    """
-    Definition of all process outputs under mapping.
-    """
-    output_id = DescribeOutputTypeDefinition(
-        variable="<output-id>", title="ProcessOutputDefinition",
-        description="Output definition under mapping of process description."
-    )
-
-
 class DescribeOutputType(AllOfKeywordSchema):
     _all_of = [
         DescriptionType(),
@@ -1109,7 +1098,21 @@ class DescribeOutputTypeWithID(OutputIdentifierType, DescribeOutputType):
 
 
 class DescribeOutputTypeList(ExtendedSequenceSchema):
+    """
+    Listing of process outputs descriptions.
+    """
     output = DescribeOutputTypeWithID()
+
+
+# for {"<id>": {...}} representation within ProcessDescription (OGC schema)
+class DescribeOutputTypeMap(PermissiveMappingSchema):
+    """
+    Definition of all process outputs under mapping.
+    """
+    output_id = DescribeOutputType(
+        variable="<output-id>", title="ProcessOutputDefinition",
+        description="Output definition under mapping of process description."
+    )
 
 
 # Different definition than 'Describe' such that nested 'complex' type 'formats' can be validated and backward
@@ -1132,7 +1135,7 @@ class DeployOutputTypeWithID(OutputIdentifierType, DeployOutputType):
 # for [{id: "", ...}] representation within ProcessDeployment (OLD schema)
 class DeployOutputTypeList(ExtendedSequenceSchema):
     """
-    Output validation against `OGC-API` recommendation.
+    Listing of process output definitions to deploy.
     """
     input = DeployOutputTypeWithID()
 

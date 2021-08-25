@@ -1,5 +1,4 @@
 import logging
-import warnings
 from typing import TYPE_CHECKING
 
 from pyramid.httpexceptions import HTTPCreated, HTTPNoContent, HTTPNotFound, HTTPOk
@@ -11,8 +10,7 @@ from weaver.exceptions import ServiceNotFound, log_unhandled_exceptions
 from weaver.formats import OUTPUT_FORMAT_JSON
 from weaver.owsexceptions import OWSMissingParameterValue, OWSNotImplemented
 from weaver.store.base import StoreServices
-from weaver.utils import get_any_id, get_settings, request_extra
-from weaver.warning import NonBreakingExceptionWarning
+from weaver.utils import get_any_id, get_settings
 from weaver.wps_restapi import swagger_definitions as sd
 
 LOGGER = logging.getLogger(__name__)
@@ -36,20 +34,10 @@ def get_provider_services(container, check=True):
     if not check:
         LOGGER.info("Skipping remote provider service check. Accessibility of listed services will not be validated.")
     for service in store.list_services():
-        # pre-check service location
-        # status can be 500 because of missing query params, but faster skip of invalid references
-        # this avoids long pending connexions that never resolve because of down server
-        try:
-            if check:
-                resp = request_extra("head", service.url, timeout=1, settings=settings)
-                if resp.status_code == 404:
-                    LOGGER.warning("Skipping unresponsive service (%s) [%s]", service.name, service.url)
-                    continue
-        except Exception as exc:
-            msg = "Exception occurred while fetching wps {0} : {1!r}".format(service.url, exc)
-            warnings.warn(msg, NonBreakingExceptionWarning)
-        else:
-            providers.append(service)
+        if check and not service.check_accessible():
+            LOGGER.warning("Skipping unresponsive service (%s) [%s]", service.name, service.url)
+            continue
+        providers.append(service)
     return providers
 
 

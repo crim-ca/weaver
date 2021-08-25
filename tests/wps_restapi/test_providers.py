@@ -76,7 +76,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         resources.TEST_REMOTE_SERVER_URL
     )
     def test_register_provider_conflict(self):
-        self.register_provider()
+        self.register_provider(clear=True, error=False)
         resp = self.register_provider(clear=False, error=True)
         assert resp.status_code == 409
 

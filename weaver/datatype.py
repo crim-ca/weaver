@@ -12,6 +12,8 @@ from typing import TYPE_CHECKING
 from urllib.parse import urljoin, urlparse
 
 import lxml.etree
+import requests.exceptions
+import pyramid.httpexceptions
 from dateutil.parser import parse as dt_parse
 from owslib.wps import Process as ProcessOWS, WPSException
 from pywps import Process as ProcessWPS
@@ -44,7 +46,15 @@ from weaver.status import (
 )
 from weaver.typedefs import XML
 from weaver.utils import localize_datetime  # for backward compatibility of previously saved jobs not time-locale-aware
-from weaver.utils import fully_qualified_name, get_job_log_msg, get_log_date_fmt, get_log_fmt, get_settings, now
+from weaver.utils import (
+    fully_qualified_name,
+    get_job_log_msg,
+    get_log_date_fmt,
+    get_log_fmt,
+    get_settings,
+    now,
+    request_extra
+)
 from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_VALUES
 from weaver.warning import NonBreakingExceptionWarning
 from weaver.wps.utils import get_wps_client
@@ -357,6 +367,34 @@ class Service(Base):
         wps = self.wps(container)
         settings = get_settings(container)
         return [Process.convert(process, self, settings) for process in wps.processes]
+
+    def check_accessible(self, settings):
+        # type: (AnySettingsContainer) -> bool
+        """
+        Verify if the service URL is accessible.
+        """
+        try:
+            # some WPS don't like HEAD request, so revert to normal GetCapabilities
+            # otherwise use HEAD because it is faster to only 'ping' the service
+            if self.type.lower() in PROCESS_WPS_TYPES:
+                meth = "GET"
+                url = "{}?service=WPS&request=GetCapabilities".format(self.url)
+            else:
+                meth = "HEAD"
+                url = self.url
+            # - allow 500 for services that incorrectly handle invalid request params, but at least respond
+            #   (should be acceptable in this case because the 'ping' request is not necessarily well formed)
+            # - allow 400/405 for bad request/method directly reported by the service for the same reasons
+            # - enforce quick timeout (but don't allow 408 code) to avoid long pending connexions that never resolve
+            allowed_codes = [200, 400, 405, 500]
+            resp = request_extra(meth, url, timeout=2, settings=settings, allowed_codes=allowed_codes)
+            return resp.status_code in allowed_codes
+        except (requests.exceptions.RequestException, pyramid.httpexceptions.HTTPException) as exc:
+            msg = "HTTP exception occurred while checking service [{}] accessibility on [{}] : {!r}".format(
+                self.name, self.url, exc
+            )
+            warnings.warn(msg, NonBreakingExceptionWarning)
+        return False
 
 
 class Job(Base):

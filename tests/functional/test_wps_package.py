@@ -59,11 +59,12 @@ IANA_TAR = IANA_NAMESPACE + ":" + CONTENT_TYPE_APP_TAR  # noqa # pylint: disable
 IANA_ZIP = IANA_NAMESPACE + ":" + CONTENT_TYPE_APP_ZIP  # noqa # pylint: disable=unused-variable
 
 KNOWN_PROCESS_DESCRIPTION_FIELDS = {
-    "id", "title", "abstract", "keywords", "metadata", "inputs", "outputs", "executeEndpoint", "visibility"
+    "id", "title", "description", "keywords", "metadata", "inputs", "outputs",
+    "executeEndpoint", "processDescriptionURL", "processEndpointWPS1", "visibility"
 }
 # intersection of fields in InputType and specific sub-schema LiteralInputType
 KNOWN_PROCESS_DESCRIPTION_INPUT_DATA_FIELDS = {
-    "id", "title", "abstract", "keywords", "metadata", "links", "literalDataDomains", "additionalParameters",
+    "id", "title", "description", "keywords", "metadata", "links", "literalDataDomains", "additionalParameters",
     "minOccurs", "maxOccurs"
 }
 # corresponding schemas of input, but min/max occurs not expected
