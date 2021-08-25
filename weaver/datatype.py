@@ -57,7 +57,7 @@ from weaver.utils import (
 )
 from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_VALUES
 from weaver.warning import NonBreakingExceptionWarning
-from weaver.wps.utils import get_wps_client
+from weaver.wps.utils import get_wps_client, get_wps_url
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
@@ -1358,23 +1358,27 @@ class Process(Base):
         Converts a :mod:`owslib.wps` Process to local storage :class:`weaver.datatype.Process`.
         """
         assert isinstance(process, ProcessOWS)
-        wps_url = get_wps_restapi_base_url(container)
+        wps_xml_url = get_wps_url(container)
+        wps_api_url = get_wps_restapi_base_url(container)
         svc_name = None
-        if not service or wps_url == service.url:
+        if not service or wps_api_url == service.url:
             # local weaver process, using WPS-XML endpoint
-            remote_service_url = wps_url
-            local_provider_url = wps_url
+            remote_service_url = wps_xml_url
+            local_provider_url = wps_api_url
         else:
             svc_name = service.get("name")
             remote_service_url = service.url
-            local_provider_url = "{}/providers/{}".format(wps_url, svc_name)
+            local_provider_url = "{}/providers/{}".format(wps_api_url, svc_name)
         describe_process_url = "{}/processes/{}".format(local_provider_url, process.identifier)
         execute_process_url = "{}/jobs".format(describe_process_url)
         package, info = ows2json(process, svc_name, remote_service_url)
+        wps_description_url = "{}?service=WPS&request=DescribeProcess&version=1.0.0&identifier={}".format(
+            remote_service_url, process.identifier
+        )
         kwargs.update({  # parameters that must be enforced to find service
             "url": describe_process_url,
             "executeEndpoint": execute_process_url,
-            "processEndpointWPS1": remote_service_url,
+            "processEndpointWPS1": wps_description_url,
             "processDescriptionURL": describe_process_url,
             "type": PROCESS_WPS_REMOTE,
             "package": package,

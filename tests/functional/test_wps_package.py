@@ -155,13 +155,13 @@ class WpsPackageAppTest(WpsPackageConfigBase):
         assert "maxOccurs" not in proc["outputs"][0]
         assert "format" not in proc["outputs"][0]
         expect = KNOWN_PROCESS_DESCRIPTION_FIELDS
-        fields = set(desc.keys()) - KNOWN_PROCESS_DESCRIPTION_FIELDS
+        fields = set(proc.keys()) - expect
         assert len(fields) == 0, \
             "Unexpected fields found:\n  Unknown: {}\n  Expected: {}".format(list(fields), list(expect))
         # make sure that deserialization of literal fields did not produce over-verbose metadata
         for p_input in proc["inputs"]:
-            fields = set(p_input) - expect
             expect = KNOWN_PROCESS_DESCRIPTION_INPUT_DATA_FIELDS
+            fields = set(p_input) - expect
             assert len(fields) == 0, \
                 "Unexpected fields found:\n  Unknown: {}\n  Expected: {}".format(list(fields), list(expect))
         for p_output in proc["outputs"]:
