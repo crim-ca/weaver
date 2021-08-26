@@ -117,6 +117,9 @@ services:
       - /data/mongodb_persist:/data/db
     # MongoDB crash with permission denied errors if the command is not overridden like this
     command: bash -c 'chown -R mongodb:mongodb /data && chmod -R 755 /data && mongod'
+    networks:
+      - default
+      - docker-proxy
     restart: always
     logging: *default-logging
 
