@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 import yaml
 from colander import DateTime, Email, OneOf, Range, Regex, drop, required
 from cornice import Service
+from dateutil import parser as dateparser
 
 from weaver import __meta__
 from weaver.config import WEAVER_CONFIGURATION_EMS
@@ -73,7 +74,7 @@ from weaver.wps_restapi.colander_extras import (
 from weaver.wps_restapi.utils import wps_restapi_base_path
 
 if TYPE_CHECKING:
-    from weaver.typedefs import SettingsType, TypedDict
+    from weaver.typedefs import DatetimeIntervalType, SettingsType, TypedDict
 
     ViewInfo = TypedDict("ViewInfo", {"name": str, "pattern": str})
 
@@ -109,6 +110,10 @@ IO_INFO_IDS = (
 
 OGC_API_REPO_URL = "https://github.com/opengeospatial/ogcapi-processes"
 OGC_API_SCHEMA_URL = "https://raw.githubusercontent.com/opengeospatial/ogcapi-processes"
+
+DATETIME_INTERVAL_CLOSED_SYMBOL = "/"
+DATETIME_INTERVAL_OPEN_START_SYMBOL = "../"
+DATETIME_INTERVAL_OPEN_END_SYMBOL = "/.."
 
 #########################################################
 # Examples
@@ -226,6 +231,25 @@ class URL(ExtendedSchemaNode):
     schema_type = String
     description = "URL reference."
     format = "url"
+
+
+class DateTimeInterval(ExtendedSchemaNode):
+    schema_type = String
+    description = (
+        "DateTime format against OGC-API - Processes, "
+        "to get values before a certain date-time use '../' before the date-time, "
+        "to get values after a certain date-time use '/..' after the date-time like the example, "
+        "to get values between two date-times use '/' between the date-times, "
+        "to get values with a specific date-time just pass the datetime. "
+    )
+    example = "2022-03-02T03:32:38.487000+00:00/.."
+    regex_datetime = r"(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d+)?(([+-]\d\d:\d\d)|Z)?)"
+    regex_interval_closed = r"{i}\/{i}".format(i=regex_datetime)
+    regex_interval_open_start = r"\.\.\/{}".format(regex_datetime)
+    regex_interval_open_end = r"{}\/\.\.".format(regex_datetime)
+
+    pattern = "^{}|{}|{}|{}$".format(regex_datetime, regex_interval_closed,
+                                     regex_interval_open_start, regex_interval_open_end)
 
 
 class S3Bucket(ExtendedSchemaNode):
@@ -442,26 +466,73 @@ class LandingPage(ExtendedMappingSchema):
     links = LinkList()
 
 
-class Format(ExtendedMappingSchema):
+class FormatMimeType(ExtendedMappingSchema):
+    """
+    Used to respect ``mimeType`` field to work with pre-existing processes.
+    """
     title = "Format"
-    mimeType = ExtendedSchemaNode(String())
+    mimeType = ExtendedSchemaNode(
+        String(), default=CONTENT_TYPE_TEXT_PLAIN, example=CONTENT_TYPE_APP_JSON)
     schema = ExtendedSchemaNode(String(), missing=drop)
     encoding = ExtendedSchemaNode(String(), missing=drop)
 
 
-class FormatDefault(Format):
-    """Format for process input are assumed plain text if the MIME-type was omitted and is not
+class Format(ExtendedMappingSchema):
+    """
+    Used to respect ``mediaType`` field as suggested per `OGC-API`.
+    """
+    title = "Format"
+    mediaType = ExtendedSchemaNode(String(), default=CONTENT_TYPE_TEXT_PLAIN, example=CONTENT_TYPE_APP_JSON)
+    schema = ExtendedSchemaNode(String(), missing=drop)
+    encoding = ExtendedSchemaNode(String(), missing=drop)
+
+
+class DeployFormatDefaultMimeType(FormatMimeType, ExtendedMappingSchema):
+    """
+    Format for process input are assumed plain text if the MIME-type was omitted and is not
     one of the known formats by this instance. When executing a job, the best match will be used
     to run the process, and will fallback to the default as last resort.
     """
-    mimeType = ExtendedSchemaNode(String(), default=CONTENT_TYPE_TEXT_PLAIN, example=CONTENT_TYPE_APP_JSON)
+    # NOTE:
+    # The default is override from FormatMimeType since the FormatSelection 'oneOf' always fails,
+    # due to the 'default' value wich is always generated and it cause the presence of both Format and FormatMimeType
+    mimeType = ExtendedSchemaNode(String(), example=CONTENT_TYPE_APP_JSON)
+
+
+class DeployFormatDefault(Format, ExtendedMappingSchema):
+    """
+    Format for process input are assumed plain text if the MEDIA-type was omitted and is not
+    one of the known formats by this instance. When executing a job, the best match will be used
+    to run the process, and will fallback to the default as last resort.
+    """
+    # NOTE:
+    # The default is override from Format since the FormatSelection 'oneOf' always fails,
+    # due to the 'default' value wich is always generated and it cause the presence of both Format and FormatMimeType
+    mediaType = ExtendedSchemaNode(String(), example=CONTENT_TYPE_APP_JSON)
+
+
+class FormatSelection(OneOfKeywordSchema):
+    """
+    Validation against ``mimeType`` or ``mediaType`` format.
+
+    .. seealso::
+        - :class:`DeployFormatDefault`
+        - :class:`DeployFormatDefaultMimeType`
+
+    .. note::
+        Format are validated to be retrocompatible with pre-existing/deployed/remote processes.
+    """
+    _one_of = [
+        DeployFormatDefault(),
+        DeployFormatDefaultMimeType()
+    ]
 
 
 class FormatExtra(ExtendedMappingSchema):
     maximumMegabytes = ExtendedSchemaNode(Integer(), missing=drop)
 
 
-class FormatDescription(FormatDefault, FormatExtra):
+class FormatDefault(ExtendedMappingSchema):
     default = ExtendedSchemaNode(
         Boolean(), missing=drop, default=False,
         description=(
@@ -469,6 +540,22 @@ class FormatDescription(FormatDefault, FormatExtra):
             "allowed or supported formats was matched nor provided as input during job submission."
         )
     )
+
+
+class DescribeFormatDescription(Format, FormatExtra, FormatDefault):
+    # NOTE:
+    #  The 'OGC-API' suggest to use 'mediaType' field for FormatType, but retro-compatibility is supported,
+    #  FormatType can be with either old 'mimeType' or new 'mediaType' during deployement,
+    #  but only 'mediaType' is used for description
+    pass
+
+
+class DeployFormatDescription(FormatSelection, FormatExtra, FormatDefault):
+    # NOTE:
+    #  The 'OGC-API' suggest to use 'mediaType' field for FormatType, but retro-compatibility is supported,
+    #  FormatType can be with either old 'mimeType' or new 'mediaType' during deployement,
+    #  but only 'mediaType' is used for description
+    pass
 
 
 class FormatMedia(FormatExtra):
@@ -479,8 +566,12 @@ class FormatMedia(FormatExtra):
     encoding = ExtendedSchemaNode(String(), missing=drop)
 
 
-class FormatDescriptionList(ExtendedSequenceSchema):
-    format = FormatDescription()
+class DescribeFormatDescriptionList(ExtendedSequenceSchema):
+    format = DescribeFormatDescription()
+
+
+class DeployFormatDescriptionList(ExtendedSequenceSchema):
+    format = DeployFormatDescription()
 
 
 class AdditionalParameterValuesList(ExtendedSequenceSchema):
@@ -630,11 +721,19 @@ class OutputDescriptionType(OutputIdentifierType, DescriptionType, InputOutputDe
     pass
 
 
-class WithFormats(ExtendedMappingSchema):
-    formats = FormatDescriptionList()
+class DescribeWithFormats(ExtendedMappingSchema):
+    formats = DescribeFormatDescriptionList()
 
 
-class ComplexInputType(WithFormats):
+class DeployWithFormats(ExtendedMappingSchema):
+    formats = DeployFormatDescriptionList()
+
+
+class DescribeComplexInputType(DescribeWithFormats):
+    pass
+
+
+class DeployComplexInputType(DeployWithFormats):
     pass
 
 
@@ -717,6 +816,34 @@ class AnyLiteralType(OneOfKeywordSchema):
     ]
 
 
+class SequenceStringType(ExtendedSequenceSchema):
+    value = ExtendedSchemaNode(String())
+
+
+class SequenceBooleanType(ExtendedSequenceSchema):
+    value = ExtendedSchemaNode(Boolean())
+
+
+class SequenceNumberType(ExtendedSequenceSchema):
+    value = ExtendedSchemaNode(Float())
+
+
+class ArrayLiteralType(OneOfKeywordSchema):
+    _one_of = [
+        SequenceNumberType(),
+        SequenceBooleanType(),
+        SequenceStringType()
+    ]
+
+
+class ArrayLiteralDataType(ExtendedMappingSchema):
+    data = ArrayLiteralType()
+
+
+class ArrayLiteralValueType(ExtendedMappingSchema):
+    value = ArrayLiteralType()
+
+
 class AnyLiteralDataType(ExtendedMappingSchema):
     data = AnyLiteralType()
 
@@ -741,7 +868,7 @@ class LiteralDataDomainConstraints(OneOfKeywordSchema, LiteralDataDomainDefiniti
         AllowedValues,
         AllowedRanges,
         ValuesReference,
-        AnyValue,  # must be last because it"s the most permissive (always valid, default)
+        AnyValue,  # must be last because it's the most permissive (always valid, default)
     ]
 
 
@@ -751,38 +878,69 @@ class LiteralDataDomainList(ExtendedSequenceSchema):
 
 class LiteralInputType(NotKeywordSchema, ExtendedMappingSchema):
     _not = [
-        WithFormats,
+        DescribeWithFormats,
     ]
     literalDataDomains = LiteralDataDomainList(missing=drop)
 
 
-class InputTypeDefinition(OneOfKeywordSchema):
+class DescribeInputTypeDefinition(OneOfKeywordSchema):
+    _one_of = [
+        # NOTE:
+        #   LiteralInputType could be used to represent a complex input if the 'format' is missing in
+        #   process description definition but is instead provided in CWL definition.
+        #   This use case is still valid because 'format' can be inferred from the combining Process/CWL contents.
+        BoundingBoxInputType,
+        DescribeComplexInputType,  # should be 2nd to last because very permissive, but requires format at least
+        LiteralInputType,  # must be last because it"s the most permissive (all can default if omitted)
+    ]
+
+
+class DeployInputTypeDefinition(OneOfKeywordSchema):
     _one_of = [
         # NOTE:
         #   LiteralInputType could be used to represent a complex input if the 'format' is missing in
         #   process deployment definition but is instead provided in CWL definition.
         #   This use case is still valid because 'format' can be inferred from the combining Process/CWL contents.
         BoundingBoxInputType,
-        ComplexInputType,  # should be 2nd to last because very permissive, but requires format at least
+        DeployComplexInputType,  # should be 2nd to last because very permissive, but requires formats at least
         LiteralInputType,  # must be last because it"s the most permissive (all can default if omitted)
     ]
 
 
-class InputType(AnyOfKeywordSchema):
-    _any_of = [
+class DescribeInputType(AllOfKeywordSchema):
+    _all_of = [
         InputDescriptionType(),
-        InputTypeDefinition(),
+        DescribeInputTypeDefinition(),
         WithMinMaxOccurs(),
     ]
 
 
-class InputTypeList(ExtendedSequenceSchema):
-    input = InputType()
+class DeployInputType(AllOfKeywordSchema):
+    _all_of = [
+        InputDescriptionType(),
+        DeployInputTypeDefinition(),
+        WithMinMaxOccurs(),
+    ]
+
+
+class DescribeInputTypeList(ExtendedSequenceSchema):
+    input = DescribeInputType()
+
+
+class DeployInputTypeList(ExtendedSequenceSchema):
+    """
+    Input validation against `OGC-API` recommendation.
+
+    .. note::
+            Format are validated to be backward compatible with pre-existing/deployed/remote processes,
+            it will work with ``mediaType`` and ``mimeType`` formats.
+    """
+    input = DeployInputType()
 
 
 class LiteralOutputType(NotKeywordSchema, ExtendedMappingSchema):
     _not = [
-        WithFormats,
+        DescribeWithFormats,
     ]
     literalDataDomains = LiteralDataDomainList(missing=drop)
 
@@ -791,27 +949,57 @@ class BoundingBoxOutputType(ExtendedMappingSchema):
     supportedCRS = SupportedCRSList()
 
 
-class ComplexOutputType(WithFormats):
+class DescribeComplexOutputType(DescribeWithFormats):
     pass
 
 
-class OutputTypeDefinition(OneOfKeywordSchema):
+class DeployComplexOutputType(DeployWithFormats):
+    pass
+
+
+class DescribeOutputTypeDefinition(OneOfKeywordSchema):
     _one_of = [
         BoundingBoxOutputType,
-        ComplexOutputType,  # should be 2nd to last because very permissive, but requires format at least
+        DescribeComplexOutputType,  # should be 2nd to last because very permissive, but requires formats at least
         LiteralOutputType,  # must be last because it's the most permissive (all can default if omitted)
     ]
 
 
-class OutputType(AnyOfKeywordSchema):
-    _any_of = [
-        OutputTypeDefinition(),
+class DeployOutputTypeDefinition(OneOfKeywordSchema):
+    _one_of = [
+        BoundingBoxOutputType,
+        DeployComplexOutputType,  # should be 2nd to last because very permissive, but requires formats at least
+        LiteralOutputType,  # must be last because it's the most permissive (all can default if omitted)
+    ]
+
+
+class DeployOutputType(AllOfKeywordSchema):
+    _all_of = [
+        DeployOutputTypeDefinition(),
         OutputDescriptionType(),
     ]
 
 
-class OutputDescriptionList(ExtendedSequenceSchema):
-    output = OutputType()
+class DescribeOutputType(AllOfKeywordSchema):
+    _all_of = [
+        DescribeOutputTypeDefinition(),
+        OutputDescriptionType(),
+    ]
+
+
+class DescribeOutputTypeList(ExtendedSequenceSchema):
+    output = DescribeOutputType()
+
+
+class DeployOutputTypeList(ExtendedSequenceSchema):
+    """
+    Output validation against `OGC-API` recommendation.
+
+    .. note::
+        Format are validated to be backward compatible with pre-existing/deployed/remote processes,
+        it will work with ``mediaType`` and ``mimeType`` formats.
+    """
+    output = DeployOutputType()
 
 
 class JobExecuteModeEnum(ExtendedSchemaNode):
@@ -883,6 +1071,10 @@ class VisibilityValue(ExtendedSchemaNode):
     schema_type = String
     validator = OneOf(VISIBILITY_VALUES)
     example = VISIBILITY_PUBLIC
+
+
+class JobAccess(VisibilityValue):
+    pass
 
 
 class Visibility(ExtendedMappingSchema):
@@ -1867,27 +2059,27 @@ class ProcessInfo(ExtendedMappingSchema):
 
 
 class Process(ProcessInfo, ProcessDescriptionType, ProcessDescriptionMeta):
-    inputs = InputTypeList(description="Inputs definition of the process.")
-    outputs = OutputDescriptionList(description="Outputs definition of the process.")
+    inputs = DescribeInputTypeList(description="Inputs definition of the process.")
+    outputs = DescribeOutputTypeList(description="Outputs definition of the process.")
     visibility = VisibilityValue(missing=drop)
 
 
 class ProcessDeployment(ProcessDescriptionType, ProcessDeployMeta):
     # allowed undefined I/O during deploy because of reference from owsContext or executionUnit
-    inputs = InputTypeList(
+    inputs = DeployInputTypeList(
         missing=drop, title="DeploymentInputs",
         description="Additional definitions for process inputs to extend generated details by the referred package. "
                     "These are optional as they can mostly be inferred from the 'executionUnit', but allow specific "
                     "overrides (see '{}/package.html#correspondence-between-cwl-and-wps-fields')".format(DOC_URL))
-    outputs = OutputDescriptionList(
-        missing=drop, title="DeploymentInputs",
+    outputs = DeployOutputTypeList(
+        missing=drop, title="DeploymentOutputs",
         description="Additional definitions for process outputs to extend generated details by the referred package. "
                     "These are optional as they can mostly be inferred from the 'executionUnit', but allow specific "
                     "overrides (see '{}/package.html#correspondence-between-cwl-and-wps-fields')".format(DOC_URL))
     visibility = VisibilityValue(missing=drop)
 
 
-class ProcessOutputDescriptionSchema(ExtendedMappingSchema):
+class ProcessDescriptionOutputSchema(ExtendedMappingSchema):
     """WPS process output definition."""
     dataType = ExtendedSchemaNode(String())
     defaultValue = ExtendedMappingSchema()
@@ -1947,7 +2139,7 @@ class CreatedQuotedJobStatusSchema(CreatedJobStatusSchema):
 
 class GetPagingJobsSchema(ExtendedMappingSchema):
     jobs = JobCollection()
-    limit = ExtendedSchemaNode(Integer(), default=10)
+    limit = ExtendedSchemaNode(Integer(), missing=10, default=10, validator=Range(min=0, max=10000))
     page = ExtendedSchemaNode(Integer(), validator=Range(min=0))
 
 
@@ -1987,8 +2179,8 @@ class DismissedJobSchema(ExtendedMappingSchema):
 
 
 class QuoteProcessParametersSchema(ExtendedMappingSchema):
-    inputs = InputTypeList(missing=drop)
-    outputs = OutputDescriptionList(missing=drop)
+    inputs = DescribeInputTypeList(missing=drop)
+    outputs = DescribeOutputTypeList(missing=drop)
     mode = JobExecuteModeEnum()
     response = JobResponseOptionsEnum()
 
@@ -2011,7 +2203,7 @@ class AlternateQuotationList(ExtendedSequenceSchema):
 
 # same as base Format, but for process/job responses instead of process submission
 # (ie: 'Format' is for allowed/supported formats, this is the result format)
-class DataEncodingAttributes(Format):
+class DataEncodingAttributes(FormatSelection):
     pass
 
 
@@ -2023,34 +2215,118 @@ class Reference(ExtendedMappingSchema):
     bodyReference = ReferenceURL(missing=drop)
 
 
+class ArrayReference(ExtendedSequenceSchema):
+    item = Reference()
+
+
+class ArrayReferenceValueType(ExtendedMappingSchema):
+    value = ArrayReference()
+
+
 class AnyType(OneOfKeywordSchema):
     """Permissive variants that we attempt to parse automatically."""
     _one_of = [
+        # Array of literal data with 'data' key
+        ArrayLiteralDataType(),
+        # same with 'value' key (OGC specification)
+        ArrayLiteralValueType(),
+        # Array of HTTP references with various keywords
+        ArrayReferenceValueType(),
         # literal data with 'data' key
         AnyLiteralDataType(),
         # same with 'value' key (OGC specification)
         AnyLiteralValueType(),
         # HTTP references with various keywords
         LiteralReference(),
-        Reference(),
+        Reference()
     ]
 
 
-class Input(InputDataType, AnyType):
+class ExecuteInput(InputDataType, AnyType):
     """
     Default value to be looked for uses key 'value' to conform to OGC API standard.
     We still look for 'href', 'data' and 'reference' to remain back-compatible.
     """
 
 
-class InputList(ExtendedSequenceSchema):
-    input = Input(missing=drop, description="Received input definition during job submission.")
+class ExecuteInputString(ExtendedSchemaNode):
+    schema_type = String
+    title = "String input"
+    description = "Execute input string definition."
+    example = "This is a string"
+
+
+class ExecuteInputInteger(ExtendedSchemaNode):
+    schema_type = Integer
+    title = "Integer input"
+    description = "Execute input integer definition."
+    example = 8
+
+
+class ExecuteInputFloat(ExtendedSchemaNode):
+    schema_type = Float
+    title = "Float input"
+    description = "Execute input float definition."
+    example = 2.45
+
+
+class ExecuteInputTypes(OneOfKeywordSchema):
+    title = "Execute inputs types"
+    description = "Execute input supported types."
+    _one_of = [
+        ExecuteInputInteger(summary="Execute input integer value."),
+        ExecuteInputFloat(summary="Execute input float value."),
+        ExecuteInputString(summary="Execute input string value")
+    ]
+
+
+class ExecuteInputValue(OneOfKeywordSchema):
+    _one_of = [
+        ExecuteInputTypes(),
+        ExtendedMappingSchema()
+    ]
+
+
+class ExecuteInputObject(PermissiveMappingSchema):
+    value = ExecuteInputValue(variable="<input-id>")
+    inputBinding = ExtendedMappingSchema(missing=drop, title="Input Binding",
+                                         description="Defines how to specify the input for the command.")
+
+
+class ExecuteInputListValues(ExtendedSequenceSchema):
+    description = "List of allowed direct Execute values."
+    items = ExecuteInputTypes()
+
+
+class ExecuteInputDict(OneOfKeywordSchema):
+    description = "Execute type definition of the input."
+    _one_of = [
+        ExecuteInputTypes(variable="<input-id>"),
+        ExecuteInputListValues(summary="Execute input list."),
+        ExecuteInputObject(summary="Execute input value definition with parameters."),
+    ]
+
+
+class ExecuteInputMap(PermissiveMappingSchema):
+    input_id = ExecuteInputDict(variable="<input-id>", title="ExecuteInputIdentifier",
+                                description="Received mapping input definition during job submission.")
+
+
+class ExecuteInputList(ExtendedSequenceSchema):
+    input_item = ExecuteInput(missing=drop, description="Received list input definition during job submission.")
+
+
+class ExecuteInputsDefinition(OneOfKeywordSchema):
+    _one_of = [
+        ExecuteInputList(missing=drop, description="Package inputs defined as items."),
+        ExecuteInputMap(description="Package inputs defined as mapping."),
+    ]
 
 
 class Execute(ExtendedMappingSchema):
     # permit unspecified inputs for processes that could technically allow no-inputs definition (CWL),
     # but very unlikely/unusual in real world scenarios (possible case: constant endpoint fetcher?)
-    inputs = InputList(missing=drop)
+    inputs = ExecuteInputsDefinition(missing=drop)
     outputs = OutputList()
     mode = JobExecuteModeEnum()
     notification_email = ExtendedSchemaNode(
@@ -2524,7 +2800,7 @@ class ProcessInputSupportedValues(ExtendedSequenceSchema):
     value = SupportedValues()
 
 
-class ProcessInputDescriptionSchema(ExtendedMappingSchema):
+class ProcessDescriptionInputSchema(ExtendedMappingSchema):
     id = AnyIdentifier()
     title = ExtendedSchemaNode(String())
     dataType = ExtendedSchemaNode(String())
@@ -2535,20 +2811,20 @@ class ProcessInputDescriptionSchema(ExtendedMappingSchema):
     supportedValues = ProcessInputSupportedValues()
 
 
-class ProcessInputDescriptionList(ExtendedSequenceSchema):
-    input = ProcessInputDescriptionSchema()
+class ProcessDescriptionInputList(ExtendedSequenceSchema):
+    input = ProcessDescriptionInputSchema()
 
 
-class ProcessOutputDescriptionList(ExtendedSequenceSchema):
-    input = ProcessOutputDescriptionSchema()
+class ProcessDescriptionOutputList(ExtendedSequenceSchema):
+    input = ProcessDescriptionOutputSchema()
 
 
 class ProcessDescriptionSchema(ExtendedMappingSchema):
     id = AnyIdentifier()
     label = ExtendedSchemaNode(String())
     description = ExtendedSchemaNode(String())
-    inputs = ProcessInputDescriptionList()
-    outputs = ProcessOutputDescriptionList()
+    inputs = ProcessDescriptionInputList()
+    outputs = ProcessDescriptionOutputList()
 
 
 class UndeploymentResult(ExtendedMappingSchema):
@@ -2568,7 +2844,7 @@ class ProvidersSchema(ExtendedSequenceSchema):
 
 
 class ProcessesSchema(ExtendedSequenceSchema):
-    provider_processes_service = ProcessInputDescriptionSchema()
+    provider_processes_service = ProcessDescriptionInputSchema()
 
 
 class JobOutputValue(OneOfKeywordSchema):
@@ -2650,7 +2926,7 @@ class Result(ExtendedMappingSchema):
 
 
 class JobInputsSchema(ExtendedMappingSchema):
-    inputs = InputList()
+    inputs = ExecuteInputList()
     links = LinkList(missing=drop)
 
 
@@ -2792,12 +3068,15 @@ class GetJobsQueries(ExtendedMappingSchema):
     groups = ExtendedSchemaNode(String(),
                                 description="Comma-separated list of grouping fields with which to list jobs.",
                                 default=False, example="process,service", missing=drop)
-    page = ExtendedSchemaNode(Integer(), missing=drop, default=0, validator=Range(min=0))
-    limit = ExtendedSchemaNode(Integer(), missing=drop, default=10)
-    status = JobStatusEnum(missing=drop)
-    process = AnyIdentifier(missing=None)
+    page = ExtendedSchemaNode(Integer(), missing=0, default=0, validator=Range(min=0))
+    limit = ExtendedSchemaNode(Integer(), missing=10, default=10, validator=Range(min=0, max=10000))
+    datetime = DateTimeInterval(missing=drop, default=None)
+    status = JobStatusEnum(missing=drop, default=None)
+    process = AnyIdentifier(missing=drop)
     provider = ExtendedSchemaNode(String(), missing=drop, default=None)
     sort = JobSortEnum(missing=drop)
+    access = JobAccess(missing=drop, default=None)
+    notification_email = ExtendedSchemaNode(String(), missing=drop, validator=Email())
     tags = ExtendedSchemaNode(String(), missing=drop, default=None,
                               description="Comma-separated values of tags assigned to jobs")
 
@@ -2845,7 +3124,7 @@ class ProcessQuoteEndpoint(ProcessPath, QuotePath):
 
 class GetQuotesQueries(ExtendedMappingSchema):
     page = ExtendedSchemaNode(Integer(), missing=drop, default=0)
-    limit = ExtendedSchemaNode(Integer(), missing=drop, default=10)
+    limit = ExtendedSchemaNode(Integer(), missing=10, default=10, validator=Range(min=0, max=10000))
     process = AnyIdentifier(missing=None)
     sort = QuoteSortEnum(missing=drop)
 
@@ -2933,6 +3212,12 @@ class ErrorJsonResponseBodySchema(ExtendedMappingSchema):
     description = ExtendedSchemaNode(String(), description="Detail about the cause of error.")
     error = ErrorDetail(missing=drop)
     exception = OWSExceptionResponse(missing=drop)
+
+
+class UnprocessableEntityResponseSchema(ExtendedMappingSchema):
+    description = "Wrong format of given parameters."
+    header = ResponseHeaders()
+    body = ErrorJsonResponseBodySchema()
 
 
 class ForbiddenProcessAccessResponseSchema(ExtendedMappingSchema):
@@ -3355,6 +3640,7 @@ get_all_jobs_responses = {
             "value": EXAMPLES["jobs_listing.json"]
         }
     }),
+    "422": UnprocessableEntityResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_single_job_status_responses = {
@@ -3486,3 +3772,26 @@ def service_api_route_info(service_api, settings):
     # type: (Service, SettingsType) -> ViewInfo
     api_base = wps_restapi_base_path(settings)
     return {"name": service_api.name, "pattern": "{base}{path}".format(base=api_base, path=service_api.path)}
+
+
+def datetime_interval_parser(datetime_interval):
+    # type: (str) -> DatetimeIntervalType
+    """This function parses a given datetime or interval into a dictionary that will be easy for database process."""
+    parsed_datetime = {}
+
+    if datetime_interval.startswith(DATETIME_INTERVAL_OPEN_START_SYMBOL):
+        datetime_interval = datetime_interval.replace(DATETIME_INTERVAL_OPEN_START_SYMBOL, "")
+        parsed_datetime["before"] = dateparser.parse(datetime_interval)
+
+    elif datetime_interval.endswith(DATETIME_INTERVAL_OPEN_END_SYMBOL):
+        datetime_interval = datetime_interval.replace(DATETIME_INTERVAL_OPEN_END_SYMBOL, "")
+        parsed_datetime["after"] = dateparser.parse(datetime_interval)
+
+    elif DATETIME_INTERVAL_CLOSED_SYMBOL in datetime_interval:
+        datetime_interval = datetime_interval.split(DATETIME_INTERVAL_CLOSED_SYMBOL)
+        parsed_datetime["after"] = dateparser.parse(datetime_interval[0])
+        parsed_datetime["before"] = dateparser.parse(datetime_interval[-1])
+    else:
+        parsed_datetime["match"] = dateparser.parse(datetime_interval)
+
+    return parsed_datetime

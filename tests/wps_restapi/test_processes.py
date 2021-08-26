@@ -215,7 +215,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
 
         # change value that will trigger schema error on check
         process = self.process_store.fetch_by_id(process_name)
-        process["jobControlOptions"] = "random"  # invalid
+        process["outputTransmission"] = "random"  # invalid (don't use jobControlOptions fixed in-place)
         process["visibility"] = VISIBILITY_PUBLIC
         self.process_store.save_process(process, overwrite=True)
 
@@ -330,8 +330,8 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert expected_process_id in response_json["process"]["id"]
         assert len(response_json["process"]["inputs"]) == 1
         assert response_json["process"]["inputs"][0]["id"] == "input-1"
-        assert response_json["process"]["inputs"][0]["minOccurs"] == "1"
-        assert response_json["process"]["inputs"][0]["maxOccurs"] == "1"
+        assert response_json["process"]["inputs"][0]["minOccurs"] == 1
+        assert response_json["process"]["inputs"][0]["maxOccurs"] == 1
         assert "formats" not in response_json["process"]["inputs"][0]   # literal data doesn't have "formats"
         assert len(response_json["process"]["outputs"]) == 1
         assert response_json["process"]["outputs"][0]["id"] == "output"
@@ -342,7 +342,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         # assert response_json["process"]["outputs"][0]["maxOccurs"] == "1"
         assert isinstance(response_json["process"]["outputs"][0]["formats"], list)
         assert len(response_json["process"]["outputs"][0]["formats"]) == 1
-        assert response_json["process"]["outputs"][0]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_JSON
+        assert response_json["process"]["outputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
 
     def deploy_process_make_visible_and_fetch_deployed(self, deploy_payload, expected_process_id):
         """

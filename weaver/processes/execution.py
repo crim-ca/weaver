@@ -111,14 +111,27 @@ def execute_process(self, job_id, url, headers=None):
 
         try:
             wps_inputs = list()
-            for process_input in job.inputs:
-                input_id = get_any_id(process_input)
-                process_value = get_any_value(process_input)
+            # parse both dict and list type inputs
+            job_inputs = job.inputs.items() if isinstance(job.inputs, dict) else job.get("inputs", [])
+            for process_input in job_inputs:
+                if isinstance(process_input, tuple):
+                    input_id = process_input[0]
+                    process_value = process_input[1]
+                else:
+                    input_id = get_any_id(process_input)
+                    process_value = get_any_value(process_input)
                 # in case of array inputs, must repeat (id,value)
                 input_values = process_value if isinstance(process_value, list) else [process_value]
 
                 # we need to support file:// scheme but PyWPS doesn't like them so remove the scheme file://
-                input_values = [val[7:] if str(val).startswith("file://") else val for val in input_values]
+                input_values = [
+                    # when value is an array of dict that each contain a file reference
+                    (get_any_value(val)[7:] if str(get_any_value(val)).startswith("file://") else get_any_value(val))
+                    if isinstance(val, dict) else
+                    # when value is directly a single dict with file reference
+                    (val[7:] if str(val).startswith("file://") else val)
+                    for val in input_values
+                ]
 
                 # need to use ComplexDataInput structure for complex input
                 # need to use literal String for anything else than complex
@@ -423,7 +436,9 @@ def submit_job_handler(payload,             # type: JSON
         job_id=job.id)
     body_data = {
         "jobID": job.id,
+        "processID": job.process,
         "status": map_status(STATUS_ACCEPTED),
         "location": location
     }
+    body_data = body_data.update({"providerID": provider_id}) if provider_id else body_data
     return body_data

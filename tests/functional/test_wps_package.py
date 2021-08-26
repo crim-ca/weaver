@@ -8,8 +8,11 @@ Local test web application is employed to run operations by mocking external req
     - :mod:`tests.processes.wps_package`.
 """
 import contextlib
+import json
 import logging
 import os
+import tempfile
+from inspect import cleandoc
 
 import colander
 import pytest
@@ -23,6 +26,8 @@ from tests.utils import (
     mocked_aws_s3,
     mocked_aws_s3_bucket_test_file,
     mocked_execute_process,
+    mocked_http_file,
+    mocked_reference_test_file,
     mocked_sub_requests
 )
 from weaver.execute import EXECUTE_MODE_ASYNC, EXECUTE_RESPONSE_DOCUMENT, EXECUTE_TRANSMISSION_MODE_REFERENCE
@@ -37,7 +42,7 @@ from weaver.formats import (
     IANA_NAMESPACE,
     get_cwl_file_format
 )
-from weaver.processes.constants import CWL_REQUIREMENT_APP_BUILTIN, CWL_REQUIREMENT_INIT_WORKDIR
+from weaver.processes.constants import CWL_REQUIREMENT_APP_DOCKER, CWL_REQUIREMENT_INIT_WORKDIR
 from weaver.utils import get_any_value
 
 EDAM_PLAIN = EDAM_NAMESPACE + ":" + EDAM_MAPPING[CONTENT_TYPE_TEXT_PLAIN]
@@ -48,8 +53,15 @@ IANA_TAR = IANA_NAMESPACE + ":" + CONTENT_TYPE_APP_TAR  # noqa # pylint: disable
 IANA_ZIP = IANA_NAMESPACE + ":" + CONTENT_TYPE_APP_ZIP  # noqa # pylint: disable=unused-variable
 
 KNOWN_PROCESS_DESCRIPTION_FIELDS = {
-    "id", "title", "abstract", "inputs", "outputs", "executeEndpoint", "keywords", "metadata", "visibility"
+    "id", "title", "abstract", "keywords", "metadata", "inputs", "outputs", "executeEndpoint", "visibility"
 }
+# intersection of fields in InputType and specific sub-schema LiteralInputType
+KNOWN_PROCESS_DESCRIPTION_INPUT_DATA_FIELDS = {
+    "id", "title", "abstract", "keywords", "metadata", "links", "literalDataDomains", "additionalParameters",
+    "minOccurs", "maxOccurs"
+}
+# corresponding schemas of input, but min/max occurs not expected
+KNOWN_PROCESS_DESCRIPTION_OUTPUT_DATA_FIELDS = KNOWN_PROCESS_DESCRIPTION_INPUT_DATA_FIELDS - {"minOccurs", "maxOccurs"}
 
 LOGGER = logging.getLogger(__name__)
 
@@ -62,6 +74,7 @@ class WpsPackageAppTest(WpsPackageConfigBase):
             "weaver.wps": True,
             "weaver.wps_path": "/ows/wps",
             "weaver.wps_restapi_path": "/",
+            "weaver.wps_output_dir": "/tmp",  # nosec: B108 # don't care hardcoded for test
         }
         super(WpsPackageAppTest, cls).setUpClass()
 
@@ -124,8 +137,8 @@ class WpsPackageAppTest(WpsPackageConfigBase):
         assert isinstance(desc["process"]["inputs"], list)
         assert len(desc["process"]["inputs"]) == 1
         assert desc["process"]["inputs"][0]["id"] == "url"
-        assert desc["process"]["inputs"][0]["minOccurs"] == "1"
-        assert desc["process"]["inputs"][0]["maxOccurs"] == "1"
+        assert desc["process"]["inputs"][0]["minOccurs"] == 1
+        assert desc["process"]["inputs"][0]["maxOccurs"] == 1
         assert "format" not in desc["process"]["inputs"][0]
         assert isinstance(desc["process"]["outputs"], list)
         assert len(desc["process"]["outputs"]) == 1
@@ -134,6 +147,11 @@ class WpsPackageAppTest(WpsPackageConfigBase):
         assert "maxOccurs" not in desc["process"]["outputs"][0]
         assert "format" not in desc["process"]["outputs"][0]
         assert len(set(desc["process"].keys()) - KNOWN_PROCESS_DESCRIPTION_FIELDS) == 0
+        # make sure that deserialization of literal fields did not produce over-verbose metadata
+        for p_input in desc["process"]["inputs"]:
+            assert len(set(p_input) - KNOWN_PROCESS_DESCRIPTION_INPUT_DATA_FIELDS) == 0
+        for p_output in desc["process"]["outputs"]:
+            assert len(set(p_output) - KNOWN_PROCESS_DESCRIPTION_OUTPUT_DATA_FIELDS) == 0
 
     def test_literal_io_from_package_and_offering(self):
         """
@@ -211,11 +229,11 @@ class WpsPackageAppTest(WpsPackageConfigBase):
         assert isinstance(desc["process"]["inputs"], list)
         assert len(desc["process"]["inputs"]) == 2
         assert desc["process"]["inputs"][0]["id"] == "literal_input_only_cwl_minimal"
-        assert desc["process"]["inputs"][0]["minOccurs"] == "1"
-        assert desc["process"]["inputs"][0]["maxOccurs"] == "1"
+        assert desc["process"]["inputs"][0]["minOccurs"] == 1
+        assert desc["process"]["inputs"][0]["maxOccurs"] == 1
         assert desc["process"]["inputs"][1]["id"] == "literal_input_both_cwl_and_wps"
-        assert desc["process"]["inputs"][1]["minOccurs"] == "1"
-        assert desc["process"]["inputs"][1]["maxOccurs"] == "1"
+        assert desc["process"]["inputs"][1]["minOccurs"] == 1
+        assert desc["process"]["inputs"][1]["maxOccurs"] == 1
         assert desc["process"]["inputs"][1]["title"] == "Extra detail for I/O both in CWL and WPS", \
             "Additional details defined only in WPS matching CWL I/O by ID should be preserved"
         assert isinstance(desc["process"]["outputs"], list)
@@ -316,7 +334,7 @@ class WpsPackageAppTest(WpsPackageConfigBase):
 
         assert desc["process"]["inputs"][0]["id"] == "wps_only_format_exists"
         assert len(desc["process"]["inputs"][0]["formats"]) == 1
-        assert desc["process"]["inputs"][0]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_JSON
+        assert desc["process"]["inputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
         assert pkg["inputs"][0]["id"] == "wps_only_format_exists"
         assert pkg["inputs"][0]["type"] == "File"
         # FIXME: back-propagate WPS format to CWL without format specified
@@ -325,15 +343,15 @@ class WpsPackageAppTest(WpsPackageConfigBase):
 
         assert desc["process"]["inputs"][1]["id"] == "wps_only_format_not_exists"
         assert len(desc["process"]["inputs"][1]["formats"]) == 1
-        assert desc["process"]["inputs"][1]["formats"][0]["mimeType"] == ct_not_exists
+        assert desc["process"]["inputs"][1]["formats"][0]["mediaType"] == ct_not_exists
         assert pkg["inputs"][1]["id"] == "wps_only_format_not_exists"
         assert pkg["inputs"][1]["type"] == "File"
         assert "format" not in pkg["inputs"][1], "Non-existing CWL format reference should have been dropped."
 
         assert desc["process"]["inputs"][2]["id"] == "wps_only_format_both"
         assert len(desc["process"]["inputs"][2]["formats"]) == 2
-        assert desc["process"]["inputs"][2]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_JSON
-        assert desc["process"]["inputs"][2]["formats"][1]["mimeType"] == ct_not_exists
+        assert desc["process"]["inputs"][2]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
+        assert desc["process"]["inputs"][2]["formats"][1]["mediaType"] == ct_not_exists
         assert pkg["inputs"][2]["id"] == "wps_only_format_both"
         assert pkg["inputs"][2]["type"] == "File"
         # FIXME: for now we don't even back-propagate, but if we did, must be none because one is unknown reference
@@ -342,10 +360,97 @@ class WpsPackageAppTest(WpsPackageConfigBase):
 
         assert desc["process"]["inputs"][3]["id"] == "cwl_only_format_exists"
         assert len(desc["process"]["inputs"][3]["formats"]) == 1
-        assert desc["process"]["inputs"][3]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_JSON
+        assert desc["process"]["inputs"][3]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
         assert pkg["inputs"][3]["id"] == "cwl_only_format_exists"
         assert pkg["inputs"][3]["type"] == "File"
         assert pkg["inputs"][3]["format"] == type_json
+
+    def test_mediatype_io_format_references(self):
+        """
+        Test to validates ``mimeType`` is replaced by ``mediaType`` for all descriptions. Also we validate
+        that processes that use ``mimeType`` or ``mediaType`` can be deployed successfully.
+        """
+        ns_json, type_json = get_cwl_file_format(CONTENT_TYPE_APP_JSON)
+        namespaces = dict(list(ns_json.items()))
+        body = {
+            "processDescription": {
+                "process": {
+                    "id": self._testMethodName,
+                    "title": "some title",
+                    "abstract": "this is a test",
+                    "inputs": [
+                        {
+                            "id": "wps_format_mimeType",
+                            "formats": [
+                                {
+                                    "mimeType": CONTENT_TYPE_APP_JSON,
+                                    "default": True,
+                                }
+                            ]
+                        },
+                        {
+                            "id": "wps_format_mediaType",
+                            "formats": [
+                                {
+                                    "mediaType": CONTENT_TYPE_APP_JSON,
+                                    "default": True,
+                                }
+                            ]
+                        },
+                    ],
+                    "outputs": [
+                        {
+                            "id": "wps_format_mimeType",
+                            "formats": [{"mediaType": CONTENT_TYPE_APP_JSON}],
+                        },
+                        {
+                            "id": "wps_format_mediaType",
+                            "formats": [{"mediaType": CONTENT_TYPE_APP_JSON}],
+                        },
+                    ],
+                },
+            },
+            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "executionUnit": [{
+                "unit": {
+                    "cwlVersion": "v1.0",
+                    "class": "CommandLineTool",
+                    "inputs": [
+                        {
+                            "id": "wps_format_mimeType",
+                            "type": "File",
+                            "format": type_json,
+                        },
+                        {
+                            "id": "wps_format_mediaType",
+                            "type": "File",
+                            "format": type_json,
+                        },
+                    ],
+                    "outputs": [
+                        {
+                            "id": "wps_format_mimeType",
+                            "type": "File",
+                            "format": type_json,
+                        },
+                        {
+                            "id": "wps_format_mediaType",
+                            "type": "File",
+                            "format": type_json,
+                        },
+                    ],
+                    "$namespaces": namespaces
+                }
+            }]
+        }
+        desc, _ = self.deploy_process(body)
+
+        assert desc["process"]["inputs"][0]["id"] == "wps_format_mimeType"
+        assert desc["process"]["inputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
+        assert desc["process"]["outputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
+        assert desc["process"]["inputs"][1]["id"] == "wps_format_mediaType"
+        assert desc["process"]["inputs"][1]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
+        assert desc["process"]["outputs"][1]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
 
     def test_complex_io_with_multiple_formats_and_defaults(self):
         """
@@ -537,68 +642,68 @@ class WpsPackageAppTest(WpsPackageConfigBase):
 
         # process description input validation
         assert desc["process"]["inputs"][0]["id"] == "single_value_single_format"
-        assert desc["process"]["inputs"][0]["minOccurs"] == "1"
-        assert desc["process"]["inputs"][0]["maxOccurs"] == "1"
+        assert desc["process"]["inputs"][0]["minOccurs"] == 1
+        assert desc["process"]["inputs"][0]["maxOccurs"] == 1
         assert len(desc["process"]["inputs"][0]["formats"]) == 1
-        assert desc["process"]["inputs"][0]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_JSON
+        assert desc["process"]["inputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
         assert desc["process"]["inputs"][0]["formats"][0]["default"] is True  # only format available, auto default
         assert desc["process"]["inputs"][1]["id"] == "multi_value_single_format"
-        assert desc["process"]["inputs"][1]["minOccurs"] == "1"
+        assert desc["process"]["inputs"][1]["minOccurs"] == 1
         assert desc["process"]["inputs"][1]["maxOccurs"] == "unbounded"
         assert len(desc["process"]["inputs"][1]["formats"]) == 1
-        assert desc["process"]["inputs"][1]["formats"][0]["mimeType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert desc["process"]["inputs"][1]["formats"][0]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
         assert desc["process"]["inputs"][1]["formats"][0]["default"] is True  # only format available, auto default
         assert desc["process"]["inputs"][2]["id"] == "single_value_single_format_default"
-        assert desc["process"]["inputs"][2]["minOccurs"] == "0"
-        assert desc["process"]["inputs"][2]["maxOccurs"] == "1"
+        assert desc["process"]["inputs"][2]["minOccurs"] == 0
+        assert desc["process"]["inputs"][2]["maxOccurs"] == 1
         assert len(desc["process"]["inputs"][2]["formats"]) == 1
-        assert desc["process"]["inputs"][2]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_NETCDF
+        assert desc["process"]["inputs"][2]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_NETCDF
         assert desc["process"]["inputs"][2]["formats"][0]["default"] is True  # only format available, auto default
         assert desc["process"]["inputs"][3]["id"] == "multi_value_single_format_default"
-        assert desc["process"]["inputs"][3]["minOccurs"] == "0"
+        assert desc["process"]["inputs"][3]["minOccurs"] == 0
         assert desc["process"]["inputs"][3]["maxOccurs"] == "unbounded"
         assert len(desc["process"]["inputs"][3]["formats"]) == 1
-        assert desc["process"]["inputs"][3]["formats"][0]["mimeType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert desc["process"]["inputs"][3]["formats"][0]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
         assert desc["process"]["inputs"][3]["formats"][0]["default"] is True  # only format available, auto default
         assert desc["process"]["inputs"][4]["id"] == "single_value_multi_format"
-        assert desc["process"]["inputs"][4]["minOccurs"] == "1"
-        assert desc["process"]["inputs"][4]["maxOccurs"] == "1"
+        assert desc["process"]["inputs"][4]["minOccurs"] == 1
+        assert desc["process"]["inputs"][4]["maxOccurs"] == 1
         assert len(desc["process"]["inputs"][4]["formats"]) == 3
-        assert desc["process"]["inputs"][4]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_JSON
+        assert desc["process"]["inputs"][4]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
         assert desc["process"]["inputs"][4]["formats"][0]["default"] is True  # no explicit default, uses first
-        assert desc["process"]["inputs"][4]["formats"][1]["mimeType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert desc["process"]["inputs"][4]["formats"][1]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
         assert desc["process"]["inputs"][4]["formats"][1]["default"] is False
-        assert desc["process"]["inputs"][4]["formats"][2]["mimeType"] == CONTENT_TYPE_APP_NETCDF
+        assert desc["process"]["inputs"][4]["formats"][2]["mediaType"] == CONTENT_TYPE_APP_NETCDF
         assert desc["process"]["inputs"][4]["formats"][2]["default"] is False
         assert desc["process"]["inputs"][5]["id"] == "multi_value_multi_format"
-        assert desc["process"]["inputs"][5]["minOccurs"] == "1"
+        assert desc["process"]["inputs"][5]["minOccurs"] == 1
         assert desc["process"]["inputs"][5]["maxOccurs"] == "unbounded"
         assert len(desc["process"]["inputs"][5]["formats"]) == 3
-        assert desc["process"]["inputs"][5]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_NETCDF
+        assert desc["process"]["inputs"][5]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_NETCDF
         assert desc["process"]["inputs"][5]["formats"][0]["default"] is False
-        assert desc["process"]["inputs"][5]["formats"][1]["mimeType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert desc["process"]["inputs"][5]["formats"][1]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
         assert desc["process"]["inputs"][5]["formats"][1]["default"] is True  # specified in process description
-        assert desc["process"]["inputs"][5]["formats"][2]["mimeType"] == CONTENT_TYPE_APP_JSON
+        assert desc["process"]["inputs"][5]["formats"][2]["mediaType"] == CONTENT_TYPE_APP_JSON
         assert desc["process"]["inputs"][5]["formats"][2]["default"] is False
         assert desc["process"]["inputs"][6]["id"] == "single_value_multi_format_default"
-        assert desc["process"]["inputs"][6]["minOccurs"] == "0"
-        assert desc["process"]["inputs"][6]["maxOccurs"] == "1"
+        assert desc["process"]["inputs"][6]["minOccurs"] == 0
+        assert desc["process"]["inputs"][6]["maxOccurs"] == 1
         assert len(desc["process"]["inputs"][6]["formats"]) == 3
-        assert desc["process"]["inputs"][6]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_JSON
+        assert desc["process"]["inputs"][6]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
         assert desc["process"]["inputs"][6]["formats"][0]["default"] is True  # no explicit default, uses first
-        assert desc["process"]["inputs"][6]["formats"][1]["mimeType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert desc["process"]["inputs"][6]["formats"][1]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
         assert desc["process"]["inputs"][6]["formats"][1]["default"] is False
-        assert desc["process"]["inputs"][6]["formats"][2]["mimeType"] == CONTENT_TYPE_APP_NETCDF
+        assert desc["process"]["inputs"][6]["formats"][2]["mediaType"] == CONTENT_TYPE_APP_NETCDF
         assert desc["process"]["inputs"][6]["formats"][2]["default"] is False
         assert desc["process"]["inputs"][7]["id"] == "multi_value_multi_format_default"
-        assert desc["process"]["inputs"][7]["minOccurs"] == "0"
+        assert desc["process"]["inputs"][7]["minOccurs"] == 0
         assert desc["process"]["inputs"][7]["maxOccurs"] == "unbounded"
         assert len(desc["process"]["inputs"][7]["formats"]) == 3
-        assert desc["process"]["inputs"][7]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_JSON
+        assert desc["process"]["inputs"][7]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
         assert desc["process"]["inputs"][7]["formats"][0]["default"] is False
-        assert desc["process"]["inputs"][7]["formats"][1]["mimeType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert desc["process"]["inputs"][7]["formats"][1]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
         assert desc["process"]["inputs"][7]["formats"][1]["default"] is False
-        assert desc["process"]["inputs"][7]["formats"][2]["mimeType"] == CONTENT_TYPE_APP_NETCDF
+        assert desc["process"]["inputs"][7]["formats"][2]["mediaType"] == CONTENT_TYPE_APP_NETCDF
         assert desc["process"]["inputs"][7]["formats"][2]["default"] is True  # specified in process description
 
         # process description output validation
@@ -616,13 +721,13 @@ class WpsPackageAppTest(WpsPackageConfigBase):
                 # assert "default" not in format_spec
         assert desc["process"]["outputs"][0]["id"] == "single_value_single_format"
         assert len(desc["process"]["outputs"][0]["formats"]) == 1
-        assert desc["process"]["outputs"][0]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_JSON
+        assert desc["process"]["outputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
         assert desc["process"]["outputs"][0]["formats"][0]["default"] is True
         assert desc["process"]["outputs"][1]["id"] == "single_value_multi_format"
         assert len(desc["process"]["outputs"][1]["formats"]) == 3
-        assert desc["process"]["outputs"][1]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_JSON
-        assert desc["process"]["outputs"][1]["formats"][1]["mimeType"] == CONTENT_TYPE_TEXT_PLAIN
-        assert desc["process"]["outputs"][1]["formats"][2]["mimeType"] == CONTENT_TYPE_APP_NETCDF
+        assert desc["process"]["outputs"][1]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
+        assert desc["process"]["outputs"][1]["formats"][1]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert desc["process"]["outputs"][1]["formats"][2]["mediaType"] == CONTENT_TYPE_APP_NETCDF
         assert desc["process"]["outputs"][1]["formats"][0]["default"] is True   # mandatory
         assert desc["process"]["outputs"][1]["formats"][1].get("default", False) is False  # omission is allowed
         assert desc["process"]["outputs"][1]["formats"][2].get("default", False) is False  # omission is allowed
@@ -768,51 +873,51 @@ class WpsPackageAppTest(WpsPackageConfigBase):
         desc, pkg = self.deploy_process(body)
 
         assert desc["process"]["inputs"][0]["id"] == "required_literal"
-        assert desc["process"]["inputs"][0]["minOccurs"] == "1"
-        assert desc["process"]["inputs"][0]["maxOccurs"] == "1"
+        assert desc["process"]["inputs"][0]["minOccurs"] == 1
+        assert desc["process"]["inputs"][0]["maxOccurs"] == 1
         assert desc["process"]["inputs"][1]["id"] == "required_literal_default"
-        assert desc["process"]["inputs"][1]["minOccurs"] == "0"
-        assert desc["process"]["inputs"][1]["maxOccurs"] == "1"
+        assert desc["process"]["inputs"][1]["minOccurs"] == 0
+        assert desc["process"]["inputs"][1]["maxOccurs"] == 1
         assert desc["process"]["inputs"][2]["id"] == "optional_literal_shortcut"
-        assert desc["process"]["inputs"][2]["minOccurs"] == "0"
-        assert desc["process"]["inputs"][2]["maxOccurs"] == "1"
+        assert desc["process"]["inputs"][2]["minOccurs"] == 0
+        assert desc["process"]["inputs"][2]["maxOccurs"] == 1
         assert desc["process"]["inputs"][3]["id"] == "optional_literal_explicit"
-        assert desc["process"]["inputs"][3]["minOccurs"] == "0"
-        assert desc["process"]["inputs"][3]["maxOccurs"] == "1"
+        assert desc["process"]["inputs"][3]["minOccurs"] == 0
+        assert desc["process"]["inputs"][3]["maxOccurs"] == 1
         assert desc["process"]["inputs"][4]["id"] == "required_array_shortcut"
-        assert desc["process"]["inputs"][4]["minOccurs"] == "1"
+        assert desc["process"]["inputs"][4]["minOccurs"] == 1
         assert desc["process"]["inputs"][4]["maxOccurs"] == "unbounded"
         assert desc["process"]["inputs"][5]["id"] == "required_array_explicit"
-        assert desc["process"]["inputs"][5]["minOccurs"] == "1"
+        assert desc["process"]["inputs"][5]["minOccurs"] == 1
         assert desc["process"]["inputs"][5]["maxOccurs"] == "unbounded"
         assert desc["process"]["inputs"][6]["id"] == "optional_array_shortcut"
-        assert desc["process"]["inputs"][6]["minOccurs"] == "0"
+        assert desc["process"]["inputs"][6]["minOccurs"] == 0
         assert desc["process"]["inputs"][6]["maxOccurs"] == "unbounded"
         assert desc["process"]["inputs"][7]["id"] == "optional_array_explicit"
-        assert desc["process"]["inputs"][7]["minOccurs"] == "0"
+        assert desc["process"]["inputs"][7]["minOccurs"] == 0
         assert desc["process"]["inputs"][7]["maxOccurs"] == "unbounded"
         assert desc["process"]["inputs"][8]["id"] == "required_literal_min_fixed_by_wps"
-        assert desc["process"]["inputs"][8]["minOccurs"] == "1"
-        assert desc["process"]["inputs"][8]["maxOccurs"] == "1"
+        assert desc["process"]["inputs"][8]["minOccurs"] == 1
+        assert desc["process"]["inputs"][8]["maxOccurs"] == 1
         assert desc["process"]["inputs"][9]["id"] == "optional_literal_min_fixed_by_wps"
-        assert desc["process"]["inputs"][9]["minOccurs"] == "0"
-        assert desc["process"]["inputs"][9]["maxOccurs"] == "1"
+        assert desc["process"]["inputs"][9]["minOccurs"] == 0
+        assert desc["process"]["inputs"][9]["maxOccurs"] == 1
         assert desc["process"]["inputs"][10]["id"] == "required_array_min_fixed_by_wps"
         # FIXME: https://github.com/crim-ca/weaver/issues/50
         #   `maxOccurs=1` not updated to `maxOccurs="unbounded"` as it is evaluated as a single value,
         #   but it should be considered an array since `minOccurs>1`
         #   (see: https://github.com/crim-ca/weaver/issues/17)
-        assert desc["process"]["inputs"][10]["minOccurs"] == "2"
+        assert desc["process"]["inputs"][10]["minOccurs"] == 2
         # assert desc["process"]["inputs"][10]["maxOccurs"] == "unbounded"
         assert desc["process"]["inputs"][11]["id"] == "required_array_min_optional_fixed_by_wps"
-        assert desc["process"]["inputs"][11]["minOccurs"] == "2"
+        assert desc["process"]["inputs"][11]["minOccurs"] == 2
         # assert desc["process"]["inputs"][11]["maxOccurs"] == "unbounded"
         assert desc["process"]["inputs"][12]["id"] == "required_array_max_fixed_by_wps"
-        assert desc["process"]["inputs"][12]["minOccurs"] == "1"
-        assert desc["process"]["inputs"][12]["maxOccurs"] == "10"
+        assert desc["process"]["inputs"][12]["minOccurs"] == 1
+        assert desc["process"]["inputs"][12]["maxOccurs"] == 10
         assert desc["process"]["inputs"][13]["id"] == "optional_array_max_fixed_by_wps"
-        assert desc["process"]["inputs"][13]["minOccurs"] == "0"
-        assert desc["process"]["inputs"][13]["maxOccurs"] == "10"
+        assert desc["process"]["inputs"][13]["minOccurs"] == 0
+        assert desc["process"]["inputs"][13]["maxOccurs"] == 10
 
         assert pkg["inputs"][0]["id"] == "required_literal"
         assert pkg["inputs"][0]["type"] == "string"
@@ -908,10 +1013,315 @@ class WpsPackageAppTest(WpsPackageConfigBase):
             assert desc["process"]["inputs"][i]["id"] == process_input["id"]
             for field in ["minOccurs", "maxOccurs"]:
                 proc_in_res = desc["process"]["inputs"][i][field]
-                proc_in_exp = process_input[field]
-                assert proc_in_res in (proc_in_exp, str(proc_in_exp)), \
+                proc_in_exp = (
+                    int(process_input[field]) if str(process_input[field]).isnumeric() else process_input[field]
+                )
+                assert proc_in_res == proc_in_exp, \
                     "Field '{}' of input '{}'({}) is expected to be '{}' but was '{}'" \
                     .format(field, process_input, i, proc_in_exp, proc_in_res)
+
+    @mocked_aws_credentials
+    @mocked_aws_s3
+    @mocked_http_file
+    def test_execute_job_with_array_input(self):
+        """
+        The test validates job can receive an array as input and process it as expected.
+        """
+        cwl = {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "baseCommand": ["python3", "script.py"],
+            "inputs":
+            {
+                "test_int_array": {"type": {"type": "array", "items": "int"}, "inputBinding": {"position": 1}},
+                "test_float_array": {"type": {"type": "array", "items": "float"}},
+                "test_string_array": {"type": {"type": "array", "items": "string"}},
+                "test_reference_array": {"type": {"type": "array", "items": "File"}},
+                "test_int_value": "int",
+                "test_float_value": "float",
+                "test_string_value": "string",
+                "test_reference_http_value": "File",
+                "test_reference_file_value": "File",
+                "test_reference_s3_value": "File"
+            },
+            "requirements": {
+                CWL_REQUIREMENT_APP_DOCKER: {
+                    "dockerPull": "python:3.7-alpine"
+                },
+                CWL_REQUIREMENT_INIT_WORKDIR: {
+                    "listing": [
+                        {
+                            "entryname": "script.py",
+                            "entry": cleandoc("""
+                                import json
+                                import os
+                                input = $(inputs)
+                                for key, value in input.items():
+                                    if isinstance(value, list):
+                                        if all(isinstance(val, int) for val in value):
+                                            value = map(lambda v: v+1, value)
+                                        elif all(isinstance(val, float) for val in value):
+                                            value = map(lambda v: v+0.5, value)
+                                        elif all(isinstance(val, bool) for val in value):
+                                            value = map(lambda v: not v, value)
+                                        elif all(isinstance(val, str) for val in value):
+                                            value = map(lambda v: v.upper(), value)
+                                        elif all(isinstance(val, dict) for val in value):
+                                            def tmp(value):
+                                                path_ = value.get('path')
+                                                if path_ and os.path.exists(path_):
+                                                    with open (path_, 'r') as file_:
+                                                        filedata = file_.read()
+                                                return filedata.upper()
+                                            value = map(tmp, value)
+                                        input[key] = ";".join(map(str, value))
+                                    elif isinstance(value, dict):
+                                        path_ = value.get('path')
+                                        if path_ and os.path.exists(path_):
+                                            with open (path_, 'r') as file_:
+                                                filedata = file_.read()
+                                            input[key] = filedata.upper()
+                                    elif isinstance(value, str):
+                                        input[key] = value.upper()
+                                    elif isinstance(value, bool):
+                                        input[key] = not value
+                                    elif isinstance(value, int):
+                                        input[key] = value+1
+                                    elif isinstance(value, float):
+                                        input[key] = value+0.5
+                                json.dump(input, open("./tmp.txt","w"))
+                                """)
+                        }
+                    ]
+                }
+            },
+            "outputs": [{"id": "output_test", "type": "File", "outputBinding": {"glob": "tmp.txt"}}],
+        }
+        body = {
+            "processDescription": {
+                "process": {
+                    "id": self._testMethodName,
+                    "title": "some title",
+                    "abstract": "this is a test",
+                },
+            },
+            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "executionUnit": [{"unit": cwl}],
+        }
+        try:
+            desc, _ = self.deploy_process(body)
+        except colander.Invalid:
+            self.fail("Test")
+
+        assert desc["process"] is not None
+
+        test_bucket_ref = mocked_aws_s3_bucket_test_file(
+            "wps-process-test-bucket",
+            "input_file_s3.txt",
+            "This is a generated file for s3 test"
+        )
+
+        test_http_ref = mocked_reference_test_file(
+            "input_file_http.txt",
+            "http",
+            "This is a generated file for http test"
+        )
+
+        test_file_ref = mocked_reference_test_file(
+            "input_file_ref.txt",
+            "file",
+            "This is a generated file for file test"
+        )
+
+        exec_body = {
+            "mode": EXECUTE_MODE_ASYNC,
+            "response": EXECUTE_RESPONSE_DOCUMENT,
+            "inputs":
+            [
+                {"id": "test_int_array", "value": [10, 20, 30, 40, 50]},
+                {"id": "test_float_array", "value": [10.03, 20.03, 30.03, 40.03, 50.03]},
+                {"id": "test_string_array", "value": ["this", "is", "a", "test"]},
+                {"id": "test_reference_array",
+                    "value": [
+                        {"href": test_file_ref},
+                        {"href": test_http_ref},
+                        {"href": test_bucket_ref}
+                    ]
+                 },
+                {"id": "test_int_value", "value": 2923},
+                {"id": "test_float_value", "value": 389.73},
+                {"id": "test_string_value", "value": "stringtest"},
+                {"id": "test_reference_http_value", "href": test_http_ref},
+                {"id": "test_reference_file_value", "href": test_file_ref},
+                {"id": "test_reference_s3_value", "href": test_bucket_ref}
+            ],
+            "outputs": [
+                {"id": "output_test", "type": "File"},
+            ]
+        }
+
+        with contextlib.ExitStack() as stack_exec:
+            for mock_exec in mocked_execute_process():
+                stack_exec.enter_context(mock_exec)
+            proc_url = "/processes/{}/jobs".format(self._testMethodName)
+            resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
+                                       data=exec_body, headers=self.json_headers, only_local=True)
+            assert resp.status_code in [200, 201], "Failed with: [{}]\nReason:\n{}".format(resp.status_code, resp.json)
+            status_url = resp.json.get("location")
+
+        results = self.monitor_job(status_url)
+
+        job_output_file = results.get("output_test")["href"].split("/", 3)[-1]
+        tmpfile = "{}/{}".format(self.settings["weaver.wps_output_dir"], job_output_file)
+
+        try:
+            processed_values = json.load(open(tmpfile, "r"))
+        except FileNotFoundError:
+            self.fail("Output file [{}] was not found where it was expected to resume test".format(tmpfile))
+        except Exception as exception:
+            self.fail("An error occured during the reading of the file: {}".format(exception))
+        assert processed_values["test_int_array"] == "11;21;31;41;51"
+        assert processed_values["test_float_array"] == "10.53;20.53;30.53;40.53;50.53"
+        assert processed_values["test_string_array"] == "THIS;IS;A;TEST"
+        assert processed_values["test_reference_array"] == ("THIS IS A GENERATED FILE FOR FILE TEST;"
+                                                            "THIS IS A GENERATED FILE FOR HTTP TEST;"
+                                                            "THIS IS A GENERATED FILE FOR S3 TEST")
+        assert processed_values["test_int_value"] == 2924
+        assert processed_values["test_float_value"] == 390.23
+        assert processed_values["test_string_value"] == "STRINGTEST"
+        assert processed_values["test_reference_s3_value"] == "THIS IS A GENERATED FILE FOR S3 TEST"
+        assert processed_values["test_reference_http_value"] == "THIS IS A GENERATED FILE FOR HTTP TEST"
+        assert processed_values["test_reference_file_value"] == "THIS IS A GENERATED FILE FOR FILE TEST"
+
+    def test_execute_job_with_inline_input_values(self):
+        """
+        Validates that the job can receive an object and array types inputs and process them as expected.
+        """
+        cwl = {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "baseCommand": ["python3", "script.py"],
+            "inputs": {
+                "stringInput": "string",
+                "integerInput": "int",
+                "doubleInput": "float",
+                "stringArrayInput": {"type": {"type": "array", "items": "string"}},
+                "integerArrayInput": {"type": {"type": "array", "items": "int"}},
+                "floatArrayInput": {"type": {"type": "array", "items": "float"}},
+                "measureStringInput": "string",
+                "measureIntegerInput": "int",
+                "measureFloatInput": "float",
+                "measureFileInput": "File"
+            },
+            "requirements": {
+                CWL_REQUIREMENT_APP_DOCKER: {
+                    "dockerPull": "python:3.7-alpine"
+                },
+                CWL_REQUIREMENT_INIT_WORKDIR: {
+                    "listing": [
+                        {
+                            "entryname": "script.py",
+                            "entry": cleandoc("""
+                                import json
+                                import os
+                                import ast
+                                input = $(inputs)
+                                for key,value in input.items():
+                                    if isinstance(value, dict):
+                                        path_ = value.get('path')
+                                        if path_ and os.path.exists(path_):
+                                            with open (path_, 'r') as file_:
+                                                filedata = file_.read()
+                                            input[key] = ast.literal_eval(filedata.upper())
+                                json.dump(input, open("./tmp.txt","w"))
+                                """)
+                        }
+                    ]
+                }
+            },
+            "outputs": [{"id": "output_test", "type": "File", "outputBinding": {"glob": "tmp.txt"}}],
+        }
+        body = {
+            "processDescription": {
+                "process": {
+                    "id": self._testMethodName,
+                    "title": "some title",
+                    "abstract": "this is a test",
+                },
+            },
+            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "executionUnit": [{"unit": cwl}],
+        }
+        try:
+            desc, _ = self.deploy_process(body)
+        except colander.Invalid:
+            self.fail("Test")
+
+        assert desc["process"] is not None
+
+        with contextlib.ExitStack() as stack_exec:
+            for mock_exec in mocked_execute_process():
+                stack_exec.enter_context(mock_exec)
+            tmp_file = stack_exec.enter_context(tempfile.NamedTemporaryFile(mode="w", suffix=".json"))  # noqa
+            tmp_file.write(json.dumps({"value": {"ref": 1, "measurement": 10.3, "uom": "m"}}))
+            tmp_file.seek(0)
+
+            exec_body = {
+                "mode": EXECUTE_MODE_ASYNC,
+                "response": EXECUTE_RESPONSE_DOCUMENT,
+                "inputs": {
+                    "stringInput": "stringtest",
+                    "integerInput": 10,
+                    "doubleInput": 3.14159,
+                    "stringArrayInput": ["1", "2", "3", "4", "5", "6"],
+                    "integerArrayInput": [1, 2, 3, 4, 5, 6],
+                    "floatArrayInput": [1.45, 2.65, 3.5322, 4.86, 5.57, 6.02],
+                    "measureStringInput": {
+                        "value": "this is a test"
+                    },
+                    "measureIntegerInput": {
+                        "value": 45
+                    },
+                    "measureFloatInput": {
+                        "value": 10.2
+                    },
+                    "measureFileInput": {
+                        "href": "file://{}".format(tmp_file.name)
+                    }
+                },
+                "outputs": [
+                    {"id": "output_test", "type": "File"},
+                ]
+            }
+
+            proc_url = "/processes/{}/jobs".format(self._testMethodName)
+            resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
+                                       data=exec_body, headers=self.json_headers, only_local=True)
+            assert resp.status_code in [200, 201], "Failed with: [{}]\nReason:\n{}".format(resp.status_code, resp.json)
+            status_url = resp.json.get("location")
+
+        results = self.monitor_job(status_url)
+
+        job_output_file = results.get("output_test")["href"].split("/", 3)[-1]
+        tmp_file = "{}/{}".format(self.settings["weaver.wps_output_dir"], job_output_file)
+
+        try:
+            with open(tmp_file, "r") as f:
+                processed_values = json.load(f)
+        except FileNotFoundError:
+            self.fail("Output file [{}] was not found where it was expected to resume test".format(tmp_file))
+        except Exception as exception:
+            self.fail("An error occured during the reading of the file: {}".format(exception))
+        assert processed_values["stringInput"] == "stringtest"
+        assert processed_values["integerInput"] == 10
+        assert processed_values["doubleInput"] == 3.14159
+        assert processed_values["stringArrayInput"] == ["1", "2", "3", "4", "5", "6"]
+        assert processed_values["integerArrayInput"] == [1, 2, 3, 4, 5, 6]
+        assert processed_values["floatArrayInput"] == [1.45, 2.65, 3.5322, 4.86, 5.57, 6.02]
+        assert processed_values["measureStringInput"] == "this is a test"
+        assert processed_values["measureIntegerInput"] == 45
+        assert processed_values["measureFloatInput"] == 10.2
+        assert processed_values["measureFileInput"] == {"VALUE": {"REF": 1, "MEASUREMENT": 10.3, "UOM": "M"}}
 
     # FIXME: test not working
     #   same payloads sent directly to running weaver properly raise invalid schema -> bad request error
@@ -997,12 +1407,12 @@ class WpsPackageAppTest(WpsPackageConfigBase):
         assert isinstance(desc["process"]["inputs"], list)
         assert len(desc["process"]["inputs"]) == 1
         assert desc["process"]["inputs"][0]["id"] == "url"
-        assert desc["process"]["inputs"][0]["minOccurs"] == "1"
-        assert desc["process"]["inputs"][0]["maxOccurs"] == "1"
+        assert desc["process"]["inputs"][0]["minOccurs"] == 1
+        assert desc["process"]["inputs"][0]["maxOccurs"] == 1
         assert isinstance(desc["process"]["inputs"][0]["formats"], list)
         assert len(desc["process"]["inputs"][0]["formats"]) == 1
         assert isinstance(desc["process"]["inputs"][0]["formats"][0], dict)
-        assert desc["process"]["inputs"][0]["formats"][0]["mimeType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert desc["process"]["inputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
         assert desc["process"]["inputs"][0]["formats"][0]["default"] is True
         assert isinstance(desc["process"]["outputs"], list)
         assert len(desc["process"]["outputs"]) == 1
@@ -1012,7 +1422,7 @@ class WpsPackageAppTest(WpsPackageConfigBase):
         assert isinstance(desc["process"]["outputs"][0]["formats"], list)
         assert len(desc["process"]["outputs"][0]["formats"]) == 1
         assert isinstance(desc["process"]["outputs"][0]["formats"][0], dict)
-        assert desc["process"]["outputs"][0]["formats"][0]["mimeType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert desc["process"]["outputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
         assert desc["process"]["outputs"][0]["formats"][0]["default"] is True
         assert len(set(desc["process"].keys()) - KNOWN_PROCESS_DESCRIPTION_FIELDS) == 0
 
@@ -1092,18 +1502,18 @@ class WpsPackageAppTest(WpsPackageConfigBase):
         assert isinstance(desc["process"]["inputs"], list)
         assert len(desc["process"]["inputs"]) == 2
         assert desc["process"]["inputs"][0]["id"] == "complex_input_only_cwl_minimal"
-        assert desc["process"]["inputs"][0]["minOccurs"] == "1"
-        assert desc["process"]["inputs"][0]["maxOccurs"] == "1"
+        assert desc["process"]["inputs"][0]["minOccurs"] == 1
+        assert desc["process"]["inputs"][0]["maxOccurs"] == 1
         assert len(desc["process"]["inputs"][0]["formats"]) == 1, \
             "Default format should be added to process definition when omitted from both CWL and WPS"
-        assert desc["process"]["inputs"][0]["formats"][0]["mimeType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert desc["process"]["inputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
         assert desc["process"]["inputs"][0]["formats"][0]["default"] is True
         assert desc["process"]["inputs"][1]["id"] == "complex_input_both_cwl_and_wps"
-        assert desc["process"]["inputs"][1]["minOccurs"] == "1"
-        assert desc["process"]["inputs"][1]["maxOccurs"] == "1"
+        assert desc["process"]["inputs"][1]["minOccurs"] == 1
+        assert desc["process"]["inputs"][1]["maxOccurs"] == 1
         assert len(desc["process"]["inputs"][1]["formats"]) == 1, \
             "Default format should be added to process definition when omitted from both CWL and WPS"
-        assert desc["process"]["inputs"][1]["formats"][0]["mimeType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert desc["process"]["inputs"][1]["formats"][0]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
         assert desc["process"]["inputs"][1]["formats"][0]["default"] is True
         assert desc["process"]["inputs"][1]["title"] == "Extra detail for I/O both in CWL and WPS", \
             "Additional details defined only in WPS matching CWL I/O by ID should be preserved"
@@ -1112,12 +1522,12 @@ class WpsPackageAppTest(WpsPackageConfigBase):
         assert desc["process"]["outputs"][0]["id"] == "complex_output_only_cwl_minimal"
         assert len(desc["process"]["outputs"][0]["formats"]) == 1, \
             "Default format should be added to process definition when omitted from both CWL and WPS"
-        assert desc["process"]["outputs"][0]["formats"][0]["mimeType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert desc["process"]["outputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
         assert desc["process"]["outputs"][0]["formats"][0]["default"] is True
         assert desc["process"]["outputs"][1]["id"] == "complex_output_both_cwl_and_wps"
         assert len(desc["process"]["outputs"][1]["formats"]) == 1, \
             "Default format should be added to process definition when omitted from both CWL and WPS"
-        assert desc["process"]["outputs"][1]["formats"][0]["mimeType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert desc["process"]["outputs"][1]["formats"][0]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
         assert desc["process"]["outputs"][1]["formats"][0]["default"] is True
         assert desc["process"]["outputs"][1]["title"] == "Additional detail only within WPS output", \
             "Additional details defined only in WPS matching CWL I/O by ID should be preserved"
@@ -1198,17 +1608,17 @@ class WpsPackageAppTest(WpsPackageConfigBase):
         assert desc["process"]["inputs"][0]["id"] == "tasmax"
         assert desc["process"]["inputs"][0]["title"] == "Resource"
         assert desc["process"]["inputs"][0]["abstract"] == "NetCDF Files or archive (tar/zip) containing netCDF files."
-        assert desc["process"]["inputs"][0]["minOccurs"] == "1"
-        assert desc["process"]["inputs"][0]["maxOccurs"] == "1000"
+        assert desc["process"]["inputs"][0]["minOccurs"] == 1
+        assert desc["process"]["inputs"][0]["maxOccurs"] == 1000
         assert len(desc["process"]["inputs"][0]["formats"]) == 1
         assert desc["process"]["inputs"][0]["formats"][0]["default"] is True
-        assert desc["process"]["inputs"][0]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_NETCDF
+        assert desc["process"]["inputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_NETCDF
         assert desc["process"]["inputs"][0]["formats"][0]["encoding"] == "base64"
         assert desc["process"]["inputs"][1]["id"] == "freq"
         assert desc["process"]["inputs"][1]["title"] == "Frequency"
         assert desc["process"]["inputs"][1]["abstract"] == "Resampling frequency"
-        assert desc["process"]["inputs"][1]["minOccurs"] == "0"
-        assert desc["process"]["inputs"][1]["maxOccurs"] == "1"
+        assert desc["process"]["inputs"][1]["minOccurs"] == 0
+        assert desc["process"]["inputs"][1]["maxOccurs"] == 1
         assert "formats" not in desc["process"]["inputs"][1]
         assert len(desc["process"]["outputs"]) == 2
         assert desc["process"]["outputs"][0]["id"] == "output_netcdf"
@@ -1218,7 +1628,7 @@ class WpsPackageAppTest(WpsPackageConfigBase):
         assert "maxOccurs" not in desc["process"]["outputs"][0]
         assert len(desc["process"]["outputs"][0]["formats"]) == 1
         assert desc["process"]["outputs"][0]["formats"][0]["default"] is True
-        assert desc["process"]["outputs"][0]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_NETCDF
+        assert desc["process"]["outputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_NETCDF
         assert desc["process"]["outputs"][0]["formats"][0]["encoding"] == "base64"
         assert desc["process"]["outputs"][1]["id"] == "output_log"
         assert desc["process"]["outputs"][1]["title"] == "Logging information"
@@ -1227,7 +1637,7 @@ class WpsPackageAppTest(WpsPackageConfigBase):
         assert "maxOccurs" not in desc["process"]["outputs"][1]
         assert len(desc["process"]["outputs"][1]["formats"]) == 1
         assert desc["process"]["outputs"][1]["formats"][0]["default"] is True
-        assert desc["process"]["outputs"][1]["formats"][0]["mimeType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert desc["process"]["outputs"][1]["formats"][0]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
 
     def test_enum_array_and_multi_format_inputs_from_wps_xml_reference(self):
         body = {
@@ -1295,31 +1705,31 @@ class WpsPackageAppTest(WpsPackageConfigBase):
         assert desc["process"]["inputs"][0]["id"] == "region"
         assert desc["process"]["inputs"][0]["title"] == "Region"
         assert desc["process"]["inputs"][0]["abstract"] == "Country code, see ISO-3166-3"
-        assert desc["process"]["inputs"][0]["minOccurs"] == "1"
-        assert desc["process"]["inputs"][0]["maxOccurs"] == "220"
+        assert desc["process"]["inputs"][0]["minOccurs"] == 1
+        assert desc["process"]["inputs"][0]["maxOccurs"] == 220
         assert "formats" not in desc["process"]["inputs"][0]
         assert desc["process"]["inputs"][1]["id"] == "mosaic"
         assert desc["process"]["inputs"][1]["title"] == "Union of multiple regions"
         assert desc["process"]["inputs"][1]["abstract"] == \
                "If True, selected regions will be merged into a single geometry."   # noqa
-        assert desc["process"]["inputs"][1]["minOccurs"] == "0"
-        assert desc["process"]["inputs"][1]["maxOccurs"] == "1"
+        assert desc["process"]["inputs"][1]["minOccurs"] == 0
+        assert desc["process"]["inputs"][1]["maxOccurs"] == 1
         assert "formats" not in desc["process"]["inputs"][1]
         assert desc["process"]["inputs"][2]["id"] == "resource"
         assert desc["process"]["inputs"][2]["title"] == "Resource"
         assert desc["process"]["inputs"][2]["abstract"] == "NetCDF Files or archive (tar/zip) containing NetCDF files."
-        assert desc["process"]["inputs"][2]["minOccurs"] == "1"
-        assert desc["process"]["inputs"][2]["maxOccurs"] == "1000"
+        assert desc["process"]["inputs"][2]["minOccurs"] == 1
+        assert desc["process"]["inputs"][2]["maxOccurs"] == 1000
         # note: TAR should remain as literal format in the WPS context (not mapped/added as GZIP when resolved for CWL)
         assert len(desc["process"]["inputs"][2]["formats"]) == 3
         assert desc["process"]["inputs"][2]["formats"][0]["default"] is True
-        assert desc["process"]["inputs"][2]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_NETCDF
+        assert desc["process"]["inputs"][2]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_NETCDF
         assert "encoding" not in desc["process"]["inputs"][2]["formats"][0]  # none specified, so omitted in response
         assert desc["process"]["inputs"][2]["formats"][1]["default"] is False
-        assert desc["process"]["inputs"][2]["formats"][1]["mimeType"] == CONTENT_TYPE_APP_TAR
+        assert desc["process"]["inputs"][2]["formats"][1]["mediaType"] == CONTENT_TYPE_APP_TAR
         assert "encoding" not in desc["process"]["inputs"][2]["formats"][1]  # none specified, so omitted in response
         assert desc["process"]["inputs"][2]["formats"][2]["default"] is False
-        assert desc["process"]["inputs"][2]["formats"][2]["mimeType"] == CONTENT_TYPE_APP_ZIP
+        assert desc["process"]["inputs"][2]["formats"][2]["mediaType"] == CONTENT_TYPE_APP_ZIP
         assert "encoding" not in desc["process"]["inputs"][2]["formats"][2]  # none specified, so omitted in response
 
     # FIXME: implement,
@@ -1366,6 +1776,9 @@ class WpsPackageAppWithS3BucketTest(WpsPackageConfigBase):
             "baseCommand": "echo",
             "arguments": ["$(runtime.outdir)"],
             "requirements": {
+                CWL_REQUIREMENT_APP_DOCKER: {
+                    "dockerPull": "alpine:latest"
+                },
                 CWL_REQUIREMENT_INIT_WORKDIR: {
                     # directly copy files to output dir in order to retrieve them by glob
                     "listing": [
@@ -1374,10 +1787,6 @@ class WpsPackageAppWithS3BucketTest(WpsPackageConfigBase):
                     ]
                 }
             },
-            "hints": {CWL_REQUIREMENT_APP_BUILTIN: {
-                # ensure remote files are downloaded prior to CWL execution
-                "process": self._testMethodName,
-            }},
             "inputs": [
                 # regardless of reference type, they must be fetched as file before CWL call
                 {"id": "input_with_http", "type": "File"},

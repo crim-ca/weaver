@@ -99,6 +99,7 @@ class WorkerService(ServiceWPS):
     When receiving ``Execute`` request, convert the XML payload to corresponding JSON and
     dispatch it to the Celery Worker to actually process it after job setup for monitoring.
     """
+
     def __init__(self, *_, is_worker=False, settings=None, **__):
         super(WorkerService, self).__init__(*_, **__)
         self.is_worker = is_worker

@@ -104,6 +104,7 @@ class OneOfCaseInsensitive(colander.OneOf):
     """
     Validator that ensures the given value matches one of the available choices, but allowing case insensitive values.
     """
+
     def __call__(self, node, value):
         if str(value).lower() not in (choice.lower() for choice in self.choices):
             return super(OneOfCaseInsensitive, self).__call__(node, value)
@@ -113,6 +114,7 @@ class StringRange(colander.Range):
     """
     Validator that provides the same functionalities as :class:`colander.Range` for a numerical string value.
     """
+
     def __init__(self, min=None, max=None, **kwargs):
         try:
             if isinstance(min, str):
@@ -139,6 +141,7 @@ class SchemeURL(colander.Regex):
         :class:`colander.url` [remote http(s)/ftp(s)]
         :class:`colander.file_uri` [local file://]
     """
+
     def __init__(self, schemes=None, msg=None, flags=re.IGNORECASE):
         if not schemes:
             schemes = [""]
@@ -176,6 +179,20 @@ class SemanticVersion(colander.Regex):
 
 
 class ExtendedBoolean(colander.Boolean):
+
+    def __init__(self, *args, true_choices=None, fase_choices=None, **kwargs):
+        """
+        The arguments :paramref:`true_choices` and :paramref:`false_choices`
+        are defined as ``"true"`` and ``"false"`` since :mod:`colander` converts the value to string lowercase
+        to compare with other thruty/falsy values it should accept. Do NOT add other values like ``"1"``
+        to avoid conflict with ``Integer`` type for schemas that support both variants.
+        """
+        if true_choices is None:
+            true_choices = ("true")
+        if fase_choices is None:
+            false_choices = ("false")
+        super(ExtendedBoolean, self).__init__(true_choices=true_choices, false_choices=false_choices, *args, **kwargs)
+
     def serialize(self, node, cstruct):  # pylint: disable=W0221
         result = super(ExtendedBoolean, self).serialize(node, cstruct)
         if result is not colander.null:
@@ -861,6 +878,7 @@ class PermissiveMappingSchema(ExtendedMappingSchema):
         This class is only a shorthand definition of ``unknown`` keyword for convenience.
         All :class:`colander.MappingSchema` support this natively.
     """
+
     def __init__(self, *args, **kwargs):
         kwargs["unknown"] = "preserve"
         super(PermissiveMappingSchema, self).__init__(*args, **kwargs)
@@ -1422,7 +1440,9 @@ class NotKeywordSchema(KeywordMapper):
     """
     Allows specifying specific schema conditions that fails underlying schema definition validation if present.
 
-    This is equivalent to OpenAPI object mapping with ``additionalProperties: false``, but is more explicit in
+    Corresponds to the ``not`` specifier of `OpenAPI` specification.
+
+    This is equivalent to `OpenAPI` object mapping with ``additionalProperties: false``, but is more explicit in
     the definition of invalid or conflicting field names with explicit definitions during deserialization.
 
     Example::
@@ -1436,8 +1456,20 @@ class NotKeywordSchema(KeywordMapper):
         class MappingWithoutType(NotKeywordSchema, RequiredItem):
             _not = [MappingWithType()]
 
+        class MappingOnlyNotType(NotKeywordSchema):
+            _not = [MappingWithType()]
+
         # following will raise invalid error even if 'item' is valid because 'type' is also present
         MappingWithoutType().deserialize({"type": "invalid", "item": "valid"})
+
+        # following will return successfully with only 'item' because 'type' was not present
+        MappingWithoutType().deserialize({"item": "valid", "value": "ignore"})
+        # result: {"item": "valid"}
+
+        # following will return an empty mapping dropping 'item' since it only needs to ensure 'type' was not present,
+        # but did not provide any additional fields requirement from other class inheritances
+        MappingOnlyNotType().deserialize({"item": "valid"})
+        # result: {}
 
     .. seealso::
         - :class:`OneOfKeywordSchema`
@@ -1457,7 +1489,7 @@ class NotKeywordSchema(KeywordMapper):
 
     def _deserialize_keyword(self, cstruct):
         """
-        Test each possible case, raise if any corresponding schema was successfully validated.
+        Raise if any sub-node schema that should NOT be present was successfully validated.
         """
         invalid_not = dict()
         for schema_class in self._not:  # noqa
@@ -1473,11 +1505,15 @@ class NotKeywordSchema(KeywordMapper):
         if invalid_not:
             message = "Value contains not allowed fields from schema conditions: {}".format(invalid_not)
             raise colander.Invalid(node=self, msg=message, value=cstruct)
-        return cstruct
+        # If schema was a plain NotKeywordSchema, the result will be empty as it serves only to validate
+        # that the subnodes are not present. Otherwise, if it derives from other mapping classes, apply them.
+        # If deserialization was not applied here, everything in the original cstruct would bubble up.
+        return ExtendedMappingSchema.deserialize(self, cstruct)
 
 
 class KeywordTypeConverter(TypeConverter):
     """Generic keyword converter that builds schema with a list of sub-schemas under the keyword."""
+
     def convert_type(self, schema_node):
         keyword = schema_node.get_keyword_name()
         keyword_schema = {
@@ -1500,6 +1536,7 @@ class OneOfKeywordTypeConverter(KeywordTypeConverter):
     .. seealso::
         - :class:`OneOfKeywordSchema`
     """
+
     def convert_type(self, schema_node):
         # type: (OneOfKeywordSchema) -> Dict
         keyword = schema_node.get_keyword_name()
@@ -1568,6 +1605,7 @@ class VariableObjectTypeConverter(ObjectTypeConverter):
     Updates the mapping object's ``additionalProperties`` for each ``properties``
     that a marked as :class:`VariableSchemaNode`.
     """
+
     def convert_type(self, schema_node):
         converted = super(VariableObjectTypeConverter, self).convert_type(schema_node)
         converted.setdefault("additionalProperties", {})

@@ -1,13 +1,21 @@
 from typing import TYPE_CHECKING
 
 from celery.utils.log import get_task_logger
-from pyramid.httpexceptions import HTTPBadRequest, HTTPNotFound, HTTPOk, HTTPPermanentRedirect, HTTPUnauthorized
+from colander import Invalid
+from pyramid.httpexceptions import (
+    HTTPBadRequest,
+    HTTPNotFound,
+    HTTPOk,
+    HTTPPermanentRedirect,
+    HTTPUnauthorized,
+    HTTPUnprocessableEntity
+)
 from pyramid.request import Request
 from pyramid.settings import asbool
 from pyramid_celery import celery_app as app
 
 from notify import encrypt_email
-from weaver import sort, status
+from weaver import status
 from weaver.database import get_db
 from weaver.datatype import Job
 from weaver.exceptions import (
@@ -27,6 +35,7 @@ from weaver.utils import get_any_id, get_any_value, get_settings
 from weaver.visibility import VISIBILITY_PUBLIC
 from weaver.wps.utils import get_wps_output_url
 from weaver.wps_restapi import swagger_definitions as sd
+from weaver.wps_restapi.swagger_definitions import datetime_interval_parser
 
 if TYPE_CHECKING:
     from typing import List, Optional, Tuple, Union
@@ -96,7 +105,9 @@ def get_results(job, container, value_key=None, ogc_api=False):
         if rtype == "href":
             # fix paths relative to instance endpoint, but leave explicit links as is (eg: S3 bucket, remote HTTP, etc.)
             if value.startswith("/"):
-                value = wps_url + str(value).lstrip("/")
+                value = str(value).lstrip("/")
+            if "://" not in value:
+                value = wps_url + value
         elif ogc_api:
             out_key = "value"
         elif value_key:
@@ -194,44 +205,65 @@ def get_queried_jobs(request):
     """
     Retrieve the list of jobs which can be filtered, sorted, paged and categorized using query parameters.
     """
+
     settings = get_settings(request)
     service, process = validate_service_process(request)
-    detail = asbool(request.params.get("detail", False))
-    page = request.params.get("page", "0")
-    page = int(page) if str.isnumeric(page) else 0
-    limit = request.params.get("limit", "10")
-    limit = int(limit) if str.isnumeric(limit) else 10
-    email = request.params.get("notification_email", None)
-    filters = {
-        "page": page,
-        "limit": limit,
-        # split by comma and filter empty stings
-        "tags": list(filter(lambda s: s, request.params.get("tags", "").split(","))),
-        "access": request.params.get("access", None),
-        "status": request.params.get("status", None),
-        "sort": request.params.get("sort", sort.SORT_CREATED),
-        "notification_email": encrypt_email(email, settings) if email else None,
-        # service and process can be specified by query (short route) or by path (full route)
-        "process": process,
-        "service": service,
-    }
-    groups = request.params.get("groups", "")
-    groups = groups.split(",") if groups else None
-    store = get_db(request).get_store(StoreJobs)
-    items, total = store.find_jobs(request=request, group_by=groups, **filters)
-    body = {"total": total}
 
-    def _job_list(jobs):
-        return [j.json(settings) if detail else j.id for j in jobs]
+    filters = {**request.params, "process": process, "provider": service}
 
-    if groups:
-        for grouped_jobs in items:
-            grouped_jobs["jobs"] = _job_list(grouped_jobs["jobs"])
-        body.update({"groups": items})
+    filters["detail"] = asbool(request.params.get("detail"))
+
+    if request.params.get("datetime", False):
+        # replace white space with '+' since request.params replaces '+' with whitespaces when parsing
+        filters["datetime"] = request.params["datetime"].replace(" ", "+")
+
+    try:
+        filters = sd.GetJobsQueries().deserialize(filters)
+    except Invalid as ex:
+        raise HTTPUnprocessableEntity(json={
+            "code": Invalid.__name__,
+            "description": str(ex)
+        })
+
     else:
-        body.update({"jobs": _job_list(items), "page": page, "limit": limit})
-    body = sd.GetQueriedJobsSchema().deserialize(body)
-    return HTTPOk(json=body)
+
+        detail = filters.pop("detail", False)
+        groups = filters.pop("groups", "").split(",") if filters.get("groups", False) else filters.pop("groups", None)
+
+        filters["tags"] = list(filter(lambda s: s, filters["tags"].split(",") if filters.get("tags", False) else ""))
+        filters["notification_email"] = (
+            encrypt_email(filters["notification_email"], settings)
+            if filters.get("notification_email", False) else None
+        )
+        filters["datetime"] = datetime_interval_parser(filters["datetime"]) if filters.get("datetime", False) else None
+        filters["service"] = filters.pop("provider", None)
+
+        if (
+                filters["datetime"]
+                and filters["datetime"].get("before", False)
+                and filters["datetime"].get("after", False)
+                and filters["datetime"]["after"] > filters["datetime"]["before"]
+        ):
+            raise HTTPUnprocessableEntity(json={
+                "code": "InvalidDateFormat",
+                "description": "Datetime at the start of the interval must be less than the datetime at the end."
+            })
+
+        store = get_db(request).get_store(StoreJobs)
+        items, total = store.find_jobs(request=request, group_by=groups, **filters)
+        body = {"total": total}
+
+        def _job_list(jobs):
+            return [j.json(settings) if detail else j.id for j in jobs]
+
+        if groups:
+            for grouped_jobs in items:
+                grouped_jobs["jobs"] = _job_list(grouped_jobs["jobs"])
+            body.update({"groups": items})
+        else:
+            body.update({"jobs": _job_list(items), "page": filters["page"], "limit": filters["limit"]})
+        body = sd.GetQueriedJobsSchema().deserialize(body)
+        return HTTPOk(json=body)
 
 
 @sd.provider_job_service.get(tags=[sd.TAG_JOBS, sd.TAG_STATUS, sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,

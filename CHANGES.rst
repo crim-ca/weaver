@@ -10,9 +10,87 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- Update ``mimeType`` to ``mediaType`` as format type representation according to `OGC-API`
+  (fixes `#211  <https://github.com/crim-ca/weaver/issues/211>`_).
+
+`3.5.0 <https://github.com/crim-ca/weaver/tree/3.5.0>`_ (2021-08-19)
+========================================================================
+
+Changes:
+--------
+- No change.
+
+Fixes:
+------
+- Fix copy of headers when generating the WPS clients created for listing providers capabilities and processes.
+- Fix ``weaver.datatype`` objects auto-resolution of fields using either attributes (accessed as ``dict``)
+  or properties (accessed as ``class``) to ensure correct handling of additional operations on them.
+- Fix ``DuplicateKeyError`` that could sporadically arise during initial ``processes`` storage creation
+  when ``builtin`` processes get inserted/updated on launch by parallel worker/threads running the application.
+  Operation is relaxed only for default ``builtin`` to allow equivalent process replacement (``upsert``) instead
+  of only explicit inserts, as they should be pre-validated for duplicate entries, and only new definitions should
+  be registered during this operation (fixes `#246 <https://github.com/crim-ca/weaver/issues/246>`_).
+
+`3.4.0 <https://github.com/crim-ca/weaver/tree/3.4.0>`_ (2021-08-11)
+========================================================================
+
+Changes:
+--------
+- Add missing processID detail in job status info response
+  (relates to `#270 <https://github.com/crim-ca/weaver/issues/270>`_).
+- Add support for inputs under mapping for inline values and arrays in process execution
+  (relates to `#265 <https://github.com/crim-ca/weaver/issues/265>`_).
+
+Fixes:
+------
+- No change.
+
+`3.3.0 <https://github.com/crim-ca/weaver/tree/3.3.0>`_ (2021-07-16)
+========================================================================
+
+Changes:
+--------
+- Add support for array type as job inputs
+  (relates to `#233 <https://github.com/crim-ca/weaver/issues/233>`_).
+- Remove automatic conversion of falsy/truthy ``string`` and ``integer`` type definitions to ``boolean`` type
+  to align with OpenAPI ``boolean`` type definitions. Non explicit ``boolean`` values will not be automatically
+  converted to ``bool`` anymore. They will require explicit ``false|true`` values.
+
+Fixes:
+------
+- Fix ``minOccurs`` and ``maxOccurs`` representation according to `OGC-API`
+  (fixes `#263  <https://github.com/crim-ca/weaver/issues/263>`_).
+- Fixed the format of the output file URL. When the prefix ``/`` was not present,
+  URL was incorrectly handled by not prepending the required base URL location.
+
+`3.2.1 <https://github.com/crim-ca/weaver/tree/3.2.1>`_ (2021-06-08)
+========================================================================
+
+Changes:
+--------
+- No change.
+
+Fixes:
+------
+- Fix backward compatibility of pre-deployed processes that did not define ``jobControlOptions`` that is now required.
+  Missing definition are substituted in-place by default ``["execute-async"]`` mode.
+
+`3.2.0 <https://github.com/crim-ca/weaver/tree/3.2.0>`_ (2021-06-08)
+========================================================================
+
+Changes:
+--------
 - Add reference link to ReadTheDocs URL of `Weaver` in API landing page.
 - Add references to `OGC-API Processes` requirements and recommendations for eventual conformance listing
   (relates to `#231 <https://github.com/crim-ca/weaver/issues/231>`_).
+- Add ``datetime`` query parameter for job searches queries
+  (relates to `#236 <https://github.com/crim-ca/weaver/issues/236>`_).
+- Add ``limit`` query parameter validation and integration for jobs in retrieve queries
+  (relates to `#237 <https://github.com/crim-ca/weaver/issues/237>`_).
 
 Fixes:
 ------
@@ -24,6 +102,10 @@ Fixes:
 - Fix default execution mode specification in process job control options
   (fixes `#182 <https://github.com/opengeospatial/ogcapi-processes/pull/182>`_).
 - Fix old OGC-API WPS REST bindings link in landing page for the more recent `OGC-API Processes` specification.
+- Fix invalid deserialization of schemas using ``not`` keyword that would result in all fields returned instead of
+  limiting them to the expected fields from the schema definitions for ``LiteralInputType`` in process description.
+- Adjust ``InputType`` and ``OutputType`` schemas to use ``allOf`` instead of ``anyOf`` definition since all sub-schemas
+  that define them must be combined, with their respectively required or optional fields.
 
 `3.1.0 <https://github.com/crim-ca/weaver/tree/3.1.0>`_ (2021-04-23)
 ========================================================================
@@ -132,7 +214,7 @@ Changes:
 - Improve handling of `CWL` input generation in combination with ``minOccurs``, ``maxOccurs``, ``allowedValues``
   and ``default`` empty (``"null"``) value from `WPS` process from remote provider
   (fix `#17 <https://github.com/crim-ca/weaver/issues/17>`_).
-- Add ``hybrid`` mode that allows `Weaver` to simultaneously run local `Application Packages` and remote WPS providers.
+- Add ``HYBRID`` mode that allows `Weaver` to simultaneously run local `Application Packages` and remote WPS providers.
 - Rename ``ows2json_output`` to ``ows2json_output_data`` to emphasise its usage for parsing job result data rather than
   simple output definition as accomplished by ``ows2json_io``.
 - Remove function duplicating operations accomplished by ``ows2json_io`` (previously marked with FIXME).

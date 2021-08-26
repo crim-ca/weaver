@@ -9,7 +9,7 @@ MAKEFILE_NAME := $(word $(words $(MAKEFILE_LIST)),$(MAKEFILE_LIST))
 # Application
 APP_ROOT    := $(abspath $(lastword $(MAKEFILE_NAME))/..)
 APP_NAME    := $(shell basename $(APP_ROOT))
-APP_VERSION ?= 3.1.0
+APP_VERSION ?= 3.5.0
 APP_INI     ?= $(APP_ROOT)/config/$(APP_NAME).ini
 DOCKER_REPO ?= pavics/weaver
 #DOCKER_REPO ?= docker-registry.crim.ca/ogc/weaver
@@ -19,38 +19,47 @@ OS_NAME := $(shell uname -s 2>/dev/null || echo "unknown")
 CPU_ARCH := $(shell uname -m 2>/dev/null || uname -p 2>/dev/null || echo "unknown")
 
 # conda
+CONDA_CMD      ?= __EMPTY__
 CONDA_ENV      ?= $(APP_NAME)
 CONDA_HOME     ?= $(HOME)/.conda
 CONDA_ENVS_DIR ?= $(CONDA_HOME)/envs
 CONDA_ENV_PATH := $(CONDA_ENVS_DIR)/$(CONDA_ENV)
-# allow pre-installed conda in Windows bash-like shell
-ifeq ($(findstring MINGW,$(OS_NAME)),MINGW)
-  CONDA_BIN_DIR ?= $(CONDA_HOME)/Scripts
-else
-  CONDA_BIN_DIR ?= $(CONDA_HOME)/bin
-endif
-CONDA_BIN := $(CONDA_BIN_DIR)/conda
-CONDA_ENV_REAL_TARGET_PATH := $(realpath $(CONDA_ENV_PATH))
-CONDA_ENV_REAL_ACTIVE_PATH := $(realpath ${CONDA_PREFIX})
-
-# environment already active - use it directly
-ifneq ("$(CONDA_ENV_REAL_ACTIVE_PATH)", "")
-  CONDA_ENV_MODE := [using active environment]
-  CONDA_ENV := $(notdir $(CONDA_ENV_REAL_ACTIVE_PATH))
+ifneq ($(CONDA_CMD),__EMPTY__)
   CONDA_CMD :=
-endif
-# environment not active but it exists - activate and use it
-ifneq ($(CONDA_ENV_REAL_TARGET_PATH), "")
-  CONDA_ENV := $(notdir $(CONDA_ENV_REAL_TARGET_PATH))
-endif
-# environment not active and not found - create, activate and use it
-ifeq ("$(CONDA_ENV)", "")
-  CONDA_ENV := $(APP_NAME)
-endif
-# update paths for environment activation
-ifeq ("$(CONDA_ENV_REAL_ACTIVE_PATH)", "")
-  CONDA_ENV_MODE := [will activate environment]
-  CONDA_CMD := source "$(CONDA_BIN_DIR)/activate" "$(CONDA_ENV)";
+  CONDA_BIN :=
+  CONDA_ENV :=
+  CONDA_ENV_MODE := [using overridden conda command]
+else
+  CONDA_CMD :=
+  # allow pre-installed conda in Windows bash-like shell
+  ifeq ($(findstring MINGW,$(OS_NAME)),MINGW)
+    CONDA_BIN_DIR ?= $(CONDA_HOME)/Scripts
+  else
+    CONDA_BIN_DIR ?= $(CONDA_HOME)/bin
+  endif
+  CONDA_BIN := $(CONDA_BIN_DIR)/conda
+  CONDA_ENV_REAL_TARGET_PATH := $(realpath $(CONDA_ENV_PATH))
+  CONDA_ENV_REAL_ACTIVE_PATH := $(realpath ${CONDA_PREFIX})
+
+  # environment already active - use it directly
+  ifneq ("$(CONDA_ENV_REAL_ACTIVE_PATH)", "")
+    CONDA_ENV_MODE := [using active environment]
+    CONDA_ENV := $(notdir $(CONDA_ENV_REAL_ACTIVE_PATH))
+    CONDA_CMD :=
+  endif
+  # environment not active but it exists - activate and use it
+  ifneq ($(CONDA_ENV_REAL_TARGET_PATH), "")
+    CONDA_ENV := $(notdir $(CONDA_ENV_REAL_TARGET_PATH))
+  endif
+  # environment not active and not found - create, activate and use it
+  ifeq ("$(CONDA_ENV)", "")
+    CONDA_ENV := $(APP_NAME)
+  endif
+  # update paths for environment activation
+  ifeq ("$(CONDA_ENV_REAL_ACTIVE_PATH)", "")
+    CONDA_ENV_MODE := [will activate environment]
+    CONDA_CMD := source "$(CONDA_BIN_DIR)/activate" "$(CONDA_ENV)";
+  endif
 endif
 DOWNLOAD_CACHE ?= $(APP_ROOT)/downloads
 PYTHON_VERSION ?= `python -c 'import platform; print(platform.python_version())'`
@@ -140,6 +149,22 @@ info:		## display make information
 	@echo "  Download Cache     $(DOWNLOAD_CACHE)"
 	@echo "  Docker Repository  $(DOCKER_REPO)"
 
+.PHONY: fixme-list-only
+fixme-list-only: mkdir-reports  	## list all FIXME/TODO/HACK items that require attention in the code
+	@echo "Listing code that requires fixes..."
+	@echo '[MISCELLANEOUS]\nnotes=FIXME,TODO,HACK' > "$(REPORTS_DIR)/fixmerc"
+	@bash -c '$(CONDA_CMD) \
+		pylint \
+			--disable=all,use-symbolic-message-instead --enable=miscellaneous,W0511 \
+			--score n --persistent n \
+			--rcfile="$(REPORTS_DIR)/fixmerc" \
+			-f colorized \
+			"$(APP_ROOT)/weaver" "$(APP_ROOT)/tests" \
+		1> >(tee "$(REPORTS_DIR)/fixme.txt")'
+
+.PHONY: fixme-list
+fixme-list: install-dev fixme-list-only  ## list all FIXME/TODO/HACK items with pre-installation of dependencies
+
 ## -- Conda targets ------------------------------------------------------------------------------------------------- ##
 
 .PHONY: conda-base
@@ -226,6 +251,35 @@ install-raw:	## install without any requirements or dependencies (suppose everyt
 	@echo "Installing package without dependencies..."
 	@bash -c '$(CONDA_CMD) pip install $(PIP_XARGS) -e "$(APP_ROOT)" --no-deps'
 	@echo "Install package complete."
+
+# install locally to ensure they can be found by config extending them
+.PHONY: install-npm
+install-npm:    ## install npm package manager and dependencies if they cannot be found
+	@[ -f "$(shell which npm)" ] || ( \
+		echo "Binary package manager npm not found. Attempting to install it."; \
+		apt-get install npm \
+	)
+
+.PHONY: install-npm-stylelint
+install-npm-stylelint: install-npm   	## install stylelint dependency for 'check-css' target using npm
+	@[ `npm ls 2>/dev/null | grep stylelint-config-standard | wc -l` = 1 ] || ( \
+		echo "Install required dependencies for CSS checks." && \
+		npm install stylelint stylelint-config-standard --save-dev \
+	)
+
+.PHONY: install-npm-remarklint
+install-npm-remarklint: install-npm    ## install remark-lint dependency for 'check-md' target using npm
+	@[ `npm ls 2>/dev/null | grep remark-lint | wc -l` = 1 ] || ( \
+		echo "Install required dependencies for Markdown checks." && \
+		npm install --save-dev \
+		 	remark-lint \
+		 	remark-gfm \
+		 	remark-cli \
+		 	remark-lint-maximum-line-length \
+		 	remark-lint-checkbox-content-indent \
+		 	remark-preset-lint-recommended \
+		 	remark-preset-lint-markdown-style-guide \
+	)
 
 ## -- Cleanup targets ----------------------------------------------------------------------------------------------- ##
 
@@ -383,6 +437,12 @@ coverage: test-coverage  ## alias to run test with coverage analysis
 CHECKS := pep8 lint security doc8 links imports
 CHECKS := $(addprefix check-, $(CHECKS))
 
+# items that should not install python dev packages should be added here instead
+# they must provide their own target/only + with dependency install variants
+CHECKS_NO_PY := css md
+CHECKS_NO_PY := $(addprefix fix-, $(CHECKS_NO_PY))
+CHECKS_ALL := $(FIXES) $(FIXES_NO_PY)
+
 $(CHECKS): check-%: install-dev check-%-only
 
 .PHONY: mkdir-reports
@@ -396,17 +456,17 @@ check: check-all    ## alias for 'check-all' target
 check-only: $(addsuffix -only, $(CHECKS))
 
 .PHONY: check-all
-check-all: install-dev $(CHECKS) 	## run all code checks
+check-all: install-dev $(CHECKS_ALL) 	## check all code linters
 
 .PHONY: check-pep8-only
-check-pep8-only: mkdir-reports 		## run PEP8 code style checks
+check-pep8-only: mkdir-reports 		## check for PEP8 code style issues
 	@echo "Running pep8 code style checks..."
 	@-rm -fr "$(REPORTS_DIR)/check-pep8.txt"
 	@bash -c '$(CONDA_CMD) \
 		flake8 --config="$(APP_ROOT)/setup.cfg" --output-file="$(REPORTS_DIR)/check-pep8.txt" --tee'
 
 .PHONY: check-lint-only
-check-lint-only: mkdir-reports  	## run linting code style checks
+check-lint-only: mkdir-reports  	## check linting of code style
 	@echo "Running linting code style checks..."
 	@-rm -fr "$(REPORTS_DIR)/check-lint.txt"
 	@bash -c '$(CONDA_CMD) \
@@ -418,7 +478,7 @@ check-lint-only: mkdir-reports  	## run linting code style checks
 		1> >(tee "$(REPORTS_DIR)/check-lint.txt")'
 
 .PHONY: check-security-only
-check-security-only: mkdir-reports	## run security code checks
+check-security-only: mkdir-reports	## check for security code issues
 	@echo "Running security code checks..."
 	@-rm -fr "$(REPORTS_DIR)/check-security.txt"
 	@bash -c '$(CONDA_CMD) \
@@ -426,7 +486,7 @@ check-security-only: mkdir-reports	## run security code checks
 		1> >(tee "$(REPORTS_DIR)/check-security.txt")'
 
 .PHONY: check-doc8-only
-check-doc8-only: mkdir-reports	## run doc8 documentation style checks
+check-doc8-only: mkdir-reports	## check documentation style checks
 	@echo "Running doc8 doc style checks..."
 	@-rm -fr "$(REPORTS_DIR)/check-doc8.txt"
 	@bash -c '$(CONDA_CMD) \
@@ -439,16 +499,48 @@ check-links-only:       	## check all external links in documentation for integr
 	@bash -c '$(CONDA_CMD) $(MAKE) -C "$(APP_ROOT)/docs" linkcheck'
 
 .PHONY: check-imports-only
-check-imports-only: mkdir-reports	## run imports code checks
+check-imports-only: mkdir-reports 	## check imports ordering and styles
 	@echo "Running import checks..."
 	@-rm -fr "$(REPORTS_DIR)/check-imports.txt"
 	@bash -c '$(CONDA_CMD) \
 		isort --check-only --diff --recursive $(APP_ROOT) \
 		1> >(tee "$(REPORTS_DIR)/check-imports.txt")'
 
+.PHONY: check-css-only
+check-css-only: mkdir-reports  	## check CSS linting
+	@echo "Running CSS style checks..."
+	@npx --no-install stylelint \
+		--config "$(APP_ROOT)/.stylelintrc.json" \
+		--output-file "$(REPORTS_DIR)/check-css.txt" \
+		"$(APP_ROOT)/**/*.css"
+
+.PHONY: check-css
+check-css: install-npm-stylelint check-css-only	## check CSS linting after dependency installation
+
+# must pass 2 search paths because '<dir>/.<subdir>' are somehow not correctly detected with only the top-level <dir>
+.PHONY: check-md-only
+check-md-only: mkdir-reports 	## check Markdown linting
+	@echo "Running Markdown style checks..."
+	@npx --no-install remark \
+		--inspect --frail \
+		--silently-ignore \
+		--stdout --color \
+		--rc-path "$(APP_ROOT)/.remarkrc" \
+		--ignore-path "$(APP_ROOT)/.remarkignore" \
+		"$(APP_ROOT)" "$(APP_ROOT)/.*/" \
+		> "$(REPORTS_DIR)/check-md.txt"
+
+.PHONY: check-md
+check-md: install-npm-remarklint check-md-only	## check Markdown linting after dependency installation
+
 # autogen fix variants with pre-install of dependencies using the '-only' target references
 FIXES := imports lint docf
 FIXES := $(addprefix fix-, $(FIXES))
+# items that should not install python dev packages should be added here instead
+# they must provide their own target/only + with dependency install variants
+FIXES_NO_PY := css md
+FIXES_NO_PY := $(addprefix fix-, $(FIXES_NO_PY))
+FIXES_ALL := $(FIXES) $(FIXES_NO_PY)
 
 $(FIXES): fix-%: install-dev fix-%-only
 
@@ -459,7 +551,7 @@ fix: fix-all 	## alias for 'fix-all' target
 fix-only: $(addsuffix -only, $(FIXES))	## run all automatic fixes without development dependencies pre-install
 
 .PHONY: fix-all
-fix-all: install-dev $(FIXES)  ## fix all code check problems automatically after install of development dependencies
+fix-all: install-dev $(FIXES_ALL)  ## fix all code check problems automatically after install of dependencies
 
 .PHONY: fix-imports-only
 fix-imports-only: mkdir-reports	## apply import code checks corrections
@@ -469,12 +561,24 @@ fix-imports-only: mkdir-reports	## apply import code checks corrections
 		isort --recursive $(APP_ROOT) \
 		1> >(tee "$(REPORTS_DIR)/fixed-imports.txt")'
 
+# FIXME: https://github.com/PyCQA/pycodestyle/issues/996
+# Tool "pycodestyle" doesn't respect "# noqa: E241" locally, but "flake8" and other tools do.
+# Because "autopep8" uses "pycodestyle", it is impossible to disable locally extra spaces (as in tests to align values).
+# Override the codes here from "setup.cfg" because "autopep8" also uses the "flake8" config, and we want to preserve
+# global detection of those errors (typos, bad indents), unless explicitly added and excluded for readability purposes.
+# WARNING: this will cause inconsistencies between what 'check-lint' detects and what 'fix-lint' can actually fix
+_DEFAULT_SETUP_ERROR := E126,E226,E402,F401,W503,W504
+_EXTRA_SETUP_ERROR := E241
+
 .PHONY: fix-lint-only
 fix-lint-only: mkdir-reports  ## fix some PEP8 code style problems automatically
 	@echo "Fixing PEP8 code style problems..."
 	@-rm -fr "$(REPORTS_DIR)/fixed-lint.txt"
 	@bash -c '$(CONDA_CMD) \
-		autopep8 -v -j 0 -i -r $(APP_ROOT) \
+		autopep8 \
+		 	--global-config "$(APP_ROOT)/setup.cfg" \
+		 	--ignore "$(_DEFAULT_SETUP_ERROR),$(_EXTRA_SETUP_ERROR)" \
+			-v -j 0 -i -r $(APP_ROOT) \
 		1> >(tee "$(REPORTS_DIR)/fixed-lint.txt")'
 
 # FIXME: move parameters to setup.cfg when implemented (https://github.com/myint/docformatter/issues/10)
@@ -493,21 +597,32 @@ fix-docf-only: mkdir-reports  ## fix some PEP8 code documentation style problems
 			$(APP_ROOT) \
 		1> >(tee "$(REPORTS_DIR)/fixed-docf.txt")'
 
-.PHONY: fixme-list-only
-fixme-list-only: mkdir-reports  	## attempt auto-fix all linting code styles errors reported by 'check-lint'
-	@echo "Listing code that requires fixes..."
-	@echo '[MISCELLANEOUS]\nnotes=FIXME,TODO,HACK' > "$(REPORTS_DIR)/fixmerc"
-	@bash -c '$(CONDA_CMD) \
-		pylint \
-			--disable=all,use-symbolic-message-instead --enable=miscellaneous,W0511 \
-			--score n --persistent n \
-			--rcfile="$(REPORTS_DIR)/fixmerc" \
-			-f colorized \
-			"$(APP_ROOT)/weaver" "$(APP_ROOT)/tests" \
-		1> >(tee "$(REPORTS_DIR)/fixme.txt")'
+.PHONY: fix-css-only
+fix-css-only: mkdir-reports 	## fix CSS linting problems automatically
+	@echo "Fixing CSS style problems..."
+	@npx stylelint \
+		--fix \
+		--config "$(APP_ROOT)/.stylelintrc.json" \
+		--output-file "$(REPORTS_DIR)/fixed-css.txt" \
+		"$(APP_ROOT)/**/*.css"
 
-.PHONY: fixme-list
-fixme-list: install-dev fixme-list-only  ## attempt auto-fix of linting code styles errors after dependencies install
+.PHONY: fix-css
+fix-css: install-npm-stylelint fix-css-only		## fix CSS linting problems after dependency installation
+
+# must pass 2 search paths because '<dir>/.<subdir>' are somehow not correctly detected with only the top-level <dir>
+.PHONY: fix-md-only
+fix-md-only: mkdir-reports 	## fix Markdown linting problems automatically
+	@echo "Running Markdown style checks..."
+	@npx --no-install remark \
+		--output --frail \
+		--silently-ignore \
+		--rc-path "$(APP_ROOT)/.remarkrc" \
+		--ignore-path "$(APP_ROOT)/.remarkignore" \
+		"$(APP_ROOT)" "$(APP_ROOT)/.*/" \
+		2>&1 | tee "$(REPORTS_DIR)/fixed-md.txt"
+
+.PHONY: fix-md
+fix-md: install-npm-remarklint fix-md-only	## fix Markdown linting problems after dependency installation
 
 ## -- Documentation targets ----------------------------------------------------------------------------------------- ##
 

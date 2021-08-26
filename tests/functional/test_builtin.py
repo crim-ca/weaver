@@ -48,13 +48,13 @@ class BuiltinAppTest(WpsPackageConfigBase):
         assert resp.json["process"]["inputs"][0]["id"] == "input"
         assert isinstance(resp.json["process"]["inputs"][0]["formats"], list)
         assert len(resp.json["process"]["inputs"][0]["formats"]) == 1
-        assert resp.json["process"]["inputs"][0]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_JSON
+        assert resp.json["process"]["inputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
         assert isinstance(resp.json["process"]["outputs"], list)
         assert len(resp.json["process"]["outputs"]) == 1
         assert resp.json["process"]["outputs"][0]["id"] == "output"
         assert isinstance(resp.json["process"]["outputs"][0]["formats"], list)
         assert len(resp.json["process"]["outputs"][0]["formats"]) == 1
-        assert resp.json["process"]["outputs"][0]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_NETCDF
+        assert resp.json["process"]["outputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_NETCDF
 
     def test_jsonarray2netcdf_execute(self):
         dirname = tempfile.gettempdir()

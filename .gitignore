@@ -1,12 +1,22 @@
-# Installer
-#Makefile
+## Make
 [Mm]akefile.config
 downloads
 
-# Docker
+## Environment
+env
+venv
+
+## Conda
+environment.yml
+
+## Node
+package-lock.json
+node_modules
+
+## Docker
 #Dockerfile
 
-# Python / Extensions etc.
+## Python / Extensions etc.
 *~
 *.mo
 *.so
@@ -19,7 +29,7 @@ downloads
 __pycache__
 .python_history
 
-# Unit test / Coverage reports
+## Unit test / Coverage reports
 *.log
 *.lock
 .cache
@@ -35,54 +45,50 @@ unit_tests/testdata.json
 result[s].xml
 testdata.json
 
-# R
+## R
 *.Rhistory
 
-# Eclipse / PyDev
+## Eclipse / PyDev
 .project
 .pydevproject
 .settings
 
-# PyCharm
+## VS Code
+*.vscode
+
+## PyCharm
 *.idea
 
-# Intellij
+## Intellij
 *.iml
 
-# Kate
+## Kate
 *.kate-swp
 
-# Sublime Text Editor
+## Sublime Text Editor
 *.sublime*
 
-# External Sources
+## External Sources
 [Bb]uild
 src
 
-# IPython
+## IPython
 .ipynb_checkpoints
 
-# gcc/fortran
+## gcc/fortran
 *.o
 *.a
 *.mod
 *.out
 
-# snappy
+## snappy
 esa-snap_sentinel_unix_6_0.sh
 response.varfile
 
-# conda
-environment.yml
-
-# environment
-env
-venv
-
-# project process results
+## project process results
 *.tif
 *.zip
 ./workflow[s]
 
-# old project sources
+## old project sources
 [Bb]in

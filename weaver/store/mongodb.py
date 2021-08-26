@@ -48,10 +48,11 @@ from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC, VISIBILITY_
 from weaver.wps.utils import get_wps_url
 
 if TYPE_CHECKING:
+    import datetime
     from typing import Any, Callable, Dict, List, Optional, Tuple, Union
     from pymongo.collection import Collection
 
-    from weaver.store.base import JobCategoriesAndCount, JobListAndCount
+    from weaver.store.base import DatetimeIntervalType, JobCategoriesAndCount, JobListAndCount
     from weaver.typedefs import AnyProcess, AnyProcessType
 
 LOGGER = logging.getLogger(__name__)
@@ -176,6 +177,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
     """
     Registry for processes. Uses `MongoDB` to store processes and attributes.
     """
+
     def __init__(self, *args, **kwargs):
         db_args, db_kwargs = MongodbStore.get_args_kwargs(*args, **kwargs)
         StoreProcesses.__init__(self)
@@ -216,25 +218,55 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
                                  [(param, old_params.get(param), new_params.get(param))
                                   for param in set(new_params) | set(old_params)])
                 if not registered or not duplicate:
-                    self._add_process(process)
+                    self._add_process(process, upsert=True)
             except DuplicateKeyError:
                 if duplicate:
                     LOGGER.debug("Ignore verified duplicate default process definition [%s]", process_id)
                 else:
                     raise
 
-    def _add_process(self, process):
-        # type: (AnyProcess) -> None
+    def _add_process(self, process, upsert=False):
+        # type: (AnyProcess, bool) -> None
+        """
+        Stores the specified process to the database.
+
+        The operation assumes that any conflicting or duplicate process definition was pre-validated.
+        Parameter ``upsert=True`` can be employed to allow exact replacement and ignoring duplicate errors.
+        When using ``upsert=True``, it is assumed that whichever the result (insert, update, duplicate error)
+        arises, the final result of the stored process should be identical in each case.
+
+        .. note::
+            Parameter ``upsert=True`` is useful for initialization-time of the storage with default processes that
+            can sporadically generate clashing-inserts between multi-threaded/workers applications that all try adding
+            builtin processes around the same moment.
+        """
         new_process = Process.convert(process, processEndpointWPS1=self.default_wps_endpoint)
         if not isinstance(new_process, Process):
             raise ProcessInstanceError("Unsupported process type '{}'".format(type(process)))
 
         # apply defaults if not specified
-        new_process["type"] = self._get_process_type(process)
-        new_process["identifier"] = self._get_process_id(process)
-        new_process["processEndpointWPS1"] = self._get_process_endpoint_wps1(process)
+        new_process["type"] = self._get_process_type(new_process)
+        new_process["identifier"] = self._get_process_id(new_process)
+        new_process["processEndpointWPS1"] = self._get_process_endpoint_wps1(new_process)
         new_process["visibility"] = new_process.visibility
-        self.collection.insert_one(new_process.params())
+        if upsert:
+            search = {"identifier": new_process["identifier"]}
+            try:
+                result = self.collection.replace_one(search, new_process.params(), upsert=True)
+                if result.matched_count != 0 and result.modified_count != 0:
+                    LOGGER.warning(
+                        "Duplicate key in collection: %s index: %s "
+                        "was detected during replace with upsert, but permitted for process without modification.",
+                        self.collection.full_name, search
+                    )
+            except DuplicateKeyError:
+                LOGGER.warning(
+                    "Duplicate key in collection: %s index: %s "
+                    "was detected during internal insert retry, but ignored for process without modification.",
+                    self.collection.full_name, search
+                )
+        else:
+            self.collection.insert_one(new_process.params())
 
     @staticmethod
     def _get_process_field(process, function_dict):
@@ -387,6 +419,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
     """
     Registry for process jobs tracking. Uses `MongoDB` to store job attributes.
     """
+
     def __init__(self, *args, **kwargs):
         db_args, db_kwargs = MongodbStore.get_args_kwargs(*args, **kwargs)
         StoreJobs.__init__(self)
@@ -405,6 +438,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
                  access=None,               # type: Optional[str]
                  notification_email=None,   # type: Optional[str]
                  accept_language=None,      # type: Optional[str]
+                 created=None,              # type: Optional[datetime.datetime]
                  ):                         # type: (...) -> Job
         """
         Creates a new :class:`Job` and stores it in mongodb.
@@ -422,6 +456,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
                 tags.append(EXECUTE_MODE_SYNC)
             if not access:
                 access = VISIBILITY_PRIVATE
+
             new_job = Job({
                 "task_id": task_id,
                 "user_id": user_id,
@@ -432,7 +467,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
                 "execute_async": execute_async,
                 "is_workflow": is_workflow,
                 "is_local": is_local,
-                "created": now(),
+                "created": created if created else now(),
                 "tags": list(set(tags)),  # remove duplicates
                 "access": access,
                 "notification_email": notification_email,
@@ -499,6 +534,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
                   sort=None,                # type: Optional[str]
                   page=0,                   # type: int
                   limit=10,                 # type: int
+                  datetime=None,            # type: Optional[DatetimeIntervalType]
                   group_by=None,            # type: Optional[Union[str, List[str]]]
                   request=None,             # type: Optional[Request]
                   ):                        # type: (...) -> Union[JobListAndCount, JobCategoriesAndCount]
@@ -515,6 +551,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
         :param sort: field which is used for sorting results (default: creation date, descending).
         :param page: page number to return when using result paging (only when not using ``group_by``).
         :param limit: number of jobs per page when using result paging (only when not using ``group_by``).
+        :param datetime: field used for filtering data by creation date with a given date or interval of date.
         :param group_by: one or many fields specifying categories to form matching groups of jobs (paging disabled).
 
         :returns: (list of jobs matching paging OR list of {categories, list of jobs, count}) AND total of matched job
@@ -582,6 +619,20 @@ class MongodbJobStore(StoreJobs, MongodbStore):
         if service is not None:
             search_filters["service"] = service
 
+        if datetime is not None:
+            query = {}
+
+            if datetime.get("after", False):
+                query["$gte"] = datetime["after"]
+
+            if datetime.get("before", False):
+                query["$lte"] = datetime["before"]
+
+            if datetime.get("match", False):
+                query = datetime["match"]
+
+            search_filters["created"] = query
+
         if sort is None:
             sort = SORT_CREATED
         elif sort == SORT_USER:
@@ -637,6 +688,7 @@ class MongodbQuoteStore(StoreQuotes, MongodbStore):
     """
     Registry for quotes. Uses `MongoDB` to store quote attributes.
     """
+
     def __init__(self, *args, **kwargs):
         db_args, db_kwargs = MongodbStore.get_args_kwargs(*args, **kwargs)
         StoreQuotes.__init__(self)
@@ -708,6 +760,7 @@ class MongodbBillStore(StoreBills, MongodbStore):
     """
     Registry for bills. Uses `MongoDB` to store bill attributes.
     """
+
     def __init__(self, *args, **kwargs):
         db_args, db_kwargs = MongodbStore.get_args_kwargs(*args, **kwargs)
         StoreBills.__init__(self)

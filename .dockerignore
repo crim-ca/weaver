@@ -1,21 +1,24 @@
-# Docker
+## Docker
 docker
 .dockerignore
 
-# Git
+## Git
 .git
 .github
 .gitignore
 
-# installer
-#Makefile
+## Make
 [Mm]akefile.config
 downloads
 
-# Environments
+## Environments
 env
 
-# Python / Extensions etc.
+## Node
+package-lock.json
+node_modules
+
+## Python / Extensions etc.
 *~
 *.mo
 *.so
@@ -27,7 +30,7 @@ env
 *egg[s]__pycache__
 .python_history
 
-# Unit test / Coverage reports
+## Unit test / Coverage reports
 .cache
 .coverage
 coverage
@@ -42,50 +45,50 @@ tests
 testdata.json
 reports
 
-# R
+## R
 *.Rhistory
 
-# Eclipse / PyDev
+## Eclipse / PyDev
 .project
 .pydevproject
 .settings
 
-# PyCharm
+## PyCharm
 *.idea
 
-# Intellij
+## Intellij
 *.iml
 
-# Kate
+## Kate
 *.kate-swp
 
-# Sublime Text Editor
+## Sublime Text Editor
 *.sublime*
 
 # sphinx
 docs
 
-# External Sources
+## External Sources
 [Bb]uild
 src
 
-# IPython
+## IPython
 .ipynb_checkpoints
 
-# gcc/fortran
+## gcc/fortran
 **/*.o
 **/*.a
 **/*.mod
 **/*.out
 
-# Project process results
+## Project process results
 workflows
 **/*.tif
 **/*.zip
 
-# Project local configurations
+## Project local configurations
 !config/*.example
 config/*
 
-# Old project sources
+## Old project sources
 [Bb]in
