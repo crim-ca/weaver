@@ -20,7 +20,6 @@ services:
     # ensure other referenced services are created beforehand to avoid booting timing issues
     depends_on:
       - worker
-    links:
       - mongodb
     volumes:
       # Weaver configuration
@@ -49,7 +48,7 @@ services:
       #   This avoids Weaver-API to be able to run Docker commands directly.
       #   Furthermore, only the Worker has the 'docker-cli' preinstalled.
       - docker-proxy
-    links:
+    depends_on:
       - mongodb
     volumes:
       # Weaver configuration
