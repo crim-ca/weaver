@@ -1017,7 +1017,8 @@ class DescribeInputTypeMap(PermissiveMappingSchema):
     """
     input_id = DescribeInputType(
         variable="<input-id>",
-        description="Input definition under mapping of process description."
+        description="Input definition under mapping of process description.",
+        missing=drop,  # allowed because process can have empty inputs (see schema: ProcessDescriptionOGC)
     )
 
 
@@ -2296,7 +2297,11 @@ class ProcessDescriptionOGC(ProcessSummary, ProcessContext, ProcessVisibility, P
     """
     OGC-API schema for process description.
     """
-    inputs = DescribeInputTypeMap(description="Inputs definition of the process.")
+    # technically, empty inputs are allowed for processes that should generate constant/randomized outputs
+    # example:
+    #   https://pavics.ouranos.ca/twitcher/ows/proxy/catalog
+    #   ?service=WPS&request=DescribeProcess&version=1.0.0&identifier=pavicstestdocs
+    inputs = DescribeInputTypeMap(description="Inputs definition of the process.", missing=drop, default={})
     outputs = DescribeOutputTypeMap(description="Outputs definition of the process.")
 
     _sort_first = PROCESS_DESCRIPTION_FIELD_FIRST

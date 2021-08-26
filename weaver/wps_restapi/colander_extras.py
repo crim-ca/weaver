@@ -658,7 +658,11 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
                     })
                 except colander.Invalid as invalid:
                     var_invalid.add(invalid)
-            if not var_map.get(var, None):
+            var_val = var_map.get(var, colander.null)
+            if var_val is colander.null:
+                # allow unmatched variable item under mapping if it is not required
+                if var_child.missing is colander.drop:
+                    continue
                 raise var_invalid
 
         invalid_var = colander.Invalid(self, value=var_map)

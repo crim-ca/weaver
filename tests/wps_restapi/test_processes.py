@@ -374,8 +374,8 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         raise NotImplementedError
 
     @mocked_remote_server_requests_wp1(
-        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_FILE,
-        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_FILE],
+        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
+        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
         resources.TEST_REMOTE_SERVER_URL
     )
     def test_deploy_process_WPS1_DescribeProcess_href(self):
@@ -386,8 +386,8 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_PROCESS_WPS1_ID)
 
     @mocked_remote_server_requests_wp1(
-        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_FILE,
-        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_FILE],
+        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
+        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
         resources.TEST_REMOTE_SERVER_URL
     )
     def test_deploy_process_WPS1_DescribeProcess_owsContext(self):
@@ -399,8 +399,8 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_PROCESS_WPS1_ID)
 
     @mocked_remote_server_requests_wp1(
-        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_FILE,
-        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_FILE],
+        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
+        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
         resources.TEST_REMOTE_SERVER_URL
     )
     def test_deploy_process_WPS1_DescribeProcess_executionUnit(self):
@@ -414,8 +414,8 @@ class WpsRestApiProcessesTest(unittest.TestCase):
 
     @pytest.mark.skip(reason="not implemented")
     @mocked_remote_server_requests_wp1(
-        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_FILE,
-        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_FILE],
+        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
+        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
         resources.TEST_REMOTE_SERVER_URL
     )
     def test_deploy_process_WPS1_GetCapabilities_href(self):
@@ -428,8 +428,8 @@ class WpsRestApiProcessesTest(unittest.TestCase):
 
     @pytest.mark.skip(reason="not implemented")
     @mocked_remote_server_requests_wp1(
-        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_FILE,
-        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_FILE],
+        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
+        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
         resources.TEST_REMOTE_SERVER_URL
     )
     def test_deploy_process_WPS1_GetCapabilities_owsContext(self):
@@ -443,8 +443,8 @@ class WpsRestApiProcessesTest(unittest.TestCase):
 
     @pytest.mark.skip(reason="not implemented")
     @mocked_remote_server_requests_wp1(
-        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_FILE,
-        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_FILE],
+        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
+        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
         resources.TEST_REMOTE_SERVER_URL
     )
     def test_deploy_process_WPS1_GetCapabilities_executionUnit(self):

@@ -56,8 +56,8 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         return resp
 
     @mocked_remote_server_requests_wp1(
-        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_FILE,
-        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_FILE],
+        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
+        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
         resources.TEST_REMOTE_SERVER_URL
     )
     def test_register_provider_success(self):
@@ -71,8 +71,8 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert resp.json["public"] is True
 
     @mocked_remote_server_requests_wp1(
-        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_FILE,
-        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_FILE],
+        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
+        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
         resources.TEST_REMOTE_SERVER_URL
     )
     def test_register_provider_conflict(self):
@@ -81,8 +81,8 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert resp.status_code == 409
 
     @mocked_remote_server_requests_wp1(
-        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_FILE,
-        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_FILE],
+        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
+        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
         resources.TEST_REMOTE_SERVER_URL
     )
     def test_get_provider_processes(self):
@@ -93,20 +93,22 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert resp.status_code == 200
         assert resp.content_type == CONTENT_TYPE_APP_JSON
         assert "processes" in resp.json and isinstance(resp.json["processes"], list)
-        assert len(resp.json["processes"]) == 1
-        process = resp.json["processes"][0]
-        assert "id" in process and isinstance(process["id"], str)
-        assert process["id"] == resources.TEST_REMOTE_PROCESS_WPS1_ID
-        assert "title" in process and isinstance(process["title"], str)
-        assert "version" in process and isinstance(process["version"], str)
-        assert "keywords" in process and isinstance(process["keywords"], list)
-        assert "metadata" in process and isinstance(process["metadata"], list)
-        assert len(process["jobControlOptions"]) == 1
-        assert EXECUTE_CONTROL_OPTION_ASYNC in process["jobControlOptions"]
+        assert len(resp.json["processes"]) == 2
+        remote_processes = []
+        for process in resp.json["processes"]:
+            assert "id" in process and isinstance(process["id"], str)
+            assert "title" in process and isinstance(process["title"], str)
+            assert "version" in process and isinstance(process["version"], str)
+            assert "keywords" in process and isinstance(process["keywords"], list)
+            assert "metadata" in process and isinstance(process["metadata"], list)
+            assert len(process["jobControlOptions"]) == 1
+            assert EXECUTE_CONTROL_OPTION_ASYNC in process["jobControlOptions"]
+            remote_processes.append(process["id"])
+        assert resources.TEST_REMOTE_PROCESS_WPS1_ID in remote_processes
 
     @mocked_remote_server_requests_wp1(
-        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_FILE,
-        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_FILE],
+        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
+        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
         resources.TEST_REMOTE_SERVER_URL
     )
     def test_get_provider_process_description_old_schema(self):
@@ -136,8 +138,8 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert all(isinstance(p_io, dict) and "id" in p_io for p_io in process["outputs"])
 
     @mocked_remote_server_requests_wp1(
-        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_FILE,
-        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_FILE],
+        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
+        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
         resources.TEST_REMOTE_SERVER_URL
     )
     def test_get_provider_process_description_ogc_schema(self):
@@ -166,3 +168,28 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert "outputs" in process and isinstance(process["outputs"], dict)
         assert all(isinstance(p_io, str) and isinstance(process["outputs"][p_io], dict) for p_io in process["outputs"])
         assert all("id" not in process["outputs"][p_io] for p_io in process["outputs"])
+
+    @mocked_remote_server_requests_wp1(
+        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
+        [resources.WPS_NO_INPUTS_XML],
+        resources.TEST_REMOTE_SERVER_URL
+    )
+    def test_get_provider_process_no_inputs(self):
+        """
+        Process that takes no inputs should be permitted and its description must allow generation of empty map/list.
+        """
+        self.register_provider()
+
+        path = "/providers/{}/processes/{}".format(self.remote_provider_name, resources.WPS_NO_INPUTS_ID)
+        resp = self.app.get(path, params={"schema": "OLD"}, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        inputs = resp.json["process"]["inputs"]
+        assert isinstance(inputs, list) and len(inputs) == 0
+
+        path = "/providers/{}/processes/{}".format(self.remote_provider_name, resources.WPS_NO_INPUTS_ID)
+        resp = self.app.get(path, params={"schema": "OGC"}, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        inputs = resp.json["inputs"]
+        assert isinstance(inputs, dict) and len(inputs) == 0

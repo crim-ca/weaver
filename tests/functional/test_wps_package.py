@@ -1623,7 +1623,7 @@ class WpsPackageAppTest(WpsPackageConfigBase):
     def test_literal_and_complex_io_from_wps_xml_reference(self):
         body = {
             "processDescription": {"process": {"id": self._testMethodName}},
-            "executionUnit": [{"href": "mock://{}".format(resources.WPS_LITERAL_COMPLEX_IO)}],
+            "executionUnit": [{"href": "mock://{}".format(resources.WPS_LITERAL_COMPLEX_IO_XML)}],
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication"
         }
         desc, pkg = self.deploy_process(body, describe_schema="OLD")
@@ -1710,7 +1710,7 @@ class WpsPackageAppTest(WpsPackageConfigBase):
     def test_enum_array_and_multi_format_inputs_from_wps_xml_reference(self):
         body = {
             "processDescription": {"process": {"id": self._testMethodName}},
-            "executionUnit": [{"href": "mock://{}".format(resources.WPS_ENUM_ARRAY_IO)}],
+            "executionUnit": [{"href": "mock://{}".format(resources.WPS_ENUM_ARRAY_IO_XML)}],
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication"
         }
         desc, pkg = self.deploy_process(body, describe_schema="OLD")

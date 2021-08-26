@@ -61,6 +61,13 @@
     <wps:ProcessOfferings>
         <wps:Process wps:processVersion="0.5">
             <ows:Identifier>test-remote-process-wps1</ows:Identifier>
+            <ows:Title>Test Remote Process WPS1</ows:Title>
+            <ows:Abstract>Testing WPS-1 dummy remote process description.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>pavicstestdocs</ows:Identifier>
+            <ows:Title>PAVICS Catalog test documents</ows:Title>
+            <ows:Abstract>Add test documents to Solr index.</ows:Abstract>
         </wps:Process>
     </wps:ProcessOfferings>
     <wps:Languages>

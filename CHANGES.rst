@@ -54,6 +54,9 @@ Fixes:
 - Fix failing ``minOccurs`` and ``maxOccurs`` generation from a remote provider ``Process`` to support `OGC-API` format
   (relates to `#263  <https://github.com/crim-ca/weaver/issues/263>`_).
 - Fix schemas references and apply deserialization to providers listing request.
+- Fix failing deserialization of ``variable`` children schema under mapping when this variable element is allowed
+  to be undefined (i.e.: defined with ``missing=drop``). Allows support of empty ``inputs`` mapping of OGC-API
+  representation of ``ProcessDescription`` that permits such processes (constant or random output generator).
 
 `3.5.0 <https://github.com/crim-ca/weaver/tree/3.5.0>`_ (2021-08-19)
 ========================================================================

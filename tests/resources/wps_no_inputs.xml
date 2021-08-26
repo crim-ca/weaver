@@ -1,0 +1,40 @@
+<!-- PyWPS 4.2.2 -->
+<!-- https://pavics.ouranos.ca/twitcher/ows/proxy/catalog?service=WPS&request=DescribeProcess&version=1.0.0&identifier=pavicstestdocs -->
+<!--
+    Process that takes no inputs. The process description should allow the retrieval and generation of empty map/list.
+-->
+<wps:ProcessDescriptions xsi:schemaLocation="http://schemas.opengis.net/wps/1.0.0/wpsDescribeProcess_response.xsd"
+                         xmlns:wps="http://www.opengis.net/wps/1.0.0"
+                         xmlns:ows="http://www.opengis.net/ows/1.1"
+                         xmlns:xlink="http://www.w3.org/1999/xlink"
+                         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                         service="WPS"
+                         version="1.0.0"
+                         xml:lang="en-US">
+	<ProcessDescription wps:processVersion="0.1"
+	                    storeSupported="false"
+	                    statusSupported="false">
+		<ows:Identifier>pavicstestdocs</ows:Identifier>
+		<ows:Title>PAVICS Catalog test documents</ows:Title>
+		<ows:Abstract>Add test documents to Solr index.</ows:Abstract>
+		<ProcessOutputs>
+			<Output>
+				<ows:Identifier>solr_result</ows:Identifier>
+				<ows:Title>Solr result</ows:Title>
+				<ows:Abstract>Solr result as a json.</ows:Abstract>
+				<ComplexOutput>
+					<Default>
+						<Format>
+							<MimeType>application/json</MimeType>
+						</Format>
+					</Default>
+					<Supported>
+						<Format>
+							<MimeType>application/json</MimeType>
+						</Format>
+					</Supported>
+				</ComplexOutput>
+			</Output>
+		</ProcessOutputs>
+	</ProcessDescription>
+</wps:ProcessDescriptions>
