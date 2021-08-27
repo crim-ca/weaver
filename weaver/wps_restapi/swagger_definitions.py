@@ -2153,6 +2153,7 @@ class ProcessLogsEndpoint(ProcessPath, JobPath):
 class ProviderPublic(ExtendedMappingSchema):
     public = ExtendedSchemaNode(
         Boolean(),
+        default=False,
         description="Whether the service is defined as publicly visible. "
                     "This will not control allowance/denial of requests to the registered endpoint of the service. "
                     "It only indicates if it should appear during listing of providers."

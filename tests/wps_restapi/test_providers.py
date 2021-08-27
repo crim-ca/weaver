@@ -68,7 +68,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert resp.json["url"] == resources.TEST_REMOTE_SERVER_URL
         assert resp.json["title"] == "Mock Remote Server"
         assert resp.json["description"] == "Testing"
-        assert resp.json["public"] is True
+        assert resp.json["public"] is False
 
     @mocked_remote_server_requests_wp1(
         resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
@@ -155,7 +155,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert process["id"] == resources.TEST_REMOTE_PROCESS_WPS1_ID
         assert "title" in process and isinstance(process["title"], str)
         assert "description" in process and isinstance(process["description"], str)
-        assert "version" in process and isinstance(process["version"], str)
+        assert "version" in process and isinstance(process["version"], str) and len(process["version"])
         assert "keywords" in process and isinstance(process["keywords"], list)
         assert "metadata" in process and isinstance(process["metadata"], list)
         assert len(process["jobControlOptions"]) == 1

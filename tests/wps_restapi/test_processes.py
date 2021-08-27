@@ -188,7 +188,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
 
         # change value that will trigger schema error on check
         process = self.process_store.fetch_by_id(process_name)
-        process["outputTransmission"] = "random"  # invalid (don't use jobControlOptions fixed in-place)
+        process["version"] = "random"  # invalid (cannot use any property that executes in-place fixes)
         process["visibility"] = VISIBILITY_PUBLIC
         self.process_store.save_process(process, overwrite=True)
 
@@ -300,22 +300,23 @@ class WpsRestApiProcessesTest(unittest.TestCase):
 
     @staticmethod
     def assert_deployed_wps3(response_json, expected_process_id):
-        assert expected_process_id in response_json["id"]
-        assert len(response_json["inputs"]) == 1
-        assert response_json["inputs"][0]["id"] == "input-1"
-        assert response_json["inputs"][0]["minOccurs"] == 1
-        assert response_json["inputs"][0]["maxOccurs"] == 1
-        assert "formats" not in response_json["inputs"][0]   # literal data doesn't have "formats"
-        assert len(response_json["outputs"]) == 1
-        assert response_json["outputs"][0]["id"] == "output"
-        assert "minOccurs" not in response_json["outputs"][0]
-        assert "maxOccurs" not in response_json["outputs"][0]
+        proc = response_json["process"]
+        assert expected_process_id in proc["id"]
+        assert len(proc["inputs"]) == 1
+        assert proc["inputs"][0]["id"] == "input-1"
+        assert proc["inputs"][0]["minOccurs"] == 1
+        assert proc["inputs"][0]["maxOccurs"] == 1
+        assert "formats" not in proc["inputs"][0]   # literal data doesn't have "formats"
+        assert len(proc["outputs"]) == 1
+        assert proc["outputs"][0]["id"] == "output"
+        assert "minOccurs" not in proc["outputs"][0]
+        assert "maxOccurs" not in proc["outputs"][0]
         # TODO: handling multiple outputs (https://github.com/crim-ca/weaver/issues/25)
-        # assert response_json["outputs"][0]["minOccurs"] == "1"
-        # assert response_json["outputs"][0]["maxOccurs"] == "1"
-        assert isinstance(response_json["outputs"][0]["formats"], list)
-        assert len(response_json["outputs"][0]["formats"]) == 1
-        assert response_json["outputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
+        # assert proc["outputs"][0]["minOccurs"] == "1"
+        # assert proc["outputs"][0]["maxOccurs"] == "1"
+        assert isinstance(proc["outputs"][0]["formats"], list)
+        assert len(proc["outputs"][0]["formats"]) == 1
+        assert proc["outputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
 
     def deploy_process_make_visible_and_fetch_deployed(self, deploy_payload, expected_process_id):
         """
@@ -664,11 +665,12 @@ class WpsRestApiProcessesTest(unittest.TestCase):
 
     def test_set_process_visibility_success(self):
         test_process = self.process_private.identifier
-        path_describe = "/processes/{}?schema=OLD".format(test_process)
+        proc_schema = {"schema": "OLD"}
+        path_describe = "/processes/{}".format(test_process)
         path_visibility = "{}/visibility".format(path_describe)
 
         # validate cannot be found before
-        resp = self.app.get(path_describe, headers=self.json_headers, expect_errors=True)
+        resp = self.app.get(path_describe, params=proc_schema, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 403
 
         # make public
@@ -679,7 +681,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert resp.json["value"] == VISIBILITY_PUBLIC
 
         # validate now visible and found
-        resp = self.app.get(path_describe, headers=self.json_headers)
+        resp = self.app.get(path_describe, params=proc_schema, headers=self.json_headers)
         assert resp.status_code == 200
         assert resp.json["process"]["id"] == test_process
 
@@ -691,7 +693,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert resp.json["value"] == VISIBILITY_PRIVATE
 
         # validate cannot be found anymore
-        resp = self.app.get(path_describe, headers=self.json_headers, expect_errors=True)
+        resp = self.app.get(path_describe, params=proc_schema, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 403
 
     def test_set_process_visibility_bad_formats(self):

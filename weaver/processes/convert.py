@@ -95,11 +95,12 @@ if TYPE_CHECKING:
     ANY_Metadata_Type = Union[OWS_Metadata, WPS_Metadata, Dict[str, str]]
 
 
-# WPS object attribute -> all possible *other* naming variations
+# WPS object attribute -> all possible *other* naming variations (no need to repeat key name)
 WPS_FIELD_MAPPING = {
     "identifier": ["id", "ID", "Id", "Identifier"],
     "title": ["Title", "Label", "label"],
     "abstract": ["description", "Description", "Abstract"],
+    "version": ["processVersion", "Version"],
     "metadata": ["Metadata"],
     "keywords": ["Keywords"],
     "allowed_values": ["AllowedValues", "allowedValues", "allowedvalues", "Allowed_Values", "Allowedvalues"],
@@ -489,7 +490,8 @@ def ows2json(wps_process, wps_service_name, wps_service_url):
     ])
     default_title = wps_process.identifier.capitalize()
     process_info["title"] = get_field(wps_process, "title", default=default_title, search_variations=True)
-    process_info["abstract"] = get_field(wps_process, "abstract", default=None, search_variations=True)
+    process_info["description"] = get_field(wps_process, "abstract", default=None, search_variations=True)
+    process_info["version"] = get_field(wps_process, "version", default=None, search_variations=True)
     process_info["metadata"] = []
     if wps_process.metadata:
         for meta in wps_process.metadata:
