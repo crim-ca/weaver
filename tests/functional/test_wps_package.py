@@ -1284,14 +1284,18 @@ class WpsPackageAppTest(WpsPackageConfigBase):
                                 import os
                                 import ast
                                 input = $(inputs)
-                                for key,value in input.items():
-                                    if isinstance(value, dict):
-                                        path_ = value.get('path')
-                                        if path_ and os.path.exists(path_):
-                                            with open (path_, 'r') as file_:
-                                                file_data = file_.read()
-                                            input[key] = ast.literal_eval(file_data.upper())
-                                json.dump(input, open("./tmp.txt","w"))
+                                try:
+                                    for key, value in input.items():
+                                        if isinstance(value, dict):
+                                            path_ = value.get("path")
+                                            if path_ and os.path.exists(path_):
+                                                with open (path_, "r") as file_:
+                                                    file_data = file_.read()
+                                                input[key] = ast.literal_eval(file_data.upper())
+                                    json.dump(input, open("./tmp.txt", "w"))
+                                except Exception as exc:
+                                    print(exc)
+                                    raise
                                 """)
                         }
                     ]

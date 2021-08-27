@@ -42,6 +42,10 @@ Changes:
   (similarly to the processes endpoint query parameter).
 - Add query parameter ``check`` to providers listing request to retrieve all registered ``Service`` regardless of
   their URL endpoint availability at the moment the request is executed (less metadata is retrieved in that case).
+- Add ``weaver.schema_url`` configuration parameter and ``weaver.wps_restapi.utils.get_schema_ref`` function to help
+  generate ``$schema`` definition and return reference to expected/provided schema in responses
+  (relates to `#157 <https://github.com/crim-ca/weaver/issues/157>`_)
+  Only utilities are added, not all routes provide the information yet.
 
 Fixes:
 ------

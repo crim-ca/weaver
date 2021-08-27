@@ -204,6 +204,7 @@ class Service(Base):
         return self.params()
 
     def params(self):
+        # type: () -> Dict[str, Any]
         return {
             "url": self.url,
             "name": self.name,

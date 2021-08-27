@@ -114,8 +114,9 @@ class WpsRestApiProcessesTest(unittest.TestCase):
     def test_get_provider_process_description_old_schema(self):
         self.register_provider()
 
+        query = {"schema": "OLD"}
         path = "/providers/{}/processes/{}".format(self.remote_provider_name, resources.TEST_REMOTE_PROCESS_WPS1_ID)
-        resp = self.app.get(path, headers=self.json_headers)
+        resp = self.app.get(path, params=query, headers=self.json_headers)
         body = resp.json
         assert resp.status_code == 200
         assert resp.content_type == CONTENT_TYPE_APP_JSON
@@ -129,9 +130,9 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert "keywords" in process and isinstance(process["keywords"], list)
         assert "metadata" in process and isinstance(process["metadata"], list)
         assert len(body["jobControlOptions"]) == 1
-        assert EXECUTE_CONTROL_OPTION_ASYNC in process["jobControlOptions"]
+        assert EXECUTE_CONTROL_OPTION_ASYNC in body["jobControlOptions"]
         assert len(body["outputTransmission"]) == 1
-        assert EXECUTE_TRANSMISSION_MODE_REFERENCE in process["outputTransmission"]
+        assert EXECUTE_TRANSMISSION_MODE_REFERENCE in body["outputTransmission"]
         assert "inputs" in process and isinstance(process["inputs"], list)
         assert all(isinstance(p_io, dict) and "id" in p_io for p_io in process["inputs"])
         assert "outputs" in process and isinstance(process["outputs"], list)

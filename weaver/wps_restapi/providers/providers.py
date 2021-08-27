@@ -1,7 +1,16 @@
+import colander
 import logging
 from typing import TYPE_CHECKING
 
-from pyramid.httpexceptions import HTTPCreated, HTTPNoContent, HTTPNotFound, HTTPOk
+from pyramid.httpexceptions import (
+    HTTPBadRequest,
+    HTTPConflict,
+    HTTPCreated,
+    HTTPNoContent,
+    HTTPNotFound,
+    HTTPOk,
+    HTTPUnprocessableEntity
+)
 from pyramid.settings import asbool
 
 from weaver.database import get_db
@@ -12,6 +21,7 @@ from weaver.owsexceptions import OWSMissingParameterValue, OWSNotImplemented
 from weaver.store.base import StoreServices
 from weaver.utils import get_any_id, get_settings
 from weaver.wps_restapi import swagger_definitions as sd
+from weaver.wps_restapi.utils import get_schema_ref
 
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
@@ -80,24 +90,54 @@ def add_provider(request):
     """
     Register a new service provider.
     """
-    store = get_db(request).get_store(StoreServices)
-
+    schema = sd.CreateProviderRequestBody()
+    schema_ref = get_schema_ref(schema, request)
     try:
-        new_service = Service(url=request.json["url"], name=get_any_id(request.json))
-    except KeyError as exc:
-        raise OWSMissingParameterValue("Missing json parameter '{!s}'.".format(exc), value=exc)
+        body = schema.deserialize(request.json)
+    except colander.Invalid as invalid:
+        data = {
+            "description": "Invalid schema: [{!s}]".format(invalid),
+            "value": invalid.value
+        }
+        data.update(schema_ref)
+        raise HTTPBadRequest(json=data)
 
-    if "public" in request.json:
-        new_service["public"] = request.json["public"]
-    if "auth" in request.json:
-        new_service["auth"] = request.json["auth"]
+    store = get_db(request).get_store(StoreServices)
+    prov_id = get_any_id(body)
+    try:
+        store.fetch_by_name(prov_id)
+    except ServiceNotFound:
+        pass
+    else:
+        raise HTTPConflict("Provider [{}] already exists.".format(prov_id))
+    try:
+        new_service = Service(url=body["url"], name=prov_id)
+    except KeyError as exc:
+        raise OWSMissingParameterValue("Missing JSON parameter '{!s}'.".format(exc), value=exc)
+
+    if "public" in body:
+        new_service["public"] = body["public"]
+    if "auth" in body:
+        new_service["auth"] = body["auth"]
 
     try:
         store.save_service(new_service)
     except NotImplementedError:
         raise OWSNotImplemented(sd.NotImplementedPostProviderResponse.description, value=new_service)
-
-    return HTTPCreated(json=new_service.summary(request))
+    try:
+        service = new_service.summary(request)
+        if not service:
+            raise colander.Invalid(None, value=body)
+    except colander.Invalid as invalid:
+        data = {
+            "description": "Provider properties could not be parsed correctly.",
+            "value": invalid.value
+        }
+        data.update(schema_ref)
+        raise HTTPUnprocessableEntity(json=data)
+    data = get_schema_ref(sd.ProviderSummarySchema, request)
+    data.update(service)
+    return HTTPCreated(json=data)
 
 
 @sd.provider_service.delete(tags=[sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,

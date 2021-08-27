@@ -54,7 +54,7 @@ they are optional and which default value or operation is applied in each situat
   | Finally, ``DEFAULT`` configuration will provide very minimalistic operations as all other modes will be unavailable.
 
 - | ``weaver.url = <url>``
-  | (default: ``https://localhost``)
+  | (default: ``http://localhost:4001``)
   |
   | Defines the full URL (including HTTP protocol/scheme, hostname and optionally additional path suffix) that will
     be used as base URL for all other URL settings of `Weaver`.
@@ -64,12 +64,24 @@ they are optional and which default value or operation is applied in each situat
     This is the URL that you want displayed in responses (e.g.: ``processDescriptionURL`` or job ``location``).
     For the effective URL employed by the WSGI HTTP server, refer to ``[server:main]`` section of `weaver.ini.example`_.
 
+- | ``weaver.schema_url = <url>``
+  | (default: ``${weaver.url}/json#/definitions``)
+  |
+  | Defines the base URL of schemas to be reported in responses.
+  |
+  | When not provided, the running Web Application instance OpenAPI JSON path will be employed to refer to the
+    schema ``definitions`` section. The configuration setting is available to override this endpoint by another
+    static URL location where the corresponding schemas can be found if desired.
+
+.. versionadded:: 4.0.0
+
+
 - | ``weaver.wps = true|false``
   | (default: ``true``)
   |
   | Enables the WPS-1/2 endpoint.
 
- .. warning::
+.. warning::
 
      At the moment, this setting must be ``true`` to allow job execution as the worker monitors this endpoint.
      This could change with future developments (see issue `#21 <https://github.com/crim-ca/weaver/issues/21>`_).
