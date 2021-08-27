@@ -629,6 +629,7 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
 
         var_children = self._get_sub_variable(self.children)
         const_child_keys = [child.name for child in self.children if child not in var_children]
+        var = None
         for var_child in var_children:
             var = getattr(var_child, self._variable, None)
             var_map[var] = []
@@ -664,6 +665,10 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
                 if var_child.missing is colander.drop:
                     continue
                 raise var_invalid
+            # invalid if no variable match was found, unless optional
+            for mapped in var_map.values():
+                if len(mapped) < 1 and var_child.missing is colander.required:
+                    raise var_invalid
 
         invalid_var = colander.Invalid(self, value=var_map)
         try:
@@ -674,20 +679,20 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
             if not const_child_keys:
                 result = {}
             else:
-                for var, mapped in var_map.items():
+                for mapped in var_map.values():
                     # if multiple objects corresponding to a variable sub-schema where provided,
                     # we only give one as this is what is expected for normal-mapping deserialize
                     cstruct[mapped[0]["node"]] = cstruct.pop(mapped[0]["name"])
                 result = super(VariableSchemaNode, self).deserialize(cstruct)  # noqa
-            for var, mapped in var_map.items():
+            for mapped in var_map.values():
                 for var_mapped in mapped:
                     result[var_mapped["name"]] = var_mapped["cstruct"]
         except colander.Invalid as invalid:
-            invalid_var.msg = "Tried matching variable '{}' sub-schemas but no match found.".format(var)  # noqa
+            invalid_var.msg = "Tried matching variable '{}' sub-schemas but no match found.".format(var)
             invalid_var.add(invalid)
             raise invalid_var
         except KeyError:
-            invalid_var.msg = "Tried matching variable '{}' sub-schemas but mapping failed.".format(var)  # noqa
+            invalid_var.msg = "Tried matching variable '{}' sub-schemas but mapping failed.".format(var)
             raise invalid_var
         return result
 
