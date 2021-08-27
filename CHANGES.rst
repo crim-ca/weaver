@@ -17,14 +17,14 @@ Changes:
   Furthermore, ``inputs`` and ``outputs`` definitions are reported as mapping of ``{"<id>": {<parameters>}}`` as
   specified by OGP-API instead of old listing format ``[{"id": "<id-value>", <key:val parameters>}]``. The old
   nested and listing format can still be obtained using request query parameter ``schema=OLD``, and will otherwise use
-  OGC-API by default or when ``schema=OGC``. Note that some duplicated metadata fields are dropped regardless of
-  selected format in favor of OGC-API names. Some examples are ``abstract`` that becomes ``description``,
+  `OGC-API` by default or when ``schema=OGC``. Note that some duplicated metadata fields are dropped regardless of
+  selected format in favor of `OGC-API` names. Some examples are ``abstract`` that becomes ``description``,
   ``processVersion`` that simply becomes ``version``, ``mimeType`` that becomes ``mediaType``, etc.
   Some of those changes are also reflected by ``ProcessSummary`` during listing of processes, as well as for
   corresponding provider-related endpoints (relates to `#200 <https://github.com/crim-ca/weaver/issues/200>`_).
 - Add backward compatibility support of some metadata fields (``abstract``, ``mimeType``, etc.) for ``Deploy``
   operation of pre-existing processes. When those fields are detected, they are converted inplace in favor of their
-  corresponding new names aligned with OGC-API.
+  corresponding new names aligned with `OGC-API`.
 - Update ``mimeType`` to ``mediaType`` as format type representation according to `OGC-API`
   (relates to `#211  <https://github.com/crim-ca/weaver/issues/211>`_).
 - Add sorting capability to generate mapping schemas for API responses using overrides of
@@ -59,7 +59,7 @@ Fixes:
   (relates to `#263  <https://github.com/crim-ca/weaver/issues/263>`_).
 - Fix schemas references and apply deserialization to providers listing request.
 - Fix failing deserialization of ``variable`` children schema under mapping when this variable element is allowed
-  to be undefined (i.e.: defined with ``missing=drop``). Allows support of empty ``inputs`` mapping of OGC-API
+  to be undefined (i.e.: defined with ``missing=drop``). Allows support of empty ``inputs`` mapping of `OGC-API`
   representation of ``ProcessDescription`` that permits such processes (constant or random output generator).
 
 `3.5.0 <https://github.com/crim-ca/weaver/tree/3.5.0>`_ (2021-08-19)
