@@ -1,7 +1,7 @@
-import colander
 import logging
 from typing import TYPE_CHECKING
 
+import colander
 from pyramid.httpexceptions import (
     HTTPBadRequest,
     HTTPConflict,
@@ -23,11 +23,12 @@ from weaver.utils import get_any_id, get_settings
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import get_schema_ref
 
-LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from typing import List
 
     from weaver.typedefs import AnySettingsContainer
+
+LOGGER = logging.getLogger(__name__)
 
 
 def get_provider_services(container, check=True):

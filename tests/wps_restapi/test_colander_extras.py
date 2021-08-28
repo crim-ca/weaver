@@ -501,7 +501,7 @@ def test_dropable_variable_mapping():
 
 
 def test_media_type_pattern():
-    media_type = sd.MediaType()
+    media_type = sd.MediaType()  # pylint: disable=E1101,no-member
     test_cases = [
         "application/atom+xml",
         "application/EDI-X12",
