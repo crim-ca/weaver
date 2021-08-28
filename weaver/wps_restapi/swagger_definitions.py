@@ -75,9 +75,7 @@ from weaver.wps_restapi.colander_extras import (
 from weaver.wps_restapi.utils import wps_restapi_base_path
 
 if TYPE_CHECKING:
-    from typing import List, Optional
-
-    from weaver.typedefs import DatetimeIntervalType, JSON, SettingsType, TypedDict
+    from weaver.typedefs import DatetimeIntervalType, SettingsType, TypedDict
 
     ViewInfo = TypedDict("ViewInfo", {"name": str, "pattern": str})
 
@@ -513,6 +511,8 @@ class LandingPage(ExtendedMappingSchema):
     links = LinkList()
 
 
+# sub-schema within:
+#   https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/format.yaml
 class FormatSchema(OneOfKeywordSchema):
     _one_of = [
         # pointer to a file or JSON schema relative item (as in OpenAPI definitions)
@@ -520,6 +520,15 @@ class FormatSchema(OneOfKeywordSchema):
         # literal JSON schema, permissive since it can be anything
         PermissiveMappingSchema(description="Explicit schema definition of the formatted reference data.")
     ]
+
+    # because some pre-existing processes + pywps default schema is ""
+    # deserialization against the validator pattern of 'ReferenceURL' makes it always fail
+    # this causes the whole 'Format' container (and others similar) fail and be dropped
+    # to resolve this issue, preemptively detect the empty string and signal the parent OneOf to remove it
+    def deserialize(self, cstruct):
+        if isinstance(cstruct, str) and cstruct == "":
+            return drop  # field that refers to this schema will drop the field key entirely
+        return super(FormatSchema, self).deserialize(cstruct)
 
 
 class FormatMimeType(ExtendedMappingSchema):
@@ -621,11 +630,11 @@ class FormatMedia(FormatExtra):
 
 
 class DescriptionFormatList(ExtendedSequenceSchema):
-    format = DescriptionFormat()
+    format_item = DescriptionFormat()
 
 
 class DeploymentFormatList(ExtendedSequenceSchema):
-    format = DeploymentFormat()
+    format_item = DeploymentFormat()
 
 
 class AdditionalParameterValuesList(ExtendedSequenceSchema):
@@ -699,7 +708,7 @@ class DescriptionType(DescriptionBase, DescriptionLinks, DescriptionExtra):
     pass
 
 
-class DeployDescriptionType(DescriptionType):
+class DeploymentType(DescriptionType):
     deprecated = True
     abstract = ExtendedSchemaNode(
         String(), missing=drop, deprecated=True,
@@ -1004,7 +1013,7 @@ class DescribeInputTypeWithID(InputIdentifierType, DescribeInputType):
 # compatible with pre-existing/deployed/remote processes, with either ``mediaType`` and ``mimeType`` formats.
 class DeployInputType(AllOfKeywordSchema):
     _all_of = [
-        DeployDescriptionType(),
+        DeploymentType(),
         InputOutputDescriptionMeta(),
         DeployInputTypeDefinition(),
         WithMinMaxOccurs(),
@@ -1043,7 +1052,7 @@ class DeployInputTypeList(ExtendedSequenceSchema):
     """
     Listing of process input definitions to deploy.
     """
-    input = DeployInputTypeWithID()
+    input_item = DeployInputTypeWithID()
 
 
 # for {"<id>": {...}} representation within ProcessDeployment (OGC schema)
@@ -1136,7 +1145,7 @@ class DescribeOutputTypeMap(PermissiveMappingSchema):
 # compatible with pre-existing/deployed/remote processes, with either ``mediaType`` and ``mimeType`` formats.
 class DeployOutputType(AllOfKeywordSchema):
     _all_of = [
-        DeployDescriptionType(),
+        DeploymentType(),
         InputOutputDescriptionMeta(),
         DeployOutputTypeDefinition(),
     ]
@@ -1756,11 +1765,11 @@ class WPSFormatDefinition(ExtendedMappingSchema, XMLObject):
 
 class WPSFileFormat(ExtendedMappingSchema, XMLObject):
     name = "Format"
-    format = WPSFormatDefinition()
+    format_item = WPSFormatDefinition()
 
 
 class WPSFormatList(ExtendedSequenceSchema):
-    format = WPSFileFormat()
+    format_item = WPSFileFormat()
 
 
 class WPSComplexInputType(ExtendedMappingSchema, WPSNamespace):
