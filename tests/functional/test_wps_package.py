@@ -1332,7 +1332,7 @@ class WpsPackageAppTest(WpsPackageConfigBase):
                 "mode": EXECUTE_MODE_ASYNC,
                 "response": EXECUTE_RESPONSE_DOCUMENT,
                 "inputs": {
-                    "stringInput": "stringtest",
+                    "stringInput": "string_test",
                     "integerInput": 10,
                     "doubleInput": 3.14159,
                     "stringArrayInput": ["1", "2", "3", "4", "5", "6"],
