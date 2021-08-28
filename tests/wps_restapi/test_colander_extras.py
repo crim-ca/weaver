@@ -498,3 +498,34 @@ def test_dropable_variable_mapping():
         (VarMapMapReq, invalid_var_map, colander.Invalid),
     ]
     evaluate_test_cases(test_schemas)
+
+
+def test_media_type_pattern():
+    media_type = sd.MediaType()
+    test_cases = [
+        "application/atom+xml",
+        "application/EDI-X12",
+        "application/xml-dtd",
+        "application/zip",
+        "application/vnd.api+json",
+        "application/json; indent=4",
+        "video/mp4",
+        "plain/text;charset=UTF-8",
+        "plain/text; charset=UTF-8",
+        "plain/text;    charset=UTF-8",
+        "plain/text; charset=UTF-8; boundary=10"
+    ]
+    for test_value in test_cases:
+        assert media_type.deserialize(test_value) == test_value
+    test_cases = [
+        "random",
+        "bad\\value",
+        "; missing=type"
+    ]
+    for test_value in test_cases:
+        try:
+            media_type.deserialize(test_value)
+        except colander.Invalid:
+            pass
+        else:
+            pytest.fail("Expected valid format from [{}] with: '{}'".format(media_type.__name__, test_value))

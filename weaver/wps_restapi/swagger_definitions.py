@@ -264,13 +264,20 @@ class SLUG(ExtendedSchemaNode):
     schema_type = String
     description = "Slug name pattern."
     example = "some-object-slug-name"
-    pattern = "^[A-Za-z0-9]+(?:(-|_)[A-Za-z0-9]+)*$"
+    pattern = r"^[A-Za-z0-9]+(?:(-|_)[A-Za-z0-9]+)*$"
 
 
 class URL(ExtendedSchemaNode):
     schema_type = String
     description = "URL reference."
     format = "url"
+
+
+class MediaType(ExtendedSchemaNode):
+    schema_type = String
+    description = "IANA identifier of content and format."
+    example = CONTENT_TYPE_APP_JSON
+    pattern = r"^\w+\/[-.\w]+(?:\+[-.\w]+)?(?:\;\s*.+)*$"
 
 
 class DateTimeInterval(ExtendedSchemaNode):
@@ -506,17 +513,6 @@ class LandingPage(ExtendedMappingSchema):
     links = LinkList()
 
 
-class FormatMimeType(ExtendedMappingSchema):
-    """
-    Used to respect ``mimeType`` field to work with pre-existing processes.
-    """
-    title = "Format"
-    mimeType = ExtendedSchemaNode(
-        String(), default=CONTENT_TYPE_TEXT_PLAIN, example=CONTENT_TYPE_APP_JSON)
-    schema = ExtendedSchemaNode(String(), missing=drop)
-    encoding = ExtendedSchemaNode(String(), missing=drop)
-
-
 class FormatSchema(OneOfKeywordSchema):
     _one_of = [
         # pointer to a file or JSON schema relative item (as in OpenAPI definitions)
@@ -526,13 +522,21 @@ class FormatSchema(OneOfKeywordSchema):
     ]
 
 
+class FormatMimeType(ExtendedMappingSchema):
+    """
+    Used to respect ``mimeType`` field to work with pre-existing processes.
+    """
+    mimeType = MediaType(default=CONTENT_TYPE_TEXT_PLAIN, example=CONTENT_TYPE_APP_JSON)
+    encoding = ExtendedSchemaNode(String(), missing=drop)
+    schema = FormatSchema(missing=drop)
+
+
 # https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/format.yaml
 class Format(ExtendedMappingSchema):
     """
     Used to respect ``mediaType`` field as suggested per `OGC-API`.
     """
-    title = "Format"
-    mediaType = ExtendedSchemaNode(String(), default=CONTENT_TYPE_TEXT_PLAIN, example=CONTENT_TYPE_APP_JSON)
+    mediaType = MediaType(default=CONTENT_TYPE_TEXT_PLAIN, example=CONTENT_TYPE_APP_JSON)
     encoding = ExtendedSchemaNode(String(), missing=drop)
     schema = FormatSchema(missing=drop)
 
@@ -546,7 +550,7 @@ class DeployFormatDefaultMimeType(FormatMimeType):
     # NOTE:
     # The default is overridden from FormatMimeType since the FormatSelection 'oneOf' always fails,
     # due to the 'default' value which is always generated and it causes the presence of both Format and FormatMimeType
-    mimeType = ExtendedSchemaNode(String(), example=CONTENT_TYPE_APP_JSON)
+    mimeType = MediaType(example=CONTENT_TYPE_APP_JSON)
 
 
 class DeployFormatDefault(Format):
@@ -558,7 +562,7 @@ class DeployFormatDefault(Format):
     # NOTE:
     # The default is overridden from Format since the FormatSelection 'oneOf' always fails,
     # due to the 'default' value which is always generated and it causes the presence of both Format and FormatMimeType
-    mediaType = ExtendedSchemaNode(String(), example=CONTENT_TYPE_APP_JSON)
+    mediaType = MediaType(example=CONTENT_TYPE_APP_JSON)
 
 
 class FormatSelection(OneOfKeywordSchema):
@@ -611,9 +615,9 @@ class DeploymentFormat(FormatSelection, FormatExtra, FormatDefault):
 class FormatMedia(FormatExtra):
     """Format employed for reference results respecting 'OGC-API - Processes' schemas."""
     schema_ref = "{}/master/core/openapi/schemas/formatDescription.yaml".format(OGC_API_SCHEMA_URL)
-    mediaType = ExtendedSchemaNode(String())
-    schema = ExtendedSchemaNode(String(), missing=drop)
+    mediaType = MediaType(String())
     encoding = ExtendedSchemaNode(String(), missing=drop)
+    schema = FormatSchema(missing=drop)
 
 
 class DescriptionFormatList(ExtendedSequenceSchema):
