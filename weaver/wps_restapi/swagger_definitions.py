@@ -517,36 +517,46 @@ class FormatMimeType(ExtendedMappingSchema):
     encoding = ExtendedSchemaNode(String(), missing=drop)
 
 
+class FormatSchema(OneOfKeywordSchema):
+    _one_of = [
+        # pointer to a file or JSON schema relative item (as in OpenAPI definitions)
+        ReferenceURL(description="Reference where the schema definition can be retrieved to describe referenced data."),
+        # literal JSON schema, permissive since it can be anything
+        PermissiveMappingSchema(description="Explicit schema definition of the formatted reference data.")
+    ]
+
+
+# https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/format.yaml
 class Format(ExtendedMappingSchema):
     """
     Used to respect ``mediaType`` field as suggested per `OGC-API`.
     """
     title = "Format"
     mediaType = ExtendedSchemaNode(String(), default=CONTENT_TYPE_TEXT_PLAIN, example=CONTENT_TYPE_APP_JSON)
-    schema = ExtendedSchemaNode(String(), missing=drop)
     encoding = ExtendedSchemaNode(String(), missing=drop)
+    schema = FormatSchema(missing=drop)
 
 
-class DeployFormatDefaultMimeType(FormatMimeType, ExtendedMappingSchema):
+class DeployFormatDefaultMimeType(FormatMimeType):
     """
     Format for process input are assumed plain text if the MIME-type was omitted and is not
     one of the known formats by this instance. When executing a job, the best match will be used
     to run the process, and will fallback to the default as last resort.
     """
     # NOTE:
-    # The default is override from FormatMimeType since the FormatSelection 'oneOf' always fails,
+    # The default is overridden from FormatMimeType since the FormatSelection 'oneOf' always fails,
     # due to the 'default' value which is always generated and it causes the presence of both Format and FormatMimeType
     mimeType = ExtendedSchemaNode(String(), example=CONTENT_TYPE_APP_JSON)
 
 
-class DeployFormatDefault(Format, ExtendedMappingSchema):
+class DeployFormatDefault(Format):
     """
     Format for process input are assumed plain text if the MEDIA-type was omitted and is not
     one of the known formats by this instance. When executing a job, the best match will be used
     to run the process, and will fallback to the default as last resort.
     """
     # NOTE:
-    # The default is override from Format since the FormatSelection 'oneOf' always fails,
+    # The default is overridden from Format since the FormatSelection 'oneOf' always fails,
     # due to the 'default' value which is always generated and it causes the presence of both Format and FormatMimeType
     mediaType = ExtendedSchemaNode(String(), example=CONTENT_TYPE_APP_JSON)
 
@@ -855,6 +865,8 @@ class ValuesReference(ReferenceURL):
     """
 
 
+# FIXME: support byte/binary type (string + format:byte) ?
+#   https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/binaryInputValue.yaml
 class AnyLiteralType(OneOfKeywordSchema):
     """
     .. seealso::
@@ -871,15 +883,15 @@ class AnyLiteralType(OneOfKeywordSchema):
 
 
 class SequenceStringType(ExtendedSequenceSchema):
-    value = ExtendedSchemaNode(String())
+    value_item = ExtendedSchemaNode(String())
 
 
 class SequenceBooleanType(ExtendedSequenceSchema):
-    value = ExtendedSchemaNode(Boolean())
+    value_item = ExtendedSchemaNode(Boolean())
 
 
 class SequenceNumberType(ExtendedSequenceSchema):
-    value = ExtendedSchemaNode(Float())
+    value_item = ExtendedSchemaNode(Float())
 
 
 class ArrayLiteralType(OneOfKeywordSchema):
@@ -2165,15 +2177,15 @@ class CreateProviderRequestBody(ProviderPublic):
     url = URL(description="Endpoint where to query the provider.")
 
 
-class InputDataType(InputIdentifierType):
+class ExecuteInputDataType(InputIdentifierType):
     pass
 
 
-class OutputDataType(OutputIdentifierType):
+class ExecuteOutputDataType(OutputIdentifierType):
     format = Format(missing=drop)
 
 
-class ExecuteOutputDefinition(OutputDataType):
+class ExecuteOutputDefinition(ExecuteOutputDataType):
     transmissionMode = TransmissionModeEnum(missing=drop)
 
 
@@ -2475,7 +2487,14 @@ class ArrayReferenceValueType(ExtendedMappingSchema):
     value = ArrayReference()
 
 
-class AnyType(OneOfKeywordSchema):
+# Backward compatible data-input that allows values to be nested under 'data' or 'value' fields,
+# both for literal values and link references, for inputs submitted as list-items.
+# Also allows the explicit 'href' (+ optional format) reference for a link.
+#
+# Because this data-input structure applies only to list-items (see 'ExecuteInputItem' below), mapping is always needed.
+# (i.e.: values cannot be submitted inline in the list, because field 'id' of each input must also be provided)
+# For this reason, one of 'value', 'data', 'href' or 'reference' is mandatory.
+class ExecuteInputAnyType(OneOfKeywordSchema):
     """Permissive variants that we attempt to parse automatically."""
     _one_of = [
         # Array of literal data with 'data' key
@@ -2494,91 +2513,122 @@ class AnyType(OneOfKeywordSchema):
     ]
 
 
-class ExecuteInput(InputDataType, AnyType):
+class ExecuteInputItem(ExecuteInputDataType, ExecuteInputAnyType):
     """
-    Default value to be looked for uses key 'value' to conform to OGC API standard.
-    We still look for 'href', 'data' and 'reference' to remain back-compatible.
+    Default value to be looked for uses key 'value' to conform to older drafts of OGC-API standard.
+    Even older drafts that allowed other fields 'data' instead of 'value' and 'reference' instead of 'href'
+    are also looked for to remain back-compatible.
     """
 
 
-class ExecuteInputString(ExtendedSchemaNode):
-    schema_type = String
-    title = "String input"
-    description = "Execute input string definition."
-    example = "This is a string"
-
-
-class ExecuteInputInteger(ExtendedSchemaNode):
-    schema_type = Integer
-    title = "Integer input"
-    description = "Execute input integer definition."
-    example = 8
-
-
-class ExecuteInputFloat(ExtendedSchemaNode):
-    schema_type = Float
-    title = "Float input"
-    description = "Execute input float definition."
-    example = 2.45
-
-
-class ExecuteInputTypes(OneOfKeywordSchema):
-    title = "Execute inputs types"
-    description = "Execute input supported types."
-    _one_of = [
-        ExecuteInputInteger(summary="Execute input integer value."),
-        ExecuteInputFloat(summary="Execute input float value."),
-        ExecuteInputString(summary="Execute input string value")
-    ]
-
-
-class ExecuteInputValue(OneOfKeywordSchema):
-    _one_of = [
-        ExecuteInputTypes(),
-        ExtendedMappingSchema()
-    ]
-
-
-class ExecuteInputObject(PermissiveMappingSchema):
-    value = ExecuteInputValue(variable="<input-id>")
-    inputBinding = ExtendedMappingSchema(missing=drop, title="Input Binding",
-                                         description="Defines how to specify the input for the command.")
-
-
+# backward compatible definition:
+#
+#   inputs: [
+#     {"id": "<id>", "value": <data>},
+#     {"id": "<id>", "href": <link>}
+#     ... (other variants) ...
+#   ]
+#
 class ExecuteInputListValues(ExtendedSequenceSchema):
-    description = "List of allowed direct Execute values."
-    items = ExecuteInputTypes()
+    input_item = ExecuteInputItem(description="Received list input value definition during job submission.")
 
 
-class ExecuteInputDict(OneOfKeywordSchema):
-    description = "Execute type definition of the input."
+# https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/inputValueNoObject.yaml
+# Any literal value directly provided inline in input mapping.
+#
+#   {"inputs": {"<id>": <literal-data>}}
+#
+# Excludes objects to avoid conflict with later object mapping and {"value": <data>} definitions.
+# Excludes array literals that will be defined separately with allowed array of any item within this schema.
+# FIXME: does not support byte/binary type (string + format:byte) - see also: 'AnyLiteralType'
+#   https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/binaryInputValue.yaml
+# FIXME: does not support bbox
+#   https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/bbox.yaml
+class ExecuteInputInlineValue(OneOfKeywordSchema):
+    description = "Execute input value provided inline."
     _one_of = [
-        ExecuteInputTypes(variable="<input-id>"),
-        ExecuteInputListValues(summary="Execute input list."),
-        ExecuteInputObject(summary="Execute input value definition with parameters."),
+        ExtendedSchemaNode(Float()),
+        ExtendedSchemaNode(Integer()),
+        ExtendedSchemaNode(Boolean()),
+        ExtendedSchemaNode(String()),
+        Reference(summary="Execute input reference link definition with parameters."),
     ]
 
 
-class ExecuteInputMap(PermissiveMappingSchema):
-    input_id = ExecuteInputDict(variable="<input-id>", title="ExecuteInputIdentifier",
-                                description="Received mapping input definition during job submission.")
-
-
-class ExecuteInputList(ExtendedSequenceSchema):
-    input_item = ExecuteInput(missing=drop, description="Received list input definition during job submission.")
-
-
-class ExecuteInputsDefinition(OneOfKeywordSchema):
+# https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/inputValue.yaml
+#
+#   oneOf:
+#     - $ref: "inputValueNoObject.yaml"
+#     - type: object
+#
+class ExecuteInputObjectData(OneOfKeywordSchema):
+    description = "Data value of any schema "
     _one_of = [
-        ExecuteInputList(missing=drop, description="Package inputs defined as items."),
-        ExecuteInputMap(description="Package inputs defined as mapping."),
+        ExecuteInputInlineValue,
+        PermissiveMappingSchema
+    ]
+
+
+# https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/qualifiedInputValue.yaml
+class ExecuteInputObject(Format):
+    value = ExecuteInputObjectData()    # can be anything, including literal value, array of them, nested object
+
+
+class ExecuteInputArrayValues(ExtendedSequenceSchema):
+    item_value = ExecuteInputInlineValue()
+
+
+# combine 'inlineOrRefData' and its 'array[inlineOrRefData]' variants to simplify 'ExecuteInputAny' definition
+class ExecuteInputInline(OneOfKeywordSchema):
+    _one_of = [
+        ExecuteInputInlineValue,
+        ExecuteInputArrayValues
+    ]
+
+
+# https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/inlineOrRefData.yaml
+#
+#   oneOf:
+#     - $ref: "inputValueNoObject.yaml"     # in OGC-API spec, includes a generic array
+#     - $ref: "qualifiedInputValue.yaml"
+#     - $ref: "link.yaml"
+#
+class ExecuteInputAny(OneOfKeywordSchema):
+    description = "Execute data definition of the input."
+    _one_of = [
+        ExecuteInputInline(summary="Execute input value(s) provided inline."),          # 'inputValueNoObject' + 'link'
+        ExecuteInputObject(summary="Execute input value definition with parameters."),  # 'qualifiedInputValue'
+    ]
+
+
+# https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/execute.yaml
+#
+#   inputs:
+#     additionalProperties:           # this is the below 'variable=<input-id>'
+#       oneOf:
+# 	    - $ref: "inlineOrRefData.yaml"
+# 	    - type: array
+# 	      items:
+# 	        $ref: "inlineOrRefData.yaml"
+#
+class ExecuteInputMapValues(ExtendedMappingSchema):
+    input_id = ExecuteInputAny(variable="<input-id>", title="ExecuteInputValue",
+                               description="Received mapping input value definition during job submission.")
+
+
+class ExecuteInputValues(OneOfKeywordSchema):
+    _one_of = [
+        # OLD format: {"inputs": [{"id": "<id>", "value": <data>}, ...]}
+        ExecuteInputListValues(missing=drop, description="Process job execution inputs defined as item listing."),
+        # OGC-API:    {"inputs": {"<id>": <data>, "<id>": {"value": <data>}, ...}}
+        ExecuteInputMapValues(description="Process job execution inputs defined as mapping."),
     ]
 
 
 class Execute(ExtendedMappingSchema):
     # permit unspecified inputs for processes that could technically allow no-inputs definition (CWL),
-    # but very unlikely/unusual in real world scenarios (possible case: constant endpoint fetcher?)
-    inputs = ExecuteInputsDefinition(missing=drop)
+    # but very unlikely/unusual in real world scenarios (possible cases: constant endpoint fetcher, RNG output)
+    inputs = ExecuteInputValues(missing=drop)
     outputs = ExecuteOutputFilterList()
     mode = JobExecuteModeEnum()
     notification_email = ExtendedSchemaNode(
@@ -3090,7 +3140,7 @@ class JobOutputValue(OneOfKeywordSchema):
 
 class JobOutput(AllOfKeywordSchema):
     _all_of = [
-        OutputDataType(),
+        ExecuteOutputDataType(),
         JobOutputValue(),
     ]
 
@@ -3160,7 +3210,7 @@ class Result(ExtendedMappingSchema):
 
 
 class JobInputsSchema(ExtendedMappingSchema):
-    inputs = ExecuteInputList()
+    inputs = ExecuteInputListValues()
     links = LinkList(missing=drop)
 
 

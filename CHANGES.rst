@@ -61,6 +61,9 @@ Fixes:
 - Fix failing deserialization of ``variable`` children schema under mapping when this variable element is allowed
   to be undefined (i.e.: defined with ``missing=drop``). Allows support of empty ``inputs`` mapping of `OGC-API`
   representation of ``ProcessDescription`` that permits such processes (constant or random output generator).
+- Fix some invalid definitions of execution inputs schemas under mapping with ``value`` sub-schema where key-based
+  input IDs (using ``additionalProperties``) where replaced by the *variable* ``<input-id>`` name instead of their
+  original names in the request body (from `#265 <https://github.com/crim-ca/weaver/issues/265>`_ since ``3.4.0``).
 
 `3.5.0 <https://github.com/crim-ca/weaver/tree/3.5.0>`_ (2021-08-19)
 ========================================================================
