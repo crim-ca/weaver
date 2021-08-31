@@ -15,7 +15,7 @@ from pyramid.settings import asbool
 
 from weaver.config import WEAVER_CONFIGURATIONS_REMOTE, get_weaver_configuration
 from weaver.database import get_db
-from weaver.datatype import Process, Service
+from weaver.datatype import Process
 from weaver.exceptions import ProcessNotFound, log_unhandled_exceptions
 from weaver.formats import OUTPUT_FORMAT_JSON
 from weaver.processes import opensearch
