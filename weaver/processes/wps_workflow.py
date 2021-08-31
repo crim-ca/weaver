@@ -111,6 +111,8 @@ class WpsWorkflow(ProcessCWL):
     :class:`weaver.processes.wps_package.WpsPackage` as job steps.
     """
 
+    # pylint: disable=R1260,too-complex  # FIXME: simplify operations
+
     def __init__(self, toolpath_object, loading_context, get_job_process_definition):
         # type: (Dict[Text, Any], LoadingContext, GetJobProcessDefinitionFunction) -> None
         super(WpsWorkflow, self).__init__(toolpath_object, loading_context)
@@ -455,6 +457,8 @@ class WpsWorkflowJob(JobBase):  # noqa: N802
     # pylint: disable=W0221,arguments-differ    # naming using python like arguments
     def execute(self, runtime, env, runtime_context):   # noqa: E811
         # type: (List[Text], MutableMapping[Text, Text], RuntimeContext) -> None
+
+        # pylint: disable=R1260,too-complex  # FIXME: simplify operations
 
         self.results = self.wps_process.execute(self.builder.job, self.outdir, self.expected_outputs)
 

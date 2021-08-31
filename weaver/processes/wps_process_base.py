@@ -10,7 +10,7 @@ from weaver.utils import get_cookie_headers, get_settings, request_extra
 from weaver.wps.utils import get_wps_output_dir, get_wps_output_url
 
 if TYPE_CHECKING:
-    from weaver.typedefs import CWL_RuntimeInput
+    from weaver.typedefs import CWL_RuntimeInputsMap
     from typing import Dict
     from pywps.app import WPSRequest
 
@@ -22,7 +22,7 @@ class WpsProcessInterface(object):
 
     @abstractmethod
     def execute(self,
-                workflow_inputs,        # type: Dict[str, CWL_RuntimeInput]
+                workflow_inputs,        # type: CWL_RuntimeInputsMap
                 out_dir,                # type: str
                 expected_outputs,       # type: Dict[str, str]
                 ):

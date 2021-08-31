@@ -25,7 +25,8 @@ from weaver.wps.utils import check_wps_status, get_wps_client
 
 if TYPE_CHECKING:
     from pywps.app import WPSRequest
-    from weaver.typedefs import UpdateStatusPartialFunction
+
+    from weaver.typedefs import CWL_RuntimeInputsMap, OWS_InputDataValues, ProcessOWS, UpdateStatusPartialFunction
 
 LOGGER = logging.getLogger(__name__)
 
@@ -49,6 +50,63 @@ class Wps1Process(WpsProcessInterface):
         self.update_status = lambda _message, _progress, _status: update_status(
             self.provider, _message, _progress, _status)
 
+    def get_input_values(self, process, workflow_inputs):
+        # type: (ProcessOWS, CWL_RuntimeInputsMap) -> OWS_InputDataValues
+        """
+        Convert submitted CWL workflow inputs into corresponding :mod:`OWSLib.wps` representation for execution.
+
+        :param process: original OWS process definition to retrieve expected inputs' formats, values and types.
+        :param workflow_inputs: mapping of input IDs and values submitted to the workflow.
+        :return converted OWS inputs ready for submission to remote WPS process.
+        """
+        # prepare inputs
+        complex_inputs = []
+        for process_input in process.dataInputs:
+            if WPS_COMPLEX_DATA in process_input.dataType:
+                complex_inputs.append(process_input.identifier)
+
+        # remove any 'null' input, should employ the 'default' of the remote WPS process
+        inputs_provided_keys = filter(lambda i: workflow_inputs[i] != "null", workflow_inputs)
+
+        wps_inputs = []
+        for input_key in inputs_provided_keys:
+            input_val = workflow_inputs[input_key]
+            # in case of array inputs, must repeat (id,value)
+            # in case of complex input (File), obtain location, otherwise get data value
+            if not isinstance(input_val, list):
+                input_val = [input_val]
+
+            input_values = []
+            for val in input_val:
+                mime_type = None
+                encoding = None
+                if isinstance(val, dict):
+                    fmt = val.get("format")  # format as namespace:link
+                    val = val["location"]
+                    if fmt:
+                        fmt = get_format(workflow_inputs[input_key]["format"])  # format as content-type
+                        mime_type = fmt.mime_type or None
+                        encoding = fmt.encoding or None  # avoid empty string
+
+                # owslib only accepts strings, not numbers directly
+                if isinstance(val, (int, float)):
+                    val = str(val)
+
+                if val.startswith("file://"):
+                    # we need to host file starting with file:// scheme
+                    val = self.host_file(val)
+
+                input_values.append((val, mime_type, encoding))
+
+            # need to use ComplexDataInput structure for complex input
+            # TODO: BoundingBox not supported
+            for input_value, mime_type, encoding in input_values:
+                if input_key in complex_inputs:
+                    input_value = ComplexDataInput(input_value, mimeType=mime_type, encoding=encoding)
+
+                wps_inputs.append((input_key, input_value))
+        return wps_inputs
+
     def execute(self, workflow_inputs, out_dir, expected_outputs):
         self.update_status("Preparing execute request for remote WPS1 provider.",
                            REMOTE_JOB_PROGRESS_REQ_PREP, status.STATUS_RUNNING)
@@ -64,52 +122,7 @@ class Wps1Process(WpsProcessInterface):
             except Exception as ex:
                 raise OWSNoApplicableCode("Failed to retrieve WPS process description. Error: [{}].".format(str(ex)))
 
-            # prepare inputs
-            complex_inputs = []
-            for process_input in process.dataInputs:
-                if WPS_COMPLEX_DATA in process_input.dataType:
-                    complex_inputs.append(process_input.identifier)
-
-            # remove any 'null' input, should employ the 'default' of the remote WPS process
-            inputs_provided_keys = filter(lambda i: workflow_inputs[i] != "null", workflow_inputs)
-
-            wps_inputs = []
-            for input_key in inputs_provided_keys:
-                input_val = workflow_inputs[input_key]
-                # in case of array inputs, must repeat (id,value)
-                # in case of complex input (File), obtain location, otherwise get data value
-                if not isinstance(input_val, list):
-                    input_val = [input_val]
-
-                input_values = []
-                for val in input_val:
-                    mime_type = None
-                    encoding = None
-                    if isinstance(val, dict):
-                        fmt = val.get("format")  # format as namespace:link
-                        val = val["location"]
-                        if fmt:
-                            fmt = get_format(workflow_inputs[input_key]["format"])  # format as content-type
-                            mime_type = fmt.mime_type or None
-                            encoding = fmt.encoding or None  # avoid empty string
-
-                    # owslib only accepts strings, not numbers directly
-                    if isinstance(val, (int, float)):
-                        val = str(val)
-
-                    if val.startswith("file://"):
-                        # we need to host file starting with file:// scheme
-                        val = self.host_file(val)
-
-                    input_values.append((val, mime_type, encoding))
-
-                # need to use ComplexDataInput structure for complex input
-                # TODO: BoundingBox not supported
-                for input_value, mime_type, encoding in input_values:
-                    if input_key in complex_inputs:
-                        input_value = ComplexDataInput(input_value, mimeType=mime_type, encoding=encoding)
-
-                    wps_inputs.append((input_key, input_value))
+            wps_inputs = self.get_input_values(process, workflow_inputs)
 
             # prepare outputs
             outputs_as_ref = [

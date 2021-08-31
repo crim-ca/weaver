@@ -66,6 +66,8 @@ JOB_PROGRESS_DONE = 100
 
 @app.task(bind=True)
 def execute_process(self, job_id, url, headers=None):
+    # pylint: disable=R1260,too-complex  # FIXME: simplify operations
+
     from weaver.wps.service import get_pywps_service
 
     LOGGER.debug("Job execute process called.")
