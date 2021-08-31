@@ -74,6 +74,7 @@ LOGGER = getLogger(__name__)
 class Base(dict):
     """
     Dictionary with extended attributes auto-``getter``/``setter`` for convenience.
+
     Explicitly overridden ``getter``/``setter`` attributes are called instead of ``dict``-key ``get``/``set``-item
     to ensure corresponding checks and/or value adjustments are executed before applying it to the sub-``dict``.
     """
@@ -174,28 +175,38 @@ class Service(Base):
 
     @property
     def url(self):
-        """Service URL."""
+        """
+        Service URL.
+        """
         return dict.__getitem__(self, "url")
 
     @property
     def name(self):
-        """Service name."""
+        """
+        Service name.
+        """
         return dict.__getitem__(self, "name")
 
     @property
     def type(self):
-        """Service type."""
+        """
+        Service type.
+        """
         return self.get("type", PROCESS_WPS_REMOTE)
 
     @property
     def public(self):
-        """Flag if service has public access."""
+        """
+        Flag if service has public access.
+        """
         # TODO: public access can be set via auth parameter.
         return self.get("public", False)
 
     @property
     def auth(self):
-        """Authentication method: public, token, cert."""
+        """
+        Authentication method: public, token, cert.
+        """
         return self.get("auth", "token")
 
     def json(self):
@@ -487,7 +498,9 @@ class Job(Base):
     @property
     def id(self):
         # type: () -> str
-        """Job UUID to retrieve the details from storage."""
+        """
+        Job UUID to retrieve the details from storage.
+        """
         job_id = self.get("id")
         if not job_id:
             job_id = str(uuid.uuid4())
@@ -497,7 +510,9 @@ class Job(Base):
     @property
     def task_id(self):
         # type: () -> Optional[str]
-        """Reference Task UUID attributed by the ``Celery`` worker that monitors and executes this job."""
+        """
+        Reference Task UUID attributed by the ``Celery`` worker that monitors and executes this job.
+        """
         return self.get("task_id", None)
 
     @task_id.setter
@@ -510,7 +525,8 @@ class Job(Base):
     @property
     def wps_id(self):
         # type: () -> Optional[str]
-        """Reference WPS Request/Response UUID attributed by the executed ``PyWPS`` process.
+        """
+        Reference WPS Request/Response UUID attributed by the executed ``PyWPS`` process.
 
         This UUID matches the status-location, log and output directory of the WPS process.
         This parameter is only available when the process is executed on this local instance.
@@ -531,7 +547,8 @@ class Job(Base):
     @property
     def service(self):
         # type: () -> Optional[str]
-        """Service identifier of the corresponding remote process.
+        """
+        Service identifier of the corresponding remote process.
 
         .. seealso::
             - :attr:`Service.id`
@@ -548,7 +565,8 @@ class Job(Base):
     @property
     def process(self):
         # type: () -> Optional[str]
-        """Process identifier of the corresponding remote process.
+        """
+        Process identifier of the corresponding remote process.
 
         .. seealso::
             - :attr:`Process.id`
@@ -821,13 +839,17 @@ class Job(Base):
     @property
     def access(self):
         # type: () -> str
-        """Job visibility access from execution."""
+        """
+        Job visibility access from execution.
+        """
         return self.get("access", VISIBILITY_PRIVATE)
 
     @access.setter
     def access(self, visibility):
         # type: (str) -> None
-        """Job visibility access from execution."""
+        """
+        Job visibility access from execution.
+        """
         if not isinstance(visibility, str):
             raise TypeError("Type 'str' is required for '{}.access'".format(type(self)))
         if visibility not in VISIBILITY_VALUES:
@@ -837,13 +859,17 @@ class Job(Base):
     @property
     def request(self):
         # type: () -> Optional[str]
-        """XML request for WPS execution submission as string (binary)."""
+        """
+        XML request for WPS execution submission as string (binary).
+        """
         return self.get("request", None)
 
     @request.setter
     def request(self, request):
         # type: (Optional[str]) -> None
-        """XML request for WPS execution submission as string (binary)."""
+        """
+        XML request for WPS execution submission as string (binary).
+        """
         if isinstance(request, XML):
             request = lxml.etree.tostring(request)
         self["request"] = request
@@ -851,13 +877,17 @@ class Job(Base):
     @property
     def response(self):
         # type: () -> Optional[str]
-        """XML status response from WPS execution submission as string (binary)."""
+        """
+        XML status response from WPS execution submission as string (binary).
+        """
         return self.get("response", None)
 
     @response.setter
     def response(self, response):
         # type: (Optional[str]) -> None
-        """XML status response from WPS execution submission as string (binary)."""
+        """
+        XML status response from WPS execution submission as string (binary).
+        """
         if isinstance(response, XML):
             response = lxml.etree.tostring(response)
         self["response"] = response
@@ -870,7 +900,8 @@ class Job(Base):
 
     def links(self, container=None, self_link=None):
         # type: (Optional[AnySettingsContainer], Optional[str]) -> JSON
-        """Obtains the JSON links section of many response body for jobs.
+        """
+        Obtains the JSON links section of many response body for jobs.
 
         If :paramref:`self_link` is provided (e.g.: `"outputs"`) the link for that corresponding item will also
         be added as `self` entry to the links. It must be a recognized job link field.
@@ -911,7 +942,8 @@ class Job(Base):
 
     def json(self, container=None, self_link=None):     # pylint: disable=W0221,arguments-differ
         # type: (Optional[AnySettingsContainer], Optional[str]) -> JSON
-        """Obtains the JSON data representation for response body.
+        """
+        Obtains the JSON data representation for response body.
 
         .. note::
             Settings are required to update API shortcut URLs to job additional information.
@@ -970,8 +1002,10 @@ class Job(Base):
 class Process(Base):
     # pylint: disable=C0103,invalid-name
     """
-    Dictionary that contains a process description for db storage.
-    It always has ``identifier`` and ``processEndpointWPS1`` keys.
+    Dictionary that contains a process definition for db storage.
+
+    It always has ``identifier`` (or ``id`` alias) and a ``package`` definition.
+    Parameters can be accessed by key or attribute, and appropriate validators or default values will be applied.
     """
 
     def __init__(self, *args, **kwargs):
@@ -1038,6 +1072,8 @@ class Process(Base):
     def inputs(self):
         # type: () -> Optional[List[Dict[str, Any]]]
         """
+        Inputs of the process following backward-compatible conversion of stored parameters.
+
         According to `OGC-API`, ``maxOccurs`` and ``minOccurs`` representations should be:
             - ``maxOccurs``: ``int`` or ``"unbounded"``
             - ``minOccurs``: ``int``
@@ -1046,7 +1082,8 @@ class Process(Base):
             - ``mediaType``: ``string``
 
         .. note::
-            Because of pre-existing/deployed/remote processes, inputs are formatted to respect valid representation.
+            Because of pre-registered/deployed/retrieved remote processes, inputs are formatted in-line
+            to respect valid OGC-API schema representation and apply any required correction transparently.
         """
 
         inputs = self.get("inputs")
@@ -1070,11 +1107,14 @@ class Process(Base):
     def outputs(self):
         # type: () -> Optional[List[Dict[str, Any]]]
         """
+        Outputs of the process following backward-compatible conversion of stored parameters.
+
         According to `OGC-API`, ``mediaType`` should be in description as:
             - ``mediaType``: ``string``
 
         .. note::
-            Because of pre-existing/deployed/remote processes, outputs are formatted to respect valid representation.
+            Because of pre-registered/deployed/retrieved remote processes, inputs are formatted in-line
+            to respect valid OGC-API schema representation and apply any required correction transparently.
         """
 
         outputs = self.get("outputs", [])
@@ -1252,7 +1292,9 @@ class Process(Base):
     @property
     def params_wps(self):
         # type: () -> Dict[str, Any]
-        """Values applicable to PyWPS Process ``__init__``"""
+        """
+        Values applicable to create an instance of :class:`pywps.app.Process`.
+        """
         return {
             "identifier": self.identifier,
             "title": self.title,
@@ -1429,11 +1471,12 @@ class Process(Base):
 
 
 class Quote(Base):
-    # pylint: disable=C0103,invalid-name
     """
     Dictionary that contains quote information.
+
     It always has ``id`` and ``process`` keys.
     """
+    # pylint: disable=C0103,invalid-name
 
     def __init__(self, *args, **kwargs):
         super(Quote, self).__init__(*args, **kwargs)
@@ -1470,72 +1513,100 @@ class Quote(Base):
 
     @property
     def id(self):
-        """Quote ID."""
+        """
+        Quote ID.
+        """
         return dict.__getitem__(self, "id")
 
     @property
     def title(self):
-        """Quote title."""
+        """
+        Quote title.
+        """
         return self.get("title")
 
     @property
     def description(self):
-        """Quote description."""
+        """
+        Quote description.
+        """
         return self.get("description")
 
     @property
     def details(self):
-        """Quote details."""
+        """
+        Quote details.
+        """
         return self.get("details")
 
     @property
     def user(self):
-        """User ID requesting the quote"""
+        """
+        User ID requesting the quote.
+        """
         return dict.__getitem__(self, "user")
 
     @property
     def process(self):
-        """WPS Process ID."""
+        """
+        WPS Process ID.
+        """
         return dict.__getitem__(self, "process")
 
     @property
     def estimatedTime(self):  # noqa: N802
-        """Process estimated time."""
+        """
+        Process estimated time.
+        """
         return self.get("estimatedTime")
 
     @property
     def processParameters(self):  # noqa: N802
-        """Process execution parameters for quote."""
+        """
+        Process execution parameters for quote.
+        """
         return self.get("processParameters")
 
     @property
     def location(self):
-        """WPS Process URL."""
+        """
+        WPS Process URL.
+        """
         return self.get("location", "")
 
     @property
     def price(self):
-        """Price of the current quote"""
+        """
+        Price of the current quote.
+        """
         return self.get("price", 0.0)
 
     @property
     def currency(self):
-        """Currency of the quote price"""
+        """
+        Currency of the quote price.
+        """
         return self.get("currency")
 
     @property
     def expire(self):
-        """Quote expiration datetime."""
+        """
+        Quote expiration datetime.
+        """
         return self.get("expire")
 
     @property
     def created(self):
-        """Quote creation datetime."""
+        """
+        Quote creation datetime.
+        """
         return self.get("created")
 
     @property
     def steps(self):
-        """Sub-quote IDs if applicable"""
+        """
+        Sub-quote IDs if applicable.
+        """
         return self.get("steps", [])
 
     def params(self):
@@ -1601,47 +1672,64 @@ class Bill(Base):
 
     @property
     def id(self):
-        """Bill ID."""
+        """
+        Bill ID.
+        """
         return dict.__getitem__(self, "id")
 
     @property
     def user(self):
-        """User ID"""
+        """
+        User ID"""
         return dict.__getitem__(self, "user")
 
     @property
     def quote(self):
-        """Quote ID."""
+        """
+        Quote ID.
+        """
         return dict.__getitem__(self, "quote")
 
     @property
     def job(self):
-        """Job ID."""
+        """
+        Job ID.
+        """
         return dict.__getitem__(self, "job")
 
     @property
     def price(self):
-        """Price of the current quote"""
+        """
+        Price of the current quote.
+        """
         return self.get("price", 0.0)
 
     @property
     def currency(self):
-        """Currency of the quote price"""
+        """
+        Currency of the quote price.
+        """
         return self.get("currency")
 
     @property
     def created(self):
-        """Quote creation datetime."""
+        """
+        Quote creation datetime.
+        """
         return self.get("created")
 
     @property
     def title(self):
-        """Quote title."""
+        """
+        Quote title.
+        """
         return self.get("title")
 
     @property
     def description(self):
-        """Quote description."""
+        """
+        Quote description.
+        """
         return self.get("description")
 
     def params(self):

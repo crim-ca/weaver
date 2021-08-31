@@ -156,6 +156,8 @@ def complex2json(data):
 def metadata2json(meta, force=False):
     # type: (Union[ANY_Metadata_Type, Any], bool) -> Union[JSON, Any]
     """
+    Retrieve metadata information and generate its JSON representation.
+
     Obtains the JSON representation of a :class:`OWS_Metadata` or :class:`pywps.app.Common.Metadata`.
     Otherwise, simply return the unmatched type.
     If requested, can enforce parsing a dictionary for the corresponding keys.

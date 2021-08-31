@@ -11,7 +11,7 @@ import warnings
 from copy import deepcopy
 from datetime import datetime
 from typing import TYPE_CHECKING
-from urllib.parse import ParseResult, parse_qs, urlparse, urlunsplit
+from urllib.parse import ParseResult, urlparse, urlunsplit
 
 import boto3
 import colander
@@ -74,11 +74,15 @@ class _Singleton(type):
 
 
 class NullType(metaclass=_Singleton):
-    """Represents a ``null`` value to differentiate from ``None``."""
+    """
+    Represents a ``null`` value to differentiate from ``None``.
+    """
 
     # pylint: disable=E1101,no-member
     def __eq__(self, other):
-        """Makes any instance of :class:`NullType` compare as the same (ie: Singleton)"""
+        """
+        Makes any instance of :class:`NullType` compare as the same (ie: Singleton).
+        """
         return (isinstance(other, NullType)                                     # noqa: W503
                 or other is null                                                # noqa: W503
                 or other is self.__instance__                                   # noqa: W503
@@ -86,7 +90,8 @@ class NullType(metaclass=_Singleton):
 
     def __getattr__(self, item):
         # type: (Any) -> NullType
-        """Makes any property getter return ``null`` to make any sub-item also look like ``null``.
+        """
+        Makes any property getter return ``null`` to make any sub-item also look like ``null``.
 
         Useful for example in the case of type comparators that do not validate their
         own type before accessing a property that they expect to be there. Without this
@@ -111,14 +116,18 @@ null = NullType()
 
 def get_weaver_url(container):
     # type: (AnySettingsContainer) -> str
-    """Retrieves the home URL of the `weaver` application."""
+    """
+    Retrieves the home URL of the `weaver` application.
+    """
     value = get_settings(container).get("weaver.url", "") or ""  # handle explicit None
     return value.rstrip("/").strip()
 
 
 def get_any_id(info):
     # type: (JSON) -> Union[str, None]
-    """Retrieves a dictionary `id-like` key using multiple common variations ``[id, identifier, _id]``.
+    """
+    Retrieves a dictionary `id-like` key using multiple common variations ``[id, identifier, _id]``.
+
     :param info: dictionary that potentially contains an `id-like` key.
     :returns: value of the matched `id-like` key or ``None`` if not found."""
     return info.get("id", info.get("identifier", info.get("_id")))
@@ -126,23 +135,31 @@ def get_any_id(info):
 
 def get_any_value(info):
     # type: (JSON) -> AnyValue
-    """Retrieves a dictionary `value-like` key using multiple common variations ``[href, value, reference]``.
+    """
+    Retrieves a dictionary `value-like` key using multiple common variations ``[href, value, reference]``.
+
     :param info: dictionary that potentially contains a `value-like` key.
-    :returns: value of the matched `value-like` key or ``None`` if not found."""
+    :returns: value of the matched `value-like` key or ``None`` if not found.
+    """
     return info.get("href", info.get("value", info.get("reference", info.get("data"))))
 
 
 def get_any_message(info):
     # type: (JSON) -> str
-    """Retrieves a dictionary 'value'-like key using multiple common variations [message].
+    """
+    Retrieves a dictionary 'value'-like key using multiple common variations [message].
+
     :param info: dictionary that potentially contains a 'message'-like key.
-    :returns: value of the matched 'message'-like key or an empty string if not found. """
+    :returns: value of the matched 'message'-like key or an empty string if not found.
+    """
     return info.get("message", "").strip()
 
 
 def get_registry(container, nothrow=False):
     # type: (AnyRegistryContainer, bool) -> Optional[Registry]
-    """Retrieves the application ``registry`` from various containers referencing to it."""
+    """
+    Retrieves the application ``registry`` from various containers referencing to it.
+    """
     if isinstance(container, Celery):
         return container.conf.get("PYRAMID_REGISTRY", {})
     if isinstance(container, (Configurator, Request)):
@@ -156,7 +173,9 @@ def get_registry(container, nothrow=False):
 
 def get_settings(container=None):
     # type: (Optional[AnySettingsContainer]) -> SettingsType
-    """Retrieves the application ``settings`` from various containers referencing to it."""
+    """
+    Retrieves the application ``settings`` from various containers referencing to it.
+    """
     if isinstance(container, (Celery, Configurator, Request)):
         container = get_registry(container)
     if isinstance(container, Registry):
@@ -191,6 +210,7 @@ def get_cookie_headers(header_container, cookie_header_name="Cookie"):
     # type: (AnyHeadersContainer, Optional[str]) -> HeadersType
     """
     Looks for ``cookie_header_name`` header within ``header_container``.
+
     :returns: new header container in the form ``{'Cookie': <found_cookie>}`` if it was matched, or empty otherwise.
     """
     try:
@@ -204,7 +224,9 @@ def get_cookie_headers(header_container, cookie_header_name="Cookie"):
 
 def get_url_without_query(url):
     # type: (Union[str, ParseResult]) -> str
-    """Removes the query string part of an URL."""
+    """
+    Removes the query string part of an URL.
+    """
     if isinstance(url, str):
         url = urlparse(url)
     if not isinstance(url, ParseResult):
@@ -262,7 +284,9 @@ def parse_extra_options(option_str):
 
 def fully_qualified_name(obj):
     # type: (Union[Any, Type[Any]]) -> str
-    """Obtains the ``'<module>.<name>'`` full path definition of the object to allow finding and importing it."""
+    """
+    Obtains the ``'<module>.<name>'`` full path definition of the object to allow finding and importing it.
+    """
     cls = obj if inspect.isclass(obj) or inspect.isfunction(obj) else type(obj)
     return ".".join([obj.__module__, cls.__name__])
 
@@ -340,7 +364,9 @@ def xml_strip_ns(tree):
 
 def ows_context_href(href, partial=False):
     # type: (str, Optional[bool]) -> JSON
-    """Returns the complete or partial dictionary defining an ``OWSContext`` from a reference."""
+    """
+    Retrieves the complete or partial dictionary defining an ``OWSContext`` from a reference.
+    """
     context = {"offering": {"content": {"href": href}}}
     if partial:
         return context
@@ -350,8 +376,11 @@ def ows_context_href(href, partial=False):
 def pass_http_error(exception, expected_http_error):
     # type: (Exception, Union[Type[PyramidHTTPError], Iterable[Type[PyramidHTTPError]]]) -> None
     """
-    Given an `HTTPError` of any type (pyramid, requests), ignores (pass) the exception if the actual
+    Silently ignore a raised HTTP error that matches the specified error code of the reference exception class.
+
+    Given an `HTTPError` of any type (:mod:`pyramid`, :mod:`requests`), ignores the exception if the actual
     error matches the status code. Other exceptions are re-raised.
+    This is equivalent to capturing a specific ``Exception`` within an ``except`` block and calling ``pass`` to drop it.
 
     :param exception: any `Exception` instance ("object" from a `try..except exception as "object"` block).
     :param expected_http_error: single or list of specific pyramid `HTTPError` to handle and ignore.
@@ -375,6 +404,7 @@ def raise_on_xml_exception(xml_node):
     # type: (XML) -> Optional[NoReturn]
     """
     Raises an exception with the description if the XML response document defines an ExceptionReport.
+
     :param xml_node: instance of :class:`XML`
     :raise Exception: on found ExceptionReport document.
     """
@@ -389,7 +419,9 @@ def raise_on_xml_exception(xml_node):
 
 def str2bytes(string):
     # type: (Union[str, bytes]) -> bytes
-    """Obtains the bytes representation of the string."""
+    """
+    Obtains the bytes representation of the string.
+    """
     if not isinstance(string, (str, bytes)):
         raise TypeError("Cannot convert item to bytes: {!r}".format(type(string)))
     if isinstance(string, bytes):
@@ -399,7 +431,9 @@ def str2bytes(string):
 
 def bytes2str(string):
     # type: (Union[str, bytes]) -> str
-    """Obtains the unicode representation of the string."""
+    """
+    Obtains the unicode representation of the string.
+    """
     if not isinstance(string, (str, bytes)):
         raise TypeError("Cannot convert item to unicode: {!r}".format(type(string)))
     if not isinstance(string, bytes):
@@ -414,31 +448,6 @@ def islambda(func):
 
 first_cap_re = re.compile(r"(.)([A-Z][a-z]+)")
 all_cap_re = re.compile(r"([a-z0-9])([A-Z])")
-
-
-def convert_snake_case(name):
-    # type: (str) -> str
-    s1 = first_cap_re.sub(r"\1_\2", name)
-    return all_cap_re.sub(r"\1_\2", s1).lower()
-
-
-def parse_request_query(request):
-    # type: (Request) -> Dict[str, Dict[AnyKey, str]]
-    """
-    :param request:
-    :return: dict of dict where k=v are accessible by d[k][0] == v and q=k=v are accessible by d[q][k] == v, lowercase
-    """
-    queries = parse_qs(request.query_string.lower())
-    queries_dict = dict()
-    for q in queries:
-        queries_dict[q] = dict()
-        for i, kv in enumerate(queries[q]):
-            kvp = kv.split("=")
-            if len(kvp) > 1:
-                queries_dict[q][kvp[0]] = kvp[1]
-            else:
-                queries_dict[q][i] = kvp[0]
-    return queries_dict
 
 
 def get_path_kvp(path, sep=",", **params):
@@ -520,8 +529,10 @@ def setup_loggers(settings, level=None):
 
 def make_dirs(path, mode=0o755, exist_ok=False):
     """
+    Backward compatible ``make_dirs`` with reduced set of default mode flags.
+
     Alternative to ``os.makedirs`` with ``exists_ok`` parameter only available for ``python>3.5``.
-    Also using a reduced set of permissions ``755`` instead of original default ``777``.
+    Also, using a reduced set of permissions ``755`` instead of original default ``777``.
 
     .. note::
         The method employed in this function is safer then ``if os.pat.exists`` or ``if os.pat.isdir`` pre-check
@@ -537,7 +548,10 @@ def make_dirs(path, mode=0o755, exist_ok=False):
 
 
 def get_caller_name(skip=2, base_class=False):
-    """Returns the name of a caller in the format ``module.class.method``.
+    """
+    Find the name of a parent caller function or method.
+
+    The name is returned with respective formats ``module.class.method`` or ``module.function``.
 
     :param skip: specifies how many levels of stack to skip while getting the caller.
     :param base_class:
@@ -624,8 +638,10 @@ def invalidate_region(caching_args):
 def get_ssl_verify_option(method, url, settings, request_options=None):
     # type: (str, str, AnySettingsContainer, Optional[SettingsType]) -> bool
     """
-    Obtains the SSL verification option from combined settings from ``weaver.ssl_verify`` and parsed
-    ``weaver.request_options`` file for the corresponding request.
+    Obtains the SSL verification option considering multiple setting definitions and the provided request context.
+
+    Obtains the SSL verification option from combined settings from ``weaver.ssl_verify``
+    and parsed ``weaver.request_options`` file for the corresponding request.
 
     :param method: request method (GET, POST, etc.).
     :param url: request URL.
@@ -666,9 +682,9 @@ def get_no_cache_option(request_headers, request_options):
 def get_request_options(method, url, settings):
     # type: (str, str, AnySettingsContainer) -> SettingsType
     """
-    Obtains the *request options* corresponding to the request according to configuration file specified by pre-loaded
-    setting ``weaver.request_options``.
+    Obtains the *request options* corresponding to the request from the configuration file.
 
+    The configuration file specified is expected to be pre-loaded within setting ``weaver.request_options``.
     If no file was pre-loaded or no match is found for the request, an empty options dictionary is returned.
 
     .. seealso::
@@ -1015,8 +1031,11 @@ REGEX_ASSERT_INVALID_CHARACTERS = re.compile(r"^[a-zA-Z0-9_\-]+$")
 def get_sane_name(name, min_len=3, max_len=None, assert_invalid=True, replace_character="_"):
     # type: (str, Optional[int], Optional[Union[int, None]], Optional[bool], str) -> Union[str, None]
     """
-    Returns a cleaned-up version of the :paramref:`name`, replacing invalid characters not matched with
-    :py:data:`REGEX_SEARCH_INVALID_CHARACTERS` by :paramref:`replace_character`.
+    Cleans up the name to allow only specified characters and conditions.
+
+    Returns a cleaned-up version of the :paramref:`name`, replacing invalid characters not
+    matched with :py:data:`REGEX_SEARCH_INVALID_CHARACTERS` by :paramref:`replace_character`.
+    Also, ensure that the resulting name respects specified length conditions.
 
     .. seealso::
         :class:`weaver.wps_restapi.swagger_definitions.SLUG`

@@ -23,7 +23,7 @@ from weaver.processes.execution import submit_job
 from weaver.processes.types import PROCESS_BUILTIN
 from weaver.processes.utils import deploy_process_from_payload, get_job_submission_response, get_process
 from weaver.store.base import StoreProcesses, StoreServices
-from weaver.utils import get_any_id, get_settings, parse_request_query
+from weaver.utils import get_any_id, get_settings
 from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_VALUES
 from weaver.wps.utils import get_wps_client
 from weaver.wps_restapi import swagger_definitions as sd
@@ -141,9 +141,8 @@ def get_processes(request):
         # if 'EMS' and '?providers=True', also fetch each provider's processes
         settings = get_settings(request)
         if get_weaver_configuration(settings) in WEAVER_CONFIGURATIONS_REMOTE:
-            queries = parse_request_query(request)
-            # FIXME: many steps below suppose that everything goes well...
-            if "providers" in queries and asbool(queries["providers"][0]) is True:
+            with_providers = asbool(request.params.get("providers", False))
+            if with_providers:
                 services = get_provider_services(request)  # must fetch for listing of available processes
                 response_body.update({
                     "providers": [svc.summary(request) if detail else {"id": svc.name} for svc in services]

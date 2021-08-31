@@ -26,16 +26,26 @@ from requests import Response
 from requests.exceptions import HTTPError as RequestsHTTPError
 
 from tests.utils import mocked_aws_credentials, mocked_aws_s3, mocked_aws_s3_bucket_test_file, mocked_file_response
-from weaver import status, utils
+from weaver import status
 from weaver.utils import (
     NullType,
+    assert_sane_name,
+    bytes2str,
     fetch_file,
+    get_base_url,
     get_path_kvp,
     get_request_options,
+    get_sane_name,
     get_ssl_verify_option,
+    get_url_without_query,
+    is_valid_url,
     make_dirs,
     null,
-    request_extra
+    pass_http_error,
+    request_extra,
+    str2bytes,
+    xml_path_elements,
+    xml_strip_ns
 )
 
 
@@ -65,36 +75,36 @@ def test_null_singleton():
 
 
 def test_is_url_valid():
-    assert utils.is_valid_url("http://somewhere.org") is True
-    assert utils.is_valid_url("https://somewhere.org/my/path") is True
-    assert utils.is_valid_url("file:///my/path") is True
-    assert utils.is_valid_url("/my/path") is False
-    assert utils.is_valid_url(None) is False
+    assert is_valid_url("http://somewhere.org") is True
+    assert is_valid_url("https://somewhere.org/my/path") is True
+    assert is_valid_url("file:///my/path") is True
+    assert is_valid_url("/my/path") is False
+    assert is_valid_url(None) is False
 
 
 def test_get_url_without_query():
     url_h = "http://some-host.com/wps"
     url_q = "{}?service=WPS".format(url_h)
     url_p = urlparse(url_q)
-    assert utils.get_url_without_query(url_q) == url_h
-    assert utils.get_url_without_query(url_p) == url_h
-    assert utils.get_url_without_query(url_h) == url_h
+    assert get_url_without_query(url_q) == url_h
+    assert get_url_without_query(url_p) == url_h
+    assert get_url_without_query(url_h) == url_h
 
 
 def test_get_base_url():
-    assert utils.get_base_url("http://localhost:8094/wps") == "http://localhost:8094/wps"
-    assert utils.get_base_url("http://localhost:8094/wps?service=wps&request=getcapabilities") == \
+    assert get_base_url("http://localhost:8094/wps") == "http://localhost:8094/wps"
+    assert get_base_url("http://localhost:8094/wps?service=wps&request=getcapabilities") == \
         "http://localhost:8094/wps"
-    assert utils.get_base_url("https://localhost:8094/wps?service=wps&request=getcapabilities") == \
+    assert get_base_url("https://localhost:8094/wps?service=wps&request=getcapabilities") == \
         "https://localhost:8094/wps"
     with pytest.raises(ValueError):
-        utils.get_base_url("ftp://localhost:8094/wps")
+        get_base_url("ftp://localhost:8094/wps")
 
 
 def test_xml_path_elements():
-    assert utils.xml_path_elements("/ows/proxy/lovely_bird") == ["ows", "proxy", "lovely_bird"]
-    assert utils.xml_path_elements("/ows/proxy/lovely_bird/") == ["ows", "proxy", "lovely_bird"]
-    assert utils.xml_path_elements("/ows/proxy/lovely_bird/ ") == ["ows", "proxy", "lovely_bird"]
+    assert xml_path_elements("/ows/proxy/lovely_bird") == ["ows", "proxy", "lovely_bird"]
+    assert xml_path_elements("/ows/proxy/lovely_bird/") == ["ows", "proxy", "lovely_bird"]
+    assert xml_path_elements("/ows/proxy/lovely_bird/ ") == ["ows", "proxy", "lovely_bird"]
 
 
 def test_xml_strip_ns():
@@ -108,7 +118,7 @@ xsi:schemaLocation="http://www.opengis.net/wps/1.0.0 http://schemas.opengis.net/
 
     doc = etree.fromstring(wps_xml)
     assert doc.tag == "{http://www.opengis.net/wps/1.0.0}Execute"
-    utils.xml_strip_ns(doc)
+    xml_strip_ns(doc)
     assert doc.tag == "Execute"
 
 
@@ -119,34 +129,6 @@ class MockRequest(object):
     @property
     def query_string(self):
         return urlparse(self.url).query
-
-
-def test_parse_request_query_basic():
-    req = MockRequest("http://localhost:5000/ows/wps?service=wps&request=GetCapabilities&version=1.0.0")
-    queries = utils.parse_request_query(req)    # noqa
-    assert "service" in queries
-    assert isinstance(queries["service"], dict)
-    assert queries["service"][0] == "wps"
-    assert "request" in queries
-    assert isinstance(queries["request"], dict)
-    assert queries["request"][0] == "getcapabilities"
-    assert "version" in queries
-    assert isinstance(queries["version"], dict)
-    assert queries["version"][0] == "1.0.0"
-
-
-def test_parse_request_query_many_datainputs_multi_case():
-    req = MockRequest("http://localhost:5000/ows/wps?service=wps&request=GetCapabilities&version=1.0.0&" +
-                      "datainputs=data1=value1&dataInputs=data2=value2&DataInputs=data3=value3")
-    queries = utils.parse_request_query(req)  # noqa
-    assert "datainputs" in queries
-    assert isinstance(queries["datainputs"], dict)
-    assert "data1" in queries["datainputs"]
-    assert "data2" in queries["datainputs"]
-    assert "data3" in queries["datainputs"]
-    assert "value1" in queries["datainputs"].values()
-    assert "value2" in queries["datainputs"].values()
-    assert "value3" in queries["datainputs"].values()
 
 
 def raise_http_error(http):
@@ -169,7 +151,7 @@ def test_pass_http_error_doesnt_raise_single_pyramid_error():
             try:
                 raise_http_error(err)
             except Exception as ex:
-                utils.pass_http_error(ex, err)
+                pass_http_error(ex, err)
         except PyramidHTTPError:
             pytest.fail("PyramidHTTPError should be ignored but was raised.")
 
@@ -183,7 +165,7 @@ def test_pass_http_error_doesnt_raise_multi_pyramid_error():
             try:
                 raise_http_error(err)
             except Exception as ex:
-                utils.pass_http_error(ex, http_errors)
+                pass_http_error(ex, http_errors)
         except PyramidHTTPError:
             pytest.fail("PyramidHTTPError should be ignored but was raised.")
 
@@ -191,14 +173,14 @@ def test_pass_http_error_doesnt_raise_multi_pyramid_error():
 def test_pass_http_error_doesnt_raise_requests_error():
     http_errors = [HTTPNotFound, HTTPInternalServerError]
     for err in http_errors:
-        req_err = make_http_error(err)
+        req_err = make_http_error(err)  # noqa
         # test try/except
         try:
             # normal usage try/except
             try:
                 raise_http_error(req_err)
             except Exception as ex:
-                utils.pass_http_error(ex, err)
+                pass_http_error(ex, err)
         except RequestsHTTPError:
             pytest.fail("RequestsHTTPError should be ignored but was raised.")
 
@@ -208,7 +190,7 @@ def test_pass_http_error_raises_pyramid_error_with_single_pyramid_error():
         try:
             raise_http_error(HTTPNotFound)
         except Exception as ex:
-            utils.pass_http_error(ex, HTTPConflict)
+            pass_http_error(ex, HTTPConflict)
 
 
 def test_pass_http_error_raises_pyramid_error_with_multi_pyramid_error():
@@ -216,23 +198,23 @@ def test_pass_http_error_raises_pyramid_error_with_multi_pyramid_error():
         try:
             raise_http_error(HTTPNotFound)
         except Exception as ex:
-            utils.pass_http_error(ex, [HTTPConflict, HTTPInternalServerError])
+            pass_http_error(ex, [HTTPConflict, HTTPInternalServerError])
 
 
 def test_pass_http_error_raises_requests_error_with_single_pyramid_error():
     with pytest.raises(RequestsHTTPError):
         try:
-            raise_http_error(make_http_error(HTTPNotFound))
+            raise_http_error(make_http_error(HTTPNotFound))  # noqa
         except Exception as ex:
-            utils.pass_http_error(ex, HTTPConflict)
+            pass_http_error(ex, HTTPConflict)
 
 
 def test_pass_http_error_raises_requests_error_with_multi_pyramid_error():
     with pytest.raises(RequestsHTTPError):
         try:
-            raise_http_error(make_http_error(HTTPNotFound))
+            raise_http_error(make_http_error(HTTPNotFound))  # noqa
         except Exception as ex:
-            utils.pass_http_error(ex, [HTTPConflict, HTTPInternalServerError])
+            pass_http_error(ex, [HTTPConflict, HTTPInternalServerError])
 
 
 def test_pass_http_error_raises_other_error_with_single_pyramid_error():
@@ -240,7 +222,7 @@ def test_pass_http_error_raises_other_error_with_single_pyramid_error():
         try:
             raise ValueError("Test Error")
         except Exception as ex:
-            utils.pass_http_error(ex, HTTPConflict)
+            pass_http_error(ex, HTTPConflict)
 
 
 def test_pass_http_error_raises_other_error_with_multi_pyramid_error():
@@ -248,7 +230,7 @@ def test_pass_http_error_raises_other_error_with_multi_pyramid_error():
         try:
             raise ValueError("Test Error")
         except Exception as ex:
-            utils.pass_http_error(ex, [HTTPConflict, HTTPInternalServerError])
+            pass_http_error(ex, [HTTPConflict, HTTPInternalServerError])
 
 
 def get_status_variations(status_value):
@@ -298,12 +280,12 @@ def test_map_status_pywps_back_and_forth():
 
 def test_get_sane_name_replace():
     kw = {"assert_invalid": False, "max_len": 25}
-    assert utils.get_sane_name("Hummingbird", **kw) == "Hummingbird"
-    assert utils.get_sane_name("MapMint Demo Instance", **kw) == "MapMint_Demo_Instance"
-    assert utils.get_sane_name(None, **kw) is None  # noqa
-    assert utils.get_sane_name("12", **kw) is None
-    assert utils.get_sane_name(" ab c ", **kw) == "ab_c"
-    assert utils.get_sane_name("a_much_to_long_name_for_this_test", **kw) == "a_much_to_long_name_for_t"
+    assert get_sane_name("Hummingbird", **kw) == "Hummingbird"
+    assert get_sane_name("MapMint Demo Instance", **kw) == "MapMint_Demo_Instance"
+    assert get_sane_name(None, **kw) is None  # noqa
+    assert get_sane_name("12", **kw) is None
+    assert get_sane_name(" ab c ", **kw) == "ab_c"
+    assert get_sane_name("a_much_to_long_name_for_this_test", **kw) == "a_much_to_long_name_for_t"
 
 
 def test_assert_sane_name():
@@ -322,7 +304,7 @@ def test_assert_sane_name():
     ]
     for test in test_cases_invalid:
         with pytest.raises(ValueError):
-            utils.assert_sane_name(test)
+            assert_sane_name(test)
 
     test_cases_valid = [
         "Hummingbird",
@@ -333,17 +315,17 @@ def test_assert_sane_name():
         "underscores_also_ok",
     ]
     for test in test_cases_valid:
-        utils.assert_sane_name(test)
+        assert_sane_name(test)
 
 
 def test_str2bytes():
-    assert utils.str2bytes(b"test-bytes") == b"test-bytes"
-    assert utils.str2bytes(u"test-unicode") == b"test-unicode"
+    assert str2bytes(b"test-bytes") == b"test-bytes"
+    assert str2bytes(u"test-unicode") == b"test-unicode"
 
 
 def test_bytes2str():
-    assert utils.bytes2str(b"test-bytes") == u"test-bytes"
-    assert utils.bytes2str(u"test-unicode") == u"test-unicode"
+    assert bytes2str(b"test-bytes") == u"test-bytes"
+    assert bytes2str(u"test-unicode") == u"test-unicode"
 
 
 def test_get_ssl_verify_option():
@@ -407,7 +389,7 @@ def test_request_extra_allowed_codes():
     """Verifies that ``allowed_codes`` only are considered as valid status instead of any non-error HTTP code."""
     mocked_codes = {"codes": [HTTPCreated.code, HTTPOk.code, HTTPCreated.code]}  # note: used in reverse order
 
-    def mocked_request(*args, **kwargs):  # noqa: E811
+    def mocked_request(*_, **__):  # noqa: E811
         mocked_resp = Response()
         mocked_resp.status_code = mocked_codes["codes"].pop()
         return mocked_resp
@@ -447,7 +429,7 @@ def test_get_request_options():
 def test_request_extra_intervals():
     """Verifies that ``intervals`` are used for calling the retry operations instead of ``backoff``/``retries``."""
 
-    def mock_request(*args, **kwargs):  # noqa: E811
+    def mock_request(*_, **__):  # noqa: E811
         m_resp = Response()
         m_resp.status_code = HTTPNotFound.code
         return m_resp
@@ -509,7 +491,7 @@ def test_fetch_file_remote_with_request():
     """
     tmp_dir = tempfile.gettempdir()
     with contextlib.ExitStack() as stack:
-        tmp_json = stack.enter_context(tempfile.NamedTemporaryFile(dir=tmp_dir, mode="w", suffix=".json"))
+        tmp_json = stack.enter_context(tempfile.NamedTemporaryFile(dir=tmp_dir, mode="w", suffix=".json"))  # noqa
         tmp_data = {"message": "fetch-file-request"}
         tmp_json.write(json.dumps(tmp_data))
         tmp_json.seek(0)
@@ -520,7 +502,7 @@ def test_fetch_file_remote_with_request():
         # share in below mocked_request, 'nonlocal' back compatible with Python 2
         tmp = {"retry": tmp_retry, "json": tmp_json, "http": tmp_http}
 
-        def mocked_request(*args, **kwargs):  # noqa: E811
+        def mocked_request(*_, **__):  # noqa: E811
             tmp["retry"] -= 1
             if not tmp["retry"]:
                 return mocked_file_response(tmp["json"].name, tmp["http"])
