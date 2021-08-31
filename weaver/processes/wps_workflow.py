@@ -107,8 +107,9 @@ class CallbackJob(object):
 
 class WpsWorkflow(ProcessCWL):
     """
-    Definition of a ``CWL`` ``workflow`` that can execute ``WPS`` application packages as defined by
-    :class:`weaver.processes.wps_package.WpsPackage` as job steps.
+    Definition of a `CWL` ``workflow`` that can execute ``WPS`` application packages as intermediate job steps.
+
+    Steps are expected to be defined as individual :class:`weaver.processes.wps_package.WpsPackage` references.
     """
 
     # pylint: disable=R1260,too-complex  # FIXME: simplify operations

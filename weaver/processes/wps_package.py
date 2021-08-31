@@ -1,6 +1,9 @@
 """
-Functions and classes that offer interoperability and conversion between corresponding elements defined as
-`CWL CommandLineTool/Workflow` and `WPS ProcessDescription` in order to generate `ADES/EMS Application Package`.
+Representation of :term:`WPS` process with an internal :term:`CWL` package definition.
+
+Functions and classes that offer interoperability and conversion between corresponding elements
+defined as :term:`CWL` `CommandLineTool`/`Workflow` and :term:`WPS` `ProcessDescription` in order to
+generate :term:`ADES`/:term:`EMS` deployable :term:`Application Package`.
 
 .. seealso::
     - `CWL specification <https://www.commonwl.org/#Specification>`_
@@ -202,6 +205,8 @@ def get_process_location(process_id_or_url, data_source=None):
 def get_package_workflow_steps(package_dict_or_url):
     # type: (Union[Dict[str, Any], str]) -> List[Dict[str, str]]
     """
+    Obtain references to intermediate steps of a CWL workflow.
+
     :param package_dict_or_url: process package definition or literal URL to DescribeProcess WPS-REST location.
     :return: list of workflow steps as {"name": <name>, "reference": <reference>}
         where `name` is the generic package step name, and `reference` is the id/url of a registered WPS package.
@@ -279,8 +284,11 @@ def _get_package_type(package_dict):
 def _get_package_requirements_as_class_list(requirements):
     # type: (AnyCWLRequirements) -> ListCWLRequirements
     """
-    Converts `CWL` package ``requirements`` or ``hints`` sometime defined as ``Dict[<req>: {<params>}]`` to an
-    explicit list of dictionary requirements with ``class`` key.
+    Converts `CWL` package ``requirements`` or ``hints`` into list representation.
+
+    Uniformization `CWL` requirements into the list representation, whether the input definitions where
+    provided using the dictionary definition as ``{"<req-class>": {<params>}}`` or
+    the list of dictionary requirements ``[{<req-class+params>}]`` each with a ``class`` key.
     """
     if isinstance(requirements, dict):
         reqs = []
@@ -294,14 +302,18 @@ def _get_package_requirements_as_class_list(requirements):
 def _get_package_ordered_io(io_section, order_hints=None):
     # type: (Union[List[JSON], Dict[str, Union[JSON, str]]], Optional[List[JSON]]) -> List[JSON]
     """
-    Converts `CWL` package I/O definitions defined as dictionary to an equivalent :class:`list` representation.
-    The list representation ensures that I/O order is preserved when written to file and reloaded afterwards
-    regardless of each server and/or library's implementation of :class:`dict` container.
+    Reorders and converts `CWL` I/O from any representation and considering specified ordering hints.
+
+    First, converts `CWL` package I/O definitions defined as dictionary to an equivalent :class:`list` representation,
+    in order to work only with a single representation method. The :class:`list` is chosen over :class:`dict` because
+    sequences can enforce a specific order, while mapping have no particular order. The list representation ensures
+    that I/O order is preserved when written to file and reloaded afterwards regardless of each server and/or library's
+    implementation of the mapping container.
 
     If this function fails to correctly order any I/O or cannot correctly guarantee such result because of the provided
     parameters (e.g.: no hints given when required), the result will not break nor change the final processing behaviour
     of the `CWL` engine. This is merely *cosmetic* adjustments to ease readability of I/O to avoid always shuffling
-    their order across multiple application package reporting.
+    their order across multiple :term:`Application Package` reporting.
 
     The important result of this function is to provide the `CWL` I/O as a consistent list of objects so it is less
     cumbersome to compare/merge/iterate over the elements with all functions that will follow.
@@ -375,7 +387,9 @@ def _check_package_file(cwl_file_path_or_url):
 
 def _load_package_file(file_path):
     # type: (str) -> CWL
-    """Loads the package in YAML/JSON format specified by the file path."""
+    """
+    Loads the package in YAML/JSON format specified by the file path.
+    """
 
     file_path, is_url = _check_package_file(file_path)
     # if URL, get the content and validate it by loading, otherwise load file directly
@@ -401,8 +415,17 @@ def _load_package_content(package_dict,                             # type: Dict
                           process_offering=None,                    # type: Optional[JSON]
                           ):  # type: (...) -> Optional[Tuple[CWLFactoryCallable, str, Dict[str, str]]]
     """
-    Loads the package content to file in a temporary directory.
-    Recursively processes sub-packages steps if the parent is a `Workflow` (CWL class).
+    Loads `CWL` package definition using various contextual resources.
+
+    Following operations are accomplished to validate the package:
+
+    - Starts by resolving any intermediate sub-packages steps if the parent package is a `Workflow` (CWL class),
+      in order to recursively generate and validate their process and package, potentially using remote reference.
+      Each of those operations are applied to every step.
+    - Package I/O are reordered using any reference process offering hints if provided to generate consistent results.
+    - The resulting package definition is dumped to a temporary JSON file, to validate the content can be serialized.
+    - Optionally, the `CWL` factory is employed to create the application runner, validating any provided loading and
+      runtime contexts, and considering all Workflow steps if applicable, or the single application otherwise.
 
     :param package_dict: package content representation as a json dictionary.
     :param package_name: name to use to create the package file.
@@ -463,12 +486,14 @@ def _merge_package_inputs_outputs(wps_inputs_list,      # type: List[ANY_IO_Type
                                   cwl_outputs_list,     # type: List[WPS_Output_Type]
                                   ):                    # type: (...) -> Tuple[List[JSON_IO_Type], List[JSON_IO_Type]]
     """
+    Merges corresponding metadata of I/O definitions from `CWL` and `WPS` sources.
+
     Merges I/O definitions to use for process creation and returned by ``GetCapabilities``, ``DescribeProcess``
     using the `WPS` specifications (from request ``POST``) and `CWL` specifications (extracted from file).
 
-    Note:
-        parameters ``cwl_inputs_list`` and ``cwl_outputs_list`` are expected to be in `WPS`-like format
-        (ie: `CWL` I/O converted to corresponding `WPS` I/O)
+    .. note::
+        Parameters ``cwl_inputs_list`` and ``cwl_outputs_list`` are expected to be in `WPS`-like format
+        (ie: `CWL` I/O converted to corresponding `WPS` I/O).
     """
     wps_inputs_merged = merge_package_io(wps_inputs_list, cwl_inputs_list, WPS_INPUT)
     wps_outputs_merged = merge_package_io(wps_outputs_list, cwl_outputs_list, WPS_OUTPUT)
@@ -478,7 +503,17 @@ def _merge_package_inputs_outputs(wps_inputs_list,      # type: List[ANY_IO_Type
 def _get_package_io(package_factory, io_select, as_json):
     # type: (CWLFactoryCallable, str, bool) -> List[PKG_IO_Type]
     """
-    Retrieves I/O definitions from a validated ``CWLFactoryCallable``. Returned I/O format depends on value ``as_json``.
+    Retrieves I/O definitions from a validated :class:`CWLFactoryCallable`.
+
+    .. seealso::
+        Factory can be obtained with validation using :func:`_load_package_content`.
+
+    :param package_factory: `CWL` factory that contains I/O references to the package definition.
+    :param io_select: either :data:`WPS_INPUT` or :data:`WPS_OUTPUT` according to what needs to be processed.
+    :param as_json: toggle to specific the desired output type.
+    :returns: I/O format depends on value :paramref:`as_json`.
+        If ``True``, converts the I/O definitions into `JSON` representation.
+        If ``False``, converts the I/O definitions into `WPS` objects.
     """
     if io_select == WPS_OUTPUT:
         io_attrib = "outputs_record_schema"
@@ -496,14 +531,18 @@ def _get_package_io(package_factory, io_select, as_json):
 def _get_package_inputs_outputs(package_factory,    # type: CWLFactoryCallable
                                 as_json=False,      # type: bool
                                 ):                  # type: (...) -> Tuple[List[PKG_IO_Type], List[PKG_IO_Type]]
-    """Generates `WPS-like` ``(inputs, outputs)`` tuple using parsed CWL package definitions."""
+    """
+    Generates `WPS-like` ``(inputs, outputs)`` tuple using parsed CWL package definitions.
+    """
     return (_get_package_io(package_factory, io_select=WPS_INPUT, as_json=as_json),
             _get_package_io(package_factory, io_select=WPS_OUTPUT, as_json=as_json))
 
 
 def _update_package_metadata(wps_package_metadata, cwl_package_package):
     # type: (JSON, CWL) -> None
-    """Updates the package `WPS` metadata dictionary from extractable `CWL` package definition."""
+    """
+    Updates the package `WPS` metadata dictionary from extractable `CWL` package definition.
+    """
     wps_package_metadata["title"] = wps_package_metadata.get("title", cwl_package_package.get("label", ""))
     wps_package_metadata["abstract"] = wps_package_metadata.get("abstract", cwl_package_package.get("doc", ""))
 
@@ -531,7 +570,10 @@ def _generate_process_with_cwl_from_reference(reference):
     # type: (str) -> Tuple[CWL, JSON]
     """
     Resolves the ``reference`` type (`CWL`, `WPS-1`, `WPS-2`, `WPS-3`) and generates a `CWL` ``package`` from it.
+
     Additionally provides minimal process details retrieved from the ``reference``.
+    The number of details obtained from the process will depend on available parameters from its description as well
+    as the number of metadata that can be mapped between it and the generated `CWL` package.
     """
     cwl_package = None
     process_info = dict()
@@ -574,6 +616,8 @@ def _generate_process_with_cwl_from_reference(reference):
 def get_process_definition(process_offering, reference=None, package=None, data_source=None):
     # type: (JSON, Optional[str], Optional[CWL], Optional[str]) -> JSON
     """
+    Resolve the process definition considering corresponding metadata from the offering, package and references.
+
     Returns an updated process definition dictionary ready for storage using provided `WPS` ``process_offering``
     and a package definition passed by ``reference`` or ``package`` `CWL` content.
     The returned process information can be used later on to load an instance of :class:`weaver.wps_package.WpsPackage`.
@@ -753,7 +797,8 @@ class WpsPackage(Process):
 
     def insert_package_log(self, result):
         # type: (Union[CWLResults, CWLException]) -> List[str]
-        """Retrieves additional `CWL` sub-process logs captures to retrieve internal application output and/or errors.
+        """
+        Retrieves additional `CWL` sub-process logs captures to retrieve internal application output and/or errors.
 
         After execution of this method, the `WPS` output log (which can be obtained by :func:`retrieve_package_job_log`)
         will have additional ``stderr/stdout`` entries extracted from the underlying application package tool execution.
@@ -773,7 +818,7 @@ class WpsPackage(Process):
             :func:`retrieve_package_job_log`
 
         :param result: output results returned by successful `CWL` package instance execution or raised CWL exception.
-        :returns:  captured execution log lines retrieved from files
+        :returns: captured execution log lines retrieved from files
         """
         captured_log = []
         status = STATUS_RUNNING
@@ -874,7 +919,8 @@ class WpsPackage(Process):
                 self.package["baseCommand"] = os.path.join(active_python_path, "python")
 
     def update_effective_user(self):
-        """ Update effective user/group for the `Application Package` to be executed.
+        """
+        Update effective user/group for the `Application Package` to be executed.
 
         FIXME: (experimental) update user/group permissions
 
@@ -947,7 +993,8 @@ class WpsPackage(Process):
     @classmethod
     def map_step_progress(cls, step_index, steps_total):
         # type: (int, int) -> Number
-        """Calculates the percentage progression of a single step of the full process.
+        """
+        Calculates the percentage progression of a single step of the full process.
 
         .. note::
             The step procession is adjusted according to delimited start/end of the underlying `CWL` execution to
@@ -1087,6 +1134,7 @@ class WpsPackage(Process):
         # type: (str) -> bool
         """
         Figures out if file reference should be fetched immediately for local execution.
+
         If anything else than local script/docker, remote ADES/WPS process will fetch it.
         S3 are handled here to avoid error on remote WPS not supporting it.
 
@@ -1268,6 +1316,8 @@ class WpsPackage(Process):
     def get_application_requirement(self):
         # type: () -> Dict[str, Any]
         """
+        Retrieve the principal requirement that allows mapping to the appropriate process implementation.
+
         Obtains the first item in `CWL` package ``requirements`` or ``hints`` that corresponds to a `Weaver`-specific
         application type as defined in :py:data:`CWL_REQUIREMENT_APP_TYPES`.
 
@@ -1289,7 +1339,9 @@ class WpsPackage(Process):
     def get_job_process_definition(self, jobname, joborder, tool):  # noqa: E811
         # type: (str, JSON, CWL) -> WpsPackage
         """
-        This function is called before running an ADES job (either from a workflow step or a simple EMS dispatch).
+        Obtain the execution job definition for the given process.
+
+        This function is called before running an `ADES` job (either from a workflow step or a simple `EMS` dispatch).
         It must return a :class:`weaver.processes.wps_process.WpsProcess` instance configured with the proper ``CWL``
         package definition, ADES target and cookies to access it (if protected).
 

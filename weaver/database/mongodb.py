@@ -93,7 +93,9 @@ class MongoDatabase(DatabaseInterface):
     def get_information(self):
         # type: (...) -> JSON
         """
-        :returns: {'version': version, 'type': db_type}
+        Obtain information about the database implementation.
+
+        :returns: JSON with parameters: ``{"version": "<version>", "type": "<db_type>"}``.
         """
         result = list(self._database.version.find().limit(1))[0]
         db_version = result["version_num"]
@@ -110,7 +112,9 @@ class MongoDatabase(DatabaseInterface):
 
 def get_mongodb_connection(container):
     # type: (AnySettingsContainer) -> Database
-    """Obtains the basic database connection from settings."""
+    """
+    Obtains the basic database connection from settings.
+    """
     settings = get_settings(container)
     settings_default = [("mongodb.host", "localhost"), ("mongodb.port", 27017), ("mongodb.db_name", "weaver")]
     for setting, default in settings_default:
@@ -123,7 +127,9 @@ def get_mongodb_connection(container):
 
 def get_mongodb_engine(container):
     # type: (AnySettingsContainer) -> Database
-    """Obtains the database with configuration ready for usage."""
+    """
+    Obtains the database with configuration ready for usage.
+    """
     db = get_mongodb_connection(container)
     db.services.create_index("name", unique=True)
     db.services.create_index("url", unique=True)

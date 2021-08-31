@@ -117,7 +117,7 @@ null = NullType()
 def get_weaver_url(container):
     # type: (AnySettingsContainer) -> str
     """
-    Retrieves the home URL of the `weaver` application.
+    Retrieves the home URL of the `Weaver` application.
     """
     value = get_settings(container).get("weaver.url", "") or ""  # handle explicit None
     return value.rstrip("/").strip()
@@ -129,7 +129,8 @@ def get_any_id(info):
     Retrieves a dictionary `id-like` key using multiple common variations ``[id, identifier, _id]``.
 
     :param info: dictionary that potentially contains an `id-like` key.
-    :returns: value of the matched `id-like` key or ``None`` if not found."""
+    :returns: value of the matched `id-like` key or ``None`` if not found.
+    """
     return info.get("id", info.get("identifier", info.get("_id")))
 
 

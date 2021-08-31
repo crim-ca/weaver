@@ -547,7 +547,9 @@ def xml_wps2cwl(wps_process_response, settings):
     """
     def _tag_name(_xml):
         # type: (Union[XML, str]) -> str
-        """Obtains ``tag`` from a ``{namespace}Tag`` `XML` element."""
+        """
+        Obtains ``tag`` from a ``{namespace}Tag`` `XML` element.
+        """
         if hasattr(_xml, "tag"):
             _xml = _xml.tag
         return _xml.split("}")[-1].lower()
@@ -917,6 +919,7 @@ def any2wps_literal_datatype(io_type, is_value):
     # type: (AnyValueType, bool) -> Union[str, Type[null]]
     """
     Solves common literal data-type names to supported ones for `WPS`.
+
     Verification is accomplished by name when ``is_value=False``, otherwise with python ``type`` when ``is_value=True``.
     """
     if isinstance(io_type, str):
@@ -944,6 +947,8 @@ def any2wps_literal_datatype(io_type, is_value):
 def json2wps_datatype(io_info):
     # type: (JSON_IO_Type) -> str
     """
+    Converts a JSON input definition into the corresponding :mod:`pywps` parameters.
+
     Guesses the literal data-type from I/O JSON information in order to allow creation of the corresponding I/O WPS.
     Defaults to ``string`` if no suitable guess can be accomplished.
     """

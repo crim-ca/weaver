@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# noqa: D205  # ignore missing summary, since this is the complete process description
 """
 Extracts and fetches NetCDF files from a JSON file containing an URL string array,
 and provides them on the output directory.

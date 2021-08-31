@@ -1636,6 +1636,7 @@ class Quote(Base):
 class Bill(Base):
     """
     Dictionary that contains bill information.
+
     It always has ``id``, ``user``, ``quote`` and ``job`` keys.
     """
 

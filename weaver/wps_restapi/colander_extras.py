@@ -1112,8 +1112,9 @@ class KeywordMapper(ExtendedMappingSchema):
 
 class OneOfKeywordSchema(KeywordMapper):
     """
-    Allows specifying multiple supported mapping schemas variants for an underlying schema
-    definition. Corresponds to the ``oneOf`` specifier of `OpenAPI` specification.
+    Allows specifying multiple supported mapping schemas variants for an underlying schema definition.
+
+    Corresponds to the ``oneOf`` specifier of `OpenAPI` specification.
 
     Example::
 
@@ -1222,7 +1223,11 @@ class OneOfKeywordSchema(KeywordMapper):
     @abstractmethod
     def _one_of(cls):
         # type: () -> Iterable[Union[colander.SchemaNode, Type[colander.SchemaNode]]]  # noqa: W0212
-        """This must be overridden in the schema definition using it."""
+        """
+        Sequence of applicable schema nested under the ``oneOf`` keyword.
+
+        Must be overridden in the schema definition using it.
+        """
         raise SchemaNodeTypeError("Missing '{}' keyword for schema '{}'.".format(cls._keyword, cls))
 
     def __init__(self, *args, **kwargs):
@@ -1277,8 +1282,7 @@ class OneOfKeywordSchema(KeywordMapper):
 
     def _deserialize_keyword(self, cstruct):
         """
-        Test each possible case, return all corresponding errors if
-        none of the possibilities is valid including all sub-dependencies.
+        Test each possible case, return all corresponding errors if not exactly one of the possibilities is valid.
         """
         invalid_one_of = dict()
         valid_one_of = []
@@ -1347,8 +1351,9 @@ class OneOfKeywordSchema(KeywordMapper):
 
 class AllOfKeywordSchema(KeywordMapper):
     """
-    Allows specifying all the required partial mapping schemas for an underlying complete schema
-    definition. Corresponds to the ``allOf`` specifier of `OpenAPI` specification.
+    Allows specifying all the required partial mapping schemas for an underlying complete schema definition.
+
+    Corresponds to the ``allOf`` specifier of `OpenAPI` specification.
 
     Example::
 
@@ -1378,13 +1383,16 @@ class AllOfKeywordSchema(KeywordMapper):
     @abstractmethod
     def _all_of(cls):
         # type: () -> Iterable[Union[colander.SchemaNode, Type[colander.SchemaNode]]]  # noqa: W0212
-        """This must be overridden in the schema definition using it."""
+        """
+        Sequence of applicable schema nested under the ``allOf`` keyword.
+
+        Must be overridden in the schema definition using it.
+        """
         raise SchemaNodeTypeError("Missing '{}' keyword for schema '{}'.".format(cls._keyword, cls))
 
     def _deserialize_keyword(self, cstruct):
         """
-        Test each possible case, return all corresponding errors if
-        any of the possibilities is invalid.
+        Test each possible case, return all corresponding errors if any of the possibilities is invalid.
         """
         required_all_of = dict()
         missing_all_of = dict()
@@ -1412,6 +1420,7 @@ class AllOfKeywordSchema(KeywordMapper):
 class AnyOfKeywordSchema(KeywordMapper):
     """
     Allows specifying all mapping schemas that can be matched for an underlying schema definition.
+
     Corresponds to the ``anyOf`` specifier of `OpenAPI` specification.
 
     Contrary to :class:`OneOfKeywordSchema` that MUST be validated with exactly one schema, this
@@ -1473,7 +1482,11 @@ class AnyOfKeywordSchema(KeywordMapper):
     @abstractmethod
     def _any_of(cls):
         # type: () -> Iterable[Union[colander.SchemaNode, Type[colander.SchemaNode]]]  # noqa: W0212
-        """This must be overridden in the schema definition using it."""
+        """
+        Sequence of applicable schema nested under the ``anyOf`` keyword.
+
+        Must be overridden in the schema definition using it.
+        """
         raise SchemaNodeTypeError("Missing '{}' keyword for schema '{}'.".format(cls._keyword, cls))
 
     def _deserialize_keyword(self, cstruct):
@@ -1564,7 +1577,11 @@ class NotKeywordSchema(KeywordMapper):
     @abstractmethod
     def _not(cls):
         # type: () -> Iterable[Union[colander.SchemaNode, Type[colander.SchemaNode]]]  # noqa: W0212
-        """This must be overridden in the schema definition using it."""
+        """
+        Sequence of applicable schema nested under the ``not`` keyword.
+
+        Must be overridden in the schema definition using it.
+        """
         raise SchemaNodeTypeError("Missing '{}' keyword for schema '{}'.".format(cls._keyword, cls))
 
     def _deserialize_keyword(self, cstruct):
@@ -1809,10 +1826,13 @@ class OAS3TypeConversionDispatcher(TypeConversionDispatcher):
 
 def _make_node_instance(schema_node_or_class):
     # type: (Union[colander.SchemaNode, Type[colander.SchemaNode]]) -> colander.SchemaNode
-    """Obtains a schema node instance in case it was specified only by type reference.
+    """
+    Obtains a schema node instance in case it was specified only by type reference.
 
     This helps being more permissive of provided definitions while handling situations
-    like presented in the example below::
+    like presented in the example below:
+
+    .. code-block:: python
 
         class Map(OneOfMappingSchema):
             # uses types instead of instances like 'SubMap1([...])' and 'SubMap2([...])'
@@ -1829,7 +1849,8 @@ def _make_node_instance(schema_node_or_class):
 
 def _get_schema_type(schema_node, check=False):
     # type: (Union[colander.SchemaNode, Type[colander.SchemaNode]], bool) -> Optional[colander.SchemaType]
-    """Obtains the schema-type from the provided node, supporting various initialization methods.
+    """
+    Obtains the schema-type from the provided node, supporting various initialization methods.
 
     - ``typ`` is set by an instantiated node from specific schema (e.g.: ``colander.SchemaNode(colander.String())``)
     - ``schema_type`` can also be provided, either by type or instance if using class definition with property

@@ -234,7 +234,8 @@ def api_conformance(request):  # noqa: F811
 def get_openapi_json(http_scheme="http", http_host="localhost", base_url=None,
                      use_refs=True, use_docstring_summary=True, settings=None):
     # type: (str, str, Optional[str], bool, bool, Optional[SettingsType]) -> JSON
-    """Obtains the JSON schema of Weaver OpenAPI from request and response views schemas.
+    """
+    Obtains the JSON schema of Weaver OpenAPI from request and response views schemas.
 
     :param http_scheme: Protocol scheme to use for building the API base if not provided by base URL parameter.
     :param http_host: Hostname to use for building the API base if not provided by base URL parameter.

@@ -213,7 +213,9 @@ class OWSNoApplicableCode(OWSException, NoApplicableCode):
 
 
 class OWSMissingParameterValue(OWSException, MissingParameterValue):
-    """MissingParameterValue WPS Exception"""
+    """
+    MissingParameterValue WPS Exception.
+    """
     code = "MissingParameterValue"
     locator = ""
     description = "Parameter value is missing"

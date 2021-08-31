@@ -61,13 +61,20 @@ STATUS_PYWPS_IDS = {k.lower(): v for v, k in STATUS_PYWPS_MAP.items()}
 def map_status(wps_status, compliant=STATUS_COMPLIANT_OGC):
     # type: (AnyStatusType, str) -> str
     """
-    Maps WPS statuses (weaver.status, OWSLib or PyWPS) to OWSLib/PyWPS compatible values.
-    For each compliant combination, unsupported statuses are changed to corresponding ones (with closest logical match).
-    Statuses are returned with `weaver.status.JOB_STATUS_VALUES` format (lowercase and not preceded by 'Process').
+    Maps WPS execution statuses to between compatible values of different implementations.
 
-    :param wps_status: one of `weaver.status.JOB_STATUS_VALUES` to map to `compliant` standard or PyWPS `int` status.
-    :param compliant: one of `STATUS_COMPLIANT_[...]` values.
-    :returns: mapped status complying to the requested compliant category, or `STATUS_UNKNOWN` if no match found.
+    Mapping is supported for values from :mod:`weaver.status`, :mod:`OWSLib`, :mod:`pywps` as well as some
+    specific one-of values of custom implementations.
+
+    For each compliant combination, unsupported statuses are changed to corresponding ones (with closest logical match).
+    Statuses are returned following :data:`weaver.status.JOB_STATUS_VALUES` format.
+    Specifically, this ensures statues are lowercase and not prefixed by ``Process``
+    (as in XML response of OWS WPS like ``ProcessSucceeded`` for example).
+
+    :param wps_status:
+        One of :data:`weaver.status.JOB_STATUS_VALUES` to map to `compliant` standard or PyWPS `int` status.
+    :param compliant: One of ``STATUS_COMPLIANT_[...]`` values.
+    :returns: mapped status complying to the requested compliant category, or :data:`STATUS_UNKNOWN` if no match found.
     """
 
     # case of raw PyWPS status

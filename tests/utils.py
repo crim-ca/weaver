@@ -494,8 +494,13 @@ def mocked_execute_process():
 
     class MockTask(object):
         """
+        Mocks the Celery Task for testing.
+
         Mocks call ``self.request.id`` in :func:`weaver.processes.execution.execute_process` and
         call ``result.id`` in :func:`weaver.processes.execution.submit_job_handler`.
+
+        .. note::
+            Parameter ``self.request`` in this context is the Celery Task handle, not to be confused with HTTP request.
         """
         _id = str(uuid.uuid4())
 

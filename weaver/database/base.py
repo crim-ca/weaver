@@ -46,7 +46,9 @@ class DatabaseInterface(metaclass=abc.ABCMeta):
     def get_information(self):
         # type: (...) -> JSON
         """
-        :returns: {'version': version, 'type': db_type}
+        Obtain information about the database.
+
+        The implementing class should provide JSON serializable metadata.
         """
         raise NotImplementedError
 
