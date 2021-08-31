@@ -43,7 +43,9 @@ class ESGFProcess(Wps1Process):
 
     def execute(self, workflow_inputs, out_dir, expected_outputs):
         # type: (JSON, str, Dict[str, str]) -> None
-        """Execute an ESGF process from cwl inputs"""
+        """
+        Execute an ESGF process from cwl inputs.
+        """
         self._check_required_inputs(workflow_inputs)
 
         api_key = workflow_inputs.get(InputNames.API_KEY)
@@ -55,7 +57,9 @@ class ESGFProcess(Wps1Process):
 
     def _prepare_inputs(self, workflow_inputs):
         # type: (JSON) -> List[cwt.Variable]
-        """Convert inputs from cwl inputs to ESGF format"""
+        """
+        Convert inputs from cwl inputs to ESGF format.
+        """
         message = "Preparing execute request for remote ESGF provider."
         self.update_status(message, Percent.PREPARING, STATUS_RUNNING)
 
@@ -131,7 +135,9 @@ class ESGFProcess(Wps1Process):
     @staticmethod
     def _get_files_urls(workflow_inputs):
         # type: (JSON) -> List[Tuple[str, str]]
-        """Get all netcdf files from the cwl inputs"""
+        """
+        Get all netcdf files from the cwl inputs.
+        """
         urls = []
 
         files = workflow_inputs[InputNames.FILES]
@@ -150,14 +156,18 @@ class ESGFProcess(Wps1Process):
     @staticmethod
     def _get_variable(workflow_inputs):
         # type: (JSON) -> str
-        """Get all netcdf files from the cwl inputs"""
+        """
+        Get all netcdf files from the cwl inputs.
+        """
         if InputNames.VARIABLE not in workflow_inputs:
             raise ValueError("Missing required input " + InputNames.VARIABLE)
         return workflow_inputs[InputNames.VARIABLE]
 
     def _run_process(self, api_key, inputs, domain=None):
         # type: (str, List[cwt.Variable], Optional[cwt.Domain]) -> cwt.Process
-        """Run an ESGF process"""
+        """
+        Run an ESGF process.
+        """
         wps = cwt.WPSClient(self.provider, api_key=api_key, verify=True)
         process = wps.processes(self.process)[0]
 
@@ -172,7 +182,9 @@ class ESGFProcess(Wps1Process):
 
     def _wait(self, esgf_process, sleep_time=2):
         # type: (cwt.Process, float) -> bool
-        """Wait for an ESGF process to finish, while reporting its status"""
+        """
+        Wait for an ESGF process to finish, while reporting its status.
+        """
         status_history = set()
 
         def update_history():
@@ -202,7 +214,9 @@ class ESGFProcess(Wps1Process):
 
     def _process_results(self, esgf_process, output_dir, expected_outputs):
         # type: (cwt.Process, str, Dict[str, str]) -> None
-        """Process the result of the execution"""
+        """
+        Process the result of the execution.
+        """
         if not esgf_process.succeeded:
             message = "Process failed."
             self.update_status(message, Percent.FINISHED, STATUS_FAILED)
@@ -218,7 +232,9 @@ class ESGFProcess(Wps1Process):
             raise
 
     def _write_outputs(self, url, output_dir, expected_outputs):
-        """Write the output netcdf url to a local drive"""
+        """
+        Write the output netcdf url to a local drive.
+        """
         message = "Downloading outputs."
         self.update_status(message, Percent.COMPUTE_DONE, STATUS_RUNNING)
 

@@ -946,8 +946,7 @@ def request_extra(method,                       # type: str
 def fetch_file(file_reference, file_outdir, settings=None, **request_kwargs):
     # type: (str, str, Optional[AnySettingsContainer], **Any) -> str
     """
-    Fetches a file from a local path, an AWS-S3 bucket or remote URL, and dumps it's content to the specified output
-    directory.
+    Fetches a file from local path, AWS-S3 bucket or remote URL, and dumps it's content to the output directory.
 
     The output directory is expected to exist prior to this function call.
     The file reference scheme (protocol) determines from where to fetch the content.
@@ -1069,7 +1068,8 @@ def get_sane_name(name, min_len=3, max_len=None, assert_invalid=True, replace_ch
 
 
 def assert_sane_name(name, min_len=3, max_len=None):
-    """Asserts that the sane name respects conditions.
+    """
+    Asserts that the sane name respects conditions.
 
     .. seealso::
         - argument details in :func:`get_sane_name`
@@ -1123,7 +1123,7 @@ def clean_json_text_body(body, remove_newlines=True, remove_indents=True):
     return body_clean
 
 
-def transform_json(json_data,               # type: JSON
+def transform_json(json_data,               # type: Dict[str, JSON]
                    rename=None,             # type: Optional[Dict[AnyKey, Any]]
                    remove=None,             # type: Optional[List[AnyKey]]
                    add=None,                # type: Optional[Dict[AnyKey, Any]]
@@ -1131,8 +1131,29 @@ def transform_json(json_data,               # type: JSON
                    replace_func=None,       # type: Optional[Dict[AnyKey, Callable[[Any], Any]]]
                    ):                       # type: (...) -> JSON
     """
-    Transforms the input ``json_data`` with different methods.
+    Transforms the input JSON with different methods.
+
     The transformations are applied in the same order as the arguments.
+    All operations are applied onto the top-level fields of the mapping.
+    No nested operations are applied, unless handled by replace functions.
+
+    .. note::
+        Because fields and values are iterated over the provided mappings, replacements of previous iterations
+        could be re-replaced by following ones if the renamed item corresponds to a following item to match.
+        For example, renaming ``field1 -> field2`` and ``field2 -> field3` within the same operation type would
+        result in successive replacements with ``field3`` as result. The parameter order is important in this case
+        as swapping the definitions would not find ``field2`` on the first iteration (not in mapping *yet*), and
+        then find ``field1``, making the result to be ``field2``.
+
+    :param json_data: JSON mapping structure to transform.
+    :param rename: rename matched fields key name to the associated value name.
+    :param remove: remove matched fields by name.
+    :param add: add or override the fields names with associated values.
+    :param replace_values: replace matched values by the associated new values regardless of field names.
+    :param replace_func:
+        Replace values under matched fields by name with the returned value from the associated function.
+        Mapping functions will receive the original value as input.
+        If the result is to be serialized to JSON, they should return a valid JSON-serializable value.
     """
     rename = rename or {}
     remove = remove or []

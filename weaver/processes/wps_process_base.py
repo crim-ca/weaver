@@ -28,6 +28,7 @@ class WpsProcessInterface(object):
                 ):
         """
         Execute a remote process using the given inputs.
+
         The function is expected to monitor the process and update the status.
         Retrieve the expected outputs and store them in the ``out_dir``.
 

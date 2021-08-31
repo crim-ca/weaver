@@ -1680,7 +1680,8 @@ class Bill(Base):
     @property
     def user(self):
         """
-        User ID"""
+        User ID.
+        """
         return dict.__getitem__(self, "user")
 
     @property

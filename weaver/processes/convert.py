@@ -59,7 +59,16 @@ from weaver.processes.constants import (
     WPS_OUTPUT,
     WPS_REFERENCE
 )
-from weaver.utils import bytes2str, fetch_file, get_any_id, get_sane_name, get_url_without_query, null, str2bytes
+from weaver.utils import (
+    bytes2str,
+    fetch_file,
+    get_any_id,
+    get_sane_name,
+    get_url_without_query,
+    null,
+    str2bytes,
+    transform_json
+)
 from weaver.wps.utils import get_wps_client
 
 if TYPE_CHECKING:
@@ -306,6 +315,8 @@ def ows2json_output_data(output, process_description, container=None):
 def _get_multi_json_references(output, container):
     # type: (OWS_Output_Type, Optional[AnySettingsContainer]) -> Optional[List[JSON]]
     """
+    Obtains the JSON contents of a single output corresponding to multi-file references.
+
     Since WPS standard does not allow to return multiple values for a single output,
     a lot of process actually return a JSON array containing references to these outputs.
 
@@ -347,6 +358,7 @@ def any2cwl_io(wps_io, io_select):
     # type: (Union[JSON_IO_Type, WPS_IO_Type, OWS_IO_Type], str) -> Tuple[CWL_IO_Type, Dict[str, str]]
     """
     Converts a `WPS`-like I/O to `CWL` corresponding I/O.
+
     Because of `CWL` I/O of type `File` with `format` field, the applicable namespace is also returned.
 
     :returns: converted I/O and namespace dictionary with corresponding format references as required
@@ -525,7 +537,9 @@ def ows2json(wps_process, wps_service_name, wps_service_url):
 def xml_wps2cwl(wps_process_response, settings):
     # type: (Response, AnySettingsContainer) -> Tuple[CWL, JSON]
     """
-    Converts a `WPS-1 ProcessDescription XML` tree structure to an equivalent `WPS-3 Process JSON` and builds the
+    Obtains the ``CWL`` definition that corresponds to a XML WPS-1 process.
+
+    Converts a `WPS-1 ProcessDescription XML` tree structure to an equivalent `WPS-3 Process JSON`.  and builds the
     associated `CWL` package in conformance to :ref:`weaver.processes.wps_package.CWL_REQUIREMENT_APP_WPS1`.
 
     :param wps_process_response: valid response (XML, 200) from a `WPS-1 ProcessDescription`.
@@ -590,7 +604,8 @@ def is_cwl_file_type(io_info):
 
 def is_cwl_array_type(io_info):
     # type: (CWL_IO_Type) -> Tuple[bool, str, MODE, Union[AnyValue, List[Any]]]
-    """Verifies if the specified I/O corresponds to one of various CWL array type definitions.
+    """
+    Verifies if the specified I/O corresponds to one of various CWL array type definitions.
 
     returns ``tuple(is_array, io_type, io_mode, io_allow)`` where:
         - ``is_array``: specifies if the I/O is of array type.
@@ -611,7 +626,8 @@ def is_cwl_array_type(io_info):
         # type: (CWL_IO_Type) -> bool
         """
         Updates the ``io_return`` parameters if ``io_item`` evaluates to a valid ``enum`` type.
-        Parameter ``io_item`` should correspond to the ``items`` field of an array I/O definition.
+
+        Parameter ``io_item`` should correspond to field ``items`` of an array I/O definition.
         Simple pass-through if the array item is not an ``enum``.
         """
         _is_enum, _enum_type, _enum_mode, _enum_allow = is_cwl_enum_type({"type": _io_item})
@@ -660,7 +676,8 @@ def is_cwl_array_type(io_info):
 
 def is_cwl_enum_type(io_info):
     # type: (CWL_IO_Type) -> Tuple[bool, str, int, Union[List[str], None]]
-    """Verifies if the specified I/O corresponds to a CWL enum definition.
+    """
+    Verifies if the specified I/O corresponds to a CWL enum definition.
 
     returns ``tuple(is_enum, io_type, io_allow)`` where:
         - ``is_enum``: specifies if the I/O is of enum type.
@@ -701,7 +718,7 @@ def is_cwl_enum_type(io_info):
 def get_cwl_io_type(io_info):
     # type: (CWL_IO_Type) -> Tuple[str, bool]
     """
-    Obtain the basic type of the CWL input and identity if it is optional.
+    Obtains the basic type of the CWL input and identity if it is optional.
 
     CWL allows multiple shorthand representation or combined types definition.
     The *base* type must be extracted in order to identify the expected data format and supported values.
@@ -759,7 +776,8 @@ def get_cwl_io_type(io_info):
 
 def cwl2wps_io(io_info, io_select):
     # type:(CWL_IO_Type, str) -> WPS_IO_Type
-    """Converts input/output parameters from CWL types to WPS types.
+    """
+    Converts input/output parameters from CWL types to WPS types.
 
     :param io_info: parsed IO of a CWL file
     :param io_select: :py:data:`WPS_INPUT` or :py:data:`WPS_OUTPUT` to specify desired WPS type conversion.
@@ -994,7 +1012,8 @@ def json2wps_field(field_info, field_category):
 
 def json2wps_io(io_info, io_select):
     # type: (JSON_IO_Type, str) -> WPS_IO_Type
-    """Converts an I/O from a JSON dict to PyWPS types.
+    """
+    Converts an I/O from a JSON dict to PyWPS types.
 
     :param io_info: I/O in JSON dict format.
     :param io_select: :py:data:`WPS_INPUT` or :py:data:`WPS_OUTPUT` to specify desired WPS type conversion.
@@ -1115,7 +1134,9 @@ def json2wps_io(io_info, io_select):
 
 def wps2json_io(io_wps):
     # type: (WPS_IO_Type) -> JSON_IO_Type
-    """Converts a PyWPS I/O into a dictionary based version with keys corresponding to standard names (WPS 2.0)."""
+    """
+    Converts a PyWPS I/O into a dictionary based version with keys corresponding to standard names (WPS 2.0).
+    """
 
     if not isinstance(io_wps, BasicIO):
         raise PackageTypeError("Invalid type, expected 'BasicIO', got: [{0!r}] '{1!r}'".format(type(io_wps), io_wps))
@@ -1243,6 +1264,7 @@ def set_field(io_object, field, value, force=False):
     # type: (Union[ANY_IO_Type, ANY_Format_Type], str, Any, bool) -> None
     """
     Sets a field by name into various I/O object types.
+
     Field value is set only if not ``null`` to avoid inserting data considered `invalid`.
     If ``force=True``, verification of ``null`` value is ignored.
     """
@@ -1256,10 +1278,12 @@ def set_field(io_object, field, value, force=False):
 def _are_different_and_set(item1, item2):
     # type: (Any, Any) -> bool
     """
+    Verifies if two items are set and are different of different "representative" value.
+
     Compares two value representations and returns ``True`` only if both are not ``null``, are of same ``type`` and
     of different representative value. By "representative", we consider here the visual representation of byte/unicode
-    strings to support XML/JSON and Python 2/3 implementations. Other non string-like types are verified with
-    literal (usual) equality method.
+    strings rather than literal values to support XML/JSON and Python 2/3 implementations.
+    Other non string-like types are verified with literal (usual) equality method.
     """
     if item1 is null or item2 is null:
         return False
@@ -1301,6 +1325,7 @@ def merge_io_formats(wps_formats, cwl_formats):
     # type: (List[ANY_Format_Type], List[ANY_Format_Type]) -> List[ANY_Format_Type]
     """
     Merges I/O format definitions by matching ``mime-type`` field.
+
     In case of conflict, preserve the WPS version which can be more detailed (for example, by specifying ``encoding``).
 
     Verifies if ``DEFAULT_FORMAT_MISSING`` was written to a single `CWL` format caused by a lack of any value
@@ -1335,6 +1360,8 @@ def merge_io_formats(wps_formats, cwl_formats):
 def merge_package_io(wps_io_list, cwl_io_list, io_select):
     # type: (List[ANY_IO_Type], List[WPS_IO_Type], str) -> List[WPS_IO_Type]
     """
+    Merges corresponding parameters of different I/O definitions from CWL/WPS sources.
+
     Update I/O definitions to use for process creation and returned by GetCapabilities, DescribeProcess.
     If WPS I/O definitions where provided during deployment, update `CWL-to-WPS` converted I/O with the WPS I/O
     complementary details. Otherwise, provide minimum field requirements that can be retrieved from CWL definitions.
@@ -1411,58 +1438,3 @@ def merge_package_io(wps_io_list, cwl_io_list, io_select):
                         continue
                 set_field(updated_io_list[-1], field_type, wps_field)
     return updated_io_list
-
-
-def transform_json(json_data,               # type: ANY_IO_Type
-                   rename=None,             # type: Optional[Dict[AnyKey, Any]]
-                   remove=None,             # type: Optional[List[AnyKey]]
-                   add=None,                # type: Optional[Dict[AnyKey, Any]]
-                   replace_values=None,     # type: Optional[Dict[AnyKey, Any]]
-                   replace_func=None,       # type: Optional[Dict[AnyKey, Callable[[Any], Any]]]
-                   ):                       # type: (...) -> ANY_IO_Type
-    """
-    Transforms the input json_data with different methods.
-    The transformations are applied in the same order as the arguments.
-    """
-    rename = rename or {}
-    remove = remove or []
-    add = add or {}
-    replace_values = replace_values or {}
-    replace_func = replace_func or {}
-
-    # rename
-    for k, v in rename.items():
-        if k in json_data:
-            json_data[v] = json_data.pop(k)
-
-    # remove
-    for r_k in remove:
-        json_data.pop(r_k, None)
-
-    # add
-    for k, v in add.items():
-        json_data[k] = v
-
-    # replace values
-    for key, value in json_data.items():
-        for old_value, new_value in replace_values.items():
-            if value == old_value:
-                json_data[key] = new_value
-
-    # replace with function call
-    for k, func in replace_func.items():
-        if k in json_data:
-            json_data[k] = func(json_data[k])
-
-    # also rename if the type of the value is a list of dicts
-    for key, value in json_data.items():
-        if isinstance(value, list):
-            for nested_item in value:
-                if isinstance(nested_item, dict):
-                    for k, v in rename.items():
-                        if k in nested_item:
-                            nested_item[v] = nested_item.pop(k)
-                    for k, func in replace_func.items():
-                        if k in nested_item:
-                            nested_item[k] = func(nested_item[k])
-    return json_data
