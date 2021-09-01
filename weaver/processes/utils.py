@@ -39,7 +39,7 @@ from weaver.exceptions import (
     ServiceNotFound,
     log_unhandled_exceptions
 )
-from weaver.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
+from weaver.processes.types import PROCESS_APPLICATION, PROCESS_BUILTIN, PROCESS_WORKFLOW
 from weaver.store.base import StoreProcesses, StoreServices
 from weaver.utils import get_sane_name, get_settings, get_url_without_query
 from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC
@@ -195,6 +195,11 @@ def deploy_process_from_payload(payload, container, overwrite=False):
                 break
     else:
         raise HTTPBadRequest("Missing one of required parameters [href, owsContext, deploymentProfileName].")
+
+    if process_info.get("type", "") == PROCESS_BUILTIN:
+        raise HTTPBadRequest(
+            "Invalid process type resolved from package: [{0}]. Deployment of {0} process is not allowed."
+            .format(PROCESS_BUILTIN))
 
     # obtain updated process information using WPS process offering, CWL/WPS reference or CWL package definition
     process_info = _get_deploy_process_info(process_info, reference, package)
