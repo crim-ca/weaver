@@ -10,6 +10,28 @@ import pytest
 from weaver.wps_restapi import colander_extras as ce, swagger_definitions as sd
 
 
+def evaluate_test_cases(test_cases):
+    """
+    Evaluate a list of tuple of (SchemaType, Test-Value, Expected-Result).
+
+    If ``Expected-Result`` is :class:`colander.Invalid``, the ``SchemaType`` deserialization should raise when
+    evaluation ``Test-Value``. Otherwise, the result from deserialization should equal exactly ``Expected-Result``.
+    """
+
+    for test_schema, test_value, test_expect in test_cases:
+        try:
+            result = test_schema().deserialize(test_value)
+            if test_expect is colander.Invalid:
+                pytest.fail("Expected invalid format from [{}] with: {}, but received: {}".format(
+                    test_schema.__name__, test_value, result))
+            assert result == test_expect, "Bad result from [{}] with: {}".format(test_schema.__name__, test_value)
+        except colander.Invalid:
+            if test_expect is colander.Invalid:
+                pass
+            else:
+                pytest.fail("Expected valid format from [{}] with: {}".format(test_schema.__name__, test_value))
+
+
 def test_oneof_io_formats_deserialize_as_mapping():
     """
     Evaluates OneOf deserialization for inputs/outputs CWL definition specified as key-mapping of objects.
@@ -140,12 +162,7 @@ def test_not_keyword_extra_fields_handling():
         (MappingWithoutType, {"item": "valid", "value": "ignore"}, {"item": "valid"}),
         (MappingOnlyNotType, {"item": "valid", "value": "ignore"}, {})
     ]
-    for test_schema, test_value, test_expect in test_cases:
-        try:
-            result = test_schema().deserialize(test_value)
-            assert result == test_expect, "Bad result from [{}] with [{}]".format(test_schema.__name__, test_value)
-        except colander.Invalid:
-            pytest.fail("Expected valid format from [{}] with [{}]".format(test_schema.__name__, test_value))
+    evaluate_test_cases(test_cases)
 
 
 class FieldTestString(ce.ExtendedSchemaNode):
@@ -391,18 +408,7 @@ def test_schema_default_missing_validator_combinations():
         (DefaultDropValidator, {"test": "bad"}, {}),
         (DefaultDropValidator, {"test": "test"}, {"test": "test"}),
     ]
-
-    for test_schema, test_value, test_expect in test_schemas:
-        try:
-            result = test_schema().deserialize(test_value)
-            if test_expect is colander.Invalid:
-                pytest.fail("Expected invalid format from [{}] with [{}]".format(test_schema.__name__, test_value))
-            assert result == test_expect, "Bad result from [{}] with [{}]".format(test_schema.__name__, test_value)
-        except colander.Invalid:
-            if test_expect is colander.Invalid:
-                pass
-            else:
-                pytest.fail("Expected valid format from [{}] with [{}]".format(test_schema.__name__, test_value))
+    evaluate_test_cases(test_schemas)
 
 
 def test_schema_default_missing_validator_openapi():
@@ -431,3 +437,95 @@ def test_schema_default_missing_validator_openapi():
     for schema in test_schemas:
         converted = converter.convert_type(schema())
         assert converted == schema.schema_expected, "Schema for [{}] not as expected".format(schema.__name__)
+
+
+def test_dropable_variable_mapping():
+    """
+    Validate that sub-schema marked with ``missing=drop`` under a ``variable`` schema resolve without error.
+
+    Also, ensure that the same ``variable`` sub-schemas without ``missing=drop`` raise for invalid data structure.
+
+    .. seealso::
+        - :class:`weaver.wps_restapi.colander_extras.VariableSchemaNode`
+    """
+
+    class SomeList(ce.ExtendedSequenceSchema):
+        item = ce.ExtendedSchemaNode(colander.String())
+
+    class SomeMap(ce.ExtendedMappingSchema):
+        field = ce.ExtendedSchemaNode(colander.String())
+
+    class VarMapStrDrop(ce.ExtendedMappingSchema):
+        var_str = ce.ExtendedSchemaNode(colander.String(), variable="<var_str>", missing=colander.drop)
+
+    class VarMapListDrop(ce.ExtendedMappingSchema):
+        var_list = SomeList(variable="<var_list>", missing=colander.drop)
+
+    class VarMapMapDrop(ce.ExtendedMappingSchema):
+        var_map = SomeMap(variable="<var_list>", missing=colander.drop)
+
+    class VarMapStrReq(ce.ExtendedMappingSchema):
+        var_str = ce.ExtendedSchemaNode(colander.String(), variable="<var_str>")
+
+    class VarMapListReq(ce.ExtendedMappingSchema):
+        var_list = SomeList(variable="<var_list>")
+
+    class VarMapMapReq(ce.ExtendedMappingSchema):
+        var_map = SomeMap(variable="<var_list>")
+
+    valid_var_str = {"dont-care": "value"}
+    valid_var_list = {"dont-care": ["value"]}
+    valid_var_map = {"dont-care": {"field": "value"}}  # 'field' exact name important, but not variable 'dont-care'
+    # lowest sub-fields are string, int should raise
+    invalid_var_str = {"dont-care": 1}
+    invalid_var_list = {"dont-care": [1]}
+    invalid_var_map = {"dont-care": {"field": 1}}
+
+    test_schemas = [
+        # whether required or missing variable sub-schema is allowed, result schema should all resolve correctly
+        (VarMapStrDrop, valid_var_str, valid_var_str),
+        (VarMapListDrop, valid_var_list, valid_var_list),
+        (VarMapMapDrop, valid_var_map, valid_var_map),
+        (VarMapStrReq, valid_var_str, valid_var_str),
+        (VarMapListReq, valid_var_list, valid_var_list),
+        (VarMapMapReq, valid_var_map, valid_var_map),
+        # for invalid schemas, only the allowed missing (drop) variable sub-schema should succeed
+        (VarMapStrDrop, invalid_var_str, {}),
+        (VarMapListDrop, invalid_var_list, {}),
+        (VarMapMapDrop, invalid_var_map, {}),
+        (VarMapStrReq, invalid_var_str, colander.Invalid),
+        (VarMapListReq, invalid_var_list, colander.Invalid),
+        (VarMapMapReq, invalid_var_map, colander.Invalid),
+    ]
+    evaluate_test_cases(test_schemas)
+
+
+def test_media_type_pattern():
+    test_schema = sd.MediaType
+    test_cases = [
+        "application/atom+xml",
+        "application/EDI-X12",
+        "application/xml-dtd",
+        "application/zip",
+        "application/vnd.api+json",
+        "application/json; indent=4",
+        "video/mp4",
+        "plain/text;charset=UTF-8",
+        "plain/text; charset=UTF-8",
+        "plain/text;    charset=UTF-8",
+        "plain/text; charset=UTF-8; boundary=10"
+    ]
+    for test_value in test_cases:
+        assert test_schema().deserialize(test_value) == test_value
+    test_cases = [
+        "random",
+        "bad\\value",
+        "; missing=type"
+    ]
+    for test_value in test_cases:
+        try:
+            test_schema().deserialize(test_value)
+        except colander.Invalid:
+            pass
+        else:
+            pytest.fail("Expected valid format from [{}] with: '{}'".format(test_schema.__name__, test_value))

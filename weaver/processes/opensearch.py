@@ -29,10 +29,8 @@ LOGGER = logging.getLogger("PACKAGE")
 
 
 def alter_payload_after_query(payload):
-    """When redeploying the package on ADES, strip out any EOImage parameter
-
-    :param payload:
-
+    """
+    When redeploying the package on :term:`ADES`, strip out any :term:`EOImage` parameter.
     """
     new_payload = deepcopy(payload)
 
@@ -56,9 +54,8 @@ def query_eo_images_from_wps_inputs(wps_inputs,             # type: Dict[str, De
                                     accept_mime_types,      # type: Dict[str, List[str]]
                                     settings=None,          # type: Optional[AnySettingsContainer]
                                     ):                      # type: (...) -> Dict[str, Deque]
-    """Query OpenSearch using parameters in inputs and return file links.
-
-    eoimage_ids is used to identify if a certain input is an eoimage.
+    """
+    Query `OpenSearch` using parameters in inputs and return file links.
 
     :param wps_inputs: inputs containing info to query
     :param eoimage_source_info: data source info of eoimages
@@ -70,9 +67,9 @@ def query_eo_images_from_wps_inputs(wps_inputs,             # type: Dict[str, De
     def get_input_data(ids_to_get):
         # type: (Iterable[str]) -> str
         """
+        Check that specified input IDs contain submitted data.
 
-        :param ids_to_get: list of elements to check
-
+        :raises ValueError: when no input by ID can be found with provided data.
         """
         for id_ in ids_to_get:
             try:
@@ -83,7 +80,9 @@ def query_eo_images_from_wps_inputs(wps_inputs,             # type: Dict[str, De
 
     def is_eoimage_parameter(param):
         # type: (str) -> bool
-        """Return True if the name of this parameter is a query parameter"""
+        """
+        Return ``True`` if the name of this parameter is a query parameter of an ``EOImage``.
+        """
         parameters = [
             OPENSEARCH_AOI,
             OPENSEARCH_START_DATE,
@@ -140,9 +139,7 @@ def query_eo_images_from_wps_inputs(wps_inputs,             # type: Dict[str, De
 
 def replace_with_opensearch_scheme(link):
     """
-
-    :param link: url to replace scheme
-
+    Replaces ``file://`` scheme by ``opensearch://`` scheme.
     """
     scheme = urlparse(link).scheme
     if scheme == "file":
@@ -152,13 +149,8 @@ def replace_with_opensearch_scheme(link):
         return link
 
 
+# FIXME: move appropriately when adding BoundingBox support (https://github.com/crim-ca/weaver/issues/51)
 def load_wkt(wkt):
-    """
-
-    :param wkt: to get the bounding box of
-    :type wkt: string
-
-    """
     bounds = shapely.wkt.loads(wkt).bounds
     bbox_str = ",".join(map(str, bounds))
     return bbox_str
@@ -175,8 +167,10 @@ class OpenSearchQuery(object):
         settings=None,                              # type: Optional[AnySettingsContainer]
     ):
         """
+        Container to handle `OpenSearch` queries.
+
         :param collection_identifier: Collection ID to query
-        :param osdd_url: Global OSDD url for opensearch queries.
+        :param osdd_url: Global OSDD url for `OpenSearch` queries.
         :param catalog_search_field: Name of the field for the collection identifier.
         :param settings: application settings to retrieve request options as necessary.
         """
@@ -205,9 +199,10 @@ class OpenSearchQuery(object):
     def _prepare_query_url(self, template_url, params):
         # type: (str, Dict) -> Tuple[str, Dict]
         """
+        Prepare the URL for the `OpenSearch` query.
 
-        :param template_url: url containing query parameters
-        :param params: parameters to insert in formatted url
+        :param template_url: url containing query parameters.
+        :param params: parameters to insert in formatted URL.
 
         """
         base_url, query = template_url.split("?", 1)
@@ -250,6 +245,8 @@ class OpenSearchQuery(object):
     def _query_features_paginated(self, params):
         # type: (Dict) -> Iterable[Dict, str]
         """
+        Iterates over paginated results until all features are retrieved.
+
         :param params: query parameters
         """
         start_index = 1
@@ -281,8 +278,10 @@ class OpenSearchQuery(object):
     def query_datasets(self, params, accept_schemes, accept_mime_types):
         # type: (Dict, Tuple, List) -> Iterable[str]
         """
-        Loop on every opensearch result feature and yield url matching required mime-type and scheme.
-        Log a warning if a feature cannot yield a valid url (either no compatible mime-type or scheme)
+        Query the specified datasets.
+
+        Loop on every `OpenSearch` result feature and yield URL matching required mime-type and scheme.
+        Log a warning if a feature cannot yield a valid URL (either no compatible mime-type or scheme)
 
         :param params: query parameters
         :param accept_schemes: only return links of this scheme
@@ -323,6 +322,7 @@ class OpenSearchQuery(object):
 def get_additional_parameters(input_data):
     # type: (Dict) -> List[Tuple[str, str]]
     """
+    Retrieve the values from the ``additionalParameters`` of the input.
 
     :param input_data: Dict containing or not the "additionalParameters" key
     """
@@ -409,8 +409,9 @@ class EOImageDescribeProcessHandler(object):
     @staticmethod
     def make_toi(id_, start_date=True):
         """
+        Generate the Time-Of-Interest definition.
 
-        :param id_:
+        :param id_: ID of the input.
         :param start_date:  (Default value = True)
 
         """
@@ -438,9 +439,10 @@ class EOImageDescribeProcessHandler(object):
     def to_opensearch(self, unique_aoi, unique_toi):
         # type: (bool, bool) -> List[Dict]
         """
+        Convert the inputs with `OpenSearch` request parameters considering Area-Of-Interest and Time-Of-Interest.
 
-        :param unique_aoi:
-        :param unique_toi:
+        :param unique_aoi: indicate if a single/global AOI must be applied or individual ones for each input.
+        :param unique_toi: indicate if a single/global TOI must be applied or individual ones for each input.
 
         """
         if not self.eoimage_inputs:
@@ -492,11 +494,6 @@ class EOImageDescribeProcessHandler(object):
 
 
 def get_eo_images_inputs_from_payload(payload):
-    """
-
-    :param payload:
-
-    """
     inputs = payload.get("processDescription", {}).get("process", {}).get("inputs", {})
     return list(filter(EOImageDescribeProcessHandler.is_eoimage_input, inputs))
 
@@ -504,10 +501,15 @@ def get_eo_images_inputs_from_payload(payload):
 def get_original_collection_id(payload, wps_inputs):
     # type: (Dict, Dict[str, deque]) -> Dict[str, deque]
     """
-    When we deploy a Process that contains OpenSearch parameters, the collection identifier is modified.
-    Ex: files -> collection
-    Ex: s2 -> collection_s2, probav -> collection_probav
-    This function changes the id in the execute request to the one in the deploy description.
+    Obtains modified WPS inputs considering mapping to known `OpenSearch` collection IDs.
+
+    When we deploy a `Process` that contains `OpenSearch` parameters, the collection identifier is modified::
+
+        Ex: files -> collection
+        Ex: s2 -> collection_s2, probav -> collection_probav
+
+    This function changes the ID in the execute request to the one from the deployed `Process` description.
+
     :param payload:
     :param wps_inputs:
     :return:
@@ -529,10 +531,11 @@ def get_original_collection_id(payload, wps_inputs):
 def get_eo_images_data_sources(payload, wps_inputs):
     # type: (Dict, Dict[str, deque]) -> Dict[str, Dict]
     """
+    Resolve the data source of an ``EOImage`` input reference.
 
     :param payload: Deploy payload
     :param wps_inputs: Execute inputs
-
+    :returns: Data source of the ``EOImage``.
     """
     inputs = get_eo_images_inputs_from_payload(payload)
     eo_image_identifiers = [get_any_id(i) for i in inputs]
@@ -543,8 +546,10 @@ def get_eo_images_data_sources(payload, wps_inputs):
 def get_eo_images_mime_types(payload):
     # type: (Dict) -> Dict[str, List]
     """
-    From the deploy payload, get the accepted mime types.
-    :param payload: Deploy payload
+    Get the accepted media-types from the deployment payload.
+
+    :param payload: Deploy payload.
+    :returns: Accepted media-type.
     """
     inputs = get_eo_images_inputs_from_payload(payload)
 
@@ -562,8 +567,9 @@ def insert_max_occurs(payload, wps_inputs):
     # type: (Dict, Dict[str, Deque]) -> None
     """
     Insert maxOccurs value in wps inputs using the deploy payload.
-    :param payload: Deploy payload
-    :param wps_inputs: WPS inputs
+
+    :param payload: Deploy payload.
+    :param wps_inputs: WPS inputs.
     """
     inputs = get_eo_images_inputs_from_payload(payload)
 
@@ -640,5 +646,7 @@ def replace_inputs_describe_process(inputs, payload):
 
 
 def _make_specific_identifier(param_name, identifier):
-    """Only adds an underscore between the parameters."""
+    """
+    Only adds an underscore between the parameters.
+    """
     return "{}_{}".format(param_name, identifier)

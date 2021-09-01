@@ -2,7 +2,9 @@
 Utility methods for various TestCase setup operations.
 """
 import contextlib
+import functools
 import os
+import re
 import tempfile
 import uuid
 import warnings
@@ -10,12 +12,13 @@ from configparser import ConfigParser
 from inspect import isclass
 from typing import TYPE_CHECKING
 
-import colander
 # Note: do NOT import 'boto3' here otherwise 'moto' will not be able to mock it effectively
+import colander
 import mock
 import moto
 import pkg_resources
 import pyramid_celery
+import responses
 from owslib.wps import Languages, WebProcessingService
 from pyramid import testing
 from pyramid.config import Configurator
@@ -28,7 +31,7 @@ from weaver.app import main as weaver_app
 from weaver.config import WEAVER_CONFIGURATION_DEFAULT, WEAVER_DEFAULT_INI_CONFIG, get_weaver_config_file
 from weaver.database import get_db
 from weaver.datatype import Service
-from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_XML
+from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML, CONTENT_TYPE_TEXT_XML
 from weaver.store.mongodb import MongodbJobStore, MongodbProcessStore, MongodbServiceStore
 from weaver.utils import fetch_file, get_path_kvp, get_url_without_query, get_weaver_url, null
 from weaver.warning import MissingParameterWarning, UnsupportedOperationWarning
@@ -51,9 +54,10 @@ MOCK_HTTP_REF = "http://mock.localhost"
 
 def ignore_warning_regex(func, warning_message_regex, warning_categories=DeprecationWarning):
     # type: (Callable, Union[str, List[str]], Union[Type[Warning], List[Type[Warning]]]) -> Callable
-    """Wrapper that eliminates any warning matching ``warning_regex`` during testing logging.
+    """
+    Wrapper that eliminates any warning matching ``warning_regex`` during testing logging.
 
-    **NOTE**:
+    .. note::
         Wrapper should be applied on method (not directly on :class:`unittest.TestCase`
         as it can disable the whole test suite.
     """
@@ -77,7 +81,8 @@ def ignore_warning_regex(func, warning_message_regex, warning_categories=Depreca
 
 
 def ignore_wps_warnings(func):
-    """Wrapper that eliminates WPS related warnings during testing logging.
+    """
+    Wrapper that eliminates WPS related warnings during testing logging.
 
     **NOTE**:
         Wrapper should be applied on method (not directly on :class:`unittest.TestCase`
@@ -166,8 +171,8 @@ def setup_config_with_pywps(config):
 
 def setup_config_with_celery(config):
     # type: (Configurator) -> Configurator
-    """Prepares the configuration to define ``Celery`` settings needed to execute processes from mocked
-    :class:`webtest.TestApp` application.
+    """
+    Configures :mod:`celery` settings to mock process executions from under a :class:`webtest.TestApp` application.
 
     This is also needed when using :func:`mocked_execute_process` since it will prepare underlying ``Celery``
     application object, multiple of its settings and the database connection reference, although ``Celery`` worker
@@ -308,6 +313,8 @@ def mocked_file_response(path, url):
 def mocked_sub_requests(app, function, *args, only_local=False, **kwargs):
     # type: (TestApp, str, *Any, bool, **Any) -> AnyResponseType
     """
+    Mocks request calls under :class:`webTest.TestApp` to avoid sending real requests.
+
     Executes ``app.function(*args, **kwargs)`` with a mock of every underlying :func:`requests.request` call
     to relay their execution to the :class:`webTest.TestApp`.
 
@@ -328,6 +335,8 @@ def mocked_sub_requests(app, function, *args, only_local=False, **kwargs):
 
     def _parse_for_app_req(method, url, **req_kwargs):
         """
+        Obtain request details with adjustments to support specific handling for :class:`webTest.TestApp`.
+
         WebTest application employs ``params`` instead of ``data``/``json``.
         Actual query parameters must be pre-appended to ``url``.
         """
@@ -360,6 +369,8 @@ def mocked_sub_requests(app, function, *args, only_local=False, **kwargs):
 
     def mocked_app_request(method, url=None, **req_kwargs):
         """
+        Mock requests under the web test application under specific conditions.
+
         Request corresponding to :func:`requests.request` that instead gets executed by :class:`webTest.TestApp`,
         unless permitted to call real external requests.
         """
@@ -422,14 +433,62 @@ def mocked_remote_wps(processes, languages=None):
     )
 
 
+def mocked_remote_server_requests_wp1(
+        resource_file_getcap,                           # type: str
+        resource_files_describe,                        # type: Iterable[str]
+        test_server_wps="https://remote-server.com",    # type: str
+):                                                      # type: (...) -> MockPatch
+    """
+    Mocks a `remote` WPS-1 requests/responses with specified contents from local test resources.
+
+    .. seealso::
+        ``tests/resources`` directory for available XML files to simulate response bodies.
+
+    :param resource_file_getcap: XML file path within test resource directory for server ``GetCapabilities`` result.
+    :param resource_files_describe: XML file path(s) within test resource directory for ``DescribeProcess`` result(s).
+    :param test_server_wps: endpoint where the mocked WPS server should simulate receiving requests and reply from.
+    :returns: decorator that mocks WPS-1 server responses with provided processes and XML contents.
+    """
+    assert isinstance(resource_file_getcap, str)
+    assert isinstance(resource_files_describe, (set, list, tuple)) and len(resource_files_describe) > 0
+    assert os.path.isfile(resource_file_getcap)
+    assert all(os.path.isfile(file) for file in resource_files_describe)
+
+    def mocked_remote_server_wrapper(test):
+        @functools.wraps(test)
+        def mock_requests_wps1(*args, **kwargs):
+            """Mock ``requests`` responses fetching ``test_server_wps`` WPS reference."""
+            xml_header = {"Content-Type": CONTENT_TYPE_APP_XML}
+            with responses.RequestsMock(assert_all_requests_are_fired=False) as mock_resp:
+                with open(resource_file_getcap, "r") as f:
+                    get_cap_xml = f.read()
+                get_cap_url = "{}?service=WPS&request=GetCapabilities&version=1.0.0".format(test_server_wps)
+                mock_resp.add(responses.GET, get_cap_url, body=get_cap_xml, headers=xml_header)
+                for proc_desc_file in resource_files_describe:
+                    with open(proc_desc_file, "r") as f:
+                        describe_xml = f.read()
+                    # assume always first identifier (ignore input/output ones after)
+                    proc_desc_id = re.findall("<ows:Identifier>(.*)</ows:Identifier>", describe_xml)[0]
+                    proc_desc_url = "{}?service=WPS&request=DescribeProcess&identifier={}&version=1.0.0".format(
+                        test_server_wps, proc_desc_id
+                    )
+                    mock_resp.add(responses.GET, proc_desc_url, body=describe_xml, headers=xml_header)
+                    # special case where 'identifier' gets added to 'GetCapabilities', but is simply ignored
+                    getcap_with_proc_id_url = proc_desc_url.replace("DescribeProcess", "GetCapabilities")
+                    mock_resp.add(responses.GET, body=get_cap_xml, headers=xml_header, url=getcap_with_proc_id_url)
+                return test(*args, **kwargs)
+        return mock_requests_wps1
+    return mocked_remote_server_wrapper
+
+
 def mocked_execute_process():
     # type: () -> Iterable[MockPatch]
     """
-    Provides a mock to call :func:`weaver.processes.execution.execute_process` safely within a test employing
-    :class:`webTest.TestApp` without a running ``Celery`` app.
+    Contextual mock of a process execution to run locally instead of dispatched :mod:`celery` worker.
 
+    Provides a mock to call :func:`weaver.processes.execution.execute_process` safely within a test
+    employing :class:`webTest.TestApp` without a running ``Celery`` app.
     This avoids connection error from ``Celery`` during a job execution request.
-
     Bypasses ``execute_process.delay`` call by directly invoking the ``execute_process``.
 
     .. note::
@@ -443,8 +502,13 @@ def mocked_execute_process():
 
     class MockTask(object):
         """
+        Mocks the Celery Task for testing.
+
         Mocks call ``self.request.id`` in :func:`weaver.processes.execution.execute_process` and
         call ``result.id`` in :func:`weaver.processes.execution.submit_job_handler`.
+
+        .. note::
+            Parameter ``self.request`` in this context is the Celery Task handle, not to be confused with HTTP request.
         """
         _id = str(uuid.uuid4())
 
@@ -494,7 +558,8 @@ def mocked_process_package():
 
 def mocked_aws_credentials(test_func):
     # type: (Callable[[...], Any]) -> Callable
-    """Mocked AWS Credentials for :py:mod:`moto`.
+    """
+    Mocked AWS Credentials for :py:mod:`moto`.
 
     When using this fixture, ensures that if other mocks fail, at least credentials should be invalid to avoid
     mistakenly overriding real bucket files.
@@ -528,11 +593,11 @@ def mocked_aws_s3(test_func):
 def mocked_aws_s3_bucket_test_file(bucket_name, file_name, file_content="Test file inside test S3 bucket"):
     # type: (str,str, str) -> str
     """
-    Generates a test file reference from dummy data that will be uploaded to the specified S3 bucket name using the
-    provided file key.
+    Mock a test file as if retrieved from an AWS-S3 bucket reference.
 
-    The S3 interface employed is completely dependent of the wrapping context. For instance, calling this function
-    with :func:`mocked_aws_s3` decorator will effectively employ the mocked S3 interface.
+    Generates a test file reference from dummy data that will be uploaded to the specified S3 bucket name using the
+    provided file key. The S3 interface employed is completely dependent of the wrapping context. For instance,
+    calling this function with :func:`mocked_aws_s3` decorator will effectively employ the mocked S3 interface.
 
     .. seealso::
         - :func:`mocked_aws_s3`
@@ -556,6 +621,7 @@ def mocked_http_file(test_func):
     # type: (Callable[[...], Any]) -> Callable
     """
     Creates a mock of the function :func:`fetch_file`, to fetch a generated file locally, for test purposes only.
+
     For instance, calling this function with :func:`mocked_http_file` decorator
     will effectively employ the mocked :func:`fetch_file` and return a generated local file.
 

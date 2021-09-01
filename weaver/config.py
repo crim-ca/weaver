@@ -42,7 +42,8 @@ WEAVER_DEFAULT_CONFIGS = frozenset([
 
 def get_weaver_configuration(container):
     # type: (AnySettingsContainer) -> str
-    """Obtains the defined operation configuration mode.
+    """
+    Obtains the defined operation configuration mode.
 
     :returns: one value amongst :py:data:`weaver.config.WEAVER_CONFIGURATIONS`.
     """
@@ -59,7 +60,8 @@ def get_weaver_configuration(container):
 
 def get_weaver_config_file(file_path, default_config_file, generate_default_from_example=True):
     # type: (str, str, bool) -> str
-    """Validates that the specified configuration file can be found, or falls back to the default one.
+    """
+    Validates that the specified configuration file can be found, or falls back to the default one.
 
     Handles 'relative' paths for settings in ``WEAVER_DEFAULT_INI_CONFIG`` referring to other configuration files.
     Default file must be one of ``WEAVER_DEFAULT_CONFIGS``.

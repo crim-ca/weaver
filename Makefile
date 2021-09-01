@@ -434,14 +434,14 @@ coverage: test-coverage  ## alias to run test with coverage analysis
 ## -- [variants '<target>-only' without '-only' suffix are also available with pre-install setup]
 
 # autogen check variants with pre-install of dependencies using the '-only' target references
-CHECKS := pep8 lint security doc8 links imports
+CHECKS := pep8 lint security doc8 docstring links imports
 CHECKS := $(addprefix check-, $(CHECKS))
 
 # items that should not install python dev packages should be added here instead
 # they must provide their own target/only + with dependency install variants
 CHECKS_NO_PY := css md
 CHECKS_NO_PY := $(addprefix fix-, $(CHECKS_NO_PY))
-CHECKS_ALL := $(FIXES) $(FIXES_NO_PY)
+CHECKS_ALL := $(CHECKS) $(CHECKS_NO_PY)
 
 $(CHECKS): check-%: install-dev check-%-only
 
@@ -486,12 +486,20 @@ check-security-only: mkdir-reports	## check for security code issues
 		1> >(tee "$(REPORTS_DIR)/check-security.txt")'
 
 .PHONY: check-doc8-only
-check-doc8-only: mkdir-reports	## check documentation style checks
+check-doc8-only: mkdir-reports	  ## check documentation RST styles and linting
 	@echo "Running doc8 doc style checks..."
 	@-rm -fr "$(REPORTS_DIR)/check-doc8.txt"
 	@bash -c '$(CONDA_CMD) \
 		doc8 "$(APP_ROOT)/docs" \
 		1> >(tee "$(REPORTS_DIR)/check-doc8.txt")'
+
+.PHONY: check-docstring-only
+check-docstring-only: mkdir-reports  ## check code docstring style and linting
+	@echo "Running pycodestyle docstring checks..."
+	@-rm -fr "$(REPORTS_DIR)/check-docstring.txt"
+	@bash -c '$(CONDA_CMD) \
+		pydocstyle --explain --config "$(APP_ROOT)/setup.cfg" "$(APP_ROOT)" \
+		1> >(tee "$(REPORTS_DIR)/check-docstring.txt")'
 
 .PHONY: check-links-only
 check-links-only:       	## check all external links in documentation for integrity

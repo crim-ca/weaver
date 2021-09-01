@@ -66,6 +66,8 @@ JOB_PROGRESS_DONE = 100
 
 @app.task(bind=True)
 def execute_process(self, job_id, url, headers=None):
+    # pylint: disable=R1260,too-complex  # FIXME: simplify operations
+
     from weaver.wps.service import get_pywps_service
 
     LOGGER.debug("Job execute process called.")
@@ -281,12 +283,34 @@ def execute_process(self, job_id, url, headers=None):
 def make_results_relative(results, settings):
     # type: (List[JSON], SettingsType) -> List[JSON]
     """
-    Redefines job results to be saved in database as relative paths to output directory configured in PyWPS
-    (i.e.: relative to ``weaver.wps_output_dir``).
+    Converts file references to a pseudo-relative location to allow the application to dynamically generate paths.
 
-    This allows us to easily adjust the exposed result HTTP path according to server configuration
-    (i.e.: relative to ``weaver.wps_output_path`` and/or ``weaver.wps_output_url``) and it also avoid rewriting
-    the whole database job results if the setting is changed later on.
+    Redefines job results to be saved in database as pseudo-relative paths to configured WPS output directory.
+    This allows the application to easily adjust the exposed result HTTP path according to the service configuration
+    (i.e.: relative to ``weaver.wps_output_dir`` and/or ``weaver.wps_output_url``) and it also avoids rewriting
+    the database job results entry if those settings are changed later on following reboot of the web application.
+
+    Only references prefixed with ``weaver.wps_output_dir``, ``weaver.wps_output_url`` or a corresponding resolution
+    from ``weaver.wps_output_path`` with ``weaver.url`` will be modified to pseudo-relative paths.
+    Other references (file/URL endpoints that do not correspond to `Weaver`) will be left untouched for
+    literal remote reference. Results that do not correspond to a reference are also unmodified.
+
+    .. note::
+
+        The references are not *real* relative paths (i.e.: starting with ``./``), as those could also be specified as
+        input, and there would be no way to guarantee proper differentiation from paths already handled and stored in
+        the database. Instead, *pseudo-relative* paths employ an explicit *absolute*-like path
+        (i.e.: starting with ``/``) and are assumed to always require to be prefixed by the configured WPS locations
+        (i.e.: ``weaver.wps_output_dir`` or ``weaver.wps_output_url`` based on local or HTTP response context).
+
+        With this approach, data persistence with mapped volumes into the dockerized `Weaver` service can be placed
+        anywhere at convenience. This is important because sibling docker execution require exact mappings such that
+        volume mount ``/data/path:/data/path`` resolve correctly on both sides (host and image path must be identical).
+        If volumes get remapped differently, ensuring that ``weaver.wps_output_dir`` setting follows the same remapping
+        update will automatically resolve to the proper location for both local references and exposed URL endpoints.
+
+    :param results: JSON mapping of data results as ``{"<id>": <definition>}`` entries where a reference can be found.
+    :param settings: container to retrieve current application settings.
     """
     wps_url = get_wps_output_url(settings)
     wps_path = get_wps_output_path(settings)
@@ -304,6 +328,8 @@ def make_results_relative(results, settings):
 def map_locations(job, settings):
     # type: (Job, SettingsType) -> None
     """
+    Maps directory locations between :mod:`pywps` process execution and produced jobs storage.
+
     Generates symlink references from the Job UUID to PyWPS UUID results (outputs directory, status and log locations).
     Update the Job's WPS ID if applicable (job executed locally).
     Assumes that all results are located under the same reference UUID.

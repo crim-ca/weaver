@@ -8,6 +8,7 @@ XML = lxml.etree._Element  # noqa
 if TYPE_CHECKING:
     import os
     import typing
+    from datetime import datetime
     from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Type, Union
     if hasattr(typing, "TypedDict"):
         from typing import TypedDict  # pylint: disable=E0611,no-name-in-module
@@ -19,7 +20,7 @@ if TYPE_CHECKING:
         FileSystemPathType = str
 
     from celery.app import Celery
-    from owslib.wps import Process as ProcessOWS
+    from owslib.wps import BoundingBoxDataInput, ComplexDataInput, Process as ProcessOWS
     from pyramid.httpexceptions import HTTPSuccessful, HTTPRedirection
     from pyramid.registry import Registry
     from pyramid.request import Request as PyramidRequest
@@ -82,7 +83,13 @@ if TYPE_CHECKING:
                                        "basename": str, "nameroot": str, "nameext": str,
                                        "checksum": Optional[str], "size": Optional[str]}, total=False)
     CWL_RuntimeInput = Union[CWL_RuntimeLiteral, CWL_RuntimeInputFile]
+    CWL_RuntimeInputsMap = Dict[str, CWL_RuntimeInput]
     CWL_RuntimeOutput = Union[CWL_RuntimeLiteral, CWL_RuntimeOutputFile]
+
+    # OWSLib Execution
+    # inputs of OWSLib are either a string (any literal type, bbox or complex file)
+    OWS_InputData = Union[str, BoundingBoxDataInput, ComplexDataInput]
+    OWS_InputDataValues = List[Tuple[str, OWS_InputData]]
 
     KVP_Item = Union[ValueType, Sequence[ValueType]]
     KVP = Union[Sequence[Tuple[str, KVP_Item]], Dict[str, KVP_Item]]
@@ -117,5 +124,4 @@ if TYPE_CHECKING:
 
     # others
     DatetimeIntervalType = TypedDict("DatetimeIntervalType",
-                                     {"before": str, "after": str,
-                                      "match": str, }, total=False)
+                                     {"before": datetime, "after": datetime, "match": datetime}, total=False)

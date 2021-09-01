@@ -1,5 +1,5 @@
 """
-pywps 4.x wrapper
+PyWPS 4.x wrapper.
 """
 import logging
 

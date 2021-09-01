@@ -107,9 +107,12 @@ class CallbackJob(object):
 
 class WpsWorkflow(ProcessCWL):
     """
-    Definition of a ``CWL`` ``workflow`` that can execute ``WPS`` application packages as defined by
-    :class:`weaver.processes.wps_package.WpsPackage` as job steps.
+    Definition of a `CWL` ``workflow`` that can execute ``WPS`` application packages as intermediate job steps.
+
+    Steps are expected to be defined as individual :class:`weaver.processes.wps_package.WpsPackage` references.
     """
+
+    # pylint: disable=R1260,too-complex  # FIXME: simplify operations
 
     def __init__(self, toolpath_object, loading_context, get_job_process_definition):
         # type: (Dict[Text, Any], LoadingContext, GetJobProcessDefinitionFunction) -> None
@@ -395,7 +398,7 @@ class WpsWorkflow(ProcessCWL):
         return result
 
 
-class WpsWorkflowJob(JobBase):  # noqa: N802
+class WpsWorkflowJob(JobBase):
     def __init__(self,
                  builder,           # type: Builder
                  joborder,          # type: Dict[Text, Union[Dict[Text, Any], List, Text, None]]
@@ -455,6 +458,8 @@ class WpsWorkflowJob(JobBase):  # noqa: N802
     # pylint: disable=W0221,arguments-differ    # naming using python like arguments
     def execute(self, runtime, env, runtime_context):   # noqa: E811
         # type: (List[Text], MutableMapping[Text, Text], RuntimeContext) -> None
+
+        # pylint: disable=R1260,too-complex  # FIXME: simplify operations
 
         self.results = self.wps_process.execute(self.builder.job, self.outdir, self.expected_outputs)
 

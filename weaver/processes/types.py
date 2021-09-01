@@ -4,3 +4,7 @@ PROCESS_TEST = "test"                   # Same as local WPS, but specifically fo
 PROCESS_WORKFLOW = "workflow"           # CWL package chaining multiple other process-types
 PROCESS_WPS_LOCAL = "wps"               # Local PyWPS process definitions
 PROCESS_WPS_REMOTE = "wps-remote"       # Remote WPS provider references (once instantiated from Service definition)
+PROCESS_WPS_TYPES = frozenset([
+    PROCESS_WPS_LOCAL,
+    PROCESS_WPS_REMOTE
+])

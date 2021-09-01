@@ -142,8 +142,10 @@ def _get_deploy_process_info(process_info, reference, package):
 def deploy_process_from_payload(payload, container, overwrite=False):
     # type: (JSON, AnyContainer, bool) -> HTTPException
     """
-    Adds a :class:`weaver.datatype.Process` instance to storage using the provided JSON ``payload`` matching
-    :class:`weaver.wps_restapi.swagger_definitions.ProcessDescription`.
+    Deploy the process after resolution of all references and validation of the parameters from payload definition.
+
+    Adds a :class:`weaver.datatype.Process` instance to storage using the provided JSON ``payload``
+    matching :class:`weaver.wps_restapi.swagger_definitions.ProcessDescription`.
 
     :param payload: JSON payload that was specified during the process deployment request.
     :param container: container to retrieve application settings.
@@ -222,13 +224,16 @@ def deploy_process_from_payload(payload, container, overwrite=False):
         process_info["owsContext"] = {"offering": {"content": {"href": str(reference)}}}
     elif isinstance(ows_context, dict):
         process_info["owsContext"] = ows_context
+    # bw-compat abstract/description (see: ProcessDeployment schema)
+    if "description" not in process_info or not process_info["description"]:
+        process_info["description"] = process_info.get("abstract", "")
 
     # FIXME: handle colander invalid directly in tween (https://github.com/crim-ca/weaver/issues/112)
     try:
         store = get_db(container).get_store(StoreProcesses)
         process = Process(process_info)
         sd.ProcessSummary().deserialize(process)  # make if fail before save if invalid
-        store.save_process(process, overwrite=False)
+        store.save_process(process, overwrite=overwrite)
         process_summary = process.summary()
     except ProcessRegistrationError as ex:
         raise HTTPConflict(detail=str(ex))
@@ -275,6 +280,8 @@ def parse_wps_process_config(config_entry):
 def register_wps_processes_from_config(wps_processes_file_path, container):
     # type: (Optional[FileSystemPathType], AnySettingsContainer) -> None
     """
+    Registers remote `WPS` providers and/or processes as specified from the configuration file.
+
     Loads a `wps_processes.yml` file and registers `WPS-1` providers processes to the
     current `Weaver` instance as equivalent `WPS-2` processes.
 

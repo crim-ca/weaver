@@ -1,6 +1,16 @@
 """
-This module should contain any and every definitions in use to build the swagger UI,
-so that one can update the swagger without touching any other files after the initial integration
+Schema definitions for `OpenAPI` generation and validation of data from received requests and returned responses.
+
+This module should contain any and every definitions in use to build the Swagger UI and the OpenAPI JSON schema
+so that one can update the specification without touching any other files after the initial integration.
+
+Schemas defined in this module are employed (through ``deserialize`` method calls) to validate that data conforms to
+reported definitions. This makes the documentation of the API better aligned with resulting code execution under it.
+It also provides a reference point for external users to understand expected data structures with complete schema
+definitions generated on the exposed endpoints (JSON and Swagger UI).
+
+The definitions are also employed to generate the `OpenAPI` definitions reported in the documentation published
+on `Weaver`'s `ReadTheDocs` page.
 """
 # pylint: disable=C0103,invalid-name
 
@@ -10,7 +20,7 @@ from typing import TYPE_CHECKING
 import yaml
 from colander import DateTime, Email, OneOf, Range, Regex, drop, required
 from cornice import Service
-from dateutil import parser as dateparser
+from dateutil import parser as date_parser
 
 from weaver import __meta__
 from weaver.config import WEAVER_CONFIGURATION_EMS
@@ -47,7 +57,8 @@ from weaver.processes.constants import (
     PACKAGE_ARRAY_ITEMS,
     PACKAGE_CUSTOM_TYPES,
     PACKAGE_ENUM_BASE,
-    PACKAGE_TYPE_POSSIBLE_VALUES
+    PACKAGE_TYPE_POSSIBLE_VALUES,
+    WPS_LITERAL_DATA_TYPE_NAMES
 )
 from weaver.sort import JOB_SORT_VALUES, QUOTE_SORT_VALUES, SORT_CREATED, SORT_ID, SORT_PROCESS
 from weaver.status import JOB_STATUS_CATEGORIES, STATUS_ACCEPTED, STATUS_COMPLIANT_OGC
@@ -114,6 +125,43 @@ OGC_API_SCHEMA_URL = "https://raw.githubusercontent.com/opengeospatial/ogcapi-pr
 DATETIME_INTERVAL_CLOSED_SYMBOL = "/"
 DATETIME_INTERVAL_OPEN_START_SYMBOL = "../"
 DATETIME_INTERVAL_OPEN_END_SYMBOL = "/.."
+
+# fields ordering for generation of ProcessDescription body (shared for OGC/OLD schema format)
+PROCESS_DESCRIPTION_FIELD_FIRST = [
+    "id",
+    "title",
+    "version",
+    "description",
+    "keywords",
+    "metadata",
+    "inputs",
+    "outputs"
+]
+PROCESS_DESCRIPTION_FIELD_AFTER = [
+    "processDescriptionURL",
+    "processEndpointWPS1",
+    "executeEndpoint",
+    "links"
+]
+# fields ordering for nested process definition of OLD schema format of ProcessDescription
+PROCESS_DESCRIPTION_FIELD_FIRST_OLD_SCHEMA = ["process"]
+PROCESS_DESCRIPTION_FIELD_AFTER_OLD_SCHEMA = ["links"]
+
+PROCESS_IO_FIELD_FIRST = ["id", "title", "description", "minOccurs", "maxOccurs"]
+PROCESS_IO_FIELD_AFTER = ["literalDataDomains", "formats", "crs", "bbox"]
+
+PROVIDER_DESCRIPTION_FIELD_FIRST = [
+    "id",
+    "title",
+    "version",
+    "description",
+    "url",
+    "type",
+    "public",
+    "keywords",
+    "metadata",
+]
+PROVIDER_DESCRIPTION_FIELD_AFTER = ["links"]
 
 #########################################################
 # Examples
@@ -224,13 +272,20 @@ class SLUG(ExtendedSchemaNode):
     schema_type = String
     description = "Slug name pattern."
     example = "some-object-slug-name"
-    pattern = "^[A-Za-z0-9]+(?:(-|_)[A-Za-z0-9]+)*$"
+    pattern = r"^[A-Za-z0-9]+(?:(-|_)[A-Za-z0-9]+)*$"
 
 
 class URL(ExtendedSchemaNode):
     schema_type = String
     description = "URL reference."
     format = "url"
+
+
+class MediaType(ExtendedSchemaNode):
+    schema_type = String
+    description = "IANA identifier of content and format."
+    example = CONTENT_TYPE_APP_JSON
+    pattern = r"^\w+\/[-.\w]+(?:\+[-.\w]+)?(?:\;\s*.+)*$"
 
 
 class DateTimeInterval(ExtendedSchemaNode):
@@ -466,49 +521,67 @@ class LandingPage(ExtendedMappingSchema):
     links = LinkList()
 
 
+# sub-schema within:
+#   https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/format.yaml
+class FormatSchema(OneOfKeywordSchema):
+    _one_of = [
+        # pointer to a file or JSON schema relative item (as in OpenAPI definitions)
+        ReferenceURL(description="Reference where the schema definition can be retrieved to describe referenced data."),
+        # literal JSON schema, permissive since it can be anything
+        PermissiveMappingSchema(description="Explicit schema definition of the formatted reference data.")
+    ]
+
+    # because some pre-existing processes + pywps default schema is ""
+    # deserialization against the validator pattern of 'ReferenceURL' makes it always fail
+    # this causes the whole 'Format' container (and others similar) fail and be dropped
+    # to resolve this issue, preemptively detect the empty string and signal the parent OneOf to remove it
+    def deserialize(self, cstruct):
+        if isinstance(cstruct, str) and cstruct == "":
+            return drop  # field that refers to this schema will drop the field key entirely
+        return super(FormatSchema, self).deserialize(cstruct)
+
+
 class FormatMimeType(ExtendedMappingSchema):
     """
     Used to respect ``mimeType`` field to work with pre-existing processes.
     """
-    title = "Format"
-    mimeType = ExtendedSchemaNode(
-        String(), default=CONTENT_TYPE_TEXT_PLAIN, example=CONTENT_TYPE_APP_JSON)
-    schema = ExtendedSchemaNode(String(), missing=drop)
+    mimeType = MediaType(default=CONTENT_TYPE_TEXT_PLAIN, example=CONTENT_TYPE_APP_JSON)
     encoding = ExtendedSchemaNode(String(), missing=drop)
+    schema = FormatSchema(missing=drop)
 
 
+# https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/format.yaml
 class Format(ExtendedMappingSchema):
     """
     Used to respect ``mediaType`` field as suggested per `OGC-API`.
     """
-    title = "Format"
-    mediaType = ExtendedSchemaNode(String(), default=CONTENT_TYPE_TEXT_PLAIN, example=CONTENT_TYPE_APP_JSON)
-    schema = ExtendedSchemaNode(String(), missing=drop)
+    mediaType = MediaType(default=CONTENT_TYPE_TEXT_PLAIN, example=CONTENT_TYPE_APP_JSON)
     encoding = ExtendedSchemaNode(String(), missing=drop)
+    schema = FormatSchema(missing=drop)
 
 
-class DeployFormatDefaultMimeType(FormatMimeType, ExtendedMappingSchema):
-    """
-    Format for process input are assumed plain text if the MIME-type was omitted and is not
-    one of the known formats by this instance. When executing a job, the best match will be used
-    to run the process, and will fallback to the default as last resort.
-    """
+class DeployFormatDefaultMimeType(FormatMimeType):
+    description = (
+        "Format for process input are assumed plain/text if the media-type was omitted and is not one of the known "
+        "formats by this instance. When executing a job, the best match against supported formats by the process "
+        "definition will be used to run the process, and will fallback to the default as last resort."
+    )
     # NOTE:
-    # The default is override from FormatMimeType since the FormatSelection 'oneOf' always fails,
-    # due to the 'default' value wich is always generated and it cause the presence of both Format and FormatMimeType
-    mimeType = ExtendedSchemaNode(String(), example=CONTENT_TYPE_APP_JSON)
+    # The default is overridden from FormatMimeType since the FormatSelection 'oneOf' always fails,
+    # due to the 'default' value which is always generated and it causes the presence of both Format and FormatMimeType
+    mimeType = MediaType(example=CONTENT_TYPE_APP_JSON)
 
 
-class DeployFormatDefault(Format, ExtendedMappingSchema):
-    """
-    Format for process input are assumed plain text if the MEDIA-type was omitted and is not
-    one of the known formats by this instance. When executing a job, the best match will be used
-    to run the process, and will fallback to the default as last resort.
-    """
+class DeployFormatDefault(Format):
+    description = (
+        "Format for process input are assumed plain/text if the media-type was omitted and is not one of the known "
+        "formats by this instance. When executing a job, the best match against supported formats by the process "
+        "definition will be used to run the process, and will fallback to the default as last resort."
+    )
     # NOTE:
-    # The default is override from Format since the FormatSelection 'oneOf' always fails,
-    # due to the 'default' value wich is always generated and it cause the presence of both Format and FormatMimeType
-    mediaType = ExtendedSchemaNode(String(), example=CONTENT_TYPE_APP_JSON)
+    # The default is overridden from Format since the FormatSelection 'oneOf' always fails,
+    # due to the 'default' value which is always generated and it causes the presence of both Format and FormatMimeType
+    mediaType = MediaType(example=CONTENT_TYPE_APP_JSON)
 
 
 class FormatSelection(OneOfKeywordSchema):
@@ -520,7 +593,7 @@ class FormatSelection(OneOfKeywordSchema):
         - :class:`DeployFormatDefaultMimeType`
 
     .. note::
-        Format are validated to be retrocompatible with pre-existing/deployed/remote processes.
+        Format are validated to be retro-compatible with pre-existing/deployed/remote processes.
     """
     _one_of = [
         DeployFormatDefault(),
@@ -542,36 +615,38 @@ class FormatDefault(ExtendedMappingSchema):
     )
 
 
-class DescribeFormatDescription(Format, FormatExtra, FormatDefault):
+class DescriptionFormat(Format, FormatExtra, FormatDefault):
     # NOTE:
     #  The 'OGC-API' suggest to use 'mediaType' field for FormatType, but retro-compatibility is supported,
-    #  FormatType can be with either old 'mimeType' or new 'mediaType' during deployement,
+    #  FormatType can be with either old 'mimeType' or new 'mediaType' during deployment,
     #  but only 'mediaType' is used for description
     pass
 
 
-class DeployFormatDescription(FormatSelection, FormatExtra, FormatDefault):
+class DeploymentFormat(FormatSelection, FormatExtra, FormatDefault):
     # NOTE:
     #  The 'OGC-API' suggest to use 'mediaType' field for FormatType, but retro-compatibility is supported,
-    #  FormatType can be with either old 'mimeType' or new 'mediaType' during deployement,
+    #  FormatType can be with either old 'mimeType' or new 'mediaType' during deployment,
     #  but only 'mediaType' is used for description
     pass
 
 
 class FormatMedia(FormatExtra):
-    """Format employed for reference results respecting 'OGC-API - Processes' schemas."""
+    """
+    Format employed for reference results respecting 'OGC-API - Processes' schemas.
+    """
     schema_ref = "{}/master/core/openapi/schemas/formatDescription.yaml".format(OGC_API_SCHEMA_URL)
-    mediaType = ExtendedSchemaNode(String())
-    schema = ExtendedSchemaNode(String(), missing=drop)
+    mediaType = MediaType(String())
     encoding = ExtendedSchemaNode(String(), missing=drop)
+    schema = FormatSchema(missing=drop)
 
 
-class DescribeFormatDescriptionList(ExtendedSequenceSchema):
-    format = DescribeFormatDescription()
+class DescriptionFormatList(ExtendedSequenceSchema):
+    format_item = DescriptionFormat()
 
 
-class DeployFormatDescriptionList(ExtendedSequenceSchema):
-    format = DeployFormatDescription()
+class DeploymentFormatList(ExtendedSequenceSchema):
+    format_item = DeploymentFormat()
 
 
 class AdditionalParameterValuesList(ExtendedSequenceSchema):
@@ -625,12 +700,15 @@ class OWSContext(ExtendedMappingSchema):
 
 
 class DescriptionBase(ExtendedMappingSchema):
-    title = ExtendedSchemaNode(String(), missing=drop, description="Short name definition of the process.")
-    abstract = ExtendedSchemaNode(String(), missing=drop, description="Detailed explanation of the process operation.")
-    links = LinkList(missing=drop, description="References to endpoints with information related to the process.")
+    title = ExtendedSchemaNode(String(), missing=drop, description="Short human-readable name of the object.")
+    description = ExtendedSchemaNode(String(), missing=drop, description="Detailed explanation of the object.")
 
 
-class DescriptionOWS(ExtendedMappingSchema):
+class DescriptionLinks(ExtendedMappingSchema):
+    links = LinkList(missing=drop, description="References to endpoints with information related to object.")
+
+
+class ProcessContext(ExtendedMappingSchema):
     owsContext = OWSContext(missing=drop)
 
 
@@ -638,11 +716,21 @@ class DescriptionExtra(ExtendedMappingSchema):
     additionalParameters = AdditionalParametersList(missing=drop)
 
 
-class DescriptionType(DescriptionBase, DescriptionExtra):
+class DescriptionType(DescriptionBase, DescriptionLinks, DescriptionExtra):
     pass
 
 
-class ProcessDescriptionMeta(ExtendedMappingSchema):
+class DeploymentType(DescriptionType):
+    deprecated = True
+    abstract = ExtendedSchemaNode(
+        String(), missing=drop, deprecated=True,
+        description="Description of the object. Will be replaced by 'description' field if not already provided. "
+                    "Preserved for backward compatibility of pre-existing process deployment. "
+                    "Consider using 'description' directly instead."
+    )
+
+
+class DescriptionMeta(ExtendedMappingSchema):
     # employ empty lists by default if nothing is provided for process description
     keywords = KeywordList(
         default=[],
@@ -701,8 +789,10 @@ class WithMinMaxOccurs(ExtendedMappingSchema):
     maxOccurs = MaxOccursDefinition(missing=drop)
 
 
-class ProcessDescriptionType(DescriptionType, DescriptionOWS):
+# does not inherit from 'DescriptionLinks' because other 'ProcessDescription<>' schema depend from this without 'links'
+class ProcessDescriptionType(DescriptionBase, DescriptionExtra):
     id = ProcessIdentifier()
+    version = Version(missing=drop)
 
 
 class InputIdentifierType(ExtendedMappingSchema):
@@ -713,20 +803,12 @@ class OutputIdentifierType(ExtendedMappingSchema):
     id = AnyIdentifier(description=IO_INFO_IDS.format(first="WPS", second="CWL", what="output"))
 
 
-class InputDescriptionType(InputIdentifierType, DescriptionType, InputOutputDescriptionMeta):
-    pass
-
-
-class OutputDescriptionType(OutputIdentifierType, DescriptionType, InputOutputDescriptionMeta):
-    pass
-
-
 class DescribeWithFormats(ExtendedMappingSchema):
-    formats = DescribeFormatDescriptionList()
+    formats = DescriptionFormatList()
 
 
 class DeployWithFormats(ExtendedMappingSchema):
-    formats = DeployFormatDescriptionList()
+    formats = DeploymentFormatList()
 
 
 class DescribeComplexInputType(DescribeWithFormats):
@@ -763,6 +845,8 @@ class NameReferenceType(ExtendedMappingSchema):
 class DataTypeSchema(NameReferenceType):
     description = "Type of the literal data representation."
     title = "DataType"
+    # any named type that can be converted by: 'weaver.processes.convert.any2wps_literal_datatype'
+    name = ExtendedSchemaNode(String(), validator=OneOf(list(WPS_LITERAL_DATA_TYPE_NAMES)))
 
 
 class UomSchema(NameReferenceType):
@@ -774,6 +858,9 @@ class AllowedValuesList(ExtendedSequenceSchema):
 
 
 class AllowedValues(ExtendedMappingSchema):
+    """
+    Allows string values (enum).
+    """
     allowedValues = AllowedValuesList()
 
 
@@ -797,35 +884,41 @@ class AnyValue(ExtendedMappingSchema):
     anyValue = ExtendedSchemaNode(Boolean(), missing=drop, default=True)
 
 
-class ValuesReference(ExtendedMappingSchema):
-    valueReference = ReferenceURL()
+class ValuesReference(ReferenceURL):
+    """
+    URL where to retrieve applicable values.
+    """
 
 
+# FIXME: support byte/binary type (string + format:byte) ?
+#   https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/binaryInputValue.yaml
 class AnyLiteralType(OneOfKeywordSchema):
     """
+    Submitted values that correspond to literal data.
+
     .. seealso::
         - :class:`AnyLiteralDataType`
         - :class:`AnyLiteralValueType`
         - :class:`AnyLiteralDefaultType`
     """
     _one_of = [
-        ExtendedSchemaNode(Float()),
-        ExtendedSchemaNode(Integer()),
-        ExtendedSchemaNode(Boolean()),
-        ExtendedSchemaNode(String()),
+        ExtendedSchemaNode(Float(), description="Literal data type representing a floating point number."),
+        ExtendedSchemaNode(Integer(), description="Literal data type representing an integer number."),
+        ExtendedSchemaNode(Boolean(), description="Literal data type representing a boolean flag."),
+        ExtendedSchemaNode(String(), description="Literal data type representing a generic string."),
     ]
 
 
 class SequenceStringType(ExtendedSequenceSchema):
-    value = ExtendedSchemaNode(String())
+    value_item = ExtendedSchemaNode(String())
 
 
 class SequenceBooleanType(ExtendedSequenceSchema):
-    value = ExtendedSchemaNode(Boolean())
+    value_item = ExtendedSchemaNode(Boolean())
 
 
 class SequenceNumberType(ExtendedSequenceSchema):
-    value = ExtendedSchemaNode(Float())
+    value_item = ExtendedSchemaNode(Float())
 
 
 class ArrayLiteralType(OneOfKeywordSchema):
@@ -863,7 +956,7 @@ class LiteralDataDomainDefinition(ExtendedMappingSchema):
     uom = UomSchema(missing=drop)
 
 
-class LiteralDataDomainConstraints(OneOfKeywordSchema, LiteralDataDomainDefinition):
+class LiteralDataValueDefinition(OneOfKeywordSchema):
     _one_of = [
         AllowedValues,
         AllowedRanges,
@@ -872,7 +965,14 @@ class LiteralDataDomainConstraints(OneOfKeywordSchema, LiteralDataDomainDefiniti
     ]
 
 
+class LiteralDataDomainConstraints(LiteralDataDomainDefinition):
+    valueDefinition = LiteralDataValueDefinition()
+
+
 class LiteralDataDomainList(ExtendedSequenceSchema):
+    """
+    Constraints that apply to the literal data values.
+    """
     literalDataDomain = LiteralDataDomainConstraints()
 
 
@@ -909,33 +1009,82 @@ class DeployInputTypeDefinition(OneOfKeywordSchema):
 
 class DescribeInputType(AllOfKeywordSchema):
     _all_of = [
-        InputDescriptionType(),
+        DescriptionType(),
+        InputOutputDescriptionMeta(),
         DescribeInputTypeDefinition(),
         WithMinMaxOccurs(),
     ]
 
+    _sort_first = PROCESS_IO_FIELD_FIRST
+    _sort_after = PROCESS_IO_FIELD_AFTER
 
+
+class DescribeInputTypeWithID(InputIdentifierType, DescribeInputType):
+    pass
+
+
+# Different definition than 'Describe' such that nested 'complex' type 'formats' can be validated and backward
+# compatible with pre-existing/deployed/remote processes, with either ``mediaType`` and ``mimeType`` formats.
 class DeployInputType(AllOfKeywordSchema):
     _all_of = [
-        InputDescriptionType(),
+        DeploymentType(),
+        InputOutputDescriptionMeta(),
         DeployInputTypeDefinition(),
         WithMinMaxOccurs(),
     ]
 
+    _sort_first = PROCESS_IO_FIELD_FIRST
+    _sort_after = PROCESS_IO_FIELD_AFTER
 
+
+class DeployInputTypeWithID(InputIdentifierType, DeployInputType):
+    pass
+
+
+# for [{id: "", ...}] representation within ProcessDescription (OLD schema)
 class DescribeInputTypeList(ExtendedSequenceSchema):
-    input = DescribeInputType()
+    """
+    Listing of process inputs descriptions.
+    """
+    input = DescribeInputTypeWithID()
 
 
+# for {"<id>": {...}} representation within ProcessDescription (OGC schema)
+class DescribeInputTypeMap(PermissiveMappingSchema):
+    """
+    Description of all process inputs under mapping.
+    """
+    input_id = DescribeInputType(
+        variable="<input-id>",
+        description="Input definition under mapping of process description.",
+        missing=drop,  # allowed because process can have empty inputs (see schema: ProcessDescriptionOGC)
+    )
+
+
+# for [{id: "", ...}] representation within ProcessDeployment (OLD schema)
 class DeployInputTypeList(ExtendedSequenceSchema):
     """
-    Input validation against `OGC-API` recommendation.
-
-    .. note::
-            Format are validated to be backward compatible with pre-existing/deployed/remote processes,
-            it will work with ``mediaType`` and ``mimeType`` formats.
+    Listing of process input definitions to deploy.
     """
-    input = DeployInputType()
+    input_item = DeployInputTypeWithID()
+
+
+# for {"<id>": {...}} representation within ProcessDeployment (OGC schema)
+class DeployInputTypeMap(PermissiveMappingSchema):
+    """
+    Definition of all process inputs under mapping.
+    """
+    input_id = DeployInputType(
+        variable="<input-id>",
+        description="Input definition under mapping of process deployment."
+    )
+
+
+class DeployInputTypeAny(OneOfKeywordSchema):
+    _one_of = [
+        DeployInputTypeList,
+        DeployInputTypeMap,
+    ]
 
 
 class LiteralOutputType(NotKeywordSchema, ExtendedMappingSchema):
@@ -973,33 +1122,80 @@ class DeployOutputTypeDefinition(OneOfKeywordSchema):
     ]
 
 
-class DeployOutputType(AllOfKeywordSchema):
-    _all_of = [
-        DeployOutputTypeDefinition(),
-        OutputDescriptionType(),
-    ]
-
-
 class DescribeOutputType(AllOfKeywordSchema):
     _all_of = [
+        DescriptionType(),
+        InputOutputDescriptionMeta(),
         DescribeOutputTypeDefinition(),
-        OutputDescriptionType(),
     ]
+
+    _sort_first = PROCESS_IO_FIELD_FIRST
+    _sort_after = PROCESS_IO_FIELD_AFTER
+
+
+class DescribeOutputTypeWithID(OutputIdentifierType, DescribeOutputType):
+    pass
 
 
 class DescribeOutputTypeList(ExtendedSequenceSchema):
-    output = DescribeOutputType()
+    """
+    Listing of process outputs descriptions.
+    """
+    output = DescribeOutputTypeWithID()
 
 
+# for {"<id>": {...}} representation within ProcessDescription (OGC schema)
+class DescribeOutputTypeMap(PermissiveMappingSchema):
+    """
+    Definition of all process outputs under mapping.
+    """
+    output_id = DescribeOutputType(
+        variable="<output-id>", title="ProcessOutputDefinition",
+        description="Output definition under mapping of process description."
+    )
+
+
+# Different definition than 'Describe' such that nested 'complex' type 'formats' can be validated and backward
+# compatible with pre-existing/deployed/remote processes, with either ``mediaType`` and ``mimeType`` formats.
+class DeployOutputType(AllOfKeywordSchema):
+    _all_of = [
+        DeploymentType(),
+        InputOutputDescriptionMeta(),
+        DeployOutputTypeDefinition(),
+    ]
+
+    _sort_first = PROCESS_IO_FIELD_FIRST
+    _sort_after = PROCESS_IO_FIELD_AFTER
+
+
+class DeployOutputTypeWithID(OutputIdentifierType, DeployOutputType):
+    pass
+
+
+# for [{id: "", ...}] representation within ProcessDeployment (OLD schema)
 class DeployOutputTypeList(ExtendedSequenceSchema):
     """
-    Output validation against `OGC-API` recommendation.
-
-    .. note::
-        Format are validated to be backward compatible with pre-existing/deployed/remote processes,
-        it will work with ``mediaType`` and ``mimeType`` formats.
+    Listing of process output definitions to deploy.
     """
-    output = DeployOutputType()
+    input = DeployOutputTypeWithID()
+
+
+# for {"<id>": {...}} representation within ProcessDeployment (OGC schema)
+class DeployOutputTypeMap(PermissiveMappingSchema):
+    """
+    Definition of all process outputs under mapping.
+    """
+    input_id = DeployOutputType(
+        variable="<input-id>",
+        description="Output definition under mapping of process deployment."
+    )
+
+
+class DeployOutputTypeAny(OneOfKeywordSchema):
+    _one_of = [
+        DeployOutputTypeList,
+        DeployOutputTypeMap,
+    ]
 
 
 class JobExecuteModeEnum(ExtendedSchemaNode):
@@ -1474,12 +1670,12 @@ class OperationRequest(ExtendedMappingSchema, OWSNamespace):
     href = OperationLink()
 
 
-class OWS_HTTP(ExtendedMappingSchema, OWSNamespace):
+class OWS_HTTP(ExtendedMappingSchema, OWSNamespace):  # noqa: N802
     get = OperationRequest(name="Get", title="OWSGet")
     post = OperationRequest(name="Post", title="OWSPost")
 
 
-class OWS_DCP(ExtendedMappingSchema, OWSNamespace):
+class OWS_DCP(ExtendedMappingSchema, OWSNamespace):  # noqa: N802
     http = OWS_HTTP(name="HTTP", missing=drop)
     https = OWS_HTTP(name="HTTPS", missing=drop)
 
@@ -1583,11 +1779,11 @@ class WPSFormatDefinition(ExtendedMappingSchema, XMLObject):
 
 class WPSFileFormat(ExtendedMappingSchema, XMLObject):
     name = "Format"
-    format = WPSFormatDefinition()
+    format_item = WPSFormatDefinition()
 
 
 class WPSFormatList(ExtendedSequenceSchema):
-    format = WPSFileFormat()
+    format_item = WPSFileFormat()
 
 
 class WPSComplexInputType(ExtendedMappingSchema, WPSNamespace):
@@ -1870,12 +2066,22 @@ class ProviderEndpoint(ProviderPath):
     header = RequestHeaders()
 
 
+class ProcessDescriptionSchemaQuery(ExtendedMappingSchema):
+    # see: 'ProcessDescription' schema and 'Process.offering' method
+    schema = ExtendedSchemaNode(
+        String(), example="OGC", default="OGC", validator=OneOfCaseInsensitive(["OGC", "OLD"]),
+        description="Selects the desired schema representation of the process description."
+    )
+
+
 class ProviderProcessEndpoint(ProviderPath, ProcessPath):
     header = RequestHeaders()
+    querystring = ProcessDescriptionSchemaQuery()
 
 
 class ProcessEndpoint(ProcessPath):
     header = RequestHeaders()
+    querystring = ProcessDescriptionSchemaQuery()
 
 
 class ProcessPackageEndpoint(ProcessPath):
@@ -1983,45 +2189,59 @@ class ProcessLogsEndpoint(ProcessPath, JobPath):
 ##################################################################
 
 
-class CreateProviderRequestBody(ExtendedMappingSchema):
+class ProviderPublic(ExtendedMappingSchema):
+    public = ExtendedSchemaNode(
+        Boolean(),
+        default=False,
+        description="Whether the service is defined as publicly visible. "
+                    "This will not control allowance/denial of requests to the registered endpoint of the service. "
+                    "It only indicates if it should appear during listing of providers."
+    )
+
+
+class CreateProviderRequestBody(ProviderPublic):
     id = AnyIdentifier()
     url = URL(description="Endpoint where to query the provider.")
-    public = ExtendedSchemaNode(Boolean())
 
 
-class InputDataType(InputIdentifierType):
+class ExecuteInputDataType(InputIdentifierType):
     pass
 
 
-class OutputDataType(OutputIdentifierType):
+class ExecuteOutputDataType(OutputIdentifierType):
     format = Format(missing=drop)
 
 
-class Output(OutputDataType):
+class ExecuteOutputDefinition(ExecuteOutputDataType):
     transmissionMode = TransmissionModeEnum(missing=drop)
 
 
-class OutputList(ExtendedSequenceSchema):
-    output = Output()
+class ExecuteOutputFilterList(ExtendedSequenceSchema):
+    """
+    Filter list of outputs to be obtained from execution.
+    """
+    # FIXME:
+    #   nothing done with this currently... execution just generates all outputs anyway
+    #   useful only in for limiting reported outputs in 'sync' mode that should reply after only with those specified
+    output = ExecuteOutputDefinition()
 
 
-class ProviderSummarySchema(ExtendedMappingSchema):
-    """WPS provider summary definition."""
-    id = ExtendedSchemaNode(String())
-    url = URL(description="Endpoint of the provider.")
-    title = ExtendedSchemaNode(String())
-    abstract = ExtendedSchemaNode(String())
-    public = ExtendedSchemaNode(Boolean())
-
-
-class ProviderCapabilitiesSchema(ExtendedMappingSchema):
-    """WPS provider capabilities."""
-    id = ExtendedSchemaNode(String())
-    url = URL(description="WPS GetCapabilities URL of the provider.")
-    title = ExtendedSchemaNode(String())
-    abstract = ExtendedSchemaNode(String())
-    contact = ExtendedSchemaNode(String())
+class ProviderSummarySchema(DescriptionType, ProviderPublic, DescriptionMeta, DescriptionLinks):
+    """
+    Service provider summary definition.
+    """
+    id = AnyIdentifier()
+    url = URL(description="Endpoint of the service provider.")
     type = ExtendedSchemaNode(String())
+
+    _sort_first = PROVIDER_DESCRIPTION_FIELD_FIRST
+    _sort_after = PROVIDER_DESCRIPTION_FIELD_AFTER
+
+
+class ProviderCapabilitiesSchema(ProviderSummarySchema):
+    """
+    Service provider detailed capabilities.
+    """
 
 
 class TransmissionModeList(ExtendedSequenceSchema):
@@ -2037,55 +2257,126 @@ class ExceptionReportType(ExtendedMappingSchema):
     description = ExtendedSchemaNode(String(), missing=drop)
 
 
-class ProcessSummary(ProcessDescriptionType, ProcessDescriptionMeta):
-    """WPS process definition."""
-    version = Version(missing=drop)
-    jobControlOptions = JobControlOptionsList(missing=[])
-    outputTransmission = TransmissionModeList(missing=[])
-    processDescriptionURL = URL(description="Process description endpoint.",
+class ProcessControl(ExtendedMappingSchema):
+    jobControlOptions = JobControlOptionsList(missing=[EXECUTE_CONTROL_OPTION_ASYNC],
+                                              default=[EXECUTE_CONTROL_OPTION_ASYNC])
+    outputTransmission = TransmissionModeList(missing=[EXECUTE_TRANSMISSION_MODE_REFERENCE],
+                                              default=[EXECUTE_TRANSMISSION_MODE_REFERENCE])
+
+
+class ProcessLocations(ExtendedMappingSchema):
+    """
+    Additional endpoint locations specific to the process.
+    """
+    processDescriptionURL = URL(description="Process description endpoint using OGC-API interface.",
                                 missing=drop, title="processDescriptionURL")
+    processEndpointWPS1 = URL(description="Process description endpoint using WPS-1 interface.",
+                              missing=drop, title="processEndpointWPS1")
+    executeEndpoint = URL(description="Endpoint where the process can be executed from.",
+                          missing=drop, title="executeEndpoint")
+    # 'links' already included via 'ProcessDescriptionType->DescriptionType'
+
+
+class ProcessSummary(
+    ProcessDescriptionType,
+    DescriptionMeta,
+    ProcessControl,
+    ProcessLocations,
+    DescriptionLinks
+):
+    """
+    Summary process definition.
+    """
+    _sort_first = PROCESS_DESCRIPTION_FIELD_FIRST
+    _sort_after = PROCESS_DESCRIPTION_FIELD_AFTER
 
 
 class ProcessSummaryList(ExtendedSequenceSchema):
-    processSummary = ProcessSummary()
+    summary = ProcessSummary()
 
 
 class ProcessCollection(ExtendedMappingSchema):
     processes = ProcessSummaryList()
+    links = LinkList(missing=drop)
 
 
-class ProcessInfo(ExtendedMappingSchema):
-    executeEndpoint = URL(description="Endpoint where the process can be executed from.", missing=drop)
-
-
-class Process(ProcessInfo, ProcessDescriptionType, ProcessDescriptionMeta):
-    inputs = DescribeInputTypeList(description="Inputs definition of the process.")
-    outputs = DescribeOutputTypeList(description="Outputs definition of the process.")
+class ProcessVisibility(ExtendedMappingSchema):
     visibility = VisibilityValue(missing=drop)
 
 
-class ProcessDeployment(ProcessDescriptionType, ProcessDeployMeta):
+class Process(
+    # following are like 'ProcessSummary',
+    # except without 'ProcessControl' and 'DescriptionLinks' that are outside of nested 'process'
+    ProcessDescriptionType, DescriptionMeta,
+    # following are additional fields only in description, just like for OGC-API ProcessDescription
+    ProcessContext, ProcessVisibility, ProcessLocations
+):
+    """
+    Old nested process schema for process description.
+    """
+    # note: deprecated in favor of OGC-API schema
+    inputs = DescribeInputTypeList(description="Inputs definition of the process.")
+    outputs = DescribeOutputTypeList(description="Outputs definition of the process.")
+
+    _sort_first = PROCESS_DESCRIPTION_FIELD_FIRST
+    _sort_after = PROCESS_DESCRIPTION_FIELD_AFTER
+
+
+class ProcessDescriptionOLD(ProcessControl, DescriptionLinks):
+    """
+    Old schema for process description.
+    """
+    deprecated = True
+    process = Process()
+
+    _sort_first = PROCESS_DESCRIPTION_FIELD_FIRST_OLD_SCHEMA
+    _sort_after = PROCESS_DESCRIPTION_FIELD_AFTER_OLD_SCHEMA
+
+
+class ProcessDescriptionOGC(ProcessSummary, ProcessContext, ProcessVisibility, ProcessLocations, DescriptionLinks):
+    """
+    OGC-API schema for process description.
+    """
+    # technically, empty inputs are allowed for processes that should generate constant/randomized outputs
+    # example:
+    #   https://pavics.ouranos.ca/twitcher/ows/proxy/catalog
+    #   ?service=WPS&request=DescribeProcess&version=1.0.0&identifier=pavicstestdocs
+    inputs = DescribeInputTypeMap(description="Inputs definition of the process.", missing=drop, default={})
+    outputs = DescribeOutputTypeMap(description="Outputs definition of the process.")
+
+    _sort_first = PROCESS_DESCRIPTION_FIELD_FIRST
+    _sort_after = PROCESS_DESCRIPTION_FIELD_AFTER
+
+
+class ProcessDescription(OneOfKeywordSchema):
+    """
+    Supported schema representations of a process description (based on specified query parameters).
+    """
+    _one_of = [
+        ProcessDescriptionOGC,
+        ProcessDescriptionOLD,
+    ]
+
+
+class ProcessDeployment(ProcessSummary, ProcessContext, ProcessDeployMeta):
+    # explicit "abstract" handling for bw-compat, new versions should use "description"
+    # only allowed in deploy to support older servers that report abstract (or parsed from WPS-1/2)
+    # recent OGC-API v1+ will usually provide directly "description" as per the specification
+    abstract = ExtendedSchemaNode(String(), missing=drop, deprecated=True,
+                                  description="Detailed explanation of the process being deployed. "
+                                              "[Deprecated] Consider using 'description' instead.")
     # allowed undefined I/O during deploy because of reference from owsContext or executionUnit
-    inputs = DeployInputTypeList(
+    inputs = DeployInputTypeAny(
         missing=drop, title="DeploymentInputs",
         description="Additional definitions for process inputs to extend generated details by the referred package. "
                     "These are optional as they can mostly be inferred from the 'executionUnit', but allow specific "
                     "overrides (see '{}/package.html#correspondence-between-cwl-and-wps-fields')".format(DOC_URL))
-    outputs = DeployOutputTypeList(
+    outputs = DeployOutputTypeAny(
         missing=drop, title="DeploymentOutputs",
         description="Additional definitions for process outputs to extend generated details by the referred package. "
                     "These are optional as they can mostly be inferred from the 'executionUnit', but allow specific "
                     "overrides (see '{}/package.html#correspondence-between-cwl-and-wps-fields')".format(DOC_URL))
     visibility = VisibilityValue(missing=drop)
-
-
-class ProcessDescriptionOutputSchema(ExtendedMappingSchema):
-    """WPS process output definition."""
-    dataType = ExtendedSchemaNode(String())
-    defaultValue = ExtendedMappingSchema()
-    id = ExtendedSchemaNode(String())
-    abstract = ExtendedSchemaNode(String())
-    title = ExtendedSchemaNode(String())
 
 
 class JobStatusInfo(ExtendedMappingSchema):
@@ -2223,8 +2514,17 @@ class ArrayReferenceValueType(ExtendedMappingSchema):
     value = ArrayReference()
 
 
-class AnyType(OneOfKeywordSchema):
-    """Permissive variants that we attempt to parse automatically."""
+# Backward compatible data-input that allows values to be nested under 'data' or 'value' fields,
+# both for literal values and link references, for inputs submitted as list-items.
+# Also allows the explicit 'href' (+ optional format) reference for a link.
+#
+# Because this data-input structure applies only to list-items (see 'ExecuteInputItem' below), mapping is always needed.
+# (i.e.: values cannot be submitted inline in the list, because field 'id' of each input must also be provided)
+# For this reason, one of 'value', 'data', 'href' or 'reference' is mandatory.
+class ExecuteInputAnyType(OneOfKeywordSchema):
+    """
+    Permissive variants that we attempt to parse automatically.
+    """
     _one_of = [
         # Array of literal data with 'data' key
         ArrayLiteralDataType(),
@@ -2242,92 +2542,123 @@ class AnyType(OneOfKeywordSchema):
     ]
 
 
-class ExecuteInput(InputDataType, AnyType):
-    """
-    Default value to be looked for uses key 'value' to conform to OGC API standard.
-    We still look for 'href', 'data' and 'reference' to remain back-compatible.
-    """
+class ExecuteInputItem(ExecuteInputDataType, ExecuteInputAnyType):
+    description = (
+        "Default value to be looked for uses key 'value' to conform to older drafts of OGC-API standard. "
+        "Even older drafts that allowed other fields 'data' instead of 'value' and 'reference' instead of 'href' "
+        "are also looked for to remain back-compatible."
+    )
 
 
-class ExecuteInputString(ExtendedSchemaNode):
-    schema_type = String
-    title = "String input"
-    description = "Execute input string definition."
-    example = "This is a string"
-
-
-class ExecuteInputInteger(ExtendedSchemaNode):
-    schema_type = Integer
-    title = "Integer input"
-    description = "Execute input integer definition."
-    example = 8
-
-
-class ExecuteInputFloat(ExtendedSchemaNode):
-    schema_type = Float
-    title = "Float input"
-    description = "Execute input float definition."
-    example = 2.45
-
-
-class ExecuteInputTypes(OneOfKeywordSchema):
-    title = "Execute inputs types"
-    description = "Execute input supported types."
-    _one_of = [
-        ExecuteInputInteger(summary="Execute input integer value."),
-        ExecuteInputFloat(summary="Execute input float value."),
-        ExecuteInputString(summary="Execute input string value")
-    ]
-
-
-class ExecuteInputValue(OneOfKeywordSchema):
-    _one_of = [
-        ExecuteInputTypes(),
-        ExtendedMappingSchema()
-    ]
-
-
-class ExecuteInputObject(PermissiveMappingSchema):
-    value = ExecuteInputValue(variable="<input-id>")
-    inputBinding = ExtendedMappingSchema(missing=drop, title="Input Binding",
-                                         description="Defines how to specify the input for the command.")
-
-
+# backward compatible definition:
+#
+#   inputs: [
+#     {"id": "<id>", "value": <data>},
+#     {"id": "<id>", "href": <link>}
+#     ... (other variants) ...
+#   ]
+#
 class ExecuteInputListValues(ExtendedSequenceSchema):
-    description = "List of allowed direct Execute values."
-    items = ExecuteInputTypes()
+    input_item = ExecuteInputItem(summary="Received list input value definition during job submission.")
 
 
-class ExecuteInputDict(OneOfKeywordSchema):
-    description = "Execute type definition of the input."
+# https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/inputValueNoObject.yaml
+# Any literal value directly provided inline in input mapping.
+#
+#   {"inputs": {"<id>": <literal-data>}}
+#
+# Excludes objects to avoid conflict with later object mapping and {"value": <data>} definitions.
+# Excludes array literals that will be defined separately with allowed array of any item within this schema.
+# FIXME: does not support byte/binary type (string + format:byte) - see also: 'AnyLiteralType'
+#   https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/binaryInputValue.yaml
+# FIXME: does not support bbox
+#   https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/bbox.yaml
+class ExecuteInputInlineValue(OneOfKeywordSchema):
+    description = "Execute input value provided inline."
     _one_of = [
-        ExecuteInputTypes(variable="<input-id>"),
-        ExecuteInputListValues(summary="Execute input list."),
-        ExecuteInputObject(summary="Execute input value definition with parameters."),
+        ExtendedSchemaNode(Float()),
+        ExtendedSchemaNode(Integer()),
+        ExtendedSchemaNode(Boolean()),
+        ExtendedSchemaNode(String()),
+        Reference(summary="Execute input reference link definition with parameters."),
     ]
 
 
-class ExecuteInputMap(PermissiveMappingSchema):
-    input_id = ExecuteInputDict(variable="<input-id>", title="ExecuteInputIdentifier",
-                                description="Received mapping input definition during job submission.")
-
-
-class ExecuteInputList(ExtendedSequenceSchema):
-    input_item = ExecuteInput(missing=drop, description="Received list input definition during job submission.")
-
-
-class ExecuteInputsDefinition(OneOfKeywordSchema):
+# https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/inputValue.yaml
+#
+#   oneOf:
+#     - $ref: "inputValueNoObject.yaml"
+#     - type: object
+#
+class ExecuteInputObjectData(OneOfKeywordSchema):
+    description = "Data value of any schema "
     _one_of = [
-        ExecuteInputList(missing=drop, description="Package inputs defined as items."),
-        ExecuteInputMap(description="Package inputs defined as mapping."),
+        ExecuteInputInlineValue,
+        PermissiveMappingSchema
+    ]
+
+
+# https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/qualifiedInputValue.yaml
+class ExecuteInputObject(Format):
+    value = ExecuteInputObjectData()    # can be anything, including literal value, array of them, nested object
+
+
+class ExecuteInputArrayValues(ExtendedSequenceSchema):
+    item_value = ExecuteInputInlineValue()
+
+
+# combine 'inlineOrRefData' and its 'array[inlineOrRefData]' variants to simplify 'ExecuteInputAny' definition
+class ExecuteInputInline(OneOfKeywordSchema):
+    _one_of = [
+        ExecuteInputInlineValue,
+        ExecuteInputArrayValues
+    ]
+
+
+# https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/inlineOrRefData.yaml
+#
+#   oneOf:
+#     - $ref: "inputValueNoObject.yaml"     # in OGC-API spec, includes a generic array
+#     - $ref: "qualifiedInputValue.yaml"
+#     - $ref: "link.yaml"
+#
+class ExecuteInputAny(OneOfKeywordSchema):
+    description = "Execute data definition of the input."
+    _one_of = [
+        ExecuteInputInline(summary="Execute input value(s) provided inline."),          # 'inputValueNoObject' + 'link'
+        ExecuteInputObject(summary="Execute input value definition with parameters."),  # 'qualifiedInputValue'
+    ]
+
+
+# https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/execute.yaml
+#
+#   inputs:
+#     additionalProperties:           # this is the below 'variable=<input-id>'
+#       oneOf:
+# 	    - $ref: "inlineOrRefData.yaml"
+# 	    - type: array
+# 	      items:
+# 	        $ref: "inlineOrRefData.yaml"
+#
+class ExecuteInputMapValues(ExtendedMappingSchema):
+    input_id = ExecuteInputAny(variable="<input-id>", title="ExecuteInputValue",
+                               description="Received mapping input value definition during job submission.")
+
+
+class ExecuteInputValues(OneOfKeywordSchema):
+    _one_of = [
+        # OLD format: {"inputs": [{"id": "<id>", "value": <data>}, ...]}
+        ExecuteInputListValues(missing=drop, description="Process job execution inputs defined as item listing."),
+        # OGC-API:    {"inputs": {"<id>": <data>, "<id>": {"value": <data>}, ...}}
+        ExecuteInputMapValues(description="Process job execution inputs defined as mapping."),
     ]
 
 
 class Execute(ExtendedMappingSchema):
     # permit unspecified inputs for processes that could technically allow no-inputs definition (CWL),
-    # but very unlikely/unusual in real world scenarios (possible case: constant endpoint fetcher?)
-    inputs = ExecuteInputsDefinition(missing=drop)
-    outputs = OutputList()
+    # but very unlikely/unusual in real world scenarios (possible cases: constant endpoint fetcher, RNG output)
+    inputs = ExecuteInputValues(missing=drop)
+    outputs = ExecuteOutputFilterList(description="Filter list of outputs to be obtained from execution.")
     mode = JobExecuteModeEnum()
     notification_email = ExtendedSchemaNode(
         String(),
@@ -2508,11 +2839,11 @@ class ESGF_CWT_RequirementSpecification(PermissiveMappingSchema):
     provider = AnyIdentifier(description="ESGF-CWT provider endpoint.")
 
 
-class ESGF_CWT_RequirementMap(ExtendedMappingSchema):
+class ESGF_CWT_RequirementMap(ExtendedMappingSchema):  # noqa: N802
     req = ESGF_CWT_RequirementSpecification(name=CWL_REQUIREMENT_APP_ESGF_CWT)
 
 
-class ESGF_CWT_RequirementClass(ESGF_CWT_RequirementSpecification):
+class ESGF_CWT_RequirementClass(ESGF_CWT_RequirementSpecification):  # noqa: N802
     _class = RequirementClass(example=CWL_REQUIREMENT_APP_ESGF_CWT, validator=OneOf([CWL_REQUIREMENT_APP_ESGF_CWT]))
 
 
@@ -2792,41 +3123,6 @@ class Unit(ExtendedMappingSchema):
     unit = CWL(description="Execution unit definition as CWL package specification. " + CWL_DOC_MESSAGE)
 
 
-class ProcessInputDefaultValues(ExtendedSequenceSchema):
-    value = DefaultValues()
-
-
-class ProcessInputSupportedValues(ExtendedSequenceSchema):
-    value = SupportedValues()
-
-
-class ProcessDescriptionInputSchema(ExtendedMappingSchema):
-    id = AnyIdentifier()
-    title = ExtendedSchemaNode(String())
-    dataType = ExtendedSchemaNode(String())
-    abstract = ExtendedSchemaNode(String())
-    minOccurs = MinOccursDefinition()
-    maxOccurs = MaxOccursDefinition()
-    defaultValue = ProcessInputDefaultValues()
-    supportedValues = ProcessInputSupportedValues()
-
-
-class ProcessDescriptionInputList(ExtendedSequenceSchema):
-    input = ProcessDescriptionInputSchema()
-
-
-class ProcessDescriptionOutputList(ExtendedSequenceSchema):
-    input = ProcessDescriptionOutputSchema()
-
-
-class ProcessDescriptionSchema(ExtendedMappingSchema):
-    id = AnyIdentifier()
-    label = ExtendedSchemaNode(String())
-    description = ExtendedSchemaNode(String())
-    inputs = ProcessDescriptionInputList()
-    outputs = ProcessDescriptionOutputList()
-
-
 class UndeploymentResult(ExtendedMappingSchema):
     id = AnyIdentifier()
 
@@ -2835,16 +3131,33 @@ class DeploymentResult(ExtendedMappingSchema):
     processSummary = ProcessSummary()
 
 
-class ProcessDescriptionBodySchema(ExtendedMappingSchema):
-    process = ProcessDescriptionSchema()
+class ProvidersListSchema(ExtendedSequenceSchema):
+    provider_service = ProviderSummarySchema()
 
 
-class ProvidersSchema(ExtendedSequenceSchema):
-    providers_service = ProviderSummarySchema()
+class ProviderNamesSchema(ExtendedSequenceSchema):
+    provider_name = AnyIdentifier()
 
 
-class ProcessesSchema(ExtendedSequenceSchema):
-    provider_processes_service = ProcessDescriptionInputSchema()
+class ProviderListing(OneOfKeywordSchema):
+    _one_of = [
+        ProvidersListSchema(description="Listing of provider summary details retrieved from remote service."),
+        ProviderNamesSchema(description="Listing of provider names, possibly unvalidated from remote service."),
+    ]
+
+
+class ProvidersBodySchema(ExtendedMappingSchema):
+    checked = ExtendedSchemaNode(
+        Boolean(),
+        description="Indicates if the listed providers have been validated and are accessible from registered URL. "
+                    "In such case, provider metadata was partially retrieved from remote services and is accessible. "
+                    "Otherwise, only local metadata is provided and service availability is not guaranteed."
+    )
+    providers = ProviderListing(description="Providers listing according to specified query parameters.")
+
+
+class ProviderProcessesSchema(ExtendedSequenceSchema):
+    provider_process = ProcessSummary()
 
 
 class JobOutputValue(OneOfKeywordSchema):
@@ -2856,7 +3169,7 @@ class JobOutputValue(OneOfKeywordSchema):
 
 class JobOutput(AllOfKeywordSchema):
     _all_of = [
-        OutputDataType(),
+        ExecuteOutputDataType(),
         JobOutputValue(),
     ]
 
@@ -2926,7 +3239,7 @@ class Result(ExtendedMappingSchema):
 
 
 class JobInputsSchema(ExtendedMappingSchema):
-    inputs = ExecuteInputList()
+    inputs = ExecuteInputListValues()
     links = LinkList(missing=drop)
 
 
@@ -3022,19 +3335,11 @@ class ExecutionUnitList(ExtendedSequenceSchema):
     )
 
 
-class ProcessOfferingBase(ExtendedMappingSchema):
-    process = Process()
+class ProcessDeploymentOffering(ExtendedMappingSchema):
+    process = ProcessDeployment()
     processVersion = Version(title="processVersion", missing=drop)
     jobControlOptions = JobControlOptionsList(missing=drop)
     outputTransmission = TransmissionModeList(missing=drop)
-
-
-class ProcessOffering(ProcessOfferingBase):
-    process = Process()
-
-
-class ProcessDeploymentOffering(ProcessOfferingBase):
-    process = ProcessDeployment()
 
 
 class ProcessDescriptionChoiceType(OneOfKeywordSchema):
@@ -3158,7 +3463,21 @@ class PostProcessQuoteRequestEndpoint(ProcessPath, QuotePath):
 # ################################################################
 
 
+class ProvidersQuerySchema(ExtendedMappingSchema):
+    detail = ExtendedSchemaNode(
+        Boolean(), example=True, default=True, missing=drop,
+        description="Return summary details about each provider, or simply their IDs."
+    )
+    check = ExtendedSchemaNode(
+        Boolean(), example=True, default=True, missing=drop,
+        description="List only reachable providers, dropping unresponsive ones that cannot be checked for listing. "
+                    "Otherwise, all registered providers are listed regardless of their availability. When requesting "
+                    "details, less metadata will be provided since it will not be fetched from remote services."
+    )
+
+
 class GetProviders(ExtendedMappingSchema):
+    querystring = ProvidersQuerySchema()
     header = RequestHeaders()
 
 
@@ -3176,7 +3495,9 @@ class GetProviderProcess(ExtendedMappingSchema):
 
 
 class PostProviderProcessJobRequest(ExtendedMappingSchema):
-    """Launching a new process request definition."""
+    """
+    Launching a new process request definition.
+    """
     header = RequestHeaders()
     querystring = LaunchJobQuerystring()
     body = Execute()
@@ -3198,7 +3519,9 @@ class OWSErrorCode(ExtendedSchemaNode):
 
 
 class OWSExceptionResponse(ExtendedMappingSchema):
-    """Error content in XML format"""
+    """
+    Error content in XML format.
+    """
     description = "OWS formatted exception."
     code = OWSErrorCode(example="NoSuchProcess")
     locator = ExtendedSchemaNode(String(), example="identifier",
@@ -3270,7 +3593,7 @@ class OkGetConformanceResponse(ExtendedMappingSchema):
 
 class OkGetProvidersListResponse(ExtendedMappingSchema):
     header = ResponseHeaders()
-    body = ProvidersSchema()
+    body = ProvidersBodySchema()
 
 
 class OkGetProviderCapabilitiesSchema(ExtendedMappingSchema):
@@ -3289,7 +3612,7 @@ class NotImplementedDeleteProviderResponse(ExtendedMappingSchema):
 
 class OkGetProviderProcessesSchema(ExtendedMappingSchema):
     header = ResponseHeaders()
-    body = ProcessesSchema()
+    body = ProviderProcessesSchema()
 
 
 class GetProcessesQuery(ExtendedMappingSchema):
@@ -3332,7 +3655,7 @@ class BadRequestGetProcessInfoResponse(ExtendedMappingSchema):
 
 class OkGetProcessInfoResponse(ExtendedMappingSchema):
     header = ResponseHeaders()
-    body = ProcessOffering()
+    body = ProcessDescription()
 
 
 class OkGetProcessPackageSchema(ExtendedMappingSchema):
@@ -3380,7 +3703,7 @@ class OkDeleteProcessResponse(ExtendedMappingSchema):
 
 class OkGetProviderProcessDescriptionResponse(ExtendedMappingSchema):
     header = ResponseHeaders()
-    body = ProcessDescriptionBodySchema()
+    body = ProcessDescription()
 
 
 class CreatedPostProvider(ExtendedMappingSchema):
@@ -3532,8 +3855,14 @@ post_processes_responses = {
 }
 get_process_responses = {
     "200": OkGetProcessInfoResponse(description="success", examples={
-        "ProcessDescription": {
-            "summary": "Description of a local process registered in Weaver.",
+        "ProcessDescriptionSchemaOGC": {
+            "summary": "Description of a local process registered in Weaver (OGC Schema) "
+                       "with fields on top-level and using inputs/outputs as mapping with keys as IDs.",
+            "value": EXAMPLES["local_process_description_ogc_api.json"],
+        },
+        "ProcessDescriptionSchemaOld": {
+            "summary": "Description of a local process registered in Weaver (Old Schema) "
+                       "with fields nested under a process section and using inputs/outputs listed with IDs.",
             "value": EXAMPLES["local_process_description.json"],
         }
     }),
@@ -3580,6 +3909,10 @@ get_providers_list_responses = {
         "ProviderList": {
             "summary": "Listing of registered remote providers.",
             "value": EXAMPLES["provider_listing.json"],
+        },
+        "ProviderNames": {
+            "summary": "Listing of registered providers names without validation.",
+            "value": EXAMPLES["provider_names.json"],
         }
     }),
     "403": ForbiddenProviderAccessResponseSchema(),
@@ -3776,22 +4109,24 @@ def service_api_route_info(service_api, settings):
 
 def datetime_interval_parser(datetime_interval):
     # type: (str) -> DatetimeIntervalType
-    """This function parses a given datetime or interval into a dictionary that will be easy for database process."""
+    """
+    This function parses a given datetime or interval into a dictionary that will be easy for database process.
+    """
     parsed_datetime = {}
 
     if datetime_interval.startswith(DATETIME_INTERVAL_OPEN_START_SYMBOL):
         datetime_interval = datetime_interval.replace(DATETIME_INTERVAL_OPEN_START_SYMBOL, "")
-        parsed_datetime["before"] = dateparser.parse(datetime_interval)
+        parsed_datetime["before"] = date_parser.parse(datetime_interval)
 
     elif datetime_interval.endswith(DATETIME_INTERVAL_OPEN_END_SYMBOL):
         datetime_interval = datetime_interval.replace(DATETIME_INTERVAL_OPEN_END_SYMBOL, "")
-        parsed_datetime["after"] = dateparser.parse(datetime_interval)
+        parsed_datetime["after"] = date_parser.parse(datetime_interval)
 
     elif DATETIME_INTERVAL_CLOSED_SYMBOL in datetime_interval:
         datetime_interval = datetime_interval.split(DATETIME_INTERVAL_CLOSED_SYMBOL)
-        parsed_datetime["after"] = dateparser.parse(datetime_interval[0])
-        parsed_datetime["before"] = dateparser.parse(datetime_interval[-1])
+        parsed_datetime["after"] = date_parser.parse(datetime_interval[0])
+        parsed_datetime["before"] = date_parser.parse(datetime_interval[-1])
     else:
-        parsed_datetime["match"] = dateparser.parse(datetime_interval)
+        parsed_datetime["match"] = date_parser.parse(datetime_interval)
 
     return parsed_datetime

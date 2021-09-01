@@ -28,7 +28,22 @@ limit-inference-results=100
 
 # List of plugins (as comma separated values of python module names) to load,
 # usually to register additional checkers.
-load-plugins=
+# https://pylint.pycqa.org/en/latest/technical_reference/extensions.html
+load-plugins=pylint.extensions.docparams,
+             pylint.extensions.mccabe
+
+# https://pylint.pycqa.org/en/latest/technical_reference/extensions.html#design-checker-options
+max-complexity = 24
+# FIXME: medium/lower-high complexity permitted, should focus toward <20 to facilitate testing and debugging
+
+# https://pylint.pycqa.org/en/latest/technical_reference/extensions.html#parameter-documentation-checker-options
+# allow unspecified items, but if the docstring is present, it should follow Sphinx format for documentation generation
+# see also 'disabled' W90XX warnings, we ignore only raised 'missing', but detect invalid documentation issues
+accept-no-param-doc = yes
+accept-no-raise-doc = yes
+accept-no-return-doc = yes
+accept-no-yields-doc = yes
+default-docstring-type = sphinx
 
 # Pickle collected data for later comparisons.
 persistent=yes
@@ -87,7 +102,15 @@ disable=C0111,missing-docstring,
         W0640,cell-var-from-loop,
         W0706,try-except-raise,
         W0707,raise-missing-from,
-        W1508,invalid-envvar-default
+        W1508,invalid-envvar-default,
+        W9005,multiple-constructor-doc,
+        W9006,missing-raises-doc,
+        W9011,missing-return-doc,
+        W9012,missing-return-type-doc,
+        W9013,missing-yield-doc,
+        W9014,missing-yield-type-doc,
+        W9015,missing-param-doc,
+        W9016,missing-type-doc
 
 # note: (C0412, ungrouped-imports) is managed via isort tool, ignore false positives
 

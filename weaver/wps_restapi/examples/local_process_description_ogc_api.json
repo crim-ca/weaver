@@ -1,0 +1,73 @@
+{
+  "id": "jsonarray2netcdf",
+  "title": "JSON array to NetCDF",
+  "version": "1.1",
+  "abstract": "Extracts and fetches NetCDF files from a JSON file containing an URL string array, and provides them on the output directory.",
+  "keywords": [],
+  "metadata": [],
+  "inputs": {
+    "input": {
+      "title": "input",
+      "formats": [
+        {
+          "mimeType": "application/json",
+          "default": true
+        }
+      ],
+      "minOccurs": "1",
+      "maxOccurs": "1"
+    }
+  },
+  "outputs": {
+    "output": {
+      "title": "output",
+      "formats": [
+        {
+          "mimeType": "application/x-netcdf",
+          "default": true
+        }
+      ]
+    }
+  },
+  "visibility": "public",
+  "processEndpointWPS1": "http://localhost:4002/wps",
+  "processDescriptionURL": "http://localhost:4002/processes/jsonarray2netcdf/jobs",
+  "executeEndpoint": "http://localhost:4002/processes/jsonarray2netcdf/jobs",
+  "links": [
+    {
+      "type": "application/json",
+      "title": "Process description.",
+      "hreflang": "en-CA",
+      "href": "http://localhost:4002/processes/jsonarray2netcdf",
+      "rel": "self"
+    },
+    {
+      "type": "application/json",
+      "title": "Process description.",
+      "hreflang": "en-CA",
+      "href": "http://localhost:4002/processes/jsonarray2netcdf",
+      "rel": "process-desc"
+    },
+    {
+      "type": "application/json",
+      "title": "Process execution endpoint for job submission.",
+      "hreflang": "en-CA",
+      "href": "http://localhost:4002/processes/jsonarray2netcdf/execution",
+      "rel": "execute"
+    },
+    {
+      "type": "application/json",
+      "title": "List of registered processes.",
+      "hreflang": "en-CA",
+      "href": "http://localhost:4002/processes",
+      "rel": "collection"
+    },
+    {
+      "type": "application/xml",
+      "title": "Service definition.",
+      "hreflang": "en-CA",
+      "href": "http://localhost:4002/ows/wps?service=WPS&request=GetCapabilities",
+      "rel": "service-desc"
+    }
+  ]
+}

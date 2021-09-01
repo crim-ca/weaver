@@ -10,12 +10,65 @@ Changes
 
 Changes:
 --------
-- No change.
+- Apply conformance updates to better align with expected ``ProcessDescription`` schema from
+  `OGC-API - Processes v1.0-draft6 <https://github.com/opengeospatial/ogcapi-processes/tree/1.0-draft.6>`_.
+  The principal change introduced in this case is that process description contents will be directly at the root
+  of the object returned by ``/processes/{id}`` response instead of being nested under ``"process"`` field.
+  Furthermore, ``inputs`` and ``outputs`` definitions are reported as mapping of ``{"<id>": {<parameters>}}`` as
+  specified by OGP-API instead of old listing format ``[{"id": "<id-value>", <key:val parameters>}]``. The old
+  nested and listing format can still be obtained using request query parameter ``schema=OLD``, and will otherwise use
+  `OGC-API` by default or when ``schema=OGC``. Note that some duplicated metadata fields are dropped regardless of
+  selected format in favor of `OGC-API` names. Some examples are ``abstract`` that becomes ``description``,
+  ``processVersion`` that simply becomes ``version``, ``mimeType`` that becomes ``mediaType``, etc.
+  Some of those changes are also reflected by ``ProcessSummary`` during listing of processes, as well as for
+  corresponding provider-related endpoints (relates to `#200 <https://github.com/crim-ca/weaver/issues/200>`_).
+- Add backward compatibility support of some metadata fields (``abstract``, ``mimeType``, etc.) for ``Deploy``
+  operation of pre-existing processes. When those fields are detected, they are converted inplace in favor of their
+  corresponding new names aligned with `OGC-API`.
+- Update ``mimeType`` to ``mediaType`` as format type representation according to `OGC-API`
+  (relates to `#211  <https://github.com/crim-ca/weaver/issues/211>`_).
+- Add explicit pattern validation (``type/subtype``) of format string definitions with ``MediaType`` schema.
+- Add sorting capability to generate mapping schemas for API responses using overrides of
+  properties ``_sort_first`` and ``_sort_after`` using lists of desired ordered field names.
+- Improved naming of many ambiguous and repeated words across schema definitions that did not necessarily interact
+  with each other although making use of similar naming convention, making their interpretation and debugging much
+  more complicated. A stricter naming convention has been applied for consistent Deploy/Describe/Execute-related
+  and Input/Output-related references.
+- Replace ``list_remote_processes`` function by method ``processes`` under the ``Service`` instance.
+- Replace ``get_capabilities`` function by reusing and extending method ``summary`` under the ``Service`` instance.
+- Improve generation of metadata and content validation of ``Service`` provider responses
+  (relates to OGC `#200 <https://github.com/crim-ca/weaver/issues/200>`_
+  and `#266 <https://github.com/crim-ca/weaver/issues/266>`_).
+- Add query parameter ``detail`` to providers listing request to allow listing of names instead of their summary
+  (similarly to the processes endpoint query parameter).
+- Add query parameter ``check`` to providers listing request to retrieve all registered ``Service`` regardless of
+  their URL endpoint availability at the moment the request is executed (less metadata is retrieved in that case).
+- Add ``weaver.schema_url`` configuration parameter and ``weaver.wps_restapi.utils.get_schema_ref`` function to help
+  generate ``$schema`` definition and return reference to expected/provided schema in responses
+  (relates to `#157 <https://github.com/crim-ca/weaver/issues/157>`_)
+  Only utilities are added, not all routes provide the information yet.
+- Add validation of ``schema`` field under ``Format`` schema (as per `opengeospatial/ogcapi-processes schema format.yml
+  <https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/format.yaml>`_) such that only
+  URL formatted strings are allowed, or alternatively and explicit JSON definition. Previous definitions that would
+  indicate an empty string schema are dropped since ``schema`` is optional.
 
 Fixes:
 ------
-- Update ``mimeType`` to ``mediaType`` as format type representation according to `OGC-API`
-  (fixes `#211  <https://github.com/crim-ca/weaver/issues/211>`_).
+- Revert an incorrectly removed schema deserialization operation during generation of the ``ProcessSummary`` employed
+  for populating process listing.
+- Revert an incorrectly modified schema reference that erroneously replaced service provider ``ProcessSummary`` items
+  during their listing by a single ``ProcessInputDescriptionSchema`` (introduced since ``3.0.0``).
+- Fix `#203 <https://github.com/crim-ca/weaver/issues/203>`_ with explicit validation test of ``ProcessSummary``
+  schema for providers response.
+- Fix failing ``minOccurs`` and ``maxOccurs`` generation from a remote provider ``Process`` to support `OGC-API` format
+  (relates to `#263  <https://github.com/crim-ca/weaver/issues/263>`_).
+- Fix schemas references and apply deserialization to providers listing request.
+- Fix failing deserialization of ``variable`` children schema under mapping when this variable element is allowed
+  to be undefined (i.e.: defined with ``missing=drop``). Allows support of empty ``inputs`` mapping of `OGC-API`
+  representation of ``ProcessDescription`` that permits such processes (constant or random output generator).
+- Fix some invalid definitions of execution inputs schemas under mapping with ``value`` sub-schema where key-based
+  input IDs (using ``additionalProperties``) where replaced by the *variable* ``<input-id>`` name instead of their
+  original names in the request body (from `#265 <https://github.com/crim-ca/weaver/issues/265>`_ since ``3.4.0``).
 
 `3.5.0 <https://github.com/crim-ca/weaver/tree/3.5.0>`_ (2021-08-19)
 ========================================================================
@@ -26,7 +79,6 @@ Changes:
 
 Fixes:
 ------
-- Fix copy of headers when generating the WPS clients created for listing providers capabilities and processes.
 - Fix ``weaver.datatype`` objects auto-resolution of fields using either attributes (accessed as ``dict``)
   or properties (accessed as ``class``) to ensure correct handling of additional operations on them.
 - Fix ``DuplicateKeyError`` that could sporadically arise during initial ``processes`` storage creation
@@ -47,7 +99,7 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Fix copy of headers when generating the WPS clients created for listing providers capabilities and processes.
 
 `3.3.0 <https://github.com/crim-ca/weaver/tree/3.3.0>`_ (2021-07-16)
 ========================================================================

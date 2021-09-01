@@ -22,8 +22,9 @@ OWS_TWEEN_HANDLED = "OWS_TWEEN_HANDLED"
 def error_repr(http_err):
     # type: (Union[HTTPException, OWSException, Exception]) -> str
     """
-    Returns a cleaned up representation string of the HTTP error, but with similar and even extended details to
-    facilitate later debugging.
+    Returns a cleaned up representation string of the HTTP error.
+
+    Similar and even extended details relative to the HTTP error message are added to facilitate later debugging.
     """
     err_type = type(http_err).__name__
     if not isinstance(http_err, (HTTPException, OWSException)):
@@ -43,7 +44,9 @@ def error_repr(http_err):
 
 
 def ows_response_tween(request, handler):
-    """Tween that wraps any API request with appropriate dispatch of error conversion to handle formatting."""
+    """
+    Tween that wraps any API request with appropriate dispatch of error conversion to handle formatting.
+    """
     exc_log_lvl = logging.WARNING
     try:
         result = handler(request)
@@ -94,12 +97,16 @@ def ows_response_tween(request, handler):
 
 
 def ows_response_tween_factory_excview(handler, registry):  # noqa: F811
-    """A tween factory which produces a tween which transforms common exceptions into OWS specific exceptions."""
+    """
+    Tween factory which produces a tween which transforms common exceptions into OWS specific exceptions.
+    """
     return lambda request: ows_response_tween(request, handler)
 
 
 def ows_response_tween_factory_ingress(handler, registry):  # noqa: F811
-    """A tween factory which produces a tween which transforms common exceptions into OWS specific exceptions."""
+    """
+    Tween factory which produces a tween which transforms common exceptions into OWS specific exceptions.
+    """
     def handle_ows_tween(request):
         # because the EXCVIEW will also wrap any exception raised that should before be handled by OWS response
         # to allow conversions to occur, use a flag that will re-raise the result

@@ -78,9 +78,15 @@ def _replace_template(pkg, var, val):
 def _get_builtin_package(process_id, package):
     # type: (str, CWL) -> CWL
     """
-    Updates the `CWL` with following requirements to allow running a ``PROCESS_BUILTIN``:
-        - add `hints` section with ``CWL_REQUIREMENT_APP_BUILTIN``
-        - replace ``WEAVER_ROOT_DIR`` as needed
+    Updates the `CWL` with requirements to allow running a :data:`PROCESS_BUILTIN` process.
+
+    Following modifications are applied:
+
+    - Add `hints` section with :data:`CWL_REQUIREMENT_APP_BUILTIN`.
+    - Replace references to environment variable :data:`WEAVER_ROOT_DIR` as needed.
+
+    The `CWL` ``hints`` are employed to avoid error from the runner that doesn't known this requirement definition.
+    The ``hints`` can be directly in the package definition without triggering validation errors.
     """
     if "hints" not in package:
         package["hints"] = dict()
@@ -94,7 +100,8 @@ def _get_builtin_package(process_id, package):
 
 def register_builtin_processes(container):
     # type: (AnySettingsContainer) -> None
-    """Registers every ``builtin`` CWL package to the processes database.
+    """
+    Registers every ``builtin`` CWL package to the processes database.
 
     CWL definitions must be located within the :mod:`weaver.processes.builtin` module.
     """

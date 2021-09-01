@@ -9,14 +9,23 @@ import warnings
 from datetime import datetime, timedelta
 from logging import ERROR, INFO, Logger, getLevelName, getLogger
 from typing import TYPE_CHECKING
+from urllib.parse import urljoin, urlparse
 
 import lxml.etree
+import pyramid.httpexceptions
+import requests.exceptions
 from dateutil.parser import parse as dt_parse
 from owslib.wps import Process as ProcessOWS, WPSException
 from pywps import Process as ProcessWPS
 
 from weaver.exceptions import ProcessInstanceError
-from weaver.execute import EXECUTE_CONTROL_OPTION_ASYNC, EXECUTE_CONTROL_OPTIONS, EXECUTE_TRANSMISSION_MODE_REFERENCE
+from weaver.execute import (
+    EXECUTE_CONTROL_OPTION_ASYNC,
+    EXECUTE_CONTROL_OPTIONS,
+    EXECUTE_TRANSMISSION_MODE_OPTIONS,
+    EXECUTE_TRANSMISSION_MODE_REFERENCE
+)
+from weaver.formats import ACCEPT_LANGUAGE_EN_CA, CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML
 from weaver.processes.convert import get_field, null, ows2json, wps2json_io
 from weaver.processes.types import (
     PROCESS_APPLICATION,
@@ -24,7 +33,8 @@ from weaver.processes.types import (
     PROCESS_TEST,
     PROCESS_WORKFLOW,
     PROCESS_WPS_LOCAL,
-    PROCESS_WPS_REMOTE
+    PROCESS_WPS_REMOTE,
+    PROCESS_WPS_TYPES
 )
 from weaver.status import (
     JOB_STATUS_CATEGORIES,
@@ -36,16 +46,26 @@ from weaver.status import (
 )
 from weaver.typedefs import XML
 from weaver.utils import localize_datetime  # for backward compatibility of previously saved jobs not time-locale-aware
-from weaver.utils import fully_qualified_name, get_job_log_msg, get_log_date_fmt, get_log_fmt, get_settings, now
+from weaver.utils import (
+    fully_qualified_name,
+    get_job_log_msg,
+    get_log_date_fmt,
+    get_log_fmt,
+    get_settings,
+    now,
+    request_extra
+)
 from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_VALUES
 from weaver.warning import NonBreakingExceptionWarning
-from weaver.wps.utils import get_wps_client
+from weaver.wps.utils import get_wps_client, get_wps_url
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
     from typing import Any, Dict, List, Optional, Union
-    from pyramid.request import Request
+
+    from owslib.wps import WebProcessingService
+
     from weaver.typedefs import AnyProcess, AnySettingsContainer, Number, CWL, JSON
 
 LOGGER = getLogger(__name__)
@@ -54,6 +74,7 @@ LOGGER = getLogger(__name__)
 class Base(dict):
     """
     Dictionary with extended attributes auto-``getter``/``setter`` for convenience.
+
     Explicitly overridden ``getter``/``setter`` attributes are called instead of ``dict``-key ``get``/``set``-item
     to ensure corresponding checks and/or value adjustments are executed before applying it to the sub-``dict``.
     """
@@ -146,6 +167,7 @@ class Service(Base):
             raise TypeError("Service 'name' is required")
         if "url" not in self:
             raise TypeError("Service 'url' is required")
+        self["_wps"] = None
 
     @property
     def id(self):
@@ -153,28 +175,38 @@ class Service(Base):
 
     @property
     def url(self):
-        """Service URL."""
+        """
+        Service URL.
+        """
         return dict.__getitem__(self, "url")
 
     @property
     def name(self):
-        """Service name."""
+        """
+        Service name.
+        """
         return dict.__getitem__(self, "name")
 
     @property
     def type(self):
-        """Service type."""
-        return self.get("type", "WPS")
+        """
+        Service type.
+        """
+        return self.get("type", PROCESS_WPS_REMOTE)
 
     @property
     def public(self):
-        """Flag if service has public access."""
+        """
+        Flag if service has public access.
+        """
         # TODO: public access can be set via auth parameter.
         return self.get("public", False)
 
     @property
     def auth(self):
-        """Authentication method: public, token, cert."""
+        """
+        Authentication method: public, token, cert.
+        """
         return self.get("auth", "token")
 
     def json(self):
@@ -183,6 +215,7 @@ class Service(Base):
         return self.params()
 
     def params(self):
+        # type: () -> Dict[str, Any]
         return {
             "url": self.url,
             "name": self.name,
@@ -191,25 +224,189 @@ class Service(Base):
             "auth": self.auth
         }
 
-    def summary(self, request):
-        # type: (Request) -> Optional[JSON]
-        try:
-            if self.type.lower() != "wps":
-                return None  # FIXME: not implemented
+    def wps(self, container=None, **kwargs):
+        # type: (AnySettingsContainer, Any) -> WebProcessingService
+        """
+        Obtain the remote WPS service definition and metadata.
 
-            wps = get_wps_client(self.url, request)
-            url = "{}/providers/{}".format(get_wps_restapi_base_url(request), self.name)
-            return {
-                "id": self.name,
-                "title": getattr(wps.identification, "title", ""),
-                "abstract": getattr(wps.identification, "abstract", ""),
-                "url": url,
-                "public": self.public,
+        Stores the reference locally to avoid re-fetching it needlessly for future reference.
+        """
+        _wps = self.get("_wps")
+        if _wps is None:
+            # client retrieval could also be cached if recently fetched an not yet invalidated
+            self["_wps"] = _wps = get_wps_client(self.url, container=container, **kwargs)
+        return _wps
+
+    def links(self, container, fetch=True):
+        # type: (AnySettingsContainer, bool) -> List[JSON]
+        """
+        Obtains the links relevant to the service provider.
+        """
+        if fetch:
+            wps = self.wps(container=container)
+            wps_lang = wps.language
+            wps_url = wps.url
+        else:
+            wps_url = self.url
+            wps_lang = ACCEPT_LANGUAGE_EN_CA  # assume, cannot validate
+
+        wps_url = urljoin(wps_url, urlparse(wps_url).path)
+        wps_url = "{}?service=WPS&request=GetCapabilities".format(wps_url)
+        svc_url = "{}/providers/{}".format(get_wps_restapi_base_url(container), self.name)
+        proc_url = "{}/processes".format(svc_url)
+        links = [
+            {
+                "rel": "service-desc",
+                "title": "Service description (GetCapabilities).",
+                "href": wps_url,
+                "hreflang": wps_lang,
+                "type": CONTENT_TYPE_APP_XML,
+            },
+            {
+                "rel": "service",
+                "title": "Service definition.",
+                "href": svc_url,
+                "hreflang": ACCEPT_LANGUAGE_EN_CA,
+                "type": CONTENT_TYPE_APP_JSON,
+            },
+            {
+                "rel": "self",
+                "title": "Service definition.",
+                "href": svc_url,
+                "hreflang": ACCEPT_LANGUAGE_EN_CA,
+                "type": CONTENT_TYPE_APP_JSON,
+            },
+            {
+                "rel": "processes",
+                "title": "Listing of processes provided by this service.",
+                "href": proc_url,
+                "hreflang": ACCEPT_LANGUAGE_EN_CA,
+                "type": CONTENT_TYPE_APP_JSON,
+            },
+        ]
+        return links
+
+    def metadata(self, container):
+        # type: (AnySettingsContainer) -> List[JSON]
+        """
+        Obtains the metadata relevant to the service provider.
+        """
+        wps = self.wps(container=container)
+        wps_lang = wps.language
+        # FIXME: add more metadata retrieved from 'wps.identification' and 'wps.provider.contact' (?)
+        #        if so, should be included only in "long description", while "summary" only returns below info
+        meta = [
+            {
+                "type": "provider-name",
+                "title": "Provider Name",
+                "role": "http://www.opengis.net/eoc/applicationContext/providerMetadata",
+                "value": wps.provider.name,
+                "lang": wps_lang
+            },
+            {
+                "type": "provider-site",
+                "title": "Provider Name",
+                "role": "http://www.opengis.net/eoc/applicationContext/providerMetadata",
+                "value": wps.provider.url,
+                "lang": wps_lang
+            },
+            {
+                "type": "contact-name",
+                "title": "Contact Name",
+                "role": "http://www.opengis.net/eoc/applicationContext/providerMetadata",
+                "value": wps.provider.contact.name,
+                "lang": wps_lang
             }
+        ]
+        return meta
+
+    def keywords(self, container=None):
+        # type: (AnySettingsContainer) -> List[str]
+        """
+        Obtains the keywords relevant to the service provider.
+        """
+        wps = self.wps(container=container)
+        return wps.identification.keywords
+
+    def summary(self, container, fetch=True):
+        # type: (AnySettingsContainer, bool) -> Optional[JSON]
+        """
+        Obtain the summary information from the provider service.
+
+        When metadata fetching is disabled, the generated summary will contain only information available locally.
+
+        :param container: employed to retrieve application settings.
+        :param fetch: indicates whether metadata should be fetched from remote.
+        :return: generated summary information.
+        """
+        try:
+            # FIXME: not implemented (https://github.com/crim-ca/weaver/issues/130)
+            if self.type.lower() not in PROCESS_WPS_TYPES:
+                return None
+            # basic information always available (local)
+            data = {
+                "id": self.name,
+                "url": self.url,  # remote URL (bw-compat, also in links)
+                "type": PROCESS_WPS_REMOTE,
+                "public": self.public,
+                "links": self.links(container, fetch=fetch),
+            }
+            # retrieve more metadata from remote if possible and requested
+            if fetch:
+                wps = self.wps(container)
+                data.update({
+                    "title": getattr(wps.identification, "title", None),
+                    "description": getattr(wps.identification, "abstract", None),
+                    "keywords": self.keywords(container),
+                    "metadata": self.metadata(container),
+                })
+            return sd.ProviderSummarySchema().deserialize(data)
         except Exception as exc:
             msg = "Exception occurred while fetching wps {0} : {1!r}".format(self.url, exc)
             warnings.warn(msg, NonBreakingExceptionWarning)
         return None
+
+    def processes(self, container):
+        # type: (AnySettingsContainer) -> List[Process]
+        """
+        Obtains a list of remote service processes in a compatible :class:`weaver.datatype.Process` format.
+
+        Note: remote processes won't be stored to the local process storage.
+        """
+        # FIXME: support other providers (https://github.com/crim-ca/weaver/issues/130)
+        if self.type.lower() not in PROCESS_WPS_TYPES:
+            return []
+        wps = self.wps(container)
+        settings = get_settings(container)
+        return [Process.convert(process, self, settings) for process in wps.processes]
+
+    def check_accessible(self, settings):
+        # type: (AnySettingsContainer) -> bool
+        """
+        Verify if the service URL is accessible.
+        """
+        try:
+            # some WPS don't like HEAD request, so revert to normal GetCapabilities
+            # otherwise use HEAD because it is faster to only 'ping' the service
+            if self.type.lower() in PROCESS_WPS_TYPES:
+                meth = "GET"
+                url = "{}?service=WPS&request=GetCapabilities".format(self.url)
+            else:
+                meth = "HEAD"
+                url = self.url
+            # - allow 500 for services that incorrectly handle invalid request params, but at least respond
+            #   (should be acceptable in this case because the 'ping' request is not necessarily well formed)
+            # - allow 400/405 for bad request/method directly reported by the service for the same reasons
+            # - enforce quick timeout (but don't allow 408 code) to avoid long pending connexions that never resolve
+            allowed_codes = [200, 400, 405, 500]
+            resp = request_extra(meth, url, timeout=2, settings=settings, allowed_codes=allowed_codes)
+            return resp.status_code in allowed_codes
+        except (requests.exceptions.RequestException, pyramid.httpexceptions.HTTPException) as exc:
+            msg = "HTTP exception occurred while checking service [{}] accessibility on [{}] : {!r}".format(
+                self.name, self.url, exc
+            )
+            warnings.warn(msg, NonBreakingExceptionWarning)
+        return False
 
 
 class Job(Base):
@@ -301,7 +498,9 @@ class Job(Base):
     @property
     def id(self):
         # type: () -> str
-        """Job UUID to retrieve the details from storage."""
+        """
+        Job UUID to retrieve the details from storage.
+        """
         job_id = self.get("id")
         if not job_id:
             job_id = str(uuid.uuid4())
@@ -311,7 +510,9 @@ class Job(Base):
     @property
     def task_id(self):
         # type: () -> Optional[str]
-        """Reference Task UUID attributed by the ``Celery`` worker that monitors and executes this job."""
+        """
+        Reference Task UUID attributed by the ``Celery`` worker that monitors and executes this job.
+        """
         return self.get("task_id", None)
 
     @task_id.setter
@@ -324,7 +525,8 @@ class Job(Base):
     @property
     def wps_id(self):
         # type: () -> Optional[str]
-        """Reference WPS Request/Response UUID attributed by the executed ``PyWPS`` process.
+        """
+        Reference WPS Request/Response UUID attributed by the executed ``PyWPS`` process.
 
         This UUID matches the status-location, log and output directory of the WPS process.
         This parameter is only available when the process is executed on this local instance.
@@ -345,7 +547,8 @@ class Job(Base):
     @property
     def service(self):
         # type: () -> Optional[str]
-        """Service identifier of the corresponding remote process.
+        """
+        Service identifier of the corresponding remote process.
 
         .. seealso::
             - :attr:`Service.id`
@@ -362,7 +565,8 @@ class Job(Base):
     @property
     def process(self):
         # type: () -> Optional[str]
-        """Process identifier of the corresponding remote process.
+        """
+        Process identifier of the corresponding remote process.
 
         .. seealso::
             - :attr:`Process.id`
@@ -635,13 +839,17 @@ class Job(Base):
     @property
     def access(self):
         # type: () -> str
-        """Job visibility access from execution."""
+        """
+        Job visibility access from execution.
+        """
         return self.get("access", VISIBILITY_PRIVATE)
 
     @access.setter
     def access(self, visibility):
         # type: (str) -> None
-        """Job visibility access from execution."""
+        """
+        Job visibility access from execution.
+        """
         if not isinstance(visibility, str):
             raise TypeError("Type 'str' is required for '{}.access'".format(type(self)))
         if visibility not in VISIBILITY_VALUES:
@@ -651,13 +859,17 @@ class Job(Base):
     @property
     def request(self):
         # type: () -> Optional[str]
-        """XML request for WPS execution submission as string (binary)."""
+        """
+        XML request for WPS execution submission as string (binary).
+        """
         return self.get("request", None)
 
     @request.setter
     def request(self, request):
         # type: (Optional[str]) -> None
-        """XML request for WPS execution submission as string (binary)."""
+        """
+        XML request for WPS execution submission as string (binary).
+        """
         if isinstance(request, XML):
             request = lxml.etree.tostring(request)
         self["request"] = request
@@ -665,27 +877,31 @@ class Job(Base):
     @property
     def response(self):
         # type: () -> Optional[str]
-        """XML status response from WPS execution submission as string (binary)."""
+        """
+        XML status response from WPS execution submission as string (binary).
+        """
         return self.get("response", None)
 
     @response.setter
     def response(self, response):
         # type: (Optional[str]) -> None
-        """XML status response from WPS execution submission as string (binary)."""
+        """
+        XML status response from WPS execution submission as string (binary).
+        """
         if isinstance(response, XML):
             response = lxml.etree.tostring(response)
         self["response"] = response
 
-    def _job_url(self, settings):
-        base_job_url = get_wps_restapi_base_url(settings)
+    def _job_url(self, base_url=None):
         if self.service is not None:
-            base_job_url += sd.provider_service.path.format(provider_id=self.service)
+            base_url += sd.provider_service.path.format(provider_id=self.service)
         job_path = sd.process_job_service.path.format(process_id=self.process, job_id=self.id)
-        return "{base_job_url}{job_path}".format(base_job_url=base_job_url, job_path=job_path)
+        return "{base_job_url}{job_path}".format(base_job_url=base_url, job_path=job_path)
 
     def links(self, container=None, self_link=None):
         # type: (Optional[AnySettingsContainer], Optional[str]) -> JSON
-        """Obtains the JSON links section of many response body for jobs.
+        """
+        Obtains the JSON links section of many response body for jobs.
 
         If :paramref:`self_link` is provided (e.g.: `"outputs"`) the link for that corresponding item will also
         be added as `self` entry to the links. It must be a recognized job link field.
@@ -693,10 +909,14 @@ class Job(Base):
         :param container: object that helps retrieve instance details, namely the host URL.
         :param self_link: name of a section that represents the current link that will be returned.
         """
-        settings = get_settings(container) if container else {}
-        job_url = self._job_url(settings)
+        settings = get_settings(container)
+        base_url = get_wps_restapi_base_url(settings)
+        job_url = self._job_url(base_url)
+        job_list = "{}/{}".format(base_url, sd.jobs_service.path)
         job_links_body = {"links": [
             {"href": job_url, "rel": "status", "title": "Job status."},
+            {"href": job_url, "rel": "monitor", "title": "Job monitoring location."},
+            {"href": job_list, "rel": "collection", "title": "List of submitted jobs."}
         ]}
         job_links = ["logs", "inputs"]
         if self.status in JOB_STATUS_CATEGORIES[STATUS_CATEGORY_FINISHED]:
@@ -715,11 +935,15 @@ class Job(Base):
             self_link_body = {"href": job_url, "title": "Job status."}
         self_link_body["rel"] = "self"
         job_links_body["links"].append(self_link_body)
+        link_meta = {"type": CONTENT_TYPE_APP_JSON, "hreflang": ACCEPT_LANGUAGE_EN_CA}
+        for link in job_links_body["links"]:
+            link.update(link_meta)
         return job_links_body
 
     def json(self, container=None, self_link=None):     # pylint: disable=W0221,arguments-differ
         # type: (Optional[AnySettingsContainer], Optional[str]) -> JSON
-        """Obtains the JSON data representation for response body.
+        """
+        Obtains the JSON data representation for response body.
 
         .. note::
             Settings are required to update API shortcut URLs to job additional information.
@@ -778,8 +1002,10 @@ class Job(Base):
 class Process(Base):
     # pylint: disable=C0103,invalid-name
     """
-    Dictionary that contains a process description for db storage.
-    It always has ``identifier`` and ``processEndpointWPS1`` keys.
+    Dictionary that contains a process definition for db storage.
+
+    It always has ``identifier`` (or ``id`` alias) and a ``package`` definition.
+    Parameters can be accessed by key or attribute, and appropriate validators or default values will be applied.
     """
 
     def __init__(self, *args, **kwargs):
@@ -846,6 +1072,8 @@ class Process(Base):
     def inputs(self):
         # type: () -> Optional[List[Dict[str, Any]]]
         """
+        Inputs of the process following backward-compatible conversion of stored parameters.
+
         According to `OGC-API`, ``maxOccurs`` and ``minOccurs`` representations should be:
             - ``maxOccurs``: ``int`` or ``"unbounded"``
             - ``minOccurs``: ``int``
@@ -854,7 +1082,8 @@ class Process(Base):
             - ``mediaType``: ``string``
 
         .. note::
-            Because of pre-existing/deployed/remote processes, inputs are formated to respect the valid representation.
+            Because of pre-registered/deployed/retrieved remote processes, inputs are formatted in-line
+            to respect valid OGC-API schema representation and apply any required correction transparently.
         """
 
         inputs = self.get("inputs")
@@ -862,24 +1091,30 @@ class Process(Base):
             for input_ in inputs:
                 input_formats = get_field(input_, "formats", search_variations=False, default=[])
                 for fmt in input_formats:
-                    mime_type = get_field(fmt, "mime_type", pop_found=True, search_variations=True)
+                    mime_type = get_field(fmt, "mime_type", search_variations=True, pop_found=True)
                     if mime_type is not null:
                         fmt["mediaType"] = mime_type
-                input_["minOccurs"] = int(input_["minOccurs"])
-                input_["maxOccurs"] = (
-                    int(input_["maxOccurs"]) if input_["maxOccurs"] != "unbounded" else input_["maxOccurs"]
-                )
+                input_min = get_field(input_, "min_occurs", search_variations=True, pop_found=True, default=1)
+                input_max = get_field(input_, "max_occurs", search_variations=True, pop_found=True, default=1)
+                input_["minOccurs"] = int(input_min)
+                input_["maxOccurs"] = int(input_max) if input_max != "unbounded" else input_max
+                input_desc = get_field(input_, "abstract", search_variations=True, pop_found=True)
+                if input_desc:
+                    input_["description"] = input_desc
         return inputs
 
     @property
     def outputs(self):
         # type: () -> Optional[List[Dict[str, Any]]]
         """
+        Outputs of the process following backward-compatible conversion of stored parameters.
+
         According to `OGC-API`, ``mediaType`` should be in description as:
             - ``mediaType``: ``string``
 
         .. note::
-            Because of pre-existing/deployed/remote processes, outputs are formated to respect the valid representation.
+            Because of pre-registered/deployed/retrieved remote processes, inputs are formatted in-line
+            to respect valid OGC-API schema representation and apply any required correction transparently.
         """
 
         outputs = self.get("outputs", [])
@@ -889,6 +1124,10 @@ class Process(Base):
                 mime_type = get_field(fmt, "mime_type", pop_found=True, search_variations=True)
                 if mime_type is not null:
                     fmt["mediaType"] = mime_type
+
+            output_desc = get_field(output_, "abstract", search_variations=True, pop_found=True)
+            if output_desc:
+                output_["description"] = output_desc
         return outputs
 
     @property
@@ -906,7 +1145,13 @@ class Process(Base):
     @property
     def outputTransmission(self):  # noqa: N802
         # type: () -> List[str]
-        self.setdefault("outputTransmission", [EXECUTE_TRANSMISSION_MODE_REFERENCE])
+        out = self.setdefault("outputTransmission", [EXECUTE_TRANSMISSION_MODE_REFERENCE])
+        if not isinstance(out, list):  # eg: None, bw-compat
+            out = [EXECUTE_TRANSMISSION_MODE_REFERENCE]
+        out = [mode for mode in out if mode in EXECUTE_TRANSMISSION_MODE_OPTIONS]
+        if len(out) == 0:
+            out.append(EXECUTE_TRANSMISSION_MODE_REFERENCE)
+        self["outputTransmission"] = out
         return dict.__getitem__(self, "outputTransmission")
 
     @property
@@ -1047,7 +1292,9 @@ class Process(Base):
     @property
     def params_wps(self):
         # type: () -> Dict[str, Any]
-        """Values applicable to PyWPS Process ``__init__``"""
+        """
+        Values applicable to create an instance of :class:`pywps.app.Process`.
+        """
         return {
             "identifier": self.identifier,
             "title": self.title,
@@ -1068,19 +1315,62 @@ class Process(Base):
         """
         return sd.Process().deserialize(self.dict())
 
-    def offering(self):
-        # type: () -> JSON
+    def links(self, container=None):
+        # type: (Optional[AnySettingsContainer]) -> JSON
         """
-        Obtains the JSON serializable offering representation of the process.
+        Obtains the JSON links section of many response body for the process.
+
+        :param container: object that helps retrieve instance details, namely the host URL.
         """
-        process_offering = {"process": self.dict()}
-        if self.version:
-            process_offering.update({"processVersion": self.version})
-        if self.jobControlOptions:
-            process_offering.update({"jobControlOptions": self.jobControlOptions})
-        if self.outputTransmission:
-            process_offering.update({"outputTransmission": self.outputTransmission})
-        return sd.ProcessOffering().deserialize(process_offering)
+        settings = get_settings(container)
+        base_url = get_wps_restapi_base_url(settings)
+        proc_desc = sd.process_service.path.format(process_id=self.id)
+        proc_list = sd.processes_service.path
+        proc_exec = sd.process_execution_service.path.format(process_id=self.id)
+        links = [
+            {"href": base_url + proc_desc, "rel": "self", "title": "Process description."},
+            {"href": base_url + proc_desc, "rel": "process-desc", "title": "Process description."},
+            {"href": base_url + proc_exec, "rel": "execute", "title": "Process execution endpoint for job submission."},
+            {"href": base_url + proc_list, "rel": "collection", "title": "List of registered processes."}
+        ]
+        if self.processEndpointWPS1:
+            wps_url = "{}?service=WPS&request=GetCapabilities".format(self.processEndpointWPS1)
+            links.append({"href": wps_url, "rel": "service-desc",
+                          "type": CONTENT_TYPE_APP_XML, "title": "Service definition."})
+        for link in links:
+            link.setdefault("type", CONTENT_TYPE_APP_JSON)
+            link.setdefault("hreflang", ACCEPT_LANGUAGE_EN_CA)
+        return {"links": links}
+
+    def offering(self, schema="OGC"):
+        # type: (str) -> JSON
+        """
+        Obtains the JSON serializable offering/description representation of the process.
+
+        :param schema:
+            One of values defined by :class:`sd.ProcessDescriptionSchemaQuery` to select which
+            process description representation to generate (see each schema for details).
+
+        .. note::
+            Property name ``offering`` is employed to differentiate from the string process ``description`` field.
+            The result of this JSON representation is still the ``ProcessDescription`` schema.
+        """
+        process = self.dict()
+        links = self.links()
+        # force selection of schema to avoid ambiguity
+        if str(schema or "OGC").upper() == "OLD":
+            # nested process fields + I/O as lists
+            process.update({"process": dict(process)})
+            process.update(links)
+            return sd.ProcessDescriptionOLD().deserialize(process)
+        # direct process + I/O as mappings
+        for io_type in ["inputs", "outputs"]:
+            process[io_type] = {
+                get_field(io_def, "identifier", search_variations=True, pop_found=True): io_def
+                for io_def in process[io_type]
+            }
+        process.update(links)
+        return sd.ProcessDescriptionOGC().deserialize(process)
 
     def summary(self):
         # type: () -> JSON
@@ -1111,23 +1401,27 @@ class Process(Base):
         Converts a :mod:`owslib.wps` Process to local storage :class:`weaver.datatype.Process`.
         """
         assert isinstance(process, ProcessOWS)
-        wps_url = get_wps_restapi_base_url(container)
+        wps_xml_url = get_wps_url(container)
+        wps_api_url = get_wps_restapi_base_url(container)
         svc_name = None
-        if not service or wps_url == service.url:
+        if not service or wps_api_url == service.url:
             # local weaver process, using WPS-XML endpoint
-            remote_service_url = wps_url
-            local_provider_url = wps_url
+            remote_service_url = wps_xml_url
+            local_provider_url = wps_api_url
         else:
             svc_name = service.get("name")
             remote_service_url = service.url
-            local_provider_url = "{}/providers/{}".format(wps_url, svc_name)
+            local_provider_url = "{}/providers/{}".format(wps_api_url, svc_name)
         describe_process_url = "{}/processes/{}".format(local_provider_url, process.identifier)
         execute_process_url = "{}/jobs".format(describe_process_url)
         package, info = ows2json(process, svc_name, remote_service_url)
+        wps_description_url = "{}?service=WPS&request=DescribeProcess&version=1.0.0&identifier={}".format(
+            remote_service_url, process.identifier
+        )
         kwargs.update({  # parameters that must be enforced to find service
             "url": describe_process_url,
             "executeEndpoint": execute_process_url,
-            "processEndpointWPS1": remote_service_url,
+            "processEndpointWPS1": wps_description_url,
             "processDescriptionURL": describe_process_url,
             "type": PROCESS_WPS_REMOTE,
             "package": package,
@@ -1177,11 +1471,12 @@ class Process(Base):
 
 
 class Quote(Base):
-    # pylint: disable=C0103,invalid-name
     """
     Dictionary that contains quote information.
+
     It always has ``id`` and ``process`` keys.
     """
+    # pylint: disable=C0103,invalid-name
 
     def __init__(self, *args, **kwargs):
         super(Quote, self).__init__(*args, **kwargs)
@@ -1218,72 +1513,100 @@ class Quote(Base):
 
     @property
     def id(self):
-        """Quote ID."""
+        """
+        Quote ID.
+        """
         return dict.__getitem__(self, "id")
 
     @property
     def title(self):
-        """Quote title."""
+        """
+        Quote title.
+        """
         return self.get("title")
 
     @property
     def description(self):
-        """Quote description."""
+        """
+        Quote description.
+        """
         return self.get("description")
 
     @property
     def details(self):
-        """Quote details."""
+        """
+        Quote details.
+        """
         return self.get("details")
 
     @property
     def user(self):
-        """User ID requesting the quote"""
+        """
+        User ID requesting the quote.
+        """
         return dict.__getitem__(self, "user")
 
     @property
     def process(self):
-        """WPS Process ID."""
+        """
+        WPS Process ID.
+        """
         return dict.__getitem__(self, "process")
 
     @property
     def estimatedTime(self):  # noqa: N802
-        """Process estimated time."""
+        """
+        Process estimated time.
+        """
         return self.get("estimatedTime")
 
     @property
     def processParameters(self):  # noqa: N802
-        """Process execution parameters for quote."""
+        """
+        Process execution parameters for quote.
+        """
         return self.get("processParameters")
 
     @property
     def location(self):
-        """WPS Process URL."""
+        """
+        WPS Process URL.
+        """
         return self.get("location", "")
 
     @property
     def price(self):
-        """Price of the current quote"""
+        """
+        Price of the current quote.
+        """
         return self.get("price", 0.0)
 
     @property
     def currency(self):
-        """Currency of the quote price"""
+        """
+        Currency of the quote price.
+        """
         return self.get("currency")
 
     @property
     def expire(self):
-        """Quote expiration datetime."""
+        """
+        Quote expiration datetime.
+        """
         return self.get("expire")
 
     @property
     def created(self):
-        """Quote creation datetime."""
+        """
+        Quote creation datetime.
+        """
         return self.get("created")
 
     @property
     def steps(self):
-        """Sub-quote IDs if applicable"""
+        """
+        Sub-quote IDs if applicable.
+        """
         return self.get("steps", [])
 
     def params(self):
@@ -1313,6 +1636,7 @@ class Quote(Base):
 class Bill(Base):
     """
     Dictionary that contains bill information.
+
     It always has ``id``, ``user``, ``quote`` and ``job`` keys.
     """
 
@@ -1349,47 +1673,65 @@ class Bill(Base):
 
     @property
     def id(self):
-        """Bill ID."""
+        """
+        Bill ID.
+        """
         return dict.__getitem__(self, "id")
 
     @property
     def user(self):
-        """User ID"""
+        """
+        User ID.
+        """
         return dict.__getitem__(self, "user")
 
     @property
     def quote(self):
-        """Quote ID."""
+        """
+        Quote ID.
+        """
         return dict.__getitem__(self, "quote")
 
     @property
     def job(self):
-        """Job ID."""
+        """
+        Job ID.
+        """
         return dict.__getitem__(self, "job")
 
     @property
     def price(self):
-        """Price of the current quote"""
+        """
+        Price of the current quote.
+        """
         return self.get("price", 0.0)
 
     @property
     def currency(self):
-        """Currency of the quote price"""
+        """
+        Currency of the quote price.
+        """
         return self.get("currency")
 
     @property
     def created(self):
-        """Quote creation datetime."""
+        """
+        Quote creation datetime.
+        """
         return self.get("created")
 
     @property
     def title(self):
-        """Quote title."""
+        """
+        Quote title.
+        """
         return self.get("title")
 
     @property
     def description(self):
-        """Quote description."""
+        """
+        Quote description.
+        """
         return self.get("description")
 
     def params(self):

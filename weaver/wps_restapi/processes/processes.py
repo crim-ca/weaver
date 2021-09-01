@@ -15,7 +15,7 @@ from pyramid.settings import asbool
 
 from weaver.config import WEAVER_CONFIGURATIONS_REMOTE, get_weaver_configuration
 from weaver.database import get_db
-from weaver.datatype import Process, Service
+from weaver.datatype import Process
 from weaver.exceptions import ProcessNotFound, log_unhandled_exceptions
 from weaver.formats import OUTPUT_FORMAT_JSON
 from weaver.processes import opensearch
@@ -23,7 +23,7 @@ from weaver.processes.execution import submit_job
 from weaver.processes.types import PROCESS_BUILTIN
 from weaver.processes.utils import deploy_process_from_payload, get_job_submission_response, get_process
 from weaver.store.base import StoreProcesses, StoreServices
-from weaver.utils import get_any_id, get_settings, parse_request_query
+from weaver.utils import get_any_id, get_settings
 from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_VALUES
 from weaver.wps.utils import get_wps_client
 from weaver.wps_restapi import swagger_definitions as sd
@@ -51,19 +51,6 @@ def submit_provider_job(request):
     return get_job_submission_response(body)
 
 
-def list_remote_processes(service, request):
-    # type: (Service, Request) -> List[Process]
-    """
-    Obtains a list of remote service processes in a compatible :class:`weaver.datatype.Process` format.
-
-    Note: remote processes won't be stored to the local process storage.
-    """
-    # FIXME: support other providers (https://github.com/crim-ca/weaver/issues/130)
-    wps = get_wps_client(service.url, request)
-    settings = get_settings(request)
-    return [Process.convert(process, service, settings) for process in wps.processes]
-
-
 @sd.provider_processes_service.get(tags=[sd.TAG_PROVIDERS, sd.TAG_PROCESSES, sd.TAG_PROVIDERS, sd.TAG_GETCAPABILITIES],
                                    renderer=OUTPUT_FORMAT_JSON, schema=sd.ProviderEndpoint(),
                                    response_schemas=sd.get_provider_processes_responses)
@@ -75,7 +62,7 @@ def get_provider_processes(request):
     provider_id = request.matchdict.get("provider_id")
     store = get_db(request).get_store(StoreServices)
     service = store.fetch_by_name(provider_id)
-    processes = list_remote_processes(service, request)
+    processes = service.processes(request)
     return HTTPOk(json={"processes": [p.summary() for p in processes]})
 
 
@@ -106,8 +93,9 @@ def get_provider_process(request):
     """
     try:
         process = describe_provider_process(request)
-        process_offering = process.offering()
-        return HTTPOk(json=process_offering)
+        schema = request.params.get("schema")
+        offering = process.offering(schema)
+        return HTTPOk(json=offering)
     # FIXME: handle colander invalid directly in tween (https://github.com/crim-ca/weaver/issues/112)
     except colander.Invalid as ex:
         raise HTTPBadRequest("Invalid schema: [{!s}]".format(ex))
@@ -117,6 +105,7 @@ def get_processes_filtered_by_valid_schemas(request):
     # type: (Request) -> Tuple[List[JSON], List[str]]
     """
     Validates the processes summary schemas and returns them into valid/invalid lists.
+
     :returns: list of valid process summaries and invalid processes IDs for manual cleanup.
     """
     store = get_db(request).get_store(StoreProcesses)
@@ -153,17 +142,16 @@ def get_processes(request):
         # if 'EMS' and '?providers=True', also fetch each provider's processes
         settings = get_settings(request)
         if get_weaver_configuration(settings) in WEAVER_CONFIGURATIONS_REMOTE:
-            queries = parse_request_query(request)
-            # FIXME: many steps below suppose that everything goes well...
-            if "providers" in queries and asbool(queries["providers"][0]) is True:
-                services = get_provider_services(request)
+            with_providers = asbool(request.params.get("providers", False))
+            if with_providers:
+                services = get_provider_services(request)  # must fetch for listing of available processes
                 response_body.update({
                     "providers": [svc.summary(request) if detail else {"id": svc.name} for svc in services]
                 })
                 for i, provider in enumerate(services):
-                    processes = list_remote_processes(provider, request)
+                    processes = provider.processes(request)
                     response_body["providers"][i].update({
-                        "processes": processes if detail else [get_any_id(proc) for proc in processes.json()]
+                        "processes": processes if detail else [get_any_id(proc) for proc in processes]
                     })
         return HTTPOk(json=response_body)
     # FIXME: handle colander invalid directly in tween (https://github.com/crim-ca/weaver/issues/112)
@@ -191,7 +179,9 @@ def get_local_process(request):
     try:
         process = get_process(request=request)
         process["inputs"] = opensearch.replace_inputs_describe_process(process.inputs, process.payload)
-        return HTTPOk(json=process.offering())
+        schema = request.params.get("schema")
+        offering = process.offering(schema)
+        return HTTPOk(json=offering)
     # FIXME: handle colander invalid directly in tween (https://github.com/crim-ca/weaver/issues/112)
     except colander.Invalid as ex:
         raise HTTPBadRequest("Invalid schema: [{!s}]\nValue: [{!s}]".format(ex, ex.value))

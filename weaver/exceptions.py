@@ -37,7 +37,9 @@ if TYPE_CHECKING:
 
 
 class WeaverException(Exception):
-    """Base class of exceptions defined by :mod:`weaver` package."""
+    """
+    Base class of exceptions defined by :mod:`weaver` package.
+    """
     code = 500
     title = "Internal Server Error"
     detail = message = comment = explanation = "Unknown error"
@@ -45,8 +47,10 @@ class WeaverException(Exception):
 
 class InvalidIdentifierValue(WeaverException, ValueError, HTTPBadRequest, OWSInvalidParameterValue):
     """
+    Error related to an invalid identifier parameter.
+
     Error indicating that an ID to be employed for following operations
-    is not considered as valid to allow further processed or usage.
+    is not considered as valid to allow further processing or usage.
     """
     code = 400
     locator = "identifier"
@@ -54,6 +58,8 @@ class InvalidIdentifierValue(WeaverException, ValueError, HTTPBadRequest, OWSInv
 
 class MissingIdentifierValue(WeaverException, ValueError, HTTPBadRequest, OWSMissingParameterValue):
     """
+    Error related to missing identifier parameter.
+
     Error indicating that an ID to be employed for following operations
     was missing and cannot continue further processing or usage.
     """
@@ -62,12 +68,16 @@ class MissingIdentifierValue(WeaverException, ValueError, HTTPBadRequest, OWSMis
 
 
 class ServiceException(WeaverException, OWSException):
-    """Base exception related to a :class:`weaver.datatype.Service`."""
+    """
+    Base exception related to a :class:`weaver.datatype.Service`.
+    """
     locator = "service"
 
 
 class ServiceNotAccessible(ServiceException, HTTPForbidden, OWSAccessForbidden):
     """
+    Error related to forbidden access to a service.
+
     Error indicating that a WPS service exists but is not visible to retrieve
     from the storage backend of an instance of :class:`weaver.store.ServiceStore`.
     """
@@ -75,6 +85,8 @@ class ServiceNotAccessible(ServiceException, HTTPForbidden, OWSAccessForbidden):
 
 class ServiceNotFound(ServiceException, HTTPNotFound, OWSNotFound):
     """
+    Error related to non existant service definition.
+
     Error indicating that an OWS service could not be read from the
     storage backend by an instance of :class:`weaver.store.ServiceStore`.
     """
@@ -82,18 +94,24 @@ class ServiceNotFound(ServiceException, HTTPNotFound, OWSNotFound):
 
 class ServiceRegistrationError(ServiceException, HTTPInternalServerError, OWSNoApplicableCode):
     """
+    Error related to a registration issue for a service.
+
     Error indicating that an OWS service could not be registered in the
     storage backend by an instance of :class:`weaver.store.ServiceStore`.
     """
 
 
 class ProcessException(WeaverException, OWSException):
-    """Base exception related to a :class:`weaver.datatype.Process`."""
+    """
+    Base exception related to a :class:`weaver.datatype.Process`.
+    """
     locator = "process"
 
 
 class ProcessNotAccessible(ProcessException, HTTPForbidden, OWSAccessForbidden):
     """
+    Error related to forbidden access to a process.
+
     Error indicating that a local WPS process exists but is not visible to retrieve
     from the storage backend of an instance of :class:`weaver.store.ProcessStore`.
     """
@@ -101,6 +119,8 @@ class ProcessNotAccessible(ProcessException, HTTPForbidden, OWSAccessForbidden):
 
 class ProcessNotFound(ProcessException, HTTPNotFound, OWSNotFound):
     """
+    Error related to a non existant process definition.
+
     Error indicating that a local WPS process could not be read from the
     storage backend by an instance of :class:`weaver.store.ProcessStore`.
     """
@@ -108,6 +128,8 @@ class ProcessNotFound(ProcessException, HTTPNotFound, OWSNotFound):
 
 class ProcessRegistrationError(ProcessException, HTTPInternalServerError, OWSNoApplicableCode):
     """
+    Error related to a registration issue for a process.
+
     Error indicating that a WPS process could not be registered in the
     storage backend by an instance of :class:`weaver.store.ProcessStore`.
     """
@@ -115,18 +137,24 @@ class ProcessRegistrationError(ProcessException, HTTPInternalServerError, OWSNoA
 
 class ProcessInstanceError(ProcessException, HTTPInternalServerError, OWSNoApplicableCode):
     """
+    Error related to an invalid process definition.
+
     Error indicating that the process instance passed is not supported with
     storage backend by an instance of :class:`weaver.store.ProcessStore`.
     """
 
 
 class JobException(WeaverException):
-    """Base exception related to a :class:`weaver.datatype.Job`."""
+    """
+    Base exception related to a :class:`weaver.datatype.Job`.
+    """
     locator = "job"
 
 
 class JobNotFound(JobException, HTTPNotFound, OWSNotFound):
     """
+    Error related to a non existant job definition.
+
     Error indicating that a job could not be read from the
     storage backend by an instance of :class:`weaver.store.JobStore`.
     """
@@ -134,6 +162,8 @@ class JobNotFound(JobException, HTTPNotFound, OWSNotFound):
 
 class JobRegistrationError(JobException, HTTPInternalServerError, OWSNoApplicableCode):
     """
+    Error related to a registration issue for a job.
+
     Error indicating that a job could not be registered in the
     storage backend by an instance of :class:`weaver.store.JobStore`.
     """
@@ -141,18 +171,24 @@ class JobRegistrationError(JobException, HTTPInternalServerError, OWSNoApplicabl
 
 class JobUpdateError(JobException, HTTPInternalServerError, OWSNoApplicableCode):
     """
+    Error related to an update issue for a job.
+
     Error indicating that a job could not be updated in the
     storage backend by an instance of :class:`weaver.store.JobStore`.
     """
 
 
 class PackageException(WeaverException):
-    """Base exception related to a :class:`weaver.processes.wps_package.Package`."""
+    """
+    Base exception related to a :class:`weaver.processes.wps_package.Package`.
+    """
     locator = "package"
 
 
 class PackageTypeError(PackageException, HTTPUnprocessableEntity):
     """
+    Error related to an invalid package definition.
+
     Error indicating that an instance of :class:`weaver.processes.wps_package.WpsPackage`
     could not properly parse input/output type(s) for package deployment or execution.
     """
@@ -160,13 +196,17 @@ class PackageTypeError(PackageException, HTTPUnprocessableEntity):
 
 class PackageRegistrationError(PackageException, HTTPInternalServerError, OWSNoApplicableCode):
     """
+    Error related to a registration issue for a package.
+
     Error indicating that an instance of :class:`weaver.processes.wps_package.WpsPackage`
-    could not properly be registered for package deployment because of invalid prerequisite.
+    could not properly be registered for package deployment because of invalid prerequisites.
     """
 
 
 class PackageExecutionError(PackageException, HTTPInternalServerError, OWSNoApplicableCode):
     """
+    Error related to a runtime issue during package execution.
+
     Error indicating that an instance of :class:`weaver.processes.wps_package.WpsPackage`
     could not properly execute the package using provided inputs and package definition.
     """
@@ -174,6 +214,8 @@ class PackageExecutionError(PackageException, HTTPInternalServerError, OWSNoAppl
 
 class PackageNotFound(PackageException, HTTPNotFound, OWSNotFound):
     """
+    Error related to a non existant package definition.
+
     Error indicating that an instance of :class:`weaver.processes.wps_package.WpsPackage`
     could not properly retrieve the package definition using provided references.
     """
@@ -181,18 +223,24 @@ class PackageNotFound(PackageException, HTTPNotFound, OWSNotFound):
 
 class PayloadNotFound(PackageException, HTTPNotFound, OWSNotFound):
     """
+    Error related to a non existant deployment payload definition.
+
     Error indicating that an instance of :class:`weaver.processes.wps_package.WpsPackage`
     could not properly retrieve the package deploy payload using provided references.
     """
 
 
 class QuoteException(WeaverException):
-    """Base exception related to a :class:`weaver.datatype.Quote`."""
+    """
+    Base exception related to a :class:`weaver.datatype.Quote`.
+    """
     locator = "quote"
 
 
 class QuoteNotFound(QuoteException, HTTPNotFound, OWSNotFound):
     """
+    Error related to a non existant quote definition.
+
     Error indicating that a quote could not be read from the
     storage backend by an instance of :class:`weaver.store.QuoteStore`.
     """
@@ -200,6 +248,8 @@ class QuoteNotFound(QuoteException, HTTPNotFound, OWSNotFound):
 
 class QuoteRegistrationError(QuoteException, HTTPInternalServerError, OWSNoApplicableCode):
     """
+    Error related to an invalid registration issue for a quote.
+
     Error indicating that a quote could not be registered in the
     storage backend by an instance of :class:`weaver.store.QuoteStore`.
     """
@@ -207,18 +257,24 @@ class QuoteRegistrationError(QuoteException, HTTPInternalServerError, OWSNoAppli
 
 class QuoteInstanceError(QuoteException, HTTPInternalServerError, OWSNoApplicableCode):
     """
+    Error related to an invalid quote definition.
+
     Error indicating that a given object doesn't correspond to an expected
     instance of :class:`weaver.datatype.Quote`.
     """
 
 
 class BillException(WeaverException):
-    """Base exception related to a :class:`weaver.datatype.Bill`."""
+    """
+    Base exception related to a :class:`weaver.datatype.Bill`.
+    """
     locator = "bill"
 
 
 class BillNotFound(BillException, HTTPNotFound, OWSNotFound):
     """
+    Error related to a non existant bill definition.
+
     Error indicating that a bill could not be read from the
     storage backend by an instance of :class:`weaver.store.BillStore`.
     """
@@ -226,6 +282,8 @@ class BillNotFound(BillException, HTTPNotFound, OWSNotFound):
 
 class BillRegistrationError(BillException, HTTPInternalServerError, OWSNoApplicableCode):
     """
+    Error related to a registration issue for a bill.
+
     Error indicating that a bill could not be registered in the
     storage backend by an instance of :class:`weaver.store.BillStore`.
     """
@@ -233,6 +291,8 @@ class BillRegistrationError(BillException, HTTPInternalServerError, OWSNoApplica
 
 class BillInstanceError(BillException, HTTPInternalServerError, OWSNoApplicableCode):
     """
+    Error related to an invalid bill definition.
+
     Error indicating that a given object doesn't correspond to an expected
     instance of :class:`weaver.datatype.Bill`.
     """
@@ -290,6 +350,8 @@ def log_unhandled_exceptions(logger=LOGGER, message="Unhandled exception occurre
                              force=False, require_http=True, is_request=True):
     # type: (logging.Logger, str, Type[Exception], bool, bool, bool) -> Callable
     """
+    Decorator for logging captured exceptions before re-raise.
+
     Decorator that will raise ``exception`` with specified ``message`` if an exception is caught while execution the
     wrapped function, after logging relevant details about the caught exception with ``logger``.
 

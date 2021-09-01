@@ -1,51 +1,54 @@
 import logging
-import warnings
 from typing import TYPE_CHECKING
 
-from pyramid.httpexceptions import HTTPCreated, HTTPNoContent, HTTPNotFound, HTTPOk
+import colander
+from pyramid.httpexceptions import (
+    HTTPBadRequest,
+    HTTPConflict,
+    HTTPCreated,
+    HTTPNoContent,
+    HTTPNotFound,
+    HTTPOk,
+    HTTPUnprocessableEntity
+)
+from pyramid.settings import asbool
 
 from weaver.database import get_db
 from weaver.datatype import Service
 from weaver.exceptions import ServiceNotFound, log_unhandled_exceptions
 from weaver.formats import OUTPUT_FORMAT_JSON
 from weaver.owsexceptions import OWSMissingParameterValue, OWSNotImplemented
-from weaver.processes.types import PROCESS_WPS_REMOTE
 from weaver.store.base import StoreServices
-from weaver.utils import get_any_id, get_settings, request_extra
-from weaver.warning import NonBreakingExceptionWarning
-from weaver.wps.utils import get_wps_client
+from weaver.utils import get_any_id, get_settings
 from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.utils import get_wps_restapi_base_url
+from weaver.wps_restapi.utils import get_schema_ref
 
-LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from typing import List
 
-    from pyramid.request import Request
+    from weaver.typedefs import AnySettingsContainer
+
+LOGGER = logging.getLogger(__name__)
 
 
-def get_provider_services(request):
-    # type: (Request) -> List[Service]
+def get_provider_services(container, check=True):
+    # type: (AnySettingsContainer, bool) -> List[Service]
     """
     Obtain the list of remote provider services.
+
+    :param container: definition to retrieve settings and database connection.
+    :param check: request that all provider services are remotely accessible to fetch metadata from them.
     """
-    settings = get_settings(request)
+    settings = get_settings(container)
     store = get_db(settings).get_store(StoreServices)
     providers = []
+    if not check:
+        LOGGER.info("Skipping remote provider service check. Accessibility of listed services will not be validated.")
     for service in store.list_services():
-        # pre-check service location
-        # status can be 500 because of missing query params, but faster skip of invalid references
-        # this avoids long pending connexions that never resolve because of down server
-        try:
-            resp = request_extra("head", service.url, timeout=1, settings=settings)
-            if resp.status_code == 404:
-                LOGGER.warning("Skipping unresponsive service (%s) [%s]", service.name, service.url)
-                continue
-        except Exception as exc:
-            msg = "Exception occurred while fetching wps {0} : {1!r}".format(service.url, exc)
-            warnings.warn(msg, NonBreakingExceptionWarning)
-        else:
-            providers.append(service)
+        if check and not service.check_accessible():
+            LOGGER.warning("Skipping unresponsive service (%s) [%s]", service.name, service.url)
+            continue
+        providers.append(service)
     return providers
 
 
@@ -56,31 +59,16 @@ def get_providers(request):
     """
     Lists registered providers.
     """
-
-    reachable_services = get_provider_services(request)
+    detail = asbool(request.params.get("detail", True))
+    check = asbool(request.params.get("check", True))
+    reachable_services = get_provider_services(request, check=check)
     providers = []
     for service in reachable_services:
-        summary = service.summary(request)
+        summary = service.summary(request, fetch=check) if detail else service.name
         if summary:
             providers.append(summary)
-    return HTTPOk(json={"providers": providers})
-
-
-def get_capabilities(service, request):
-    """
-    GetCapabilities of a wps provider.
-    """
-    wps = get_wps_client(service.url, request)
-    url = get_wps_restapi_base_url(request)
-    return {
-        "id": service.name,
-        "title": wps.identification.title,
-        "abstract": wps.identification.abstract,
-        "url": "{base_url}/providers/{provider_id}".format(base_url=url, provider_id=service.name),
-        "processes": "{base_url}/providers/{provider_id}/processes".format(base_url=url, provider_id=service.name),
-        "type": PROCESS_WPS_REMOTE,
-        "contact": wps.provider.contact.name,
-    }
+    data = {"checked": check, "providers": providers}
+    return HTTPOk(json=sd.ProvidersBodySchema().deserialize(data))
 
 
 def get_service(request):
@@ -101,26 +89,56 @@ def get_service(request):
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def add_provider(request):
     """
-    Add a provider.
+    Register a new service provider.
     """
-    store = get_db(request).get_store(StoreServices)
-
+    schema = sd.CreateProviderRequestBody()
+    schema_ref = get_schema_ref(schema, request)
     try:
-        new_service = Service(url=request.json["url"], name=get_any_id(request.json))
-    except KeyError as exc:
-        raise OWSMissingParameterValue("Missing json parameter '{!s}'.".format(exc), value=exc)
+        body = schema.deserialize(request.json)
+    except colander.Invalid as invalid:
+        data = {
+            "description": "Invalid schema: [{!s}]".format(invalid),
+            "value": invalid.value
+        }
+        data.update(schema_ref)
+        raise HTTPBadRequest(json=data)
 
-    if "public" in request.json:
-        new_service["public"] = request.json["public"]
-    if "auth" in request.json:
-        new_service["auth"] = request.json["auth"]
+    store = get_db(request).get_store(StoreServices)
+    prov_id = get_any_id(body)
+    try:
+        store.fetch_by_name(prov_id)
+    except ServiceNotFound:
+        pass
+    else:
+        raise HTTPConflict("Provider [{}] already exists.".format(prov_id))
+    try:
+        new_service = Service(url=body["url"], name=prov_id)
+    except KeyError as exc:
+        raise OWSMissingParameterValue("Missing JSON parameter '{!s}'.".format(exc), value=exc)
+
+    if "public" in body:
+        new_service["public"] = body["public"]
+    if "auth" in body:
+        new_service["auth"] = body["auth"]
 
     try:
         store.save_service(new_service)
     except NotImplementedError:
         raise OWSNotImplemented(sd.NotImplementedPostProviderResponse.description, value=new_service)
-
-    return HTTPCreated(json=get_capabilities(new_service, request))
+    try:
+        service = new_service.summary(request)
+        if not service:
+            raise colander.Invalid(None, value=body)
+    except colander.Invalid as invalid:
+        data = {
+            "description": "Provider properties could not be parsed correctly.",
+            "value": invalid.value
+        }
+        data.update(schema_ref)
+        raise HTTPUnprocessableEntity(json=data)
+    data = get_schema_ref(sd.ProviderSummarySchema, request)
+    data.update(service)
+    return HTTPCreated(json=data)
 
 
 @sd.provider_service.delete(tags=[sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
@@ -128,7 +146,7 @@ def add_provider(request):
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def remove_provider(request):
     """
-    Remove a provider.
+    Remove an existing service provider.
     """
     service, store = get_service(request)
 
@@ -148,4 +166,4 @@ def get_provider(request):
     Get a provider definition (GetCapabilities).
     """
     service, _ = get_service(request)
-    return HTTPOk(json=get_capabilities(service, request))
+    return HTTPOk(json=service.summary(request))

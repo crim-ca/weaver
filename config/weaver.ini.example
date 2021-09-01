@@ -44,6 +44,10 @@ cache.result.enabled = false
 weaver.configuration = ems
 weaver.url = http://localhost:4001
 
+# Static endpoint to external schema locations for reference in responses.
+# If not provided, the current instance OpenAPI JSON path is employed instead.
+weaver.schema_url =
+
 # --- Weaver Logging ---
 # When provided, this value will override every weaver-specific level defined in other section logging configuration
 # Otherwise, their individual levels are employed as provided by other logging sections from this configuration file

@@ -57,8 +57,15 @@ class WpsPackageConfigBase(unittest.TestCase):
         pyramid.testing.tearDown()
 
     @classmethod
-    def deploy_process(cls, payload):
-        # type: (JSON) -> JSON
+    def describe_process(cls, process_id, describe_schema="OGC"):
+        path = "/processes/{}?schema={}".format(process_id, describe_schema)
+        resp = cls.app.get(path, headers=cls.json_headers)
+        assert resp.status_code == 200
+        return deepcopy(resp.json)
+
+    @classmethod
+    def deploy_process(cls, payload, describe_schema="OGC"):
+        # type: (JSON, str) -> JSON
         """
         Deploys a process with :paramref:`payload`.
 
@@ -71,8 +78,8 @@ class WpsPackageConfigBase(unittest.TestCase):
         resp = cls.app.put_json("{}/visibility".format(path), params=body, headers=cls.json_headers)
         assert resp.status_code == 200, "Expected successful visibility.\nError:\n{}".format(resp.text)
         info = []
-        for pkg_url in [path, "{}/package".format(path)]:
-            resp = cls.app.get(pkg_url, headers=cls.json_headers)
+        for info_path in ["{}?schema={}".format(path, describe_schema), "{}/package".format(path)]:
+            resp = cls.app.get(info_path, headers=cls.json_headers)
             assert resp.status_code == 200
             info.append(deepcopy(resp.json))
         return info

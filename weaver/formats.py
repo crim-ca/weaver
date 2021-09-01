@@ -115,7 +115,9 @@ LOGGER = logging.getLogger(__name__)
 
 def get_format(mime_type, default=None):
     # type: (str, Optional[str]) -> Format
-    """Obtains a :class:`Format` with predefined extension and encoding details from known MIME-types."""
+    """
+    Obtains a :class:`Format` with predefined extension and encoding details from known MIME-types.
+    """
     ctype = clean_mime_type_format(mime_type, strip_parameters=True)
     fmt = _CONTENT_TYPE_FORMAT_MAPPING.get(mime_type)
     if fmt is not None:
@@ -143,6 +145,8 @@ def get_extension(mime_type):
 def get_cwl_file_format(mime_type, make_reference=False, must_exist=True, allow_synonym=True):
     # type: (str, bool, bool, bool) -> Union[Tuple[Optional[JSON], Optional[str]], Optional[str]]
     """
+    Obtains the extended schema reference from the media-type identifier.
+
     Obtains the corresponding `IANA`/`EDAM` ``format`` value to be applied under a `CWL` I/O ``File`` from
     the :paramref:`mime_type` (`Content-Type` header) using the first matched one.
 
@@ -225,6 +229,8 @@ def get_cwl_file_format(mime_type, make_reference=False, must_exist=True, allow_
 def clean_mime_type_format(mime_type, suffix_subtype=False, strip_parameters=False):
     # type: (str, bool, bool) -> str
     """
+    Obtains a generic media-type identifier by cleaning up any additional parameters.
+
     Removes any additional namespace key or URL from :paramref:`mime_type` so that it corresponds to the generic
     representation (e.g.: ``application/json``) instead of the ``<namespace-name>:<format>`` mapping variant used
     in `CWL->inputs/outputs->File->format` or the complete URL reference.

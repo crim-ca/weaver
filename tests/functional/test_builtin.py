@@ -8,7 +8,12 @@ import pytest
 
 from tests.functional.utils import WpsPackageConfigBase
 from tests.utils import get_settings_from_testapp, mocked_execute_process, mocked_sub_requests
-from weaver.execute import EXECUTE_TRANSMISSION_MODE_REFERENCE
+from weaver.execute import (
+    EXECUTE_CONTROL_OPTION_ASYNC,
+    EXECUTE_MODE_ASYNC,
+    EXECUTE_RESPONSE_DOCUMENT,
+    EXECUTE_TRANSMISSION_MODE_REFERENCE
+)
 from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_NETCDF
 from weaver.processes.builtin import register_builtin_processes
 
@@ -36,25 +41,54 @@ class BuiltinAppTest(WpsPackageConfigBase):
         self.process_store.clear_processes()
         register_builtin_processes(self.settings)
 
-    def test_jsonarray2netcdf_describe(self):
-        resp = self.app.get("/processes/jsonarray2netcdf", headers=self.json_headers)
+    def test_jsonarray2netcdf_describe_old_schema(self):
+        resp = self.app.get("/processes/jsonarray2netcdf?schema=OLD", headers=self.json_headers)
+        body = resp.json
         assert resp.status_code == 200
         assert resp.content_type in CONTENT_TYPE_APP_JSON
-        assert resp.json["process"]["id"] == "jsonarray2netcdf"
-        assert resp.json["process"]["abstract"] not in ["", None]
-        assert resp.json["process"]["executeEndpoint"] == "https://localhost/processes/jsonarray2netcdf/jobs"
-        assert isinstance(resp.json["process"]["inputs"], list)
-        assert len(resp.json["process"]["inputs"]) == 1
-        assert resp.json["process"]["inputs"][0]["id"] == "input"
-        assert isinstance(resp.json["process"]["inputs"][0]["formats"], list)
-        assert len(resp.json["process"]["inputs"][0]["formats"]) == 1
-        assert resp.json["process"]["inputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
-        assert isinstance(resp.json["process"]["outputs"], list)
-        assert len(resp.json["process"]["outputs"]) == 1
-        assert resp.json["process"]["outputs"][0]["id"] == "output"
-        assert isinstance(resp.json["process"]["outputs"][0]["formats"], list)
-        assert len(resp.json["process"]["outputs"][0]["formats"]) == 1
-        assert resp.json["process"]["outputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_NETCDF
+        assert "process" in body, "OLD schema process description should be nested under 'process' field."
+        assert body["process"]["id"] == "jsonarray2netcdf"
+        assert "abstract" not in body["process"], "Deprecated 'abstract' should now be 'description'."
+        assert body["process"]["description"] not in ["", None]
+        assert body["process"]["executeEndpoint"] == "https://localhost/processes/jsonarray2netcdf/jobs"
+        assert isinstance(body["process"]["inputs"], list)
+        assert len(body["process"]["inputs"]) == 1
+        assert body["process"]["inputs"][0]["id"] == "input"
+        assert isinstance(body["process"]["inputs"][0]["formats"], list)
+        assert len(body["process"]["inputs"][0]["formats"]) == 1
+        assert body["process"]["inputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
+        assert isinstance(body["process"]["outputs"], list)
+        assert len(body["process"]["outputs"]) == 1
+        assert body["process"]["outputs"][0]["id"] == "output"
+        assert isinstance(body["process"]["outputs"][0]["formats"], list)
+        assert len(body["process"]["outputs"][0]["formats"]) == 1
+        assert body["process"]["outputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_NETCDF
+        assert body["jobControlOptions"] == [EXECUTE_CONTROL_OPTION_ASYNC]
+        assert body["outputTransmission"] == [EXECUTE_TRANSMISSION_MODE_REFERENCE]
+
+    def test_jsonarray2netcdf_describe_ogc_schema(self):
+        resp = self.app.get("/processes/jsonarray2netcdf", headers=self.json_headers)
+        body = resp.json
+        assert resp.status_code == 200
+        assert resp.content_type in CONTENT_TYPE_APP_JSON
+        assert body["id"] == "jsonarray2netcdf"
+        assert "abstract" not in body, "Deprecated 'abstract' should now be 'description'."
+        assert body["description"] not in ["", None]
+        assert body["executeEndpoint"] == "https://localhost/processes/jsonarray2netcdf/jobs"
+        assert isinstance(body["inputs"], dict)
+        assert len(body["inputs"]) == 1 and "input" in body["inputs"]
+        assert "id" not in body["inputs"]["input"]
+        assert isinstance(body["inputs"]["input"]["formats"], list)
+        assert len(body["inputs"]["input"]["formats"]) == 1
+        assert body["inputs"]["input"]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
+        assert isinstance(body["outputs"], dict)
+        assert len(body["outputs"]) == 1 and "output" in body["outputs"]
+        assert "id" not in body["outputs"]["output"]
+        assert isinstance(body["outputs"]["output"]["formats"], list)
+        assert len(body["outputs"]["output"]["formats"]) == 1
+        assert body["outputs"]["output"]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_NETCDF
+        assert body["jobControlOptions"] == [EXECUTE_CONTROL_OPTION_ASYNC]
+        assert body["outputTransmission"] == [EXECUTE_TRANSMISSION_MODE_REFERENCE]
 
     def test_jsonarray2netcdf_execute(self):
         dirname = tempfile.gettempdir()
@@ -69,8 +103,8 @@ class BuiltinAppTest(WpsPackageConfigBase):
             tmp_json.write(json.dumps(["file://{}".format(os.path.join(dirname, tmp_ncdf.name))]))
             tmp_json.seek(0)
             data = {
-                "mode": "async",
-                "response": "document",
+                "mode": EXECUTE_MODE_ASYNC,
+                "response": EXECUTE_RESPONSE_DOCUMENT,
                 "inputs": [{"id": "input", "href": os.path.join(dirname, tmp_json.name)}],
                 "outputs": [{"id": "output", "transmissionMode": EXECUTE_TRANSMISSION_MODE_REFERENCE}],
             }

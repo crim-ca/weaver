@@ -1,0 +1,11 @@
+{
+  "checked": false,
+  "providers": [
+    "catalog",
+    "finch",
+    "flyingpigeon",
+    "hummingbird",
+    "malleefowl",
+    "raven"
+  ]
+}

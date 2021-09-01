@@ -199,7 +199,9 @@ class OWSNotAcceptable(OWSException):
 
 
 class OWSNoApplicableCode(OWSException, NoApplicableCode):
-    """WPS Bad Request Exception"""
+    """
+    WPS Bad Request Exception.
+    """
     code = "NoApplicableCode"
     locator = ""
     explanation = "Undefined error"
@@ -211,7 +213,9 @@ class OWSNoApplicableCode(OWSException, NoApplicableCode):
 
 
 class OWSMissingParameterValue(OWSException, MissingParameterValue):
-    """MissingParameterValue WPS Exception"""
+    """
+    MissingParameterValue WPS Exception.
+    """
     code = "MissingParameterValue"
     locator = ""
     description = "Parameter value is missing"
@@ -223,7 +227,9 @@ class OWSMissingParameterValue(OWSException, MissingParameterValue):
 
 
 class OWSInvalidParameterValue(OWSException, InvalidParameterValue):
-    """InvalidParameterValue WPS Exception"""
+    """
+    InvalidParameterValue WPS Exception.
+    """
     code = "InvalidParameterValue"
     locator = ""
     description = "Parameter value is not acceptable."

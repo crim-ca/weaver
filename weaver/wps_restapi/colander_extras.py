@@ -1,6 +1,5 @@
 """
-This module offers multiple utility schema definitions to be employed with
-:mod:`colander` and :mod:`cornice_swagger`.
+This module offers multiple utility schema definitions to be employed with :mod:`colander` and :mod:`cornice_swagger`.
 
 The :class:`colander.SchemaNode` provided here can be used in-place of :mod:`colander`
 ones, but giving you extended behaviour according to provided keywords. You can therefore
@@ -68,7 +67,7 @@ from cornice_swagger.converters.schema import (
 )
 
 if TYPE_CHECKING:
-    from typing import Dict, Iterable, Optional, Type, Union
+    from typing import Any, Dict, Iterable, Optional, Sequence, Type, Union
 
 
 LITERAL_SCHEMA_TYPES = frozenset([
@@ -83,7 +82,8 @@ LITERAL_SCHEMA_TYPES = frozenset([
 
 
 class SchemaNodeTypeError(TypeError):
-    """Generic error indicating that the definition of a SchemaNode is invalid.
+    """
+    Generic error indicating that the definition of a SchemaNode is invalid.
 
     This usually means the user forgot to specify a required element for schema creation,
     or that a provided combination of keywords, sub-nodes and/or schema type don't make
@@ -93,11 +93,15 @@ class SchemaNodeTypeError(TypeError):
 
 
 class ConversionTypeError(ConversionError, TypeError):
-    """Conversion error due to invalid type."""
+    """
+    Conversion error due to invalid type.
+    """
 
 
 class ConversionValueError(ConversionError, ValueError):
-    """Conversion error due to invalid value."""
+    """
+    Conversion error due to invalid value.
+    """
 
 
 class OneOfCaseInsensitive(colander.OneOf):
@@ -180,17 +184,24 @@ class SemanticVersion(colander.Regex):
 
 class ExtendedBoolean(colander.Boolean):
 
-    def __init__(self, *args, true_choices=None, fase_choices=None, **kwargs):
+    def __init__(self, *args, true_choices=None, false_choices=None, **kwargs):
         """
-        The arguments :paramref:`true_choices` and :paramref:`false_choices`
-        are defined as ``"true"`` and ``"false"`` since :mod:`colander` converts the value to string lowercase
-        to compare with other thruty/falsy values it should accept. Do NOT add other values like ``"1"``
-        to avoid conflict with ``Integer`` type for schemas that support both variants.
+        Initializes the extended boolean schema node.
+
+        The arguments :paramref:`true_choices` and :paramref:`false_choices` are defined
+        as ``"true"`` and ``"false"`` since :mod:`colander` converts the value to string lowercase
+        to compare with other truthy/falsy values it should accept.
+
+        Do **NOT** add other values like ``"1"`` to avoid conflict with ``Integer`` type for schemas that support
+        both variants. This boolean schema is a *strict* representation of *only* :class:`bool` type.
+
+        If an `OpenAPI` field is expected to support truthy/falsy values, it should explicitly define its schema using
+        a ``oneOf`` keyword of all relevant schemas it supports, an any applicable validators for explicit values.
         """
         if true_choices is None:
-            true_choices = ("true")
-        if fase_choices is None:
-            false_choices = ("false")
+            true_choices = ("true", )
+        if false_choices is None:
+            false_choices = ("false", )
         super(ExtendedBoolean, self).__init__(true_choices=true_choices, false_choices=false_choices, *args, **kwargs)
 
     def serialize(self, node, cstruct):  # pylint: disable=W0221
@@ -340,8 +351,10 @@ class ExtendedSchemaBase(colander.SchemaNode, metaclass=ExtendedSchemaMeta):
 
 class DropableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
     """
+    Schema that can be dropped if the value is missing.
+
     Drops the underlying schema node if ``missing=drop`` was specified and that the value
-    representing it represents an *empty* value.
+    representing it represents an *empty* value instead of raising a invalid schema error.
 
     In the case of nodes corresponding to literal schema type (i.e.: Integer, String, etc.),
     the *empty* value looked for is ``None``. This is to make sure that ``0`` or ``""`` are
@@ -413,6 +426,8 @@ class DropableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
 
 class DefaultSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
     """
+    Schema that will return the provided default value when the corresponding value is missing or invalid.
+
     If ``default`` keyword is provided during :class:`colander.SchemaNode` creation, overrides the
     returned value by this default if missing from the structure during :meth:`deserialize` call.
 
@@ -563,6 +578,8 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
 
     def _mark_variable_children(self):
         """
+        Ensures that any immediate children schema with variable key are detected.
+
         Verifies if a :class:`colander.MappingSchema` (or any of its extensions)
         contains children :class:`VariableSchemaNode` schema nodes for adequate
         :meth:`deserialize` result later on.
@@ -629,6 +646,7 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
 
         var_children = self._get_sub_variable(self.children)
         const_child_keys = [child.name for child in self.children if child not in var_children]
+        var = None
         for var_child in var_children:
             var = getattr(var_child, self._variable, None)
             var_map[var] = []
@@ -658,8 +676,16 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
                     })
                 except colander.Invalid as invalid:
                     var_invalid.add(invalid)
-            if not var_map.get(var, None):
+            var_val = var_map.get(var, colander.null)
+            if var_val is colander.null:
+                # allow unmatched variable item under mapping if it is not required
+                if var_child.missing is colander.drop:
+                    continue
                 raise var_invalid
+            # invalid if no variable match was found, unless optional
+            for mapped in var_map.values():
+                if len(mapped) < 1 and var_child.missing is colander.required:
+                    raise var_invalid
 
         invalid_var = colander.Invalid(self, value=var_map)
         try:
@@ -670,26 +696,99 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
             if not const_child_keys:
                 result = {}
             else:
-                for var, mapped in var_map.items():
+                for mapped in var_map.values():
                     # if multiple objects corresponding to a variable sub-schema where provided,
                     # we only give one as this is what is expected for normal-mapping deserialize
                     cstruct[mapped[0]["node"]] = cstruct.pop(mapped[0]["name"])
                 result = super(VariableSchemaNode, self).deserialize(cstruct)  # noqa
-            for var, mapped in var_map.items():
+            for mapped in var_map.values():
                 for var_mapped in mapped:
                     result[var_mapped["name"]] = var_mapped["cstruct"]
         except colander.Invalid as invalid:
-            invalid_var.msg = "Tried matching variable '{}' sub-schemas but no match found.".format(var)  # noqa
+            invalid_var.msg = "Tried matching variable '{}' sub-schemas but no match found.".format(var)
             invalid_var.add(invalid)
             raise invalid_var
         except KeyError:
-            invalid_var.msg = "Tried matching variable '{}' sub-schemas but mapping failed.".format(var)  # noqa
+            invalid_var.msg = "Tried matching variable '{}' sub-schemas but mapping failed.".format(var)
             raise invalid_var
+        return result
+
+
+class SortableMappingSchema(ExtendedNodeInterface, ExtendedSchemaBase):
+    """
+    Adds sorting capabilities to mapping schema.
+
+    Extended schema nodes that inherit from :class:`colander.Mapping` schema-type such that they can request
+    ordering of resulting fields by overriding properties :prop:`_sort_first` and :prop:`_sort_after` within
+    the schema definition with lists of fields names to sort.
+
+    .. seealso::
+        - :func:`_order_deserialize`
+    """
+
+    _extension = "_ext_sortable"
+    _sort_first = []  # type: Sequence[str]
+    _sort_after = []  # type: Sequence[str]
+
+    def __init__(self, *args, **kwargs):
+        super(SortableMappingSchema, self).__init__(*args, **kwargs)
+        setattr(self, SortableMappingSchema._extension, True)
+
+    # pylint: disable=W0222,signature-differs
+    def deserialize(self, cstruct):
+        return ExtendedSchemaNode.deserialize(self, cstruct)  # noqa
+
+    @staticmethod
+    def schema_type():
+        raise NotImplementedError("Using SchemaNode for a field requires 'schema_type' definition.")
+
+    def _deserialize_impl(self, cstruct):
+        if not getattr(self, SortableMappingSchema._extension, False):
+            return cstruct
+        if not isinstance(cstruct, dict):
+            return cstruct
+
+        sort_first = getattr(self, "_sort_first", [])
+        sort_after = getattr(self, "_sort_after", [])
+        if sort_first or sort_after:
+            return self._order_deserialize(cstruct, sort_first, sort_after)
+        return cstruct
+
+    @staticmethod
+    def _order_deserialize(cstruct, sort_first=None, sort_after=None):
+        # type: (Dict[str, Any], Optional[Sequence[str]], Optional[Sequence[str]]) -> Dict[str, Any]
+        """
+        Enforces ordering of expected fields in deserialized result, regardless of specified children/inherited schema.
+
+        This function takes care of moving back items in a consistent order for better readability from API responses
+        against different loaded definitions field order from remote servers, local database, pre-defined objects, etc.
+
+        This way, any field insertion order from both the input ``cstruct`` following deserialization operation, the
+        internal mechanics that :mod:`colander` (and extended OpenAPI schema definitions) employ to process this
+        deserialization, and the ``result`` dictionary fields order obtained from it all don't matter.
+
+        Using this, the order of inheritance of schema children classes also doesn't matter, removing the need to worry
+        about placing classes in any specific order when editing and joining the already complicated structures of
+        inherited schemas.
+
+        :param cstruct: JSON structure to be sorted that has already been processed by a schema's ``deserialize`` call.
+        :param sort_first: ordered list of fields to place first in the result.
+        :param sort_after: ordered list of fields to place last in the result.
+        :returns: results formed from cstruct following order: (<fields_firsts> + <other_fields> + <fields_after>)
+        """
+        sort_first = sort_first if sort_first else []
+        sort_after = sort_after if sort_after else []
+        result = {field: cstruct.pop(field, None) for field in sort_first if field in cstruct}
+        remain = {field: cstruct.pop(field, None) for field in sort_after if field in cstruct}
+        result.update(cstruct)
+        result.update(remain)
         return result
 
 
 class ExtendedSchemaNode(DefaultSchemaNode, DropableSchemaNode, VariableSchemaNode, ExtendedSchemaBase):
     """
+    Base schema node with support of extended functionalities.
+
     Combines all :class:`colander.SchemaNode` extensions so that ``default`` keyword is used first to
     resolve a missing field value during :meth:`deserialize` call, and then removes the node completely
     if no ``default`` was provided, and evaluate variables as needed.
@@ -759,11 +858,13 @@ class ExtendedSchemaNode(DefaultSchemaNode, DropableSchemaNode, VariableSchemaNo
         if result is colander.null and self.missing is colander.required:
             raise colander.Invalid(node=self, msg=self.missing_msg)
 
-        return result
+        return SortableMappingSchema._deserialize_impl(self, result)
 
 
 class DropableSequenceSchema(DropableSchemaNode, colander.SequenceSchema):
     """
+    Sequence schema that supports the dropable functionality.
+
     Extends :class:`colander.SequenceSchema` to auto-handle dropping missing entry definitions
     when its value is either ``None``, :class:`colander.null` or :class:`colander.drop`.
     """
@@ -772,6 +873,8 @@ class DropableSequenceSchema(DropableSchemaNode, colander.SequenceSchema):
 
 class DefaultSequenceSchema(DefaultSchemaNode, colander.SequenceSchema):
     """
+    Sequence schema that supports the default value functionality.
+
     Extends :class:`colander.SequenceSchema` to auto-handle replacing the result using the provided
     ``default`` value when the deserialization results into a sequence that should normally be dropped.
     """
@@ -780,8 +883,10 @@ class DefaultSequenceSchema(DefaultSchemaNode, colander.SequenceSchema):
 
 class ExtendedSequenceSchema(DefaultSchemaNode, DropableSchemaNode, colander.SequenceSchema):
     """
-    Combines :class:`DefaultSequenceSchema` and :class:`DefaultSequenceSchema` extensions so that
-    ``default`` keyword is used first to resolve a missing sequence during :meth:`deserialize`
+    Sequence schema that supports all applicable extended schema node functionalities.
+
+    Combines :class:`DefaultSequenceSchema` and :class:`DefaultSequenceSchema` extensions
+    so that ``default`` keyword is used first to resolve a missing sequence during :meth:`deserialize`
     call, and then removes the node completely if no ``default`` was provided.
 
     .. seealso::
@@ -798,16 +903,20 @@ class ExtendedSequenceSchema(DefaultSchemaNode, DropableSchemaNode, colander.Seq
         ExtendedSchemaBase._validate(self.children[0])
 
 
-class DropableMappingSchema(DropableSchemaNode, colander.MappingSchema):
+class DropableMappingSchema(DropableSchemaNode, SortableMappingSchema, colander.MappingSchema):
     """
+    Mapping schema that supports the dropable functionality.
+
     Override the default :class:`colander.MappingSchema` to auto-handle dropping missing field definitions
     when the corresponding value is either ``None``, :class:`colander.null` or :class:`colander.drop`.
     """
     schema_type = colander.MappingSchema.schema_type
 
 
-class DefaultMappingSchema(DefaultSchemaNode, colander.MappingSchema):
+class DefaultMappingSchema(DefaultSchemaNode, SortableMappingSchema, colander.MappingSchema):
     """
+    Mapping schema that supports the default value functionality.
+
     Override the default :class:`colander.MappingSchema` to auto-handle replacing missing entries by
     their specified ``default`` during deserialization.
     """
@@ -816,6 +925,8 @@ class DefaultMappingSchema(DefaultSchemaNode, colander.MappingSchema):
 
 class VariableMappingSchema(VariableSchemaNode, colander.MappingSchema):
     """
+    Mapping schema that supports the variable functionality.
+
     Override the default :class:`colander.MappingSchema` to auto-handle replacing missing entries by
     their specified ``variable`` during deserialization.
     """
@@ -826,6 +937,7 @@ class ExtendedMappingSchema(
     DefaultSchemaNode,
     DropableSchemaNode,
     VariableSchemaNode,
+    SortableMappingSchema,
     colander.MappingSchema
 ):
     """
@@ -840,6 +952,7 @@ class ExtendedMappingSchema(
         - :class:`VariableSchemaNode`
         - :class:`ExtendedSchemaNode`
         - :class:`ExtendedSequenceSchema`
+        - :class:`SortableMappingSchema`
         - :class:`PermissiveMappingSchema`
     """
     schema_type = colander.MappingSchema.schema_type
@@ -980,6 +1093,8 @@ class KeywordMapper(ExtendedMappingSchema):
     @abstractmethod
     def _deserialize_keyword(self, cstruct):
         """
+        Deserialization and validation of a keyword-based schema definition.
+
         This method must be implemented by the specific keyword to handle
         invalid subnodes according to the behaviour it offers.
 
@@ -990,6 +1105,8 @@ class KeywordMapper(ExtendedMappingSchema):
 
     def _deserialize_subnode(self, node, cstruct):
         """
+        Deserialization and validation of sub-nodes under a keyword-based schema definition.
+
         This method must be called by keyword deserialization implementers
         for deserialization of every sub-node in order to apply extended behaviour
         operations accordingly. The original ``deserialize`` method of
@@ -1027,13 +1144,15 @@ class KeywordMapper(ExtendedMappingSchema):
         if isinstance(result, dict) and self.children:
             mapping_data = super(KeywordMapper, self).deserialize(cstruct)
             result.update(mapping_data)
+        result = SortableMappingSchema._deserialize_impl(self, result)
         return result
 
 
 class OneOfKeywordSchema(KeywordMapper):
     """
-    Allows specifying multiple supported mapping schemas variants for an underlying schema
-    definition. Corresponds to the ``oneOf`` specifier of `OpenAPI` specification.
+    Allows specifying multiple supported mapping schemas variants for an underlying schema definition.
+
+    Corresponds to the ``oneOf`` specifier of `OpenAPI` specification.
 
     Example::
 
@@ -1142,7 +1261,11 @@ class OneOfKeywordSchema(KeywordMapper):
     @abstractmethod
     def _one_of(cls):
         # type: () -> Iterable[Union[colander.SchemaNode, Type[colander.SchemaNode]]]  # noqa: W0212
-        """This must be overridden in the schema definition using it."""
+        """
+        Sequence of applicable schema nested under the ``oneOf`` keyword.
+
+        Must be overridden in the schema definition using it.
+        """
         raise SchemaNodeTypeError("Missing '{}' keyword for schema '{}'.".format(cls._keyword, cls))
 
     def __init__(self, *args, **kwargs):
@@ -1197,8 +1320,7 @@ class OneOfKeywordSchema(KeywordMapper):
 
     def _deserialize_keyword(self, cstruct):
         """
-        Test each possible case, return all corresponding errors if
-        none of the possibilities is valid including all sub-dependencies.
+        Test each possible case, return all corresponding errors if not exactly one of the possibilities is valid.
         """
         invalid_one_of = dict()
         valid_one_of = []
@@ -1267,8 +1389,9 @@ class OneOfKeywordSchema(KeywordMapper):
 
 class AllOfKeywordSchema(KeywordMapper):
     """
-    Allows specifying all the required partial mapping schemas for an underlying complete schema
-    definition. Corresponds to the ``allOf`` specifier of `OpenAPI` specification.
+    Allows specifying all the required partial mapping schemas for an underlying complete schema definition.
+
+    Corresponds to the ``allOf`` specifier of `OpenAPI` specification.
 
     Example::
 
@@ -1298,13 +1421,16 @@ class AllOfKeywordSchema(KeywordMapper):
     @abstractmethod
     def _all_of(cls):
         # type: () -> Iterable[Union[colander.SchemaNode, Type[colander.SchemaNode]]]  # noqa: W0212
-        """This must be overridden in the schema definition using it."""
+        """
+        Sequence of applicable schema nested under the ``allOf`` keyword.
+
+        Must be overridden in the schema definition using it.
+        """
         raise SchemaNodeTypeError("Missing '{}' keyword for schema '{}'.".format(cls._keyword, cls))
 
     def _deserialize_keyword(self, cstruct):
         """
-        Test each possible case, return all corresponding errors if
-        any of the possibilities is invalid.
+        Test each possible case, return all corresponding errors if any of the possibilities is invalid.
         """
         required_all_of = dict()
         missing_all_of = dict()
@@ -1332,6 +1458,7 @@ class AllOfKeywordSchema(KeywordMapper):
 class AnyOfKeywordSchema(KeywordMapper):
     """
     Allows specifying all mapping schemas that can be matched for an underlying schema definition.
+
     Corresponds to the ``anyOf`` specifier of `OpenAPI` specification.
 
     Contrary to :class:`OneOfKeywordSchema` that MUST be validated with exactly one schema, this
@@ -1393,7 +1520,11 @@ class AnyOfKeywordSchema(KeywordMapper):
     @abstractmethod
     def _any_of(cls):
         # type: () -> Iterable[Union[colander.SchemaNode, Type[colander.SchemaNode]]]  # noqa: W0212
-        """This must be overridden in the schema definition using it."""
+        """
+        Sequence of applicable schema nested under the ``anyOf`` keyword.
+
+        Must be overridden in the schema definition using it.
+        """
         raise SchemaNodeTypeError("Missing '{}' keyword for schema '{}'.".format(cls._keyword, cls))
 
     def _deserialize_keyword(self, cstruct):
@@ -1484,7 +1615,11 @@ class NotKeywordSchema(KeywordMapper):
     @abstractmethod
     def _not(cls):
         # type: () -> Iterable[Union[colander.SchemaNode, Type[colander.SchemaNode]]]  # noqa: W0212
-        """This must be overridden in the schema definition using it."""
+        """
+        Sequence of applicable schema nested under the ``not`` keyword.
+
+        Must be overridden in the schema definition using it.
+        """
         raise SchemaNodeTypeError("Missing '{}' keyword for schema '{}'.".format(cls._keyword, cls))
 
     def _deserialize_keyword(self, cstruct):
@@ -1528,7 +1663,8 @@ class KeywordTypeConverter(TypeConverter):
 
 
 class OneOfKeywordTypeConverter(KeywordTypeConverter):
-    """Object converter that generates the ``oneOf`` keyword definition.
+    """
+    Object converter that generates the ``oneOf`` keyword definition.
 
     This object does a bit more work than other :class:`KeywordTypeConverter` as it
     handles the shorthand definition as described in :class:`OneOfKeywordSchema`
@@ -1584,15 +1720,21 @@ class OneOfKeywordTypeConverter(KeywordTypeConverter):
 
 
 class AllOfKeywordTypeConverter(KeywordTypeConverter):
-    """Object converter that generates the ``allOf`` keyword definition."""
+    """
+    Object converter that generates the ``allOf`` keyword definition.
+    """
 
 
 class AnyOfKeywordTypeConverter(KeywordTypeConverter):
-    """Object converter that generates the ``anyOf`` keyword definition."""
+    """
+    Object converter that generates the ``anyOf`` keyword definition.
+    """
 
 
 class NotKeywordTypeConverter(KeywordTypeConverter):
-    """Object converter that generates the ``not`` keyword definition."""
+    """
+    Object converter that generates the ``not`` keyword definition.
+    """
 
     def convert_type(self, schema_node):
         result = ObjectTypeConverter(self.dispatcher).convert_type(schema_node)
@@ -1602,8 +1744,7 @@ class NotKeywordTypeConverter(KeywordTypeConverter):
 
 class VariableObjectTypeConverter(ObjectTypeConverter):
     """
-    Updates the mapping object's ``additionalProperties`` for each ``properties``
-    that a marked as :class:`VariableSchemaNode`.
+    Object convertor with ``additionalProperties`` for each ``properties`` marked as :class:`VariableSchemaNode`.
     """
 
     def convert_type(self, schema_node):
@@ -1729,10 +1870,13 @@ class OAS3TypeConversionDispatcher(TypeConversionDispatcher):
 
 def _make_node_instance(schema_node_or_class):
     # type: (Union[colander.SchemaNode, Type[colander.SchemaNode]]) -> colander.SchemaNode
-    """Obtains a schema node instance in case it was specified only by type reference.
+    """
+    Obtains a schema node instance in case it was specified only by type reference.
 
     This helps being more permissive of provided definitions while handling situations
-    like presented in the example below::
+    like presented in the example below:
+
+    .. code-block:: python
 
         class Map(OneOfMappingSchema):
             # uses types instead of instances like 'SubMap1([...])' and 'SubMap2([...])'
@@ -1749,7 +1893,8 @@ def _make_node_instance(schema_node_or_class):
 
 def _get_schema_type(schema_node, check=False):
     # type: (Union[colander.SchemaNode, Type[colander.SchemaNode]], bool) -> Optional[colander.SchemaType]
-    """Obtains the schema-type from the provided node, supporting various initialization methods.
+    """
+    Obtains the schema-type from the provided node, supporting various initialization methods.
 
     - ``typ`` is set by an instantiated node from specific schema (e.g.: ``colander.SchemaNode(colander.String())``)
     - ``schema_type`` can also be provided, either by type or instance if using class definition with property

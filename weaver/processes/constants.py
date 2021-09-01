@@ -7,6 +7,10 @@ WPS_BOUNDINGBOX = "bbox"
 WPS_LITERAL = "literal"
 WPS_REFERENCE = "reference"
 WPS_COMPLEX_DATA = "ComplexData"
+WPS_LITERAL_DATA_TYPE_NAMES = frozenset([
+    "date", "time", "dateTime", "anyURI", "scale", "angle", "float", "double",
+    "int", "integer", "long", "positiveInteger", "nonNegativeInteger", "bool", "boolean", "string"
+])
 
 # opensearch
 OPENSEARCH_START_DATE = "StartDate"
