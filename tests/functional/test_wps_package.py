@@ -511,7 +511,7 @@ class WpsPackageAppTest(WpsPackageConfigBase):
 
     def test_block_builtin_processes_from_api(self):
         """
-        Test to validates if ``builtin`` process type is explicitely blocked during deployememt from API.
+        Test to validates if ``builtin`` process type is explicitly blocked during deploymemt from API.
         """
         cwl = {
             "cwlVersion": "v1.0",
@@ -548,8 +548,8 @@ class WpsPackageAppTest(WpsPackageConfigBase):
 
     def test_block_unknown_processes(self):
         """
-        Test to validates that any process that cannot be resolved against one of known ``CWL_REQUIREMENT_APP_TYPES``
-        is explicitely blocked.
+        Test to validates that any process that cannot be resolved against one of
+        known :py:data:`weaver.processes.constants.CWL_REQUIREMENT_APP_TYPES` is explicitly blocked.
         """
         cwl = {
             "cwlVersion": "v1.0",

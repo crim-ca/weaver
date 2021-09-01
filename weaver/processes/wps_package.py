@@ -614,12 +614,13 @@ def _generate_process_with_cwl_from_reference(reference):
     return cwl_package, process_info
 
 
-def _get_requirements(package):
-    # type: () -> Dict[str, Any]
+def get_application_requirement(package):
+    # type: (CWL) -> Dict[str, Any]
     """
+    Retrieve the principal requirement that allows mapping to the appropriate process implementation.
+
     Obtains the first item in `CWL` package ``requirements`` or ``hints`` that corresponds to a `Weaver`-specific
     application type as defined in :py:data:`CWL_REQUIREMENT_APP_TYPES`.
-    Also verifies if the requirements types are supported.
 
     :returns: dictionary that minimally has ``class`` field, and optionally other parameters from that requirement.
     """
@@ -637,8 +638,7 @@ def _get_requirements(package):
 
     cwl_supported_reqs = [item for item in CWL_REQUIREMENT_APP_TYPES] + [CWL_REQUIREMENT_INIT_WORKDIR]
     if not all(item.get("class") in cwl_supported_reqs for item in all_hints):
-        raise PackageTypeError(
-            "Invalid requirement, the requirements supported are {0}".format(cwl_supported_reqs))
+        raise PackageTypeError("Invalid requirement, the requirements supported are {0}".format(cwl_supported_reqs))
 
     return requirement
 
@@ -705,7 +705,7 @@ def get_process_definition(process_offering, reference=None, package=None, data_
         lambda: _merge_package_inputs_outputs(process_inputs, package_inputs, process_outputs, package_outputs),
         reason="Merging of inputs/outputs")
 
-    try_or_raise_package_error(lambda: _get_requirements(package), reason="Validate requirements and hints")
+    try_or_raise_package_error(lambda: get_application_requirement(package), reason="Validate requirements and hints")
 
     # obtain any retrieved process id if not already provided from upstream process offering, and clean it
     process_id = get_sane_name(get_any_id(process_info), assert_invalid=False)
@@ -1175,7 +1175,7 @@ class WpsPackage(Process):
         """
         if self.remote_execution or self.package_type == PROCESS_WORKFLOW:
             return False
-        app_req = self.get_application_requirement()
+        app_req = get_application_requirement(self.package)
         if app_req["class"] not in [CWL_REQUIREMENT_APP_BUILTIN, CWL_REQUIREMENT_APP_DOCKER]:
             if input_ref.startswith("s3://"):
                 return True
@@ -1345,18 +1345,6 @@ class WpsPackage(Process):
         from weaver.processes.wps_workflow import default_make_tool
         return default_make_tool(toolpath_object, loading_context, self.get_job_process_definition)
 
-    def get_application_requirement(self):
-        # type: () -> Dict[str, Any]
-        """
-        Retrieve the principal requirement that allows mapping to the appropriate process implementation.
-
-        Obtains the first item in `CWL` package ``requirements`` or ``hints`` that corresponds to a `Weaver`-specific
-        application type as defined in :py:data:`CWL_REQUIREMENT_APP_TYPES`.
-
-        :returns: dictionary that minimally has ``class`` field, and optionally other parameters from that requirement.
-        """
-        return _get_requirements(self.package)
-
     def get_job_process_definition(self, jobname, joborder, tool):  # noqa: E811
         # type: (str, JSON, CWL) -> WpsPackage
         """
@@ -1409,7 +1397,7 @@ class WpsPackage(Process):
                 _wps_params[_param] = _requirement[_param]
             return _wps_params
 
-        requirement = self.get_application_requirement()
+        requirement = get_application_requirement(self.package)
         req_class = requirement["class"]
 
         if req_class.endswith(CWL_REQUIREMENT_APP_WPS1):
