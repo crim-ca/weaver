@@ -1,6 +1,9 @@
 import unittest
+from distutils.version import LooseVersion
 
+import owslib
 import pyramid.testing
+import pytest
 
 from tests import resources
 from tests.utils import (
@@ -106,6 +109,39 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             remote_processes.append(process["id"])
         assert resources.TEST_REMOTE_PROCESS_WPS1_ID in remote_processes
 
+    @pytest.mark.xfail(condition=LooseVersion(owslib.__version__) <= LooseVersion("0.25.0"),
+                       reason="OWSLib fix for retrieval of processVersion from DescribeProcess not yet available")
+    @mocked_remote_server_requests_wp1(
+        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
+        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
+        resources.TEST_REMOTE_SERVER_URL
+    )
+    def test_get_provider_process_description_with_version(self):
+        """
+        Test only the version field which depends on a fix from :mod:`OWSLib`.
+
+        The process description retrieved from a remote WPS-1 DescribeProcess request should provide
+        its version converted into JSON schema, for both the ``"OLD"`` and ``"OGC"`` schema representations.
+
+        .. seealso::
+            - Full description validation (OGC schema): :meth:`test_get_provider_process_description_ogc_schema`
+            - Full description validation (OLD schema): :meth:`test_get_provider_process_description_old_schema`
+            - Fix in PR `geopython/OWSLib#794 <https://github.com/geopython/OWSLib/pull/794>`_
+        """
+        path = "/providers/{}/processes/{}".format(self.remote_provider_name, resources.TEST_REMOTE_PROCESS_WPS1_ID)
+        resp = self.app.get(path, params={"schema": "OLD"}, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        proc = resp.json["process"]
+
+        resp = self.app.get(path, params={"schema": "OGC"}, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        desc = resp.json
+
+        assert "version" in proc and isinstance(proc["version"], str) and proc["version"] == "1.0.0"
+        assert "version" in desc and isinstance(desc["version"], str) and desc["version"] == "1.0.0"
+
     @mocked_remote_server_requests_wp1(
         resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
         [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
@@ -126,7 +162,8 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert process["id"] == resources.TEST_REMOTE_PROCESS_WPS1_ID
         assert "title" in process and isinstance(process["title"], str)
         assert "description" in process and isinstance(process["description"], str)
-        assert "version" in process and isinstance(process["version"], str)
+        # evaluated in separate test (test_get_provider_process_description_with_version)
+        # assert "version" in process and isinstance(process["version"], str)
         assert "keywords" in process and isinstance(process["keywords"], list)
         assert "metadata" in process and isinstance(process["metadata"], list)
         assert len(body["jobControlOptions"]) == 1
@@ -156,7 +193,8 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert process["id"] == resources.TEST_REMOTE_PROCESS_WPS1_ID
         assert "title" in process and isinstance(process["title"], str)
         assert "description" in process and isinstance(process["description"], str)
-        assert "version" in process and isinstance(process["version"], str) and len(process["version"])
+        # evaluated in separate test (test_get_provider_process_description_with_version)
+        # assert "version" in process and isinstance(process["version"], str) and len(process["version"])
         assert "keywords" in process and isinstance(process["keywords"], list)
         assert "metadata" in process and isinstance(process["metadata"], list)
         assert len(process["jobControlOptions"]) == 1
