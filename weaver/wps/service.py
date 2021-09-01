@@ -240,8 +240,8 @@ class WorkerService(ServiceWPS):
             message = "Failed building XML response from WPS Execute result. Error [{!r}]".format(ex)
             raise OWSNoApplicableCode(message, locator=job_id)
 
-    def execute_job(self, process_id, wps_inputs, wps_outputs, mode, job_uuid, remote_process):
-        # type: (str, List[WPS_Input_Type], List[WPS_Output_Type], str, str, Optional[Process]) -> WPSExecution
+    def execute_job(self, process_id, wps_inputs, wps_outputs, mode, job_uuid, remote_process, language):
+        # type: (str, List[WPS_Input_Type], List[WPS_Output_Type], str, str, Optional[Process], str) -> WPSExecution
         """
         Real execution of the process by active Celery Worker.
         """
@@ -249,9 +249,17 @@ class WorkerService(ServiceWPS):
         xml_request = execution.buildRequest(process_id, wps_inputs, wps_outputs, mode=mode, lineage=True)
         wps_request = WPSRequest()
         wps_request.identifier = process_id
+        wps_request.check_and_set_language(language)
         wps_request.set_version("2.0.0")
         request_parser = wps_request._post_request_parser(wps_request.WPS.Execute().tag)  # noqa: W0212
-        request_parser(xml_request)
+        request_parser(xml_request)  # parses the submitted inputs/outputs data and request parameters
+
+        # HACK: patch erroneous WPS outputs mimeType as None handling until fixed
+        #       (see: https://github.com/geopython/pywps/pull/623)
+        for out in wps_request.outputs:
+            if "mimetype" in out and out["mimetype"] is None:
+                out["mimetype"] = ""
+
         # NOTE:
         #  Setting 'status = false' will disable async execution of 'pywps.app.Process.Process'
         #  but this is needed since this job is running within Celery worker already async
