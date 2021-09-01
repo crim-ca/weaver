@@ -19,7 +19,7 @@ from weaver.execute import (
     EXECUTE_RESPONSE_DOCUMENT,
     EXECUTE_TRANSMISSION_MODE_OPTIONS
 )
-from weaver.formats import CONTENT_TYPE_APP_JSON
+from weaver.formats import ACCEPT_LANGUAGE_EN_CA, CONTENT_TYPE_APP_JSON
 from weaver.notify import encrypt_email, notify_job_complete
 from weaver.owsexceptions import OWSNoApplicableCode
 from weaver.processes import wps_package
@@ -156,15 +156,16 @@ def execute_process(self, job_id, url, headers=None):
             service = Service(name=job.service, url=url)
             process = Process.from_ows(wps_process, service, settings)
 
-        mode = EXECUTE_MODE_ASYNC if job.execute_async else EXECUTE_MODE_SYNC
         job.progress = JOB_PROGRESS_EXECUTE_REQUEST
         job.save_log(logger=task_logger, message="Starting job process execution.")
         job.save_log(logger=task_logger,
                      message="Following updates could take a while until the Application Package answers...")
 
+        mode = EXECUTE_MODE_ASYNC if job.execute_async else EXECUTE_MODE_SYNC
+        lang = job.accept_language or ACCEPT_LANGUAGE_EN_CA  # pywps fails XML template generation if None
         wps_worker = get_pywps_service(environ=settings, is_worker=True)
         execution = wps_worker.execute_job(job.process, wps_inputs=wps_inputs, wps_outputs=wps_outputs,
-                                           mode=mode, job_uuid=job.id, remote_process=process)
+                                           mode=mode, job_uuid=job.id, remote_process=process, language=lang)
         if not execution.process and execution.errors:
             raise execution.errors[0]
 
