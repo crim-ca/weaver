@@ -37,7 +37,7 @@ lxml
 mako
 # esgf-compute-api (cwt) needs oauthlib but doesn't add it in their requirements
 oauthlib
-owslib>=0.19.2
+owslib==0.25.0
 pymongo
 # pyproj>=2 employed by OWSLib, but make requirements stricter
 pyproj>=3
@@ -48,7 +48,7 @@ pyramid_mako
 python-dateutil
 pyramid_rewrite
 pytz
-pywps==4.4.3
+pywps==4.5.0
 pyyaml>=5.2
 # required by: cwltool => schema_salad, make requirement stricter because it has longer wheel build time
 rdflib-jsonld==0.5.0
