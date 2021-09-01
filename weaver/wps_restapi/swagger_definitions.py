@@ -82,7 +82,6 @@ from weaver.wps_restapi.colander_extras import (
     StringRange,
     XMLObject
 )
-from weaver.wps_restapi.utils import wps_restapi_base_path
 
 if TYPE_CHECKING:
     from weaver.typedefs import DatetimeIntervalType, SettingsType, TypedDict
@@ -4103,6 +4102,15 @@ wps_responses = {
 
 def service_api_route_info(service_api, settings):
     # type: (Service, SettingsType) -> ViewInfo
+    """
+    Automatically generates the view configuration parameters from the :mod:`cornice` service definition.
+
+    :param service_api: cornice service with name and path definition.
+    :param settings: settings to obtain the base path of the application.
+    :return: view configuration parameters that can be passed directly to ``config.add_route`` call.
+    """
+    from weaver.wps_restapi.utils import wps_restapi_base_path  # import here to avoid circular import errors
+
     api_base = wps_restapi_base_path(settings)
     return {"name": service_api.name, "pattern": "{base}{path}".format(base=api_base, path=service_api.path)}
 
