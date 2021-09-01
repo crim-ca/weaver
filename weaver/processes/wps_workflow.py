@@ -398,7 +398,7 @@ class WpsWorkflow(ProcessCWL):
         return result
 
 
-class WpsWorkflowJob(JobBase):  # noqa: N802
+class WpsWorkflowJob(JobBase):
     def __init__(self,
                  builder,           # type: Builder
                  joborder,          # type: Dict[Text, Union[Dict[Text, Any], List, Text, None]]

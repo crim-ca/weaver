@@ -29,10 +29,8 @@ LOGGER = logging.getLogger("PACKAGE")
 
 
 def alter_payload_after_query(payload):
-    """When redeploying the package on ADES, strip out any EOImage parameter
-
-    :param payload:
-
+    """
+    When redeploying the package on :term:`ADES`, strip out any :term:`EOImage` parameter.
     """
     new_payload = deepcopy(payload)
 
@@ -69,9 +67,9 @@ def query_eo_images_from_wps_inputs(wps_inputs,             # type: Dict[str, De
     def get_input_data(ids_to_get):
         # type: (Iterable[str]) -> str
         """
+        Check that specified input IDs contain submitted data.
 
-        :param ids_to_get: list of elements to check
-
+        :raises ValueError: when no input by ID can be found with provided data.
         """
         for id_ in ids_to_get:
             try:
@@ -82,7 +80,9 @@ def query_eo_images_from_wps_inputs(wps_inputs,             # type: Dict[str, De
 
     def is_eoimage_parameter(param):
         # type: (str) -> bool
-        """Return True if the name of this parameter is a query parameter"""
+        """
+        Return ``True`` if the name of this parameter is a query parameter of an ``EOImage``.
+        """
         parameters = [
             OPENSEARCH_AOI,
             OPENSEARCH_START_DATE,
@@ -139,9 +139,7 @@ def query_eo_images_from_wps_inputs(wps_inputs,             # type: Dict[str, De
 
 def replace_with_opensearch_scheme(link):
     """
-
-    :param link: url to replace scheme
-
+    Replaces ``file://`` scheme by ``opensearch://`` scheme.
     """
     scheme = urlparse(link).scheme
     if scheme == "file":
@@ -151,13 +149,8 @@ def replace_with_opensearch_scheme(link):
         return link
 
 
+# FIXME: move appropriately when adding BoundingBox support (https://github.com/crim-ca/weaver/issues/51)
 def load_wkt(wkt):
-    """
-
-    :param wkt: to get the bounding box of
-    :type wkt: string
-
-    """
     bounds = shapely.wkt.loads(wkt).bounds
     bbox_str = ",".join(map(str, bounds))
     return bbox_str
@@ -174,6 +167,8 @@ class OpenSearchQuery(object):
         settings=None,                              # type: Optional[AnySettingsContainer]
     ):
         """
+        Container to handle `OpenSearch` queries.
+
         :param collection_identifier: Collection ID to query
         :param osdd_url: Global OSDD url for `OpenSearch` queries.
         :param catalog_search_field: Name of the field for the collection identifier.
@@ -204,9 +199,10 @@ class OpenSearchQuery(object):
     def _prepare_query_url(self, template_url, params):
         # type: (str, Dict) -> Tuple[str, Dict]
         """
+        Prepare the URL for the `OpenSearch` query.
 
-        :param template_url: url containing query parameters
-        :param params: parameters to insert in formatted url
+        :param template_url: url containing query parameters.
+        :param params: parameters to insert in formatted URL.
 
         """
         base_url, query = template_url.split("?", 1)
@@ -326,6 +322,7 @@ class OpenSearchQuery(object):
 def get_additional_parameters(input_data):
     # type: (Dict) -> List[Tuple[str, str]]
     """
+    Retrieve the values from the ``additionalParameters`` of the input.
 
     :param input_data: Dict containing or not the "additionalParameters" key
     """

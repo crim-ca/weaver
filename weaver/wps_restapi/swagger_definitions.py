@@ -1,6 +1,16 @@
 """
-This module should contain any and every definitions in use to build the swagger UI,
-so that one can update the swagger without touching any other files after the initial integration
+Schema definitions for `OpenAPI` generation and validation of data from received requests and returned responses.
+
+This module should contain any and every definitions in use to build the Swagger UI and the OpenAPI JSON schema
+so that one can update the specification without touching any other files after the initial integration.
+
+Schemas defined in this module are employed (through ``deserialize`` method calls) to validate that data conforms to
+reported definitions. This makes the documentation of the API better aligned with resulting code execution under it.
+It also provides a reference point for external users to understand expected data structures with complete schema
+definitions generated on the exposed endpoints (JSON and Swagger UI).
+
+The definitions are also employed to generate the `OpenAPI` definitions reported in the documentation published
+on `Weaver`'s `ReadTheDocs` page.
 """
 # pylint: disable=C0103,invalid-name
 
@@ -551,11 +561,11 @@ class Format(ExtendedMappingSchema):
 
 
 class DeployFormatDefaultMimeType(FormatMimeType):
-    """
-    Format for process input are assumed plain text if the MIME-type was omitted and is not
-    one of the known formats by this instance. When executing a job, the best match will be used
-    to run the process, and will fallback to the default as last resort.
-    """
+    description = (
+        "Format for process input are assumed plain/text if the media-type was omitted and is not one of the known "
+        "formats by this instance. When executing a job, the best match against supported formats by the process "
+        "definition will be used to run the process, and will fallback to the default as last resort."
+    )
     # NOTE:
     # The default is overridden from FormatMimeType since the FormatSelection 'oneOf' always fails,
     # due to the 'default' value which is always generated and it causes the presence of both Format and FormatMimeType
@@ -563,11 +573,11 @@ class DeployFormatDefaultMimeType(FormatMimeType):
 
 
 class DeployFormatDefault(Format):
-    """
-    Format for process input are assumed plain text if the MEDIA-type was omitted and is not
-    one of the known formats by this instance. When executing a job, the best match will be used
-    to run the process, and will fallback to the default as last resort.
-    """
+    description = (
+        "Format for process input are assumed plain/text if the media-type was omitted and is not one of the known "
+        "formats by this instance. When executing a job, the best match against supported formats by the process "
+        "definition will be used to run the process, and will fallback to the default as last resort."
+    )
     # NOTE:
     # The default is overridden from Format since the FormatSelection 'oneOf' always fails,
     # due to the 'default' value which is always generated and it causes the presence of both Format and FormatMimeType
@@ -622,7 +632,9 @@ class DeploymentFormat(FormatSelection, FormatExtra, FormatDefault):
 
 
 class FormatMedia(FormatExtra):
-    """Format employed for reference results respecting 'OGC-API - Processes' schemas."""
+    """
+    Format employed for reference results respecting 'OGC-API - Processes' schemas.
+    """
     schema_ref = "{}/master/core/openapi/schemas/formatDescription.yaml".format(OGC_API_SCHEMA_URL)
     mediaType = MediaType(String())
     encoding = ExtendedSchemaNode(String(), missing=drop)
@@ -882,16 +894,18 @@ class ValuesReference(ReferenceURL):
 #   https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/binaryInputValue.yaml
 class AnyLiteralType(OneOfKeywordSchema):
     """
+    Submitted values that correspond to literal data.
+
     .. seealso::
         - :class:`AnyLiteralDataType`
         - :class:`AnyLiteralValueType`
         - :class:`AnyLiteralDefaultType`
     """
     _one_of = [
-        ExtendedSchemaNode(Float()),
-        ExtendedSchemaNode(Integer()),
-        ExtendedSchemaNode(Boolean()),
-        ExtendedSchemaNode(String()),
+        ExtendedSchemaNode(Float(), description="Literal data type representing a floating point number."),
+        ExtendedSchemaNode(Integer(), description="Literal data type representing an integer number."),
+        ExtendedSchemaNode(Boolean(), description="Literal data type representing a boolean flag."),
+        ExtendedSchemaNode(String(), description="Literal data type representing a generic string."),
     ]
 
 
@@ -1656,12 +1670,12 @@ class OperationRequest(ExtendedMappingSchema, OWSNamespace):
     href = OperationLink()
 
 
-class OWS_HTTP(ExtendedMappingSchema, OWSNamespace):
+class OWS_HTTP(ExtendedMappingSchema, OWSNamespace):  # noqa: N802
     get = OperationRequest(name="Get", title="OWSGet")
     post = OperationRequest(name="Post", title="OWSPost")
 
 
-class OWS_DCP(ExtendedMappingSchema, OWSNamespace):
+class OWS_DCP(ExtendedMappingSchema, OWSNamespace):  # noqa: N802
     http = OWS_HTTP(name="HTTP", missing=drop)
     https = OWS_HTTP(name="HTTPS", missing=drop)
 
@@ -2508,7 +2522,9 @@ class ArrayReferenceValueType(ExtendedMappingSchema):
 # (i.e.: values cannot be submitted inline in the list, because field 'id' of each input must also be provided)
 # For this reason, one of 'value', 'data', 'href' or 'reference' is mandatory.
 class ExecuteInputAnyType(OneOfKeywordSchema):
-    """Permissive variants that we attempt to parse automatically."""
+    """
+    Permissive variants that we attempt to parse automatically.
+    """
     _one_of = [
         # Array of literal data with 'data' key
         ArrayLiteralDataType(),
@@ -2527,11 +2543,11 @@ class ExecuteInputAnyType(OneOfKeywordSchema):
 
 
 class ExecuteInputItem(ExecuteInputDataType, ExecuteInputAnyType):
-    """
-    Default value to be looked for uses key 'value' to conform to older drafts of OGC-API standard.
-    Even older drafts that allowed other fields 'data' instead of 'value' and 'reference' instead of 'href'
-    are also looked for to remain back-compatible.
-    """
+    description = (
+        "Default value to be looked for uses key 'value' to conform to older drafts of OGC-API standard. "
+        "Even older drafts that allowed other fields 'data' instead of 'value' and 'reference' instead of 'href' "
+        "are also looked for to remain back-compatible."
+    )
 
 
 # backward compatible definition:
@@ -2543,7 +2559,7 @@ class ExecuteInputItem(ExecuteInputDataType, ExecuteInputAnyType):
 #   ]
 #
 class ExecuteInputListValues(ExtendedSequenceSchema):
-    input_item = ExecuteInputItem(description="Received list input value definition during job submission.")
+    input_item = ExecuteInputItem(summary="Received list input value definition during job submission.")
 
 
 # https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/inputValueNoObject.yaml
@@ -2642,7 +2658,7 @@ class Execute(ExtendedMappingSchema):
     # permit unspecified inputs for processes that could technically allow no-inputs definition (CWL),
     # but very unlikely/unusual in real world scenarios (possible cases: constant endpoint fetcher, RNG output)
     inputs = ExecuteInputValues(missing=drop)
-    outputs = ExecuteOutputFilterList()
+    outputs = ExecuteOutputFilterList(description="Filter list of outputs to be obtained from execution.")
     mode = JobExecuteModeEnum()
     notification_email = ExtendedSchemaNode(
         String(),
@@ -2823,11 +2839,11 @@ class ESGF_CWT_RequirementSpecification(PermissiveMappingSchema):
     provider = AnyIdentifier(description="ESGF-CWT provider endpoint.")
 
 
-class ESGF_CWT_RequirementMap(ExtendedMappingSchema):
+class ESGF_CWT_RequirementMap(ExtendedMappingSchema):  # noqa: N802
     req = ESGF_CWT_RequirementSpecification(name=CWL_REQUIREMENT_APP_ESGF_CWT)
 
 
-class ESGF_CWT_RequirementClass(ESGF_CWT_RequirementSpecification):
+class ESGF_CWT_RequirementClass(ESGF_CWT_RequirementSpecification):  # noqa: N802
     _class = RequirementClass(example=CWL_REQUIREMENT_APP_ESGF_CWT, validator=OneOf([CWL_REQUIREMENT_APP_ESGF_CWT]))
 
 
@@ -3479,7 +3495,9 @@ class GetProviderProcess(ExtendedMappingSchema):
 
 
 class PostProviderProcessJobRequest(ExtendedMappingSchema):
-    """Launching a new process request definition."""
+    """
+    Launching a new process request definition.
+    """
     header = RequestHeaders()
     querystring = LaunchJobQuerystring()
     body = Execute()
@@ -3501,7 +3519,9 @@ class OWSErrorCode(ExtendedSchemaNode):
 
 
 class OWSExceptionResponse(ExtendedMappingSchema):
-    """Error content in XML format"""
+    """
+    Error content in XML format.
+    """
     description = "OWS formatted exception."
     code = OWSErrorCode(example="NoSuchProcess")
     locator = ExtendedSchemaNode(String(), example="identifier",

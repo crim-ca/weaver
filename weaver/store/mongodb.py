@@ -272,13 +272,15 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
     def _get_process_field(process, function_dict):
         # type: (AnyProcess, Union[Dict[AnyProcessType, Callable[[], Any]], Callable[[], Any]]) -> Any
         """
+        Obtain a field from a process instance after validation and using mapping of process implementation functions.
+
         Takes a lambda expression or a dict of process-specific lambda expressions to retrieve a field.
         Validates that the passed process object is one of the supported types.
 
         :param process: process to retrieve the field from.
-        :param function_dict: lambda or dict of lambda of process type
-        :return: retrieved field if the type was supported
-        :raises ProcessInstanceError: invalid process type
+        :param function_dict: lambda or dict of lambda of process type.
+        :return: retrieved field if the type was supported.
+        :raises ProcessInstanceError: invalid process type.
         """
         if isinstance(process, Process):
             if islambda(function_dict):
@@ -333,6 +335,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
         # type: (str, Optional[str]) -> bool
         """
         Removes process from database, optionally filtered by visibility.
+
         If ``visibility=None``, the process is deleted (if existing) regardless of its visibility value.
         """
         sane_name = get_sane_name(process_id, **self.sane_name_config)
@@ -367,6 +370,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
         # type: (str, Optional[str]) -> Process
         """
         Get process for given :paramref:`process_id` from storage, optionally filtered by :paramref:`visibility`.
+
         If ``visibility=None``, the process is retrieved (if existing) regardless of its visibility value.
 
         :param process_id: process identifier
@@ -485,6 +489,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
         # type: (Job) -> Job
         """
         Updates a job parameters in `MongoDB` storage.
+
         :param job: instance of ``weaver.datatype.Job``.
         """
         try:
@@ -517,6 +522,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
         # type: () -> List[Job]
         """
         Lists all jobs in `MongoDB` storage.
+
         For user-specific access to available jobs, use :meth:`MongodbJobStore.find_jobs` instead.
         """
         jobs = []
@@ -541,6 +547,30 @@ class MongodbJobStore(StoreJobs, MongodbStore):
         """
         Finds all jobs in `MongoDB` storage matching search filters to obtain results with requested paging or grouping.
 
+        Using paging (default), result will be in the form::
+
+            (
+                [Job(1), Job(2), Job(3), ...],
+                <total>
+            )
+
+        Where ``<total>`` will indicate the complete count of matched jobs with filters, but the list of jobs
+        will be limited only to ``page`` index and ``limit`` specified.
+
+        Using grouping with a list of field specified with ``group_by``, results will be in the form::
+
+            (
+                [{category: {field1: valueA, field2: valueB, ...}, [Job(1), Job(2), ...], count: <count>},
+                 {category: {field1: valueC, field2: valueD, ...}, [Job(x), Job(y), ...], count: <count>},
+                 ...
+                ],
+                <total>
+            )
+
+        Where ``<total>`` will again indicate all matched jobs by every category combined, and ``<count>`` will
+        indicate the amount of jobs matched for each individual category. Also, ``category`` will indicate values
+        of specified fields (from ``group_by``) that compose corresponding jobs with matching values.
+
         :param request: request that lead to this call to obtain permissions and user id.
         :param process: process name to filter matching jobs.
         :param service: service name to filter matching jobs.
@@ -553,34 +583,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
         :param limit: number of jobs per page when using result paging (only when not using ``group_by``).
         :param datetime: field used for filtering data by creation date with a given date or interval of date.
         :param group_by: one or many fields specifying categories to form matching groups of jobs (paging disabled).
-
-        :returns: (list of jobs matching paging OR list of {categories, list of jobs, count}) AND total of matched job
-
-        Example:
-
-            Using paging (default), result will be in the form::
-
-                (
-                    [Job(1), Job(2), Job(3), ...],
-                    <total>
-                )
-
-            Where ``<total>`` will indicate the complete count of matched jobs with filters, but the list of jobs
-            will be limited only to ``page`` index and ``limit`` specified.
-
-            Using grouping with a list of field specified with ``group_by``, results will be in the form::
-
-                (
-                    [{category: {field1: valueA, field2: valueB, ...}, [Job(1), Job(2), ...], count: <count>},
-                     {category: {field1: valueC, field2: valueD, ...}, [Job(x), Job(y), ...], count: <count>},
-                     ...
-                    ],
-                    <total>
-                )
-
-            Where ``<total>`` will again indicate all matched jobs by every category combined, and ``<count>`` will
-            indicate the amount of jobs matched for each individual category. Also, ``category`` will indicate values
-            of specified fields (from ``group_by``) that compose corresponding jobs with matching values.
+        :returns: (list of jobs matching paging OR list of {categories, list of jobs, count}) AND total of matched job.
         """
 
         if any(v in tags for v in VISIBILITY_VALUES):

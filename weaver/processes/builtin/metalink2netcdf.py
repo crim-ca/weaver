@@ -1,6 +1,5 @@
 #!/usr/bin/env python
-# noqa: D205  # ignore missing summary, since this is the complete process description
-"""
+__doc__ = """
 Extracts and fetches NetCDF files from a Metalink file containing an URL, and outputs the NetCDF file at a given
 index of the list.
 """

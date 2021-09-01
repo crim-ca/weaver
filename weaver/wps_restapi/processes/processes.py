@@ -105,6 +105,7 @@ def get_processes_filtered_by_valid_schemas(request):
     # type: (Request) -> Tuple[List[JSON], List[str]]
     """
     Validates the processes summary schemas and returns them into valid/invalid lists.
+
     :returns: list of valid process summaries and invalid processes IDs for manual cleanup.
     """
     store = get_db(request).get_store(StoreProcesses)

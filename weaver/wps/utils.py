@@ -69,7 +69,7 @@ def get_wps_path(container):
 def get_wps_url(container):
     # type: (AnySettingsContainer) -> str
     """
-    Retrieves the full WPS URL (hostname + WPS path)
+    Retrieves the full WPS URL (hostname + WPS path).
 
     Searches directly in settings, then `weaver.wps_cfg` file, or finally, uses the default values if not found.
     """
@@ -80,6 +80,7 @@ def get_wps_output_dir(container):
     # type: (AnySettingsContainer) -> str
     """
     Retrieves the WPS output directory path where to write XML and result files.
+
     Searches directly in settings, then `weaver.wps_cfg` file, or finally, uses the default values if not found.
     """
     tmp_dir = tempfile.gettempdir()
@@ -91,6 +92,7 @@ def get_wps_output_path(container):
     # type: (AnySettingsContainer) -> str
     """
     Retrieves the WPS output path (without hostname) for staging XML status, logs and process outputs.
+
     Searches directly in settings, then `weaver.wps_cfg` file, or finally, uses the default values if not found.
     """
     return get_settings(container).get("weaver.wps_output_path") or urlparse(get_wps_output_url(container)).path
@@ -100,6 +102,7 @@ def get_wps_output_url(container):
     # type: (AnySettingsContainer) -> str
     """
     Retrieves the WPS output URL that maps to WPS output directory path.
+
     Searches directly in settings, then `weaver.wps_cfg` file, or finally, uses the default values if not found.
     """
     wps_output_default = get_weaver_url(container) + "/wpsoutputs"
@@ -111,7 +114,8 @@ def get_wps_output_url(container):
 
 def get_wps_local_status_location(url_status_location, container, must_exist=True):
     # type: (str, AnySettingsContainer, bool) -> Optional[str]
-    """Attempts to retrieve the local XML file path corresponding to the WPS status location as URL.
+    """
+    Attempts to retrieve the local XML file path corresponding to the WPS status location as URL.
 
     :param url_status_location: URL reference pointing to some WPS status location XML.
     :param container: any settings container to map configured local paths.
@@ -360,7 +364,8 @@ def load_pywps_config(container, config=None):
 
 def set_wps_language(wps, accept_language=None, request=None):
     # type: (WebProcessingService, Optional[str], Optional[AnyRequestType]) -> None
-    """Set the :attr:`language` property on the :class:`WebProcessingService` object.
+    """
+    Set the :attr:`language` property on the :class:`WebProcessingService` object.
 
     Given the `Accept-Language` header value, match the best language
     to the supported languages.

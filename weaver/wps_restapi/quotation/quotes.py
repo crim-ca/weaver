@@ -1,6 +1,7 @@
 import logging
 import random
 from datetime import timedelta
+from typing import TYPE_CHECKING
 
 from duration import to_iso8601
 from pyramid.httpexceptions import HTTPBadRequest, HTTPCreated, HTTPNotFound, HTTPOk
@@ -18,11 +19,18 @@ from weaver.utils import get_settings, get_weaver_url
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.processes.processes import submit_local_job
 
+if TYPE_CHECKING:
+    from weaver.datatype import Process
+    from weaver.typedefs import JSON
+
 LOGGER = logging.getLogger(__name__)
 
 
 def process_quote_estimator(process):   # noqa: E811
+    # type: (Process) -> JSON
     """
+    Simulate quote parameters for the process execution.
+
     :param process: instance of :class:`weaver.datatype.Process` for which to evaluate the quote.
     :return: dict of {price, currency, estimatedTime} values for the process quote.
     """

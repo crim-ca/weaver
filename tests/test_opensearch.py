@@ -135,6 +135,7 @@ def test_transform_execute_parameters_wps():
     assert compare(transformed) == compare(expected)
 
 
+# FIXME: move appropriately when adding BoundingBox support (https://github.com/crim-ca/weaver/issues/51)
 @pytest.mark.skip(reason="The user-provided bbox is now a comma delimited string, not a WKT.")
 def test_load_wkt():
     data = [
