@@ -4,8 +4,8 @@ from typing import TYPE_CHECKING
 
 from colander import SchemaNode
 
-from weaver.wps_restapi import swagger_definitions as sd
 from weaver.utils import get_settings, get_weaver_url
+from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
     from typing import Dict

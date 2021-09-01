@@ -9,6 +9,7 @@ import pyramid.testing
 import pytest
 import stopit
 
+from tests import resources
 from tests.utils import (
     get_test_weaver_app,
     mocked_execute_process,
@@ -19,7 +20,6 @@ from tests.utils import (
     setup_mongodb_jobstore,
     setup_mongodb_processstore
 )
-from tests import resources
 from weaver.exceptions import JobNotFound, ProcessNotFound
 from weaver.execute import (
     EXECUTE_CONTROL_OPTION_ASYNC,

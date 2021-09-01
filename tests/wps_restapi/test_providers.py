@@ -2,6 +2,7 @@ import unittest
 
 import pyramid.testing
 
+from tests import resources
 from tests.utils import (
     get_test_weaver_app,
     mocked_remote_server_requests_wp1,
@@ -10,7 +11,6 @@ from tests.utils import (
     setup_mongodb_processstore,
     setup_mongodb_servicestore
 )
-from tests import resources
 from weaver.execute import EXECUTE_CONTROL_OPTION_ASYNC, EXECUTE_TRANSMISSION_MODE_REFERENCE
 from weaver.formats import CONTENT_TYPE_APP_JSON
 from weaver.utils import fully_qualified_name

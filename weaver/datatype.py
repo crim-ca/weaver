@@ -12,8 +12,8 @@ from typing import TYPE_CHECKING
 from urllib.parse import urljoin, urlparse
 
 import lxml.etree
-import requests.exceptions
 import pyramid.httpexceptions
+import requests.exceptions
 from dateutil.parser import parse as dt_parse
 from owslib.wps import Process as ProcessOWS, WPSException
 from pywps import Process as ProcessWPS
