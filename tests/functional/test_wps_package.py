@@ -44,6 +44,7 @@ from weaver.formats import (
     get_cwl_file_format
 )
 from weaver.processes.constants import CWL_REQUIREMENT_APP_DOCKER, CWL_REQUIREMENT_INIT_WORKDIR
+from weaver.processes.types import PROCESS_BUILTIN
 from weaver.utils import get_any_value
 
 if TYPE_CHECKING:
@@ -507,6 +508,82 @@ class WpsPackageAppTest(WpsPackageConfigBase):
         assert desc["inputs"]["wps_format_mediaType"]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
         assert desc["outputs"]["wps_format_mimeType"]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
         assert desc["outputs"]["wps_format_mediaType"]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
+
+    def test_block_builtin_processes_from_api(self):
+        """
+        Test to validates if ``builtin`` process type is explicitly blocked during deploymemt from API.
+        """
+        cwl = {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "baseCommand": ["python3"],
+            "inputs": {
+                "stringInput": "string"
+            },
+            "requirements": {
+                CWL_REQUIREMENT_APP_DOCKER: {
+                    "dockerPull": "python:3.7-alpine"
+                },
+            },
+            "outputs": [],
+        }
+        body = {
+            "processDescription": {
+                "process": {
+                    "id": self._testMethodName,
+                    "title": "some title",
+                    "abstract": "this is a test",
+                    "type": PROCESS_BUILTIN,
+                },
+            },
+            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "executionUnit": [{"unit": cwl}],
+        }
+        with contextlib.ExitStack() as stack_exec:
+            for mock_exec in mocked_execute_process():
+                stack_exec.enter_context(mock_exec)
+            resp = mocked_sub_requests(self.app, "post_json", "/processes", data=body, timeout=5,
+                                       headers=self.json_headers, only_local=True, expect_errors=True)
+            assert resp.status_code == 400
+
+    def test_block_unknown_processes(self):
+        """
+        Test to validates that any process that cannot be resolved against one of
+        known :py:data:`weaver.processes.constants.CWL_REQUIREMENT_APP_TYPES` is explicitly blocked.
+        """
+        cwl = {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "baseCommand": ["python3"],
+            "inputs": {
+                "stringInput": "string"
+            },
+            "requirements": {
+                CWL_REQUIREMENT_APP_DOCKER: {"dockerPull": "python:3.7-alpine"},
+                "InlineJavascriptRequirement": {},
+                "ResourceRequirement": {"ramMin": 10240, "coresMin": 3}
+
+            },
+            "outputs": [],
+        }
+        body = {
+            "processDescription": {
+                "process": {
+                    "id": self._testMethodName,
+                    "title": "some title",
+                    "abstract": "this is a test",
+                },
+            },
+            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "executionUnit": [{"unit": cwl}],
+        }
+
+        with contextlib.ExitStack() as stack_exec:
+            for mock_exec in mocked_execute_process():
+                stack_exec.enter_context(mock_exec)
+            resp = mocked_sub_requests(self.app, "post_json", "/processes", data=body, timeout=5,
+                                       headers=self.json_headers, only_local=True, expect_errors=True)
+            assert resp.status_code == 422
 
     def test_complex_io_with_multiple_formats_and_defaults(self):
         """
