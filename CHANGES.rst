@@ -27,7 +27,7 @@ Changes:
   corresponding new names aligned with `OGC-API`.
 - Update ``mimeType`` to ``mediaType`` as format type representation according to `OGC-API`
   (relates to `#211  <https://github.com/crim-ca/weaver/issues/211>`_).
-- Add explicit pattern validation of string defines by ``MediaType`` schema.
+- Add explicit pattern validation (``type/subtype``) of format string definitions with ``MediaType`` schema.
 - Add sorting capability to generate mapping schemas for API responses using overrides of
   properties ``_sort_first`` and ``_sort_after`` using lists of desired ordered field names.
 - Improved naming of many ambiguous and repeated words across schema definitions that did not necessarily interact

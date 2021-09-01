@@ -38,7 +38,7 @@ max-complexity = 24
 
 # https://pylint.pycqa.org/en/latest/technical_reference/extensions.html#parameter-documentation-checker-options
 # allow unspecified items, but if the docstring is present, it should follow Sphinx format for documentation generation
-# see also 'disabled' warnings, we ignore only raised 'missing', but detect other 'useless' or 'redundant' errors
+# see also 'disabled' W90XX warnings, we ignore only raised 'missing', but detect invalid documentation issues
 accept-no-param-doc = yes
 accept-no-raise-doc = yes
 accept-no-return-doc = yes
@@ -110,9 +110,7 @@ disable=C0111,missing-docstring,
         W9013,missing-yield-doc,
         W9014,missing-yield-type-doc,
         W9015,missing-param-doc,
-        W9016,missing-type-doc,
-        W9017,differing-param-doc,
-        W9018,differing-type-doc
+        W9016,missing-type-doc
 
 # note: (C0412, ungrouped-imports) is managed via isort tool, ignore false positives
 
