@@ -441,7 +441,7 @@ CHECKS := $(addprefix check-, $(CHECKS))
 # they must provide their own target/only + with dependency install variants
 CHECKS_NO_PY := css md
 CHECKS_NO_PY := $(addprefix fix-, $(CHECKS_NO_PY))
-CHECKS_ALL := $(FIXES) $(FIXES_NO_PY)
+CHECKS_ALL := $(CHECKS) $(CHECKS_NO_PY)
 
 $(CHECKS): check-%: install-dev check-%-only
 
