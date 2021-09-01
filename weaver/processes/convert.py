@@ -72,7 +72,7 @@ from weaver.utils import (
 from weaver.wps.utils import get_wps_client
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
+    from typing import Any, Dict, List, Optional, Tuple, Type, Union
     from urllib.parse import ParseResult
 
     from pywps.app import WPSRequest
@@ -80,7 +80,6 @@ if TYPE_CHECKING:
     from requests.models import Response
 
     from weaver.typedefs import (
-        AnyKey,
         AnySettingsContainer,
         AnyValueType,
         CWL,
