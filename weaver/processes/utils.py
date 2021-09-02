@@ -273,8 +273,11 @@ def parse_wps_process_config(config_entry):
     url_p = urlparse(svc_url)
     qs_p = parse_qs(url_p.query)
     svc_url = get_url_without_query(url_p)
-    svc_name = svc_name or get_sane_name(url_p.hostname)
-    svc_proc = svc_proc or qs_p.get("identifier", [])  # noqa
+    # if explicit name was provided, validate it (assert fail if not),
+    # otherwise replace silently bad character since since is requested to be inferred
+    svc_name = get_sane_name(svc_name or url_p.hostname, assert_invalid=bool(svc_name))
+    svc_proc = svc_proc or qs_p.get("identifier", "").split(",")  # noqa  # 'identifier=a,b,c' techically allowed
+    svc_proc = [proc.strip() for proc in svc_proc if proc.strip()]  # remote empty
     if not isinstance(svc_name, str):
         raise ValueError("Invalid service value: [{!s}].".format(svc_name))
     if not isinstance(svc_proc, list):
@@ -318,9 +321,13 @@ def register_wps_processes_from_config(wps_processes_file_path, container):
     LOGGER.info("Using WPS-1 provider processes file: [%s]", wps_processes_file_path)
     try:
         with open(wps_processes_file_path, "r") as f:
-            processes_config = yaml.safe_load(f)
-        processes = processes_config.get("processes") or []
-        providers = processes_config.get("providers") or []
+            # if file is empty (not even processes/providers section), None is return instead of dict
+            processes_config = yaml.safe_load(f) or {}
+        if processes_config:
+            processes = processes_config.get("processes") or []
+            providers = processes_config.get("providers") or []
+        else:
+            processes = providers = None
         if not processes and not providers:
             LOGGER.warning("Nothing to process from file: [%s]", wps_processes_file_path)
             return
@@ -401,6 +408,6 @@ def register_wps_processes_from_config(wps_processes_file_path, container):
 
         LOGGER.info("Finished processing configuration file [%s].", wps_processes_file_path)
     except Exception as exc:
-        msg = "Invalid WPS-1 providers configuration file [{!r}].".format(exc)
+        msg = "Invalid WPS-1 providers configuration file caused: [{!s}]({!s}).".format(type(exc).__name__, exc)
         LOGGER.exception(msg)
         raise RuntimeError(msg)
