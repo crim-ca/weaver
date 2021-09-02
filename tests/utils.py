@@ -433,7 +433,7 @@ def mocked_remote_wps(processes, languages=None):
     )
 
 
-def mocked_remote_server_requests_wp1(
+def mocked_remote_server_requests_wps1(
         resource_file_getcap,                           # type: str
         resource_files_describe,                        # type: Iterable[str]
         test_server_wps="https://remote-server.com",    # type: str
