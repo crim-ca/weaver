@@ -491,7 +491,7 @@ def test_request_extra_zero_values():
                 resp = request_extra("get", "http://whatever", backoff=0, retries=3, allowed_codes=[HTTPOk.code])
                 assert resp.status_code == HTTPGatewayTimeout.code
                 assert mocked_request.call_count == 4  # first called directly, then 3 times for each retry
-    
+
     # since backoff factor multiplies all incrementally increasing delays between requests,
     # proper detection of input backoff=0 makes all sleep calls equal to zero
     assert all(backoff == 0 for backoff in sleep_counter["called_with"])

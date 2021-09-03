@@ -372,7 +372,7 @@ test-only: mkdir-reports			## run all tests but without prior validation of inst
 
 .PHONY: test-unit-only
 test-unit-only: mkdir-reports 		## run unit tests (skip long running and online tests)
-	@echo "Running tests (skip slow and online tests)..."
+	@echo "Running unit tests (skip slow and online tests)..."
 	@bash -c '$(CONDA_CMD) pytest tests $(TEST_VERBOSITY) \
 		-m "not slow and not online and not functional" --junitxml "$(REPORTS_DIR)/test-results.xml"'
 

@@ -437,7 +437,7 @@ def mocked_remote_server_requests_wps1(
         server_configs,  # type: Union[Sequence[str, str, Sequence[str]], Sequence[Sequence[str, str, Sequence[str]]]]
 ):                       # type: (...) -> MockPatch
     """
-    Mocks a `remote` WPS-1 requests/responses with specified contents from local test resources.
+    Mocks *remote* WPS-1 requests/responses with specified XML contents from local test resources in returned body.
 
     .. seealso::
         ``tests/resources`` directory for available XML files to simulate response bodies.
