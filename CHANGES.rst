@@ -75,6 +75,8 @@ Fixes:
   original names in the request body (from `#265 <https://github.com/crim-ca/weaver/issues/265>`_ since ``3.4.0``).
 - Fix parsing error raised from ``wps_processes.yml`` configuration file when it can be found but contains neither
   a ``processes`` nor ``providers`` section. Also, apply more validation of specified ``name`` values.
+- Fix parsing of ``request_extra`` function/setting parameters for specifically zero values corresponding
+  to ``retries`` and ``backoff`` options that were be ignored.
 
 `3.5.0 <https://github.com/crim-ca/weaver/tree/3.5.0>`_ (2021-08-19)
 ========================================================================

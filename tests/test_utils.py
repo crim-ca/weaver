@@ -385,21 +385,6 @@ def test_get_ssl_verify_option():
         assert get_ssl_verify_option(method, url, any_wps_conf)
 
 
-def test_request_extra_allowed_codes():
-    """Verifies that ``allowed_codes`` only are considered as valid status instead of any non-error HTTP code."""
-    mocked_codes = {"codes": [HTTPCreated.code, HTTPOk.code, HTTPCreated.code]}  # note: used in reverse order
-
-    def mocked_request(*_, **__):  # noqa: E811
-        mocked_resp = Response()
-        mocked_resp.status_code = mocked_codes["codes"].pop()
-        return mocked_resp
-
-    with mock.patch("requests.Session.request", side_effect=mocked_request) as mocked:
-        resp = request_extra("get", "http://whatever", retries=3, allowed_codes=[HTTPOk.code])
-        assert resp.status_code == HTTPOk.code
-        assert mocked.call_count == 2
-
-
 def test_get_request_options():
     assert get_request_options("get", "http://test.com", {
         "weaver.request_options": {"requests": [
@@ -426,17 +411,36 @@ def test_get_request_options():
     }) == {"timeout": 30}
 
 
-def test_request_extra_intervals():
-    """Verifies that ``intervals`` are used for calling the retry operations instead of ``backoff``/``retries``."""
+def test_request_extra_allowed_codes():
+    """
+    Verifies that ``allowed_codes`` only are considered as valid status instead of any non-error HTTP code.
+    """
+    mocked_codes = {"codes": [HTTPCreated.code, HTTPOk.code, HTTPCreated.code]}  # note: used in reverse order
 
-    def mock_request(*_, **__):  # noqa: E811
+    def mocked_request(*_, **__):
+        mocked_resp = Response()
+        mocked_resp.status_code = mocked_codes["codes"].pop()
+        return mocked_resp
+
+    with mock.patch("requests.Session.request", side_effect=mocked_request) as mocked:
+        resp = request_extra("get", "http://whatever", retries=3, allowed_codes=[HTTPOk.code])
+        assert resp.status_code == HTTPOk.code
+        assert mocked.call_count == 2
+
+
+def test_request_extra_intervals():
+    """
+    Verifies that ``intervals`` are used for calling the retry operations instead of ``backoff``/``retries``.
+    """
+
+    def mock_request(*_, **__):
         m_resp = Response()
         m_resp.status_code = HTTPNotFound.code
         return m_resp
 
     sleep_counter = {"called_count": 0, "called_with": []}
 
-    def mock_sleep(delay):  # noqa: E811
+    def mock_sleep(delay):
         if delay > 1e5:
             sleep_counter["called_count"] += 1
             sleep_counter["called_with"].append(delay)
@@ -457,6 +461,41 @@ def test_request_extra_intervals():
                 #   instead use our custom counter that employs unrealistic values
                 assert sleep_counter["called_count"] == 3  # first direct call doesn't have any sleep interval
                 assert all(called == expect for called, expect in zip(sleep_counter["called_with"], intervals))
+
+
+def test_request_extra_zero_values():
+    """
+    Test that zero-value ``retries`` and ``backoff`` are not ignored.
+    """
+    def mock_request(*_, **__):
+        mocked_resp = Response()
+        mocked_resp.status_code = HTTPNotFound.code
+        return mocked_resp
+
+    with mock.patch("requests.Session.request", side_effect=mock_request) as mocked_request:
+        resp = request_extra("get", "http://whatever", retries=0, allowed_codes=[HTTPOk.code])
+        assert resp.status_code == HTTPGatewayTimeout.code, "failing request with no retry should produce timeout"
+        assert mocked_request.call_count == 1
+
+    sleep_counter = {"called_count": 0, "called_with": []}
+
+    def mock_sleep(delay):
+        sleep_counter["called_count"] += 1
+        sleep_counter["called_with"].append(delay)
+
+    with mock.patch("weaver.utils.get_settings", return_value={"cache.requests.enable": "false"}):
+        with mock.patch("requests.Session.request", side_effect=mock_request) as mocked_request:
+            with mock.patch("weaver.utils.time.sleep", side_effect=mock_sleep):
+                # if backoff is not correctly handled as explicit zero, the default backoff value would be used
+                # to calculate the delay between requests which should increase with backoff formula and retry count
+                resp = request_extra("get", "http://whatever", backoff=0, retries=3, allowed_codes=[HTTPOk.code])
+                assert resp.status_code == HTTPGatewayTimeout.code
+                assert mocked_request.call_count == 4  # first called directly, then 3 times for each retry
+    
+    # since backoff factor multiplies all incrementally increasing delays between requests,
+    # proper detection of input backoff=0 makes all sleep calls equal to zero
+    assert all(backoff == 0 for backoff in sleep_counter["called_with"])
+    assert sleep_counter["called_count"] == 3  # first direct call doesn't have any sleep from retry
 
 
 def test_fetch_file_local_with_protocol():
@@ -487,6 +526,7 @@ def test_fetch_file_local_with_protocol():
 def test_fetch_file_remote_with_request():
     """
     Test function :func:`weaver.utils.fetch_file` when the reference is an URL.
+
     Also validates retries of the failing request.
     """
     tmp_dir = tempfile.gettempdir()
