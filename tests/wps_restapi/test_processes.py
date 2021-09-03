@@ -374,11 +374,11 @@ class WpsRestApiProcessesTest(unittest.TestCase):
     def test_deploy_process_CWL_WPS1Requirement_executionUnit(self):
         raise NotImplementedError
 
-    @mocked_remote_server_requests_wps1(
+    @mocked_remote_server_requests_wps1([
+        resources.TEST_REMOTE_SERVER_URL,
         resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
         [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
-        resources.TEST_REMOTE_SERVER_URL
-    )
+    ])
     def test_deploy_process_WPS1_DescribeProcess_href(self):
         body = {
             "processDescription": {"href": resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_URL},  # this one should be used
@@ -386,11 +386,11 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         }
         self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_PROCESS_WPS1_ID)
 
-    @mocked_remote_server_requests_wps1(
+    @mocked_remote_server_requests_wps1([
+        resources.TEST_REMOTE_SERVER_URL,
         resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
         [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
-        resources.TEST_REMOTE_SERVER_URL
-    )
+    ])
     def test_deploy_process_WPS1_DescribeProcess_owsContext(self):
         body = {
             "processDescription": {"process": {"id": resources.TEST_REMOTE_PROCESS_WPS1_ID}},
@@ -399,11 +399,11 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         body["processDescription"]["process"].update(ows_context_href(resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_URL))
         self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_PROCESS_WPS1_ID)
 
-    @mocked_remote_server_requests_wps1(
+    @mocked_remote_server_requests_wps1([
+        resources.TEST_REMOTE_SERVER_URL,
         resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
         [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
-        resources.TEST_REMOTE_SERVER_URL
-    )
+    ])
     def test_deploy_process_WPS1_DescribeProcess_executionUnit(self):
         """Test process deployment using a WPS-1 DescribeProcess URL specified as process description reference."""
         body = {
@@ -414,11 +414,11 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_PROCESS_WPS1_ID)
 
     @pytest.mark.skip(reason="not implemented")
-    @mocked_remote_server_requests_wps1(
+    @mocked_remote_server_requests_wps1([
+        resources.TEST_REMOTE_SERVER_URL,
         resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
         [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
-        resources.TEST_REMOTE_SERVER_URL
-    )
+    ])
     def test_deploy_process_WPS1_GetCapabilities_href(self):
         """Test process deployment using a WPS-1 GetCapabilities URL specified as process description reference."""
         body = {
@@ -428,11 +428,11 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_PROCESS_WPS1_ID)
 
     @pytest.mark.skip(reason="not implemented")
-    @mocked_remote_server_requests_wps1(
+    @mocked_remote_server_requests_wps1([
+        resources.TEST_REMOTE_SERVER_URL,
         resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
         [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
-        resources.TEST_REMOTE_SERVER_URL
-    )
+    ])
     def test_deploy_process_WPS1_GetCapabilities_owsContext(self):
         """Test process deployment using a WPS-1 GetCapabilities URL specified through the OwsContext definition."""
         body = {
@@ -443,11 +443,11 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_PROCESS_WPS1_ID)
 
     @pytest.mark.skip(reason="not implemented")
-    @mocked_remote_server_requests_wps1(
+    @mocked_remote_server_requests_wps1([
+        resources.TEST_REMOTE_SERVER_URL,
         resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
         [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
-        resources.TEST_REMOTE_SERVER_URL
-    )
+    ])
     def test_deploy_process_WPS1_GetCapabilities_executionUnit(self):
         """Test process deployment using a WPS-1 GetCapabilities URL specified through the ExecutionUnit parameter."""
         body = {

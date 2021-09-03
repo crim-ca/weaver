@@ -58,11 +58,11 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert (error and resp.status_code != 201) or (not error and resp.status_code == 201)
         return resp
 
-    @mocked_remote_server_requests_wps1(
+    @mocked_remote_server_requests_wps1([
+        resources.TEST_REMOTE_SERVER_URL,
         resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
         [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
-        resources.TEST_REMOTE_SERVER_URL
-    )
+    ])
     def test_register_provider_success(self):
         resp = self.register_provider()
 
@@ -73,21 +73,21 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert resp.json["description"] == "Testing"
         assert resp.json["public"] is False
 
-    @mocked_remote_server_requests_wps1(
+    @mocked_remote_server_requests_wps1([
+        resources.TEST_REMOTE_SERVER_URL,
         resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
         [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
-        resources.TEST_REMOTE_SERVER_URL
-    )
+    ])
     def test_register_provider_conflict(self):
         self.register_provider(clear=True, error=False)
         resp = self.register_provider(clear=False, error=True)
         assert resp.status_code == 409
 
-    @mocked_remote_server_requests_wps1(
+    @mocked_remote_server_requests_wps1([
+        resources.TEST_REMOTE_SERVER_URL,
         resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
         [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
-        resources.TEST_REMOTE_SERVER_URL
-    )
+    ])
     def test_get_provider_processes(self):
         self.register_provider()
 
@@ -111,11 +111,11 @@ class WpsRestApiProcessesTest(unittest.TestCase):
 
     @pytest.mark.xfail(condition=LooseVersion(owslib.__version__) <= LooseVersion("0.25.0"),
                        reason="OWSLib fix for retrieval of processVersion from DescribeProcess not yet available")
-    @mocked_remote_server_requests_wps1(
+    @mocked_remote_server_requests_wps1([
+        resources.TEST_REMOTE_SERVER_URL,
         resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
         [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
-        resources.TEST_REMOTE_SERVER_URL
-    )
+    ])
     def test_get_provider_process_description_with_version(self):
         """
         Test only the version field which depends on a fix from :mod:`OWSLib`.
@@ -142,11 +142,11 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert "version" in proc and isinstance(proc["version"], str) and proc["version"] == "1.0.0"
         assert "version" in desc and isinstance(desc["version"], str) and desc["version"] == "1.0.0"
 
-    @mocked_remote_server_requests_wps1(
+    @mocked_remote_server_requests_wps1([
+        resources.TEST_REMOTE_SERVER_URL,
         resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
         [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
-        resources.TEST_REMOTE_SERVER_URL
-    )
+    ])
     def test_get_provider_process_description_old_schema(self):
         self.register_provider()
 
@@ -175,11 +175,11 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert "outputs" in process and isinstance(process["outputs"], list)
         assert all(isinstance(p_io, dict) and "id" in p_io for p_io in process["outputs"])
 
-    @mocked_remote_server_requests_wps1(
+    @mocked_remote_server_requests_wps1([
+        resources.TEST_REMOTE_SERVER_URL,
         resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
         [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
-        resources.TEST_REMOTE_SERVER_URL
-    )
+    ])
     def test_get_provider_process_description_ogc_schema(self):
         self.register_provider()
 
@@ -208,11 +208,11 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert all(isinstance(p_io, str) and isinstance(process["outputs"][p_io], dict) for p_io in process["outputs"])
         assert all("id" not in process["outputs"][p_io] for p_io in process["outputs"])
 
-    @mocked_remote_server_requests_wps1(
+    @mocked_remote_server_requests_wps1([
+        resources.TEST_REMOTE_SERVER_URL,
         resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
         [resources.WPS_NO_INPUTS_XML],
-        resources.TEST_REMOTE_SERVER_URL
-    )
+    ])
     def test_get_provider_process_no_inputs(self):
         """
         Process that takes no inputs should be permitted and its description must allow generation of empty map/list.

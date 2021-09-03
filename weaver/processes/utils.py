@@ -276,7 +276,7 @@ def parse_wps_process_config(config_entry):
     # if explicit name was provided, validate it (assert fail if not),
     # otherwise replace silently bad character since since is requested to be inferred
     svc_name = get_sane_name(svc_name or url_p.hostname, assert_invalid=bool(svc_name))
-    svc_proc = svc_proc or qs_p.get("identifier", "").split(",")  # noqa  # 'identifier=a,b,c' techically allowed
+    svc_proc = svc_proc or qs_p.get("identifier", [])  # noqa  # 'identifier=a,b,c' techically allowed
     svc_proc = [proc.strip() for proc in svc_proc if proc.strip()]  # remote empty
     if not isinstance(svc_name, str):
         raise ValueError("Invalid service value: [{!s}].".format(svc_name))

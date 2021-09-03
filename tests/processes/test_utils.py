@@ -61,22 +61,15 @@ def test_register_wps_processes_from_config_missing():
         pytest.fail("Path pointing to missing file should not raise any error")
 
 
-@mocked_remote_server_requests_wps1(
-    resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,  # has 1 process listed
-    [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
-    WPS1_URL1
-)
-@mocked_remote_server_requests_wps1(
-    resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,  # has 1 process listed
-    [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
-    WPS1_URL2
-)
-@mocked_remote_server_requests_wps1(
-    resources.WPS_CAPS_EMU_XML,  # has 11 processes listed
-    # although they don't match processes in GetCaps, simulate fetching only those
-    [resources.WPS_ENUM_ARRAY_IO_XML, resources.WPS_LITERAL_COMPLEX_IO_XML],
-    WPS1_URL3
-)
+@mocked_remote_server_requests_wps1([
+    # has 1 process listed
+    (WPS1_URL1, resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML, [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML]),
+    # has 1 process listed
+    (WPS1_URL2, resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML, [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML]),
+    # has 11 processes listed
+    # although they don't match processes in GetCaps, simulate fetching only those directly so we can omit real ones
+    (WPS1_URL3, resources.WPS_CAPS_EMU_XML, [resources.WPS_ENUM_ARRAY_IO_XML, resources.WPS_LITERAL_COMPLEX_IO_XML]),
+])
 def test_register_wps_processes_from_config_valid():
     settings = {
         "weaver.url": "https://localhost",
