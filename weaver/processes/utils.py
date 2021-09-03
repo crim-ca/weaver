@@ -285,6 +285,130 @@ def parse_wps_process_config(config_entry):
     return svc_name, svc_url, svc_proc, svc_vis
 
 
+def register_wps_processes_static(service_url, service_name, service_visibility, service_processes, container):
+    # type: (str, str, bool, List[str], AnySettingsContainer) -> None
+    """
+    Register WPS-1 :term:`Process` under a service :term:`Provider` as static references.
+
+    For a given WPS provider endpoint, either iterates over all available processes under it to register them one
+    by one, or limit itself only to those of the reduced set specified by :paramref:`service_processes`.
+
+    The registered `WPS-1` processes generate a **static** reference, meaning that metadata of each process as well
+    as any other modifications to the real remote reference will not be tracked, including validation of even their
+    actual existence, or modifications to inputs/outputs. The :term:`Application Package` will only point to it
+    assuming it remains valid.
+
+    Each of the deployed processes using *static* reference will be accessible directly under `Weaver` endpoints::
+
+        /processes/<service-name>_<process-id>
+
+    The service is **NOT** deployed as :term:`Provider` since the processes are registered directly.
+
+    .. seealso::
+        - :func:`register_wps_processes_dynamic`
+
+    :param service_url: WPS-1 service location (where ``GetCapabilities`` and ``DescribeProcess`` requests can be made).
+    :param service_name: Identifier to employ for generating the full process identifier.
+    :param service_visibility: Visibility flag of the provider.
+    :param service_processes: process IDs under the service to be registered, or all if empty.
+    :param container: settings to retrieve required configuration settings.
+    """
+    db = get_db(container)
+    process_store = db.get_store(StoreProcesses)  # type: StoreProcesses
+
+    LOGGER.info("Fetching WPS-1: [%s]", service_url)
+    wps = get_wps_client(service_url, container)
+    if LooseVersion(wps.version) >= LooseVersion("2.0"):
+        LOGGER.warning("Invalid WPS-1 provider, version was [%s]", wps.version)
+        return
+    wps_processes = [wps.describeprocess(p) for p in service_processes] or wps.processes
+    for wps_process in wps_processes:
+        proc_id = "{}_{}".format(service_name, get_sane_name(wps_process.identifier))
+        proc_url = "{}?service=WPS&request=DescribeProcess&identifier={}&version={}".format(
+            service_url, wps_process.identifier, wps.version
+        )
+        svc_vis = VISIBILITY_PUBLIC if service_visibility else VISIBILITY_PRIVATE
+        try:
+            old_process = process_store.fetch_by_id(proc_id)
+        except ProcessNotFound:
+            pass
+        else:
+            if (
+                    old_process.id == proc_id
+                    and old_process.processDescriptionURL == proc_url
+                    and old_process.visibility == svc_vis
+            ):
+                LOGGER.warning("Process already registered: [%s]. Skipping...", proc_id)
+                continue
+            LOGGER.warning("Process matches registered one: [%s]. Updating details...", proc_id)
+        payload = {
+            "processDescription": {"process": {"id": proc_id, "visibility": svc_vis}},
+            "executionUnit": [{"href": proc_url}],
+            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+        }
+        try:
+            resp = deploy_process_from_payload(payload, container, overwrite=True)
+            if resp.status_code == HTTPOk.code:
+                LOGGER.info("Process registered: [%s]", proc_id)
+            else:
+                raise RuntimeError("Process registration failed: [{}]".format(proc_id))
+        except Exception as ex:
+            LOGGER.exception("Exception during process registration: [%r]. Skipping...", ex)
+            continue
+
+
+def register_wps_processes_dynamic(service_name, service_url, service_visibility, container):
+    # type: (str, str, bool, AnySettingsContainer) -> None
+    """
+    Register a WPS service ``provider`` such that ``processes`` under it are dynamically accessible on demand.
+
+    The registered `WPS-1` provider generates a **dynamic** reference to processes under it. Only the :term:`Provider`
+    reference itself is actually registered. No :term:`Process` are directly registered following this operation.
+
+    When information about the offered processes, descriptions of those processes or their execution are requested,
+    `Weaver` will query the referenced :term:`Provider` for details and convert the corresponding :term:`Process`
+    dynamically. This means that latest metadata of the :term:`Process`, and any modification to it on the remote
+    service will be immediately reflected on `Weaver` without any need to re-deploy processes.
+
+    Each of the deployed processes using *dynamic* reference will be accessible under `Weaver` endpoints::
+
+        /providers/<service-name>/processes/<process-id>
+
+    The processes are **NOT** deployed locally since the processes are retrieved from the :term:`Provider` itself.
+
+    .. seealso::
+        - :func:`register_wps_processes_static`
+
+    :param service_url: WPS-1 service location (where ``GetCapabilities`` and ``DescribeProcess`` requests can be made).
+    :param service_name: Identifier to employ for registering the provider identifier.
+    :param service_visibility: Visibility flag of the provider.
+    :param container: settings to retrieve required configuration settings.
+    """
+    db = get_db(container)
+    service_store = db.get_store(StoreServices)     # type: StoreServices
+
+    LOGGER.info("Register WPS-1/2 provider: [%s]", service_url)
+    try:
+        get_wps_client(service_url, container)  # only attempt fetch to validate it exists
+    except Exception as ex:
+        LOGGER.exception("Exception during provider validation: [%s] [%r]. Skipping...", service_name, ex)
+        return
+    new_service = Service(name=service_name, url=service_url, public=service_visibility)
+    try:
+        old_service = service_store.fetch_by_name(service_name)
+    except ServiceNotFound:
+        LOGGER.info("Registering new provider: [%s]...", service_name)
+    else:
+        if new_service == old_service:
+            LOGGER.warning("Provider already registered: [%s]. Skipping...", service_name)
+            return
+        LOGGER.warning("Provider matches registered service: [%s]. Updating details...", service_name)
+    try:
+        service_store.save_service(new_service, overwrite=True)
+    except Exception as ex:
+        LOGGER.exception("Exception during provider registration: [%s] [%r]. Skipping...", service_name, ex)
+
+
 def register_wps_processes_from_config(wps_processes_file_path, container):
     # type: (Optional[FileSystemPathType], AnySettingsContainer) -> None
     """
@@ -332,79 +456,16 @@ def register_wps_processes_from_config(wps_processes_file_path, container):
             LOGGER.warning("Nothing to process from file: [%s]", wps_processes_file_path)
             return
 
-        db = get_db(container)
-        process_store = db.get_store(StoreProcesses)    # type: StoreProcesses
-        service_store = db.get_store(StoreServices)     # type: StoreServices
-
         # either 'service' references to register every underlying 'process' individually
         # or explicit 'process' references to register by themselves
         for cfg_service in processes:
             svc_name, svc_url, svc_proc, svc_vis = parse_wps_process_config(cfg_service)
-
-            # fetch data
-            LOGGER.info("Fetching WPS-1: [%s]", svc_url)
-            wps = get_wps_client(svc_url, container)
-            if LooseVersion(wps.version) >= LooseVersion("2.0"):
-                LOGGER.warning("Invalid WPS-1 provider, version was [%s]", wps.version)
-                continue
-            wps_processes = [wps.describeprocess(p) for p in svc_proc] or wps.processes
-            for wps_process in wps_processes:
-                proc_id = "{}_{}".format(svc_name, get_sane_name(wps_process.identifier))
-                proc_url = "{}?service=WPS&request=DescribeProcess&identifier={}&version={}" \
-                           .format(svc_url, wps_process.identifier, wps.version)
-                svc_vis = VISIBILITY_PUBLIC if svc_vis else VISIBILITY_PRIVATE
-                try:
-                    old_process = process_store.fetch_by_id(proc_id)
-                except ProcessNotFound:
-                    pass
-                else:
-                    if (
-                        old_process.id == proc_id
-                        and old_process.processDescriptionURL == proc_url
-                        and old_process.visibility == svc_vis
-                    ):
-                        LOGGER.warning("Process already registered: [%s]. Skipping...", proc_id)
-                        continue
-                    LOGGER.warning("Process matches registered one: [%s]. Updating details...", proc_id)
-                payload = {
-                    "processDescription": {"process": {"id": proc_id, "visibility": svc_vis}},
-                    "executionUnit": [{"href": proc_url}],
-                    "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
-                }
-                try:
-                    resp = deploy_process_from_payload(payload, container, overwrite=True)
-                    if resp.status_code == HTTPOk.code:
-                        LOGGER.info("Process registered: [%s]", proc_id)
-                    else:
-                        raise RuntimeError("Process registration failed: [{}]".format(proc_id))
-                except Exception as ex:
-                    LOGGER.exception("Exception during process registration: [%r]. Skipping...", ex)
-                    continue
+            register_wps_processes_static(svc_url, svc_name, svc_vis, svc_proc, container)
 
         # direct WPS providers to register
         for cfg_service in providers:
             svc_name, svc_url, _, svc_vis = parse_wps_process_config(cfg_service)
-            LOGGER.info("Register WPS-1/2 provider: [%s]", svc_url)
-            try:
-                get_wps_client(svc_url, container)  # only attempt fetch to validate it exists
-            except Exception as ex:
-                LOGGER.exception("Exception during provider validation: [%s] [%r]. Skipping...", svc_name, ex)
-                continue
-            new_service = Service(name=svc_name, url=svc_url, public=svc_vis)
-            try:
-                old_service = service_store.fetch_by_name(svc_name)
-            except ServiceNotFound:
-                LOGGER.info("Registering new provider: [%s]...", svc_name)
-            else:
-                if new_service == old_service:
-                    LOGGER.warning("Provider already registered: [%s]. Skipping...", svc_name)
-                    continue
-                LOGGER.warning("Provider matches registered service: [%s]. Updating details...", svc_name)
-            try:
-                service_store.save_service(new_service, overwrite=True)
-            except Exception as ex:
-                LOGGER.exception("Exception during provider registration: [%s] [%r]. Skipping...", svc_name, ex)
-                continue
+            register_wps_processes_dynamic(svc_name, svc_url, svc_vis, container)
 
         LOGGER.info("Finished processing configuration file [%s].", wps_processes_file_path)
     except Exception as exc:

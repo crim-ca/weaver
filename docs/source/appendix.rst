@@ -92,6 +92,10 @@ Glossary
         Entity that describes the required inputs, produced outputs, and any applicable metadata for the execution of
         the defined script, calculation, or operation.
 
+    Provider
+        Entity that offers an ensemble of :term:`Process` under it. It is typically a reference to a remote service,
+        where any :term:`Process` it provides is fetched dynamically on demand.
+
     S3
         Simple Storage Service (:term:`AWS` S3), bucket file storage.
 

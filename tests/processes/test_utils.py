@@ -20,7 +20,7 @@ WPS1_URL4 = "http://emu-server.com"
 
 def test_register_wps_processes_from_config_empty():
     with tempfile.NamedTemporaryFile(mode="w", suffix=".yml") as f:
-        f.write('\n')
+        f.write("\n")
         f.flush()
         f.seek(0)
         try:
@@ -29,7 +29,7 @@ def test_register_wps_processes_from_config_empty():
             pytest.fail("Empty file should not raise any error")
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".yml") as f:
-        f.write('processes:\n')
+        f.write("processes:\n")
         f.flush()
         f.seek(0)
         try:
@@ -38,7 +38,7 @@ def test_register_wps_processes_from_config_empty():
             pytest.fail("File with empty 'processes' section should not raise any error")
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".yml") as f:
-        f.write('providers:\n')
+        f.write("providers:\n")
         f.flush()
         f.seek(0)
         try:
@@ -47,7 +47,7 @@ def test_register_wps_processes_from_config_empty():
             pytest.fail("File with empty 'providers' section should not raise any error")
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".yml") as f:
-        f.write('providers:\nprocesses:\n')
+        f.write("providers:\nprocesses:\n")
         f.flush()
         f.seek(0)
         try:
