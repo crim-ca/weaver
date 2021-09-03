@@ -879,11 +879,12 @@ def request_extra(method,                       # type: str
     request_options = get_request_options(method, url, settings)
     request_options.update(request_kwargs)
     # catch kw passed to request corresponding to retries parameters
+    # it is safe top pop items because 'get_request_options' creates a copy each time
     kw_retries = request_options.pop("retries", request_options.pop("retry", request_options.pop("max_retries", None)))
     kw_backoff = request_options.pop("backoff", request_options.pop("backoff_factor", None))
     kw_intervals = request_options.pop("intervals", None)
-    retries = retries or kw_retries or 0
-    backoff = backoff or kw_backoff or 0.3
+    retries = retries if retries is not None else kw_retries if kw_retries is not None else 0
+    backoff = backoff if backoff is not None else kw_backoff if kw_backoff is not None else 0.3
     intervals = intervals or kw_intervals
     if intervals and len(intervals) and all(isinstance(i, (int, float)) for i in intervals):
         request_delta = [0] + intervals

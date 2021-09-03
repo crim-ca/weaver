@@ -19,7 +19,9 @@ TEST_REMOTE_PROCESS_DESCRIBE_WPS1_URL = DESCRIBE_PROCESS_TEMPLATE_URL.format(
 )
 
 WPS_CAPS_EMU_XML = os.path.join(RESOURCES_PATH, "wps_caps_emu.xml")
+WPS_ENUM_ARRAY_IO_ID = "subset_countries"
 WPS_ENUM_ARRAY_IO_XML = os.path.join(RESOURCES_PATH, "wps_enum_array_io.xml")
+WPS_LITERAL_COMPLEX_IO_ID = "ice_days"
 WPS_LITERAL_COMPLEX_IO_XML = os.path.join(RESOURCES_PATH, "wps_literal_complex_io.xml")
 
 WPS_NO_INPUTS_ID = "pavicstestdocs"
