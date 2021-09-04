@@ -46,7 +46,7 @@ pyramid_mako
 python-dateutil
 pyramid_rewrite
 pytz
-pywps==4.4.3
+pywps==4.5.0
 pyyaml>=5.2
 requests
 requests_file
