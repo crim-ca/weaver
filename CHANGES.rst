@@ -55,6 +55,10 @@ Changes:
   (fixes `#276  <https://github.com/crim-ca/weaver/issues/276>`_).
   Type ``builtin`` can only be registered by `Weaver` itself at startup. Other unknown types that have
   no indication for mapping to an appropriate `Process` implementation are preemptively validated.
+- Add parsing of additional literal data domains for specification of inputs/outputs data constrains and provide
+  corresponding definitions in process description response (fixes `#41 <https://github.com/crim-ca/weaver/issues/41>`_,
+  `#211 <https://github.com/crim-ca/weaver/issues/211>`_, `#297 <https://github.com/crim-ca/weaver/issues/297>`_)
+
 
 Fixes:
 ------
@@ -77,6 +81,8 @@ Fixes:
   a ``processes`` nor ``providers`` section. Also, apply more validation of specified ``name`` values.
 - Fix parsing of ``request_extra`` function/setting parameters for specifically zero values corresponding
   to ``retries`` and ``backoff`` options that were be ignored.
+- Fix incorrect parsing of ``default`` field within WPS input when ``literal`` data type is present and was assumed
+  as ``complex`` (fixes `#297 <https://github.com/crim-ca/weaver/issues/297>`_).
 
 `3.5.0 <https://github.com/crim-ca/weaver/tree/3.5.0>`_ (2021-08-19)
 ========================================================================
