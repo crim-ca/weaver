@@ -48,7 +48,9 @@ LOGGER = logging.getLogger(__name__)
 @sd.api_frontpage_service.get(tags=[sd.TAG_API], renderer=OUTPUT_FORMAT_JSON,
                               schema=sd.FrontpageEndpoint(), response_schemas=sd.get_api_frontpage_responses)
 def api_frontpage(request):
-    """Frontpage of Weaver."""
+    """
+    Frontpage of Weaver.
+    """
     settings = get_settings(request)
     return api_frontpage_body(settings)
 
@@ -56,7 +58,9 @@ def api_frontpage(request):
 @cache_region("doc", sd.api_frontpage_service.name)
 def api_frontpage_body(settings):
     # type: (SettingsType) -> JSON
-    """Generates the JSON body describing the Weaver API and documentation references."""
+    """
+    Generates the JSON body describing the Weaver API and documentation references.
+    """
 
     # import here to avoid circular import errors
     from weaver.config import get_weaver_configuration
@@ -171,7 +175,9 @@ def api_frontpage_body(settings):
                              schema=sd.VersionsEndpoint(), response_schemas=sd.get_api_versions_responses)
 def api_versions(request):  # noqa: F811
     # type: (Request) -> HTTPException
-    """Weaver versions information."""
+    """
+    Weaver versions information.
+    """
     weaver_info = {"name": "weaver", "version": __meta__.__version__, "type": "api"}
     return HTTPOk(json={"versions": [weaver_info]})
 
@@ -180,22 +186,30 @@ def api_versions(request):  # noqa: F811
                                 schema=sd.ConformanceEndpoint(), response_schemas=sd.get_api_conformance_responses)
 def api_conformance(request):  # noqa: F811
     # type: (Request) -> HTTPException
-    """Weaver specification conformance information."""
+    """
+    Weaver specification conformance information.
+    """
     # see references:
-    # - https://github.com/opengeospatial/ogcapi-common/tree/Working/collections/requirements
-    # - https://github.com/opengeospatial/ogcapi-common/tree/Working/collections/recommendations
+    # - https://github.com/opengeospatial/ogcapi-common/tree/master/collections/requirements
+    # - https://github.com/opengeospatial/ogcapi-common/tree/master/collections/recommendations
     # - https://github.com/opengeospatial/ogcapi-processes/tree/master/core/requirements
     # - https://github.com/opengeospatial/ogcapi-processes/tree/master/core/recommendations
     # - https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/transactions/standard/requirements
     # - https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/transactions/standard/recommendations
     # - https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/workflows/standard/requirements
     # - https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/workflows/standard/recommendations
-
+    # see ogcapi-processes schemas details:
+    # - https://github.com/opengeospatial/ogcapi-processes
+    # see other references:
+    # - https://github.com/crim-ca/weaver/issues/53
+    # - https://htmlpreview.github.io/?https://github.com/opengeospatial/ogcapi-processes/blob/master/docs/18-062.html
     ows_wps1 = "http://schemas.opengis.net/wps/1.0.0"
     ows_wps2 = "http://www.opengis.net/spec/WPS/2.0"
-    ogcapi_common = "https://github.com/opengeospatial/ogcapi-common"
+    ogcapi_common = "http://www.opengis.net/spec/ogcapi-common-2/1.0"
     ogcapi_processes = "http://www.opengis.net/spec/ogcapi-processes-1/1.0"
-    conformance = {"conformsTo": [
+    ogcapi_transactions = "http://www.opengis.net/spec/ogcapi-processes-2/1.0"
+    ogcapi_workflows = "http://www.opengis.net/spec/ogcapi-processes-3/1.0"
+    conformance = [
         # "http://www.opengis.net/spec/wfs-1/3.0/req/core",
         # "http://www.opengis.net/spec/wfs-1/3.0/req/oas30",
         # "http://www.opengis.net/spec/wfs-1/3.0/req/html",
@@ -206,29 +220,246 @@ def api_conformance(request):  # noqa: F811
         # "http://www.opengis.net/spec/WPS/2.0/req/service/binding/rest-json/oas30",
         # "http://www.opengis.net/spec/WPS/2.0/req/service/binding/rest-json/html"
         "https://github.com/opengeospatial/wps-rest-binding",  # old reference for bw-compat
-        # see ogcapi-processes schemas details:
-        #   https://github.com/opengeospatial/ogcapi-processes
-        # see other references:
-        #   https://github.com/crim-ca/weaver/issues/53
-        # https://htmlpreview.github.io/?https://github.com/opengeospatial/ogcapi-processes/blob/master/docs/18-062.html
-        ogcapi_processes + "/conf/core",
-        ogcapi_processes + "/conf/ogc-process-description",
-        ogcapi_processes + "/conf/json",
+        ogcapi_common + "/conf/core",
+        ogcapi_common + "/per/core/additional-link-relations",
+        ogcapi_common + "/per/core/additional-status-codes",
+        ogcapi_common + "/per/core/query-param-name-specified",
+        ogcapi_common + "/per/core/query-param-name-tolerance",
+        ogcapi_common + "/per/core/query-param-value-specified",
+        ogcapi_common + "/per/core/query-param-value-tolerance",
+        ogcapi_common + "/rec/core/cross-origin",
+        # ogcapi_common + "/rec/core/etag",
+        # ogcapi_common + "/rec/core/html",
+        ogcapi_common + "/rec/core/json",
+        # ogcapi_common + "/rec/core/link-header",
+        # FIXME: error details (for all below: https://github.com/crim-ca/weaver/issues/320)
+        # ogcapi_common + "/rec/core/problem-details",
+        # ogcapi_common + "/rec/core/query-param-capitalization",
+        # ogcapi_common + "/rec/core/query-param-value-special",
+        # FIXME: https://github.com/crim-ca/weaver/issues/112 (language/translate)
+        # ogcapi_common + "/rec/core/string-i18n",
+        ogcapi_common + "/req/collections",
+        # ogcapi_common + "/req/collections/collection-definition",
+        # ogcapi_common + "/req/collections/src-md-op",
+        # ogcapi_common + "/req/collections/src-md-success",
+        # ogcapi_common + "/req/collections/rc-bbox-collection-response",
+        ogcapi_common + "/req/collections/rc-bbox-unsupported",
+        ogcapi_common + "/req/collections/rc-datetime-collection-response",
+        ogcapi_common + "/req/collections/rc-datetime-unsupported",
+        ogcapi_common + "/req/collections/rc-limit-unsupported",
+        ogcapi_common + "/req/collections/rc-limit-collection-response",
+        ogcapi_common + "/req/collections/rc-links",
+        # FIXME: https://github.com/crim-ca/weaver/issues/318
+        # ogcapi_common + "/rec/collections/rc-md-extent",
+        # ogcapi_common + "/rec/collections/rc-md-extent-single",
+        # ogcapi_common + "/rec/collections/rc-md-extent-extensions",
+        # ogcapi_common + "/req/collections/rc-md-items",
+        # ogcapi_common + "/rec/collections/rc-md-item-type",
+        # ogcapi_common + "/rec/collections/rc-md-items-descriptions",
+        # ogcapi_common + "/req/collections/rc-md-items-links",
+        # ogcapi_common + "/rec/collections/rc-md-op",
+        # ogcapi_common + "/rec/collections/rc-md-success",
+        # ogcapi_common + "/req/collections/rc-numberMatched"
+        # ogcapi_common + "/req/collections/rc-numberReturned"
+        # ogcapi_common + "/req/collections/rc-op",
+        # ogcapi_common + "/req/collections/rc-response",
+        # ogcapi_common + "/req/collections/rc-subset-collection-response"
+        # ogcapi_common + "/req/collections/rc-timeStamp",
+        ogcapi_common + "/req/core/http",
+        ogcapi_common + "/req/core/query-param-capitalization",
+        ogcapi_common + "/req/core/query-param-list-delimiter",
+        ogcapi_common + "/req/core/query-param-list-empty",
+        ogcapi_common + "/req/core/query-param-list-escape",
+        # ogcapi_common + "/req/core/query-param-name-unknown",
+        ogcapi_common + "/req/core/query-param-value-boolean",
+        ogcapi_common + "/req/core/query-param-value-decimal",
+        ogcapi_common + "/req/core/query-param-value-double",
+        ogcapi_common + "/req/core/query-param-value-integer",
+        ogcapi_common + "/req/core/query-param-value-invalid",
+        # FIXME: Following applicable if result output endpoint to offer content returned directly is added
+        #   https://github.com/crim-ca/weaver/issues/18
+        ogcapi_common + "/req/geojson",
+        # ogcapi_common + "/req/geojson/content",
+        # ogcapi_common + "/req/geojson/definition",
         # FIXME: https://github.com/crim-ca/weaver/issues/210
-        # "http://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/html",
-        ogcapi_processes + "/req/oas30",  # OpenAPI 3.0
-        ogcapi_processes + "/conf/job-list",
+        # https://github.com/opengeospatial/ogcapi-common/blob/master/collections/requirements/requirements_class_html.adoc
+        # ogcapi_common + "/req/html",
+        # ogcapi_common + "/req/html/content",
+        # ogcapi_common + "/req/html/definition",
+        ogcapi_common + "/req/json",
+        ogcapi_common + "/req/json/content",
+        ogcapi_common + "/req/json/definition",
+        ogcapi_common + "/req/landing-page",
+        ogcapi_common + "/req/oas30",  # OpenAPI 3.0
+        # ogcapi_common + "/req/simple-query",
+        # ogcapi_common + "/req/umd-collection",
+        ogcapi_processes + "/conf/core",
         # FIXME: https://github.com/crim-ca/weaver/issues/230
-        # "http://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/callback",
+        # ogcapi_processes + "/conf/callback",
         # FIXME: https://github.com/crim-ca/weaver/issues/228
-        # "http://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/dismiss",
+        # ogcapi_processes + "/conf/dismiss",
+        # FIXME: https://github.com/crim-ca/weaver/issues/210
+        # ogcapi_processes + "/conf/html",
+        # ogcapi_processes + "/conf/html/content",
+        # ogcapi_processes + "/conf/html/definition",
+        ogcapi_processes + "/conf/json",
+        ogcapi_processes + "/conf/job-list",
+        ogcapi_processes + "/per/core/additional-status-codes",
+        ogcapi_processes + "/per/core/alternative-process-description",
+        ogcapi_processes + "/per/core/alternative-process-paths",
+        ogcapi_processes + "/per/core/api-definition-uri",
+        # FIXME: BoundingBox not implemented (https://github.com/crim-ca/weaver/issues/51)
+        # ogcapi_processes + "/per/core/process-execute-input-inline-bbox",
+        ogcapi_processes + "/per/core/process-execute-sync-job",
+        ogcapi_processes + "/per/core/limit-response",
+        # FIXME: https://github.com/crim-ca/weaver/issues/267
+        ogcapi_processes + "/per/core/prev",
+        # ogcapi_processes + "/rec/core/access-control-expose-headers",
+        ogcapi_processes + "/rec/core/api-definition-oas",
+        ogcapi_processes + "/rec/core/cross-origin",
+        # ogcapi_processes + "/rec/core/html",
+        ogcapi_processes + "/rec/core/job-status",
+        # ogcapi_processes + "/rec/core/link-header",
+        ogcapi_processes + "/rec/core/ogc-process-description",
+        # FIXME: error details (for all below: https://github.com/crim-ca/weaver/issues/320)
+        # ogcapi_processes + "/rec/core/problem-details",
+        # FIXME: https://github.com/crim-ca/weaver/issues/247 (Prefer header)
+        # ogcapi_processes + "/rec/core/process-execute-handle-prefer",
+        # ogcapi_processes + "/rec/core/process-execute-honor-prefer",
+        # ogcapi_processes + "/rec/core/process-execute-mode-auto",
+        # ogcapi_processes + "/rec/core/process-execute-preference-applied",
+        ogcapi_processes + "/rec/core/process-execute-sync-document-ref",
+        # FIXME: https://github.com/crim-ca/weaver/issues/267
+        # ogcapi_processes + "/rec/core/next-1",
+        # ogcapi_processes + "/rec/core/next-2",
+        # ogcapi_processes + "/rec/core/next-3",
+        # ogcapi_processes + "/rec/core/test-process",
+        # FIXME: https://github.com/crim-ca/weaver/issues/230
+        # ogcapi_processes + "/req/callback/job-callback",
+        ogcapi_processes + "/req/core",
+        ogcapi_processes + "/req/core/api-definition-op",
+        ogcapi_processes + "/req/core/api-definition-success",
+        ogcapi_processes + "/req/core/conformance-op",
+        ogcapi_processes + "/req/core/conformance-success",
+        ogcapi_processes + "/req/core/http",
+        ogcapi_processes + "/req/core/job",
+        # FIXME: process/job error details (for all below: https://github.com/crim-ca/weaver/issues/320)
+        #   https://github.com/opengeospatial/ogcapi-processes/blob/master/core/requirements/core/REQ_job-exception-no-such-job.adoc
+        #   https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/master/core/openapi/schemas/exception.yaml
+        #   type of the exception SHALL be: "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/no-such-job"
+        # ogcapi_processes + "/req/core/job-exception-no-such-job",
+        ogcapi_processes + "/req/job-list/links",
+        # ogcapi_processes + "/req/core/job-results-exception/no-such-job",
+        # FIXME:
+        #   https://github.com/opengeospatial/ogcapi-processes/blob/master/core/requirements/core/REQ_job-results-exception-results-not-ready.adoc
+        #   type of the exception SHALL be "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/result-not-ready"
+        # ogcapi_processes + "/req/core/job-results-exception/results-not-ready",
+        # ogcapi_processes + "/req/core/job-results-failed",
+        ogcapi_processes + "/req/core/job-results",
+        ogcapi_processes + "/req/core/job-results-async-document",
+        # ogcapi_processes + "/req/core/job-results-async-raw-mixed-multi",
+        # ogcapi_processes + "/req/core/job-results-async-raw-ref",
+        # ogcapi_processes + "/req/core/job-results-async-raw-value-multi",
+        # ogcapi_processes + "/req/core/job-results-async-raw-value-one",
+        # ogcapi_processes + "/req/core/job-results-success-sync",
+        ogcapi_processes + "/req/core/job-success",
+        ogcapi_processes + "/req/core/landingpage-op",
+        ogcapi_processes + "/req/core/landingpage-success",
+        ogcapi_processes + "/req/core/pl-links",
+        ogcapi_processes + "/req/core/process",
+        ogcapi_processes + "/req/core/process-success",
+        # FIXME: process error details (for all below: https://github.com/crim-ca/weaver/issues/320)
+        ogcapi_processes + "/req/core/process-exception/no-such-process",
+        # FIXME: https://github.com/crim-ca/weaver/issues/247 (Prefer header)
+        # ogcapi_processes + "/req/core/process-execute-auto-execution-mode",
+        ogcapi_processes + "/req/core/process-execute-default-execution-mode",
+        ogcapi_processes + "/req/core/process-execute-default-outputs",
+        ogcapi_processes + "/req/core/process-execute-input-array",
+        # FIXME: BoundingBox not implemented (https://github.com/crim-ca/weaver/issues/51)
+        # ogcapi_processes + "/req/core/process-execute-input-inline-bbox",
+        # FIXME: support byte/binary type (string + format:byte) ?
+        # ogcapi_processes + "/req/core/process-execute-input-inline-binary",
+        ogcapi_processes + "/req/core/process-execute-input-mixed-type",
+        ogcapi_processes + "/req/core/process-execute-input-inline-object",
+        ogcapi_processes + "/req/core/process-execute-input-validation",
+        ogcapi_processes + "/req/core/process-execute-inputs",
+        ogcapi_processes + "/req/core/process-execute-op",
+        ogcapi_processes + "/req/core/process-execute-request",
+        ogcapi_processes + "/req/core/process-execute-success-async",
+        ogcapi_processes + "/req/core/process-execute-sync-document",
+        # ogcapi_processes + "/req/core/process-execute-sync-raw-mixed-multi",
+        # ogcapi_processes + "/req/core/process-execute-sync-raw-ref",
+        # ogcapi_processes + "/req/core/process-execute-sync-raw-value-multi",
+        # ogcapi_processes + "/req/core/process-execute-sync-raw-value-one",
+        # FIXME: https://github.com/crim-ca/weaver/issues/269
+        # ogcapi_processes + "/req/core/pl-limit-definition",
+        # ogcapi_processes + "/req/core/pl-limit-response",
+        ogcapi_processes + "/req/core/process-list",
+        ogcapi_processes + "/req/core/process-list-success",
+        # ogcapi_processes + "/req/core/test-process",
+        # FIXME: https://github.com/crim-ca/weaver/issues/228
+        ogcapi_processes + "/req/dismiss/job-dismiss-op",
+        ogcapi_processes + "/req/dismiss/job-dismiss-success",
+        # https://github.com/opengeospatial/ogcapi-processes/blob/master/core/clause_7_core.adoc#sc_requirements_class_html
+        # ogcapi_processes + "/req/html",
+        # ogcapi_processes + "/req/html/content",
+        # ogcapi_processes + "/req/html/definition",
         # FIXME: https://github.com/crim-ca/weaver/issues/231
         #  List all supported requirements, recommendations and abstract tests
-        ogcapi_processes + "/req/core/process",
-        ogcapi_common + "/req/collections/rc-limit-response",
-        ogcapi_common + "/req/collections/rc-time-collections-response"
-    ]}
-    return HTTPOk(json=conformance)
+        ogcapi_processes + "/conf/ogc-process-description",
+        ogcapi_processes + "/req/json",
+        ogcapi_processes + "/req/json/definition",
+        ogcapi_processes + "/req/oas30",  # OpenAPI 3.0
+        ogcapi_processes + "/req/oas30/completeness",
+        ogcapi_processes + "/req/oas30/exceptions-codes",
+        ogcapi_processes + "/req/oas30/oas-definition-1",
+        ogcapi_processes + "/req/oas30/oas-definition-2",
+        ogcapi_processes + "/req/oas30/oas-impl",
+        ogcapi_processes + "/req/oas30/security",
+        # FIXME: https://github.com/crim-ca/weaver/issues/245 (schema field)
+        # ogcapi_processes + "/req/ogc-process-description/input-def",
+        # ogcapi_processes + "/req/ogc-process-description/input-mixed-type",
+        ogcapi_processes + "/req/ogc-process-description/inputs-def",
+        ogcapi_processes + "/req/ogc-process-description/json-encoding",
+        # FIXME: https://github.com/crim-ca/weaver/issues/245 (schema field)
+        # ogcapi_processes + "/req/ogc-process-description/output-def",
+        # ogcapi_processes + "/req/ogc-process-description/output-mixed-type",
+        ogcapi_processes + "/req/ogc-process-description/outputs-def",
+        ogcapi_transactions + "/req/ogcapppkg",
+        ogcapi_transactions + "/req/ogcapppkg/execution-unit-docker",
+        ogcapi_transactions + "/req/ogcapppkg/process-description",
+        # FIXME: 'deploymentProfile = http://www.opengis.net/profiles/eoc/dockerizedApplication'
+        #   https://github.com/crim-ca/weaver/issues/319
+        # ogcapi_transactions + "/req/ogcapppkg/profile-docker",
+        ogcapi_transactions + "/req/ogcapppkg/schema",
+        ogcapi_transactions + "/req/transactions",
+        ogcapi_transactions + "/req/transactions/delete/delete-op",
+        ogcapi_transactions + "/req/transactions/delete/response",
+        ogcapi_transactions + "/req/transactions/insert/body",
+        ogcapi_transactions + "/req/transactions/insert/content-type",
+        ogcapi_transactions + "/req/transactions/insert/post-op",
+        ogcapi_transactions + "/req/transactions/insert/response-body",
+        ogcapi_transactions + "/req/transactions/insert/response-pid",
+        ogcapi_transactions + "/req/transactions/insert/response",
+        # FIXME: https://github.com/crim-ca/weaver/issues/180
+        # ogcapi_transactions + "/req/transactions/static/indicator",
+        ogcapi_transactions + "/req/transactions/update/body",
+        ogcapi_transactions + "/req/transactions/update/content-type",
+        ogcapi_transactions + "/req/transactions/update/put-op",
+        ogcapi_transactions + "/req/transactions/update/response",
+        ogcapi_transactions + "/req/transactions/ogcapppkg",
+        # http://www.opengis.net/spec/ogcapi-processes-1/1.0/req/workflows
+        ogcapi_workflows + "/req/workflows/collection/body",
+        ogcapi_workflows + "/req/workflows/collection/content-type",
+        ogcapi_workflows + "/req/workflows/collection/post-op",
+        # ogcapi_workflows + "/req/workflows/collection/response-body",
+        # ogcapi_workflows + "/req/workflows/collection/response",
+        # FIXME: https://github.com/crim-ca/weaver/issues/156  (billing/quotation)
+        # https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/billing
+        # https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/quotation
+    ]
+    data = {"conformsTo": list(sorted(conformance))}
+    return HTTPOk(json=data)
 
 
 def get_openapi_json(http_scheme="http", http_host="localhost", base_url=None,
@@ -303,7 +534,9 @@ def openapi_json_cached(*args, **kwargs):
                              schema=sd.OpenAPIEndpoint(), response_schemas=sd.get_openapi_json_responses)
 def openapi_json(request):  # noqa: F811
     # type: (Request) -> dict
-    """Weaver OpenAPI schema definitions."""
+    """
+    Weaver OpenAPI schema definitions.
+    """
     # obtain 'server' host and api-base-path, which doesn't correspond necessarily to the app's host and path
     # ex: 'server' adds '/weaver' with proxy redirect before API routes
     settings = get_settings(request)
@@ -327,7 +560,9 @@ def swagger_ui_cached(request):
 @sd.api_swagger_ui_service.get(tags=[sd.TAG_API], schema=sd.SwaggerUIEndpoint(),
                                response_schemas=sd.get_api_swagger_ui_responses)
 def api_swagger_ui(request):
-    """Weaver OpenAPI schema definitions rendering using Swagger-UI viewer."""
+    """
+    Weaver OpenAPI schema definitions rendering using Swagger-UI viewer.
+    """
     return swagger_ui_cached(request)
 
 
@@ -345,13 +580,17 @@ def redoc_ui_cached(request):
 @sd.api_redoc_ui_service.get(tags=[sd.TAG_API], schema=sd.RedocUIEndpoint(),
                              response_schemas=sd.get_api_redoc_ui_responses)
 def api_redoc_ui(request):
-    """Weaver OpenAPI schema definitions rendering using Redoc viewer."""
+    """
+    Weaver OpenAPI schema definitions rendering using Redoc viewer.
+    """
     return redoc_ui_cached(request)
 
 
 def get_request_info(request, detail=None):
     # type: (Request, Optional[str]) -> JSON
-    """Provided additional response details based on the request and execution stack on failure."""
+    """
+    Provided additional response details based on the request and execution stack on failure.
+    """
     content = {u"route": str(request.upath_info), u"url": str(request.url), u"method": request.method}
     if isinstance(detail, str):
         content.update({"detail": detail})
@@ -373,7 +612,9 @@ def get_request_info(request, detail=None):
 
 
 def ows_json_format(function):
-    """Decorator that adds additional detail in the response's JSON body if this is the returned content-type."""
+    """
+    Decorator that adds additional detail in the response's JSON body if this is the returned content-type.
+    """
     def format_response_details(response, request):
         # type: (Response, Request) -> HTTPException
         http_response = function(request)
