@@ -23,7 +23,8 @@ WPS_ENUM_ARRAY_IO_ID = "subset_countries"
 WPS_ENUM_ARRAY_IO_XML = os.path.join(RESOURCES_PATH, "wps_enum_array_io.xml")
 WPS_LITERAL_COMPLEX_IO_ID = "ice_days"
 WPS_LITERAL_COMPLEX_IO_XML = os.path.join(RESOURCES_PATH, "wps_literal_complex_io.xml")
-
+WPS_LITERAL_VALUES_IO_ID = "ensemble_grid_point_cold_spell_duration_index"
+WPS_LITERAL_VALUES_IO_XML = os.path.join(RESOURCES_PATH, "wps_literal_values_io.xml")
 WPS_NO_INPUTS_ID = "pavicstestdocs"
 WPS_NO_INPUTS_XML = os.path.join(RESOURCES_PATH, "wps_no_inputs.xml")
 WPS_NO_INPUTS_URL = DESCRIBE_PROCESS_TEMPLATE_URL.format(

@@ -831,64 +831,6 @@ class BoundingBoxInputType(ExtendedMappingSchema):
     supportedCRS = SupportedCRSList()
 
 
-class LiteralReference(ExtendedMappingSchema):
-    reference = ReferenceURL()
-
-
-class NameReferenceType(ExtendedMappingSchema):
-    schema_ref = "{}/master/core/openapi/schemas/nameReferenceType.yaml".format(OGC_API_SCHEMA_URL)
-    name = ExtendedSchemaNode(String())
-    reference = ReferenceURL(missing=drop)
-
-
-class DataTypeSchema(NameReferenceType):
-    description = "Type of the literal data representation."
-    title = "DataType"
-    # any named type that can be converted by: 'weaver.processes.convert.any2wps_literal_datatype'
-    name = ExtendedSchemaNode(String(), validator=OneOf(list(WPS_LITERAL_DATA_TYPE_NAMES)))
-
-
-class UomSchema(NameReferenceType):
-    title = "UnitOfMeasure"
-
-
-class AllowedValuesList(ExtendedSequenceSchema):
-    allowedValues = ExtendedSchemaNode(String())
-
-
-class AllowedValues(ExtendedMappingSchema):
-    """
-    Allows string values (enum).
-    """
-    allowedValues = AllowedValuesList()
-
-
-class AllowedRange(ExtendedMappingSchema):
-    minimumValue = ExtendedSchemaNode(String(), missing=drop)
-    maximumValue = ExtendedSchemaNode(String(), missing=drop)
-    spacing = ExtendedSchemaNode(String(), missing=drop)
-    rangeClosure = ExtendedSchemaNode(String(), missing=drop,
-                                      validator=OneOf(["closed", "open", "open-closed", "closed-open"]))
-
-
-class AllowedRangesList(ExtendedSequenceSchema):
-    allowedRanges = AllowedRange()
-
-
-class AllowedRanges(ExtendedMappingSchema):
-    allowedRanges = AllowedRangesList()
-
-
-class AnyValue(ExtendedMappingSchema):
-    anyValue = ExtendedSchemaNode(Boolean(), missing=drop, default=True)
-
-
-class ValuesReference(ReferenceURL):
-    """
-    URL where to retrieve applicable values.
-    """
-
-
 # FIXME: support byte/binary type (string + format:byte) ?
 #   https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/binaryInputValue.yaml
 class AnyLiteralType(OneOfKeywordSchema):
@@ -906,6 +848,80 @@ class AnyLiteralType(OneOfKeywordSchema):
         ExtendedSchemaNode(Boolean(), description="Literal data type representing a boolean flag."),
         ExtendedSchemaNode(String(), description="Literal data type representing a generic string."),
     ]
+
+
+class NumericType(OneOfKeywordSchema):
+    _one_of = [
+        ExtendedSchemaNode(Float()),
+        ExtendedSchemaNode(Integer()),
+        ExtendedSchemaNode(String(), pattern="^[0-9]+$"),
+    ]
+
+
+class LiteralReference(ExtendedMappingSchema):
+    reference = ReferenceURL()
+
+
+# https://github.com/opengeospatial/ogcapi-processes/blob/e6893b/extensions/workflows/openapi/workflows.yaml#L1707-L1716
+class NameReferenceType(ExtendedMappingSchema):
+    schema_ref = "{}/master/core/openapi/schemas/nameReferenceType.yaml".format(OGC_API_SCHEMA_URL)
+    name = ExtendedSchemaNode(String())
+    reference = ReferenceURL(missing=drop, description="Reference URL to schema definition of the named entity.")
+
+
+class DataTypeSchema(NameReferenceType):
+    description = "Type of the literal data representation."
+    title = "DataType"
+    # any named type that can be converted by: 'weaver.processes.convert.any2wps_literal_datatype'
+    name = ExtendedSchemaNode(String(), validator=OneOf(list(WPS_LITERAL_DATA_TYPE_NAMES)))
+
+
+class UomSchema(NameReferenceType):
+    title = "UnitOfMeasure"
+
+
+# https://github.com/opengeospatial/ogcapi-processes/blob/e6893b/extensions/workflows/openapi/workflows.yaml#L1423
+# NOTE: Original is only 'string', but we allow any literal type
+class AllowedValuesList(ExtendedSequenceSchema):
+    value = AnyLiteralType()
+
+
+# https://github.com/opengeospatial/ogcapi-processes/blob/e6893b/extensions/workflows/openapi/workflows.yaml#L1772-L1787
+# NOTE:
+#   Contrary to original schema where all fields are 'string', we allow any literal type as well since those make more
+#   sense when parsing corresponding data values (eg: float, integer, bool).
+class AllowedRange(ExtendedMappingSchema):
+    minimumValue = NumericType(missing=drop)
+    maximumValue = NumericType(missing=drop)
+    spacing = NumericType(missing=drop)
+    rangeClosure = ExtendedSchemaNode(String(), missing=drop,
+                                      validator=OneOf(["closed", "open", "open-closed", "closed-open"]))
+
+
+class AllowedRangesList(ExtendedSequenceSchema):
+    range = AllowedRange()
+
+
+class AllowedValues(OneOfKeywordSchema):
+    _one_of = [
+        AllowedRangesList(description="List of value ranges and contrains."),   # array of {range}
+        AllowedValuesList(description="List of enumerated allowed values."),    # array of "value"
+        ExtendedSchemaNode(String(), description="Single allowed value."),      # single "value"
+    ]
+
+
+# https://github.com/opengeospatial/ogcapi-processes/blob/e6893b/extensions/workflows/openapi/workflows.yaml#L1425-L1430
+class AnyValue(ExtendedMappingSchema):
+    anyValue = ExtendedSchemaNode(
+        Boolean(), missing=drop, default=True,
+        description="Explicitly indicate if any value is allowed. "
+                    "This is the default behaviour if no other constrains are specified."
+    )
+
+
+# https://github.com/opengeospatial/ogcapi-processes/blob/e6893b/extensions/workflows/openapi/workflows.yaml#L1801-L1803
+class ValuesReference(ReferenceURL):
+    description = "URL where to retrieve applicable values."
 
 
 class SequenceStringType(ExtendedSequenceSchema):
@@ -948,38 +964,64 @@ class AnyLiteralDefaultType(ExtendedMappingSchema):
     default = AnyLiteralType()
 
 
-class LiteralDataDomainDefinition(ExtendedMappingSchema):
-    default = AnyLiteralDefaultType()
-    defaultValue = ExtendedSchemaNode(String(), missing=drop)
-    dataType = DataTypeSchema(missing=drop)
-    uom = UomSchema(missing=drop)
-
-
 class LiteralDataValueDefinition(OneOfKeywordSchema):
     _one_of = [
-        AllowedValues,
-        AllowedRanges,
-        ValuesReference,
-        AnyValue,  # must be last because it's the most permissive (always valid, default)
+        AllowedValues(description="Constraints of allowed values."),
+        ValuesReference(description="URL where to retrieve applicable values."),
+        # 'AnyValue' must be last because it's the most permissive (always valid, default)
+        AnyValue(description="Permissive definition for any value allowed."),
     ]
 
 
-class LiteralDataDomainConstraints(LiteralDataDomainDefinition):
-    valueDefinition = LiteralDataValueDefinition()
+# https://github.com/opengeospatial/ogcapi-processes/blob/e6893b/extensions/workflows/openapi/workflows.yaml#L1675-L1688
+#
+#  literalDataDomain:
+#    type: object
+#    properties:
+#      valueDefinition:
+#        oneOf:
+#          - $ref: "#/components/schemas/allowedValues"
+#          - $ref: "#/components/schemas/anyValue"
+#          - $ref: "#/components/schemas/valuesReference"
+#      defaultValue:
+#        type: string
+#      dataType:
+#        $ref: "#/components/schemas/nameReferenceType"
+#      uom:
+#        $ref: "#/components/schemas/nameReferenceType"
+#
+class LiteralDataDomain(ExtendedMappingSchema):
+    default = ExtendedSchemaNode(Boolean(), default=True,
+                                 description="Indicates if this literal data domain definition is the default one.")
+    defaultValue = AnyLiteralType(missing=drop, description="Default value to employ if none was provided.")
+    dataType = DataTypeSchema(missing=drop, description="Type name and reference of the literal data representation.")
+    uom = UomSchema(missing=drop, description="Unit of measure applicable for the data.")
+    valueDefinition = LiteralDataValueDefinition(description="Literal data domain constraints.")
 
 
 class LiteralDataDomainList(ExtendedSequenceSchema):
     """
     Constraints that apply to the literal data values.
     """
-    literalDataDomain = LiteralDataDomainConstraints()
+    literalDataDomain = LiteralDataDomain()
 
 
-class LiteralInputType(NotKeywordSchema, ExtendedMappingSchema):
+# https://github.com/opengeospatial/ogcapi-processes/blob/e6893b/extensions/workflows/openapi/workflows.yaml#L1689-L1697
+class LiteralDataType(NotKeywordSchema, ExtendedMappingSchema):
+    # NOTE:
+    #   Apply 'missing=drop' although original schema of 'literalDataDomains' (see link above) requires it because
+    #   we support omitting it for minimalistic literal input definition.
+    #   This is because our schema validation allows us to do detection of 'basic' types using the literal parsing.
+    #   Because there is not explicit requirement though (ie: missing would fail schema validation), we must check
+    #   that 'format' is not present to avoid conflict with minimalistic literal data definition in case of ambiguity.
+    literalDataDomains = LiteralDataDomainList(missing=drop)
     _not = [
         DescribeWithFormats,
     ]
-    literalDataDomains = LiteralDataDomainList(missing=drop)
+
+
+class LiteralInputType(LiteralDataType):
+    pass
 
 
 class DescribeInputTypeDefinition(OneOfKeywordSchema):
@@ -1086,11 +1128,8 @@ class DeployInputTypeAny(OneOfKeywordSchema):
     ]
 
 
-class LiteralOutputType(NotKeywordSchema, ExtendedMappingSchema):
-    _not = [
-        DescribeWithFormats,
-    ]
-    literalDataDomains = LiteralDataDomainList(missing=drop)
+class LiteralOutputType(LiteralDataType):
+    pass
 
 
 class BoundingBoxOutputType(ExtendedMappingSchema):
@@ -3178,9 +3217,14 @@ class JobOutputList(ExtendedSequenceSchema):
     output = JobOutput(description="Job output result with specific keyword according to represented format.")
 
 
-# implement only literal part of:
-#   https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/master/core/openapi/schemas/inlineOrRefData.yaml
-class ResultLiteral(AnyLiteralValueType, LiteralDataDomainDefinition):
+# implement only literal parts from following schemas:
+# https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/master/core/openapi/schemas/inlineOrRefData.yaml
+# https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/master/core/openapi/schemas/qualifiedInputValue.yaml
+#
+# Other parts are implemented separately with:
+#   - 'ValueFormatted' (qualifiedInputValue)
+#   - 'ResultReference' (link)
+class ResultLiteral(AnyLiteralValueType):
     # value = <AnyLiteralValueType>
     pass
 

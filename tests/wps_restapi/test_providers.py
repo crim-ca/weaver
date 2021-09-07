@@ -232,3 +232,77 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert resp.content_type == CONTENT_TYPE_APP_JSON
         inputs = resp.json["inputs"]
         assert isinstance(inputs, dict) and len(inputs) == 0
+
+    @mocked_remote_server_requests_wps1([
+        resources.TEST_REMOTE_SERVER_URL,
+        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,  # don't care
+        [resources.WPS_LITERAL_VALUES_IO_XML],
+    ])
+    def test_get_provider_process_literal_values(self):
+        """
+        Test conversion of I/O with supported values metadata for provider process.
+        """
+        self.register_provider()
+        path = "/providers/{}/processes/{}".format(self.remote_provider_name, resources.WPS_LITERAL_VALUES_IO_ID)
+        resp = self.app.get(path, params={"schema": "OLD"}, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        inputs = resp.json["process"]["inputs"]
+        outputs = resp.json["process"]["outputs"]
+        assert isinstance(inputs, list) and len(inputs) == 15
+        assert isinstance(outputs, list) and len(outputs) == 2
+
+        # inputs have different combinations of minOccurs/maxOccurs, Allowed/Supported Values, Ranges, Types, etc.
+        assert inputs[0]["id"] == "lat"
+        assert inputs[0]["title"] == "Latitude"
+        assert inputs[0]["minOccurs"] == 1
+        assert inputs[0]["maxOccurs"] == 100
+        assert "default" not in inputs[0]
+        assert inputs[1]["id"] == "lon"
+        assert inputs[1]["title"] == "Longitude"
+        assert inputs[1]["minOccurs"] == 1
+        assert inputs[1]["maxOccurs"] == 100
+        assert "default" not in inputs[1]
+        assert inputs[2]["id"] == "start_date"
+        assert inputs[2]["title"] == "Initial date"
+        assert inputs[2]["minOccurs"] == 0
+        assert inputs[2]["maxOccurs"] == 1
+        assert "default" not in inputs[2]
+        assert inputs[3]["id"] == "end_date"
+        assert inputs[3]["title"] == "Final date"
+        assert inputs[3]["minOccurs"] == 0
+        assert inputs[3]["maxOccurs"] == 1
+        assert "default" not in inputs[3]
+        assert inputs[4]["id"] == "ensemble_percentiles"
+        assert inputs[4]["title"] == "Ensemble percentiles"
+        assert inputs[4]["minOccurs"] == 0
+        assert inputs[4]["maxOccurs"] == 1
+        assert inputs[4]["default"] == "10,50,90"
+        assert inputs[5]["id"] == "dataset_name"
+        assert inputs[5]["title"] == "Dataset name"
+        assert inputs[5]["minOccurs"] == 0
+        assert inputs[5]["maxOccurs"] == 1
+        assert "default" not in inputs[5]
+        assert inputs[5]["allowedValues"] == ["bccaqv2"]
+        assert inputs[6]["id"] == "rcp"
+        assert inputs[6]["title"] == "RCP Scenario"
+        assert inputs[6]["minOccurs"] == 1
+        assert inputs[6]["maxOccurs"] == 1
+        assert "default" not in inputs[6]
+        assert inputs[6]["allowedValues"] == ["rcp26", "rcp45", "rcp85"]
+        assert inputs[7]["id"] == "rcp"
+        assert inputs[7]["title"] == "RCP Scenario"
+        assert inputs[7]["minOccurs"] == 0
+        assert inputs[7]["maxOccurs"] == 1000
+        assert "default" not in inputs[7]
+        assert inputs[7]["allowedValues"] == [
+            "24MODELS", "PCIC12", "BNU-ESM", "CCSM4", "CESM1-CAM5", "CNRM-CM5", "CSIRO-Mk3-6-0", "CanESM2",
+            "FGOALS-g2", "GFDL-CM3", "GFDL-ESM2G", "GFDL-ESM2M", "HadGEM2-AO", "HadGEM2-ES", "IPSL-CM5A-LR",
+            "IPSL-CM5A-MR", "MIROC-ESM-CHEM", "MIROC-ESM", "MIROC5", "MPI-ESM-LR", "MPI-ESM-MR", "MRI-CGCM3",
+            "NorESM1-M", "NorESM1-ME", "bcc-csm1-1-m", "bcc-csm1-1"
+        ]
+        assert inputs[7]["id"] == "window"
+        assert inputs[7]["title"] == "Window"
+        assert inputs[7]["minOccurs"] == 0
+        assert inputs[7]["maxOccurs"] == 1
+        assert inputs[7]["default"] == 6

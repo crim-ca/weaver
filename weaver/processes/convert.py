@@ -124,6 +124,10 @@ WPS_FIELD_MAPPING = {
     "max_occurs": ["maxOccurs", "MaxOccurs", "Max_Occurs", "maxoccurs"],
     "mime_type": ["mimeType", "MimeType", "mime-type", "Mime-Type", "mimetype",
                   "mediaType", "MediaType", "media-type", "Media-Type", "mediatype"],
+    "range_minimum": ["minval", "minimum", "minimumValue"],
+    "range_maximum": ["maxval", "maximum", "maximumValue"],
+    "range_spacing": ["spacing"],
+    "range_closure": ["closure", "rangeClosure"],
     "encoding": ["Encoding"],
     "href": ["url", "link", "reference"],
 }
@@ -202,7 +206,6 @@ def ows2json_io(ows_io):
     """
     Converts I/O definition from :mod:`owslib.wps` to JSON.
     """
-
     json_io = dict()
     for field in WPS_FIELD_MAPPING:
         value = get_field(ows_io, field, search_variations=True)
@@ -226,27 +229,35 @@ def ows2json_io(ows_io):
     json_io["id"] = get_field(json_io, "identifier", search_variations=True, pop_found=True)
 
     # add 'format' if missing, derived from other variants
-    if "formats" not in json_io:
-        fmt_val = get_field(json_io, "supported_values")
-        if fmt_val and json_io.get("type") == WPS_COMPLEX_DATA:
-            json_io["formats"] = json_io.pop("supported_values")
-        else:
-            # search for format fields directly specified in I/O body
-            for field in WPS_FIELD_FORMAT:
-                fmt = get_field(json_io, field, search_variations=True)
-                if not fmt:
+    io_type = json_io.get("type")
+    if io_type == WPS_COMPLEX_DATA and "formats" not in json_io:
+        # correct complex data 'formats' from OWSLib from above fields loop can get stored in 'supported_values'
+        fmt_val = get_field(json_io, "supported_values", pop_found=True)
+        if fmt_val:
+            json_io["formats"] = fmt_val
+            return json_io
+        # search for format fields directly specified in I/O body
+        for field in WPS_FIELD_FORMAT:
+            fmt = get_field(json_io, field, search_variations=True)
+            if not fmt:
+                continue
+            if isinstance(fmt, dict):
+                fmt = [fmt]
+            fmt = filter(lambda f: isinstance(f, dict), fmt)
+            if not isinstance(json_io.get("formats"), list):
+                json_io["formats"] = list()
+            for var_fmt in fmt:
+                # add it only if not exclusively provided by a previous variant
+                json_fmt_items = [j_fmt.items() for j_fmt in json_io["formats"]]
+                if any(all(var_item in items for var_item in var_fmt.items()) for items in json_fmt_items):
                     continue
-                if isinstance(fmt, dict):
-                    fmt = [fmt]
-                fmt = filter(lambda f: isinstance(f, dict), fmt)
-                if not isinstance(json_io.get("formats"), list):
-                    json_io["formats"] = list()
-                for var_fmt in fmt:
-                    # add it only if not exclusively provided by a previous variant
-                    json_fmt_items = [j_fmt.items() for j_fmt in json_io["formats"]]
-                    if any(all(var_item in items for var_item in var_fmt.items()) for items in json_fmt_items):
-                        continue
-                    json_io["formats"].append(var_fmt)
+                json_io["formats"].append(var_fmt)
+
+    # add value contrains specifications if missing
+    elif io_type in WPS_LITERAL_DATA_TYPE_NAMES:
+        domains = any2json_literal_data_domains(ows_io)
+        if domains:
+            json_io["literalDataDomains"] = domains
 
     return json_io
 
@@ -943,6 +954,53 @@ def any2wps_literal_datatype(io_type, is_value):
     return null
 
 
+def any2json_literal_allowed_values(io_allow):
+    # type: (Union[AllowedValue, JSON, str, float, int, bool]) -> Union[JSON, str, str, float, int, bool]
+    """
+    Converts an ``AllowedValues`` definition from different packages into standardized JSON representation of `OGC-API`.
+    """
+    if isinstance(io_allow, AllowedValue):
+        io_allow = io_allow.json
+    if isinstance(io_allow, dict):
+        wps_range = {}
+        for field, dest in [
+            ("range_minimum", "minimumValue"),
+            ("range_maximum", "maximumValue"),
+            ("spacing", "spacing"),
+            ("range_closure", "rangeClosure")
+        ]:
+            wps_range_value = get_field(io_allow, field, search_variations=True)
+            if wps_range_value is not null:
+                wps_range[dest] = wps_range_value
+    return io_allow
+
+
+def any2json_literal_data_domains(io_info):
+    # type: (ANY_IO_Type) -> Union[Type[null], List[JSON]]
+    """
+    Extracts allowed value constrains from the input definition and generate the expected literal data domains.
+
+    The generated result, if applicable, corresponds to
+    schema definition :class:`weaver.wps_restapi.swagger_definitions.LiteralDataDomainList`.
+    """
+    if io_info.get("type") in [WPS_BOUNDINGBOX, WPS_COMPLEX]:
+        return null
+
+    wps_allowed_values = get_field(io_info, "allowed_values", search_variations=True)
+    wps_default_value = get_field(io_info, "default", search_variations=True)
+    domain = {"default": True}  # since it is generated from convert, only one is available anyway
+    if isinstance(wps_allowed_values, list) and len(wps_allowed_values) > 0:
+        wps_allowed_values = [any2json_literal_allowed_values(io_value) for io_value in wps_allowed_values]
+        wps_allowed_values = [io_value for io_value in wps_allowed_values if io_value]  # remote empty/null
+        if wps_allowed_values:
+            domain["allowedValues"] = wps_allowed_values
+    if wps_default_value is not null:
+        domain["defaultValue"] = wps_default_value
+    if domain == {"default": True}:  # no contrains were added
+        domain["anyValue"] = True
+    return [domain]
+
+
 def json2wps_datatype(io_info):
     # type: (JSON_IO_Type) -> str
     """
@@ -1188,6 +1246,14 @@ def wps2json_io(io_wps):
             io_default_mime_type = get_field(io_default, "mime_type", search_variations=True)
             io_single_fmt_mime_type = get_field(io_wps_json["formats"][0], "mime_type", search_variations=True)
             io_wps_json["formats"][0]["default"] = (io_default_mime_type == io_single_fmt_mime_type)
+
+    elif io_wps_json["type"] == WPS_BOUNDINGBOX:
+        pass  # FIXME: BoundingBox not implemented (https://github.com/crim-ca/weaver/issues/51)
+
+    else:  # literal
+        domains = any2json_literal_data_domains(io_wps_json)
+        if domains:
+            io_wps_json["literalDataDomains"] = domains
 
     return io_wps_json
 
