@@ -123,6 +123,7 @@ WPS_FIELD_MAPPING = {
     "type": ["Type", "data_type", "dataType", "DataType", "Data_Type"],
     "min_occurs": ["minOccurs", "MinOccurs", "Min_Occurs", "minoccurs"],
     "max_occurs": ["maxOccurs", "MaxOccurs", "Max_Occurs", "maxoccurs"],
+    "max_megabytes": ["maximumMegabytes", "max_size"],
     "mime_type": ["mimeType", "MimeType", "mime-type", "Mime-Type", "mimetype",
                   "mediaType", "MediaType", "media-type", "Media-Type", "mediatype"],
     "range_minimum": ["minval", "minimum", "minimumValue"],
@@ -159,10 +160,16 @@ def complex2json(data):
     """
     if not isinstance(data, ComplexData):
         return data
+    # backward compat based on OWSLib version, field did not always exist
+    max_mb = getattr(data, "maximumMegabytes", None)
+    if isinstance(max_mb, str) and max_mb.isnumeric():
+        max_mb = int(max_mb)
     return {
         "mimeType": data.mimeType,
         "encoding": data.encoding,
         "schema": data.schema,
+        "maximumMegabytes": max_mb,
+        "default": False,  # always assume it is a supported format/value, caller should override
     }
 
 
@@ -229,36 +236,54 @@ def ows2json_io(ows_io):
                 json_io[field] = value
     json_io["id"] = get_field(json_io, "identifier", search_variations=True, pop_found=True)
 
-    # add 'format' if missing, derived from other variants
     io_type = json_io.get("type")
+    fmt_default = None
+    if io_type == WPS_COMPLEX_DATA and "default" in json_io and isinstance(json_io["default"], dict):
+        json_io["default"]["default"] = True  # provide the field for workflow extension
+        fmt_default = get_field(json_io["default"], "mime_type", search_variations=True)
+
+    # add 'format' if missing, derived from other variants
     if io_type == WPS_COMPLEX_DATA and "formats" not in json_io:
         # correct complex data 'formats' from OWSLib from above fields loop can get stored in 'supported_values'
         fmt_val = get_field(json_io, "supported_values", pop_found=True)
         if fmt_val:
             json_io["formats"] = fmt_val
-            return json_io
-        # search for format fields directly specified in I/O body
-        for field in WPS_FIELD_FORMAT:
-            fmt = get_field(json_io, field, search_variations=True)
-            if not fmt:
-                continue
-            if isinstance(fmt, dict):
-                fmt = [fmt]
-            fmt = filter(lambda f: isinstance(f, dict), fmt)
-            if not isinstance(json_io.get("formats"), list):
-                json_io["formats"] = list()
-            for var_fmt in fmt:
-                # add it only if not exclusively provided by a previous variant
-                json_fmt_items = [j_fmt.items() for j_fmt in json_io["formats"]]
-                if any(all(var_item in items for var_item in var_fmt.items()) for items in json_fmt_items):
+        else:
+            # search for format fields directly specified in I/O body
+            for field in WPS_FIELD_FORMAT:
+                fmt = get_field(json_io, field, search_variations=True)
+                if not fmt:
                     continue
-                json_io["formats"].append(var_fmt)
+                if isinstance(fmt, dict):
+                    fmt = [fmt]
+                fmt = filter(lambda f: isinstance(f, dict), fmt)
+                if not isinstance(json_io.get("formats"), list):
+                    json_io["formats"] = list()
+                for var_fmt in fmt:
+                    # add it only if not exclusively provided by a previous variant
+                    json_fmt_items = [j_fmt.items() for j_fmt in json_io["formats"]]
+                    if any(all(var_item in items for var_item in var_fmt.items()) for items in json_fmt_items):
+                        continue
+                    json_io["formats"].append(var_fmt)
+        # apply the default flag
+        for fmt in json_io["formats"]:
+            if fmt_default:
+                fmt_type = get_field(json_io["default"], "mime_type", search_variations=True)
+                fmt["default"] = fmt_default == fmt_type
+            else:
+                fmt["default"] = False
+        return json_io
 
     # add value contrains specifications if missing
     elif io_type in WPS_LITERAL_DATA_TYPE_NAMES:
         domains = any2json_literal_data_domains(ows_io)
         if domains:
             json_io["literalDataDomains"] = domains
+            # fix inconsistencies of some process descriptions
+            # WPS are allowed to report 'minOccurs=1' although 'defaultValue' can also be provided
+            # (see https://github.com/bird-house/finch/pull/199)
+            if "defaultValue" in domains[0]:
+                json_io["minOccurs"] = 1
 
     return json_io
 

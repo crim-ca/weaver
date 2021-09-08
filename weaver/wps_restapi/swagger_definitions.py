@@ -600,10 +600,14 @@ class FormatSelection(OneOfKeywordSchema):
     ]
 
 
-class FormatExtra(ExtendedMappingSchema):
+# only extra portion from:
+# https://github.com/opengeospatial/ogcapi-processes/blob/e6893b/extensions/workflows/openapi/workflows.yaml#L1538-L1547
+class FormatDescription(ExtendedMappingSchema):
     maximumMegabytes = ExtendedSchemaNode(Integer(), missing=drop)
 
 
+# although original schema defines 'default' in above 'FormatDescription', separate it in order to omit it
+# from 'FormatMedia' employed for result reporting, which shouldn't have a default (applied vs supported format)
 class FormatDefault(ExtendedMappingSchema):
     default = ExtendedSchemaNode(
         Boolean(), missing=drop, default=False,
@@ -614,7 +618,7 @@ class FormatDefault(ExtendedMappingSchema):
     )
 
 
-class DescriptionFormat(Format, FormatExtra, FormatDefault):
+class DescriptionFormat(Format, FormatDescription, FormatDefault):
     # NOTE:
     #  The 'OGC-API' suggest to use 'mediaType' field for FormatType, but retro-compatibility is supported,
     #  FormatType can be with either old 'mimeType' or new 'mediaType' during deployment,
@@ -622,7 +626,7 @@ class DescriptionFormat(Format, FormatExtra, FormatDefault):
     pass
 
 
-class DeploymentFormat(FormatSelection, FormatExtra, FormatDefault):
+class DeploymentFormat(FormatSelection, FormatDescription, FormatDefault):
     # NOTE:
     #  The 'OGC-API' suggest to use 'mediaType' field for FormatType, but retro-compatibility is supported,
     #  FormatType can be with either old 'mimeType' or new 'mediaType' during deployment,
@@ -630,7 +634,7 @@ class DeploymentFormat(FormatSelection, FormatExtra, FormatDefault):
     pass
 
 
-class FormatMedia(FormatExtra):
+class FormatMedia(FormatDescription):
     """
     Format employed for reference results respecting 'OGC-API - Processes' schemas.
     """
@@ -2866,7 +2870,7 @@ class BuiltinRequirementClass(BuiltinRequirementSpecification):
     _class = RequirementClass(example=CWL_REQUIREMENT_APP_BUILTIN, validator=OneOf([CWL_REQUIREMENT_APP_BUILTIN]))
 
 
-class ESGF_CWT_RequirementSpecification(PermissiveMappingSchema):
+class ESGF_CWT_RequirementSpecification(PermissiveMappingSchema):  # noqa: N802
     title = CWL_REQUIREMENT_APP_ESGF_CWT
     description = (
         "Hint indicating that the Application Package corresponds to an ESGF-CWT provider process"
