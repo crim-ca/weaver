@@ -222,6 +222,12 @@ install-run: install-sys install-pkg install-raw 	## install requirements and ap
 .PHONY: install-all
 install-all: install-sys install-pkg install-pip install-dev  ## install application with all its dependencies
 
+.PHONY: install-doc
+install-doc: install-pip	## install documentation dependencies
+	@echo "Installing development packages with pip..."
+	@bash -c '$(CONDA_CMD) pip install $(PIP_XARGS) -r "$(APP_ROOT)/requirements-doc.txt"'
+	@echo "Install with pip complete. Run documentation generation with 'make docs' target."
+
 .PHONY: install-dev
 install-dev: install-pip	## install development and test dependencies
 	@echo "Installing development packages with pip..."
@@ -516,7 +522,7 @@ check-docf-only: mkdir-reports	## run PEP8 code documentation format checks
 
 .PHONY: check-docstring-only
 check-docstring-only: mkdir-reports  ## check code docstring style and linting
-	@echo "Running pycodestyle docstring checks..."
+	@echo "Running docstring checks..."
 	@-rm -fr "$(REPORTS_DIR)/check-docstring.txt"
 	@bash -c '$(CONDA_CMD) \
 		pydocstyle --explain --config "$(APP_ROOT)/setup.cfg" "$(APP_ROOT)" \
@@ -665,7 +671,7 @@ docs-build: clean-docs	## generate HTML documentation with Sphinx
 	@bash -c '$(CONDA_CMD) $(MAKE) -C "$(APP_ROOT)/docs" html'
 
 .PHONY: docs
-docs: install-dev docs-build  ## generate HTML documentation with Sphinx after dependencies installation
+docs: install-doc docs-build  ## generate HTML documentation with Sphinx after dependencies installation
 
 ## -- Versioning targets -------------------------------------------------------------------------------------------- ##
 

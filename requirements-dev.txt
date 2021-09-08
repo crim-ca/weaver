@@ -1,5 +1,5 @@
 # pyup: ignore file
--r requirements-docs.txt
+-r requirements-doc.txt
 # pylint>=2.5 requires astroid>=2.4
 # install/update sometime fails randomly, so enforce it
 astroid>=2.4,<2.5.8
