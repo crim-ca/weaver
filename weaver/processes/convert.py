@@ -1312,7 +1312,9 @@ def _are_different_and_set(item1, item2):
 
 def is_equal_formats(format1, format2):
     # type: (Union[Format, JSON], Union[Format, JSON]) -> bool
-    """Verifies for matching formats."""
+    """
+    Verifies for matching formats.
+    """
     mime_type1 = get_field(format1, "mime_type", search_variations=True)
     mime_type2 = get_field(format2, "mime_type", search_variations=True)
     encoding1 = get_field(format1, "encoding", search_variations=True)

@@ -158,7 +158,9 @@ class Base(dict):
 
 class Service(Base):
     """
-    Dictionary that contains OWS services. It always has ``url`` key.
+    Dictionary that contains OWS services.
+
+    It always has ``url`` key.
     """
 
     def __init__(self, *args, **kwargs):
@@ -411,7 +413,9 @@ class Service(Base):
 
 class Job(Base):
     """
-    Dictionary that contains OWS service jobs. It always has ``id`` and ``task_id`` keys.
+    Dictionary that contains OWS service jobs.
+
+    It always has ``id`` and ``task_id`` keys.
     """
 
     def __init__(self, *args, **kwargs):

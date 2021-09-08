@@ -79,7 +79,9 @@ def test_get_cwl_file_format_default():
 
 
 def test_get_cwl_file_format_retry_attempts():
-    """Verifies that failing request will not immediately fail the MIME-type validation."""
+    """
+    Verifies that failing request will not immediately fail the MIME-type validation.
+    """
     codes = {"codes": [HTTPOk.code, HTTPRequestTimeout.code]}  # note: used in reverse order (pop)
 
     def mock_request_extra(*_, **__):
@@ -95,7 +97,9 @@ def test_get_cwl_file_format_retry_attempts():
 
 
 def test_get_cwl_file_format_retry_fallback_urlopen():
-    """Verifies that failing request because of critical error still validate the MIME-type using the fallback."""
+    """
+    Verifies that failing request because of critical error still validate the MIME-type using the fallback.
+    """
     def mock_connect_error(*_, **__):
         raise ConnectionError()
 
@@ -112,7 +116,9 @@ def test_get_cwl_file_format_retry_fallback_urlopen():
 
 
 def test_get_cwl_file_format_synonym():
-    """Test handling of special non-official MIME-type that have a synonym redirection to an official one."""
+    """
+    Test handling of special non-official MIME-type that have a synonym redirection to an official one.
+    """
     res = f.get_cwl_file_format(f.CONTENT_TYPE_APP_TAR_GZ, make_reference=False, must_exist=True, allow_synonym=False)
     assert res == (None, None), "Non-official MIME-type without allowed synonym should resolve as not-found"
     res = f.get_cwl_file_format(f.CONTENT_TYPE_APP_TAR_GZ, make_reference=False, must_exist=True, allow_synonym=True)

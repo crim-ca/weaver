@@ -126,7 +126,9 @@ def get_processes_filtered_by_valid_schemas(request):
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_processes(request):
     """
-    List registered processes (GetCapabilities). Optionally list both local and provider processes.
+    List registered processes (GetCapabilities).
+
+    Optionally list both local and provider processes.
     """
     detail = asbool(request.params.get("detail", True))
     try:
@@ -278,7 +280,9 @@ def delete_local_process(request):
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def submit_local_job(request):
     """
-    Execute a process registered locally. Execution location and method is according to deployed Application Package.
+    Execute a process registered locally.
+
+    Execution location and method is according to deployed Application Package.
     """
     process = get_process(request=request)
     body = submit_job(request, process, tags=["wps-rest"])

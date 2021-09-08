@@ -110,7 +110,9 @@ def setup_config_from_settings(settings=None):
 
 def setup_config_with_mongodb(config=None, settings=None):
     # type: (Optional[Configurator], Optional[SettingsType]) -> Configurator
-    """Prepares the configuration in order to allow calls to a ``MongoDB`` test database."""
+    """
+    Prepares the configuration in order to allow calls to a ``MongoDB`` test database.
+    """
     settings = settings or {}
     settings.update({
         "mongodb.host":     os.getenv("WEAVER_TEST_DB_HOST", "127.0.0.1"),      # noqa: E241
@@ -126,7 +128,9 @@ def setup_config_with_mongodb(config=None, settings=None):
 
 def setup_mongodb_servicestore(config=None):
     # type: (Optional[Configurator]) -> MongodbServiceStore
-    """Setup store using mongodb, will be enforced if not configured properly."""
+    """
+    Setup store using mongodb, will be enforced if not configured properly.
+    """
     config = setup_config_with_mongodb(config)
     store = get_db(config).get_store(MongodbServiceStore)
     store.clear_services()
@@ -135,7 +139,9 @@ def setup_mongodb_servicestore(config=None):
 
 def setup_mongodb_processstore(config=None):
     # type: (Optional[Configurator]) -> MongodbProcessStore
-    """Setup store using mongodb, will be enforced if not configured properly."""
+    """
+    Setup store using mongodb, will be enforced if not configured properly.
+    """
     config = setup_config_with_mongodb(config)
     db = get_db(config)
     store = db.get_store(MongodbProcessStore)
@@ -148,7 +154,9 @@ def setup_mongodb_processstore(config=None):
 
 def setup_mongodb_jobstore(config=None):
     # type: (Optional[Configurator]) -> MongodbJobStore
-    """Setup store using mongodb, will be enforced if not configured properly."""
+    """
+    Setup store using mongodb, will be enforced if not configured properly.
+    """
     config = setup_config_with_mongodb(config)
     store = get_db(config).get_store(MongodbJobStore)
     store.clear_jobs()
@@ -157,7 +165,9 @@ def setup_mongodb_jobstore(config=None):
 
 def setup_config_with_pywps(config):
     # type: (Configurator) -> Configurator
-    """Prepares the ``PyWPS`` interface, usually needed to call the WPS route (not API), or when executing processes."""
+    """
+    Prepares the ``PyWPS`` interface, usually needed to call the WPS route (not API), or when executing processes.
+    """
     # flush any PyWPS config (global) to make sure we restart from clean state
     import pywps.configuration  # isort: skip
     pywps.configuration.CONFIG = None
@@ -505,7 +515,9 @@ def mocked_remote_server_requests_wps1(
     def mocked_remote_server_wrapper(test):
         @functools.wraps(test)
         def mock_requests_wps1(*args, **kwargs):
-            """Mock ``requests`` responses fetching ``test_server_wps`` WPS reference."""
+            """
+            Mock ``requests`` responses fetching ``test_server_wps`` WPS reference.
+            """
 
             with responses.RequestsMock(assert_all_requests_are_fired=False) as mock_resp:
                 for meth, url, body in all_request:

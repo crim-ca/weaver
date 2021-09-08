@@ -50,7 +50,6 @@ complementary support of one-another features.
     The same value will also be used to generate the ``$ref`` reference names
     of generated OpenAPI model definitions. If not explicitly provided, the
     value of ``title`` **WILL** default to the name of the schema node class.
-
 """
 import inspect
 import re
@@ -544,11 +543,15 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
 
     @classmethod
     def is_variable(cls, node):
-        """If current node is the variable field definition."""
+        """
+        If current node is the variable field definition.
+        """
         return getattr(node, cls._variable, None) is not None
 
     def has_variables(self):
-        """If the current container schema node has sub-node variables."""
+        """
+        If the current container schema node has sub-node variables.
+        """
         if isinstance(_get_schema_type(self), colander.Mapping):
             return any(VariableSchemaNode.is_variable(node) for node in self.children)
         return False
@@ -1647,7 +1650,9 @@ class NotKeywordSchema(KeywordMapper):
 
 
 class KeywordTypeConverter(TypeConverter):
-    """Generic keyword converter that builds schema with a list of sub-schemas under the keyword."""
+    """
+    Generic keyword converter that builds schema with a list of sub-schemas under the keyword.
+    """
 
     def convert_type(self, schema_node):
         keyword = schema_node.get_keyword_name()
@@ -1881,7 +1886,6 @@ def _make_node_instance(schema_node_or_class):
         class Map(OneOfMappingSchema):
             # uses types instead of instances like 'SubMap1([...])' and 'SubMap2([...])'
             _one_of = (SubMap1, SubMap2)
-
     """
     if isinstance(schema_node_or_class, colander._SchemaMeta):  # noqa: W0212
         schema_node_or_class = schema_node_or_class()

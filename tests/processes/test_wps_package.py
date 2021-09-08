@@ -98,6 +98,7 @@ def test_get_package_ordered_io_with_ordered_dict():
 def test_get_package_ordered_io_with_list():
     """
     Everything should remain the same as list variant is only allowed to have I/O objects.
+
     (i.e.: not allowed to have both objects and literal string-type simultaneously as for dictionary variant).
     """
     expected_result = [
