@@ -434,7 +434,7 @@ coverage: test-coverage  ## alias to run test with coverage analysis
 ## -- [variants '<target>-only' without '-only' suffix are also available with pre-install setup]
 
 # autogen check variants with pre-install of dependencies using the '-only' target references
-CHECKS := pep8 lint security doc8 docstring links imports
+CHECKS := pep8 lint security doc8 docf docstring links imports
 CHECKS := $(addprefix check-, $(CHECKS))
 
 # items that should not install python dev packages should be added here instead
@@ -492,6 +492,27 @@ check-doc8-only: mkdir-reports	  ## check documentation RST styles and linting
 	@bash -c '$(CONDA_CMD) \
 		doc8 "$(APP_ROOT)/docs" \
 		1> >(tee "$(REPORTS_DIR)/check-doc8.txt")'
+
+# FIXME: move parameters to setup.cfg when implemented (https://github.com/myint/docformatter/issues/10)
+# NOTE: docformatter only reports files with errors on stderr, redirect trace stderr & stdout to file with tee
+# NOTE:
+#	Don't employ '--wrap-descriptions 120' since they *enforce* that length and rearranges format if any word can fit
+#	within remaining space, which often cause big diffs of ugly formatting for no important reason. Instead only check
+#	general formatting operations, and let other linter capture docstrings going over 120 (what we really care about).
+.PHONY: check-docf-only
+check-docf-only: mkdir-reports	## run PEP8 code documentation format checks
+	@echo "Checking PEP8 doc formatting problems..."
+	@-rm -fr "$(REPORTS_DIR)/check-docf.txt"
+	@bash -c '$(CONDA_CMD) \
+		docformatter \
+			--pre-summary-newline \
+			--wrap-descriptions 0 \
+			--wrap-summaries 120 \
+			--make-summary-multi-line \
+			--check \
+			--recursive \
+			"$(APP_ROOT)" \
+		1>&2 2> >(tee "$(REPORTS_DIR)/check-docf.txt")'
 
 .PHONY: check-docstring-only
 check-docstring-only: mkdir-reports  ## check code docstring style and linting
@@ -590,6 +611,10 @@ fix-lint-only: mkdir-reports  ## fix some PEP8 code style problems automatically
 		1> >(tee "$(REPORTS_DIR)/fixed-lint.txt")'
 
 # FIXME: move parameters to setup.cfg when implemented (https://github.com/myint/docformatter/issues/10)
+# NOTE:
+#	Don't employ '--wrap-descriptions 120' since they *enforce* that length and rearranges format if any word can fit
+#	within remaining space, which often cause big diffs of ugly formatting for no important reason. Instead only check
+#	general formatting operations, and let other linter capture docstrings going over 120 (what we really care about).
 .PHONY: fix-docf-only
 fix-docf-only: mkdir-reports  ## fix some PEP8 code documentation style problems automatically
 	@echo "Fixing PEP8 code documentation problems..."
