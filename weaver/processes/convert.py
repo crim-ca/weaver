@@ -272,6 +272,9 @@ def ows2json_io(ows_io):
                 fmt["default"] = fmt_default == fmt_type
             else:
                 fmt["default"] = False
+        # fix inconsistencies of some process descriptions, both with minOccurs=1 and default format
+        if fmt_default:
+            json_io["min_occurs"] = 0
         return json_io
 
     # add value contrains specifications if missing
@@ -283,7 +286,7 @@ def ows2json_io(ows_io):
             # WPS are allowed to report 'minOccurs=1' although 'defaultValue' can also be provided
             # (see https://github.com/bird-house/finch/pull/199)
             if "defaultValue" in domains[0]:
-                json_io["minOccurs"] = 1
+                json_io["min_occurs"] = 0
 
     return json_io
 

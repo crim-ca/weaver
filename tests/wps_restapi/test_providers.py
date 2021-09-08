@@ -306,9 +306,9 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert "default" not in inputs[5]
         assert "literalDataDomains" in inputs[5] and len(inputs[5]["literalDataDomains"]) == 1
         assert inputs[5]["literalDataDomains"][0]["dataType"]["name"] == "string"
-        assert inputs[5]["literalDataDomains"][0]["valueDefinition"] == {"anyValue": False}
+        assert inputs[5]["literalDataDomains"][0]["valueDefinition"] == ["bccaqv2"]
         assert "defaultValue" not in inputs[5]["literalDataDomains"][0]
-        assert inputs[5]["allowedValues"] == ["bccaqv2"]
+        assert "allowedValues" not in inputs[5]
         assert inputs[6]["id"] == "rcp"
         assert inputs[6]["title"] == "RCP Scenario"
         assert inputs[6]["minOccurs"] == 1
@@ -318,8 +318,8 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert inputs[6]["literalDataDomains"][0]["dataType"]["name"] == "string"
         assert inputs[6]["literalDataDomains"][0]["valueDefinition"] == ["rcp26", "rcp45", "rcp85"]
         assert "defaultValue" not in inputs[6]["literalDataDomains"][0]
-        assert inputs[7]["id"] == "rcp"
-        assert inputs[7]["title"] == "RCP Scenario"
+        assert inputs[7]["id"] == "models"
+        assert inputs[7]["title"] == "Models to include in ensemble"
         assert inputs[7]["minOccurs"] == 0
         assert inputs[7]["maxOccurs"] == 1000
         assert "default" not in inputs[7]
@@ -331,7 +331,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             "IPSL-CM5A-MR", "MIROC-ESM-CHEM", "MIROC-ESM", "MIROC5", "MPI-ESM-LR", "MPI-ESM-MR", "MRI-CGCM3",
             "NorESM1-M", "NorESM1-ME", "bcc-csm1-1-m", "bcc-csm1-1"
         ]
-        assert "defaultValue" not in inputs[7]["literalDataDomains"][0]
+        assert inputs[7]["literalDataDomains"][0]["defaultValue"] == "24MODELS"
         assert inputs[8]["id"] == "window"
         assert inputs[8]["title"] == "Window"
         assert inputs[8]["minOccurs"] == 0
@@ -342,7 +342,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert inputs[8]["literalDataDomains"][0]["valueDefinition"] == {"anyValue": False}
         assert inputs[8]["literalDataDomains"][0]["defaultValue"] == 6
         assert inputs[9]["id"] == "freq"
-        assert inputs[9]["title"] == "Resampling Frequency"
+        assert inputs[9]["title"] == "Frequency"
         assert inputs[9]["minOccurs"] == 0
         assert inputs[9]["maxOccurs"] == 1
         assert "default" not in inputs[9]
@@ -352,7 +352,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert inputs[9]["literalDataDomains"][0]["defaultValue"] == "YS"
         assert inputs[10]["id"] == "check_missing"
         assert inputs[10]["title"] == "Missing value handling method"
-        assert inputs[10]["minOccurs"] == 0, "original XML says 1, but we detect defaultValue and correct it to 0"
+        assert inputs[10]["minOccurs"] == 0, "original XML minOccurs=1, but detected defaultValue should correct to 0"
         assert inputs[10]["maxOccurs"] == 1
         assert "default" not in inputs[10]
         assert "literalDataDomains" in inputs[10] and len(inputs[10]["literalDataDomains"]) == 1
@@ -375,40 +375,31 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         # assert inputs[11]["formats"][0]["maximumMegabytes"] == 200
         assert inputs[12]["id"] == "cf_compliance"
         assert inputs[12]["title"] == "Strictness level for CF-compliance input checks."
-        assert inputs[12]["minOccurs"] == 0, "original XML says 1, but we detect defaultValue and correct it to 0"
+        assert inputs[12]["minOccurs"] == 0, "original XML minOccurs=1, but detected defaultValue should correct to 0"
         assert inputs[12]["maxOccurs"] == 1
         assert "default" not in inputs[12]
         assert "literalDataDomains" in inputs[12] and len(inputs[12]["literalDataDomains"]) == 1
         assert inputs[12]["literalDataDomains"][0]["dataType"]["name"] == "string"
-        assert inputs[12]["literalDataDomains"][0]["valueDefinition"] == ["log", "warm", "raise"]
-        assert inputs[12]["literalDataDomains"][0]["defaultValue"] == "warm"
-        assert inputs[13]["id"] == "freq"
-        assert inputs[13]["title"] == "Resampling Frequency"
-        assert inputs[13]["minOccurs"] == 0
+        assert inputs[12]["literalDataDomains"][0]["valueDefinition"] == ["log", "warn", "raise"]
+        assert inputs[12]["literalDataDomains"][0]["defaultValue"] == "warn"
+        assert inputs[13]["id"] == "data_validation"
+        assert inputs[13]["title"] == "Strictness level for data validation input checks."
+        assert inputs[13]["minOccurs"] == 0, "original XML minOccurs=1, but detected defaultValue should correct to 0"
         assert inputs[13]["maxOccurs"] == 1
         assert "default" not in inputs[13]
         assert "literalDataDomains" in inputs[13] and len(inputs[13]["literalDataDomains"]) == 1
         assert inputs[13]["literalDataDomains"][0]["dataType"]["name"] == "string"
-        assert inputs[13]["literalDataDomains"][0]["valueDefinition"] == ["YS", "MS", "QS-DEC", "AS-JUL"]
-        assert inputs[13]["literalDataDomains"][0]["defaultValue"] == "YS"
-        assert inputs[14]["id"] == "freq"
-        assert inputs[14]["title"] == "Resampling Frequency"
+        assert inputs[13]["literalDataDomains"][0]["valueDefinition"] == ["log", "warn", "raise"]
+        assert inputs[13]["literalDataDomains"][0]["defaultValue"] == "raise"
+        assert inputs[14]["id"] == "output_format"
+        assert inputs[14]["title"] == "Output format choice"
         assert inputs[14]["minOccurs"] == 0
         assert inputs[14]["maxOccurs"] == 1
         assert "default" not in inputs[14]
         assert "literalDataDomains" in inputs[14] and len(inputs[14]["literalDataDomains"]) == 1
         assert inputs[14]["literalDataDomains"][0]["dataType"]["name"] == "string"
-        assert inputs[14]["literalDataDomains"][0]["valueDefinition"] == ["YS", "MS", "QS-DEC", "AS-JUL"]
-        assert inputs[14]["literalDataDomains"][0]["defaultValue"] == "YS"
-        assert inputs[15]["id"] == "freq"
-        assert inputs[15]["title"] == "Resampling Frequency"
-        assert inputs[15]["minOccurs"] == 0
-        assert inputs[15]["maxOccurs"] == 1
-        assert "default" not in inputs[15]
-        assert "literalDataDomains" in inputs[15] and len(inputs[15]["literalDataDomains"]) == 1
-        assert inputs[15]["literalDataDomains"][0]["dataType"]["name"] == "string"
-        assert inputs[15]["literalDataDomains"][0]["valueDefinition"] == ["YS", "MS", "QS-DEC", "AS-JUL"]
-        assert inputs[15]["literalDataDomains"][0]["defaultValue"] == "YS"
+        assert inputs[14]["literalDataDomains"][0]["valueDefinition"] == ["netcdf", "csv"]
+        assert inputs[14]["literalDataDomains"][0]["defaultValue"] == "netcdf"
 
     @pytest.mark.xfail(condition=LooseVersion(owslib.__version__) <= LooseVersion("0.25.0"),
                        reason="OWSLib fix for retrieval of maximumMegabytes from ComplexData not yet available "
