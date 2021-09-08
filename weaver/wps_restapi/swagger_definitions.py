@@ -967,9 +967,9 @@ class AnyLiteralDefaultType(ExtendedMappingSchema):
 class LiteralDataValueDefinition(OneOfKeywordSchema):
     _one_of = [
         AllowedValues(description="Constraints of allowed values."),
-        ValuesReference(description="URL where to retrieve applicable values."),
+        ValuesReference(description="Reference URL where to retrieve allowed values."),
         # 'AnyValue' must be last because it's the most permissive (always valid, default)
-        AnyValue(description="Permissive definition for any value allowed."),
+        AnyValue(description="Permissive definition for any allowed value."),
     ]
 
 

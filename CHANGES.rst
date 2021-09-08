@@ -57,8 +57,7 @@ Changes:
   no indication for mapping to an appropriate `Process` implementation are preemptively validated.
 - Add parsing of additional literal data domains for specification of inputs/outputs data constrains and provide
   corresponding definitions in process description response (fixes `#41 <https://github.com/crim-ca/weaver/issues/41>`_,
-  `#211 <https://github.com/crim-ca/weaver/issues/211>`_, `#297 <https://github.com/crim-ca/weaver/issues/297>`_)
-
+  `#211 <https://github.com/crim-ca/weaver/issues/211>`_, `#297 <https://github.com/crim-ca/weaver/issues/297>`_).
 
 Fixes:
 ------

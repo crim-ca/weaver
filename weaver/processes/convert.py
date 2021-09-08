@@ -114,6 +114,7 @@ WPS_FIELD_MAPPING = {
     "allowed_values": ["AllowedValues", "allowedValues", "allowedvalues", "Allowed_Values", "Allowedvalues"],
     "allowed_collections": ["AllowedCollections", "allowedCollections", "allowedcollections", "Allowed_Collections",
                             "Allowedcollections"],
+    "any_value": ["anyvalue", "anyValue", "AnyValue"],
     "default": ["default_value", "defaultValue", "DefaultValue", "Default", "data_format"],
     "supported_values": ["SupportedValues", "supportedValues", "supportedvalues", "Supported_Values"],
     "supported_formats": ["SupportedFormats", "supportedFormats", "supportedformats", "Supported_Formats", "formats"],
@@ -983,21 +984,43 @@ def any2json_literal_data_domains(io_info):
     The generated result, if applicable, corresponds to
     schema definition :class:`weaver.wps_restapi.swagger_definitions.LiteralDataDomainList`.
     """
-    if io_info.get("type") in [WPS_BOUNDINGBOX, WPS_COMPLEX]:
+    io_type = get_field(io_info, "type", search_variations=False)
+    if io_type in [WPS_BOUNDINGBOX, WPS_COMPLEX]:
         return null
 
+    # simplified structure of expected key:types
+    #
+    #   default: bool
+    #   defaultValue: float, int, bool, str
+    #   dataType: {name: string, <reference: url: string>}
+    #   uom: string
+    #   valueDefinition:
+    #     - string
+    #     - url-string
+    #     - {anyValue: bool}
+    #     - [float, int, bool, str]
+    #     - [{minimum, maximum, spacing, closure}]
+    #
+    io_data_type = get_field(io_info, "type", search_variations=True, only_variations=True)
+    domain = {
+        "default": True,  # since it is generated from convert, only one is available anyway
+        "dataType": {
+            "name": any2wps_literal_datatype(io_data_type, is_value=False),  # just to make sure, simplify type
+            # reference:  # FIXME: unsupported named-reference data-type (need example to test it)
+        }
+        # uom: # FIXME: unsupported Unit of Measure (need example to test it)
+    }
     wps_allowed_values = get_field(io_info, "allowed_values", search_variations=True)
     wps_default_value = get_field(io_info, "default", search_variations=True)
-    domain = {"default": True}  # since it is generated from convert, only one is available anyway
+    wps_value_definition = {"anyValue": get_field(io_info, "any_value", search_variations=True, default=False)}
+    if wps_default_value not in [null, None]:
+        domain["defaultValue"] = wps_default_value
     if isinstance(wps_allowed_values, list) and len(wps_allowed_values) > 0:
         wps_allowed_values = [any2json_literal_allowed_values(io_value) for io_value in wps_allowed_values]
         wps_allowed_values = [io_value for io_value in wps_allowed_values if io_value]  # remote empty/null
         if wps_allowed_values:
-            domain["allowedValues"] = wps_allowed_values
-    if wps_default_value is not null:
-        domain["defaultValue"] = wps_default_value
-    if domain == {"default": True}:  # no contrains were added
-        domain["anyValue"] = True
+            wps_value_definition = wps_allowed_values
+    domain["valueDefinition"] = wps_value_definition
     return [domain]
 
 
@@ -1299,32 +1322,43 @@ def wps2json_job_payload(wps_request, wps_process):
     return data
 
 
-def get_field(io_object, field, search_variations=False, pop_found=False, default=null):
-    # type: (Any, str, bool, bool, Any) -> Any
+def get_field(io_object, field, search_variations=False, only_variations=False, pop_found=False, default=null):
+    # type: (Any, str, bool, bool, bool, Any) -> Any
     """
     Gets a field by name from various I/O object types.
 
-    Default value is :py:data:`null` used for most situations to differentiate from
-    literal ``None`` which is often used as default for parameters. The :class:`NullType`
-    allows to explicitly tell that there was 'no field' and not 'no value' in existing
-    field. If you provided another value, it will be returned if not found within
-    the input object.
+    Default value is :py:data:`null` used for most situations to differentiate from literal ``None`` which is often
+    used as default for parameters. The :class:`NullType` allows to explicitly tell that there was 'no field' and
+    not 'no value' in existing field. If you provided another value, it will be returned if not found within the
+    input object.
 
-    :returns: matched value (including search variations if enabled), or ``default``.
+    When :paramref:`search_variation` is enabled and that :paramref:`field` could not be found within the object,
+    field lookup will employ the values under the :paramref:`field` entry within :data:`WPS_FIELD_MAPPING` as
+    additional field names to search for an existing property or key. Search continues until the first match is found,
+    respecting order within the variations listing, and finally uses :paramref:`default` if no match was found.
+
+    :param io_object: Any I/O representation, either as a class instance or JSON container.
+    :param field: Name of the field to look for, either as property or key name based on input object type.
+    :param search_variations: If enabled, search for all variations to the field name to attempt search until matched.
+    :param only_variations: If enabled, skip the first 'basic' field and start search directly with field variations.
+    :param pop_found: If enabled, whenever a match is found by field or variations, remove that entry from the object.
+    :param default: Alternative default value to return if no match could be found.
+    :returns: Matched value (including search variations if enabled), or ``default``.
     """
-    if isinstance(io_object, dict):
-        value = io_object.get(field, null)
-        if value is not null:
-            if pop_found:
-                io_object.pop(field)
-            return value
-    else:
-        value = getattr(io_object, field, null)
-        if value is not null:
-            return value
+    if not (search_variations and only_variations):
+        if isinstance(io_object, dict):
+            value = io_object.get(field, null)
+            if value is not null:
+                if pop_found:
+                    io_object.pop(field)
+                return value
+        else:
+            value = getattr(io_object, field, null)
+            if value is not null:
+                return value
     if search_variations and field in WPS_FIELD_MAPPING:
         for var in WPS_FIELD_MAPPING[field]:
-            value = get_field(io_object, var, pop_found=pop_found)
+            value = get_field(io_object, var, search_variations=False, only_variations=False, pop_found=pop_found)
             if value is not null:
                 return value
     return default

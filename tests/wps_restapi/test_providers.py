@@ -240,7 +240,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
     ])
     def test_get_provider_process_literal_values(self):
         """
-        Test conversion of I/O with supported values metadata for provider process.
+        Test conversion of I/O of supported values defined as literal data domains from provider process.
         """
         self.register_provider()
         path = "/providers/{}/processes/{}".format(self.remote_provider_name, resources.WPS_LITERAL_VALUES_IO_ID)
@@ -258,51 +258,95 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert inputs[0]["minOccurs"] == 1
         assert inputs[0]["maxOccurs"] == 100
         assert "default" not in inputs[0]
+        assert "literalDataDomains" in inputs[0] and len(inputs[0]["literalDataDomains"]) == 1
+        assert inputs[0]["literalDataDomains"][0]["dataType"]["name"] == "string"
+        assert inputs[0]["literalDataDomains"][0]["valueDefinition"] == {"anyValue": False}
+        assert "defaultValue" not in inputs[0]["literalDataDomains"][0]
         assert inputs[1]["id"] == "lon"
         assert inputs[1]["title"] == "Longitude"
         assert inputs[1]["minOccurs"] == 1
         assert inputs[1]["maxOccurs"] == 100
         assert "default" not in inputs[1]
+        assert "literalDataDomains" in inputs[1] and len(inputs[1]["literalDataDomains"]) == 1
+        assert inputs[1]["literalDataDomains"][0]["dataType"]["name"] == "string"
+        assert inputs[1]["literalDataDomains"][0]["valueDefinition"] == {"anyValue": False}
+        assert "defaultValue" not in inputs[1]["literalDataDomains"][0]
         assert inputs[2]["id"] == "start_date"
         assert inputs[2]["title"] == "Initial date"
         assert inputs[2]["minOccurs"] == 0
         assert inputs[2]["maxOccurs"] == 1
         assert "default" not in inputs[2]
+        assert "literalDataDomains" in inputs[2] and len(inputs[2]["literalDataDomains"]) == 1
+        assert inputs[2]["literalDataDomains"][0]["dataType"]["name"] == "string"
+        assert inputs[2]["literalDataDomains"][0]["valueDefinition"] == {"anyValue": False}
+        assert "defaultValue" not in inputs[2]["literalDataDomains"][0]
         assert inputs[3]["id"] == "end_date"
         assert inputs[3]["title"] == "Final date"
         assert inputs[3]["minOccurs"] == 0
         assert inputs[3]["maxOccurs"] == 1
         assert "default" not in inputs[3]
+        assert "literalDataDomains" in inputs[3] and len(inputs[3]["literalDataDomains"]) == 1
+        assert inputs[3]["literalDataDomains"][0]["dataType"]["name"] == "string"
+        assert inputs[3]["literalDataDomains"][0]["valueDefinition"] == {"anyValue": False}
+        assert "defaultValue" not in inputs[3]["literalDataDomains"][0]
         assert inputs[4]["id"] == "ensemble_percentiles"
         assert inputs[4]["title"] == "Ensemble percentiles"
         assert inputs[4]["minOccurs"] == 0
         assert inputs[4]["maxOccurs"] == 1
-        assert inputs[4]["default"] == "10,50,90"
+        assert "default" not in inputs[4]
+        assert "literalDataDomains" in inputs[4] and len(inputs[4]["literalDataDomains"]) == 1
+        assert inputs[4]["literalDataDomains"][0]["dataType"]["name"] == "string"
+        assert inputs[4]["literalDataDomains"][0]["valueDefinition"] == {"anyValue": False}
+        assert inputs[4]["literalDataDomains"][0]["defaultValue"] == "10,50,90"
         assert inputs[5]["id"] == "dataset_name"
         assert inputs[5]["title"] == "Dataset name"
         assert inputs[5]["minOccurs"] == 0
         assert inputs[5]["maxOccurs"] == 1
         assert "default" not in inputs[5]
+        assert "literalDataDomains" in inputs[5] and len(inputs[5]["literalDataDomains"]) == 1
+        assert inputs[5]["literalDataDomains"][0]["dataType"]["name"] == "string"
+        assert inputs[5]["literalDataDomains"][0]["valueDefinition"] == {"anyValue": False}
+        assert "defaultValue" not in inputs[5]["literalDataDomains"][0]
         assert inputs[5]["allowedValues"] == ["bccaqv2"]
         assert inputs[6]["id"] == "rcp"
         assert inputs[6]["title"] == "RCP Scenario"
         assert inputs[6]["minOccurs"] == 1
         assert inputs[6]["maxOccurs"] == 1
         assert "default" not in inputs[6]
-        assert inputs[6]["allowedValues"] == ["rcp26", "rcp45", "rcp85"]
+        assert "literalDataDomains" in inputs[6] and len(inputs[6]["literalDataDomains"]) == 1
+        assert inputs[6]["literalDataDomains"][0]["dataType"]["name"] == "string"
+        assert inputs[6]["literalDataDomains"][0]["valueDefinition"] == ["rcp26", "rcp45", "rcp85"]
+        assert "defaultValue" not in inputs[6]["literalDataDomains"][0]
         assert inputs[7]["id"] == "rcp"
         assert inputs[7]["title"] == "RCP Scenario"
         assert inputs[7]["minOccurs"] == 0
         assert inputs[7]["maxOccurs"] == 1000
         assert "default" not in inputs[7]
-        assert inputs[7]["allowedValues"] == [
+        assert "literalDataDomains" in inputs[7] and len(inputs[7]["literalDataDomains"]) == 1
+        assert inputs[7]["literalDataDomains"][0]["dataType"]["name"] == "string"
+        assert inputs[7]["literalDataDomains"][0]["valueDefinition"] ==  [
             "24MODELS", "PCIC12", "BNU-ESM", "CCSM4", "CESM1-CAM5", "CNRM-CM5", "CSIRO-Mk3-6-0", "CanESM2",
             "FGOALS-g2", "GFDL-CM3", "GFDL-ESM2G", "GFDL-ESM2M", "HadGEM2-AO", "HadGEM2-ES", "IPSL-CM5A-LR",
             "IPSL-CM5A-MR", "MIROC-ESM-CHEM", "MIROC-ESM", "MIROC5", "MPI-ESM-LR", "MPI-ESM-MR", "MRI-CGCM3",
             "NorESM1-M", "NorESM1-ME", "bcc-csm1-1-m", "bcc-csm1-1"
         ]
-        assert inputs[7]["id"] == "window"
-        assert inputs[7]["title"] == "Window"
-        assert inputs[7]["minOccurs"] == 0
-        assert inputs[7]["maxOccurs"] == 1
-        assert inputs[7]["default"] == 6
+        assert "defaultValue" not in inputs[7]["literalDataDomains"][0]
+        assert inputs[8]["id"] == "window"
+        assert inputs[8]["title"] == "Window"
+        assert inputs[8]["minOccurs"] == 0
+        assert inputs[8]["maxOccurs"] == 1
+        assert "default" not in inputs[8]
+        assert "literalDataDomains" in inputs[8] and len(inputs[8]["literalDataDomains"]) == 1
+        assert inputs[8]["literalDataDomains"][0]["dataType"]["name"] == "integer"
+        assert inputs[8]["literalDataDomains"][0]["valueDefinition"] == {"anyValue": False}
+        assert inputs[8]["literalDataDomains"][0]["defaultValue"] == 6
+        assert inputs[9]["id"] == "freq"
+        assert inputs[9]["title"] == "Resampling Frequency"
+        assert inputs[9]["minOccurs"] == 0
+        assert inputs[9]["maxOccurs"] == 1
+        assert "default" not in inputs[9]
+        assert "literalDataDomains" in inputs[9] and len(inputs[9]["literalDataDomains"]) == 1
+        assert inputs[9]["literalDataDomains"][0]["dataType"]["name"] == "string"
+        assert inputs[9]["literalDataDomains"][0]["valueDefinition"] == ["YS", "MS", "QS-DEC", "AS-JUL"]
+        assert inputs[9]["literalDataDomains"][0]["defaultValue"] == "YS"
+        # FIXME: finish 10-15 inputs
