@@ -454,6 +454,7 @@ class End2EndEMSTestCase(TestCase):
         # type: (str, str, bool, bool, bool, Optional[Any]) -> AnyResponseType
         """
         Executes the request, but following any server prior redirects as needed.
+
         Also prepares JSON body and obvious error handling according to a given status code.
         """
         expect_errors = kw.pop("expect_errors", ignore_errors)

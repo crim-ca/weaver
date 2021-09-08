@@ -27,7 +27,9 @@ from weaver.utils import null
 
 
 class ObjectWithEqProperty(object):
-    """Dummy object for some test evaluations."""
+    """
+    Dummy object for some test evaluations.
+    """
     _prop = "prop"
 
     def __init__(self, prop="prop"):
@@ -67,6 +69,7 @@ def test_are_different_and_set_both_null():
 def test_are_different_and_set_single_null():
     """
     Tests that equality check is correctly handled when a single item amongst the two is ``null``.
+
     This was identified as problematic is case when the checked and set item implements ``__eq__`` and expects a
     property to exist, which is not the case for the second item being ``null``.
     """
@@ -107,8 +110,8 @@ def test_json2wps_datatype():
 
 def test_cwl2wps_io_null_or_array_of_enums():
     """
-    I/O `CWL` with ``["null", "<enum-type>", "<array-enum-type>]`` must be parsed as `WPS` with
-    parameters ``minOccurs=0``, ``maxOccurs>1`` and ``allowedValues`` as restricted set of values.
+    I/O `CWL` with ``["null", "<enum-type>", "<array-enum-type>]`` must be parsed as `WPS` with parameters
+    ``minOccurs=0``, ``maxOccurs>1`` and ``allowedValues`` as restricted set of values.
     """
     allowed_values = ["A", "B", "C"]
     io_info = {
@@ -164,6 +167,7 @@ def testis_cwl_array_type_explicit_invalid_item():
 def testis_cwl_array_type_shorthand_invalid_item():
     """
     In case of shorthand syntax, because type is only a string, it shouldn't raise.
+
     Type is returned as is and value validation is left to later calls.
     """
     io_info = {

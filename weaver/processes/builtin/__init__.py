@@ -39,7 +39,9 @@ __all__ = [
 
 def _get_builtin_reference_mapping(root):
     # type: (str) -> Dict[str, str]
-    """Generates a mapping of `reference` to actual ``builtin`` package file path."""
+    """
+    Generates a mapping of `reference` to actual ``builtin`` package file path.
+    """
     builtin_names = [_pkg for _pkg in os.listdir(root)
                      if os.path.splitext(_pkg)[-1].replace(".", "") in PACKAGE_EXTENSIONS]
     return {os.path.splitext(_pkg)[0]: os.path.join(root, _pkg) for _pkg in builtin_names}

@@ -10,7 +10,9 @@ if TYPE_CHECKING:
 
 
 class DatabaseInterface(metaclass=abc.ABCMeta):
-    """Return the unique identifier of db type matching settings."""
+    """
+    Return the unique identifier of db type matching settings.
+    """
     __slots__ = ["type"]
 
     def __init__(self, _):

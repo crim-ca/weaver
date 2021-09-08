@@ -83,6 +83,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         # type: (str) -> JSON
         """
         Provides deploy process bare minimum template with undefined execution unit.
+
         To be used in conjunction with `get_process_package_mock` to avoid extra package content-specific validations.
         """
         return {
@@ -106,8 +107,9 @@ class WpsRestApiProcessesTest(unittest.TestCase):
     @staticmethod
     def get_process_execute_template(test_input="not-specified"):
         """
-        Provides execute process bare minimum template corresponding to
-        WPS process `weaver.processes.wps_testing.WpsTestProcess`.
+        Provides execute process bare minimum template definition.
+
+        Contents correspond to required I/O for WPS process :class:`weaver.processes.wps_testing.WpsTestProcess`.
         """
         return {
             "inputs": [
@@ -281,7 +283,9 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                 assert resp.content_type == CONTENT_TYPE_APP_JSON, msg.format(i, resp.content_type)
 
     def test_deploy_process_default_endpoint_wps1(self):
-        """Validates that the default (localhost) endpoint to execute WPS requests are saved during deployment."""
+        """
+        Validates that the default (localhost) endpoint to execute WPS requests are saved during deployment.
+        """
         process_name = self.fully_qualified_test_process_name()
         process_data = self.get_process_deploy_template(process_name)
         package_mock = mocked_process_package()
@@ -320,10 +324,11 @@ class WpsRestApiProcessesTest(unittest.TestCase):
 
     def deploy_process_make_visible_and_fetch_deployed(self, deploy_payload, expected_process_id):
         """
+        Deploy, make visible and obtain process description.
+
         Attempts to deploy the process using the provided deployment payload, then makes it visible and finally
         fetches the deployed process to validate the resulting WPS-3 REST JSON description.
-
-        Any failure along the way is raised.
+        Any failure along the way is raised, ensuring that returned data corresponds to a process ready for execution.
 
         .. note::
             This is a shortcut method for all ``test_deploy_process_<>`` cases.
@@ -405,7 +410,9 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
     ])
     def test_deploy_process_WPS1_DescribeProcess_executionUnit(self):
-        """Test process deployment using a WPS-1 DescribeProcess URL specified as process description reference."""
+        """
+        Test process deployment using a WPS-1 DescribeProcess URL specified as process description reference.
+        """
         body = {
             "processDescription": {"process": {"id": resources.TEST_REMOTE_PROCESS_WPS1_ID}},
             "executionUnit": [{"href": resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_URL}],
@@ -420,7 +427,9 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
     ])
     def test_deploy_process_WPS1_GetCapabilities_href(self):
-        """Test process deployment using a WPS-1 GetCapabilities URL specified as process description reference."""
+        """
+        Test process deployment using a WPS-1 GetCapabilities URL specified as process description reference.
+        """
         body = {
             "processDescription": {"href": resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_URL},  # this one should be used
             "executionUnit": [{"href": resources.TEST_REMOTE_SERVER_URL}]  # some URL just to fulfill schema validation
@@ -434,7 +443,9 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
     ])
     def test_deploy_process_WPS1_GetCapabilities_owsContext(self):
-        """Test process deployment using a WPS-1 GetCapabilities URL specified through the OwsContext definition."""
+        """
+        Test process deployment using a WPS-1 GetCapabilities URL specified through the OwsContext definition.
+        """
         body = {
             "processDescription": {"process": {"id": resources.TEST_REMOTE_PROCESS_WPS1_ID}},
             "executionUnit": [{"href": resources.TEST_REMOTE_SERVER_URL}]  # some URL just to fulfill schema validation
@@ -449,7 +460,9 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
     ])
     def test_deploy_process_WPS1_GetCapabilities_executionUnit(self):
-        """Test process deployment using a WPS-1 GetCapabilities URL specified through the ExecutionUnit parameter."""
+        """
+        Test process deployment using a WPS-1 GetCapabilities URL specified through the ExecutionUnit parameter.
+        """
         body = {
             "processDescription": {"process": {"id": resources.TEST_REMOTE_PROCESS_WPS1_ID}},
             "executionUnit": [{"href": resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_URL}],
@@ -594,8 +607,10 @@ class WpsRestApiProcessesTest(unittest.TestCase):
 
     def test_execute_process_no_error_not_required_params(self):
         """
-        Optional parameters for execute job shouldn't raise an error if omitted,
-        and should resolve to default values if any was specified.
+        Test that optional parameters not provided during execute request do not fail.
+
+        Optional parameters for execute job shouldn't raise an error if omitted, and should resolve to default
+        values if any was explicitly specified during deployment, or inferred from it.
         """
         # get basic mock/data templates
         name = fully_qualified_name(self)
@@ -721,7 +736,9 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert resp.content_type == CONTENT_TYPE_APP_JSON
 
     def test_process_description_metadata_href_or_value_valid(self):
-        """Validates that metadata is accepted as either hyperlink reference or literal string value."""
+        """
+        Validates that metadata is accepted as either hyperlink reference or literal string value.
+        """
         process = {
             "id": self._testMethodName,
             "metadata": [
@@ -735,7 +752,9 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert process["metadata"] == result["metadata"]
 
     def test_process_description_metadata_href_or_value_invalid(self):
-        """Validates that various invalid metadata definitions are indicated as such."""
+        """
+        Validates that various invalid metadata definitions are indicated as such.
+        """
         test_meta = [
             [{"type": "value", "lang": "en-US"}],  # missing 'value'
             [{"href": "https://example.com", "hreflang": "en-US"}],  # missing 'rel'

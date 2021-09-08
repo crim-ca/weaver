@@ -83,6 +83,7 @@ class GenericApiRoutesTestCase(unittest.TestCase):
     def test_status_unauthorized_and_forbidden(self):
         """
         Validates that 401/403 status codes are correctly handled and that the appropriate one is returned.
+
         Shouldn't be the default behaviour to employ 403 on both cases.
         """
         # mock any function called inside the corresponding views just so that the exception is raised
@@ -97,6 +98,7 @@ class GenericApiRoutesTestCase(unittest.TestCase):
     def test_status_not_found_and_method_not_allowed(self):
         """
         Validates that 404/405 status codes are correctly handled and that the appropriate one is returned.
+
         Shouldn't be the default behaviour to employ 404 on both cases.
         """
         resp = self.testapp.post("/random", headers=self.json_headers, expect_errors=True)
@@ -131,8 +133,8 @@ class RebasedApiRoutesTestCase(unittest.TestCase):
 
     def test_swagger_api_request_base_path_proxied(self):
         """
-        Validates that Swagger JSON properly redefines the host/path to test live requests on Swagger UI
-        when the app's URI resides behind a proxy pass redirect path as specified by setting ``weaver.url``.
+        Validates that Swagger JSON properly redefines the host/path to test live requests on Swagger UI when the app's
+        URI resides behind a proxy pass redirect path as specified by setting ``weaver.url``.
         """
 
         # fake "proxy" derived path for testing simulated server proxy pass
@@ -165,8 +167,8 @@ class RebasedApiRoutesTestCase(unittest.TestCase):
 
     def test_swagger_api_request_base_path_original(self):
         """
-        Validates that Swagger JSON properly uses the original host/path to test live requests on Swagger UI
-        when the app's URI results direct route access.
+        Validates that Swagger JSON properly uses the original host/path to test live requests on Swagger UI when the
+        app's URI results direct route access.
         """
         # base app without proxy pass
         # ensure that setting that would define the weaver's location is not defined for local app

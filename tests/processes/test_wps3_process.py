@@ -33,7 +33,9 @@ def test_wps3_process_step_io_data_or_href():
     ]
 
     class TestDoneEarlyExit(Exception):
-        """Dummy exception to raise to skip further processing steps after the portion to evaluate was reached."""
+        """
+        Dummy exception to raise to skip further processing steps after the portion to evaluate was reached.
+        """
 
     def mock_wps_request(method, url, *_, **kwargs):
         nonlocal test_reached_parse_inputs

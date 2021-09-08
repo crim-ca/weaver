@@ -189,6 +189,8 @@ def api_conformance(request):  # noqa: F811
     """
     Weaver specification conformance information.
     """
+    # pylint: disable=C0301,line-too-long  # many long comment links cannot be split
+
     # see references:
     # - https://github.com/opengeospatial/ogcapi-common/tree/master/collections/requirements
     # - https://github.com/opengeospatial/ogcapi-common/tree/master/collections/recommendations
@@ -346,13 +348,13 @@ def api_conformance(request):  # noqa: F811
         # FIXME: process/job error details (for all below: https://github.com/crim-ca/weaver/issues/320)
         #   https://github.com/opengeospatial/ogcapi-processes/blob/master/core/requirements/core/REQ_job-exception-no-such-job.adoc
         #   https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/master/core/openapi/schemas/exception.yaml
-        #   type of the exception SHALL be: "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/no-such-job"
+        #   type of exception SHALL be: "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/no-such-job"
         # ogcapi_processes + "/req/core/job-exception-no-such-job",
         ogcapi_processes + "/req/job-list/links",
         # ogcapi_processes + "/req/core/job-results-exception/no-such-job",
         # FIXME:
         #   https://github.com/opengeospatial/ogcapi-processes/blob/master/core/requirements/core/REQ_job-results-exception-results-not-ready.adoc
-        #   type of the exception SHALL be "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/result-not-ready"
+        #   type of exception SHALL be "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/result-not-ready"
         # ogcapi_processes + "/req/core/job-results-exception/results-not-ready",
         # ogcapi_processes + "/req/core/job-results-failed",
         ogcapi_processes + "/req/core/job-results",

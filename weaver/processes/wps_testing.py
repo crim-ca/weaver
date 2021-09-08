@@ -4,7 +4,9 @@ from weaver.processes.types import PROCESS_TEST
 
 
 class WpsTestProcess(Process):
-    """Test WPS process definition that simply returns its input string as output."""
+    """
+    Test WPS process definition that simply returns its input string as output.
+    """
 
     type = PROCESS_TEST   # allows to map WPS class
 

@@ -106,8 +106,8 @@ class WpsPackageAppTest(WpsPackageConfigBase):
 
     def test_literal_io_from_package(self):
         """
-        Test validates that literal I/O definitions *only* defined in the `CWL` package as `JSON` within the
-        deployment body generates expected `WPS` process description I/O with corresponding formats and values.
+        Test validates that literal I/O definitions *only* defined in the `CWL` package as `JSON` within the deployment
+        body generates expected `WPS` process description I/O with corresponding formats and values.
         """
         cwl = {
             "cwlVersion": "v1.0",
@@ -173,8 +173,8 @@ class WpsPackageAppTest(WpsPackageConfigBase):
 
     def test_literal_io_from_package_and_offering(self):
         """
-        Test validates that literal I/O definitions simultaneously defined in *both* (but not necessarily for each
-        one and exhaustively) `CWL` and `WPS` payloads are correctly resolved. More specifically, verifies that:
+        Test validates that literal I/O definitions simultaneously defined in *both* (but not necessarily for each one
+        and exhaustively) `CWL` and `WPS` payloads are correctly resolved. More specifically, verifies that:
 
             - `WPS` I/O that don't match any `CWL` I/O by ID are removed completely.
             - `WPS` I/O that were omitted are added with minimal detail requirements using corresponding `CWL` I/O
@@ -299,9 +299,9 @@ class WpsPackageAppTest(WpsPackageConfigBase):
 
     def test_complex_io_format_references(self):
         """
-        Test validates that known `WPS` I/O formats (i.e.: `MIME-type`) considered as valid, but not corresponding
-        to any *real* `IANA/EDAM` reference for `CWL` are preserved on the `WPS` side and dropped on `CWL` side to
-        avoid validation error.
+        Test validates that known `WPS` I/O formats (i.e.: `MIME-type`) considered as valid, but not corresponding to
+        any *real* `IANA/EDAM` reference for `CWL` are preserved on the `WPS` side and dropped on `CWL` side to avoid
+        validation error.
 
         We also validate a `MIME-type` that should be found for both `CWL` and `WPS` formats to make sure that `CWL`
         formats are only dropped when necessary.
@@ -416,7 +416,9 @@ class WpsPackageAppTest(WpsPackageConfigBase):
 
     def test_mediatype_io_format_references(self):
         """
-        Test to validates ``mimeType`` is replaced by ``mediaType`` for all descriptions. Also we validate
+        Test to validates ``mimeType`` is replaced by ``mediaType`` for all descriptions.
+
+        Also we validate
         that processes that use ``mimeType`` or ``mediaType`` can be deployed successfully.
         """
         ns_json, type_json = get_cwl_file_format(CONTENT_TYPE_APP_JSON)
@@ -548,8 +550,8 @@ class WpsPackageAppTest(WpsPackageConfigBase):
 
     def test_block_unknown_processes(self):
         """
-        Test to validates that any process that cannot be resolved against one of
-        known :py:data:`weaver.processes.constants.CWL_REQUIREMENT_APP_TYPES` is explicitly blocked.
+        Test to validates that any process that cannot be resolved against one of known
+        :py:data:`weaver.processes.constants.CWL_REQUIREMENT_APP_TYPES` is explicitly blocked.
         """
         cwl = {
             "cwlVersion": "v1.0",
@@ -588,6 +590,7 @@ class WpsPackageAppTest(WpsPackageConfigBase):
     def test_complex_io_with_multiple_formats_and_defaults(self):
         """
         Test validates that different format types are set on different input variations simultaneously:
+
             - input with 1 format, single value, no default value
             - input with 1 format, array values, no default value
             - input with 1 format, single value, 1 default value
@@ -936,8 +939,8 @@ class WpsPackageAppTest(WpsPackageConfigBase):
     def test_resolution_io_min_max_occurs(self):
         """
         Test validates that various merging/resolution strategies of I/O definitions are properly applied for
-        corresponding ``minOccurs`` and ``maxOccurs`` fields across `CWL` and `WPS` payloads. Also, fields that
-        can help infer ``minOccurs`` and ``maxOccurs`` values such as ``default`` and ``type`` are tested.
+        corresponding ``minOccurs`` and ``maxOccurs`` fields across `CWL` and `WPS` payloads. Also, fields that can help
+        infer ``minOccurs`` and ``maxOccurs`` values such as ``default`` and ``type`` are tested.
 
         Following cases are evaluated:
 
@@ -1099,8 +1102,8 @@ class WpsPackageAppTest(WpsPackageConfigBase):
     @pytest.mark.xfail(reason="MinOccurs/MaxOccurs values in response should be preserved as defined in deploy body")
     def test_valid_io_min_max_occurs_as_str_or_int(self):
         """
-        Test validates that I/O definitions with ``minOccurs`` and/or ``maxOccurs`` are permitted as both integer
-        and string definitions in order to support (1, "1", "unbounded") variations.
+        Test validates that I/O definitions with ``minOccurs`` and/or ``maxOccurs`` are permitted as both integer and
+        string definitions in order to support (1, "1", "unbounded") variations.
 
         .. seealso::
             - :meth:`test_invalid_io_min_max_occurs_wrong_format`
@@ -1470,8 +1473,8 @@ class WpsPackageAppTest(WpsPackageConfigBase):
     @pytest.mark.xfail(reason="MinOccurs/MaxOccurs somehow fail validation here, but s")
     def test_invalid_io_min_max_occurs_wrong_format(self):
         """
-        Test verifies that ``minOccurs`` and/or ``maxOccurs`` definitions other than allowed formats are
-        raised as invalid schemas.
+        Test verifies that ``minOccurs`` and/or ``maxOccurs`` definitions other than allowed formats are raised as
+        invalid schemas.
 
         .. seealso::
             - :meth:`test_valid_io_min_max_occurs_as_str_or_int`
@@ -1510,8 +1513,8 @@ class WpsPackageAppTest(WpsPackageConfigBase):
 
     def test_complex_io_from_package(self):
         """
-        Test validates that complex I/O definitions *only* defined in the `CWL` package as `JSON` within the
-        deployment body generates expected `WPS` process description I/O with corresponding formats and values.
+        Test validates that complex I/O definitions *only* defined in the `CWL` package as `JSON` within the deployment
+        body generates expected `WPS` process description I/O with corresponding formats and values.
         """
         cwl = {
             "cwlVersion": "v1.0",
@@ -1573,8 +1576,8 @@ class WpsPackageAppTest(WpsPackageConfigBase):
 
     def test_complex_io_from_package_and_offering(self):
         """
-        Test validates that complex I/O definitions simultaneously defined in *both* (but not necessarily for each
-        one and exhaustively) `CWL` and `WPS` payloads are correctly resolved. More specifically, verifies that:
+        Test validates that complex I/O definitions simultaneously defined in *both* (but not necessarily for each one
+        and exhaustively) `CWL` and `WPS` payloads are correctly resolved. More specifically, verifies that:
 
             - `WPS` I/O that don't match any `CWL` I/O by ID are removed completely.
             - `WPS` I/O that were omitted are added with minimal detail requirements using corresponding `CWL` I/O
@@ -1917,6 +1920,7 @@ class WpsPackageAppWithS3BucketTest(WpsPackageConfigBase):
     def test_execute_application_package_process_with_bucket(self):
         """
         Test validates:
+
             - Both S3 bucket and HTTP file references can be used simultaneously as inputs.
             - Process results are uploaded to the configured S3 bucket.
             - Process results are not accessible locally (not referenced as WPS-outputs URL, but as S3 reference).
