@@ -547,21 +547,14 @@ class WpsRestApiJobsTest(unittest.TestCase):
         assert resp.json["limit"] == limit_parameter
         assert len(resp.json["jobs"]) <= limit_parameter
 
-    def test_jobs_list_with_limit_openapi_schema(self):
+    def test_jobs_list_schema_not_required_fields(self):
         """
-        Test handling of ``limit`` query parameter when listing jobs.
+        Test that job listing query parameters for filtering results are marked as optional in OpenAPI schema.
 
         .. seealso::
             - `/req/collections/rc-limit-response
                 <https://github.com/opengeospatial/ogcapi-common/blob/master/collections/requirements/collections/REQ_rc-limit-response.adoc>`_
         """
-        resp = self.app.get(sd.openapi_json_service.path, headers=self.json_headers)
-        assert resp.status_code == 200
-        assert resp.content_type == CONTENT_TYPE_APP_JSON
-        assert "limit" in resp.json and isinstance(resp.json["limit"], int)
-        assert len(resp.json["jobs"]) <= resp.json["limit"]
-
-    def test_not_required_fields(self):
         uri = sd.openapi_json_service.path
         resp = self.app.get(uri, headers=self.json_headers)
         assert not resp.json["parameters"]["page"]["required"]
