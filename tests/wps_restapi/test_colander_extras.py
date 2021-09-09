@@ -4,32 +4,51 @@
 Tests for :mod:`weaver.wps_restapi.colander_extras` operations applied
 on :mod:`weaver.wps_restapi.swagger_definitions` objects.
 """
+import inspect
+
 import colander
 import pytest
+from typing import TYPE_CHECKING
 
 from weaver.wps_restapi import colander_extras as ce, swagger_definitions as sd
 
+if TYPE_CHECKING:
+    from typing import List, Tuple, Type, Union
+
+    from weaver.typedefs import JSON
+
+    TestSchema = Union[colander.SchemaNode, Type[colander.SchemaNode]]
+    TestValue = JSON
+    TestExpect = Union[JSON, colander.Invalid]
+
 
 def evaluate_test_cases(test_cases):
+    # type: (List[Tuple[TestSchema, TestValue, TestExpect]]) -> None
     """
     Evaluate a list of tuple of (SchemaType, Test-Value, Expected-Result).
 
     If ``Expected-Result`` is :class:`colander.Invalid``, the ``SchemaType`` deserialization should raise when
-    evaluation ``Test-Value``. Otherwise, the result from deserialization should equal exactly ``Expected-Result``.
+    evaluating ``Test-Value``. Otherwise, the result from deserialization should equal exactly ``Expected-Result``.
     """
 
-    for test_schema, test_value, test_expect in test_cases:
+    for test_schema_ref, test_value, test_expect in test_cases:
+        if inspect.isclass(test_schema_ref):
+            test_schema = test_schema_ref()
+            test_schema_name = test_schema_ref.__name__
+        else:
+            test_schema = test_schema_ref
+            test_schema_name = type(test_schema_ref).__name__
         try:
-            result = test_schema().deserialize(test_value)
+            result = test_schema.deserialize(test_value)
             if test_expect is colander.Invalid:
                 pytest.fail("Expected invalid format from [{}] with: {}, but received: {}".format(
-                    test_schema.__name__, test_value, result))
-            assert result == test_expect, "Bad result from [{}] with: {}".format(test_schema.__name__, test_value)
+                    test_schema_name, test_value, result))
+            assert result == test_expect, "Bad result from [{}] with: {}".format(test_schema_name, test_value)
         except colander.Invalid:
             if test_expect is colander.Invalid:
                 pass
             else:
-                pytest.fail("Expected valid format from [{}] with: {}".format(test_schema.__name__, test_value))
+                pytest.fail("Expected valid format from [{}] with: {}".format(test_schema_name, test_value))
 
 
 def test_oneof_io_formats_deserialize_as_mapping():
@@ -125,6 +144,58 @@ def test_oneof_nested_dict_list():
         else:
             raise AssertionError("Should have raised invalid schema from deserialize of '{!s}' with {!s}, but got {!s}"
                                  .format(ce._get_node_name(test_schema), test_value, result))
+
+
+def test_oneof_dropable():
+    """
+    Using optional (dropable) ``oneOf`` with required sub-schema, failing deserialization should drop it entirely.
+
+    Keyword ``oneOf`` must still be respected regardless of optional status, as in, it must only allow a single
+    valid schema amongst allowed cases if value matches one of the definitions. Adding the drop option only *also*
+    allows it to match none of them.
+    """
+
+    class AnyMap(ce.PermissiveMappingSchema):
+        pass  # any field is ok
+
+    class OneOfStrMap(ce.OneOfKeywordSchema):
+        _one_of = [
+            ce.ExtendedSchemaNode(colander.String()),
+            AnyMap()
+        ]
+
+    schema = OneOfStrMap(missing=colander.drop)
+    evaluate_test_cases([
+        (schema, [], colander.drop),  # not a string nor mapping, but don't raise since drop allowed
+        (schema, "", ""),
+        (schema, "ok", "ok"),
+        (schema, {}, {}),
+        (schema, {"any": 123}, {"any": 123}),
+        # since OneOf[str,map], it is not possible to combine them
+    ])
+
+    class Map1(ce.ExtendedMappingSchema):
+        field1 = ce.ExtendedSchemaNode(colander.String())
+
+    class Map2(ce.ExtendedMappingSchema):
+        field2 = ce.ExtendedSchemaNode(colander.String())
+
+    class OneOfTwoMap(ce.OneOfKeywordSchema):
+        _one_of = [
+            Map1(),
+            Map2()
+        ]
+
+    schema = OneOfTwoMap(missing=colander.drop)
+    evaluate_test_cases([
+        (schema, [], colander.drop),  # not mapping, but don't raise since drop allowed
+        (schema, "", colander.drop),  # not mapping, but don't raise since drop allowed
+        (schema, {}, colander.drop),  # mapping, but not respecting sub-fields, don't raise since drop allowed
+        (schema, {"field1": 1}, colander.drop),  # mapping with good field name, but wrong type, drop since allowed
+        (schema, {"field1": "1"}, {"field1": "1"}),
+        (schema, {"field2": "2"}, {"field2": "2"}),
+        (schema, {"field1": "1", "field2": "2"}, colander.drop),  # cannot have both, don't raise since drop allowed
+    ])
 
 
 def test_not_keyword_extra_fields_handling():

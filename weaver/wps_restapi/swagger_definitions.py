@@ -603,11 +603,11 @@ class FormatSelection(OneOfKeywordSchema):
 # only extra portion from:
 # https://github.com/opengeospatial/ogcapi-processes/blob/e6893b/extensions/workflows/openapi/workflows.yaml#L1538-L1547
 class FormatDescription(ExtendedMappingSchema):
-    maximumMegabytes = ExtendedSchemaNode(Integer(), missing=drop)
+    maximumMegabytes = ExtendedSchemaNode(Integer(), missing=drop, validator=Range(min=1))
 
 
 # although original schema defines 'default' in above 'FormatDescription', separate it in order to omit it
-# from 'FormatMedia' employed for result reporting, which shouldn't have a default (applied vs supported format)
+# from 'ResultFormat' employed for result reporting, which shouldn't have a default (applied vs supported format)
 class FormatDefault(ExtendedMappingSchema):
     default = ExtendedSchemaNode(
         Boolean(), missing=drop, default=False,
@@ -619,22 +619,19 @@ class FormatDefault(ExtendedMappingSchema):
 
 
 class DescriptionFormat(Format, FormatDescription, FormatDefault):
-    # NOTE:
-    #  The 'OGC-API' suggest to use 'mediaType' field for FormatType, but retro-compatibility is supported,
-    #  FormatType can be with either old 'mimeType' or new 'mediaType' during deployment,
-    #  but only 'mediaType' is used for description
     pass
 
 
 class DeploymentFormat(FormatSelection, FormatDescription, FormatDefault):
     # NOTE:
-    #  The 'OGC-API' suggest to use 'mediaType' field for FormatType, but retro-compatibility is supported,
-    #  FormatType can be with either old 'mimeType' or new 'mediaType' during deployment,
-    #  but only 'mediaType' is used for description
+    #   The 'OGC-API' suggest to use 'mediaType' field for format representation, but retro-compatibility is
+    #   supported during deployment only, where either old 'mimeType' or new 'mediaType', but only 'mediaType'
+    #   is used for process description and result reporting. This support is added for deployment so that
+    #   pre-existing deploy definitions remain valid without need to update them.
     pass
 
 
-class FormatMedia(FormatDescription):
+class ResultFormat(FormatDescription):
     """
     Format employed for reference results respecting 'OGC-API - Processes' schemas.
     """
@@ -3243,7 +3240,7 @@ class ValueFormatted(ExtendedMappingSchema):
         example="<xml><data>test</data></xml>",
         description="Formatted content value of the result."
     )
-    format = FormatMedia()
+    format = ResultFormat()
 
 
 class ValueFormattedList(ExtendedSequenceSchema):
@@ -3252,7 +3249,7 @@ class ValueFormattedList(ExtendedSequenceSchema):
 
 class ResultReference(ExtendedMappingSchema):
     href = ReferenceURL(description="Result file reference.")
-    format = FormatMedia()
+    format = ResultFormat()
 
 
 class ResultReferenceList(ExtendedSequenceSchema):
