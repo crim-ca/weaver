@@ -55,9 +55,13 @@ Changes:
   (fixes `#276  <https://github.com/crim-ca/weaver/issues/276>`_).
   Type ``builtin`` can only be registered by `Weaver` itself at startup. Other unknown types that have
   no indication for mapping to an appropriate `Process` implementation are preemptively validated.
-- Add parsing of additional literal data domains for specification of inputs/outputs data constrains and provide
-  corresponding definitions in process description response (fixes `#41 <https://github.com/crim-ca/weaver/issues/41>`_,
-  `#211 <https://github.com/crim-ca/weaver/issues/211>`_, `#297 <https://github.com/crim-ca/weaver/issues/297>`_).
+- Add parsing and generation of additional ``literalDataDomains`` for specification of WPS I/O data constrains and
+  provide corresponding definitions in process description responses
+  (fixes `#41 <https://github.com/crim-ca/weaver/issues/41>`_,
+  `#211 <https://github.com/crim-ca/weaver/issues/211>`_,
+  `#297 <https://github.com/crim-ca/weaver/issues/297>`_).
+- Add additional ``maximumMegabyte`` metadata detail to ``formats`` of WPS I/O of ``complex`` type whenever available
+  (requires `geopython/OWSLib#796 <https://github.com/geopython/OWSLib/pull/796>`_, future ``OWSLIB==0.26.0`` release).
 
 Fixes:
 ------
