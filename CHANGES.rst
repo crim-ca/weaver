@@ -82,6 +82,8 @@ Fixes:
   to ``retries`` and ``backoff`` options that were be ignored.
 - Fix incorrect parsing of ``default`` field within WPS input when ``literal`` data type is present and was assumed
   as ``complex`` (fixes `#297 <https://github.com/crim-ca/weaver/issues/297>`_).
+- Fix and test various invalid schema deserialization validation issues, notably regarding ``PermissiveMappingSchema``,
+  schema nodes ``ExtendedFloat``, ``ExtendedFloat`` and their handling strategies when combined in mappings or keywords.
 
 `3.5.0 <https://github.com/crim-ca/weaver/tree/3.5.0>`_ (2021-08-19)
 ========================================================================

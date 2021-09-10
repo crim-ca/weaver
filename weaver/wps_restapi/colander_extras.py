@@ -212,6 +212,17 @@ class ExtendedBoolean(colander.Boolean):
 
 
 class ExtendedFloat(colander.Float):
+
+    def __init__(self, *_, **__):
+        super(ExtendedFloat, self).__init__(*_, **__)
+
+        def _strict_float(num):
+            if not isinstance(num, float):
+                raise ValueError("Value is not a Floating point number.")
+            return num
+
+        self.num = _strict_float
+
     def serialize(self, node, cstruct):  # pylint: disable=W0221
         result = super(ExtendedFloat, self).serialize(node, cstruct)
         if result is not colander.null:
@@ -220,6 +231,16 @@ class ExtendedFloat(colander.Float):
 
 
 class ExtendedInteger(colander.Integer):
+    """
+    Integer definition with enforced strict typing validation.
+
+    This is to distinguish it from explicit definitions of ``integer``-like numbers or strings.
+    Values such as ``"1"``, ``1.0``, ``True`` will not be automatically converted to equivalent ``1``.
+    """
+    def __init__(self, *_, **kwargs):
+        kwargs["strict"] = True
+        super(ExtendedInteger, self).__init__(*_, **kwargs)
+
     def serialize(self, node, cstruct):  # pylint: disable=W0221
         result = super(ExtendedInteger, self).serialize(node, cstruct)
         if result is not colander.null:
@@ -995,6 +1016,8 @@ class PermissiveMappingSchema(ExtendedMappingSchema):
     def __init__(self, *args, **kwargs):
         kwargs["unknown"] = "preserve"
         super(PermissiveMappingSchema, self).__init__(*args, **kwargs)
+        # sub-type mapping itself must also have 'preserve' such that its own 'deserialize' copies the fields over
+        self.typ.unknown = "preserve"
 
 
 class KeywordMapper(ExtendedMappingSchema):
@@ -1103,7 +1126,7 @@ class KeywordMapper(ExtendedMappingSchema):
         """
         raise NotImplementedError
 
-    def _deserialize_subnode(self, node, cstruct):
+    def _deserialize_subnode(self, node, cstruct, index):
         """
         Deserialization and validation of sub-nodes under a keyword-based schema definition.
 
@@ -1126,7 +1149,9 @@ class KeywordMapper(ExtendedMappingSchema):
             - :class:`ExtendedSchemaNode`
         """
         if not node.name:
-            node.name = _get_node_name(self, schema_name=True)  # pass down the parent name
+            # pass down the parent name for reference, but with an index to distinguish from it
+            # distinction is also important such that generated schema definitions in OpenAPI don't override each other
+            node.name = _get_node_name(self, schema_name=True) + "." + str(index)
         if isinstance(node, KeywordMapper):
             return KeywordMapper.deserialize(node, cstruct)
         return ExtendedSchemaNode.deserialize(node, cstruct)
@@ -1325,10 +1350,10 @@ class OneOfKeywordSchema(KeywordMapper):
         invalid_one_of = dict()
         valid_one_of = []
         valid_nodes = []
-        for schema_class in self._one_of:  # noqa
+        for index, schema_class in enumerate(self._one_of):  # noqa
             try:
                 schema_class = _make_node_instance(schema_class)
-                result = self._deserialize_subnode(schema_class, cstruct)
+                result = self._deserialize_subnode(schema_class, cstruct, index)
                 valid_one_of.append(result)
                 valid_nodes.append(schema_class)
             except colander.Invalid as invalid:
@@ -1384,6 +1409,9 @@ class OneOfKeywordSchema(KeywordMapper):
                     "Must be only one of: {}.".format(valid_values)
                 )
 
+        # not a single valid sub-node was found
+        if self.missing is colander.drop:
+            return colander.drop
         raise colander.Invalid(node=self, msg=message, value=cstruct)
 
 
@@ -1435,12 +1463,12 @@ class AllOfKeywordSchema(KeywordMapper):
         required_all_of = dict()
         missing_all_of = dict()
         merged_all_of = dict()
-        for schema_class in self._all_of:  # noqa
+        for index, schema_class in enumerate(self._all_of):  # noqa
             try:
                 schema_class = _make_node_instance(schema_class)
                 # update items with new ones
                 required_all_of.update({_get_node_name(schema_class, schema_name=True): str(schema_class)})
-                merged_all_of.update(self._deserialize_subnode(schema_class, cstruct))
+                merged_all_of.update(self._deserialize_subnode(schema_class, cstruct, index))
             except colander.Invalid as invalid:
                 missing_all_of.update({_get_node_name(invalid.node, schema_name=True): str(invalid)})
 
@@ -1534,12 +1562,12 @@ class AnyOfKeywordSchema(KeywordMapper):
         option_any_of = dict()
         merged_any_of = colander.null
         invalid_any_of = colander.Invalid(node=self)
-        for schema_class in self._any_of:  # noqa
+        for index, schema_class in enumerate(self._any_of):  # noqa
             try:
                 schema_class = _make_node_instance(schema_class)
                 # update items with new ones
                 option_any_of.update({_get_node_name(schema_class, schema_name=True): str(schema_class)})
-                result = self._deserialize_subnode(schema_class, cstruct)
+                result = self._deserialize_subnode(schema_class, cstruct, index)
                 if result not in (colander.drop, colander.null):
                     # technically not supposed to have 'Sequence' type since they can only have one child
                     # only possibility is all similar objects or all literals because of '_keyword_schemas_same_struct'
@@ -1627,10 +1655,10 @@ class NotKeywordSchema(KeywordMapper):
         Raise if any sub-node schema that should NOT be present was successfully validated.
         """
         invalid_not = dict()
-        for schema_class in self._not:  # noqa
+        for index, schema_class in enumerate(self._not):  # noqa
             try:
                 schema_class = _make_node_instance(schema_class)
-                result = self._deserialize_subnode(schema_class, cstruct)
+                result = self._deserialize_subnode(schema_class, cstruct, index)
                 if isinstance(result, dict) and not len(result):
                     continue  # allow empty result meaning every item was missing and dropped
                 invalid_names = [node.name for node in schema_class.children]

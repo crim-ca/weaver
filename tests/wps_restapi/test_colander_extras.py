@@ -160,17 +160,16 @@ def test_oneof_dropable():
 
     class OneOfStrMap(ce.OneOfKeywordSchema):
         _one_of = [
-            ce.ExtendedSchemaNode(colander.String()),
+            ce.ExtendedSchemaNode(colander.String()),  # note: 'allow_empty=False' by default
             AnyMap()
         ]
 
     schema = OneOfStrMap(missing=colander.drop)
     evaluate_test_cases([
         (schema, [], colander.drop),  # not a string nor mapping, but don't raise since drop allowed
-        (schema, "", ""),
         (schema, "ok", "ok"),
-        (schema, {}, {}),
-        (schema, {"any": 123}, {"any": 123}),
+        (schema, {}, {}),   # since mapping is permissive, empty is valid
+        (schema, {"any": 123}, {"any": 123}),  # unknown field is also valid
         # since OneOf[str,map], it is not possible to combine them
     ])
 
@@ -192,9 +191,21 @@ def test_oneof_dropable():
         (schema, "", colander.drop),  # not mapping, but don't raise since drop allowed
         (schema, {}, colander.drop),  # mapping, but not respecting sub-fields, don't raise since drop allowed
         (schema, {"field1": 1}, colander.drop),  # mapping with good field name, but wrong type, drop since allowed
+        (schema, {"field1": "1", "field2": "2"}, colander.drop),  # cannot have both, don't raise since drop allowed
         (schema, {"field1": "1"}, {"field1": "1"}),
         (schema, {"field2": "2"}, {"field2": "2"}),
-        (schema, {"field1": "1", "field2": "2"}, colander.drop),  # cannot have both, don't raise since drop allowed
+    ])
+
+    # validate that the same definition above behaves normally (raise Invalid) when not dropable
+    schema = OneOfTwoMap()
+    evaluate_test_cases([
+        (schema, [], colander.Invalid),  # not mapping
+        (schema, "", colander.Invalid),  # not mapping
+        (schema, {}, colander.Invalid),  # mapping, but not respecting sub-fields
+        (schema, {"field1": 1}, colander.Invalid),  # mapping with good field name, but wrong type
+        (schema, {"field1": "1", "field2": "2"}, colander.Invalid),  # cannot have both mappings at the same time
+        (schema, {"field1": "1"}, {"field1": "1"}),
+        (schema, {"field2": "2"}, {"field2": "2"}),
     ])
 
 
@@ -234,6 +245,34 @@ def test_not_keyword_extra_fields_handling():
         (MappingOnlyNotType, {"item": "valid", "value": "ignore"}, {})
     ]
     evaluate_test_cases(test_cases)
+
+
+def test_preserve_mapping():
+    class NormalMap(ce.ExtendedMappingSchema):
+        known = ce.ExtendedSchemaNode(ce.ExtendedInteger())
+
+    class PreserveMap(ce.PermissiveMappingSchema, NormalMap):  # inherit above 'known' field
+        pass
+
+    class Seq(ce.ExtendedSequenceSchema):
+        item = ce.ExtendedSchemaNode(ce.ExtendedFloat())
+
+    class ExtendMap(ce.PermissiveMappingSchema, NormalMap):  # inherit above 'known' field
+        other = Seq()
+
+    evaluate_test_cases([
+        (PreserveMap, {}, colander.Invalid),  # missing 'known' field
+        (PreserveMap, {"known": "str"}, colander.Invalid),  # invalid type for 'known' field
+        (PreserveMap, {"known": 1}, {"known": 1}),  # ok by itself
+        (PreserveMap, {"known": 1, "extra": 2}, {"known": 1, "extra": 2}),  # ok with extra unknown field to preserve
+        (NormalMap, {"known": 1, "extra": 2}, {"known": 1}),  # unknown field is drop in normal schema
+        (NormalMap, {"known": "A"}, colander.Invalid),
+        (ExtendMap, {"known": 1}, colander.Invalid),  # missing 'other' list
+        (ExtendMap, {"known": 1, "other": []}, {"known": 1, "other": []}),
+        (ExtendMap, {"known": 1, "other": [1.2, 3.4]}, {"known": 1, "other": [1.2, 3.4]}),
+        (ExtendMap, {"known": 1, "other": ["1.2"]}, colander.Invalid),
+        (ExtendMap, {"known": 1, "other": [1.2], "extra": "ok"}, {"known": 1, "other": [1.2], "extra": "ok"}),
+    ])
 
 
 class FieldTestString(ce.ExtendedSchemaNode):
