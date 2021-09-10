@@ -325,7 +325,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert "default" not in inputs[7]
         assert "literalDataDomains" in inputs[7] and len(inputs[7]["literalDataDomains"]) == 1
         assert inputs[7]["literalDataDomains"][0]["dataType"]["name"] == "string"
-        assert inputs[7]["literalDataDomains"][0]["valueDefinition"] ==  [
+        assert inputs[7]["literalDataDomains"][0]["valueDefinition"] == [
             "24MODELS", "PCIC12", "BNU-ESM", "CCSM4", "CESM1-CAM5", "CNRM-CM5", "CSIRO-Mk3-6-0", "CanESM2",
             "FGOALS-g2", "GFDL-CM3", "GFDL-ESM2G", "GFDL-ESM2M", "HadGEM2-AO", "HadGEM2-ES", "IPSL-CM5A-LR",
             "IPSL-CM5A-MR", "MIROC-ESM-CHEM", "MIROC-ESM", "MIROC5", "MPI-ESM-LR", "MPI-ESM-MR", "MRI-CGCM3",
@@ -400,6 +400,8 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert inputs[14]["literalDataDomains"][0]["dataType"]["name"] == "string"
         assert inputs[14]["literalDataDomains"][0]["valueDefinition"] == ["netcdf", "csv"]
         assert inputs[14]["literalDataDomains"][0]["defaultValue"] == "netcdf"
+
+        assert outputs[0]
 
     @pytest.mark.xfail(condition=LooseVersion(owslib.__version__) <= LooseVersion("0.25.0"),
                        reason="OWSLib fix for retrieval of maximumMegabytes from ComplexData not yet available "

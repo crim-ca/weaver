@@ -975,22 +975,11 @@ class LiteralDataValueDefinition(OneOfKeywordSchema):
 
 
 # https://github.com/opengeospatial/ogcapi-processes/blob/e6893b/extensions/workflows/openapi/workflows.yaml#L1675-L1688
-#
 #  literalDataDomain:
-#    type: object
-#    properties:
-#      valueDefinition:
-#        oneOf:
-#          - $ref: "#/components/schemas/allowedValues"
-#          - $ref: "#/components/schemas/anyValue"
-#          - $ref: "#/components/schemas/valuesReference"
-#      defaultValue:
-#        type: string
-#      dataType:
-#        $ref: "#/components/schemas/nameReferenceType"
-#      uom:
-#        $ref: "#/components/schemas/nameReferenceType"
-#
+#    valueDefinition: oneOf(<allowedValues, anyValue, valuesReference>)
+#    defaultValue: <string>
+#    dataType: <nameReferenceType>
+#    uom: <nameReferenceType>
 class LiteralDataDomain(ExtendedMappingSchema):
     default = ExtendedSchemaNode(Boolean(), default=True,
                                  description="Indicates if this literal data domain definition is the default one.")

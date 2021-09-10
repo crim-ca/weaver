@@ -5,10 +5,10 @@ Tests for :mod:`weaver.wps_restapi.colander_extras` operations applied
 on :mod:`weaver.wps_restapi.swagger_definitions` objects.
 """
 import inspect
+from typing import TYPE_CHECKING
 
 import colander
 import pytest
-from typing import TYPE_CHECKING
 
 from weaver.wps_restapi import colander_extras as ce, swagger_definitions as sd
 
