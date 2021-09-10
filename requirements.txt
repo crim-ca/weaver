@@ -39,6 +39,8 @@ mako
 oauthlib
 owslib>=0.19.2
 pymongo
+# pyproj>=2 employed by OWSLib, but make requirements stricter
+pyproj>=3
 pyramid>=1.7.3
 pyramid_beaker>=0.8
 pyramid_celery
@@ -48,6 +50,8 @@ pyramid_rewrite
 pytz
 pywps==4.4.3
 pyyaml>=5.2
+# required by: cwltool => schema_salad, make requirement stricter because it has longer wheel build time
+rdflib-jsonld==0.5.0
 requests
 requests_file
 # let cwltool define ruamel.yaml version (<=0.16.5)

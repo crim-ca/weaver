@@ -24,7 +24,9 @@ TEST_NOTFOUND_ROUTES = [
 
 class StatusCodeTestCase(unittest.TestCase):
     """
-    this routine should verify that the weaver app returns correct status codes for common cases, such as
+    Verify that the Weaver Web Application returns correct status codes for common cases.
+
+    Common cases are:
     - not found
     - forbidden (possibly with a difference between unauthorized and unauthenticated
     - resource added

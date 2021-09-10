@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Tests for :mod:`weaver.wps_restapi.colander_extras` operations applied
-on :mod:`weaver.wps_restapi.swagger_definitions` objects.
+Tests for :mod:`weaver.wps_restapi.colander_extras` operations applied on :mod:`weaver.wps_restapi.swagger_definitions`
+objects.
 """
 import inspect
 from typing import TYPE_CHECKING
@@ -53,7 +53,8 @@ def evaluate_test_cases(test_cases):
 
 def test_oneof_io_formats_deserialize_as_mapping():
     """
-    Evaluates OneOf deserialization for inputs/outputs CWL definition specified as key-mapping of objects.
+    Evaluates ``oneOf`` deserialization for inputs/outputs CWL definition specified as key-mapping of objects.
+
     Should work simultaneously with the listing variation using the same deserializer.
 
     .. seealso::
@@ -77,7 +78,8 @@ def test_oneof_io_formats_deserialize_as_mapping():
 
 def test_oneof_io_formats_deserialize_as_listing():
     """
-    Evaluates OneOf deserialization for inputs/outputs CWL definition specified as list of objects.
+    Evaluates ``oneOf`` deserialization for inputs/outputs CWL definition specified as list of objects.
+
     Should work simultaneously with the mapping variation using the same deserializer.
 
     .. seealso::
@@ -212,6 +214,7 @@ def test_oneof_dropable():
 def test_not_keyword_extra_fields_handling():
     """
     Using ``not`` keyword without any other schemas must return an empty mapping with additional fields dropped.
+
     When providing other schemas, only fields in those inherited definitions should remain.
     In should raise when matching the ``not`` conditions regardless.
     """
@@ -371,7 +374,9 @@ class Validator(ce.ExtendedMappingSchema):
 
 
 class DefaultDropValidator(ce.ExtendedMappingSchema):
-    """Definition that will allow only the specific validator values, or drops the content silently."""
+    """
+    Definition that will allow only the specific validator values, or drops the content silently.
+    """
     test = FieldTestString(default=colander.drop, validator=colander.OneOf(["test"]))
     schema_expected = {
         "type": "object",
@@ -388,6 +393,8 @@ class DefaultDropValidator(ce.ExtendedMappingSchema):
 
 class DefaultDropRequired(ce.ExtendedMappingSchema):
     """
+    Mapping to evaluate handling of deserialization when both ``missing`` and ``default`` arguments are specified.
+
     Definition that will allow only the specific validator values, or drops the full content silently.
     One top of that, ensures that the resulting OpenAPI schema defines it as required instead of optional
     when default is usually specified.

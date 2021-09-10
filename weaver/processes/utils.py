@@ -100,14 +100,18 @@ def get_job_submission_response(body):
 
 def map_progress(progress, range_min, range_max):
     # type: (Number, Number, Number) -> Number
-    """Calculates the relative progression of the percentage process within min/max values."""
+    """
+    Calculates the relative progression of the percentage process within min/max values.
+    """
     return max(range_min, min(range_max, range_min + (progress * (range_max - range_min)) / 100))
 
 
 @log_unhandled_exceptions(logger=LOGGER, message="Unhandled error occurred during parsing of deploy payload.",
                           is_request=False)
 def _check_deploy(payload):
-    """Validate minimum deploy payload field requirements with exception handling."""
+    """
+    Validate minimum deploy payload field requirements with exception handling.
+    """
     # FIXME: handle colander invalid directly in tween (https://github.com/crim-ca/weaver/issues/112)
     try:
         sd.Deploy().deserialize(payload)

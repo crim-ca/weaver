@@ -203,7 +203,6 @@ class OpenSearchQuery(object):
 
         :param template_url: url containing query parameters.
         :param params: parameters to insert in formatted URL.
-
         """
         base_url, query = template_url.split("?", 1)
 
@@ -413,7 +412,6 @@ class EOImageDescribeProcessHandler(object):
 
         :param id_: ID of the input.
         :param start_date:  (Default value = True)
-
         """
         date = OPENSEARCH_START_DATE if start_date else OPENSEARCH_END_DATE
         search_field = "{}{}".format(date[0].lower(), date[1:])
@@ -443,7 +441,6 @@ class EOImageDescribeProcessHandler(object):
 
         :param unique_aoi: indicate if a single/global AOI must be applied or individual ones for each input.
         :param unique_toi: indicate if a single/global TOI must be applied or individual ones for each input.
-
         """
         if not self.eoimage_inputs:
             return self.other_inputs

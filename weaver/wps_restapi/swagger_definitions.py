@@ -428,13 +428,17 @@ class ResponseContentTypeHeader(OneOfKeywordSchema):
 
 
 class RequestHeaders(RequestContentTypeHeader):
-    """Headers that can indicate how to adjust the behavior and/or result the be provided in the response."""
+    """
+    Headers that can indicate how to adjust the behavior and/or result the be provided in the response.
+    """
     accept = AcceptHeader()
     accept_language = AcceptLanguageHeader()
 
 
 class ResponseHeaders(ResponseContentTypeHeader):
-    """Headers describing resulting response."""
+    """
+    Headers describing resulting response.
+    """
 
 
 class RedirectHeaders(ResponseHeaders):
@@ -3260,7 +3264,9 @@ class ResultData(OneOfKeywordSchema):
 
 
 class Result(ExtendedMappingSchema):
-    """Result outputs obtained from a successful process job execution."""
+    """
+    Result outputs obtained from a successful process job execution.
+    """
     example_ref = "{}/master/core/examples/json/Result.json".format(OGC_API_SCHEMA_URL)
     output_id = ResultData(
         variable="<output-id>", title="Output Identifier",

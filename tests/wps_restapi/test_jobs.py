@@ -130,7 +130,9 @@ class WpsRestApiJobsTest(unittest.TestCase):
         return job
 
     def message_with_jobs_mapping(self, message="", indent=2):
-        """For helping debugging of auto-generated job ids"""
+        """
+        For helping debugging of auto-generated job ids.
+        """
         mapping = OrderedDict(sorted((j.task_id, j.id) for j in self.job_store.list_jobs()))
         return message + "\nMapping Task-ID/Job-ID:\n{}".format(json.dumps(mapping, indent=indent))
 
@@ -311,7 +313,9 @@ class WpsRestApiJobsTest(unittest.TestCase):
                 pytest.fail("Unknown job grouping 'service' value not expected.")
 
     def test_get_jobs_by_encrypted_email(self):
-        """Verifies that literal email can be used as search criterion although not saved in plain text within db."""
+        """
+        Verifies that literal email can be used as search criterion although not saved in plain text within db.
+        """
         email = "some.test@crim.ca"
         body = {
             "inputs": [{"id": "test_input", "data": "test"}],
@@ -455,7 +459,9 @@ class WpsRestApiJobsTest(unittest.TestCase):
             assert resp.content_type == CONTENT_TYPE_APP_JSON
 
     def test_get_jobs_public_with_access_and_request_user(self):
-        """Verifies that corresponding processes are returned when proper access/user-id are respected."""
+        """
+        Verifies that corresponding processes are returned when proper access/user-id are respected.
+        """
         uri_direct_jobs = sd.jobs_service.path
         uri_process_jobs = sd.process_jobs_service.path.format(process_id=self.process_public.identifier)
         uri_provider_jobs = sd.provider_jobs_service.path.format(
@@ -526,6 +532,8 @@ class WpsRestApiJobsTest(unittest.TestCase):
 
     def test_jobs_list_with_limit_api(self):
         """
+        Test handling of ``limit`` query parameter when listing jobs.
+
         .. seealso::
             - `/req/collections/rc-limit-response
                 <https://github.com/opengeospatial/ogcapi-common/blob/master/collections/requirements/collections/REQ_rc-limit-response.adoc>`_
@@ -539,19 +547,14 @@ class WpsRestApiJobsTest(unittest.TestCase):
         assert resp.json["limit"] == limit_parameter
         assert len(resp.json["jobs"]) <= limit_parameter
 
-    def test_jobs_list_with_limit_openapi_schema(self):
+    def test_jobs_list_schema_not_required_fields(self):
         """
+        Test that job listing query parameters for filtering results are marked as optional in OpenAPI schema.
+
         .. seealso::
             - `/req/collections/rc-limit-response
                 <https://github.com/opengeospatial/ogcapi-common/blob/master/collections/requirements/collections/REQ_rc-limit-response.adoc>`_
         """
-        resp = self.app.get(sd.jobs_service.path, headers=self.json_headers)
-        assert resp.status_code == 200
-        assert resp.content_type == CONTENT_TYPE_APP_JSON
-        assert "limit" in resp.json and isinstance(resp.json["limit"], int)
-        assert len(resp.json["jobs"]) <= resp.json["limit"]
-
-    def test_not_required_fields(self):
         uri = sd.openapi_json_service.path
         resp = self.app.get(uri, headers=self.json_headers)
         assert not resp.json["parameters"]["page"]["required"]
@@ -559,6 +562,8 @@ class WpsRestApiJobsTest(unittest.TestCase):
 
     def test_jobs_datetime_before(self):
         """
+        Test that only filtered jobs before a certain time are returned when ``datetime`` query parameter is provided.
+
         .. seealso::
             - `/req/collections/rc-time-collections-response
                 <https://github.com/opengeospatial/ogcapi-common/blob/master/collections/requirements/collections/REQ_rc-time-collections-response.adoc>`_
@@ -580,6 +585,8 @@ class WpsRestApiJobsTest(unittest.TestCase):
 
     def test_jobs_datetime_after(self):
         """
+        Test that only filtered jobs after a certain time are returned when ``datetime`` query parameter is provided.
+
         .. seealso::
             - `/req/collections/rc-time-collections-response
                 <https://github.com/opengeospatial/ogcapi-common/blob/master/collections/requirements/collections/REQ_rc-time-collections-response.adoc>`_
@@ -601,6 +608,8 @@ class WpsRestApiJobsTest(unittest.TestCase):
 
     def test_jobs_datetime_interval(self):
         """
+        Test that only filtered jobs in the time interval are returned when ``datetime`` query parameter is provided.
+
         .. seealso::
             - `/req/collections/rc-time-collections-response
                 <https://github.com/opengeospatial/ogcapi-common/blob/master/collections/requirements/collections/REQ_rc-time-collections-response.adoc>`_
@@ -624,6 +633,8 @@ class WpsRestApiJobsTest(unittest.TestCase):
 
     def test_jobs_datetime_match(self):
         """
+        Test that only filtered jobs at a specific time are returned when ``datetime`` query parameter is provided.
+
         .. seealso::
             - `/req/collections/rc-time-collections-response
                 <https://github.com/opengeospatial/ogcapi-common/blob/master/collections/requirements/collections/REQ_rc-time-collections-response.adoc>`_
@@ -644,12 +655,14 @@ class WpsRestApiJobsTest(unittest.TestCase):
 
     def test_jobs_datetime_invalid(self):
         """
+        Test that incorrectly formatted ``datetime`` query parameter value is handled.
+
         .. seealso::
             - `/req/collections/rc-time-collections-response
                 <https://github.com/opengeospatial/ogcapi-common/blob/master/collections/requirements/collections/REQ_rc-time-collections-response.adoc>`_
 
-        datetime_invalid is not formatted against the rfc3339 datetime format,
-        for more details refer to https://datatracker.ietf.org/doc/html/rfc3339#section-5.6
+        Value of ``datetime_invalid`` is not formatted against the RFC-3339 datetime format.
+        For more details refer to https://datatracker.ietf.org/doc/html/rfc3339#section-5.6.
         """
         datetime_invalid = "2022-31-12 23:59:59"
         path = get_path_kvp(sd.jobs_service.path, datetime=datetime_invalid)
@@ -658,12 +671,14 @@ class WpsRestApiJobsTest(unittest.TestCase):
 
     def test_jobs_datetime_interval_invalid(self):
         """
+        Test that invalid ``datetime`` query parameter value is handled.
+
         .. seealso::
             - `/req/collections/rc-time-collections-response
                 <https://github.com/opengeospatial/ogcapi-common/blob/master/collections/requirements/collections/REQ_rc-time-collections-response.adoc>`_
 
-        datetime_invalid represents a datetime interval where the limit dates are inverted,
-        the minimum is greater than the maximum datetime limit
+        Value of ``datetime_invalid`` represents a datetime interval where the limit dates are inverted.
+        The minimum is greater than the maximum datetime limit.
         """
         datetime_interval = self.datetime_interval[3] + DATETIME_INTERVAL_CLOSED_SYMBOL + self.datetime_interval[1]
         path = get_path_kvp(sd.jobs_service.path, datetime=datetime_interval)
@@ -672,11 +687,13 @@ class WpsRestApiJobsTest(unittest.TestCase):
 
     def test_jobs_datetime_before_invalid(self):
         """
+        Test that invalid ``datetime`` query parameter value with a range is handled.
+
         .. seealso::
             - `/req/collections/rc-time-collections-response
                 <https://github.com/opengeospatial/ogcapi-common/blob/master/collections/requirements/collections/REQ_rc-time-collections-response.adoc>`_
 
-        datetime_before represents a bad open range datetime interval
+        Value of ``datetime_before`` represents a bad open range datetime interval.
         """
         datetime_before = "./" + self.datetime_interval[3]
         path = get_path_kvp(sd.jobs_service.path, datetime=datetime_before)
@@ -684,7 +701,9 @@ class WpsRestApiJobsTest(unittest.TestCase):
         assert resp.status_code == 422
 
     def test_job_status_response(self):
-        """Verify the processID value in the job status response"""
+        """
+        Verify the processID value in the job status response.
+        """
         body = {
             "outputs": [],
             "mode": EXECUTE_MODE_ASYNC,

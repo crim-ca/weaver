@@ -976,7 +976,9 @@ class WpsPackage(Process):
 
     def update_status(self, message, progress, status):
         # type: (str, Number, AnyStatusType) -> None
-        """Updates the `PyWPS` real job status from a specified parameters."""
+        """
+        Updates the `PyWPS` real job status from a specified parameters.
+        """
         self.percent = progress or self.percent or 0
 
         # find the enum PyWPS status matching the given one as string
