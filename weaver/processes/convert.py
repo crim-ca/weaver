@@ -235,43 +235,47 @@ def ows2json_io(ows_io):
             else:
                 json_io[field] = value
     json_io["id"] = get_field(json_io, "identifier", search_variations=True, pop_found=True)
-
     io_type = json_io.get("type")
-    fmt_default = None
-    if io_type == WPS_COMPLEX_DATA and "default" in json_io and isinstance(json_io["default"], dict):
-        json_io["default"]["default"] = True  # provide the field for workflow extension
-        fmt_default = get_field(json_io["default"], "mime_type", search_variations=True)
 
     # add 'format' if missing, derived from other variants
-    if io_type == WPS_COMPLEX_DATA and "formats" not in json_io:
-        # correct complex data 'formats' from OWSLib from above fields loop can get stored in 'supported_values'
-        fmt_val = get_field(json_io, "supported_values", pop_found=True)
-        if fmt_val:
-            json_io["formats"] = fmt_val
-        else:
-            # search for format fields directly specified in I/O body
-            for field in WPS_FIELD_FORMAT:
-                fmt = get_field(json_io, field, search_variations=True)
-                if not fmt:
-                    continue
-                if isinstance(fmt, dict):
-                    fmt = [fmt]
-                fmt = filter(lambda f: isinstance(f, dict), fmt)
-                if not isinstance(json_io.get("formats"), list):
-                    json_io["formats"] = list()
-                for var_fmt in fmt:
-                    # add it only if not exclusively provided by a previous variant
-                    json_fmt_items = [j_fmt.items() for j_fmt in json_io["formats"]]
-                    if any(all(var_item in items for var_item in var_fmt.items()) for items in json_fmt_items):
+    if io_type == WPS_COMPLEX_DATA:
+        fmt_default = False
+        if "default" in json_io and isinstance(json_io["default"], dict):
+            json_io["default"]["default"] = True  # provide for workflow extension (internal), schema drops it (API)
+            fmt_default = True
+
+        # retrieve alternate format definitions
+        if "formats" not in json_io:
+            # correct complex data 'formats' from OWSLib from initial fields loop can get stored in 'supported_values'
+            fmt_val = get_field(json_io, "supported_values", pop_found=True)
+            if fmt_val:
+                json_io["formats"] = fmt_val
+            else:
+                # search for format fields directly specified in I/O body
+                for field in WPS_FIELD_FORMAT:
+                    fmt = get_field(json_io, field, search_variations=True)
+                    if not fmt:
                         continue
-                    json_io["formats"].append(var_fmt)
+                    if isinstance(fmt, dict):
+                        fmt = [fmt]
+                    fmt = filter(lambda f: isinstance(f, dict), fmt)
+                    if not isinstance(json_io.get("formats"), list):
+                        json_io["formats"] = []
+                    for var_fmt in fmt:
+                        # add it only if not exclusively provided by a previous variant
+                        json_fmt_items = [j_fmt.items() for j_fmt in json_io["formats"]]
+                        if any(all(var_item in items for var_item in var_fmt.items()) for items in json_fmt_items):
+                            continue
+                        json_io["formats"].append(var_fmt)
+                else:
+                    json_io["formats"] = []
+
         # apply the default flag
         for fmt in json_io["formats"]:
-            if fmt_default:
-                fmt_type = get_field(json_io["default"], "mime_type", search_variations=True)
-                fmt["default"] = fmt_default == fmt_type
-            else:
-                fmt["default"] = False
+            fmt["default"] = fmt_default and is_equal_formats(json_io["default"], fmt)
+            if fmt["default"]:
+                break
+
         # fix inconsistencies of some process descriptions, both with minOccurs=1 and default format
         if fmt_default:
             json_io["min_occurs"] = 0
@@ -1440,7 +1444,9 @@ def _are_different_and_set(item1, item2):
 
 def is_equal_formats(format1, format2):
     # type: (Union[Format, JSON], Union[Format, JSON]) -> bool
-    """Verifies for matching formats."""
+    """
+    Verifies for matching formats.
+    """
     mime_type1 = get_field(format1, "mime_type", search_variations=True)
     mime_type2 = get_field(format2, "mime_type", search_variations=True)
     encoding1 = get_field(format1, "encoding", search_variations=True)

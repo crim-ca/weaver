@@ -15,7 +15,7 @@ from tests.utils import (
     setup_mongodb_servicestore
 )
 from weaver.execute import EXECUTE_CONTROL_OPTION_ASYNC, EXECUTE_TRANSMISSION_MODE_REFERENCE
-from weaver.formats import CONTENT_TYPE_APP_JSON
+from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_NETCDF, CONTENT_TYPE_APP_ZIP, CONTENT_TYPE_TEXT_PLAIN
 from weaver.utils import fully_qualified_name
 
 
@@ -401,7 +401,22 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert inputs[14]["literalDataDomains"][0]["valueDefinition"] == ["netcdf", "csv"]
         assert inputs[14]["literalDataDomains"][0]["defaultValue"] == "netcdf"
 
-        assert outputs[0]
+        assert outputs[0]["id"] == "output"
+        assert len(outputs[0]["formats"]) == 2
+        assert outputs[0]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_NETCDF
+        assert outputs[0]["formats"][0]["encoding"] == "base64"
+        assert outputs[0]["formats"][0]["default"] is True
+        assert "maximumMegabytes" not in outputs[0]["formats"][0]  # never applies, even with OWSLib update
+        assert outputs[0]["formats"][1]["mediaType"] == CONTENT_TYPE_APP_ZIP
+        assert outputs[0]["formats"][1]["encoding"] == "base64"
+        assert outputs[0]["formats"][1]["default"] is False
+        assert "maximumMegabytes" not in outputs[0]["formats"][1]  # never applies, even with OWSLib update
+        assert outputs[1]["id"] == "output_log"
+        assert len(outputs[1]["formats"]) == 1
+        assert outputs[1]["formats"][0]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert "encoding" not in outputs[1]["formats"][0]
+        assert outputs[1]["formats"][0]["default"] is True
+        assert "maximumMegabytes" not in outputs[1]["formats"][0]  # never applies, even with OWSLib update
 
     @pytest.mark.xfail(condition=LooseVersion(owslib.__version__) <= LooseVersion("0.25.0"),
                        reason="OWSLib fix for retrieval of maximumMegabytes from ComplexData not yet available "
