@@ -48,7 +48,7 @@ pyramid_mako
 python-dateutil
 pyramid_rewrite
 pytz
-pywps==4.4.3
+pywps==4.5.0
 pyyaml>=5.2
 # required by: cwltool => schema_salad, make requirement stricter because it has longer wheel build time
 rdflib-jsonld==0.5.0
