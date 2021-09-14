@@ -4,6 +4,7 @@ Generic schema tests.
 import colander
 import pytest
 
+from weaver.formats import CONTENT_TYPE_APP_JSON
 from weaver.wps_restapi import swagger_definitions as sd
 
 
@@ -84,3 +85,39 @@ def test_url_schemes():
             pass
         else:
             pytest.fail("Expected URL to be raised as invalid for incorrectly formatted reference: [{}]".format(url))
+
+
+def test_format_variations():
+    format_schema = sd.DeploymentFormat()
+    schema = "https://www.iana.org/assignments/media-types/{}".format(CONTENT_TYPE_APP_JSON)
+    test_valid_fmt_deploy = [
+        (
+            {"mimeType": CONTENT_TYPE_APP_JSON},
+            {"mimeType": CONTENT_TYPE_APP_JSON, "default": False}),
+        (
+            {"mediaType": CONTENT_TYPE_APP_JSON},
+            {"mediaType": CONTENT_TYPE_APP_JSON, "default": False}),
+        (
+            {"mediaType": CONTENT_TYPE_APP_JSON, "maximumMegabytes": 200},
+            {"mediaType": CONTENT_TYPE_APP_JSON, "maximumMegabytes": 200, "default": False}),
+        (
+            {"mediaType": CONTENT_TYPE_APP_JSON, "maximumMegabytes": None},
+            {"mediaType": CONTENT_TYPE_APP_JSON, "default": False}),
+        (
+            {"mediaType": CONTENT_TYPE_APP_JSON, "default": False},
+            {"mediaType": CONTENT_TYPE_APP_JSON, "default": False}),
+        (
+            {"mediaType": CONTENT_TYPE_APP_JSON, "default": True},
+            {"mediaType": CONTENT_TYPE_APP_JSON, "default": True}),
+        (
+            {"mediaType": CONTENT_TYPE_APP_JSON, "schema": None},
+            {"mediaType": CONTENT_TYPE_APP_JSON, "default": False}),
+        (
+            {"mediaType": CONTENT_TYPE_APP_JSON, "schema": schema},
+            {"mediaType": CONTENT_TYPE_APP_JSON, "schema": schema, "default": False}),
+    ]
+    for fmt, res in test_valid_fmt_deploy:
+        try:
+            assert format_schema.deserialize(fmt) == res
+        except colander.Invalid:
+            pytest.fail("Expected format to be valid: [{}]".format(fmt))

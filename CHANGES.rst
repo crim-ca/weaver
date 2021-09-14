@@ -55,6 +55,13 @@ Changes:
   (fixes `#276  <https://github.com/crim-ca/weaver/issues/276>`_).
   Type ``builtin`` can only be registered by `Weaver` itself at startup. Other unknown types that have
   no indication for mapping to an appropriate `Process` implementation are preemptively validated.
+- Add parsing and generation of additional ``literalDataDomains`` for specification of WPS I/O data constrains and
+  provide corresponding definitions in process description responses
+  (fixes `#41 <https://github.com/crim-ca/weaver/issues/41>`_,
+  `#211 <https://github.com/crim-ca/weaver/issues/211>`_,
+  `#297 <https://github.com/crim-ca/weaver/issues/297>`_).
+- Add additional ``maximumMegabyte`` metadata detail to ``formats`` of WPS I/O of ``complex`` type whenever available
+  (requires `geopython/OWSLib#796 <https://github.com/geopython/OWSLib/pull/796>`_, future ``OWSLIB==0.26.0`` release).
 
 Fixes:
 ------
@@ -77,6 +84,13 @@ Fixes:
   a ``processes`` nor ``providers`` section. Also, apply more validation of specified ``name`` values.
 - Fix parsing of ``request_extra`` function/setting parameters for specifically zero values corresponding
   to ``retries`` and ``backoff`` options that were be ignored.
+- Fix incorrect parsing of ``default`` field within WPS input when ``literal`` data type is present and was assumed
+  as ``complex`` (fixes `#297 <https://github.com/crim-ca/weaver/issues/297>`_).
+- Fix and test various invalid schema deserialization validation issues, notably regarding ``PermissiveMappingSchema``,
+  schema nodes ``ExtendedFloat``, ``ExtendedInt`` and their handling strategies when combined in mappings or keywords.
+- Fix resolution of similar values that could be implicitly converted between ``ExtendedString``, ``ExtendedFloat``,
+  ``ExtendedInt`` and ``ExtendedBool`` schema types to guarantee original data type explicitly defined are preserved.
+- Fix ``runningSeconds`` field reporting to be of ``float`` type although implicit ``int`` type conversion could occur.
 
 `3.5.0 <https://github.com/crim-ca/weaver/tree/3.5.0>`_ (2021-08-19)
 ========================================================================

@@ -187,30 +187,121 @@ class ExtendedBoolean(colander.Boolean):
         """
         Initializes the extended boolean schema node.
 
-        The arguments :paramref:`true_choices` and :paramref:`false_choices` are defined
-        as ``"true"`` and ``"false"`` since :mod:`colander` converts the value to string lowercase
-        to compare with other truthy/falsy values it should accept.
+        When arguments :paramref:`true_choices` or :paramref:`false_choices` are provided, the corresponding string
+        values are respectively considered as valid `truthy`/`falsy` values. Otherwise (default), ``strict`` values
+        only of explicit type :class:`bool` will be considered valid.
 
-        Do **NOT** add other values like ``"1"`` to avoid conflict with ``Integer`` type for schemas that support
-        both variants. This boolean schema is a *strict* representation of *only* :class:`bool` type.
-
-        If an `OpenAPI` field is expected to support truthy/falsy values, it should explicitly define its schema using
+        When values are specified :mod:`colander` converts them to string lowercase to compare against `truthy`/`falsy`
+        values it should accept. For real `OpenAPI` typing validation, do **NOT** add other values like ``"1"`` to
+        avoid conflict with :class:`ExtendedInteger` type for schemas that support both variants.  If an `OpenAPI`
+        field is expected to support `truthy`/`falsy` values, it is recommended to explicitly define its schema using
         a ``oneOf`` keyword of all relevant schemas it supports, an any applicable validators for explicit values.
+        This is the safest way to ensure the generated `OpenAPI` schema corresponds to expected type validation.
         """
-        if true_choices is None:
-            true_choices = ("true", )
-        if false_choices is None:
-            false_choices = ("false", )
-        super(ExtendedBoolean, self).__init__(true_choices=true_choices, false_choices=false_choices, *args, **kwargs)
+        if true_choices is None and false_choices is None:
+            # use strict variant
+            self.true_choices = ()
+            self.false_choices = ()
+            self.true_val = "true"
+            self.false_val = "false"
+            self.false_reprs = [str(False)]
+            self.true_reprs = [str(True)]
+        else:
+            # use normal variant (bool-like values)
+            true_choices = true_choices if true_choices else ("true", )
+            false_choices = false_choices if false_choices else ("false", )
+            super(ExtendedBoolean, self).__init__(
+                *args, true_choices=true_choices, false_choices=false_choices, **kwargs
+            )
 
-    def serialize(self, node, cstruct):  # pylint: disable=W0221
-        result = super(ExtendedBoolean, self).serialize(node, cstruct)
+    def deserialize(self, node, cstruct):
+        if cstruct is colander.null:
+            return cstruct
+
+        # strict type variant
+        if not self.true_choices and not self.false_choices:
+            # note: cannot compare with literal 'True' and 'False' since '0' and '1' are equivalent (implicit convert)
+            if isinstance(cstruct, bool):
+                return cstruct
+            raise colander.Invalid(node, colander._("\"${val}\" is neither True or False.", mapping={"val": cstruct}))
+
+        # normal type variant
+        result = super(ExtendedBoolean, self).deserialize(node, cstruct)
         if result is not colander.null:
             result = result == "true"
         return result
 
 
-class ExtendedFloat(colander.Float):
+class ExtendedNumber(colander.Number):
+    """
+    Definition of a numeric value, either explicitly or implicit with permissive :class:`str` representation.
+
+    Behaviour in each case:
+        - ``strict=True`` and ``allow_string=False``:
+          Value can only be explicit numeric type that matches exactly the base ``num`` type (default).
+          All implicit conversion between :class:`float`, :class:`int` or :class:`str` are disallowed.
+        - ``strict=True`` and ``allow_string=True``:
+          Value can be the explicit numeric type (:class:`int` or :class:`float`) or a numeric :class:`str` value
+          representing the corresponding base numeric type.
+          Implicit conversion between :class:`float` and :class:`int` is still disallowed.
+        - ``strict=False`` (``allow_string`` doesn't matter):
+          Value can be anything as long as it can be converted to the expected numeric type
+          (:class:`int` or :class:`float`).
+
+    Recommended usage:
+        - When making `OpenAPI` schema definitions for JSON body elements within a request or response object, default
+          parameters ``strict=True`` and ``allow_string=False`` should be used to ensure the numeric type is respected.
+          As for other literal data `Extended` schema types, keyword `oneOf` should be used when multiple similar value
+          types are permitted for a field in order to document in `OpenAPI` the specific type definitions of expected
+          data, which is automatically converted by ``json`` properties of request and response classes.
+        - When defining `OpenAPI` query parameters, ``strict=True`` and ``allow_string=True`` should be used. This
+          ensures that documented schemas still indicate only the numeric type as expected data format, although
+          technically the ``path`` of the request will contain a :class:`str` representing the number. Queries are not
+          automatically converted by request objects, but will be converted and validated as the explicit number
+          following deserialization when using those configuration parameters.
+    """
+
+    def __init__(self, *_, allow_string=False, strict=True, **__):
+        # default applied based on 'strict' in kwargs
+        # then, make even stricter number validation if requested
+        super(ExtendedNumber, self).__init__(*_, **__)
+        if strict:
+            self.num = self.number if allow_string else self.strict
+
+    @staticmethod
+    @abstractmethod
+    def number(num):
+        raise NotImplementedError
+
+    @staticmethod
+    @abstractmethod
+    def strict(num):
+        raise NotImplementedError
+
+
+class ExtendedFloat(ExtendedNumber, colander.Float):
+    """
+    Float definition with strict typing validation by default.
+
+    This is to distinguish it from explicit definitions of ``float``-like numbers or strings.
+    By default, values such as ``"1"``, ``1.0``, ``True`` will not be automatically converted to equivalent ``1.0``.
+    """
+    def __init__(self, *_, allow_string=False, strict=True, **__):
+        colander.Float.__init__(self)
+        ExtendedNumber.__init__(self, *_, strict=strict, allow_string=allow_string, **__)
+
+    @staticmethod
+    def number(num):
+        if (isinstance(num, str) and "." in num) or isinstance(num, float):
+            return float(num)
+        raise ValueError("Value is not a Floating point number (Integer not allowed).")
+
+    @staticmethod
+    def strict(num):
+        if not isinstance(num, float):
+            raise ValueError("Value is not a Floating point number (Boolean, Integer and String not allowed).")
+        return num
+
     def serialize(self, node, cstruct):  # pylint: disable=W0221
         result = super(ExtendedFloat, self).serialize(node, cstruct)
         if result is not colander.null:
@@ -218,7 +309,33 @@ class ExtendedFloat(colander.Float):
         return result
 
 
-class ExtendedInteger(colander.Integer):
+class ExtendedInteger(ExtendedNumber, colander.Integer):
+    """
+    Integer definition with strict typing validation by default.
+
+    This is to distinguish it from explicit definitions of ``integer``-like numbers or strings.
+    By default, values such as ``"1"``, ``1.0``, ``True`` will not be automatically converted to equivalent ``1``.
+    """
+    def __init__(self, *_, allow_string=False, strict=True, **__):
+        colander.Integer.__init__(self)
+        ExtendedNumber.__init__(self, *_, strict=strict, allow_string=allow_string, **__)
+
+    @staticmethod
+    def number(num):
+        if not float(num).is_integer() or isinstance(num, bool):
+            raise ValueError("Value is not an Integer number (Float not allowed).")
+        return int(num)
+
+    @staticmethod
+    def strict(num):
+        # note:
+        #  - original colander function does not handle all cases
+        #    (e.g.: float("1.23").is_integer() -> False, but still not a float)
+        #  - furthermore, True/False are considered 'int', so must double check for 'bool'
+        if not isinstance(num, int) or isinstance(num, bool):
+            raise ValueError("Value is not a Integer number (Boolean, Float and String not allowed).")
+        return num
+
     def serialize(self, node, cstruct):  # pylint: disable=W0221
         result = super(ExtendedInteger, self).serialize(node, cstruct)
         if result is not colander.null:
@@ -998,6 +1115,8 @@ class PermissiveMappingSchema(ExtendedMappingSchema):
     def __init__(self, *args, **kwargs):
         kwargs["unknown"] = "preserve"
         super(PermissiveMappingSchema, self).__init__(*args, **kwargs)
+        # sub-type mapping itself must also have 'preserve' such that its own 'deserialize' copies the fields over
+        self.typ.unknown = "preserve"
 
 
 class KeywordMapper(ExtendedMappingSchema):
@@ -1106,7 +1225,7 @@ class KeywordMapper(ExtendedMappingSchema):
         """
         raise NotImplementedError
 
-    def _deserialize_subnode(self, node, cstruct):
+    def _deserialize_subnode(self, node, cstruct, index):
         """
         Deserialization and validation of sub-nodes under a keyword-based schema definition.
 
@@ -1129,7 +1248,9 @@ class KeywordMapper(ExtendedMappingSchema):
             - :class:`ExtendedSchemaNode`
         """
         if not node.name:
-            node.name = _get_node_name(self, schema_name=True)  # pass down the parent name
+            # pass down the parent name for reference, but with an index to distinguish from it
+            # distinction is also important such that generated schema definitions in OpenAPI don't override each other
+            node.name = _get_node_name(self, schema_name=True) + "." + str(index)
         if isinstance(node, KeywordMapper):
             return KeywordMapper.deserialize(node, cstruct)
         return ExtendedSchemaNode.deserialize(node, cstruct)
@@ -1328,10 +1449,10 @@ class OneOfKeywordSchema(KeywordMapper):
         invalid_one_of = dict()
         valid_one_of = []
         valid_nodes = []
-        for schema_class in self._one_of:  # noqa
+        for index, schema_class in enumerate(self._one_of):  # noqa
             try:
                 schema_class = _make_node_instance(schema_class)
-                result = self._deserialize_subnode(schema_class, cstruct)
+                result = self._deserialize_subnode(schema_class, cstruct, index)
                 valid_one_of.append(result)
                 valid_nodes.append(schema_class)
             except colander.Invalid as invalid:
@@ -1387,6 +1508,9 @@ class OneOfKeywordSchema(KeywordMapper):
                     "Must be only one of: {}.".format(valid_values)
                 )
 
+        # not a single valid sub-node was found
+        if self.missing is colander.drop:
+            return colander.drop
         raise colander.Invalid(node=self, msg=message, value=cstruct)
 
 
@@ -1438,12 +1562,12 @@ class AllOfKeywordSchema(KeywordMapper):
         required_all_of = dict()
         missing_all_of = dict()
         merged_all_of = dict()
-        for schema_class in self._all_of:  # noqa
+        for index, schema_class in enumerate(self._all_of):  # noqa
             try:
                 schema_class = _make_node_instance(schema_class)
                 # update items with new ones
                 required_all_of.update({_get_node_name(schema_class, schema_name=True): str(schema_class)})
-                merged_all_of.update(self._deserialize_subnode(schema_class, cstruct))
+                merged_all_of.update(self._deserialize_subnode(schema_class, cstruct, index))
             except colander.Invalid as invalid:
                 missing_all_of.update({_get_node_name(invalid.node, schema_name=True): str(invalid)})
 
@@ -1537,12 +1661,12 @@ class AnyOfKeywordSchema(KeywordMapper):
         option_any_of = dict()
         merged_any_of = colander.null
         invalid_any_of = colander.Invalid(node=self)
-        for schema_class in self._any_of:  # noqa
+        for index, schema_class in enumerate(self._any_of):  # noqa
             try:
                 schema_class = _make_node_instance(schema_class)
                 # update items with new ones
                 option_any_of.update({_get_node_name(schema_class, schema_name=True): str(schema_class)})
-                result = self._deserialize_subnode(schema_class, cstruct)
+                result = self._deserialize_subnode(schema_class, cstruct, index)
                 if result not in (colander.drop, colander.null):
                     # technically not supposed to have 'Sequence' type since they can only have one child
                     # only possibility is all similar objects or all literals because of '_keyword_schemas_same_struct'
@@ -1630,10 +1754,10 @@ class NotKeywordSchema(KeywordMapper):
         Raise if any sub-node schema that should NOT be present was successfully validated.
         """
         invalid_not = dict()
-        for schema_class in self._not:  # noqa
+        for index, schema_class in enumerate(self._not):  # noqa
             try:
                 schema_class = _make_node_instance(schema_class)
-                result = self._deserialize_subnode(schema_class, cstruct)
+                result = self._deserialize_subnode(schema_class, cstruct, index)
                 if isinstance(result, dict) and not len(result):
                     continue  # allow empty result meaning every item was missing and dropped
                 invalid_names = [node.name for node in schema_class.children]

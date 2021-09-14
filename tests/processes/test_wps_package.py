@@ -247,7 +247,7 @@ def test_stdout_stderr_logging_for_commandline_tool_success():
     Execute a process and assert that stdout is correctly logged to log file upon successful process execution.
     """
     with contextlib.ExitStack() as stack:
-        xml_file = stack.enter_context(tempfile.NamedTemporaryFile(suffix=".xml"))
+        xml_file = stack.enter_context(tempfile.NamedTemporaryFile(suffix=".xml"))  # noqa
         workdir = stack.enter_context(tempfile.TemporaryDirectory())
         process = MockProcess(shell_command="echo")
         wps_package_instance = MockWpsPackage(identifier=process["id"], title=process["title"],
@@ -273,7 +273,7 @@ def test_stdout_stderr_logging_for_commandline_tool_failure():
     Execute a process and assert that stderr is correctly logged to log file upon failing process execution.
     """
     with contextlib.ExitStack() as stack:
-        xml_file = stack.enter_context(tempfile.NamedTemporaryFile(suffix=".xml"))
+        xml_file = stack.enter_context(tempfile.NamedTemporaryFile(suffix=".xml"))  # noqa
         workdir = stack.enter_context(tempfile.TemporaryDirectory())
         process = MockProcess(shell_command="not_existing_command")
     wps_package_instance = MockWpsPackage(identifier=process["id"], title=process["title"],

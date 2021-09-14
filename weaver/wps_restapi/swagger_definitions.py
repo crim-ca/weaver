@@ -604,10 +604,14 @@ class FormatSelection(OneOfKeywordSchema):
     ]
 
 
-class FormatExtra(ExtendedMappingSchema):
-    maximumMegabytes = ExtendedSchemaNode(Integer(), missing=drop)
+# only extra portion from:
+# https://github.com/opengeospatial/ogcapi-processes/blob/e6893b/extensions/workflows/openapi/workflows.yaml#L1538-L1547
+class FormatDescription(ExtendedMappingSchema):
+    maximumMegabytes = ExtendedSchemaNode(Integer(), missing=drop, validator=Range(min=1))
 
 
+# although original schema defines 'default' in above 'FormatDescription', separate it in order to omit it
+# from 'ResultFormat' employed for result reporting, which shouldn't have a default (applied vs supported format)
 class FormatDefault(ExtendedMappingSchema):
     default = ExtendedSchemaNode(
         Boolean(), missing=drop, default=False,
@@ -618,23 +622,20 @@ class FormatDefault(ExtendedMappingSchema):
     )
 
 
-class DescriptionFormat(Format, FormatExtra, FormatDefault):
-    # NOTE:
-    #  The 'OGC-API' suggest to use 'mediaType' field for FormatType, but retro-compatibility is supported,
-    #  FormatType can be with either old 'mimeType' or new 'mediaType' during deployment,
-    #  but only 'mediaType' is used for description
+class DescriptionFormat(Format, FormatDescription, FormatDefault):
     pass
 
 
-class DeploymentFormat(FormatSelection, FormatExtra, FormatDefault):
+class DeploymentFormat(FormatSelection, FormatDescription, FormatDefault):
     # NOTE:
-    #  The 'OGC-API' suggest to use 'mediaType' field for FormatType, but retro-compatibility is supported,
-    #  FormatType can be with either old 'mimeType' or new 'mediaType' during deployment,
-    #  but only 'mediaType' is used for description
+    #   The 'OGC-API' suggest to use 'mediaType' field for format representation, but retro-compatibility is
+    #   supported during deployment only, where either old 'mimeType' or new 'mediaType', but only 'mediaType'
+    #   is used for process description and result reporting. This support is added for deployment so that
+    #   pre-existing deploy definitions remain valid without need to update them.
     pass
 
 
-class FormatMedia(FormatExtra):
+class ResultFormat(FormatDescription):
     """
     Format employed for reference results respecting 'OGC-API - Processes' schemas.
     """
@@ -835,64 +836,6 @@ class BoundingBoxInputType(ExtendedMappingSchema):
     supportedCRS = SupportedCRSList()
 
 
-class LiteralReference(ExtendedMappingSchema):
-    reference = ReferenceURL()
-
-
-class NameReferenceType(ExtendedMappingSchema):
-    schema_ref = "{}/master/core/openapi/schemas/nameReferenceType.yaml".format(OGC_API_SCHEMA_URL)
-    name = ExtendedSchemaNode(String())
-    reference = ReferenceURL(missing=drop)
-
-
-class DataTypeSchema(NameReferenceType):
-    description = "Type of the literal data representation."
-    title = "DataType"
-    # any named type that can be converted by: 'weaver.processes.convert.any2wps_literal_datatype'
-    name = ExtendedSchemaNode(String(), validator=OneOf(list(WPS_LITERAL_DATA_TYPE_NAMES)))
-
-
-class UomSchema(NameReferenceType):
-    title = "UnitOfMeasure"
-
-
-class AllowedValuesList(ExtendedSequenceSchema):
-    allowedValues = ExtendedSchemaNode(String())
-
-
-class AllowedValues(ExtendedMappingSchema):
-    """
-    Allows string values (enum).
-    """
-    allowedValues = AllowedValuesList()
-
-
-class AllowedRange(ExtendedMappingSchema):
-    minimumValue = ExtendedSchemaNode(String(), missing=drop)
-    maximumValue = ExtendedSchemaNode(String(), missing=drop)
-    spacing = ExtendedSchemaNode(String(), missing=drop)
-    rangeClosure = ExtendedSchemaNode(String(), missing=drop,
-                                      validator=OneOf(["closed", "open", "open-closed", "closed-open"]))
-
-
-class AllowedRangesList(ExtendedSequenceSchema):
-    allowedRanges = AllowedRange()
-
-
-class AllowedRanges(ExtendedMappingSchema):
-    allowedRanges = AllowedRangesList()
-
-
-class AnyValue(ExtendedMappingSchema):
-    anyValue = ExtendedSchemaNode(Boolean(), missing=drop, default=True)
-
-
-class ValuesReference(ReferenceURL):
-    """
-    URL where to retrieve applicable values.
-    """
-
-
 # FIXME: support byte/binary type (string + format:byte) ?
 #   https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/binaryInputValue.yaml
 class AnyLiteralType(OneOfKeywordSchema):
@@ -912,24 +855,95 @@ class AnyLiteralType(OneOfKeywordSchema):
     ]
 
 
-class SequenceStringType(ExtendedSequenceSchema):
-    value_item = ExtendedSchemaNode(String())
-
-
-class SequenceBooleanType(ExtendedSequenceSchema):
-    value_item = ExtendedSchemaNode(Boolean())
-
-
-class SequenceNumberType(ExtendedSequenceSchema):
-    value_item = ExtendedSchemaNode(Float())
-
-
-class ArrayLiteralType(OneOfKeywordSchema):
+class NumberType(OneOfKeywordSchema):
+    """
+    Represents a literal number, integer or float.
+    """
     _one_of = [
-        SequenceNumberType(),
-        SequenceBooleanType(),
-        SequenceStringType()
+        ExtendedSchemaNode(Float()),
+        ExtendedSchemaNode(Integer()),
     ]
+
+
+class NumericType(OneOfKeywordSchema):
+    """
+    Represents a numeric-like value.
+    """
+    _one_of = [
+        ExtendedSchemaNode(Float()),
+        ExtendedSchemaNode(Integer()),
+        ExtendedSchemaNode(String(), pattern="^[0-9]+$"),
+    ]
+
+
+class LiteralReference(ExtendedMappingSchema):
+    reference = ReferenceURL()
+
+
+# https://github.com/opengeospatial/ogcapi-processes/blob/e6893b/extensions/workflows/openapi/workflows.yaml#L1707-L1716
+class NameReferenceType(ExtendedMappingSchema):
+    schema_ref = "{}/master/core/openapi/schemas/nameReferenceType.yaml".format(OGC_API_SCHEMA_URL)
+    name = ExtendedSchemaNode(String())
+    reference = ReferenceURL(missing=drop, description="Reference URL to schema definition of the named entity.")
+
+
+class DataTypeSchema(NameReferenceType):
+    description = "Type of the literal data representation."
+    title = "DataType"
+    # any named type that can be converted by: 'weaver.processes.convert.any2wps_literal_datatype'
+    name = ExtendedSchemaNode(String(), validator=OneOf(list(WPS_LITERAL_DATA_TYPE_NAMES)))
+
+
+class UomSchema(NameReferenceType):
+    title = "UnitOfMeasure"
+
+
+# https://github.com/opengeospatial/ogcapi-processes/blob/e6893b/extensions/workflows/openapi/workflows.yaml#L1423
+# NOTE: Original is only 'string', but we allow any literal type
+class AllowedValuesList(ExtendedSequenceSchema):
+    value = AnyLiteralType()
+
+
+# https://github.com/opengeospatial/ogcapi-processes/blob/e6893b/extensions/workflows/openapi/workflows.yaml#L1772-L1787
+# NOTE:
+#   Contrary to original schema where all fields are 'string', we allow any literal type as well since those make more
+#   sense when parsing corresponding data values (eg: float, integer, bool).
+class AllowedRange(ExtendedMappingSchema):
+    minimumValue = NumericType(missing=drop)
+    maximumValue = NumericType(missing=drop)
+    spacing = NumericType(missing=drop)
+    rangeClosure = ExtendedSchemaNode(String(), missing=drop,
+                                      validator=OneOf(["closed", "open", "open-closed", "closed-open"]))
+
+
+class AllowedRangesList(ExtendedSequenceSchema):
+    range = AllowedRange()
+
+
+class AllowedValues(OneOfKeywordSchema):
+    _one_of = [
+        AllowedRangesList(description="List of value ranges and contrains."),   # array of {range}
+        AllowedValuesList(description="List of enumerated allowed values."),    # array of "value"
+        ExtendedSchemaNode(String(), description="Single allowed value."),      # single "value"
+    ]
+
+
+# https://github.com/opengeospatial/ogcapi-processes/blob/e6893b/extensions/workflows/openapi/workflows.yaml#L1425-L1430
+class AnyValue(ExtendedMappingSchema):
+    anyValue = ExtendedSchemaNode(
+        Boolean(), missing=drop, default=True,
+        description="Explicitly indicate if any value is allowed. "
+                    "This is the default behaviour if no other constrains are specified."
+    )
+
+
+# https://github.com/opengeospatial/ogcapi-processes/blob/e6893b/extensions/workflows/openapi/workflows.yaml#L1801-L1803
+class ValuesReference(ReferenceURL):
+    description = "URL where to retrieve applicable values."
+
+
+class ArrayLiteralType(ExtendedSequenceSchema):
+    value_item = AnyLiteralType()
 
 
 class ArrayLiteralDataType(ExtendedMappingSchema):
@@ -952,38 +966,53 @@ class AnyLiteralDefaultType(ExtendedMappingSchema):
     default = AnyLiteralType()
 
 
-class LiteralDataDomainDefinition(ExtendedMappingSchema):
-    default = AnyLiteralDefaultType()
-    defaultValue = ExtendedSchemaNode(String(), missing=drop)
-    dataType = DataTypeSchema(missing=drop)
-    uom = UomSchema(missing=drop)
-
-
 class LiteralDataValueDefinition(OneOfKeywordSchema):
     _one_of = [
-        AllowedValues,
-        AllowedRanges,
-        ValuesReference,
-        AnyValue,  # must be last because it's the most permissive (always valid, default)
+        AllowedValues(description="Constraints of allowed values."),
+        ValuesReference(description="Reference URL where to retrieve allowed values."),
+        # 'AnyValue' must be last because it's the most permissive (always valid, default)
+        AnyValue(description="Permissive definition for any allowed value."),
     ]
 
 
-class LiteralDataDomainConstraints(LiteralDataDomainDefinition):
-    valueDefinition = LiteralDataValueDefinition()
+# https://github.com/opengeospatial/ogcapi-processes/blob/e6893b/extensions/workflows/openapi/workflows.yaml#L1675-L1688
+#  literalDataDomain:
+#    valueDefinition: oneOf(<allowedValues, anyValue, valuesReference>)
+#    defaultValue: <string>
+#    dataType: <nameReferenceType>
+#    uom: <nameReferenceType>
+class LiteralDataDomain(ExtendedMappingSchema):
+    default = ExtendedSchemaNode(Boolean(), default=True,
+                                 description="Indicates if this literal data domain definition is the default one.")
+    defaultValue = AnyLiteralType(missing=drop, description="Default value to employ if none was provided.")
+    dataType = DataTypeSchema(missing=drop, description="Type name and reference of the literal data representation.")
+    uom = UomSchema(missing=drop, description="Unit of measure applicable for the data.")
+    valueDefinition = LiteralDataValueDefinition(description="Literal data domain constraints.")
 
 
 class LiteralDataDomainList(ExtendedSequenceSchema):
     """
     Constraints that apply to the literal data values.
     """
-    literalDataDomain = LiteralDataDomainConstraints()
+    literalDataDomain = LiteralDataDomain()
 
 
-class LiteralInputType(NotKeywordSchema, ExtendedMappingSchema):
+# https://github.com/opengeospatial/ogcapi-processes/blob/e6893b/extensions/workflows/openapi/workflows.yaml#L1689-L1697
+class LiteralDataType(NotKeywordSchema, ExtendedMappingSchema):
+    # NOTE:
+    #   Apply 'missing=drop' although original schema of 'literalDataDomains' (see link above) requires it because
+    #   we support omitting it for minimalistic literal input definition.
+    #   This is because our schema validation allows us to do detection of 'basic' types using the literal parsing.
+    #   Because there is not explicit requirement though (ie: missing would fail schema validation), we must check
+    #   that 'format' is not present to avoid conflict with minimalistic literal data definition in case of ambiguity.
+    literalDataDomains = LiteralDataDomainList(missing=drop)
     _not = [
         DescribeWithFormats,
     ]
-    literalDataDomains = LiteralDataDomainList(missing=drop)
+
+
+class LiteralInputType(LiteralDataType):
+    pass
 
 
 class DescribeInputTypeDefinition(OneOfKeywordSchema):
@@ -1090,11 +1119,8 @@ class DeployInputTypeAny(OneOfKeywordSchema):
     ]
 
 
-class LiteralOutputType(NotKeywordSchema, ExtendedMappingSchema):
-    _not = [
-        DescribeWithFormats,
-    ]
-    literalDataDomains = LiteralDataDomainList(missing=drop)
+class LiteralOutputType(LiteralDataType):
+    pass
 
 
 class BoundingBoxOutputType(ExtendedMappingSchema):
@@ -2395,15 +2421,15 @@ class JobStatusInfo(ExtendedMappingSchema):
     # note: using String instead of Time because timedelta object cannot be directly handled (missing parts at parsing)
     duration = ExtendedSchemaNode(String(), missing=drop,
                                   description="Duration since the start of the process execution.")
-    runningSeconds = ExtendedSchemaNode(Integer(), missing=drop,
-                                        description="Duration in seconds since the start of the process execution.")
+    runningSeconds = NumberType(missing=drop,
+                                description="Duration in seconds since the start of the process execution.")
     expirationDate = ExtendedSchemaNode(DateTime(), missing=drop,
                                         description="Timestamp when the job will be canceled if not yet completed.")
     estimatedCompletion = ExtendedSchemaNode(DateTime(), missing=drop)
     nextPoll = ExtendedSchemaNode(DateTime(), missing=drop,
                                   description="Timestamp when the job will prompted for updated status details.")
-    percentCompleted = ExtendedSchemaNode(Integer(), example=0, validator=Range(min=0, max=100),
-                                          description="Completion percentage of the job as indicated by the process.")
+    percentCompleted = NumberType(example=0, validator=Range(min=0, max=100),
+                                  description="Completion percentage of the job as indicated by the process.")
     links = LinkList(missing=drop)
 
 
@@ -2831,7 +2857,7 @@ class BuiltinRequirementClass(BuiltinRequirementSpecification):
     _class = RequirementClass(example=CWL_REQUIREMENT_APP_BUILTIN, validator=OneOf([CWL_REQUIREMENT_APP_BUILTIN]))
 
 
-class ESGF_CWT_RequirementSpecification(PermissiveMappingSchema):
+class ESGF_CWT_RequirementSpecification(PermissiveMappingSchema):  # noqa: N802
     title = CWL_REQUIREMENT_APP_ESGF_CWT
     description = (
         "Hint indicating that the Application Package corresponds to an ESGF-CWT provider process"
@@ -3182,9 +3208,14 @@ class JobOutputList(ExtendedSequenceSchema):
     output = JobOutput(description="Job output result with specific keyword according to represented format.")
 
 
-# implement only literal part of:
-#   https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/master/core/openapi/schemas/inlineOrRefData.yaml
-class ResultLiteral(AnyLiteralValueType, LiteralDataDomainDefinition):
+# implement only literal parts from following schemas:
+# https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/master/core/openapi/schemas/inlineOrRefData.yaml
+# https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/master/core/openapi/schemas/qualifiedInputValue.yaml
+#
+# Other parts are implemented separately with:
+#   - 'ValueFormatted' (qualifiedInputValue)
+#   - 'ResultReference' (link)
+class ResultLiteral(AnyLiteralValueType):
     # value = <AnyLiteralValueType>
     pass
 
@@ -3199,7 +3230,7 @@ class ValueFormatted(ExtendedMappingSchema):
         example="<xml><data>test</data></xml>",
         description="Formatted content value of the result."
     )
-    format = FormatMedia()
+    format = ResultFormat()
 
 
 class ValueFormattedList(ExtendedSequenceSchema):
@@ -3208,7 +3239,7 @@ class ValueFormattedList(ExtendedSequenceSchema):
 
 class ResultReference(ExtendedMappingSchema):
     href = ReferenceURL(description="Result file reference.")
-    format = FormatMedia()
+    format = ResultFormat()
 
 
 class ResultReferenceList(ExtendedSequenceSchema):
@@ -3378,8 +3409,8 @@ class GetJobsQueries(ExtendedMappingSchema):
     groups = ExtendedSchemaNode(String(),
                                 description="Comma-separated list of grouping fields with which to list jobs.",
                                 default=False, example="process,service", missing=drop)
-    page = ExtendedSchemaNode(Integer(), missing=0, default=0, validator=Range(min=0))
-    limit = ExtendedSchemaNode(Integer(), missing=10, default=10, validator=Range(min=0, max=10000))
+    page = ExtendedSchemaNode(Integer(allow_string=True), missing=0, default=0, validator=Range(min=0))
+    limit = ExtendedSchemaNode(Integer(allow_string=True), missing=10, default=10, validator=Range(min=0, max=10000))
     datetime = DateTimeInterval(missing=drop, default=None)
     status = JobStatusEnum(missing=drop, default=None)
     process = AnyIdentifier(missing=drop)

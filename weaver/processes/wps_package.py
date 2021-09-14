@@ -523,7 +523,7 @@ def _get_package_io(package_factory, io_select, as_json):
     else:
         raise PackageTypeError("Unknown I/O selection: '{}'.".format(io_select))
     cwl_package_io = getattr(package_factory.t, io_attrib)
-    wps_package_io = [cwl2wps_io(io, io_select) for io in cwl_package_io["fields"]]
+    wps_package_io = [cwl2wps_io(io_item, io_select) for io_item in cwl_package_io["fields"]]
     if as_json:
         return [wps2json_io(io) for io in wps_package_io]
     return wps_package_io

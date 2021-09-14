@@ -1,0 +1,271 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- PyWPS 4.4.0 -->
+<wps:ProcessDescriptions xmlns:wps="http://www.opengis.net/wps/1.0.0" xmlns:ows="http://www.opengis.net/ows/1.1"
+                         xmlns:xlink="http://www.w3.org/1999/xlink"
+                         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                         xsi:schemaLocation="http://www.opengis.net/wps/1.0.0 ../wpsDescribeProcess_response.xsd"
+                         service="WPS" version="1.0.0" xml:lang="en-US">
+    <ProcessDescription wps:processVersion="0.1" storeSupported="true" statusSupported="true">
+        <ows:Identifier>ensemble_grid_point_cold_spell_duration_index</ows:Identifier>
+        <ows:Title>Cold spell duration index.</ows:Title>
+        <ows:Abstract>Number of days with at least six consecutive days where the daily minimum temperature is below the
+            10th percentile.
+        </ows:Abstract>
+        <DataInputs>
+            <Input minOccurs="1" maxOccurs="100">
+                <ows:Identifier>lat</ows:Identifier>
+                <ows:Title>Latitude</ows:Title>
+                <ows:Abstract>Latitude coordinate. Accepts a comma separated list of floats for multiple grid cells.
+                </ows:Abstract>
+                <LiteralData>
+                    <ows:DataType ows:reference="http://www.w3.org/TR/xmlschema-2/#string">string</ows:DataType>
+                </LiteralData>
+            </Input>
+            <Input minOccurs="1" maxOccurs="100">
+                <ows:Identifier>lon</ows:Identifier>
+                <ows:Title>Longitude</ows:Title>
+                <ows:Abstract>Longitude coordinate. Accepts a comma separated list of floats for multiple grid cells.
+                </ows:Abstract>
+                <LiteralData>
+                    <ows:DataType ows:reference="http://www.w3.org/TR/xmlschema-2/#string">string</ows:DataType>
+                </LiteralData>
+            </Input>
+            <Input minOccurs="0" maxOccurs="1">
+                <ows:Identifier>start_date</ows:Identifier>
+                <ows:Title>Initial date</ows:Title>
+                <ows:Abstract>Initial date for temporal subsetting. Can be expressed as year (%Y), year-month (%Y-%m) or
+                    year-month-day(%Y-%m-%d). Defaults to first day in file.
+                </ows:Abstract>
+                <LiteralData>
+                    <ows:DataType ows:reference="http://www.w3.org/TR/xmlschema-2/#string">string</ows:DataType>
+                </LiteralData>
+            </Input>
+            <Input minOccurs="0" maxOccurs="1">
+                <ows:Identifier>end_date</ows:Identifier>
+                <ows:Title>Final date</ows:Title>
+                <ows:Abstract>Final date for temporal subsetting. Can be expressed as year (%Y), year-month (%Y-%m) or
+                    year-month-day(%Y-%m-%d). Defaults to last day in file.
+                </ows:Abstract>
+                <LiteralData>
+                    <ows:DataType ows:reference="http://www.w3.org/TR/xmlschema-2/#string">string</ows:DataType>
+                </LiteralData>
+            </Input>
+            <Input minOccurs="0" maxOccurs="1">
+                <ows:Identifier>ensemble_percentiles</ows:Identifier>
+                <ows:Title>Ensemble percentiles</ows:Title>
+                <ows:Abstract>Ensemble percentiles to calculate for input climate simulations. Accepts a comma separated
+                    list of integers.
+                </ows:Abstract>
+                <LiteralData>
+                    <ows:DataType ows:reference="http://www.w3.org/TR/xmlschema-2/#string">string</ows:DataType>
+                    <DefaultValue>10,50,90</DefaultValue>
+                </LiteralData>
+            </Input>
+            <Input minOccurs="0" maxOccurs="1">
+                <ows:Identifier>dataset_name</ows:Identifier>
+                <ows:Title>Dataset name</ows:Title>
+                <ows:Abstract>Name of the dataset from which to get netcdf files for inputs.</ows:Abstract>
+                <LiteralData>
+                    <ows:DataType ows:reference="http://www.w3.org/TR/xmlschema-2/#string">string</ows:DataType>
+                    <ows:AllowedValues>
+                        <ows:Value>bccaqv2</ows:Value>
+                    </ows:AllowedValues>
+                </LiteralData>
+            </Input>
+            <Input minOccurs="1" maxOccurs="1">
+                <ows:Identifier>rcp</ows:Identifier>
+                <ows:Title>RCP Scenario</ows:Title>
+                <ows:Abstract>Representative Concentration Pathway (RCP)</ows:Abstract>
+                <LiteralData>
+                    <ows:DataType ows:reference="http://www.w3.org/TR/xmlschema-2/#string">string</ows:DataType>
+                    <ows:AllowedValues>
+                        <ows:Value>rcp26</ows:Value>
+                        <ows:Value>rcp45</ows:Value>
+                        <ows:Value>rcp85</ows:Value>
+                    </ows:AllowedValues>
+                </LiteralData>
+            </Input>
+            <Input minOccurs="0" maxOccurs="1000">
+                <ows:Identifier>models</ows:Identifier>
+                <ows:Title>Models to include in ensemble</ows:Title>
+                <ows:Abstract>When calculating the ensemble, include only these models. By default, all 24 models are
+                    used.
+                </ows:Abstract>
+                <LiteralData>
+                    <ows:DataType ows:reference="http://www.w3.org/TR/xmlschema-2/#string">string</ows:DataType>
+                    <ows:AllowedValues>
+                        <ows:Value>24MODELS</ows:Value>
+                        <ows:Value>PCIC12</ows:Value>
+                        <ows:Value>BNU-ESM</ows:Value>
+                        <ows:Value>CCSM4</ows:Value>
+                        <ows:Value>CESM1-CAM5</ows:Value>
+                        <ows:Value>CNRM-CM5</ows:Value>
+                        <ows:Value>CSIRO-Mk3-6-0</ows:Value>
+                        <ows:Value>CanESM2</ows:Value>
+                        <ows:Value>FGOALS-g2</ows:Value>
+                        <ows:Value>GFDL-CM3</ows:Value>
+                        <ows:Value>GFDL-ESM2G</ows:Value>
+                        <ows:Value>GFDL-ESM2M</ows:Value>
+                        <ows:Value>HadGEM2-AO</ows:Value>
+                        <ows:Value>HadGEM2-ES</ows:Value>
+                        <ows:Value>IPSL-CM5A-LR</ows:Value>
+                        <ows:Value>IPSL-CM5A-MR</ows:Value>
+                        <ows:Value>MIROC-ESM-CHEM</ows:Value>
+                        <ows:Value>MIROC-ESM</ows:Value>
+                        <ows:Value>MIROC5</ows:Value>
+                        <ows:Value>MPI-ESM-LR</ows:Value>
+                        <ows:Value>MPI-ESM-MR</ows:Value>
+                        <ows:Value>MRI-CGCM3</ows:Value>
+                        <ows:Value>NorESM1-M</ows:Value>
+                        <ows:Value>NorESM1-ME</ows:Value>
+                        <ows:Value>bcc-csm1-1-m</ows:Value>
+                        <ows:Value>bcc-csm1-1</ows:Value>
+                    </ows:AllowedValues>
+                    <DefaultValue>24MODELS</DefaultValue>
+                </LiteralData>
+            </Input>
+            <Input minOccurs="0" maxOccurs="1">
+                <ows:Identifier>window</ows:Identifier>
+                <ows:Title>Window</ows:Title>
+                <ows:Abstract>Minimum number of days with temperature below threshold to qualify as a cold spell.
+                </ows:Abstract>
+                <LiteralData>
+                    <ows:DataType ows:reference="http://www.w3.org/TR/xmlschema-2/#integer">integer</ows:DataType>
+                    <DefaultValue>6</DefaultValue>
+                </LiteralData>
+            </Input>
+            <Input minOccurs="0" maxOccurs="1">
+                <ows:Identifier>freq</ows:Identifier>
+                <ows:Title>Frequency</ows:Title>
+                <ows:Abstract>Resampling frequency.</ows:Abstract>
+                <LiteralData>
+                    <ows:DataType ows:reference="http://www.w3.org/TR/xmlschema-2/#string">string</ows:DataType>
+                    <ows:AllowedValues>
+                        <ows:Value>YS</ows:Value>
+                        <ows:Value>MS</ows:Value>
+                        <ows:Value>QS-DEC</ows:Value>
+                        <ows:Value>AS-JUL</ows:Value>
+                    </ows:AllowedValues>
+                    <DefaultValue>YS</DefaultValue>
+                </LiteralData>
+            </Input>
+            <Input minOccurs="1" maxOccurs="1">
+                <ows:Identifier>check_missing</ows:Identifier>
+                <ows:Title>Missing value handling method</ows:Title>
+                <ows:Abstract>Method used to determine which aggregations should be considered missing.</ows:Abstract>
+                <LiteralData>
+                    <ows:DataType ows:reference="http://www.w3.org/TR/xmlschema-2/#string">string</ows:DataType>
+                    <ows:AllowedValues>
+                        <ows:Value>any</ows:Value>
+                        <ows:Value>wmo</ows:Value>
+                        <ows:Value>pct</ows:Value>
+                        <ows:Value>at_least_n</ows:Value>
+                        <ows:Value>skip</ows:Value>
+                        <ows:Value>from_context</ows:Value>
+                    </ows:AllowedValues>
+                    <DefaultValue>any</DefaultValue>
+                </LiteralData>
+            </Input>
+            <Input minOccurs="0" maxOccurs="1">
+                <ows:Identifier>missing_options</ows:Identifier>
+                <ows:Title>Missing method parameters</ows:Title>
+                <ows:Abstract>JSON representation of dictionary of missing method parameters.</ows:Abstract>
+                <ComplexData maximumMegabytes="200">
+                    <Default>
+                        <Format>
+                            <MimeType>application/json</MimeType>
+                        </Format>
+                    </Default>
+                    <Supported>
+                        <Format>
+                            <MimeType>application/json</MimeType>
+                        </Format>
+                    </Supported>
+                </ComplexData>
+            </Input>
+            <Input minOccurs="1" maxOccurs="1">
+                <ows:Identifier>cf_compliance</ows:Identifier>
+                <ows:Title>Strictness level for CF-compliance input checks.</ows:Title>
+                <ows:Abstract>Whether to log, warn or raise when inputs have non-CF-compliant attributes.</ows:Abstract>
+                <LiteralData>
+                    <ows:DataType ows:reference="http://www.w3.org/TR/xmlschema-2/#string">string</ows:DataType>
+                    <ows:AllowedValues>
+                        <ows:Value>log</ows:Value>
+                        <ows:Value>warn</ows:Value>
+                        <ows:Value>raise</ows:Value>
+                    </ows:AllowedValues>
+                    <DefaultValue>warn</DefaultValue>
+                </LiteralData>
+            </Input>
+            <Input minOccurs="1" maxOccurs="1">
+                <ows:Identifier>data_validation</ows:Identifier>
+                <ows:Title>Strictness level for data validation input checks.</ows:Title>
+                <ows:Abstract>Whether to log, warn or raise when inputs fail data validation checks.</ows:Abstract>
+                <LiteralData>
+                    <ows:DataType ows:reference="http://www.w3.org/TR/xmlschema-2/#string">string</ows:DataType>
+                    <ows:AllowedValues>
+                        <ows:Value>log</ows:Value>
+                        <ows:Value>warn</ows:Value>
+                        <ows:Value>raise</ows:Value>
+                    </ows:AllowedValues>
+                    <DefaultValue>raise</DefaultValue>
+                </LiteralData>
+            </Input>
+            <Input minOccurs="0" maxOccurs="1">
+                <ows:Identifier>output_format</ows:Identifier>
+                <ows:Title>Output format choice</ows:Title>
+                <ows:Abstract>Choose in which format you want to recieve the result</ows:Abstract>
+                <LiteralData>
+                    <ows:DataType ows:reference="http://www.w3.org/TR/xmlschema-2/#string">string</ows:DataType>
+                    <ows:AllowedValues>
+                        <ows:Value>netcdf</ows:Value>
+                        <ows:Value>csv</ows:Value>
+                    </ows:AllowedValues>
+                    <DefaultValue>netcdf</DefaultValue>
+                </LiteralData>
+            </Input>
+        </DataInputs>
+        <ProcessOutputs>
+            <Output>
+                <ows:Identifier>output</ows:Identifier>
+                <ows:Title>Result</ows:Title>
+                <ows:Abstract>The format depends on the 'output_format' input parameter.</ows:Abstract>
+                <ComplexOutput>
+                    <Default>
+                        <Format>
+                            <MimeType>application/x-netcdf</MimeType>
+                            <Encoding>base64</Encoding>
+                        </Format>
+                    </Default>
+                    <Supported>
+                        <Format>
+                            <MimeType>application/x-netcdf</MimeType>
+                            <Encoding>base64</Encoding>
+                        </Format>
+                        <Format>
+                            <MimeType>application/zip</MimeType>
+                            <Encoding>base64</Encoding>
+                        </Format>
+                    </Supported>
+                </ComplexOutput>
+            </Output>
+            <Output>
+                <ows:Identifier>output_log</ows:Identifier>
+                <ows:Title>Logging information</ows:Title>
+                <ows:Abstract>Collected logs during process run.</ows:Abstract>
+                <ComplexOutput>
+                    <Default>
+                        <Format>
+                            <MimeType>text/plain</MimeType>
+                        </Format>
+                    </Default>
+                    <Supported>
+                        <Format>
+                            <MimeType>text/plain</MimeType>
+                        </Format>
+                    </Supported>
+                </ComplexOutput>
+            </Output>
+        </ProcessOutputs>
+    </ProcessDescription>
+</wps:ProcessDescriptions>

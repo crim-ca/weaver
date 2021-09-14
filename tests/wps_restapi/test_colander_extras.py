@@ -4,32 +4,51 @@
 Tests for :mod:`weaver.wps_restapi.colander_extras` operations applied on :mod:`weaver.wps_restapi.swagger_definitions`
 objects.
 """
+import inspect
+from typing import TYPE_CHECKING
+
 import colander
 import pytest
 
 from weaver.wps_restapi import colander_extras as ce, swagger_definitions as sd
 
+if TYPE_CHECKING:
+    from typing import List, Tuple, Type, Union
+
+    from weaver.typedefs import JSON
+
+    TestSchema = Union[colander.SchemaNode, Type[colander.SchemaNode]]
+    TestValue = JSON
+    TestExpect = Union[JSON, colander.Invalid]
+
 
 def evaluate_test_cases(test_cases):
+    # type: (List[Tuple[TestSchema, TestValue, TestExpect]]) -> None
     """
     Evaluate a list of tuple of (SchemaType, Test-Value, Expected-Result).
 
     If ``Expected-Result`` is :class:`colander.Invalid``, the ``SchemaType`` deserialization should raise when
-    evaluation ``Test-Value``. Otherwise, the result from deserialization should equal exactly ``Expected-Result``.
+    evaluating ``Test-Value``. Otherwise, the result from deserialization should equal exactly ``Expected-Result``.
     """
 
-    for test_schema, test_value, test_expect in test_cases:
+    for test_schema_ref, test_value, test_expect in test_cases:
+        if inspect.isclass(test_schema_ref):
+            test_schema = test_schema_ref()
+            test_schema_name = test_schema_ref.__name__
+        else:
+            test_schema = test_schema_ref
+            test_schema_name = type(test_schema_ref).__name__
         try:
-            result = test_schema().deserialize(test_value)
+            result = test_schema.deserialize(test_value)
             if test_expect is colander.Invalid:
                 pytest.fail("Expected invalid format from [{}] with: {}, but received: {}".format(
-                    test_schema.__name__, test_value, result))
-            assert result == test_expect, "Bad result from [{}] with: {}".format(test_schema.__name__, test_value)
+                    test_schema_name, test_value, result))
+            assert result == test_expect, "Bad result from [{}] with: {}".format(test_schema_name, test_value)
         except colander.Invalid:
             if test_expect is colander.Invalid:
                 pass
             else:
-                pytest.fail("Expected valid format from [{}] with: {}".format(test_schema.__name__, test_value))
+                pytest.fail("Expected valid format from [{}] with: {}".format(test_schema_name, test_value))
 
 
 def test_oneof_io_formats_deserialize_as_mapping():
@@ -129,6 +148,69 @@ def test_oneof_nested_dict_list():
                                  .format(ce._get_node_name(test_schema), test_value, result))
 
 
+def test_oneof_dropable():
+    """
+    Using optional (dropable) ``oneOf`` with required sub-schema, failing deserialization should drop it entirely.
+
+    Keyword ``oneOf`` must still be respected regardless of optional status, as in, it must only allow a single
+    valid schema amongst allowed cases if value matches one of the definitions. Adding the drop option only *also*
+    allows it to match none of them.
+    """
+
+    class AnyMap(ce.PermissiveMappingSchema):
+        pass  # any field is ok
+
+    class OneOfStrMap(ce.OneOfKeywordSchema):
+        _one_of = [
+            ce.ExtendedSchemaNode(colander.String()),  # note: 'allow_empty=False' by default
+            AnyMap()
+        ]
+
+    schema = OneOfStrMap(missing=colander.drop)
+    evaluate_test_cases([
+        (schema, [], colander.drop),  # not a string nor mapping, but don't raise since drop allowed
+        (schema, "ok", "ok"),
+        (schema, {}, {}),   # since mapping is permissive, empty is valid
+        (schema, {"any": 123}, {"any": 123}),  # unknown field is also valid
+        # since OneOf[str,map], it is not possible to combine them
+    ])
+
+    class Map1(ce.ExtendedMappingSchema):
+        field1 = ce.ExtendedSchemaNode(colander.String())
+
+    class Map2(ce.ExtendedMappingSchema):
+        field2 = ce.ExtendedSchemaNode(colander.String())
+
+    class OneOfTwoMap(ce.OneOfKeywordSchema):
+        _one_of = [
+            Map1(),
+            Map2()
+        ]
+
+    schema = OneOfTwoMap(missing=colander.drop)
+    evaluate_test_cases([
+        (schema, [], colander.drop),  # not mapping, but don't raise since drop allowed
+        (schema, "", colander.drop),  # not mapping, but don't raise since drop allowed
+        (schema, {}, colander.drop),  # mapping, but not respecting sub-fields, don't raise since drop allowed
+        (schema, {"field1": 1}, colander.drop),  # mapping with good field name, but wrong type, drop since allowed
+        (schema, {"field1": "1", "field2": "2"}, colander.drop),  # cannot have both, don't raise since drop allowed
+        (schema, {"field1": "1"}, {"field1": "1"}),
+        (schema, {"field2": "2"}, {"field2": "2"}),
+    ])
+
+    # validate that the same definition above behaves normally (raise Invalid) when not dropable
+    schema = OneOfTwoMap()
+    evaluate_test_cases([
+        (schema, [], colander.Invalid),  # not mapping
+        (schema, "", colander.Invalid),  # not mapping
+        (schema, {}, colander.Invalid),  # mapping, but not respecting sub-fields
+        (schema, {"field1": 1}, colander.Invalid),  # mapping with good field name, but wrong type
+        (schema, {"field1": "1", "field2": "2"}, colander.Invalid),  # cannot have both mappings at the same time
+        (schema, {"field1": "1"}, {"field1": "1"}),
+        (schema, {"field2": "2"}, {"field2": "2"}),
+    ])
+
+
 def test_not_keyword_extra_fields_handling():
     """
     Using ``not`` keyword without any other schemas must return an empty mapping with additional fields dropped.
@@ -166,6 +248,175 @@ def test_not_keyword_extra_fields_handling():
         (MappingOnlyNotType, {"item": "valid", "value": "ignore"}, {})
     ]
     evaluate_test_cases(test_cases)
+
+
+def test_preserve_mapping():
+    class NormalMap(ce.ExtendedMappingSchema):
+        known = ce.ExtendedSchemaNode(ce.ExtendedInteger())
+
+    class PreserveMap(ce.PermissiveMappingSchema, NormalMap):  # inherit above 'known' field
+        pass
+
+    class Seq(ce.ExtendedSequenceSchema):
+        item = ce.ExtendedSchemaNode(ce.ExtendedFloat())
+
+    class ExtendMap(ce.PermissiveMappingSchema, NormalMap):  # inherit above 'known' field
+        other = Seq()
+
+    evaluate_test_cases([
+        (PreserveMap, {}, colander.Invalid),  # missing 'known' field
+        (PreserveMap, {"known": "str"}, colander.Invalid),  # invalid type for 'known' field
+        (PreserveMap, {"known": 1}, {"known": 1}),  # ok by itself
+        (PreserveMap, {"known": 1, "extra": 2}, {"known": 1, "extra": 2}),  # ok with extra unknown field to preserve
+        (NormalMap, {"known": 1, "extra": 2}, {"known": 1}),  # unknown field is drop in normal schema
+        (NormalMap, {"known": "A"}, colander.Invalid),
+        (ExtendMap, {"known": 1}, colander.Invalid),  # missing 'other' list
+        (ExtendMap, {"known": 1, "other": []}, {"known": 1, "other": []}),
+        (ExtendMap, {"known": 1, "other": [1.2, 3.4]}, {"known": 1, "other": [1.2, 3.4]}),
+        (ExtendMap, {"known": 1, "other": ["1.2"]}, colander.Invalid),
+        (ExtendMap, {"known": 1, "other": [1.2], "extra": "ok"}, {"known": 1, "other": [1.2], "extra": "ok"}),
+    ])
+
+
+def test_strict_float():
+    class FloatMap(ce.ExtendedMappingSchema):
+        num = ce.ExtendedSchemaNode(ce.ExtendedFloat())
+
+    evaluate_test_cases([
+        (FloatMap, {"num": 1}, colander.Invalid),
+        (FloatMap, {"num": "1"}, colander.Invalid),
+        (FloatMap, {"num": "1.23"}, colander.Invalid),
+        (FloatMap, {"num": None}, colander.Invalid),
+        (FloatMap, {"num": True}, colander.Invalid),
+        (FloatMap, {"num": False}, colander.Invalid),
+        (FloatMap, {"num": "None"}, colander.Invalid),
+        (FloatMap, {"num": "True"}, colander.Invalid),
+        (FloatMap, {"num": "False"}, colander.Invalid),
+        (FloatMap, {"num": "true"}, colander.Invalid),
+        (FloatMap, {"num": "false"}, colander.Invalid),
+        (FloatMap, {"num": 1.23}, {"num": 1.23}),
+        (FloatMap, {"num": 1.}, {"num": 1.0}),
+    ])
+
+
+def test_strict_float_allowed_str():
+    class FloatMap(ce.ExtendedMappingSchema):
+        num = ce.ExtendedSchemaNode(ce.ExtendedFloat(allow_string=True))
+
+    evaluate_test_cases([
+        (FloatMap, {"num": 1}, colander.Invalid),
+        (FloatMap, {"num": "1"}, colander.Invalid),
+        (FloatMap, {"num": None}, colander.Invalid),
+        (FloatMap, {"num": True}, colander.Invalid),
+        (FloatMap, {"num": False}, colander.Invalid),
+        (FloatMap, {"num": "None"}, colander.Invalid),
+        (FloatMap, {"num": "True"}, colander.Invalid),
+        (FloatMap, {"num": "False"}, colander.Invalid),
+        (FloatMap, {"num": "true"}, colander.Invalid),
+        (FloatMap, {"num": "false"}, colander.Invalid),
+        (FloatMap, {"num": 1.23}, {"num": 1.23}),
+        (FloatMap, {"num": "1.23"}, {"num": 1.23}),  # only convert from str is also allowed compared to 'strict' test
+        (FloatMap, {"num": 1.}, {"num": 1.0}),
+        (FloatMap, {"num": "1."}, {"num": 1.0}),  # only convert from str is also allowed compared to 'strict' test
+    ])
+
+
+def test_strict_int():
+    class IntMap(ce.ExtendedMappingSchema):
+        num = ce.ExtendedSchemaNode(ce.ExtendedInteger())
+
+    evaluate_test_cases([
+        (IntMap, {"num": 1.23}, colander.Invalid),
+        (IntMap, {"num": "1"}, colander.Invalid),
+        (IntMap, {"num": "1.23"}, colander.Invalid),
+        (IntMap, {"num": None}, colander.Invalid),
+        (IntMap, {"num": True}, colander.Invalid),
+        (IntMap, {"num": False}, colander.Invalid),
+        (IntMap, {"num": "None"}, colander.Invalid),
+        (IntMap, {"num": "True"}, colander.Invalid),
+        (IntMap, {"num": "False"}, colander.Invalid),
+        (IntMap, {"num": "true"}, colander.Invalid),
+        (IntMap, {"num": "false"}, colander.Invalid),
+        (IntMap, {"num": 1}, {"num": 1}),
+    ])
+
+
+def test_strict_int_allowed_str():
+    class IntMap(ce.ExtendedMappingSchema):
+        num = ce.ExtendedSchemaNode(ce.ExtendedInteger(allow_string=True))
+
+    evaluate_test_cases([
+        (IntMap, {"num": 1.23}, colander.Invalid),
+        (IntMap, {"num": "1.23"}, colander.Invalid),
+        (IntMap, {"num": None}, colander.Invalid),
+        (IntMap, {"num": True}, colander.Invalid),
+        (IntMap, {"num": False}, colander.Invalid),
+        (IntMap, {"num": "None"}, colander.Invalid),
+        (IntMap, {"num": "True"}, colander.Invalid),
+        (IntMap, {"num": "False"}, colander.Invalid),
+        (IntMap, {"num": "true"}, colander.Invalid),
+        (IntMap, {"num": "false"}, colander.Invalid),
+        (IntMap, {"num": 1}, {"num": 1}),
+        (IntMap, {"num": "1"}, {"num": 1}),  # only this is also allowed compared to 'strict' test
+    ])
+
+
+def test_strict_bool():
+    class BoolMap(ce.ExtendedMappingSchema):
+        num = ce.ExtendedSchemaNode(ce.ExtendedBoolean())
+
+    evaluate_test_cases([
+        (BoolMap, {"num": 1.23}, colander.Invalid),
+        (BoolMap, {"num": "1.23"}, colander.Invalid),
+        (BoolMap, {"num": "1"}, colander.Invalid),
+        (BoolMap, {"num": "0"}, colander.Invalid),
+        (BoolMap, {"num": 1}, colander.Invalid),
+        (BoolMap, {"num": 0}, colander.Invalid),
+        (BoolMap, {"num": "on"}, colander.Invalid),
+        (BoolMap, {"num": "off"}, colander.Invalid),
+        (BoolMap, {"num": "true"}, colander.Invalid),
+        (BoolMap, {"num": "false"}, colander.Invalid),
+        (BoolMap, {"num": "True"}, colander.Invalid),
+        (BoolMap, {"num": "False"}, colander.Invalid),
+        (BoolMap, {"num": "Yes"}, colander.Invalid),
+        (BoolMap, {"num": "No"}, colander.Invalid),
+        (BoolMap, {"num": None}, colander.Invalid),
+        (BoolMap, {"num": True}, {"num": True}),
+        (BoolMap, {"num": False}, {"num": False}),
+    ])
+
+
+def test_strict_literal_convert():
+    """
+    Test that literals are adequately interpreted and validated with respective representations..
+
+    Given a schema that allows multiple similar types that could be implicitly or explicitly converted from one to
+    another with proper format, validate that such conversion do not occur to ensure explicit schema definitions.
+    """
+
+    # Schemas below could fail appropriate resolution if implicit conversion occurs (because >1 in oneOf succeeds).
+    # With correct validation and type handling, only one case is possible each time.
+    class Literal(ce.OneOfKeywordSchema):
+        _one_of = [
+            ce.ExtendedSchemaNode(ce.ExtendedFloat()),
+            ce.ExtendedSchemaNode(ce.ExtendedInteger()),
+            ce.ExtendedSchemaNode(ce.ExtendedString()),
+            ce.ExtendedSchemaNode(ce.ExtendedBoolean()),
+        ]
+
+    evaluate_test_cases([
+        (Literal, 1, 1),
+        (Literal, 0, 0),
+        (Literal, "1", "1"),
+        (Literal, "0", "0"),
+        (Literal, True, True),
+        (Literal, False, False),
+        (Literal, "true", "true"),
+        (Literal, "false", "false"),
+        (Literal, "True", "True"),
+        (Literal, "False", "False"),
+        (Literal, 1.23, 1.23),
+    ])
 
 
 class FieldTestString(ce.ExtendedSchemaNode):

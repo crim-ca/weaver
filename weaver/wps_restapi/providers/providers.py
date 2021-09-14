@@ -45,7 +45,7 @@ def get_provider_services(container, check=True):
     if not check:
         LOGGER.info("Skipping remote provider service check. Accessibility of listed services will not be validated.")
     for service in store.list_services():
-        if check and not service.check_accessible():
+        if check and not service.check_accessible(settings):
             LOGGER.warning("Skipping unresponsive service (%s) [%s]", service.name, service.url)
             continue
         providers.append(service)
