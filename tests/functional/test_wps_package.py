@@ -1817,28 +1817,32 @@ class WpsPackageAppTest(WpsPackageConfigBase):
         assert "format" not in pkg["inputs"][0]
         assert isinstance(pkg["inputs"][0]["type"], list)
         # single entry of enum allowed values
-        assert len(pkg["inputs"][0]["type"]) == 2, "single type and array type of same base"
-        assert isinstance(pkg["inputs"][0]["type"][0], dict), "enum base type expected since allowed values"
-        assert pkg["inputs"][0]["type"][0]["type"] == "enum"
-        assert isinstance(pkg["inputs"][0]["type"][0]["symbols"], list)
-        assert len(pkg["inputs"][0]["type"][0]["symbols"]) == 220
-        assert all(isinstance(s, str) for s in pkg["inputs"][0]["type"][0]["symbols"])
+        assert len(pkg["inputs"][0]["type"]) == 3, "default value (null) + single type + array type of same base"
+        assert pkg["inputs"][0]["type"][0] == "null", "XML defaultValue should result in 'null' as valid unspecified"
+        assert "default" in pkg["inputs"][0]
+        assert pkg["inputs"][0]["default"] == "DEU", "CWL default value should match extracted defaultValue from XML"
+        assert isinstance(pkg["inputs"][0]["type"][1], dict), "enum base type expected since allowed values"
+        assert pkg["inputs"][0]["type"][1]["type"] == "enum"
+        assert isinstance(pkg["inputs"][0]["type"][1]["symbols"], list)
+        assert len(pkg["inputs"][0]["type"][1]["symbols"]) == 220
+        assert all(isinstance(s, str) for s in pkg["inputs"][0]["type"][1]["symbols"])
         # array type of same enum allowed values
-        assert pkg["inputs"][0]["type"][1]["type"] == "array"
-        assert pkg["inputs"][0]["type"][1]["items"]["type"] == "enum"
-        assert isinstance(pkg["inputs"][0]["type"][1]["items"]["symbols"], list)
-        assert len(pkg["inputs"][0]["type"][1]["items"]["symbols"]) == 220
-        assert all(isinstance(s, str) for s in pkg["inputs"][0]["type"][1]["items"]["symbols"])
+        assert pkg["inputs"][0]["type"][2]["type"] == "array"
+        assert pkg["inputs"][0]["type"][2]["items"]["type"] == "enum"
+        assert isinstance(pkg["inputs"][0]["type"][2]["items"]["symbols"], list)
+        assert len(pkg["inputs"][0]["type"][2]["items"]["symbols"]) == 220
+        assert all(isinstance(s, str) for s in pkg["inputs"][0]["type"][2]["items"]["symbols"])
         # second input
         assert pkg["inputs"][1]["id"] == "mosaic"
         assert pkg["inputs"][1]["default"] == "null"
         assert "format" not in pkg["inputs"][1]
         assert isinstance(pkg["inputs"][1]["type"], list), "default 'null' result type formed with it"
         assert len(pkg["inputs"][1]["type"]) == 2
-        assert pkg["inputs"][1]["type"][0] == "null"
+        assert pkg["inputs"][1]["type"][0] == "null", "CWL omitted input expect from minOccurs=0 from WPS input"
         assert pkg["inputs"][1]["type"][1] == "boolean"
         assert pkg["inputs"][2]["id"] == "resource"
-        assert "default" not in pkg["inputs"][2]
+        assert "default" not in pkg["inputs"][2], \
+            "WPS 'default format media-type' with minOccurs=1 must not result in CWL input with 'default' value"
         assert isinstance(pkg["inputs"][2]["type"], list), "single and array File"
         assert len(pkg["inputs"][2]["type"]) == 2
         assert pkg["inputs"][2]["type"][0] == "File", "single File type"
@@ -1861,8 +1865,14 @@ class WpsPackageAppTest(WpsPackageConfigBase):
         assert proc["inputs"][0]["title"] == "Region"
         assert "abstract" not in proc["inputs"][0], "Field 'abstract' should be replaced by 'description'."
         assert proc["inputs"][0]["description"] == "Country code, see ISO-3166-3"
-        assert proc["inputs"][0]["minOccurs"] == 1
+        assert proc["inputs"][0]["minOccurs"] == 0, \
+            "Real XML indicates 'minOccurs=1' but also has 'defaultValue', Weaver should correct it."
         assert proc["inputs"][0]["maxOccurs"] == 220
+        assert "literalDataDomains" in proc["inputs"][0]
+        assert "defaultValue" in proc["inputs"][0]["literalDataDomains"][0]
+        assert len(proc["inputs"][0]["literalDataDomains"][0]["valueDefinition"]) == 220, \
+            "List of all 220 region abbreviation explicitly provided is expected."
+        assert proc["inputs"][0]["literalDataDomains"][0]["defaultValue"] == "DEU"
         assert "formats" not in proc["inputs"][0]
         assert proc["inputs"][1]["id"] == "mosaic"
         assert proc["inputs"][1]["title"] == "Union of multiple regions"

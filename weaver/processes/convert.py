@@ -276,9 +276,9 @@ def ows2json_io(ows_io):
             if fmt["default"]:
                 break
 
-        # fix inconsistencies of some process descriptions, both with minOccurs=1 and default format
-        if fmt_default:
-            json_io["min_occurs"] = 0
+        # NOTE:
+        #   Don't apply 'minOccurs=0' as in below literal case because default 'format' does not imply that unspecified
+        #   input is valid, but rather that given an input without explicit 'format' specified, that 'default' is used.
         return json_io
 
     # add value contrains specifications if missing
