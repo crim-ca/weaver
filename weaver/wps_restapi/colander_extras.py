@@ -187,24 +187,46 @@ class ExtendedBoolean(colander.Boolean):
         """
         Initializes the extended boolean schema node.
 
-        The arguments :paramref:`true_choices` and :paramref:`false_choices` are defined
-        as ``"true"`` and ``"false"`` since :mod:`colander` converts the value to string lowercase
-        to compare with other truthy/falsy values it should accept.
+        When arguments :paramref:`true_choices` or :paramref:`false_choices` are provided, the corresponding string
+        values are respectively considered as valid `truthy`/`falsy` values. Otherwise (default), ``strict`` values
+        only of explicit type :class:`bool` will be considered valid.
 
-        Do **NOT** add other values like ``"1"`` to avoid conflict with ``Integer`` type for schemas that support
-        both variants. This boolean schema is a *strict* representation of *only* :class:`bool` type.
-
-        If an `OpenAPI` field is expected to support truthy/falsy values, it should explicitly define its schema using
+        When values are specified :mod:`colander` converts them to string lowercase to compare against `truthy`/`falsy`
+        values it should accept. For real `OpenAPI` typing validation, do **NOT** add other values like ``"1"`` to
+        avoid conflict with :class:`ExtendedInteger` type for schemas that support both variants.  If an `OpenAPI`
+        field is expected to support `truthy`/`falsy` values, it is recommended to explicitly define its schema using
         a ``oneOf`` keyword of all relevant schemas it supports, an any applicable validators for explicit values.
+        This is the safest way to ensure the generated `OpenAPI` schema corresponds to expected type validation.
         """
-        if true_choices is None:
-            true_choices = ("true", )
-        if false_choices is None:
-            false_choices = ("false", )
-        super(ExtendedBoolean, self).__init__(true_choices=true_choices, false_choices=false_choices, *args, **kwargs)
+        if true_choices is None and false_choices is None:
+            # use strict variant
+            self.true_choices = ()
+            self.false_choices = ()
+            self.true_val = "true"
+            self.false_val = "false"
+            self.false_reprs = [str(False)]
+            self.true_reprs = [str(True)]
+        else:
+            # use normal variant (bool-like values)
+            true_choices = true_choices if true_choices else ("true", )
+            false_choices = false_choices if false_choices else ("false", )
+            super(ExtendedBoolean, self).__init__(
+                *args, true_choices=true_choices, false_choices=false_choices, **kwargs
+            )
 
-    def serialize(self, node, cstruct):  # pylint: disable=W0221
-        result = super(ExtendedBoolean, self).serialize(node, cstruct)
+    def deserialize(self, node, cstruct):
+        if cstruct is colander.null:
+            return cstruct
+
+        # strict type variant
+        if not self.true_choices and not self.false_choices:
+            # note: cannot compare with literal 'True' and 'False' since '0' and '1' are equivalent (implicit convert)
+            if isinstance(cstruct, bool):
+                return cstruct
+            raise colander.Invalid(node, colander._("\"${val}\" is neither True or False.", mapping={"val": cstruct}))
+
+        # normal type variant
+        result = super(ExtendedBoolean, self).deserialize(node, cstruct)
         if result is not colander.null:
             result = result == "true"
         return result
@@ -237,8 +259,18 @@ class ExtendedInteger(colander.Integer):
     Values such as ``"1"``, ``1.0``, ``True`` will not be automatically converted to equivalent ``1``.
     """
     def __init__(self, *_, **kwargs):
-        kwargs["strict"] = True
         super(ExtendedInteger, self).__init__(*_, **kwargs)
+
+        def _strict_int(num):
+            # note:
+            #  - original colander function does not handle all cases
+            #    (e.g.: float("1.23").is_integer() -> False, but still not a float)
+            #  - furthermore, True/False are considered 'int', so must double check for 'bool'
+            if not isinstance(num, int) or isinstance(num, bool):
+                raise ValueError("Value is not a Floating point number.")
+            return num
+
+        self.num = _strict_int
 
     def serialize(self, node, cstruct):  # pylint: disable=W0221
         result = super(ExtendedInteger, self).serialize(node, cstruct)

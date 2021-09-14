@@ -87,7 +87,9 @@ Fixes:
 - Fix incorrect parsing of ``default`` field within WPS input when ``literal`` data type is present and was assumed
   as ``complex`` (fixes `#297 <https://github.com/crim-ca/weaver/issues/297>`_).
 - Fix and test various invalid schema deserialization validation issues, notably regarding ``PermissiveMappingSchema``,
-  schema nodes ``ExtendedFloat``, ``ExtendedFloat`` and their handling strategies when combined in mappings or keywords.
+  schema nodes ``ExtendedFloat``, ``ExtendedInt`` and their handling strategies when combined in mappings or keywords.
+- Fix resolution of similar values that could be implicitly converted between ``ExtendedString``, ``ExtendedFloat``,
+  ``ExtendedInt`` and ``ExtendedBool`` schema types to guarantee original data type explicitly defined are preserved.
 
 `3.5.0 <https://github.com/crim-ca/weaver/tree/3.5.0>`_ (2021-08-19)
 ========================================================================

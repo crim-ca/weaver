@@ -278,6 +278,92 @@ def test_preserve_mapping():
     ])
 
 
+def test_strict_float():
+    class FloatMap(ce.ExtendedMappingSchema):
+        num = ce.ExtendedSchemaNode(ce.ExtendedFloat())
+
+    evaluate_test_cases([
+        (FloatMap, {"num": 1}, colander.Invalid),
+        (FloatMap, {"num": "1"}, colander.Invalid),
+        (FloatMap, {"num": "1.23"}, colander.Invalid),
+        (FloatMap, {"num": None}, colander.Invalid),
+        (FloatMap, {"num": 1.23}, {"num": 1.23}),
+    ])
+
+
+def test_strict_int():
+    class IntMap(ce.ExtendedMappingSchema):
+        num = ce.ExtendedSchemaNode(ce.ExtendedInteger())
+
+    evaluate_test_cases([
+        (IntMap, {"num": 1.23}, colander.Invalid),
+        (IntMap, {"num": "1"}, colander.Invalid),
+        (IntMap, {"num": "1.23"}, colander.Invalid),
+        (IntMap, {"num": None}, colander.Invalid),
+        (IntMap, {"num": True}, colander.Invalid),
+        (IntMap, {"num": False}, colander.Invalid),
+        (IntMap, {"num": 1}, {"num": 1}),
+    ])
+
+
+def test_strict_bool():
+    class BoolMap(ce.ExtendedMappingSchema):
+        num = ce.ExtendedSchemaNode(ce.ExtendedBoolean())
+
+    evaluate_test_cases([
+        (BoolMap, {"num": 1.23}, colander.Invalid),
+        (BoolMap, {"num": "1.23"}, colander.Invalid),
+        (BoolMap, {"num": "1"}, colander.Invalid),
+        (BoolMap, {"num": "0"}, colander.Invalid),
+        (BoolMap, {"num": 1}, colander.Invalid),
+        (BoolMap, {"num": 0}, colander.Invalid),
+        (BoolMap, {"num": "on"}, colander.Invalid),
+        (BoolMap, {"num": "off"}, colander.Invalid),
+        (BoolMap, {"num": "true"}, colander.Invalid),
+        (BoolMap, {"num": "false"}, colander.Invalid),
+        (BoolMap, {"num": "True"}, colander.Invalid),
+        (BoolMap, {"num": "False"}, colander.Invalid),
+        (BoolMap, {"num": "Yes"}, colander.Invalid),
+        (BoolMap, {"num": "No"}, colander.Invalid),
+        (BoolMap, {"num": None}, colander.Invalid),
+        (BoolMap, {"num": True}, {"num": True}),
+        (BoolMap, {"num": False}, {"num": False}),
+    ])
+
+
+def test_strict_literal_convert():
+    """
+    Test that literals are adequately interpreted and validated with respective representations..
+
+    Given a schema that allows multiple similar types that could be implicitly or explicitly converted from one to
+    another with proper format, validate that such conversion do not occur to ensure explicit schema definitions.
+    """
+
+    # Schemas below could fail appropriate resolution if implicit conversion occurs (because >1 in oneOf succeeds).
+    # With correct validation and type handling, only one case is possible each time.
+    class Literal(ce.OneOfKeywordSchema):
+        _one_of = [
+            ce.ExtendedSchemaNode(ce.ExtendedFloat()),
+            ce.ExtendedSchemaNode(ce.ExtendedInteger()),
+            ce.ExtendedSchemaNode(ce.ExtendedString()),
+            ce.ExtendedSchemaNode(ce.ExtendedBoolean()),
+        ]
+
+    evaluate_test_cases([
+        (Literal, 1, 1),
+        (Literal, 0, 0),
+        (Literal, "1", "1"),
+        (Literal, "0", "0"),
+        (Literal, True, True),
+        (Literal, False, False),
+        (Literal, "true", "true"),
+        (Literal, "false", "false"),
+        (Literal, "True", "True"),
+        (Literal, "False", "False"),
+        (Literal, 1.23, 1.23),
+    ])
+
+
 class FieldTestString(ce.ExtendedSchemaNode):
     schema_type = colander.String
 

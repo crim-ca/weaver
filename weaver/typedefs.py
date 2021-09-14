@@ -51,7 +51,7 @@ if TYPE_CHECKING:
     _JsonObjectItem = Dict[str, Union["JSON", "_JsonListItem"]]
     _JsonListItem = List[Union[AnyValue, _JsonObjectItem, "_JsonListItem", "JSON"]]
     _JsonItem = Union[AnyValue, _JsonObjectItem, _JsonListItem]
-    JSON = Union[Dict[str, _JsonItem], List[_JsonItem]]
+    JSON = Union[Dict[str, _JsonItem], List[_JsonItem], AnyValue]
 
     # CWL definition
     CWL_IO_EnumType = TypedDict("CWL_IO_EnumType", {"type": str, "symbols": List[str]})  # "symbols" => allowed values
