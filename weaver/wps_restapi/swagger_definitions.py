@@ -3409,8 +3409,8 @@ class GetJobsQueries(ExtendedMappingSchema):
     groups = ExtendedSchemaNode(String(),
                                 description="Comma-separated list of grouping fields with which to list jobs.",
                                 default=False, example="process,service", missing=drop)
-    page = ExtendedSchemaNode(Integer(), missing=0, default=0, validator=Range(min=0))
-    limit = ExtendedSchemaNode(Integer(), missing=10, default=10, validator=Range(min=0, max=10000))
+    page = ExtendedSchemaNode(Integer(allow_string=True), missing=0, default=0, validator=Range(min=0))
+    limit = ExtendedSchemaNode(Integer(allow_string=True), missing=10, default=10, validator=Range(min=0, max=10000))
     datetime = DateTimeInterval(missing=drop, default=None)
     status = JobStatusEnum(missing=drop, default=None)
     process = AnyIdentifier(missing=drop)

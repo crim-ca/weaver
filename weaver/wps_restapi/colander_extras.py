@@ -232,17 +232,75 @@ class ExtendedBoolean(colander.Boolean):
         return result
 
 
-class ExtendedFloat(colander.Float):
+class ExtendedNumber(colander.Number):
+    """
+    Definition of a numeric value, either explicitly or implicit with permissive :class:`str` representation.
 
-    def __init__(self, *_, **__):
-        super(ExtendedFloat, self).__init__(*_, **__)
+    Behaviour in each case:
+        - ``strict=True`` and ``allow_string=False``:
+          Value can only be explicit numeric type that matches exactly the base ``num`` type (default).
+          All implicit conversion between :class:`float`, :class:`int` or :class:`str` are disallowed.
+        - ``strict=True`` and ``allow_string=True``:
+          Value can be the explicit numeric type (:class:`int` or :class:`float`) or a numeric :class:`str` value
+          representing the corresponding base numeric type.
+          Implicit conversion between :class:`float` and :class:`int` is still disallowed.
+        - ``strict=False`` (``allow_string`` doesn't matter):
+          Value can be anything as long as it can be converted to the expected numeric type
+          (:class:`int` or :class:`float`).
 
-        def _strict_float(num):
-            if not isinstance(num, float):
-                raise ValueError("Value is not a Floating point number.")
-            return num
+    Recommended usage:
+        - When making `OpenAPI` schema definitions for JSON body elements within a request or response object, default
+          parameters ``strict=True`` and ``allow_string=False`` should be used to ensure the numeric type is respected.
+          As for other literal data `Extended` schema types, keyword `oneOf` should be used when multiple similar value
+          types are permitted for a field in order to document in `OpenAPI` the specific type definitions of expected
+          data, which is automatically converted by ``json`` properties of request and response classes.
+        - When defining `OpenAPI` query parameters, ``strict=True`` and ``allow_string=True`` should be used. This
+          ensures that documented schemas still indicate only the numeric type as expected data format, although
+          technically the ``path`` of the request will contain a :class:`str` representing the number. Queries are not
+          automatically converted by request objects, but will be converted and validated as the explicit number
+          following deserialization when using those configuration parameters.
+    """
 
-        self.num = _strict_float
+    def __init__(self, *_, allow_string=False, strict=True, **__):
+        # default applied based on 'strict' in kwargs
+        # then, make even stricter number validation if requested
+        super(ExtendedNumber, self).__init__(*_, **__)
+        if strict:
+            self.num = self.number if allow_string else self.strict
+
+    @staticmethod
+    @abstractmethod
+    def number(cstruct):
+        raise NotImplementedError
+
+    @staticmethod
+    @abstractmethod
+    def strict(cstruct):
+        raise NotImplementedError
+
+
+class ExtendedFloat(ExtendedNumber, colander.Float):
+    """
+    Float definition with strict typing validation by default.
+
+    This is to distinguish it from explicit definitions of ``float``-like numbers or strings.
+    By default, values such as ``"1"``, ``1.0``, ``True`` will not be automatically converted to equivalent ``1.0``.
+    """
+    def __init__(self, *_, allow_string=False, strict=True, **__):
+        colander.Float.__init__(self)
+        ExtendedNumber.__init__(self, *_, strict=strict, allow_string=allow_string, **__)
+
+    @staticmethod
+    def number(num):
+        if (isinstance(num, str) and "." in num) or isinstance(num, float):
+            return float(num)
+        raise ValueError("Value is not a Floating point number (Integer not allowed).")
+
+    @staticmethod
+    def strict(num):
+        if not isinstance(num, float):
+            raise ValueError("Value is not a Floating point number (Boolean, Integer and String not allowed).")
+        return num
 
     def serialize(self, node, cstruct):  # pylint: disable=W0221
         result = super(ExtendedFloat, self).serialize(node, cstruct)
@@ -251,26 +309,32 @@ class ExtendedFloat(colander.Float):
         return result
 
 
-class ExtendedInteger(colander.Integer):
+class ExtendedInteger(ExtendedNumber, colander.Integer):
     """
-    Integer definition with enforced strict typing validation.
+    Integer definition with strict typing validation by default.
 
     This is to distinguish it from explicit definitions of ``integer``-like numbers or strings.
-    Values such as ``"1"``, ``1.0``, ``True`` will not be automatically converted to equivalent ``1``.
+    By default, values such as ``"1"``, ``1.0``, ``True`` will not be automatically converted to equivalent ``1``.
     """
-    def __init__(self, *_, **kwargs):
-        super(ExtendedInteger, self).__init__(*_, **kwargs)
+    def __init__(self, *_, allow_string=False, strict=True, **__):
+        colander.Integer.__init__(self)
+        ExtendedNumber.__init__(self, *_, strict=strict, allow_string=allow_string, **__)
 
-        def _strict_int(num):
-            # note:
-            #  - original colander function does not handle all cases
-            #    (e.g.: float("1.23").is_integer() -> False, but still not a float)
-            #  - furthermore, True/False are considered 'int', so must double check for 'bool'
-            if not isinstance(num, int) or isinstance(num, bool):
-                raise ValueError("Value is not a Floating point number.")
-            return num
+    @staticmethod
+    def number(num):
+        if not float(num).is_integer() or isinstance(num, bool):
+            raise ValueError("Value is not an Integer number (Float not allowed).")
+        return int(num)
 
-        self.num = _strict_int
+    @staticmethod
+    def strict(num):
+        # note:
+        #  - original colander function does not handle all cases
+        #    (e.g.: float("1.23").is_integer() -> False, but still not a float)
+        #  - furthermore, True/False are considered 'int', so must double check for 'bool'
+        if not isinstance(num, int) or isinstance(num, bool):
+            raise ValueError("Value is not a Integer number (Boolean, Float and String not allowed).")
+        return num
 
     def serialize(self, node, cstruct):  # pylint: disable=W0221
         result = super(ExtendedInteger, self).serialize(node, cstruct)

@@ -287,7 +287,37 @@ def test_strict_float():
         (FloatMap, {"num": "1"}, colander.Invalid),
         (FloatMap, {"num": "1.23"}, colander.Invalid),
         (FloatMap, {"num": None}, colander.Invalid),
+        (FloatMap, {"num": True}, colander.Invalid),
+        (FloatMap, {"num": False}, colander.Invalid),
+        (FloatMap, {"num": "None"}, colander.Invalid),
+        (FloatMap, {"num": "True"}, colander.Invalid),
+        (FloatMap, {"num": "False"}, colander.Invalid),
+        (FloatMap, {"num": "true"}, colander.Invalid),
+        (FloatMap, {"num": "false"}, colander.Invalid),
         (FloatMap, {"num": 1.23}, {"num": 1.23}),
+        (FloatMap, {"num": 1.}, {"num": 1.0}),
+    ])
+
+
+def test_strict_float_allowed_str():
+    class FloatMap(ce.ExtendedMappingSchema):
+        num = ce.ExtendedSchemaNode(ce.ExtendedFloat(allow_string=True))
+
+    evaluate_test_cases([
+        (FloatMap, {"num": 1}, colander.Invalid),
+        (FloatMap, {"num": "1"}, colander.Invalid),
+        (FloatMap, {"num": None}, colander.Invalid),
+        (FloatMap, {"num": True}, colander.Invalid),
+        (FloatMap, {"num": False}, colander.Invalid),
+        (FloatMap, {"num": "None"}, colander.Invalid),
+        (FloatMap, {"num": "True"}, colander.Invalid),
+        (FloatMap, {"num": "False"}, colander.Invalid),
+        (FloatMap, {"num": "true"}, colander.Invalid),
+        (FloatMap, {"num": "false"}, colander.Invalid),
+        (FloatMap, {"num": 1.23}, {"num": 1.23}),
+        (FloatMap, {"num": "1.23"}, {"num": 1.23}),  # only convert from str is also allowed compared to 'strict' test
+        (FloatMap, {"num": 1.}, {"num": 1.0}),
+        (FloatMap, {"num": "1."}, {"num": 1.0}),  # only convert from str is also allowed compared to 'strict' test
     ])
 
 
@@ -302,7 +332,32 @@ def test_strict_int():
         (IntMap, {"num": None}, colander.Invalid),
         (IntMap, {"num": True}, colander.Invalid),
         (IntMap, {"num": False}, colander.Invalid),
+        (IntMap, {"num": "None"}, colander.Invalid),
+        (IntMap, {"num": "True"}, colander.Invalid),
+        (IntMap, {"num": "False"}, colander.Invalid),
+        (IntMap, {"num": "true"}, colander.Invalid),
+        (IntMap, {"num": "false"}, colander.Invalid),
         (IntMap, {"num": 1}, {"num": 1}),
+    ])
+
+
+def test_strict_int_allowed_str():
+    class IntMap(ce.ExtendedMappingSchema):
+        num = ce.ExtendedSchemaNode(ce.ExtendedInteger(allow_string=True))
+
+    evaluate_test_cases([
+        (IntMap, {"num": 1.23}, colander.Invalid),
+        (IntMap, {"num": "1.23"}, colander.Invalid),
+        (IntMap, {"num": None}, colander.Invalid),
+        (IntMap, {"num": True}, colander.Invalid),
+        (IntMap, {"num": False}, colander.Invalid),
+        (IntMap, {"num": "None"}, colander.Invalid),
+        (IntMap, {"num": "True"}, colander.Invalid),
+        (IntMap, {"num": "False"}, colander.Invalid),
+        (IntMap, {"num": "true"}, colander.Invalid),
+        (IntMap, {"num": "false"}, colander.Invalid),
+        (IntMap, {"num": 1}, {"num": 1}),
+        (IntMap, {"num": "1"}, {"num": 1}),  # only this is also allowed compared to 'strict' test
     ])
 
 
