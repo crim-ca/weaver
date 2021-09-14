@@ -125,9 +125,8 @@ def test_json2wps_allowed_values():
          [AllowedValue(value="A"), AllowedValue(value="B")]),
         ({"literalDataDomains": [{"valueDefinition": [{"closure": "open", "minimum": 1, "maximum": 5}]}]},
          [AllowedValue(minval=1, maxval=5, range_closure="open")]),
-        ({"literalDataDomains": [{"valueDefinition": [
-            {"closure": "open-closed", "minimum": 0, "maximum": 6, "spacing": 2}]}
-         ]},
+        ({"literalDataDomains": [
+            {"valueDefinition": [{"closure": "open-closed", "minimum": 0, "maximum": 6, "spacing": 2}]}]},
          [AllowedValue(minval=0, maxval=6, spacing=2, range_closure="open-closed")]),
     ]):
         result = json2wps_allowed_values(values)

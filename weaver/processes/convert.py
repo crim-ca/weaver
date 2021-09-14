@@ -267,8 +267,8 @@ def ows2json_io(ows_io):
                         if any(all(var_item in items for var_item in var_fmt.items()) for items in json_fmt_items):
                             continue
                         json_io["formats"].append(var_fmt)
-                else:
-                    json_io["formats"] = []
+
+            json_io.setdefault("formats", [])
 
         # apply the default flag
         for fmt in json_io["formats"]:

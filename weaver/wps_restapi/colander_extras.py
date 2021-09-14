@@ -270,12 +270,12 @@ class ExtendedNumber(colander.Number):
 
     @staticmethod
     @abstractmethod
-    def number(cstruct):
+    def number(num):
         raise NotImplementedError
 
     @staticmethod
     @abstractmethod
-    def strict(cstruct):
+    def strict(num):
         raise NotImplementedError
 
 
