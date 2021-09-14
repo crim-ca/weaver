@@ -2684,9 +2684,20 @@ class ExecuteInputValues(OneOfKeywordSchema):
 
 
 class Execute(ExtendedMappingSchema):
-    # permit unspecified inputs for processes that could technically allow no-inputs definition (CWL),
-    # but very unlikely/unusual in real world scenarios (possible cases: constant endpoint fetcher, RNG output)
-    inputs = ExecuteInputValues(missing=drop)
+    # Permit unspecified (optional) inputs for processes that could technically allow no-inputs definition (CWL).
+    # This is very unusual in real world scenarios, but has some possible cases: constant endpoint fetcher, RNG output.
+    #
+    # NOTE:
+    #   It is **VERY** important to use 'default={}' and not 'missing=drop' contrary to other optional fields.
+    #   Using 'drop' causes and invalid input definition to be ignored/removed and not be validated for expected schema.
+    #   We want to ensure format is validated if present to rapidly report the issue and not move on to full execution.
+    #   If 'inputs' are indeed omitted, the default with match against and empty 'ExecuteInputMapValues' schema.
+    #   If 'inputs' are explicitly provided as '{}' or '[]', it will also behave the right way for no-inputs process.
+    #
+    # See tests validating both cases (incorrect schema vs optionals inputs):
+    #   - 'tests.wps_restapi.test_processes.WpsRestApiProcessesTest.test_execute_process_missing_required_params'
+    #   - 'tests.wps_restapi.test_providers.WpsRestApiProcessesTest.test_get_provider_process_no_inputs'
+    inputs = ExecuteInputValues(default={})
     outputs = ExecuteOutputFilterList(description="Filter list of outputs to be obtained from execution.")
     mode = JobExecuteModeEnum()
     notification_email = ExtendedSchemaNode(

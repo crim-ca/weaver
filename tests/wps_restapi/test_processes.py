@@ -576,9 +576,9 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         path = "/processes/{}/jobs".format(self.process_public.identifier)
         for i, exec_data in enumerate(execute_data_tests):
             data_json = json.dumps(exec_data, indent=2)
-            with stopit.ThreadingTimeout(3) as timeout:  # timeout to kill dummy execution if schema validation fails
+            with stopit.ThreadingTimeout(3) as timeout:  # timeout to kill execution if schema validation did not raise
                 resp = self.app.post_json(path, params=exec_data, headers=self.json_headers, expect_errors=True)
-                msg = "Failed with test variation '{}' with status '{}' using {}."
+                msg = "Failed with test variation '{}' with status '{}' using:\n{}"
                 assert resp.status_code in [400, 422], msg.format(i, resp.status_code, data_json)
                 assert resp.content_type == CONTENT_TYPE_APP_JSON, msg.format(i, resp.content_type)
             msg = "Killed test '{}' request taking too long using:\n{}".format(i, data_json)

@@ -91,6 +91,7 @@ Fixes:
 - Fix resolution of similar values that could be implicitly converted between ``ExtendedString``, ``ExtendedFloat``,
   ``ExtendedInt`` and ``ExtendedBool`` schema types to guarantee original data type explicitly defined are preserved.
 - Fix ``runningSeconds`` field reporting to be of ``float`` type although implicit ``int`` type conversion could occur.
+- Fix validation of ``Execute`` inputs schemas to adequately distinguish between optional inputs and incorrect formats.
 
 `3.5.0 <https://github.com/crim-ca/weaver/tree/3.5.0>`_ (2021-08-19)
 ========================================================================
