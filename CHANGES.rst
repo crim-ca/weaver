@@ -90,6 +90,7 @@ Fixes:
   schema nodes ``ExtendedFloat``, ``ExtendedInt`` and their handling strategies when combined in mappings or keywords.
 - Fix resolution of similar values that could be implicitly converted between ``ExtendedString``, ``ExtendedFloat``,
   ``ExtendedInt`` and ``ExtendedBool`` schema types to guarantee original data type explicitly defined are preserved.
+- Fix ``runningSeconds`` field reporting to be of ``float`` type although implicit ``int`` type conversion could occur.
 
 `3.5.0 <https://github.com/crim-ca/weaver/tree/3.5.0>`_ (2021-08-19)
 ========================================================================

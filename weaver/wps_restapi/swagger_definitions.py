@@ -855,7 +855,20 @@ class AnyLiteralType(OneOfKeywordSchema):
     ]
 
 
+class NumberType(OneOfKeywordSchema):
+    """
+    Represents a literal number, integer or float.
+    """
+    _one_of = [
+        ExtendedSchemaNode(Float()),
+        ExtendedSchemaNode(Integer()),
+    ]
+
+
 class NumericType(OneOfKeywordSchema):
+    """
+    Represents a numeric-like value.
+    """
     _one_of = [
         ExtendedSchemaNode(Float()),
         ExtendedSchemaNode(Integer()),
@@ -929,24 +942,8 @@ class ValuesReference(ReferenceURL):
     description = "URL where to retrieve applicable values."
 
 
-class SequenceStringType(ExtendedSequenceSchema):
-    value_item = ExtendedSchemaNode(String())
-
-
-class SequenceBooleanType(ExtendedSequenceSchema):
-    value_item = ExtendedSchemaNode(Boolean())
-
-
-class SequenceNumberType(ExtendedSequenceSchema):
-    value_item = ExtendedSchemaNode(Float())
-
-
-class ArrayLiteralType(OneOfKeywordSchema):
-    _one_of = [
-        SequenceNumberType(),
-        SequenceBooleanType(),
-        SequenceStringType()
-    ]
+class ArrayLiteralType(ExtendedSequenceSchema):
+    value_item = AnyLiteralType()
 
 
 class ArrayLiteralDataType(ExtendedMappingSchema):
@@ -2424,15 +2421,15 @@ class JobStatusInfo(ExtendedMappingSchema):
     # note: using String instead of Time because timedelta object cannot be directly handled (missing parts at parsing)
     duration = ExtendedSchemaNode(String(), missing=drop,
                                   description="Duration since the start of the process execution.")
-    runningSeconds = ExtendedSchemaNode(Integer(), missing=drop,
-                                        description="Duration in seconds since the start of the process execution.")
+    runningSeconds = NumberType(missing=drop,
+                                description="Duration in seconds since the start of the process execution.")
     expirationDate = ExtendedSchemaNode(DateTime(), missing=drop,
                                         description="Timestamp when the job will be canceled if not yet completed.")
     estimatedCompletion = ExtendedSchemaNode(DateTime(), missing=drop)
     nextPoll = ExtendedSchemaNode(DateTime(), missing=drop,
                                   description="Timestamp when the job will prompted for updated status details.")
-    percentCompleted = ExtendedSchemaNode(Integer(), example=0, validator=Range(min=0, max=100),
-                                          description="Completion percentage of the job as indicated by the process.")
+    percentCompleted = NumberType(example=0, validator=Range(min=0, max=100),
+                                  description="Completion percentage of the job as indicated by the process.")
     links = LinkList(missing=drop)
 
 
