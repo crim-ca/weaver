@@ -513,7 +513,7 @@ class WpsPackageAppTest(WpsPackageConfigBase):
 
     def test_block_builtin_processes_from_api(self):
         """
-        Test to validates if ``builtin`` process type is explicitly blocked during deploymemt from API.
+        Test to validates if ``builtin`` process type is explicitly blocked during deployment from API.
         """
         cwl = {
             "cwlVersion": "v1.0",

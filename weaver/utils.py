@@ -1131,11 +1131,11 @@ def transform_json(json_data,               # type: Dict[str, JSON]
                    add=None,                # type: Optional[Dict[AnyKey, Any]]
                    replace_values=None,     # type: Optional[Dict[AnyKey, Any]]
                    replace_func=None,       # type: Optional[Dict[AnyKey, Callable[[Any], Any]]]
-                   ):                       # type: (...) -> JSON
+                   ):                       # type: (...) -> Dict[str, JSON]
     """
     Transforms the input JSON with different methods.
 
-    The transformations are applied in the same order as the arguments.
+    The transformations are applied in-place and in the same order as the arguments (rename, remove, add, etc.).
     All operations are applied onto the top-level fields of the mapping.
     No nested operations are applied, unless handled by replace functions.
 
@@ -1156,6 +1156,7 @@ def transform_json(json_data,               # type: Dict[str, JSON]
         Replace values under matched fields by name with the returned value from the associated function.
         Mapping functions will receive the original value as input.
         If the result is to be serialized to JSON, they should return a valid JSON-serializable value.
+    :return transformed JSON (same as modified in-place input JSON)
     """
     rename = rename or {}
     remove = remove or []

@@ -22,8 +22,7 @@ from pywps.app.Common import Metadata as WPS_Metadata
 from pywps.inout import BoundingBoxInput, BoundingBoxOutput, ComplexInput, ComplexOutput, LiteralInput, LiteralOutput
 from pywps.inout.basic import BasicIO
 from pywps.inout.formats import Format
-from pywps.inout.literaltypes import ALLOWEDVALUETYPE, AllowedValue, AnyValue
-# FIXME: #211 (range): pywps.inout.literaltypes.RANGECLOSURETYPE
+from pywps.inout.literaltypes import ALLOWEDVALUETYPE, RANGECLOSURETYPE, AllowedValue, AnyValue
 from pywps.validator.mode import MODE
 
 from weaver.exceptions import PackageTypeError
@@ -115,6 +114,7 @@ WPS_FIELD_MAPPING = {
     "allowed_collections": ["AllowedCollections", "allowedCollections", "allowedcollections", "Allowed_Collections",
                             "Allowedcollections"],
     "any_value": ["anyvalue", "anyValue", "AnyValue"],
+    "literal_data_domains": ["literalDataDomains"],
     "default": ["default_value", "defaultValue", "DefaultValue", "Default", "data_format"],
     "supported_values": ["SupportedValues", "supportedValues", "supportedvalues", "Supported_Values"],
     "supported_formats": ["SupportedFormats", "supportedFormats", "supportedformats", "Supported_Formats", "formats"],
@@ -675,7 +675,7 @@ def is_cwl_array_type(io_info):
         Parameter ``io_item`` should correspond to field ``items`` of an array I/O definition.
         Simple pass-through if the array item is not an ``enum``.
         """
-        _is_enum, _enum_type, _enum_mode, _enum_allow = is_cwl_enum_type({"type": _io_item})
+        _is_enum, _enum_type, _enum_mode, _enum_allow = is_cwl_enum_type({"type": _io_item})  # noqa: typing
         if _is_enum:
             LOGGER.debug("I/O [%s] parsed as 'array' with sub-item as 'enum'", io_info["name"])
             io_return["type"] = _enum_type
@@ -1056,6 +1056,50 @@ def any2json_literal_data_domains(io_info):
     return [domain]
 
 
+def json2wps_allowed_values(io_info):
+    # type: (JSON_IO_Type) -> Union[Type[null], List[AllowedValue]]
+    """
+    Obtains the allowed values constrains for the literal data type from a JSON I/O definition.
+
+    Converts the ``literalDataDomains`` definition into ``allowed_values`` understood by :mod:`pywps`.
+    Handles explicit ``allowed_values`` if available and not previously defined by ``literalDataDomains``.
+
+    .. seealso::
+        Function :func:`any2json_literal_data_domains` defines generated ``literalDataDomains`` JSON definition.
+    """
+    domains = get_field(io_info, "literal_data_domains", search_variations=True)
+    allowed = get_field(io_info, "allowed_values", search_variations=True)
+    if not domains and isinstance(allowed, list):
+        if all(isinstance(value, (float, int, str)) for value in allowed):
+            return [AllowedValue(value=value) for value in allowed]
+        if all(isinstance(value, dict) for value in allowed):
+            allowed_values = []
+            for value in allowed:
+                min_val = get_field(value, "range_minimum", search_variations=True, default=None)
+                max_val = get_field(value, "range_maximum", search_variations=True, default=None)
+                spacing = get_field(value, "range_spacing", search_variations=True, default=None)
+                closure = get_field(value, "range_closure", search_variations=True, default=RANGECLOSURETYPE.CLOSED)
+                literal = get_field(value, "value", search_variations=False, default=None)
+                if min_val or max_val or spacing:
+                    allowed_values.append(AllowedValue(ALLOWEDVALUETYPE.RANGE,
+                                                       minval=min_val, maxval=max_val,
+                                                       spacing=spacing, range_closure=closure))
+                elif literal:
+                    allowed_values.append(AllowedValue(ALLOWEDVALUETYPE.VALUE, value=literal))
+                # literalDataDomains could be 'anyValue', which is to be ignored here
+            return allowed_values
+        LOGGER.debug("Cannot parse literal I/O AllowedValues: %s", allowed)
+        raise ValueError("Unknown parsing of 'AllowedValues' for value: {!s}".format(allowed))
+    if domains:
+        for domain in domains:
+            allowed = json2wps_allowed_values(domain)
+            # stop on first because undefined how to combine multiple
+            # no multiple definitions by 'any2json_literal_data_domains' regardless, and not directly handled by pywps
+            if allowed:
+                return allowed
+    return null
+
+
 def json2wps_datatype(io_info):
     # type: (JSON_IO_Type) -> str
     """
@@ -1227,8 +1271,13 @@ def json2wps_io(io_info, io_select):
         if io_type == WPS_LITERAL:
             io_info.pop("data_format", None)
             io_info.pop("supported_formats", None)
-            io_info.pop("literalDataDomains", None)  # FIXME: https://github.com/crim-ca/weaver/issues/211
             io_info["data_type"] = json2wps_datatype(io_info)
+            allowed_values = json2wps_allowed_values(io_info)
+            if allowed_values:
+                io_info["allowed_values"] = allowed_values
+            else:
+                io_info.pop("allowed_values", None)
+            io_info.pop("literalDataDomains", None)
             return LiteralInput(**io_info)
     elif io_select == WPS_OUTPUT:
         io_info.pop("min_occurs", None)
@@ -1245,6 +1294,12 @@ def json2wps_io(io_info, io_select):
         if io_type == WPS_LITERAL:
             io_info.pop("supported_formats", None)
             io_info["data_type"] = json2wps_datatype(io_info)
+            allowed_values = json2wps_allowed_values(io_info)
+            if allowed_values:
+                io_info["allowed_values"] = allowed_values
+            else:
+                io_info.pop("allowed_values", None)
+            io_info.pop("literalDataDomains", None)
             return LiteralOutput(**io_info)
     raise PackageTypeError("Unknown conversion from dict to WPS type (type={0}, mode={1}).".format(io_type, io_select))
 
