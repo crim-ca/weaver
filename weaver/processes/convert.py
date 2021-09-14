@@ -115,7 +115,7 @@ WPS_FIELD_MAPPING = {
                             "Allowedcollections"],
     "any_value": ["anyvalue", "anyValue", "AnyValue"],
     "literal_data_domains": ["literalDataDomains"],
-    "default": ["default_value", "defaultValue", "DefaultValue", "Default", "data_format"],
+    "default": ["default_value", "defaultValue", "DefaultValue", "Default", "data_format", "data"],
     "supported_values": ["SupportedValues", "supportedValues", "supportedvalues", "Supported_Values"],
     "supported_formats": ["SupportedFormats", "supportedFormats", "supportedformats", "Supported_Formats", "formats"],
     "additional_parameters": ["AdditionalParameters", "additionalParameters", "additionalparameters",
@@ -288,7 +288,7 @@ def ows2json_io(ows_io):
             json_io["literalDataDomains"] = domains
             # fix inconsistencies of some process descriptions
             # WPS are allowed to report 'minOccurs=1' although 'defaultValue' can also be provided
-            # (see https://github.com/bird-house/finch/pull/199)
+            # (see https://github.com/geopython/pywps/issues/625)
             if "defaultValue" in domains[0]:
                 json_io["min_occurs"] = 0
 
@@ -987,8 +987,8 @@ def any2wps_literal_datatype(io_type, is_value):
     return null
 
 
-def any2json_literal_allowed_values(io_allow):
-    # type: (Union[AllowedValue, JSON, str, float, int, bool]) -> Union[JSON, str, str, float, int, bool]
+def any2json_literal_allowed_value(io_allow):
+    # type: (Union[AllowedValue, JSON, str, float, int, bool]) -> Union[JSON, str, str, float, int, bool, Type[null]]
     """
     Converts an ``AllowedValues`` definition from different packages into standardized JSON representation of `OGC-API`.
     """
@@ -999,12 +999,25 @@ def any2json_literal_allowed_values(io_allow):
         for field, dest in [
             ("range_minimum", "minimumValue"),
             ("range_maximum", "maximumValue"),
-            ("spacing", "spacing"),
+            ("range_spacing", "spacing"),
             ("range_closure", "rangeClosure")
         ]:
-            wps_range_value = get_field(io_allow, field, search_variations=True)
+            wps_range_value = get_field(io_allow, field, search_variations=True, pop_found=True)
             if wps_range_value is not null:
                 wps_range[dest] = wps_range_value
+        # in case input was a PyWPS AllowedValue object converted to JSON,
+        # extra metadata must be removed/transformed accordingly for literal value
+        basic_type = io_allow.pop("type", None)
+        allowed_type = io_allow.pop("allowed_type", None)
+        allowed_type = allowed_type or basic_type
+        allowed_value = io_allow.pop("value", None)
+        if allowed_value is not None:
+            # note: closure must be ignored for range compare because it defaults to 'close' even for a 'value' type
+            range_fields = ["minimumValue", "maximumValue", "spacing"]
+            if allowed_type == "value" or not any(field in io_allow for field in range_fields):
+                return allowed_value
+        if not io_allow:  # empty container
+            return null
     return io_allow
 
 
@@ -1013,26 +1026,27 @@ def any2json_literal_data_domains(io_info):
     """
     Extracts allowed value constrains from the input definition and generate the expected literal data domains.
 
-    The generated result, if applicable, corresponds to
-    schema definition :class:`weaver.wps_restapi.swagger_definitions.LiteralDataDomainList`.
+    The generated result, if applicable, corresponds to a list of a single instance of
+    schema definition :class:`weaver.wps_restapi.swagger_definitions.LiteralDataDomainList` with following structure.
+
+    .. code-block:: yaml
+
+        default: bool
+        defaultValue: float, int, bool, str
+        dataType: {name: string, <reference: url: string>}
+        uom: string
+        valueDefinition:
+          oneOf:
+          - string
+          - url-string
+          - {anyValue: bool}
+          - [float, int, bool, str]
+          - [{minimum, maximum, spacing, closure}]
     """
     io_type = get_field(io_info, "type", search_variations=False)
     if io_type in [WPS_BOUNDINGBOX, WPS_COMPLEX]:
         return null
 
-    # simplified structure of expected key:types
-    #
-    #   default: bool
-    #   defaultValue: float, int, bool, str
-    #   dataType: {name: string, <reference: url: string>}
-    #   uom: string
-    #   valueDefinition:
-    #     - string
-    #     - url-string
-    #     - {anyValue: bool}
-    #     - [float, int, bool, str]
-    #     - [{minimum, maximum, spacing, closure}]
-    #
     io_data_type = get_field(io_info, "type", search_variations=True, only_variations=True)
     domain = {
         "default": True,  # since it is generated from convert, only one is available anyway
@@ -1048,56 +1062,12 @@ def any2json_literal_data_domains(io_info):
     if wps_default_value not in [null, None]:
         domain["defaultValue"] = wps_default_value
     if isinstance(wps_allowed_values, list) and len(wps_allowed_values) > 0:
-        wps_allowed_values = [any2json_literal_allowed_values(io_value) for io_value in wps_allowed_values]
-        wps_allowed_values = [io_value for io_value in wps_allowed_values if io_value]  # remote empty/null
+        wps_allowed_values = [any2json_literal_allowed_value(io_value) for io_value in wps_allowed_values]
+        wps_allowed_values = [io_value for io_value in wps_allowed_values if io_value is not null]
         if wps_allowed_values:
             wps_value_definition = wps_allowed_values
     domain["valueDefinition"] = wps_value_definition
     return [domain]
-
-
-def json2wps_allowed_values(io_info):
-    # type: (JSON_IO_Type) -> Union[Type[null], List[AllowedValue]]
-    """
-    Obtains the allowed values constrains for the literal data type from a JSON I/O definition.
-
-    Converts the ``literalDataDomains`` definition into ``allowed_values`` understood by :mod:`pywps`.
-    Handles explicit ``allowed_values`` if available and not previously defined by ``literalDataDomains``.
-
-    .. seealso::
-        Function :func:`any2json_literal_data_domains` defines generated ``literalDataDomains`` JSON definition.
-    """
-    domains = get_field(io_info, "literal_data_domains", search_variations=True)
-    allowed = get_field(io_info, "allowed_values", search_variations=True)
-    if not domains and isinstance(allowed, list):
-        if all(isinstance(value, (float, int, str)) for value in allowed):
-            return [AllowedValue(value=value) for value in allowed]
-        if all(isinstance(value, dict) for value in allowed):
-            allowed_values = []
-            for value in allowed:
-                min_val = get_field(value, "range_minimum", search_variations=True, default=None)
-                max_val = get_field(value, "range_maximum", search_variations=True, default=None)
-                spacing = get_field(value, "range_spacing", search_variations=True, default=None)
-                closure = get_field(value, "range_closure", search_variations=True, default=RANGECLOSURETYPE.CLOSED)
-                literal = get_field(value, "value", search_variations=False, default=None)
-                if min_val or max_val or spacing:
-                    allowed_values.append(AllowedValue(ALLOWEDVALUETYPE.RANGE,
-                                                       minval=min_val, maxval=max_val,
-                                                       spacing=spacing, range_closure=closure))
-                elif literal:
-                    allowed_values.append(AllowedValue(ALLOWEDVALUETYPE.VALUE, value=literal))
-                # literalDataDomains could be 'anyValue', which is to be ignored here
-            return allowed_values
-        LOGGER.debug("Cannot parse literal I/O AllowedValues: %s", allowed)
-        raise ValueError("Unknown parsing of 'AllowedValues' for value: {!s}".format(allowed))
-    if domains:
-        for domain in domains:
-            allowed = json2wps_allowed_values(domain)
-            # stop on first because undefined how to combine multiple
-            # no multiple definitions by 'any2json_literal_data_domains' regardless, and not directly handled by pywps
-            if allowed:
-                return allowed
-    return null
 
 
 def json2wps_datatype(io_info):
@@ -1140,15 +1110,7 @@ def json2wps_field(field_info, field_category):
     :param field_category: one of ``WPS_FIELD_MAPPING`` keys to indicate how to parse ``field_info``.
     """
     if field_category == "allowed_values":
-        if isinstance(field_info, AllowedValue):
-            return field_info
-        if isinstance(field_info, dict):
-            field_info.pop("type", None)
-            return AllowedValue(**field_info)
-        if isinstance(field_info, str):
-            return AllowedValue(value=field_info, allowed_type=ALLOWEDVALUETYPE.VALUE)
-        if isinstance(field_info, list):
-            return AllowedValue(minval=min(field_info), maxval=max(field_info), allowed_type=ALLOWEDVALUETYPE.RANGE)
+        return json2wps_allowed_values({"allowed_values": field_info})
     elif field_category == "supported_formats":
         if isinstance(field_info, dict):
             return Format(**field_info)
@@ -1169,6 +1131,54 @@ def json2wps_field(field_info, field_category):
         return field_info
     LOGGER.warning("Field of type '%s' not handled as known WPS field.", field_category)
     return None
+
+
+def json2wps_allowed_values(io_info):
+    # type: (JSON_IO_Type) -> Union[Type[null], List[AllowedValue]]
+    """
+    Obtains the allowed values constrains for the literal data type from a JSON I/O definition.
+
+    Converts the ``literalDataDomains`` definition into ``allowed_values`` understood by :mod:`pywps`.
+    Handles explicit ``allowed_values`` if available and not previously defined by ``literalDataDomains``.
+
+    .. seealso::
+        Function :func:`any2json_literal_data_domains` defines generated ``literalDataDomains`` JSON definition.
+    """
+    domains = get_field(io_info, "literal_data_domains", search_variations=True)
+    allowed = get_field(io_info, "allowed_values", search_variations=True)
+    if not domains and isinstance(allowed, list):
+        if all(isinstance(value, AllowedValue) for value in allowed):
+            return allowed
+        if all(isinstance(value, (float, int, str)) for value in allowed):
+            return [AllowedValue(value=value) for value in allowed]
+        if all(isinstance(value, dict) for value in allowed):
+            allowed_values = []
+            for value in allowed:
+                min_val = get_field(value, "range_minimum", search_variations=True, default=None)
+                max_val = get_field(value, "range_maximum", search_variations=True, default=None)
+                spacing = get_field(value, "range_spacing", search_variations=True, default=None)
+                closure = get_field(value, "range_closure", search_variations=True, default=RANGECLOSURETYPE.CLOSED)
+                literal = get_field(value, "value", search_variations=False, default=None)
+                if min_val or max_val or spacing:
+                    allowed_values.append(AllowedValue(ALLOWEDVALUETYPE.RANGE,
+                                                       minval=min_val, maxval=max_val,
+                                                       spacing=spacing, range_closure=closure))
+                elif literal:
+                    allowed_values.append(AllowedValue(ALLOWEDVALUETYPE.VALUE, value=literal))
+                # literalDataDomains could be 'anyValue', which is to be ignored here
+            return allowed_values
+        LOGGER.debug("Cannot parse literal I/O AllowedValues: %s", allowed)
+        raise ValueError("Unknown parsing of 'AllowedValues' for value: {!s}".format(allowed))
+    if domains:
+        for domain in domains:
+            values = domain.get("valueDefinition")
+            if values:
+                allowed = json2wps_allowed_values({"allowed_values": values})
+            # stop on first because undefined how to combine multiple
+            # no multiple definitions by 'any2json_literal_data_domains' regardless, and not directly handled by pywps
+            if allowed:
+                return allowed
+    return null
 
 
 def json2wps_io(io_info, io_select):
@@ -1210,12 +1220,10 @@ def json2wps_io(io_info, io_select):
     transform_json(io_info, rename=rename, remove=remove, replace_values=replace_values)
 
     # convert allowed value objects
-    values = get_field(io_info, "allowed_values", search_variations=True, pop_found=True)
+    values = json2wps_allowed_values(io_info)
     if values is not null:
         if isinstance(values, list) and len(values) > 0:
-            io_info["allowed_values"] = list()
-            for allow_value in values:
-                io_info["allowed_values"].append(json2wps_field(allow_value, "allowed_values"))
+            io_info["allowed_values"] = values
         else:
             io_info["allowed_values"] = AnyValue  # noqa
 
@@ -1611,10 +1619,13 @@ def merge_package_io(wps_io_list, cwl_io_list, io_select):
             wps_io_json["max_occurs"] = cwl_max_occurs
         wps_io = json2wps_io(wps_io_json, io_select)
 
-        # retrieve any complementing fields (metadata, keywords, etc.) passed as WPS input
-        # additionally enforce 'default' format defined by 'data_format' to keep value specified by WPS if applicable
+        # Retrieve any complementing fields (metadata, keywords, etc.) passed as WPS input.
+        # Enforce some additional fields to keep value specified by WPS if applicable.
+        # These are only added here rather that 'WPS_FIELD_MAPPING' to avoid erroneous detection by other functions.
+        #   - Literal: 'default' value defined by 'data'
+        #   - Complex: 'default' format defined by 'data_format'
         # (see function 'json2wps_io' for detail)
-        for field_type in list(WPS_FIELD_MAPPING) + ["data_format"]:
+        for field_type in list(WPS_FIELD_MAPPING) + ["data", "data_format"]:
             cwl_field = get_field(cwl_io, field_type)
             wps_field = get_field(wps_io, field_type)
             # override provided formats if different (keep WPS), or if CWL->WPS was missing but is provided by WPS

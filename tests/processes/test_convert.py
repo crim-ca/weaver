@@ -16,11 +16,11 @@ from weaver.processes.convert import _are_different_and_set  # noqa: W0212
 from weaver.processes.convert import (
     DEFAULT_FORMAT,
     PACKAGE_ARRAY_MAX_SIZE,
-    any2cwl_io,
     cwl2wps_io,
     is_cwl_array_type,
     is_cwl_enum_type,
     is_cwl_file_type,
+    json2wps_allowed_values,
     json2wps_datatype,
     merge_io_formats
 )
@@ -107,6 +107,31 @@ def test_json2wps_datatype():
     for expect, test_io in test_cases:
         copy_io = deepcopy(test_io)  # can get modified by function
         assert json2wps_datatype(test_io) == expect, "Failed for [{}]".format(copy_io)
+
+
+def test_json2wps_allowed_values():
+    for i, (values, expect) in enumerate([
+        ({"allowedvalues": [1, 2, 3]},
+         [AllowedValue(value=1), AllowedValue(value=2), AllowedValue(value=3)]),
+        ({"allowedvalues": ["A", "B"]},
+         [AllowedValue(value="A"), AllowedValue(value="B")]),
+        ({"allowedvalues": [{"closure": "open", "minimum": 1, "maximum": 5}]},
+         [AllowedValue(minval=1, maxval=5, range_closure="open")]),
+        ({"allowedvalues": [{"closure": "open-closed", "minimum": 0, "maximum": 6, "spacing": 2}]},
+         [AllowedValue(minval=0, maxval=6, spacing=2, range_closure="open-closed")]),
+        ({"literalDataDomains": [{"valueDefinition": [1, 2, 3]}]},
+         [AllowedValue(value=1), AllowedValue(value=2), AllowedValue(value=3)]),
+        ({"literalDataDomains": [{"valueDefinition": ["A", "B"]}]},
+         [AllowedValue(value="A"), AllowedValue(value="B")]),
+        ({"literalDataDomains": [{"valueDefinition": [{"closure": "open", "minimum": 1, "maximum": 5}]}]},
+         [AllowedValue(minval=1, maxval=5, range_closure="open")]),
+        ({"literalDataDomains": [{"valueDefinition": [
+            {"closure": "open-closed", "minimum": 0, "maximum": 6, "spacing": 2}]}
+         ]},
+         [AllowedValue(minval=0, maxval=6, spacing=2, range_closure="open-closed")]),
+    ]):
+        result = json2wps_allowed_values(values)
+        assert result == expect, "Failed test {}".format(i)
 
 
 def test_cwl2wps_io_null_or_array_of_enums():
