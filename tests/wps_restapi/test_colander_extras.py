@@ -31,7 +31,7 @@ def evaluate_test_cases(test_cases):
     evaluating ``Test-Value``. Otherwise, the result from deserialization should equal exactly ``Expected-Result``.
     """
 
-    for test_schema_ref, test_value, test_expect in test_cases:
+    for i, (test_schema_ref, test_value, test_expect) in enumerate(test_cases):
         if inspect.isclass(test_schema_ref):
             test_schema = test_schema_ref()
             test_schema_name = test_schema_ref.__name__
@@ -41,14 +41,19 @@ def evaluate_test_cases(test_cases):
         try:
             result = test_schema.deserialize(test_value)
             if test_expect is colander.Invalid:
-                pytest.fail("Expected invalid format from [{}] with: {}, but received: {}".format(
-                    test_schema_name, test_value, result))
-            assert result == test_expect, "Bad result from [{}] with: {}".format(test_schema_name, test_value)
+                pytest.fail("Test [{}]: Expected invalid format from [{}] with: {}, but received: {}".format(
+                    i, test_schema_name, test_value, result)
+                )
+            assert result == test_expect, "Test [{}]: Bad result from [{}] with: {}".format(
+                i, test_schema_name, test_value
+            )
         except colander.Invalid:
             if test_expect is colander.Invalid:
                 pass
             else:
-                pytest.fail("Expected valid format from [{}] with: {}".format(test_schema_name, test_value))
+                pytest.fail("Test [{}]: Expected valid format from [{}] with: {}, but invalid instead of: {}".format(
+                    i, test_schema_name, test_value, test_expect)
+                )
 
 
 def test_oneof_io_formats_deserialize_as_mapping():
@@ -107,6 +112,63 @@ def test_any_of_under_variable():
     assert isinstance(result, dict)
     assert key in result
     assert result[key] == {"type": "float"}
+
+
+def test_oneof_variable_dict_or_list():
+    """
+    Test the common representation of item listing (with ID) and corresponding ID to content mapping representations.
+    """
+
+    class DataMap(ce.ExtendedMappingSchema):
+        field = ce.ExtendedSchemaNode(ce.ExtendedInteger())
+
+    class DataItem(DataMap):
+        id = ce.ExtendedSchemaNode(ce.ExtendedString())
+
+    class DataSeq(ce.ExtendedSequenceSchema):
+        item = DataItem()
+
+    class DataVarMap(ce.ExtendedMappingSchema):
+        var_id = DataMap(variable="<var_id>")
+
+    class DataOneOf(ce.OneOfKeywordSchema):
+        _one_of = [DataVarMap, DataSeq]
+
+    class DataMapDrop(ce.ExtendedMappingSchema):
+        field = ce.ExtendedSchemaNode(ce.ExtendedInteger(), missing=colander.drop)
+
+    class DataItemDrop(DataMapDrop):
+        id = ce.ExtendedSchemaNode(ce.ExtendedString())
+
+    class DataSeqDrop(ce.ExtendedSequenceSchema):
+        item = DataItemDrop()
+
+    class DataVarMapDrop(ce.ExtendedMappingSchema):
+        var_id = DataMapDrop(variable="<var_id>")
+
+    class DataOneOfDrop(ce.OneOfKeywordSchema):
+        _one_of = [DataVarMapDrop, DataSeqDrop]
+
+    valid_map = {"id-1": {"field": 1}, "id-2": {"field": 2}}
+    valid_list = [{"id": "id-1", "field": 1}, {"id": "id-2", "field": 2}]
+
+    evaluate_test_cases([
+        (DataOneOf, valid_map, valid_map),
+        (DataOneOf, valid_list, valid_list),
+        (DataOneOf, {}, colander.Invalid),  # missing 'field', so empty is not valid because we check sub-schemas
+        (DataOneOf, [], []),  # missing 'field'+'id' so empty is not valid
+        (DataOneOfDrop, {}, colander.Invalid),  # valid now because 'field' can be omitted
+        (DataOneOfDrop, [], []),  # valid because empty list is allowed
+        (DataOneOf(default={}), "bad-format", colander.Invalid),  # not drop, default only if not provided
+        (DataOneOf(default={}), None, colander.Invalid),  # value 'None' (JSON 'null') is still "providing" the field
+        (DataOneOf(missing=colander.drop), "bad-format", colander.drop),  # would be dropped by higher level schema
+        (DataOneOf(default={}, missing=colander.drop), colander.null, {}),  # result if value not "provided" use default
+        (DataOneOfDrop(default={}), colander.null, {}),  # value not provided uses default
+        (DataOneOf, {"id-1": {"field": "ok"}, "id-2": {"field": "123"}}, colander.Invalid),
+        (DataOneOf, [{"id": 1, "field": "ok"}, {"id": "id-2", "field": 123}], colander.Invalid),
+        (DataOneOf, {"id-1": [1, 2, 3]}, colander.Invalid),
+        (DataOneOf, [{"id": "id-1"}], colander.Invalid),
+    ])
 
 
 def test_oneof_nested_dict_list():
@@ -699,9 +761,13 @@ def test_schema_default_missing_validator_openapi():
 
 def test_dropable_variable_mapping():
     """
-    Validate that sub-schema marked with ``missing=drop`` under a ``variable`` schema resolve without error.
+    Validate that optional sub-schema using different parameters under ``variable`` schema resolve without error.
 
-    Also, ensure that the same ``variable`` sub-schemas without ``missing=drop`` raise for invalid data structure.
+    Variable schemas with as sub-schema marked as ``missing=drop`` should allow it to be omitted and drop it.
+    Similarly, omitted sub-value matching a schema with a ``default`` should allow it to be omitted and use the default.
+
+    Also, ensure that the same ``variable`` sub-schemas without ``missing=drop`` nor ``default`` (i.e.: required) raise
+    for data structure that could not be resolved to a variable sub-schema (either because it is missing or invalid).
 
     .. seealso::
         - :class:`weaver.wps_restapi.colander_extras.VariableSchemaNode`
@@ -720,7 +786,16 @@ def test_dropable_variable_mapping():
         var_list = SomeList(variable="<var_list>", missing=colander.drop)
 
     class VarMapMapDrop(ce.ExtendedMappingSchema):
-        var_map = SomeMap(variable="<var_list>", missing=colander.drop)
+        var_map = SomeMap(variable="<var_map>", missing=colander.drop)
+
+    class VarMapStrDefault(ce.ExtendedMappingSchema):
+        var_str = ce.ExtendedSchemaNode(colander.String(), variable="<var_str>", default="default")
+
+    class VarMapListDefault(ce.ExtendedMappingSchema):
+        var_list = SomeList(variable="<var_list>", default=["default"])
+
+    class VarMapMapDefault(ce.ExtendedMappingSchema):
+        var_map = SomeMap(variable="<var_map>", default={"field": "default"})
 
     class VarMapStrReq(ce.ExtendedMappingSchema):
         var_str = ce.ExtendedSchemaNode(colander.String(), variable="<var_str>")
@@ -729,7 +804,7 @@ def test_dropable_variable_mapping():
         var_list = SomeList(variable="<var_list>")
 
     class VarMapMapReq(ce.ExtendedMappingSchema):
-        var_map = SomeMap(variable="<var_list>")
+        var_map = SomeMap(variable="<var_map>")
 
     valid_var_str = {"dont-care": "value"}
     valid_var_list = {"dont-care": ["value"]}
@@ -738,12 +813,23 @@ def test_dropable_variable_mapping():
     invalid_var_str = {"dont-care": 1}
     invalid_var_list = {"dont-care": [1]}
     invalid_var_map = {"dont-care": {"field": 1}}
+    missing_var = {}
+    missing_var_list = {"dont-care": []}
+    missing_var_map = {"dont-care": {}}
 
     test_schemas = [
         # whether required or missing variable sub-schema is allowed, result schema should all resolve correctly
         (VarMapStrDrop, valid_var_str, valid_var_str),
         (VarMapListDrop, valid_var_list, valid_var_list),
         (VarMapMapDrop, valid_var_map, valid_var_map),
+        (VarMapStrDrop, missing_var, {}),
+        (VarMapListDrop, missing_var, {}),
+        (VarMapMapDrop, missing_var, {}),
+        (VarMapListDrop, missing_var_list, {}),
+        (VarMapMapDrop, missing_var_map, {}),
+        (VarMapStrDefault, valid_var_str, valid_var_str),
+        (VarMapListDefault, valid_var_list, valid_var_list),
+        (VarMapMapDefault, valid_var_map, valid_var_map),
         (VarMapStrReq, valid_var_str, valid_var_str),
         (VarMapListReq, valid_var_list, valid_var_list),
         (VarMapMapReq, valid_var_map, valid_var_map),
@@ -751,6 +837,9 @@ def test_dropable_variable_mapping():
         (VarMapStrDrop, invalid_var_str, {}),
         (VarMapListDrop, invalid_var_list, {}),
         (VarMapMapDrop, invalid_var_map, {}),
+        (VarMapStrDefault, invalid_var_str, {"dont-care": "default"}),
+        (VarMapListDefault, invalid_var_list, {"dont-care": ["default"]}),
+        (VarMapMapDefault, invalid_var_map, {"dont-care": {"field": "default"}}),
         (VarMapStrReq, invalid_var_str, colander.Invalid),
         (VarMapListReq, invalid_var_list, colander.Invalid),
         (VarMapMapReq, invalid_var_map, colander.Invalid),
