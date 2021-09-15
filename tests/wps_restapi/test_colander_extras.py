@@ -160,8 +160,9 @@ def test_oneof_variable_dict_or_list():
         (DataOneOfDrop, {}, colander.Invalid),  # valid now because 'field' can be omitted
         (DataOneOfDrop, [], []),  # valid because empty list is allowed
         (DataOneOf(default={}), "bad-format", colander.Invalid),  # not drop, default only if not provided
+        (DataOneOf(default={}), None, colander.Invalid),  # value 'None' (JSON 'null') is still "providing" the field
         (DataOneOf(missing=colander.drop), "bad-format", colander.drop),  # would be dropped by higher level schema
-        (DataOneOf(default={}, missing=colander.drop), colander.null, {}),  # value not provided uses default
+        (DataOneOf(default={}, missing=colander.drop), colander.null, {}),  # result if value not "provided" use default
         (DataOneOfDrop(default={}), colander.null, {}),  # value not provided uses default
         (DataOneOf, {"id-1": {"field": "ok"}, "id-2": {"field": "123"}}, colander.Invalid),
         (DataOneOf, [{"id": 1, "field": "ok"}, {"id": "id-2", "field": 123}], colander.Invalid),
