@@ -2677,7 +2677,7 @@ class ExecuteInputMapValues(ExtendedMappingSchema):
 class ExecuteInputValues(OneOfKeywordSchema):
     _one_of = [
         # OLD format: {"inputs": [{"id": "<id>", "value": <data>}, ...]}
-        ExecuteInputListValues(missing=drop, description="Process job execution inputs defined as item listing."),
+        ExecuteInputListValues(description="Process job execution inputs defined as item listing."),
         # OGC-API:    {"inputs": {"<id>": <data>, "<id>": {"value": <data>}, ...}}
         ExecuteInputMapValues(description="Process job execution inputs defined as mapping."),
     ]
@@ -2696,7 +2696,9 @@ class Execute(ExtendedMappingSchema):
     #
     # See tests validating both cases (incorrect schema vs optionals inputs):
     #   - 'tests.wps_restapi.test_processes.WpsRestApiProcessesTest.test_execute_process_missing_required_params'
+    #   - 'tests.wps_restapi.test_providers.WpsRestApiProcessesTest.test_execute_process_no_error_not_required_params'
     #   - 'tests.wps_restapi.test_providers.WpsRestApiProcessesTest.test_get_provider_process_no_inputs'
+    #   - 'tests.wps_restapi.test_colander_extras.test_oneof_variable_dict_or_list'
     inputs = ExecuteInputValues(default={})
     outputs = ExecuteOutputFilterList(description="Filter list of outputs to be obtained from execution.")
     mode = JobExecuteModeEnum()

@@ -727,12 +727,15 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
         if self.schema_type is colander.Mapping:
             var_children = self._get_sub_variable(self.children)
             var_full_search = [var_children]
-            if isinstance(_make_node_instance(self), KeywordMapper):
-                keyword_objects = KeywordMapper.get_keyword_items(self)  # noqa
-                var_full_search.extend(
-                    [self._get_sub_variable(_make_node_instance(var_obj).children)
-                     for var_obj in keyword_objects if var_obj.schema_type is colander.Mapping]
-                )
+            # TODO: see if this will still be necessary...
+            #   When a Keyword schema contains a mapping with itself containing a variable, the mapping should directly
+            #   handle this child-variable detection mechanism. There is no need to go search for vars "2 level" lower.
+            # if isinstance(_make_node_instance(self), KeywordMapper):
+            #     keyword_objects = KeywordMapper.get_keyword_items(self)  # noqa
+            #     var_full_search.extend(
+            #         [self._get_sub_variable(_make_node_instance(var_obj).children)
+            #          for var_obj in keyword_objects if var_obj.schema_type is colander.Mapping]
+            #     )
             for var_subnodes in var_full_search:
                 if len(var_subnodes):
                     var_names = [child.name for child in var_subnodes]
@@ -742,7 +745,7 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
                         raise SchemaNodeTypeError("Invalid node '{}' defines multiple schema nodes "
                                                   "with name 'variable={}'.".format(type(self), var))
                     var_names = [getattr(child, self._variable, None) for child in var_subnodes]
-                    setattr(self, self._variable_map, {var: None for var in var_names})
+                    setattr(self, self._variable_map, {var: [] for var in var_names})
 
     def _get_sub_variable(self, subnodes):
         return [child for child in subnodes if getattr(child, self._variable, None)]
@@ -763,6 +766,10 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
         var_map = getattr(self, self._variable_map, {})
         if not isinstance(var_map, dict) or not len(var_map):
             return cstruct
+        # value must be a dictionary map object to allow variable key
+        if not isinstance(cstruct, dict):
+            msg = "Variable key not allowed for non-mapping data: {}".format(type(cstruct).__name__)
+            raise colander.Invalid(node=self, msg=msg)
 
         var_children = self._get_sub_variable(self.children)
         const_child_keys = [child.name for child in self.children if child not in var_children]
@@ -770,24 +777,22 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
         for var_child in var_children:
             var = getattr(var_child, self._variable, None)
             var_map[var] = []
-            # value must be a dictionary map object to allow variable key
-            if not isinstance(cstruct, dict):
-                raise colander.Invalid(
-                    node=self, msg="Variable key not allowed for non-mapping data: {}".format(type(cstruct).__name__)
-                )
-
-            var_invalid = colander.Invalid(
-                node=self, msg="Requirement not met under variable: {}.".format(var), value=cstruct,
-            )
+            var_msg = "Requirement not met under variable: {}.".format(var)
+            var_invalid = colander.Invalid(node=self, msg=var_msg, value=cstruct)
             # attempt to find any sub-node matching the sub-schema under variable
             for child_key, child_cstruct in cstruct.items():
                 # skip explicit nodes as well as other variables already matched
                 # cannot match the same child-cstruct again with another variable
                 if child_key in const_child_keys or child_key in var_map:
                     continue
+                schema_class = _make_node_instance(var_child)
                 try:
-                    schema_class = _make_node_instance(var_child)
                     var_cstruct = schema_class.deserialize(child_cstruct)
+                    if var_cstruct in [colander.drop, colander.null]:
+                        if var_child.missing is colander.drop:
+                            continue
+                        elif var_child.default not in [colander.drop, colander.null]:
+                            var_cstruct = var_child.default
                     # not reached if previous raised invalid
                     var_map[var].append({
                         "node": schema_class.name,
@@ -795,7 +800,16 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
                         "cstruct": var_cstruct
                     })
                 except colander.Invalid as invalid:
-                    var_invalid.add(invalid)
+                    if var_child.missing is colander.drop:
+                        continue
+                    elif var_child.missing is not colander.required:
+                        var_map[var].append({
+                            "node": schema_class.name,
+                            "name": child_key,
+                            "cstruct": var_child.default
+                        })
+                    else:
+                        var_invalid.add(invalid)
             var_val = var_map.get(var, colander.null)
             if var_val is colander.null:
                 # allow unmatched variable item under mapping if it is not required
@@ -814,14 +828,17 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
             # We must do this as non-variable sub-schemas could be present and we must also
             # validate them against full schema.
             if not const_child_keys:
-                result = {}
+                result = self.default or {}
             else:
                 for mapped in var_map.values():
                     # if multiple objects corresponding to a variable sub-schema where provided,
                     # we only give one as this is what is expected for normal-mapping deserialize
                     cstruct[mapped[0]["node"]] = cstruct.pop(mapped[0]["name"])
                 result = super(VariableSchemaNode, self).deserialize(cstruct)  # noqa
-            for mapped in var_map.values():
+            for var_name, mapped in var_map.items():
+                # invalid if no variable match was found, unless optional
+                if mapped is None and self.missing is colander.required:
+                    raise KeyError
                 for var_mapped in mapped:
                     result[var_mapped["name"]] = var_mapped["cstruct"]
         except colander.Invalid as invalid:
@@ -831,6 +848,10 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
         except KeyError:
             invalid_var.msg = "Tried matching variable '{}' sub-schemas but mapping failed.".format(var)
             raise invalid_var
+        if not isinstance(result, dict):
+            raise TypeError("Variable result must be of mapping schema type. Got [{}] value {}".format(
+                _get_node_name(self, schema_name=True), result
+            ))
         return result
 
 
