@@ -5,14 +5,13 @@ from configparser import ConfigParser
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
-import lxml.etree
 from beaker.cache import cache_region
 from owslib.wps import WebProcessingService, WPSExecution
 from pyramid.httpexceptions import HTTPNotFound
 from pywps import configuration as pywps_config
 
+from weaver import xml
 from weaver.config import get_weaver_configuration
-from weaver.typedefs import XML
 from weaver.utils import (
     get_header,
     get_no_cache_option,
@@ -149,10 +148,10 @@ def get_wps_local_status_location(url_status_location, container, must_exist=Tru
 
 
 @cache_region("request")
-def _describe_process_cached(self, identifier, xml=None):
-    # type: (WebProcessingService, str, Optional[XML]) -> ProcessOWS
+def _describe_process_cached(self, identifier, xml_data=None):
+    # type: (WebProcessingService, str, Optional[xml.XML]) -> ProcessOWS
     LOGGER.debug("Request WPS DescribeProcess to [%s] with [id: %s]", self.url, identifier)
-    return self.describeprocess_method(identifier, xml=xml)  # noqa  # method created by '_get_wps_client_cached'
+    return self.describeprocess_method(identifier, xml=xml_data)  # noqa  # method created by '_get_wps_client_cached'
 
 
 @cache_region("request")
@@ -211,7 +210,7 @@ def get_wps_client(url, container=None, verify=None, headers=None, language=None
 
 
 def check_wps_status(location=None,     # type: Optional[str]
-                     response=None,     # type: Optional[XML]
+                     response=None,     # type: Optional[xml.XML]
                      sleep_secs=2,      # type: int
                      verify=True,       # type: bool
                      settings=None,     # type: Optional[AnySettingsContainer]
@@ -238,28 +237,28 @@ def check_wps_status(location=None,     # type: Optional[str]
     execution = WPSExecution()
     if response:
         LOGGER.debug("Retrieving WPS status from XML response document...")
-        xml = response
+        data = response
     elif location:
         xml_resp = HTTPNotFound()
         try:
             LOGGER.debug("Attempt to retrieve WPS status-location from URL [%s]...", location)
             xml_resp = request_extra("get", location, verify=verify, settings=settings)
-            xml = xml_resp.content
+            data = xml_resp.content
         except Exception as ex:
             LOGGER.debug("Got exception during get status: [%r]", ex)
-            xml = _retry_file()
+            data = _retry_file()
         if xml_resp.status_code == HTTPNotFound.code:
-            LOGGER.debug("Got not-found during get status: [%r]", xml)
-            xml = _retry_file()
+            LOGGER.debug("Got not-found during get status: [%r]", data)
+            data = _retry_file()
     else:
         raise Exception("Missing status-location URL/file reference or response with XML object.")
     if isinstance(xml, str):
-        xml = xml.encode("utf8", errors="ignore")
-    execution.checkStatus(response=xml, sleepSecs=sleep_secs)
+        data = data.encode("utf8", errors="ignore")
+    execution.checkStatus(response=data, sleepSecs=sleep_secs)
     if execution.response is None:
         raise Exception("Missing response, cannot check status.")
-    if not isinstance(execution.response, XML):
-        execution.response = lxml.etree.fromstring(execution.response)
+    if not isinstance(execution.response, xml.XML):
+        execution.response = xml.fromstring(execution.response)
     return execution
 
 

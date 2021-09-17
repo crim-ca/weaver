@@ -1,10 +1,5 @@
 from typing import TYPE_CHECKING
 
-import lxml.etree
-
-# define this type here so that code can use it for actual logic without repeating 'noqa'
-XML = lxml.etree._Element  # noqa
-
 if TYPE_CHECKING:
     import os
     import typing
@@ -93,7 +88,6 @@ if TYPE_CHECKING:
 
     KVP_Item = Union[ValueType, Sequence[ValueType]]
     KVP = Union[Sequence[Tuple[str, KVP_Item]], Dict[str, KVP_Item]]
-    XML = lxml.etree._Element  # noqa
 
     AnyContainer = Union[Configurator, Registry, PyramidRequest, Celery]
     SettingValue = Optional[Union[JSON, AnyValue]]

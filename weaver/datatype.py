@@ -11,7 +11,6 @@ from logging import ERROR, INFO, Logger, getLevelName, getLogger
 from typing import TYPE_CHECKING
 from urllib.parse import urljoin, urlparse
 
-import lxml.etree
 import pyramid.httpexceptions
 import requests.exceptions
 from dateutil.parser import parse as dt_parse
@@ -44,7 +43,7 @@ from weaver.status import (
     STATUS_UNKNOWN,
     map_status
 )
-from weaver.typedefs import XML
+from weaver import xml
 from weaver.utils import localize_datetime  # for backward compatibility of previously saved jobs not time-locale-aware
 from weaver.utils import (
     fully_qualified_name,
@@ -874,8 +873,8 @@ class Job(Base):
         """
         XML request for WPS execution submission as string (binary).
         """
-        if isinstance(request, XML):
-            request = lxml.etree.tostring(request)
+        if isinstance(request, xml.XML):
+            request = xml.tostring(request)
         self["request"] = request
 
     @property
@@ -892,8 +891,8 @@ class Job(Base):
         """
         XML status response from WPS execution submission as string (binary).
         """
-        if isinstance(response, XML):
-            response = lxml.etree.tostring(response)
+        if isinstance(response, xml.XML):
+            response = xml.tostring(response)
         self["response"] = response
 
     def _job_url(self, base_url=None):

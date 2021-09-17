@@ -9,7 +9,6 @@ from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
-import lxml.etree
 from owslib.wps import (
     ComplexData,
     Input as OWS_Input_Type,
@@ -25,6 +24,7 @@ from pywps.inout.formats import Format
 from pywps.inout.literaltypes import ALLOWEDVALUETYPE, RANGECLOSURETYPE, AllowedValue, AnyValue
 from pywps.validator.mode import MODE
 
+from weaver import xml
 from weaver.exceptions import PackageTypeError
 from weaver.execute import (
     EXECUTE_MODE_ASYNC,
@@ -84,8 +84,7 @@ if TYPE_CHECKING:
         CWL,
         CWL_Input_Type,
         CWL_Output_Type,
-        JSON,
-        XML
+        JSON
     )
 
     # typing shortcuts
@@ -598,8 +597,8 @@ def xml_wps2cwl(wps_process_response, settings):
         return _xml.split("}")[-1].lower()
 
     # look for `XML` structure starting at `ProcessDescription` (WPS-1)
-    xml_resp = lxml.etree.fromstring(str2bytes(wps_process_response.content))
-    xml_wps_process = xml_resp.xpath("//ProcessDescription")  # type: List[XML]
+    xml_resp = xml.fromstring(str2bytes(wps_process_response.content))
+    xml_wps_process = xml_resp.xpath("//ProcessDescription")  # type: List[xml.XML]
     if not len(xml_wps_process) == 1:
         raise ValueError("Could not retrieve a valid 'ProcessDescription' from WPS-1 response.")
     process_id = None
