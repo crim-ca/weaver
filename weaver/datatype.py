@@ -43,7 +43,7 @@ from weaver.status import (
     STATUS_UNKNOWN,
     map_status
 )
-from weaver import xml
+from weaver import xml_util
 from weaver.utils import localize_datetime  # for backward compatibility of previously saved jobs not time-locale-aware
 from weaver.utils import (
     fully_qualified_name,
@@ -873,8 +873,8 @@ class Job(Base):
         """
         XML request for WPS execution submission as string (binary).
         """
-        if isinstance(request, xml.XML):
-            request = xml.tostring(request)
+        if isinstance(request, xml_util.XML):
+            request = xml_util.tostring(request)
         self["request"] = request
 
     @property
@@ -891,8 +891,8 @@ class Job(Base):
         """
         XML status response from WPS execution submission as string (binary).
         """
-        if isinstance(response, xml.XML):
-            response = xml.tostring(response)
+        if isinstance(response, xml_util.XML):
+            response = xml_util.tostring(response)
         self["response"] = response
 
     def _job_url(self, base_url=None):

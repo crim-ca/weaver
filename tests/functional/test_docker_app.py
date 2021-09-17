@@ -7,7 +7,7 @@ from owslib.wps import ComplexDataInput, WPSExecution
 
 from tests.functional.utils import WpsPackageConfigBase
 from tests.utils import mocked_execute_process, mocked_sub_requests
-from weaver import xml
+from weaver import xml_util
 from weaver.execute import EXECUTE_MODE_ASYNC, EXECUTE_RESPONSE_DOCUMENT, EXECUTE_TRANSMISSION_MODE_REFERENCE
 from weaver.formats import CONTENT_TYPE_ANY_XML, CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML, CONTENT_TYPE_TEXT_PLAIN
 from weaver.processes.wps_package import CWL_REQUIREMENT_APP_DOCKER
@@ -208,7 +208,7 @@ class WpsPackageDockerAppTest(WpsPackageConfigBase):
                 wps_outputs = [(self.out_key, True)]  # as reference
                 wps_exec = WPSExecution(version=version, url=wps_url)
                 wps_req = wps_exec.buildRequest(self.process_id, wps_inputs, wps_outputs)
-                wps_data = xml.tostring(wps_req)
+                wps_data = xml_util.tostring(wps_req)
                 wps_headers = {"Accept": accept, "Content-Type": CONTENT_TYPE_APP_XML}
                 wps_params = None
             resp = mocked_sub_requests(self.app, wps_method, wps_url,
@@ -219,7 +219,7 @@ class WpsPackageDockerAppTest(WpsPackageConfigBase):
             # parse response status
             if accept == CONTENT_TYPE_APP_XML:
                 assert resp.content_type in CONTENT_TYPE_ANY_XML, test_content
-                xml_body = xml.fromstring(str2bytes(resp.text))
+                xml_body = xml_util.fromstring(str2bytes(resp.text))
                 status_url = xml_body.get("statusLocation")
                 job_id = status_url.split("/")[-1]
             elif accept == CONTENT_TYPE_APP_JSON:

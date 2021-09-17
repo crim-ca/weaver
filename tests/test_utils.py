@@ -25,7 +25,7 @@ from requests import Response
 from requests.exceptions import HTTPError as RequestsHTTPError
 
 from tests.utils import mocked_aws_credentials, mocked_aws_s3, mocked_aws_s3_bucket_test_file, mocked_file_response
-from weaver import status, xml
+from weaver import status, xml_util
 from weaver.utils import (
     NullType,
     assert_sane_name,
@@ -115,7 +115,7 @@ service="WPS"
 version="1.0.0"
 xsi:schemaLocation="http://www.opengis.net/wps/1.0.0 http://schemas.opengis.net/wps/1.0.0/wpsExecute_request.xsd"/>"""
 
-    doc = xml.fromstring(wps_xml)
+    doc = xml_util.fromstring(wps_xml)
     assert doc.tag == "{http://www.opengis.net/wps/1.0.0}Execute"
     xml_strip_ns(doc)
     assert doc.tag == "Execute"

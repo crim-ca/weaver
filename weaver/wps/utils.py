@@ -10,7 +10,7 @@ from owslib.wps import WebProcessingService, WPSExecution
 from pyramid.httpexceptions import HTTPNotFound
 from pywps import configuration as pywps_config
 
-from weaver import xml
+from weaver import xml_util
 from weaver.config import get_weaver_configuration
 from weaver.utils import (
     get_header,
@@ -148,8 +148,8 @@ def get_wps_local_status_location(url_status_location, container, must_exist=Tru
 
 
 @cache_region("request")
-def _describe_process_cached(self, identifier, xml=None):  # noqa  # pylint: disable=W0621,redefined-outer-name
-    # type: (WebProcessingService, str, Optional[xml.XML]) -> ProcessOWS
+def _describe_process_cached(self, identifier, xml=None):
+    # type: (WebProcessingService, str, Optional[xml_util.XML]) -> ProcessOWS
     LOGGER.debug("Request WPS DescribeProcess to [%s] with [id: %s]", self.url, identifier)
     return self.describeprocess_method(identifier, xml=xml)  # noqa  # method created by '_get_wps_client_cached'
 
@@ -210,7 +210,7 @@ def get_wps_client(url, container=None, verify=None, headers=None, language=None
 
 
 def check_wps_status(location=None,     # type: Optional[str]
-                     response=None,     # type: Optional[xml.XML]
+                     response=None,     # type: Optional[xml_util.XML]
                      sleep_secs=2,      # type: int
                      verify=True,       # type: bool
                      settings=None,     # type: Optional[AnySettingsContainer]
@@ -257,8 +257,8 @@ def check_wps_status(location=None,     # type: Optional[str]
     execution.checkStatus(response=data, sleepSecs=sleep_secs)
     if execution.response is None:
         raise Exception("Missing response, cannot check status.")
-    if not isinstance(execution.response, xml.XML):
-        execution.response = xml.fromstring(execution.response)
+    if not isinstance(execution.response, xml_util.XML):
+        execution.response = xml_util.fromstring(execution.response)
     return execution
 
 

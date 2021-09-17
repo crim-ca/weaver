@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(CUR_DIR))))
 
 # place weaver specific imports after sys path fixing to ensure they are found from external call
 # pylint: disable=C0413,wrong-import-order
-from weaver import xml  # isort:skip # noqa: E402
+from weaver import xml_util  # isort:skip # noqa: E402
 from weaver.utils import fetch_file  # isort:skip # noqa: E402
 
 PACKAGE_NAME = os.path.split(os.path.splitext(__file__)[0])[-1]

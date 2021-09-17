@@ -35,7 +35,7 @@ from webob.headers import EnvironHeaders, ResponseHeaders
 
 from weaver.status import map_status
 from weaver.warning import TimeZoneInfoAlreadySetWarning
-from weaver.xml import XML
+from weaver.xml_util import XML
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, List, Iterable, NoReturn, Optional, Type, Tuple, Union
