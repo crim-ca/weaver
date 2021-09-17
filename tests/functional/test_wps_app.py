@@ -86,7 +86,7 @@ class WpsAppTest(unittest.TestCase):
         assert resp.content_type in CONTENT_TYPE_ANY_XML
         resp.mustcontain("<wps:ProcessOfferings>")
         root = xml_util.fromstring(str2bytes(resp.text))  # test response has no 'content'
-        process_offerings = list(filter(lambda e: "ProcessOfferings" in e.tag, root.iter(xml.Element)))
+        process_offerings = list(filter(lambda e: "ProcessOfferings" in e.tag, root.iter(xml_util.XML)))
         assert len(process_offerings) == 1
         processes = [p for p in process_offerings[0]]
         ids = [pi.text for pi in [list(filter(lambda e: e.tag.endswith("Identifier"), p))[0] for p in processes]]

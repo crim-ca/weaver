@@ -237,24 +237,24 @@ def check_wps_status(location=None,     # type: Optional[str]
     execution = WPSExecution()
     if response:
         LOGGER.debug("Retrieving WPS status from XML response document...")
-        data = response
+        xml_data = response
     elif location:
         xml_resp = HTTPNotFound()
         try:
             LOGGER.debug("Attempt to retrieve WPS status-location from URL [%s]...", location)
             xml_resp = request_extra("get", location, verify=verify, settings=settings)
-            data = xml_resp.content
+            xml_data = xml_resp.content
         except Exception as ex:
             LOGGER.debug("Got exception during get status: [%r]", ex)
-            data = _retry_file()
+            xml_data = _retry_file()
         if xml_resp.status_code == HTTPNotFound.code:
-            LOGGER.debug("Got not-found during get status: [%r]", data)
-            data = _retry_file()
+            LOGGER.debug("Got not-found during get status: [%r]", xml_data)
+            xml_data = _retry_file()
     else:
         raise Exception("Missing status-location URL/file reference or response with XML object.")
-    if isinstance(xml, str):
-        data = data.encode("utf8", errors="ignore")
-    execution.checkStatus(response=data, sleepSecs=sleep_secs)
+    if isinstance(xml_data, str):
+        xml_data = xml_data.encode("utf8", errors="ignore")
+    execution.checkStatus(response=xml_data, sleepSecs=sleep_secs)
     if execution.response is None:
         raise Exception("Missing response, cannot check status.")
     if not isinstance(execution.response, xml_util.XML):

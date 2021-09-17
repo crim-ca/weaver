@@ -256,7 +256,7 @@ class WorkerService(ServiceWPS):
 
         # FIXME: patch erroneous WPS outputs mimeType as None handling until fixed
         #        (see: https://github.com/geopython/pywps/pull/623)
-        for out in wps_request.outputs:
+        for out in wps_request.outputs.values():
             if "mimetype" in out and out["mimetype"] is None:
                 out["mimetype"] = ""
 

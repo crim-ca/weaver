@@ -46,7 +46,7 @@ def m2n(metalink_reference, index, output_dir):
             LOGGER.debug("Fetching Metalink file: [%s]", metalink_reference)
             metalink_path = fetch_file(metalink_reference, tmp_dir, timeout=10, retry=3)
             LOGGER.debug("Reading Metalink file: [%s]", metalink_path)
-            xml_data = xml.parse(metalink_path)
+            xml_data = xml_util.parse(metalink_path)
             LOGGER.debug("Parsing Metalink file references.")
             nc_file_url = xml_data.xpath("string(//metalink/file[" + str(index) + "]/metaurl)")
             LOGGER.debug("Fetching NetCDF reference from Metalink file: [%s]", metalink_reference)
