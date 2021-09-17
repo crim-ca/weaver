@@ -254,8 +254,8 @@ class WorkerService(ServiceWPS):
         request_parser = wps_request._post_request_parser(wps_request.WPS.Execute().tag)  # noqa: W0212
         request_parser(xml_request)  # parses the submitted inputs/outputs data and request parameters
 
-        # HACK: patch erroneous WPS outputs mimeType as None handling until fixed
-        #       (see: https://github.com/geopython/pywps/pull/623)
+        # FIXME: patch erroneous WPS outputs mimeType as None handling until fixed
+        #        (see: https://github.com/geopython/pywps/pull/623)
         for out in wps_request.outputs:
             if "mimetype" in out and out["mimetype"] is None:
                 out["mimetype"] = ""

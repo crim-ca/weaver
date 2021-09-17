@@ -148,10 +148,10 @@ def get_wps_local_status_location(url_status_location, container, must_exist=Tru
 
 
 @cache_region("request")
-def _describe_process_cached(self, identifier, xml_data=None):
+def _describe_process_cached(self, identifier, xml=None):  # noqa  # pylint: disable=W0621,redefined-outer-name
     # type: (WebProcessingService, str, Optional[xml.XML]) -> ProcessOWS
     LOGGER.debug("Request WPS DescribeProcess to [%s] with [id: %s]", self.url, identifier)
-    return self.describeprocess_method(identifier, xml=xml_data)  # noqa  # method created by '_get_wps_client_cached'
+    return self.describeprocess_method(identifier, xml=xml)  # noqa  # method created by '_get_wps_client_cached'
 
 
 @cache_region("request")
