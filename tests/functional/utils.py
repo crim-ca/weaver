@@ -90,12 +90,16 @@ class WpsPackageConfigBase(unittest.TestCase):
             return "Error logs:\n{}".format("\n".join(_resp.json))
         return ""
 
-    def monitor_job(self, status_url, timeout=None, delta=None):
-        # type: (str, Optional[int], Optional[int]) -> JSON
+    def monitor_job(self, status_url, timeout=None, delta=None, return_status=False):
+        # type: (str, Optional[int], Optional[int], bool) -> JSON
         """
         Job polling of status URL until completion or timeout.
 
-        :return: result of the successful job
+        :param status_url: URL with job ID where to monitor execution.
+        :param timeout: timeout of monitoring until completion or abort.
+        :param delta: interval (seconds) between polling monitor requests.
+        :param return_status: return final status body instead of results once job completed.
+        :return: result of the successful job, or the status body if requested.
         :raises AssertionError: when job fails or took too long to complete.
         """
 
@@ -120,6 +124,8 @@ class WpsPackageConfigBase(unittest.TestCase):
             once = False
             left -= delta
         check_job_status(resp)
+        if return_status:
+            return resp.json
         resp = self.app.get("{}/results".format(status_url), headers=self.json_headers)
         assert resp.status_code == 200, "Error job info:\n{}".format(resp.json)
         return resp.json

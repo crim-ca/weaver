@@ -12,6 +12,7 @@ import json
 import logging
 import os
 import tempfile
+from copy import deepcopy
 from inspect import cleandoc
 from typing import TYPE_CHECKING
 
@@ -33,6 +34,7 @@ from tests.utils import (
 )
 from weaver.execute import EXECUTE_MODE_ASYNC, EXECUTE_RESPONSE_DOCUMENT, EXECUTE_TRANSMISSION_MODE_REFERENCE
 from weaver.formats import (
+    ACCEPT_LANGUAGES,
     CONTENT_TYPE_APP_JSON,
     CONTENT_TYPE_APP_NETCDF,
     CONTENT_TYPE_APP_TAR,
@@ -1159,6 +1161,58 @@ class WpsPackageAppTest(WpsPackageConfigBase):
                 assert proc_in_res == proc_in_exp, \
                     "Field '{}' of input '{}'({}) is expected to be '{}' but was '{}'" \
                     .format(field, process_input, i, proc_in_exp, proc_in_res)
+
+    def test_execute_job_with_accept_languages(self):
+        """
+        Test that different accept language matching supported languages all successfully execute and apply them.
+
+        Invalid accept languages must be correctly reported as not supported.
+        """
+        cwl = {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "baseCommand": "echo",
+            "inputs": {"message": {"type": "string", "inputBinding": {"position": 1}}},
+            "outputs": {"output": {"type": "File", "outputBinding": {"glob": "stdout.log"}}}
+        }
+        body = {
+            "processDescription": {"process": {"id": self._testMethodName}},
+            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "executionUnit": [{"unit": cwl}],
+        }
+        self.deploy_process(body)
+        exec_body = {
+            "mode": EXECUTE_MODE_ASYNC,
+            "response": EXECUTE_RESPONSE_DOCUMENT,
+            "inputs": [{"id": "message", "value": "test"}],
+            "outputs": [{"id": "output", "transmissionMode": EXECUTE_TRANSMISSION_MODE_REFERENCE}]
+        }
+        headers = deepcopy(self.json_headers)
+
+        with contextlib.ExitStack() as stack_exec:
+            for mock_exec in mocked_execute_process():
+                stack_exec.enter_context(mock_exec)
+            proc_url = "/processes/{}/jobs".format(self._testMethodName)
+
+            valid_languages = [(lang, True) for lang in ACCEPT_LANGUAGES]
+            wrong_languages = [(lang, False) for lang in ["ru", "fr-CH"]]
+            for lang, accept in valid_languages + wrong_languages:
+                headers["Accept-Language"] = lang
+                resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5, expect_errors=not accept,
+                                           data=exec_body, headers=headers, only_local=True)
+                code = resp.status_code
+                if accept:  # must execute until completion with success
+                    assert code in [200, 201], "Failed with: [{}]\nReason:\n{}".format(code, resp.json)
+                    status_url = resp.json.get("location")
+                    self.monitor_job(status_url, timeout=5, return_status=True)  # wait until success
+                    job_id = resp.json.get("jobID")
+                    job = self.job_store.fetch_by_id(job_id)
+                    assert job.accept_language == lang
+                else:
+                    # job not even created
+                    assert code == 406, "Error code should indicate not acceptable header"
+                    desc = resp.json.get("description")
+                    assert "language" in desc and lang in desc, "Expected error description to indicate bad language"
 
     @mocked_aws_credentials
     @mocked_aws_s3

@@ -9,9 +9,11 @@ from beaker.cache import cache_region
 from owslib.wps import WebProcessingService, WPSExecution
 from pyramid.httpexceptions import HTTPNotFound
 from pywps import configuration as pywps_config
+from webob.acceptparse import create_accept_language_header
 
 from weaver import xml_util
 from weaver.config import get_weaver_configuration
+from weaver.formats import ACCEPT_LANGUAGES
 from weaver.utils import (
     get_header,
     get_no_cache_option,
@@ -158,6 +160,7 @@ def _describe_process_cached(self, identifier, xml=None):
 def _get_wps_client_cached(url, headers, verify, language):
     # type: (str, HeadersType, bool, Optional[str]) -> WebProcessingService
     LOGGER.debug("Request WPS GetCapabilities to [%s]", url)
+    # cannot preset language because capabilities must be fetched to find best match
     wps = WebProcessingService(url=url, headers=headers, verify=verify, timeout=5)
     set_wps_language(wps, accept_language=language)
     setattr(wps, "describeprocess_method", wps.describeprocess)  # backup real method, them override with cached
@@ -299,6 +302,12 @@ def load_pywps_config(container, config=None):
         if isinstance(settings.get("PYWPS_CFG"), dict):
             del settings["PYWPS_CFG"]
 
+    # set accepted languages aligned with values provided by REST API endpoints
+    # otherwise, execute request could fail due to languages considered not supported
+    languages = ", ".join(ACCEPT_LANGUAGES)
+    LOGGER.debug("Setting WPS languages: [%s]", languages)
+    pywps_config.CONFIG.set("server", "language", languages)
+
     LOGGER.debug("Updating WPS output configuration.")
     # find output directory from app config or wps config
     if "weaver.wps_output_dir" not in settings:
@@ -362,22 +371,25 @@ def load_pywps_config(container, config=None):
 
 
 def set_wps_language(wps, accept_language=None, request=None):
-    # type: (WebProcessingService, Optional[str], Optional[AnyRequestType]) -> None
+    # type: (WebProcessingService, Optional[str], Optional[AnyRequestType]) -> Optional[str]
     """
-    Set the :attr:`language` property on the :class:`WebProcessingService` object.
+    Applies the best match between requested accept languages and supported ones by the WPS server.
 
-    Given the `Accept-Language` header value, match the best language
-    to the supported languages.
+    Given the `Accept-Language` header value, match the best language to the supported languages retrieved from WPS.
+    By default, and if no match is found, sets :attr:`WebProcessingService.language` property to ``None``.
 
-    By default, and if no match is found, the :attr:`WebProcessingService.language`
-    property is set to None.
+    .. seealso::
+        Details about the format of the ``Accept-Language`` header:
+        https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Accept-Language
 
-    https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Accept-Language
-    (q-factor weighting is ignored, only order is considered)
+    .. note::
+        This function considers quality-factor weighting and parsing resolution of ``Accept-Language`` header
+        according to :rfc:`RFC 7231, section 5.3.2 <7231#section-5.3.2>`.
 
-    :param wps: process for which to set the language header if it is accepted
-    :param str accept_language: the value of the Accept-Language header
-    :param request: request from which to extract Accept-Language header if not provided directly
+    :param wps: service for which to apply a supported language if matched.
+    :param str accept_language: value of the Accept-Language header.
+    :param request: request from which to extract Accept-Language header if not provided directly.
+    :returns: language that has been set, or ``None`` if no match could be found.
     """
     if not accept_language and request and hasattr(request, "accept_language"):
         accept_language = request.accept_language.header_value
@@ -389,12 +401,8 @@ def set_wps_language(wps, accept_language=None, request=None):
         # owslib version doesn't support setting a language
         return
 
-    accept_language = str(accept_language)  # in case it is one of pyramid AcceptLanguage objects
-    accepted_languages = [lang.strip().split(";")[0] for lang in accept_language.lower().split(",")]
-
-    for accept in accepted_languages:
-        for language in wps.languages.supported:    # noqa
-            # Accept-Language header could be only 'fr' instead of 'fr-CA'
-            if language.lower().startswith(accept):
-                wps.language = language
-                return
+    supported_languages = wps.languages.supported or ACCEPT_LANGUAGES
+    language = create_accept_language_header(accept_language).best_match(supported_languages)
+    if language:
+        wps.language = language
+    return language

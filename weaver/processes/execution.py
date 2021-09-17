@@ -7,7 +7,7 @@ import colander
 from celery.utils.log import get_task_logger
 from owslib.util import clean_ows_url
 from owslib.wps import ComplexDataInput
-from pyramid.httpexceptions import HTTPBadRequest, HTTPNotImplemented
+from pyramid.httpexceptions import HTTPBadRequest, HTTPNotAcceptable, HTTPNotImplemented
 from pyramid_celery import celery_app as app
 
 from weaver.database import get_db
@@ -19,7 +19,7 @@ from weaver.execute import (
     EXECUTE_RESPONSE_DOCUMENT,
     EXECUTE_TRANSMISSION_MODE_OPTIONS
 )
-from weaver.formats import ACCEPT_LANGUAGE_EN_CA, CONTENT_TYPE_APP_JSON
+from weaver.formats import ACCEPT_LANGUAGES, CONTENT_TYPE_APP_JSON
 from weaver.notify import encrypt_email, notify_job_complete
 from weaver.owsexceptions import OWSNoApplicableCode
 from weaver.processes import wps_package
@@ -162,7 +162,7 @@ def execute_process(self, job_id, url, headers=None):
                      message="Following updates could take a while until the Application Package answers...")
 
         mode = EXECUTE_MODE_ASYNC if job.execute_async else EXECUTE_MODE_SYNC
-        lang = job.accept_language or ACCEPT_LANGUAGE_EN_CA  # pywps fails XML template generation if None
+        lang = job.accept_language
         wps_worker = get_pywps_service(environ=settings, is_worker=True)
         execution = wps_worker.execute_job(job.process, wps_inputs=wps_inputs, wps_outputs=wps_outputs,
                                            mode=mode, job_uuid=job.id, remote_process=process, language=lang)
@@ -249,6 +249,7 @@ def execute_process(self, job_id, url, headers=None):
 
     except Exception as exc:
         LOGGER.exception("Failed running [%s]", job)
+        LOGGER.debug("Failed job [%s] raised an exception.", job, exc_info=exc)
         job.status = map_status(STATUS_FAILED)
         job.status_message = "Failed to run {!s}.".format(job)
         job.progress = JOB_PROGRESS_EXECUTE_MONITOR_ERROR
@@ -372,6 +373,7 @@ def submit_job(request, reference, tags=None):
     provider_id = None  # None OK if local
     process_id = None   # None OK if remote, but can be found as well if available from WPS-REST path
     tags = tags or []
+    lang = request.accept_language.header_value  # can only preemptively check if local process
     if isinstance(reference, Process):
         service_url = reference.processEndpointWPS1
         process_id = reference.id
@@ -379,6 +381,10 @@ def submit_job(request, reference, tags=None):
         is_workflow = reference.type == PROCESS_WORKFLOW
         is_local = True
         tags += "local"
+        if lang and request.accept_language.best_match(ACCEPT_LANGUAGES) is None:
+            raise HTTPNotAcceptable("Requested language [{}] is not in supported languages [{}].".format(
+                lang, ", ".join(ACCEPT_LANGUAGES)
+            ))
     elif isinstance(reference, Service):
         service_url = reference.url
         provider_id = reference.id
@@ -392,7 +398,6 @@ def submit_job(request, reference, tags=None):
         raise TypeError("Invalid process or service reference to execute job.")
     tags = request.params.get("tags", "").split(",") + tags
     user = request.authenticated_userid
-    lang = request.accept_language.header_value
     headers = dict(request.headers)
     settings = get_settings(request)
     return submit_job_handler(json_body, settings, service_url, provider_id, process_id, is_workflow, is_local,

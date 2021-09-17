@@ -95,6 +95,7 @@ def get_job_submission_response(body):
     .. seealso::
         :func:`weaver.processes.execution.submit_job`
     """
+    body = sd.CreatedJobStatusSchema().deserialize(body)
     return HTTPCreated(location=body["location"], json=body)
 
 
