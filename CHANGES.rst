@@ -92,8 +92,8 @@ Fixes:
   ``ExtendedInt`` and ``ExtendedBool`` schema types to guarantee original data type explicitly defined are preserved.
 - Fix ``runningSeconds`` field reporting to be of ``float`` type although implicit ``int`` type conversion could occur.
 - Fix validation of ``Execute`` inputs schemas to adequately distinguish between optional inputs and incorrect formats.
-- Fix XML security issue flag within dependencies to ``PyWPS`` and ``OWSLib`` by pinning requirements to
-  versions ``pywps==4.5.0`` and ``owslib==0.25.0`` (see following for details:
+- Fix XML security issue flagged within dependencies to ``PyWPS`` and ``OWSLib`` by pinning requirements to
+  versions ``pywps==4.5.0`` and ``owslib==0.25.0``, and apply the same fix in `Weaver` code (see following for details:
   `geopython/pywps#616 <https://github.com/geopython/pywps/pull/616>`_,
   `geopython/pywps#618 <https://github.com/geopython/pywps/pull/618>`_,
   `geopython/pywps#624 <https://github.com/geopython/pywps/issues/624>`_).
