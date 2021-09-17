@@ -96,7 +96,8 @@ Fixes:
   versions ``pywps==4.5.0`` and ``owslib==0.25.0``, and apply the same fix in `Weaver` code (see following for details:
   `geopython/pywps#616 <https://github.com/geopython/pywps/pull/616>`_,
   `geopython/pywps#618 <https://github.com/geopython/pywps/pull/618>`_,
-  `geopython/pywps#624 <https://github.com/geopython/pywps/issues/624>`_).
+  `geopython/pywps#624 <https://github.com/geopython/pywps/issues/624>`_,
+  `CVE-2021-39371 <https://nvd.nist.gov/vuln/detail/CVE-2021-39371>`_).
 
 `3.5.0 <https://github.com/crim-ca/weaver/tree/3.5.0>`_ (2021-08-19)
 ========================================================================
