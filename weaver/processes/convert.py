@@ -588,7 +588,7 @@ def xml_wps2cwl(wps_process_response, settings):
     :param settings: application settings to retrieve additional request options.
     """
     def _tag_name(_xml):
-        # type: (Union[XML, str]) -> str
+        # type: (Union[xml.XML, str]) -> str
         """
         Obtains ``tag`` from a ``{namespace}Tag`` `XML` element.
         """

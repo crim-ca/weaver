@@ -34,8 +34,8 @@ from urlmatch import urlmatch
 from webob.headers import EnvironHeaders, ResponseHeaders
 
 from weaver.status import map_status
-from weaver.typedefs import XML
 from weaver.warning import TimeZoneInfoAlreadySetWarning
+from weaver.xml import XML
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, List, Iterable, NoReturn, Optional, Type, Tuple, Union
