@@ -17,6 +17,7 @@ from dateutil.parser import parse as dt_parse
 from owslib.wps import Process as ProcessOWS, WPSException
 from pywps import Process as ProcessWPS
 
+from weaver import xml_util
 from weaver.exceptions import ProcessInstanceError
 from weaver.execute import (
     EXECUTE_CONTROL_OPTION_ASYNC,
@@ -43,7 +44,6 @@ from weaver.status import (
     STATUS_UNKNOWN,
     map_status
 )
-from weaver import xml_util
 from weaver.utils import localize_datetime  # for backward compatibility of previously saved jobs not time-locale-aware
 from weaver.utils import (
     fully_qualified_name,

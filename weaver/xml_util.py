@@ -1,4 +1,23 @@
-from lxml import etree
+"""
+Define a default XML parser that avoids XXE injection.
+
+Package :mod:`lxml` is employed directly even though some linters (e.g.: ``bandit``) report to employ ``defusedxml``
+instead, because that package's extension with ``lxml`` is marked as deprecated.
+
+.. seealso::
+    https://pypi.org/project/defusedxml/#defusedxml-lxml
+
+To use the module, import is as if importing ``lxml.etree``:
+
+.. code-block:: python
+
+    from weaver.xml_util import XML  # ElementTree
+    from weaver import xml_util
+
+    data = xml_util.fromstring("<xml>content</xml>")
+"""
+
+from lxml import etree  # nosec: B410  # flagged issue is known, this is what the applied fix below is about
 
 # security fix: XML external entity (XXE) injection
 #   https://lxml.de/parsing.html#parser-options
@@ -17,8 +36,8 @@ XML = etree._Element  # noqa
 
 
 def fromstring(text):
-    return etree.fromstring(text, parser=XML_PARSER)
+    return etree.fromstring(text, parser=XML_PARSER)  # nosec: B410
 
 
 def parse(source):
-    return etree.parse(source, parser=XML_PARSER)
+    return etree.parse(source, parser=XML_PARSER)  # nosec: B410
