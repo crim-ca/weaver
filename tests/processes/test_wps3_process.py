@@ -65,8 +65,9 @@ def test_wps3_process_step_io_data_or_href():
             wps_params = {"service": "wps", "request": "execute", "identifier": test_process, "version": "1.0.0"}
             req = Request(method="GET", params=wps_params)
             setattr(req, "args", wps_params)
+            setattr(req, "path", "/wps")
             req = WPSRequest(req)
-            wps = Wps3Process({}, {}, test_process, req, mock_update_status)
+            wps = Wps3Process({}, {}, test_process, req, mock_update_status)  # noqa
             try:
                 wps.execute(test_cwl_inputs, "", {})
             except TestDoneEarlyExit:

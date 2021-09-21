@@ -12,7 +12,6 @@ import unittest
 import pyramid.testing
 import pytest
 import xmltodict
-from lxml import etree
 
 from tests.utils import (
     get_test_weaver_app,
@@ -23,6 +22,7 @@ from tests.utils import (
     setup_config_with_pywps,
     setup_mongodb_processstore
 )
+from weaver import xml_util
 from weaver.formats import CONTENT_TYPE_ANY_XML, CONTENT_TYPE_APP_XML
 from weaver.processes.wps_default import HelloWPS
 from weaver.processes.wps_testing import WpsTestProcess
@@ -85,8 +85,8 @@ class WpsAppTest(unittest.TestCase):
         assert resp.status_code == 200
         assert resp.content_type in CONTENT_TYPE_ANY_XML
         resp.mustcontain("<wps:ProcessOfferings>")
-        root = etree.fromstring(str2bytes(resp.text))  # test response has no 'content'
-        process_offerings = list(filter(lambda e: "ProcessOfferings" in e.tag, root.iter(etree.Element)))
+        root = xml_util.fromstring(str2bytes(resp.text))  # test response has no 'content'
+        process_offerings = list(filter(lambda e: "ProcessOfferings" in e.tag, root.iter(xml_util.Element)))
         assert len(process_offerings) == 1
         processes = [p for p in process_offerings[0]]
         ids = [pi.text for pi in [list(filter(lambda e: e.tag.endswith("Identifier"), p))[0] for p in processes]]

@@ -9,8 +9,6 @@ import os
 import sys
 from tempfile import TemporaryDirectory
 
-from lxml import etree
-
 CUR_DIR = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(0, CUR_DIR)
 # root to allow 'from weaver import <...>'
@@ -18,6 +16,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(CUR_DIR))))
 
 # place weaver specific imports after sys path fixing to ensure they are found from external call
 # pylint: disable=C0413,wrong-import-order
+from weaver import xml_util  # isort:skip # noqa: E402
 from weaver.utils import fetch_file  # isort:skip # noqa: E402
 
 PACKAGE_NAME = os.path.split(os.path.splitext(__file__)[0])[-1]
@@ -47,8 +46,7 @@ def m2n(metalink_reference, index, output_dir):
             LOGGER.debug("Fetching Metalink file: [%s]", metalink_reference)
             metalink_path = fetch_file(metalink_reference, tmp_dir, timeout=10, retry=3)
             LOGGER.debug("Reading Metalink file: [%s]", metalink_path)
-            parser = etree.HTMLParser()
-            xml_data = etree.parse(metalink_path, parser)
+            xml_data = xml_util.parse(metalink_path)
             LOGGER.debug("Parsing Metalink file references.")
             nc_file_url = xml_data.xpath("string(//metalink/file[" + str(index) + "]/metaurl)")
             LOGGER.debug("Fetching NetCDF reference from Metalink file: [%s]", metalink_reference)

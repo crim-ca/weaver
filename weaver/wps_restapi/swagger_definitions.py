@@ -442,7 +442,7 @@ class ResponseHeaders(ResponseContentTypeHeader):
 
 
 class RedirectHeaders(ResponseHeaders):
-    Location = ExtendedSchemaNode(String(), example="https://job/123/result", description="Redirect resource location.")
+    Location = URL(example="https://job/123/result", description="Redirect resource location.")
 
 
 class NoContent(ExtendedMappingSchema):
@@ -2448,9 +2448,11 @@ class JobCollection(ExtendedSequenceSchema):
 
 
 class CreatedJobStatusSchema(ExtendedMappingSchema):
+    jobID = UUID(description="Unique identifier of the created job for execution.")
+    processID = ProcessIdentifier(description="Identifier of the process that will be executed.")
+    providerID = AnyIdentifier(description="Remote provider identifier if applicable.", missing=drop)
     status = ExtendedSchemaNode(String(), example=STATUS_ACCEPTED)
     location = ExtendedSchemaNode(String(), example="http://{host}/weaver/processes/{my-process-id}/jobs/{my-job-id}")
-    jobID = UUID(description="ID of the created job.")
 
 
 class CreatedQuotedJobStatusSchema(CreatedJobStatusSchema):
@@ -3764,8 +3766,12 @@ class NotImplementedPostProviderResponse(ExtendedMappingSchema):
     description = "Provider registration not supported using referenced storage."
 
 
+class CreatedJobLocationHeader(ResponseHeaders):
+    Location = URL(description="Status monitoring location of the job execution.")
+
+
 class CreatedLaunchJobResponse(ExtendedMappingSchema):
-    header = ResponseHeaders()
+    header = CreatedJobLocationHeader()
     body = CreatedJobStatusSchema()
 
 

@@ -20,9 +20,9 @@ ACCEPT_LANGUAGE_FR_CA = "fr-CA"
 ACCEPT_LANGUAGE_EN_US = "en-US"
 
 ACCEPT_LANGUAGES = frozenset([
+    ACCEPT_LANGUAGE_EN_US,  # place first to match default of PyWPS and most existing remote servers
     ACCEPT_LANGUAGE_EN_CA,
     ACCEPT_LANGUAGE_FR_CA,
-    ACCEPT_LANGUAGE_EN_US,
 ])
 
 # Content-Types

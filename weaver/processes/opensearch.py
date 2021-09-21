@@ -4,11 +4,11 @@ from copy import deepcopy
 from typing import TYPE_CHECKING
 from urllib.parse import parse_qsl, urlparse
 
-import lxml.etree
 import shapely.wkt
 from pyramid.httpexceptions import HTTPOk
 from pyramid.settings import asbool
 
+from weaver import xml_util
 from weaver.formats import CONTENT_TYPE_TEXT_PLAIN
 from weaver.processes.constants import (
     OPENSEARCH_AOI,
@@ -22,7 +22,7 @@ from weaver.processes.sources import fetch_data_sources
 from weaver.utils import get_any_id, request_extra
 
 if TYPE_CHECKING:
-    from weaver.typedefs import AnySettingsContainer, XML
+    from weaver.typedefs import AnySettingsContainer
     from typing import Deque, Dict, Iterable, List, Optional, Tuple
 
 LOGGER = logging.getLogger("PACKAGE")
@@ -191,9 +191,9 @@ class OpenSearchQuery(object):
         resp = request_extra("get", self.osdd_url, params=self.params, settings=self.settings)
         resp.raise_for_status()
 
-        xml = lxml.etree.fromstring(resp.content)
+        data = xml_util.fromstring(resp.content)
         xpath = "//*[local-name() = 'Url'][@rel='results']"
-        url = xml.xpath(xpath)[0]  # type: XML
+        url = data.xpath(xpath)[0]  # type: xml_util.XML
         return url.attrib["template"]
 
     def _prepare_query_url(self, template_url, params):
@@ -235,9 +235,9 @@ class OpenSearchQuery(object):
                 resp = request_extra("get", link["href"], settings=self.settings)
                 resp.raise_for_status()
 
-                xml = lxml.etree.fromstring(resp.content)
+                data = xml_util.fromstring(resp.content)
                 xpath = "//*[local-name() = 'entry']/*[local-name() = 'link']"
-                links = xml.xpath(xpath)  # type: List[XML]
+                links = data.xpath(xpath)  # type: List[xml_util.XML]
                 return [link.attrib for link in links]
         return []
 
