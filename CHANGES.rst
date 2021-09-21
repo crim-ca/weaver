@@ -10,6 +10,17 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+`4.0.0 <https://github.com/crim-ca/weaver/tree/4.0.0>`_ (2021-09-21)
+========================================================================
+
+Changes:
+--------
 - Apply conformance updates to better align with expected ``ProcessDescription`` schema from
   `OGC-API - Processes v1.0-draft6 <https://github.com/opengeospatial/ogcapi-processes/tree/1.0-draft.6>`_.
   The principal change introduced in this case is that process description contents will be directly at the root
