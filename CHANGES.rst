@@ -15,6 +15,9 @@ Changes:
 - Forbid `Provider` and applicable `Process` definitions to be deployed, executed or queried when corresponding remote
   execution is not supported according to `Weaver` instance configuration since `Provider` must be accessed remotely.
 - Refactor endpoint views and utilities referring to `Provider` operations into appropriate modules.
+- Apply ``weaver.configuration = HYBRID`` by default in example INI configuration since it is the most common use case.
+  Apply same configuration by default in tests. Default resolution still employs ``DEFAULT`` for backward compatibility
+  in case the setting was omitted completely from a custom INI file.
 
 Fixes:
 ------

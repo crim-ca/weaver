@@ -40,7 +40,7 @@ from pywps.inout.literaltypes import AnyValue
 from pywps.inout.storage.s3 import S3StorageBuilder
 from yaml.scanner import ScannerError
 
-from weaver.config import WEAVER_CONFIGURATIONS_REMOTE, get_weaver_configuration
+from weaver.config import WEAVER_CONFIGURATION_HYBRID, WEAVER_CONFIGURATIONS_REMOTE, get_weaver_configuration
 from weaver.exceptions import (
     PackageException,
     PackageExecutionError,
@@ -1102,16 +1102,19 @@ class WpsPackage(Process):
             #   configuration was modified and followed by Weaver reboot with persisted WPS-remote process.
             config = get_weaver_configuration(self.settings)
             self.remote_execution = config in WEAVER_CONFIGURATIONS_REMOTE
+            problem_needs_remote = check_package_instance_compatible(self.package)
             if not self.remote_execution:
-                problem = check_package_instance_compatible(self.package)
-                if problem:
+                if problem_needs_remote:
                     raise self.exception_message(
                         PackageExecutionError,
                         message="Weaver instance is configured as [{}] but remote execution with one of {} is "
                                 "required for process [{}] because {}. Aborting execution.".format(
-                                    config, list(WEAVER_CONFIGURATIONS_REMOTE), self.package_id, problem
+                                    config, list(WEAVER_CONFIGURATIONS_REMOTE), self.package_id, problem_needs_remote
                                 )
                     )
+            # switch back to local execution if hybrid execution can handle this package by itself (eg: Docker, builtin)
+            elif config == WEAVER_CONFIGURATION_HYBRID:
+                self.remote_execution = problem_needs_remote is not None
 
             if self.remote_execution:
                 # EMS/Hybrid dispatch the execution to ADES or remote WPS

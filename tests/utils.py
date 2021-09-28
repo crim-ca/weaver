@@ -29,7 +29,7 @@ from requests import Response
 from webtest import TestApp, TestResponse
 
 from weaver.app import main as weaver_app
-from weaver.config import WEAVER_CONFIGURATION_DEFAULT, WEAVER_DEFAULT_INI_CONFIG, get_weaver_config_file
+from weaver.config import WEAVER_CONFIGURATION_HYBRID, WEAVER_DEFAULT_INI_CONFIG, get_weaver_config_file
 from weaver.database import get_db
 from weaver.datatype import Service
 from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML, CONTENT_TYPE_TEXT_XML
@@ -214,7 +214,8 @@ def get_test_weaver_config(config=None, settings=None):
         # default db required if none specified by config
         config = setup_config_from_settings(settings=settings)
     if "weaver.configuration" not in config.registry.settings:
-        config.registry.settings["weaver.configuration"] = WEAVER_CONFIGURATION_DEFAULT
+        # allow both local and remote for testing, alternative test should provide explicitly
+        config.registry.settings["weaver.configuration"] = WEAVER_CONFIGURATION_HYBRID
     # set default log level for tests to ease debugging failing test cases
     if not config.registry.settings.get("weaver.log_level"):
         config.registry.settings["weaver.log_level"] = "DEBUG"
