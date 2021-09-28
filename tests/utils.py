@@ -3,6 +3,7 @@ Utility methods for various TestCase setup operations.
 """
 import contextlib
 import functools
+import inspect
 import os
 import re
 import tempfile
@@ -477,6 +478,15 @@ def mocked_remote_server_requests_wps1(server_configs):
         def test_function():
             pass
 
+    The generated responses mock can be obtained as follows to add further request definitions to simulate:
+
+    .. code-block:: python
+
+        @mocked_remote_server_requests_wps1([...])
+        def test_function(mock_responses):
+            mock_responses.add("GET", "http://other.com", body="data", headers={"Content-Type": "text/plain"})
+            # Call requests here, both provided WPS and above requests will be mocked.
+
     :param server_configs:
         Single level or nested 2D list/tuples of 3 elements, where each one defines:
             1. WPS server URL to be mocked to simulate response contents from requests for following items.
@@ -520,11 +530,15 @@ def mocked_remote_server_requests_wps1(server_configs):
             """
             Mock ``requests`` responses fetching ``test_server_wps`` WPS reference.
             """
+            sig = inspect.signature(test)
+            sig_has_mock = len(sig.parameters) > (1 if "self" in sig.parameters else 0)
 
             with responses.RequestsMock(assert_all_requests_are_fired=False) as mock_resp:
                 for meth, url, body in all_request:
                     mock_resp.add(meth, url, body=body, headers=xml_header)
-                return test(*args, **kwargs)
+                if not sig_has_mock:
+                    return test(*args, **kwargs)
+                return test(*args, mock_resp, **kwargs)  # inject mock if parameter for it is available
         return mock_requests_wps1
     return mocked_remote_server_wrapper
 

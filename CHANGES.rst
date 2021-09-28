@@ -10,7 +10,11 @@ Changes
 
 Changes:
 --------
-- No change.
+- Improve reporting of mismatching `Weaver` configuration for `Process` and `Application Package` definitions that
+  always require remote execution. Invalid combinations will be raised during execution with detailed problem.
+- Forbid `Provider` and applicable `Process` definitions to be deployed, executed or queried when corresponding remote
+  execution is not supported according to `Weaver` instance configuration since `Provider` must be accessed remotely.
+- Refactor endpoint views and utilities referring to `Provider` operations into appropriate modules.
 
 Fixes:
 ------

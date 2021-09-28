@@ -20,7 +20,7 @@ from pyramid.httpexceptions import (
 from pyramid.settings import asbool
 
 from weaver.config import (
-    WEAVER_CONFIGURATION_EMS,
+    WEAVER_CONFIGURATIONS_REMOTE,
     WEAVER_DEFAULT_WPS_PROCESSES_CONFIG,
     get_weaver_config_file,
     get_weaver_configuration
@@ -122,17 +122,29 @@ def _check_deploy(payload):
 
 @log_unhandled_exceptions(logger=LOGGER, message="Unhandled error occurred during parsing of process definition.",
                           is_request=False)
-def _get_deploy_process_info(process_info, reference, package):
+def _validate_deploy_process_info(process_info, reference, package, settings):
     """
     Obtain the process definition from deploy payload with exception handling.
 
     .. seealso::
         - :func:`weaver.processes.wps_package.get_process_definition`
     """
-    from weaver.processes.wps_package import get_process_definition
+    from weaver.processes.wps_package import check_package_instance_compatible, get_process_definition
     try:
         # data_source `None` forces workflow process to search locally for deployed step applications
-        return get_process_definition(process_info, reference, package, data_source=None)
+        info = get_process_definition(process_info, reference, package, data_source=None)
+
+        # validate process type and package against weaver configuration
+        cfg = get_weaver_configuration(settings)
+        if cfg not in WEAVER_CONFIGURATIONS_REMOTE:
+            problem = check_package_instance_compatible(info["package"])
+            if problem:
+                raise HTTPForbidden(json={
+                    "description": "Invalid process deployment of type [{}] on [{}] instance. "
+                                   "Remote execution is required but not supported.".format(info["type"], cfg),
+                    "cause": problem
+                })
+        return info
     except PackageNotFound as ex:
         # raised when a workflow sub-process is not found (not deployed locally)
         raise HTTPNotFound(detail=str(ex))
@@ -206,16 +218,9 @@ def deploy_process_from_payload(payload, container, overwrite=False):
             "Invalid process type resolved from package: [{0}]. Deployment of {0} process is not allowed."
             .format(PROCESS_BUILTIN))
 
-    # obtain updated process information using WPS process offering, CWL/WPS reference or CWL package definition
-    process_info = _get_deploy_process_info(process_info, reference, package)
-
-    # validate process type against weaver configuration
+    # update and validate process information using WPS process offering, CWL/WPS reference or CWL package definition
     settings = get_settings(container)
-    process_type = process_info["type"]
-    if process_type == PROCESS_WORKFLOW:
-        weaver_config = get_weaver_configuration(settings)
-        if weaver_config != WEAVER_CONFIGURATION_EMS:
-            raise HTTPBadRequest("Invalid [{0}] package deployment on [{1}].".format(process_type, weaver_config))
+    process_info = _validate_deploy_process_info(process_info, reference, package, settings)
 
     restapi_url = get_wps_restapi_base_url(settings)
     description_url = "/".join([restapi_url, "processes", process_info["identifier"]])

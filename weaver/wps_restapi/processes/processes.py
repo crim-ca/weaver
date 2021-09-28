@@ -15,90 +15,23 @@ from pyramid.settings import asbool
 
 from weaver.config import WEAVER_CONFIGURATIONS_REMOTE, get_weaver_configuration
 from weaver.database import get_db
-from weaver.datatype import Process
 from weaver.exceptions import ProcessNotFound, log_unhandled_exceptions
 from weaver.formats import OUTPUT_FORMAT_JSON
 from weaver.processes import opensearch
 from weaver.processes.execution import submit_job
 from weaver.processes.types import PROCESS_BUILTIN
 from weaver.processes.utils import deploy_process_from_payload, get_job_submission_response, get_process
-from weaver.store.base import StoreProcesses, StoreServices
+from weaver.store.base import StoreProcesses
 from weaver.utils import get_any_id, get_settings
 from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_VALUES
-from weaver.wps.utils import get_wps_client
 from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.providers.providers import get_provider_services
+from weaver.wps_restapi.providers.utils import get_provider_services
 
 if TYPE_CHECKING:
     from weaver.typedefs import JSON
     from typing import List, Tuple
 
 LOGGER = logging.getLogger(__name__)
-
-
-@sd.provider_jobs_service.post(tags=[sd.TAG_PROVIDERS, sd.TAG_PROVIDERS, sd.TAG_EXECUTE, sd.TAG_JOBS],
-                               renderer=OUTPUT_FORMAT_JSON, schema=sd.PostProviderProcessJobRequest(),
-                               response_schemas=sd.post_provider_process_job_responses)
-@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
-def submit_provider_job(request):
-    """
-    Execute a remote provider process.
-    """
-    store = get_db(request).get_store(StoreServices)
-    provider_id = request.matchdict.get("provider_id")
-    service = store.fetch_by_name(provider_id)
-    body = submit_job(request, service, tags=["wps-rest"])
-    return get_job_submission_response(body)
-
-
-@sd.provider_processes_service.get(tags=[sd.TAG_PROVIDERS, sd.TAG_PROCESSES, sd.TAG_PROVIDERS, sd.TAG_GETCAPABILITIES],
-                                   renderer=OUTPUT_FORMAT_JSON, schema=sd.ProviderEndpoint(),
-                                   response_schemas=sd.get_provider_processes_responses)
-@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
-def get_provider_processes(request):
-    """
-    Retrieve available provider processes (GetCapabilities).
-    """
-    provider_id = request.matchdict.get("provider_id")
-    store = get_db(request).get_store(StoreServices)
-    service = store.fetch_by_name(provider_id)
-    processes = service.processes(request)
-    return HTTPOk(json={"processes": [p.summary() for p in processes]})
-
-
-def describe_provider_process(request):
-    # type: (Request) -> Process
-    """
-    Obtains a remote service process description in a compatible local process format.
-
-    Note: this processes won't be stored to the local process storage.
-    """
-    provider_id = request.matchdict.get("provider_id")
-    process_id = request.matchdict.get("process_id")
-    store = get_db(request).get_store(StoreServices)
-    service = store.fetch_by_name(provider_id)
-    # FIXME: support other providers (https://github.com/crim-ca/weaver/issues/130)
-    wps = get_wps_client(service.url, request)
-    process = wps.describeprocess(process_id)
-    return Process.convert(process, service, get_settings(request))
-
-
-@sd.provider_process_service.get(tags=[sd.TAG_PROVIDERS, sd.TAG_PROCESSES, sd.TAG_PROVIDERS, sd.TAG_DESCRIBEPROCESS],
-                                 renderer=OUTPUT_FORMAT_JSON, schema=sd.ProviderProcessEndpoint(),
-                                 response_schemas=sd.get_provider_process_responses)
-@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
-def get_provider_process(request):
-    """
-    Retrieve a process description (DescribeProcess).
-    """
-    try:
-        process = describe_provider_process(request)
-        schema = request.params.get("schema")
-        offering = process.offering(schema)
-        return HTTPOk(json=offering)
-    # FIXME: handle colander invalid directly in tween (https://github.com/crim-ca/weaver/issues/112)
-    except colander.Invalid as ex:
-        raise HTTPBadRequest("Invalid schema: [{!s}]".format(ex))
 
 
 def get_processes_filtered_by_valid_schemas(request):

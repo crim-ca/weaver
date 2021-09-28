@@ -2,7 +2,6 @@ import contextlib
 
 import pyramid.testing
 import pytest
-import responses
 
 from tests import resources
 from tests.utils import (
@@ -14,6 +13,7 @@ from tests.utils import (
     setup_mongodb_servicestore
 )
 from tests.functional.utils import WpsConfigBase
+from weaver.config import WEAVER_CONFIGURATION_HYBRID
 from weaver.execute import (
     EXECUTE_CONTROL_OPTION_ASYNC,
     EXECUTE_MODE_ASYNC,
@@ -26,7 +26,11 @@ from weaver.processes.types import PROCESS_WPS_REMOTE
 
 # pylint: disable=C0103,invalid-name
 @pytest.mark.functional
-class WpsRestApiProcessesTest(WpsConfigBase):
+class WpsProviderTest(WpsConfigBase):
+    settings = {
+        # NOTE: important otherwise cannot execute "remote" provider (default local only)
+        "weaver.configuration": WEAVER_CONFIGURATION_HYBRID
+    }
 
     @classmethod
     def tearDownClass(cls):
@@ -75,7 +79,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         resources.TEST_HUMMINGBIRD_GETCAP_WPS1_XML,
         [resources.TEST_HUMMINGBIRD_DESCRIBE_WPS1_XML],
     ])
-    def test_register_describe_execute_ncdump(self):
+    def test_register_describe_execute_ncdump(self, mock_responses):
         """
         Test the full workflow from remote WPS-1 provider registration, process description and execution.
 
@@ -181,8 +185,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         with contextlib.ExitStack() as stack_exec:
             for mock_exec in mocked_execute_process():
                 stack_exec.enter_context(mock_exec)
-            mock_resp = stack_exec.enter_context(responses.RequestsMock(assert_all_requests_are_fired=False))
-            mock_resp.add("GET", exec_file, body="Fake NetCDF", headers={"Content-Type": CONTENT_TYPE_APP_NETCDF})
+            mock_responses.add("GET", exec_file, body="Fake NetCDF", headers={"Content-Type": CONTENT_TYPE_APP_NETCDF})
             resp = mocked_sub_requests(self.app, "post_json", proc_exec_url, timeout=5,
                                        data=exec_body, headers=self.json_headers, only_local=True)
             assert resp.status_code in [200, 201], "Failed with: [{}]\nReason:\n{}".format(resp.status_code, resp.json)

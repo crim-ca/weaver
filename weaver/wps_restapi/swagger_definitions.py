@@ -15,6 +15,7 @@ on `Weaver`'s `ReadTheDocs` page.
 # pylint: disable=C0103,invalid-name
 
 import os
+from copy import copy
 from typing import TYPE_CHECKING
 
 import yaml
@@ -23,7 +24,7 @@ from cornice import Service
 from dateutil import parser as date_parser
 
 from weaver import __meta__
-from weaver.config import WEAVER_CONFIGURATION_EMS
+from weaver.config import WEAVER_CONFIGURATION_EMS, WEAVER_CONFIGURATIONS_REMOTE
 from weaver.execute import (
     EXECUTE_CONTROL_OPTION_ASYNC,
     EXECUTE_CONTROL_OPTIONS,
@@ -3606,6 +3607,15 @@ class ForbiddenProviderAccessResponseSchema(ExtendedMappingSchema):
     body = ErrorJsonResponseBodySchema()
 
 
+class ForbiddenProviderLocalResponseSchema(ExtendedMappingSchema):
+    description = (
+        "Provider operation is not allowed on local-only Weaver instance. "
+        "Applies only when application configuration is not within: {}"
+    ).format(list(WEAVER_CONFIGURATIONS_REMOTE))
+    header = ResponseHeaders()
+    body = ErrorJsonResponseBodySchema()
+
+
 class InternalServerErrorResponseSchema(ExtendedMappingSchema):
     description = "Unhandled internal server error."
     header = ResponseHeaders()
@@ -4031,6 +4041,10 @@ get_all_jobs_responses = {
     "422": UnprocessableEntityResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
+get_prov_all_jobs_responses = copy(get_all_jobs_responses)
+get_prov_all_jobs_responses.update({
+    "403": ForbiddenProviderLocalResponseSchema(),
+})
 get_single_job_status_responses = {
     "200": OkGetJobStatusResponse(description="success", examples={
         "JobStatusSuccess": {
@@ -4044,11 +4058,19 @@ get_single_job_status_responses = {
     "404": NotFoundJobResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
+get_prov_single_job_status_responses = copy(get_single_job_status_responses)
+get_prov_single_job_status_responses.update({
+    "403": ForbiddenProviderLocalResponseSchema(),
+})
 delete_job_responses = {
     "200": OkDismissJobResponse(description="success"),
     "404": NotFoundJobResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
+delete_prov_job_responses = copy(delete_job_responses)
+delete_prov_job_responses.update({
+    "403": ForbiddenProviderLocalResponseSchema(),
+})
 get_job_inputs_responses = {
     "200": OkGetJobInputsResponse(description="success", examples={
         "JobInputs": {
@@ -4059,6 +4081,10 @@ get_job_inputs_responses = {
     "404": NotFoundJobResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
+get_prov_inputs_responses = copy(get_job_inputs_responses)
+get_prov_inputs_responses.update({
+    "403": ForbiddenProviderLocalResponseSchema(),
+})
 get_job_outputs_responses = {
     "200": OkGetJobOutputsResponse(description="success", examples={
         "JobOutputs": {
@@ -4069,6 +4095,10 @@ get_job_outputs_responses = {
     "404": NotFoundJobResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
+get_prov_outputs_responses = copy(get_job_outputs_responses)
+get_prov_outputs_responses.update({
+    "403": ForbiddenProviderLocalResponseSchema(),
+})
 get_result_redirect_responses = {
     "308": RedirectResultResponse(description="Redirects '/result' (without 's') to corresponding '/results' path."),
 }
@@ -4082,6 +4112,10 @@ get_job_results_responses = {
     "404": NotFoundJobResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
+get_prov_results_responses = copy(get_job_results_responses)
+get_prov_results_responses.update({
+    "403": ForbiddenProviderLocalResponseSchema(),
+})
 get_exceptions_responses = {
     "200": OkGetJobExceptionsResponse(description="success", examples={
         "JobExceptions": {
@@ -4092,6 +4126,10 @@ get_exceptions_responses = {
     "404": NotFoundJobResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
+get_prov_exceptions_responses = copy(get_exceptions_responses)
+get_prov_exceptions_responses.update({
+    "403": ForbiddenProviderLocalResponseSchema(),
+})
 get_logs_responses = {
     "200": OkGetJobLogsResponse(description="success", examples={
         "JobLogs": {
@@ -4102,6 +4140,10 @@ get_logs_responses = {
     "404": NotFoundJobResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
+get_prov_logs_responses = copy(get_logs_responses)
+get_prov_logs_responses.update({
+    "403": ForbiddenProviderLocalResponseSchema(),
+})
 get_quote_list_responses = {
     "200": OkGetQuoteListResponse(description="success"),
     "500": InternalServerErrorResponseSchema(),

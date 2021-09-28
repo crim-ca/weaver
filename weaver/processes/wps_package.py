@@ -643,6 +643,39 @@ def get_application_requirement(package):
     return requirement
 
 
+def check_package_instance_compatible(package):
+    # type: (CWL) -> Optional[str]
+    """
+    Verifies if an :term:`Application Package` definition is valid for the employed `Weaver` instance configuration.
+
+    Given that the :term:`CWL` is invalid for the active application, explains the reason why that package `always`
+    require remote execution.
+
+    When a package can sometimes be executed locally (:term:`ADES`) or remotely (:term:`EMS`) depending on the instance
+    configuration, such as in the case of a :data:`CWL_REQUIREMENT_APP_DOCKER`, return ``None``. This function instead
+    detects cases where a remote server is mandatory without ambiguity related to the current `Weaver` instance,
+    regardless whether remote should be an :term:`ADES` or a remote :term:`Provider` (:term:`WPS` or :term:`ESGF-CWT`).
+
+    :param package: CWL definition for the process.
+    :returns reason message if must be executed remotely or ``None`` if it *could* be executed locally.
+    """
+    if _get_package_type(package) == PROCESS_WORKFLOW:
+        return "CWL package defines a [{}] process that uses remote step-processes.".format(PROCESS_WORKFLOW)
+    requirement = get_application_requirement(package)
+    req_class = requirement["class"]
+    req_local = [CWL_REQUIREMENT_APP_BUILTIN, CWL_REQUIREMENT_APP_DOCKER]
+    req_remote = [CWL_REQUIREMENT_APP_ESGF_CWT, CWL_REQUIREMENT_APP_WPS1]
+    if req_class in req_local:
+        return None
+    if req_class in req_remote:
+        return "CWL package hint/requirement [{}] requires a remote provider.".format(req_class)
+    # other undefined hint/requirement for remote execution (aka: ADES dispatched WPS-3/REST/OGC-API)
+    remote = all(req in req_class for req in ["provider", "process"])
+    if remote:
+        return "CWL package hint/requirement [{}] defines a remote provider entry.".format(req_class)
+    return None
+
+
 def get_process_definition(process_offering, reference=None, package=None, data_source=None):
     # type: (JSON, Optional[str], Optional[CWL], Optional[str]) -> JSON
     """
@@ -1062,13 +1095,30 @@ class WpsPackage(Process):
 
             self.update_status("Launching package...", PACKAGE_PROGRESS_LAUNCHING, STATUS_RUNNING)
 
-            self.remote_execution = get_weaver_configuration(self.settings) in WEAVER_CONFIGURATIONS_REMOTE
+            # early validation to ensure proper instance is defined for target process/package
+            # Note:
+            #   This is only to ensure we stop execution in case some process was deployed somehow with mandatory
+            #   remote execution, but cannot accomplish it due to mismatching configuration. This can occur if
+            #   configuration was modified and followed by Weaver reboot with persisted WPS-remote process.
+            config = get_weaver_configuration(self.settings)
+            self.remote_execution = config in WEAVER_CONFIGURATIONS_REMOTE
+            if not self.remote_execution:
+                problem = check_package_instance_compatible(self.package)
+                if problem:
+                    raise self.exception_message(
+                        PackageExecutionError,
+                        message="Weaver instance is configured as [{}] but remote execution with one of {} is "
+                                "required for process [{}] because {}. Aborting execution.".format(
+                                    config, list(WEAVER_CONFIGURATIONS_REMOTE), self.package_id, problem
+                                )
+                    )
+
             if self.remote_execution:
-                # EMS dispatch the execution to the ADES
+                # EMS/Hybrid dispatch the execution to ADES or remote WPS
                 loading_context = LoadingContext()
                 loading_context.construct_tool_object = self.make_tool
             else:
-                # ADES execute the cwl locally
+                # ADES/Hybrid execute the CWL/AppPackage locally
                 loading_context = None
 
             self.update_effective_user()

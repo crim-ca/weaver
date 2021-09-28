@@ -35,6 +35,7 @@ from weaver.utils import get_any_id, get_any_value, get_settings
 from weaver.visibility import VISIBILITY_PUBLIC
 from weaver.wps.utils import get_wps_output_url
 from weaver.wps_restapi import swagger_definitions as sd
+from weaver.wps_restapi.providers.utils import forbid_local_only
 from weaver.wps_restapi.swagger_definitions import datetime_interval_parser
 
 if TYPE_CHECKING:
@@ -62,6 +63,8 @@ def get_job(request):
 
     provider_id = request.matchdict.get("provider_id", job.service)
     process_id = request.matchdict.get("process_id", job.process)
+    if provider_id:
+        forbid_local_only(request)
 
     if job.service != provider_id:
         raise OWSNotFound(
@@ -158,6 +161,7 @@ def validate_service_process(request):
     try:
         service = None
         if service_name:
+            forbid_local_only(request)
             item_type = "Service"
             item_test = service_name
             store = get_db(request).get_store(StoreServices)
@@ -193,10 +197,10 @@ def validate_service_process(request):
     return service_name, process_name
 
 
+@sd.provider_jobs_service.get(tags=[sd.TAG_JOBS, sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
+                              schema=sd.GetProviderJobsEndpoint(), response_schemas=sd.get_prov_all_jobs_responses)
 @sd.process_jobs_service.get(tags=[sd.TAG_PROCESSES, sd.TAG_JOBS], renderer=OUTPUT_FORMAT_JSON,
                              schema=sd.GetProcessJobsEndpoint(), response_schemas=sd.get_all_jobs_responses)
-@sd.provider_jobs_service.get(tags=[sd.TAG_JOBS, sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
-                              schema=sd.GetProviderJobsEndpoint(), response_schemas=sd.get_all_jobs_responses)
 @sd.jobs_service.get(tags=[sd.TAG_JOBS], renderer=OUTPUT_FORMAT_JSON,
                      schema=sd.GetJobsEndpoint(), response_schemas=sd.get_all_jobs_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
@@ -207,6 +211,8 @@ def get_queried_jobs(request):
 
     settings = get_settings(request)
     service, process = validate_service_process(request)
+    if service:
+        forbid_local_only(settings)
 
     filters = {**request.params, "process": process, "provider": service}
 
@@ -266,7 +272,7 @@ def get_queried_jobs(request):
 
 
 @sd.provider_job_service.get(tags=[sd.TAG_JOBS, sd.TAG_STATUS, sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
-                             schema=sd.ProviderJobEndpoint(), response_schemas=sd.get_single_job_status_responses)
+                             schema=sd.ProviderJobEndpoint(), response_schemas=sd.get_prov_single_job_status_responses)
 @sd.job_service.get(tags=[sd.TAG_JOBS, sd.TAG_STATUS], renderer=OUTPUT_FORMAT_JSON,
                     schema=sd.JobEndpoint(), response_schemas=sd.get_single_job_status_responses)
 @sd.process_job_service.get(tags=[sd.TAG_PROCESSES, sd.TAG_JOBS, sd.TAG_STATUS], renderer=OUTPUT_FORMAT_JSON,
@@ -282,7 +288,7 @@ def get_job_status(request):
 
 
 @sd.provider_job_service.delete(tags=[sd.TAG_JOBS, sd.TAG_DISMISS, sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
-                                schema=sd.ProviderJobEndpoint(), response_schemas=sd.delete_job_responses)
+                                schema=sd.ProviderJobEndpoint(), response_schemas=sd.delete_prov_job_responses)
 @sd.job_service.delete(tags=[sd.TAG_JOBS, sd.TAG_DISMISS], renderer=OUTPUT_FORMAT_JSON,
                        schema=sd.JobEndpoint(), response_schemas=sd.delete_job_responses)
 @sd.process_job_service.delete(tags=[sd.TAG_PROCESSES, sd.TAG_JOBS, sd.TAG_DISMISS], renderer=OUTPUT_FORMAT_JSON,
@@ -310,7 +316,7 @@ def cancel_job(request):
 
 
 @sd.provider_inputs_service.get(tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
-                                schema=sd.ProviderInputsEndpoint(), response_schemas=sd.get_job_inputs_responses)
+                                schema=sd.ProviderInputsEndpoint(), response_schemas=sd.get_prov_inputs_responses)
 @sd.process_inputs_service.get(tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES], renderer=OUTPUT_FORMAT_JSON,
                                schema=sd.ProcessInputsEndpoint(), response_schemas=sd.get_job_inputs_responses)
 @sd.job_inputs_service.get(tags=[sd.TAG_JOBS, sd.TAG_RESULTS], renderer=OUTPUT_FORMAT_JSON,
@@ -329,7 +335,7 @@ def get_job_inputs(request):
 
 
 @sd.provider_outputs_service.get(tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES], renderer=OUTPUT_FORMAT_JSON,
-                                 schema=sd.ProviderOutputsEndpoint(), response_schemas=sd.get_job_outputs_responses)
+                                 schema=sd.ProviderOutputsEndpoint(), response_schemas=sd.get_prov_outputs_responses)
 @sd.process_outputs_service.get(tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES], renderer=OUTPUT_FORMAT_JSON,
                                 schema=sd.ProcessOutputsEndpoint(), response_schemas=sd.get_job_outputs_responses)
 @sd.job_outputs_service.get(tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES], renderer=OUTPUT_FORMAT_JSON,
@@ -348,7 +354,7 @@ def get_job_outputs(request):
 
 
 @sd.provider_results_service.get(tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
-                                 schema=sd.ProviderResultsEndpoint(), response_schemas=sd.get_job_results_responses)
+                                 schema=sd.ProviderResultsEndpoint(), response_schemas=sd.get_prov_results_responses)
 @sd.process_results_service.get(tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES], renderer=OUTPUT_FORMAT_JSON,
                                 schema=sd.ProcessResultsEndpoint(), response_schemas=sd.get_job_results_responses)
 @sd.job_results_service.get(tags=[sd.TAG_JOBS, sd.TAG_RESULTS], renderer=OUTPUT_FORMAT_JSON,
@@ -373,7 +379,7 @@ def get_job_results(request):
 
 @sd.provider_exceptions_service.get(tags=[sd.TAG_JOBS, sd.TAG_EXCEPTIONS, sd.TAG_PROVIDERS],
                                     renderer=OUTPUT_FORMAT_JSON, schema=sd.ProviderExceptionsEndpoint(),
-                                    response_schemas=sd.get_exceptions_responses)
+                                    response_schemas=sd.get_prov_exceptions_responses)
 @sd.job_exceptions_service.get(tags=[sd.TAG_JOBS, sd.TAG_EXCEPTIONS], renderer=OUTPUT_FORMAT_JSON,
                                schema=sd.JobExceptionsEndpoint(), response_schemas=sd.get_exceptions_responses)
 @sd.process_exceptions_service.get(tags=[sd.TAG_JOBS, sd.TAG_EXCEPTIONS, sd.TAG_PROCESSES], renderer=OUTPUT_FORMAT_JSON,
@@ -389,7 +395,7 @@ def get_job_exceptions(request):
 
 
 @sd.provider_logs_service.get(tags=[sd.TAG_JOBS, sd.TAG_LOGS, sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
-                              schema=sd.ProviderLogsEndpoint(), response_schemas=sd.get_logs_responses)
+                              schema=sd.ProviderLogsEndpoint(), response_schemas=sd.get_prov_logs_responses)
 @sd.job_logs_service.get(tags=[sd.TAG_JOBS, sd.TAG_LOGS], renderer=OUTPUT_FORMAT_JSON,
                          schema=sd.JobLogsEndpoint(), response_schemas=sd.get_logs_responses)
 @sd.process_logs_service.get(tags=[sd.TAG_JOBS, sd.TAG_LOGS, sd.TAG_PROCESSES], renderer=OUTPUT_FORMAT_JSON,
