@@ -44,12 +44,12 @@ XML = lxml_etree._Element  # noqa
 _lxml_fromstring = lxml_etree.fromstring
 
 
-def fromstring(text):
-    return _lxml_fromstring(text, parser=XML_PARSER)  # nosec: B410
+def fromstring(text, parser=XML_PARSER):
+    return _lxml_fromstring(text, parser=parser)  # nosec: B410
 
 
-def parse(source):
-    return lxml_etree.parse(source, parser=XML_PARSER)  # nosec: B410
+def parse(source, parser=XML_PARSER):
+    return lxml_etree.parse(source, parser=parser)  # nosec: B410
 
 
 # override OWSLib call with adjusted method reference with configured parser enforced
