@@ -272,6 +272,7 @@ def get_template_urls(collection_id):
     assert not set(expected) - set(fields_in_all_queries)
 
 
+@pytest.mark.skip(reason="Collection 'sentinel2' dataset series cannot be found (decommission).")
 @pytest.mark.slow
 @pytest.mark.online
 @pytest.mark.testbed14
@@ -279,7 +280,7 @@ def test_get_template_sentinel2():
     get_template_urls(COLLECTION_IDS["sentinel2"])
 
 
-@pytest.mark.xfail(reason="Collection 'probav' dataset series cannot be found.")
+@pytest.mark.skip(reason="Collection 'probav' dataset series cannot be found (decommission).")
 @pytest.mark.online
 @pytest.mark.testbed14
 def test_get_template_probav():
