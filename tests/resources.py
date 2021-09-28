@@ -17,6 +17,9 @@ TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML = os.path.join(RESOURCES_PATH, "test_descr
 TEST_REMOTE_PROCESS_DESCRIBE_WPS1_URL = DESCRIBE_PROCESS_TEMPLATE_URL.format(
     TEST_REMOTE_SERVER_URL, TEST_REMOTE_PROCESS_WPS1_ID
 )
+TEST_HUMMINGBIRD_GETCAP_WPS1_XML = os.path.join(RESOURCES_PATH, "wps_hummingbird_getcap.xml")
+TEST_HUMMINGBIRD_DESCRIBE_WPS1_XML = os.path.join(RESOURCES_PATH, "wps_hummingbird_ncdump.xml")
+TEST_INVALID_ESCAPE_CHARS_GETCAP_WPS1_XML = os.path.join(RESOURCES_PATH, "wps_invalid_escape_chars_getcap.xml")
 
 WPS_CAPS_EMU_XML = os.path.join(RESOURCES_PATH, "wps_caps_emu.xml")
 WPS_ENUM_ARRAY_IO_ID = "subset_countries"

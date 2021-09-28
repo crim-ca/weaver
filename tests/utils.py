@@ -48,6 +48,9 @@ if TYPE_CHECKING:
     # pylint: disable=C0103,invalid-name,E1101,no-member
     MockPatch = mock._patch  # noqa
 
+    # [WPS1-URL, GetCapPathXML, [DescribePathXML]]
+    MockConfigWPS1 = Sequence[str, str, Sequence[str]]
+
 MOCK_AWS_REGION = "us-central-1"
 MOCK_HTTP_REF = "http://mock.localhost"
 
@@ -443,9 +446,8 @@ def mocked_remote_wps(processes, languages=None):
     )
 
 
-def mocked_remote_server_requests_wps1(
-        server_configs,  # type: Union[Sequence[str, str, Sequence[str]], Sequence[Sequence[str, str, Sequence[str]]]]
-):                       # type: (...) -> MockPatch
+def mocked_remote_server_requests_wps1(server_configs):
+    # type: (Union[MockConfigWPS1, Sequence[MockConfigWPS1]]) -> MockPatch
     """
     Mocks *remote* WPS-1 requests/responses with specified XML contents from local test resources in returned body.
 
@@ -489,7 +491,7 @@ def mocked_remote_server_requests_wps1(
 
     for test_server_wps, resource_file_getcap, resource_files_describe in server_configs:
         assert isinstance(resource_file_getcap, str)
-        assert isinstance(resource_files_describe, (set, list, tuple)) and len(resource_files_describe) > 0
+        assert isinstance(resource_files_describe, (set, list, tuple))
         assert os.path.isfile(resource_file_getcap)
         assert all(os.path.isfile(file) for file in resource_files_describe)
 

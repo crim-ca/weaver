@@ -17,27 +17,40 @@ To use the module, import is as if importing ``lxml.etree``:
     data = xml_util.fromstring("<xml>content</xml>")
 """
 
-from lxml import etree  # nosec: B410  # flagged issue is known, this is what the applied fix below is about
+from lxml import etree as lxml_etree  # nosec: B410  # flagged known issue, this is what the applied fix below is about
+from owslib.wps import etree as owslib_wps_etree
 
-# security fix: XML external entity (XXE) injection
-#   https://lxml.de/parsing.html#parser-options
-#   https://nvd.nist.gov/vuln/detail/CVE-2021-39371
-# based on:
-#   https://github.com/geopython/pywps/pull/616
-XML_PARSER = etree.XMLParser(
+XML_PARSER = lxml_etree.XMLParser(
+    # security fix: XML external entity (XXE) injection
+    #   https://lxml.de/parsing.html#parser-options
+    #   https://nvd.nist.gov/vuln/detail/CVE-2021-39371
+    # based on:
+    #   https://github.com/geopython/pywps/pull/616
     resolve_entities=False,
+    # avoid failing parsing if some characters are not correctly escaped
+    # based on:
+    #   https://stackoverflow.com/a/57450722/5936364
+    recover=True,  # attempt, no guarantee
 )
 
-tostring = etree.tostring
-Element = etree.Element
+tostring = lxml_etree.tostring
+Element = lxml_etree.Element
+ParseError = lxml_etree.ParseError
 
 # define this type here so that code can use it for actual logic without repeating 'noqa'
-XML = etree._Element  # noqa
+XML = lxml_etree._Element  # noqa
+
+# save a local reference to method employed by OWSLib directly called
+_lxml_fromstring = lxml_etree.fromstring
 
 
 def fromstring(text):
-    return etree.fromstring(text, parser=XML_PARSER)  # nosec: B410
+    return _lxml_fromstring(text, parser=XML_PARSER)  # nosec: B410
 
 
 def parse(source):
-    return etree.parse(source, parser=XML_PARSER)  # nosec: B410
+    return lxml_etree.parse(source, parser=XML_PARSER)  # nosec: B410
+
+
+# override OWSLib call with adjusted method reference with configured parser enforced
+owslib_wps_etree.fromstring = fromstring
