@@ -363,8 +363,9 @@ class Service(Base):
                 })
             return sd.ProviderSummarySchema().deserialize(data)
         except Exception as exc:
-            msg = "Exception occurred while fetching wps {0} : {1!r}".format(self.url, exc)
+            msg = "Exception occurred while fetching WPS {0} : {1!r}".format(self.url, exc)
             warnings.warn(msg, NonBreakingExceptionWarning)
+            LOGGER.debug(msg, exc_info=exc)
         return None
 
     def processes(self, container):
@@ -1327,14 +1328,16 @@ class Process(Base):
         """
         settings = get_settings(container)
         base_url = get_wps_restapi_base_url(settings)
-        proc_desc = sd.process_service.path.format(process_id=self.id)
-        proc_list = sd.processes_service.path
-        proc_exec = sd.process_execution_service.path.format(process_id=self.id)
+        if self.service:
+            base_url += sd.provider_service.path.format(provider_id=self.service)
+        proc_desc = base_url + sd.process_service.path.format(process_id=self.id)
+        proc_list = base_url + sd.processes_service.path
+        proc_exec = base_url + sd.process_execution_service.path.format(process_id=self.id)
         links = [
-            {"href": base_url + proc_desc, "rel": "self", "title": "Process description."},
-            {"href": base_url + proc_desc, "rel": "process-desc", "title": "Process description."},
-            {"href": base_url + proc_exec, "rel": "execute", "title": "Process execution endpoint for job submission."},
-            {"href": base_url + proc_list, "rel": "collection", "title": "List of registered processes."}
+            {"href": proc_desc, "rel": "self", "title": "Process description."},
+            {"href": proc_desc, "rel": "process-desc", "title": "Process description."},
+            {"href": proc_exec, "rel": "execute", "title": "Process execution endpoint for job submission."},
+            {"href": proc_list, "rel": "collection", "title": "List of registered processes."}
         ]
         if self.processEndpointWPS1:
             wps_url = "{}?service=WPS&request=GetCapabilities".format(self.processEndpointWPS1)
@@ -1411,13 +1414,15 @@ class Process(Base):
             # local weaver process, using WPS-XML endpoint
             remote_service_url = wps_xml_url
             local_provider_url = wps_api_url
+            svc_provider_name = "Weaver"
         else:
-            svc_name = service.get("name")
+            svc_name = service.get("name")  # can be a custom ID or identical to provider name
             remote_service_url = service.url
             local_provider_url = "{}/providers/{}".format(wps_api_url, svc_name)
+            svc_provider_name = service.wps().provider.name
         describe_process_url = "{}/processes/{}".format(local_provider_url, process.identifier)
         execute_process_url = "{}/jobs".format(describe_process_url)
-        package, info = ows2json(process, svc_name, remote_service_url)
+        package, info = ows2json(process, svc_name, remote_service_url, svc_provider_name)
         wps_description_url = "{}?service=WPS&request=DescribeProcess&version=1.0.0&identifier={}".format(
             remote_service_url, process.identifier
         )
@@ -1428,8 +1433,28 @@ class Process(Base):
             "processDescriptionURL": describe_process_url,
             "type": PROCESS_WPS_REMOTE,
             "package": package,
+            "service": svc_name
         })
         return Process(**info, **kwargs)
+
+    @property
+    def service(self):
+        # type: () -> Optional[str]
+        """
+        Name of the parent service provider under which this process resides.
+
+        .. seealso::
+            - :meth:`Service.processes`
+            - :meth:`Process.convert`
+        """
+        return self.get("service", None)
+
+    @service.setter
+    def service(self, service):
+        # type: (Optional[str]) -> None
+        if not (isinstance(service, str) or service is None):
+            raise TypeError("Type 'str' is required for '{}.service'".format(type(self)))
+        self["service"] = service
 
     @staticmethod
     def convert(process, service=None, container=None, **kwargs):

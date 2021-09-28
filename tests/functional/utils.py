@@ -20,7 +20,9 @@ from tests.utils import (
 from weaver.database import get_db
 from weaver.formats import CONTENT_TYPE_APP_JSON
 from weaver.status import STATUS_RUNNING, STATUS_SUCCEEDED
+from weaver.utils import fully_qualified_name
 from weaver.visibility import VISIBILITY_PUBLIC
+
 
 if TYPE_CHECKING:
     from typing import Optional
@@ -28,7 +30,7 @@ if TYPE_CHECKING:
 
 
 @pytest.mark.functional
-class WpsPackageConfigBase(unittest.TestCase):
+class WpsConfigBase(unittest.TestCase):
     json_headers = {"Accept": CONTENT_TYPE_APP_JSON, "Content-Type": CONTENT_TYPE_APP_JSON}
     monitor_timeout = 30
     monitor_delta = 1
@@ -36,8 +38,8 @@ class WpsPackageConfigBase(unittest.TestCase):
 
     def __init__(self, *args, **kwargs):
         # won't run this as a test suite, only its derived classes
-        setattr(self, "__test__", self is WpsPackageConfigBase)
-        super(WpsPackageConfigBase, self).__init__(*args, **kwargs)
+        setattr(self, "__test__", self is WpsConfigBase)
+        super(WpsConfigBase, self).__init__(*args, **kwargs)
 
     @classmethod
     def setUpClass(cls):
@@ -89,6 +91,9 @@ class WpsPackageConfigBase(unittest.TestCase):
         if _resp.status_code == 200:
             return "Error logs:\n{}".format("\n".join(_resp.json))
         return ""
+
+    def fully_qualified_test_process_name(self):
+        return fully_qualified_name(self).replace(".", "-")
 
     def monitor_job(self, status_url, timeout=None, delta=None, return_status=False):
         # type: (str, Optional[int], Optional[int], bool) -> JSON

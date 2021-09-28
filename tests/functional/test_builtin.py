@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from tests.functional.utils import WpsPackageConfigBase
+from tests.functional.utils import WpsConfigBase
 from tests.utils import get_settings_from_testapp, mocked_execute_process, mocked_sub_requests
 from weaver.execute import (
     EXECUTE_CONTROL_OPTION_ASYNC,
@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
 
 @pytest.mark.functional
-class BuiltinAppTest(WpsPackageConfigBase):
+class BuiltinAppTest(WpsConfigBase):
     @classmethod
     def setUpClass(cls):
         cls.settings = {
