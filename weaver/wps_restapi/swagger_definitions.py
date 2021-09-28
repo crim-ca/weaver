@@ -2325,8 +2325,20 @@ class ProcessSummaryList(ExtendedSequenceSchema):
     summary = ProcessSummary()
 
 
+class ProcessNamesList(ExtendedSequenceSchema):
+    process_name = ProcessIdentifier()
+
+
+class ProcessListing(OneOfKeywordSchema):
+    _one_of = [
+        ProcessSummaryList(description="Listing of process summary details from existing definitions."),
+        ProcessNamesList(description="Listing of process names when not requesting details.",
+                         missing=drop),  # in case of empty list, both schema are valid, drop this one to resolve
+    ]
+
+
 class ProcessCollection(ExtendedMappingSchema):
-    processes = ProcessSummaryList()
+    processes = ProcessListing()
     links = LinkList(missing=drop)
 
 
@@ -3187,7 +3199,8 @@ class ProviderNamesSchema(ExtendedSequenceSchema):
 class ProviderListing(OneOfKeywordSchema):
     _one_of = [
         ProvidersListSchema(description="Listing of provider summary details retrieved from remote service."),
-        ProviderNamesSchema(description="Listing of provider names, possibly unvalidated from remote service."),
+        ProviderNamesSchema(description="Listing of provider names, possibly unvalidated from remote service.",
+                            missing=drop),  # in case of empty list, both schema are valid, drop this one to resolve
     ]
 
 

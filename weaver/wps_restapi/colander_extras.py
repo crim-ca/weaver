@@ -1484,6 +1484,8 @@ class OneOfKeywordSchema(KeywordMapper):
             try:
                 schema_class = _make_node_instance(schema_class)
                 result = self._deserialize_subnode(schema_class, cstruct, index)
+                if result is colander.drop:
+                    continue
                 valid_one_of.append(result)
                 valid_nodes.append(schema_class)
             except colander.Invalid as invalid:

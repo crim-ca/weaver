@@ -26,6 +26,10 @@ Fixes:
 - Fix resolution and execution of WPS-1 remote `Provider` and validate it against end-to-end test procedure from
   scratch `Service` registration down to results retrieval
   (fixes `#340 <https://github.com/crim-ca/weaver/issues/340>`_).
+- Fix resolution of applicable `Provider` listing schema validation when none have been registered
+  (fixes `#339 <https://github.com/crim-ca/weaver/issues/339>`_).
+- Fix incorrect schema definition of `Process` items for ``GET /processes`` response that did not report the
+  alternative identifier-only listing when ``detail=false`` query is employed.
 
 `4.0.0 <https://github.com/crim-ca/weaver/tree/4.0.0>`_ (2021-09-21)
 ========================================================================

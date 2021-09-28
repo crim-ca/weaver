@@ -68,6 +68,22 @@ class WpsRestApiProvidersTest(WpsProviderBase):
         "weaver.configuration": WEAVER_CONFIGURATION_HYBRID
     }
 
+    def test_empty_provider_listing(self):
+        """
+        Ensure schema validation succeeds when providers are empty.
+
+        Because of empty items within the list, ``OneOf["name",{detail}]`` cannot resolve which item is applicable.
+
+        .. seealso:
+            - https://github.com/crim-ca/weaver/issues/339
+        """
+        self.service_store.clear_services()
+        resp = self.app.get("/providers", headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        body = resp.json
+        assert "providers" in body and len(body["providers"]) == 0
+
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
         resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
