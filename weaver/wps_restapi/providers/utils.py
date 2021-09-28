@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 from pyramid.httpexceptions import HTTPForbidden, HTTPNotFound
 
-from weaver.config import get_weaver_configuration, WEAVER_CONFIGURATIONS_REMOTE
+from weaver.config import WEAVER_CONFIGURATIONS_REMOTE, get_weaver_configuration
 from weaver.database import get_db
 from weaver.exceptions import ServiceNotFound
 from weaver.store.base import StoreServices

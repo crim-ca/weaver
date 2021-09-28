@@ -21,10 +21,10 @@ from weaver.processes.execution import submit_job
 from weaver.processes.utils import get_job_submission_response
 from weaver.store.base import StoreServices
 from weaver.utils import get_any_id, get_settings
-from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.providers.utils import get_provider_services, check_provider_requirements, get_service
-from weaver.wps_restapi.utils import get_schema_ref
 from weaver.wps.utils import get_wps_client
+from weaver.wps_restapi import swagger_definitions as sd
+from weaver.wps_restapi.providers.utils import check_provider_requirements, get_provider_services, get_service
+from weaver.wps_restapi.utils import get_schema_ref
 
 if TYPE_CHECKING:
     from pyramid.request import Request

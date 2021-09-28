@@ -23,7 +23,6 @@ from weaver.status import STATUS_RUNNING, STATUS_SUCCEEDED
 from weaver.utils import fully_qualified_name
 from weaver.visibility import VISIBILITY_PUBLIC
 
-
 if TYPE_CHECKING:
     from typing import Dict, Optional
     from weaver.typedefs import JSON, SettingsType

@@ -6,6 +6,7 @@ import pyramid.testing
 import pytest
 
 from tests import resources
+from tests.functional.utils import WpsConfigBase
 from tests.utils import (
     mocked_execute_process,
     mocked_remote_server_requests_wps1,
@@ -14,7 +15,6 @@ from tests.utils import (
     setup_mongodb_processstore,
     setup_mongodb_servicestore
 )
-from tests.functional.utils import WpsConfigBase
 from weaver.config import WEAVER_CONFIGURATION_HYBRID
 from weaver.execute import (
     EXECUTE_CONTROL_OPTION_ASYNC,
