@@ -30,6 +30,9 @@ Fixes:
   (fixes `#339 <https://github.com/crim-ca/weaver/issues/339>`_).
 - Fix incorrect schema definition of `Process` items for ``GET /processes`` response that did not report the
   alternative identifier-only listing when ``detail=false`` query is employed.
+- Fix incorrect reporting of documented OpenAPI reference definitions for ``query`` parameters with same names shared
+  across multiple endpoints. Fix is directly applied on relevant reference repository that generates OpenAPI schemas
+  (see `fmigneault/cornice.ext.swagger@70eb702 <https://github.com/fmigneault/cornice.ext.swagger/commit/70eb702>`_).
 
 `4.0.0 <https://github.com/crim-ca/weaver/tree/4.0.0>`_ (2021-09-21)
 ========================================================================
