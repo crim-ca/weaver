@@ -557,8 +557,9 @@ class WpsRestApiJobsTest(unittest.TestCase):
         """
         uri = sd.openapi_json_service.path
         resp = self.app.get(uri, headers=self.json_headers)
-        assert not resp.json["parameters"]["page"]["required"]
-        assert not resp.json["parameters"]["limit"]["required"]
+        schema_prefix = sd.GetJobsQueries.__name__
+        assert not resp.json["parameters"]["{}.page".format(schema_prefix)]["required"]
+        assert not resp.json["parameters"]["{}.limit".format(schema_prefix)]["required"]
 
     def test_jobs_datetime_before(self):
         """
