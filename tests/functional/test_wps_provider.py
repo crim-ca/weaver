@@ -102,7 +102,9 @@ class WpsProviderTest(WpsConfigBase):
         server are pre-generated from real request calls to the actual service that was running on a live platform.
 
         .. seealso::
-            https://github.com/Ouranosinc/pavics-sdi/blob/master/docs/source/notebook-components/weaver_example.ipynb.
+            - Reference notebook testing the same process on a live server:
+              https://github.com/Ouranosinc/pavics-sdi/blob/master/docs/source/notebook-components/weaver_example.ipynb
+            - Evaluate format of submitted Execute body (see `#340 <https://github.com/crim-ca/weaver/issues/340>`_).
         """
         self.service_store.clear_services()
 
