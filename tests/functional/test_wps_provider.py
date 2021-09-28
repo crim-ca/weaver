@@ -1,5 +1,7 @@
 import contextlib
+from typing import TYPE_CHECKING
 
+import mock
 import pyramid.testing
 import pytest
 
@@ -20,8 +22,14 @@ from weaver.execute import (
     EXECUTE_RESPONSE_DOCUMENT,
     EXECUTE_TRANSMISSION_MODE_REFERENCE
 )
-from weaver.formats import CONTENT_TYPE_APP_NETCDF, CONTENT_TYPE_TEXT_PLAIN
+from weaver.formats import CONTENT_TYPE_APP_NETCDF, CONTENT_TYPE_TEXT_PLAIN, CONTENT_TYPE_TEXT_XML
 from weaver.processes.types import PROCESS_WPS_REMOTE
+from weaver.processes.wps1_process import Wps1Process
+
+if TYPE_CHECKING:
+    from responses import RequestsMock
+
+    from tests.utils import MockPatch
 
 
 # pylint: disable=C0103,invalid-name
@@ -29,7 +37,9 @@ from weaver.processes.types import PROCESS_WPS_REMOTE
 class WpsProviderTest(WpsConfigBase):
     settings = {
         # NOTE: important otherwise cannot execute "remote" provider (default local only)
-        "weaver.configuration": WEAVER_CONFIGURATION_HYBRID
+        "weaver.configuration": WEAVER_CONFIGURATION_HYBRID,
+        "weaver.wps_output_dir": "/tmp",
+        "weaver.wps_output_url": resources.TEST_REMOTE_SERVER_URL + "/wps-outputs"
     }
 
     @classmethod
@@ -80,11 +90,16 @@ class WpsProviderTest(WpsConfigBase):
         [resources.TEST_HUMMINGBIRD_DESCRIBE_WPS1_XML],
     ])
     def test_register_describe_execute_ncdump(self, mock_responses):
+        # type: (RequestsMock) -> None
         """
-        Test the full workflow from remote WPS-1 provider registration, process description and execution.
+        Test the full workflow from remote WPS-1 provider registration, process description, execution and fetch result.
+
+        The complete execution and definitions (XML responses) of the "remote" WPS are mocked.
+        Requests and response negotiation between Weaver and that "remote" WPS are effectively executed and validated.
 
         Validation is accomplished against the same process and mocked server from corresponding test deployment
-        of a complete server in order to detect early any breaking feature.
+        server in order to detect early any breaking feature. Responses XML bodies employed to simulate the mocked
+        server are pre-generated from real request calls to the actual service that was running on a live platform.
 
         .. seealso::
             https://github.com/Ouranosinc/pavics-sdi/blob/master/docs/source/notebook-components/weaver_example.ipynb.
@@ -175,6 +190,8 @@ class WpsProviderTest(WpsConfigBase):
 
         # validate execution submission
         # (don't actually execute because server is mocked, only validate parsing of I/O and job creation)
+
+        # first setup all expected contents and files
         exec_file = "http://localhost.com/dont/care.nc"
         exec_body = {
             "mode": EXECUTE_MODE_ASYNC,
@@ -182,15 +199,48 @@ class WpsProviderTest(WpsConfigBase):
             "inputs": [{"id": "dataset", "href": exec_file}],
             "outputs": [{"id": "output", "transmissionMode": EXECUTE_TRANSMISSION_MODE_REFERENCE}]
         }
+        status_url = resources.TEST_REMOTE_SERVER_URL + "/status.xml"
+        output_url = resources.TEST_REMOTE_SERVER_URL + "/output.txt"
+        with open(resources.TEST_HUMMINGBIRD_STATUS_WPS1_XML) as status_file:
+            status = status_file.read().format(
+                TEST_SERVER_URL=resources.TEST_REMOTE_SERVER_URL,
+                LOCATION_XML=status_url,
+                OUTPUT_FILE=output_url,
+            )
+
+        xml_headers = {"Content-Type": CONTENT_TYPE_TEXT_XML}
+        ncdump_data = "Fake NetCDF Data"
         with contextlib.ExitStack() as stack_exec:
+            # mock direct execution bypassing celery
             for mock_exec in mocked_execute_process():
                 stack_exec.enter_context(mock_exec)
-            mock_responses.add("GET", exec_file, body="Fake NetCDF", headers={"Content-Type": CONTENT_TYPE_APP_NETCDF})
+            # mock responses expected by "remote" WPS-1 Execute request and relevant documents
+            mock_responses.add("GET", exec_file, body=ncdump_data, headers={"Content-Type": CONTENT_TYPE_APP_NETCDF})
+            mock_responses.add("POST", resources.TEST_REMOTE_SERVER_URL, body=status, headers=xml_headers)
+            mock_responses.add("GET", status_url, body=status, headers=xml_headers)
+            mock_responses.add("GET", output_url, body=ncdump_data, headers={"Content-Type": CONTENT_TYPE_TEXT_PLAIN})
+
+            # add reference to specific provider execute class to validate it was called
+            # (whole procedure must run even though a lot of parts are mocked)
+            real_wps1_process_execute = Wps1Process.execute
+            handle_wps1_process_execute = stack_exec.enter_context(
+                mock.patch.object(Wps1Process, "execute", side_effect=real_wps1_process_execute, autospec=True)
+            )  # type: MockPatch
+
+            # launch job execution and validate
             resp = mocked_sub_requests(self.app, "post_json", proc_exec_url, timeout=5,
                                        data=exec_body, headers=self.json_headers, only_local=True)
             assert resp.status_code in [200, 201], "Failed with: [{}]\nReason:\n{}".format(resp.status_code, resp.json)
+            assert handle_wps1_process_execute.called, "WPS-1 handler should have been called by CWL runner context"
+
             status_url = resp.json["location"]
             job_id = resp.json["jobID"]
+            assert status_url == proc_exec_url + "/" + job_id
             results = self.monitor_job(status_url)
-            outputs = self.get_outputs(status_url)
-
+            output_url = "{}/{}/{}".format(self.settings["weaver.wps_output_url"], job_id, "output.txt")
+            output_path = "{}/{}/{}".format(self.settings["weaver.wps_output_dir"], job_id, "output.txt")
+            assert results["output"]["format"]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
+            assert results["output"]["href"] == output_url
+            with open(output_path) as out_file:
+                data = out_file.read()
+            assert data == ncdump_data

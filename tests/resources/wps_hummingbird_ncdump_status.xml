@@ -1,0 +1,35 @@
+<!--
+    Response body of execute status from ncdump process.
+    Test using it must substitute following variables:
+
+        - TEST_SERVER_URL: location where the service resides
+        - LOCATION_XML: location of 'this' simulated status XML file
+        - OUTPUT_FILE: location of result file from ncdump operation
+-->
+<wps:ExecuteResponse
+        xmlns:gml="http://www.opengis.net/gml"
+        xmlns:ows="http://www.opengis.net/ows/1.1"
+        xmlns:wps="http://www.opengis.net/wps/1.0.0"
+        xmlns:xlink="http://www.w3.org/1999/xlink"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.opengis.net/wps/1.0.0 http://schemas.opengis.net/wps/1.0.0/wpsExecute_response.xsd"
+        service="WPS" version="1.0.0" xml:lang="en-US"
+        serviceInstance="{TEST_SERVER_URL}?service=WPS&amp;request=GetCapabilities"
+        statusLocation="{LOCATION_XML}">
+    <wps:Process wps:processVersion="4.4.1.1">
+        <ows:Identifier>ncdump</ows:Identifier>
+        <ows:Title>NCDump</ows:Title>
+        <ows:Abstract>Run ncdump to retrieve NetCDF header metadata.</ows:Abstract>
+    </wps:Process>
+    <wps:Status creationTime="2021-09-28T15:08:05Z">
+        <wps:ProcessSucceeded>PyWPS Process NCDump finished</wps:ProcessSucceeded>
+    </wps:Status>
+    <wps:ProcessOutputs>
+        <wps:Output>
+            <ows:Identifier>output</ows:Identifier>
+            <ows:Title>NetCDF Metadata</ows:Title>
+            <ows:Abstract>NetCDF Metadata</ows:Abstract>
+            <wps:Reference xlink:href="{OUTPUT_FILE}" mimeType="text/plain"/>
+        </wps:Output>
+    </wps:ProcessOutputs>
+</wps:ExecuteResponse>

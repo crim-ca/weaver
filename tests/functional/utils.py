@@ -25,7 +25,7 @@ from weaver.visibility import VISIBILITY_PUBLIC
 
 
 if TYPE_CHECKING:
-    from typing import Optional
+    from typing import Dict, Optional
     from weaver.typedefs import JSON, SettingsType
 
 
@@ -96,7 +96,7 @@ class WpsConfigBase(unittest.TestCase):
         return fully_qualified_name(self).replace(".", "-")
 
     def monitor_job(self, status_url, timeout=None, delta=None, return_status=False):
-        # type: (str, Optional[int], Optional[int], bool) -> JSON
+        # type: (str, Optional[int], Optional[int], bool) -> Dict[str, JSON]
         """
         Job polling of status URL until completion or timeout.
 

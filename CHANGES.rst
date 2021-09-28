@@ -20,9 +20,11 @@ Fixes:
 ------
 - Fix reported ``links`` by processes nested under a provider ``Service``.
   Generated URL references were omitting the ``/providers/{id}`` portion.
-- Fix documentation referring to incorrect setting name in some cases for WPS outputs.
+- Fix documentation referring to incorrect setting name in some cases for WPS outputs configuration.
 - Fix strict XML parsing failing resolution of some remote WPS providers with invalid characters such as ``<``, ``<=``
   within process description fields. Although invalid, those easily recoverable errors will be handled by the parser.
+- Fix resolution and execution of WPS-1 remote `Provider` and validate it against end-to-end test procedure from
+  scratch `Service` registration down to results retrieval.
 
 `4.0.0 <https://github.com/crim-ca/weaver/tree/4.0.0>`_ (2021-09-21)
 ========================================================================

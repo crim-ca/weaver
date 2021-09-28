@@ -49,8 +49,8 @@ if TYPE_CHECKING:
     # pylint: disable=C0103,invalid-name,E1101,no-member
     MockPatch = mock._patch  # noqa
 
-    # [WPS1-URL, GetCapPathXML, [DescribePathXML]]
-    MockConfigWPS1 = Sequence[str, str, Sequence[str]]
+    # [WPS1-URL, GetCapPathXML, [DescribePathXML], [ExecutePathXML]]
+    MockConfigWPS1 = Sequence[str, str, Optional[Sequence[str]], Optional[Sequence[str]]]
 
 MOCK_AWS_REGION = "us-central-1"
 MOCK_HTTP_REF = "http://mock.localhost"

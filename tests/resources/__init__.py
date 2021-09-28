@@ -1,6 +1,6 @@
 import os
 
-RESOURCES_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "resources"))
+RESOURCES_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), ""))
 
 GET_CAPABILITIES_TEMPLATE_URL = "{}?service=WPS&request=GetCapabilities&version=1.0.0"
 DESCRIBE_PROCESS_TEMPLATE_URL = "{}?service=WPS&request=DescribeProcess&identifier={}&version=1.0.0"
@@ -18,7 +18,8 @@ TEST_REMOTE_PROCESS_DESCRIBE_WPS1_URL = DESCRIBE_PROCESS_TEMPLATE_URL.format(
     TEST_REMOTE_SERVER_URL, TEST_REMOTE_PROCESS_WPS1_ID
 )
 TEST_HUMMINGBIRD_GETCAP_WPS1_XML = os.path.join(RESOURCES_PATH, "wps_hummingbird_getcap.xml")
-TEST_HUMMINGBIRD_DESCRIBE_WPS1_XML = os.path.join(RESOURCES_PATH, "wps_hummingbird_ncdump.xml")
+TEST_HUMMINGBIRD_DESCRIBE_WPS1_XML = os.path.join(RESOURCES_PATH, "wps_hummingbird_ncdump_describe.xml")
+TEST_HUMMINGBIRD_STATUS_WPS1_XML = os.path.join(RESOURCES_PATH, "wps_hummingbird_ncdump_status.xml")
 TEST_INVALID_ESCAPE_CHARS_GETCAP_WPS1_XML = os.path.join(RESOURCES_PATH, "wps_invalid_escape_chars_getcap.xml")
 
 WPS_CAPS_EMU_XML = os.path.join(RESOURCES_PATH, "wps_caps_emu.xml")
