@@ -38,7 +38,7 @@ class WpsProviderTest(WpsConfigBase):
     settings = {
         # NOTE: important otherwise cannot execute "remote" provider (default local only)
         "weaver.configuration": WEAVER_CONFIGURATION_HYBRID,
-        "weaver.wps_output_dir": "/tmp",
+        "weaver.wps_output_dir": "/tmp",  # nosec: B108 # don't care hardcoded for test
         "weaver.wps_output_url": resources.TEST_REMOTE_SERVER_URL + "/wps-outputs"
     }
 
