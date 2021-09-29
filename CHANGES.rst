@@ -42,7 +42,8 @@ Fixes:
   across multiple endpoints. Fix is directly applied on relevant reference repository that generates OpenAPI schemas
   (see `fmigneault/cornice.ext.swagger@70eb702 <https://github.com/fmigneault/cornice.ext.swagger/commit/70eb702>`_).
 - Fix ``weaver.exception`` definitions such that raising them directly will employ the corresponding ``HTTPException``
-  codes (if applicable) to generate the error response when raising them directly without further handling.
+  code (if applicable) to generate the appropriate error response automatically when raising them directly without
+  further handling. The order of class inheritance were always using ``500`` due to ``WeaverException`` definition.
 
 `4.0.0 <https://github.com/crim-ca/weaver/tree/4.0.0>`_ (2021-09-21)
 ========================================================================
