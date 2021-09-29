@@ -585,8 +585,8 @@ combinations.
 
 .. [#file2http]
     When a ``file://`` (or empty scheme) maps to a local file that needs to be exposed externally for
-    another remote process, the conversion to ``http(s)://`` scheme employs setting ``weaver.wps_outputs_url`` to form
-    the result URL reference. The file is placed in ``weaver.wps_outputs_dir`` to expose it as HTTP(S) endpoint.
+    another remote process, the conversion to ``http(s)://`` scheme employs setting ``weaver.wps_output_url`` to form
+    the result URL reference. The file is placed in ``weaver.wps_output_dir`` to expose it as HTTP(S) endpoint.
 
 .. [#wps3]
     When the process refers to a remote :ref:`WPS-REST` process (i.e.: remote :term:`WPS` instance that supports

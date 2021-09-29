@@ -15,6 +15,7 @@ on `Weaver`'s `ReadTheDocs` page.
 # pylint: disable=C0103,invalid-name
 
 import os
+from copy import copy
 from typing import TYPE_CHECKING
 
 import yaml
@@ -23,7 +24,7 @@ from cornice import Service
 from dateutil import parser as date_parser
 
 from weaver import __meta__
-from weaver.config import WEAVER_CONFIGURATION_EMS
+from weaver.config import WEAVER_CONFIGURATION_EMS, WEAVER_CONFIGURATIONS_REMOTE
 from weaver.execute import (
     EXECUTE_CONTROL_OPTION_ASYNC,
     EXECUTE_CONTROL_OPTIONS,
@@ -2324,8 +2325,20 @@ class ProcessSummaryList(ExtendedSequenceSchema):
     summary = ProcessSummary()
 
 
+class ProcessNamesList(ExtendedSequenceSchema):
+    process_name = ProcessIdentifier()
+
+
+class ProcessListing(OneOfKeywordSchema):
+    _one_of = [
+        ProcessSummaryList(description="Listing of process summary details from existing definitions."),
+        ProcessNamesList(description="Listing of process names when not requesting details.",
+                         missing=drop),  # in case of empty list, both schema are valid, drop this one to resolve
+    ]
+
+
 class ProcessCollection(ExtendedMappingSchema):
-    processes = ProcessSummaryList()
+    processes = ProcessListing()
     links = LinkList(missing=drop)
 
 
@@ -3186,7 +3199,8 @@ class ProviderNamesSchema(ExtendedSequenceSchema):
 class ProviderListing(OneOfKeywordSchema):
     _one_of = [
         ProvidersListSchema(description="Listing of provider summary details retrieved from remote service."),
-        ProviderNamesSchema(description="Listing of provider names, possibly unvalidated from remote service."),
+        ProviderNamesSchema(description="Listing of provider names, possibly unvalidated from remote service.",
+                            missing=drop),  # in case of empty list, both schema are valid, drop this one to resolve
     ]
 
 
@@ -3525,6 +3539,12 @@ class ProvidersQuerySchema(ExtendedMappingSchema):
                     "Otherwise, all registered providers are listed regardless of their availability. When requesting "
                     "details, less metadata will be provided since it will not be fetched from remote services."
     )
+    ignore = ExtendedSchemaNode(
+        Boolean(), example=True, default=True, missing=drop,
+        description="When listing providers with check of reachable remote service definitions, unresponsive response "
+                    "or unprocessable contents will be silently ignored and dropped from full listing in the response. "
+                    "Disabling this option will raise an error immediately instead of ignoring invalid services."
+    )
 
 
 class GetProviders(ExtendedMappingSchema):
@@ -3602,6 +3622,15 @@ class ForbiddenProcessAccessResponseSchema(ExtendedMappingSchema):
 
 class ForbiddenProviderAccessResponseSchema(ExtendedMappingSchema):
     description = "Referenced provider is not accessible."
+    header = ResponseHeaders()
+    body = ErrorJsonResponseBodySchema()
+
+
+class ForbiddenProviderLocalResponseSchema(ExtendedMappingSchema):
+    description = (
+        "Provider operation is not allowed on local-only Weaver instance. "
+        "Applies only when application configuration is not within: {}"
+    ).format(list(WEAVER_CONFIGURATIONS_REMOTE))
     header = ResponseHeaders()
     body = ErrorJsonResponseBodySchema()
 
@@ -3763,7 +3792,7 @@ class CreatedPostProvider(ExtendedMappingSchema):
 
 
 class NotImplementedPostProviderResponse(ExtendedMappingSchema):
-    description = "Provider registration not supported using referenced storage."
+    description = "Provider registration not supported using specified definition."
 
 
 class CreatedJobLocationHeader(ResponseHeaders):
@@ -4031,6 +4060,10 @@ get_all_jobs_responses = {
     "422": UnprocessableEntityResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
+get_prov_all_jobs_responses = copy(get_all_jobs_responses)
+get_prov_all_jobs_responses.update({
+    "403": ForbiddenProviderLocalResponseSchema(),
+})
 get_single_job_status_responses = {
     "200": OkGetJobStatusResponse(description="success", examples={
         "JobStatusSuccess": {
@@ -4044,11 +4077,19 @@ get_single_job_status_responses = {
     "404": NotFoundJobResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
+get_prov_single_job_status_responses = copy(get_single_job_status_responses)
+get_prov_single_job_status_responses.update({
+    "403": ForbiddenProviderLocalResponseSchema(),
+})
 delete_job_responses = {
     "200": OkDismissJobResponse(description="success"),
     "404": NotFoundJobResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
+delete_prov_job_responses = copy(delete_job_responses)
+delete_prov_job_responses.update({
+    "403": ForbiddenProviderLocalResponseSchema(),
+})
 get_job_inputs_responses = {
     "200": OkGetJobInputsResponse(description="success", examples={
         "JobInputs": {
@@ -4059,6 +4100,10 @@ get_job_inputs_responses = {
     "404": NotFoundJobResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
+get_prov_inputs_responses = copy(get_job_inputs_responses)
+get_prov_inputs_responses.update({
+    "403": ForbiddenProviderLocalResponseSchema(),
+})
 get_job_outputs_responses = {
     "200": OkGetJobOutputsResponse(description="success", examples={
         "JobOutputs": {
@@ -4069,6 +4114,10 @@ get_job_outputs_responses = {
     "404": NotFoundJobResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
+get_prov_outputs_responses = copy(get_job_outputs_responses)
+get_prov_outputs_responses.update({
+    "403": ForbiddenProviderLocalResponseSchema(),
+})
 get_result_redirect_responses = {
     "308": RedirectResultResponse(description="Redirects '/result' (without 's') to corresponding '/results' path."),
 }
@@ -4082,6 +4131,10 @@ get_job_results_responses = {
     "404": NotFoundJobResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
+get_prov_results_responses = copy(get_job_results_responses)
+get_prov_results_responses.update({
+    "403": ForbiddenProviderLocalResponseSchema(),
+})
 get_exceptions_responses = {
     "200": OkGetJobExceptionsResponse(description="success", examples={
         "JobExceptions": {
@@ -4092,6 +4145,10 @@ get_exceptions_responses = {
     "404": NotFoundJobResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
+get_prov_exceptions_responses = copy(get_exceptions_responses)
+get_prov_exceptions_responses.update({
+    "403": ForbiddenProviderLocalResponseSchema(),
+})
 get_logs_responses = {
     "200": OkGetJobLogsResponse(description="success", examples={
         "JobLogs": {
@@ -4102,6 +4159,10 @@ get_logs_responses = {
     "404": NotFoundJobResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
+get_prov_logs_responses = copy(get_logs_responses)
+get_prov_logs_responses.update({
+    "403": ForbiddenProviderLocalResponseSchema(),
+})
 get_quote_list_responses = {
     "200": OkGetQuoteListResponse(description="success"),
     "500": InternalServerErrorResponseSchema(),

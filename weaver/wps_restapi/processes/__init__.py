@@ -15,8 +15,7 @@ def includeme(config):
     config.add_route(**sd.service_api_route_info(sd.process_package_service, settings))
     config.add_route(**sd.service_api_route_info(sd.process_payload_service, settings))
     config.add_route(**sd.service_api_route_info(sd.process_visibility_service, settings))
-    config.add_route(**sd.service_api_route_info(sd.provider_processes_service, settings))
-    config.add_route(**sd.service_api_route_info(sd.provider_process_service, settings))
+
     # added within jobs (conflict)
     # config.add_route(**sd.service_api_route_info(sd.process_jobs_service, settings))
     # config.add_route(**sd.service_api_route_info(sd.jobs_full_service, settings))
@@ -33,12 +32,6 @@ def includeme(config):
     config.add_view(p.get_local_process_payload, route_name=sd.process_payload_service.name,
                     request_method="GET", renderer=OUTPUT_FORMAT_JSON)
     config.add_view(p.submit_local_job, route_name=sd.process_jobs_service.name,
-                    request_method="POST", renderer=OUTPUT_FORMAT_JSON)
-    config.add_view(p.get_provider_processes, route_name=sd.provider_processes_service.name,
-                    request_method="GET", renderer=OUTPUT_FORMAT_JSON)
-    config.add_view(p.get_provider_process, route_name=sd.provider_process_service.name,
-                    request_method="GET", renderer=OUTPUT_FORMAT_JSON)
-    config.add_view(p.submit_provider_job, route_name=sd.provider_jobs_service.name,
                     request_method="POST", renderer=OUTPUT_FORMAT_JSON)
     config.add_view(p.get_process_visibility, route_name=sd.process_visibility_service.name,
                     request_method="GET", renderer=OUTPUT_FORMAT_JSON)

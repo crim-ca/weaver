@@ -21,7 +21,7 @@ import pytest
 from pyramid.httpexceptions import HTTPBadRequest
 
 from tests import resources
-from tests.functional.utils import WpsPackageConfigBase
+from tests.functional.utils import WpsConfigBase
 from tests.utils import (
     MOCK_AWS_REGION,
     mocked_aws_credentials,
@@ -77,7 +77,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 @pytest.mark.functional
-class WpsPackageAppTest(WpsPackageConfigBase):
+class WpsPackageAppTest(WpsConfigBase):
     @classmethod
     def setUpClass(cls):
         cls.settings = {
@@ -1964,7 +1964,7 @@ class WpsPackageAppTest(WpsPackageConfigBase):
 
 
 @pytest.mark.functional
-class WpsPackageAppWithS3BucketTest(WpsPackageConfigBase):
+class WpsPackageAppWithS3BucketTest(WpsConfigBase):
     @classmethod
     def setUpClass(cls):
         cls.settings = {

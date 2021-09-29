@@ -14,22 +14,37 @@ from tests.utils import (
     setup_mongodb_processstore,
     setup_mongodb_servicestore
 )
+from weaver.config import WEAVER_CONFIGURATION_ADES, WEAVER_CONFIGURATION_HYBRID
+from weaver.datatype import Service
 from weaver.execute import EXECUTE_CONTROL_OPTION_ASYNC, EXECUTE_TRANSMISSION_MODE_REFERENCE
 from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_NETCDF, CONTENT_TYPE_APP_ZIP, CONTENT_TYPE_TEXT_PLAIN
 from weaver.utils import fully_qualified_name
 
 
 # pylint: disable=C0103,invalid-name
-class WpsRestApiProcessesTest(unittest.TestCase):
-    remote_server = None
+class WpsProviderBase(unittest.TestCase):
+    remote_provider_name = None
+    settings = {}
+
+    def fully_qualified_test_process_name(self):
+        return fully_qualified_name(self).replace(".", "-")
+
+    def register_provider(self, clear=True, error=False, data=None):
+        if clear:
+            self.service_store.clear_services()
+        path = "/providers"
+        data = data or {"id": self.remote_provider_name, "url": resources.TEST_REMOTE_SERVER_URL}
+        resp = self.app.post_json(path, params=data, headers=self.json_headers, expect_errors=error)
+        if error:
+            assert resp.status_code != 201, "Expected provider to fail registration, but erroneously succeeded."
+        else:
+            err = resp.json
+            assert resp.status_code == 201, "Expected failed provider registration to succeed. Error:\n{}".format(err)
+        return resp
 
     @classmethod
     def setUpClass(cls):
-        settings = {
-            "weaver.url": "https://localhost",
-            "weaver.wps_path": "/ows/wps",
-        }
-        cls.config = setup_config_with_mongodb(settings=settings)
+        cls.config = setup_config_with_mongodb(settings=cls.settings)
         cls.app = get_test_weaver_app(config=cls.config)
         cls.json_headers = {"Accept": CONTENT_TYPE_APP_JSON, "Content-Type": CONTENT_TYPE_APP_JSON}
 
@@ -37,26 +52,184 @@ class WpsRestApiProcessesTest(unittest.TestCase):
     def tearDownClass(cls):
         pyramid.testing.tearDown()
 
-    def fully_qualified_test_process_name(self):
-        return fully_qualified_name(self).replace(".", "-")
-
     def setUp(self):
         # rebuild clean db on each test
         self.service_store = setup_mongodb_servicestore(self.config)
         self.process_store = setup_mongodb_processstore(self.config)
         self.job_store = setup_mongodb_jobstore(self.config)
 
-        self.remote_provider_name = "test-remote-provider"
-        self.process_remote_WPS1 = "process_remote_wps1"
 
-    def register_provider(self, clear=True, error=False):
-        if clear:
-            self.service_store.clear_services()
-        path = "/providers"
-        data = {"id": self.remote_provider_name, "url": resources.TEST_REMOTE_SERVER_URL}
-        resp = self.app.post_json(path, params=data, headers=self.json_headers, expect_errors=error)
-        assert (error and resp.status_code != 201) or (not error and resp.status_code == 201)
-        return resp
+# pylint: disable=C0103,invalid-name
+class WpsRestApiProvidersTest(WpsProviderBase):
+    remote_provider_name = "test-remote-provider"
+    settings = {
+        "weaver.url": "https://localhost",
+        "weaver.wps_path": "/ows/wps",
+        "weaver.configuration": WEAVER_CONFIGURATION_HYBRID
+    }
+
+    def test_empty_provider_listing(self):
+        """
+        Ensure schema validation succeeds when providers are empty.
+
+        Because of empty items within the list, ``OneOf["name",{detail}]`` cannot resolve which item is applicable.
+
+        .. seealso:
+            - https://github.com/crim-ca/weaver/issues/339
+        """
+        self.service_store.clear_services()
+        resp = self.app.get("/providers", headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        body = resp.json
+        assert "providers" in body and len(body["providers"]) == 0
+
+    @mocked_remote_server_requests_wps1([
+        resources.TEST_REMOTE_SERVER_URL,
+        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
+        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
+    ])
+    def test_provider_listing_error_handling_queries(self, mock_responses):
+        """
+        Verify that provider listing handles invalid/unresponsive services as specified by query parameters.
+        """
+        # register valid service
+        self.register_provider()
+
+        # register service reachable but returning invalid XML
+        invalid_id = self.remote_provider_name + "-invalid"
+        invalid_url = resources.TEST_REMOTE_SERVER_URL + "/invalid"
+        with open(resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML) as xml:
+            # inject badly formatted XML in otherwise valid GetCapabilities response
+            # following causes 'wps.provider' to be 'None', which raises during metadata link generation (no check)
+            invalid_data = xml.read().replace(
+                "<ows:ServiceIdentification>",
+                "<ows:ServiceIdentification> <ows:Title>Double Title <bad></ows:Title>"
+            )
+        mocked_remote_server_requests_wps1([invalid_url, invalid_data, []], mock_responses, data=True)
+        # must store directly otherwise it raises during registration check
+        # (simulate original service was ok, but was restarted at some point and now has invalid XML)
+        self.service_store.save_service(Service(name=invalid_id, url=invalid_url))
+
+        # register service reachable wit invalid XML but can be recovered since it does not impact structure directly
+        recover_id = self.remote_provider_name + "-recover"
+        recover_url = resources.TEST_REMOTE_SERVER_URL + "/recover"
+        with open(resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML) as xml:
+            # inject badly formatted XML in otherwise valid GetCapabilities response
+            # following causes 'wps.processes' to be unresolvable, but service definition itself works
+            recover_data = xml.read().replace(
+                "<ows:ProcessOffering>",
+                "<ows:ProcessOffering   <wps:random> bad content <!-- -->  <info>  >"
+            )
+        mocked_remote_server_requests_wps1([recover_url, recover_data, []], mock_responses, data=True)
+        # must store directly otherwise it raises during registration check
+        # (simulate original service was ok, but was restarted at some point and now has invalid XML)
+        self.service_store.save_service(Service(name=recover_id, url=recover_url))
+
+        # register service unreachable (eg: was reachable at some point but stopped responding)
+        # must store directly since registration will attempt to check it with failing request
+        unresponsive_id = self.remote_provider_name + "-unresponsive"
+        unresponsive_url = resources.TEST_REMOTE_SERVER_URL + "/unresponsive"
+        unresponsive_caps = unresponsive_url + "?service=WPS&request=GetCapabilities&version=1.0.0"
+        self.service_store.save_service(Service(name=unresponsive_id, url=unresponsive_caps))
+
+        resp = self.app.get("/providers?check=False", headers=self.json_headers)
+        assert resp.status_code == 200
+        assert len(resp.json["providers"]) == 4, "All providers should be returned since no check is requested"
+
+        resp = self.app.get("/providers?check=True&ignore=True", headers=self.json_headers)
+        assert resp.status_code == 200
+        assert len(resp.json["providers"]) == 2, "Unresponsive provider should have been dropped, but not invalid XML"
+        assert resp.json["providers"][0]["id"] == self.remote_provider_name
+        assert resp.json["providers"][1]["id"] == recover_id
+
+        # error expected to be caused by 'service_store' service, first bad one in the list
+        resp = self.app.get("/providers?check=True&ignore=False", headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 422, "Unprocessable response expected for invalid XML"
+        assert unresponsive_id in resp.json["description"]
+        assert "not accessible" in resp.json["cause"]
+        assert resp.json["error"] == "ConnectionError", "Expected service to have trouble retrieving metadata"
+
+        # remove 'unresponsive' service, and recheck, service 'invalid' should now be the problematic one
+        self.service_store.delete_service(unresponsive_id)
+        resp = self.app.get("/providers?check=True&ignore=False", headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 422, "Unprocessable response expected for invalid XML"
+        assert invalid_id in resp.json["description"]
+        assert "attribute" in resp.json["cause"]
+        assert resp.json["error"] == "AttributeError", "Expected service to have trouble parsing metadata"
+
+        # remove 'unresponsive' service, and recheck, now all services are valid/recoverable without error
+        self.service_store.delete_service(invalid_id)
+        resp = self.app.get("/providers?check=True&ignore=False", headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 200, "Valid service and recoverable XML should result in valid response"
+        assert len(resp.json["providers"]) == 2
+
+    @mocked_remote_server_requests_wps1([
+        resources.TEST_REMOTE_SERVER_URL,
+        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
+        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
+    ])
+    def test_register_provider_invalid(self, mock_responses):
+        """
+        Test registration of a service that is reachable but returning invalid XML GetCapabilities schema.
+        """
+        invalid_id = self.remote_provider_name + "-invalid"
+        invalid_url = resources.TEST_REMOTE_SERVER_URL + "/invalid"
+        with open(resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML) as xml:
+            # inject badly formatted XML in otherwise valid GetCapabilities response
+            # following causes 'wps.provider' to be 'None', which raises during metadata link generation (no check)
+            invalid_data = xml.read().replace(
+                "<ows:ServiceIdentification>",
+                "<ows:ServiceIdentification> <ows:Title>Double Title <bad></ows:Title>"
+            )
+        mocked_remote_server_requests_wps1([invalid_url, invalid_data, []], mock_responses, data=True)
+
+        resp = self.register_provider(clear=True, error=True, data={"id": invalid_id, "url": invalid_url})
+        assert resp.status_code == 422
+        assert invalid_id in resp.json["description"]
+        assert "attribute" in resp.json["cause"]
+        assert resp.json["error"] == "AttributeError", "Expected service to have trouble parsing metadata"
+
+    def test_register_provider_unresponsive(self):
+        """
+        Test registration of a service that is unreachable (cannot obtain XML GetCapabilities because no response).
+        """
+        unresponsive_id = self.remote_provider_name + "-unresponsive"
+        unresponsive_url = resources.TEST_REMOTE_SERVER_URL + "/unresponsive"
+        resp = self.register_provider(clear=True, error=True, data={"id": unresponsive_id, "url": unresponsive_url})
+        assert resp.status_code == 422, "Unprocessable response expected for invalid XML"
+        assert unresponsive_id in resp.json["description"]
+        assert "Connection refused" in resp.json["cause"]
+        assert resp.json["error"] == "ConnectionError", "Expected service to have trouble retrieving metadata"
+
+    @mocked_remote_server_requests_wps1([
+        resources.TEST_REMOTE_SERVER_URL,
+        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
+        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
+    ])
+    def test_register_provider_recoverable(self, mock_responses):
+        """
+        Test registration of a service that technically has invalid XML GetCapabilities schema, but can be recovered.
+
+        .. seealso::
+            - Parameter ``recover`` from instance :data:`weaver.xml_util.XML_PARSER` allows handling partially bad XML.
+            - Other test that validates end-to-end definition of recoverable XML provider process.
+              :class:`tests.functional.test_wps_provider.WpsProviderTest.test_register_finch_with_invalid_escape_chars`
+        """
+        recover_id = self.remote_provider_name + "-recover"
+        recover_url = resources.TEST_REMOTE_SERVER_URL + "/recover"
+        with open(resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML) as xml:
+            # inject badly formatted XML in otherwise valid GetCapabilities response
+            # following causes 'wps.processes' to be unresolvable, but service definition itself works
+            recover_data = xml.read().replace(
+                "<ows:ProcessOffering>",
+                "<ows:ProcessOffering   <wps:random> bad content <!-- -->  <info>  >"
+            )
+        mocked_remote_server_requests_wps1([recover_url, recover_data, []], mock_responses, data=True)
+
+        resp = self.register_provider(clear=True, error=False, data={"id": recover_id, "url": recover_url})
+        assert resp.json["id"] == recover_id
+        assert resp.json["url"] == recover_url
 
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
@@ -438,3 +611,83 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         inputs = resp.json["process"]["inputs"]
         assert "maximumMegabytes" in inputs[11]["formats"][0]
         assert inputs[11]["formats"][0]["maximumMegabytes"] == 200
+
+
+# pylint: disable=C0103,invalid-name
+class WpsProviderLocalOnlyTest(WpsProviderBase):
+    """
+    Validate that operations are preemptively forbidden for a local-only instance.
+    """
+    remote_provider_name = "test-wps-local-only"
+    settings = {
+        "weaver.url": "https://localhost",
+        "weaver.wps_path": "/ows/wps",
+        "weaver.configuration": WEAVER_CONFIGURATION_ADES  # local-only
+    }
+
+    def setUp(self):
+        """
+        Inject service directly in database to ensure errors are not raised by missing entry, but by explicit checks.
+        """
+        super(WpsProviderLocalOnlyTest, self).setUp()
+        self.service_store.clear_services()
+        self.job_store.clear_jobs()
+        self.service_store.save_service(service=Service({
+            "name": self.remote_provider_name,
+            "url": resources.TEST_REMOTE_SERVER_URL,
+            "public": True
+        }), overwrite=True)
+        self.job = self.job_store.save_job("test", "fake-process", self.remote_provider_name)
+
+    @mocked_remote_server_requests_wps1([
+        resources.TEST_REMOTE_SERVER_URL,
+        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
+        []
+    ])
+    def test_forbidden_register_provider(self):
+        resp = self.register_provider(error=True)
+        assert resp.status_code == 403, "\n{}".format(resp.json)
+
+    @mocked_remote_server_requests_wps1([
+        resources.TEST_REMOTE_SERVER_URL,
+        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
+        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
+    ])
+    def test_forbidden_describe_process(self):
+        prov = "/providers/{}".format(self.remote_provider_name)
+        path = "{}/processes/{}/jobs".format(prov, resources.TEST_REMOTE_PROCESS_WPS1_ID)
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 403, "\n{}".format(resp.json)
+
+    @mocked_remote_server_requests_wps1([
+        resources.TEST_REMOTE_SERVER_URL,
+        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
+        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
+    ])
+    def test_forbidden_execute_process(self):
+        prov = "/providers/{}".format(self.remote_provider_name)
+        path = "{}/processes/{}/jobs".format(prov, resources.TEST_REMOTE_PROCESS_WPS1_ID)
+        resp = self.app.post_json(path, params={}, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 403, "\n{}".format(resp.json)
+
+    @mocked_remote_server_requests_wps1([
+        resources.TEST_REMOTE_SERVER_URL,
+        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
+        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
+    ])
+    def test_forbidden_list_jobs(self):
+        prov = "/providers/{}".format(self.remote_provider_name)
+        path = "{}/processes/{}/jobs".format(prov, resources.TEST_REMOTE_PROCESS_WPS1_ID)
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 403, "\n{}".format(resp.json)
+
+    @mocked_remote_server_requests_wps1([
+        resources.TEST_REMOTE_SERVER_URL,
+        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
+        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
+    ])
+    def test_forbidden_get_job(self):
+        prov = "/providers/{}".format(self.remote_provider_name)
+        path = "{}/processes/{}/jobs/{}".format(prov, resources.TEST_REMOTE_PROCESS_WPS1_ID, self.job.id)
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 403, "\n{}".format(resp.json)

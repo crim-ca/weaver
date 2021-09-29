@@ -535,8 +535,8 @@ def wps2cwl_requirement(wps_service_url, wps_process_id):
     ])
 
 
-def ows2json(wps_process, wps_service_name, wps_service_url):
-    # type: (ProcessOWS, str, Union[str, ParseResult]) -> Tuple[CWL, JSON]
+def ows2json(wps_process, wps_service_name, wps_service_url, wps_provider_name=None):
+    # type: (ProcessOWS, str, Union[str, ParseResult], Optional[str]) -> Tuple[CWL, JSON]
     """
     Generates the `CWL` package and process definitions from a :class:`owslib.wps.Process` hosted under `WPS` location.
     """
@@ -544,6 +544,8 @@ def ows2json(wps_process, wps_service_name, wps_service_url):
         ("id", wps_process.identifier),
         ("keywords", [wps_service_name] if wps_service_name else []),
     ])
+    if wps_provider_name and wps_provider_name not in process_info["keywords"]:
+        process_info["keywords"].append(wps_provider_name)
     default_title = wps_process.identifier.capitalize()
     process_info["title"] = get_field(wps_process, "title", default=default_title, search_variations=True)
     process_info["description"] = get_field(wps_process, "abstract", default=None, search_variations=True)

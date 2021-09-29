@@ -45,7 +45,7 @@ class WeaverException(Exception):
     detail = message = comment = explanation = "Unknown error"
 
 
-class InvalidIdentifierValue(WeaverException, ValueError, HTTPBadRequest, OWSInvalidParameterValue):
+class InvalidIdentifierValue(HTTPBadRequest, OWSInvalidParameterValue, WeaverException, ValueError):
     """
     Error related to an invalid identifier parameter.
 
@@ -56,7 +56,7 @@ class InvalidIdentifierValue(WeaverException, ValueError, HTTPBadRequest, OWSInv
     locator = "identifier"
 
 
-class MissingIdentifierValue(WeaverException, ValueError, HTTPBadRequest, OWSMissingParameterValue):
+class MissingIdentifierValue(HTTPBadRequest, OWSMissingParameterValue, WeaverException, ValueError):
     """
     Error related to missing identifier parameter.
 
@@ -67,14 +67,20 @@ class MissingIdentifierValue(WeaverException, ValueError, HTTPBadRequest, OWSMis
     locator = "identifier"
 
 
-class ServiceException(WeaverException, OWSException):
+class ServiceException(OWSException, WeaverException):
     """
     Base exception related to a :class:`weaver.datatype.Service`.
     """
     locator = "service"
 
 
-class ServiceNotAccessible(ServiceException, HTTPForbidden, OWSAccessForbidden):
+class ServiceParsingError(HTTPUnprocessableEntity, ServiceException):
+    """
+    Error related to parsing issue of the reference service definition (incorrectly formed XML/JSON contents).
+    """
+
+
+class ServiceNotAccessible(HTTPForbidden, OWSAccessForbidden, ServiceException):
     """
     Error related to forbidden access to a service.
 
@@ -83,7 +89,7 @@ class ServiceNotAccessible(ServiceException, HTTPForbidden, OWSAccessForbidden):
     """
 
 
-class ServiceNotFound(ServiceException, HTTPNotFound, OWSNotFound):
+class ServiceNotFound(HTTPNotFound, OWSNotFound, ServiceException):
     """
     Error related to non existant service definition.
 
@@ -92,7 +98,7 @@ class ServiceNotFound(ServiceException, HTTPNotFound, OWSNotFound):
     """
 
 
-class ServiceRegistrationError(ServiceException, HTTPInternalServerError, OWSNoApplicableCode):
+class ServiceRegistrationError(HTTPInternalServerError, OWSNoApplicableCode, ServiceException):
     """
     Error related to a registration issue for a service.
 
@@ -101,14 +107,14 @@ class ServiceRegistrationError(ServiceException, HTTPInternalServerError, OWSNoA
     """
 
 
-class ProcessException(WeaverException, OWSException):
+class ProcessException(OWSException, WeaverException):
     """
     Base exception related to a :class:`weaver.datatype.Process`.
     """
     locator = "process"
 
 
-class ProcessNotAccessible(ProcessException, HTTPForbidden, OWSAccessForbidden):
+class ProcessNotAccessible(HTTPForbidden, OWSAccessForbidden, ProcessException):
     """
     Error related to forbidden access to a process.
 
@@ -117,7 +123,7 @@ class ProcessNotAccessible(ProcessException, HTTPForbidden, OWSAccessForbidden):
     """
 
 
-class ProcessNotFound(ProcessException, HTTPNotFound, OWSNotFound):
+class ProcessNotFound(HTTPNotFound, OWSNotFound, ProcessException):
     """
     Error related to a non existant process definition.
 
@@ -126,7 +132,7 @@ class ProcessNotFound(ProcessException, HTTPNotFound, OWSNotFound):
     """
 
 
-class ProcessRegistrationError(ProcessException, HTTPInternalServerError, OWSNoApplicableCode):
+class ProcessRegistrationError(HTTPInternalServerError, OWSNoApplicableCode, ProcessException):
     """
     Error related to a registration issue for a process.
 
@@ -135,7 +141,7 @@ class ProcessRegistrationError(ProcessException, HTTPInternalServerError, OWSNoA
     """
 
 
-class ProcessInstanceError(ProcessException, HTTPInternalServerError, OWSNoApplicableCode):
+class ProcessInstanceError(HTTPInternalServerError, OWSNoApplicableCode, ProcessException):
     """
     Error related to an invalid process definition.
 
@@ -151,7 +157,7 @@ class JobException(WeaverException):
     locator = "job"
 
 
-class JobNotFound(JobException, HTTPNotFound, OWSNotFound):
+class JobNotFound(HTTPNotFound, OWSNotFound, JobException):
     """
     Error related to a non existant job definition.
 
@@ -160,7 +166,7 @@ class JobNotFound(JobException, HTTPNotFound, OWSNotFound):
     """
 
 
-class JobRegistrationError(JobException, HTTPInternalServerError, OWSNoApplicableCode):
+class JobRegistrationError(HTTPInternalServerError, OWSNoApplicableCode, JobException):
     """
     Error related to a registration issue for a job.
 
@@ -169,7 +175,7 @@ class JobRegistrationError(JobException, HTTPInternalServerError, OWSNoApplicabl
     """
 
 
-class JobUpdateError(JobException, HTTPInternalServerError, OWSNoApplicableCode):
+class JobUpdateError(HTTPInternalServerError, OWSNoApplicableCode, JobException):
     """
     Error related to an update issue for a job.
 
@@ -185,7 +191,7 @@ class PackageException(WeaverException):
     locator = "package"
 
 
-class PackageTypeError(PackageException, HTTPUnprocessableEntity):
+class PackageTypeError(HTTPUnprocessableEntity, PackageException):
     """
     Error related to an invalid package definition.
 
@@ -194,7 +200,7 @@ class PackageTypeError(PackageException, HTTPUnprocessableEntity):
     """
 
 
-class PackageRegistrationError(PackageException, HTTPInternalServerError, OWSNoApplicableCode):
+class PackageRegistrationError(HTTPInternalServerError, OWSNoApplicableCode, PackageException):
     """
     Error related to a registration issue for a package.
 
@@ -203,7 +209,7 @@ class PackageRegistrationError(PackageException, HTTPInternalServerError, OWSNoA
     """
 
 
-class PackageExecutionError(PackageException, HTTPInternalServerError, OWSNoApplicableCode):
+class PackageExecutionError(HTTPInternalServerError, OWSNoApplicableCode, PackageException):
     """
     Error related to a runtime issue during package execution.
 
@@ -212,7 +218,7 @@ class PackageExecutionError(PackageException, HTTPInternalServerError, OWSNoAppl
     """
 
 
-class PackageNotFound(PackageException, HTTPNotFound, OWSNotFound):
+class PackageNotFound(HTTPNotFound, OWSNotFound, PackageException):
     """
     Error related to a non existant package definition.
 
@@ -221,7 +227,7 @@ class PackageNotFound(PackageException, HTTPNotFound, OWSNotFound):
     """
 
 
-class PayloadNotFound(PackageException, HTTPNotFound, OWSNotFound):
+class PayloadNotFound(HTTPNotFound, OWSNotFound, PackageException):
     """
     Error related to a non existant deployment payload definition.
 
@@ -237,7 +243,7 @@ class QuoteException(WeaverException):
     locator = "quote"
 
 
-class QuoteNotFound(QuoteException, HTTPNotFound, OWSNotFound):
+class QuoteNotFound(HTTPNotFound, OWSNotFound, QuoteException):
     """
     Error related to a non existant quote definition.
 
@@ -246,7 +252,7 @@ class QuoteNotFound(QuoteException, HTTPNotFound, OWSNotFound):
     """
 
 
-class QuoteRegistrationError(QuoteException, HTTPInternalServerError, OWSNoApplicableCode):
+class QuoteRegistrationError(HTTPInternalServerError, OWSNoApplicableCode, QuoteException):
     """
     Error related to an invalid registration issue for a quote.
 
@@ -255,7 +261,7 @@ class QuoteRegistrationError(QuoteException, HTTPInternalServerError, OWSNoAppli
     """
 
 
-class QuoteInstanceError(QuoteException, HTTPInternalServerError, OWSNoApplicableCode):
+class QuoteInstanceError(HTTPInternalServerError, OWSNoApplicableCode, QuoteException):
     """
     Error related to an invalid quote definition.
 
@@ -271,7 +277,7 @@ class BillException(WeaverException):
     locator = "bill"
 
 
-class BillNotFound(BillException, HTTPNotFound, OWSNotFound):
+class BillNotFound(HTTPNotFound, OWSNotFound, BillException):
     """
     Error related to a non existant bill definition.
 
@@ -280,7 +286,7 @@ class BillNotFound(BillException, HTTPNotFound, OWSNotFound):
     """
 
 
-class BillRegistrationError(BillException, HTTPInternalServerError, OWSNoApplicableCode):
+class BillRegistrationError(HTTPInternalServerError, OWSNoApplicableCode, BillException):
     """
     Error related to a registration issue for a bill.
 
@@ -289,7 +295,7 @@ class BillRegistrationError(BillException, HTTPInternalServerError, OWSNoApplica
     """
 
 
-class BillInstanceError(BillException, HTTPInternalServerError, OWSNoApplicableCode):
+class BillInstanceError(HTTPInternalServerError, OWSNoApplicableCode, BillException):
     """
     Error related to an invalid bill definition.
 

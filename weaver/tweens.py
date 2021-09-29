@@ -88,9 +88,9 @@ def ows_response_tween(request, handler):
     err_msg = "\n  Cause:  [{} {}]".format(request.method, request.url)
     raised_error_repr = error_repr(raised_error)
     if raised_error != return_error:
-        err_msg += "\n  Raised: [{}]\n  Return: [{}]".format(raised_error_repr, error_repr(return_error))
+        err_msg += "\n  Error: [{}]\n  Return: [{}]".format(raised_error_repr, error_repr(return_error))
     else:
-        err_msg += "\n  Raised: [{}]".format(raised_error_repr)
+        err_msg += "\n  Error: [{}]".format(raised_error_repr)
     LOGGER.log(exc_log_lvl, "Handled request exception:%s", err_msg, exc_info=exc_info_err)
     LOGGER.debug("Handled request details:\n%s\n%s", raised_error_repr, getattr(raised_error, "text", ""))
     return return_error

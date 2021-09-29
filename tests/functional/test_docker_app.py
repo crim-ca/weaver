@@ -5,7 +5,7 @@ import tempfile
 import pytest
 from owslib.wps import ComplexDataInput, WPSExecution
 
-from tests.functional.utils import WpsPackageConfigBase
+from tests.functional.utils import WpsConfigBase
 from tests.utils import mocked_execute_process, mocked_sub_requests
 from weaver import xml_util
 from weaver.execute import EXECUTE_MODE_ASYNC, EXECUTE_RESPONSE_DOCUMENT, EXECUTE_TRANSMISSION_MODE_REFERENCE
@@ -16,7 +16,7 @@ from weaver.wps.utils import get_wps_url
 
 
 @pytest.mark.functional
-class WpsPackageDockerAppTest(WpsPackageConfigBase):
+class WpsPackageDockerAppTest(WpsConfigBase):
     @classmethod
     def setUpClass(cls):
         cls.settings = {

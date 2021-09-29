@@ -10,11 +10,40 @@ Changes
 
 Changes:
 --------
-- No change.
+- Improve reporting of mismatching `Weaver` configuration for `Process` and `Application Package` definitions that
+  always require remote execution. Invalid combinations will be raised during execution with detailed problem.
+- Forbid `Provider` and applicable `Process` definitions to be deployed, executed or queried when corresponding remote
+  execution is not supported according to `Weaver` instance configuration since `Provider` must be accessed remotely.
+- Refactor endpoint views and utilities referring to `Provider` operations into appropriate modules.
+- Apply ``weaver.configuration = HYBRID`` by default in example INI configuration since it is the most common use case.
+  Apply same configuration by default in tests. Default resolution still employs ``DEFAULT`` for backward compatibility
+  in case the setting was omitted completely from a custom INI file.
+- Add query parameter ``ignore`` to ``GET /providers`` listing in order to obtain full validation of
+  remote providers (including XML contents parsing) to return ``200``. Invalid definitions will raise
+  and return a ``[422] Unprocessable Entity`` HTTP error.
+- Add more explicit messages about the problem that produced an error (XML parsing, unreachable WPS, etc.) and which
+  caused request failure when attempting registration of a remote `Provider`.
 
 Fixes:
 ------
-- No change.
+- Fix reported ``links`` by processes nested under a provider ``Service``.
+  Generated URL references were omitting the ``/providers/{id}`` portion.
+- Fix documentation referring to incorrect setting name in some cases for WPS outputs configuration.
+- Fix strict XML parsing failing resolution of some remote WPS providers with invalid characters such as ``<``, ``<=``
+  within process description fields. Although invalid, those easily recoverable errors will be handled by the parser.
+- Fix resolution and execution of WPS-1 remote `Provider` and validate it against end-to-end test procedure from
+  scratch `Service` registration down to results retrieval
+  (fixes `#340 <https://github.com/crim-ca/weaver/issues/340>`_).
+- Fix resolution of applicable `Provider` listing schema validation when none have been registered
+  (fixes `#339 <https://github.com/crim-ca/weaver/issues/339>`_).
+- Fix incorrect schema definition of `Process` items for ``GET /processes`` response that did not report the
+  alternative identifier-only listing when ``detail=false`` query is employed.
+- Fix incorrect reporting of documented OpenAPI reference definitions for ``query`` parameters with same names shared
+  across multiple endpoints. Fix is directly applied on relevant reference repository that generates OpenAPI schemas
+  (see `fmigneault/cornice.ext.swagger@70eb702 <https://github.com/fmigneault/cornice.ext.swagger/commit/70eb702>`_).
+- Fix ``weaver.exception`` definitions such that raising them directly will employ the corresponding ``HTTPException``
+  code (if applicable) to generate the appropriate error response automatically when raising them directly without
+  further handling. The order of class inheritance were always using ``500`` due to ``WeaverException`` definition.
 
 `4.0.0 <https://github.com/crim-ca/weaver/tree/4.0.0>`_ (2021-09-21)
 ========================================================================

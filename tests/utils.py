@@ -3,6 +3,7 @@ Utility methods for various TestCase setup operations.
 """
 import contextlib
 import functools
+import inspect
 import os
 import re
 import tempfile
@@ -28,7 +29,7 @@ from requests import Response
 from webtest import TestApp, TestResponse
 
 from weaver.app import main as weaver_app
-from weaver.config import WEAVER_CONFIGURATION_DEFAULT, WEAVER_DEFAULT_INI_CONFIG, get_weaver_config_file
+from weaver.config import WEAVER_CONFIGURATION_HYBRID, WEAVER_DEFAULT_INI_CONFIG, get_weaver_config_file
 from weaver.database import get_db
 from weaver.datatype import Service
 from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML, CONTENT_TYPE_TEXT_XML
@@ -47,6 +48,9 @@ if TYPE_CHECKING:
 
     # pylint: disable=C0103,invalid-name,E1101,no-member
     MockPatch = mock._patch  # noqa
+
+    # [WPS1-URL, GetCapPathXML, [DescribePathXML], [ExecutePathXML]]
+    MockConfigWPS1 = Sequence[str, str, Optional[Sequence[str]], Optional[Sequence[str]]]
 
 MOCK_AWS_REGION = "us-central-1"
 MOCK_HTTP_REF = "http://mock.localhost"
@@ -210,7 +214,8 @@ def get_test_weaver_config(config=None, settings=None):
         # default db required if none specified by config
         config = setup_config_from_settings(settings=settings)
     if "weaver.configuration" not in config.registry.settings:
-        config.registry.settings["weaver.configuration"] = WEAVER_CONFIGURATION_DEFAULT
+        # allow both local and remote for testing, alternative test should provide explicitly
+        config.registry.settings["weaver.configuration"] = WEAVER_CONFIGURATION_HYBRID
     # set default log level for tests to ease debugging failing test cases
     if not config.registry.settings.get("weaver.log_level"):
         config.registry.settings["weaver.log_level"] = "DEBUG"
@@ -443,11 +448,14 @@ def mocked_remote_wps(processes, languages=None):
     )
 
 
-def mocked_remote_server_requests_wps1(
-        server_configs,  # type: Union[Sequence[str, str, Sequence[str]], Sequence[Sequence[str, str, Sequence[str]]]]
-):                       # type: (...) -> MockPatch
+def mocked_remote_server_requests_wps1(server_configs,          # type: Union[MockConfigWPS1, Sequence[MockConfigWPS1]]
+                                       mock_responses=None,     # type: Optional[responses.RequestsMock]
+                                       data=False,              # type: bool
+                                       ):                       # type: (...) -> Optional[MockPatch]
     """
     Mocks *remote* WPS-1 requests/responses with specified XML contents from local test resources in returned body.
+
+    Can be employed as function decorator or direct function call with an existing :class:`RequestsMock` instance.
 
     .. seealso::
         ``tests/resources`` directory for available XML files to simulate response bodies.
@@ -475,42 +483,77 @@ def mocked_remote_server_requests_wps1(
         def test_function():
             pass
 
+    The generated responses mock can be obtained as follows to add further request definitions to simulate:
+
+    .. code-block:: python
+
+        @mocked_remote_server_requests_wps1([...])
+        def test_function(mock_responses):
+            mock_responses.add("GET", "http://other.com", body="data", headers={"Content-Type": "text/plain"})
+            # Call requests here, both provided WPS and above requests will be mocked.
+
+    The generated responses mock can also be passed back into the function to register further WPS services with
+    similar handling as the decorator to register relavant requests based on provided server configurations.
+
+    .. code-block:: python
+
+        @mocked_remote_server_requests_wps1([<config-server-2>])
+        def test_function(mock_responses):
+            mocked_remote_server_requests_wps1([<config-server-2>], mocked_responses)
+            # call requests for both server-1 and server-2 configurations
+
     :param server_configs:
         Single level or nested 2D list/tuples of 3 elements, where each one defines:
             1. WPS server URL to be mocked to simulate response contents from requests for following items.
             2. Single XML file path to the expected response body of a server ``GetCapabilities`` request.
             3. List of XML file paths to one or multiple expected response body of ``DescribeProcess`` requests.
-    :returns: decorator that mocks multiple WPS-1 servers and their responses with provided processes and XML contents.
+    :param mock_responses:
+        Handle to the generated mock instance by this decorator on the first wrapped call to add more configurations.
+        In this case, wrapper function is not returned.
+    :param data:
+        Flag indicating that provided strings are the literal data instead of file references.
+        All server configurations must be file OR data references, no mixing between them supported.
+    :returns: wrapper that mocks multiple WPS-1 servers and their responses with provided processes and XML contents.
     """
+
+    def get_xml(ref):
+        if data:
+            return ref
+        with open(ref, "r") as file:
+            return file.read()
 
     all_request = set()
     if not isinstance(server_configs[0], (tuple, list)):
         server_configs = [server_configs]
 
-    for test_server_wps, resource_file_getcap, resource_files_describe in server_configs:
-        assert isinstance(resource_file_getcap, str)
-        assert isinstance(resource_files_describe, (set, list, tuple)) and len(resource_files_describe) > 0
-        assert os.path.isfile(resource_file_getcap)
-        assert all(os.path.isfile(file) for file in resource_files_describe)
+    for test_server_wps, resource_xml_getcap, resource_xml_describe in server_configs:
+        assert isinstance(resource_xml_getcap, str)
+        assert isinstance(resource_xml_describe, (set, list, tuple))
+        if not data:
+            assert os.path.isfile(resource_xml_getcap)
+            assert all(os.path.isfile(file) for file in resource_xml_describe)
 
-        with open(resource_file_getcap, "r") as f:
-            get_cap_xml = f.read()
-        get_cap_url = "{}?service=WPS&request=GetCapabilities&version=1.0.0".format(test_server_wps)
+        get_cap_xml = get_xml(resource_xml_getcap)
+        version_query = "&version=1.0.0"
+        get_cap_url = "{}?service=WPS&request=GetCapabilities".format(test_server_wps)
         all_request.add((responses.GET, get_cap_url, get_cap_xml))
-        for proc_desc_file in resource_files_describe:
-            with open(proc_desc_file, "r") as f:
-                describe_xml = f.read()
+        all_request.add((responses.GET, get_cap_url + version_query, get_cap_xml))
+        for proc_desc_xml in resource_xml_describe:
+            describe_xml = get_xml(proc_desc_xml)
             # assume process ID is always the first identifier (ignore input/output IDs after)
             proc_desc_id = re.findall("<ows:Identifier>(.*)</ows:Identifier>", describe_xml)[0]
-            proc_desc_url = "{}?service=WPS&request=DescribeProcess&identifier={}&version=1.0.0".format(
-                test_server_wps, proc_desc_id
-            )
+            proc_desc_url = "{}?service=WPS&request=DescribeProcess&identifier={}".format(test_server_wps, proc_desc_id)
             all_request.add((responses.GET, proc_desc_url, describe_xml))
+            all_request.add((responses.GET, proc_desc_url + version_query, describe_xml))
             # special case where 'identifier' gets added to 'GetCapabilities', but is simply ignored
             getcap_with_proc_id_url = proc_desc_url.replace("DescribeProcess", "GetCapabilities")
             all_request.add((responses.GET, getcap_with_proc_id_url, get_cap_xml))
+            all_request.add((responses.GET, getcap_with_proc_id_url + version_query, get_cap_xml))
 
-    xml_header = {"Content-Type": CONTENT_TYPE_APP_XML}
+    def apply_mocks(_mock_resp, _requests):
+        xml_header = {"Content-Type": CONTENT_TYPE_APP_XML}
+        for meth, url, body in _requests:
+            _mock_resp.add(meth, url, body=body, headers=xml_header)
 
     def mocked_remote_server_wrapper(test):
         @functools.wraps(test)
@@ -518,12 +561,20 @@ def mocked_remote_server_requests_wps1(
             """
             Mock ``requests`` responses fetching ``test_server_wps`` WPS reference.
             """
+            sig = inspect.signature(test)
+            sig_has_mock = len(sig.parameters) > (1 if "self" in sig.parameters else 0)
 
             with responses.RequestsMock(assert_all_requests_are_fired=False) as mock_resp:
-                for meth, url, body in all_request:
-                    mock_resp.add(meth, url, body=body, headers=xml_header)
-                return test(*args, **kwargs)
+                apply_mocks(mock_resp, all_request)
+                if not sig_has_mock:
+                    return test(*args, **kwargs)
+                return test(*args, mock_resp, **kwargs)  # inject mock if parameter for it is available
         return mock_requests_wps1
+
+    if mock_responses is not None:
+        apply_mocks(mock_responses, all_request)
+        return
+
     return mocked_remote_server_wrapper
 
 

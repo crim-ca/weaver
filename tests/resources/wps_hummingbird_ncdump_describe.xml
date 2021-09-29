@@ -1,0 +1,66 @@
+<!-- PyWPS 4.0.0 -->
+<wps:ProcessDescriptions
+        xmlns:gml="http://schemas.opengis.net/gml"
+        xmlns:ows="http://www.opengis.net/ows/1.1"
+        xmlns:wps="http://www.opengis.net/wps/1.0.0"
+        xmlns:xlink="http://www.w3.org/1999/xlink"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.opengis.net/wps/1.0.0 http://schemas.opengis.net/wps/1.0.0/wpsDescribeProcess_response.xsd"
+        service="WPS" version="1.0.0" xml:lang="en-US"
+>
+  <ProcessDescription wps:processVersion="4.4.1.1" storeSupported="true" statusSupported="true">
+    <ows:Identifier>ncdump</ows:Identifier>
+    <ows:Title>NCDump</ows:Title>
+    <ows:Abstract>Run ncdump to retrieve NetCDF header metadata.</ows:Abstract>
+    <ows:Metadata xlink:href="http://bird-house.github.io/" xlink:title="Birdhouse" xlink:type="simple"/>
+    <ows:Metadata xlink:href="http://birdhouse-hummingbird.readthedocs.io/en/latest/" xlink:title="User Guide" xlink:type="simple"/>
+    <DataInputs>
+      <Input minOccurs="0" maxOccurs="100">
+        <ows:Identifier>dataset</ows:Identifier>
+        <ows:Title>Dataset</ows:Title>
+        <ows:Abstract>Enter a URL pointing to a NetCDF file (optional)</ows:Abstract>
+        <ComplexData>
+          <Default>
+            <Format>
+              <MimeType>application/x-netcdf</MimeType>
+            </Format>
+          </Default>
+          <Supported>
+            <Format>
+              <MimeType>application/x-netcdf</MimeType>
+            </Format>
+          </Supported>
+        </ComplexData>
+      </Input>
+      <Input minOccurs="0" maxOccurs="100">
+        <ows:Identifier>dataset_opendap</ows:Identifier>
+        <ows:Title>Remote OpenDAP Data URL</ows:Title>
+        <ows:Abstract>Or provide a remote OpenDAP data URL, for example: http://my.opendap/thredds/dodsC/path/to/file.nc</ows:Abstract>
+        <ows:Metadata xlink:href="https://www.iana.org/assignments/media-types/media-types.xhtml" xlink:title="application/x-ogc-dods" xlink:type="simple"/>
+        <LiteralData>
+          <ows:DataType ows:reference="urn:ogc:def:dataType:OGC:1.1:string">string</ows:DataType>
+          <ows:AnyValue/>
+        </LiteralData>
+      </Input>
+    </DataInputs>
+    <ProcessOutputs>
+      <Output>
+        <ows:Identifier>output</ows:Identifier>
+        <ows:Title>NetCDF Metadata</ows:Title>
+        <ows:Abstract>NetCDF Metadata</ows:Abstract>
+        <ComplexOutput>
+          <Default>
+            <Format>
+              <MimeType>text/plain</MimeType>
+            </Format>
+          </Default>
+          <Supported>
+            <Format>
+              <MimeType>text/plain</MimeType>
+            </Format>
+          </Supported>
+        </ComplexOutput>
+      </Output>
+    </ProcessOutputs>
+  </ProcessDescription>
+</wps:ProcessDescriptions>

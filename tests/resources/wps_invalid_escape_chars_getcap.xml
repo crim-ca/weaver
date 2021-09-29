@@ -1,0 +1,2279 @@
+<!--
+    Exisitng Finch provider that contains some invalid characters not properly escaped:
+
+    * 'Tmin<=thresh_tasmin' should be escaped with: &le;
+    * 'Tn < 0' should be escaped with: &lt;
+
+    WARNING:
+        Cannot use <!-> comment blocks within process definitions.
+        OWSLib's XML parsing assumes all objects have .tag attribute, which is not the case for comments.
+-->
+<wps:Capabilities
+        xmlns:xlink="http://www.w3.org/1999/xlink"
+        xmlns:wps="http://www.opengis.net/wps/1.0.0"
+        xmlns:ows="http://www.opengis.net/ows/1.1.0"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="../wpsGetCapabilities_response.xsd http://schemas.opengis.net/wps/1.0.0"
+        updateSequence="1" service="WPS" version="1.0.0" xml:lang="en-US"
+>
+    <ows:ServiceIdentification>
+        <ows:Title>Finch</ows:Title>
+        <ows:Abstract>A Web Processing Service for Climate Indicators</ows:Abstract>
+        <ows:Keywords>
+            <ows:Keyword>PyWPS</ows:Keyword>
+            <ows:Keyword>WPS</ows:Keyword>
+            <ows:Keyword>OGC</ows:Keyword>
+            <ows:Keyword>processing</ows:Keyword>
+            <ows:Keyword>birdhouse</ows:Keyword>
+            <ows:Keyword>finch</ows:Keyword>
+            <ows:Keyword>demo</ows:Keyword>
+            <ows:Type codeSpace="ISOTC211/19115">theme</ows:Type>
+        </ows:Keywords>
+        <ows:ServiceType>WPS</ows:ServiceType>
+        <ows:ServiceTypeVersion>1.0.0</ows:ServiceTypeVersion>
+        <ows:ServiceTypeVersion>2.0.0</ows:ServiceTypeVersion>
+        <ows:Fees>NONE</ows:Fees>
+        <ows:AccessConstraints>NONE</ows:AccessConstraints>
+    </ows:ServiceIdentification>
+    <ows:ServiceProvider>
+        <ows:ProviderName>Finch</ows:ProviderName>
+        <ows:ProviderSite xlink:href="http://finch.readthedocs.org/en/latest/"/>
+        <ows:ServiceContact>
+            <ows:IndividualName>Lastname, Firstname</ows:IndividualName>
+            <ows:PositionName>Position Title</ows:PositionName>
+            <ows:ContactInfo>
+                <ows:Phone>
+                    <ows:Voice>+xx-xxx-xxx-xxxx</ows:Voice>
+                    <ows:Facsimile/>
+                </ows:Phone>
+                <ows:Address>
+                    <ows:DeliveryPoint/>
+                    <ows:City>City</ows:City>
+                    <ows:AdministrativeArea/>
+                    <ows:PostalCode>Zip or Postal Code</ows:PostalCode>
+                    <ows:Country>Country</ows:Country>
+                    <ows:ElectronicMailAddress>Email Address</ows:ElectronicMailAddress>
+                </ows:Address>
+            </ows:ContactInfo>
+        </ows:ServiceContact>
+    </ows:ServiceProvider>
+    <ows:OperationsMetadata>
+        <ows:Operation name="GetCapabilities">
+            <ows:DCP>
+                <ows:HTTP>
+                    <ows:Get xlink:href="http://10.0.0.3/wps"/>
+                </ows:HTTP>
+            </ows:DCP>
+        </ows:Operation>
+        <ows:Operation name="DescribeProcess">
+            <ows:DCP>
+                <ows:HTTP>
+                    <ows:Get xlink:href="http://10.0.0.3/wps"/>
+                    <ows:Post xlink:href="http://10.0.0.3/wps"/>
+                </ows:HTTP>
+            </ows:DCP>
+        </ows:Operation>
+        <ows:Operation name="Execute">
+            <ows:DCP>
+                <ows:HTTP>
+                    <ows:Get xlink:href="http://10.0.0.3/wps"/>
+                    <ows:Post xlink:href="http://10.0.0.3/wps"/>
+                </ows:HTTP>
+            </ows:DCP>
+        </ows:Operation>
+    </ows:OperationsMetadata>
+    <wps:ProcessOfferings>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>humidex</ows:Identifier>
+            <ows:Title>Humidex index.</ows:Title>
+            <ows:Abstract>The humidex indicates how hot the air feels to an average person, accounting for the effect of
+                humidity. It can be loosely interpreted as the equivalent perceived temperature when the air is dry.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>tg</ows:Identifier>
+            <ows:Title>Average temperature from minimum and maximum temperatures.</ows:Title>
+            <ows:Abstract>We assume a symmetrical distribution for the temperature and retrieve the average value as Tg
+                = (Tx + Tn) / 2
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>wind_speed_from_vector</ows:Identifier>
+            <ows:Title>Wind speed and direction from the eastward and northward wind components.</ows:Title>
+            <ows:Abstract>Computes the magnitude and angle of the wind vector from its northward and eastward
+                components, following the meteorological convention that sets calm wind to a direction of 0deg and
+                northerly wind to 360deg.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>wind_vector_from_speed</ows:Identifier>
+            <ows:Title>Eastward and northward wind components from the wind speed and direction.</ows:Title>
+            <ows:Abstract>Compute the eastward and northward wind components from the wind speed and direction.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>hurs_fromdewpoint</ows:Identifier>
+            <ows:Title>Relative humidity from temperature and dewpoint temperature.</ows:Title>
+            <ows:Abstract>Compute relative humidity from temperature and either dewpoint temperature or specific
+                humidity and pressure through the saturation vapor pressure.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>hurs</ows:Identifier>
+            <ows:Title>Relative humidity from temperature, pressure and specific humidity.</ows:Title>
+            <ows:Abstract>Compute relative humidity from temperature and either dewpoint temperature or specific
+                humidity and pressure through the saturation vapor pressure.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>prsn</ows:Identifier>
+            <ows:Title>Snowfall approximation from total precipitation and temperature.</ows:Title>
+            <ows:Abstract>Solid precipitation estimated from precipitation and temperature according to a given
+                method.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>prlp</ows:Identifier>
+            <ows:Title>Rainfall approximation from total precipitation and temperature.</ows:Title>
+            <ows:Abstract>Liquid precipitation estimated from precipitation and temperature according to a given method.
+                This is a convenience method based on `snowfall_approximation`, see the latter for details.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>wind_chill</ows:Identifier>
+            <ows:Title>Wind chill index.</ows:Title>
+            <ows:Abstract>The Wind Chill Index is an estimation of how cold the weather feels to the average person. It
+                is computed from the air temperature and the 10-m wind. As defined by the Environment and Climate Change
+                Canada ([MVSZ15]_), two equations exist, the conventional one and one for slow winds (usually &lt; 5
+                km/h), see Notes.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>rain_frzgr</ows:Identifier>
+            <ows:Title>Number of rain on frozen ground events.</ows:Title>
+            <ows:Abstract>Number of days with rain above a threshold after a series of seven days below freezing
+                temperature. Precipitation is assumed to be rain when the temperature is above 0.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>rx1day</ows:Identifier>
+            <ows:Title>Highest 1-day precipitation amount for a period (frequency).</ows:Title>
+            <ows:Abstract>Resample the original daily total precipitation temperature series by taking the max over each
+                period.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>max_n_day_precipitation_amount</ows:Identifier>
+            <ows:Title>Highest precipitation amount cumulated over a n-day moving window.</ows:Title>
+            <ows:Abstract>Calculate the n-day rolling sum of the original daily total precipitation series and determine
+                the maximum value over each period.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>wetdays</ows:Identifier>
+            <ows:Title>Wet days.</ows:Title>
+            <ows:Abstract>Return the total number of days during period with precipitation over threshold.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>dry_days</ows:Identifier>
+            <ows:Title>Dry days.</ows:Title>
+            <ows:Abstract>The number of days with daily precipitation below threshold.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>cwd</ows:Identifier>
+            <ows:Title>Consecutive wet days.</ows:Title>
+            <ows:Abstract>Returns the maximum number of consecutive wet days.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>cdd</ows:Identifier>
+            <ows:Title>Maximum number of consecutive dry days.</ows:Title>
+            <ows:Abstract>Return the maximum number of consecutive days within the period where precipitation is below a
+                certain threshold.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>sdii</ows:Identifier>
+            <ows:Title>Average daily precipitation intensity.</ows:Title>
+            <ows:Abstract>Return the average precipitation over wet days.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>max_pr_intensity</ows:Identifier>
+            <ows:Title>Highest precipitation intensity over a n-hour moving window.</ows:Title>
+            <ows:Abstract>Calculate the n-hour rolling average of the original hourly total precipitation series and
+                determine the maximum value over each period.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>prcptot</ows:Identifier>
+            <ows:Title>Accumulated total precipitation (solid and liquid)</ows:Title>
+            <ows:Abstract>Resample the original daily mean precipitation flux and accumulate over each period. If a
+                daily temperature is provided, the `phase` keyword can be used to sum precipitation of a given phase
+                only. When the temperature is under the provided threshold, precipitation is assumed to be snow, and
+                liquid rain otherwise. This indice is agnostic to the type of daily temperature (tas, tasmax or tasmin)
+                given.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>liquidprcptot</ows:Identifier>
+            <ows:Title>Accumulated liquid precipitation.</ows:Title>
+            <ows:Abstract>Resample the original daily mean precipitation flux and accumulate over each period. If a
+                daily temperature is provided, the `phase` keyword can be used to sum precipitation of a given phase
+                only. When the temperature is under the provided threshold, precipitation is assumed to be snow, and
+                liquid rain otherwise. This indice is agnostic to the type of daily temperature (tas, tasmax or tasmin)
+                given.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>solidprcptot</ows:Identifier>
+            <ows:Title>Accumulated solid precipitation.</ows:Title>
+            <ows:Abstract>Resample the original daily mean precipitation flux and accumulate over each period. If a
+                daily temperature is provided, the `phase` keyword can be used to sum precipitation of a given phase
+                only. When the temperature is under the provided threshold, precipitation is assumed to be snow, and
+                liquid rain otherwise. This indice is agnostic to the type of daily temperature (tas, tasmax or tasmin)
+                given.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>last_snowfall</ows:Identifier>
+            <ows:Title>Last day with solid precipitation above a threshold.</ows:Title>
+            <ows:Abstract>Returns the last day of a period where the solid precipitation exceeds a threshold. WARNING:
+                The default freq is valid for the northern hemisphere.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>first_snowfall</ows:Identifier>
+            <ows:Title>First day with solid precipitation above a threshold.</ows:Title>
+            <ows:Abstract>Returns the first day of a period where the solid precipitation exceeds a threshold. WARNING:
+                The default `freq` is valid for the northern hemisphere.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>days_with_snow</ows:Identifier>
+            <ows:Title>Days with snowfall</ows:Title>
+            <ows:Abstract>Return the number of days where snowfall is within low and high thresholds.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>days_over_precip_thresh</ows:Identifier>
+            <ows:Title>Number of wet days with daily precipitation over a given percentile.</ows:Title>
+            <ows:Abstract>Number of days over period where the precipitation is above a threshold defining wet days and
+                above a given percentile for that day.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>high_precip_low_temp</ows:Identifier>
+            <ows:Title>Number of days with precipitation above threshold and temperature below threshold.</ows:Title>
+            <ows:Abstract>Number of days where precipitation is greater or equal to some threshold, and temperatures are
+                colder than some threshold. This can be used for example to identify days with the potential for
+                freezing rain or icing conditions.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>fraction_over_precip_thresh</ows:Identifier>
+            <ows:Title>Fraction of precipitation due to wet days with daily precipitation over a given percentile.
+            </ows:Title>
+            <ows:Abstract>Percentage of the total precipitation over period occurring in days where the precipitation is
+                above a threshold defining wet days and above a given percentile for that day.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>liquid_precip_ratio</ows:Identifier>
+            <ows:Title>Ratio of rainfall to total precipitation.</ows:Title>
+            <ows:Abstract>The ratio of total liquid precipitation over the total precipitation. Liquid precipitation is
+                approximated from total precipitation on days where temperature is above a threshold.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>tn_days_above</ows:Identifier>
+            <ows:Title>Number of days with tasmin above a threshold (number of tropical nights).</ows:Title>
+            <ows:Abstract>Number of days where daily minimum temperature exceeds a threshold.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>tn_days_below</ows:Identifier>
+            <ows:Title>Number of days with tasmin below a threshold.</ows:Title>
+            <ows:Abstract>Number of days where daily minimum temperature is below a threshold.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>tg_days_above</ows:Identifier>
+            <ows:Title>Number of days with tas above a threshold.</ows:Title>
+            <ows:Abstract>Number of days where daily mean temperature exceeds a threshold.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>tg_days_below</ows:Identifier>
+            <ows:Title>Number of days with tas below a threshold.</ows:Title>
+            <ows:Abstract>Number of days where daily mean temperature is below a threshold.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>tx_days_above</ows:Identifier>
+            <ows:Title>Number of days with tasmax above a threshold (number of summer days).</ows:Title>
+            <ows:Abstract>Number of days where daily maximum temperature exceeds a threshold.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>tx_days_below</ows:Identifier>
+            <ows:Title>Number of days with tmax below a threshold.</ows:Title>
+            <ows:Abstract>Number of days where daily maximum temperature is below a threshold.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>tx_tn_days_above</ows:Identifier>
+            <ows:Title>Number of days with both hot maximum and minimum daily temperatures.</ows:Title>
+            <ows:Abstract>The number of days per period with tasmin above a threshold and tasmax above another
+                threshold.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>heat_wave_frequency</ows:Identifier>
+            <ows:Title>Heat wave frequency.</ows:Title>
+            <ows:Abstract>Number of heat waves over a given period. A heat wave is defined as an event where the minimum
+                and maximum daily temperature both exceeds specific thresholds over a minimum number of days.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>heat_wave_max_length</ows:Identifier>
+            <ows:Title>Heat wave max length.</ows:Title>
+            <ows:Abstract>Maximum length of heat waves over a given period. A heat wave is defined as an event where the
+                minimum and maximum daily temperature both exceeds specific thresholds over a minimum number of days.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>heat_wave_total_length</ows:Identifier>
+            <ows:Title>Heat wave total length.</ows:Title>
+            <ows:Abstract>Total length of heat waves over a given period. A heat wave is defined as an event where the
+                minimum and maximum daily temperature both exceeds specific thresholds over a minimum number of days.
+                This the sum of all days in such events.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>heat_wave_index</ows:Identifier>
+            <ows:Title>Heat wave index.</ows:Title>
+            <ows:Abstract>Number of days that are part of a heatwave, defined as five or more consecutive days over
+                25.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>hot_spell_frequency</ows:Identifier>
+            <ows:Title>Hot spell frequency.</ows:Title>
+            <ows:Abstract>Number of hot spells over a given period. A hot spell is defined as an event where the maximum
+                daily temperature exceeds a specific threshold over a minimum number of days.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>hot_spell_max_length</ows:Identifier>
+            <ows:Title>Longest hot spell.</ows:Title>
+            <ows:Abstract>Longest spell of high temperatures over a given period.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>tg_mean</ows:Identifier>
+            <ows:Title>Mean of daily average temperature.</ows:Title>
+            <ows:Abstract>Resample the original daily mean temperature series by taking the mean over each period.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>tg_max</ows:Identifier>
+            <ows:Title>Highest mean temperature.</ows:Title>
+            <ows:Abstract>The maximum of daily mean temperature.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>tg_min</ows:Identifier>
+            <ows:Title>Lowest mean temperature.</ows:Title>
+            <ows:Abstract>Minimum of daily mean temperature.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>tx_mean</ows:Identifier>
+            <ows:Title>Mean max temperature.</ows:Title>
+            <ows:Abstract>The mean of daily maximum temperature.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>tx_max</ows:Identifier>
+            <ows:Title>Highest max temperature.</ows:Title>
+            <ows:Abstract>The maximum value of daily maximum temperature.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>tx_min</ows:Identifier>
+            <ows:Title>Lowest max temperature.</ows:Title>
+            <ows:Abstract>The minimum of daily maximum temperature.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>tn_mean</ows:Identifier>
+            <ows:Title>Mean minimum temperature.</ows:Title>
+            <ows:Abstract>Mean of daily minimum temperature.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>tn_max</ows:Identifier>
+            <ows:Title>Highest minimum temperature.</ows:Title>
+            <ows:Abstract>The maximum of daily minimum temperature.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>tn_min</ows:Identifier>
+            <ows:Title>Lowest minimum temperature.</ows:Title>
+            <ows:Abstract>Minimum of daily minimum temperature.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>dtr</ows:Identifier>
+            <ows:Title>Mean of daily temperature range.</ows:Title>
+            <ows:Abstract>The mean difference between the daily maximum temperature and the daily minimum temperature.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>dtrmax</ows:Identifier>
+            <ows:Title>Maximum of daily temperature range.</ows:Title>
+            <ows:Abstract>The mean difference between the daily maximum temperature and the daily minimum temperature.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>dtrvar</ows:Identifier>
+            <ows:Title>Mean absolute day-to-day variation in daily temperature range.</ows:Title>
+            <ows:Abstract>Mean absolute day-to-day variation in daily temperature range.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>etr</ows:Identifier>
+            <ows:Title>Extreme intra-period temperature range.</ows:Title>
+            <ows:Abstract>The maximum of max temperature (TXx) minus the minimum of min temperature (TNn) for the given
+                time period.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>cold_spell_duration_index</ows:Identifier>
+            <ows:Title>Cold spell duration index.</ows:Title>
+            <ows:Abstract>Number of days with at least six consecutive days where the daily minimum temperature is below
+                the 10th percentile.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>cold_spell_days</ows:Identifier>
+            <ows:Title>Cold spell days.</ows:Title>
+            <ows:Abstract>The number of days that are part of cold spell events, defined as a sequence of consecutive
+                days with mean daily temperature below a threshold in degC.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>cold_spell_frequency</ows:Identifier>
+            <ows:Title>Cold spell frequency.</ows:Title>
+            <ows:Abstract>The number of cold spell events, defined as a sequence of consecutive days with mean daily
+                temperature below a threshold.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>dlyfrzthw</ows:Identifier>
+            <ows:Title>Statistics of consecutive diurnal temperature swing events.</ows:Title>
+            <ows:Abstract>A diurnal swing of max and min temperature event is when Tmax > thresh_tasmax and Tmin<=
+                thresh_tasmin. This indice finds all days that constitute these events and computes statistics over the
+                length and frequency of these events.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>freezethaw_spell_frequency</ows:Identifier>
+            <ows:Title>Frequency of freeze-thaw spells</ows:Title>
+            <ows:Abstract>A diurnal swing of max and min temperature event is when Tmax > thresh_tasmax and Tmin<=
+                thresh_tasmin. This indice finds all days that constitute these events and computes statistics over the
+                length and frequency of these events.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>freezethaw_spell_mean_length</ows:Identifier>
+            <ows:Title>Averge length of freeze-thaw spells.</ows:Title>
+            <ows:Abstract>A diurnal swing of max and min temperature event is when Tmax > thresh_tasmax and Tmin<=
+                thresh_tasmin. This indice finds all days that constitute these events and computes statistics over the
+                length and frequency of these events.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>freezethaw_spell_max_length</ows:Identifier>
+            <ows:Title>Maximal length of freeze-thaw spells.</ows:Title>
+            <ows:Abstract>A diurnal swing of max and min temperature event is when Tmax > thresh_tasmax and Tmin<=
+                thresh_tasmin. This indice finds all days that constitute these events and computes statistics over the
+                length and frequency of these events.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>cooling_degree_days</ows:Identifier>
+            <ows:Title>Cooling degree days.</ows:Title>
+            <ows:Abstract>Sum of degree days above the temperature threshold at which spaces are cooled.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>heating_degree_days</ows:Identifier>
+            <ows:Title>Heating degree days.</ows:Title>
+            <ows:Abstract>Sum of degree days below the temperature threshold at which spaces are heated.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>growing_degree_days</ows:Identifier>
+            <ows:Title>Growing degree-days over threshold temperature value.</ows:Title>
+            <ows:Abstract>The sum of degree-days over the threshold temperature.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>freshet_start</ows:Identifier>
+            <ows:Title>First day consistently exceeding threshold temperature.</ows:Title>
+            <ows:Abstract>Returns first day of period where a temperature threshold is exceeded over a given number of
+                days.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>frost_days</ows:Identifier>
+            <ows:Title>Frost days index.</ows:Title>
+            <ows:Abstract>Number of days where daily minimum temperatures are below 0.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>frost_season_length</ows:Identifier>
+            <ows:Title>Frost season length.</ows:Title>
+            <ows:Abstract>The number of days between the first occurrence of at least N (def: 5) consecutive days with
+                minimum daily temperature under a threshold (default: 0) and the first occurrence of at least N (def 5)
+                consecutive days with minimum daily temperature above the same threshold A mid date can be given to
+                limit the earliest day the end of season can take. WARNING: The default freq and mid_date values are
+                valid for the northern hemisphere.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>last_spring_frost</ows:Identifier>
+            <ows:Title>Last day of temperatures inferior to a threshold temperature.</ows:Title>
+            <ows:Abstract>Returns last day of period where a temperature is inferior to a threshold over a given number
+                of days and limited to a final calendar date.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>first_day_below</ows:Identifier>
+            <ows:Title>First day of temperatures inferior to a threshold temperature.</ows:Title>
+            <ows:Abstract>Returns first day of period where a temperature is inferior to a threshold over a given number
+                of days, limited to a starting calendar date.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>first_day_above</ows:Identifier>
+            <ows:Title>First day of temperatures superior to a threshold temperature.</ows:Title>
+            <ows:Abstract>Returns first day of period where a temperature is superior to a threshold over a given number
+                of days, limited to a starting calendar date.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ice_days</ows:Identifier>
+            <ows:Title>Number of ice/freezing days.</ows:Title>
+            <ows:Abstract>Number of days where daily maximum temperatures are below 0.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>consecutive_frost_days</ows:Identifier>
+            <ows:Title>Maximum number of consecutive frost days (Tn < 0).
+            </ows:Title>
+            <ows:Abstract>The maximum number of consecutive days within the period where the temperature is under a
+                certain threshold (default: 0degC). WARNING: The default freq value is valid for the northern
+                hemisphere.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>consecutive_frost_free_days</ows:Identifier>
+            <ows:Title>Maximum number of consecutive frost free days (Tn > 0).</ows:Title>
+            <ows:Abstract>Return the maximum number of consecutive days within the period where the minimum temperature
+                is above a certain threshold.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>growing_season_length</ows:Identifier>
+            <ows:Title>Growing season length.</ows:Title>
+            <ows:Abstract>The number of days between the first occurrence of at least six consecutive days with mean
+                daily temperature over a threshold (default: 5) and the first occurrence of at least six consecutive
+                days with mean daily temperature below the same threshold after a certain date. (Usually July 1st in the
+                northern emisphere and January 1st in the southern hemisphere.)
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>growing_season_end</ows:Identifier>
+            <ows:Title>End of the growing season.</ows:Title>
+            <ows:Abstract>Day of the year of the start of a sequence of days with a temperature consistently below a
+                threshold, after a period with temperatures consistently above the same threshold.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>tropical_nights</ows:Identifier>
+            <ows:Title>Number of days with tasmin above a threshold (number of tropical nights).</ows:Title>
+            <ows:Abstract>Number of days where daily minimum temperature exceeds a threshold.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>tg90p</ows:Identifier>
+            <ows:Title>Number of days with daily mean temperature over the 90th percentile.</ows:Title>
+            <ows:Abstract>Number of days with daily mean temperature over the 90th percentile.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>tg10p</ows:Identifier>
+            <ows:Title>Number of days with daily mean temperature below the 10th percentile.</ows:Title>
+            <ows:Abstract>Number of days with daily mean temperature below the 10th percentile.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>tx90p</ows:Identifier>
+            <ows:Title>Number of days with daily maximum temperature over the 90th percentile.</ows:Title>
+            <ows:Abstract>Number of days with daily maximum temperature over the 90th percentile.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>tx10p</ows:Identifier>
+            <ows:Title>Number of days with daily maximum temperature below the 10th percentile.</ows:Title>
+            <ows:Abstract>Number of days with daily maximum temperature below the 10th percentile.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>tn90p</ows:Identifier>
+            <ows:Title>Number of days with daily minimum temperature over the 90th percentile.</ows:Title>
+            <ows:Abstract>Number of days with daily minimum temperature over the 90th percentile.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>tn10p</ows:Identifier>
+            <ows:Title>Number of days with daily minimum temperature below the 10th percentile.</ows:Title>
+            <ows:Abstract>Number of days with daily minimum temperature below the 10th percentile.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>degree_days_exceedance_date</ows:Identifier>
+            <ows:Title>Degree days exceedance date.</ows:Title>
+            <ows:Abstract>Day of year when the sum of degree days exceeds a threshold. Degree days are computed above or
+                below a given temperature threshold.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>warm_spell_duration_index</ows:Identifier>
+            <ows:Title>Warm spell duration index.</ows:Title>
+            <ows:Abstract>Number of days inside spells of a minimum number of consecutive days where the daily maximum
+                temperature is above the 90th percentile. The 90th percentile should be computed for a 5-day moving
+                window, centered on each calendar day in the 1961-1990 period.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>maximum_consecutive_warm_days</ows:Identifier>
+            <ows:Title>Maximum number of consecutive days with tasmax above a threshold (summer days).</ows:Title>
+            <ows:Abstract>Return the maximum number of consecutive days within the period where the maximum temperature
+                is above a certain threshold.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>fire_season</ows:Identifier>
+            <ows:Title>Fire season mask.</ows:Title>
+            <ows:Abstract>Binary mask of the active fire season, defined by conditions on consecutive daily temperatures
+                and, optionally, snow depths.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>corn_heat_units</ows:Identifier>
+            <ows:Title>Corn heat units.</ows:Title>
+            <ows:Abstract>Temperature-based index used to estimate the development of corn crops.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>snow_cover_duration</ows:Identifier>
+            <ows:Title>Number of days with snow depth above a threshold.</ows:Title>
+            <ows:Abstract>Number of days where surface snow depth is greater or equal to given threshold. WARNING: The
+                default `freq` is valid for the northern hemisphere.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>continuous_snow_cover_start</ows:Identifier>
+            <ows:Title>Start date of continuous snow cover.</ows:Title>
+            <ows:Abstract>Day of year when snow depth is above `threshold` for at least `window` consecutive days.
+                WARNING: The default `freq` is valid for the northern hemisphere.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>continuous_snow_cover_end</ows:Identifier>
+            <ows:Title>End date of continuous snow cover.</ows:Title>
+            <ows:Abstract>First day after the start of the continuous snow cover when snow depth is below `threshold`
+                for at least `window` consecutive days. WARNING: The default `freq` is valid for the northern
+                hemisphere.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>snd_max_doy</ows:Identifier>
+            <ows:Title>Maximum snow depth day of year.</ows:Title>
+            <ows:Abstract>Day of year when surface snow reaches its peak value. If snow depth is 0 over entire period,
+                return NaN.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>snow_melt_we_max</ows:Identifier>
+            <ows:Title>Maximum snow melt</ows:Title>
+            <ows:Abstract>The maximum snow melt over a given number of days expressed in snow water equivalent.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>melt_and_precip_max</ows:Identifier>
+            <ows:Title>Maximum snow melt and precipitation</ows:Title>
+            <ows:Abstract>The maximum snow melt plus precipitation over a given number of days expressed in snow water
+                equivalent.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>winter_storm</ows:Identifier>
+            <ows:Title>Days with snowfall over threshold.</ows:Title>
+            <ows:Abstract>Number of days with snowfall accumulation greater or equal to threshold.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>blowing_snow</ows:Identifier>
+            <ows:Title>Days with blowing snow events</ows:Title>
+            <ows:Abstract>Number of days where both snowfall over the last days and daily wind speeds are above
+                respective thresholds.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>base_flow_index</ows:Identifier>
+            <ows:Title>Base flow index.</ows:Title>
+            <ows:Abstract>Return the base flow index, defined as the minimum 7-day average flow divided by the mean
+                flow.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>freq_analysis</ows:Identifier>
+            <ows:Title>Flow values for given return periods.</ows:Title>
+            <ows:Abstract/>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>rb_flashiness_index</ows:Identifier>
+            <ows:Title>Richards-Baker flashiness index.</ows:Title>
+            <ows:Abstract>Measures oscillations in flow relative to total flow, quantifying the frequency and rapidity
+                of short term changes in flow.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>stats</ows:Identifier>
+            <ows:Title>Statistic of the daily flow on a given period.</ows:Title>
+            <ows:Abstract/>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>fit</ows:Identifier>
+            <ows:Title>Distribution parameters fitted over the time dimension.</ows:Title>
+            <ows:Abstract/>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>doy_qmax</ows:Identifier>
+            <ows:Title>Day of year of the maximum.</ows:Title>
+            <ows:Abstract/>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>doy_qmin</ows:Identifier>
+            <ows:Title>Day of year of the minimum.</ows:Title>
+            <ows:Abstract/>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>sea_ice_extent</ows:Identifier>
+            <ows:Title>Total sea ice extent.</ows:Title>
+            <ows:Abstract>Sea ice extent measures the *ice-covered* area, where a region is considered ice-covered if
+                its sea ice concentration is above a threshold usually set to 15%.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>sea_ice_area</ows:Identifier>
+            <ows:Title>Total sea ice area.</ows:Title>
+            <ows:Abstract>Sea ice area measures the total sea ice covered area where sea ice concentration is above a
+                threshold, usually set to 15%.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>empirical_quantile_mapping</ows:Identifier>
+            <ows:Title>Empirical Quantile Mapping bias-adjustment</ows:Title>
+            <ows:Abstract>Adjustment factors are computed between the quantiles of `ref` and `sim`.Values of `sim` are
+                matched to the corresponding quantiles of `hist` and corrected accordingly.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_tg</ows:Identifier>
+            <ows:Title>Average temperature from minimum and maximum temperatures.</ows:Title>
+            <ows:Abstract>We assume a symmetrical distribution for the temperature and retrieve the average value as Tg
+                = (Tx + Tn) / 2
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_prsn</ows:Identifier>
+            <ows:Title>Snowfall approximation from total precipitation and temperature.</ows:Title>
+            <ows:Abstract>Solid precipitation estimated from precipitation and temperature according to a given
+                method.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_prlp</ows:Identifier>
+            <ows:Title>Rainfall approximation from total precipitation and temperature.</ows:Title>
+            <ows:Abstract>Liquid precipitation estimated from precipitation and temperature according to a given method.
+                This is a convenience method based on `snowfall_approximation`, see the latter for details.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_rain_frzgr</ows:Identifier>
+            <ows:Title>Number of rain on frozen ground events.</ows:Title>
+            <ows:Abstract>Number of days with rain above a threshold after a series of seven days below freezing
+                temperature. Precipitation is assumed to be rain when the temperature is above 0.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_rx1day</ows:Identifier>
+            <ows:Title>Highest 1-day precipitation amount for a period (frequency).</ows:Title>
+            <ows:Abstract>Resample the original daily total precipitation temperature series by taking the max over each
+                period.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_max_n_day_precipitation_amount</ows:Identifier>
+            <ows:Title>Highest precipitation amount cumulated over a n-day moving window.</ows:Title>
+            <ows:Abstract>Calculate the n-day rolling sum of the original daily total precipitation series and determine
+                the maximum value over each period.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_wetdays</ows:Identifier>
+            <ows:Title>Wet days.</ows:Title>
+            <ows:Abstract>Return the total number of days during period with precipitation over threshold.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_dry_days</ows:Identifier>
+            <ows:Title>Dry days.</ows:Title>
+            <ows:Abstract>The number of days with daily precipitation below threshold.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_cwd</ows:Identifier>
+            <ows:Title>Consecutive wet days.</ows:Title>
+            <ows:Abstract>Returns the maximum number of consecutive wet days.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_cdd</ows:Identifier>
+            <ows:Title>Maximum number of consecutive dry days.</ows:Title>
+            <ows:Abstract>Return the maximum number of consecutive days within the period where precipitation is below a
+                certain threshold.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_sdii</ows:Identifier>
+            <ows:Title>Average daily precipitation intensity.</ows:Title>
+            <ows:Abstract>Return the average precipitation over wet days.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_max_pr_intensity</ows:Identifier>
+            <ows:Title>Highest precipitation intensity over a n-hour moving window.</ows:Title>
+            <ows:Abstract>Calculate the n-hour rolling average of the original hourly total precipitation series and
+                determine the maximum value over each period.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_prcptot</ows:Identifier>
+            <ows:Title>Accumulated total precipitation (solid and liquid)</ows:Title>
+            <ows:Abstract>Resample the original daily mean precipitation flux and accumulate over each period. If a
+                daily temperature is provided, the `phase` keyword can be used to sum precipitation of a given phase
+                only. When the temperature is under the provided threshold, precipitation is assumed to be snow, and
+                liquid rain otherwise. This indice is agnostic to the type of daily temperature (tas, tasmax or tasmin)
+                given.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_liquidprcptot</ows:Identifier>
+            <ows:Title>Accumulated liquid precipitation.</ows:Title>
+            <ows:Abstract>Resample the original daily mean precipitation flux and accumulate over each period. If a
+                daily temperature is provided, the `phase` keyword can be used to sum precipitation of a given phase
+                only. When the temperature is under the provided threshold, precipitation is assumed to be snow, and
+                liquid rain otherwise. This indice is agnostic to the type of daily temperature (tas, tasmax or tasmin)
+                given.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_solidprcptot</ows:Identifier>
+            <ows:Title>Accumulated solid precipitation.</ows:Title>
+            <ows:Abstract>Resample the original daily mean precipitation flux and accumulate over each period. If a
+                daily temperature is provided, the `phase` keyword can be used to sum precipitation of a given phase
+                only. When the temperature is under the provided threshold, precipitation is assumed to be snow, and
+                liquid rain otherwise. This indice is agnostic to the type of daily temperature (tas, tasmax or tasmin)
+                given.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_high_precip_low_temp</ows:Identifier>
+            <ows:Title>Number of days with precipitation above threshold and temperature below threshold.</ows:Title>
+            <ows:Abstract>Number of days where precipitation is greater or equal to some threshold, and temperatures are
+                colder than some threshold. This can be used for example to identify days with the potential for
+                freezing rain or icing conditions.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_liquid_precip_ratio</ows:Identifier>
+            <ows:Title>Ratio of rainfall to total precipitation.</ows:Title>
+            <ows:Abstract>The ratio of total liquid precipitation over the total precipitation. Liquid precipitation is
+                approximated from total precipitation on days where temperature is above a threshold.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_tn_days_above</ows:Identifier>
+            <ows:Title>Number of days with tasmin above a threshold (number of tropical nights).</ows:Title>
+            <ows:Abstract>Number of days where daily minimum temperature exceeds a threshold.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_tn_days_below</ows:Identifier>
+            <ows:Title>Number of days with tasmin below a threshold.</ows:Title>
+            <ows:Abstract>Number of days where daily minimum temperature is below a threshold.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_tg_days_above</ows:Identifier>
+            <ows:Title>Number of days with tas above a threshold.</ows:Title>
+            <ows:Abstract>Number of days where daily mean temperature exceeds a threshold.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_tg_days_below</ows:Identifier>
+            <ows:Title>Number of days with tas below a threshold.</ows:Title>
+            <ows:Abstract>Number of days where daily mean temperature is below a threshold.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_tx_days_above</ows:Identifier>
+            <ows:Title>Number of days with tasmax above a threshold (number of summer days).</ows:Title>
+            <ows:Abstract>Number of days where daily maximum temperature exceeds a threshold.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_tx_days_below</ows:Identifier>
+            <ows:Title>Number of days with tmax below a threshold.</ows:Title>
+            <ows:Abstract>Number of days where daily maximum temperature is below a threshold.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_tx_tn_days_above</ows:Identifier>
+            <ows:Title>Number of days with both hot maximum and minimum daily temperatures.</ows:Title>
+            <ows:Abstract>The number of days per period with tasmin above a threshold and tasmax above another
+                threshold.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_heat_wave_frequency</ows:Identifier>
+            <ows:Title>Heat wave frequency.</ows:Title>
+            <ows:Abstract>Number of heat waves over a given period. A heat wave is defined as an event where the minimum
+                and maximum daily temperature both exceeds specific thresholds over a minimum number of days.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_heat_wave_max_length</ows:Identifier>
+            <ows:Title>Heat wave max length.</ows:Title>
+            <ows:Abstract>Maximum length of heat waves over a given period. A heat wave is defined as an event where the
+                minimum and maximum daily temperature both exceeds specific thresholds over a minimum number of days.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_heat_wave_total_length</ows:Identifier>
+            <ows:Title>Heat wave total length.</ows:Title>
+            <ows:Abstract>Total length of heat waves over a given period. A heat wave is defined as an event where the
+                minimum and maximum daily temperature both exceeds specific thresholds over a minimum number of days.
+                This the sum of all days in such events.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_heat_wave_index</ows:Identifier>
+            <ows:Title>Heat wave index.</ows:Title>
+            <ows:Abstract>Number of days that are part of a heatwave, defined as five or more consecutive days over
+                25.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_hot_spell_frequency</ows:Identifier>
+            <ows:Title>Hot spell frequency.</ows:Title>
+            <ows:Abstract>Number of hot spells over a given period. A hot spell is defined as an event where the maximum
+                daily temperature exceeds a specific threshold over a minimum number of days.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_hot_spell_max_length</ows:Identifier>
+            <ows:Title>Longest hot spell.</ows:Title>
+            <ows:Abstract>Longest spell of high temperatures over a given period.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_tg_mean</ows:Identifier>
+            <ows:Title>Mean of daily average temperature.</ows:Title>
+            <ows:Abstract>Resample the original daily mean temperature series by taking the mean over each period.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_tg_max</ows:Identifier>
+            <ows:Title>Highest mean temperature.</ows:Title>
+            <ows:Abstract>The maximum of daily mean temperature.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_tg_min</ows:Identifier>
+            <ows:Title>Lowest mean temperature.</ows:Title>
+            <ows:Abstract>Minimum of daily mean temperature.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_tx_mean</ows:Identifier>
+            <ows:Title>Mean max temperature.</ows:Title>
+            <ows:Abstract>The mean of daily maximum temperature.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_tx_max</ows:Identifier>
+            <ows:Title>Highest max temperature.</ows:Title>
+            <ows:Abstract>The maximum value of daily maximum temperature.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_tx_min</ows:Identifier>
+            <ows:Title>Lowest max temperature.</ows:Title>
+            <ows:Abstract>The minimum of daily maximum temperature.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_tn_mean</ows:Identifier>
+            <ows:Title>Mean minimum temperature.</ows:Title>
+            <ows:Abstract>Mean of daily minimum temperature.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_tn_max</ows:Identifier>
+            <ows:Title>Highest minimum temperature.</ows:Title>
+            <ows:Abstract>The maximum of daily minimum temperature.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_tn_min</ows:Identifier>
+            <ows:Title>Lowest minimum temperature.</ows:Title>
+            <ows:Abstract>Minimum of daily minimum temperature.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_dtr</ows:Identifier>
+            <ows:Title>Mean of daily temperature range.</ows:Title>
+            <ows:Abstract>The mean difference between the daily maximum temperature and the daily minimum temperature.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_dtrmax</ows:Identifier>
+            <ows:Title>Maximum of daily temperature range.</ows:Title>
+            <ows:Abstract>The mean difference between the daily maximum temperature and the daily minimum temperature.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_dtrvar</ows:Identifier>
+            <ows:Title>Mean absolute day-to-day variation in daily temperature range.</ows:Title>
+            <ows:Abstract>Mean absolute day-to-day variation in daily temperature range.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_etr</ows:Identifier>
+            <ows:Title>Extreme intra-period temperature range.</ows:Title>
+            <ows:Abstract>The maximum of max temperature (TXx) minus the minimum of min temperature (TNn) for the given
+                time period.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_cold_spell_duration_index</ows:Identifier>
+            <ows:Title>Cold spell duration index.</ows:Title>
+            <ows:Abstract>Number of days with at least six consecutive days where the daily minimum temperature is below
+                the 10th percentile.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_cold_spell_days</ows:Identifier>
+            <ows:Title>Cold spell days.</ows:Title>
+            <ows:Abstract>The number of days that are part of cold spell events, defined as a sequence of consecutive
+                days with mean daily temperature below a threshold in degC.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_cold_spell_frequency</ows:Identifier>
+            <ows:Title>Cold spell frequency.</ows:Title>
+            <ows:Abstract>The number of cold spell events, defined as a sequence of consecutive days with mean daily
+                temperature below a threshold.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_dlyfrzthw</ows:Identifier>
+            <ows:Title>Statistics of consecutive diurnal temperature swing events.</ows:Title>
+            <ows:Abstract>A diurnal swing of max and min temperature event is when Tmax > thresh_tasmax and Tmin<=
+                thresh_tasmin. This indice finds all days that constitute these events and computes statistics over the
+                length and frequency of these events.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_freezethaw_spell_frequency</ows:Identifier>
+            <ows:Title>Frequency of freeze-thaw spells</ows:Title>
+            <ows:Abstract>A diurnal swing of max and min temperature event is when Tmax > thresh_tasmax and Tmin<=
+                thresh_tasmin. This indice finds all days that constitute these events and computes statistics over the
+                length and frequency of these events.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_freezethaw_spell_mean_length</ows:Identifier>
+            <ows:Title>Averge length of freeze-thaw spells.</ows:Title>
+            <ows:Abstract>A diurnal swing of max and min temperature event is when Tmax > thresh_tasmax and Tmin<=
+                thresh_tasmin. This indice finds all days that constitute these events and computes statistics over the
+                length and frequency of these events.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_freezethaw_spell_max_length</ows:Identifier>
+            <ows:Title>Maximal length of freeze-thaw spells.</ows:Title>
+            <ows:Abstract>A diurnal swing of max and min temperature event is when Tmax > thresh_tasmax and Tmin<=
+                thresh_tasmin. This indice finds all days that constitute these events and computes statistics over the
+                length and frequency of these events.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_cooling_degree_days</ows:Identifier>
+            <ows:Title>Cooling degree days.</ows:Title>
+            <ows:Abstract>Sum of degree days above the temperature threshold at which spaces are cooled.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_heating_degree_days</ows:Identifier>
+            <ows:Title>Heating degree days.</ows:Title>
+            <ows:Abstract>Sum of degree days below the temperature threshold at which spaces are heated.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_growing_degree_days</ows:Identifier>
+            <ows:Title>Growing degree-days over threshold temperature value.</ows:Title>
+            <ows:Abstract>The sum of degree-days over the threshold temperature.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_freshet_start</ows:Identifier>
+            <ows:Title>First day consistently exceeding threshold temperature.</ows:Title>
+            <ows:Abstract>Returns first day of period where a temperature threshold is exceeded over a given number of
+                days.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_frost_days</ows:Identifier>
+            <ows:Title>Frost days index.</ows:Title>
+            <ows:Abstract>Number of days where daily minimum temperatures are below 0.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_frost_season_length</ows:Identifier>
+            <ows:Title>Frost season length.</ows:Title>
+            <ows:Abstract>The number of days between the first occurrence of at least N (def: 5) consecutive days with
+                minimum daily temperature under a threshold (default: 0) and the first occurrence of at least N (def 5)
+                consecutive days with minimum daily temperature above the same threshold A mid date can be given to
+                limit the earliest day the end of season can take. WARNING: The default freq and mid_date values are
+                valid for the northern hemisphere.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_last_spring_frost</ows:Identifier>
+            <ows:Title>Last day of temperatures inferior to a threshold temperature.</ows:Title>
+            <ows:Abstract>Returns last day of period where a temperature is inferior to a threshold over a given number
+                of days and limited to a final calendar date.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_first_day_below</ows:Identifier>
+            <ows:Title>First day of temperatures inferior to a threshold temperature.</ows:Title>
+            <ows:Abstract>Returns first day of period where a temperature is inferior to a threshold over a given number
+                of days, limited to a starting calendar date.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_first_day_above</ows:Identifier>
+            <ows:Title>First day of temperatures superior to a threshold temperature.</ows:Title>
+            <ows:Abstract>Returns first day of period where a temperature is superior to a threshold over a given number
+                of days, limited to a starting calendar date.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_ice_days</ows:Identifier>
+            <ows:Title>Number of ice/freezing days.</ows:Title>
+            <ows:Abstract>Number of days where daily maximum temperatures are below 0.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_consecutive_frost_days</ows:Identifier>
+            <ows:Title>Maximum number of consecutive frost days (Tn < 0).
+            </ows:Title>
+            <ows:Abstract>The maximum number of consecutive days within the period where the temperature is under a
+                certain threshold (default: 0degC). WARNING: The default freq value is valid for the northern
+                hemisphere.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_consecutive_frost_free_days</ows:Identifier>
+            <ows:Title>Maximum number of consecutive frost free days (Tn > 0).</ows:Title>
+            <ows:Abstract>Return the maximum number of consecutive days within the period where the minimum temperature
+                is above a certain threshold.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_growing_season_length</ows:Identifier>
+            <ows:Title>Growing season length.</ows:Title>
+            <ows:Abstract>The number of days between the first occurrence of at least six consecutive days with mean
+                daily temperature over a threshold (default: 5) and the first occurrence of at least six consecutive
+                days with mean daily temperature below the same threshold after a certain date. (Usually July 1st in the
+                northern emisphere and January 1st in the southern hemisphere.)
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_growing_season_end</ows:Identifier>
+            <ows:Title>End of the growing season.</ows:Title>
+            <ows:Abstract>Day of the year of the start of a sequence of days with a temperature consistently below a
+                threshold, after a period with temperatures consistently above the same threshold.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_tropical_nights</ows:Identifier>
+            <ows:Title>Number of days with tasmin above a threshold (number of tropical nights).</ows:Title>
+            <ows:Abstract>Number of days where daily minimum temperature exceeds a threshold.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_tg90p</ows:Identifier>
+            <ows:Title>Number of days with daily mean temperature over the 90th percentile.</ows:Title>
+            <ows:Abstract>Number of days with daily mean temperature over the 90th percentile.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_tg10p</ows:Identifier>
+            <ows:Title>Number of days with daily mean temperature below the 10th percentile.</ows:Title>
+            <ows:Abstract>Number of days with daily mean temperature below the 10th percentile.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_tx90p</ows:Identifier>
+            <ows:Title>Number of days with daily maximum temperature over the 90th percentile.</ows:Title>
+            <ows:Abstract>Number of days with daily maximum temperature over the 90th percentile.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_tx10p</ows:Identifier>
+            <ows:Title>Number of days with daily maximum temperature below the 10th percentile.</ows:Title>
+            <ows:Abstract>Number of days with daily maximum temperature below the 10th percentile.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_tn90p</ows:Identifier>
+            <ows:Title>Number of days with daily minimum temperature over the 90th percentile.</ows:Title>
+            <ows:Abstract>Number of days with daily minimum temperature over the 90th percentile.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_tn10p</ows:Identifier>
+            <ows:Title>Number of days with daily minimum temperature below the 10th percentile.</ows:Title>
+            <ows:Abstract>Number of days with daily minimum temperature below the 10th percentile.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_degree_days_exceedance_date</ows:Identifier>
+            <ows:Title>Degree days exceedance date.</ows:Title>
+            <ows:Abstract>Day of year when the sum of degree days exceeds a threshold. Degree days are computed above or
+                below a given temperature threshold.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_warm_spell_duration_index</ows:Identifier>
+            <ows:Title>Warm spell duration index.</ows:Title>
+            <ows:Abstract>Number of days inside spells of a minimum number of consecutive days where the daily maximum
+                temperature is above the 90th percentile. The 90th percentile should be computed for a 5-day moving
+                window, centered on each calendar day in the 1961-1990 period.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_maximum_consecutive_warm_days</ows:Identifier>
+            <ows:Title>Maximum number of consecutive days with tasmax above a threshold (summer days).</ows:Title>
+            <ows:Abstract>Return the maximum number of consecutive days within the period where the maximum temperature
+                is above a certain threshold.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_grid_point_corn_heat_units</ows:Identifier>
+            <ows:Title>Corn heat units.</ows:Title>
+            <ows:Abstract>Temperature-based index used to estimate the development of corn crops.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_tg</ows:Identifier>
+            <ows:Title>Average temperature from minimum and maximum temperatures.</ows:Title>
+            <ows:Abstract>We assume a symmetrical distribution for the temperature and retrieve the average value as Tg
+                = (Tx + Tn) / 2
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_prsn</ows:Identifier>
+            <ows:Title>Snowfall approximation from total precipitation and temperature.</ows:Title>
+            <ows:Abstract>Solid precipitation estimated from precipitation and temperature according to a given
+                method.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_prlp</ows:Identifier>
+            <ows:Title>Rainfall approximation from total precipitation and temperature.</ows:Title>
+            <ows:Abstract>Liquid precipitation estimated from precipitation and temperature according to a given method.
+                This is a convenience method based on `snowfall_approximation`, see the latter for details.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_rain_frzgr</ows:Identifier>
+            <ows:Title>Number of rain on frozen ground events.</ows:Title>
+            <ows:Abstract>Number of days with rain above a threshold after a series of seven days below freezing
+                temperature. Precipitation is assumed to be rain when the temperature is above 0.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_rx1day</ows:Identifier>
+            <ows:Title>Highest 1-day precipitation amount for a period (frequency).</ows:Title>
+            <ows:Abstract>Resample the original daily total precipitation temperature series by taking the max over each
+                period.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_max_n_day_precipitation_amount</ows:Identifier>
+            <ows:Title>Highest precipitation amount cumulated over a n-day moving window.</ows:Title>
+            <ows:Abstract>Calculate the n-day rolling sum of the original daily total precipitation series and determine
+                the maximum value over each period.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_wetdays</ows:Identifier>
+            <ows:Title>Wet days.</ows:Title>
+            <ows:Abstract>Return the total number of days during period with precipitation over threshold.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_dry_days</ows:Identifier>
+            <ows:Title>Dry days.</ows:Title>
+            <ows:Abstract>The number of days with daily precipitation below threshold.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_cwd</ows:Identifier>
+            <ows:Title>Consecutive wet days.</ows:Title>
+            <ows:Abstract>Returns the maximum number of consecutive wet days.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_cdd</ows:Identifier>
+            <ows:Title>Maximum number of consecutive dry days.</ows:Title>
+            <ows:Abstract>Return the maximum number of consecutive days within the period where precipitation is below a
+                certain threshold.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_sdii</ows:Identifier>
+            <ows:Title>Average daily precipitation intensity.</ows:Title>
+            <ows:Abstract>Return the average precipitation over wet days.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_max_pr_intensity</ows:Identifier>
+            <ows:Title>Highest precipitation intensity over a n-hour moving window.</ows:Title>
+            <ows:Abstract>Calculate the n-hour rolling average of the original hourly total precipitation series and
+                determine the maximum value over each period.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_prcptot</ows:Identifier>
+            <ows:Title>Accumulated total precipitation (solid and liquid)</ows:Title>
+            <ows:Abstract>Resample the original daily mean precipitation flux and accumulate over each period. If a
+                daily temperature is provided, the `phase` keyword can be used to sum precipitation of a given phase
+                only. When the temperature is under the provided threshold, precipitation is assumed to be snow, and
+                liquid rain otherwise. This indice is agnostic to the type of daily temperature (tas, tasmax or tasmin)
+                given.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_liquidprcptot</ows:Identifier>
+            <ows:Title>Accumulated liquid precipitation.</ows:Title>
+            <ows:Abstract>Resample the original daily mean precipitation flux and accumulate over each period. If a
+                daily temperature is provided, the `phase` keyword can be used to sum precipitation of a given phase
+                only. When the temperature is under the provided threshold, precipitation is assumed to be snow, and
+                liquid rain otherwise. This indice is agnostic to the type of daily temperature (tas, tasmax or tasmin)
+                given.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_solidprcptot</ows:Identifier>
+            <ows:Title>Accumulated solid precipitation.</ows:Title>
+            <ows:Abstract>Resample the original daily mean precipitation flux and accumulate over each period. If a
+                daily temperature is provided, the `phase` keyword can be used to sum precipitation of a given phase
+                only. When the temperature is under the provided threshold, precipitation is assumed to be snow, and
+                liquid rain otherwise. This indice is agnostic to the type of daily temperature (tas, tasmax or tasmin)
+                given.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_high_precip_low_temp</ows:Identifier>
+            <ows:Title>Number of days with precipitation above threshold and temperature below threshold.</ows:Title>
+            <ows:Abstract>Number of days where precipitation is greater or equal to some threshold, and temperatures are
+                colder than some threshold. This can be used for example to identify days with the potential for
+                freezing rain or icing conditions.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_liquid_precip_ratio</ows:Identifier>
+            <ows:Title>Ratio of rainfall to total precipitation.</ows:Title>
+            <ows:Abstract>The ratio of total liquid precipitation over the total precipitation. Liquid precipitation is
+                approximated from total precipitation on days where temperature is above a threshold.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_tn_days_above</ows:Identifier>
+            <ows:Title>Number of days with tasmin above a threshold (number of tropical nights).</ows:Title>
+            <ows:Abstract>Number of days where daily minimum temperature exceeds a threshold.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_tn_days_below</ows:Identifier>
+            <ows:Title>Number of days with tasmin below a threshold.</ows:Title>
+            <ows:Abstract>Number of days where daily minimum temperature is below a threshold.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_tg_days_above</ows:Identifier>
+            <ows:Title>Number of days with tas above a threshold.</ows:Title>
+            <ows:Abstract>Number of days where daily mean temperature exceeds a threshold.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_tg_days_below</ows:Identifier>
+            <ows:Title>Number of days with tas below a threshold.</ows:Title>
+            <ows:Abstract>Number of days where daily mean temperature is below a threshold.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_tx_days_above</ows:Identifier>
+            <ows:Title>Number of days with tasmax above a threshold (number of summer days).</ows:Title>
+            <ows:Abstract>Number of days where daily maximum temperature exceeds a threshold.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_tx_days_below</ows:Identifier>
+            <ows:Title>Number of days with tmax below a threshold.</ows:Title>
+            <ows:Abstract>Number of days where daily maximum temperature is below a threshold.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_tx_tn_days_above</ows:Identifier>
+            <ows:Title>Number of days with both hot maximum and minimum daily temperatures.</ows:Title>
+            <ows:Abstract>The number of days per period with tasmin above a threshold and tasmax above another
+                threshold.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_heat_wave_frequency</ows:Identifier>
+            <ows:Title>Heat wave frequency.</ows:Title>
+            <ows:Abstract>Number of heat waves over a given period. A heat wave is defined as an event where the minimum
+                and maximum daily temperature both exceeds specific thresholds over a minimum number of days.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_heat_wave_max_length</ows:Identifier>
+            <ows:Title>Heat wave max length.</ows:Title>
+            <ows:Abstract>Maximum length of heat waves over a given period. A heat wave is defined as an event where the
+                minimum and maximum daily temperature both exceeds specific thresholds over a minimum number of days.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_heat_wave_total_length</ows:Identifier>
+            <ows:Title>Heat wave total length.</ows:Title>
+            <ows:Abstract>Total length of heat waves over a given period. A heat wave is defined as an event where the
+                minimum and maximum daily temperature both exceeds specific thresholds over a minimum number of days.
+                This the sum of all days in such events.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_heat_wave_index</ows:Identifier>
+            <ows:Title>Heat wave index.</ows:Title>
+            <ows:Abstract>Number of days that are part of a heatwave, defined as five or more consecutive days over
+                25.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_hot_spell_frequency</ows:Identifier>
+            <ows:Title>Hot spell frequency.</ows:Title>
+            <ows:Abstract>Number of hot spells over a given period. A hot spell is defined as an event where the maximum
+                daily temperature exceeds a specific threshold over a minimum number of days.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_hot_spell_max_length</ows:Identifier>
+            <ows:Title>Longest hot spell.</ows:Title>
+            <ows:Abstract>Longest spell of high temperatures over a given period.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_tg_mean</ows:Identifier>
+            <ows:Title>Mean of daily average temperature.</ows:Title>
+            <ows:Abstract>Resample the original daily mean temperature series by taking the mean over each period.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_tg_max</ows:Identifier>
+            <ows:Title>Highest mean temperature.</ows:Title>
+            <ows:Abstract>The maximum of daily mean temperature.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_tg_min</ows:Identifier>
+            <ows:Title>Lowest mean temperature.</ows:Title>
+            <ows:Abstract>Minimum of daily mean temperature.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_tx_mean</ows:Identifier>
+            <ows:Title>Mean max temperature.</ows:Title>
+            <ows:Abstract>The mean of daily maximum temperature.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_tx_max</ows:Identifier>
+            <ows:Title>Highest max temperature.</ows:Title>
+            <ows:Abstract>The maximum value of daily maximum temperature.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_tx_min</ows:Identifier>
+            <ows:Title>Lowest max temperature.</ows:Title>
+            <ows:Abstract>The minimum of daily maximum temperature.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_tn_mean</ows:Identifier>
+            <ows:Title>Mean minimum temperature.</ows:Title>
+            <ows:Abstract>Mean of daily minimum temperature.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_tn_max</ows:Identifier>
+            <ows:Title>Highest minimum temperature.</ows:Title>
+            <ows:Abstract>The maximum of daily minimum temperature.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_tn_min</ows:Identifier>
+            <ows:Title>Lowest minimum temperature.</ows:Title>
+            <ows:Abstract>Minimum of daily minimum temperature.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_dtr</ows:Identifier>
+            <ows:Title>Mean of daily temperature range.</ows:Title>
+            <ows:Abstract>The mean difference between the daily maximum temperature and the daily minimum temperature.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_dtrmax</ows:Identifier>
+            <ows:Title>Maximum of daily temperature range.</ows:Title>
+            <ows:Abstract>The mean difference between the daily maximum temperature and the daily minimum temperature.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_dtrvar</ows:Identifier>
+            <ows:Title>Mean absolute day-to-day variation in daily temperature range.</ows:Title>
+            <ows:Abstract>Mean absolute day-to-day variation in daily temperature range.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_etr</ows:Identifier>
+            <ows:Title>Extreme intra-period temperature range.</ows:Title>
+            <ows:Abstract>The maximum of max temperature (TXx) minus the minimum of min temperature (TNn) for the given
+                time period.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_cold_spell_duration_index</ows:Identifier>
+            <ows:Title>Cold spell duration index.</ows:Title>
+            <ows:Abstract>Number of days with at least six consecutive days where the daily minimum temperature is below
+                the 10th percentile.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_cold_spell_days</ows:Identifier>
+            <ows:Title>Cold spell days.</ows:Title>
+            <ows:Abstract>The number of days that are part of cold spell events, defined as a sequence of consecutive
+                days with mean daily temperature below a threshold in degC.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_cold_spell_frequency</ows:Identifier>
+            <ows:Title>Cold spell frequency.</ows:Title>
+            <ows:Abstract>The number of cold spell events, defined as a sequence of consecutive days with mean daily
+                temperature below a threshold.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_dlyfrzthw</ows:Identifier>
+            <ows:Title>Statistics of consecutive diurnal temperature swing events.</ows:Title>
+            <ows:Abstract>A diurnal swing of max and min temperature event is when Tmax > thresh_tasmax and Tmin<=
+                thresh_tasmin. This indice finds all days that constitute these events and computes statistics over the
+                length and frequency of these events.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_freezethaw_spell_frequency</ows:Identifier>
+            <ows:Title>Frequency of freeze-thaw spells</ows:Title>
+            <ows:Abstract>A diurnal swing of max and min temperature event is when Tmax > thresh_tasmax and Tmin<=
+                thresh_tasmin. This indice finds all days that constitute these events and computes statistics over the
+                length and frequency of these events.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_freezethaw_spell_mean_length</ows:Identifier>
+            <ows:Title>Averge length of freeze-thaw spells.</ows:Title>
+            <ows:Abstract>A diurnal swing of max and min temperature event is when Tmax > thresh_tasmax and Tmin<=
+                thresh_tasmin. This indice finds all days that constitute these events and computes statistics over the
+                length and frequency of these events.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_freezethaw_spell_max_length</ows:Identifier>
+            <ows:Title>Maximal length of freeze-thaw spells.</ows:Title>
+            <ows:Abstract>A diurnal swing of max and min temperature event is when Tmax > thresh_tasmax and Tmin<=
+                thresh_tasmin. This indice finds all days that constitute these events and computes statistics over the
+                length and frequency of these events.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_cooling_degree_days</ows:Identifier>
+            <ows:Title>Cooling degree days.</ows:Title>
+            <ows:Abstract>Sum of degree days above the temperature threshold at which spaces are cooled.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_heating_degree_days</ows:Identifier>
+            <ows:Title>Heating degree days.</ows:Title>
+            <ows:Abstract>Sum of degree days below the temperature threshold at which spaces are heated.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_growing_degree_days</ows:Identifier>
+            <ows:Title>Growing degree-days over threshold temperature value.</ows:Title>
+            <ows:Abstract>The sum of degree-days over the threshold temperature.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_freshet_start</ows:Identifier>
+            <ows:Title>First day consistently exceeding threshold temperature.</ows:Title>
+            <ows:Abstract>Returns first day of period where a temperature threshold is exceeded over a given number of
+                days.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_frost_days</ows:Identifier>
+            <ows:Title>Frost days index.</ows:Title>
+            <ows:Abstract>Number of days where daily minimum temperatures are below 0.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_frost_season_length</ows:Identifier>
+            <ows:Title>Frost season length.</ows:Title>
+            <ows:Abstract>The number of days between the first occurrence of at least N (def: 5) consecutive days with
+                minimum daily temperature under a threshold (default: 0) and the first occurrence of at least N (def 5)
+                consecutive days with minimum daily temperature above the same threshold A mid date can be given to
+                limit the earliest day the end of season can take. WARNING: The default freq and mid_date values are
+                valid for the northern hemisphere.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_last_spring_frost</ows:Identifier>
+            <ows:Title>Last day of temperatures inferior to a threshold temperature.</ows:Title>
+            <ows:Abstract>Returns last day of period where a temperature is inferior to a threshold over a given number
+                of days and limited to a final calendar date.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_first_day_below</ows:Identifier>
+            <ows:Title>First day of temperatures inferior to a threshold temperature.</ows:Title>
+            <ows:Abstract>Returns first day of period where a temperature is inferior to a threshold over a given number
+                of days, limited to a starting calendar date.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_first_day_above</ows:Identifier>
+            <ows:Title>First day of temperatures superior to a threshold temperature.</ows:Title>
+            <ows:Abstract>Returns first day of period where a temperature is superior to a threshold over a given number
+                of days, limited to a starting calendar date.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_ice_days</ows:Identifier>
+            <ows:Title>Number of ice/freezing days.</ows:Title>
+            <ows:Abstract>Number of days where daily maximum temperatures are below 0.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_consecutive_frost_days</ows:Identifier>
+            <ows:Title>Maximum number of consecutive frost days (Tn < 0).
+            </ows:Title>
+            <ows:Abstract>The maximum number of consecutive days within the period where the temperature is under a
+                certain threshold (default: 0degC). WARNING: The default freq value is valid for the northern
+                hemisphere.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_consecutive_frost_free_days</ows:Identifier>
+            <ows:Title>Maximum number of consecutive frost free days (Tn > 0).</ows:Title>
+            <ows:Abstract>Return the maximum number of consecutive days within the period where the minimum temperature
+                is above a certain threshold.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_growing_season_length</ows:Identifier>
+            <ows:Title>Growing season length.</ows:Title>
+            <ows:Abstract>The number of days between the first occurrence of at least six consecutive days with mean
+                daily temperature over a threshold (default: 5) and the first occurrence of at least six consecutive
+                days with mean daily temperature below the same threshold after a certain date. (Usually July 1st in the
+                northern emisphere and January 1st in the southern hemisphere.)
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_growing_season_end</ows:Identifier>
+            <ows:Title>End of the growing season.</ows:Title>
+            <ows:Abstract>Day of the year of the start of a sequence of days with a temperature consistently below a
+                threshold, after a period with temperatures consistently above the same threshold.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_tropical_nights</ows:Identifier>
+            <ows:Title>Number of days with tasmin above a threshold (number of tropical nights).</ows:Title>
+            <ows:Abstract>Number of days where daily minimum temperature exceeds a threshold.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_tg90p</ows:Identifier>
+            <ows:Title>Number of days with daily mean temperature over the 90th percentile.</ows:Title>
+            <ows:Abstract>Number of days with daily mean temperature over the 90th percentile.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_tg10p</ows:Identifier>
+            <ows:Title>Number of days with daily mean temperature below the 10th percentile.</ows:Title>
+            <ows:Abstract>Number of days with daily mean temperature below the 10th percentile.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_tx90p</ows:Identifier>
+            <ows:Title>Number of days with daily maximum temperature over the 90th percentile.</ows:Title>
+            <ows:Abstract>Number of days with daily maximum temperature over the 90th percentile.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_tx10p</ows:Identifier>
+            <ows:Title>Number of days with daily maximum temperature below the 10th percentile.</ows:Title>
+            <ows:Abstract>Number of days with daily maximum temperature below the 10th percentile.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_tn90p</ows:Identifier>
+            <ows:Title>Number of days with daily minimum temperature over the 90th percentile.</ows:Title>
+            <ows:Abstract>Number of days with daily minimum temperature over the 90th percentile.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_tn10p</ows:Identifier>
+            <ows:Title>Number of days with daily minimum temperature below the 10th percentile.</ows:Title>
+            <ows:Abstract>Number of days with daily minimum temperature below the 10th percentile.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_degree_days_exceedance_date</ows:Identifier>
+            <ows:Title>Degree days exceedance date.</ows:Title>
+            <ows:Abstract>Day of year when the sum of degree days exceeds a threshold. Degree days are computed above or
+                below a given temperature threshold.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_warm_spell_duration_index</ows:Identifier>
+            <ows:Title>Warm spell duration index.</ows:Title>
+            <ows:Abstract>Number of days inside spells of a minimum number of consecutive days where the daily maximum
+                temperature is above the 90th percentile. The 90th percentile should be computed for a 5-day moving
+                window, centered on each calendar day in the 1961-1990 period.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_maximum_consecutive_warm_days</ows:Identifier>
+            <ows:Title>Maximum number of consecutive days with tasmax above a threshold (summer days).</ows:Title>
+            <ows:Abstract>Return the maximum number of consecutive days within the period where the maximum temperature
+                is above a certain threshold.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_bbox_corn_heat_units</ows:Identifier>
+            <ows:Title>Corn heat units.</ows:Title>
+            <ows:Abstract>Temperature-based index used to estimate the development of corn crops.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_tg</ows:Identifier>
+            <ows:Title>Average temperature from minimum and maximum temperatures.</ows:Title>
+            <ows:Abstract>We assume a symmetrical distribution for the temperature and retrieve the average value as Tg
+                = (Tx + Tn) / 2
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_prsn</ows:Identifier>
+            <ows:Title>Snowfall approximation from total precipitation and temperature.</ows:Title>
+            <ows:Abstract>Solid precipitation estimated from precipitation and temperature according to a given
+                method.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_prlp</ows:Identifier>
+            <ows:Title>Rainfall approximation from total precipitation and temperature.</ows:Title>
+            <ows:Abstract>Liquid precipitation estimated from precipitation and temperature according to a given method.
+                This is a convenience method based on `snowfall_approximation`, see the latter for details.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_rain_frzgr</ows:Identifier>
+            <ows:Title>Number of rain on frozen ground events.</ows:Title>
+            <ows:Abstract>Number of days with rain above a threshold after a series of seven days below freezing
+                temperature. Precipitation is assumed to be rain when the temperature is above 0.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_rx1day</ows:Identifier>
+            <ows:Title>Highest 1-day precipitation amount for a period (frequency).</ows:Title>
+            <ows:Abstract>Resample the original daily total precipitation temperature series by taking the max over each
+                period.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_max_n_day_precipitation_amount</ows:Identifier>
+            <ows:Title>Highest precipitation amount cumulated over a n-day moving window.</ows:Title>
+            <ows:Abstract>Calculate the n-day rolling sum of the original daily total precipitation series and determine
+                the maximum value over each period.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_wetdays</ows:Identifier>
+            <ows:Title>Wet days.</ows:Title>
+            <ows:Abstract>Return the total number of days during period with precipitation over threshold.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_dry_days</ows:Identifier>
+            <ows:Title>Dry days.</ows:Title>
+            <ows:Abstract>The number of days with daily precipitation below threshold.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_cwd</ows:Identifier>
+            <ows:Title>Consecutive wet days.</ows:Title>
+            <ows:Abstract>Returns the maximum number of consecutive wet days.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_cdd</ows:Identifier>
+            <ows:Title>Maximum number of consecutive dry days.</ows:Title>
+            <ows:Abstract>Return the maximum number of consecutive days within the period where precipitation is below a
+                certain threshold.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_sdii</ows:Identifier>
+            <ows:Title>Average daily precipitation intensity.</ows:Title>
+            <ows:Abstract>Return the average precipitation over wet days.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_max_pr_intensity</ows:Identifier>
+            <ows:Title>Highest precipitation intensity over a n-hour moving window.</ows:Title>
+            <ows:Abstract>Calculate the n-hour rolling average of the original hourly total precipitation series and
+                determine the maximum value over each period.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_prcptot</ows:Identifier>
+            <ows:Title>Accumulated total precipitation (solid and liquid)</ows:Title>
+            <ows:Abstract>Resample the original daily mean precipitation flux and accumulate over each period. If a
+                daily temperature is provided, the `phase` keyword can be used to sum precipitation of a given phase
+                only. When the temperature is under the provided threshold, precipitation is assumed to be snow, and
+                liquid rain otherwise. This indice is agnostic to the type of daily temperature (tas, tasmax or tasmin)
+                given.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_liquidprcptot</ows:Identifier>
+            <ows:Title>Accumulated liquid precipitation.</ows:Title>
+            <ows:Abstract>Resample the original daily mean precipitation flux and accumulate over each period. If a
+                daily temperature is provided, the `phase` keyword can be used to sum precipitation of a given phase
+                only. When the temperature is under the provided threshold, precipitation is assumed to be snow, and
+                liquid rain otherwise. This indice is agnostic to the type of daily temperature (tas, tasmax or tasmin)
+                given.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_solidprcptot</ows:Identifier>
+            <ows:Title>Accumulated solid precipitation.</ows:Title>
+            <ows:Abstract>Resample the original daily mean precipitation flux and accumulate over each period. If a
+                daily temperature is provided, the `phase` keyword can be used to sum precipitation of a given phase
+                only. When the temperature is under the provided threshold, precipitation is assumed to be snow, and
+                liquid rain otherwise. This indice is agnostic to the type of daily temperature (tas, tasmax or tasmin)
+                given.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_high_precip_low_temp</ows:Identifier>
+            <ows:Title>Number of days with precipitation above threshold and temperature below threshold.</ows:Title>
+            <ows:Abstract>Number of days where precipitation is greater or equal to some threshold, and temperatures are
+                colder than some threshold. This can be used for example to identify days with the potential for
+                freezing rain or icing conditions.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_liquid_precip_ratio</ows:Identifier>
+            <ows:Title>Ratio of rainfall to total precipitation.</ows:Title>
+            <ows:Abstract>The ratio of total liquid precipitation over the total precipitation. Liquid precipitation is
+                approximated from total precipitation on days where temperature is above a threshold.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_tn_days_above</ows:Identifier>
+            <ows:Title>Number of days with tasmin above a threshold (number of tropical nights).</ows:Title>
+            <ows:Abstract>Number of days where daily minimum temperature exceeds a threshold.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_tn_days_below</ows:Identifier>
+            <ows:Title>Number of days with tasmin below a threshold.</ows:Title>
+            <ows:Abstract>Number of days where daily minimum temperature is below a threshold.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_tg_days_above</ows:Identifier>
+            <ows:Title>Number of days with tas above a threshold.</ows:Title>
+            <ows:Abstract>Number of days where daily mean temperature exceeds a threshold.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_tg_days_below</ows:Identifier>
+            <ows:Title>Number of days with tas below a threshold.</ows:Title>
+            <ows:Abstract>Number of days where daily mean temperature is below a threshold.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_tx_days_above</ows:Identifier>
+            <ows:Title>Number of days with tasmax above a threshold (number of summer days).</ows:Title>
+            <ows:Abstract>Number of days where daily maximum temperature exceeds a threshold.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_tx_days_below</ows:Identifier>
+            <ows:Title>Number of days with tmax below a threshold.</ows:Title>
+            <ows:Abstract>Number of days where daily maximum temperature is below a threshold.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_tx_tn_days_above</ows:Identifier>
+            <ows:Title>Number of days with both hot maximum and minimum daily temperatures.</ows:Title>
+            <ows:Abstract>The number of days per period with tasmin above a threshold and tasmax above another
+                threshold.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_heat_wave_frequency</ows:Identifier>
+            <ows:Title>Heat wave frequency.</ows:Title>
+            <ows:Abstract>Number of heat waves over a given period. A heat wave is defined as an event where the minimum
+                and maximum daily temperature both exceeds specific thresholds over a minimum number of days.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_heat_wave_max_length</ows:Identifier>
+            <ows:Title>Heat wave max length.</ows:Title>
+            <ows:Abstract>Maximum length of heat waves over a given period. A heat wave is defined as an event where the
+                minimum and maximum daily temperature both exceeds specific thresholds over a minimum number of days.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_heat_wave_total_length</ows:Identifier>
+            <ows:Title>Heat wave total length.</ows:Title>
+            <ows:Abstract>Total length of heat waves over a given period. A heat wave is defined as an event where the
+                minimum and maximum daily temperature both exceeds specific thresholds over a minimum number of days.
+                This the sum of all days in such events.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_heat_wave_index</ows:Identifier>
+            <ows:Title>Heat wave index.</ows:Title>
+            <ows:Abstract>Number of days that are part of a heatwave, defined as five or more consecutive days over
+                25.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_hot_spell_frequency</ows:Identifier>
+            <ows:Title>Hot spell frequency.</ows:Title>
+            <ows:Abstract>Number of hot spells over a given period. A hot spell is defined as an event where the maximum
+                daily temperature exceeds a specific threshold over a minimum number of days.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_hot_spell_max_length</ows:Identifier>
+            <ows:Title>Longest hot spell.</ows:Title>
+            <ows:Abstract>Longest spell of high temperatures over a given period.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_tg_mean</ows:Identifier>
+            <ows:Title>Mean of daily average temperature.</ows:Title>
+            <ows:Abstract>Resample the original daily mean temperature series by taking the mean over each period.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_tg_max</ows:Identifier>
+            <ows:Title>Highest mean temperature.</ows:Title>
+            <ows:Abstract>The maximum of daily mean temperature.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_tg_min</ows:Identifier>
+            <ows:Title>Lowest mean temperature.</ows:Title>
+            <ows:Abstract>Minimum of daily mean temperature.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_tx_mean</ows:Identifier>
+            <ows:Title>Mean max temperature.</ows:Title>
+            <ows:Abstract>The mean of daily maximum temperature.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_tx_max</ows:Identifier>
+            <ows:Title>Highest max temperature.</ows:Title>
+            <ows:Abstract>The maximum value of daily maximum temperature.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_tx_min</ows:Identifier>
+            <ows:Title>Lowest max temperature.</ows:Title>
+            <ows:Abstract>The minimum of daily maximum temperature.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_tn_mean</ows:Identifier>
+            <ows:Title>Mean minimum temperature.</ows:Title>
+            <ows:Abstract>Mean of daily minimum temperature.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_tn_max</ows:Identifier>
+            <ows:Title>Highest minimum temperature.</ows:Title>
+            <ows:Abstract>The maximum of daily minimum temperature.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_tn_min</ows:Identifier>
+            <ows:Title>Lowest minimum temperature.</ows:Title>
+            <ows:Abstract>Minimum of daily minimum temperature.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_dtr</ows:Identifier>
+            <ows:Title>Mean of daily temperature range.</ows:Title>
+            <ows:Abstract>The mean difference between the daily maximum temperature and the daily minimum temperature.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_dtrmax</ows:Identifier>
+            <ows:Title>Maximum of daily temperature range.</ows:Title>
+            <ows:Abstract>The mean difference between the daily maximum temperature and the daily minimum temperature.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_dtrvar</ows:Identifier>
+            <ows:Title>Mean absolute day-to-day variation in daily temperature range.</ows:Title>
+            <ows:Abstract>Mean absolute day-to-day variation in daily temperature range.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_etr</ows:Identifier>
+            <ows:Title>Extreme intra-period temperature range.</ows:Title>
+            <ows:Abstract>The maximum of max temperature (TXx) minus the minimum of min temperature (TNn) for the given
+                time period.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_cold_spell_duration_index</ows:Identifier>
+            <ows:Title>Cold spell duration index.</ows:Title>
+            <ows:Abstract>Number of days with at least six consecutive days where the daily minimum temperature is below
+                the 10th percentile.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_cold_spell_days</ows:Identifier>
+            <ows:Title>Cold spell days.</ows:Title>
+            <ows:Abstract>The number of days that are part of cold spell events, defined as a sequence of consecutive
+                days with mean daily temperature below a threshold in degC.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_cold_spell_frequency</ows:Identifier>
+            <ows:Title>Cold spell frequency.</ows:Title>
+            <ows:Abstract>The number of cold spell events, defined as a sequence of consecutive days with mean daily
+                temperature below a threshold.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_dlyfrzthw</ows:Identifier>
+            <ows:Title>Statistics of consecutive diurnal temperature swing events.</ows:Title>
+            <ows:Abstract>A diurnal swing of max and min temperature event is when Tmax > thresh_tasmax and Tmin<=
+                thresh_tasmin. This indice finds all days that constitute these events and computes statistics over the
+                length and frequency of these events.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_freezethaw_spell_frequency</ows:Identifier>
+            <ows:Title>Frequency of freeze-thaw spells</ows:Title>
+            <ows:Abstract>A diurnal swing of max and min temperature event is when Tmax > thresh_tasmax and Tmin<=
+                thresh_tasmin. This indice finds all days that constitute these events and computes statistics over the
+                length and frequency of these events.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_freezethaw_spell_mean_length</ows:Identifier>
+            <ows:Title>Averge length of freeze-thaw spells.</ows:Title>
+            <ows:Abstract>A diurnal swing of max and min temperature event is when Tmax > thresh_tasmax and Tmin<=
+                thresh_tasmin. This indice finds all days that constitute these events and computes statistics over the
+                length and frequency of these events.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_freezethaw_spell_max_length</ows:Identifier>
+            <ows:Title>Maximal length of freeze-thaw spells.</ows:Title>
+            <ows:Abstract>A diurnal swing of max and min temperature event is when Tmax > thresh_tasmax and Tmin<=
+                thresh_tasmin. This indice finds all days that constitute these events and computes statistics over the
+                length and frequency of these events.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_cooling_degree_days</ows:Identifier>
+            <ows:Title>Cooling degree days.</ows:Title>
+            <ows:Abstract>Sum of degree days above the temperature threshold at which spaces are cooled.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_heating_degree_days</ows:Identifier>
+            <ows:Title>Heating degree days.</ows:Title>
+            <ows:Abstract>Sum of degree days below the temperature threshold at which spaces are heated.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_growing_degree_days</ows:Identifier>
+            <ows:Title>Growing degree-days over threshold temperature value.</ows:Title>
+            <ows:Abstract>The sum of degree-days over the threshold temperature.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_freshet_start</ows:Identifier>
+            <ows:Title>First day consistently exceeding threshold temperature.</ows:Title>
+            <ows:Abstract>Returns first day of period where a temperature threshold is exceeded over a given number of
+                days.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_frost_days</ows:Identifier>
+            <ows:Title>Frost days index.</ows:Title>
+            <ows:Abstract>Number of days where daily minimum temperatures are below 0.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_frost_season_length</ows:Identifier>
+            <ows:Title>Frost season length.</ows:Title>
+            <ows:Abstract>The number of days between the first occurrence of at least N (def: 5) consecutive days with
+                minimum daily temperature under a threshold (default: 0) and the first occurrence of at least N (def 5)
+                consecutive days with minimum daily temperature above the same threshold A mid date can be given to
+                limit the earliest day the end of season can take. WARNING: The default freq and mid_date values are
+                valid for the northern hemisphere.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_last_spring_frost</ows:Identifier>
+            <ows:Title>Last day of temperatures inferior to a threshold temperature.</ows:Title>
+            <ows:Abstract>Returns last day of period where a temperature is inferior to a threshold over a given number
+                of days and limited to a final calendar date.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_first_day_below</ows:Identifier>
+            <ows:Title>First day of temperatures inferior to a threshold temperature.</ows:Title>
+            <ows:Abstract>Returns first day of period where a temperature is inferior to a threshold over a given number
+                of days, limited to a starting calendar date.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_first_day_above</ows:Identifier>
+            <ows:Title>First day of temperatures superior to a threshold temperature.</ows:Title>
+            <ows:Abstract>Returns first day of period where a temperature is superior to a threshold over a given number
+                of days, limited to a starting calendar date.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_ice_days</ows:Identifier>
+            <ows:Title>Number of ice/freezing days.</ows:Title>
+            <ows:Abstract>Number of days where daily maximum temperatures are below 0.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_consecutive_frost_days</ows:Identifier>
+            <ows:Title>Maximum number of consecutive frost days (Tn < 0).
+            </ows:Title>
+            <ows:Abstract>The maximum number of consecutive days within the period where the temperature is under a
+                certain threshold (default: 0degC). WARNING: The default freq value is valid for the northern
+                hemisphere.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_consecutive_frost_free_days</ows:Identifier>
+            <ows:Title>Maximum number of consecutive frost free days (Tn > 0).</ows:Title>
+            <ows:Abstract>Return the maximum number of consecutive days within the period where the minimum temperature
+                is above a certain threshold.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_growing_season_length</ows:Identifier>
+            <ows:Title>Growing season length.</ows:Title>
+            <ows:Abstract>The number of days between the first occurrence of at least six consecutive days with mean
+                daily temperature over a threshold (default: 5) and the first occurrence of at least six consecutive
+                days with mean daily temperature below the same threshold after a certain date. (Usually July 1st in the
+                northern emisphere and January 1st in the southern hemisphere.)
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_growing_season_end</ows:Identifier>
+            <ows:Title>End of the growing season.</ows:Title>
+            <ows:Abstract>Day of the year of the start of a sequence of days with a temperature consistently below a
+                threshold, after a period with temperatures consistently above the same threshold.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_tropical_nights</ows:Identifier>
+            <ows:Title>Number of days with tasmin above a threshold (number of tropical nights).</ows:Title>
+            <ows:Abstract>Number of days where daily minimum temperature exceeds a threshold.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_tg90p</ows:Identifier>
+            <ows:Title>Number of days with daily mean temperature over the 90th percentile.</ows:Title>
+            <ows:Abstract>Number of days with daily mean temperature over the 90th percentile.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_tg10p</ows:Identifier>
+            <ows:Title>Number of days with daily mean temperature below the 10th percentile.</ows:Title>
+            <ows:Abstract>Number of days with daily mean temperature below the 10th percentile.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_tx90p</ows:Identifier>
+            <ows:Title>Number of days with daily maximum temperature over the 90th percentile.</ows:Title>
+            <ows:Abstract>Number of days with daily maximum temperature over the 90th percentile.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_tx10p</ows:Identifier>
+            <ows:Title>Number of days with daily maximum temperature below the 10th percentile.</ows:Title>
+            <ows:Abstract>Number of days with daily maximum temperature below the 10th percentile.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_tn90p</ows:Identifier>
+            <ows:Title>Number of days with daily minimum temperature over the 90th percentile.</ows:Title>
+            <ows:Abstract>Number of days with daily minimum temperature over the 90th percentile.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_tn10p</ows:Identifier>
+            <ows:Title>Number of days with daily minimum temperature below the 10th percentile.</ows:Title>
+            <ows:Abstract>Number of days with daily minimum temperature below the 10th percentile.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_degree_days_exceedance_date</ows:Identifier>
+            <ows:Title>Degree days exceedance date.</ows:Title>
+            <ows:Abstract>Day of year when the sum of degree days exceeds a threshold. Degree days are computed above or
+                below a given temperature threshold.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_warm_spell_duration_index</ows:Identifier>
+            <ows:Title>Warm spell duration index.</ows:Title>
+            <ows:Abstract>Number of days inside spells of a minimum number of consecutive days where the daily maximum
+                temperature is above the 90th percentile. The 90th percentile should be computed for a 5-day moving
+                window, centered on each calendar day in the 1961-1990 period.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_maximum_consecutive_warm_days</ows:Identifier>
+            <ows:Title>Maximum number of consecutive days with tasmax above a threshold (summer days).</ows:Title>
+            <ows:Abstract>Return the maximum number of consecutive days within the period where the maximum temperature
+                is above a certain threshold.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>ensemble_polygon_corn_heat_units</ows:Identifier>
+            <ows:Title>Corn heat units.</ows:Title>
+            <ows:Abstract>Temperature-based index used to estimate the development of corn crops.</ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>subset_grid_point_dataset</ows:Identifier>
+            <ows:Title>Subset of grid cells from a dataset, using a list of coordinates</ows:Title>
+            <ows:Abstract>For the the given dataset, return the closest grid cell for each provided coordinates pair,
+                for the time range selected.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>subset_ensemble_BCCAQv2</ows:Identifier>
+            <ows:Title>Subset of BCCAQv2 datasets grid cells using a list of coordinates</ows:Title>
+            <ows:Abstract>For the BCCAQv2 datasets, return the closest grid cell for each provided coordinates pair, for
+                the time range selected.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>subset_bbox_dataset</ows:Identifier>
+            <ows:Title>Subset of a dataset, using a bounding box</ows:Title>
+            <ows:Abstract>For the given dataset, return the data for which grid cells intersect the bounding box for
+                each input dataset as well as the time range selected.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>subset_ensemble_bbox_BCCAQv2</ows:Identifier>
+            <ows:Title>Subset of BCCAQv2 datasets, using a bounding box</ows:Title>
+            <ows:Abstract>For the BCCAQv2 datasets, return the data for which grid cells intersect the bounding box for
+                each input dataset as well as the time range selected.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>BCCAQv2_heat_wave_frequency_gridpoint</ows:Identifier>
+            <ows:Title>BCCAQv2 grid cell heat wave frequency computation***Deprecated*** to be removed in a future
+                release
+            </ows:Title>
+            <ows:Abstract>Compute heat wave frequency for all the BCCAQv2 datasets for a single grid cell.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>subset_bbox</ows:Identifier>
+            <ows:Title>Subset with bounding box</ows:Title>
+            <ows:Abstract>Return the data for which grid cells intersect the bounding box for each input dataset as well
+                as the time range selected.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.2">
+            <ows:Identifier>subset_gridpoint</ows:Identifier>
+            <ows:Title>Subset with a grid point</ows:Title>
+            <ows:Abstract>Return the data for which grid cells includes the point coordinates for each input dataset as
+                well as the time range selected.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>subset_polygon</ows:Identifier>
+            <ows:Title>Subset with one or more polygons</ows:Title>
+            <ows:Abstract>Return the data for which grid cells center are within the polygon for each input dataset as
+                well as the time range selected.
+            </ows:Abstract>
+        </wps:Process>
+        <wps:Process wps:processVersion="0.1">
+            <ows:Identifier>average_polygon</ows:Identifier>
+            <ows:Title>Average over one or more polygons</ows:Title>
+            <ows:Abstract>Return the average of the data within each polygons, taking into account partial overlaps and
+                holes, for each input dataset as well as the time range selected.
+            </ows:Abstract>
+        </wps:Process>
+    </wps:ProcessOfferings>
+    <wps:Languages>
+        <wps:Default>
+            <ows:Language>en-US</ows:Language>
+        </wps:Default>
+        <wps:Supported>
+            <ows:Language>en-US</ows:Language>
+            <ows:Language>fr</ows:Language>
+        </wps:Supported>
+    </wps:Languages>
+</wps:Capabilities>
