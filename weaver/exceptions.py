@@ -76,7 +76,7 @@ class ServiceException(OWSException, WeaverException):
 
 class ServiceParsingError(HTTPUnprocessableEntity, ServiceException):
     """
-    Error related to parsing issue of the reference service definition (incorrectly formed XML, JSON, etc. contents).
+    Error related to parsing issue of the reference service definition (incorrectly formed XML/JSON contents).
     """
 
 
