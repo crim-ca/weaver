@@ -18,7 +18,7 @@ from owslib.wps import Process as ProcessOWS, WPSException
 from pywps import Process as ProcessWPS
 
 from weaver import xml_util
-from weaver.exceptions import ProcessInstanceError
+from weaver.exceptions import ProcessInstanceError, ServiceParsingError
 from weaver.execute import (
     EXECUTE_CONTROL_OPTION_ASYNC,
     EXECUTE_CONTROL_OPTIONS,
@@ -232,11 +232,15 @@ class Service(Base):
 
         Stores the reference locally to avoid re-fetching it needlessly for future reference.
         """
-        _wps = self.get("_wps")
-        if _wps is None:
-            # client retrieval could also be cached if recently fetched an not yet invalidated
-            self["_wps"] = _wps = get_wps_client(self.url, container=container, **kwargs)
-        return _wps
+        try:
+            _wps = self.get("_wps")
+            if _wps is None:
+                # client retrieval could also be cached if recently fetched an not yet invalidated
+                self["_wps"] = _wps = get_wps_client(self.url, container=container, **kwargs)
+            return _wps
+        except xml_util.ParseError as exc:
+            msg = "Invalid XML returned by WPS [{}] at [{}] cannot be parsed.".format(self.name, self.url)
+            raise ServiceParsingError(json={"description": msg, "cause": str(exc), "error": exc.__class__.__name__})
 
     def links(self, container, fetch=True):
         # type: (AnySettingsContainer, bool) -> List[JSON]
@@ -329,8 +333,8 @@ class Service(Base):
         wps = self.wps(container=container)
         return wps.identification.keywords
 
-    def summary(self, container, fetch=True):
-        # type: (AnySettingsContainer, bool) -> Optional[JSON]
+    def summary(self, container, fetch=True, ignore=False):
+        # type: (AnySettingsContainer, bool, bool) -> Optional[JSON]
         """
         Obtain the summary information from the provider service.
 
@@ -338,6 +342,7 @@ class Service(Base):
 
         :param container: employed to retrieve application settings.
         :param fetch: indicates whether metadata should be fetched from remote.
+        :param ignore: indicates if failing metadata retrieval/parsing should be silently discarded or raised.
         :return: generated summary information.
         """
         try:
@@ -362,11 +367,21 @@ class Service(Base):
                     "metadata": self.metadata(container),
                 })
             return sd.ProviderSummarySchema().deserialize(data)
+        except ServiceParsingError as exc:
+            err_msg = repr(exc)
+            warnings.warn(err_msg, NonBreakingExceptionWarning)
+            LOGGER.debug(err_msg, exc_info=exc)
+            if ignore:
+                return None
+            raise
         except Exception as exc:
-            msg = "Exception occurred while fetching WPS {0} : {1!r}".format(self.url, exc)
-            warnings.warn(msg, NonBreakingExceptionWarning)
-            LOGGER.debug(msg, exc_info=exc)
-        return None
+            msg = "Exception occurred while fetching WPS [{}] at [{}]".format(self.name, self.url)
+            err_msg = "{}: {!r}".format(msg, exc)
+            warnings.warn(err_msg, NonBreakingExceptionWarning)
+            LOGGER.debug(err_msg, exc_info=exc)
+            if ignore:
+                return None
+            raise ServiceParsingError(json={"description": msg, "cause": str(exc), "error": exc.__class__.__name__})
 
     def processes(self, container):
         # type: (AnySettingsContainer) -> List[Process]
@@ -382,8 +397,8 @@ class Service(Base):
         settings = get_settings(container)
         return [Process.convert(process, self, settings) for process in wps.processes]
 
-    def check_accessible(self, settings):
-        # type: (AnySettingsContainer) -> bool
+    def check_accessible(self, settings, ignore=True):
+        # type: (AnySettingsContainer, bool) -> bool
         """
         Verify if the service URL is accessible.
         """
@@ -404,10 +419,14 @@ class Service(Base):
             resp = request_extra(meth, url, timeout=2, settings=settings, allowed_codes=allowed_codes)
             return resp.status_code in allowed_codes
         except (requests.exceptions.RequestException, pyramid.httpexceptions.HTTPException) as exc:
-            msg = "HTTP exception occurred while checking service [{}] accessibility on [{}] : {!r}".format(
-                self.name, self.url, exc
-            )
-            warnings.warn(msg, NonBreakingExceptionWarning)
+            msg = "Exception occurred while checking service [{}] accessibility at [{}]".format(self.name, self.url)
+            warnings.warn("{}: {!r}".format(msg, exc), NonBreakingExceptionWarning)
+            if not ignore:
+                raise ServiceParsingError(json={
+                    "description": msg,
+                    "cause": "Cannot validate or parse service metadata since it is not accessible.",
+                    "error": exc.__class__.__name__
+                })
         return False
 
 

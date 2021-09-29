@@ -3539,6 +3539,12 @@ class ProvidersQuerySchema(ExtendedMappingSchema):
                     "Otherwise, all registered providers are listed regardless of their availability. When requesting "
                     "details, less metadata will be provided since it will not be fetched from remote services."
     )
+    ignore = ExtendedSchemaNode(
+        Boolean(), example=True, default=True, missing=drop,
+        description="When listing providers with check of reachable remote service definitions, unresponsive response "
+                    "or unprocessable contents will be silently ignored and dropped from full listing in the response. "
+                    "Disabling this option will raise an error immediately instead of ignoring invalid services."
+    )
 
 
 class GetProviders(ExtendedMappingSchema):
@@ -3786,7 +3792,7 @@ class CreatedPostProvider(ExtendedMappingSchema):
 
 
 class NotImplementedPostProviderResponse(ExtendedMappingSchema):
-    description = "Provider registration not supported using referenced storage."
+    description = "Provider registration not supported using specified definition."
 
 
 class CreatedJobLocationHeader(ResponseHeaders):

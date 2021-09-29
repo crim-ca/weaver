@@ -18,6 +18,11 @@ Changes:
 - Apply ``weaver.configuration = HYBRID`` by default in example INI configuration since it is the most common use case.
   Apply same configuration by default in tests. Default resolution still employs ``DEFAULT`` for backward compatibility
   in case the setting was omitted completely from a custom INI file.
+- Add query parameter ``ignore`` to ``GET /providers`` listing in order to obtain full validation of
+  remote providers (including XML contents parsing) to return ``200``. Invalid definitions will raise
+  and return a ``[422] Unprocessable Entity`` HTTP error.
+- Add more explicit messages about the problem that produced an error (XML parsing, unreachable WPS, etc.) and which
+  caused request failure when attempting registration of a remote `Provider`.
 
 Fixes:
 ------
@@ -36,6 +41,8 @@ Fixes:
 - Fix incorrect reporting of documented OpenAPI reference definitions for ``query`` parameters with same names shared
   across multiple endpoints. Fix is directly applied on relevant reference repository that generates OpenAPI schemas
   (see `fmigneault/cornice.ext.swagger@70eb702 <https://github.com/fmigneault/cornice.ext.swagger/commit/70eb702>`_).
+- Fix ``weaver.exception`` definitions such that raising them directly will employ the corresponding ``HTTPException``
+  codes (if applicable) to generate the error response when raising them directly without further handling.
 
 `4.0.0 <https://github.com/crim-ca/weaver/tree/4.0.0>`_ (2021-09-21)
 ========================================================================

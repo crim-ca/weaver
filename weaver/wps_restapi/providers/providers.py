@@ -14,7 +14,7 @@ from pyramid.settings import asbool
 
 from weaver.database import get_db
 from weaver.datatype import Process, Service
-from weaver.exceptions import ServiceNotFound, log_unhandled_exceptions
+from weaver.exceptions import ServiceNotFound, ServiceParsingError, log_unhandled_exceptions
 from weaver.formats import OUTPUT_FORMAT_JSON
 from weaver.owsexceptions import OWSMissingParameterValue, OWSNotImplemented
 from weaver.processes.execution import submit_job
@@ -42,10 +42,11 @@ def get_providers(request):
     """
     detail = asbool(request.params.get("detail", True))
     check = asbool(request.params.get("check", True))
-    reachable_services = get_provider_services(request, check=check)
+    ignore = asbool(request.params.get("ignore", True))
+    reachable_services = get_provider_services(request, check=check, ignore=ignore)
     providers = []
     for service in reachable_services:
-        summary = service.summary(request, fetch=check) if detail else service.name
+        summary = service.summary(request, fetch=check, ignore=ignore) if detail else service.name
         if summary:
             providers.append(summary)
     data = {"checked": check, "providers": providers}
@@ -91,13 +92,15 @@ def add_provider(request):
         new_service["auth"] = body["auth"]
 
     try:
-        store.save_service(new_service)
-    except NotImplementedError:
-        raise OWSNotImplemented(sd.NotImplementedPostProviderResponse.description, value=new_service)
-    try:
-        service = new_service.summary(request)
+        # validate that metadata or any pre-fetch operation can be resolved
+        service = new_service.summary(request, fetch=True, ignore=False)
         if not service:
             raise colander.Invalid(None, value=body)
+        store.save_service(new_service)
+    except NotImplementedError:  # raised when supported service types / conversion
+        raise OWSNotImplemented(sd.NotImplementedPostProviderResponse.description, value=new_service)
+    except ServiceParsingError:  # derives from HTTPUnprocessableEntity with relevant error message
+        raise
     except colander.Invalid as invalid:
         data = {
             "description": "Provider properties could not be parsed correctly.",

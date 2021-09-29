@@ -19,13 +19,14 @@ if TYPE_CHECKING:
 LOGGER = logging.getLogger(__name__)
 
 
-def get_provider_services(container, check=True):
-    # type: (AnySettingsContainer, bool) -> List[Service]
+def get_provider_services(container, check=True, ignore=True):
+    # type: (AnySettingsContainer, bool, bool) -> List[Service]
     """
     Obtain the list of remote provider services.
 
     :param container: definition to retrieve settings and database connection.
     :param check: request that all provider services are remotely accessible to fetch metadata from them.
+    :param ignore: given that any provider service is not accessible, ignore it or raise the error.
     """
     settings = get_settings(container)
     store = get_db(settings).get_store(StoreServices)
@@ -33,7 +34,7 @@ def get_provider_services(container, check=True):
     if not check:
         LOGGER.info("Skipping remote provider service check. Accessibility of listed services will not be validated.")
     for service in store.list_services():
-        if check and not service.check_accessible(settings):
+        if check and not service.check_accessible(settings, ignore=ignore):
             LOGGER.warning("Skipping unresponsive service (%s) [%s]", service.name, service.url)
             continue
         providers.append(service)
