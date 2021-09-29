@@ -10,6 +10,17 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+`4.1.0 <https://github.com/crim-ca/weaver/tree/4.1.0>`_ (2021-09-29)
+========================================================================
+
+Changes:
+--------
 - Improve reporting of mismatching `Weaver` configuration for `Process` and `Application Package` definitions that
   always require remote execution. Invalid combinations will be raised during execution with detailed problem.
 - Forbid `Provider` and applicable `Process` definitions to be deployed, executed or queried when corresponding remote
