@@ -23,6 +23,9 @@ Fixes:
   drop or ignore *omitted* inputs are handled by ``"null"`` within ``type`` field in `CWL` definitions.
 - Fix ``Wps1Process`` job runner for dispatched execution of `WPS-1 Process` assuming all provided inputs contain data
   or reference. Skip omitted optional inputs that are resolved with ``None`` value following above fixes.
+- Resolve execution failure of `WPS-1 Process` ``ncdump`` under ``hummingbird`` `Provider`
+  (fixes issue identified in output logs from notebook in
+  `PR pavics-sdi#230 <https://github.com/Ouranosinc/pavics-sdi/pull/230>`_).
 
 `4.1.0 <https://github.com/crim-ca/weaver/tree/4.1.0>`_ (2021-09-29)
 ========================================================================
