@@ -14,7 +14,15 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Fix handling of default *format* field of `WPS` input definition incorrectly resolved as default *data* by ``PyWPS``
+  for `Process` that allows optional (``minOccurs=0``) inputs of ``Complex`` type. Specific case is detected with
+  relevant erroneous data and dropped silently because it should not be present (since omitted in `WPS` request) and
+  should not generate a `WPS` input (relates to `geopython/pywps#633 <https://github.com/geopython/pywps/issues/633>`_).
+- Fix resolution of `CWL` field ``default`` value erroneously inserted as ``"null"`` literal string for inputs generated
+  from `WPS` definition to avoid potential confusion with valid ``"null"`` input or default string. Default behaviour to
+  drop or ignore *omitted* inputs are handled by ``"null"`` within ``type`` field in `CWL` definitions.
+- Fix ``Wps1Process`` job runner for dispatched execution of `WPS-1 Process` assuming all provided inputs contain data
+  or reference. Skip omitted optional inputs that are resolved with ``None`` value following above fixes.
 
 `4.1.0 <https://github.com/crim-ca/weaver/tree/4.1.0>`_ (2021-09-29)
 ========================================================================
