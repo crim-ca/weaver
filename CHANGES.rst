@@ -14,7 +14,8 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Add ``celery worker`` task events flag (``-E``) to Docker command (``weaver-worker``) to help detect submitted
+  delayed tasks when requesting job executions.
 
 `4.1.1 <https://github.com/crim-ca/weaver/tree/4.1.1>`_ (2021-10-12)
 ========================================================================
