@@ -478,6 +478,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
                 "is_workflow": is_workflow,
                 "is_local": is_local,
                 "created": created if created else now(),
+                "updated": now(),
                 "tags": list(set(tags)),  # remove duplicates
                 "access": access,
                 "notification_email": notification_email,
@@ -499,6 +500,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
         :param job: instance of ``weaver.datatype.Job``.
         """
         try:
+            job.updated = now()
             result = self.collection.update_one({"id": job.id}, {"$set": job.params()})
             if result.acknowledged and result.matched_count == 1:
                 return self.fetch_by_id(job.id)

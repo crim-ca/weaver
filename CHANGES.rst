@@ -10,11 +10,22 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add execution endpoint ``POST /provider/{id}/process/{id}/execution`` corresponding to the OGC-API compliant endpoint
+  for local ``Process`` definitions.
+- Add multiple additional relation ``links`` for ``Process`` and ``Job`` responses
+  (resolves `#267 <https://github.com/crim-ca/weaver/issues/267>`_).
+- Add convenience ``DELETE /jobs`` endpoint with input list of ``Job`` UUIDs in order to ``dismiss`` multiple entries
+  simultaneously. This is useful for quickly removing a set of ``Job`` returned by filtered ``GET /jobs`` contents.
+- Update conformance link list for ``dismiss`` and relevant relation ``links`` definitions
+  (relates to `#53 <https://github.com/crim-ca/weaver/issues/53>`_
+  and `#267 <https://github.com/crim-ca/weaver/issues/267>`_).
 
 Fixes:
 ------
-- No change.
+- Fix OGC-API compliant execution endpoint ``POST /process/{id}/execution`` not registered in API.
+- Fix missing status for cancelled ``Jobs`` in order to properly support ``dismiss`` operation
+  (resolves `#145 <https://github.com/crim-ca/weaver/issues/145>`_
+  and `#228 <https://github.com/crim-ca/weaver/issues/228>`_).
 
 `4.1.2 <https://github.com/crim-ca/weaver/tree/4.1.2>`_ (2021-10-13)
 ========================================================================

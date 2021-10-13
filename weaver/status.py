@@ -18,6 +18,7 @@ STATUS_ACCEPTED = "accepted"
 STATUS_STARTED = "started"
 STATUS_PAUSED = "paused"
 STATUS_SUCCEEDED = "succeeded"
+STATUS_SUCCESSFUL = "successful"
 STATUS_FAILED = "failed"
 STATUS_RUNNING = "running"
 STATUS_DISMISSED = "dismissed"
@@ -35,21 +36,58 @@ JOB_STATUS_VALUES = frozenset([
     STATUS_EXCEPTION,
 ])
 
-# pylint: disable=C0301,line-too-long
 JOB_STATUS_CATEGORIES = {
     # note:
-    #   OGC compliant:  [Accepted, Running, Succeeded, Failed]
-    #   PyWPS uses:     [Accepted, Started, Succeeded, Failed, Paused, Exception]
-    #   OWSLib users:   [Accepted, Running, Succeeded, Failed, Paused] (with 'Process' in front)
+    #   OGC compliant (old): [Accepted, Running, Succeeded, Failed]
+    #   OGC compliant (new): [accepted, running, successful, failed, dismissed]
+    #   PyWPS uses:          [Accepted, Started, Succeeded, Failed, Paused, Exception]
+    #   OWSLib users:        [Accepted, Running, Succeeded, Failed, Paused] (with 'Process' in front)
+    # https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/statusCode.yaml
     # http://docs.opengeospatial.org/is/14-065/14-065.html#17
+
     # corresponding statuses are aligned vertically for 'COMPLIANT' groups
-    STATUS_COMPLIANT_OGC:       frozenset([STATUS_ACCEPTED, STATUS_RUNNING, STATUS_SUCCEEDED, STATUS_FAILED]),                                   # noqa: E241, E501
-    STATUS_COMPLIANT_PYWPS:     frozenset([STATUS_ACCEPTED, STATUS_STARTED, STATUS_SUCCEEDED, STATUS_FAILED, STATUS_PAUSED, STATUS_EXCEPTION]),  # noqa: E241, E501
-    STATUS_COMPLIANT_OWSLIB:    frozenset([STATUS_ACCEPTED, STATUS_RUNNING, STATUS_SUCCEEDED, STATUS_FAILED, STATUS_PAUSED]),                    # noqa: E241, E501
+    STATUS_COMPLIANT_OGC: frozenset([
+        STATUS_ACCEPTED,
+        STATUS_RUNNING,
+        STATUS_SUCCEEDED,   # old (keep it because it matches existing ADES/EMS and other providers)
+        STATUS_FAILED,
+        STATUS_SUCCESSFUL,  # new
+        STATUS_DISMISSED    # new
+    ]),
+    STATUS_COMPLIANT_PYWPS: frozenset([
+        STATUS_ACCEPTED,
+        STATUS_STARTED,     # running
+        STATUS_SUCCEEDED,
+        STATUS_FAILED,
+        STATUS_PAUSED,
+        STATUS_EXCEPTION
+    ]),
+    STATUS_COMPLIANT_OWSLIB: frozenset([
+        STATUS_ACCEPTED,
+        STATUS_RUNNING,
+        STATUS_SUCCEEDED,
+        STATUS_FAILED,
+        STATUS_PAUSED
+    ]),
     # utility categories
-    STATUS_CATEGORY_RUNNING:    frozenset([STATUS_ACCEPTED, STATUS_RUNNING, STATUS_STARTED,   STATUS_PAUSED]),                                   # noqa: E241, E501
-    STATUS_CATEGORY_FINISHED:   frozenset([STATUS_FAILED, STATUS_DISMISSED, STATUS_EXCEPTION, STATUS_SUCCEEDED]),                                # noqa: E241, E501
-    STATUS_CATEGORY_FAILED:     frozenset([STATUS_FAILED, STATUS_DISMISSED, STATUS_EXCEPTION]),                                                  # noqa: E241, E501
+    STATUS_CATEGORY_RUNNING: frozenset([
+        STATUS_ACCEPTED,
+        STATUS_RUNNING,
+        STATUS_STARTED,
+        STATUS_PAUSED
+    ]),
+    STATUS_CATEGORY_FINISHED: frozenset([
+        STATUS_FAILED,
+        STATUS_DISMISSED,
+        STATUS_EXCEPTION,
+        STATUS_SUCCEEDED,
+        STATUS_SUCCESSFUL
+    ]),
+    STATUS_CATEGORY_FAILED: frozenset([
+        STATUS_FAILED,
+        STATUS_DISMISSED,
+        STATUS_EXCEPTION
+    ]),
 }
 
 # id -> str
@@ -103,9 +141,9 @@ def map_status(wps_status, compliant=STATUS_COMPLIANT_OGC):
         elif job_status in JOB_STATUS_CATEGORIES[STATUS_CATEGORY_FAILED] and job_status != STATUS_FAILED:
             job_status = STATUS_FAILED
 
-    # TODO: patch for Geomatys not conforming to the status schema
-    #       (status are upper cases and succeeded process are indicated as 'successful')
-    if job_status == "successful":
+    # FIXME: new official status is 'successful', but this breaks everywhere (tests, local/remote execute, etc.)
+    #        https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/statusCode.yaml
+    if job_status == STATUS_SUCCESSFUL:
         job_status = STATUS_SUCCEEDED
 
     if job_status in JOB_STATUS_VALUES:

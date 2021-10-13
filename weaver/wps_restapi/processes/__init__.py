@@ -19,6 +19,8 @@ def includeme(config):
     # added within jobs (conflict)
     # config.add_route(**sd.service_api_route_info(sd.process_jobs_service, settings))
     # config.add_route(**sd.service_api_route_info(sd.jobs_full_service, settings))
+    config.add_route(**sd.service_api_route_info(sd.process_execution_service, settings))
+
     config.add_view(p.get_processes, route_name=sd.processes_service.name,
                     request_method="GET", renderer=OUTPUT_FORMAT_JSON)
     config.add_view(p.add_local_process, route_name=sd.processes_service.name,
@@ -32,6 +34,8 @@ def includeme(config):
     config.add_view(p.get_local_process_payload, route_name=sd.process_payload_service.name,
                     request_method="GET", renderer=OUTPUT_FORMAT_JSON)
     config.add_view(p.submit_local_job, route_name=sd.process_jobs_service.name,
+                    request_method="POST", renderer=OUTPUT_FORMAT_JSON)
+    config.add_view(p.submit_local_job, route_name=sd.process_execution_service.name,
                     request_method="POST", renderer=OUTPUT_FORMAT_JSON)
     config.add_view(p.get_process_visibility, route_name=sd.process_visibility_service.name,
                     request_method="GET", renderer=OUTPUT_FORMAT_JSON)

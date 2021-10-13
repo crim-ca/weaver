@@ -242,7 +242,6 @@ process_inputs_service = Service(name="process_inputs", path=process_service.pat
 process_outputs_service = Service(name="process_outputs", path=process_service.path + job_outputs_service.path)
 process_exceptions_service = Service(name="process_exceptions", path=process_service.path + job_exceptions_service.path)
 process_logs_service = Service(name="process_logs", path=process_service.path + job_logs_service.path)
-
 process_execution_service = Service(name="process_execution", path=process_service.path + "/execution")
 
 providers_service = Service(name="providers", path="/providers")
@@ -257,6 +256,7 @@ provider_outputs_service = Service(name="provider_outputs", path=provider_servic
 provider_logs_service = Service(name="provider_logs", path=provider_service.path + process_logs_service.path)
 provider_exceptions_service = Service(name="provider_exceptions",
                                       path=provider_service.path + process_exceptions_service.path)
+provider_execution_service = Service(name="provider_execution", path=provider_service.path + "/execution")
 
 # backward compatibility deprecated routes
 job_result_service = Service(name="job_result", path=job_service.path + "/result")
@@ -2423,6 +2423,8 @@ class ProcessDeployment(ProcessSummary, ProcessContext, ProcessDeployMeta):
 
 class JobStatusInfo(ExtendedMappingSchema):
     jobID = UUID(example="a9d14bf4-84e0-449a-bac8-16e598efe807", description="ID of the job.")
+    processID = ProcessIdentifier(missing=None, description="Process identifier corresponding to the job execution.")
+    providerID = ProcessIdentifier(missing=None, description="Provider identifier corresponding to the job execution.")
     status = JobStatusEnum(description="Last updated status.")
     message = ExtendedSchemaNode(String(), missing=drop, description="Information about the last status update.")
     created = ExtendedSchemaNode(DateTime(), missing=drop, default=None,
@@ -2431,6 +2433,11 @@ class JobStatusInfo(ExtendedMappingSchema):
                                  description="Timestamp when the process started execution if applicable.")
     finished = ExtendedSchemaNode(DateTime(), missing=drop, default=None,
                                   description="Timestamp when the process completed execution if applicable.")
+    updated = ExtendedSchemaNode(DateTime(), missing=drop, default=None,
+                                 description="Timestamp of the last update of the job status. This can correspond to "
+                                             "any of the other timestamps according to current execution status or "
+                                             "even slightly after job finished execution according to the duration "
+                                             "needed to deallocate job resources and store results.")
     # note: using String instead of Time because timedelta object cannot be directly handled (missing parts at parsing)
     duration = ExtendedSchemaNode(String(), missing=drop,
                                   description="Duration since the start of the process execution.")
@@ -2443,6 +2450,8 @@ class JobStatusInfo(ExtendedMappingSchema):
                                   description="Timestamp when the job will prompted for updated status details.")
     percentCompleted = NumberType(example=0, validator=Range(min=0, max=100),
                                   description="Completion percentage of the job as indicated by the process.")
+    progress = ExtendedSchemaNode(Integer(), example=100, validator=Range(0, 100),
+                                  description="Completion progress of the job (alias to 'percentCompleted').")
     links = LinkList(missing=drop)
 
 
@@ -2452,7 +2461,7 @@ class JobEntrySchema(OneOfKeywordSchema):
     #   They will be discarded by `OneOfKeywordSchema.deserialize()`.
     _one_of = [
         JobStatusInfo,
-        ExtendedSchemaNode(String(), description="Job ID."),
+        UUID(description="Job ID."),
     ]
 
 
@@ -2504,6 +2513,7 @@ class GetQueriedJobsSchema(OneOfKeywordSchema):
     ]
     total = ExtendedSchemaNode(Integer(),
                                description="Total number of matched jobs regardless of grouping or paging result.")
+    links = LinkList(missing=drop)
 
 
 class DismissedJobSchema(ExtendedMappingSchema):
@@ -3442,8 +3452,8 @@ class GetJobsQueries(ExtendedMappingSchema):
     limit = ExtendedSchemaNode(Integer(allow_string=True), missing=10, default=10, validator=Range(min=0, max=10000))
     datetime = DateTimeInterval(missing=drop, default=None)
     status = JobStatusEnum(missing=drop, default=None)
-    process = AnyIdentifier(missing=drop)
-    provider = ExtendedSchemaNode(String(), missing=drop, default=None)
+    process = ProcessIdentifier(missing=drop, default=None)
+    provider = AnyIdentifier(missing=drop, default=None)
     sort = JobSortEnum(missing=drop)
     access = JobAccess(missing=drop, default=None)
     notification_email = ExtendedSchemaNode(String(), missing=drop, validator=Email())
@@ -3458,6 +3468,19 @@ class GetJobsRequest(ExtendedMappingSchema):
 
 class GetJobsEndpoint(GetJobsRequest):
     pass
+
+
+class JobIdentifierList(ExtendedSequenceSchema):
+    job_id = UUID(description="ID of a job to dismiss. Identifiers not matching any known job are ignored.")
+
+
+class DeleteJobsBodySchema(ExtendedMappingSchema):
+    jobs = JobIdentifierList()
+
+
+class DeleteJobsEndpoint(ExtendedMappingSchema):
+    header = RequestHeaders()
+    body = DeleteJobsBodySchema()
 
 
 class GetProcessJobsEndpoint(GetJobsRequest, ProcessPath):
@@ -3606,6 +3629,12 @@ class ErrorJsonResponseBodySchema(ExtendedMappingSchema):
     description = ExtendedSchemaNode(String(), description="Detail about the cause of error.")
     error = ErrorDetail(missing=drop)
     exception = OWSExceptionResponse(missing=drop)
+
+
+class BadRequestResponseSchema(ExtendedMappingSchema):
+    description = "Incorrectly formed request contents."
+    header = ResponseHeaders()
+    body = ErrorJsonResponseBodySchema()
 
 
 class UnprocessableEntityResponseSchema(ExtendedMappingSchema):
@@ -3817,6 +3846,15 @@ class OkDeleteProcessJobResponse(ExtendedMappingSchema):
 class OkGetQueriedJobsResponse(ExtendedMappingSchema):
     header = ResponseHeaders()
     body = GetQueriedJobsSchema()
+
+
+class BatchDismissJobsBodySchema(ExtendedMappingSchema):
+    jobs = JobIdentifierList(description="Confirmation of jobs that have been dismissed.")
+
+
+class OkBatchDismissJobsResponseSchema(ExtendedMappingSchema):
+    header = ResponseHeaders()
+    body = BatchDismissJobsBodySchema()
 
 
 class OkDismissJobResponse(ExtendedMappingSchema):
@@ -4059,6 +4097,11 @@ get_all_jobs_responses = {
     }),
     "422": UnprocessableEntityResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
+}
+delete_jobs_responses = {
+    "200": OkBatchDismissJobsResponseSchema(description="success"),
+    "400": BadRequestResponseSchema(),
+    "422": UnprocessableEntityResponseSchema(),
 }
 get_prov_all_jobs_responses = copy(get_all_jobs_responses)
 get_prov_all_jobs_responses.update({

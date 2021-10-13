@@ -78,10 +78,11 @@ def api_frontpage_body(settings):
     weaver_wps_url = get_wps_url(settings) if weaver_wps else None
     weaver_conform_url = weaver_url + sd.api_conformance_service.path
     weaver_process_url = weaver_url + sd.processes_service.path
+    weaver_jobs_url = weaver_url + sd.jobs_service.path
     weaver_links = [
         {"href": weaver_url, "rel": "self", "type": CONTENT_TYPE_APP_JSON, "title": "This document"},
-        {"href": weaver_conform_url, "rel": "conformance", "type": CONTENT_TYPE_APP_JSON,
-         "title": "Conformance classes implemented by this service."},
+        {"href": weaver_conform_url, "rel": "http://www.opengis.net/def/rel/ogc/1.0/conformance",
+         "type": CONTENT_TYPE_APP_JSON, "title": "Conformance classes implemented by this service."},
     ]
     if weaver_api:
         weaver_links.extend([
@@ -95,11 +96,14 @@ def api_frontpage_body(settings):
              "rel": "OpenAPI", "type": CONTENT_TYPE_APP_JSON,
              "title": "WPS REST API specification of this service."},
             {"href": weaver_process_url,
-             "rel": "processes", "type": CONTENT_TYPE_APP_JSON,
+             "rel": "http://www.opengis.net/def/rel/ogc/1.0/processes", "type": CONTENT_TYPE_APP_JSON,
              "title": "Processes offered by this service."},
             {"href": sd.OGC_API_REPO_URL,
              "rel": "ogcapi-processes-repository", "type": CONTENT_TYPE_TEXT_HTML,
              "title": "OGC-API - Processes schema definitions repository."},
+            {"href": weaver_jobs_url,
+             "rel": "http://www.opengis.net/def/rel/ogc/1.0/job-list", "type": CONTENT_TYPE_APP_JSON,
+             "title": "Job search and listing endpoint of executions registered under this service."},
             {"href": sd.CWL_BASE_URL,
              "rel": "cwl-home", "type": CONTENT_TYPE_TEXT_HTML,
              "title": "Common Workflow Language (CWL) homepage."},
@@ -298,14 +302,14 @@ def api_conformance(request):  # noqa: F811
         ogcapi_processes + "/conf/core",
         # FIXME: https://github.com/crim-ca/weaver/issues/230
         # ogcapi_processes + "/conf/callback",
-        # FIXME: https://github.com/crim-ca/weaver/issues/228
-        # ogcapi_processes + "/conf/dismiss",
+        ogcapi_processes + "/conf/dismiss",
         # FIXME: https://github.com/crim-ca/weaver/issues/210
         # ogcapi_processes + "/conf/html",
         # ogcapi_processes + "/conf/html/content",
         # ogcapi_processes + "/conf/html/definition",
         ogcapi_processes + "/conf/json",
         ogcapi_processes + "/conf/job-list",
+        ogcapi_processes + "/conf/oas30",
         ogcapi_processes + "/per/core/additional-status-codes",
         ogcapi_processes + "/per/core/alternative-process-description",
         ogcapi_processes + "/per/core/alternative-process-paths",
@@ -314,8 +318,9 @@ def api_conformance(request):  # noqa: F811
         # ogcapi_processes + "/per/core/process-execute-input-inline-bbox",
         ogcapi_processes + "/per/core/process-execute-sync-job",
         ogcapi_processes + "/per/core/limit-response",
-        # FIXME: https://github.com/crim-ca/weaver/issues/267
         ogcapi_processes + "/per/core/prev",
+        ogcapi_processes + "/per/job-list/limit-response",
+        ogcapi_processes + "/per/job-list/prev",
         # ogcapi_processes + "/rec/core/access-control-expose-headers",
         ogcapi_processes + "/rec/core/api-definition-oas",
         ogcapi_processes + "/rec/core/cross-origin",
@@ -331,11 +336,13 @@ def api_conformance(request):  # noqa: F811
         # ogcapi_processes + "/rec/core/process-execute-mode-auto",
         # ogcapi_processes + "/rec/core/process-execute-preference-applied",
         ogcapi_processes + "/rec/core/process-execute-sync-document-ref",
-        # FIXME: https://github.com/crim-ca/weaver/issues/267
-        # ogcapi_processes + "/rec/core/next-1",
-        # ogcapi_processes + "/rec/core/next-2",
-        # ogcapi_processes + "/rec/core/next-3",
+        ogcapi_processes + "/rec/core/next-1",
+        ogcapi_processes + "/rec/core/next-2",
+        ogcapi_processes + "/rec/core/next-3",
         # ogcapi_processes + "/rec/core/test-process",
+        ogcapi_processes + "/rec/job-list/next-1",
+        ogcapi_processes + "/rec/job-list/next-2",
+        ogcapi_processes + "/rec/job-list/next-3",
         # FIXME: https://github.com/crim-ca/weaver/issues/230
         # ogcapi_processes + "/req/callback/job-callback",
         ogcapi_processes + "/req/core",
@@ -350,8 +357,8 @@ def api_conformance(request):  # noqa: F811
         #   https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/master/core/openapi/schemas/exception.yaml
         #   type of exception SHALL be: "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/no-such-job"
         # ogcapi_processes + "/req/core/job-exception-no-such-job",
-        ogcapi_processes + "/req/job-list/links",
         # ogcapi_processes + "/req/core/job-results-exception/no-such-job",
+        ogcapi_processes + "/req/job-list/links",
         # FIXME:
         #   https://github.com/opengeospatial/ogcapi-processes/blob/master/core/requirements/core/REQ_job-results-exception-results-not-ready.adoc
         #   type of exception SHALL be "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/result-not-ready"
@@ -399,7 +406,6 @@ def api_conformance(request):  # noqa: F811
         ogcapi_processes + "/req/core/process-list",
         ogcapi_processes + "/req/core/process-list-success",
         # ogcapi_processes + "/req/core/test-process",
-        # FIXME: https://github.com/crim-ca/weaver/issues/228
         ogcapi_processes + "/req/dismiss/job-dismiss-op",
         ogcapi_processes + "/req/dismiss/job-dismiss-success",
         # https://github.com/opengeospatial/ogcapi-processes/blob/master/core/clause_7_core.adoc#sc_requirements_class_html
