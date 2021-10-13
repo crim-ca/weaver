@@ -1264,12 +1264,14 @@ class WpsPackage(Process):
             is_array, elem_type, _, _ = is_cwl_array_type(cwl_inputs_info[input_id])
             if isinstance(input_i, ComplexInput) or elem_type == "File":
                 # extend array data that allow max_occur > 1
+                # drop invalid inputs returned as None
                 if is_array:
-                    cwl_inputs[input_id] = [
-                        self.make_location_input(elem_type, input_def) for input_def in input_occurs
-                    ]
+                    input_href = [self.make_location_input(elem_type, input_def) for input_def in input_occurs]
+                    input_href = [cwl_input for cwl_input in input_href if cwl_input is not None]
                 else:
-                    cwl_inputs[input_id] = self.make_location_input(elem_type, input_i)
+                    input_href = self.make_location_input(elem_type, input_i)
+                if input_href:
+                    cwl_inputs[input_id] = input_href
             elif isinstance(input_i, (LiteralInput, BoundingBoxInput)):
                 # extend array data that allow max_occur > 1
                 if is_array:
@@ -1282,7 +1284,7 @@ class WpsPackage(Process):
         return cwl_inputs
 
     def make_location_input(self, input_type, input_definition):
-        # type: (str, ComplexInput) -> JSON
+        # type: (str, ComplexInput) -> Optional[JSON]
         """
         Generates the JSON content required to specify a `CWL` ``File`` input definition from a location.
 
@@ -1306,8 +1308,9 @@ class WpsPackage(Process):
         #   since href is already handled (pulled and staged locally), use it directly to avoid double fetch with CWL
         #   validate using the internal '_file' instead of 'file' otherwise we trigger the fetch
         #   normally, file should be pulled an this check should fail
-        if input_definition._iohandler._file and os.path.isfile(input_definition._iohandler._file):  # noqa: W0212
-            input_location = input_definition._iohandler._file                                       # noqa: W0212
+        input_definition_file = input_definition._iohandler._file  # noqa: W0212
+        if input_definition_file and os.path.isfile(input_definition_file):
+            input_location = input_definition_file
         # if source type is data, we actually need to call 'data' (without fetch of remote file, already fetched)
         # value of 'file' in this case points to a local file path where the wanted link was dumped as raw data
         if input_definition.source_type == SOURCE_TYPE.DATA:
@@ -1319,6 +1322,27 @@ class WpsPackage(Process):
             else:
                 # last option, could not resolve 'lazily' so will fetch data if needed
                 input_location = input_definition.data
+        # FIXME: PyWPS bug (https://github.com/geopython/pywps/issues/633)
+        #   Optional File inputs receive 'data' content that correspond to 'default format' definition if not provided.
+        #   This is invalid since input is not provided, it should not be there at all (default format != default data).
+        #   Patch with a combination of available detection methods to be safe:
+        #   - The 'file' attribute gets resolved to the process '{workdir}/input' temporary file.
+        #     This 'file' is instead named 'input_{uuid}' when it is actually resolved to real input href/data contents.
+        #     The IO handler better reports 'None' in its internal '_file' attribute.
+        #   - For even more robustness, verify that erroneous 'data' matches the 'default format'.
+        #     The media-type should match and 'default' argument should True since it resolve with '_default' argument.
+        default_format_def = getattr(input_definition, "_default", None)
+        if (
+            isinstance(default_format_def, dict) and
+            input_location == default_format_def and
+            input_definition_file is None and
+            # input_definition.size == 0 and  # not reliable, sometimes fails because 'data' is dict instead of str
+            default_format_def.get("default") is True and
+            any(default_format_def.get("mimeType") == fmt.mime_type and fmt.mime_type is not None
+                for fmt in input_definition.supported_formats)
+        ):
+            self.logger.debug("File input (%s) DROPPED. Detected default format as data.", input_definition.identifier)
+            return None
         if self.must_fetch(input_location):
             self.logger.info("File input (%s) ATTEMPT fetch: [%s]", input_definition.identifier, input_location)
             input_location = fetch_file(input_location, input_definition.workdir, settings=self.settings)

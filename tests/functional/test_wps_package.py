@@ -1888,7 +1888,11 @@ class WpsPackageAppTest(WpsConfigBase):
         assert all(isinstance(s, str) for s in pkg["inputs"][0]["type"][2]["items"]["symbols"])
         # second input
         assert pkg["inputs"][1]["id"] == "mosaic"
-        assert pkg["inputs"][1]["default"] == "null"
+        # note: modified by https://github.com/crim-ca/weaver/pull/344
+        #   explicit 'null' should not be reported as 'default', causing CWL error seeing as string with "null" value
+        #   must be in 'type' instead to define it as optional, as tested below
+        # assert pkg["inputs"][1]["default"] == "null"
+        assert "null" not in pkg["inputs"][1]
         assert "format" not in pkg["inputs"][1]
         assert isinstance(pkg["inputs"][1]["type"], list), "default 'null' result type formed with it"
         assert len(pkg["inputs"][1]["type"]) == 2

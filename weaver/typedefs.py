@@ -53,7 +53,7 @@ if TYPE_CHECKING:
     CWL_IO_ArrayType = TypedDict("CWL_IO_ArrayType", {"type": str, "items": str})  # "items" => type of every item
     CWL_IO_MultiType = List[str, CWL_IO_ArrayType, CWL_IO_EnumType]  # single string allowed for "null"
     CWL_IO_DataType = Union[str, CWL_IO_ArrayType, CWL_IO_EnumType, CWL_IO_MultiType]
-    CWL_Input_Type = TypedDict("CWL_Input_Type", {"id": str, "type": CWL_IO_DataType}, total=False)
+    CWL_Input_Type = TypedDict("CWL_Input_Type", {"id": str, "type": CWL_IO_DataType, "default": AnyValue}, total=False)
     CWL_Output_Type = TypedDict("CWL_Output_Type", {"id": str, "type": CWL_IO_DataType}, total=False)
     CWL_Inputs = Union[List[CWL_Input_Type], Dict[str, CWL_Input_Type]]
     CWL_Outputs = Union[List[CWL_Output_Type], Dict[str, CWL_Output_Type]]

@@ -493,8 +493,10 @@ def any2cwl_io(wps_io, io_select):
         is_min_null = wps_min_occ in [0, "0"]
         if wps_default != null and not isinstance(wps_default, dict):
             cwl_io["default"] = wps_default
-        elif is_min_null:
-            cwl_io["default"] = "null"
+        # NOTE:
+        #   Don't set any 'default' field here (neither 'null' string or 'None' type) if no value was provided
+        #   since those are interpreted by CWL as literal string 'null' (for 'string' type) or null object.
+        #   Instead, 'null' entry is added to 'type' to indicate drop/ignore missing input.
 
         wps_max_occ = get_field(wps_io, "max_occurs", search_variations=True)
         if wps_max_occ != null and (wps_max_occ == "unbounded" or wps_max_occ > 1):

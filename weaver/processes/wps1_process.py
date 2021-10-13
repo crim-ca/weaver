@@ -71,6 +71,11 @@ class Wps1Process(WpsProcessInterface):
         wps_inputs = []
         for input_key in inputs_provided_keys:
             input_val = workflow_inputs[input_key]
+
+            # ignore optional inputs resolved as omitted
+            if input_val is None:
+                continue
+
             # in case of array inputs, must repeat (id,value)
             # in case of complex input (File), obtain location, otherwise get data value
             if not isinstance(input_val, list):
