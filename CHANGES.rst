@@ -14,6 +14,17 @@ Changes:
 
 Fixes:
 ------
+- No change.
+
+`4.1.1 <https://github.com/crim-ca/weaver/tree/4.1.1>`_ (2021-10-12)
+========================================================================
+
+Changes:
+--------
+- No change.
+
+Fixes:
+------
 - Fix handling of default *format* field of `WPS` input definition incorrectly resolved as default *data* by ``PyWPS``
   for `Process` that allows optional (``minOccurs=0``) inputs of ``Complex`` type. Specific case is detected with
   relevant erroneous data and dropped silently because it should not be present (since omitted in `WPS` request) and
