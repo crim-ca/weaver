@@ -20,6 +20,14 @@ Changes:
 - Update conformance link list for ``dismiss`` and relevant relation ``links`` definitions
   (relates to `#53 <https://github.com/crim-ca/weaver/issues/53>`_
   and `#267 <https://github.com/crim-ca/weaver/issues/267>`_).
+- Add better support and reporting of ``Job`` status ``dismissed`` when operation is called from API on running task.
+- Use explicit ``started`` status when ``Job`` has been picked up by a `Celery` worker instead of leaving it
+  to ``accepted`` (same status that indicates the ``Job`` "pending", although a worker is processing it).
+  Early modification of status is done in case setup operations (send `WPS` request, prepare files, etc.) take some
+  time which would leave users under the impression the ``Job`` is not getting picked up.
+  Report explicit ``running`` status in ``Job`` once it has been sent to the remote `WPS` endpoint.
+  The API will report ``running`` in both cases in order to support `OGC API - Processes` naming conventions, but
+  internal ``Job`` status will have more detail.
 
 Fixes:
 ------

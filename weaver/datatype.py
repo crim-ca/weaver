@@ -1024,7 +1024,7 @@ class Job(Base):
             "jobID": self.id,
             "processID": self.process,
             "providerID": self.service,
-            "status": self.status,
+            "status": map_status(self.status),
             "message": self.status_message,
             "created": self.created,
             "started": self.started,

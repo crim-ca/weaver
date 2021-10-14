@@ -29,6 +29,7 @@ from tests.utils import (
     mocked_aws_s3_bucket_test_file,
     mocked_execute_process,
     mocked_http_file,
+    mocked_process_job_runner,
     mocked_reference_test_file,
     mocked_sub_requests
 )
@@ -47,6 +48,7 @@ from weaver.formats import (
 )
 from weaver.processes.constants import CWL_REQUIREMENT_APP_DOCKER, CWL_REQUIREMENT_INIT_WORKDIR
 from weaver.processes.types import PROCESS_BUILTIN
+from weaver.status import STATUS_DISMISSED, STATUS_RUNNING
 from weaver.utils import get_any_value
 
 if TYPE_CHECKING:
@@ -1520,6 +1522,62 @@ class WpsPackageAppTest(WpsConfigBase):
         assert processed_values["measureIntegerInput"] == 45
         assert processed_values["measureFloatInput"] == 10.2
         assert processed_values["measureFileInput"] == {"VALUE": {"REF": 1, "MEASUREMENT": 10.3, "UOM": "M"}}
+
+    def test_dismiss_job(self):
+        """
+        Test that different accept language matching supported languages all successfully execute and apply them.
+
+        Invalid accept languages must be correctly reported as not supported.
+        """
+        cwl = {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "baseCommand": "sleep",
+            "inputs": {"delay": {"type": "int", "inputBinding": {"position": 1}}},
+            "outputs": {"output": {"type": "File", "outputBinding": {"glob": "stdout.log"}}}
+        }
+        body = {
+            "processDescription": {"process": {"id": self._testMethodName}},
+            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication",
+            "executionUnit": [{"unit": cwl}],
+        }
+        self.deploy_process(body)
+        exec_body = {
+            "mode": EXECUTE_MODE_ASYNC,
+            "response": EXECUTE_RESPONSE_DOCUMENT,
+            "inputs": [{"id": "delay", "value": 1}],
+            "outputs": [{"id": "output", "transmissionMode": EXECUTE_TRANSMISSION_MODE_REFERENCE}]
+        }
+
+        with contextlib.ExitStack() as stack_exec:
+            # Because 'mocked_execute_process' is blocking, we cannot dismiss it until it has already completed
+            # without getting into complex multiprocess queue/wait to preserve sub-request mock context of TestApp.
+            # Instead, create a full job, and simulate dismissing it midway after the fact to check result.
+            for mock_exec in mocked_execute_process():
+                stack_exec.enter_context(mock_exec)
+            path = "/processes/{}/jobs".format(self._testMethodName)
+            resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
+                                       data=exec_body, headers=self.json_headers, only_local=True)
+            assert resp.status_code in [200, 201], "Failed with: [{}]\nReason:\n{}".format(resp.status_code, resp.json)
+            status_url = resp.json.get("location")
+            self.monitor_job(status_url)
+            resp = self.app.get(status_url, headers=self.json_headers)
+            assert resp.status_code == 200
+            job_id = resp.json["jobID"]
+
+            # patch the job as if still running
+            job = self.job_store.fetch_by_id(job_id)
+            job.logs = job.logs[:len(job.logs)//2]
+            job.status = STATUS_RUNNING
+            job.process = 50
+
+            resp = self.app.delete(status_url, headers=self.json_headers)
+            assert resp.status_code == 200
+            assert resp.json["status"] == STATUS_DISMISSED
+
+            resp = self.app.get(status_url, headers=self.json_headers)
+            assert resp.status_code == 200
+            assert resp.json["status"] == STATUS_DISMISSED
 
     # FIXME: test not working
     #   same payloads sent directly to running weaver properly raise invalid schema -> bad request error

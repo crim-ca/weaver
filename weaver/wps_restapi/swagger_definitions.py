@@ -62,7 +62,7 @@ from weaver.processes.constants import (
     WPS_LITERAL_DATA_TYPE_NAMES
 )
 from weaver.sort import JOB_SORT_VALUES, QUOTE_SORT_VALUES, SORT_CREATED, SORT_ID, SORT_PROCESS
-from weaver.status import JOB_STATUS_CATEGORIES, STATUS_ACCEPTED, STATUS_COMPLIANT_OGC
+from weaver.status import JOB_STATUS_CODE_API, STATUS_ACCEPTED
 from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_VALUES
 from weaver.wps_restapi.colander_extras import (
     AllOfKeywordSchema,
@@ -1283,7 +1283,7 @@ class JobStatusEnum(ExtendedSchemaNode):
     title = "JobStatus"
     default = STATUS_ACCEPTED
     example = STATUS_ACCEPTED
-    validator = OneOf(JOB_STATUS_CATEGORIES[STATUS_COMPLIANT_OGC])
+    validator = OneOf(JOB_STATUS_CODE_API)
 
 
 class JobSortEnum(ExtendedSchemaNode):

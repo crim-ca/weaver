@@ -90,6 +90,10 @@ JOB_STATUS_CATEGORIES = {
     ]),
 }
 
+# FIXME: see below detail in map_status about 'successful', partially compliant to OGC statuses
+# https://github.com/opengeospatial/ogcapi-processes/blob/ca8e90/core/openapi/schemas/statusCode.yaml
+JOB_STATUS_CODE_API = JOB_STATUS_CATEGORIES[STATUS_COMPLIANT_OGC] - {STATUS_SUCCESSFUL}
+
 # id -> str
 STATUS_PYWPS_MAP = {s: _WPS_STATUS._fields[s].lower() for s in range(len(WPS_STATUS))}
 # str -> id
@@ -126,8 +130,9 @@ def map_status(wps_status, compliant=STATUS_COMPLIANT_OGC):
         if job_status in JOB_STATUS_CATEGORIES[STATUS_CATEGORY_RUNNING]:
             if job_status in [STATUS_STARTED, STATUS_PAUSED]:
                 job_status = STATUS_RUNNING
-        elif job_status in JOB_STATUS_CATEGORIES[STATUS_CATEGORY_FAILED] and job_status != STATUS_FAILED:
-            job_status = STATUS_FAILED
+        elif job_status in JOB_STATUS_CATEGORIES[STATUS_CATEGORY_FAILED]:
+            if job_status not in [STATUS_FAILED, STATUS_DISMISSED]:
+                job_status = STATUS_FAILED
 
     elif compliant == STATUS_COMPLIANT_PYWPS:
         if job_status == STATUS_RUNNING:

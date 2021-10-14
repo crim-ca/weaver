@@ -26,7 +26,15 @@ from weaver.processes import wps_package
 from weaver.processes.constants import WPS_COMPLEX_DATA
 from weaver.processes.convert import ows2json_output_data
 from weaver.processes.types import PROCESS_WORKFLOW
-from weaver.status import STATUS_ACCEPTED, STATUS_FAILED, STATUS_STARTED, STATUS_SUCCEEDED, map_status
+from weaver.status import (
+    STATUS_ACCEPTED,
+    STATUS_DISMISSED,
+    STATUS_FAILED,
+    STATUS_RUNNING,
+    STATUS_STARTED,
+    STATUS_SUCCEEDED,
+    map_status
+)
 from weaver.store.base import StoreJobs
 from weaver.utils import get_any_id, get_any_value, get_settings, now, raise_on_xml_exception, wait_secs
 from weaver.visibility import VISIBILITY_PUBLIC
@@ -83,10 +91,19 @@ def execute_process(self, job_id, url, headers=None):
 
     job = store.fetch_by_id(job_id)
     job.started = now()
+    job.status = STATUS_STARTED  # will be mapped to 'RUNNING'
+    job.status_message = "Job {}.".format(STATUS_STARTED)  # will preserve detail of STARTED vs RUNNING
     job.task_id = self.request.id
     job.progress = JOB_PROGRESS_SETUP
     job.save_log(logger=task_logger, message="Job task setup completed.")
     job = store.update_job(job)
+
+    # Flag to keep track if job is running in background (remote-WPS, CWL app, etc.).
+    # If terminate signal is sent to worker task via API dismiss request while still running in background,
+    # the raised exception within the task will switch the job to STATUS_FAILED, but this will not raise an
+    # exception here. Since the task execution 'succeeds' without raising, it skips directly to the last 'finally'.
+    # Patch it back to STATUS_DISMISSED in this case.
+    local_status = False
 
     try:
         try:
@@ -178,7 +195,7 @@ def execute_process(self, job_id, url, headers=None):
         job.save_log(logger=task_logger, level=logging.DEBUG,
                      message="Updated job status location: [{}].".format(wps_status_path))
 
-        job.status = map_status(STATUS_STARTED)
+        job.status = STATUS_RUNNING
         job.status_message = execution.statusMessage or "{} initiation done.".format(str(job))
         job.status_location = wps_status_path
         job.request = execution.request
@@ -245,6 +262,7 @@ def execute_process(self, job_id, url, headers=None):
                 num_retries = 0
                 run_step += 1
             finally:
+                local_status = True  # reached only if sub WPS execution completed (worker not terminated beforehand)
                 job = store.update_job(job)
 
     except Exception as exc:
@@ -257,6 +275,11 @@ def execute_process(self, job_id, url, headers=None):
         errors = "{0}: {1!s}".format(exception_class, exc)
         job.save_log(errors=errors, logger=task_logger)
     finally:
+        # if task worker terminated, local 'job' is out of date compared to remote/background runner last update
+        job = store.fetch_by_id(job.id)
+        if not local_status and map_status(job.status) == STATUS_FAILED:
+            job.status = STATUS_DISMISSED
+
         job.progress = JOB_PROGRESS_EXECUTE_MONITOR_END
         job.status_message = "Job {}.".format(job.status)
         job.save_log(logger=task_logger)
