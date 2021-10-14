@@ -18,7 +18,6 @@ from typing import TYPE_CHECKING
 
 import colander
 import pytest
-from pyramid.httpexceptions import HTTPBadRequest
 
 from tests import resources
 from tests.functional.utils import WpsConfigBase
@@ -1579,10 +1578,6 @@ class WpsPackageAppTest(WpsConfigBase):
             assert resp.json["status"] == STATUS_DISMISSED
             assert mock_del.control.revoke.called_with(job.task_id, terminate=True)
 
-    # FIXME: test not working
-    #   same payloads sent directly to running weaver properly raise invalid schema -> bad request error
-    #   somehow they don't work within this test (not raised)...
-    @pytest.mark.xfail(reason="MinOccurs/MaxOccurs somehow fail validation here, but s")
     def test_invalid_io_min_max_occurs_wrong_format(self):
         """
         Test verifies that ``minOccurs`` and/or ``maxOccurs`` definitions other than allowed formats are raised as
@@ -1603,8 +1598,8 @@ class WpsPackageAppTest(WpsConfigBase):
                     "id": self._testMethodName,
                     "title": "some title",
                     "abstract": "this is a test",
+                    "inputs": [{}]  # updated after
                 },
-                "inputs": [{}]    # updated after
             },
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
             "executionUnit": [{"unit": cwl}],
@@ -1612,16 +1607,16 @@ class WpsPackageAppTest(WpsConfigBase):
 
         # replace by invalid min/max and check that it raises
         cwl["inputs"][0] = {"id": "test", "type": {"type": "array", "items": "string"}}
-        body["processDescription"]["inputs"][0] = {"id": "test", "minOccurs": [1], "maxOccurs": 1}
-        with self.assertRaises(colander.Invalid):
-            self.deploy_process(body)
-            self.fail("Invalid input minOccurs schema definition should have been raised")
+        body["processDescription"]["process"]["inputs"][0] = {"id": "test", "minOccurs": [1], "maxOccurs": 1}
+        resp = mocked_sub_requests(self.app, "post_json", "/processes", data=body, headers=self.json_headers)
+        assert resp.status_code == 400, "Invalid input minOccurs schema definition should have been raised"
+        assert "WithMinMaxOccurs" in resp.json["cause"] and "Invalid" in resp.json["error"]
 
         cwl["inputs"][0] = {"id": "test", "type": {"type": "array", "items": "string"}}
-        body["processDescription"]["inputs"][0] = {"id": "test", "minOccurs": 1, "maxOccurs": 3.1416}
-        with self.assertRaises(HTTPBadRequest):
-            self.deploy_process(body)
-            self.fail("Invalid input maxOccurs schema definition should have been raised")
+        body["processDescription"]["process"]["inputs"][0] = {"id": "test", "minOccurs": 1, "maxOccurs": 3.1416}
+        resp = mocked_sub_requests(self.app, "post_json", "/processes", data=body, headers=self.json_headers)
+        assert resp.status_code == 400, "Invalid input maxOccurs schema definition should have been raised"
+        assert "WithMinMaxOccurs" in resp.json["cause"] and "Invalid" in resp.json["error"]
 
     def test_complex_io_from_package(self):
         """

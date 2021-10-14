@@ -114,10 +114,26 @@ def _check_deploy(payload):
     Validate minimum deploy payload field requirements with exception handling.
     """
     # FIXME: handle colander invalid directly in tween (https://github.com/crim-ca/weaver/issues/112)
+    message = "Process deployment definition is invalid."
     try:
-        sd.Deploy().deserialize(payload)
-    except colander.Invalid as ex:
-        raise HTTPBadRequest("Invalid schema: [{!s}]".format(ex))
+        results = sd.Deploy().deserialize(payload)
+        # Because many fields are optional during deployment to allow flexibility between compatible WPS/CWL
+        # definitions, any invalid field at lower-level could make a full higher-level definition to be dropped.
+        # Verify the result to ensure this was not the case for known cases to attempt early detection.
+        p_inputs = payload.get("processDescription", {}).get("process", {}).get("inputs")
+        r_inputs = results.get("processDescription", {}).get("process", {}).get("inputs")
+        if p_inputs and p_inputs != r_inputs:
+            # try raising sub-schema to have specific reason
+            message = "Process deployment inputs definition is invalid."
+            sd.DeployInputTypeAny().deserialize(p_inputs)
+            # raise directly if we where not able to detect the cause
+            raise HTTPBadRequest(json={"description": message, "cause": "unknown", "error": "Invalid"})
+    except colander.Invalid as exc:
+        raise HTTPBadRequest(json={
+            "description": message,
+            "cause": "Invalid schema: [{!s}]".format(exc),
+            "error": exc.__class__.__name__
+        })
 
 
 @log_unhandled_exceptions(logger=LOGGER, message="Unhandled error occurred during parsing of process definition.",

@@ -783,9 +783,9 @@ class MinOccursDefinition(OneOfKeywordSchema):
     title = "MinOccurs"
     example = 1
     _one_of = [
-        ExtendedSchemaNode(Integer(), validator=Range(min=0),
-                           description="Positive integer."),
-        ExtendedSchemaNode(String(), validator=StringRange(min=0), pattern="^[0-9]+$",
+        ExtendedSchemaNode(Integer(), validator=Range(min=0), title="MinOccurs.integer",
+                           ddescription="Positive integer."),
+        ExtendedSchemaNode(String(), validator=StringRange(min=0), pattern="^[0-9]+$", title="MinOccurs.string",
                            description="Numerical string representing a positive integer."),
     ]
 
@@ -795,17 +795,20 @@ class MaxOccursDefinition(OneOfKeywordSchema):
     title = "MaxOccurs"
     example = 1
     _one_of = [
-        ExtendedSchemaNode(Integer(), validator=Range(min=0),
+        ExtendedSchemaNode(Integer(), validator=Range(min=0), title="MaxOccurs.integer",
                            description="Positive integer."),
-        ExtendedSchemaNode(String(), validator=StringRange(min=0), pattern="^[0-9]+$",
+        ExtendedSchemaNode(String(), validator=StringRange(min=0), pattern="^[0-9]+$", title="MaxOccurs.string",
                            description="Numerical string representing a positive integer."),
-        ExtendedSchemaNode(String(), validator=OneOf(["unbounded"])),
+        ExtendedSchemaNode(String(), validator=OneOf(["unbounded"]), title="MaxOccurs.unbounded",
+                           description="Special value indicating no limit to occurrences."),
     ]
 
 
 class WithMinMaxOccurs(ExtendedMappingSchema):
-    minOccurs = MinOccursDefinition(missing=drop)
-    maxOccurs = MaxOccursDefinition(missing=drop)
+    # omitted definitions are permitted to allow inference from other fields in package (CWL)
+    # if provided though, schema format and values should be valid
+    minOccurs = MinOccursDefinition(default=1)
+    maxOccurs = MaxOccursDefinition(default=1)
 
 
 # does not inherit from 'DescriptionLinks' because other 'ProcessDescription<>' schema depend from this without 'links'
