@@ -180,9 +180,9 @@ class WpsRestApiJobsTest(unittest.TestCase):
             assert "href" in link_info and isinstance(link_info["href"], str)
         assert job["status"] in JOB_STATUS_VALUES
         if job["status"] == STATUS_SUCCEEDED:
-            assert len([link for link in job["links"] if link["rel"] == "results"])
+            assert len([link for link in job["links"] if link["rel"].endswith("results")])
         elif job["status"] == STATUS_FAILED:
-            assert len([link for link in job["links"] if link["rel"] == "exceptions"])
+            assert len([link for link in job["links"] if link["rel"].endswith("exceptions")])
 
     @staticmethod
     def check_basic_jobs_info(response):

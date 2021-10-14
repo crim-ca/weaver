@@ -2437,8 +2437,10 @@ class ProcessDeployment(ProcessSummary, ProcessContext, ProcessDeployMeta):
 
 class JobStatusInfo(ExtendedMappingSchema):
     jobID = UUID(example="a9d14bf4-84e0-449a-bac8-16e598efe807", description="ID of the job.")
-    processID = ProcessIdentifier(missing=None, description="Process identifier corresponding to the job execution.")
-    providerID = ProcessIdentifier(missing=None, description="Provider identifier corresponding to the job execution.")
+    processID = ProcessIdentifier(missing=None, default=None,
+                                  description="Process identifier corresponding to the job execution.")
+    providerID = ProcessIdentifier(missing=None, default=None,
+                                   description="Provider identifier corresponding to the job execution.")
     status = JobStatusEnum(description="Last updated status.")
     message = ExtendedSchemaNode(String(), missing=drop, description="Information about the last status update.")
     created = ExtendedSchemaNode(DateTime(), missing=drop, default=None,

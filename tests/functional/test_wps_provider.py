@@ -183,12 +183,12 @@ class WpsProviderTest(WpsConfigBase):
         job_exec_url = proc_exec_url.replace("/execution", "/jobs")  # both are aliases, any could be returned
         ogc_exec_url = proc_exec_url.replace("/jobs", "/execution")
         assert any(link["href"] in [job_exec_url, ogc_exec_url]
-                   and link["rel"].endswith("execute") for link in body["links"])
+                   and link["rel"].endswith("execute") for link in body["links"]), body["links"]
         assert any(link["href"] == proc_desc_url
-                   and link["rel"].endswith("process-desc") for link in body["links"])
+                   and link["rel"].endswith("process-desc") for link in body["links"]), body["links"]
         # WPS-1 URL also includes relevant query parameters to obtain a valid response
         assert any(link["href"].startswith(proc_wps1_url)
-                   and link["rel"] == "service-desc" for link in body["links"])
+                   and link["rel"] == "service-desc" for link in body["links"]), body["links"]
 
         assert EXECUTE_CONTROL_OPTION_ASYNC in body["jobControlOptions"]
         assert EXECUTE_TRANSMISSION_MODE_REFERENCE in body["outputTransmission"]
