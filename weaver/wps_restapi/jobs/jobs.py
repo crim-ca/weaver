@@ -92,6 +92,9 @@ def get_job_list_links(job_total, filters, request):
 
     # reapply queries that must be given to obtain the same result in case of subsequent requests (sort, limits, etc.)
     kvp_params = {param: value for param, value in request.params.items() if param != "page"}
+    # patch datetime that have some extra character manipulation (reapply '+' auto-converted to ' ' by params parser)
+    if "datetime" in kvp_params:
+        kvp_params["datetime"] = kvp_params["datetime"].replace(" ", "+")
     alt_kvp = deepcopy(kvp_params)
 
     # request job uses general endpoint, obtain the full path if any service/process was given as alternate location

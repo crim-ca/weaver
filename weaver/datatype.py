@@ -1406,7 +1406,7 @@ class Process(Base):
         proc_desc = base_url + sd.process_service.path.format(process_id=self.id)
         proc_list = base_url + sd.processes_service.path
         jobs_list = proc_desc + sd.jobs_service.path
-        proc_exec = proc_desc + sd.process_execution_service.path.format(process_id=self.id)
+        proc_exec = proc_desc + "/execution"
         links = [
             {"href": proc_desc, "rel": "self", "title": "Current process description."},
             {"href": proc_desc, "rel": "process-meta", "title": "Process definition."},
