@@ -963,7 +963,7 @@ class Job(Base):
         job_url = self._job_url(base_url)  # full URL
         job_path = "{}/{}".format(base_url, sd.jobs_service.path.format(job_id=self.id))
         job_err = job_url + "/exceptions"
-        job_exec = job_url.replace(sd.jobs_service.path, "/execution")
+        job_exec = job_url.rsplit("/", 1)[0] + "/execution"
         job_list = "{}/{}".format(base_url, sd.jobs_service.path)
         job_links_body = {"links": [
             {"href": job_url, "rel": "status", "title": "Job status."},  # OGC
@@ -1398,23 +1398,31 @@ class Process(Base):
             base_url += sd.provider_service.path.format(provider_id=self.service)
         proc_desc = base_url + sd.process_service.path.format(process_id=self.id)
         proc_list = base_url + sd.processes_service.path
-        jobs_list = base_url + sd.jobs_service.path
-        proc_exec = base_url + sd.process_execution_service.path.format(process_id=self.id)
+        jobs_list = proc_desc + sd.jobs_service.path
+        proc_exec = proc_desc + sd.process_execution_service.path.format(process_id=self.id)
         links = [
-            {"href": proc_desc, "rel": "self", "title": "Process description."},
-            {"href": proc_desc, "rel": "process-desc", "title": "Process description."},
-            {"href": proc_list, "rel": "collection", "title": "List of registered processes."},  # IANA variant
+            {"href": proc_desc, "rel": "self", "title": "Current process description."},
+            {"href": proc_desc, "rel": "process-meta", "title": "Process definition."},
             {"href": proc_exec, "rel": "http://www.opengis.net/def/rel/ogc/1.0/execute",
              "title": "Process execution endpoint for job submission."},
-            {"href": proc_list, "rel": "http://www.opengis.net/def/rel/ogc/1.0/processes",  # OGC variant
+            {"href": proc_list, "rel": "http://www.opengis.net/def/rel/ogc/1.0/processes",
              "title": "List of registered processes."},
             {"href": jobs_list, "rel": "http://www.opengis.net/def/rel/ogc/1.0/job-list",
              "title": "List of job executions corresponding to this process."},
+            {"href": proc_list, "rel": "up", "title": "List of processes registered under the service."},
         ]
-        if self.processEndpointWPS1:
-            wps_url = "{}?service=WPS&request=GetCapabilities".format(self.processEndpointWPS1)
-            links.append({"href": wps_url, "rel": "service-desc",
-                          "type": CONTENT_TYPE_APP_XML, "title": "Service definition."})
+        if self.service:
+            wps_base_url = self.processEndpointWPS1.split("?")[0]
+            wps_get_caps = wps_base_url + "?service=WPS&request=GetCapabilities&version=1.0.0"
+            wps_links = [
+                {"href": base_url, "rel": "service", "title": "Provider service description."},
+                {"href": base_url, "rel": "service-meta", "title": "Provider service definition."},
+                {"href": wps_get_caps, "rel": "service-desc", "title": "Remote service description."},
+                {"href": self.processEndpointWPS1, "rel": "process-desc", "title": "Remote process description."},
+            ]
+            for link in wps_links:
+                link.setdefault("type", CONTENT_TYPE_APP_XML)
+            links.extend(wps_links)
         for link in links:
             link.setdefault("type", CONTENT_TYPE_APP_JSON)
             link.setdefault("hreflang", ACCEPT_LANGUAGE_EN_CA)

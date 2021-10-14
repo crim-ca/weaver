@@ -16,6 +16,7 @@ from weaver.exceptions import (
     BillInstanceError,
     BillNotFound,
     BillRegistrationError,
+    JobInvalidParameter,
     JobNotFound,
     JobRegistrationError,
     JobUpdateError,
@@ -594,8 +595,13 @@ class MongodbJobStore(StoreJobs, MongodbStore):
         :returns: (list of jobs matching paging OR list of {categories, list of jobs, count}) AND total of matched job.
         """
 
-        if any(v in tags for v in VISIBILITY_VALUES):
-            raise ValueError("Visibility values not acceptable in 'tags', use 'access' instead.")
+        bad_tags = [v for v in VISIBILITY_VALUES if v in tags]
+        if any(bad_tags):
+            raise JobInvalidParameter(json={
+                "description": "Visibility values not acceptable in 'tags', use 'access' instead.",
+                "cause": "Invalid value{} in 'tag': {}".format("s" if len(bad_tags) > 1 else "", ",".join(bad_tags)),
+                "locator": "tags",
+            })
 
         search_filters = {}
 
@@ -649,7 +655,10 @@ class MongodbJobStore(StoreJobs, MongodbStore):
         elif sort == SORT_USER:
             sort = "user_id"
         if sort not in JOB_SORT_VALUES:
-            raise JobNotFound("Invalid sorting method: '{}'".format(repr(sort)))
+            raise JobInvalidParameter(json={
+                "description": "Invalid sorting method: '{}'".format(repr(sort)),
+                "locator": "sort"
+            })
         sort_order = DESCENDING if sort in (SORT_FINISHED, SORT_CREATED) else ASCENDING
         sort_criteria = {sort: sort_order}
 

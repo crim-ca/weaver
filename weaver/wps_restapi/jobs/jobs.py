@@ -81,46 +81,90 @@ def get_job(request):
     return job
 
 
-def get_job_list_links(filters, request):
-    # type: (Dict[str, AnyValue], Request) -> List[JSON]
+def get_job_list_links(job_total, filters, request):
+    # type: (int, Dict[str, AnyValue], Request) -> List[JSON]
+    """
+    Obtains a list of all relevant links for the corresponding job listing defined by query parameter filters.
+    """
     base_url = get_weaver_url(request)
+    # request job uses general endpoint, obtain the full path if any service/process was given as alternate location
     if request.path.startswith(sd.jobs_service.path):
         job_list = base_url + sd.jobs_service.path
         alt_list = None
+        parent_url = None
+        # cannot generate full path apply for 'service' by itself
         if filters["process"] and filters["service"]:
-            alt_list = sd.provider_jobs_service.path.format(
+            alt_list = base_url + sd.provider_jobs_service.path.format(
                 provider_id=filters["service"], process_id=filters["process"]
             )
+            parent_url = alt_list.rsplit("/", 1)[0]
+            alt_list += "?"  # prepare in advance since below 'else' already includes it
         elif filters["process"]:
-            alt_list = sd.process_jobs_service.path.format(process_id=filters["process"])
+            alt_list = base_url + sd.process_jobs_service.path.format(process_id=filters["process"])
+            parent_url = alt_list.rsplit("/", 1)[0]
+            alt_list += "?"  # prepare in advance since below 'else' already includes it
+    # path is whichever specific service/process endpoint, jobs are pre-filtered by them
+    # transform sub-endpoints into matching query parameters and use generic path as alternate location
     else:
-        job_list = base_url + request.path  # whichever specific process/service endpoint
-        # transform sub-endpoints into matching query parameters
+        job_list = base_url + request.path
         alt_list = base_url + sd.jobs_service.path + "?process={}".format(filters["process"])
         if filters["service"]:
             alt_list += "&provider={}".format(filters["service"])
+        parent_url = job_list.rsplit("/", 1)[0]
 
-    # reapply queries that must be given to obtain the same result in case of subsequent requests
+    alt_links = []
+    if alt_list:
+        # apply required query parameters as for other links (sort, limits, etc.),
+        # but ignore already processed ones employed to build alternate link
+        kvp_params = ["{}={}".format(param, value)
+                      for param, value in request.params.items()
+                      if param not in ["service", "provider", "process"]]
+        alt_list += "&".join(kvp_params)
+        alt_links = [{
+            "href": alt_list, "rel": "alternate",
+            "type": CONTENT_TYPE_APP_JSON, "title": "Alternate endpoint with equivalent set of filtered jobs."
+        }]
 
-    #### next, prev, start, last, first
+    cur_page = filters["page"]
+    per_page = filters["limit"]
+    max_page = job_total // per_page
 
-    links = [
-        {"href": job_list, "rel": "collection", "type": CONTENT_TYPE_APP_JSON,
-         "title": "Complete job listing (no filtering queries applied)."},
-        {"href": job_list, "rel": "search", "type": CONTENT_TYPE_APP_JSON,
-         "title": "Query endpoint to search for jobs."},
-        {"href": job_list + "?detail=false", "rel": "preview", "type": CONTENT_TYPE_APP_JSON,
-         "title": "Job listing summary (UUID and count only)."},
+    # reapply queries that must be given to obtain the same result in case of subsequent requests (sort, limits, etc.)
+    kvp_params = ["{}={}".format(param, value) for param, value in request.params.items() if param != "page"]
+    job_query = job_list + "?" + "&".join(kvp_params) + ("&" if kvp_params else "")
+
+    links = alt_links + [
+        {"href": job_list, "rel": "collection",
+         "type": CONTENT_TYPE_APP_JSON, "title": "Complete job listing (no filtering queries applied)."},
+        {"href": job_list, "rel": "search",
+         "type": CONTENT_TYPE_APP_JSON, "title": "Query endpoint to search for jobs."},
+        {"href": job_list + "?detail=false", "rel": "preview",
+         "type": CONTENT_TYPE_APP_JSON, "title": "Job listing summary (UUID and count only)."},
         {"href": job_list, "rel": "http://www.opengis.net/def/rel/ogc/1.0/job-list",
          "type": CONTENT_TYPE_APP_JSON, "title": "List of registered jobs."},
+        {"href": job_query + "page={}".format(cur_page), "rel": "current",
+         "type": CONTENT_TYPE_APP_JSON, "title": "Current page of job query listing."},
+        {"href": job_query + "page=0", "rel": "first",
+         "type": CONTENT_TYPE_APP_JSON, "title": "First page of job query listing."},
+        {"href": job_query + "page={}".format(max_page), "rel": "last",
+         "type": CONTENT_TYPE_APP_JSON, "title": "Last page of job query listing."},
     ]
-    page = filters.pop("page", 0)
-    links.append({
-        "href": job_list + "?page={}".format(page), "rel": "current", "type": CONTENT_TYPE_APP_JSON,
-        "title": "Current job query endpoint."
-    })
-
-    return []
+    if cur_page > 0:
+        links.append({
+            "href": job_query + "page={}".format(cur_page - 1), "rel": "prev",
+            "type": CONTENT_TYPE_APP_JSON, "title": "Previous page of job query listing."
+        })
+    if cur_page < max_page:
+        links.append({
+            "href": job_query + "page={}".format(cur_page + 1), "rel": "next",
+            "type": CONTENT_TYPE_APP_JSON, "title": "Next page of job query listing."
+        })
+    if parent_url:
+        links.append({
+            "href": parent_url, "rel": "up",
+            "type": CONTENT_TYPE_APP_JSON, "title": "Parent collection for which listed jobs apply."
+        })
+    return links
 
 
 def get_results(job, container, value_key=None, ogc_api=False):
@@ -307,7 +351,7 @@ def get_queried_jobs(request):
         body.update({"groups": items})
     else:
         body.update({"jobs": _job_list(items), "page": filters["page"], "limit": filters["limit"]})
-    body.update({"links": get_job_list_links(filters, request)})
+    body.update({"links": get_job_list_links(total, filters, request)})
     body = sd.GetQueriedJobsSchema().deserialize(body)
     return HTTPOk(json=body)
 

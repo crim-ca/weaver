@@ -478,8 +478,22 @@ class MetadataRole(ExtendedMappingSchema):
     role = URL(missing=drop)
 
 
+class LinkRelationshipType(OneOfKeywordSchema):
+    description = (
+        "Link relation as registered or extension type "
+        "(see https://www.rfc-editor.org/rfc/rfc8288.html#section-2.1)."
+    )
+    _one_of = [
+        SLUG(description=(
+            "Relationship of the link to the current content. "
+            "This should be one item amongst registered relations https://www.iana.org/assignments/link-relations/."
+        )),
+        URL(description="Fully qualified extension link relation to the current content.")
+    ]
+
+
 class LinkRelationship(ExtendedMappingSchema):
-    rel = SLUG(description="Relationship of the link to the current content.")
+    rel = LinkRelationshipType()
 
 
 class LinkBase(LinkLanguage, MetadataBase):
