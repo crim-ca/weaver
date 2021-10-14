@@ -1,3 +1,5 @@
+import math
+from copy import deepcopy
 from typing import TYPE_CHECKING
 
 from celery.utils.log import get_task_logger
@@ -31,7 +33,7 @@ from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_PLAIN, OUTPU
 from weaver.owsexceptions import OWSNotFound
 from weaver.processes.convert import any2wps_literal_datatype
 from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
-from weaver.utils import get_any_id, get_any_value, get_settings, get_weaver_url
+from weaver.utils import get_any_id, get_any_value, get_path_kvp, get_settings, get_weaver_url
 from weaver.visibility import VISIBILITY_PUBLIC
 from weaver.wps.utils import get_wps_output_url
 from weaver.wps_restapi import swagger_definitions as sd
@@ -87,76 +89,72 @@ def get_job_list_links(job_total, filters, request):
     Obtains a list of all relevant links for the corresponding job listing defined by query parameter filters.
     """
     base_url = get_weaver_url(request)
+
+    # reapply queries that must be given to obtain the same result in case of subsequent requests (sort, limits, etc.)
+    kvp_params = {param: value for param, value in request.params.items() if param != "page"}
+    alt_kvp = deepcopy(kvp_params)
+
     # request job uses general endpoint, obtain the full path if any service/process was given as alternate location
     if request.path.startswith(sd.jobs_service.path):
-        job_list = base_url + sd.jobs_service.path
-        alt_list = None
+        job_path = base_url + sd.jobs_service.path
+        alt_path = None
         parent_url = None
         # cannot generate full path apply for 'service' by itself
         if filters["process"] and filters["service"]:
-            alt_list = base_url + sd.provider_jobs_service.path.format(
+            alt_path = base_url + sd.provider_jobs_service.path.format(
                 provider_id=filters["service"], process_id=filters["process"]
             )
-            parent_url = alt_list.rsplit("/", 1)[0]
-            alt_list += "?"  # prepare in advance since below 'else' already includes it
+            parent_url = alt_path.rsplit("/", 1)[0]
         elif filters["process"]:
-            alt_list = base_url + sd.process_jobs_service.path.format(process_id=filters["process"])
-            parent_url = alt_list.rsplit("/", 1)[0]
-            alt_list += "?"  # prepare in advance since below 'else' already includes it
+            alt_path = base_url + sd.process_jobs_service.path.format(process_id=filters["process"])
+            parent_url = alt_path.rsplit("/", 1)[0]
+        for param in ["service", "provider", "process"]:
+            alt_kvp.pop(param, None)
     # path is whichever specific service/process endpoint, jobs are pre-filtered by them
     # transform sub-endpoints into matching query parameters and use generic path as alternate location
     else:
-        job_list = base_url + request.path
-        alt_list = base_url + sd.jobs_service.path + "?process={}".format(filters["process"])
+        job_path = base_url + request.path
+        alt_path = base_url + sd.jobs_service.path
+        alt_kvp["process"] = filters["process"]
         if filters["service"]:
-            alt_list += "&provider={}".format(filters["service"])
-        parent_url = job_list.rsplit("/", 1)[0]
-
-    alt_links = []
-    if alt_list:
-        # apply required query parameters as for other links (sort, limits, etc.),
-        # but ignore already processed ones employed to build alternate link
-        kvp_params = ["{}={}".format(param, value)
-                      for param, value in request.params.items()
-                      if param not in ["service", "provider", "process"]]
-        alt_list += "&".join(kvp_params)
-        alt_links = [{
-            "href": alt_list, "rel": "alternate",
-            "type": CONTENT_TYPE_APP_JSON, "title": "Alternate endpoint with equivalent set of filtered jobs."
-        }]
+            alt_kvp["provider"] = filters["service"]
+        parent_url = job_path.rsplit("/", 1)[0]
 
     cur_page = filters["page"]
     per_page = filters["limit"]
-    max_page = job_total // per_page
+    max_page = math.ceil(job_total / per_page) - 1
 
-    # reapply queries that must be given to obtain the same result in case of subsequent requests (sort, limits, etc.)
-    kvp_params = ["{}={}".format(param, value) for param, value in request.params.items() if param != "page"]
-    job_query = job_list + "?" + "&".join(kvp_params) + ("&" if kvp_params else "")
+    alt_links = []
+    if alt_path:
+        alt_links = [{
+            "href": get_path_kvp(alt_path, page=cur_page, **alt_kvp), "rel": "alternate",
+            "type": CONTENT_TYPE_APP_JSON, "title": "Alternate endpoint with equivalent set of filtered jobs."
+        }]
 
     links = alt_links + [
-        {"href": job_list, "rel": "collection",
+        {"href": job_path, "rel": "collection",
          "type": CONTENT_TYPE_APP_JSON, "title": "Complete job listing (no filtering queries applied)."},
-        {"href": job_list, "rel": "search",
-         "type": CONTENT_TYPE_APP_JSON, "title": "Query endpoint to search for jobs."},
-        {"href": job_list + "?detail=false", "rel": "preview",
+        {"href": base_url + sd.jobs_service.path, "rel": "search",
+         "type": CONTENT_TYPE_APP_JSON, "title": "Generic query endpoint to search for jobs."},
+        {"href": job_path + "?detail=false", "rel": "preview",
          "type": CONTENT_TYPE_APP_JSON, "title": "Job listing summary (UUID and count only)."},
-        {"href": job_list, "rel": "http://www.opengis.net/def/rel/ogc/1.0/job-list",
+        {"href": job_path, "rel": "http://www.opengis.net/def/rel/ogc/1.0/job-list",
          "type": CONTENT_TYPE_APP_JSON, "title": "List of registered jobs."},
-        {"href": job_query + "page={}".format(cur_page), "rel": "current",
+        {"href": get_path_kvp(job_path, page=cur_page, **kvp_params), "rel": "current",
          "type": CONTENT_TYPE_APP_JSON, "title": "Current page of job query listing."},
-        {"href": job_query + "page=0", "rel": "first",
+        {"href": get_path_kvp(job_path, page=0, **kvp_params), "rel": "first",
          "type": CONTENT_TYPE_APP_JSON, "title": "First page of job query listing."},
-        {"href": job_query + "page={}".format(max_page), "rel": "last",
+        {"href": get_path_kvp(job_path, page=max_page, **kvp_params), "rel": "last",
          "type": CONTENT_TYPE_APP_JSON, "title": "Last page of job query listing."},
     ]
     if cur_page > 0:
         links.append({
-            "href": job_query + "page={}".format(cur_page - 1), "rel": "prev",
+            "href": get_path_kvp(job_path, page=cur_page - 1, **kvp_params), "rel": "prev",
             "type": CONTENT_TYPE_APP_JSON, "title": "Previous page of job query listing."
         })
     if cur_page < max_page:
         links.append({
-            "href": job_query + "page={}".format(cur_page + 1), "rel": "next",
+            "href": get_path_kvp(job_path, page=cur_page + 1, **kvp_params), "rel": "next",
             "type": CONTENT_TYPE_APP_JSON, "title": "Next page of job query listing."
         })
     if parent_url:
@@ -497,6 +495,7 @@ def get_job_results(request):
             "description": "Job status is '{}'. Results are not yet available.".format(job_status)
         })
     results = get_results(job, request, value_key="value", ogc_api=True)
+    # note: cannot add links in this case because variable OutputID keys are directly at the root
     results = sd.Result().deserialize(results)
     return HTTPOk(json=results)
 

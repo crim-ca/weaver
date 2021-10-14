@@ -51,11 +51,11 @@ class WpsRestApiJobsTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         warnings.simplefilter("ignore", TimeZoneInfoAlreadySetWarning)
-        settings = {
-            "weaver.url": "localhost",
+        cls.settings = {
+            "weaver.url": "https://localhost",
             "weaver.wps_email_encrypt_salt": "weaver-test",
         }
-        cls.config = setup_config_with_mongodb(settings=settings)
+        cls.config = setup_config_with_mongodb(settings=cls.settings)
         cls.app = get_test_weaver_app(config=cls.config)
         cls.json_headers = {"Accept": CONTENT_TYPE_APP_JSON, "Content-Type": CONTENT_TYPE_APP_JSON}
         cls.datetime_interval = cls.generate_test_datetimes()
@@ -311,6 +311,125 @@ class WpsRestApiJobsTest(unittest.TestCase):
                 assert set(grouped_jobs["jobs"]) == {self.job_info[0].id, self.job_info[2].id}
             else:
                 pytest.fail("Unknown job grouping 'service' value not expected.")
+
+    def test_get_jobs_links_navigation(self):
+        """
+        Verifies that relation links update according to context in order to allow natural navigation between responses.
+        """
+        def get_links(resp_links):
+            nav_links = ["up", "current", "next", "prev", "first", "last", "search", "alternate", "collection"]
+            link_dict = {rel: None for rel in nav_links}
+            for _link in resp_links:
+                if _link["rel"] in link_dict:
+                    link_dict[_link["rel"]] = _link["href"]
+            return link_dict
+
+        assert len(self.job_store.list_jobs()) == 9, "expected number of jobs mismatch, following test might not work"
+        path = get_path_kvp(sd.jobs_service.path, limit=1000)
+        resp = self.app.get(path, headers=self.json_headers)
+        assert len(resp.json["jobs"]) == 7, "unexpected number of visible jobs"
+
+        base_url = self.settings["weaver.url"]
+        jobs_url = base_url + sd.jobs_service.path
+        limit = 2  # expect 7 jobs to be visible, making 4 pages of 2
+        limit_kvp = "limit={}".format(limit)
+        path = get_path_kvp(sd.jobs_service.path, limit=limit)
+        resp = self.app.get(path, headers=self.json_headers)
+        links = get_links(resp.json["links"])
+        assert len(resp.json["jobs"]) == limit
+        assert links["alternate"] is None
+        assert links["collection"] == jobs_url
+        assert links["search"] == jobs_url
+        assert links["up"] is None, "generic jobs endpoint doesn't have any parent collection"
+        assert links["current"].startswith(jobs_url) and limit_kvp in links["current"] and "page=0" in links["current"]
+        assert links["prev"] is None, "no previous on first page (default page=0 used)"
+        assert links["next"].startswith(jobs_url) and limit_kvp in links["next"] and "page=1" in links["next"]
+        assert links["first"].startswith(jobs_url) and limit_kvp in links["first"] and "page=0" in links["first"]
+        assert links["last"].startswith(jobs_url) and limit_kvp in links["last"] and "page=3" in links["last"]
+
+        path = get_path_kvp(sd.jobs_service.path, limit=limit, page=2)
+        resp = self.app.get(path, headers=self.json_headers)
+        links = get_links(resp.json["links"])
+        assert len(resp.json["jobs"]) == limit
+        assert links["alternate"] is None
+        assert links["collection"] == jobs_url
+        assert links["search"] == jobs_url
+        assert links["up"] is None, "generic jobs endpoint doesn't have any parent collection"
+        assert links["current"].startswith(jobs_url) and limit_kvp in links["current"] and "page=2" in links["current"]
+        assert links["prev"].startswith(jobs_url) and limit_kvp in links["prev"] and "page=1" in links["prev"]
+        assert links["next"].startswith(jobs_url) and limit_kvp in links["next"] and "page=3" in links["next"]
+        assert links["first"].startswith(jobs_url) and limit_kvp in links["first"] and "page=0" in links["first"]
+        assert links["last"].startswith(jobs_url) and limit_kvp in links["last"] and "page=3" in links["last"]
+
+        path = get_path_kvp(sd.jobs_service.path, limit=limit, page=3)
+        resp = self.app.get(path, headers=self.json_headers)
+        links = get_links(resp.json["links"])
+        assert len(resp.json["jobs"]) == 1, "last page should show only remaining jobs within limit"
+        assert links["alternate"] is None
+        assert links["collection"] == jobs_url
+        assert links["search"] == jobs_url
+        assert links["up"] is None, "generic jobs endpoint doesn't have any parent collection"
+        assert links["current"].startswith(jobs_url) and limit_kvp in links["current"] and "page=3" in links["current"]
+        assert links["prev"].startswith(jobs_url) and limit_kvp in links["prev"] and "page=2" in links["prev"]
+        assert links["next"] is None, "no next page on last"
+        assert links["first"].startswith(jobs_url) and limit_kvp in links["first"] and "page=0" in links["first"]
+        assert links["last"].startswith(jobs_url) and limit_kvp in links["last"] and "page=3" in links["last"]
+
+        p_id = self.process_public.identifier  # 5 jobs with this process, but only 3 visible
+        p_j_url = base_url + sd.process_jobs_service.path.format(process_id=p_id)
+        p_url = base_url + sd.process_service.path.format(process_id=p_id)
+        p_kvp = "process={}".format(p_id)
+        path = get_path_kvp(sd.jobs_service.path, limit=1000, process=p_id)
+        resp = self.app.get(path, headers=self.json_headers)
+        assert len(resp.json["jobs"]) == 3, "unexpected number of visible jobs for specific process"
+
+        path = get_path_kvp(sd.jobs_service.path, limit=limit, page=1, process=p_id)
+        resp = self.app.get(path, headers=self.json_headers)
+        links = get_links(resp.json["links"])
+        assert len(resp.json["jobs"]) == 1, "last page should show only remaining jobs within limit"
+        assert links["alternate"].startswith(p_j_url) and p_kvp not in links["alternate"]
+        assert limit_kvp in links["alternate"] and "page=1" in links["alternate"], "alt link should also have filters"
+        assert links["collection"] == jobs_url
+        assert links["search"] == jobs_url
+        assert links["up"] == p_url, "parent path should be indirectly pointing at process description from alt link"
+        assert links["current"].startswith(jobs_url) and limit_kvp in links["current"] and "page=1" in links["current"]
+        assert links["prev"].startswith(jobs_url) and limit_kvp in links["prev"] and "page=0" in links["prev"]
+        assert links["next"] is None
+        assert links["first"].startswith(jobs_url) and limit_kvp in links["first"] and "page=0" in links["first"]
+        assert links["last"].startswith(jobs_url) and limit_kvp in links["last"] and "page=1" in links["last"]
+        assert all(p_kvp in links[rel] for rel in ["current", "next", "prev", "first", "last"] if links[rel])
+
+        path = get_path_kvp(sd.process_jobs_service.path.format(process_id=p_id), limit=limit, page=0)
+        resp = self.app.get(path, headers=self.json_headers)
+        links = get_links(resp.json["links"])
+        assert len(resp.json["jobs"]) == limit
+        assert links["alternate"].startswith(jobs_url) and "process={}".format(p_id) in links["alternate"]
+        assert limit_kvp in links["alternate"] and "page=0" in links["alternate"], "alt link should also have filters"
+        assert links["collection"] == p_j_url, "collection endpoint should rebase according to context process"
+        assert links["search"] == jobs_url, "search endpoint should remain generic jobs even with context process used"
+        assert links["up"] == p_url, "parent path should be directly pointing at process description"
+        assert links["current"].startswith(p_j_url) and limit_kvp in links["current"] and "page=0" in links["current"]
+        assert links["prev"] is None
+        assert links["next"].startswith(p_j_url) and limit_kvp in links["next"] and "page=1" in links["next"]
+        assert links["first"].startswith(p_j_url) and limit_kvp in links["first"] and "page=0" in links["first"]
+        assert links["last"].startswith(p_j_url) and limit_kvp in links["last"] and "page=1" in links["last"]
+        assert all(p_kvp not in links[rel] for rel in ["current", "next", "prev", "first", "last"] if links[rel])
+
+        over_limit = 10
+        limit_kvp = "limit={}".format(over_limit)
+        path = get_path_kvp(sd.jobs_service.path, limit=over_limit)
+        resp = self.app.get(path, headers=self.json_headers)
+        links = get_links(resp.json["links"])
+        assert len(resp.json["jobs"]) == 7, "only 7 of 9 existing jobs should be visible"
+        assert links["alternate"] is None
+        assert links["collection"] == jobs_url
+        assert links["search"] == jobs_url
+        assert links["up"] is None, "generic jobs endpoint doesn't have any parent collection"
+        assert links["current"].startswith(jobs_url) and limit_kvp in links["current"] and "page=0" in links["current"]
+        assert links["prev"] is None, "no previous on first page (default page=0 used)"
+        assert links["next"] is None, "no next page on last"
+        assert links["first"].startswith(jobs_url) and limit_kvp in links["first"] and "page=0" in links["first"]
+        assert links["last"].startswith(jobs_url) and limit_kvp in links["last"] and "page=0" in links["last"]
 
     def test_get_jobs_by_encrypted_email(self):
         """

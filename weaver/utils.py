@@ -454,7 +454,7 @@ all_cap_re = re.compile(r"([a-z0-9])([A-Z])")
 def get_path_kvp(path, sep=",", **params):
     # type: (str, str, **KVP_Item) -> str
     """
-    Generates the WPS URL with Key-Value-Pairs (KVP) query parameters.
+    Generates the URL with Key-Value-Pairs (KVP) query parameters.
 
     :param path: WPS URL or Path
     :param sep: separator to employ when multiple values are provided.

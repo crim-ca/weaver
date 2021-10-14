@@ -962,10 +962,9 @@ class Job(Base):
         base_url = get_wps_restapi_base_url(settings)
         job_url = self._job_url(base_url)  # full URL
         job_path = "{}/{}".format(base_url, sd.jobs_service.path.format(job_id=self.id))
-        job_err = job_url + "/exceptions"
         job_exec = job_url.rsplit("/", 1)[0] + "/execution"
         job_list = "{}/{}".format(base_url, sd.jobs_service.path)
-        job_links_body = {"links": [
+        job_links = [
             {"href": job_url, "rel": "status", "title": "Job status."},  # OGC
             {"href": job_url, "rel": "monitor", "title": "Job monitoring location."},  # IANA
             {"href": job_path, "rel": "alternate", "title": "Job status specific endpoint."},  # IANA
@@ -974,34 +973,42 @@ class Job(Base):
              "title": "List of submitted jobs."},
             {"href": job_exec, "rel": "http://www.opengis.net/def/rel/ogc/1.0/execute",
              "title": "New job submission endpoint for the corresponding process."},
-            {"href": job_err, "rel": "http://www.opengis.net/def/rel/ogc/1.0/exceptions",
-             "title": "List of job exceptions if applicable in case of failing job."},
-        ]}
-        job_links = ["logs", "inputs"]
+            {"href": job_url + "/inputs", "rel": "inputs",  # unofficial
+             "title": "Submitted job inputs for process execution."}
+        ]
         if self.status in JOB_STATUS_CATEGORIES[STATUS_CATEGORY_FINISHED]:
             job_status = map_status(self.status)
             if job_status == STATUS_SUCCEEDED:
-                job_links.extend(["outputs", "results"])
+                job_links.extend([
+                    {"href": job_url + "/outputs", "rel": "outputs",  # unofficial
+                     "title": "Job outputs of successful process execution (extended outputs with metadata)."},
+                    {"href": job_url + "/results", "rel": "http://www.opengis.net/def/rel/ogc/1.0/results",
+                     "title": "Job results of successful process execution (direct output values mapping)."},
+                ])
             else:
-                job_links.extend(["exceptions"])
-        for link_type in job_links:
-            link_href = "{job_url}/{res}".format(job_url=job_url, res=link_type)
-            job_links_body["links"].append({"href": link_href, "rel": link_type, "title": "Job {}.".format(link_type)})
+                job_links.append({
+                    "href": job_url + "/exceptions", "rel": "http://www.opengis.net/def/rel/ogc/1.0/exceptions",
+                    "title": "List of job exceptions if applicable in case of failing job."
+                })
+        job_links.append({
+            "href": job_url + "/logs", "rel": "logs",  # unofficial
+            "title": "List of collected job logs during process execution."
+        })
         if self_link in ["status", "inputs", "outputs", "results", "logs", "exceptions"]:
-            self_link_body = list(filter(lambda _link: _link["rel"] == self_link, job_links_body["links"]))[-1]
+            self_link_body = list(filter(lambda _link: _link["rel"].endswith(self_link), job_links))[-1]
             self_link_body = copy.deepcopy(self_link_body)
             # back to specific job if we are in one of its sub-endpoints
-            self_link_up = [{"href": job_url, "rel": "up", "title": "Job status details."}]
+            self_link_up = {"href": job_url, "rel": "up", "title": "Job status details."}
         else:
             self_link_body = {"href": job_url, "title": "Job status."}
             # back to full list of jobs if we are already on the job itself
-            self_link_up = [{"href": job_list, "rel": "up", "title": "List of submitted jobs."}]
+            self_link_up = {"href": job_list, "rel": "up", "title": "List of submitted jobs."}
         self_link_body["rel"] = "self"
-        job_links_body["links"].extend([self_link_body, self_link_up])
+        job_links.extend([self_link_body, self_link_up])
         link_meta = {"type": CONTENT_TYPE_APP_JSON, "hreflang": ACCEPT_LANGUAGE_EN_CA}
-        for link in job_links_body["links"]:
+        for link in job_links:
             link.update(link_meta)
-        return job_links_body
+        return {"links": job_links}
 
     def json(self, container=None, self_link=None):     # pylint: disable=W0221,arguments-differ
         # type: (Optional[AnySettingsContainer], Optional[str]) -> JSON
@@ -1418,7 +1425,8 @@ class Process(Base):
                 {"href": base_url, "rel": "service", "title": "Provider service description."},
                 {"href": base_url, "rel": "service-meta", "title": "Provider service definition."},
                 {"href": wps_get_caps, "rel": "service-desc", "title": "Remote service description."},
-                {"href": self.processEndpointWPS1, "rel": "process-desc", "title": "Remote process description."},
+                {"href": self.processEndpointWPS1, "rel": "http://www.opengis.net/def/rel/ogc/1.0/process-desc",
+                 "title": "Remote process description."},
             ]
             for link in wps_links:
                 link.setdefault("type", CONTENT_TYPE_APP_XML)
