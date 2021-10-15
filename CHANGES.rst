@@ -28,6 +28,8 @@ Changes:
   Report explicit ``running`` status in ``Job`` once it has been sent to the remote `WPS` endpoint.
   The API will report ``running`` in both cases in order to support `OGC API - Processes` naming conventions, but
   internal ``Job`` status will have more detail.
+- Add ``update`` timestamp to ``Job`` response to better track latest milestones saved to database.
+  This avoids users having to compare many fields (``created``, ``started``, ``finished``) depending on latest status.
 
 Fixes:
 ------
@@ -35,6 +37,8 @@ Fixes:
 - Fix missing status for cancelled ``Jobs`` in order to properly support ``dismiss`` operation
   (resolves `#145 <https://github.com/crim-ca/weaver/issues/145>`_
   and `#228 <https://github.com/crim-ca/weaver/issues/228>`_).
+- Fix all known `OGC`-specific link relationships with URI prefix
+  (resolves `#266 <https://github.com/crim-ca/weaver/issues/266>`_).
 
 `4.1.2 <https://github.com/crim-ca/weaver/tree/4.1.2>`_ (2021-10-13)
 ========================================================================
