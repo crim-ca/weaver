@@ -27,9 +27,9 @@ from tests.utils import (
     mocked_aws_credentials,
     mocked_aws_s3,
     mocked_aws_s3_bucket_test_file,
+    mocked_dismiss_process,
     mocked_execute_process,
     mocked_http_file,
-    mocked_process_job_runner,
     mocked_reference_test_file,
     mocked_sub_requests
 )
@@ -1523,6 +1523,7 @@ class WpsPackageAppTest(WpsConfigBase):
         assert processed_values["measureFloatInput"] == 10.2
         assert processed_values["measureFileInput"] == {"VALUE": {"REF": 1, "MEASUREMENT": 10.3, "UOM": "M"}}
 
+    # FIXME: create a real async test (threading/multiprocess) to evaluate this correctly
     def test_dismiss_job(self):
         """
         Test that different accept language matching supported languages all successfully execute and apply them.
@@ -1555,29 +1556,28 @@ class WpsPackageAppTest(WpsConfigBase):
             # Instead, create a full job, and simulate dismissing it midway after the fact to check result.
             for mock_exec in mocked_execute_process():
                 stack_exec.enter_context(mock_exec)
+            mock_del = stack_exec.enter_context(mocked_dismiss_process())
             path = "/processes/{}/jobs".format(self._testMethodName)
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_body, headers=self.json_headers, only_local=True)
             assert resp.status_code in [200, 201], "Failed with: [{}]\nReason:\n{}".format(resp.status_code, resp.json)
             status_url = resp.json.get("location")
-            self.monitor_job(status_url)
-            resp = self.app.get(status_url, headers=self.json_headers)
-            assert resp.status_code == 200
-            job_id = resp.json["jobID"]
+            status = self.monitor_job(status_url, return_status=True)
+            job_id = status["jobID"]
 
-            # patch the job as if still running
+            # patch the job as if still running but dismissed midway
             job = self.job_store.fetch_by_id(job_id)
             job.logs = job.logs[:len(job.logs)//2]
-            job.status = STATUS_RUNNING
-            job.process = 50
+            job.status = STATUS_DISMISSED
+            job.progress = 50
+            self.job_store.update_job(job)
 
-            resp = self.app.delete(status_url, headers=self.json_headers)
+            # validate that API reports dismiss instead of failed
+            path = "/jobs/{}".format(job_id)
+            resp = self.app.delete(path, headers=self.json_headers)
             assert resp.status_code == 200
             assert resp.json["status"] == STATUS_DISMISSED
-
-            resp = self.app.get(status_url, headers=self.json_headers)
-            assert resp.status_code == 200
-            assert resp.json["status"] == STATUS_DISMISSED
+            assert mock_del.control.revoke.called_with(job.task_id, terminate=True)
 
     # FIXME: test not working
     #   same payloads sent directly to running weaver properly raise invalid schema -> bad request error
