@@ -48,7 +48,7 @@ from weaver.formats import (
 )
 from weaver.processes.constants import CWL_REQUIREMENT_APP_DOCKER, CWL_REQUIREMENT_INIT_WORKDIR
 from weaver.processes.types import PROCESS_BUILTIN
-from weaver.status import STATUS_DISMISSED, STATUS_RUNNING
+from weaver.status import STATUS_DISMISSED
 from weaver.utils import get_any_value
 
 if TYPE_CHECKING:

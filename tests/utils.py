@@ -7,7 +7,6 @@ import inspect
 import os
 import re
 import tempfile
-import threading
 import uuid
 import warnings
 from configparser import ConfigParser
