@@ -111,7 +111,7 @@ ways as presented below.
 
     When a process is deployed with any of the below supported :term:`Application Package` formats, additional parsing
     of this :term:`CWL` as well as complementary details directly within the :term:`WPS` deployment body is
-    accomplished. See :ref:`Correspondance between CWL and WPS fields` section for more details.
+    accomplished. See :ref:`cwl-wps-mapping` section for more details.
 
 
 Package as Literal Unit Block
@@ -460,7 +460,7 @@ The former represents basic values such as integers or strings, while the other 
 Files in `Weaver` (and :term:`WPS` in general) can be specified with any ``formats`` as MIME-type.
 
 .. seealso::
-    - :ref:`Correspondance between CWL and WPS fields`
+    - :ref:`cwl-wps-mapping`
 
 As for *standard* :term:`WPS`, remote file references are *usually* limited to ``http(s)`` scheme, unless the process
 takes an input string and parses the unusual reference from the literal data to process it by itself. On the other hand,
@@ -613,10 +613,126 @@ combinations.
     add tests that validate each combination of operation
 
 
+.. _opensearch_data_source:
+
 OpenSearch Data Source
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. todo:: EOImage with AOI/TOI/CollectionId for OpenSearch
+In order to provide :term:`OpenSearch` query results as input to :term:`Process` for execution, the
+corresponding `Deploy`_ request body must be provided with ``additionalParameters`` in order to indicate
+how to interpret any specified metadata. The appropriate :term:`OpenSearch` queries can then be applied
+prior the execution to retrieve the explicit file reference(s) of :term:`EOImage` elements that have
+been found and to be submitted to the :term:`Job`.
+
+Depending on the desired context (application or per-input) over which the :term:`AOI`, :term:`TOI`, :term:`EOImage` and
+multiple other metadata search filters are to be applied, their definition can be provided in the following locations
+within the `Deploy`_ body.
+
+.. list-table::
+    :stub-columns: 1
+    :widths: 20,40,40
+
+    * - Context
+      - Application
+      - Input
+    * - Location
+      - ``processDescription.process.additionalParameters``
+      - ``processDescription.process.inputs[*].additionalParameters``
+    * - Role
+      - ``http://www.opengis.net/eoc/applicationContext``
+      - ``http://www.opengis.net/eoc/applicationContext/inputMetadata``
+
+
+The distinction between application or per-input contexts is entirely dependent of whatever is the intended processing
+operation of the underlying :term:`Process`, which is why they must be defined by the user deploying the process since
+there is no way for `Weaver` to automatically infer how to employ provided search parameters.
+
+In each case, the structure of ``additionalParameters`` should be similar to the following definition:
+
+.. code-block:: json
+
+    {
+      "additionalParameters": [
+        {
+          "role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
+          "parameters": [
+            {
+              "name": "EOImage",
+              "values": [
+                "true"
+              ]
+            },
+            {
+              "name": "AllowedCollections",
+              "values": "s2-collection-1,s2-collection-2,s2-sentinel2,s2-landsat8"
+            }
+          ]
+        }
+      ]
+    }
+
+In each case, it is also expected that the ``role`` should correspond to the location where the definition is provided
+accordingly to their context from the above table.
+
+For each deployment, processes using :term:`EOImage` to be processed into :term:`OpenSearch` query results can
+interpret the following field definitions for mapping against respective inputs or application context.
+
+.. list-table::
+    :stub-columns: 1
+    :widths: 20,20,20,40
+
+    * - Name
+      - ``EOImage``
+      - ``AllowedCollections``
+      - ``CatalogSearchField``
+      - ``UniqueAOI``
+      - ``UniqueTOI``
+    * - Values
+      - ``["true"]``
+      - String of Comma-separated list of collection IDs.
+      - ``["<name>"]``
+      - ``["true"]``
+      - ``["true"]``
+    * - Context
+      - Input
+      - Input (same one as ``EOImage``)
+      - Input (other one than ``EOImage``)
+      - Application
+      - Application
+    * - Description
+      - Indicates that the nested parameters within the current ``additionalParameters`` section where it is located
+        defines an :term:`EOImage`. This is to avoid misinterpretation by similar names that could be employed
+        by other kind of definitions. The :term:`Process` input's ``id`` where this parameter is defined is the name
+        that will be employed to pass down :term:`OpenSearch` results.
+      - Provides a subset of collection identifiers that are supported. During execution any specified input not
+        respecting one of the defined values will fail :term:`OpenSearch` query resolution.
+      - String with the relevant :term:`OpenSearch` query filter name according to the described input.
+        Defines a given :term:`Process` input ``id`` to be mapped against the specified query name.
+      - Indicates that provided ``CatalogSearchField`` (typically ``bbox``) corresponds to a global :term:`AOI` that
+        should be respected across multiple ``EOImage`` inputs. Otherwise, (default values: ``["false"]``)
+        each ``EOImage`` should be accompanied with its respective :term:`AOI` definition.
+      - Indicates that provided ``CatalogSearchField`` (typically ``StartDate`` and ``EndDate``) corresponds to a
+        global :term:`TOI` that should be respected across multiple ``EOImage`` inputs. Otherwise, (default
+        values: ``["false"]``) each ``EOImage`` should be accompanied with its respective :term:`TOI` definition.
+
+When an :term:`EOImage` is detected for a given :term:`Process`, any submitted :term:`Job` execution will expect the
+defined inputs in the :term:`Process` description to indicate which images to retrieve for the application. Using
+inputs defined with corresponding ``CatalogSearchField`` filters, a specific :term:`OpenSearch` query will be sent to
+obtain the relevant images. The inputs corresponding to search fields will then be discarded following
+:term:`OpenSearch` resolution. The resolved link(s) for to :term:`EOImage` will be substituted within the ``id`` of the
+input where ``EOImage`` was specified and will be forwarded to the underlying :term:`Application Package` for execution.
+
+.. note::
+    Collection identifiers are mapped against URL endpoints defined in configuration to execute the
+    appropriate :term:`OpenSearch` requests. See :ref:`Configuration of Data Sources` for more details.
+
+.. seealso::
+    Definitions in |opensearch-deploy|_ request body provides a more detailed example of the expected structure and
+    relevant ``additionalParameters`` locations.
+
+.. seealso::
+    Definitions in |opensearch-examples|_ providing different combinations of inputs, notably for using distinct
+    :term:`AOI`, term:`TOI` and collections, with or without ``UniqueAOI`` and ``UniqueTOI`` specifiers.
 
 Multiple Inputs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~

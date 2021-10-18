@@ -49,7 +49,7 @@ def get_test_file(*args):
 
 
 def load_json_test_file(filename):
-    return json.load(open(get_test_file("json_examples", filename)))
+    return json.load(open(get_test_file("opensearch/json", filename)))
 
 
 def make_request(**kw):

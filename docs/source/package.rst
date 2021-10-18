@@ -133,6 +133,8 @@ preserve and enforce matching input/output ``format`` definition in both :term:`
 not introduce ambiguous results (see :ref:`File Format` for more details).
 
 
+.. _cwl-wps-mapping:
+
 Correspondence between CWL and WPS fields
 ===========================================
 

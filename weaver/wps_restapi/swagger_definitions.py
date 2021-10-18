@@ -668,21 +668,41 @@ class DeploymentFormatList(ExtendedSequenceSchema):
     format_item = DeploymentFormat()
 
 
-class AdditionalParameterValuesList(ExtendedSequenceSchema):
-    values = ExtendedSchemaNode(String())
+class AdditionalParameterUnique(OneOfKeywordSchema):
+    _one_of = [
+        ExtendedSchemaNode(String(), title="InputParameterLiteral.String"),
+        ExtendedSchemaNode(Boolean(), title="InputParameterLiteral.Boolean"),
+        ExtendedSchemaNode(Integer(), title="InputParameterLiteral.Integer"),
+        ExtendedSchemaNode(Float(), title="InputParameterLiteral.Float"),
+        # PermissiveMappingSchema(title="InputParameterLiteral.object"),
+    ]
 
 
-class AdditionalParameter(ExtendedMappingSchema):
-    name = ExtendedSchemaNode(String())
-    values = AdditionalParameterValuesList()
+class AdditionalParameterListing(ExtendedSequenceSchema):
+    param = AdditionalParameterUnique()
+
+
+class AdditionalParameterValues(OneOfKeywordSchema):
+    _one_of = [
+        AdditionalParameterUnique(),
+        AdditionalParameterListing()
+    ]
+
+
+class AdditionalParameterDefinition(ExtendedMappingSchema):
+    name = SLUG(title="AdditionalParameterName", example="EOImage")
+    values = AdditionalParameterValues(example=["true"])
 
 
 class AdditionalParameterList(ExtendedSequenceSchema):
-    additionalParameter = AdditionalParameter()
+    param = AdditionalParameterDefinition()
 
 
-class AdditionalParametersMeta(LinkBase, MetadataRole):
-    pass
+class AdditionalParametersMeta(OneOfKeywordSchema):
+    _one_of = [
+        LinkBase(title="AdditionalParameterLink"),
+        MetadataRole(title="AdditionalParameterRole")
+    ]
 
 
 class AdditionalParameters(ExtendedMappingSchema):
@@ -691,7 +711,7 @@ class AdditionalParameters(ExtendedMappingSchema):
 
 class AdditionalParametersItem(AnyOfKeywordSchema):
     _any_of = [
-        AdditionalParametersMeta(missind=drop),
+        AdditionalParametersMeta(),
         AdditionalParameters()
     ]
 
@@ -1063,6 +1083,7 @@ class DescribeInputType(AllOfKeywordSchema):
         InputOutputDescriptionMeta(),
         DescribeInputTypeDefinition(),
         WithMinMaxOccurs(),
+        DescriptionExtra(),
     ]
 
     _sort_first = PROCESS_IO_FIELD_FIRST
@@ -1081,6 +1102,7 @@ class DeployInputType(AllOfKeywordSchema):
         InputOutputDescriptionMeta(),
         DeployInputTypeDefinition(),
         WithMinMaxOccurs(),
+        DescriptionExtra(),
     ]
 
     _sort_first = PROCESS_IO_FIELD_FIRST

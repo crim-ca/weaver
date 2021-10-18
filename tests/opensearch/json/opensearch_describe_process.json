@@ -18,7 +18,7 @@
       "inputs": [
         {
           "id": "collectionId_image-s2",
-          "title": "Collection Identifer for input image-s2",
+          "title": "Collection Identifier for input image-s2",
           "formats": [
             {
               "mimeType": "text/plain",
@@ -39,7 +39,7 @@
         },
         {
           "id": "collectionId_image-probav",
-          "title": "Collection Identifer for input image-probav",
+          "title": "Collection Identifier for input image-probav",
           "formats": [
             {
               "mimeType": "text/plain",
@@ -58,7 +58,7 @@
         },
         {
           "id": "collectionId_image-deimos",
-          "title": "Collection Identifer for input image-deimos",
+          "title": "Collection Identifier for input image-deimos",
           "formats": [
             {
               "mimeType": "text/plain",
