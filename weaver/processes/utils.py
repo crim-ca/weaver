@@ -114,10 +114,40 @@ def _check_deploy(payload):
     Validate minimum deploy payload field requirements with exception handling.
     """
     # FIXME: handle colander invalid directly in tween (https://github.com/crim-ca/weaver/issues/112)
+    message = "Process deployment definition is invalid."
     try:
-        sd.Deploy().deserialize(payload)
-    except colander.Invalid as ex:
-        raise HTTPBadRequest("Invalid schema: [{!s}]".format(ex))
+        results = sd.Deploy().deserialize(payload)
+        # Because many fields are optional during deployment to allow flexibility between compatible WPS/CWL
+        # definitions, any invalid field at lower-level could make a full higher-level definition to be dropped.
+        # Verify the result to ensure this was not the case for known cases to attempt early detection.
+        p_inputs = payload.get("processDescription", {}).get("process", {}).get("inputs")
+        r_inputs = results.get("processDescription", {}).get("process", {}).get("inputs")
+        if p_inputs and p_inputs != r_inputs:
+            message = "Process deployment inputs definition is invalid."
+            # try raising sub-schema to have specific reason
+            d_inputs = sd.DeployInputTypeAny().deserialize(p_inputs)
+            # Raise directly if we where not able to detect the cause, but there is something incorrectly dropped.
+            # Only raise if indirect vs direct inputs deserialize differ such that auto-resolved defaults omitted from
+            # submitted process inputs or unknowns fields that were correctly ignored don't cause false-positive diffs.
+            if r_inputs != d_inputs:
+                message = (
+                    "Process deployment inputs definition resolved as valid schema but differ from submitted values. "
+                    "Validate provided inputs against resolved inputs with schemas to avoid mismatching definitions."
+                )
+                raise HTTPBadRequest(json={
+                    "description": message,
+                    "cause": "unknown",
+                    "error": "Invalid",
+                    "value": d_inputs
+                })
+        return results
+    except colander.Invalid as exc:
+        raise HTTPBadRequest(json={
+            "description": message,
+            "cause": "Invalid schema: [{!s}]".format(exc.msg),
+            "error": exc.__class__.__name__,
+            "value": exc.value
+        })
 
 
 @log_unhandled_exceptions(logger=LOGGER, message="Unhandled error occurred during parsing of process definition.",
@@ -170,10 +200,9 @@ def deploy_process_from_payload(payload, container, overwrite=False):
     :returns: HTTPOk if the process registration was successful.
     :raises HTTPException: for any invalid process deployment step.
     """
-    _check_deploy(payload)
-
     # use deepcopy of to remove any circular dependencies before writing to mongodb or any updates to the payload
     payload_copy = deepcopy(payload)
+    payload = _check_deploy(payload)
 
     # validate identifier naming for unsupported characters
     process_description = payload.get("processDescription")

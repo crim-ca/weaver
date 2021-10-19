@@ -19,7 +19,7 @@ from copy import copy
 from typing import TYPE_CHECKING
 
 import yaml
-from colander import DateTime, Email, OneOf, Range, Regex, drop, required
+from colander import DateTime, Email, OneOf, Range, Regex, drop, null, required
 from cornice import Service
 from dateutil import parser as date_parser
 
@@ -668,21 +668,41 @@ class DeploymentFormatList(ExtendedSequenceSchema):
     format_item = DeploymentFormat()
 
 
-class AdditionalParameterValuesList(ExtendedSequenceSchema):
-    values = ExtendedSchemaNode(String())
+class AdditionalParameterUnique(OneOfKeywordSchema):
+    _one_of = [
+        ExtendedSchemaNode(String(), title="InputParameterLiteral.String"),
+        ExtendedSchemaNode(Boolean(), title="InputParameterLiteral.Boolean"),
+        ExtendedSchemaNode(Integer(), title="InputParameterLiteral.Integer"),
+        ExtendedSchemaNode(Float(), title="InputParameterLiteral.Float"),
+        # PermissiveMappingSchema(title="InputParameterLiteral.object"),
+    ]
 
 
-class AdditionalParameter(ExtendedMappingSchema):
-    name = ExtendedSchemaNode(String())
-    values = AdditionalParameterValuesList()
+class AdditionalParameterListing(ExtendedSequenceSchema):
+    param = AdditionalParameterUnique()
+
+
+class AdditionalParameterValues(OneOfKeywordSchema):
+    _one_of = [
+        AdditionalParameterUnique(),
+        AdditionalParameterListing()
+    ]
+
+
+class AdditionalParameterDefinition(ExtendedMappingSchema):
+    name = SLUG(title="AdditionalParameterName", example="EOImage")
+    values = AdditionalParameterValues(example=["true"])
 
 
 class AdditionalParameterList(ExtendedSequenceSchema):
-    additionalParameter = AdditionalParameter()
+    param = AdditionalParameterDefinition()
 
 
-class AdditionalParametersMeta(LinkBase, MetadataRole):
-    pass
+class AdditionalParametersMeta(OneOfKeywordSchema):
+    _one_of = [
+        LinkBase(title="AdditionalParameterLink"),
+        MetadataRole(title="AdditionalParameterRole")
+    ]
 
 
 class AdditionalParameters(ExtendedMappingSchema):
@@ -691,7 +711,7 @@ class AdditionalParameters(ExtendedMappingSchema):
 
 class AdditionalParametersItem(AnyOfKeywordSchema):
     _any_of = [
-        AdditionalParametersMeta(missind=drop),
+        AdditionalParametersMeta(),
         AdditionalParameters()
     ]
 
@@ -783,9 +803,9 @@ class MinOccursDefinition(OneOfKeywordSchema):
     title = "MinOccurs"
     example = 1
     _one_of = [
-        ExtendedSchemaNode(Integer(), validator=Range(min=0),
-                           description="Positive integer."),
-        ExtendedSchemaNode(String(), validator=StringRange(min=0), pattern="^[0-9]+$",
+        ExtendedSchemaNode(Integer(), validator=Range(min=0), title="MinOccurs.integer",
+                           ddescription="Positive integer."),
+        ExtendedSchemaNode(String(), validator=StringRange(min=0), pattern="^[0-9]+$", title="MinOccurs.string",
                            description="Numerical string representing a positive integer."),
     ]
 
@@ -795,17 +815,28 @@ class MaxOccursDefinition(OneOfKeywordSchema):
     title = "MaxOccurs"
     example = 1
     _one_of = [
-        ExtendedSchemaNode(Integer(), validator=Range(min=0),
+        ExtendedSchemaNode(Integer(), validator=Range(min=0), title="MaxOccurs.integer",
                            description="Positive integer."),
-        ExtendedSchemaNode(String(), validator=StringRange(min=0), pattern="^[0-9]+$",
+        ExtendedSchemaNode(String(), validator=StringRange(min=0), pattern="^[0-9]+$", title="MaxOccurs.string",
                            description="Numerical string representing a positive integer."),
-        ExtendedSchemaNode(String(), validator=OneOf(["unbounded"])),
+        ExtendedSchemaNode(String(), validator=OneOf(["unbounded"]), title="MaxOccurs.unbounded",
+                           description="Special value indicating no limit to occurrences."),
     ]
 
 
-class WithMinMaxOccurs(ExtendedMappingSchema):
-    minOccurs = MinOccursDefinition(missing=drop)
-    maxOccurs = MaxOccursDefinition(missing=drop)
+class DescribeMinMaxOccurs(ExtendedMappingSchema):
+    minOccurs = MinOccursDefinition()
+    maxOccurs = MaxOccursDefinition()
+
+
+class DeployMinMaxOccurs(ExtendedMappingSchema):
+    # entirely omitted definitions are permitted to allow inference from fields in package (CWL) or using defaults
+    # if explicitly provided though, schema format and values should be validated
+    # - do not use 'missing=drop' to ensure we raise provided invalid value instead of ignoring it
+    # - do not use any specific value (e.g.: 1) for 'default' such that we do not inject an erroneous value when it
+    #   was originally omitted, since it could be resolved differently depending on matching CWL inputs definitions
+    minOccurs = MinOccursDefinition(default=null, missing=null)
+    maxOccurs = MaxOccursDefinition(default=null, missing=null)
 
 
 # does not inherit from 'DescriptionLinks' because other 'ProcessDescription<>' schema depend from this without 'links'
@@ -1059,7 +1090,8 @@ class DescribeInputType(AllOfKeywordSchema):
         DescriptionType(),
         InputOutputDescriptionMeta(),
         DescribeInputTypeDefinition(),
-        WithMinMaxOccurs(),
+        DescribeMinMaxOccurs(),
+        DescriptionExtra(),
     ]
 
     _sort_first = PROCESS_IO_FIELD_FIRST
@@ -1077,7 +1109,8 @@ class DeployInputType(AllOfKeywordSchema):
         DeploymentType(),
         InputOutputDescriptionMeta(),
         DeployInputTypeDefinition(),
-        WithMinMaxOccurs(),
+        DeployMinMaxOccurs(),
+        DescriptionExtra(),
     ]
 
     _sort_first = PROCESS_IO_FIELD_FIRST
@@ -1129,8 +1162,8 @@ class DeployInputTypeMap(PermissiveMappingSchema):
 
 class DeployInputTypeAny(OneOfKeywordSchema):
     _one_of = [
-        DeployInputTypeList,
-        DeployInputTypeMap,
+        DeployInputTypeList(),
+        DeployInputTypeMap(),
     ]
 
 
@@ -3089,8 +3122,8 @@ class CWLDefault(OneOfKeywordSchema):
 class CWLInputObject(PermissiveMappingSchema):
     type = CWLType()
     default = CWLDefault(missing=drop, description="Default value of input if not provided for task execution.")
-    inputBinding = ExtendedMappingSchema(missing=drop, title="Input Binding",
-                                         description="Defines how to specify the input for the command.")
+    inputBinding = PermissiveMappingSchema(missing=drop, title="Input Binding",
+                                           description="Defines how to specify the input for the command.")
 
 
 class CWLTypeStringList(ExtendedSequenceSchema):

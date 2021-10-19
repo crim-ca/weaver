@@ -87,6 +87,10 @@
 .. _Dockerfile-manager: ../../../docker/Dockerfile-manager
 .. _Dockerfile-worker: ../../../docker/Dockerfile-worker
 .. _email-template: ../../../weaver/wps_restapi/templates/notification_email_example.mako
+.. |opensearch-deploy| replace:: OpenSearch Deploy
+.. _opensearch-deploy: ../../../tests/opensearch/json/opensearch_deploy.json
+.. |opensearch-examples| replace:: OpenSearch Examples
+.. _opensearch-examples: https://github.com/crim-ca/weaver/tree/master/tests/opensearch/json
 
 .. API requests
 .. Full path displayed, otherwise use '-name' suffixed reference for same link with only the general name (no path)

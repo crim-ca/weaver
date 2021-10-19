@@ -273,6 +273,78 @@ def test_oneof_dropable():
     ])
 
 
+def test_oneof_optional_default_with_nested_required():
+    """
+    Using ``oneOf`` keyword that is optional with default, its required subnodes must resolve to the provided default.
+
+    The resolution of default in this case is particular because the nested schemas of ``oneOf`` are not necessarily
+    mappings themselves (as is ``oneOf`` schema). Default resolution must take this into account when the corresponding
+    schema-fields are invalid or omitted. Not only that, nested schemas can each be composed of distinct schema types.
+    """
+    class MappingSchema(ce.ExtendedMappingSchema):
+        value = ce.ExtendedSchemaNode(ce.ExtendedInteger())  # strict int, no auto convert to str
+
+    class OneOfDifferentNested(ce.OneOfKeywordSchema):
+        _one_of = [
+            ce.ExtendedSchemaNode(ce.ExtendedString()),  # strict string, no auto convert from int
+            MappingSchema()
+        ]
+
+    class OneOfRequiredDefaultStr(ce.ExtendedMappingSchema):
+        field = OneOfDifferentNested(default="1")  # match first schema of OneOf
+
+    class OneOfRequiredDefaultMap(ce.ExtendedMappingSchema):
+        field = OneOfDifferentNested(default={"value": 1})  # match second schema of OneOf
+
+    class OneOfMissingDropDefaultStr(ce.ExtendedMappingSchema):
+        field = OneOfDifferentNested(default="1", missing=colander.drop)
+
+    class OneOfMissingDropDefaultMap(ce.ExtendedMappingSchema):
+        field = OneOfDifferentNested(default={"value": 1}, missing=colander.drop)
+
+    class OneOfMissingNullDefaultStr(ce.ExtendedMappingSchema):
+        field = OneOfDifferentNested(default="1", missing=colander.null)
+
+    class OneOfMissingNullDefaultMap(ce.ExtendedMappingSchema):
+        field = OneOfDifferentNested(default={"value": 1}, missing=colander.null)
+
+    class OneOfMissingNullDefaultNull(ce.ExtendedMappingSchema):
+        field = OneOfDifferentNested(default=colander.null, missing=colander.null)
+
+    evaluate_test_cases([
+        (OneOfRequiredDefaultStr, {}, {"field": "1"}),
+        (OneOfRequiredDefaultStr, None, colander.Invalid),  # oneOf itself is required
+        (OneOfRequiredDefaultStr, {"field": True}, colander.Invalid),  # raise because provided is wrong format
+        (OneOfRequiredDefaultStr, {"field": {}}, colander.Invalid),
+        (OneOfRequiredDefaultStr, {"field": {"value": "1"}}, colander.Invalid),
+        (OneOfRequiredDefaultStr, {"field": {"value": 1}}, {"field": {"value": 1}}),
+        (OneOfMissingDropDefaultStr, {"field": True}, {}),
+        (OneOfMissingDropDefaultStr, {"field": 1}, {}),
+        (OneOfMissingNullDefaultStr, {}, {"field": "1"}),
+        (OneOfMissingNullDefaultStr, {"field": True}, colander.Invalid),
+        (OneOfMissingNullDefaultStr, {"field": {"value": "1"}}, colander.Invalid),
+        (OneOfMissingNullDefaultStr, {"field": {"value": 1}}, {"field": {"value": 1}}),
+        (OneOfRequiredDefaultMap, {}, {"field": {"value": 1}}),  # default
+        (OneOfRequiredDefaultMap, None, colander.Invalid),
+        (OneOfRequiredDefaultMap, {"field": True}, colander.Invalid),
+        (OneOfRequiredDefaultMap, {"field": {}}, colander.Invalid),
+        (OneOfRequiredDefaultMap, {"field": {"value": "1"}}, colander.Invalid),
+        (OneOfRequiredDefaultMap, {"field": {"value": 1}}, {"field": {"value": 1}}),
+        (OneOfRequiredDefaultMap, {}, {"field": {"value": 1}}),  # default
+        (OneOfMissingDropDefaultMap, {"field": True}, {}),
+        (OneOfMissingDropDefaultMap, {"field": 1}, {}),
+        (OneOfMissingNullDefaultMap, {}, {"field": {"value": 1}}),
+        (OneOfMissingNullDefaultMap, {"field": True}, colander.Invalid),
+        (OneOfMissingNullDefaultMap, {"field": {"value": "1"}}, colander.Invalid),
+        (OneOfMissingNullDefaultMap, {"field": {"value": 1}}, {"field": {"value": 1}}),
+        (OneOfMissingNullDefaultNull, {}, {}),
+        (OneOfMissingNullDefaultNull, {"field": True}, colander.Invalid),
+        (OneOfMissingNullDefaultNull, {"field": {"value": "1"}}, colander.Invalid),
+        (OneOfMissingNullDefaultNull, {"field": "1"}, {"field": "1"}),
+        (OneOfMissingNullDefaultNull, {"field": {"value": 1}}, {"field": {"value": 1}}),
+    ])
+
+
 def test_not_keyword_extra_fields_handling():
     """
     Using ``not`` keyword without any other schemas must return an empty mapping with additional fields dropped.

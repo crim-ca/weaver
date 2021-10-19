@@ -111,7 +111,7 @@ ways as presented below.
 
     When a process is deployed with any of the below supported :term:`Application Package` formats, additional parsing
     of this :term:`CWL` as well as complementary details directly within the :term:`WPS` deployment body is
-    accomplished. See :ref:`Correspondance between CWL and WPS fields` section for more details.
+    accomplished. See :ref:`cwl-wps-mapping` section for more details.
 
 
 Package as Literal Unit Block
@@ -460,7 +460,7 @@ The former represents basic values such as integers or strings, while the other 
 Files in `Weaver` (and :term:`WPS` in general) can be specified with any ``formats`` as MIME-type.
 
 .. seealso::
-    - :ref:`Correspondance between CWL and WPS fields`
+    - :ref:`cwl-wps-mapping`
 
 As for *standard* :term:`WPS`, remote file references are *usually* limited to ``http(s)`` scheme, unless the process
 takes an input string and parses the unusual reference from the literal data to process it by itself. On the other hand,
@@ -547,23 +547,26 @@ combinations.
 |           |                                           +---------------+                                           |
 |           |                                           | |s3_scheme|   |                                           |
 +-----------+-------------------------------------------+---------------+-------------------------------------------+
-| |HYBRID|  | |HYBRID| assumes |ADES| role (remote):    | |file_scheme| | Convert to |http_scheme| [#file2http]_    |
-|           | - `WPS-1/2`_                              +---------------+-------------------------------------------+
-|           | - `ESGF-CWT`_                             | |http_scheme| | Nothing (unmodified)                      |
-|           | - `WPS-REST`_ (remote) [#wps3]_           +---------------+-------------------------------------------+
-|           | - :ref:`remote-provider`                  | |s3_scheme|   | Fetch and convert to |http_scheme| [#s3]_ |
+| |HYBRID|  | - `WPS-1/2`_                              | |file_scheme| | Convert to |http_scheme| [#file2http]_    |
+|           | - `ESGF-CWT`_                             +---------------+-------------------------------------------+
+|           | - `WPS-REST`_ (remote) [#wps3]_           | |http_scheme| | Nothing (unmodified)                      |
+|           | - :ref:`remote-provider`                  +---------------+-------------------------------------------+
+|           |                                           | |s3_scheme|   | Fetch and convert to |http_scheme| [#s3]_ |
+|           | *Note*: |HYBRID| assumes |ADES| role      |               |                                           |
+|           | (remote processes)                        |               |                                           |
 |           +-------------------------------------------+---------------+-------------------------------------------+
-|           | |HYBRID| assumes |ADES| role (local):     | |file_scheme| | Nothing (unmodified)                      |
-|           | - `WPS-REST`_ (`CWL`) [#wps3]_            +---------------+-------------------------------------------+
+|           | - `WPS-REST`_ (`CWL`) [#wps3]_            | |file_scheme| | Nothing (unmodified)                      |
+|           |                                           +---------------+-------------------------------------------+
 |           |                                           | |http_scheme| | Fetch and convert to |file_scheme|        |
 |           |                                           +---------------+                                           |
-|           |                                           | |s3_scheme|   |                                           |
+|           | *Note*: |HYBRID| assumes |ADES| role      |               |                                           |
+|           | (local processes)                         |               |                                           |
 |           +-------------------------------------------+---------------+-------------------------------------------+
-|           | |HYBRID| assumes |EMS| role:              | |file_scheme| | Convert to |http_scheme| [#file2http]_    |
-|           | - `Workflow`_ (`CWL`) [#wf]_              +---------------+-------------------------------------------+
+|           | - `Workflow`_ (`CWL`) [#wf]_              | |file_scheme| | Convert to |http_scheme| [#file2http]_    |
+|           |                                           +---------------+-------------------------------------------+
 |           |                                           | |http_scheme| | Nothing (unmodified, step will handle it) |
 |           |                                           +---------------+                                           |
-|           |                                           | |s3_scheme|   |                                           |
+|           | *Note*: |HYBRID| assumes |EMS| role       | |s3_scheme|   |                                           |
 +-----------+-------------------------------------------+---------------+-------------------------------------------+
 
 .. |any| replace:: *<any>*
@@ -576,6 +579,10 @@ combinations.
 .. |EMS| replace:: :term:`EMS`
 .. |HYBRID| replace:: :term:`HYBRID`
 
+.. |br| raw:: html
+
+    <br>
+
 .. rubric:: Footnotes
 
 .. [#openseach]
@@ -587,6 +594,8 @@ combinations.
     When a ``file://`` (or empty scheme) maps to a local file that needs to be exposed externally for
     another remote process, the conversion to ``http(s)://`` scheme employs setting ``weaver.wps_output_url`` to form
     the result URL reference. The file is placed in ``weaver.wps_output_dir`` to expose it as HTTP(S) endpoint.
+    Note that the HTTP(S) servicing of the file is not handled by `Weaver` itself. It is assumed that the server
+    where `Weaver` is hosted or another service takes care of this task.
 
 .. [#wps3]
     When the process refers to a remote :ref:`WPS-REST` process (i.e.: remote :term:`WPS` instance that supports
@@ -613,10 +622,126 @@ combinations.
     add tests that validate each combination of operation
 
 
+.. _opensearch_data_source:
+
 OpenSearch Data Source
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. todo:: EOImage with AOI/TOI/CollectionId for OpenSearch
+In order to provide :term:`OpenSearch` query results as input to :term:`Process` for execution, the
+corresponding `Deploy`_ request body must be provided with ``additionalParameters`` in order to indicate
+how to interpret any specified metadata. The appropriate :term:`OpenSearch` queries can then be applied
+prior the execution to retrieve the explicit file reference(s) of :term:`EOImage` elements that have
+been found and to be submitted to the :term:`Job`.
+
+Depending on the desired context (application or per-input) over which the :term:`AOI`, :term:`TOI`, :term:`EOImage` and
+multiple other metadata search filters are to be applied, their definition can be provided in the following locations
+within the `Deploy`_ body.
+
+.. list-table::
+    :header-rows: 1
+    :widths: 20,40,40
+
+    * - Context
+      - Location
+      - Role
+    * - Application
+      - ``processDescription.process.additionalParameters``
+      - ``http://www.opengis.net/eoc/applicationContext``
+    * - Input
+      - ``processDescription.process.inputs[*].additionalParameters``
+      - ``http://www.opengis.net/eoc/applicationContext/inputMetadata``
+
+
+The distinction between application or per-input contexts is entirely dependent of whatever is the intended processing
+operation of the underlying :term:`Process`, which is why they must be defined by the user deploying the process since
+there is no way for `Weaver` to automatically infer how to employ provided search parameters.
+
+In each case, the structure of ``additionalParameters`` should be similar to the following definition:
+
+.. code-block:: json
+
+    {
+      "additionalParameters": [
+        {
+          "role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
+          "parameters": [
+            {
+              "name": "EOImage",
+              "values": [
+                "true"
+              ]
+            },
+            {
+              "name": "AllowedCollections",
+              "values": "s2-collection-1,s2-collection-2,s2-sentinel2,s2-landsat8"
+            }
+          ]
+        }
+      ]
+    }
+
+In each case, it is also expected that the ``role`` should correspond to the location where the definition is provided
+accordingly to their context from the above table.
+
+For each deployment, processes using :term:`EOImage` to be processed into :term:`OpenSearch` query results can
+interpret the following field definitions for mapping against respective inputs or application context.
+
+.. list-table::
+    :header-rows: 1
+    :widths: 10,10,20,60
+
+    * - Name
+      - Values
+      - Context
+      - Description
+    * - ``EOImage``
+      - ``["true"]``
+      - Input
+      - Indicates that the nested parameters within the current ``additionalParameters`` section where it is located
+        defines an :term:`EOImage`. This is to avoid misinterpretation by similar names that could be employed
+        by other kind of definitions. The :term:`Process` input's ``id`` where this parameter is defined is the name
+        that will be employed to pass down :term:`OpenSearch` results.
+    * - ``AllowedCollections``
+      - String of comma-separated list of collection IDs.
+      - Input (same one as ``EOImage``)
+      - Provides a subset of collection identifiers that are supported. During execution any specified input not
+        respecting one of the defined values will fail :term:`OpenSearch` query resolution.
+    * - ``CatalogSearchField``
+      - ``["<name>"]``
+      - Input (other one than ``EOImage``)
+      - String with the relevant :term:`OpenSearch` query filter name according to the described input.
+        Defines a given :term:`Process` input ``id`` to be mapped against the specified query name.
+    * - ``UniqueAOI``
+      - ``["true"]``
+      - Application
+      - Indicates that provided ``CatalogSearchField`` (typically ``bbox``) corresponds to a global :term:`AOI` that
+        should be respected across multiple ``EOImage`` inputs. Otherwise, (default values: ``["false"]``)
+        each ``EOImage`` should be accompanied with its respective :term:`AOI` definition.
+    * - ``UniqueTOI``
+      - ``["true"]``
+      - Application
+      - Indicates that provided ``CatalogSearchField`` (typically ``StartDate`` and ``EndDate``) corresponds to a
+        global :term:`TOI` that should be respected across multiple ``EOImage`` inputs. Otherwise, (default
+        values: ``["false"]``) each ``EOImage`` should be accompanied with its respective :term:`TOI` definition.
+
+When an :term:`EOImage` is detected for a given :term:`Process`, any submitted :term:`Job` execution will expect the
+defined inputs in the :term:`Process` description to indicate which images to retrieve for the application. Using
+inputs defined with corresponding ``CatalogSearchField`` filters, a specific :term:`OpenSearch` query will be sent to
+obtain the relevant images. The inputs corresponding to search fields will then be discarded following
+:term:`OpenSearch` resolution. The resolved link(s) for to :term:`EOImage` will be substituted within the ``id`` of the
+input where ``EOImage`` was specified and will be forwarded to the underlying :term:`Application Package` for execution.
+
+.. note::
+    Collection identifiers are mapped against URL endpoints defined in configuration to execute the
+    appropriate :term:`OpenSearch` requests. See :ref:`Configuration of Data Sources` for more details.
+
+.. seealso::
+    Definitions in |opensearch-deploy|_ request body provides a more detailed example of the expected structure and
+    relevant ``additionalParameters`` locations.
+
+.. seealso::
+    Definitions in |opensearch-examples|_ providing different combinations of inputs, notably for using distinct
+    :term:`AOI`, term:`TOI` and collections, with or without ``UniqueAOI`` and ``UniqueTOI`` specifiers.
 
 Multiple Inputs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~

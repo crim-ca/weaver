@@ -13,6 +13,11 @@ Glossary
         | See :ref:`processes` section for details.
           Alternative operation modes are described in :ref:`Configuration Settings`.
 
+    AOI
+        | Area of Interest.
+        | Corresponds to a region, often provided by :term:`OGC` :term:`WKT` definition, employed for :term:`OpenSearch`
+          queries in the context of :term:`EOImage` inputs.
+
     Application Package
         General term that refers to *"what and how the :term:`Process` will execute"*. Application Packages provide
         the core details about the execution methodology of the underlying operation the :term:`Process` provides, and
@@ -42,6 +47,14 @@ Glossary
         | |ems|
         | See :ref:`processes` section for details.
           Alternative operation modes are described in :ref:`Configuration Settings`.
+
+    EOImage
+        | Earth Observation Image
+        | Input that interprets additional parameters in order to infer specific images applicable with filters
+          following search results within a remote catalog.
+
+        .. seealso::
+            :ref:`opensearch_data_source` section.
 
     ESGF
         |esgf|_
@@ -98,6 +111,11 @@ Glossary
 
     S3
         Simple Storage Service (:term:`AWS` S3), bucket file storage.
+
+    TOI
+        | Time of Interest.
+        | Corresponds to a date/time interval employed for :term:`OpenSearch` queries in the context
+          of :term:`EOImage` inputs.
 
     WKT
         Well-Known Text geometry representation.

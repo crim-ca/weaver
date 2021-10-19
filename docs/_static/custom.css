@@ -26,3 +26,18 @@ div[class^="highlight"] {
     max-width: none !important;
 }
 */
+
+/* override table width restrictions
+   avoids cells trying to fit all their text single line with a slider
+   instead, text will wrap according to specified :widths: specifications
+*/
+.wy-table-responsive table td,
+.wy-table-responsive table th {
+    white-space: normal;
+}
+
+.wy-table-responsive {
+    margin-bottom: 24px;
+    max-width: 100%;
+    overflow: visible;
+}

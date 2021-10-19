@@ -18,7 +18,6 @@ from typing import TYPE_CHECKING
 
 import colander
 import pytest
-from pyramid.httpexceptions import HTTPBadRequest
 
 from tests import resources
 from tests.functional.utils import WpsConfigBase
@@ -47,7 +46,7 @@ from weaver.formats import (
     get_cwl_file_format
 )
 from weaver.processes.constants import CWL_REQUIREMENT_APP_DOCKER, CWL_REQUIREMENT_INIT_WORKDIR
-from weaver.processes.types import PROCESS_BUILTIN
+from weaver.processes.types import PROCESS_APPLICATION, PROCESS_BUILTIN
 from weaver.status import STATUS_DISMISSED
 from weaver.utils import get_any_value
 
@@ -518,6 +517,8 @@ class WpsPackageAppTest(WpsConfigBase):
     def test_block_builtin_processes_from_api(self):
         """
         Test to validates if ``builtin`` process type is explicitly blocked during deployment from API.
+
+        .. versionchanged:: 4.2
         """
         cwl = {
             "cwlVersion": "v1.0",
@@ -550,7 +551,16 @@ class WpsPackageAppTest(WpsConfigBase):
                 stack_exec.enter_context(mock_exec)
             resp = mocked_sub_requests(self.app, "post_json", "/processes", data=body, timeout=5,
                                        headers=self.json_headers, only_local=True, expect_errors=True)
-            assert resp.status_code == 400
+            # With Weaver<=4.1.x, the 'type' was explicitly checked to block it since Deploy payload was kept as is
+            # This field was allowed to trickle all they way down to the instantiation of Process object
+            # assert resp.status_code == 200
+
+            # With Weaver>4.1.x, the deserialized result from Deploy payload is employed, which drops unknown 'type'
+            # Ensure that deploy now succeeds, but the obtained Process is not 'builtin' (just a regular application)
+            assert resp.status_code == 201
+            assert PROCESS_BUILTIN not in resp.json["processSummary"]["keywords"]
+            process = self.process_store.fetch_by_id(self._testMethodName)
+            assert process.type == PROCESS_APPLICATION
 
     def test_block_unknown_processes(self):
         """
@@ -964,6 +974,14 @@ class WpsPackageAppTest(WpsConfigBase):
                ``default`` is not explicitly defined in `CWL` nor `WPS`.
             9. ``default=<value>`` is automatically added to `CWL` if ``default=<value>`` is provided in `WPS` and
                ``default`` is not explicitly defined in `CWL`.
+
+        .. note::
+            This test assumes formats/values are valid and can be resolved.
+            Validation of formats/values themselves are accomplished in other tests.
+
+        .. seealso::
+            - :meth:`test_valid_io_min_max_occurs_as_str_or_int`
+            - :meth:`test_invalid_io_min_max_occurs_wrong_format`
         """
         cwl = {
             "cwlVersion": "v1.0",
@@ -1101,9 +1119,6 @@ class WpsPackageAppTest(WpsConfigBase):
         assert pkg["inputs"][13]["id"] == "optional_array_max_fixed_by_wps"
         # assert pkg["inputs"][13]["type"] == "string[]?"
 
-    # FIXME: https://github.com/crim-ca/weaver/issues/50
-    #   'unbounded' value should not override literal 2/'2'
-    @pytest.mark.xfail(reason="MinOccurs/MaxOccurs values in response should be preserved as defined in deploy body")
     def test_valid_io_min_max_occurs_as_str_or_int(self):
         """
         Test validates that I/O definitions with ``minOccurs`` and/or ``maxOccurs`` are permitted as both integer and
@@ -1111,6 +1126,7 @@ class WpsPackageAppTest(WpsConfigBase):
 
         .. seealso::
             - :meth:`test_invalid_io_min_max_occurs_wrong_format`
+            - :meth:`test_resolution_io_min_max_occurs`
         """
         cwl = {
             "cwlVersion": "v1.0",
@@ -1120,8 +1136,8 @@ class WpsPackageAppTest(WpsConfigBase):
                 {"id": "io_min_int_max_str", "type": "string"},
                 {"id": "io_min_str_max_int", "type": "string"},
                 {"id": "io_min_str_max_str", "type": "string"},
-                {"id": "io_min_int_max_unbounded", "type": "string"},
-                {"id": "io_min_str_max_unbounded", "type": "string"},
+                {"id": "io_min_int_max_unbounded", "type": {"type": "array", "items": "string"}},
+                {"id": "io_min_str_max_unbounded", "type": {"type": "array", "items": "string"}},
             ],
             "outputs": {"values": {"type": "string"}}
         }
@@ -1133,10 +1149,10 @@ class WpsPackageAppTest(WpsConfigBase):
                     "abstract": "this is a test",
                 },
                 "inputs": [
-                    {"id": "io_min_int_max_int", "minOccurs": 1, "maxOccurs": 2},
-                    {"id": "io_min_int_max_str", "minOccurs": 1, "maxOccurs": "2"},
-                    {"id": "io_min_str_max_int", "minOccurs": "1", "maxOccurs": 2},
-                    {"id": "io_min_str_max_str", "minOccurs": "1", "maxOccurs": "2"},
+                    {"id": "io_min_int_max_int", "minOccurs": 1, "maxOccurs": 1},
+                    {"id": "io_min_int_max_str", "minOccurs": 1, "maxOccurs": "1"},
+                    {"id": "io_min_str_max_int", "minOccurs": "1", "maxOccurs": 1},
+                    {"id": "io_min_str_max_str", "minOccurs": "1", "maxOccurs": "1"},
                     {"id": "io_min_int_max_unbounded", "minOccurs": 1, "maxOccurs": "unbounded"},
                     {"id": "io_min_str_max_unbounded", "minOccurs": "1", "maxOccurs": "unbounded"},
                 ]
@@ -1579,10 +1595,6 @@ class WpsPackageAppTest(WpsConfigBase):
             assert resp.json["status"] == STATUS_DISMISSED
             assert mock_del.control.revoke.called_with(job.task_id, terminate=True)
 
-    # FIXME: test not working
-    #   same payloads sent directly to running weaver properly raise invalid schema -> bad request error
-    #   somehow they don't work within this test (not raised)...
-    @pytest.mark.xfail(reason="MinOccurs/MaxOccurs somehow fail validation here, but s")
     def test_invalid_io_min_max_occurs_wrong_format(self):
         """
         Test verifies that ``minOccurs`` and/or ``maxOccurs`` definitions other than allowed formats are raised as
@@ -1590,6 +1602,7 @@ class WpsPackageAppTest(WpsConfigBase):
 
         .. seealso::
             - :meth:`test_valid_io_min_max_occurs_as_str_or_int`
+            - :meth:`test_resolution_io_min_max_occurs`
         """
         cwl = {
             "cwlVersion": "v1.0",
@@ -1603,8 +1616,8 @@ class WpsPackageAppTest(WpsConfigBase):
                     "id": self._testMethodName,
                     "title": "some title",
                     "abstract": "this is a test",
+                    "inputs": [{}]  # updated after
                 },
-                "inputs": [{}]    # updated after
             },
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
             "executionUnit": [{"unit": cwl}],
@@ -1612,16 +1625,18 @@ class WpsPackageAppTest(WpsConfigBase):
 
         # replace by invalid min/max and check that it raises
         cwl["inputs"][0] = {"id": "test", "type": {"type": "array", "items": "string"}}
-        body["processDescription"]["inputs"][0] = {"id": "test", "minOccurs": [1], "maxOccurs": 1}
-        with self.assertRaises(colander.Invalid):
-            self.deploy_process(body)
-            self.fail("Invalid input minOccurs schema definition should have been raised")
+        body["processDescription"]["process"]["inputs"][0] = {"id": "test", "minOccurs": [1], "maxOccurs": 1}
+        resp = mocked_sub_requests(self.app, "post_json", "/processes", data=body, headers=self.json_headers)
+        assert resp.status_code == 400, "Invalid input minOccurs schema definition should have been raised"
+        assert "DeployMinMaxOccurs" in resp.json["cause"]
+        assert "Invalid" in resp.json["error"]
 
         cwl["inputs"][0] = {"id": "test", "type": {"type": "array", "items": "string"}}
-        body["processDescription"]["inputs"][0] = {"id": "test", "minOccurs": 1, "maxOccurs": 3.1416}
-        with self.assertRaises(HTTPBadRequest):
-            self.deploy_process(body)
-            self.fail("Invalid input maxOccurs schema definition should have been raised")
+        body["processDescription"]["process"]["inputs"][0] = {"id": "test", "minOccurs": 1, "maxOccurs": 3.1416}
+        resp = mocked_sub_requests(self.app, "post_json", "/processes", data=body, headers=self.json_headers)
+        assert resp.status_code == 400, "Invalid input maxOccurs schema definition should have been raised"
+        assert "DeployMinMaxOccurs" in resp.json["cause"]
+        assert "Invalid" in resp.json["error"]
 
     def test_complex_io_from_package(self):
         """

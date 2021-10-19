@@ -427,8 +427,10 @@ class ExtendedSchemaBase(colander.SchemaNode, metaclass=ExtendedSchemaMeta):
                 title = "{}:{}".format(self.prefix or "xml", title)
             kwargs["title"] = title
         elif isinstance(schema_type, (colander.Mapping, colander.Sequence)):
-            if self.title in ["", colander.required] and not kwargs.get("title"):
-                kwargs["title"] = schema_name
+            if self.title in ["", colander.required]:
+                title = kwargs.get("title", schema_name)
+                kwargs["title"] = title
+                self.title = title
 
         if self.validator is None and isinstance(schema_type, colander.String):
             _format = kwargs.pop("format", getattr(self, "format", None))
@@ -1281,7 +1283,8 @@ class KeywordMapper(ExtendedMappingSchema):
         if not node.name:
             # pass down the parent name for reference, but with an index to distinguish from it
             # distinction is also important such that generated schema definitions in OpenAPI don't override each other
-            node.name = _get_node_name(self, schema_name=True) + "." + str(index)
+            sub_name = _get_node_name(node, schema_name=True) or str(index)
+            node.name = _get_node_name(self, schema_name=True) + "." + sub_name
         if isinstance(node, KeywordMapper):
             return KeywordMapper.deserialize(node, cstruct)
         return ExtendedSchemaNode.deserialize(node, cstruct)
@@ -1291,7 +1294,15 @@ class KeywordMapper(ExtendedMappingSchema):
         if cstruct is colander.null:
             if self.required and not VariableSchemaNode.is_variable(self):
                 raise colander.Invalid(self, "Missing required field.")
-            return ExtendedSchemaNode.deserialize(self, colander.null)
+            # keyword schema has additional members other than nested in keyword, mapping is required
+            # process any deserialization as mapping schema
+            if self.children:
+                return ExtendedSchemaNode.deserialize(self, colander.null)
+            # otherwise, only null/drop/default are to be processed
+            # since nested keyword schemas are not necessarily mappings, deserialize only extended features
+            # using 'ExtendedSchemaNode.deserialize' would raise "not a mapping" if nested schemas is something else
+            return ExtendedSchemaNode._deserialize_extensions(self, cstruct)
+
         # first process the keyword subnodes
         result = self._deserialize_keyword(cstruct)
         # if further fields where explicitly added next to the keyword schemas,
@@ -1600,7 +1611,15 @@ class AllOfKeywordSchema(KeywordMapper):
                 schema_class = _make_node_instance(schema_class)
                 # update items with new ones
                 required_all_of.update({_get_node_name(schema_class, schema_name=True): str(schema_class)})
-                merged_all_of.update(self._deserialize_subnode(schema_class, cstruct, index))
+                result = self._deserialize_subnode(schema_class, cstruct, index)
+                if result is colander.drop:
+                    if schema_class.missing is colander.drop:
+                        continue
+                    if isinstance(schema_class.default, dict):
+                        result = schema_class.default
+                    else:
+                        raise colander.Invalid(node=schema_class, msg="Schema is missing when required.", value=result)
+                merged_all_of.update(result)
             except colander.Invalid as invalid:
                 missing_all_of.update({_get_node_name(invalid.node, schema_name=True): str(invalid)})
 
@@ -2087,6 +2106,9 @@ def _get_node_name(schema_node, schema_name=False):
         - Otherwise, return the field name, the title or as last result the class name.
     :returns: node name
     """
+    title = getattr(schema_node, "title", None)
+    if title in ["", colander.required]:
+        title = None
     if schema_name:
-        return type(schema_node).__name__
-    return getattr(schema_node, "name", None) or getattr(schema_node, "title", None) or type(schema_node).__name__
+        return title or type(schema_node).__name__
+    return getattr(schema_node, "name", None) or title or type(schema_node).__name__
