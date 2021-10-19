@@ -140,6 +140,7 @@ def _check_deploy(payload):
                     "error": "Invalid",
                     "value": d_inputs
                 })
+        return results
     except colander.Invalid as exc:
         raise HTTPBadRequest(json={
             "description": message,
@@ -199,10 +200,9 @@ def deploy_process_from_payload(payload, container, overwrite=False):
     :returns: HTTPOk if the process registration was successful.
     :raises HTTPException: for any invalid process deployment step.
     """
-    _check_deploy(payload)
-
     # use deepcopy of to remove any circular dependencies before writing to mongodb or any updates to the payload
     payload_copy = deepcopy(payload)
+    payload = _check_deploy(payload)
 
     # validate identifier naming for unsupported characters
     process_description = payload.get("processDescription")

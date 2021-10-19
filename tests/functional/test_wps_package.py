@@ -46,7 +46,7 @@ from weaver.formats import (
     get_cwl_file_format
 )
 from weaver.processes.constants import CWL_REQUIREMENT_APP_DOCKER, CWL_REQUIREMENT_INIT_WORKDIR
-from weaver.processes.types import PROCESS_BUILTIN
+from weaver.processes.types import PROCESS_APPLICATION, PROCESS_BUILTIN
 from weaver.status import STATUS_DISMISSED
 from weaver.utils import get_any_value
 
@@ -517,6 +517,8 @@ class WpsPackageAppTest(WpsConfigBase):
     def test_block_builtin_processes_from_api(self):
         """
         Test to validates if ``builtin`` process type is explicitly blocked during deployment from API.
+
+        .. versionchanged:: 4.2
         """
         cwl = {
             "cwlVersion": "v1.0",
@@ -549,7 +551,16 @@ class WpsPackageAppTest(WpsConfigBase):
                 stack_exec.enter_context(mock_exec)
             resp = mocked_sub_requests(self.app, "post_json", "/processes", data=body, timeout=5,
                                        headers=self.json_headers, only_local=True, expect_errors=True)
-            assert resp.status_code == 400
+            # With Weaver<=4.1.x, the 'type' was explicitly checked to block it since Deploy payload was kept as is
+            # This field was allowed to trickle all they way down to the instantiation of Process object
+            # assert resp.status_code == 200
+
+            # With Weaver>4.1.x, the deserialized result from Deploy payload is employed, which drops unknown 'type'
+            # Ensure that deploy now succeeds, but the obtained Process is not 'builtin' (just a regular application)
+            assert resp.status_code == 201
+            assert PROCESS_BUILTIN not in resp.json["processSummary"]["keywords"]
+            process = self.process_store.fetch_by_id(self._testMethodName)
+            assert process.type == PROCESS_APPLICATION
 
     def test_block_unknown_processes(self):
         """

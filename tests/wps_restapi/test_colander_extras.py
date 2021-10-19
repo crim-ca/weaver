@@ -273,6 +273,18 @@ def test_oneof_dropable():
     ])
 
 
+def test_oneof_required_with_nested_defaults():
+    """
+    Using ``oneOf`` keyword that is required, its subnodes must resolve to defaults if provided.
+
+    The resolution of defaults in this case is particular because the nested schemas of ``oneOf`` are not necessarily
+    mappings themselves (as is ``oneOf``). They default resolution must take this into account when the corresponding
+    schema-fields are omitted. Not only that, nested schemas can each composed of many distinct schema types.
+    """
+    #class
+
+
+
 def test_not_keyword_extra_fields_handling():
     """
     Using ``not`` keyword without any other schemas must return an empty mapping with additional fields dropped.

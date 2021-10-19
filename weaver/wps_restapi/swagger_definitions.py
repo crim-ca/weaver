@@ -19,7 +19,7 @@ from copy import copy
 from typing import TYPE_CHECKING
 
 import yaml
-from colander import DateTime, Email, OneOf, Range, Regex, drop, required
+from colander import DateTime, Email, OneOf, Range, Regex, drop, null, required
 from cornice import Service
 from dateutil import parser as date_parser
 
@@ -830,10 +830,13 @@ class DescribeMinMaxOccurs(ExtendedMappingSchema):
 
 
 class DeployMinMaxOccurs(ExtendedMappingSchema):
-    # omitted definitions are permitted to allow inference from other fields in package (CWL) or using defaults
-    # if provided though, schema format and values should be valid
-    minOccurs = MinOccursDefinition(default=1)
-    maxOccurs = MaxOccursDefinition(default=1)
+    # entirely omitted definitions are permitted to allow inference from fields in package (CWL) or using defaults
+    # if explicitly provided though, schema format and values should be validated
+    # - do not use 'missing=drop' to ensure we raise provided invalid value instead of ignoring it
+    # - do not use any specific value (e.g.: 1) for 'default' such that we do not inject an erroneous value when it
+    #   was originally omitted, since it could be resolved differently depending on matching CWL inputs definitions
+    minOccurs = MinOccursDefinition(default=null, missing=null)
+    maxOccurs = MaxOccursDefinition(default=null, missing=null)
 
 
 # does not inherit from 'DescriptionLinks' because other 'ProcessDescription<>' schema depend from this without 'links'
@@ -3119,8 +3122,8 @@ class CWLDefault(OneOfKeywordSchema):
 class CWLInputObject(PermissiveMappingSchema):
     type = CWLType()
     default = CWLDefault(missing=drop, description="Default value of input if not provided for task execution.")
-    inputBinding = ExtendedMappingSchema(missing=drop, title="Input Binding",
-                                         description="Defines how to specify the input for the command.")
+    inputBinding = PermissiveMappingSchema(missing=drop, title="Input Binding",
+                                           description="Defines how to specify the input for the command.")
 
 
 class CWLTypeStringList(ExtendedSequenceSchema):

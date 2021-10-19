@@ -30,6 +30,12 @@ Changes:
   internal ``Job`` status will have more detail.
 - Add ``update`` timestamp to ``Job`` response to better track latest milestones saved to database.
   This avoids users having to compare many fields (``created``, ``started``, ``finished``) depending on latest status.
+- Apply stricter ``Deploy`` body schema validation and employ deserialized result directly.
+  This ensures that preserved fields in the submitted content for deployment contain only known data elements with
+  expected structures for respective schemas. Existing deployment body that contain invalid formats could start to
+  fail or might generate inconsistent ``Process`` descriptions if not adjusted.
+- Add improved reporting of erroneous inputs during ``Process`` deployment whenever possible to identify the cause.
+- Add more documentation details about missing features such as ``EOImage`` inputs handled by `OpenSearch` requests.
 
 Fixes:
 ------
@@ -39,6 +45,7 @@ Fixes:
   and `#228 <https://github.com/crim-ca/weaver/issues/228>`_).
 - Fix all known `OGC`-specific link relationships with URI prefix
   (resolves `#266 <https://github.com/crim-ca/weaver/issues/266>`_).
+- Fix incorrect rendering of some table cells in the documentation.
 
 `4.1.2 <https://github.com/crim-ca/weaver/tree/4.1.2>`_ (2021-10-13)
 ========================================================================
