@@ -45,8 +45,11 @@ def main(global_config, **settings):
         LOGGER.warning("No request options found.")
 
     # add default caching regions if they were omitted in config file
-    LOGGER.info("Adding default caching options...")
-    setup_cache(settings)
+    if settings.get("weaver.celery", False):
+        LOGGER.info("Celery runner detected. Skipping cache options setup.")
+    else:
+        LOGGER.info("Adding default caching options...")
+        setup_cache(settings)
 
     LOGGER.info("Setup celery configuration...")
     local_config = Configurator(settings=settings)
@@ -55,11 +58,14 @@ def main(global_config, **settings):
         local_config.configure_celery(global_config["__file__"])
     local_config.include("weaver")
 
-    LOGGER.info("Registering builtin processes...")
-    register_builtin_processes(local_config)
+    if settings.get("weaver.celery", False):
+        LOGGER.info("Celery runner detected. Skipping process registration.")
+    else:
+        LOGGER.info("Registering builtin processes...")
+        register_builtin_processes(local_config)
 
-    LOGGER.info("Registering WPS-1 processes from configuration file...")
-    wps_processes_file = get_settings(local_config).get("weaver.wps_processes_file")
-    register_wps_processes_from_config(wps_processes_file, local_config)
+        LOGGER.info("Registering WPS-1 processes from configuration file...")
+        wps_processes_file = get_settings(local_config).get("weaver.wps_processes_file")
+        register_wps_processes_from_config(wps_processes_file, local_config)
 
     return local_config.make_wsgi_app()
