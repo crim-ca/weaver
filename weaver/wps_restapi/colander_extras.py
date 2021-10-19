@@ -1600,7 +1600,15 @@ class AllOfKeywordSchema(KeywordMapper):
                 schema_class = _make_node_instance(schema_class)
                 # update items with new ones
                 required_all_of.update({_get_node_name(schema_class, schema_name=True): str(schema_class)})
-                merged_all_of.update(self._deserialize_subnode(schema_class, cstruct, index))
+                result = self._deserialize_subnode(schema_class, cstruct, index)
+                if result is colander.drop:
+                    if schema_class.missing is colander.drop:
+                        continue
+                    if isinstance(schema_class.default, dict):
+                        result = schema_class.default
+                    else:
+                        raise colander.Invalid(node=schema_class, msg="Schema is missing when required.", value=result)
+                merged_all_of.update(result)
             except colander.Invalid as invalid:
                 missing_all_of.update({_get_node_name(invalid.node, schema_name=True): str(invalid)})
 

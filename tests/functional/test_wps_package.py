@@ -1610,13 +1610,15 @@ class WpsPackageAppTest(WpsConfigBase):
         body["processDescription"]["process"]["inputs"][0] = {"id": "test", "minOccurs": [1], "maxOccurs": 1}
         resp = mocked_sub_requests(self.app, "post_json", "/processes", data=body, headers=self.json_headers)
         assert resp.status_code == 400, "Invalid input minOccurs schema definition should have been raised"
-        assert "WithMinMaxOccurs" in resp.json["cause"] and "Invalid" in resp.json["error"]
+        assert "DeployMinMaxOccurs" in resp.json["cause"]
+        assert "Invalid" in resp.json["error"]
 
         cwl["inputs"][0] = {"id": "test", "type": {"type": "array", "items": "string"}}
         body["processDescription"]["process"]["inputs"][0] = {"id": "test", "minOccurs": 1, "maxOccurs": 3.1416}
         resp = mocked_sub_requests(self.app, "post_json", "/processes", data=body, headers=self.json_headers)
         assert resp.status_code == 400, "Invalid input maxOccurs schema definition should have been raised"
-        assert "WithMinMaxOccurs" in resp.json["cause"] and "Invalid" in resp.json["error"]
+        assert "DeployMinMaxOccurs" in resp.json["cause"]
+        assert "Invalid" in resp.json["error"]
 
     def test_complex_io_from_package(self):
         """

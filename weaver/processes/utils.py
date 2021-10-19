@@ -123,16 +123,29 @@ def _check_deploy(payload):
         p_inputs = payload.get("processDescription", {}).get("process", {}).get("inputs")
         r_inputs = results.get("processDescription", {}).get("process", {}).get("inputs")
         if p_inputs and p_inputs != r_inputs:
-            # try raising sub-schema to have specific reason
             message = "Process deployment inputs definition is invalid."
-            sd.DeployInputTypeAny().deserialize(p_inputs)
-            # raise directly if we where not able to detect the cause
-            raise HTTPBadRequest(json={"description": message, "cause": "unknown", "error": "Invalid"})
+            # try raising sub-schema to have specific reason
+            d_inputs = sd.DeployInputTypeAny().deserialize(p_inputs)
+            # Raise directly if we where not able to detect the cause, but there is something incorrectly dropped.
+            # Only raise if indirect vs direct inputs deserialize differ such that auto-resolved defaults omitted from
+            # submitted process inputs or unknowns fields that were correctly ignored don't cause false-positive diffs.
+            if r_inputs != d_inputs:
+                message = (
+                    "Process deployment inputs definition resolved as valid schema but differ from submitted values. "
+                    "Validate provided inputs against resolved inputs with schemas to avoid mismatching definitions."
+                )
+                raise HTTPBadRequest(json={
+                    "description": message,
+                    "cause": "unknown",
+                    "error": "Invalid",
+                    "value": d_inputs
+                })
     except colander.Invalid as exc:
         raise HTTPBadRequest(json={
             "description": message,
-            "cause": "Invalid schema: [{!s}]".format(exc),
-            "error": exc.__class__.__name__
+            "cause": "Invalid schema: [{!s}]".format(exc.msg),
+            "error": exc.__class__.__name__,
+            "value": exc.value
         })
 
 

@@ -824,8 +824,13 @@ class MaxOccursDefinition(OneOfKeywordSchema):
     ]
 
 
-class WithMinMaxOccurs(ExtendedMappingSchema):
-    # omitted definitions are permitted to allow inference from other fields in package (CWL)
+class DescribeMinMaxOccurs(ExtendedMappingSchema):
+    minOccurs = MinOccursDefinition()
+    maxOccurs = MaxOccursDefinition()
+
+
+class DeployMinMaxOccurs(ExtendedMappingSchema):
+    # omitted definitions are permitted to allow inference from other fields in package (CWL) or using defaults
     # if provided though, schema format and values should be valid
     minOccurs = MinOccursDefinition(default=1)
     maxOccurs = MaxOccursDefinition(default=1)
@@ -1082,7 +1087,7 @@ class DescribeInputType(AllOfKeywordSchema):
         DescriptionType(),
         InputOutputDescriptionMeta(),
         DescribeInputTypeDefinition(),
-        WithMinMaxOccurs(),
+        DescribeMinMaxOccurs(),
         DescriptionExtra(),
     ]
 
@@ -1101,7 +1106,7 @@ class DeployInputType(AllOfKeywordSchema):
         DeploymentType(),
         InputOutputDescriptionMeta(),
         DeployInputTypeDefinition(),
-        WithMinMaxOccurs(),
+        DeployMinMaxOccurs(),
         DescriptionExtra(),
     ]
 
@@ -1154,8 +1159,8 @@ class DeployInputTypeMap(PermissiveMappingSchema):
 
 class DeployInputTypeAny(OneOfKeywordSchema):
     _one_of = [
-        DeployInputTypeList,
-        DeployInputTypeMap,
+        DeployInputTypeList(),
+        DeployInputTypeMap(),
     ]
 
 
