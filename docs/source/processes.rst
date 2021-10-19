@@ -547,23 +547,26 @@ combinations.
 |           |                                           +---------------+                                           |
 |           |                                           | |s3_scheme|   |                                           |
 +-----------+-------------------------------------------+---------------+-------------------------------------------+
-| |HYBRID|  | |HYBRID| assumes |ADES| role (remote):    | |file_scheme| | Convert to |http_scheme| [#file2http]_    |
-|           | - `WPS-1/2`_                              +---------------+-------------------------------------------+
-|           | - `ESGF-CWT`_                             | |http_scheme| | Nothing (unmodified)                      |
-|           | - `WPS-REST`_ (remote) [#wps3]_           +---------------+-------------------------------------------+
-|           | - :ref:`remote-provider`                  | |s3_scheme|   | Fetch and convert to |http_scheme| [#s3]_ |
+| |HYBRID|  | - `WPS-1/2`_                              | |file_scheme| | Convert to |http_scheme| [#file2http]_    |
+|           | - `ESGF-CWT`_                             +---------------+-------------------------------------------+
+|           | - `WPS-REST`_ (remote) [#wps3]_           | |http_scheme| | Nothing (unmodified)                      |
+|           | - :ref:`remote-provider`                  +---------------+-------------------------------------------+
+|           |                                           | |s3_scheme|   | Fetch and convert to |http_scheme| [#s3]_ |
+|           | *Note*: |HYBRID| assumes |ADES| role      |               |                                           |
+|           | (remote processes)                        |               |                                           |
 |           +-------------------------------------------+---------------+-------------------------------------------+
-|           | |HYBRID| assumes |ADES| role (local):     | |file_scheme| | Nothing (unmodified)                      |
-|           | - `WPS-REST`_ (`CWL`) [#wps3]_            +---------------+-------------------------------------------+
+|           | - `WPS-REST`_ (`CWL`) [#wps3]_            | |file_scheme| | Nothing (unmodified)                      |
+|           |                                           +---------------+-------------------------------------------+
 |           |                                           | |http_scheme| | Fetch and convert to |file_scheme|        |
 |           |                                           +---------------+                                           |
-|           |                                           | |s3_scheme|   |                                           |
+|           | *Note*: |HYBRID| assumes |ADES| role      |               |                                           |
+|           | (local processes)                         |               |                                           |
 |           +-------------------------------------------+---------------+-------------------------------------------+
-|           | |HYBRID| assumes |EMS| role:              | |file_scheme| | Convert to |http_scheme| [#file2http]_    |
-|           | - `Workflow`_ (`CWL`) [#wf]_              +---------------+-------------------------------------------+
+|           | - `Workflow`_ (`CWL`) [#wf]_              | |file_scheme| | Convert to |http_scheme| [#file2http]_    |
+|           |                                           +---------------+-------------------------------------------+
 |           |                                           | |http_scheme| | Nothing (unmodified, step will handle it) |
 |           |                                           +---------------+                                           |
-|           |                                           | |s3_scheme|   |                                           |
+|           | *Note*: |HYBRID| assumes |EMS| role       | |s3_scheme|   |                                           |
 +-----------+-------------------------------------------+---------------+-------------------------------------------+
 
 .. |any| replace:: *<any>*
@@ -576,6 +579,10 @@ combinations.
 .. |EMS| replace:: :term:`EMS`
 .. |HYBRID| replace:: :term:`HYBRID`
 
+.. |br| raw:: html
+
+    <br>
+
 .. rubric:: Footnotes
 
 .. [#openseach]
@@ -587,6 +594,8 @@ combinations.
     When a ``file://`` (or empty scheme) maps to a local file that needs to be exposed externally for
     another remote process, the conversion to ``http(s)://`` scheme employs setting ``weaver.wps_output_url`` to form
     the result URL reference. The file is placed in ``weaver.wps_output_dir`` to expose it as HTTP(S) endpoint.
+    Note that the HTTP(S) servicing of the file is not handled by `Weaver` itself. It is assumed that the server
+    where `Weaver` is hosted or another service takes care of this task.
 
 .. [#wps3]
     When the process refers to a remote :ref:`WPS-REST` process (i.e.: remote :term:`WPS` instance that supports
@@ -629,17 +638,17 @@ multiple other metadata search filters are to be applied, their definition can b
 within the `Deploy`_ body.
 
 .. list-table::
-    :stub-columns: 1
+    :header-rows: 1
     :widths: 20,40,40
 
     * - Context
-      - Application
-      - Input
-    * - Location
+      - Location
+      - Role
+    * - Application
       - ``processDescription.process.additionalParameters``
-      - ``processDescription.process.inputs[*].additionalParameters``
-    * - Role
       - ``http://www.opengis.net/eoc/applicationContext``
+    * - Input
+      - ``processDescription.process.inputs[*].additionalParameters``
       - ``http://www.opengis.net/eoc/applicationContext/inputMetadata``
 
 
@@ -678,39 +687,39 @@ For each deployment, processes using :term:`EOImage` to be processed into :term:
 interpret the following field definitions for mapping against respective inputs or application context.
 
 .. list-table::
-    :stub-columns: 1
-    :widths: 20,20,20,40
+    :header-rows: 1
+    :widths: 10,10,20,60
 
     * - Name
-      - ``EOImage``
-      - ``AllowedCollections``
-      - ``CatalogSearchField``
-      - ``UniqueAOI``
-      - ``UniqueTOI``
-    * - Values
+      - Values
+      - Context
+      - Description
+    * - ``EOImage``
       - ``["true"]``
-      - String of Comma-separated list of collection IDs.
-      - ``["<name>"]``
-      - ``["true"]``
-      - ``["true"]``
-    * - Context
       - Input
-      - Input (same one as ``EOImage``)
-      - Input (other one than ``EOImage``)
-      - Application
-      - Application
-    * - Description
       - Indicates that the nested parameters within the current ``additionalParameters`` section where it is located
         defines an :term:`EOImage`. This is to avoid misinterpretation by similar names that could be employed
         by other kind of definitions. The :term:`Process` input's ``id`` where this parameter is defined is the name
         that will be employed to pass down :term:`OpenSearch` results.
+    * - ``AllowedCollections``
+      - String of comma-separated list of collection IDs.
+      - Input (same one as ``EOImage``)
       - Provides a subset of collection identifiers that are supported. During execution any specified input not
         respecting one of the defined values will fail :term:`OpenSearch` query resolution.
+    * - ``CatalogSearchField``
+      - ``["<name>"]``
+      - Input (other one than ``EOImage``)
       - String with the relevant :term:`OpenSearch` query filter name according to the described input.
         Defines a given :term:`Process` input ``id`` to be mapped against the specified query name.
+    * - ``UniqueAOI``
+      - ``["true"]``
+      - Application
       - Indicates that provided ``CatalogSearchField`` (typically ``bbox``) corresponds to a global :term:`AOI` that
         should be respected across multiple ``EOImage`` inputs. Otherwise, (default values: ``["false"]``)
         each ``EOImage`` should be accompanied with its respective :term:`AOI` definition.
+    * - ``UniqueTOI``
+      - ``["true"]``
+      - Application
       - Indicates that provided ``CatalogSearchField`` (typically ``StartDate`` and ``EndDate``) corresponds to a
         global :term:`TOI` that should be respected across multiple ``EOImage`` inputs. Otherwise, (default
         values: ``["false"]``) each ``EOImage`` should be accompanied with its respective :term:`TOI` definition.
