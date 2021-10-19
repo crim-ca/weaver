@@ -974,6 +974,14 @@ class WpsPackageAppTest(WpsConfigBase):
                ``default`` is not explicitly defined in `CWL` nor `WPS`.
             9. ``default=<value>`` is automatically added to `CWL` if ``default=<value>`` is provided in `WPS` and
                ``default`` is not explicitly defined in `CWL`.
+
+        .. note::
+            This test assumes formats/values are valid and can be resolved.
+            Validation of formats/values themselves are accomplished in other tests.
+
+        .. seealso::
+            - :meth:`test_valid_io_min_max_occurs_as_str_or_int`
+            - :meth:`test_invalid_io_min_max_occurs_wrong_format`
         """
         cwl = {
             "cwlVersion": "v1.0",
@@ -1111,9 +1119,6 @@ class WpsPackageAppTest(WpsConfigBase):
         assert pkg["inputs"][13]["id"] == "optional_array_max_fixed_by_wps"
         # assert pkg["inputs"][13]["type"] == "string[]?"
 
-    # FIXME: https://github.com/crim-ca/weaver/issues/50
-    #   'unbounded' value should not override literal 2/'2'
-    @pytest.mark.xfail(reason="MinOccurs/MaxOccurs values in response should be preserved as defined in deploy body")
     def test_valid_io_min_max_occurs_as_str_or_int(self):
         """
         Test validates that I/O definitions with ``minOccurs`` and/or ``maxOccurs`` are permitted as both integer and
@@ -1121,6 +1126,7 @@ class WpsPackageAppTest(WpsConfigBase):
 
         .. seealso::
             - :meth:`test_invalid_io_min_max_occurs_wrong_format`
+            - :meth:`test_resolution_io_min_max_occurs`
         """
         cwl = {
             "cwlVersion": "v1.0",
@@ -1143,10 +1149,10 @@ class WpsPackageAppTest(WpsConfigBase):
                     "abstract": "this is a test",
                 },
                 "inputs": [
-                    {"id": "io_min_int_max_int", "minOccurs": 1, "maxOccurs": 2},
-                    {"id": "io_min_int_max_str", "minOccurs": 1, "maxOccurs": "2"},
-                    {"id": "io_min_str_max_int", "minOccurs": "1", "maxOccurs": 2},
-                    {"id": "io_min_str_max_str", "minOccurs": "1", "maxOccurs": "2"},
+                    {"id": "io_min_int_max_int", "minOccurs": 1, "maxOccurs": 1},
+                    {"id": "io_min_int_max_str", "minOccurs": 1, "maxOccurs": "1"},
+                    {"id": "io_min_str_max_int", "minOccurs": "1", "maxOccurs": 1},
+                    {"id": "io_min_str_max_str", "minOccurs": "1", "maxOccurs": "1"},
                     {"id": "io_min_int_max_unbounded", "minOccurs": 1, "maxOccurs": "unbounded"},
                     {"id": "io_min_str_max_unbounded", "minOccurs": "1", "maxOccurs": "unbounded"},
                 ]
@@ -1596,6 +1602,7 @@ class WpsPackageAppTest(WpsConfigBase):
 
         .. seealso::
             - :meth:`test_valid_io_min_max_occurs_as_str_or_int`
+            - :meth:`test_resolution_io_min_max_occurs`
         """
         cwl = {
             "cwlVersion": "v1.0",
