@@ -18,7 +18,7 @@ sys.path.insert(0, WEAVER_MODULE_DIR)
 def main(global_config, **settings):
     import weaver.app
     # add flag to disable some unnecessary operations when runner is celery (worker)
-    settings["weaver.celery"] = sys.argv[0].rsplit("/", 1) == "celery"
+    settings["weaver.celery"] = sys.argv[0].rsplit("/", 1)[-1] == "celery"
     return weaver.app.main(global_config, **settings)
 
 
