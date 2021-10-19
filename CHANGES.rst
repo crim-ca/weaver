@@ -36,6 +36,8 @@ Changes:
   fail or might generate inconsistent ``Process`` descriptions if not adjusted.
 - Add improved reporting of erroneous inputs during ``Process`` deployment whenever possible to identify the cause.
 - Add more documentation details about missing features such as ``EOImage`` inputs handled by `OpenSearch` requests.
+- Add ``weaver.celery`` flag to internal application settings when auto-detecting that current runner is ``celery``.
+  This bypasses redundant API-only operations during application setup and startup not needed by ``celery`` worker.
 
 Fixes:
 ------
