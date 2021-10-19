@@ -10,11 +10,35 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add execution endpoint ``POST /provider/{id}/process/{id}/execution`` corresponding to the OGC-API compliant endpoint
+  for local ``Process`` definitions.
+- Add multiple additional relation ``links`` for ``Process`` and ``Job`` responses
+  (resolves `#234 <https://github.com/crim-ca/weaver/issues/234>`_
+  and `#267 <https://github.com/crim-ca/weaver/issues/267>`_).
+- Add convenience ``DELETE /jobs`` endpoint with input list of ``Job`` UUIDs in order to ``dismiss`` multiple entries
+  simultaneously. This is useful for quickly removing a set of ``Job`` returned by filtered ``GET /jobs`` contents.
+- Update conformance link list for ``dismiss`` and relevant relation ``links`` definitions
+  (relates to `#53 <https://github.com/crim-ca/weaver/issues/53>`_
+  and `#267 <https://github.com/crim-ca/weaver/issues/267>`_).
+- Add better support and reporting of ``Job`` status ``dismissed`` when operation is called from API on running task.
+- Use explicit ``started`` status when ``Job`` has been picked up by a `Celery` worker instead of leaving it
+  to ``accepted`` (same status that indicates the ``Job`` "pending", although a worker is processing it).
+  Early modification of status is done in case setup operations (send `WPS` request, prepare files, etc.) take some
+  time which would leave users under the impression the ``Job`` is not getting picked up.
+  Report explicit ``running`` status in ``Job`` once it has been sent to the remote `WPS` endpoint.
+  The API will report ``running`` in both cases in order to support `OGC API - Processes` naming conventions, but
+  internal ``Job`` status will have more detail.
+- Add ``update`` timestamp to ``Job`` response to better track latest milestones saved to database.
+  This avoids users having to compare many fields (``created``, ``started``, ``finished``) depending on latest status.
 
 Fixes:
 ------
-- No change.
+- Fix OGC-API compliant execution endpoint ``POST /process/{id}/execution`` not registered in API.
+- Fix missing status for cancelled ``Jobs`` in order to properly support ``dismiss`` operation
+  (resolves `#145 <https://github.com/crim-ca/weaver/issues/145>`_
+  and `#228 <https://github.com/crim-ca/weaver/issues/228>`_).
+- Fix all known `OGC`-specific link relationships with URI prefix
+  (resolves `#266 <https://github.com/crim-ca/weaver/issues/266>`_).
 
 `4.1.2 <https://github.com/crim-ca/weaver/tree/4.1.2>`_ (2021-10-13)
 ========================================================================

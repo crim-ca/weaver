@@ -39,7 +39,9 @@ from weaver.processes.types import (
 from weaver.status import (
     JOB_STATUS_CATEGORIES,
     JOB_STATUS_VALUES,
+    STATUS_ACCEPTED,
     STATUS_CATEGORY_FINISHED,
+    STATUS_RUNNING,
     STATUS_SUCCEEDED,
     STATUS_UNKNOWN,
     map_status
@@ -282,7 +284,7 @@ class Service(Base):
                 "type": CONTENT_TYPE_APP_JSON,
             },
             {
-                "rel": "processes",
+                "rel": "http://www.opengis.net/def/rel/ogc/1.0/processes",
                 "title": "Listing of processes provided by this service.",
                 "href": proc_url,
                 "hreflang": ACCEPT_LANGUAGE_EN_CA,
@@ -638,7 +640,7 @@ class Job(Base):
     @status.setter
     def status(self, status):
         # type: (str) -> None
-        if status == "accepted" and self.status == "running":
+        if status == STATUS_ACCEPTED and self.status == STATUS_RUNNING:
             LOGGER.debug(traceback.extract_stack())
         if not isinstance(status, str):
             raise TypeError("Type 'str' is required for '{}.status'".format(type(self)))
@@ -761,6 +763,7 @@ class Job(Base):
         # type: () -> Optional[datetime]
         return self.get("finished", None)
 
+    @property
     def is_finished(self):
         # type: () -> bool
         return self.finished is not None
@@ -768,6 +771,29 @@ class Job(Base):
     def mark_finished(self):
         # type: () -> None
         self["finished"] = now()
+
+    @property
+    def updated(self):
+        # type: () -> datetime
+        updated = self.get("updated")
+        # backward compatibility when not already set
+        if not updated:
+            if self.status == map_status(STATUS_ACCEPTED):
+                updated = self.created
+            elif self.is_finished:
+                updated = self.finished
+            else:
+                updated = self.started
+            updated = updated or now()
+            self.updated = updated  # apply to remain static until saved
+        return localize_datetime(updated)
+
+    @updated.setter
+    def updated(self, updated):
+        # type: (datetime) -> None
+        if not isinstance(updated, datetime):
+            raise TypeError("Type 'datetime' is required for '{}.updated'".format(type(self)))
+        self["updated"] = updated
 
     @property
     def duration(self):
@@ -934,34 +960,55 @@ class Job(Base):
         """
         settings = get_settings(container)
         base_url = get_wps_restapi_base_url(settings)
-        job_url = self._job_url(base_url)
+        job_url = self._job_url(base_url)  # full URL
+        job_path = "{}/{}".format(base_url, sd.jobs_service.path.format(job_id=self.id))
+        job_exec = job_url.rsplit("/", 1)[0] + "/execution"
         job_list = "{}/{}".format(base_url, sd.jobs_service.path)
-        job_links_body = {"links": [
-            {"href": job_url, "rel": "status", "title": "Job status."},
-            {"href": job_url, "rel": "monitor", "title": "Job monitoring location."},
-            {"href": job_list, "rel": "collection", "title": "List of submitted jobs."}
-        ]}
-        job_links = ["logs", "inputs"]
+        job_links = [
+            {"href": job_url, "rel": "status", "title": "Job status."},  # OGC
+            {"href": job_url, "rel": "monitor", "title": "Job monitoring location."},  # IANA
+            {"href": job_path, "rel": "alternate", "title": "Job status specific endpoint."},  # IANA
+            {"href": job_list, "rel": "collection", "title": "List of submitted jobs."},  # IANA
+            {"href": job_list, "rel": "http://www.opengis.net/def/rel/ogc/1.0/job-list",  # OGC
+             "title": "List of submitted jobs."},
+            {"href": job_exec, "rel": "http://www.opengis.net/def/rel/ogc/1.0/execute",
+             "title": "New job submission endpoint for the corresponding process."},
+            {"href": job_url + "/inputs", "rel": "inputs",  # unofficial
+             "title": "Submitted job inputs for process execution."}
+        ]
         if self.status in JOB_STATUS_CATEGORIES[STATUS_CATEGORY_FINISHED]:
             job_status = map_status(self.status)
             if job_status == STATUS_SUCCEEDED:
-                job_links.extend(["outputs", "results"])
+                job_links.extend([
+                    {"href": job_url + "/outputs", "rel": "outputs",  # unofficial
+                     "title": "Job outputs of successful process execution (extended outputs with metadata)."},
+                    {"href": job_url + "/results", "rel": "http://www.opengis.net/def/rel/ogc/1.0/results",
+                     "title": "Job results of successful process execution (direct output values mapping)."},
+                ])
             else:
-                job_links.extend(["exceptions"])
-        for link_type in job_links:
-            link_href = "{job_url}/{res}".format(job_url=job_url, res=link_type)
-            job_links_body["links"].append({"href": link_href, "rel": link_type, "title": "Job {}.".format(link_type)})
+                job_links.append({
+                    "href": job_url + "/exceptions", "rel": "http://www.opengis.net/def/rel/ogc/1.0/exceptions",
+                    "title": "List of job exceptions if applicable in case of failing job."
+                })
+        job_links.append({
+            "href": job_url + "/logs", "rel": "logs",  # unofficial
+            "title": "List of collected job logs during process execution."
+        })
         if self_link in ["status", "inputs", "outputs", "results", "logs", "exceptions"]:
-            self_link_body = list(filter(lambda _link: _link["rel"] == self_link, job_links_body["links"]))[-1]
+            self_link_body = list(filter(lambda _link: _link["rel"].endswith(self_link), job_links))[-1]
             self_link_body = copy.deepcopy(self_link_body)
+            # back to specific job if we are in one of its sub-endpoints
+            self_link_up = {"href": job_url, "rel": "up", "title": "Job status details."}
         else:
             self_link_body = {"href": job_url, "title": "Job status."}
+            # back to full list of jobs if we are already on the job itself
+            self_link_up = {"href": job_list, "rel": "up", "title": "List of submitted jobs."}
         self_link_body["rel"] = "self"
-        job_links_body["links"].append(self_link_body)
+        job_links.extend([self_link_body, self_link_up])
         link_meta = {"type": CONTENT_TYPE_APP_JSON, "hreflang": ACCEPT_LANGUAGE_EN_CA}
-        for link in job_links_body["links"]:
+        for link in job_links:
             link.update(link_meta)
-        return job_links_body
+        return {"links": job_links}
 
     def json(self, container=None, self_link=None):     # pylint: disable=W0221,arguments-differ
         # type: (Optional[AnySettingsContainer], Optional[str]) -> JSON
@@ -975,11 +1022,14 @@ class Job(Base):
         settings = get_settings(container) if container else {}
         job_json = {
             "jobID": self.id,
-            "status": self.status,
+            "processID": self.process,
+            "providerID": self.service,
+            "status": map_status(self.status),
             "message": self.status_message,
             "created": self.created,
             "started": self.started,
             "finished": self.finished,
+            "updated": self.updated,
             "duration": self.duration_str,
             "runningSeconds": self.duration.total_seconds() if self.duration is not None else None,
             # TODO: available fields not yet employed (https://github.com/crim-ca/weaver/issues/129)
@@ -987,6 +1037,9 @@ class Job(Base):
             "expirationDate": None,
             "estimatedCompletion": None,
             "percentCompleted": self.progress,
+            # new name as per OGC-API, enforced integer
+            # https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/statusInfo.yaml
+            "progress": int(self.progress)
         }
         job_json.update(self.links(settings, self_link=self_link))
         return sd.JobStatusInfo().deserialize(job_json)
@@ -1009,6 +1062,7 @@ class Job(Base):
             "created": self.created,
             "started": self.started,
             "finished": self.finished,
+            "updated": self.updated,
             "progress": self.progress,
             "results": self.results,
             "exceptions": self.exceptions,
@@ -1351,17 +1405,32 @@ class Process(Base):
             base_url += sd.provider_service.path.format(provider_id=self.service)
         proc_desc = base_url + sd.process_service.path.format(process_id=self.id)
         proc_list = base_url + sd.processes_service.path
-        proc_exec = base_url + sd.process_execution_service.path.format(process_id=self.id)
+        jobs_list = proc_desc + sd.jobs_service.path
+        proc_exec = proc_desc + "/execution"
         links = [
-            {"href": proc_desc, "rel": "self", "title": "Process description."},
-            {"href": proc_desc, "rel": "process-desc", "title": "Process description."},
-            {"href": proc_exec, "rel": "execute", "title": "Process execution endpoint for job submission."},
-            {"href": proc_list, "rel": "collection", "title": "List of registered processes."}
+            {"href": proc_desc, "rel": "self", "title": "Current process description."},
+            {"href": proc_desc, "rel": "process-meta", "title": "Process definition."},
+            {"href": proc_exec, "rel": "http://www.opengis.net/def/rel/ogc/1.0/execute",
+             "title": "Process execution endpoint for job submission."},
+            {"href": proc_list, "rel": "http://www.opengis.net/def/rel/ogc/1.0/processes",
+             "title": "List of registered processes."},
+            {"href": jobs_list, "rel": "http://www.opengis.net/def/rel/ogc/1.0/job-list",
+             "title": "List of job executions corresponding to this process."},
+            {"href": proc_list, "rel": "up", "title": "List of processes registered under the service."},
         ]
-        if self.processEndpointWPS1:
-            wps_url = "{}?service=WPS&request=GetCapabilities".format(self.processEndpointWPS1)
-            links.append({"href": wps_url, "rel": "service-desc",
-                          "type": CONTENT_TYPE_APP_XML, "title": "Service definition."})
+        if self.service:
+            wps_base_url = self.processEndpointWPS1.split("?")[0]
+            wps_get_caps = wps_base_url + "?service=WPS&request=GetCapabilities&version=1.0.0"
+            wps_links = [
+                {"href": base_url, "rel": "service", "title": "Provider service description."},
+                {"href": base_url, "rel": "service-meta", "title": "Provider service definition."},
+                {"href": wps_get_caps, "rel": "service-desc", "title": "Remote service description."},
+                {"href": self.processEndpointWPS1, "rel": "http://www.opengis.net/def/rel/ogc/1.0/process-desc",
+                 "title": "Remote process description."},
+            ]
+            for link in wps_links:
+                link.setdefault("type", CONTENT_TYPE_APP_XML)
+            links.extend(wps_links)
         for link in links:
             link.setdefault("type", CONTENT_TYPE_APP_JSON)
             link.setdefault("hreflang", ACCEPT_LANGUAGE_EN_CA)

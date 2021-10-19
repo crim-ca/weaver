@@ -19,7 +19,7 @@ from tests.utils import (
 )
 from weaver.database import get_db
 from weaver.formats import CONTENT_TYPE_APP_JSON
-from weaver.status import STATUS_RUNNING, STATUS_SUCCEEDED
+from weaver.status import STATUS_ACCEPTED, STATUS_RUNNING, STATUS_SUCCEEDED
 from weaver.utils import fully_qualified_name
 from weaver.visibility import VISIBILITY_PUBLIC
 
@@ -94,8 +94,8 @@ class WpsConfigBase(unittest.TestCase):
     def fully_qualified_test_process_name(self):
         return fully_qualified_name(self).replace(".", "-")
 
-    def monitor_job(self, status_url, timeout=None, delta=None, return_status=False):
-        # type: (str, Optional[int], Optional[int], bool) -> Dict[str, JSON]
+    def monitor_job(self, status_url, timeout=None, delta=None, return_status=False, wait_for_status=STATUS_SUCCEEDED):
+        # type: (str, Optional[int], Optional[int], bool, str) -> Dict[str, JSON]
         """
         Job polling of status URL until completion or timeout.
 
@@ -103,6 +103,7 @@ class WpsConfigBase(unittest.TestCase):
         :param timeout: timeout of monitoring until completion or abort.
         :param delta: interval (seconds) between polling monitor requests.
         :param return_status: return final status body instead of results once job completed.
+        :param wait_for_status: monitor until the requested status is reached (default: when job is completed)
         :return: result of the successful job, or the status body if requested.
         :raises AssertionError: when job fails or took too long to complete.
         """
@@ -110,10 +111,10 @@ class WpsConfigBase(unittest.TestCase):
         def check_job_status(_resp, running=False):
             body = _resp.json
             pretty = json.dumps(body, indent=2, ensure_ascii=False)
-            statuses = [STATUS_RUNNING, STATUS_SUCCEEDED] if running else [STATUS_SUCCEEDED]
+            statuses = [STATUS_ACCEPTED, STATUS_RUNNING, STATUS_SUCCEEDED] if running else [STATUS_SUCCEEDED]
             assert _resp.status_code == 200, "Execution failed:\n{}\n{}".format(pretty, self._try_get_logs(status_url))
             assert body["status"] in statuses, "Error job info:\n{}\n{}".format(pretty, self._try_get_logs(status_url))
-            return body["status"] == STATUS_SUCCEEDED
+            return body["status"] == wait_for_status
 
         time.sleep(1)  # small delay to ensure process execution had a change to start before monitoring
         left = timeout or self.monitor_timeout

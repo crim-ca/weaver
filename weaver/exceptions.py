@@ -166,6 +166,12 @@ class JobNotFound(HTTPNotFound, OWSNotFound, JobException):
     """
 
 
+class JobInvalidParameter(HTTPBadRequest, OWSInvalidParameterValue, JobException):
+    """
+    Error related to an invalid search parameter to filter jobs.
+    """
+
+
 class JobRegistrationError(HTTPInternalServerError, OWSNoApplicableCode, JobException):
     """
     Error related to a registration issue for a job.

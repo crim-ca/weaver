@@ -1,3 +1,5 @@
+import math
+from copy import deepcopy
 from typing import TYPE_CHECKING
 
 from celery.utils.log import get_task_logger
@@ -27,11 +29,11 @@ from weaver.exceptions import (
     ServiceNotFound,
     log_unhandled_exceptions
 )
-from weaver.formats import CONTENT_TYPE_TEXT_PLAIN, OUTPUT_FORMAT_JSON, get_format
+from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_PLAIN, OUTPUT_FORMAT_JSON, get_format
 from weaver.owsexceptions import OWSNotFound
 from weaver.processes.convert import any2wps_literal_datatype
 from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
-from weaver.utils import get_any_id, get_any_value, get_settings
+from weaver.utils import get_any_id, get_any_value, get_path_kvp, get_settings, get_weaver_url
 from weaver.visibility import VISIBILITY_PUBLIC
 from weaver.wps.utils import get_wps_output_url
 from weaver.wps_restapi import swagger_definitions as sd
@@ -39,9 +41,9 @@ from weaver.wps_restapi.providers.utils import forbid_local_only
 from weaver.wps_restapi.swagger_definitions import datetime_interval_parser
 
 if TYPE_CHECKING:
-    from typing import List, Optional, Tuple, Union
+    from typing import Dict, List, Optional, Tuple, Union
     from pyramid.httpexceptions import HTTPException
-    from weaver.typedefs import AnySettingsContainer, JSON
+    from weaver.typedefs import AnySettingsContainer, AnyValue, JSON
 
 LOGGER = get_task_logger(__name__)
 
@@ -79,6 +81,91 @@ def get_job(request):
             description="Could not find job corresponding to specified 'process_id'."
         )
     return job
+
+
+def get_job_list_links(job_total, filters, request):
+    # type: (int, Dict[str, AnyValue], Request) -> List[JSON]
+    """
+    Obtains a list of all relevant links for the corresponding job listing defined by query parameter filters.
+    """
+    base_url = get_weaver_url(request)
+
+    # reapply queries that must be given to obtain the same result in case of subsequent requests (sort, limits, etc.)
+    kvp_params = {param: value for param, value in request.params.items() if param != "page"}
+    # patch datetime that have some extra character manipulation (reapply '+' auto-converted to ' ' by params parser)
+    if "datetime" in kvp_params:
+        kvp_params["datetime"] = kvp_params["datetime"].replace(" ", "+")
+    alt_kvp = deepcopy(kvp_params)
+
+    # request job uses general endpoint, obtain the full path if any service/process was given as alternate location
+    if request.path.startswith(sd.jobs_service.path):
+        job_path = base_url + sd.jobs_service.path
+        alt_path = None
+        parent_url = None
+        # cannot generate full path apply for 'service' by itself
+        if filters["process"] and filters["service"]:
+            alt_path = base_url + sd.provider_jobs_service.path.format(
+                provider_id=filters["service"], process_id=filters["process"]
+            )
+            parent_url = alt_path.rsplit("/", 1)[0]
+        elif filters["process"]:
+            alt_path = base_url + sd.process_jobs_service.path.format(process_id=filters["process"])
+            parent_url = alt_path.rsplit("/", 1)[0]
+        for param in ["service", "provider", "process"]:
+            alt_kvp.pop(param, None)
+    # path is whichever specific service/process endpoint, jobs are pre-filtered by them
+    # transform sub-endpoints into matching query parameters and use generic path as alternate location
+    else:
+        job_path = base_url + request.path
+        alt_path = base_url + sd.jobs_service.path
+        alt_kvp["process"] = filters["process"]
+        if filters["service"]:
+            alt_kvp["provider"] = filters["service"]
+        parent_url = job_path.rsplit("/", 1)[0]
+
+    cur_page = filters["page"]
+    per_page = filters["limit"]
+    max_page = math.ceil(job_total / per_page) - 1
+
+    alt_links = []
+    if alt_path:
+        alt_links = [{
+            "href": get_path_kvp(alt_path, page=cur_page, **alt_kvp), "rel": "alternate",
+            "type": CONTENT_TYPE_APP_JSON, "title": "Alternate endpoint with equivalent set of filtered jobs."
+        }]
+
+    links = alt_links + [
+        {"href": job_path, "rel": "collection",
+         "type": CONTENT_TYPE_APP_JSON, "title": "Complete job listing (no filtering queries applied)."},
+        {"href": base_url + sd.jobs_service.path, "rel": "search",
+         "type": CONTENT_TYPE_APP_JSON, "title": "Generic query endpoint to search for jobs."},
+        {"href": job_path + "?detail=false", "rel": "preview",
+         "type": CONTENT_TYPE_APP_JSON, "title": "Job listing summary (UUID and count only)."},
+        {"href": job_path, "rel": "http://www.opengis.net/def/rel/ogc/1.0/job-list",
+         "type": CONTENT_TYPE_APP_JSON, "title": "List of registered jobs."},
+        {"href": get_path_kvp(job_path, page=cur_page, **kvp_params), "rel": "current",
+         "type": CONTENT_TYPE_APP_JSON, "title": "Current page of job query listing."},
+        {"href": get_path_kvp(job_path, page=0, **kvp_params), "rel": "first",
+         "type": CONTENT_TYPE_APP_JSON, "title": "First page of job query listing."},
+        {"href": get_path_kvp(job_path, page=max_page, **kvp_params), "rel": "last",
+         "type": CONTENT_TYPE_APP_JSON, "title": "Last page of job query listing."},
+    ]
+    if cur_page > 0:
+        links.append({
+            "href": get_path_kvp(job_path, page=cur_page - 1, **kvp_params), "rel": "prev",
+            "type": CONTENT_TYPE_APP_JSON, "title": "Previous page of job query listing."
+        })
+    if cur_page < max_page:
+        links.append({
+            "href": get_path_kvp(job_path, page=cur_page + 1, **kvp_params), "rel": "next",
+            "type": CONTENT_TYPE_APP_JSON, "title": "Next page of job query listing."
+        })
+    if parent_url:
+        links.append({
+            "href": parent_url, "rel": "up",
+            "type": CONTENT_TYPE_APP_JSON, "title": "Parent collection for which listed jobs apply."
+        })
+    return links
 
 
 def get_results(job, container, value_key=None, ogc_api=False):
@@ -230,53 +317,52 @@ def get_queried_jobs(request):
             "description": str(ex)
         })
 
+    detail = filters.pop("detail", False)
+    groups = filters.pop("groups", "").split(",") if filters.get("groups", False) else filters.pop("groups", None)
+
+    filters["tags"] = list(filter(lambda s: s, filters["tags"].split(",") if filters.get("tags", False) else ""))
+    filters["notification_email"] = (
+        encrypt_email(filters["notification_email"], settings)
+        if filters.get("notification_email", False) else None
+    )
+    filters["datetime"] = datetime_interval_parser(filters["datetime"]) if filters.get("datetime", False) else None
+    filters["service"] = filters.pop("provider", None)
+
+    if (
+        filters["datetime"]
+        and filters["datetime"].get("before", False)
+        and filters["datetime"].get("after", False)
+        and filters["datetime"]["after"] > filters["datetime"]["before"]
+    ):
+        raise HTTPUnprocessableEntity(json={
+            "code": "InvalidDateFormat",
+            "description": "Datetime at the start of the interval must be less than the datetime at the end."
+        })
+
+    store = get_db(request).get_store(StoreJobs)
+    items, total = store.find_jobs(request=request, group_by=groups, **filters)
+    body = {"total": total}
+
+    def _job_list(jobs):
+        return [j.json(settings) if detail else j.id for j in jobs]
+
+    if groups:
+        for grouped_jobs in items:
+            grouped_jobs["jobs"] = _job_list(grouped_jobs["jobs"])
+        body.update({"groups": items})
     else:
-
-        detail = filters.pop("detail", False)
-        groups = filters.pop("groups", "").split(",") if filters.get("groups", False) else filters.pop("groups", None)
-
-        filters["tags"] = list(filter(lambda s: s, filters["tags"].split(",") if filters.get("tags", False) else ""))
-        filters["notification_email"] = (
-            encrypt_email(filters["notification_email"], settings)
-            if filters.get("notification_email", False) else None
-        )
-        filters["datetime"] = datetime_interval_parser(filters["datetime"]) if filters.get("datetime", False) else None
-        filters["service"] = filters.pop("provider", None)
-
-        if (
-                filters["datetime"]
-                and filters["datetime"].get("before", False)
-                and filters["datetime"].get("after", False)
-                and filters["datetime"]["after"] > filters["datetime"]["before"]
-        ):
-            raise HTTPUnprocessableEntity(json={
-                "code": "InvalidDateFormat",
-                "description": "Datetime at the start of the interval must be less than the datetime at the end."
-            })
-
-        store = get_db(request).get_store(StoreJobs)
-        items, total = store.find_jobs(request=request, group_by=groups, **filters)
-        body = {"total": total}
-
-        def _job_list(jobs):
-            return [j.json(settings) if detail else j.id for j in jobs]
-
-        if groups:
-            for grouped_jobs in items:
-                grouped_jobs["jobs"] = _job_list(grouped_jobs["jobs"])
-            body.update({"groups": items})
-        else:
-            body.update({"jobs": _job_list(items), "page": filters["page"], "limit": filters["limit"]})
-        body = sd.GetQueriedJobsSchema().deserialize(body)
-        return HTTPOk(json=body)
+        body.update({"jobs": _job_list(items), "page": filters["page"], "limit": filters["limit"]})
+    body.update({"links": get_job_list_links(total, filters, request)})
+    body = sd.GetQueriedJobsSchema().deserialize(body)
+    return HTTPOk(json=body)
 
 
 @sd.provider_job_service.get(tags=[sd.TAG_JOBS, sd.TAG_STATUS, sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
                              schema=sd.ProviderJobEndpoint(), response_schemas=sd.get_prov_single_job_status_responses)
-@sd.job_service.get(tags=[sd.TAG_JOBS, sd.TAG_STATUS], renderer=OUTPUT_FORMAT_JSON,
-                    schema=sd.JobEndpoint(), response_schemas=sd.get_single_job_status_responses)
 @sd.process_job_service.get(tags=[sd.TAG_PROCESSES, sd.TAG_JOBS, sd.TAG_STATUS], renderer=OUTPUT_FORMAT_JSON,
                             schema=sd.GetProcessJobEndpoint(), response_schemas=sd.get_single_job_status_responses)
+@sd.job_service.get(tags=[sd.TAG_JOBS, sd.TAG_STATUS], renderer=OUTPUT_FORMAT_JSON,
+                    schema=sd.JobEndpoint(), response_schemas=sd.get_single_job_status_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_job_status(request):
     """
@@ -287,32 +373,71 @@ def get_job_status(request):
     return HTTPOk(json=job_status)
 
 
+def cancel_job_task(job, container):
+    # type: (Job, AnySettingsContainer) -> Job
+    app.control.revoke(job.task_id, terminate=True)  # signal to stop celery task. Up to it to terminate remote if any.
+    store = get_db(container).get_store(StoreJobs)
+    job.status_message = "Job dismissed."
+    job.status = status.map_status(status.STATUS_DISMISSED)
+    job = store.update_job(job)
+    return job
+
+
 @sd.provider_job_service.delete(tags=[sd.TAG_JOBS, sd.TAG_DISMISS, sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
                                 schema=sd.ProviderJobEndpoint(), response_schemas=sd.delete_prov_job_responses)
-@sd.job_service.delete(tags=[sd.TAG_JOBS, sd.TAG_DISMISS], renderer=OUTPUT_FORMAT_JSON,
-                       schema=sd.JobEndpoint(), response_schemas=sd.delete_job_responses)
 @sd.process_job_service.delete(tags=[sd.TAG_PROCESSES, sd.TAG_JOBS, sd.TAG_DISMISS], renderer=OUTPUT_FORMAT_JSON,
                                schema=sd.DeleteProcessJobEndpoint(), response_schemas=sd.delete_job_responses)
+@sd.job_service.delete(tags=[sd.TAG_JOBS, sd.TAG_DISMISS], renderer=OUTPUT_FORMAT_JSON,
+                       schema=sd.JobEndpoint(), response_schemas=sd.delete_job_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def cancel_job(request):
     """
     Dismiss a job.
 
-    Note: Will only stop tracking this particular process (WPS 1.0 doesn't allow to stop a process)
+    Note:
+        Will only stop tracking this particular process execution when not supported by underlying provider
+        services such as WPS 1.0. Services supporting cancel operation could attempt to terminate remote jobs.
     """
     job = get_job(request)
-    app.control.revoke(job.task_id, terminate=True)
-    store = get_db(request).get_store(StoreJobs)
-    job.status_message = "Job dismissed."
-    job.status = status.map_status(status.STATUS_DISMISSED)
-    store.update_job(job)
-
+    job = cancel_job_task(job, request)
     return HTTPOk(json={
         "jobID": job.id,
         "status": job.status,
         "message": job.status_message,
         "percentCompleted": job.progress,
     })
+
+
+@sd.jobs_service.delete(tags=[sd.TAG_JOBS, sd.TAG_DISMISS], renderer=OUTPUT_FORMAT_JSON,
+                        schema=sd.DeleteJobsEndpoint(), response_schemas=sd.delete_jobs_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
+def cancel_job_batch(request):
+    """
+    Dismiss multiple jobs.
+
+    Note:
+        Will only stop tracking jobs when underlying remote provider services do not support cancel operation.
+    """
+    try:
+        body = sd.DeleteJobsBodySchema().deserialize(request.json)
+        jobs = body["jobs"]
+    except Invalid as exc:
+        raise HTTPUnprocessableEntity(json={"code": Invalid.__name__, "description": str(exc)})
+    except Exception as exc:
+        raise HTTPBadRequest(json={"code": "Could not parse request body.", "description": str(exc)})
+
+    store = get_db(request).get_store(StoreJobs)
+    found_jobs = []
+    for job_id in jobs:
+        try:
+            job = store.fetch_by_id(job_id)
+        except JobNotFound:
+            continue
+        found_jobs.append(job.id)
+        cancel_job_task(job, request)
+
+    body = sd.BatchDismissJobsBodySchema().deserialize({"jobs": found_jobs})
+    return HTTPOk(json=body)
 
 
 @sd.provider_inputs_service.get(tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
@@ -373,6 +498,7 @@ def get_job_results(request):
             "description": "Job status is '{}'. Results are not yet available.".format(job_status)
         })
     results = get_results(job, request, value_key="value", ogc_api=True)
+    # note: cannot add links in this case because variable OutputID keys are directly at the root
     results = sd.Result().deserialize(results)
     return HTTPOk(json=results)
 

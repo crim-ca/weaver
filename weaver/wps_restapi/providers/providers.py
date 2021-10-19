@@ -196,6 +196,9 @@ def get_provider_process(request):
         raise HTTPBadRequest("Invalid schema: [{!s}]".format(ex))
 
 
+@sd.provider_execution_service.post(tags=[sd.TAG_PROVIDERS, sd.TAG_PROVIDERS, sd.TAG_EXECUTE, sd.TAG_JOBS],
+                                    renderer=OUTPUT_FORMAT_JSON, schema=sd.PostProviderProcessJobRequest(),
+                                    response_schemas=sd.post_provider_process_job_responses)
 @sd.provider_jobs_service.post(tags=[sd.TAG_PROVIDERS, sd.TAG_PROVIDERS, sd.TAG_EXECUTE, sd.TAG_JOBS],
                                renderer=OUTPUT_FORMAT_JSON, schema=sd.PostProviderProcessJobRequest(),
                                response_schemas=sd.post_provider_process_job_responses)

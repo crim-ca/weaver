@@ -625,6 +625,19 @@ def mocked_execute_process():
     )
 
 
+def mocked_dismiss_process():
+    """
+    Mock operations called to terminate :mod:`Celery` tasks.
+    """
+    mock_celery_app = mock.MagicMock()
+    mock_celery_app.control = mock.MagicMock()
+    mock_celery_app.control.revoke = mock.MagicMock()
+
+    return (
+        mock.patch("weaver.wps_restapi.jobs.jobs.app", return_value=mock_celery_app)
+    )
+
+
 def mocked_process_job_runner(job_task_id="mocked-job-id"):
     # type: (str) -> Iterable[MockPatch]
     """
