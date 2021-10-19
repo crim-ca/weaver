@@ -10,6 +10,17 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+`4.2.0 <https://github.com/crim-ca/weaver/tree/4.2.0>`_ (2021-10-19)
+========================================================================
+
+Changes:
+--------
 - Add execution endpoint ``POST /provider/{id}/process/{id}/execution`` corresponding to the OGC-API compliant endpoint
   for local ``Process`` definitions.
 - Add multiple additional relation ``links`` for ``Process`` and ``Job`` responses
