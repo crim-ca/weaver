@@ -1136,8 +1136,8 @@ class WpsPackageAppTest(WpsConfigBase):
                 {"id": "io_min_int_max_str", "type": "string"},
                 {"id": "io_min_str_max_int", "type": "string"},
                 {"id": "io_min_str_max_str", "type": "string"},
-                {"id": "io_min_int_max_unbounded", "type": "string"},
-                {"id": "io_min_str_max_unbounded", "type": "string"},
+                {"id": "io_min_int_max_unbounded", "type": {"type": "array", "items": "string"}},
+                {"id": "io_min_str_max_unbounded", "type": {"type": "array", "items": "string"}},
             ],
             "outputs": {"values": {"type": "string"}}
         }
