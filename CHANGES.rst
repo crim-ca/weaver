@@ -10,11 +10,18 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add more frequent ``Job`` updates of execution checkpoint pushed to database in order to avoid inconsistent statuses
+  between the parent ``Celery`` task and the underlying `Application Package` being executed, since both can update the
+  same ``Job`` entry at different moments.
+- Add a ``Job`` log entry as ``"accepted"`` on the API side before calling the ``Celery`` task submission
+  (``Job`` not yet picked by a worker) in order to provide more detail between the submission time and initial
+  execution time. This allows to have the first log entry not immediately set to ``"running"`` since both ``"started"``
+  and ``"running"`` statues are remapped to ``"running"`` within the task to be compliant with `OGC` status codes.
 
 Fixes:
 ------
-- No change.
+- Fix an inconsistency between the final ``Job`` status and the reported "completed" message in logs due to missing
+  push of a newer state prior re-fetch of the latest ``Job`` from the database.
 
 `4.2.0 <https://github.com/crim-ca/weaver/tree/4.2.0>`_ (2021-10-19)
 ========================================================================

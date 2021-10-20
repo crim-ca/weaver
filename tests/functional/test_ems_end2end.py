@@ -25,8 +25,8 @@ from weaver.status import (
     JOB_STATUS_CATEGORIES,
     JOB_STATUS_VALUES,
     STATUS_ACCEPTED,
-    STATUS_CATEGORY_FINISHED,
-    STATUS_CATEGORY_RUNNING,
+    JOB_STATUS_CATEGORY_FINISHED,
+    JOB_STATUS_CATEGORY_RUNNING,
     STATUS_RUNNING,
     STATUS_SUCCEEDED
 )
@@ -746,7 +746,7 @@ class End2EndEMSTestCase(TestCase):
                              message="Response process ID should match specified test process id.")
             resp = self.request("POST", execute_path, json=execute_body,
                                 headers=headers_b, cookies=cookies_b, status=HTTPCreated.code)
-            self.assert_test(lambda: resp.json.get("status") in JOB_STATUS_CATEGORIES[STATUS_CATEGORY_RUNNING],
+            self.assert_test(lambda: resp.json.get("status") in JOB_STATUS_CATEGORIES[JOB_STATUS_CATEGORY_RUNNING],
                              message="Response process execution job status should be one of running category values.")
             job_location = resp.json.get("location")
             job_id = resp.json.get("jobID")
@@ -819,7 +819,7 @@ class End2EndEMSTestCase(TestCase):
             execute_path = "{}/jobs".format(process_path)
             resp = self.request("POST", execute_path, status=HTTPCreated.code,
                                 headers=self.headers, json=execute_body)
-            self.assert_test(lambda: resp.json.get("status") in JOB_STATUS_CATEGORIES[STATUS_CATEGORY_RUNNING],
+            self.assert_test(lambda: resp.json.get("status") in JOB_STATUS_CATEGORIES[JOB_STATUS_CATEGORY_RUNNING],
                              message="Response process execution job status should be one of running values.")
             job_location = resp.json.get("location")
             job_id = resp.json.get("jobID")
@@ -852,14 +852,14 @@ class End2EndEMSTestCase(TestCase):
             status = resp.json.get("status")
             self.assert_test(lambda: status in JOB_STATUS_VALUES,
                              message="Cannot identify a valid job status for result validation.")
-            if status in JOB_STATUS_CATEGORIES[STATUS_CATEGORY_RUNNING]:
+            if status in JOB_STATUS_CATEGORIES[JOB_STATUS_CATEGORY_RUNNING]:
                 if status == STATUS_ACCEPTED:
                     timeout_accept -= self.WEAVER_TEST_JOB_GET_STATUS_INTERVAL
                 else:
                     timeout_running -= self.WEAVER_TEST_JOB_GET_STATUS_INTERVAL
                 time.sleep(self.WEAVER_TEST_JOB_GET_STATUS_INTERVAL)
                 continue
-            if status in JOB_STATUS_CATEGORIES[STATUS_CATEGORY_FINISHED]:
+            if status in JOB_STATUS_CATEGORIES[JOB_STATUS_CATEGORY_FINISHED]:
                 self.assert_test(lambda: status == STATUS_SUCCEEDED,
                                  message="Job execution '{}' failed, but expected to succeed.".format(job_location_url))
                 break
