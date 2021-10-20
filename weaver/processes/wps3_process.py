@@ -292,7 +292,7 @@ class Wps3Process(WpsProcessInterface):
         self.update_status("Monitoring job on remote ADES : {0}".format(job_status_uri),
                            REMOTE_JOB_PROGRESS_MONITORING, status.STATUS_RUNNING)
 
-        while job_status_value not in status.JOB_STATUS_CATEGORIES[status.STATUS_CATEGORY_FINISHED]:
+        while job_status_value not in status.JOB_STATUS_CATEGORIES[status.JOB_STATUS_CATEGORY_FINISHED]:
             sleep(5)
             job_status = self.get_job_status(job_status_uri)
             job_status_value = status.map_status(job_status["status"])

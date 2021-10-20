@@ -27,6 +27,8 @@ from weaver.processes.constants import WPS_COMPLEX_DATA
 from weaver.processes.convert import ows2json_output_data
 from weaver.processes.types import PROCESS_WORKFLOW
 from weaver.status import (
+    JOB_STATUS_CATEGORIES,
+    JOB_STATUS_CATEGORY_FINISHED,
     STATUS_ACCEPTED,
     STATUS_DISMISSED,
     STATUS_FAILED,
@@ -79,22 +81,22 @@ def execute_process(self, job_id, url, headers=None):
     from weaver.wps.service import get_pywps_service
 
     LOGGER.debug("Job execute process called.")
-    settings = get_settings(app)
-    task_logger = get_task_logger(__name__)
-    load_pywps_config(settings)
-
-    task_logger.debug("Job task setup.")
 
     # reset the connection because we are in a forked celery process
     db = get_db(app, reset_connection=True)
     store = db.get_store(StoreJobs)
-
     job = store.fetch_by_id(job_id)
     job.started = now()
     job.status = STATUS_STARTED  # will be mapped to 'RUNNING'
     job.status_message = "Job {}.".format(STATUS_STARTED)  # will preserve detail of STARTED vs RUNNING
-    job.task_id = self.request.id
+    job.save_log(message=job.status_message)
+
+    task_logger = get_task_logger(__name__)
+    job.save_log(logger=task_logger, message="Job task setup initiated.")
+    settings = get_settings(app)
+    load_pywps_config(settings)
     job.progress = JOB_PROGRESS_SETUP
+    job.task_id = self.request.id
     job.save_log(logger=task_logger, message="Job task setup completed.")
     job = store.update_job(job)
 
@@ -249,12 +251,14 @@ def execute_process(self, job_id, url, headers=None):
                         job.save_log(errors=execution.errors, logger=task_logger)
                     task_logger.debug("Mapping Job references with generated WPS locations.")
                     map_locations(job, settings)
+                    job = store.update_job(job)
 
             except Exception as exc:
                 num_retries += 1
                 task_logger.debug("Exception raised: %s", repr(exc))
                 job.status_message = "Could not read status XML document for {!s}. Trying again...".format(job)
                 job.save_log(errors=execution.errors, logger=task_logger)
+                job = store.update_job(job)
                 sleep(1)
             else:
                 # job.status_message = "Update {}...".format(str(job))
@@ -274,6 +278,7 @@ def execute_process(self, job_id, url, headers=None):
         exception_class = "{}.{}".format(type(exc).__module__, type(exc).__name__)
         errors = "{0}: {1!s}".format(exception_class, exc)
         job.save_log(errors=errors, logger=task_logger)
+        job = store.update_job(job)
     finally:
         # if task worker terminated, local 'job' is out of date compared to remote/background runner last update
         job = store.fetch_by_id(job.id)
@@ -297,6 +302,9 @@ def execute_process(self, job_id, url, headers=None):
                 message = "Couldn't send notification email ({})".format(exception)
                 job.save_log(errors=message, logger=task_logger, message=message)
 
+        if job.status not in JOB_STATUS_CATEGORIES[JOB_STATUS_CATEGORY_FINISHED]:
+            job.status = STATUS_SUCCEEDED
+        job.status_message = "Job {}.".format(job.status)
         job.mark_finished()
         job.progress = JOB_PROGRESS_DONE
         job.save_log(logger=task_logger, message="Job task complete.")
@@ -479,6 +487,8 @@ def submit_job_handler(payload,             # type: JSON
                          inputs=json_body.get("inputs"), is_local=is_local, is_workflow=is_workflow,
                          access=visibility, user_id=user, execute_async=is_execute_async, custom_tags=tags,
                          notification_email=encrypted_email, accept_language=language)
+    job.save_log(logger=LOGGER, message="Job task submitted for execution.", status=STATUS_ACCEPTED, progress=0)
+    job = store.update_job(job)
     result = execute_process.delay(job_id=job.id, url=clean_ows_url(service_url), headers=auth)
     LOGGER.debug("Celery pending task [%s] for job [%s].", result.id, job.id)
 

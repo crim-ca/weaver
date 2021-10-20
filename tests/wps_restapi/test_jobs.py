@@ -28,8 +28,8 @@ from weaver.formats import CONTENT_TYPE_APP_JSON
 from weaver.processes.wps_testing import WpsTestProcess
 from weaver.status import (
     JOB_STATUS_CATEGORIES,
+    JOB_STATUS_CATEGORY_FINISHED,
     JOB_STATUS_VALUES,
-    STATUS_CATEGORY_FINISHED,
     STATUS_FAILED,
     STATUS_SUCCEEDED
 )
@@ -122,7 +122,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         job = self.job_store.save_job(task_id=task_id, process=process, service=service, is_workflow=False,
                                       user_id=user_id, execute_async=True, access=access, created=created)
         job.status = status
-        if status in JOB_STATUS_CATEGORIES[STATUS_CATEGORY_FINISHED]:
+        if status in JOB_STATUS_CATEGORIES[JOB_STATUS_CATEGORY_FINISHED]:
             job.mark_finished()
         job.progress = progress
         job = self.job_store.update_job(job)

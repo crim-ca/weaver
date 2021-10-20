@@ -492,7 +492,7 @@ def get_job_results(request):
     """
     job = get_job(request)
     job_status = status.map_status(job.status)
-    if job_status in status.JOB_STATUS_CATEGORIES[status.STATUS_CATEGORY_RUNNING]:
+    if job_status in status.JOB_STATUS_CATEGORIES[status.JOB_STATUS_CATEGORY_RUNNING]:
         raise HTTPNotFound(json={
             "code": "ResultsNotReady",
             "description": "Job status is '{}'. Results are not yet available.".format(job_status)

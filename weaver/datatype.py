@@ -38,9 +38,9 @@ from weaver.processes.types import (
 )
 from weaver.status import (
     JOB_STATUS_CATEGORIES,
+    JOB_STATUS_CATEGORY_FINISHED,
     JOB_STATUS_VALUES,
     STATUS_ACCEPTED,
-    STATUS_CATEGORY_FINISHED,
     STATUS_RUNNING,
     STATUS_SUCCEEDED,
     STATUS_UNKNOWN,
@@ -976,7 +976,7 @@ class Job(Base):
             {"href": job_url + "/inputs", "rel": "inputs",  # unofficial
              "title": "Submitted job inputs for process execution."}
         ]
-        if self.status in JOB_STATUS_CATEGORIES[STATUS_CATEGORY_FINISHED]:
+        if self.status in JOB_STATUS_CATEGORIES[JOB_STATUS_CATEGORY_FINISHED]:
             job_status = map_status(self.status)
             if job_status == STATUS_SUCCEEDED:
                 job_links.extend([

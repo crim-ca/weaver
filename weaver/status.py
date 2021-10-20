@@ -10,9 +10,9 @@ if TYPE_CHECKING:
 STATUS_COMPLIANT_OGC = "STATUS_COMPLIANT_OGC"
 STATUS_COMPLIANT_PYWPS = "STATUS_COMPLIANT_PYWPS"
 STATUS_COMPLIANT_OWSLIB = "STATUS_COMPLIANT_OWSLIB"
-STATUS_CATEGORY_FINISHED = "STATUS_CATEGORY_FINISHED"
-STATUS_CATEGORY_RUNNING = "STATUS_CATEGORY_RUNNING"
-STATUS_CATEGORY_FAILED = "STATUS_CATEGORY_FAILED"
+JOB_STATUS_CATEGORY_FINISHED = "JOB_STATUS_CATEGORY_FINISHED"
+JOB_STATUS_CATEGORY_RUNNING = "JOB_STATUS_CATEGORY_RUNNING"
+JOB_STATUS_CATEGORY_FAILED = "JOB_STATUS_CATEGORY_FAILED"
 
 STATUS_ACCEPTED = "accepted"
 STATUS_STARTED = "started"
@@ -70,20 +70,20 @@ JOB_STATUS_CATEGORIES = {
         STATUS_PAUSED
     ]),
     # utility categories
-    STATUS_CATEGORY_RUNNING: frozenset([
+    JOB_STATUS_CATEGORY_RUNNING: frozenset([
         STATUS_ACCEPTED,
         STATUS_RUNNING,
         STATUS_STARTED,
         STATUS_PAUSED
     ]),
-    STATUS_CATEGORY_FINISHED: frozenset([
+    JOB_STATUS_CATEGORY_FINISHED: frozenset([
         STATUS_FAILED,
         STATUS_DISMISSED,
         STATUS_EXCEPTION,
         STATUS_SUCCEEDED,
         STATUS_SUCCESSFUL
     ]),
-    STATUS_CATEGORY_FAILED: frozenset([
+    JOB_STATUS_CATEGORY_FAILED: frozenset([
         STATUS_FAILED,
         STATUS_DISMISSED,
         STATUS_EXCEPTION
@@ -127,10 +127,10 @@ def map_status(wps_status, compliant=STATUS_COMPLIANT_OGC):
     job_status = wps_status.lower().replace("process", "")
 
     if compliant == STATUS_COMPLIANT_OGC:
-        if job_status in JOB_STATUS_CATEGORIES[STATUS_CATEGORY_RUNNING]:
+        if job_status in JOB_STATUS_CATEGORIES[JOB_STATUS_CATEGORY_RUNNING]:
             if job_status in [STATUS_STARTED, STATUS_PAUSED]:
                 job_status = STATUS_RUNNING
-        elif job_status in JOB_STATUS_CATEGORIES[STATUS_CATEGORY_FAILED]:
+        elif job_status in JOB_STATUS_CATEGORIES[JOB_STATUS_CATEGORY_FAILED]:
             if job_status not in [STATUS_FAILED, STATUS_DISMISSED]:
                 job_status = STATUS_FAILED
 
@@ -143,7 +143,7 @@ def map_status(wps_status, compliant=STATUS_COMPLIANT_OGC):
     elif compliant == STATUS_COMPLIANT_OWSLIB:
         if job_status == STATUS_STARTED:
             job_status = STATUS_RUNNING
-        elif job_status in JOB_STATUS_CATEGORIES[STATUS_CATEGORY_FAILED] and job_status != STATUS_FAILED:
+        elif job_status in JOB_STATUS_CATEGORIES[JOB_STATUS_CATEGORY_FAILED] and job_status != STATUS_FAILED:
             job_status = STATUS_FAILED
 
     # FIXME: new official status is 'successful', but this breaks everywhere (tests, local/remote execute, etc.)
