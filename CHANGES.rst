@@ -10,6 +10,17 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+`4.2.1 <https://github.com/crim-ca/weaver/tree/4.2.1>`_ (2021-10-20)
+========================================================================
+
+Changes:
+--------
 - Add more frequent ``Job`` updates of execution checkpoint pushed to database in order to avoid inconsistent statuses
   between the parent ``Celery`` task and the underlying `Application Package` being executed, since both can update the
   same ``Job`` entry at different moments.
