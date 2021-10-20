@@ -28,8 +28,8 @@ from weaver.formats import CONTENT_TYPE_APP_JSON
 from weaver.processes.wps_testing import WpsTestProcess
 from weaver.status import (
     JOB_STATUS_CATEGORIES,
-    JOB_STATUS_VALUES,
     JOB_STATUS_CATEGORY_FINISHED,
+    JOB_STATUS_VALUES,
     STATUS_FAILED,
     STATUS_SUCCEEDED
 )

@@ -23,10 +23,10 @@ from weaver.formats import CONTENT_TYPE_APP_FORM, CONTENT_TYPE_APP_JSON
 from weaver.processes.sources import fetch_data_sources
 from weaver.status import (
     JOB_STATUS_CATEGORIES,
-    JOB_STATUS_VALUES,
-    STATUS_ACCEPTED,
     JOB_STATUS_CATEGORY_FINISHED,
     JOB_STATUS_CATEGORY_RUNNING,
+    JOB_STATUS_VALUES,
+    STATUS_ACCEPTED,
     STATUS_RUNNING,
     STATUS_SUCCEEDED
 )

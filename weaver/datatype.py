@@ -38,9 +38,9 @@ from weaver.processes.types import (
 )
 from weaver.status import (
     JOB_STATUS_CATEGORIES,
+    JOB_STATUS_CATEGORY_FINISHED,
     JOB_STATUS_VALUES,
     STATUS_ACCEPTED,
-    JOB_STATUS_CATEGORY_FINISHED,
     STATUS_RUNNING,
     STATUS_SUCCEEDED,
     STATUS_UNKNOWN,
