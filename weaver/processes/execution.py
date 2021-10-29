@@ -44,6 +44,7 @@ from weaver.wps.utils import (
     check_wps_status,
     get_wps_client,
     get_wps_local_status_location,
+    get_wps_output_context,
     get_wps_output_path,
     get_wps_output_url,
     load_pywps_config
@@ -395,12 +396,19 @@ def submit_job(request, reference, tags=None):
     """
     # validate body with expected JSON content and schema
     if CONTENT_TYPE_APP_JSON not in request.content_type:
-        raise HTTPBadRequest("Request 'Content-Type' header other than '{}' not supported."
-                             .format(CONTENT_TYPE_APP_JSON))
+        raise HTTPBadRequest(json={
+            "code": "InvalidHeaderValue",
+            "name": "Content-Type",
+            "description": "Request 'Content-Type' header other than '{}' not supported.".format(CONTENT_TYPE_APP_JSON),
+            "value": str(request.content_type)
+        })
     try:
         json_body = request.json_body
     except Exception as ex:
         raise HTTPBadRequest("Invalid JSON body cannot be decoded for job submission. [{}]".format(ex))
+    # validate context if needed later on by the job for early failure
+    context = get_wps_output_context(request)
+
     provider_id = None  # None OK if local
     process_id = None   # None OK if remote, but can be found as well if available from WPS-REST path
     tags = tags or []
@@ -432,7 +440,7 @@ def submit_job(request, reference, tags=None):
     headers = dict(request.headers)
     settings = get_settings(request)
     return submit_job_handler(json_body, settings, service_url, provider_id, process_id, is_workflow, is_local,
-                              visibility, language=lang, auth=headers, tags=tags, user=user)
+                              visibility, language=lang, auth=headers, tags=tags, user=user, context=context)
 
 
 # FIXME: this should not be necessary if schema validators correctly implement OneOf(values)
@@ -464,6 +472,7 @@ def submit_job_handler(payload,             # type: JSON
                        auth=None,           # type: Optional[HeaderCookiesType]
                        tags=None,           # type: Optional[List[str]]
                        user=None,           # type: Optional[int]
+                       context=None,        # type: Optional[str]
                        ):                   # type: (...) -> JSON
     """
     Submits the job to the Celery worker with provided parameters.
@@ -486,7 +495,7 @@ def submit_job_handler(payload,             # type: JSON
     job = store.save_job(task_id=STATUS_ACCEPTED, process=process_id, service=provider_id,
                          inputs=json_body.get("inputs"), is_local=is_local, is_workflow=is_workflow,
                          access=visibility, user_id=user, execute_async=is_execute_async, custom_tags=tags,
-                         notification_email=encrypted_email, accept_language=language)
+                         notification_email=encrypted_email, accept_language=language, context=context)
     job.save_log(logger=LOGGER, message="Job task submitted for execution.", status=STATUS_ACCEPTED, progress=0)
     job = store.update_job(job)
     result = execute_process.delay(job_id=job.id, url=clean_ows_url(service_url), headers=auth)

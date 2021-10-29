@@ -906,6 +906,24 @@ class Job(Base):
         self["access"] = visibility
 
     @property
+    def context(self):
+        # type: () -> Optional[str]
+        """
+        Job outputs context.
+        """
+        return self.get("context") or None
+
+    @context.setter
+    def context(self, context):
+        # type: (Optional[str]) -> None
+        """
+        Job outputs context.
+        """
+        if not (isinstance(context, str) or context is None):
+            raise TypeError("Type 'str' or 'None' is required for '{}.context'".format(type(self)))
+        self["context"] = context
+
+    @property
     def request(self):
         # type: () -> Optional[str]
         """

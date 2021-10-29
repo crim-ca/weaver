@@ -24,7 +24,7 @@ from weaver.processes.utils import get_job_submission_response, get_process
 from weaver.store.base import StoreProcesses
 from weaver.utils import get_header, get_settings, get_weaver_url
 from weaver.visibility import VISIBILITY_PUBLIC
-from weaver.wps.utils import check_wps_status, get_wps_local_status_location, load_pywps_config
+from weaver.wps.utils import check_wps_status, get_wps_local_status_location, get_wps_output_context, load_pywps_config
 from weaver.wps_restapi import swagger_definitions as sd
 
 LOGGER = logging.getLogger(__name__)
@@ -166,6 +166,7 @@ class WorkerService(ServiceWPS):
         """
         req = wps_request.http_request
         pid = wps_request.identifier
+        ctx = get_wps_output_context(req)  # re-validate here in case submitted via WPS endpoint instead of REST-API
         proc = get_process(process_id=pid, settings=self.settings)  # raises if invalid or missing
         wps_process = self.processes.get(pid)
 
@@ -175,7 +176,7 @@ class WorkerService(ServiceWPS):
         data = wps2json_job_payload(wps_request, wps_process)
         body = submit_job_handler(data, self.settings, proc.processEndpointWPS1,
                                   process_id=pid, is_local=True, is_workflow=is_workflow, visibility=VISIBILITY_PUBLIC,
-                                  language=wps_request.language, tags=tags, auth=dict(req.headers))
+                                  language=wps_request.language, tags=tags, auth=dict(req.headers), context=ctx)
 
         # if Accept was JSON, provide response content as is
         accept_type = get_header("Accept", req.headers)

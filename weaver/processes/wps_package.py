@@ -1395,9 +1395,10 @@ class WpsPackage(Process):
             - :func:`weaver.wps.load_pywps_config`
         """
         wps_out_dir = self.workdir  # pywps will resolve file paths for us using its WPS request UUID
+        wps_out_cxt = get_wps_output_context(self.request.http_request)
         s3_bucket = self.settings.get("weaver.wps_output_s3_bucket")
         result_loc = cwl_result[output_id]["location"].replace("file://", "")
-        result_fn = os.path.split(result_loc)[-1]
+        result_path = os.path.split(result_loc)[-1]
 
         if s3_bucket:
             # result_wps = "s3://{}/{}".format(s3_bucket, result_fn)
@@ -1409,7 +1410,12 @@ class WpsPackage(Process):
             self.response.outputs[output_id]._storage = S3StorageBuilder().build()  # noqa: W0212
             self.response.outputs[output_id].storage.prefix = str(self.response.uuid)
 
-        result_wps = os.path.join(wps_out_dir, result_fn)
+        elif wps_out_cxt:
+            wps_out_dir = os.path.join(wps_out_dir, wps_out_cxt)
+
+        os.makedirs(wps_out_dir, exist_ok=True)
+        result_wps = os.path.join(wps_out_dir, result_path)
+
         if os.path.realpath(result_loc) != os.path.realpath(result_wps):
             self.logger.info("Moving [%s]: [%s] -> [%s]", output_id, result_loc, result_wps)
             shutil.move(result_loc, result_wps)

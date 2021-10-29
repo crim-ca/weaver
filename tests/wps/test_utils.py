@@ -2,10 +2,13 @@ import contextlib
 import copy
 
 import mock
+import pytest
+from pyramid.httpexceptions import HTTPUnprocessableEntity
+from pyramid.testing import DummyRequest
 
 from tests.utils import mocked_remote_wps
 from weaver.formats import ACCEPT_LANGUAGE_EN_US, ACCEPT_LANGUAGE_FR_CA, CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML
-from weaver.wps.utils import get_wps_client, set_wps_language
+from weaver.wps.utils import get_wps_client, get_wps_output_context, set_wps_language
 
 
 def test_set_wps_language():
@@ -52,3 +55,44 @@ def test_get_wps_client_headers_preserved():
     assert wps.headers == test_wps_headers, "Only allowed headers should have been passed down to WPS client"
     assert wps.language == ACCEPT_LANGUAGE_FR_CA, "Language should have been passed down to WPS client from header"
     assert wps.url == test_wps_url
+
+
+def test_get_wps_output_context():
+    bad_cases = [
+        "test/////test",
+        "test/test//",
+        "test/./test/test",
+        "test/../test/test",
+        "/test/test/test/test",
+        "/test/test/",
+        "/test",
+        "/test/",
+        "./test",
+        "../test",
+        "/"
+    ]
+    good_cases = [
+        ("test", "test"),
+        ("test/test", "test/test"),
+        ("test/test/", "test/test"),  # allow trailing slash auto-removed
+        ("test/test/test/test", "test/test/test/test"),
+    ]
+
+    header_names = [
+        "x-wps-output-context",
+        "X-WPS-OUTPUT-CONTEXT",
+        "X-WPS-Output-Context"
+    ]
+
+    for header in header_names:
+        for case in bad_cases:
+            with pytest.raises(HTTPUnprocessableEntity):
+                req = DummyRequest(headers={header: case})
+                get_wps_output_context(req)
+        for case, result in good_cases:
+            try:
+                req = DummyRequest(headers={header: case})
+                ctx = get_wps_output_context(req)
+                assert ctx == result
+            except Exception as exc:
+                pytest.fail("Exception raised when none is expected: {!s}: ${!s}".format(exc.__class__.__name__, exc))
