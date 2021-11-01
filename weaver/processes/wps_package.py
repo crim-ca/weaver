@@ -131,9 +131,6 @@ if TYPE_CHECKING:
     CWLResultEntry = Union[Dict[str, CWLResultValue], CWLResultFile, List[CWLResultFile]]
     CWLResults = Dict[str, CWLResultEntry]
 
-    # cwl_result[output_id]["location"]
-    # cwl_result[output_id][i]["location"]
-
 # NOTE:
 #   Only use this logger for 'utility' methods (not residing under WpsPackage).
 #   In that case, employ 'self.logger' instead so that the executed process has its self-contained job log entries.
@@ -1395,7 +1392,6 @@ class WpsPackage(Process):
             - :func:`weaver.wps.load_pywps_config`
         """
         wps_out_dir = self.workdir  # pywps will resolve file paths for us using its WPS request UUID
-        wps_out_cxt = get_wps_output_context(self.request.http_request)
         s3_bucket = self.settings.get("weaver.wps_output_s3_bucket")
         result_loc = cwl_result[output_id]["location"].replace("file://", "")
         result_path = os.path.split(result_loc)[-1]
@@ -1409,9 +1405,6 @@ class WpsPackage(Process):
             # using this storage builder, settings are retrieved from PyWPS server config
             self.response.outputs[output_id]._storage = S3StorageBuilder().build()  # noqa: W0212
             self.response.outputs[output_id].storage.prefix = str(self.response.uuid)
-
-        elif wps_out_cxt:
-            wps_out_dir = os.path.join(wps_out_dir, wps_out_cxt)
 
         os.makedirs(wps_out_dir, exist_ok=True)
         result_wps = os.path.join(wps_out_dir, result_path)

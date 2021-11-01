@@ -10,7 +10,11 @@ Changes
 
 Changes:
 --------
-- No change.
+- Replace ``Job.execute_async`` getter/setter by simple property using more generic ``Job.execution_mode``
+  for storage in database. Provide ``Job.execute_async`` and ``Job.execute_sync`` properties based on stored mode.
+- Simplify ``execute_process`` function executed by `Celery` task into sub-step functions where applicable.
+- Simplify forwarding of ``Job`` parameters between ``PyWPS`` service ``WorkerService.execute_job`` method
+  and `Celery` task instantiating it by reusing the ``Job`` object.
 
 Fixes:
 ------

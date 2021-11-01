@@ -76,9 +76,10 @@ JOB_PROGRESS_DONE = 100
 
 
 @app.task(bind=True)
-def execute_process(self, job_id, url, headers=None):
-    # pylint: disable=R1260,too-complex  # FIXME: simplify operations
-
+def execute_process(self, job_id, wps_url, headers=None):
+    """
+    Celery task that executes the WPS process job monitoring as status updates (local and remote).
+    """
     from weaver.wps.service import get_pywps_service
 
     LOGGER.debug("Job execute process called.")
@@ -86,7 +87,7 @@ def execute_process(self, job_id, url, headers=None):
     # reset the connection because we are in a forked celery process
     db = get_db(app, reset_connection=True)
     store = db.get_store(StoreJobs)
-    job = store.fetch_by_id(job_id)
+    job = store.fetch_by_id(job_id)  # type: Job
     job.started = now()
     job.status = STATUS_STARTED  # will be mapped to 'RUNNING'
     job.status_message = "Job {}.".format(STATUS_STARTED)  # will preserve detail of STARTED vs RUNNING
@@ -109,60 +110,15 @@ def execute_process(self, job_id, url, headers=None):
     local_status = False
 
     try:
-        try:
-            job.progress = JOB_PROGRESS_DESCRIBE
-            job.save_log(logger=task_logger, message="Employed WPS URL: [{!s}]".format(url), level=logging.DEBUG)
-            job.save_log(logger=task_logger, message="Execute WPS request for process [{!s}]".format(job.process))
-            wps = get_wps_client(url, settings, headers=headers, language=job.accept_language)
-            raise_on_xml_exception(wps._capabilities)   # noqa
-        except Exception as ex:
-            job.save_log(errors=ex, message="Failed WPS client creation for process [{!s}]".format(job.process))
-            raise OWSNoApplicableCode("Failed to retrieve WPS capabilities. Error: [{}].".format(str(ex)))
-        try:
-            wps_process = wps.describeprocess(job.process)
-        except Exception as ex:
-            raise OWSNoApplicableCode("Failed to retrieve WPS process description. Error: [{}].".format(str(ex)))
+        job.progress = JOB_PROGRESS_DESCRIBE
+        job.save_log(logger=task_logger, message="Employed WPS URL: [{!s}]".format(wps_url), level=logging.DEBUG)
+        job.save_log(logger=task_logger, message="Execute WPS request for process [{!s}]".format(job.process))
+        wps_process = fetch_wps_process(job, wps_url, headers, settings)
 
         # prepare inputs
         job.progress = JOB_PROGRESS_GET_INPUTS
         job.save_log(logger=task_logger, message="Fetching job input definitions.")
-        complex_inputs = []
-        for process_input in wps_process.dataInputs:
-            if WPS_COMPLEX_DATA in process_input.dataType:
-                complex_inputs.append(process_input.identifier)
-
-        try:
-            wps_inputs = list()
-            # parse both dict and list type inputs
-            job_inputs = job.inputs.items() if isinstance(job.inputs, dict) else job.get("inputs", [])
-            for process_input in job_inputs:
-                if isinstance(process_input, tuple):
-                    input_id = process_input[0]
-                    process_value = process_input[1]
-                else:
-                    input_id = get_any_id(process_input)
-                    process_value = get_any_value(process_input)
-                # in case of array inputs, must repeat (id,value)
-                input_values = process_value if isinstance(process_value, list) else [process_value]
-
-                # we need to support file:// scheme but PyWPS doesn't like them so remove the scheme file://
-                input_values = [
-                    # when value is an array of dict that each contain a file reference
-                    (get_any_value(val)[7:] if str(get_any_value(val)).startswith("file://") else get_any_value(val))
-                    if isinstance(val, dict) else
-                    # when value is directly a single dict with file reference
-                    (val[7:] if str(val).startswith("file://") else val)
-                    for val in input_values
-                ]
-
-                # need to use ComplexDataInput structure for complex input
-                # need to use literal String for anything else than complex
-                # TODO: BoundingBox not supported
-                wps_inputs.extend([
-                    (input_id, ComplexDataInput(input_value) if input_id in complex_inputs else str(input_value))
-                    for input_value in input_values])
-        except KeyError:
-            wps_inputs = []
+        wps_inputs = parse_wps_inputs(wps_process, job)
 
         # prepare outputs
         job.progress = JOB_PROGRESS_GET_OUTPUTS
@@ -173,7 +129,7 @@ def execute_process(self, job_id, url, headers=None):
         if job.is_local:
             process = None  # already got all the information needed pre-loaded in PyWPS service
         else:
-            service = Service(name=job.service, url=url)
+            service = Service(name=job.service, url=wps_url)
             process = Process.from_ows(wps_process, service, settings)
 
         job.progress = JOB_PROGRESS_EXECUTE_REQUEST
@@ -181,11 +137,8 @@ def execute_process(self, job_id, url, headers=None):
         job.save_log(logger=task_logger,
                      message="Following updates could take a while until the Application Package answers...")
 
-        mode = EXECUTE_MODE_ASYNC if job.execute_async else EXECUTE_MODE_SYNC
-        lang = job.accept_language
         wps_worker = get_pywps_service(environ=settings, is_worker=True)
-        execution = wps_worker.execute_job(job.process, wps_inputs=wps_inputs, wps_outputs=wps_outputs,
-                                           mode=mode, job_uuid=job.id, remote_process=process, language=lang)
+        execution = wps_worker.execute_job(job, wps_inputs=wps_inputs, wps_outputs=wps_outputs, remote_process=process)
         if not execution.process and execution.errors:
             raise execution.errors[0]
 
@@ -212,6 +165,8 @@ def execute_process(self, job_id, url, headers=None):
         run_step = 0
         while execution.isNotComplete() or run_step == 0:
             if num_retries >= max_retries:
+                job.save_log(errors=execution.errors, logger=task_logger)
+                job = store.update_job(job)
                 raise Exception("Could not read status document after {} retries. Giving up.".format(max_retries))
             try:
                 # NOTE:
@@ -221,8 +176,8 @@ def execute_process(self, job_id, url, headers=None):
                 progress_min = JOB_PROGRESS_EXECUTE_MONITOR_LOOP
                 progress_max = JOB_PROGRESS_EXECUTE_MONITOR_DONE
                 job.progress = progress_min
-                execution = check_wps_status(location=wps_status_path, settings=settings,
-                                             sleep_secs=wait_secs(run_step))
+                run_delay = wait_secs(run_step)
+                execution = check_wps_status(location=wps_status_path, settings=settings, sleep_secs=run_delay)
                 job_msg = (execution.statusMessage or "").strip()
                 job.response = execution.response
                 job.status = map_status(execution.getStatus())
@@ -230,8 +185,6 @@ def execute_process(self, job_id, url, headers=None):
                     "Job execution monitoring (progress: {}%, status: {})."
                     .format(execution.percentCompleted, job_msg or "n/a")
                 )
-                # job.save_log(logger=task_logger)
-                # job = store.update_job(job)
 
                 if execution.isComplete():
                     msg_progress = " (status: {})".format(job_msg) if job_msg else ""
@@ -262,8 +215,6 @@ def execute_process(self, job_id, url, headers=None):
                 job = store.update_job(job)
                 sleep(1)
             else:
-                # job.status_message = "Update {}...".format(str(job))
-                # job.save_log(logger=task_logger)
                 num_retries = 0
                 run_step += 1
             finally:
@@ -290,18 +241,8 @@ def execute_process(self, job_id, url, headers=None):
         job.status_message = "Job {}.".format(job.status)
         job.save_log(logger=task_logger)
 
-        # Send email if requested
-        if job.notification_email is not None:
-            job.progress = JOB_PROGRESS_NOTIFY
-            try:
-                notify_job_complete(job, job.notification_email, settings)
-                message = "Notification email sent successfully."
-                job.save_log(logger=task_logger, message=message)
-            except Exception as exc:
-                exception_class = "{}.{}".format(type(exc).__module__, type(exc).__name__)
-                exception = "{0}: {1!s}".format(exception_class, exc)
-                message = "Couldn't send notification email ({})".format(exception)
-                job.save_log(errors=message, logger=task_logger, message=message)
+        job.progress = JOB_PROGRESS_NOTIFY
+        send_job_complete_notification_email(job, task_logger, settings)
 
         if job.status not in JOB_STATUS_CATEGORIES[JOB_STATUS_CATEGORY_FINISHED]:
             job.status = STATUS_SUCCEEDED
@@ -312,6 +253,84 @@ def execute_process(self, job_id, url, headers=None):
         job = store.update_job(job)
 
     return job.status
+
+
+def fetch_wps_process(job, wps_url, headers, settings):
+    """
+    Retrieves the WPS process description from the
+    """
+    try:
+        wps = get_wps_client(wps_url, settings, headers=headers, language=job.accept_language)
+        raise_on_xml_exception(wps._capabilities)  # noqa
+    except Exception as ex:
+        job.save_log(errors=ex, message="Failed WPS client creation for process [{!s}]".format(job.process))
+        raise OWSNoApplicableCode("Failed to retrieve WPS capabilities. Error: [{}].".format(str(ex)))
+    try:
+        wps_process = wps.describeprocess(job.process)
+    except Exception as ex:
+        raise OWSNoApplicableCode("Failed to retrieve WPS process description. Error: [{}].".format(str(ex)))
+    return wps_process
+
+
+def parse_wps_inputs(wps_process, job):
+    """
+    Parses expected WPS process inputs against submitted job input values considering supported process definitions.
+    """
+    complex_inputs = []
+    for process_input in wps_process.dataInputs:
+        if WPS_COMPLEX_DATA in process_input.dataType:
+            complex_inputs.append(process_input.identifier)
+
+    try:
+        wps_inputs = list()
+        # parse both dict and list type inputs
+        job_inputs = job.inputs.items() if isinstance(job.inputs, dict) else job.get("inputs", [])
+        for process_input in job_inputs:
+            if isinstance(process_input, tuple):
+                input_id = process_input[0]
+                process_value = process_input[1]
+            else:
+                input_id = get_any_id(process_input)
+                process_value = get_any_value(process_input)
+            # in case of array inputs, must repeat (id,value)
+            input_values = process_value if isinstance(process_value, list) else [process_value]
+
+            # we need to support file:// scheme but PyWPS doesn't like them so remove the scheme file://
+            input_values = [
+                # when value is an array of dict that each contain a file reference
+                (get_any_value(val)[7:] if str(get_any_value(val)).startswith("file://") else get_any_value(val))
+                if isinstance(val, dict) else
+                # when value is directly a single dict with file reference
+                (val[7:] if str(val).startswith("file://") else val)
+                for val in input_values
+            ]
+
+            # need to use ComplexDataInput structure for complex input
+            # need to use literal String for anything else than complex
+            # TODO: BoundingBox not supported
+            wps_inputs.extend([
+                (input_id, ComplexDataInput(input_value) if input_id in complex_inputs else str(input_value))
+                for input_value in input_values])
+    except KeyError:
+        wps_inputs = []
+    return wps_inputs
+
+
+def send_job_complete_notification_email(job, task_logger, settings):
+    """
+    Sends the notification email of completed execution if it was requested during job submission.
+    """
+    if job.notification_email is not None:
+        job.progress = JOB_PROGRESS_NOTIFY
+        try:
+            notify_job_complete(job, job.notification_email, settings)
+            message = "Notification email sent successfully."
+            job.save_log(logger=task_logger, message=message)
+        except Exception as exc:
+            exception_class = "{}.{}".format(type(exc).__module__, type(exc).__name__)
+            exception = "{0}: {1!s}".format(exception_class, exc)
+            message = "Couldn't send notification email ({})".format(exception)
+            job.save_log(errors=message, logger=task_logger, message=message)
 
 
 def make_results_relative(results, settings):
@@ -498,7 +517,7 @@ def submit_job_handler(payload,             # type: JSON
                          notification_email=encrypted_email, accept_language=language, context=context)
     job.save_log(logger=LOGGER, message="Job task submitted for execution.", status=STATUS_ACCEPTED, progress=0)
     job = store.update_job(job)
-    result = execute_process.delay(job_id=job.id, url=clean_ows_url(service_url), headers=auth)
+    result = execute_process.delay(job_id=job.id, wps_url=clean_ows_url(service_url), headers=auth)
     LOGGER.debug("Celery pending task [%s] for job [%s].", result.id, job.id)
 
     # local/provider process location
