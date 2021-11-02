@@ -10,7 +10,7 @@ Changes
 
 Changes:
 --------
-- No change.
+- Improve typing of database and store getter functions to infer correct types and facilitate code auto-complete.
 
 Fixes:
 ------
