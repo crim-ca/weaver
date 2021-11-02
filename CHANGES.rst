@@ -10,11 +10,17 @@ Changes
 
 Changes:
 --------
+- Support contextual WPS output location using ``X-WPS-Output-Context`` header to store ``Job`` results.
+  When a ``Job`` is executed by providing this header with a sub-directory, the resulting outputs of the ``Job``
+  will be placed and reported under the corresponding location relative to WPS outputs (path and URL).
 - Replace ``Job.execute_async`` getter/setter by simple property using more generic ``Job.execution_mode``
   for storage in database. Provide ``Job.execute_async`` and ``Job.execute_sync`` properties based on stored mode.
 - Simplify ``execute_process`` function executed by `Celery` task into sub-step functions where applicable.
 - Simplify forwarding of ``Job`` parameters between ``PyWPS`` service ``WorkerService.execute_job`` method
   and `Celery` task instantiating it by reusing the ``Job`` object.
+- Provide corresponding ``Job`` log URL along already reported log file path to facilitate retrieval from server side.
+- Avoid ``Job.progress`` updates following ``failed`` or ``dismissed`` statuses to keep track of the last real progress
+  percentage that was reached when that status was set.
 
 Fixes:
 ------
