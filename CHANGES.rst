@@ -67,7 +67,8 @@ Changes:
   Report explicit ``running`` status in ``Job`` once it has been sent to the remote `WPS` endpoint.
   The API will report ``running`` in both cases in order to support `OGC API - Processes` naming conventions, but
   internal ``Job`` status will have more detail.
-- Add ``update`` timestamp to ``Job`` response to better track latest milestones saved to database.
+- Add ``updated`` timestamp to ``Job`` response to better track latest milestones saved to database
+  (resolves `#249 <https://github.com/crim-ca/weaver/issues/249>`_).
   This avoids users having to compare many fields (``created``, ``started``, ``finished``) depending on latest status.
 - Apply stricter ``Deploy`` body schema validation and employ deserialized result directly.
   This ensures that preserved fields in the submitted content for deployment contain only known data elements with
