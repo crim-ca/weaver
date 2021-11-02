@@ -76,6 +76,9 @@ def test_get_wps_output_context():
         ("test/test", "test/test"),
         ("test/test/", "test/test"),  # allow trailing slash auto-removed
         ("test/test/test/test", "test/test/test/test"),
+        ("test-test", "test-test"),
+        ("test_test", "test_test"),
+        ("test-test/test/test_test", "test-test/test/test_test"),
     ]
 
     header_names = [

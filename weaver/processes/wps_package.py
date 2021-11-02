@@ -96,7 +96,7 @@ from weaver.utils import (
     request_extra,
     setup_loggers
 )
-from weaver.wps.utils import get_wps_output_dir
+from weaver.wps.utils import get_wps_output_dir, get_wps_output_url
 from weaver.wps_restapi.swagger_definitions import process_service
 
 if TYPE_CHECKING:
@@ -1207,7 +1207,10 @@ class WpsPackage(Process):
                 raise self.exception_message(PackageExecutionError, exc, "Failed to save package outputs.")
         except Exception:
             # return log file location by status message since outputs are not obtained by WPS failed process
-            error_msg = "Package completed with errors. Server logs: {}".format(self.log_file)
+            log_url = "{}/{}.log".format(get_wps_output_url(self.settings), self.uuid)
+            error_msg = "Package completed with errors. Server logs: [{}], Available at [{}]:".format(
+                self.log_file, log_url
+            )
             self.update_status(error_msg, self.percent, STATUS_FAILED)
             raise
         else:

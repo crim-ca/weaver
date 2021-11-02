@@ -126,7 +126,7 @@ def get_wps_output_context(request):
     ctx = get_header("X-WPS-Output-Context", headers)
     if not ctx:
         return None
-    cxt_found = re.match(r"^(?=\w+)(\w+/?)+$", ctx)
+    cxt_found = re.match(r"^(?=[\w-]+)([\w-]+/?)+$", ctx)
     if cxt_found and cxt_found[0] == ctx:
         return ctx[:-1] if ctx.endswith("/") else ctx
     raise HTTPUnprocessableEntity(json={

@@ -28,6 +28,7 @@ from weaver.processes.convert import ows2json_output_data
 from weaver.processes.types import PROCESS_WORKFLOW
 from weaver.status import (
     JOB_STATUS_CATEGORIES,
+    JOB_STATUS_CATEGORY_FAILED,
     JOB_STATUS_CATEGORY_FINISHED,
     STATUS_ACCEPTED,
     STATUS_DISMISSED,
@@ -69,7 +70,6 @@ JOB_PROGRESS_EXECUTE_STATUS_LOCATION = 6
 JOB_PROGRESS_EXECUTE_MONITOR_START = 7
 JOB_PROGRESS_EXECUTE_MONITOR_LOOP = 8
 JOB_PROGRESS_EXECUTE_MONITOR_DONE = 96
-JOB_PROGRESS_EXECUTE_MONITOR_ERROR = 97
 JOB_PROGRESS_EXECUTE_MONITOR_END = 98
 JOB_PROGRESS_NOTIFY = 99
 JOB_PROGRESS_DONE = 100
@@ -87,7 +87,7 @@ def execute_process(self, job_id, wps_url, headers=None):
     # reset the connection because we are in a forked celery process
     db = get_db(app, reset_connection=True)
     store = db.get_store(StoreJobs)
-    job = store.fetch_by_id(job_id)  # type: Job
+    job = store.fetch_by_id(job_id)
     job.started = now()
     job.status = STATUS_STARTED  # will be mapped to 'RUNNING'
     job.status_message = "Job {}.".format(STATUS_STARTED)  # will preserve detail of STARTED vs RUNNING
@@ -107,7 +107,7 @@ def execute_process(self, job_id, wps_url, headers=None):
     # the raised exception within the task will switch the job to STATUS_FAILED, but this will not raise an
     # exception here. Since the task execution 'succeeds' without raising, it skips directly to the last 'finally'.
     # Patch it back to STATUS_DISMISSED in this case.
-    local_status = False
+    task_terminated = True
 
     try:
         job.progress = JOB_PROGRESS_DESCRIBE
@@ -218,15 +218,18 @@ def execute_process(self, job_id, wps_url, headers=None):
                 num_retries = 0
                 run_step += 1
             finally:
-                local_status = True  # reached only if sub WPS execution completed (worker not terminated beforehand)
+                task_terminated = False  # reached only if WPS execution completed (worker not terminated beforehand)
                 job = store.update_job(job)
 
     except Exception as exc:
+        # if 'execute_job' finishes quickly before even reaching the 'monitoring loop'
+        # consider WPS execution produced an error (therefore Celery worker not terminated)
+        task_terminated = False
         LOGGER.exception("Failed running [%s]", job)
         LOGGER.debug("Failed job [%s] raised an exception.", job, exc_info=exc)
+        # note: don't update the progress here to preserve last one that was set
         job.status = map_status(STATUS_FAILED)
         job.status_message = "Failed to run {!s}.".format(job)
-        job.progress = JOB_PROGRESS_EXECUTE_MONITOR_ERROR
         exception_class = "{}.{}".format(type(exc).__module__, type(exc).__name__)
         errors = "{0}: {1!s}".format(exception_class, exc)
         job.save_log(errors=errors, logger=task_logger)
@@ -234,21 +237,24 @@ def execute_process(self, job_id, wps_url, headers=None):
     finally:
         # if task worker terminated, local 'job' is out of date compared to remote/background runner last update
         job = store.fetch_by_id(job.id)
-        if not local_status and map_status(job.status) == STATUS_FAILED:
+        if task_terminated and map_status(job.status) == STATUS_FAILED:
             job.status = STATUS_DISMISSED
-
-        job.progress = JOB_PROGRESS_EXECUTE_MONITOR_END
+        task_success = map_status(job.status) not in JOB_STATUS_CATEGORIES[JOB_STATUS_CATEGORY_FAILED]
+        if task_success:
+            job.progress = JOB_PROGRESS_EXECUTE_MONITOR_END
         job.status_message = "Job {}.".format(job.status)
         job.save_log(logger=task_logger)
 
-        job.progress = JOB_PROGRESS_NOTIFY
+        if task_success:
+            job.progress = JOB_PROGRESS_NOTIFY
         send_job_complete_notification_email(job, task_logger, settings)
 
         if job.status not in JOB_STATUS_CATEGORIES[JOB_STATUS_CATEGORY_FINISHED]:
             job.status = STATUS_SUCCEEDED
         job.status_message = "Job {}.".format(job.status)
         job.mark_finished()
-        job.progress = JOB_PROGRESS_DONE
+        if task_success:
+            job.progress = JOB_PROGRESS_DONE
         job.save_log(logger=task_logger, message="Job task complete.")
         job = store.update_job(job)
 
@@ -321,7 +327,6 @@ def send_job_complete_notification_email(job, task_logger, settings):
     Sends the notification email of completed execution if it was requested during job submission.
     """
     if job.notification_email is not None:
-        job.progress = JOB_PROGRESS_NOTIFY
         try:
             notify_job_complete(job, job.notification_email, settings)
             message = "Notification email sent successfully."
