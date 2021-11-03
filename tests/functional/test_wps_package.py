@@ -1384,8 +1384,8 @@ class WpsPackageAppTest(WpsConfigBase):
 
         results = self.monitor_job(status_url)
 
-        job_output_file = results.get("output_test")["href"].split("/", 3)[-1]
-        tmp_file = "{}/{}".format(self.settings["weaver.wps_output_dir"], job_output_file)
+        job_output_path = results.get("output_test")["href"].split(self.settings["weaver.wps_output_path"])[-1]
+        tmp_file = "{}/{}".format(self.settings["weaver.wps_output_dir"], job_output_path)
 
         try:
             processed_values = json.load(open(tmp_file, "r"))
@@ -1519,8 +1519,8 @@ class WpsPackageAppTest(WpsConfigBase):
 
         results = self.monitor_job(status_url)
 
-        job_output_file = results.get("output_test")["href"].split("/", 3)[-1]
-        tmp_file = "{}/{}".format(self.settings["weaver.wps_output_dir"], job_output_file)
+        job_output_path = results.get("output_test")["href"].split(self.settings["weaver.wps_output_path"])[-1]
+        tmp_file = "{}/{}".format(self.settings["weaver.wps_output_dir"], job_output_path)
 
         try:
             with open(tmp_file, "r") as f:
