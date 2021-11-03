@@ -263,7 +263,7 @@ def execute_process(self, job_id, wps_url, headers=None):
 
 def fetch_wps_process(job, wps_url, headers, settings):
     """
-    Retrieves the WPS process description from the
+    Retrieves the WPS process description from the local or remote WPS reference URL.
     """
     try:
         wps = get_wps_client(wps_url, settings, headers=headers, language=job.accept_language)
