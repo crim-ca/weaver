@@ -359,6 +359,13 @@ def api_conformance(request):  # noqa: F811
         # ogcapi_processes + "/req/core/job-exception-no-such-job",
         # ogcapi_processes + "/req/core/job-results-exception/no-such-job",
         ogcapi_processes + "/req/job-list/links",
+        ogcapi_processes + "/rec/job-list/job-list-landing-page",
+        ogcapi_processes + "/req/job-list/job-list-op",
+        ogcapi_processes + "/req/job-list/processID-definition",
+        ogcapi_processes + "/req/job-list/processID-mandatory",
+        ogcapi_processes + "/req/job-list/processid-response",
+        ogcapi_processes + "/req/job-list/type-definition",
+        ogcapi_processes + "/req/job-list/type-response",
         # FIXME:
         #   https://github.com/opengeospatial/ogcapi-processes/blob/master/core/requirements/core/REQ_job-results-exception-results-not-ready.adoc
         #   type of exception SHALL be "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/result-not-ready"

@@ -10,11 +10,15 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add support of ``type`` and ``processID`` query parameters for ``Job`` listing
+  (resolves some tasks in `#268 <https://github.com/crim-ca/weaver/issues/268>`_).
+- Add ``type`` field to ``Job`` status information
+  (resolves `#351 <https://github.com/crim-ca/weaver/issues/351>`_).
+- Add `OGC-API - Processes` conformance references regarding supported operations for ``Job`` listing and filtering.
 
 Fixes:
 ------
-- No change.
+- Allow ``group`` query parameter to handle ``Job`` category listing with ``provider`` as ``service`` alias.
 
 `4.2.1 <https://github.com/crim-ca/weaver/tree/4.2.1>`_ (2021-10-20)
 ========================================================================

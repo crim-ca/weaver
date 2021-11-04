@@ -240,8 +240,16 @@ def validate_service_process(request):
     """
     Verifies that service or process specified by path or query will raise the appropriate error if applicable.
     """
-    service_name = request.matchdict.get("provider_id", None) or request.params.get("service", None)
-    process_name = request.matchdict.get("process_id", None) or request.params.get("process", None)
+    service_name = (
+        request.matchdict.get("provider_id", None) or
+        request.params.get("provider", None) or
+        request.params.get("service", None)  # backward compatibility
+    )
+    process_name = (
+        request.matchdict.get("process_id", None) or
+        request.params.get("process", None) or
+        request.params.get("processID", None)  # OGC-API conformance
+    )
     item_test = None
     item_type = None
 
@@ -298,16 +306,17 @@ def get_queried_jobs(request):
 
     settings = get_settings(request)
     service, process = validate_service_process(request)
-    if service:
-        forbid_local_only(settings)
 
-    filters = {**request.params, "process": process, "provider": service}
+    params = dict(request.params)
+    for param_name in ["process", "processID", "provider", "service"]:
+        params.pop(param_name, None)
+    filters = {**params, "process": process, "provider": service}
 
-    filters["detail"] = asbool(request.params.get("detail"))
+    filters["detail"] = asbool(params.get("detail"))
 
-    if request.params.get("datetime", False):
+    if params.get("datetime", False):
         # replace white space with '+' since request.params replaces '+' with whitespaces when parsing
-        filters["datetime"] = request.params["datetime"].replace(" ", "+")
+        filters["datetime"] = params["datetime"].replace(" ", "+")
 
     try:
         filters = sd.GetJobsQueries().deserialize(filters)

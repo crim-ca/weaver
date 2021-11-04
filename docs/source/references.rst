@@ -63,6 +63,9 @@
 .. |submit-issue| replace:: submit a new issue
 .. _submit-issue: https://github.com/crim-ca/weaver/issues/new/choose
 
+.. OGC-API references
+.. |ogc-statusInfo| replace:: https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/master/core/openapi/schemas/statusInfo.yaml
+
 .. Example references
 .. |examples| replace:: Examples
 .. _examples: examples.rst

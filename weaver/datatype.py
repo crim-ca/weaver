@@ -605,6 +605,20 @@ class Job(Base):
             raise TypeError("Type 'str' is required for '{}.process'".format(type(self)))
         self["process"] = process
 
+    @property
+    def type(self):
+        # type: () -> str
+        """
+        Obtain the type of the element associated to the creation of this job.
+
+        .. seealso::
+            - Defined in |ogc-statusInfo|
+            - Queried with https://docs.ogc.org/DRAFTS/18-062.html#_parameter_type
+        """
+        if self.service is None:
+            return "process"
+        return "provider"
+
     def _get_inputs(self):
         # type: () -> List[Optional[Dict[str, Any]]]
         if self.get("inputs") is None:
@@ -1024,6 +1038,7 @@ class Job(Base):
             "jobID": self.id,
             "processID": self.process,
             "providerID": self.service,
+            "type": self.type,
             "status": map_status(self.status),
             "message": self.status_message,
             "created": self.created,

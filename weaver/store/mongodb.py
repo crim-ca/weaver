@@ -54,7 +54,10 @@ if TYPE_CHECKING:
     from pymongo.collection import Collection
 
     from weaver.store.base import DatetimeIntervalType, JobCategoriesAndCount, JobListAndCount
-    from weaver.typedefs import AnyProcess, AnyProcessType
+    from weaver.typedefs import AnyProcess, AnyProcessType, AnyValue
+
+    AnyValueMongo = Union[AnyValue, datetime.datetime]
+    SearchFilterMongo = Union[AnyValueMongo, Dict[str, Union[AnyValueMongo, List[AnyValueMongo]]]]
 
 LOGGER = logging.getLogger(__name__)
 
@@ -542,6 +545,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
     def find_jobs(self,
                   process=None,             # type: Optional[str]
                   service=None,             # type: Optional[str]
+                  type=None,                # type: Optional[str]
                   tags=None,                # type: Optional[List[str]]
                   access=None,              # type: Optional[str]
                   notification_email=None,  # type: Optional[str]
@@ -583,6 +587,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
         :param request: request that lead to this call to obtain permissions and user id.
         :param process: process name to filter matching jobs.
         :param service: service name to filter matching jobs.
+        :param type: filter matching jobs for given type.
         :param tags: list of tags to filter matching jobs.
         :param access: access visibility to filter matching jobs (default: :py:data:`VISIBILITY_PUBLIC`).
         :param notification_email: notification email to filter matching jobs.
@@ -603,7 +608,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
                 "locator": "tags",
             })
 
-        search_filters = {}
+        search_filters = {}  # type: Dict[str, SearchFilterMongo]
 
         if not request:
             search_filters.setdefault("access", VISIBILITY_PUBLIC)
@@ -623,17 +628,32 @@ class MongodbJobStore(StoreJobs, MongodbStore):
             search_filters["tags"] = {"$all": tags}
 
         if status in JOB_STATUS_CATEGORIES:
-            search_filters["status"] = {"$in": JOB_STATUS_CATEGORIES[status]}
+            category_statuses = list(JOB_STATUS_CATEGORIES[status])
+            search_filters["status"] = {"$in": category_statuses}
         elif status:
             search_filters["status"] = status
 
         if notification_email is not None:
             search_filters["notification_email"] = notification_email
 
+        if type == "process":
+            search_filters["service"] = None
+        elif type == "provider":
+            search_filters["service"] = {"$ne": None}
+
         if process is not None:
+            # if (type=provider and process=<id>)
+            # doesn't contradict since it can be more specific about sub-process of service
             search_filters["process"] = process
 
         if service is not None:
+            # can override 'service' set by 'type' to be more specific, but must be logical
+            # (e.g.: type=process and service=<name> cannot ever yield anything)
+            if search_filters.get("service", -1) is None:
+                raise JobInvalidParameter(json={
+                    "description": "Ambiguous type requested contradicts with requested service provider.",
+                    "cause": {"service": service, "type": type}
+                })
             search_filters["service"] = service
 
         if datetime is not None:
@@ -656,8 +676,9 @@ class MongodbJobStore(StoreJobs, MongodbStore):
             sort = "user_id"
         if sort not in JOB_SORT_VALUES:
             raise JobInvalidParameter(json={
-                "description": "Invalid sorting method: '{}'".format(repr(sort)),
-                "locator": "sort"
+                "description": "Invalid sorting method.",
+                "cause": "sort",
+                "value": str(sort),
             })
         sort_order = DESCENDING if sort in (SORT_FINISHED, SORT_CREATED) else ASCENDING
         sort_criteria = {sort: sort_order}
@@ -668,6 +689,10 @@ class MongodbJobStore(StoreJobs, MongodbStore):
         # results by group categories
         if group_by:
             group_by = [group_by] if isinstance(group_by, str) else group_by  # type: List[str]
+            has_provider = "provider" in group_by
+            if has_provider:
+                group_by.remove("provider")
+                group_by.append("service")
             group_categories = {field: "$" + field for field in group_by}   # fields that can generate groups
             pipeline.extend([{
                 "$group": {
@@ -685,6 +710,10 @@ class MongodbJobStore(StoreJobs, MongodbStore):
             found = self.collection.aggregate(pipeline)
             items = [{k: (v if k != "jobs" else [Job(j) for j in v])    # convert to Job object where applicable
                       for k, v in i.items()} for i in found]
+            if has_provider:
+                for group_result in items:
+                    group_service = group_result["category"].pop("service", None)
+                    group_result["category"]["provider"] = group_service
 
         # results with paging
         else:
