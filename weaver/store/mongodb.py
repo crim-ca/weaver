@@ -54,10 +54,13 @@ if TYPE_CHECKING:
     from pymongo.collection import Collection
 
     from weaver.store.base import DatetimeIntervalType, JobCategoriesAndCount, JobListAndCount
-    from weaver.typedefs import AnyProcess, AnyProcessType, AnyValue
+    from weaver.typedefs import AnyProcess, AnyProcessType, AnyValue, TypedDict
 
-    AnyValueMongo = Union[AnyValue, datetime.datetime]
-    SearchFilterMongo = Union[AnyValueMongo, Dict[str, Union[AnyValueMongo, List[AnyValueMongo]]]]
+    JobGroupCategory = TypedDict("JobGroupCategory",
+                                 {"category": Dict[str, Optional[str]], "count": int, "jobs": List[Job]})
+    MongodbValue = Union[AnyValue, datetime.datetime]
+    MongodbSearchFilter = Union[MongodbValue, Dict[str, Union[MongodbValue, List[MongodbValue]]]]
+    MongodbSearchPipeline = List[Dict[str, Dict[str, MongodbSearchFilter]]]
 
 LOGGER = logging.getLogger(__name__)
 
@@ -608,7 +611,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
                 "locator": "tags",
             })
 
-        search_filters = {}  # type: Dict[str, SearchFilterMongo]
+        search_filters = {}  # type: Dict[str, MongodbSearchFilter]
 
         if not request:
             search_filters.setdefault("access", VISIBILITY_PUBLIC)
@@ -688,32 +691,8 @@ class MongodbJobStore(StoreJobs, MongodbStore):
 
         # results by group categories
         if group_by:
-            group_by = [group_by] if isinstance(group_by, str) else group_by  # type: List[str]
-            has_provider = "provider" in group_by
-            if has_provider:
-                group_by.remove("provider")
-                group_by.append("service")
-            group_categories = {field: "$" + field for field in group_by}   # fields that can generate groups
-            pipeline.extend([{
-                "$group": {
-                    "_id": group_categories,        # grouping categories to aggregate corresponding jobs
-                    "jobs": {"$push": "$$ROOT"},    # matched jobs for corresponding grouping categories
-                    "count": {"$sum": 1}},          # count of matches for corresponding grouping categories
-                }, {                        # noqa: E123  # ignore indentation checks
-                "$project": {
-                    "_id": False,           # removes "_id" field from results
-                    "category": "$_id",     # renames "_id" grouping categories key
-                    "jobs": "$jobs",        # preserve field
-                    "count": "$count",      # preserve field
-                }
-            }])
-            found = self.collection.aggregate(pipeline)
-            items = [{k: (v if k != "jobs" else [Job(j) for j in v])    # convert to Job object where applicable
-                      for k, v in i.items()} for i in found]
-            if has_provider:
-                for group_result in items:
-                    group_service = group_result["category"].pop("service", None)
-                    group_result["category"]["provider"] = group_service
+            groups = [group_by] if isinstance(group_by, str) else group_by
+            items = self._find_jobs_grouped(pipeline, groups)
 
         # results with paging
         else:
@@ -723,6 +702,36 @@ class MongodbJobStore(StoreJobs, MongodbStore):
 
         total = self.collection.count_documents(search_filters)
         return items, total
+
+    def _find_jobs_grouped(self, pipeline, groups):
+        # type: (MongodbSearchPipeline, List[str]) -> List[JobGroupCategory]
+
+        has_provider = "provider" in groups
+        if has_provider:
+            groups.remove("provider")
+            groups.append("service")
+        group_categories = {field: "$" + field for field in groups}  # fields that can generate groups
+        pipeline.extend([{
+            "$group": {
+                "_id": group_categories,  # grouping categories to aggregate corresponding jobs
+                "jobs": {"$push": "$$ROOT"},  # matched jobs for corresponding grouping categories
+                "count": {"$sum": 1}},  # count of matches for corresponding grouping categories
+        }, {  # noqa: E123  # ignore indentation checks
+            "$project": {
+                "_id": False,  # removes "_id" field from results
+                "category": "$_id",  # renames "_id" grouping categories key
+                "jobs": "$jobs",  # preserve field
+                "count": "$count",  # preserve field
+            }
+        }])
+        found = self.collection.aggregate(pipeline)
+        items = [{k: (v if k != "jobs" else [Job(j) for j in v])  # convert to Job object where applicable
+                  for k, v in i.items()} for i in found]
+        if has_provider:
+            for group_result in items:
+                group_service = group_result["category"].pop("service", None)
+                group_result["category"]["provider"] = group_service
+        return items
 
     def clear_jobs(self):
         # type: () -> bool

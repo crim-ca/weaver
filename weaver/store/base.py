@@ -140,6 +140,7 @@ class StoreJobs(StoreInterface):
     def find_jobs(self,
                   process=None,             # type: Optional[str]
                   service=None,             # type: Optional[str]
+                  type=None,                # type: Optional[str]
                   tags=None,                # type: Optional[List[str]]
                   access=None,              # type: Optional[str]
                   notification_email=None,  # type: Optional[str]
