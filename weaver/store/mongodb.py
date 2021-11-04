@@ -53,11 +53,9 @@ if TYPE_CHECKING:
     from typing import Any, Callable, Dict, List, Optional, Tuple, Union
     from pymongo.collection import Collection
 
-    from weaver.store.base import DatetimeIntervalType, JobCategoriesAndCount, JobListAndCount
-    from weaver.typedefs import AnyProcess, AnyProcessType, AnyValue, TypedDict
+    from weaver.store.base import DatetimeIntervalType, JobCategoriesAndCount, JobGroupCategory, JobListAndCount
+    from weaver.typedefs import AnyProcess, AnyProcessType, AnyValue
 
-    JobGroupCategory = TypedDict("JobGroupCategory",
-                                 {"category": Dict[str, Optional[str]], "count": int, "jobs": List[Job]})
     MongodbValue = Union[AnyValue, datetime.datetime]
     MongodbSearchFilter = Union[MongodbValue, Dict[str, Union[MongodbValue, List[MongodbValue]]]]
     MongodbSearchPipeline = List[Dict[str, Dict[str, MongodbSearchFilter]]]
