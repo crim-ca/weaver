@@ -33,7 +33,7 @@ from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_PLAIN, OUTPU
 from weaver.owsexceptions import OWSNotFound
 from weaver.processes.convert import any2wps_literal_datatype
 from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
-from weaver.utils import get_any_id, get_any_value, get_path_kvp, get_settings, get_weaver_url
+from weaver.utils import get_any_id, get_any_value, get_path_kvp, get_settings, get_weaver_url, repr_json
 from weaver.visibility import VISIBILITY_PUBLIC
 from weaver.wps.utils import get_wps_output_url
 from weaver.wps_restapi import swagger_definitions as sd
@@ -322,8 +322,11 @@ def get_queried_jobs(request):
         filters = sd.GetJobsQueries().deserialize(filters)
     except Invalid as ex:
         raise HTTPUnprocessableEntity(json={
-            "code": Invalid.__name__,
-            "description": str(ex)
+            "code": "JobInvalidParameter",
+            "description": "Job query parameters failed validation.",
+            "error": Invalid.__name__,
+            "cause": str(ex),
+            "value": repr_json(ex.value or filters),
         })
 
     detail = filters.pop("detail", False)
@@ -334,19 +337,16 @@ def get_queried_jobs(request):
         encrypt_email(filters["notification_email"], settings)
         if filters.get("notification_email", False) else None
     )
-    filters["datetime"] = datetime_interval_parser(filters["datetime"]) if filters.get("datetime", False) else None
     filters["service"] = filters.pop("provider", None)
 
-    if (
-        filters["datetime"]
-        and filters["datetime"].get("before", False)
-        and filters["datetime"].get("after", False)
-        and filters["datetime"]["after"] > filters["datetime"]["before"]
-    ):
+    dti = datetime_interval_parser(filters["datetime"]) if filters.get("datetime", False) else None
+    if dti and dti.get("before", False) and dti.get("after", False) and dti["after"] > dti["before"]:
         raise HTTPUnprocessableEntity(json={
             "code": "InvalidDateFormat",
             "description": "Datetime at the start of the interval must be less than the datetime at the end."
         })
+    filters.pop("datetime")
+    filters["datetime_interval"] = dti
 
     store = get_db(request).get_store(StoreJobs)
     items, total = store.find_jobs(request=request, group_by=groups, **filters)

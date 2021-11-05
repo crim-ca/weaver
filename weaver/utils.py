@@ -1,6 +1,7 @@
 import errno
 import functools
 import inspect
+import json
 import logging
 import os
 import re
@@ -303,6 +304,21 @@ def now_secs():
     Return the current time in seconds since the Epoch.
     """
     return int(time.time())
+
+
+def repr_json(data, **kwargs):
+    # type: (Any, Any) -> Union[JSON, str, None]
+    """
+    Ensure that the input data can be serialized as JSON to return it formatted representation as such.
+
+    If formatting as JSON fails, returns the data as string representation or ``None`` accordingly.
+    """
+    if data is None:
+        return None
+    try:
+        return json.dumps(data, **kwargs)
+    except Exception:  # noqa: W0703 # nosec: B110
+        return str(data)
 
 
 def wait_secs(run_step=-1):

@@ -141,7 +141,7 @@ class StoreJobs(StoreInterface):
     def find_jobs(self,
                   process=None,             # type: Optional[str]
                   service=None,             # type: Optional[str]
-                  type=None,                # type: Optional[str]
+                  job_type=None,            # type: Optional[str]
                   tags=None,                # type: Optional[List[str]]
                   access=None,              # type: Optional[str]
                   notification_email=None,  # type: Optional[str]
@@ -151,7 +151,7 @@ class StoreJobs(StoreInterface):
                   limit=10,                 # type: int
                   min_duration=None,        # type: Optional[int]
                   max_duration=None,        # type: Optional[int]
-                  datetime=None,            # type: Optional[DatetimeIntervalType]
+                  datetime_interval=None,   # type: Optional[DatetimeIntervalType]
                   group_by=None,            # type: Optional[Union[str, List[str]]]
                   request=None,             # type: Optional[Request]
                   ):                        # type: (...) -> Union[JobListAndCount, JobCategoriesAndCount]
