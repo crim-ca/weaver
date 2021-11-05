@@ -149,6 +149,8 @@ class StoreJobs(StoreInterface):
                   sort=None,                # type: Optional[str]
                   page=0,                   # type: int
                   limit=10,                 # type: int
+                  min_duration=None,        # type: Optional[int]
+                  max_duration=None,        # type: Optional[int]
                   datetime=None,            # type: Optional[DatetimeIntervalType]
                   group_by=None,            # type: Optional[Union[str, List[str]]]
                   request=None,             # type: Optional[Request]

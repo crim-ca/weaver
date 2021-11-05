@@ -3511,6 +3511,12 @@ class GetJobsQueries(ExtendedMappingSchema):
                                 default=False, example="process,service", missing=drop)
     page = ExtendedSchemaNode(Integer(allow_string=True), missing=0, default=0, validator=Range(min=0))
     limit = ExtendedSchemaNode(Integer(allow_string=True), missing=10, default=10, validator=Range(min=0, max=10000))
+    min_duration = ExtendedSchemaNode(
+        Integer(allow_string=True), missing=drop, default=null, validator=Range(min=0),
+        description="Minimal duration (seconds) between started time and current/finished time of jobs to find.")
+    max_duration = ExtendedSchemaNode(
+        Integer(allow_string=True), missing=drop, default=null, validator=Range(min=0),
+        description="Maximum duration (seconds) between started time and current/finished time of jobs to find.")
     datetime = DateTimeInterval(missing=drop, default=None)
     status = JobStatusEnum(missing=drop, default=None)
     processID = ProcessIdentifier(missing=drop, default=null, description="Alias to 'process' for OGC-API compliance.")

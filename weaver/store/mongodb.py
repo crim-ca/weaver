@@ -554,6 +554,8 @@ class MongodbJobStore(StoreJobs, MongodbStore):
                   sort=None,                # type: Optional[str]
                   page=0,                   # type: int
                   limit=10,                 # type: int
+                  min_duration=None,        # type: Optional[int]
+                  max_duration=None,        # type: Optional[int]
                   datetime=None,            # type: Optional[DatetimeIntervalType]
                   group_by=None,            # type: Optional[Union[str, List[str]]]
                   request=None,             # type: Optional[Request]
@@ -596,6 +598,8 @@ class MongodbJobStore(StoreJobs, MongodbStore):
         :param sort: field which is used for sorting results (default: creation date, descending).
         :param page: page number to return when using result paging (only when not using ``group_by``).
         :param limit: number of jobs per page when using result paging (only when not using ``group_by``).
+        :param min_duration: minimal duration (seconds) between started time and current/finished time of jobs to find.
+        :param max_duration: maximum duration (seconds) between started time and current/finished time of jobs to find.
         :param datetime: field used for filtering data by creation date with a given date or interval of date.
         :param group_by: one or many fields specifying categories to form matching groups of jobs (paging disabled).
         :returns: (list of jobs matching paging OR list of {categories, list of jobs, count}) AND total of matched job.
@@ -686,6 +690,11 @@ class MongodbJobStore(StoreJobs, MongodbStore):
 
         # minimal operation, only search for matches and sort them
         pipeline = [{"$match": search_filters}, {"$sort": sort_criteria}]
+
+        duration_filter = {}
+        # if min_duration is not None or max_duration is not None:
+        if duration_filter:
+            pipeline.append(duration_filter)
 
         # results by group categories
         if group_by:
