@@ -711,15 +711,15 @@ class MongodbJobStore(StoreJobs, MongodbStore):
         group_categories = {field: "$" + field for field in groups}  # fields that can generate groups
         pipeline.extend([{
             "$group": {
-                "_id": group_categories,  # grouping categories to aggregate corresponding jobs
-                "jobs": {"$push": "$$ROOT"},  # matched jobs for corresponding grouping categories
-                "count": {"$sum": 1}},  # count of matches for corresponding grouping categories
-        }, {  # noqa: E123  # ignore indentation checks
+                "_id": group_categories,        # grouping categories to aggregate corresponding jobs
+                "jobs": {"$push": "$$ROOT"},    # matched jobs for corresponding grouping categories
+                "count": {"$sum": 1}},          # count of matches for corresponding grouping categories
+            }, {                        # noqa: E123  # ignore indentation checks
             "$project": {
-                "_id": False,  # removes "_id" field from results
-                "category": "$_id",  # renames "_id" grouping categories key
-                "jobs": "$jobs",  # preserve field
-                "count": "$count",  # preserve field
+                "_id": False,           # removes "_id" field from results
+                "category": "$_id",     # renames "_id" grouping categories key
+                "jobs": "$jobs",        # preserve field
+                "count": "$count",      # preserve field
             }
         }])
         found = self.collection.aggregate(pipeline)
