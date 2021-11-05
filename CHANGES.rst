@@ -16,6 +16,11 @@ Changes:
   (resolves `#351 <https://github.com/crim-ca/weaver/issues/351>`_).
 - Add `OGC-API - Processes` conformance references regarding supported operations for ``Job`` listing and filtering.
 
+- Add ``minDuration`` and ``maxDuration`` parameters to query ``Job`` listing filtered by specific execution time range
+  (resolves ``, relates to ).
+- Require minimally ``pymongo==3.12.0`` and corresponding `MongoDB` ``5.0`` instance to process new filtering queries
+  of ``minDuration`` and ``maxDuration``.
+
 Fixes:
 ------
 - Allow ``group`` query parameter to handle ``Job`` category listing with ``provider`` as ``service`` alias.

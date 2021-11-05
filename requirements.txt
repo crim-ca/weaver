@@ -38,7 +38,7 @@ mako
 # esgf-compute-api (cwt) needs oauthlib but doesn't add it in their requirements
 oauthlib
 owslib==0.25.0
-pymongo
+pymongo>=3.12.0
 # pyproj>=2 employed by OWSLib, but make requirements stricter
 pyproj>=3
 pyramid>=1.7.3

@@ -691,9 +691,9 @@ class MongodbJobStore(StoreJobs, MongodbStore):
         # minimal operation, only search for matches and sort them
         pipeline = [{"$match": search_filters}, {"$sort": sort_criteria}]
 
-        duration_filter = {}
-        # if min_duration is not None or max_duration is not None:
-        if duration_filter:
+        if min_duration is not None or max_duration is not None:
+            duration_filter = {}
+
             pipeline.append(duration_filter)
 
         # results by group categories
