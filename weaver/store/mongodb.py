@@ -44,7 +44,7 @@ from weaver.sort import (
 )
 from weaver.status import JOB_STATUS_CATEGORIES, STATUS_ACCEPTED, map_status
 from weaver.store.base import StoreBills, StoreJobs, StoreProcesses, StoreQuotes, StoreServices
-from weaver.utils import get_base_url, get_sane_name, get_weaver_url, islambda, now
+from weaver.utils import get_base_url, get_sane_name, get_weaver_url, repr_json, islambda, now
 from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC, VISIBILITY_VALUES
 from weaver.wps.utils import get_wps_url
 
@@ -53,7 +53,7 @@ if TYPE_CHECKING:
     from typing import Any, Callable, Dict, List, Optional, Tuple, Union
     from pymongo.collection import Collection
 
-    from weaver.store.base import DatetimeIntervalType, JobCategoriesAndCount, JobGroupCategory, JobListAndCount
+    from weaver.store.base import DatetimeIntervalType, JobGroupCategory, JobSearchResult
     from weaver.typedefs import AnyProcess, AnyProcessType, AnyValue
 
     MongodbValue = Union[AnyValue, datetime.datetime]
@@ -560,7 +560,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
                   datetime_interval=None,   # type: Optional[DatetimeIntervalType]
                   group_by=None,            # type: Optional[Union[str, List[str]]]
                   request=None,             # type: Optional[Request]
-                  ):                        # type: (...) -> Union[JobListAndCount, JobCategoriesAndCount]
+                  ):                        # type: (...) -> JobSearchResult
         """
         Finds all jobs in `MongoDB` storage matching search filters to obtain results with requested paging or grouping.
 
@@ -605,7 +605,6 @@ class MongodbJobStore(StoreJobs, MongodbStore):
         :param group_by: one or many fields specifying categories to form matching groups of jobs (paging disabled).
         :returns: (list of jobs matching paging OR list of {categories, list of jobs, count}) AND total of matched job.
         """
-
         search_filters = {}
         if notification_email is not None:
             search_filters["notification_email"] = notification_email
@@ -617,21 +616,20 @@ class MongodbJobStore(StoreJobs, MongodbStore):
 
         # minimal operation, only search for matches and sort them
         pipeline = [{"$match": search_filters}]  # expected for all filters except 'duration'
-
         self._apply_duration_filter(pipeline, min_duration, max_duration)
-        self._apply_sort_method(pipeline, sort)
 
-        # results by group categories or with paging
+        sort_method = {"$sort": self._apply_sort_method(sort)}
+        pipeline.append(sort_method)
+
+        # results by group categories or with job list paging
         if group_by:
-            items = self._find_jobs_grouped(pipeline, group_by)
+            results = self._find_jobs_grouped(pipeline, group_by)
         else:
-            items = self._find_jobs_paging(pipeline, page, limit)
-
-        total = self.collection.count_documents(search_filters)
-        return items, total
+            results = self._find_jobs_paging(pipeline, page, limit)
+        return results
 
     def _find_jobs_grouped(self, pipeline, group_categories):
-        # type: (MongodbSearchPipeline, List[str]) -> List[JobGroupCategory]
+        # type: (MongodbSearchPipeline, List[str]) -> Tuple[JobGroupCategory, int]
         """
         Retrieves jobs regrouped by specified field categories and predefined search pipeline filters.
         """
@@ -641,7 +639,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
             groups.remove("provider")
             groups.append("service")
         group_categories = {field: "$" + field for field in groups}  # fields that can generate groups
-        pipeline.extend([{
+        group_pipeline = [{
             "$group": {
                 "_id": group_categories,        # grouping categories to aggregate corresponding jobs
                 "jobs": {"$push": "$$ROOT"},    # matched jobs for corresponding grouping categories
@@ -653,27 +651,58 @@ class MongodbJobStore(StoreJobs, MongodbStore):
                 "jobs": "$jobs",        # preserve field
                 "count": "$count",      # preserve field
             }
-        }])
-        LOGGER.debug("Pipeline\n%s", pipeline)
-        found = self.collection.aggregate(pipeline)
-        items = [{k: (v if k != "jobs" else [Job(j) for j in v])  # convert to Job object where applicable
-                  for k, v in i.items()} for i in found]
+        }]
+        pipeline = self._apply_total_result(pipeline, group_pipeline)
+        LOGGER.debug("Job search pipeline:\n%s", repr_json(pipeline, indent=2))
+
+        found = list(self.collection.aggregate(pipeline))
+        items = found[0]["itemsPipeline"]
+        # convert to Job object where applicable, since pipeline result contains (category, jobs, count)
+        items = [{k: (v if k != "jobs" else [Job(j) for j in v]) for k, v in i.items()} for i in items]
         if has_provider:
             for group_result in items:
                 group_service = group_result["category"].pop("service", None)
                 group_result["category"]["provider"] = group_service
-        return items
+        total = found[0]["totalPipeline"][0]["total"]
+        return items, total
 
     def _find_jobs_paging(self, pipeline, page, limit):
-        # type: (MongodbSearchPipeline, int, int) -> List[Job]
+        # type: (MongodbSearchPipeline, int, int) -> Tuple[List[Job], int]
         """
         Retrieves jobs limited by specified paging parameters and predefined search pipeline filters.
         """
-        paging = [{"$skip": page * limit}, {"$limit": limit}]  # type: List[MongodbSearchStep]
-        pipeline.extend(paging)
-        found = self.collection.aggregate(pipeline)
-        items = [Job(item) for item in list(found)]
-        return items
+        paging_pipeline = [{"$skip": page * limit}, {"$limit": limit}]  # type: List[MongodbSearchStep]
+        pipeline = self._apply_total_result(pipeline, paging_pipeline)
+        LOGGER.debug("Job search pipeline:\n%s", repr_json(pipeline, indent=2))
+
+        found = list(self.collection.aggregate(pipeline))
+        items = [Job(item) for item in found[0]["itemsPipeline"]]
+        total = found[0]["totalPipeline"][0]["total"]
+        return items, total
+
+    @staticmethod
+    def _apply_total_result(search_pipeline, extra_pipeline):
+        # type: (MongodbSearchPipeline, MongodbSearchPipeline) -> MongodbSearchPipeline
+        """
+        Extends the pipeline operations in order to obtain the grand total of matches in parallel to other filtering.
+
+        A dual-branch search pipeline is created to apply distinct operations on each facet.
+        The initial search are executed only once for both facets.
+        The first obtains results with other processing steps specified, and the second calculates the total results.
+
+        :param search_pipeline: pipeline employed to obtain initial matches against search filters.
+        :param extra_pipeline: additional steps to generate specific results.
+        :return: combination of the grand total of all items and their following processing representation.
+        """
+        total_pipeline = [{
+            "$facet": {
+                "itemsPipeline": extra_pipeline,
+                "totalPipeline": [
+                    {"$count": "total"}
+                ]
+            }
+        }]
+        return search_pipeline + total_pipeline  # noqa
 
     @staticmethod
     def _apply_tags_filter(tags):
@@ -761,7 +790,8 @@ class MongodbJobStore(StoreJobs, MongodbStore):
             if datetime_interval.get("match", False):
                 search_filters = datetime_interval["match"]
 
-        return {"created": search_filters}
+            return {"created": search_filters}
+        return {}
 
     @staticmethod
     def _apply_duration_filter(pipeline, min_duration, max_duration):

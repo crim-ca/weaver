@@ -308,6 +308,7 @@ def get_queried_jobs(request):
     service, process = validate_service_process(request)
 
     params = dict(request.params)
+    LOGGER.debug("Job search queries (raw):\n%s", repr_json(params, indent=2))
     for param_name in ["process", "processID", "provider", "service"]:
         params.pop(param_name, None)
     filters = {**params, "process": process, "provider": service}
@@ -326,7 +327,7 @@ def get_queried_jobs(request):
             "description": "Job query parameters failed validation.",
             "error": Invalid.__name__,
             "cause": str(ex),
-            "value": repr_json(ex.value or filters),
+            "value": repr_json(ex.value or filters, force_str=False),
         })
 
     detail = filters.pop("detail", False)
@@ -338,6 +339,8 @@ def get_queried_jobs(request):
         if filters.get("notification_email", False) else None
     )
     filters["service"] = filters.pop("provider", None)
+    filters["min_duration"] = filters.pop("minDuration", None)
+    filters["max_duration"] = filters.pop("maxDuration", None)
 
     dti = datetime_interval_parser(filters["datetime"]) if filters.get("datetime", False) else None
     if dti and dti.get("before", False) and dti.get("after", False) and dti["after"] > dti["before"]:
@@ -345,8 +348,9 @@ def get_queried_jobs(request):
             "code": "InvalidDateFormat",
             "description": "Datetime at the start of the interval must be less than the datetime at the end."
         })
-    filters.pop("datetime")
+    filters.pop("datetime", None)
     filters["datetime_interval"] = dti
+    LOGGER.debug("Job search queries (processed):\n%s", repr_json(filters, indent=2))
 
     store = get_db(request).get_store(StoreJobs)
     items, total = store.find_jobs(request=request, group_by=groups, **filters)

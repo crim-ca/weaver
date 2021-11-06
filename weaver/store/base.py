@@ -7,12 +7,11 @@ if TYPE_CHECKING:
     from pyramid.request import Request
     from pywps import Process as ProcessWPS
     from weaver.datatype import Bill, Job, Process, Quote, Service
-    from weaver.typedefs import AnyValue, DatetimeIntervalType, TypedDict
+    from weaver.typedefs import DatetimeIntervalType, TypedDict
 
-    JobListAndCount = Tuple[List[Job], int]
     JobGroupCategory = TypedDict("JobGroupCategory",
                                  {"category": Dict[str, Optional[str]], "count": int, "jobs": List[Job]})
-    JobCategoriesAndCount = Tuple[List[JobGroupCategory], int]
+    JobSearchResult = Tuple[Union[List[Job], JobGroupCategory], int]
 
 
 class StoreInterface(object, metaclass=abc.ABCMeta):
