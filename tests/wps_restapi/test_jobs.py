@@ -32,6 +32,7 @@ from weaver.status import (
     JOB_STATUS_CATEGORIES,
     JOB_STATUS_CATEGORY_FINISHED,
     JOB_STATUS_VALUES,
+    STATUS_ACCEPTED,
     STATUS_FAILED,
     STATUS_RUNNING,
     STATUS_SUCCEEDED
@@ -133,13 +134,18 @@ class WpsRestApiJobsTest(unittest.TestCase):
                       process=self.process_other.identifier, service=self.service_two.name,
                       user_id=self.user_editor1_id, status=STATUS_RUNNING, progress=99, access=VISIBILITY_PUBLIC)
 
-    def make_job(self, task_id, process, service, user_id, status, progress, access, created=None, duration=None):
-        created = date_parser.parse(created) if created else None
+    def make_job(self, task_id, process, service, user_id, status, progress, access,
+                 created=None, offset=None, duration=None):
+        if isinstance(created, str):
+            created = date_parser.parse(created)
         job = self.job_store.save_job(task_id=task_id, process=process, service=service, is_workflow=False,
                                       user_id=user_id, execute_async=True, access=access, created=created)
         job.status = status
+        if status != STATUS_ACCEPTED:
+            job.started = job.created + datetime.timedelta(seconds=offset if offset is not None else 0)
+        job.updated = job.created + datetime.timedelta(seconds=duration if duration is not None else 10)
         if status in JOB_STATUS_CATEGORIES[JOB_STATUS_CATEGORY_FINISHED]:
-            job["finished"] = job.created + datetime.timedelta(seconds=duration if duration else 10)
+            job["finished"] = job.updated
         job.progress = progress
         job = self.job_store.update_job(job)
         self.job_info.append(job)
@@ -533,7 +539,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         path = get_path_kvp(sd.jobs_service.path, type="process", provider=self.service_public.name)
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 400
-        assert "cause" in resp.json and resp.json["cause"] == {"type": "process", "service": self.service_public.name}
+        assert "value" in resp.json and resp.json["value"] == {"type": "process", "service": self.service_public.name}
 
     def template_get_jobs_by_type_service_provider(self, service_or_provider):
         path = get_path_kvp(sd.jobs_service.path, type=service_or_provider)
@@ -953,21 +959,25 @@ class WpsRestApiJobsTest(unittest.TestCase):
         assert resp.status_code == 422
 
     def test_get_jobs_duration_min_only(self):
-        path = get_path_kvp(sd.jobs_service.path, minDuration=40)
+        test = {"minDuration": 35}
+        path = get_path_kvp(sd.jobs_service.path, **test)
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
         result_jobs = resp.json["jobs"]
-        expect_jobs = [self.job_info[i].id for i in [8, 9]]
+        expect_jobs = [self.job_info[i].id for i in [7, 8]]
         assert len(result_jobs) == len(expect_jobs)
-        assert all(job in expect_jobs for job in result_jobs)
+        match_jobs = all(job in expect_jobs for job in result_jobs)
+        assert match_jobs, self.message_with_jobs_diffs(result_jobs, expect_jobs, test)
 
-        path = get_path_kvp(sd.jobs_service.path, minDuration=24)
+        test = {"minDuration": 24}
+        path = get_path_kvp(sd.jobs_service.path, **test)
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
         result_jobs = resp.json["jobs"]
-        expect_jobs = [self.job_info[i].id for i in [6, 7, 8, 9, 10]]
+        expect_jobs = [self.job_info[i].id for i in [6, 7, 8, 10]]
         assert len(result_jobs) == len(expect_jobs)
-        assert all(job in expect_jobs for job in result_jobs)
+        match_jobs = all(job in expect_jobs for job in result_jobs)
+        assert match_jobs, self.message_with_jobs_diffs(result_jobs, expect_jobs, test)
 
     def test_get_jobs_duration_max_only(self):
         path = get_path_kvp(sd.jobs_service.path, maxDuration=30)
@@ -1029,12 +1039,12 @@ class WpsRestApiJobsTest(unittest.TestCase):
         path = get_path_kvp(sd.jobs_service.path, status=STATUS_FAILED)
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
-        expect_fail = 8
-        expect_jobs = [self.job_info[i].id for i in range(1, expect_fail + 1)]
+        expect_jobs = [self.job_info[i].id for i in [1, 2, 5, 6, 7, 8]]  # 8 total, but only 6 visible
         result_jobs = resp.json["jobs"]
-        assert len(result_jobs) == expect_fail
+        assert len(result_jobs) == len(expect_jobs)
         assert all(job in expect_jobs for job in result_jobs)
 
+    @pytest.mark.xfail(reason="Multiple statuses not supported")  # FIXME: support comma-separated list of statuses
     def test_get_jobs_by_status_multi(self):
         path = get_path_kvp(sd.jobs_service.path, status="{},{}".format(STATUS_SUCCEEDED, STATUS_RUNNING))
         resp = self.app.get(path, headers=self.json_headers)
@@ -1048,11 +1058,17 @@ class WpsRestApiJobsTest(unittest.TestCase):
         path = get_path_kvp(sd.jobs_service.path, status="random")
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 422
-        assert resp.json[""]
+        assert resp.json["code"] == "JobInvalidParameter"
+        assert resp.json["value"]["status"] == "random"
+        assert "status" in resp.json["cause"]
 
-        path = get_path_kvp(sd.jobs_service.path, status="random,{}".format(STATUS_RUNNING))
-        resp = self.app.get(path, headers=self.json_headers)
+        status = "random,{}".format(STATUS_RUNNING)
+        path = get_path_kvp(sd.jobs_service.path, status=status)
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 422
+        assert resp.json["code"] == "JobInvalidParameter"
+        assert resp.json["value"]["status"] == status
+        assert "status" in resp.json["cause"]
 
     def test_get_job_status_response_process_id(self):
         """

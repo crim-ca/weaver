@@ -663,7 +663,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
             for group_result in items:
                 group_service = group_result["category"].pop("service", None)
                 group_result["category"]["provider"] = group_service
-        total = found[0]["totalPipeline"][0]["total"]
+        total = found[0]["totalPipeline"][0]["total"] if items else 0
         return items, total
 
     def _find_jobs_paging(self, pipeline, page, limit):
@@ -677,7 +677,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
 
         found = list(self.collection.aggregate(pipeline))
         items = [Job(item) for item in found[0]["itemsPipeline"]]
-        total = found[0]["totalPipeline"][0]["total"]
+        total = found[0]["totalPipeline"][0]["total"] if items else 0
         return items, total
 
     @staticmethod

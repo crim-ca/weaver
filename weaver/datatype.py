@@ -798,7 +798,7 @@ class Job(Base):
                 updated = self.finished
             else:
                 updated = self.started
-            updated = updated or now()
+            updated = localize_datetime(updated or now())
             self.updated = updated  # apply to remain static until saved
         return localize_datetime(updated)
 

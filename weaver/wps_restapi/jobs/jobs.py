@@ -341,6 +341,7 @@ def get_queried_jobs(request):
     filters["service"] = filters.pop("provider", None)
     filters["min_duration"] = filters.pop("minDuration", None)
     filters["max_duration"] = filters.pop("maxDuration", None)
+    filters["job_type"] = filters.pop("type", None)
 
     dti = datetime_interval_parser(filters["datetime"]) if filters.get("datetime", False) else None
     if dti and dti.get("before", False) and dti.get("after", False) and dti["after"] > dti["before"]:
