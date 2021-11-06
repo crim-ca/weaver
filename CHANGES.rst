@@ -20,7 +20,8 @@ Changes:
   Range duration parameters are limited to single values each
   (relates to `opengeospatial/ogcapi-processes#261 <https://github.com/opengeospatial/ogcapi-processes/issues/261>`_).
 - Require minimally ``pymongo==3.12.0`` and corresponding `MongoDB` ``5.0`` instance to process new filtering queries
-  of ``minDuration`` and ``maxDuration``.
+  of ``minDuration`` and ``maxDuration``. Please refer to :ref:`database_migration`
+  and `MongoDB official documentation <https://docs.mongodb.com/manual>`_ for migration methods.
 - Refactor ``Job`` search method to facilitate its extension in the event of future filter parameters.
 
 Fixes:

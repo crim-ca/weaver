@@ -69,3 +69,36 @@ Known issues
 
 
 Please refer to :ref:`Configuration` and :ref:`Running` sections for following steps.
+
+.. _database_migration:
+
+=====================
+Database Migration
+=====================
+
+.. versionadded:: 4.3.0
+
+Previous versions of `Weaver` did not require any specific version of `MongoDB`_.
+Features were working using version as early as ``mongo==3.4`` if not even older.
+Due to more recent search capabilities, performance improvements and security fixes,
+minimum requirement of ``mongo==5.0`` has been made mandatory.
+
+In terms of data itself, there should be no difference, unless more advanced usage (e.g.: Replica Sets) were configured
+on your side. See relevant |mongodb-docs|_ as needed in this case. Otherwise, employed ``mongodb`` instance simply needs
+to be updated with the relevant versions.
+
+To simplify to process, the following procedure is recommended to avoid installing `MongoDB` libraries.
+Assuming the current version is ``3.4``, below operations must be executed iteratively for every migration step of
+versions ``3.6``, ``4.0``, ``4.2``, ``4.4`` and ``5.0``, where ``VERSION`` is the new version above the current one.
+
+.. code-block:: shell
+
+    docker run --name mongo -v <DB_DATA_PATH>:/data/db -d mongo:<VERSION>
+    docker exec -ti mongo mongo
+
+    # in docker, should answer with: { "ok" : 1 }
+    db.adminCommand( { setFeatureCompatibilityVersion: "<VERSION>" } )
+    exit
+
+    # back in shell
+    docker stop mongo && docker rm mongo
