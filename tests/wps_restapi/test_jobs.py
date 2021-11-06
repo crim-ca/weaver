@@ -139,7 +139,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
                                       user_id=user_id, execute_async=True, access=access, created=created)
         job.status = status
         if status in JOB_STATUS_CATEGORIES[JOB_STATUS_CATEGORY_FINISHED]:
-            job["finished"] = created + datetime.timedelta(seconds=duration if duration else 10)
+            job["finished"] = job.created + datetime.timedelta(seconds=duration if duration else 10)
         job.progress = progress
         job = self.job_store.update_job(job)
         self.job_info.append(job)
