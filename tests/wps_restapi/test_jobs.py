@@ -1,3 +1,5 @@
+import datetime
+
 import contextlib
 import json
 import unittest
@@ -31,6 +33,7 @@ from weaver.status import (
     JOB_STATUS_CATEGORY_FINISHED,
     JOB_STATUS_VALUES,
     STATUS_FAILED,
+    STATUS_RUNNING,
     STATUS_SUCCEEDED
 )
 from weaver.utils import get_path_kvp
@@ -111,34 +114,32 @@ class WpsRestApiJobsTest(unittest.TestCase):
                       user_id=self.user_admin_id, status=STATUS_FAILED, progress=55, access=VISIBILITY_PRIVATE)
         # job public/private service/process combinations
         self.make_job(task_id="5555-5555-5555-5555", process=self.process_public.identifier,
-                      service=self.service_public.name, created=self.datetime_interval[0],
+                      service=self.service_public.name, created=self.datetime_interval[0], duration=20,
                       user_id=self.user_editor1_id, status=STATUS_FAILED, progress=99, access=VISIBILITY_PUBLIC)
         self.make_job(task_id="6666-6666-6666-6666", process=self.process_private.identifier,
-                      service=self.service_public.name, created=self.datetime_interval[1],
+                      service=self.service_public.name, created=self.datetime_interval[1], duration=30,
                       user_id=self.user_editor1_id, status=STATUS_FAILED, progress=99, access=VISIBILITY_PUBLIC)
         self.make_job(task_id="7777-7777-7777-7777", process=self.process_public.identifier,
-                      service=self.service_private.name, created=self.datetime_interval[2],
+                      service=self.service_private.name, created=self.datetime_interval[2], duration=40,
                       user_id=self.user_editor1_id, status=STATUS_FAILED, progress=99, access=VISIBILITY_PUBLIC)
         self.make_job(task_id="8888-8888-8888-8888", process=self.process_private.identifier,
-                      service=self.service_private.name, created=self.datetime_interval[3],
+                      service=self.service_private.name, created=self.datetime_interval[3], duration=50,
                       user_id=self.user_editor1_id, status=STATUS_FAILED, progress=99, access=VISIBILITY_PUBLIC)
         # jobs with duplicate 'process' identifier, but under a different 'service' name
-        self.make_job(task_id="9999-9999-9999-9999",
-                      process=self.process_other.identifier, service=self.service_one.name,
-                      user_id=self.user_editor1_id, status=STATUS_FAILED, progress=99, access=VISIBILITY_PUBLIC)
-        self.make_job(task_id="1010-1010-1010-1010",
+        self.make_job(task_id="9999-9999-9999-9999", process=self.process_other.identifier,
+                      service=self.service_one.name, created=datetime.datetime.now(), duration=20,
+                      user_id=self.user_editor1_id, status=STATUS_RUNNING, progress=99, access=VISIBILITY_PUBLIC)
+        self.make_job(task_id="1010-1010-1010-1010", created=datetime.datetime.now(), duration=25,
                       process=self.process_other.identifier, service=self.service_two.name,
-                      user_id=self.user_editor1_id, status=STATUS_FAILED, progress=99, access=VISIBILITY_PUBLIC)
+                      user_id=self.user_editor1_id, status=STATUS_RUNNING, progress=99, access=VISIBILITY_PUBLIC)
 
-    def make_job(self, task_id, process, service, user_id, status, progress, access, created=None):
-
+    def make_job(self, task_id, process, service, user_id, status, progress, access, created=None, duration=None):
         created = date_parser.parse(created) if created else None
-
         job = self.job_store.save_job(task_id=task_id, process=process, service=service, is_workflow=False,
                                       user_id=user_id, execute_async=True, access=access, created=created)
         job.status = status
         if status in JOB_STATUS_CATEGORIES[JOB_STATUS_CATEGORY_FINISHED]:
-            job.mark_finished()
+            job["finished"] = created + datetime.timedelta(seconds=duration if duration else 10)
         job.progress = progress
         job = self.job_store.update_job(job)
         self.job_info.append(job)
@@ -834,7 +835,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
             assert date_parser.parse(resp.json["created"]) <= date_parser.parse(
                 datetime_before.replace(DATETIME_INTERVAL_OPEN_START_SYMBOL, ""))
 
-    def test_jobs_datetime_after(self):
+    def test_get_jobs_datetime_after(self):
         """
         Test that only filtered jobs after a certain time are returned when ``datetime`` query parameter is provided.
 
@@ -857,7 +858,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
             assert date_parser.parse(resp.json["created"]) >= date_parser.parse(
                 datetime_after.replace(DATETIME_INTERVAL_OPEN_END_SYMBOL, ""))
 
-    def test_jobs_datetime_interval(self):
+    def test_get_jobs_datetime_interval(self):
         """
         Test that only filtered jobs in the time interval are returned when ``datetime`` query parameter is provided.
 
@@ -882,7 +883,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
             assert date_parser.parse(resp.json["created"]) >= date_parser.parse(datetime_after)
             assert date_parser.parse(resp.json["created"]) <= date_parser.parse(datetime_before)
 
-    def test_jobs_datetime_match(self):
+    def test_get_jobs_datetime_match(self):
         """
         Test that only filtered jobs at a specific time are returned when ``datetime`` query parameter is provided.
 
@@ -904,7 +905,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
             assert resp.content_type == CONTENT_TYPE_APP_JSON
             assert date_parser.parse(resp.json["created"]) == date_parser.parse(datetime_match)
 
-    def test_jobs_datetime_invalid(self):
+    def test_get_jobs_datetime_invalid(self):
         """
         Test that incorrectly formatted ``datetime`` query parameter value is handled.
 
@@ -920,7 +921,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 422
 
-    def test_jobs_datetime_interval_invalid(self):
+    def test_get_jobs_datetime_interval_invalid(self):
         """
         Test that invalid ``datetime`` query parameter value is handled.
 
@@ -936,7 +937,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 422
 
-    def test_jobs_datetime_before_invalid(self):
+    def test_get_jobs_datetime_before_invalid(self):
         """
         Test that invalid ``datetime`` query parameter value with a range is handled.
 
@@ -951,7 +952,109 @@ class WpsRestApiJobsTest(unittest.TestCase):
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 422
 
-    def test_job_status_response(self):
+    def test_get_jobs_duration_min_only(self):
+        path = get_path_kvp(sd.jobs_service.path, minDuration=40)
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        result_jobs = resp.json["jobs"]
+        expect_jobs = [self.job_info[i].id for i in [8, 9]]
+        assert len(result_jobs) == len(expect_jobs)
+        assert all(job in expect_jobs for job in result_jobs)
+
+        path = get_path_kvp(sd.jobs_service.path, minDuration=24)
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        result_jobs = resp.json["jobs"]
+        expect_jobs = [self.job_info[i].id for i in [6, 7, 8, 9, 10]]
+        assert len(result_jobs) == len(expect_jobs)
+        assert all(job in expect_jobs for job in result_jobs)
+
+    def test_get_jobs_duration_max_only(self):
+        path = get_path_kvp(sd.jobs_service.path, maxDuration=30)
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        result_jobs = resp.json["jobs"]
+        expect_jobs = [self.job_info[i].id for i in [5, 6, 10]]
+        assert len(result_jobs) == len(expect_jobs)
+        assert all(job in expect_jobs for job in result_jobs)
+
+        path = get_path_kvp(sd.jobs_service.path, maxDuration=49)
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        result_jobs = resp.json["jobs"]
+        expect_jobs = [self.job_info[i].id for i in [8]]
+        assert len(result_jobs) == len(expect_jobs)
+        assert all(job in expect_jobs for job in result_jobs)
+
+    def test_get_jobs_duration_min_max(self):
+        path = get_path_kvp(sd.jobs_service.path, minDuration=19, maxDuration=31)
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        result_jobs = resp.json["jobs"]
+        expect_jobs = [self.job_info[i].id for i in [5, 6, 9, 10]]
+        assert len(result_jobs) == len(expect_jobs)
+        assert all(job in expect_jobs for job in result_jobs)
+
+        path = get_path_kvp(sd.jobs_service.path, minDuration=23, maxDuration=28)
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        result_jobs = resp.json["jobs"]
+        expect_jobs = [self.job_info[i].id for i in [10]]
+        assert len(result_jobs) == len(expect_jobs)
+        assert all(job in expect_jobs for job in result_jobs)
+
+        path = get_path_kvp(sd.jobs_service.path, minDuration=35, maxDuration=37)
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        result_jobs = resp.json["jobs"]
+        assert len(result_jobs) == 0
+
+    def test_get_jobs_duration_min_max_invalid(self):
+        path = get_path_kvp(sd.jobs_service.path, minDuration=19, maxDuration=31)
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 200
+        result_jobs = resp.json["jobs"]
+        expect_jobs = [self.job_info[i].id for i in [5, 6, 9, 10]]
+        assert len(result_jobs) == len(expect_jobs)
+        assert all(job in expect_jobs for job in result_jobs)
+
+    def test_get_jobs_by_status_single(self):
+        path = get_path_kvp(sd.jobs_service.path, status=STATUS_SUCCEEDED)
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        result_jobs = resp.json["jobs"]
+        assert len(result_jobs) == 1
+        assert result_jobs[0] == self.job_info[0].id
+
+        path = get_path_kvp(sd.jobs_service.path, status=STATUS_FAILED)
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        expect_fail = 8
+        expect_jobs = [self.job_info[i].id for i in range(1, expect_fail + 1)]
+        result_jobs = resp.json["jobs"]
+        assert len(result_jobs) == expect_fail
+        assert all(job in expect_jobs for job in result_jobs)
+
+    def test_get_jobs_by_status_multi(self):
+        path = get_path_kvp(sd.jobs_service.path, status="{},{}".format(STATUS_SUCCEEDED, STATUS_RUNNING))
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        result_jobs = resp.json["jobs"]
+        expect_jobs = [self.job_info[i].id for i in [0, 9, 10]]
+        assert len(result_jobs) == 3
+        assert all(job in expect_jobs for job in result_jobs)
+
+    def test_get_jobs_by_status_invalid(self):
+        path = get_path_kvp(sd.jobs_service.path, status="random")
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 422
+        assert resp.json[""]
+
+        path = get_path_kvp(sd.jobs_service.path, status="random,{}".format(STATUS_RUNNING))
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 422
+
+    def test_get_job_status_response_process_id(self):
         """
         Verify the processID value in the job status response.
         """

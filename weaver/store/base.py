@@ -153,7 +153,7 @@ class StoreJobs(StoreInterface):
                   datetime_interval=None,   # type: Optional[DatetimeIntervalType]
                   group_by=None,            # type: Optional[Union[str, List[str]]]
                   request=None,             # type: Optional[Request]
-                  ):                        # type: (...) -> Union[JobListAndCount, JobCategoriesAndCount]
+                  ):                        # type: (...) -> JobSearchResult
         raise NotImplementedError
 
     @abc.abstractmethod
