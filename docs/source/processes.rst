@@ -809,10 +809,11 @@ For example, providing ``X-WPS-Output-Context: project/test-1`` will result in o
     {WPS_OUTPUT_URL}/project/test-1/{JOB_UUID}/{output.ext}
 
 .. note::
-    Values provided by ``X-WPS-Output-Context`` can only contain alphanumeric, hyphens, underscores and path separators
-    that will result in a valid directory and URL locations. The path is assumed relative to the resolved :term:`WPS`
-    output directory, and will therefore reject any ``.`` or ``..`` path references.
-    The path must also **NOT** start by ``/``.
+    Values provided by ``X-WPS-Output-Context`` can only contain alphanumeric, hyphens, underscores and path
+    separators that will result in a valid directory and URL locations. The path is assumed relative by design to be
+    resolved under the :term:`WPS` output directory, and will therefore reject any ``.`` or ``..`` path references.
+    The path also **CANNOT** start by ``/``. In such cases, an HTTP error will be immediately raised indicating
+    the symbols that where rejected when detected within ``X-WPS-Output-Context`` header.
 
 .. note::
     Header ``X-WPS-Output-Context`` is ignored when using `S3` buckets as output location since they are stored
