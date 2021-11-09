@@ -22,6 +22,7 @@ Changes:
 - Provide corresponding ``Job`` log URL along already reported log file path to facilitate retrieval from server side.
 - Avoid ``Job.progress`` updates following ``failed`` or ``dismissed`` statuses to keep track of the last real progress
   percentage that was reached when that status was set.
+- Improve typing of database and store getter functions to infer correct types and facilitate code auto-complete.
 
 Fixes:
 ------
