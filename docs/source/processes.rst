@@ -799,10 +799,10 @@ avoid conflicts. Therefore, outputs will be available with the following locatio
     Value ``WPS_OUTPUT_URL`` in above example is resolved accordingly with ``weaver.wps_output_url``,
     ``weaver.wps_output_path`` and ``weaver.url``, as per :ref:`conf_settings` details.
 
-When submitting a :term:`Job` for execution, it is also possible to provide the ``X-WPS-Output-Context`` header.
+When submitting a :term:`Job` for execution, it is possible to provide the ``X-WPS-Output-Context`` header.
 This modifies the output location to be nested under the specified directory or sub-directories.
 
-For example, providing ``X-WPS-Output-Context: project/test-1`` will result in outputs located at
+For example, providing ``X-WPS-Output-Context: project/test-1`` will result in outputs located at:
 
 .. code-block::
 
@@ -815,8 +815,13 @@ For example, providing ``X-WPS-Output-Context: project/test-1`` will result in o
     The path also **CANNOT** start by ``/``. In such cases, an HTTP error will be immediately raised indicating
     the symbols that where rejected when detected within ``X-WPS-Output-Context`` header.
 
+If desired, parameter ``weaver.wps_output_context`` can also be defined in the :ref:`conf_settings` in order to employ
+a default directory location nested under ``weaver.wps_output_dir`` when ``X-WPS-Output-Context`` header is omitted
+from the request. By default, this parameter is not defined (empty) in order to store :term:`Job` results directly under
+the configured :ter:`WPS` output directory.
+
 .. note::
-    Header ``X-WPS-Output-Context`` is ignored when using `S3` buckets as output location since they are stored
+    Header ``X-WPS-Output-Context`` is ignored when using `S3` buckets for output location since they are stored
     individually per :term:`Job` UUID, and hold no relevant *context* location. See also :ref:`conf_s3_buckets`.
 
 .. versionadded:: 4.3.0

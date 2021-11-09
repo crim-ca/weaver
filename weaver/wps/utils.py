@@ -125,10 +125,17 @@ def get_wps_output_context(request):
     headers = getattr(request, "headers", {})
     ctx = get_header("X-WPS-Output-Context", headers)
     if not ctx:
-        return None
+        settings = get_settings(request)
+        ctx_default = settings.get("weaver.wps_output_context", None)
+        if not ctx_default:
+            return None
+        LOGGER.debug("Using default 'wps.wps_output_context': %s", ctx_default)
+        ctx = ctx_default
     cxt_found = re.match(r"^(?=[\w-]+)([\w-]+/?)+$", ctx)
     if cxt_found and cxt_found[0] == ctx:
-        return ctx[:-1] if ctx.endswith("/") else ctx
+        ctx_matched = ctx[:-1] if ctx.endswith("/") else ctx
+        LOGGER.debug("Using request 'X-WPS-Output-Context': %s", ctx_matched)
+        return ctx_matched
     raise HTTPUnprocessableEntity(json={
         "code": "InvalidHeaderValue",
         "name": "X-WPS-Output-Context",

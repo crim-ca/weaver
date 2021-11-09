@@ -13,6 +13,7 @@ Changes:
 - Support contextual WPS output location using ``X-WPS-Output-Context`` header to store ``Job`` results.
   When a ``Job`` is executed by providing this header with a sub-directory, the resulting outputs of the ``Job``
   will be placed and reported under the corresponding location relative to WPS outputs (path and URL).
+- Add ``weaver.wps_output_context`` setting as default contextual WPS output location when header is omitted.
 - Replace ``Job.execute_async`` getter/setter by simple property using more generic ``Job.execution_mode``
   for storage in database. Provide ``Job.execute_async`` and ``Job.execute_sync`` properties based on stored mode.
 - Simplify ``execute_process`` function executed by `Celery` task into sub-step functions where applicable.

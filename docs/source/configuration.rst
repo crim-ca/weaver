@@ -125,7 +125,7 @@ they are optional and which default value or operation is applied in each situat
     `Configuration of AWS S3 Buckets`_
 
 - | ``weaver.wps_output_dir = <directory-path>``
-  | (default: ``/tmp``)
+  | (default: *path* ``/tmp``)
   |
   | Location where WPS outputs (results from :term:`Job`) will be stored for stage-out.
   |
@@ -135,8 +135,22 @@ they are optional and which default value or operation is applied in each situat
   | This directory should be mapped to `Weaver`'s :term:`WPS` output URL to serve them externally as needed.
 
 .. versionchanged:: 4.3.0
-    The output directory could be nested under a contextual directory if requested during :term:`Job` submission.
-    See :ref:`exec_output_location` for more details.
+    The output directory could be nested under a *contextual directory* if requested during :term:`Job` submission.
+    See :ref:`exec_output_location` and below ``weaver.wps_output_context`` parameter for more details.
+
+- | ``weaver.wps_output_context = <sub-directory-path>``
+  | (default: ``None``)
+  |
+  | Default sub-directory hierarchy location to nest :term:`WPS` outputs (:term:`Job` results) under.
+  |
+  | If defined, this parameter is used as substitute *context* when ``X-WPS-Output-Context`` header is omitted.
+    When not defined, ``X-WPS-Output-Context`` header can still take effect, but omitting it will store results
+    directly under ``weaver.wps_output_dir`` instead of default *context* location.
+
+.. versionadded:: 4.3.0
+
+.. seealso::
+    See :ref:`exec_output_location` for more details about this feature and implications of this setting.
 
 - | ``weaver.wps_output_path = <url-path>``
   | ``weaver.wps_output_url = <full-url>``
@@ -148,6 +162,12 @@ they are optional and which default value or operation is applied in each situat
   | Setting ``weaver.wps_output_path`` is ignored if its URL equivalent is defined.
   | The *path* variant **SHOULD** start with ``/`` for appropriate concatenation with ``weaver.url``, although this is
     not strictly enforced.
+
+.. note::
+    The resulting ``weaver.wps_output_url`` endpoint, whether directly provided or indirectly
+    resolved by ``weaver.url`` and ``weaver.wps_output_path`` will not be served by `Weaver` itself.
+    This location is returned for reference in API responses, but it is up to the infrastructure that
+    hosts `Weaver` service to make this location available online as deemed necessary.
 
 - | ``weaver.wps_workdir = <directory-path>``
   | (default: uses automatically generated temporary directory if none specified)
