@@ -27,6 +27,7 @@ Changes:
 Fixes:
 ------
 - Allow ``group`` query parameter to handle ``Job`` category listing with ``provider`` as ``service`` alias.
+- Improve typing of database and store getter functions to infer correct types and facilitate code auto-complete.
 
 `4.2.1 <https://github.com/crim-ca/weaver/tree/4.2.1>`_ (2021-10-20)
 ========================================================================
