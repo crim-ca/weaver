@@ -28,6 +28,8 @@ Fixes:
 ------
 - Removes the need for specific configuration to handle public/private output directory settings using
   provided ``X-WPS-Output-Context`` header (fixes `#110 <https://github.com/crim-ca/weaver/issues/110>`_).
+- Fix retrieval of `Pyramid` ``Registry`` and application settings when available *container* is `Werkzeug` ``Request``
+  instead of `Pyramid` ``Request``, as employed by underlying HTTP requests in `PyWPS` service.
 
 `4.2.1 <https://github.com/crim-ca/weaver/tree/4.2.1>`_ (2021-10-20)
 ========================================================================
