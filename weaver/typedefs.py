@@ -89,7 +89,7 @@ if TYPE_CHECKING:
     KVP_Item = Union[ValueType, Sequence[ValueType]]
     KVP = Union[Sequence[Tuple[str, KVP_Item]], Dict[str, KVP_Item]]
 
-    AnyContainer = Union[Configurator, Registry, PyramidRequest, Celery]
+    AnyContainer = Union[Configurator, Registry, PyramidRequest, WerkzeugRequest, Celery]
     SettingValue = Optional[Union[JSON, AnyValue]]
     SettingsType = Dict[str, SettingValue]
     AnySettingsContainer = Union[AnyContainer, SettingsType]

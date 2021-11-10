@@ -443,10 +443,11 @@ class MongodbJobStore(StoreJobs, MongodbStore):
                  inputs=None,               # type: Optional[List[Any]]
                  is_workflow=False,         # type: bool
                  is_local=False,            # type: bool
-                 user_id=None,              # type: Optional[int]
                  execute_async=True,        # type: bool
                  custom_tags=None,          # type: Optional[List[str]]
+                 user_id=None,              # type: Optional[int]
                  access=None,               # type: Optional[str]
+                 context=None,              # type: Optional[str]
                  notification_email=None,   # type: Optional[str]
                  accept_language=None,      # type: Optional[str]
                  created=None,              # type: Optional[datetime.datetime]
@@ -482,6 +483,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
                 "updated": now(),
                 "tags": list(set(tags)),  # remove duplicates
                 "access": access,
+                "context": context,
                 "notification_email": notification_email,
                 "accept_language": accept_language,
             })
