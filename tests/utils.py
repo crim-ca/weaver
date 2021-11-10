@@ -615,8 +615,8 @@ def mocked_execute_process():
 
     task = MockTask()
 
-    def mock_execute_process(job_id, url, headers):
-        real_execute_process(job_id, url, headers)
+    def mock_execute_process(job_id, wps_url, headers):
+        real_execute_process(job_id, wps_url, headers)
         return task
 
     return (

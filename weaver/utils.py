@@ -24,7 +24,7 @@ from celery.app import Celery
 from pyramid.config import Configurator
 from pyramid.httpexceptions import HTTPError as PyramidHTTPError, HTTPGatewayTimeout, HTTPTooManyRequests
 from pyramid.registry import Registry
-from pyramid.request import Request
+from pyramid.request import Request as PyramidRequest
 from pyramid.settings import asbool, aslist
 from pyramid.threadlocal import get_current_registry
 from pyramid_beaker import set_cache_regions_from_settings
@@ -33,6 +33,7 @@ from requests.structures import CaseInsensitiveDict
 from requests_file import FileAdapter
 from urlmatch import urlmatch
 from webob.headers import EnvironHeaders, ResponseHeaders
+from werkzeug.wrappers import Request as WerkzeugRequest
 
 from weaver.status import map_status
 from weaver.warning import TimeZoneInfoAlreadySetWarning
@@ -158,16 +159,18 @@ def get_any_message(info):
 
 
 def get_registry(container, nothrow=False):
-    # type: (AnyRegistryContainer, bool) -> Optional[Registry]
+    # type: (Optional[AnyRegistryContainer], bool) -> Optional[Registry]
     """
     Retrieves the application ``registry`` from various containers referencing to it.
     """
     if isinstance(container, Celery):
         return container.conf.get("PYRAMID_REGISTRY", {})
-    if isinstance(container, (Configurator, Request)):
+    if isinstance(container, (Configurator, PyramidRequest)):
         return container.registry
     if isinstance(container, Registry):
         return container
+    if isinstance(container, WerkzeugRequest) or container is None:
+        return get_current_registry()
     if nothrow:
         return None
     raise TypeError("Could not retrieve registry from container object of type [{}].".format(type(container)))
@@ -178,14 +181,12 @@ def get_settings(container=None):
     """
     Retrieves the application ``settings`` from various containers referencing to it.
     """
-    if isinstance(container, (Celery, Configurator, Request)):
+    if isinstance(container, (Celery, Configurator, PyramidRequest, WerkzeugRequest)) or container is None:
         container = get_registry(container)
     if isinstance(container, Registry):
         return container.settings
     if isinstance(container, dict):
         return container
-    if container is None:
-        return get_current_registry().settings
     raise TypeError("Could not retrieve settings from container object of type [{}]".format(type(container)))
 
 

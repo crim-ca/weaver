@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 import tempfile
 from configparser import ConfigParser
 from typing import TYPE_CHECKING
@@ -7,7 +8,7 @@ from urllib.parse import urlparse
 
 from beaker.cache import cache_region
 from owslib.wps import WebProcessingService, WPSExecution
-from pyramid.httpexceptions import HTTPNotFound
+from pyramid.httpexceptions import HTTPNotFound, HTTPUnprocessableEntity
 from pywps import configuration as pywps_config
 from webob.acceptparse import create_accept_language_header
 
@@ -111,6 +112,37 @@ def get_wps_output_url(container):
         container, "weaver.wps_output_url", "server", "outputurl", wps_output_default, "WPS output url"
     )
     return wps_output_config or wps_output_default
+
+
+def get_wps_output_context(request):
+    # type: (AnyRequestType) -> Optional[str]
+    """
+    Obtains and validates allowed values for sub-directory context of WPS outputs in header ``X-WPS-Output-Context``.
+
+    :raises HTTPUnprocessableEntity: if the header was provided an contains invalid or illegal value.
+    :returns: validated context or None if not specified.
+    """
+    headers = getattr(request, "headers", {})
+    ctx = get_header("X-WPS-Output-Context", headers)
+    if not ctx:
+        settings = get_settings(request)
+        ctx_default = settings.get("weaver.wps_output_context", None)
+        if not ctx_default:
+            return None
+        LOGGER.debug("Using default 'wps.wps_output_context': %s", ctx_default)
+        ctx = ctx_default
+    cxt_found = re.match(r"^(?=[\w-]+)([\w-]+/?)+$", ctx)
+    if cxt_found and cxt_found[0] == ctx:
+        ctx_matched = ctx[:-1] if ctx.endswith("/") else ctx
+        LOGGER.debug("Using request 'X-WPS-Output-Context': %s", ctx_matched)
+        return ctx_matched
+    raise HTTPUnprocessableEntity(json={
+        "code": "InvalidHeaderValue",
+        "name": "X-WPS-Output-Context",
+        "description": "Provided value for 'X-WPS-Output-Context' request header is invalid.",
+        "cause": "Value must be an alphanumeric context directory or tree hierarchy of sub-directory names.",
+        "value": str(ctx)
+    })
 
 
 def get_wps_local_status_location(url_status_location, container, must_exist=True):

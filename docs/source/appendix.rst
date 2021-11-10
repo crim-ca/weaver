@@ -128,6 +128,9 @@ Glossary
           refers to attributes that are specific to typical :term:`Process` description, in contrast to specialized
           attributes introduced by other concepts, such as for example :term:`CWL`-specific implementation details.
 
+    WPS-REST
+        Alias employed to refer to :term:`OGC API - Processes` endpoints for corresponding :term:`WPS` definitions.
+
     XML
         | Extensible Markup Language
         | Alternative representation of some data object provided by the application. Requires appropriate ``Accept``

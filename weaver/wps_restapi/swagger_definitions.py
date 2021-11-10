@@ -3495,8 +3495,28 @@ class PostProcessesEndpoint(ExtendedMappingSchema):
     body = Deploy(title="Deploy")
 
 
+class WpsOutputContextHeader(ExtendedSchemaNode):
+    # ok to use 'name' in this case because target 'key' in the mapping must
+    # be that specific value but cannot have a field named with this format
+    name = "X-WPS-Output-Context"
+    description = (
+        "Contextual location where to store WPS output results from job execution. ",
+        "When provided, value must be a directory or sub-directories slug. ",
+        "Resulting contextual location will be relative to server WPS outputs when no context is provided.",
+    )
+    schema_type = String
+    missing = drop
+    example = "my-directory/sub-project"
+    default = None
+
+
+class ExecuteHeaders(RequestHeaders):
+    description = "Request headers supported for job execution."
+    x_wps_output_context = WpsOutputContextHeader()
+
+
 class PostProcessJobsEndpoint(ProcessPath):
-    header = AcceptLanguageHeader()
+    header = ExecuteHeaders()
     body = Execute()
 
 
@@ -3663,7 +3683,7 @@ class PostProviderProcessJobRequest(ExtendedMappingSchema):
     """
     Launching a new process request definition.
     """
-    header = RequestHeaders()
+    header = ExecuteHeaders()
     querystring = LaunchJobQuerystring()
     body = Execute()
 

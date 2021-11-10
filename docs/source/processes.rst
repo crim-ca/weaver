@@ -6,6 +6,10 @@
 Processes
 **********
 
+.. contents::
+    :local:
+    :depth: 3
+
 Type of Processes
 =====================
 
@@ -376,6 +380,10 @@ to better illustrate the requirements.
 
 Basic Details
 ~~~~~~~~~~~~~~~~~
+
+.. todo::
+    Support ``sync`` mode.
+    Relates to https://github.com/crim-ca/weaver/issues/247.
 
 The first field is ``mode``, it basically tells whether to run the :term:`Process` in a blocking (``sync``) or
 non-blocking (``async``) manner. Note that support is currently limited for mode ``sync`` as this use case is often more
@@ -770,13 +778,62 @@ described in |pywps-multi-output|_.
 .. seealso::
     - :ref:`Multiple and Optional Values`
 
+.. _exec_output_location:
+
+Outputs Location
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+By default, :term:`Job` results will be hosted under the endpoint configured by ``weaver.wps_output_url`` and
+``weaver.wps_output_path``, and will be stored under directory defined by ``weaver.wps_output_dir`` setting.
+
+Each :term:`Job` will have its specific UUID employed for all of the outputs files, logs and status in order to
+avoid conflicts. Therefore, outputs will be available with the following location:
+
+.. code-block::
+
+    {WPS_OUTPUT_URL}/{JOB_UUID}.xml             # status location
+    {WPS_OUTPUT_URL}/{JOB_UUID}.log             # execution logs
+    {WPS_OUTPUT_URL}/{JOB_UUID}/{output.ext}    # results of the job if successful
+
+.. note::
+    Value ``WPS_OUTPUT_URL`` in above example is resolved accordingly with ``weaver.wps_output_url``,
+    ``weaver.wps_output_path`` and ``weaver.url``, as per :ref:`conf_settings` details.
+
+When submitting a :term:`Job` for execution, it is possible to provide the ``X-WPS-Output-Context`` header.
+This modifies the output location to be nested under the specified directory or sub-directories.
+
+For example, providing ``X-WPS-Output-Context: project/test-1`` will result in outputs located at:
+
+.. code-block::
+
+    {WPS_OUTPUT_URL}/project/test-1/{JOB_UUID}/{output.ext}
+
+.. note::
+    Values provided by ``X-WPS-Output-Context`` can only contain alphanumeric, hyphens, underscores and path
+    separators that will result in a valid directory and URL locations. The path is assumed relative by design to be
+    resolved under the :term:`WPS` output directory, and will therefore reject any ``.`` or ``..`` path references.
+    The path also **CANNOT** start by ``/``. In such cases, an HTTP error will be immediately raised indicating
+    the symbols that where rejected when detected within ``X-WPS-Output-Context`` header.
+
+If desired, parameter ``weaver.wps_output_context`` can also be defined in the :ref:`conf_settings` in order to employ
+a default directory location nested under ``weaver.wps_output_dir`` when ``X-WPS-Output-Context`` header is omitted
+from the request. By default, this parameter is not defined (empty) in order to store :term:`Job` results directly under
+the configured :ter:`WPS` output directory.
+
+.. note::
+    Header ``X-WPS-Output-Context`` is ignored when using `S3` buckets for output location since they are stored
+    individually per :term:`Job` UUID, and hold no relevant *context* location. See also :ref:`conf_s3_buckets`.
+
+.. versionadded:: 4.3.0
+    Addition of the ``X-WPS-Output-Context`` header.
+
 Email Notification
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-When submitting a job for execution, it is possible to provide the ``notification_email`` field.
-Doing so will tell `Weaver` to send an email to the specified address with successful or failure details upon job
-completion. The format of the email is configurable from `weaver.ini.example`_ file with email-specific settings
-(see: :ref:`Configuration`).
+When submitting a :term:`Job` for execution, it is possible to provide the ``notification_email`` field.
+Doing so will tell `Weaver` to send an email to the specified address with successful or failure details
+upon :term:`Job` completion. The format of the email is configurable from `weaver.ini.example`_ file with
+email-specific settings (see: :ref:`Configuration`).
 
 
 .. _GetStatus:
