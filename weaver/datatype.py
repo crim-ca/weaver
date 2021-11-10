@@ -22,6 +22,9 @@ from weaver.exceptions import ProcessInstanceError, ServiceParsingError
 from weaver.execute import (
     EXECUTE_CONTROL_OPTION_ASYNC,
     EXECUTE_CONTROL_OPTIONS,
+    EXECUTE_MODE_ASYNC,
+    EXECUTE_MODE_OPTIONS,
+    EXECUTE_MODE_SYNC,
     EXECUTE_TRANSMISSION_MODE_OPTIONS,
     EXECUTE_TRANSMISSION_MODE_REFERENCE
 )
@@ -716,14 +719,28 @@ class Job(Base):
     @property
     def execute_async(self):
         # type: () -> bool
-        return self.get("execute_async", True)
+        return self.execution_mode == EXECUTE_MODE_ASYNC
 
-    @execute_async.setter
-    def execute_async(self, execute_async):
-        # type: (bool) -> None
-        if not isinstance(execute_async, bool):
-            raise TypeError("Type 'bool' is required for '{}.execute_async'".format(type(self)))
-        self["execute_async"] = execute_async
+    @property
+    def execute_sync(self):
+        # type: () -> bool
+        return self.execution_mode == EXECUTE_MODE_SYNC
+
+    @property
+    def execution_mode(self):
+        # type: () -> str
+        return self.get("execution_mode", EXECUTE_MODE_ASYNC)
+
+    @execution_mode.setter
+    def execution_mode(self, mode):
+        # type: (str) -> None
+        if not isinstance(mode, str):
+            raise TypeError("Type 'str' is required for '{}.execution_mode'".format(type(self)))
+        if mode not in EXECUTE_MODE_OPTIONS:
+            raise ValueError("Invalid value for '{}.execution_mode'. Must be one of {}".format(
+                type(self), list(EXECUTE_MODE_OPTIONS)
+            ))
+        self["execution_mode"] = mode
 
     @property
     def is_local(self):
@@ -920,6 +937,24 @@ class Job(Base):
         self["access"] = visibility
 
     @property
+    def context(self):
+        # type: () -> Optional[str]
+        """
+        Job outputs context.
+        """
+        return self.get("context") or None
+
+    @context.setter
+    def context(self, context):
+        # type: (Optional[str]) -> None
+        """
+        Job outputs context.
+        """
+        if not (isinstance(context, str) or context is None):
+            raise TypeError("Type 'str' or 'None' is required for '{}.context'".format(type(self)))
+        self["context"] = context
+
+    @property
     def request(self):
         # type: () -> Optional[str]
         """
@@ -1072,7 +1107,7 @@ class Job(Base):
             "status": self.status,
             "status_message": self.status_message,
             "status_location": self.status_location,
-            "execute_async": self.execute_async,
+            "execution_mode": self.execution_mode,
             "is_workflow": self.is_workflow,
             "created": self.created,
             "started": self.started,
@@ -1084,6 +1119,7 @@ class Job(Base):
             "logs": self.logs,
             "tags": self.tags,
             "access": self.access,
+            "context": self.context,
             "request": self.request,
             "response": self.response,
             "notification_email": self.notification_email,

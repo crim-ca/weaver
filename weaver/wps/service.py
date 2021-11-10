@@ -24,12 +24,14 @@ from weaver.processes.utils import get_job_submission_response, get_process
 from weaver.store.base import StoreProcesses
 from weaver.utils import get_header, get_settings, get_weaver_url
 from weaver.visibility import VISIBILITY_PUBLIC
-from weaver.wps.utils import check_wps_status, get_wps_local_status_location, load_pywps_config
+from weaver.wps.utils import check_wps_status, get_wps_local_status_location, get_wps_output_context, load_pywps_config
 from weaver.wps_restapi import swagger_definitions as sd
 
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from typing import Any, Dict, List, Optional, Union
+
+    from weaver.datatype import Job
     from weaver.processes.convert import WPS_Input_Type, WPS_Output_Type
     from weaver.typedefs import HTTPValid, JSON, SettingsType
 
@@ -124,7 +126,9 @@ class WorkerService(ServiceWPS):
     def get_capabilities(self, wps_request, *_, **__):
         # type: (WPSRequest, Any, Any) -> Union[WPSResponse, HTTPValid]
         """
-        Redirect to WPS-REST endpoint if requested ``Content-Type`` is JSON or handle ``GetCapabilities`` normally.
+        Handles the ``GetCapabilities`` KVP/XML request submitted on the WPS endpoint.
+
+        Redirects to WPS-REST endpoint if requested ``Content-Type`` is JSON or handle ``GetCapabilities`` normally.
         """
         resp = self._get_capabilities_redirect(wps_request, *_, **__)
         return resp or super(WorkerService, self).get_capabilities(wps_request, *_, **__)
@@ -153,6 +157,8 @@ class WorkerService(ServiceWPS):
     def describe(self, wps_request, *_, **__):
         # type: (WPSRequest, Any, Any) -> Union[WPSResponse, HTTPValid]
         """
+        Handles the ``DescribeProcess`` KVP/XML request submitted on the WPS endpoint.
+
         Redirect to WPS-REST endpoint if requested ``Content-Type`` is JSON or handle ``DescribeProcess`` normally.
         """
         resp = self._describe_process_redirect(wps_request, *_, **__)
@@ -163,9 +169,12 @@ class WorkerService(ServiceWPS):
         # type: (WPSRequest) -> Union[WPSResponse, HTTPValid, JSON]
         """
         Dispatch operation to WPS-REST endpoint, which in turn should call back the real Celery Worker for execution.
+
+        Returns the status response as is if XML, or convert it to JSON, according to request ``Accept`` header.
         """
         req = wps_request.http_request
         pid = wps_request.identifier
+        ctx = get_wps_output_context(req)  # re-validate here in case submitted via WPS endpoint instead of REST-API
         proc = get_process(process_id=pid, settings=self.settings)  # raises if invalid or missing
         wps_process = self.processes.get(pid)
 
@@ -175,7 +184,7 @@ class WorkerService(ServiceWPS):
         data = wps2json_job_payload(wps_request, wps_process)
         body = submit_job_handler(data, self.settings, proc.processEndpointWPS1,
                                   process_id=pid, is_local=True, is_workflow=is_workflow, visibility=VISIBILITY_PUBLIC,
-                                  language=wps_request.language, tags=tags, auth=dict(req.headers))
+                                  language=wps_request.language, tags=tags, auth=dict(req.headers), context=ctx)
 
         # if Accept was JSON, provide response content as is
         accept_type = get_header("Accept", req.headers)
@@ -214,10 +223,12 @@ class WorkerService(ServiceWPS):
     def execute(self, identifier, wps_request, uuid):
         # type: (str, WPSRequest, str) -> Union[WPSResponse, HTTPValid]
         """
+        Handles the ``Execute`` KVP/XML request submitted on the WPS endpoint.
+
         Submit WPS request to corresponding WPS-REST endpoint and convert back for requested ``Accept`` content-type.
 
-        Overrides the original execute operation, that instead will get handled by :meth:`execute_job` following
-        callback from Celery Worker that handles process job creation and monitoring.
+        Overrides the original execute operation, that will instead be handled by :meth:`execute_job` following
+        callback from Celery Worker, which handles process job creation and monitoring.
 
         If ``Accept`` is JSON, the result is directly returned from :meth:`_submit_job`.
         If ``Accept`` is XML or undefined, :class:`WorkerExecuteResponse` converts the received JSON with XML template.
@@ -240,16 +251,17 @@ class WorkerService(ServiceWPS):
             message = "Failed building XML response from WPS Execute result. Error [{!r}]".format(ex)
             raise OWSNoApplicableCode(message, locator=job_id)
 
-    def execute_job(self, process_id, wps_inputs, wps_outputs, mode, job_uuid, remote_process, language):
-        # type: (str, List[WPS_Input_Type], List[WPS_Output_Type], str, str, Optional[Process], str) -> WPSExecution
+    def execute_job(self, job, wps_inputs, wps_outputs, remote_process):
+        # type: (Job, List[WPS_Input_Type], List[WPS_Output_Type], Optional[Process]) -> WPSExecution
         """
         Real execution of the process by active Celery Worker.
         """
+        process_id = job.process
         execution = WPSExecution(version="2.0", url="localhost")
-        xml_request = execution.buildRequest(process_id, wps_inputs, wps_outputs, mode=mode, lineage=True)
+        xml_request = execution.buildRequest(process_id, wps_inputs, wps_outputs, mode=job.execution_mode, lineage=True)
         wps_request = WPSRequest()
         wps_request.identifier = process_id
-        wps_request.check_and_set_language(language)
+        wps_request.check_and_set_language(job.accept_language)
         wps_request.set_version("2.0.0")
         request_parser = wps_request._post_request_parser(wps_request.WPS.Execute().tag)  # noqa: W0212
         request_parser(xml_request)  # parses the submitted inputs/outputs data and request parameters
@@ -263,8 +275,7 @@ class WorkerService(ServiceWPS):
         # NOTE:
         #  Setting 'status = false' will disable async execution of 'pywps.app.Process.Process'
         #  but this is needed since this job is running within Celery worker already async
-        #  (daemon process can't have children processes)
-        #  Because if how the code in PyWPS is made, we have to re-enable creation of status file
+        #  (daemon process can't have children processes).
         wps_request.status = "false"
 
         # When 'execute' is called, pywps will in turn call 'prepare_process_for_execution',
@@ -274,9 +285,11 @@ class WorkerService(ServiceWPS):
         if not remote_process:
             worker_process_id = process_id
         else:
-            worker_process_id = "wps_package-{}-{}".format(process_id, job_uuid)
+            worker_process_id = "wps_package-{}-{}".format(process_id, job.uuid)
             self.dispatched_processes[worker_process_id] = remote_process
-        wps_response = super(WorkerService, self).execute(worker_process_id, wps_request, job_uuid)
+
+        wps_response = super(WorkerService, self).execute(worker_process_id, wps_request, job.uuid)
+        # re-enable creation of status file so we can find it since we disabled 'status' earlier for sync execution
         wps_response.store_status_file = True
         # update execution status with actual status file and apply required references
         execution = check_wps_status(location=wps_response.process.status_location, settings=self.settings)

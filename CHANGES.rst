@@ -15,9 +15,26 @@ Changes:
 - Add ``type`` field to ``Job`` status information
   (resolves `#351 <https://github.com/crim-ca/weaver/issues/351>`_).
 - Add `OGC-API - Processes` conformance references regarding supported operations for ``Job`` listing and filtering.
+- Support contextual WPS output location using ``X-WPS-Output-Context`` header to store ``Job`` results.
+  When a ``Job`` is executed by providing this header with a sub-directory, the resulting outputs of the ``Job``
+  will be placed and reported under the corresponding location relative to WPS outputs (path and URL).
+- Add ``weaver.wps_output_context`` setting as default contextual WPS output location when header is omitted.
+- Replace ``Job.execute_async`` getter/setter by simple property using more generic ``Job.execution_mode``
+  for storage in database. Provide ``Job.execute_async`` and ``Job.execute_sync`` properties based on stored mode.
+- Simplify ``execute_process`` function executed by `Celery` task into sub-step functions where applicable.
+- Simplify forwarding of ``Job`` parameters between ``PyWPS`` service ``WorkerService.execute_job`` method
+  and `Celery` task instantiating it by reusing the ``Job`` object.
+- Provide corresponding ``Job`` log URL along already reported log file path to facilitate retrieval from server side.
+- Avoid ``Job.progress`` updates following ``failed`` or ``dismissed`` statuses to keep track of the last real progress
+  percentage that was reached when that status was set.
+- Improve typing of database and store getter functions to infer correct types and facilitate code auto-complete.
 
 Fixes:
 ------
+- Removes the need for specific configuration to handle public/private output directory settings using
+  provided ``X-WPS-Output-Context`` header (fixes `#110 <https://github.com/crim-ca/weaver/issues/110>`_).
+- Fix retrieval of `Pyramid` ``Registry`` and application settings when available *container* is `Werkzeug` ``Request``
+  instead of `Pyramid` ``Request``, as employed by underlying HTTP requests in `PyWPS` service.
 - Allow ``group`` query parameter to handle ``Job`` category listing with ``provider`` as ``service`` alias.
 
 `4.2.1 <https://github.com/crim-ca/weaver/tree/4.2.1>`_ (2021-10-20)
@@ -61,7 +78,8 @@ Changes:
   Report explicit ``running`` status in ``Job`` once it has been sent to the remote `WPS` endpoint.
   The API will report ``running`` in both cases in order to support `OGC API - Processes` naming conventions, but
   internal ``Job`` status will have more detail.
-- Add ``update`` timestamp to ``Job`` response to better track latest milestones saved to database.
+- Add ``updated`` timestamp to ``Job`` response to better track latest milestones saved to database
+  (resolves `#249 <https://github.com/crim-ca/weaver/issues/249>`_).
   This avoids users having to compare many fields (``created``, ``started``, ``finished``) depending on latest status.
 - Apply stricter ``Deploy`` body schema validation and employ deserialized result directly.
   This ensures that preserved fields in the submitted content for deployment contain only known data elements with

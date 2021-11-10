@@ -1,7 +1,7 @@
 # MongoDB
 # http://docs.pylonsproject.org/projects/pyramid-cookbook/en/latest/database/mongodb.html
 import warnings
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, overload
 
 import pymongo
 
@@ -18,9 +18,12 @@ from weaver.utils import get_settings
 
 if TYPE_CHECKING:
     from typing import Any, Optional, Type, Union
+
     from pymongo.database import Database
-    from weaver.typedefs import AnySettingsContainer, JSON
+
     from weaver.database.base import StoreSelector
+    from weaver.store.base import StoreBills, StoreJobs, StoreProcesses, StoreQuotes, StoreServices
+    from weaver.typedefs import AnySettingsContainer, JSON
 
 # pylint: disable=C0103,invalid-name
 MongoDB = None  # type: Optional[Database]
@@ -62,6 +65,31 @@ class MongoDatabase(DatabaseInterface):
     def reset_store(self, store_type):
         store_type = self._get_store_type(store_type)
         return self._stores.pop(store_type, None)
+
+    @overload
+    def get_store(self, store_type, *store_args, **store_kwargs):
+        # type: (Type[StoreBills], *Any, **Any) -> MongodbBillStore
+        ...
+
+    @overload
+    def get_store(self, store_type, *store_args, **store_kwargs):
+        # type: (Type[StoreQuotes], *Any, **Any) -> MongodbQuoteStore
+        ...
+
+    @overload
+    def get_store(self, store_type, *store_args, **store_kwargs):
+        # type: (Type[StoreJobs], *Any, **Any) -> MongodbJobStore
+        ...
+
+    @overload
+    def get_store(self, store_type, *store_args, **store_kwargs):
+        # type: (Type[StoreProcesses], *Any, **Any) -> MongodbProcessStore
+        ...
+
+    @overload
+    def get_store(self, store_type, *store_args, **store_kwargs):
+        # type: (Type[StoreServices], *Any, **Any) -> MongodbServiceStore
+        ...
 
     def get_store(self, store_type, *store_args, **store_kwargs):
         # type: (Union[str, Type[StoreInterface], AnyMongodbStoreType], *Any, **Any) -> AnyMongodbStore

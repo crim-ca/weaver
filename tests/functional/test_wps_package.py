@@ -85,6 +85,7 @@ class WpsPackageAppTest(WpsConfigBase):
             "weaver.wps": True,
             "weaver.wps_path": "/ows/wps",
             "weaver.wps_restapi_path": "/",
+            "weaver.wps_output_path": "/wpsoutputs",
             "weaver.wps_output_dir": "/tmp",  # nosec: B108 # don't care hardcoded for test
         }
         super(WpsPackageAppTest, cls).setUpClass()
@@ -1383,8 +1384,8 @@ class WpsPackageAppTest(WpsConfigBase):
 
         results = self.monitor_job(status_url)
 
-        job_output_file = results.get("output_test")["href"].split("/", 3)[-1]
-        tmp_file = "{}/{}".format(self.settings["weaver.wps_output_dir"], job_output_file)
+        job_output_path = results.get("output_test")["href"].split(self.settings["weaver.wps_output_path"])[-1]
+        tmp_file = "{}/{}".format(self.settings["weaver.wps_output_dir"], job_output_path)
 
         try:
             processed_values = json.load(open(tmp_file, "r"))
@@ -1518,8 +1519,8 @@ class WpsPackageAppTest(WpsConfigBase):
 
         results = self.monitor_job(status_url)
 
-        job_output_file = results.get("output_test")["href"].split("/", 3)[-1]
-        tmp_file = "{}/{}".format(self.settings["weaver.wps_output_dir"], job_output_file)
+        job_output_path = results.get("output_test")["href"].split(self.settings["weaver.wps_output_path"])[-1]
+        tmp_file = "{}/{}".format(self.settings["weaver.wps_output_dir"], job_output_path)
 
         try:
             with open(tmp_file, "r") as f:
@@ -1538,6 +1539,53 @@ class WpsPackageAppTest(WpsConfigBase):
         assert processed_values["measureIntegerInput"] == 45
         assert processed_values["measureFloatInput"] == 10.2
         assert processed_values["measureFileInput"] == {"VALUE": {"REF": 1, "MEASUREMENT": 10.3, "UOM": "M"}}
+
+    def test_execute_job_with_context_output_dir(self):
+        cwl = {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "baseCommand": "echo",
+            "inputs": {"message": {"type": "string", "inputBinding": {"position": 1}}},
+            "outputs": {"output": {"type": "File", "outputBinding": {"glob": "stdout.log"}}}
+        }
+        body = {
+            "processDescription": {"process": {"id": self._testMethodName}},
+            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "executionUnit": [{"unit": cwl}],
+        }
+        self.deploy_process(body)
+        exec_body = {
+            "mode": EXECUTE_MODE_ASYNC,
+            "response": EXECUTE_RESPONSE_DOCUMENT,
+            "inputs": [{"id": "message", "value": "test"}],
+            "outputs": [{"id": "output", "transmissionMode": EXECUTE_TRANSMISSION_MODE_REFERENCE}]
+        }
+        headers = deepcopy(self.json_headers)
+
+        with contextlib.ExitStack() as stack_exec:
+            for mock_exec in mocked_execute_process():
+                stack_exec.enter_context(mock_exec)
+            proc_url = "/processes/{}/jobs".format(self._testMethodName)
+
+            wps_context_dirs = [None, "", "test", "sub/test"]
+            for ctx in wps_context_dirs:
+                if ctx is not None:
+                    headers["x-wps-output-context"] = ctx
+                resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
+                                           data=exec_body, headers=headers, only_local=True)
+                code = resp.status_code
+                assert code in [200, 201], "Failed with: [{}]\nReason:\n{}".format(code, resp.json)
+                status_url = resp.json.get("location")
+                job_id = resp.json["jobID"]
+                results = self.monitor_job(status_url, timeout=5)
+                wps_dir = self.settings["weaver.wps_output_dir"]
+                ctx_dir = (wps_dir + "/" + ctx) if ctx else wps_dir
+                out_url = "https://localhost" + self.settings["weaver.wps_output_path"]
+                ctx_url = (out_url + "/" + ctx) if ctx else out_url
+                res_url = ctx_url + "/" + job_id + "/stdout.log"
+                res_path = os.path.join(ctx_dir, job_id, "stdout.log")
+                assert results["output"]["href"] == res_url, "Invalid output URL with context: {}".format(ctx)
+                assert os.path.isfile(res_path), "Invalid output path with context: {}".format(ctx)
 
     # FIXME: create a real async test (threading/multiprocess) to evaluate this correctly
     def test_dismiss_job(self):

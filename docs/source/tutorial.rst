@@ -136,6 +136,6 @@ Endpoint Content-Type
 Next Steps
 ================================
 
-Have a look to the :ref:`Processes`,  :ref:`Package` and :ref:`FAQ` sections.
+Have a look to the :ref:`Processes`, :ref:`Package` and :ref:`FAQ` sections.
 
 The full |oas|_ is also available for request details.

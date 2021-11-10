@@ -37,10 +37,12 @@ from pywps import Process
 from pywps.inout import BoundingBoxInput, ComplexInput, LiteralInput
 from pywps.inout.basic import SOURCE_TYPE
 from pywps.inout.literaltypes import AnyValue
+from pywps.inout.storage.file import FileStorageBuilder
 from pywps.inout.storage.s3 import S3StorageBuilder
 from yaml.scanner import ScannerError
 
 from weaver.config import WEAVER_CONFIGURATION_HYBRID, WEAVER_CONFIGURATIONS_REMOTE, get_weaver_configuration
+from weaver.database import get_db
 from weaver.exceptions import (
     PackageException,
     PackageExecutionError,
@@ -83,6 +85,7 @@ from weaver.status import (
     STATUS_SUCCEEDED,
     map_status
 )
+from weaver.store.base import StoreJobs
 from weaver.utils import (
     SUPPORTED_FILE_SCHEMES,
     fetch_file,
@@ -96,7 +99,7 @@ from weaver.utils import (
     request_extra,
     setup_loggers
 )
-from weaver.wps.utils import get_wps_output_dir
+from weaver.wps.utils import get_wps_output_dir, get_wps_output_url
 from weaver.wps_restapi.swagger_definitions import process_service
 
 if TYPE_CHECKING:
@@ -130,9 +133,6 @@ if TYPE_CHECKING:
     CWLResultValue = Union[AnyValueType, List[AnyValueType]]
     CWLResultEntry = Union[Dict[str, CWLResultValue], CWLResultFile, List[CWLResultFile]]
     CWLResults = Dict[str, CWLResultEntry]
-
-    # cwl_result[output_id]["location"]
-    # cwl_result[output_id][i]["location"]
 
 # NOTE:
 #   Only use this logger for 'utility' methods (not residing under WpsPackage).
@@ -772,6 +772,7 @@ class WpsPackage(Process):
     step_launched = None            # type: Optional[List[str]]
     request = None                  # type: Optional[WPSRequest]
     response = None                 # type: Optional[ExecuteResponse]
+    _job = None                     # type: Optional[Job]
 
     def __init__(self, **kw):
         """
@@ -1057,6 +1058,19 @@ class WpsPackage(Process):
                          message="{0}: {1}{2}".format(exception_type.__name__, message, exception_msg))
         return exception_type("{0}{1}".format(message, exception_msg))
 
+    @property
+    def job(self):
+        # type: () -> Job
+        """
+        Obtain the job associated to this package execution as specified by the provided UUID.
+
+        Process must be in "execute" state under :mod:`pywps` for this job to be available.
+        """
+        if self._job is None:
+            store = get_db(self.settings).get_store(StoreJobs)
+            self._job = store.fetch_by_id(self.uuid)
+        return self._job
+
     @classmethod
     def map_step_progress(cls, step_index, steps_total):
         # type: (int, int) -> Number
@@ -1210,7 +1224,10 @@ class WpsPackage(Process):
                 raise self.exception_message(PackageExecutionError, exc, "Failed to save package outputs.")
         except Exception:
             # return log file location by status message since outputs are not obtained by WPS failed process
-            error_msg = "Package completed with errors. Server logs: {}".format(self.log_file)
+            log_url = "{}/{}.log".format(get_wps_output_url(self.settings), self.uuid)
+            error_msg = "Package completed with errors. Server logs: [{}], Available at [{}]:".format(
+                self.log_file, log_url
+            )
             self.update_status(error_msg, self.percent, STATUS_FAILED)
             raise
         else:
@@ -1394,22 +1411,46 @@ class WpsPackage(Process):
         .. seealso::
             - :func:`weaver.wps.load_pywps_config`
         """
-        wps_out_dir = self.workdir  # pywps will resolve file paths for us using its WPS request UUID
         s3_bucket = self.settings.get("weaver.wps_output_s3_bucket")
         result_loc = cwl_result[output_id]["location"].replace("file://", "")
-        result_fn = os.path.split(result_loc)[-1]
+        result_path = os.path.split(result_loc)[-1]
 
+        # PyWPS internally sets a new FileStorage (default) inplace when generating the JSON definition of the output.
+        # This is done such that the generated XML status document in WPS response can obtain the output URL location.
+        # Call Stack:
+        #   - self.update_status (the one called right after 'self.make_outputs' is called)
+        #   - self.response._update_status
+        #   - pywps.response.execute.ExecuteResponse._update_status_doc
+        #   - pywps.response.execute.ExecuteResponse._construct_doc
+        #   - pywps.response.execute.ExecuteResponse.json
+        #   - pywps.response.execute.ExecuteResponse.process.json
+        #   - pywps.app.Process.Process.json
+        #   - pywps.inout.outputs.ComplexOutput.json  (for each output in Process)
+        #   - pywps.inout.outputs.ComplexOutput._json_reference
+        # Which sets:
+        #   - pywps.inout.outputs.ComplexOutput.storage = FileStorageBuilder().build()
+        # Followed by:
+        #   - pywps.inout.outputs.ComplexOutput.get_url()
+        #   - pywps.inout.outputs.ComplexOutput.storage.store()
+        # But, setter "pywps.inout.basic.ComplexOutput.storage" doesn't override predefined 'storage'.
+        # Therefore, preemptively override "ComplexOutput._storage" to whichever location according to use case.
         if s3_bucket:
-            # result_wps = "s3://{}/{}".format(s3_bucket, result_fn)
             # when 'url' is directly enforced, 'ComplexOutput.json' will use it instead of 'file' from temp workdir
-            # self.response.outputs[output_id].url = result_wps
-
             # override builder only here so that only results are uploaded to S3, and not XML status
-            # using this storage builder, settings are retrieved from PyWPS server config
+            # using this storage builder, other settings (bucket, region, etc.) are retrieved from PyWPS server config
             self.response.outputs[output_id]._storage = S3StorageBuilder().build()  # noqa: W0212
-            self.response.outputs[output_id].storage.prefix = str(self.response.uuid)
+            self.response.outputs[output_id].storage.prefix = str(self.response.uuid)  # job UUID
+        elif self.job.context:
+            storage = FileStorageBuilder().build()
+            storage.target = os.path.join(storage.target, self.job.context)
+            storage.output_url = os.path.join(storage.output_url, self.job.context)
+            os.makedirs(storage.target, exist_ok=True)  # pywps handles UUID-dir creation, but not nested context-dir
+            self.response.outputs[output_id]._storage = storage  # noqa: W0212
 
-        result_wps = os.path.join(wps_out_dir, result_fn)
+        # pywps will resolve file paths for us using its WPS request UUID
+        os.makedirs(self.workdir, exist_ok=True)
+        result_wps = os.path.join(self.workdir, result_path)
+
         if os.path.realpath(result_loc) != os.path.realpath(result_wps):
             self.logger.info("Moving [%s]: [%s] -> [%s]", output_id, result_loc, result_wps)
             shutil.move(result_loc, result_wps)
