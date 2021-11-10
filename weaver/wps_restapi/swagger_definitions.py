@@ -1319,6 +1319,14 @@ class JobStatusEnum(ExtendedSchemaNode):
     validator = OneOf(JOB_STATUS_CODE_API)
 
 
+class JobTypeEnum(ExtendedSchemaNode):
+    schema_type = String
+    title = "JobType"
+    default = null
+    example = "process"
+    validator = OneOf(["process", "provider", "service"])
+
+
 class JobSortEnum(ExtendedSchemaNode):
     schema_type = String
     title = "JobSortingMethod"
@@ -2474,6 +2482,7 @@ class JobStatusInfo(ExtendedMappingSchema):
                                   description="Process identifier corresponding to the job execution.")
     providerID = ProcessIdentifier(missing=None, default=None,
                                    description="Provider identifier corresponding to the job execution.")
+    type = JobTypeEnum(description="Type of the element associated to the creation of this job.")
     status = JobStatusEnum(description="Last updated status.")
     message = ExtendedSchemaNode(String(), missing=drop, description="Information about the last status update.")
     created = ExtendedSchemaNode(DateTime(), missing=drop, default=None,
@@ -2557,8 +2566,8 @@ class GetGroupedJobsSchema(ExtendedMappingSchema):
 
 class GetQueriedJobsSchema(OneOfKeywordSchema):
     _one_of = [
-        GetPagingJobsSchema,
-        GetGroupedJobsSchema,
+        GetPagingJobsSchema(description="Matched jobs according to filter queries."),
+        GetGroupedJobsSchema(description="Matched jobs grouped by specified categories."),
     ]
     total = ExtendedSchemaNode(Integer(),
                                description="Total number of matched jobs regardless of grouping or paging result.")
@@ -3512,6 +3521,9 @@ class PostProcessJobsEndpoint(ProcessPath):
 
 
 class GetJobsQueries(ExtendedMappingSchema):
+    # note:
+    #   This schema is also used to generate any missing defaults during filter parameter handling.
+    #   Items with default value are added if omitted, except 'default=null' which are removed after handling by alias.
     detail = ExtendedSchemaNode(Boolean(), description="Provide job details instead of IDs.",
                                 default=False, example=True, missing=drop)
     groups = ExtendedSchemaNode(String(),
@@ -3521,8 +3533,12 @@ class GetJobsQueries(ExtendedMappingSchema):
     limit = ExtendedSchemaNode(Integer(allow_string=True), missing=10, default=10, validator=Range(min=0, max=10000))
     datetime = DateTimeInterval(missing=drop, default=None)
     status = JobStatusEnum(missing=drop, default=None)
-    process = ProcessIdentifier(missing=drop, default=None)
-    provider = AnyIdentifier(missing=drop, default=None)
+    processID = ProcessIdentifier(missing=drop, default=null, description="Alias to 'process' for OGC-API compliance.")
+    process = ProcessIdentifier(missing=drop, default=None, description="Identifier of the process to filter search.")
+    service = AnyIdentifier(missing=drop, default=null, description="Alias to 'provider' for backward compatibility.")
+    provider = AnyIdentifier(missing=drop, default=None, description="Identifier of service provider to filter search.")
+    type = JobTypeEnum(missing=drop, default=null,
+                       description="Filter jobs only to matching type (note: 'service' and 'provider' are aliases).")
     sort = JobSortEnum(missing=drop)
     access = JobAccess(missing=drop, default=None)
     notification_email = ExtendedSchemaNode(String(), missing=drop, validator=Email())

@@ -80,12 +80,20 @@ class WpsRestApiJobsTest(unittest.TestCase):
         self.process_private = WpsTestProcess(identifier="process-private")
         self.process_store.save_process(self.process_private)
         self.process_store.set_visibility(self.process_private.identifier, VISIBILITY_PRIVATE)
+        self.process_other = WpsTestProcess(identifier="process-other")
+        self.process_store.save_process(self.process_other)
+        self.process_store.set_visibility(self.process_other.identifier, VISIBILITY_PUBLIC)
         self.process_unknown = "process-unknown"
 
         self.service_public = Service(name="service-public", url="http://localhost/wps/service-public", public=True)
         self.service_store.save_service(self.service_public)
         self.service_private = Service(name="service-private", url="http://localhost/wps/service-private", public=False)
         self.service_store.save_service(self.service_private)
+
+        self.service_one = Service(name="service-one", url="http://localhost/wps/service-one", public=True)
+        self.service_store.save_service(self.service_one)
+        self.service_two = Service(name="service-two", url="http://localhost/wps/service-two", public=True)
+        self.service_store.save_service(self.service_two)
 
         # create jobs accessible by index
         self.job_info = []  # type: List[Job]
@@ -113,6 +121,13 @@ class WpsRestApiJobsTest(unittest.TestCase):
                       user_id=self.user_editor1_id, status=STATUS_FAILED, progress=99, access=VISIBILITY_PUBLIC)
         self.make_job(task_id="8888-8888-8888-8888", process=self.process_private.identifier,
                       service=self.service_private.name, created=self.datetime_interval[3],
+                      user_id=self.user_editor1_id, status=STATUS_FAILED, progress=99, access=VISIBILITY_PUBLIC)
+        # jobs with duplicate 'process' identifier, but under a different 'service' name
+        self.make_job(task_id="9999-9999-9999-9999",
+                      process=self.process_other.identifier, service=self.service_one.name,
+                      user_id=self.user_editor1_id, status=STATUS_FAILED, progress=99, access=VISIBILITY_PUBLIC)
+        self.make_job(task_id="1010-1010-1010-1010",
+                      process=self.process_other.identifier, service=self.service_two.name,
                       user_id=self.user_editor1_id, status=STATUS_FAILED, progress=99, access=VISIBILITY_PUBLIC)
 
     def make_job(self, task_id, process, service, user_id, status, progress, access, created=None):
@@ -193,7 +208,6 @@ class WpsRestApiJobsTest(unittest.TestCase):
         assert "total" in response.json and isinstance(response.json["total"], int)
         assert "limit" in response.json and isinstance(response.json["limit"], int)
         assert len(response.json["jobs"]) <= response.json["limit"]
-        assert response.json["page"] == response.json["total"] // response.json["limit"]
 
     @staticmethod
     def check_basic_jobs_grouped_info(response, groups):
@@ -282,13 +296,16 @@ class WpsRestApiJobsTest(unittest.TestCase):
             elif categories["process"] == self.process_unknown:
                 assert len(grouped_jobs["jobs"]) == 1
                 assert set(grouped_jobs["jobs"]) == {self.job_info[1].id}
+            elif categories["process"] == self.process_other.identifier:
+                assert len(grouped_jobs["jobs"]) == 2
+                assert set(grouped_jobs["jobs"]) == {self.job_info[9].id, self.job_info[10].id}
             else:
-                pytest.fail("Unknown job grouping 'process' value not expected.")
+                pytest.fail("Unknown job grouping 'process' value: {}".format(categories["process"]))
 
-    def test_get_jobs_valid_grouping_by_service(self):
-        path = get_path_kvp(sd.jobs_service.path, detail="false", groups="service")
+    def template_get_jobs_valid_grouping_by_service_provider(self, service_or_provider):
+        path = get_path_kvp(sd.jobs_service.path, detail="false", groups=service_or_provider)
         resp = self.app.get(path, headers=self.json_headers)
-        self.check_basic_jobs_grouped_info(resp, groups="service")
+        self.check_basic_jobs_grouped_info(resp, groups=service_or_provider)
 
         # ensure that group categories are distinct
         for i, grouped_jobs in enumerate(resp.json["groups"]):
@@ -300,17 +317,32 @@ class WpsRestApiJobsTest(unittest.TestCase):
                 assert categories != compared
 
             # validate groups with expected jobs counts and ids (nb: only public jobs are returned)
-            if categories["service"] == self.service_public.name:
+            if categories[service_or_provider] == self.service_public.name:
                 assert len(grouped_jobs["jobs"]) == 3
                 assert set(grouped_jobs["jobs"]) == {self.job_info[1].id, self.job_info[5].id, self.job_info[6].id}
-            elif categories["service"] == self.service_private.name:
+            elif categories[service_or_provider] == self.service_private.name:
                 assert len(grouped_jobs["jobs"]) == 2
                 assert set(grouped_jobs["jobs"]) == {self.job_info[7].id, self.job_info[8].id}
-            elif categories["service"] is None:
+            elif categories[service_or_provider] == self.service_one.name:
+                assert len(grouped_jobs["jobs"]) == 1
+                assert set(grouped_jobs["jobs"]) == {self.job_info[9].id}
+            elif categories[service_or_provider] == self.service_two.name:
+                assert len(grouped_jobs["jobs"]) == 1
+                assert set(grouped_jobs["jobs"]) == {self.job_info[10].id}
+            elif categories[service_or_provider] is None:
                 assert len(grouped_jobs["jobs"]) == 2
                 assert set(grouped_jobs["jobs"]) == {self.job_info[0].id, self.job_info[2].id}
             else:
-                pytest.fail("Unknown job grouping 'service' value not expected.")
+                pytest.fail("Unknown job grouping 'service' value: {}".format(categories[service_or_provider]))
+
+    def test_get_jobs_valid_grouping_by_service(self):
+        self.template_get_jobs_valid_grouping_by_service_provider("service")
+
+    def test_get_jobs_valid_grouping_by_provider(self):
+        """
+        Grouping by ``provider`` must work as alias to ``service`` and must be adjusted inplace in response categories.
+        """
+        self.template_get_jobs_valid_grouping_by_service_provider("provider")
 
     def test_get_jobs_links_navigation(self):
         """
@@ -324,14 +356,21 @@ class WpsRestApiJobsTest(unittest.TestCase):
                     link_dict[_link["rel"]] = _link["href"]
             return link_dict
 
-        assert len(self.job_store.list_jobs()) == 9, "expected number of jobs mismatch, following test might not work"
+        expect_jobs_total = len(self.job_info)
+        expect_jobs_visible = len(list(filter(lambda j: VISIBILITY_PUBLIC in j.access, self.job_info)))
+        assert len(self.job_store.list_jobs()) == expect_jobs_total, (
+            "expected number of jobs mismatch, following test might not work"
+        )
         path = get_path_kvp(sd.jobs_service.path, limit=1000)
         resp = self.app.get(path, headers=self.json_headers)
-        assert len(resp.json["jobs"]) == 7, "unexpected number of visible jobs"
+        assert len(resp.json["jobs"]) == expect_jobs_visible, "unexpected number of visible jobs"
 
         base_url = self.settings["weaver.url"]
         jobs_url = base_url + sd.jobs_service.path
-        limit = 2  # expect 7 jobs to be visible, making 4 pages of 2
+        limit = 2  # expect 9 jobs to be visible, making 5 pages of 2
+        last = 4
+        last_page = "page={}".format(last)
+        prev_last_page = "page={}".format(last - 1)
         limit_kvp = "limit={}".format(limit)
         path = get_path_kvp(sd.jobs_service.path, limit=limit)
         resp = self.app.get(path, headers=self.json_headers)
@@ -345,7 +384,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         assert links["prev"] is None, "no previous on first page (default page=0 used)"
         assert links["next"].startswith(jobs_url) and limit_kvp in links["next"] and "page=1" in links["next"]
         assert links["first"].startswith(jobs_url) and limit_kvp in links["first"] and "page=0" in links["first"]
-        assert links["last"].startswith(jobs_url) and limit_kvp in links["last"] and "page=3" in links["last"]
+        assert links["last"].startswith(jobs_url) and limit_kvp in links["last"] and last_page in links["last"]
 
         path = get_path_kvp(sd.jobs_service.path, limit=limit, page=2)
         resp = self.app.get(path, headers=self.json_headers)
@@ -359,9 +398,9 @@ class WpsRestApiJobsTest(unittest.TestCase):
         assert links["prev"].startswith(jobs_url) and limit_kvp in links["prev"] and "page=1" in links["prev"]
         assert links["next"].startswith(jobs_url) and limit_kvp in links["next"] and "page=3" in links["next"]
         assert links["first"].startswith(jobs_url) and limit_kvp in links["first"] and "page=0" in links["first"]
-        assert links["last"].startswith(jobs_url) and limit_kvp in links["last"] and "page=3" in links["last"]
+        assert links["last"].startswith(jobs_url) and limit_kvp in links["last"] and last_page in links["last"]
 
-        path = get_path_kvp(sd.jobs_service.path, limit=limit, page=3)
+        path = get_path_kvp(sd.jobs_service.path, limit=limit, page=last)
         resp = self.app.get(path, headers=self.json_headers)
         links = get_links(resp.json["links"])
         assert len(resp.json["jobs"]) == 1, "last page should show only remaining jobs within limit"
@@ -369,11 +408,11 @@ class WpsRestApiJobsTest(unittest.TestCase):
         assert links["collection"] == jobs_url
         assert links["search"] == jobs_url
         assert links["up"] is None, "generic jobs endpoint doesn't have any parent collection"
-        assert links["current"].startswith(jobs_url) and limit_kvp in links["current"] and "page=3" in links["current"]
-        assert links["prev"].startswith(jobs_url) and limit_kvp in links["prev"] and "page=2" in links["prev"]
+        assert links["current"].startswith(jobs_url) and limit_kvp in links["current"] and last_page in links["current"]
+        assert links["prev"].startswith(jobs_url) and limit_kvp in links["prev"] and prev_last_page in links["prev"]
         assert links["next"] is None, "no next page on last"
         assert links["first"].startswith(jobs_url) and limit_kvp in links["first"] and "page=0" in links["first"]
-        assert links["last"].startswith(jobs_url) and limit_kvp in links["last"] and "page=3" in links["last"]
+        assert links["last"].startswith(jobs_url) and limit_kvp in links["last"] and last_page in links["last"]
 
         p_id = self.process_public.identifier  # 5 jobs with this process, but only 3 visible
         p_j_url = base_url + sd.process_jobs_service.path.format(process_id=p_id)
@@ -420,7 +459,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         path = get_path_kvp(sd.jobs_service.path, limit=over_limit)
         resp = self.app.get(path, headers=self.json_headers)
         links = get_links(resp.json["links"])
-        assert len(resp.json["jobs"]) == 7, "only 7 of 9 existing jobs should be visible"
+        assert len(resp.json["jobs"]) == expect_jobs_visible
         assert links["alternate"] is None
         assert links["collection"] == jobs_url
         assert links["search"] == jobs_url
@@ -463,6 +502,96 @@ class WpsRestApiJobsTest(unittest.TestCase):
         assert resp.content_type == CONTENT_TYPE_APP_JSON
         assert resp.json["total"] == 1, "Should match exactly 1 email with specified literal string as query param."
         assert resp.json["jobs"][0]["jobID"] == job_id
+
+    def test_get_jobs_by_type_process(self):
+        path = get_path_kvp(sd.jobs_service.path, type="process")
+        resp = self.app.get(path, headers=self.json_headers)
+        self.check_basic_jobs_info(resp)
+        expect_jobs = [self.job_info[i].id for i in [0, 2]]  # idx=2 & idx>4 have 'service', only 0,2 are public
+        result_jobs = resp.json["jobs"]
+        assert len(resp.json["jobs"]) == len(expect_jobs)
+        assert resp.json["total"] == len(expect_jobs)
+        assert all(job in expect_jobs for job in result_jobs), self.message_with_jobs_diffs(result_jobs, expect_jobs)
+
+    def test_get_jobs_by_type_process_and_specific_process_id(self):
+        path = get_path_kvp(sd.jobs_service.path, type="process", process=self.process_public.identifier)
+        resp = self.app.get(path, headers=self.json_headers)
+        self.check_basic_jobs_info(resp)
+        assert len(resp.json["jobs"]) == 1
+        expect_job = self.job_info[0].id
+        assert resp.json["jobs"][0] == expect_job, self.message_with_jobs_mapping("expected only matching process")
+
+    def test_get_jobs_by_type_process_and_specific_service_name(self):
+        """
+        Requesting provider ``type`` with a specific ``process`` identifier cannot yield any valid result (contradicts).
+
+        .. seealso::
+            Test :meth:`test_get_jobs_by_type_process_and_specific_process_id` that contains a valid match otherwise
+            for the given process identifier.
+        """
+        path = get_path_kvp(sd.jobs_service.path, type="process", provider=self.service_public.name)
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 400
+        assert "cause" in resp.json and resp.json["cause"] == {"type": "process", "service": self.service_public.name}
+
+    def template_get_jobs_by_type_service_provider(self, service_or_provider):
+        path = get_path_kvp(sd.jobs_service.path, type=service_or_provider)
+        resp = self.app.get(path, headers=self.json_headers)
+        self.check_basic_jobs_info(resp)
+        expect_jobs = [self.job_info[i].id for i in [1, 5, 6, 7, 8, 9]]  # has 'service' & public access
+        result_jobs = resp.json["jobs"]
+        assert len(resp.json["jobs"]) == len(expect_jobs)
+        assert resp.json["total"] == len(expect_jobs)
+        assert all(job in expect_jobs for job in result_jobs), self.message_with_jobs_diffs(result_jobs, expect_jobs)
+
+    def template_get_jobs_by_type_service(self):
+        self.template_get_jobs_by_type_service_provider("service")
+
+    def template_get_jobs_by_type_provider(self):
+        self.template_get_jobs_by_type_service_provider("provider")
+
+    def test_get_jobs_by_type_provider_and_specific_service_name(self):
+        path = get_path_kvp(sd.jobs_service.path, type="provider", provider=self.service_public.name)
+        resp = self.app.get(path, headers=self.json_headers)
+        self.check_basic_jobs_info(resp)
+        expect_jobs = [self.job_info[i].id for i in [1, 5, 6]]  # has 'service' & public access, others not same name
+        result_jobs = resp.json["jobs"]
+        assert len(resp.json["jobs"]) == len(expect_jobs)
+        assert resp.json["total"] == len(expect_jobs)
+        assert all(job in expect_jobs for job in result_jobs), self.message_with_jobs_diffs(result_jobs, expect_jobs)
+
+    def test_get_jobs_by_type_provider_and_specific_process_id(self):
+        """
+        Requesting provider ``type`` with more specific ``process`` identifier further filters result.
+
+        .. note::
+            Technically, two distinct providers could employ the same sub-process identifier.
+            Should not impact nor create a conflict here.
+
+        Test :meth:`test_get_jobs_by_type_provider` should return more results since no sub-process filtering.
+
+        Extra process from another provider than in :meth:`test_get_jobs_by_type_provider_and_specific_service_name`
+        should now be returned as well.
+
+        .. seealso::
+            - :meth:`test_get_jobs_by_type_provider`
+            - :meth:`test_get_jobs_by_type_provider_and_specific_service_name`
+        """
+        path = get_path_kvp(sd.jobs_service.path, type="provider", process=self.process_other.identifier, detail=True)
+        resp = self.app.get(path, headers=self.json_headers)
+        self.check_basic_jobs_info(resp)
+        assert len(resp.json["jobs"]) == 2
+        expect_jobs = [self.job_info[i].id for i in [9, 10]]
+        result_jobs = [job["jobID"] for job in resp.json["jobs"]]
+        assert len(result_jobs) == len(expect_jobs)
+        assert resp.json["total"] == len(expect_jobs)
+        assert all(job in expect_jobs for job in result_jobs), self.message_with_jobs_diffs(result_jobs, expect_jobs)
+        for job in resp.json["jobs"]:
+            assert job["processID"] == self.process_other.identifier
+            if job["jobID"] == self.job_info[9].id:
+                assert job["providerID"] == self.service_one.name
+            if job["jobID"] == self.job_info[10].id:
+                assert job["providerID"] == self.service_two.name
 
     def test_get_jobs_process_in_query_normal(self):
         path = get_path_kvp(sd.jobs_service.path, process=self.job_info[0].process)
@@ -641,7 +770,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
                     stack.enter_context(patch)
                 for patch in mocked_remote_wps([self.process_public]):
                     stack.enter_context(patch)
-                test = get_path_kvp(path, access=access) if access else path
+                test = get_path_kvp(path, access=access, limit=1000) if access else path
                 resp = self.app.get(test, headers=self.json_headers)
                 self.check_basic_jobs_info(resp)
                 job_ids = [job.id for job in expected_jobs]
@@ -693,7 +822,9 @@ class WpsRestApiJobsTest(unittest.TestCase):
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
         assert resp.content_type == CONTENT_TYPE_APP_JSON
-        assert len(resp.json["jobs"]) == 4
+        # generated datetime interval have an offset that makes all job in the future
+        # anything created "recently" and publicly visible will be listed here
+        assert len(resp.json["jobs"]) == 6
         for job in resp.json["jobs"]:
             base_uri = sd.jobs_service.path + "/{}".format(job)
             path = get_path_kvp(base_uri)

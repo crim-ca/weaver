@@ -10,6 +10,11 @@ Changes
 
 Changes:
 --------
+- Add support of ``type`` and ``processID`` query parameters for ``Job`` listing
+  (resolves some tasks in `#268 <https://github.com/crim-ca/weaver/issues/268>`_).
+- Add ``type`` field to ``Job`` status information
+  (resolves `#351 <https://github.com/crim-ca/weaver/issues/351>`_).
+- Add `OGC-API - Processes` conformance references regarding supported operations for ``Job`` listing and filtering.
 - Support contextual WPS output location using ``X-WPS-Output-Context`` header to store ``Job`` results.
   When a ``Job`` is executed by providing this header with a sub-directory, the resulting outputs of the ``Job``
   will be placed and reported under the corresponding location relative to WPS outputs (path and URL).
@@ -30,6 +35,7 @@ Fixes:
   provided ``X-WPS-Output-Context`` header (fixes `#110 <https://github.com/crim-ca/weaver/issues/110>`_).
 - Fix retrieval of `Pyramid` ``Registry`` and application settings when available *container* is `Werkzeug` ``Request``
   instead of `Pyramid` ``Request``, as employed by underlying HTTP requests in `PyWPS` service.
+- Allow ``group`` query parameter to handle ``Job`` category listing with ``provider`` as ``service`` alias.
 
 `4.2.1 <https://github.com/crim-ca/weaver/tree/4.2.1>`_ (2021-10-20)
 ========================================================================
