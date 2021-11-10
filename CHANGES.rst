@@ -45,6 +45,8 @@ Fixes:
   instead of `Pyramid` ``Request``, as employed by underlying HTTP requests in `PyWPS` service.
 - Allow ``group`` query parameter to handle ``Job`` category listing with ``provider`` as ``service`` alias.
 - Improve typing of database and store getter functions to infer correct types and facilitate code auto-complete.
+- Fix incorrectly configured API views for batch ``Job`` dismiss operation with ``DELETE /jobs`` and corresponding
+  endpoints for ``Process`` and ``Provider`` paths.
 
 `4.2.1 <https://github.com/crim-ca/weaver/tree/4.2.1>`_ (2021-10-20)
 ========================================================================

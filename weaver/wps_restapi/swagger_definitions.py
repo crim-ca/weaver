@@ -3561,6 +3561,14 @@ class GetJobsEndpoint(GetJobsRequest):
     pass
 
 
+class GetProcessJobsEndpoint(GetJobsRequest, ProcessPath):
+    pass
+
+
+class GetProviderJobsEndpoint(GetJobsRequest, ProviderPath, ProcessPath):
+    pass
+
+
 class JobIdentifierList(ExtendedSequenceSchema):
     job_id = UUID(description="ID of a job to dismiss. Identifiers not matching any known job are ignored.")
 
@@ -3574,11 +3582,11 @@ class DeleteJobsEndpoint(ExtendedMappingSchema):
     body = DeleteJobsBodySchema()
 
 
-class GetProcessJobsEndpoint(GetJobsRequest, ProcessPath):
+class DeleteProcessJobsEndpoint(DeleteJobsEndpoint, ProcessPath):
     pass
 
 
-class GetProviderJobsEndpoint(GetJobsRequest, ProviderPath, ProcessPath):
+class DeleteProviderJobsEndpoint(DeleteJobsEndpoint, ProviderPath, ProcessPath):
     pass
 
 

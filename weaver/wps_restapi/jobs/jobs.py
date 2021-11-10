@@ -399,7 +399,7 @@ def cancel_job_task(job, container):
 
 @sd.provider_job_service.delete(tags=[sd.TAG_JOBS, sd.TAG_DISMISS, sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
                                 schema=sd.ProviderJobEndpoint(), response_schemas=sd.delete_prov_job_responses)
-@sd.process_job_service.delete(tags=[sd.TAG_PROCESSES, sd.TAG_JOBS, sd.TAG_DISMISS], renderer=OUTPUT_FORMAT_JSON,
+@sd.process_job_service.delete(tags=[sd.TAG_JOBS, sd.TAG_DISMISS, sd.TAG_PROCESSES], renderer=OUTPUT_FORMAT_JSON,
                                schema=sd.DeleteProcessJobEndpoint(), response_schemas=sd.delete_job_responses)
 @sd.job_service.delete(tags=[sd.TAG_JOBS, sd.TAG_DISMISS], renderer=OUTPUT_FORMAT_JSON,
                        schema=sd.JobEndpoint(), response_schemas=sd.delete_job_responses)
@@ -422,6 +422,10 @@ def cancel_job(request):
     })
 
 
+@sd.process_jobs_service.delete(tags=[sd.TAG_JOBS, sd.TAG_DISMISS, sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
+                                schema=sd.DeleteProviderJobsEndpoint(), response_schemas=sd.delete_jobs_responses)
+@sd.process_jobs_service.delete(tags=[sd.TAG_JOBS, sd.TAG_DISMISS, sd.TAG_PROCESSES], renderer=OUTPUT_FORMAT_JSON,
+                                schema=sd.DeleteProcessJobsEndpoint(), response_schemas=sd.delete_jobs_responses)
 @sd.jobs_service.delete(tags=[sd.TAG_JOBS, sd.TAG_DISMISS], renderer=OUTPUT_FORMAT_JSON,
                         schema=sd.DeleteJobsEndpoint(), response_schemas=sd.delete_jobs_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
@@ -451,6 +455,7 @@ def cancel_job_batch(request):
         cancel_job_task(job, request)
 
     body = sd.BatchDismissJobsBodySchema().deserialize({"jobs": found_jobs})
+    body["description"] = "Following jobs have been successfully dismissed."
     return HTTPOk(json=body)
 
 
