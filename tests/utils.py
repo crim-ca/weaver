@@ -625,6 +625,7 @@ def mocked_execute_process():
     )
 
 
+@contextlib.contextmanager
 def mocked_dismiss_process():
     """
     Mock operations called to terminate :mod:`Celery` tasks.
@@ -632,10 +633,13 @@ def mocked_dismiss_process():
     mock_celery_app = mock.MagicMock()
     mock_celery_app.control = mock.MagicMock()
     mock_celery_app.control.revoke = mock.MagicMock()
+    mock_celery_revoke = mock.patch("weaver.wps_restapi.jobs.jobs.app", return_value=mock_celery_app)
 
-    return (
-        mock.patch("weaver.wps_restapi.jobs.jobs.app", return_value=mock_celery_app)
-    )
+    try:
+        with mock_celery_revoke:
+            yield   # for direct use by context or decorator
+    finally:
+        return (mocked_dismiss_process, )  # for use by combined ExitStack context
 
 
 def mocked_process_job_runner(job_task_id="mocked-job-id"):

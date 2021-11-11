@@ -17,6 +17,7 @@ from dateutil import parser as date_parser
 from tests.utils import (
     get_module_version,
     get_test_weaver_app,
+    mocked_dismiss_process,
     mocked_process_job_runner,
     mocked_remote_wps,
     setup_config_with_mongodb,
@@ -170,14 +171,18 @@ class WpsRestApiJobsTest(unittest.TestCase):
         return message + "\nMapping Task-ID/Job-ID:\n{}".format(json.dumps(mapping, indent=indent))
 
     def assert_equal_with_jobs_diffs(self, jobs_result, jobs_expect,
-                                     test_values=None, message="", indent=2, index=None):
-        assert len(jobs_result) == len(jobs_expect) and all(job in jobs_expect for job in jobs_result), \
-            (message if message else "Different jobs returned than expected") + \
-            (" (index: {})".format(index) if index is not None else "") + \
-            ("\nResponse: {}".format(json.dumps(sorted(jobs_result), indent=indent))) + \
-            ("\nExpected: {}".format(json.dumps(sorted(jobs_expect), indent=indent))) + \
-            ("\nTesting: {}".format(test_values) if test_values else "") + \
+                                     test_values=None, message="", indent=2, index=None, invert=False):
+        assert (
+            (invert or len(jobs_result) == len(jobs_expect)) and
+            all((job not in jobs_expect if invert else job in jobs_expect) for job in jobs_result)
+        ), (
+            (message if message else "Different jobs returned than expected") +
+            (" (index: {})".format(index) if index is not None else "") +
+            ("\nResponse: {}".format(json.dumps(sorted(jobs_result), indent=indent))) +
+            ("\nExpected: {}".format(json.dumps(sorted(jobs_expect), indent=indent))) +
+            ("\nTesting: {}".format(test_values) if test_values else "") +
             (self.message_with_jobs_mapping())
+        )
 
     def get_job_request_auth_mock(self, user_id):
         is_admin = self.user_admin_id == user_id
@@ -1119,3 +1124,37 @@ class WpsRestApiJobsTest(unittest.TestCase):
             assert resp.content_type == CONTENT_TYPE_APP_JSON
 
         assert resp.json["processID"] == "process-public"
+
+    @mocked_dismiss_process()
+    def test_job_dismiss_single(self):
+        path = sd.jobs_service.path
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        jobs = resp.json["jobs"]
+
+        path = sd.job_service.path.format(job_id=jobs[0])
+        resp = self.app.delete(path, headers=self.json_headers)
+        assert resp.status_code == 200
+
+        path = sd.jobs_service.path
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert jobs[0] not in resp.json["jobs"]
+        self.assert_equal_with_jobs_diffs(resp.json["jobs"], jobs[1:])
+
+    @mocked_dismiss_process()
+    def test_job_dismiss_batch(self):
+        path = sd.jobs_service.path
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        jobs = resp.json["jobs"]
+        assert len(jobs) > 3
+
+        resp = self.app.delete_json(path, params={"jobs": jobs[:2]}, headers=self.json_headers)
+        assert resp.status_code == 200
+        self.assert_equal_with_jobs_diffs(resp.json["jobs"], jobs[:2])
+
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        self.assert_equal_with_jobs_diffs(resp.json["jobs"], jobs[:2], invert=True)
+        self.assert_equal_with_jobs_diffs(resp.json["jobs"], jobs[2:])
