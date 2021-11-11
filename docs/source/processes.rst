@@ -459,6 +459,7 @@ Workflow Operations
 
 .. todo:: same as prev + 'operations' (deploy based on data-source, visibility, exec-remote for each step, pull-result)
 
+.. _file_reference_types:
 
 File Reference Types
 ~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -5,6 +5,22 @@ Changes
 
 .. **REPLACE AND/OR ADD SECTION ENTRIES ACCORDINGLY WITH APPLIED CHANGES**
 
+TMP FUTURE RELEASE
+==================
+
+Changes:
+--------
+- Add ``map_wps_output_location`` utility function to handle recurrent mapping of ``weaver.wps_output_dir`` back and
+  forth with resolved ``weaver.wps_output_url``.
+- Add more detection of map-able WPS output location to avoid fetching files unnecessarily. Common cases
+  are ``Workflow`` running multiple steps on the same server or `Application Package` ``Process`` that reuses an output
+  produced by a previous execution. Relates to `#183 <https://github.com/crim-ca/weaver/issues/183>`_.
+
+Fixes:
+------
+- Fix incorrect resolution of ``Process`` results endpoint to pass contents from one step to another
+  during ``Workflow`` execution (resolves `#358 <https://github.com/crim-ca/weaver/issues/358>`_).
+
 `Unreleased <https://github.com/crim-ca/weaver/tree/master>`_ (latest)
 ========================================================================
 

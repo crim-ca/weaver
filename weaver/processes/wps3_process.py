@@ -24,6 +24,7 @@ from weaver.processes.sources import get_data_source_from_url, retrieve_data_sou
 from weaver.processes.utils import map_progress
 from weaver.processes.wps_process_base import WpsProcessInterface
 from weaver.utils import (
+    fetch_file,
     get_any_id,
     get_any_message,
     get_any_value,
@@ -34,10 +35,11 @@ from weaver.utils import (
 )
 from weaver.visibility import VISIBILITY_PUBLIC
 from weaver.warning import MissingParameterWarning
+from weaver.wps.utils import map_wps_output_location
 from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
-    from typing import Union
+    from typing import List, Union
 
     from pywps.app import WPSRequest
 
@@ -318,17 +320,33 @@ class Wps3Process(WpsProcessInterface):
                            REMOTE_JOB_PROGRESS_FETCH_OUT, status.STATUS_RUNNING)
         results = self.get_job_results(job_status["jobID"])
         for result in results:
-            if get_any_id(result) in expected_outputs:
-                # This is where cwl expect the output file to be written
-                # TODO We will probably need to handle multiple output value...
-                dst_fn = "/".join([out_dir.rstrip("/"), expected_outputs[get_any_id(result)]])
-
-                # TODO Should we handle other type than File reference?
-                resp = request_extra("get", get_any_value(result), allow_redirects=True, settings=self.settings)
-                LOGGER.debug("Fetching result output from [%s] to cwl output destination: [%s]",
-                             get_any_value(result), dst_fn)
-                with open(dst_fn, mode="wb") as dst_fh:
-                    dst_fh.write(resp.content)
+            res_id = get_any_id(result)
+            # CWL expect the output file to be written matching definition in 'expected_outputs',
+            # but this definition could be a glob pattern to match multiple file.
+            # Therefore, we cannot rely on a specific name from it.
+            # Furthermore, a glob pattern could match multiple files.
+            if res_id in expected_outputs:
+                # plan ahead when list of multiple output values could be supported
+                result_values = get_any_value(result)
+                if not isinstance(result_values, list):
+                    result_values = [result_values]
+                cwl_out_dir = out_dir.rstrip("/")
+                for value in result_values:
+                    src_name = value.split("/")[-1]
+                    dst_path = "/".join([cwl_out_dir, src_name])
+                    # performance improvement: bypass download if file can be resolved as local
+                    map_path = map_wps_output_location(value, self.settings)
+                    if map_path:
+                        LOGGER.info("Detected result [%s] from [%s] as local reference to this instance. "
+                                    "Skipping fetch and using local copy in output destination: [%s]",
+                                    res_id, value, dst_path)
+                        LOGGER.debug("Mapped result [%s] to local reference: [%s]", value, map_path)
+                        src_path = map_path
+                    else:
+                        LOGGER.info("Fetching result [%s] from [%s] to CWL output destination: [%s]",
+                                    res_id, value, dst_path)
+                        src_path = value
+                    fetch_file(src_path, cwl_out_dir, settings=self.settings)
 
         self.update_status("Execution on remote ADES completed.",
                            REMOTE_JOB_PROGRESS_COMPLETED, status.STATUS_SUCCEEDED)
@@ -356,9 +374,32 @@ class Wps3Process(WpsProcessInterface):
         return job_status
 
     def get_job_results(self, job_id):
+        # type: (str) -> List[JSON]
+        """
+        Obtains produced output results from successful job status ID.
+        """
+        # use results endpoint instead of '/outputs' to ensure support with other
         result_url = self.url + sd.process_results_service.path.format(process_id=self.process, job_id=job_id)
-        response = self.make_request(method="GET",
-                                     url=result_url,
-                                     retry=True)
+        response = self.make_request(method="GET", url=result_url, retry=True)
         response.raise_for_status()
-        return response.json().get("outputs", {})
+        contents = response.json()
+
+        # backward compatibility for ADES that returns output IDs nested under 'outputs'
+        if "outputs" in contents:
+            # ensure that we don't incorrectly pick a specific output ID named 'outputs'
+            maybe_outputs = contents["outputs"]
+            if isinstance(maybe_outputs, dict) and get_any_id(maybe_outputs) is None:
+                contents = maybe_outputs
+            # backward compatibility for ADES that returns list of outputs nested under 'outputs'
+            # (i.e.: as Weaver-specific '/outputs' endpoint)
+            elif isinstance(maybe_outputs, list) and all(get_any_id(out) is not None for out in maybe_outputs):
+                contents = maybe_outputs
+
+        # rebuild the expected (old) list format for calling method
+        if isinstance(contents, dict) and all(get_any_value(out) is not None for out in contents.values()):
+            outputs = []
+            for out_id, out_val in contents.items():
+                out_val.update({"id": out_id})
+                outputs.append(out_val)
+            contents = outputs
+        return contents

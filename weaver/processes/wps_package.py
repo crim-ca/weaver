@@ -99,7 +99,7 @@ from weaver.utils import (
     request_extra,
     setup_loggers
 )
-from weaver.wps.utils import get_wps_output_dir, get_wps_output_url
+from weaver.wps.utils import get_wps_output_dir, get_wps_output_url, map_wps_output_location
 from weaver.wps_restapi.swagger_definitions import process_service
 
 if TYPE_CHECKING:
@@ -1252,7 +1252,7 @@ class WpsPackage(Process):
             if input_ref.startswith("s3://"):
                 return True
             return False
-        return True
+        return not os.path.isfile(input_ref)
 
     def make_inputs(self,
                     wps_inputs,         # type: Dict[str, Deque[WPS_Input_Type]]
@@ -1305,9 +1305,18 @@ class WpsPackage(Process):
         """
         Generates the JSON content required to specify a `CWL` ``File`` input definition from a location.
 
-        .. note::
-            If the process requires ``OpenSearch`` references that should be preserved as is, use scheme defined by
-            :py:data:`weaver.processes.constants.OPENSEARCH_LOCAL_FILE_SCHEME` prefix instead of ``http(s)://``.
+        If the input reference corresponds to an HTTP URL that is detected as matching the local WPS output endpoint,
+        implicitly convert the reference to the local WPS output directory to avoid useless download of available file.
+        Since that endpoint could be protected though, perform a minimal HEAD request to validate its accessibility.
+        Otherwise, this operation could incorrectly grant unauthorized access to protected files by forging the URL.
+
+        If the process requires ``OpenSearch`` references that should be preserved as is, scheme defined by
+        :py:data:`weaver.processes.constants.OPENSEARCH_LOCAL_FILE_SCHEME` prefix instead of ``http(s)://`` is expected.
+
+        Any other variant of file reference will be fetched as applicable by the relevant schemes.
+
+        .. seealso::
+            Documentation details of resolution based on schemes defined in :ref:`file_reference_types` section.
         """
         # NOTE:
         #   When running as EMS, must not call data/file methods if URL reference, otherwise contents
@@ -1360,11 +1369,23 @@ class WpsPackage(Process):
         ):
             self.logger.debug("File input (%s) DROPPED. Detected default format as data.", input_definition.identifier)
             return None
+
+        # auto-map local if possible after security check
+        input_local_ref = map_wps_output_location(input_location, self.settings)
+        if input_local_ref:
+            resp = request_extra("HEAD", input_location, settings=self.settings)
+            if resp.status_code == 200:  # if failed, following fetch will produce the appropriate HTTP error
+                self.logger.debug("Detected and validated remotely accessible reference [%s] "
+                                  "matching local WPS outputs [%s]. Skipping fetch using direct reference.",
+                                  input_location, input_local_ref)
+                input_location = input_local_ref
+
         if self.must_fetch(input_location):
             self.logger.info("File input (%s) ATTEMPT fetch: [%s]", input_definition.identifier, input_location)
             input_location = fetch_file(input_location, input_definition.workdir, settings=self.settings)
         else:
             self.logger.info("File input (%s) SKIPPED fetch: [%s]", input_definition.identifier, input_location)
+
         location = {"location": input_location, "class": input_type}
         if input_definition.data_format is not None and input_definition.data_format.mime_type:
             fmt = get_cwl_file_format(input_definition.data_format.mime_type, make_reference=True)
@@ -1384,6 +1405,12 @@ class WpsPackage(Process):
                     self.logger.warning(
                         "Dropping additional output values (%s total), only 1 supported per identifier.",
                         len(cwl_result[output_id])
+                    )
+                # provide more details than poorly descriptive IndexError
+                if not len(cwl_result[output_id]):
+                    raise PackageExecutionError(
+                        "Process output '{}' expects at least one value but none was found. "
+                        "Possible incorrect glob pattern definition in CWL Application Package.".format(output_id)
                     )
                 cwl_result[output_id] = cwl_result[output_id][0]  # expect only one output
 

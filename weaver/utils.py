@@ -1009,6 +1009,9 @@ def fetch_file(file_reference, file_outdir, settings=None, **request_kwargs):
         with open(file_path, "wb") as file:
             resp = request_extra("get", file_reference, stream=True, retries=3, settings=settings, **request_kwargs)
             if resp.status_code >= 400:
+                # use method since response object does not derive from Exception, therefore cannot be raised directly
+                if hasattr(resp, "raise_for_status"):
+                    resp.raise_for_status()
                 raise resp
             # NOTE:
             #   Setting 'chunk_size=None' lets the request find a suitable size according to
