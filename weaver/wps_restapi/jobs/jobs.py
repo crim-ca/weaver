@@ -422,8 +422,8 @@ def cancel_job(request):
     })
 
 
-@sd.process_jobs_service.delete(tags=[sd.TAG_JOBS, sd.TAG_DISMISS, sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
-                                schema=sd.DeleteProviderJobsEndpoint(), response_schemas=sd.delete_jobs_responses)
+@sd.provider_jobs_service.delete(tags=[sd.TAG_JOBS, sd.TAG_DISMISS, sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
+                                 schema=sd.DeleteProviderJobsEndpoint(), response_schemas=sd.delete_jobs_responses)
 @sd.process_jobs_service.delete(tags=[sd.TAG_JOBS, sd.TAG_DISMISS, sd.TAG_PROCESSES], renderer=OUTPUT_FORMAT_JSON,
                                 schema=sd.DeleteProcessJobsEndpoint(), response_schemas=sd.delete_jobs_responses)
 @sd.jobs_service.delete(tags=[sd.TAG_JOBS, sd.TAG_DISMISS], renderer=OUTPUT_FORMAT_JSON,
