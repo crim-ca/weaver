@@ -727,7 +727,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
         if not request:
             search_filters["access"] = VISIBILITY_PUBLIC
         else:
-            if request.has_permission("admin"):
+            if request.authenticated_userid is not None and request.has_permission("admin"):
                 if access in VISIBILITY_VALUES:  # otherwise any
                     search_filters["access"] = access
             else:
