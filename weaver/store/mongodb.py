@@ -725,10 +725,11 @@ class MongodbJobStore(StoreJobs, MongodbStore):
         # type: (str, Request) -> MongodbSearchFilter
         search_filters = {}
         if not request:
-            search_filters.setdefault("access", VISIBILITY_PUBLIC)
+            search_filters["access"] = VISIBILITY_PUBLIC
         else:
-            if request.has_permission("admin") and access in VISIBILITY_VALUES:
-                search_filters["access"] = access
+            if request.has_permission("admin"):
+                if access in VISIBILITY_VALUES:  # otherwise any
+                    search_filters["access"] = access
             else:
                 user_id = request.authenticated_userid
                 if user_id is not None:
@@ -817,8 +818,13 @@ class MongodbJobStore(StoreJobs, MongodbStore):
             # duration is not directly stored in the database (as it can change), it must be computed inplace
             duration_field = {
                 "$addFields": {
-                    "duration": {  # becomes 'null' if cannot be computed
-                        "$dateDiff": {"startDate": "$started", "endDate": "$finished", "unit": "second"}
+                    "duration": {  # becomes 'null' if cannot be computed (e.g.: not started)
+                        "$dateDiff": {
+                            # compute the same way as Job.duration
+                            "startDate": "$started",
+                            "endDate": {"$cond": {"if": "$finished", "then": "$finished", "else": "$$NOW"}},
+                            "unit": "second"
+                        }
                     }
                 }
             }
