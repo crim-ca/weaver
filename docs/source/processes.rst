@@ -118,7 +118,7 @@ ways as presented below.
     accomplished. See :ref:`cwl-wps-mapping` section for more details.
 
 
-Package as Literal Unit Block
+Package as Literal Execution Unit Block
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 In this situation, the :term:`CWL` definition is provided as is using JSON-formatted package embedded within the
@@ -146,6 +146,9 @@ In this situation, the :term:`CWL` definition is provided as is using JSON-forma
     }
 
 .. _process-esgf-cwt:
+
+Package as External Execution Unit Reference
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ESGF-CWT
 ----------
@@ -818,7 +821,7 @@ For example, providing ``X-WPS-Output-Context: project/test-1`` will result in o
 If desired, parameter ``weaver.wps_output_context`` can also be defined in the :ref:`conf_settings` in order to employ
 a default directory location nested under ``weaver.wps_output_dir`` when ``X-WPS-Output-Context`` header is omitted
 from the request. By default, this parameter is not defined (empty) in order to store :term:`Job` results directly under
-the configured :ter:`WPS` output directory.
+the configured :term:`WPS` output directory.
 
 .. note::
     Header ``X-WPS-Output-Context`` is ignored when using `S3` buckets for output location since they are stored

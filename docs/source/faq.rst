@@ -46,10 +46,8 @@ Please refer to below references for more details.
 
 .. seealso::
 
-    - |process-wps-rest|_
-    - :ref:`Deploy` request
-
-.. |process-wps-rest| replace:: Supported :term:`Application Package` locations
+    - Supported :term:`Application Package` definitions in :ref:`process-wps-rest` deployment.
+    - :ref:`Deploy` request.
 
 
 Fixing permission error on input files

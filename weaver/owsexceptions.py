@@ -4,9 +4,8 @@ OWSExceptions definitions.
 Exceptions are based on :mod:`pyramid.httpexceptions` and :mod:`pywps.exceptions` to handle more cases where they can
 be caught whether the running process is via :mod:`weaver` or through :mod:`pywps` service.
 
-Furthermore, interrelation with :mod:`weaver.exceptions` classes (with base
-:exception:`weaver.exceptions.WeaverException`) also employ specific :exception:`OWSExceptions` definitions to provide
-specific error details.
+Furthermore, interrelation with :mod:`weaver.exceptions` classes (with base :exc:`weaver.exceptions.WeaverException`)
+also employ specific :exc:`OWSExceptions` definitions to provide specific error details.
 """
 import json
 import warnings
