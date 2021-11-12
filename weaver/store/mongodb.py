@@ -44,7 +44,7 @@ from weaver.sort import (
 )
 from weaver.status import JOB_STATUS_CATEGORIES, STATUS_ACCEPTED, map_status
 from weaver.store.base import StoreBills, StoreJobs, StoreProcesses, StoreQuotes, StoreServices
-from weaver.utils import get_base_url, get_sane_name, get_weaver_url, repr_json, islambda, now
+from weaver.utils import get_base_url, get_sane_name, get_weaver_url, islambda, now, repr_json
 from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC, VISIBILITY_VALUES
 from weaver.wps.utils import get_wps_url
 

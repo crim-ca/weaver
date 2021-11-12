@@ -1,6 +1,5 @@
-import datetime
-
 import contextlib
+import datetime
 import json
 import unittest
 import warnings
@@ -53,7 +52,7 @@ if TYPE_CHECKING:
 
 
 class WpsRestApiJobsTest(unittest.TestCase):
-    settings = None
+    settings = {}
     config = None
 
     @classmethod
