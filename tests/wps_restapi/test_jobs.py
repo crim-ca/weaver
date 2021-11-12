@@ -52,7 +52,7 @@ if TYPE_CHECKING:
 
 
 class WpsRestApiJobsTest(unittest.TestCase):
-    settings = None
+    settings = {}
     config = None
 
     @classmethod
