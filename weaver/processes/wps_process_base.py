@@ -3,7 +3,6 @@ from time import sleep
 from typing import TYPE_CHECKING
 
 from pyramid.httpexceptions import HTTPBadGateway
-from pyramid_celery import celery_app as app
 
 from weaver.formats import CONTENT_TYPE_APP_JSON
 from weaver.utils import get_cookie_headers, get_settings, request_extra
@@ -46,7 +45,7 @@ class WpsProcessInterface(object):
         else:
             self.cookies = {}
         self.headers = {"Accept": CONTENT_TYPE_APP_JSON, "Content-Type": CONTENT_TYPE_APP_JSON}
-        self.settings = get_settings(app)
+        self.settings = get_settings()
 
     def make_request(self, method, url, retry, status_code_mock=None, **kwargs):
         response = request_extra(method, url=url, settings=self.settings,
@@ -61,7 +60,7 @@ class WpsProcessInterface(object):
 
     @staticmethod
     def host_file(file_name):
-        settings = get_settings(app)
+        settings = get_settings()
         weaver_output_url = get_wps_output_url(settings)
         weaver_output_dir = get_wps_output_dir(settings)
         file_name = file_name.replace("file://", "")

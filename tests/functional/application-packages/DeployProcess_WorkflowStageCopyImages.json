@@ -1,0 +1,51 @@
+{
+    "processDescription": {
+        "process": {
+            "visibility": "public",
+            "id": "WorkflowStageCopyImages",
+            "title": "Mocked Workflow to test sequence of Docker Apps processing input images dummy data.",
+            "version": "0.0.1"
+        }
+    },
+    "executionUnit": [
+        {
+            "unit": {
+                "cwlVersion": "v1.0",
+                "class": "Workflow",
+                "inputs": {
+                    "contents": "string"
+                },
+                "outputs": {
+                    "output": {
+                        "type": {
+                            "type": "array",
+                            "items": "File"
+                        },
+                        "outputSource": "copy/output_files"
+                    }
+                },
+                "steps": {
+                    "staging": {
+                        "run": "DockerStageImages",
+                        "in": {
+                            "contents": "contents"
+                        },
+                        "out": [
+                            "staging_output"
+                        ]
+                    },
+                    "copy": {
+                        "run": "DockerCopyImages",
+                        "in": {
+                            "input_files": "staging/staging_output"
+                        },
+                        "out": [
+                            "output_files"
+                        ]
+                    }
+                }
+            }
+        }
+    ],
+    "deploymentProfileName": "http://www.opengis.net/profiles/eoc/workflow"
+}

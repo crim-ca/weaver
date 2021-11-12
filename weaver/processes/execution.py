@@ -39,7 +39,7 @@ from weaver.status import (
     map_status
 )
 from weaver.store.base import StoreJobs
-from weaver.utils import get_any_id, get_any_value, get_settings, now, raise_on_xml_exception, wait_secs
+from weaver.utils import get_any_id, get_any_value, get_registry, get_settings, now, raise_on_xml_exception, wait_secs
 from weaver.visibility import VISIBILITY_PUBLIC
 from weaver.wps.utils import (
     check_wps_status,
@@ -85,7 +85,8 @@ def execute_process(self, job_id, wps_url, headers=None):
     LOGGER.debug("Job execute process called.")
 
     # reset the connection because we are in a forked celery process
-    db = get_db(app, reset_connection=True)
+    registry = get_registry(None)  # local thread, whether locally or dispatched celery
+    db = get_db(registry, reset_connection=True)
     store = db.get_store(StoreJobs)
     job = store.fetch_by_id(job_id)
     job.started = now()

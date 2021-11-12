@@ -4,7 +4,6 @@ from urllib.parse import urlparse
 
 import yaml
 from pyramid.settings import asbool
-from pyramid_celery import celery_app as app
 
 from weaver import WEAVER_ROOT_DIR
 from weaver.config import WEAVER_DEFAULT_DATA_SOURCES_CONFIG, get_weaver_config_file
@@ -58,7 +57,7 @@ def fetch_data_sources():
     if DATA_SOURCES:
         return DATA_SOURCES
 
-    data_source_config = get_settings(app).get("weaver.data_sources", "")
+    data_source_config = get_settings().get("weaver.data_sources", "")
     if data_source_config:
         data_source_config = get_weaver_config_file(str(data_source_config), WEAVER_DEFAULT_DATA_SOURCES_CONFIG)
         if not os.path.isabs(data_source_config):
@@ -93,7 +92,7 @@ def retrieve_data_source_url(data_source):
     """
     if data_source is None:
         # get local data source
-        return get_wps_restapi_base_url(get_settings(app))
+        return get_wps_restapi_base_url(get_settings())
     data_sources = fetch_data_sources()
     return data_sources[data_source if data_source in data_sources else get_default_data_source(data_sources)]["ades"]
 

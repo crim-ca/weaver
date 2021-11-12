@@ -32,7 +32,6 @@ import yaml
 from cwltool.context import LoadingContext, RuntimeContext
 from cwltool.factory import Factory as CWLFactory, WorkflowStatus as CWLException
 from pyramid.httpexceptions import HTTPOk, HTTPServiceUnavailable
-from pyramid_celery import celery_app as app
 from pywps import Process
 from pywps.inout import BoundingBoxInput, ComplexInput, LiteralInput
 from pywps.inout.basic import SOURCE_TYPE
@@ -170,7 +169,7 @@ def retrieve_package_job_log(execution, job, progress_min=0, progress_max=100):
     """
     try:
         # weaver package log every status update into this file (we no longer rely on the http monitoring)
-        out_dir = get_wps_output_dir(get_settings(app))
+        out_dir = get_wps_output_dir(get_settings())
         # if the process is a weaver package this status xml should be available in the process output dir
         log_path = get_status_location_log_path(execution.statusLocation, out_dir=out_dir)
         with open(log_path, "r") as log_file:
@@ -240,7 +239,7 @@ def _fetch_process_info(process_info_url, fetch_error):
 
     if not isinstance(process_info_url, str):
         raise _info_not_found_error()
-    resp = request_extra("get", process_info_url, headers={"Accept": CONTENT_TYPE_APP_JSON}, settings=get_settings(app))
+    resp = request_extra("get", process_info_url, headers={"Accept": CONTENT_TYPE_APP_JSON}, settings=get_settings())
     if resp.status_code != HTTPOk.code:
         raise _info_not_found_error()
     body = resp.json()
@@ -371,7 +370,7 @@ def _check_package_file(cwl_file_path_or_url):
         is_url = True
     if is_url:
         cwl_path = cwl_file_path_or_url
-        cwl_resp = request_extra("head", cwl_path, settings=get_settings(app))
+        cwl_resp = request_extra("head", cwl_path, settings=get_settings())
         is_url = True
         if cwl_resp.status_code != HTTPOk.code:
             raise PackageRegistrationError("Cannot find CWL file at: '{}'.".format(cwl_path))
@@ -397,7 +396,7 @@ def _load_package_file(file_path):
     # yaml properly loads json as well, error can print out the parsing error location
     try:
         if is_url:
-            settings = get_settings(app)
+            settings = get_settings()
             cwl_resp = request_extra("get", file_path, headers={"Accept": CONTENT_TYPE_TEXT_PLAIN}, settings=settings)
             return yaml.safe_load(cwl_resp.content)
         with open(file_path, "r") as f:
@@ -588,7 +587,7 @@ def _generate_process_with_cwl_from_reference(reference):
 
     # match against WPS-1/2 reference
     else:
-        settings = get_settings(app)
+        settings = get_settings()
         response = request_extra("GET", reference, retries=3, settings=settings)
         if response.status_code != HTTPOk.code:
             raise HTTPServiceUnavailable("Couldn't obtain a valid response from [{}]. Service response: [{} {}]"
@@ -785,7 +784,7 @@ class WpsPackage(Process):
         """
         self.payload = kw.pop("payload")
         self.package = kw.pop("package")
-        self.settings = get_settings(app)
+        self.settings = get_settings()
         if not self.package:
             raise PackageRegistrationError("Missing required package definition for package process.")
         if not isinstance(self.package, dict):

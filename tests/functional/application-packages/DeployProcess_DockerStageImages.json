@@ -1,0 +1,64 @@
+{
+    "processDescription": {
+        "process": {
+            "visibility": "public",
+            "id": "DockerStageImages",
+            "title": "Mock staging image staging (dummy TIF generated).",
+            "abstract": "Work around private docker image.",
+            "version": "0.0.1",
+            "outputs": [
+                {
+                    "id": "staging_output",
+                    "formats": [
+                        {"mediaType": "image/tiff"}
+                    ]
+                }
+            ]
+        },
+        "processVersion": "2.0"
+    },
+    "immediateDeployment": true,
+    "executionUnit": [
+        {
+            "unit": {
+                "cwlVersion": "v1.0",
+                "class": "CommandLineTool",
+                "requirements": {
+                    "DockerRequirement": {
+                        "dockerPull": "debian:stretch-slim"
+                    },
+                    "InitialWorkDirRequirement": {
+                        "listing": [
+                            {
+                                "entryname": "script.sh",
+                                "entry": "set -x \necho \"Input: $2\"\necho \"Output: $1\"\necho \"$2\" > \"$1\""
+                            }
+                        ]
+                    }
+                },
+                "baseCommand": ["bash", "script.sh"],
+                "arguments": ["$(runtime.outdir)/output.tif"],
+                "inputs": {
+                    "contents": {
+                        "type": "string",
+                        "inputBinding": {
+                            "position": 0
+                        }
+                    }
+                },
+                "outputs": {
+                    "staging_output": {
+                        "type": {
+                            "type": "array",
+                            "items": "File"
+                        },
+                        "outputBinding": {
+                            "glob": "*.tif"
+                        }
+                    }
+                }
+            }
+        }
+    ],
+    "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication"
+}

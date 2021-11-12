@@ -9,6 +9,8 @@ from weaver import WEAVER_CONFIG_DIR
 from weaver.utils import get_settings
 
 if TYPE_CHECKING:
+    from typing import Optional
+
     from weaver.typedefs import AnySettingsContainer
 
 LOGGER = logging.getLogger(__name__)
@@ -59,7 +61,7 @@ def get_weaver_configuration(container):
 
 
 def get_weaver_config_file(file_path, default_config_file, generate_default_from_example=True):
-    # type: (str, str, bool) -> str
+    # type: (Optional[str], str, bool) -> str
     """
     Validates that the specified configuration file can be found, or falls back to the default one.
 
@@ -80,7 +82,7 @@ def get_weaver_config_file(file_path, default_config_file, generate_default_from
         raise ValueError("Invalid default configuration file [{}] is not one of {}"
                          .format(default_config_file, list(WEAVER_DEFAULT_CONFIGS)))
     default_path = os.path.abspath(os.path.join(WEAVER_CONFIG_DIR, default_config_file))
-    if file_path in ["", default_config_file, os.path.join(os.curdir, default_config_file)]:
+    if file_path in [None, "", default_config_file, os.path.join(os.curdir, default_config_file)]:
         file_path = default_path
     if str(file_path).strip() != "":
         file_path = os.path.abspath(file_path)
