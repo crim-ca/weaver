@@ -1,4 +1,6 @@
 import math
+import os
+import shutil
 from copy import deepcopy
 from typing import TYPE_CHECKING
 
@@ -22,6 +24,7 @@ from weaver.database import get_db
 from weaver.datatype import Job
 from weaver.exceptions import (
     InvalidIdentifierValue,
+    JobGone,
     JobNotFound,
     ProcessNotAccessible,
     ProcessNotFound,
@@ -35,7 +38,7 @@ from weaver.processes.convert import any2wps_literal_datatype
 from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
 from weaver.utils import get_any_id, get_any_value, get_path_kvp, get_settings, get_weaver_url, repr_json
 from weaver.visibility import VISIBILITY_PUBLIC
-from weaver.wps.utils import get_wps_output_url
+from weaver.wps.utils import get_wps_output_dir, get_wps_output_url
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.providers.utils import forbid_local_only
 from weaver.wps_restapi.swagger_definitions import datetime_interval_parser
@@ -389,9 +392,45 @@ def get_job_status(request):
 
 def cancel_job_task(job, container):
     # type: (Job, AnySettingsContainer) -> Job
-    app.control.revoke(job.task_id, terminate=True)  # signal to stop celery task. Up to it to terminate remote if any.
+    if job.status == status.STATUS_DISMISSED:
+        raise JobGone(
+            json={
+                "code": "JobDismissed",
+                "description": "Job was already dismissed.",
+                "value": job.id
+            }
+        )
+
+    if job.status in status.JOB_STATUS_CATEGORIES[status.JOB_STATUS_CATEGORY_RUNNING]:
+        # signal to stop celery task. Up to it to terminate remote if any.
+        LOGGER.debug("Job [%s] dismiss operation: Canceling task [%s]", job.id, job.task_id)
+        app.control.revoke(job.task_id, terminate=True)
+
+    wps_out_dir = get_wps_output_dir(container)
+    job_out_dir = os.path.join(wps_out_dir, job.id)
+    job_out_log = os.path.join(wps_out_dir, job.id + ".log")
+    job_out_xml = os.path.join(wps_out_dir, job.id + ".xml")
+    if os.path.isdir(job_out_dir):
+        LOGGER.debug("Job [%s] dismiss operation: Removing output results.", job.id)
+        shutil.rmtree(job_out_dir, onerror=lambda func, path, _exc: LOGGER.warning(
+            "Job [%s] dismiss operation: Failed to delete [%s] due to [%s]", job.id, job_out_dir, _exc
+        ))
+    if os.path.isfile(job_out_log):
+        LOGGER.debug("Job [%s] dismiss operation: Removing output logs.", job.id)
+        try:
+            os.remove(job_out_log)
+        except OSError as exc:
+            LOGGER.warning("Job [%s] dismiss operation: Failed to delete [%s] due to [%s]", job.id, job_out_log, exc)
+    if os.path.isfile(job_out_xml):
+        LOGGER.debug("Job [%s] dismiss operation: Removing output WPS status.", job.id)
+        try:
+            os.remove(job_out_xml)
+        except OSError as exc:
+            LOGGER.warning("Job [%s] dismiss operation: Failed to delete [%s] due to [%s]", job.id, job_out_xml, exc)
+
+    LOGGER.debug("Job [%s] dismiss operation: Updating job status.")
     store = get_db(container).get_store(StoreJobs)
-    job.status_message = "Job dismissed."
+    job.status_message = "Job {}.".format(status.STATUS_DISMISSED)
     job.status = status.map_status(status.STATUS_DISMISSED)
     job = store.update_job(job)
     return job
@@ -449,10 +488,14 @@ def cancel_job_batch(request):
     for job_id in jobs:
         try:
             job = store.fetch_by_id(job_id)
-        except JobNotFound:
+        except JobNotFound as exc:
+            LOGGER.debug("Job [%s] not found, cannot be dismissed: [%s]", job_id, exc)
             continue
         found_jobs.append(job.id)
-        cancel_job_task(job, request)
+        try:
+            cancel_job_task(job, request)
+        except JobNotFound as exc:
+            LOGGER.debug("Job [%s] cannot be dismissed: %s.", exc.description)
 
     body = sd.BatchDismissJobsBodySchema().deserialize({"jobs": found_jobs})
     body["description"] = "Following jobs have been successfully dismissed."

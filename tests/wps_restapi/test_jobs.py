@@ -33,8 +33,10 @@ from weaver.status import (
     JOB_STATUS_CATEGORY_FINISHED,
     JOB_STATUS_VALUES,
     STATUS_ACCEPTED,
+    STATUS_DISMISSED,
     STATUS_FAILED,
     STATUS_RUNNING,
+    STATUS_STARTED,
     STATUS_SUCCEEDED
 )
 from weaver.utils import get_path_kvp, now
@@ -107,43 +109,49 @@ class WpsRestApiJobsTest(unittest.TestCase):
         self.make_job(task_id="0000-0000-0000-0000",
                       process=self.process_public.identifier, service=None,
                       user_id=self.user_editor1_id, status=STATUS_SUCCEEDED, progress=100, access=VISIBILITY_PUBLIC)
-        self.make_job(task_id="1111-1111-1111-1111",
+        self.make_job(task_id="0000-0000-0000-1111",
                       process=self.process_unknown, service=self.service_public.name,
                       user_id=self.user_editor1_id, status=STATUS_FAILED, progress=99, access=VISIBILITY_PUBLIC)
-        self.make_job(task_id="2222-2222-2222-2222",
+        self.make_job(task_id="0000-0000-0000-2222",
                       process=self.process_private.identifier, service=None,
                       user_id=self.user_editor1_id, status=STATUS_FAILED, progress=55, access=VISIBILITY_PUBLIC)
         # same process as job 0, but private (ex: job ran with private process, then process made public afterwards)
-        self.make_job(task_id="3333-3333-3333-3333",
+        self.make_job(task_id="0000-0000-0000-3333",
                       process=self.process_public.identifier, service=None,
                       user_id=self.user_editor1_id, status=STATUS_FAILED, progress=55, access=VISIBILITY_PRIVATE)
         # job ran by admin
-        self.make_job(task_id="4444-4444-4444-4444",
+        self.make_job(task_id="0000-0000-0000-4444",
                       process=self.process_public.identifier, service=None,
                       user_id=self.user_admin_id, status=STATUS_FAILED, progress=55, access=VISIBILITY_PRIVATE)
         # job public/private service/process combinations
-        self.make_job(task_id="5555-5555-5555-5555", created=self.datetime_interval[0], duration=20,
+        self.make_job(task_id="0000-0000-0000-5555", created=self.datetime_interval[0], duration=20,
                       process=self.process_public.identifier, service=self.service_public.name,
                       user_id=self.user_editor1_id, status=STATUS_FAILED, progress=99, access=VISIBILITY_PUBLIC)
-        self.make_job(task_id="6666-6666-6666-6666", created=self.datetime_interval[1], duration=30,
+        self.make_job(task_id="0000-0000-0000-6666", created=self.datetime_interval[1], duration=30,
                       process=self.process_private.identifier, service=self.service_public.name,
                       user_id=self.user_editor1_id, status=STATUS_FAILED, progress=99, access=VISIBILITY_PUBLIC)
-        self.make_job(task_id="7777-7777-7777-7777", created=self.datetime_interval[2], duration=40,
+        self.make_job(task_id="0000-0000-0000-7777", created=self.datetime_interval[2], duration=40,
                       process=self.process_public.identifier, service=self.service_private.name,
                       user_id=self.user_editor1_id, status=STATUS_FAILED, progress=99, access=VISIBILITY_PUBLIC)
-        self.make_job(task_id="8888-8888-8888-8888", created=self.datetime_interval[3], duration=50,
+        self.make_job(task_id="0000-0000-0000-8888", created=self.datetime_interval[3], duration=50,
                       process=self.process_private.identifier, service=self.service_private.name,
                       user_id=self.user_editor1_id, status=STATUS_FAILED, progress=99, access=VISIBILITY_PUBLIC)
         # jobs with duplicate 'process' identifier, but under a different 'service' name
         # WARNING:
         #   For tests that use minDuration/maxDuration, following two jobs could 'eventually' become more/less than
         #   expected test values while debugging (code breakpoints) since their duration is dynamic (current - started)
-        self.make_job(task_id="9999-9999-9999-9999", created=now(), duration=20,
+        self.make_job(task_id="0000-0000-0000-9999", created=now(), duration=20,
                       process=self.process_other.identifier, service=self.service_one.name,
                       user_id=self.user_editor1_id, status=STATUS_RUNNING, progress=99, access=VISIBILITY_PUBLIC)
-        self.make_job(task_id="1010-1010-1010-1010", created=now(), duration=25,
+        self.make_job(task_id="0000-0000-1111-0000", created=now(), duration=25,
                       process=self.process_other.identifier, service=self.service_two.name,
                       user_id=self.user_editor1_id, status=STATUS_RUNNING, progress=99, access=VISIBILITY_PUBLIC)
+        self.make_job(task_id="0000-0000-2222-0000", created=now(), duration=0,
+                      process=self.process_other.identifier, service=self.service_two.name,
+                      user_id=self.user_editor1_id, status=STATUS_ACCEPTED, progress=99, access=VISIBILITY_PUBLIC)
+        self.make_job(task_id="0000-0000-3333-0000", created=now(), duration=0,
+                      process=self.process_other.identifier, service=self.service_two.name,
+                      user_id=self.user_editor1_id, status=STATUS_STARTED, progress=99, access=VISIBILITY_PUBLIC)
 
     def make_job(self, task_id, process, service, user_id, status, progress, access,
                  created=None, offset=None, duration=None):
@@ -1125,21 +1133,54 @@ class WpsRestApiJobsTest(unittest.TestCase):
         assert resp.json["processID"] == "process-public"
 
     @mocked_dismiss_process()
-    def test_job_dismiss_single(self):
-        path = sd.jobs_service.path
-        resp = self.app.get(path, headers=self.json_headers)
-        assert resp.status_code == 200
-        jobs = resp.json["jobs"]
+    def test_job_dismiss_running_single(self):
+        """
+        Jobs that are in a valid *running* (or about to) state can be dismissed successfully.
 
-        path = sd.job_service.path.format(job_id=jobs[0])
-        resp = self.app.delete(path, headers=self.json_headers)
-        assert resp.status_code == 200
+        Subsequent calls to the same job dismiss operation must respond with HTTP Gone (410) status.
 
-        path = sd.jobs_service.path
-        resp = self.app.get(path, headers=self.json_headers)
-        assert resp.status_code == 200
-        assert jobs[0] not in resp.json["jobs"]
-        self.assert_equal_with_jobs_diffs(resp.json["jobs"], jobs[1:])
+        .. seealso::
+            OGC specification of dismiss operation: https://docs.ogc.org/DRAFTS/18-062.html#sec_cons_dismiss
+        """
+        job_running = self.job_info[10]
+        assert job_running.status == STATUS_RUNNING, "Job must be in running state for test"
+        job_accept = self.job_info[11]
+        assert job_accept.status == STATUS_ACCEPTED, "Job must be in accepted state for test"
+        job_started = self.job_info[12]
+        assert job_started.status == STATUS_STARTED, "Job must be in started state for test"
+
+        for job in [job_running, job_accept, job_started]:
+            path = sd.job_service.path.format(job_id=job.id)
+            resp = self.app.delete(path, headers=self.json_headers)
+            assert resp.status_code == 200
+            assert resp.json["status"] == STATUS_DISMISSED
+
+            # job are not removed, only dismissed
+            path = get_path_kvp(sd.jobs_service.path, status=STATUS_DISMISSED, limitt=1000)
+            resp = self.app.get(path, headers=self.json_headers)
+            assert resp.status_code == 200
+            assert job.id in resp.json["jobs"], "Job HTTP DELETE should not have deleted it, but only dismissed it."
+
+            path = sd.job_service.path.format(job_id=job.id)
+            resp = self.app.get(path, headers=self.json_headers)
+            assert resp.status_code == 200, "Job should still exist even after dismiss"
+            assert resp.json["status"] == STATUS_DISMISSED
+
+            resp = self.app.delete(path, headers=self.json_headers, expect_errors=True)
+            assert resp.status_code == 410, "Job cannot be dismissed again."
+            assert job.id in resp.json["value"]
+
+    @mocked_dismiss_process()
+    def test_job_dismiss_complete_single(self):
+        """
+        Jobs that are already *completed* (regardless of success/failure) state flushes results.
+
+        Subsequent calls to the same job dismiss operation must respond with HTTP Gone (410) status.
+
+        .. seealso::
+            OGC specification of dismiss operation: https://docs.ogc.org/DRAFTS/18-062.html#sec_cons_dismiss
+        """
+
 
     @mocked_dismiss_process()
     def test_job_dismiss_batch(self):
