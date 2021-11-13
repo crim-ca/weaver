@@ -7,12 +7,11 @@ if TYPE_CHECKING:
     from pyramid.request import Request
     from pywps import Process as ProcessWPS
     from weaver.datatype import Bill, Job, Process, Quote, Service
-    from weaver.typedefs import AnyValue, DatetimeIntervalType, TypedDict
+    from weaver.typedefs import DatetimeIntervalType, TypedDict
 
-    JobListAndCount = Tuple[List[Job], int]
     JobGroupCategory = TypedDict("JobGroupCategory",
                                  {"category": Dict[str, Optional[str]], "count": int, "jobs": List[Job]})
-    JobCategoriesAndCount = Tuple[List[JobGroupCategory], int]
+    JobSearchResult = Tuple[Union[List[Job], JobGroupCategory], int]
 
 
 class StoreInterface(object, metaclass=abc.ABCMeta):
@@ -142,7 +141,7 @@ class StoreJobs(StoreInterface):
     def find_jobs(self,
                   process=None,             # type: Optional[str]
                   service=None,             # type: Optional[str]
-                  type=None,                # type: Optional[str]
+                  job_type=None,            # type: Optional[str]
                   tags=None,                # type: Optional[List[str]]
                   access=None,              # type: Optional[str]
                   notification_email=None,  # type: Optional[str]
@@ -150,10 +149,12 @@ class StoreJobs(StoreInterface):
                   sort=None,                # type: Optional[str]
                   page=0,                   # type: int
                   limit=10,                 # type: int
-                  datetime=None,            # type: Optional[DatetimeIntervalType]
+                  min_duration=None,        # type: Optional[int]
+                  max_duration=None,        # type: Optional[int]
+                  datetime_interval=None,   # type: Optional[DatetimeIntervalType]
                   group_by=None,            # type: Optional[Union[str, List[str]]]
                   request=None,             # type: Optional[Request]
-                  ):                        # type: (...) -> Union[JobListAndCount, JobCategoriesAndCount]
+                  ):                        # type: (...) -> JobSearchResult
         raise NotImplementedError
 
     @abc.abstractmethod

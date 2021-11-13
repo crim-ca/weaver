@@ -33,7 +33,7 @@ from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_PLAIN, OUTPU
 from weaver.owsexceptions import OWSNotFound
 from weaver.processes.convert import any2wps_literal_datatype
 from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
-from weaver.utils import get_any_id, get_any_value, get_path_kvp, get_settings, get_weaver_url
+from weaver.utils import get_any_id, get_any_value, get_path_kvp, get_settings, get_weaver_url, repr_json
 from weaver.visibility import VISIBILITY_PUBLIC
 from weaver.wps.utils import get_wps_output_url
 from weaver.wps_restapi import swagger_definitions as sd
@@ -308,6 +308,7 @@ def get_queried_jobs(request):
     service, process = validate_service_process(request)
 
     params = dict(request.params)
+    LOGGER.debug("Job search queries (raw):\n%s", repr_json(params, indent=2))
     for param_name in ["process", "processID", "provider", "service"]:
         params.pop(param_name, None)
     filters = {**params, "process": process, "provider": service}
@@ -322,8 +323,11 @@ def get_queried_jobs(request):
         filters = sd.GetJobsQueries().deserialize(filters)
     except Invalid as ex:
         raise HTTPUnprocessableEntity(json={
-            "code": Invalid.__name__,
-            "description": str(ex)
+            "code": "JobInvalidParameter",
+            "description": "Job query parameters failed validation.",
+            "error": Invalid.__name__,
+            "cause": str(ex),
+            "value": repr_json(ex.value or filters, force_str=False),
         })
 
     detail = filters.pop("detail", False)
@@ -334,19 +338,20 @@ def get_queried_jobs(request):
         encrypt_email(filters["notification_email"], settings)
         if filters.get("notification_email", False) else None
     )
-    filters["datetime"] = datetime_interval_parser(filters["datetime"]) if filters.get("datetime", False) else None
     filters["service"] = filters.pop("provider", None)
+    filters["min_duration"] = filters.pop("minDuration", None)
+    filters["max_duration"] = filters.pop("maxDuration", None)
+    filters["job_type"] = filters.pop("type", None)
 
-    if (
-        filters["datetime"]
-        and filters["datetime"].get("before", False)
-        and filters["datetime"].get("after", False)
-        and filters["datetime"]["after"] > filters["datetime"]["before"]
-    ):
+    dti = datetime_interval_parser(filters["datetime"]) if filters.get("datetime", False) else None
+    if dti and dti.get("before", False) and dti.get("after", False) and dti["after"] > dti["before"]:
         raise HTTPUnprocessableEntity(json={
             "code": "InvalidDateFormat",
             "description": "Datetime at the start of the interval must be less than the datetime at the end."
         })
+    filters.pop("datetime", None)
+    filters["datetime_interval"] = dti
+    LOGGER.debug("Job search queries (processed):\n%s", repr_json(filters, indent=2))
 
     store = get_db(request).get_store(StoreJobs)
     items, total = store.find_jobs(request=request, group_by=groups, **filters)
