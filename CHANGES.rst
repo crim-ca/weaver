@@ -34,6 +34,14 @@ Changes:
 - Add ``type`` field to ``Job`` status information
   (resolves `#351 <https://github.com/crim-ca/weaver/issues/351>`_).
 - Add `OGC-API - Processes` conformance references regarding supported operations for ``Job`` listing and filtering.
+- Add ``minDuration`` and ``maxDuration`` parameters to query ``Job`` listing filtered by specific execution time range
+  (resolves `#268 <https://github.com/crim-ca/weaver/issues/268>`_).
+  Range duration parameters are limited to single values each
+  (relates to `opengeospatial/ogcapi-processes#261 <https://github.com/opengeospatial/ogcapi-processes/issues/261>`_).
+- Require minimally ``pymongo==3.12.0`` and corresponding `MongoDB` ``5.0`` instance to process new filtering queries
+  of ``minDuration`` and ``maxDuration``. Please refer to :ref:`database_migration`
+  and `MongoDB official documentation <https://docs.mongodb.com/manual>`_ for migration methods.
+- Refactor ``Job`` search method to facilitate its extension in the event of future filter parameters.
 - Support contextual WPS output location using ``X-WPS-Output-Context`` header to store ``Job`` results.
   When a ``Job`` is executed by providing this header with a sub-directory, the resulting outputs of the ``Job``
   will be placed and reported under the corresponding location relative to WPS outputs (path and URL).
@@ -55,6 +63,7 @@ Fixes:
 - Fix retrieval of `Pyramid` ``Registry`` and application settings when available *container* is `Werkzeug` ``Request``
   instead of `Pyramid` ``Request``, as employed by underlying HTTP requests in `PyWPS` service.
 - Allow ``group`` query parameter to handle ``Job`` category listing with ``provider`` as ``service`` alias.
+- Improve typing of database and store getter functions to infer correct types and facilitate code auto-complete.
 
 `4.2.1 <https://github.com/crim-ca/weaver/tree/4.2.1>`_ (2021-10-20)
 ========================================================================

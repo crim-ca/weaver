@@ -79,6 +79,8 @@
 .. _Gunicorn: https://gunicorn.org/
 .. _Miniconda: https://docs.conda.io/en/latest/miniconda.html
 .. _MongoDB: https://www.mongodb.com/
+.. |mongodb-docs| replace:: MongoDB official documentation
+.. _mongodb-docs: https://docs.mongodb.com/manual
 
 .. Weaver Configurations
 .. |weaver-config| replace:: ``weaver/config``

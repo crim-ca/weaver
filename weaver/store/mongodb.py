@@ -44,7 +44,7 @@ from weaver.sort import (
 )
 from weaver.status import JOB_STATUS_CATEGORIES, STATUS_ACCEPTED, map_status
 from weaver.store.base import StoreBills, StoreJobs, StoreProcesses, StoreQuotes, StoreServices
-from weaver.utils import get_base_url, get_sane_name, get_weaver_url, islambda, now
+from weaver.utils import get_base_url, get_sane_name, get_weaver_url, islambda, now, repr_json
 from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC, VISIBILITY_VALUES
 from weaver.wps.utils import get_wps_url
 
@@ -53,12 +53,13 @@ if TYPE_CHECKING:
     from typing import Any, Callable, Dict, List, Optional, Tuple, Union
     from pymongo.collection import Collection
 
-    from weaver.store.base import DatetimeIntervalType, JobCategoriesAndCount, JobGroupCategory, JobListAndCount
+    from weaver.store.base import DatetimeIntervalType, JobGroupCategory, JobSearchResult
     from weaver.typedefs import AnyProcess, AnyProcessType, AnyValue
 
     MongodbValue = Union[AnyValue, datetime.datetime]
-    MongodbSearchFilter = Union[MongodbValue, Dict[str, Union[MongodbValue, List[MongodbValue]]]]
-    MongodbSearchPipeline = List[Dict[str, Dict[str, MongodbSearchFilter]]]
+    MongodbSearchFilter = Dict[str, Union[MongodbValue, List[MongodbValue], Dict[str, AnyValue]]]
+    MongodbSearchStep = Union[MongodbValue, MongodbSearchFilter]
+    MongodbSearchPipeline = List[Dict[str, Dict[str, MongodbSearchStep]]]
 
 LOGGER = logging.getLogger(__name__)
 
@@ -548,7 +549,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
     def find_jobs(self,
                   process=None,             # type: Optional[str]
                   service=None,             # type: Optional[str]
-                  type=None,                # type: Optional[str]
+                  job_type=None,            # type: Optional[str]
                   tags=None,                # type: Optional[List[str]]
                   access=None,              # type: Optional[str]
                   notification_email=None,  # type: Optional[str]
@@ -556,10 +557,12 @@ class MongodbJobStore(StoreJobs, MongodbStore):
                   sort=None,                # type: Optional[str]
                   page=0,                   # type: int
                   limit=10,                 # type: int
-                  datetime=None,            # type: Optional[DatetimeIntervalType]
+                  min_duration=None,        # type: Optional[int]
+                  max_duration=None,        # type: Optional[int]
+                  datetime_interval=None,   # type: Optional[DatetimeIntervalType]
                   group_by=None,            # type: Optional[Union[str, List[str]]]
                   request=None,             # type: Optional[Request]
-                  ):                        # type: (...) -> Union[JobListAndCount, JobCategoriesAndCount]
+                  ):                        # type: (...) -> JobSearchResult
         """
         Finds all jobs in `MongoDB` storage matching search filters to obtain results with requested paging or grouping.
 
@@ -590,7 +593,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
         :param request: request that lead to this call to obtain permissions and user id.
         :param process: process name to filter matching jobs.
         :param service: service name to filter matching jobs.
-        :param type: filter matching jobs for given type.
+        :param job_type: filter matching jobs for given type.
         :param tags: list of tags to filter matching jobs.
         :param access: access visibility to filter matching jobs (default: :py:data:`VISIBILITY_PUBLIC`).
         :param notification_email: notification email to filter matching jobs.
@@ -598,26 +601,135 @@ class MongodbJobStore(StoreJobs, MongodbStore):
         :param sort: field which is used for sorting results (default: creation date, descending).
         :param page: page number to return when using result paging (only when not using ``group_by``).
         :param limit: number of jobs per page when using result paging (only when not using ``group_by``).
-        :param datetime: field used for filtering data by creation date with a given date or interval of date.
+        :param min_duration: minimal duration (seconds) between started time and current/finished time of jobs to find.
+        :param max_duration: maximum duration (seconds) between started time and current/finished time of jobs to find.
+        :param datetime_interval: field used for filtering data by creation date with a given date or interval of date.
         :param group_by: one or many fields specifying categories to form matching groups of jobs (paging disabled).
         :returns: (list of jobs matching paging OR list of {categories, list of jobs, count}) AND total of matched job.
         """
+        search_filters = {}
+        if notification_email is not None:
+            search_filters["notification_email"] = notification_email
 
+        search_filters.update(self._apply_status_filter(status))
+        search_filters.update(self._apply_ref_or_type_filter(job_type, process, service))
+        search_filters.update(self._apply_access_filter(access, request))
+        search_filters.update(self._apply_datetime_filter(datetime_interval))
+
+        # minimal operation, only search for matches and sort them
+        pipeline = [{"$match": search_filters}]  # expected for all filters except 'duration'
+        self._apply_duration_filter(pipeline, min_duration, max_duration)
+
+        sort_method = {"$sort": self._apply_sort_method(sort)}
+        pipeline.append(sort_method)
+
+        # results by group categories or with job list paging
+        if group_by:
+            results = self._find_jobs_grouped(pipeline, group_by)
+        else:
+            results = self._find_jobs_paging(pipeline, page, limit)
+        return results
+
+    def _find_jobs_grouped(self, pipeline, group_categories):
+        # type: (MongodbSearchPipeline, List[str]) -> Tuple[JobGroupCategory, int]
+        """
+        Retrieves jobs regrouped by specified field categories and predefined search pipeline filters.
+        """
+        groups = [group_categories] if isinstance(group_categories, str) else group_categories
+        has_provider = "provider" in groups
+        if has_provider:
+            groups.remove("provider")
+            groups.append("service")
+        group_categories = {field: "$" + field for field in groups}  # fields that can generate groups
+        group_pipeline = [{
+            "$group": {
+                "_id": group_categories,        # grouping categories to aggregate corresponding jobs
+                "jobs": {"$push": "$$ROOT"},    # matched jobs for corresponding grouping categories
+                "count": {"$sum": 1}},          # count of matches for corresponding grouping categories
+            }, {                        # noqa: E123  # ignore indentation checks
+            "$project": {
+                "_id": False,           # removes "_id" field from results
+                "category": "$_id",     # renames "_id" grouping categories key
+                "jobs": "$jobs",        # preserve field
+                "count": "$count",      # preserve field
+            }
+        }]
+        pipeline = self._apply_total_result(pipeline, group_pipeline)
+        LOGGER.debug("Job search pipeline:\n%s", repr_json(pipeline, indent=2))
+
+        found = list(self.collection.aggregate(pipeline))
+        items = found[0]["itemsPipeline"]
+        # convert to Job object where applicable, since pipeline result contains (category, jobs, count)
+        items = [{k: (v if k != "jobs" else [Job(j) for j in v]) for k, v in i.items()} for i in items]
+        if has_provider:
+            for group_result in items:
+                group_service = group_result["category"].pop("service", None)
+                group_result["category"]["provider"] = group_service
+        total = found[0]["totalPipeline"][0]["total"] if items else 0
+        return items, total
+
+    def _find_jobs_paging(self, pipeline, page, limit):
+        # type: (MongodbSearchPipeline, int, int) -> Tuple[List[Job], int]
+        """
+        Retrieves jobs limited by specified paging parameters and predefined search pipeline filters.
+        """
+        paging_pipeline = [{"$skip": page * limit}, {"$limit": limit}]  # type: List[MongodbSearchStep]
+        pipeline = self._apply_total_result(pipeline, paging_pipeline)
+        LOGGER.debug("Job search pipeline:\n%s", repr_json(pipeline, indent=2))
+
+        found = list(self.collection.aggregate(pipeline))
+        items = [Job(item) for item in found[0]["itemsPipeline"]]
+        total = found[0]["totalPipeline"][0]["total"] if items else 0
+        return items, total
+
+    @staticmethod
+    def _apply_total_result(search_pipeline, extra_pipeline):
+        # type: (MongodbSearchPipeline, MongodbSearchPipeline) -> MongodbSearchPipeline
+        """
+        Extends the pipeline operations in order to obtain the grand total of matches in parallel to other filtering.
+
+        A dual-branch search pipeline is created to apply distinct operations on each facet.
+        The initial search are executed only once for both facets.
+        The first obtains results with other processing steps specified, and the second calculates the total results.
+
+        :param search_pipeline: pipeline employed to obtain initial matches against search filters.
+        :param extra_pipeline: additional steps to generate specific results.
+        :return: combination of the grand total of all items and their following processing representation.
+        """
+        total_pipeline = [{
+            "$facet": {
+                "itemsPipeline": extra_pipeline,
+                "totalPipeline": [
+                    {"$count": "total"}
+                ]
+            }
+        }]
+        return search_pipeline + total_pipeline  # noqa
+
+    @staticmethod
+    def _apply_tags_filter(tags):
         bad_tags = [v for v in VISIBILITY_VALUES if v in tags]
         if any(bad_tags):
             raise JobInvalidParameter(json={
+                "code": "JobInvalidParameter",
                 "description": "Visibility values not acceptable in 'tags', use 'access' instead.",
                 "cause": "Invalid value{} in 'tag': {}".format("s" if len(bad_tags) > 1 else "", ",".join(bad_tags)),
                 "locator": "tags",
             })
+        if tags:
+            return {"tags": {"$all": tags}}
+        return {}
 
-        search_filters = {}  # type: Dict[str, MongodbSearchFilter]
-
+    @staticmethod
+    def _apply_access_filter(access, request):
+        # type: (str, Request) -> MongodbSearchFilter
+        search_filters = {}
         if not request:
-            search_filters.setdefault("access", VISIBILITY_PUBLIC)
+            search_filters["access"] = VISIBILITY_PUBLIC
         else:
-            if request.has_permission("admin") and access in VISIBILITY_VALUES:
-                search_filters["access"] = access
+            if request.authenticated_userid is not None and request.has_permission("admin"):
+                if access in VISIBILITY_VALUES:  # otherwise any
+                    search_filters["access"] = access
             else:
                 user_id = request.authenticated_userid
                 if user_id is not None:
@@ -626,22 +738,16 @@ class MongodbJobStore(StoreJobs, MongodbStore):
                         search_filters["access"] = access
                 else:
                     search_filters["access"] = VISIBILITY_PUBLIC
+        return search_filters
 
-        if tags:
-            search_filters["tags"] = {"$all": tags}
+    @staticmethod
+    def _apply_ref_or_type_filter(job_type, process, service):
+        # type: (Optional[str], Optional[str], Optional[str]) -> MongodbSearchFilter
 
-        if status in JOB_STATUS_CATEGORIES:
-            category_statuses = list(JOB_STATUS_CATEGORIES[status])
-            search_filters["status"] = {"$in": category_statuses}
-        elif status:
-            search_filters["status"] = status
-
-        if notification_email is not None:
-            search_filters["notification_email"] = notification_email
-
-        if type == "process":
+        search_filters = {}  # type: MongodbSearchFilter
+        if job_type == "process":
             search_filters["service"] = None
-        elif type == "provider":
+        elif job_type == "provider":
             search_filters["service"] = {"$ne": None}
 
         if process is not None:
@@ -654,25 +760,89 @@ class MongodbJobStore(StoreJobs, MongodbStore):
             # (e.g.: type=process and service=<name> cannot ever yield anything)
             if search_filters.get("service", -1) is None:
                 raise JobInvalidParameter(json={
-                    "description": "Ambiguous type requested contradicts with requested service provider.",
-                    "cause": {"service": service, "type": type}
+                    "code": "JobInvalidParameter",
+                    "description": "Ambiguous job type requested contradicts with requested service provider.",
+                    "value": {"service": service, "type": job_type}
                 })
             search_filters["service"] = service
 
-        if datetime is not None:
-            query = {}
+        return search_filters
 
-            if datetime.get("after", False):
-                query["$gte"] = datetime["after"]
+    @staticmethod
+    def _apply_status_filter(status):
+        # type: (Optional[str]) -> MongodbSearchFilter
+        search_filters = {}  # type: MongodbSearchFilter
+        if status in JOB_STATUS_CATEGORIES:
+            category_statuses = list(JOB_STATUS_CATEGORIES[status])
+            search_filters["status"] = {"$in": category_statuses}
+        elif status:
+            search_filters["status"] = status
+        return search_filters
 
-            if datetime.get("before", False):
-                query["$lte"] = datetime["before"]
+    @staticmethod
+    def _apply_datetime_filter(datetime_interval):
+        # type: (Optional[DatetimeIntervalType]) -> MongodbSearchFilter
+        search_filters = {}
+        if datetime_interval is not None:
+            if datetime_interval.get("after", False):
+                search_filters["$gte"] = datetime_interval["after"]
 
-            if datetime.get("match", False):
-                query = datetime["match"]
+            if datetime_interval.get("before", False):
+                search_filters["$lte"] = datetime_interval["before"]
 
-            search_filters["created"] = query
+            if datetime_interval.get("match", False):
+                search_filters = datetime_interval["match"]
 
+            return {"created": search_filters}
+        return {}
+
+    @staticmethod
+    def _apply_duration_filter(pipeline, min_duration, max_duration):
+        # type: (MongodbSearchPipeline, Optional[int], Optional[int]) -> MongodbSearchPipeline
+        """
+        Generate the filter required for comparing against :meth:`Job.duration`.
+
+        Assumes that the first item of the pipeline is ``$match`` since steps must be applied before and after.
+        Pipeline is modified inplace and returned as well.
+        """
+        if min_duration is not None or max_duration is not None:
+            # validate values when both are provided, zero-minimum already enforced by schema validators
+            if min_duration is not None and max_duration is not None and min_duration >= max_duration:
+                raise JobInvalidParameter(json={
+                    "code": "JobInvalidParameter",
+                    "description": "Duration parameters are not forming a valid range.",
+                    "cause": "Parameter 'minDuration' must be smaller than 'maxDuration'.",
+                    "value": {"minDuration": min_duration, "maxDuration": max_duration}
+                })
+
+            # duration is not directly stored in the database (as it can change), it must be computed inplace
+            duration_field = {
+                "$addFields": {
+                    "duration": {  # becomes 'null' if cannot be computed (e.g.: not started)
+                        "$dateDiff": {
+                            # compute the same way as Job.duration
+                            "startDate": "$started",
+                            "endDate": {"$cond": {"if": "$finished", "then": "$finished", "else": "$$NOW"}},
+                            "unit": "second"
+                        }
+                    }
+                }
+            }
+            pipeline.insert(0, duration_field)
+
+            # apply duration search conditions
+            duration_filter = {"$ne": None}
+            if min_duration is not None:
+                duration_filter["$gte"] = min_duration
+            if max_duration is not None:
+                duration_filter["$lte"] = max_duration
+            pipeline[1]["$match"].update({"duration": duration_filter})
+        return pipeline
+
+    @staticmethod
+    def _apply_sort_method(sort_field):
+        # type: (Optional[str]) -> MongodbSearchFilter
+        sort = sort_field  # keep original sort field in case of error
         if sort is None:
             sort = SORT_CREATED
         elif sort == SORT_USER:
@@ -684,54 +854,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
                 "value": str(sort),
             })
         sort_order = DESCENDING if sort in (SORT_FINISHED, SORT_CREATED) else ASCENDING
-        sort_criteria = {sort: sort_order}
-
-        # minimal operation, only search for matches and sort them
-        pipeline = [{"$match": search_filters}, {"$sort": sort_criteria}]
-
-        # results by group categories
-        if group_by:
-            groups = [group_by] if isinstance(group_by, str) else group_by
-            items = self._find_jobs_grouped(pipeline, groups)
-
-        # results with paging
-        else:
-            pipeline.extend([{"$skip": page * limit}, {"$limit": limit}])
-            found = self.collection.aggregate(pipeline)
-            items = [Job(item) for item in list(found)]
-
-        total = self.collection.count_documents(search_filters)
-        return items, total
-
-    def _find_jobs_grouped(self, pipeline, groups):
-        # type: (MongodbSearchPipeline, List[str]) -> List[JobGroupCategory]
-
-        has_provider = "provider" in groups
-        if has_provider:
-            groups.remove("provider")
-            groups.append("service")
-        group_categories = {field: "$" + field for field in groups}  # fields that can generate groups
-        pipeline.extend([{
-            "$group": {
-                "_id": group_categories,        # grouping categories to aggregate corresponding jobs
-                "jobs": {"$push": "$$ROOT"},    # matched jobs for corresponding grouping categories
-                "count": {"$sum": 1}},          # count of matches for corresponding grouping categories
-            }, {                        # noqa: E123  # ignore indentation checks
-            "$project": {
-                "_id": False,           # removes "_id" field from results
-                "category": "$_id",     # renames "_id" grouping categories key
-                "jobs": "$jobs",        # preserve field
-                "count": "$count",      # preserve field
-            }
-        }])
-        found = self.collection.aggregate(pipeline)
-        items = [{k: (v if k != "jobs" else [Job(j) for j in v])  # convert to Job object where applicable
-                  for k, v in i.items()} for i in found]
-        if has_provider:
-            for group_result in items:
-                group_service = group_result["category"].pop("service", None)
-                group_result["category"]["provider"] = group_service
-        return items
+        return {sort: sort_order}
 
     def clear_jobs(self):
         # type: () -> bool
