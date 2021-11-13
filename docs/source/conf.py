@@ -16,8 +16,8 @@
 #   as they refer to valid setting names defined by sphinx
 # pylint: disable=C0103
 
-import logging
 import json
+import logging
 import os
 import re
 import sys

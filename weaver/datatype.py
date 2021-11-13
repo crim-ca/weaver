@@ -615,7 +615,7 @@ class Job(Base):
         Obtain the type of the element associated to the creation of this job.
 
         .. seealso::
-            - Defined in |ogc-statusInfo|
+            - Defined in https://docs.ogc.org/DRAFTS/18-062.html#_response_6 (within ``StatusInfo`` schema).
             - Queried with https://docs.ogc.org/DRAFTS/18-062.html#_parameter_type
         """
         if self.service is None:
