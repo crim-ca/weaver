@@ -639,7 +639,8 @@ def mocked_dismiss_process():
         with mock_celery_revoke:
             yield   # for direct use by context or decorator
     finally:
-        return (mocked_dismiss_process, )  # for use by combined ExitStack context
+        pass
+    return (mock_celery_revoke, )  # for use by combined ExitStack context
 
 
 def mocked_process_job_runner(job_task_id="mocked-job-id"):
