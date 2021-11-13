@@ -16,6 +16,7 @@
 #   as they refer to valid setting names defined by sphinx
 # pylint: disable=C0103
 
+import logging
 import json
 import os
 import re
@@ -37,6 +38,7 @@ from weaver import __meta__  # isort:skip # noqa: E402 # pylint: disable=C0413
 # for api generation
 from weaver.wps_restapi.api import get_openapi_json  # isort:skip # noqa: E402
 from pyramid.config import Configurator  # isort:skip # noqa: E402
+from sphinx.domains.std import warn_missing_reference  # isort:skip # noqa: E402
 
 DOC_PKG_ROOT = os.path.join(DOC_PRJ_ROOT, __meta__.__name__)
 
@@ -440,3 +442,54 @@ nitpick_ignore = [
 nitpick_ignore_regex = [
     ("paramref", ".*")
 ]
+
+# https://www.sphinx-doc.org/en/master/usage/configuration.html#confval-suppress_warnings
+suppress_warnings = [
+    "autosectionlabel.changes",
+    "autosectionlabel.fixes",
+    "autosectionlabel.module contents",
+    "autosectionlabel.submodules",
+    "autosectionlabel.response_subclassing_notes",
+]
+
+# ignore multiple known false-positives caused by autoapi generation
+filter_warning_labels = [
+    ("term", "appstruct"),
+    ("term", "cstruct"),
+    # for "undefined label: x"
+    ("ref", "response_subclassing_notes"),
+    ("ref", "package contents"),
+    ("ref", "module contents"),
+    ("ref", "submodules"),
+]
+
+
+# mute loggers that are not using any connector to allow evaluation before warning
+# avoid getting flooded by false positive autosectionlabel warnings (which we can't fix anyway) to focus on real ones
+troublesome_loggers = [
+    "sphinx.domains.math",
+    "sphinx.domains.std",
+    "sphinx.ext.autosectionlabel",
+    "sphinx.sphinx.ext.autosectionlabel"
+]
+for logger_name in troublesome_loggers:
+    logger = logging.getLogger(logger_name)
+    logger.setLevel(logging.ERROR)
+
+
+def should_filter_warning(app, domain, node) -> bool:
+    typ = node["reftype"]
+    target = node["reftarget"]
+    if (typ, target) in filter_warning_labels:
+        return True  # skip
+    return False
+
+
+def filter_warnings_missing_reference(app, domain, node) -> bool:
+    if should_filter_warning(app, domain, node):
+        return True  # skip
+    return warn_missing_reference(app, domain, node)
+
+
+def setup(app):
+    app.connect("warn-missing-reference", filter_warnings_missing_reference)

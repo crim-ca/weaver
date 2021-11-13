@@ -38,6 +38,9 @@ if TYPE_CHECKING:
 
 @implementer(IExceptionResponse)
 class OWSException(Response, Exception):
+    """
+    Base OWS Exception definition.
+    """
 
     code = "NoApplicableCode"
     value = None
