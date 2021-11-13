@@ -57,7 +57,7 @@ class Wps1Process(WpsProcessInterface):
 
         :param process: original OWS process definition to retrieve expected inputs' formats, values and types.
         :param workflow_inputs: mapping of input IDs and values submitted to the workflow.
-        :return converted OWS inputs ready for submission to remote WPS process.
+        :returns: converted OWS inputs ready for submission to remote WPS process.
         """
         # prepare inputs
         complex_inputs = []

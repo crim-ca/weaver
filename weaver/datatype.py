@@ -486,10 +486,10 @@ class Job(Base):
             Logging level to apply to the logged ``message``. This parameter is ignored if ``errors`` are logged.
         :param status:
             Override status applied in the logged message entry, but does not set it to the job object.
-            Uses the current :prop:`Job.status` value if not specified. Must be one of :mod:`Weaver.status` values.
+            Uses the current :attr:`Job.status` value if not specified. Must be one of :mod:`Weaver.status` values.
         :param progress:
             Override progress applied in the logged message entry, but does not set it to the job object.
-            Uses the current :prop:`Job.progress` value if not specified.
+            Uses the current :attr:`Job.progress` value if not specified.
 
         .. note::
             The job object is updated with the log but still requires to be pushed to database to actually persist it.
@@ -615,7 +615,7 @@ class Job(Base):
         Obtain the type of the element associated to the creation of this job.
 
         .. seealso::
-            - Defined in |ogc-statusInfo|
+            - Defined in https://docs.ogc.org/DRAFTS/18-062.html#_response_6 (within ``StatusInfo`` schema).
             - Queried with https://docs.ogc.org/DRAFTS/18-062.html#_parameter_type
         """
         if self.service is None:
