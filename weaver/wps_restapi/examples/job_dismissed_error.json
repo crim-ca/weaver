@@ -11,9 +11,9 @@
       "hreflang": "en-CA"
     },
     {
-      "href": "http://schema-example.com/jobs",
+      "href": "http://schema-example.com/jobs/29af3a33-0a3e-477d-863e-efccc97e0b02",
       "rel": "alternate",
-      "title": "Job status specific endpoint.",
+      "title": "Job status generic endpoint.",
       "type": "application/json",
       "hreflang": "en-CA"
     },

@@ -1010,13 +1010,13 @@ class Job(Base):
         settings = get_settings(container)
         base_url = get_wps_restapi_base_url(settings)
         job_url = self._job_url(base_url)  # full URL
-        job_path = "{}{}".format(base_url, sd.jobs_service.path.format(job_id=self.id))
+        job_path = "{}{}".format(base_url, sd.job_service.path.format(job_id=self.id))
         job_exec = job_url.rsplit("/", 1)[0] + "/execution"
         job_list = "{}{}".format(base_url, sd.jobs_service.path)
         job_links = [
             {"href": job_url, "rel": "status", "title": "Job status."},  # OGC
             {"href": job_url, "rel": "monitor", "title": "Job monitoring location."},  # IANA
-            {"href": job_path, "rel": "alternate", "title": "Job status specific endpoint."},  # IANA
+            {"href": job_path, "rel": "alternate", "title": "Job status generic endpoint."},  # IANA
             {"href": job_list, "rel": "collection", "title": "List of submitted jobs."},  # IANA
             {"href": job_list, "rel": "http://www.opengis.net/def/rel/ogc/1.0/job-list",  # OGC
              "title": "List of submitted jobs."},

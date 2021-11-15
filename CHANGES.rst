@@ -51,6 +51,7 @@ Fixes:
 - Fix incorrectly configured API views for batch ``Job`` dismiss operation with ``DELETE /jobs`` and corresponding
   endpoints for ``Process`` and ``Provider`` paths.
 - Fix invalid ``Job`` links sometimes containing duplicate ``/`` occurrences.
+- Fix invalid ``Job`` link URL for ``alternate`` relationship.
 
 `4.2.1 <https://github.com/crim-ca/weaver/tree/4.2.1>`_ (2021-10-20)
 ========================================================================
