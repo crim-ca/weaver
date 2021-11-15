@@ -17,6 +17,7 @@
 # pylint: disable=C0103
 
 import json
+import logging
 import os
 import re
 import sys
@@ -28,7 +29,6 @@ DOC_SRC_ROOT = os.path.abspath(os.path.dirname(__file__))
 DOC_DIR_ROOT = os.path.dirname(DOC_SRC_ROOT)
 DOC_PRJ_ROOT = os.path.dirname(DOC_DIR_ROOT)
 DOC_BLD_ROOT = os.path.join(DOC_DIR_ROOT, "build")
-DOC_PKG_ROOT = os.path.join(DOC_PRJ_ROOT, "weaver")
 sys.path.insert(0, os.path.abspath(DOC_SRC_ROOT))
 sys.path.insert(0, os.path.abspath(DOC_DIR_ROOT))
 sys.path.insert(0, os.path.abspath(DOC_PRJ_ROOT))
@@ -38,6 +38,9 @@ from weaver import __meta__  # isort:skip # noqa: E402 # pylint: disable=C0413
 # for api generation
 from weaver.wps_restapi.api import get_openapi_json  # isort:skip # noqa: E402
 from pyramid.config import Configurator  # isort:skip # noqa: E402
+from sphinx.domains.std import warn_missing_reference  # isort:skip # noqa: E402
+
+DOC_PKG_ROOT = os.path.join(DOC_PRJ_ROOT, __meta__.__name__)
 
 # -- General configuration ---------------------------------------------
 
@@ -119,6 +122,7 @@ autoapi_dirs = [DOC_PKG_ROOT]
 autoapi_file_pattern = "*.py"
 autoapi_options = ["members", "undoc-members", "private-members"]
 autoapi_python_class_content = "both"   # class|both|init
+autoapi_template_dir = "../_templates/autoapi"
 
 # sphinx_autodoc_typehints
 set_type_checking_flag = True
@@ -159,7 +163,7 @@ release = __meta__.__version__
 #
 # This is also used if you do content translation via gettext catalogs.
 # Usually you set "language" from the command line for these cases.
-language = None
+language = "en"
 
 # There are two options for replacing |today|: either, you set today to some
 # non-false value, then it is used:
@@ -307,7 +311,7 @@ html_sidebars = {
 # html_search_scorer = 'scorer.js'
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = "projectdoc"
+htmlhelp_basename = __meta__.__name__
 
 # -- Options for LaTeX output ---------------------------------------------
 
@@ -324,7 +328,7 @@ latex_elements = {
 
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title,
-#  author, documentclass [howto, manual, or own class]).
+#  author, document class [howto, manual, or own class]).
 latex_file = "{}.tex".format(__meta__.__name__)
 latex_documents = [
     (master_doc, latex_file, master_title, __meta__.__author__, "manual"),
@@ -355,7 +359,7 @@ latex_documents = [
 
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
-man_pages = [(master_doc, "project", master_title, [author], 1)]
+man_pages = [(master_doc, __meta__.__name__, master_title, [author], 1)]
 
 # If true, show URL addresses after external links.
 # man_show_urls = False
@@ -369,11 +373,11 @@ man_pages = [(master_doc, "project", master_title, [author], 1)]
 texinfo_documents = [
     (
         master_doc,
-        "project",
+        __meta__.__name__,
         master_title,
         author,
-        "project",
-        "One line description of project.",
+        __meta__.__name__,
+        __meta__.__description__,
         "Miscellaneous",
     )
 ]
@@ -395,7 +399,7 @@ texinfo_documents = [
 # intersphinx_mapping = {'https://docs.python.org/': None}
 intersphinx_mapping = {
     "python": ("http://docs.python.org/", None),
-    "weaver": (__meta__.__documentation_url__, None),
+    __meta__.__name__: ("{}/en/latest".format(__meta__.__documentation_url__), None),
 }
 
 # linkcheck options
@@ -428,11 +432,64 @@ linkcheck_ignore = [
 linkcheck_timeout = 30
 linkcheck_retries = 5
 
-# Link references always present on RST page.
-rst_epilog = """
-.. _Sphinx: http://sphinx-doc.org/
-.. _reStructuredText: http://sphinx-doc.org/rest.html
-.. _Read the Docs: https://readthedocs.org
-.. _Weaver: https://github.com/crim-ca/weaver
-.. _PyWPS: http://pywps.org/
-"""
+# known warning issues to be ignored
+# https://www.sphinx-doc.org/en/master/usage/configuration.html#confval-nitpick_ignore
+nitpicky = False
+nitpick_ignore = [
+    ("ref.term", "appstruct"),
+    ("ref.term", "cstruct"),
+]
+nitpick_ignore_regex = [
+    ("paramref", ".*")
+]
+
+# https://www.sphinx-doc.org/en/master/usage/configuration.html#confval-suppress_warnings
+suppress_warnings = [
+    "autosectionlabel.changes",
+    "autosectionlabel.fixes",
+    "autosectionlabel.module contents",
+    "autosectionlabel.submodules",
+    "autosectionlabel.response_subclassing_notes",
+]
+
+# ignore multiple known false-positives caused by autoapi generation
+filter_warning_labels = [
+    ("term", "appstruct"),
+    ("term", "cstruct"),
+    # for "undefined label: x"
+    ("ref", "response_subclassing_notes"),
+    ("ref", "package contents"),
+    ("ref", "module contents"),
+    ("ref", "submodules"),
+]
+
+
+# mute loggers that are not using any connector to allow evaluation before warning
+# avoid getting flooded by false positive autosectionlabel warnings (which we can't fix anyway) to focus on real ones
+troublesome_loggers = [
+    "sphinx.domains.math",
+    "sphinx.domains.std",
+    "sphinx.ext.autosectionlabel",
+    "sphinx.sphinx.ext.autosectionlabel"
+]
+for logger_name in troublesome_loggers:
+    logger = logging.getLogger(logger_name)
+    logger.setLevel(logging.ERROR)
+
+
+def should_filter_warning(app, domain, node) -> bool:
+    typ = node["reftype"]
+    target = node["reftarget"]
+    if (typ, target) in filter_warning_labels:
+        return True  # skip
+    return False
+
+
+def filter_warnings_missing_reference(app, domain, node) -> bool:
+    if should_filter_warning(app, domain, node):
+        return True  # skip
+    return warn_missing_reference(app, domain, node)
+
+
+def setup(app):
+    app.connect("warn-missing-reference", filter_warnings_missing_reference)

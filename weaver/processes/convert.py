@@ -655,7 +655,8 @@ def is_cwl_array_type(io_info):
     """
     Verifies if the specified I/O corresponds to one of various CWL array type definitions.
 
-    returns ``tuple(is_array, io_type, io_mode, io_allow)`` where:
+    :returns:
+        ``tuple(is_array, io_type, io_mode, io_allow)`` where:
         - ``is_array``: specifies if the I/O is of array type.
         - ``io_type``: array element type if ``is_array`` is True, type of ``io_info`` otherwise.
         - ``io_mode``: validation mode to be applied if sub-element requires it, defaults to ``MODE.NONE``.
@@ -727,7 +728,8 @@ def is_cwl_enum_type(io_info):
     """
     Verifies if the specified I/O corresponds to a CWL enum definition.
 
-    returns ``tuple(is_enum, io_type, io_allow)`` where:
+    :returns:
+        ``tuple(is_enum, io_type, io_allow)`` where:
         - ``is_enum``: specifies if the I/O is of enum type.
         - ``io_type``: enum base type if ``is_enum=True``, type of ``io_info`` otherwise.
         - ``io_mode``: validation mode to be applied if input requires it, defaults to ``MODE.NONE``.

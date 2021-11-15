@@ -351,7 +351,7 @@ class XMLObject(object):
     """
     Object that provides mapping to known XML extensions for OpenAPI schema definition.
 
-    Name of the schema definition in the OpenAPI will use :prop:`prefix` and the schema class name.
+    Name of the schema definition in the OpenAPI will use :attr:`prefix` and the schema class name.
     Prefix can be omitted from the schema definition name by setting it to :class:`colander.drop`.
     The value of ``title`` provided as option or
 
@@ -872,7 +872,7 @@ class SortableMappingSchema(ExtendedNodeInterface, ExtendedSchemaBase):
     Adds sorting capabilities to mapping schema.
 
     Extended schema nodes that inherit from :class:`colander.Mapping` schema-type such that they can request
-    ordering of resulting fields by overriding properties :prop:`_sort_first` and :prop:`_sort_after` within
+    ordering of resulting fields by overriding properties :attr:`_sort_first` and :attr:`_sort_after` within
     the schema definition with lists of fields names to sort.
 
     .. seealso::
