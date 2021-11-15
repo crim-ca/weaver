@@ -49,9 +49,15 @@ class ReferenceStatusLocationStorage(StorageAbstract):
         self._file = get_wps_local_status_location(url_location, settings, must_exist=False)
 
     def url(self, *_, **__):
+        """
+        URL location of the XML status file.
+        """
         return self._url
 
     def location(self, *_, **__):
+        """
+        Directory location of the XML status file.
+        """
         return self._file
 
     def store(self, *_, **__):
