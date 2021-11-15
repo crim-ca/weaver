@@ -514,7 +514,7 @@ def cancel_job_batch(request):
         try:
             dismiss_job_task(job, request)
         except JobNotFound as exc:
-            LOGGER.debug("Job [%s] cannot be dismissed: %s.", exc.description)
+            LOGGER.debug("Job [%s] cannot be dismissed: %s.", job_id, exc.description)
 
     body = sd.BatchDismissJobsBodySchema().deserialize({"jobs": found_jobs})
     body["description"] = "Following jobs have been successfully dismissed."
