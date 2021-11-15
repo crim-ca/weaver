@@ -85,7 +85,7 @@ def ows_response_tween(request, handler):
     # FIXME:
     #   https://github.com/crim-ca/weaver/issues/215
     #   convivial generation of this repr format should be directly in common exception class
-    err_msg = "\n  Cause:  [{} {}]".format(request.method, request.url)
+    err_msg = "\n  Cause: [{} {}]".format(request.method, request.url)
     raised_error_repr = error_repr(raised_error)
     if raised_error != return_error:
         err_msg += "\n  Error: [{}]\n  Return: [{}]".format(raised_error_repr, error_repr(return_error))

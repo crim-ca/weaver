@@ -390,17 +390,36 @@ def get_job_status(request):
     return HTTPOk(json=job_status)
 
 
-def cancel_job_task(job, container):
-    # type: (Job, AnySettingsContainer) -> Job
+def raise_job_dismissed(job, container=None):
+    # type: (Job, Optional[AnySettingsContainer]) -> None
+    """
+    Raise the appropriate messages for dismissed job status.
+    """
     if job.status == status.STATUS_DISMISSED:
+        # provide the job status links since it is still available for reference
+        settings = get_settings(container)
+        job_links = job.links(settings)
+        job_links = [link for link in job_links if link["rel"] in ["status", "alternate", "collection", "up"]]
         raise JobGone(
             json={
                 "code": "JobDismissed",
-                "description": "Job was already dismissed.",
-                "value": job.id
+                "description": "Job was dismissed and artifacts have been removed.",
+                "value": job.id,
+                "links": job_links
             }
         )
 
+
+def dismiss_job_task(job, container):
+    # type: (Job, AnySettingsContainer) -> Job
+    """
+    Cancels any pending or running :mod:`Celery` task and removes completed job artifacts.
+
+    :param job: job to cancel or cleanup.
+    :param container:
+    :return:
+    """
+    raise_job_dismissed(job, container)
     if job.status in status.JOB_STATUS_CATEGORIES[status.JOB_STATUS_CATEGORY_RUNNING]:
         # signal to stop celery task. Up to it to terminate remote if any.
         LOGGER.debug("Job [%s] dismiss operation: Canceling task [%s]", job.id, job.task_id)
@@ -445,14 +464,14 @@ def cancel_job_task(job, container):
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def cancel_job(request):
     """
-    Dismiss a job.
+    Dismiss a planned or running job execution, or remove result artifacts of a completed job.
 
     Note:
         Will only stop tracking this particular process execution when not supported by underlying provider
         services such as WPS 1.0. Services supporting cancel operation could attempt to terminate remote jobs.
     """
     job = get_job(request)
-    job = cancel_job_task(job, request)
+    job = dismiss_job_task(job, request)
     return HTTPOk(json={
         "jobID": job.id,
         "status": job.status,
@@ -470,7 +489,7 @@ def cancel_job(request):
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def cancel_job_batch(request):
     """
-    Dismiss multiple jobs.
+    Dismiss operation for multiple jobs.
 
     Note:
         Will only stop tracking jobs when underlying remote provider services do not support cancel operation.
@@ -493,7 +512,7 @@ def cancel_job_batch(request):
             continue
         found_jobs.append(job.id)
         try:
-            cancel_job_task(job, request)
+            dismiss_job_task(job, request)
         except JobNotFound as exc:
             LOGGER.debug("Job [%s] cannot be dismissed: %s.", exc.description)
 
@@ -516,7 +535,7 @@ def get_job_inputs(request):
     """
     job = get_job(request)
     inputs = dict(inputs=[dict(id=get_any_id(_input), value=get_any_value(_input)) for _input in job.inputs])
-    inputs.update(job.links(request, self_link="inputs"))
+    inputs.update({"links": job.links(request, self_link="inputs")})
     inputs = sd.JobInputsSchema().deserialize(inputs)
     return HTTPOk(json=inputs)
 
@@ -534,8 +553,9 @@ def get_job_outputs(request):
     Retrieve the outputs of a job.
     """
     job = get_job(request)
+    raise_job_dismissed(job, request)
     outputs = {"outputs": get_results(job, request)}
-    outputs.update(job.links(request, self_link="outputs"))
+    outputs.update({"links": job.links(request, self_link="outputs")})
     outputs = sd.JobOutputsSchema().deserialize(outputs)
     return HTTPOk(json=outputs)
 
@@ -553,6 +573,7 @@ def get_job_results(request):
     Retrieve the results of a job.
     """
     job = get_job(request)
+    raise_job_dismissed(job, request)
     job_status = status.map_status(job.status)
     if job_status in status.JOB_STATUS_CATEGORIES[status.JOB_STATUS_CATEGORY_RUNNING]:
         raise HTTPNotFound(json={
@@ -578,6 +599,7 @@ def get_job_exceptions(request):
     Retrieve the exceptions of a job.
     """
     job = get_job(request)
+    raise_job_dismissed(job, request)
     exceptions = sd.JobExceptionsSchema().deserialize(job.exceptions)
     return HTTPOk(json=exceptions)
 
@@ -594,6 +616,7 @@ def get_job_logs(request):
     Retrieve the logs of a job.
     """
     job = get_job(request)
+    raise_job_dismissed(job, request)
     logs = sd.JobLogsSchema().deserialize(job.logs)
     return HTTPOk(json=logs)
 

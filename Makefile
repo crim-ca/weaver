@@ -310,14 +310,14 @@ clean-cache:	## remove caches such as DOWNLOAD_CACHE
 	@-rm -fr "$(DOWNLOAD_CACHE)"
 
 .PHONY: clean-docs
-clean-docs:	clean-docs-dirs		## remove documentation artefacts
+clean-docs:	clean-docs-dirs		## remove documentation artifacts
 	@echo "Removing documentation build files..."
 	@$(MAKE) -C "$(APP_ROOT)/docs" clean || true
 
 # extensive cleanup is possible only using sphinx-build
 # allow minimal cleanup when it could not *yet* be installed (dev)
 .PHONY: clean-docs-dirs
-clean-docs-dirs:	## remove documentation artefacts (minimal)
+clean-docs-dirs:	## remove documentation artifacts (minimal)
 	@echo "Removing documentation directories..."
 	@-rm -fr "$(APP_ROOT)/docs/_build"
 	@-rm -fr "$(APP_ROOT)/docs/build"

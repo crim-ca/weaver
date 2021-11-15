@@ -37,8 +37,8 @@ Changes:
   percentage that was reached when that status was set.
 - Improve typing of database and store getter functions to infer correct types and facilitate code auto-complete.
 - Implement ``Job`` `dismiss operation <https://docs.ogc.org/DRAFTS/18-062.html#sec_cons_dismiss>`_ ensuring
-  pending or running tasks are removed and output results are removed from disk.
-- Implement expected HTTP Gone (410) status from already dismissed ``Job`` when requested again.
+  pending or running tasks are removed and output result artifacts are removed from disk.
+- Implement HTTP Gone (410) status from already dismissed ``Job`` when requested again or when fetching its artifacts.
 
 Fixes:
 ------
@@ -50,6 +50,7 @@ Fixes:
 - Improve typing of database and store getter functions to infer correct types and facilitate code auto-complete.
 - Fix incorrectly configured API views for batch ``Job`` dismiss operation with ``DELETE /jobs`` and corresponding
   endpoints for ``Process`` and ``Provider`` paths.
+- Fix invalid ``Job`` links sometimes containing duplicate ``/`` occurrences.
 
 `4.2.1 <https://github.com/crim-ca/weaver/tree/4.2.1>`_ (2021-10-20)
 ========================================================================

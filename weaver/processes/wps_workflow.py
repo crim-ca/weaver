@@ -467,7 +467,7 @@ class WpsWorkflowJob(JobBase):
             job_order = self.joborder
             assert runtime_context.prov_obj
             assert runtime_context.process_run_id
-            runtime_context.prov_obj.used_artefacts(job_order, runtime_context.process_run_id, str(self.name))
+            runtime_context.prov_obj.used_artifacts(job_order, runtime_context.process_run_id, str(self.name))
         outputs = {}  # type: Dict[Text, Text]
         try:
             rcode = 0

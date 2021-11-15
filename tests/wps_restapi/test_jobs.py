@@ -1,3 +1,9 @@
+import shutil
+
+import os
+
+import tempfile
+
 import contextlib
 import datetime
 import json
@@ -63,6 +69,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         cls.settings = {
             "weaver.url": "https://localhost",
             "weaver.wps_email_encrypt_salt": "weaver-test",
+            "weaver.wps_output_dir": "/tmp/weaver-test/wps-outputs",
         }
         cls.config = setup_config_with_mongodb(settings=cls.settings)
         cls.app = get_test_weaver_app(config=cls.config)
@@ -1173,14 +1180,61 @@ class WpsRestApiJobsTest(unittest.TestCase):
     @mocked_dismiss_process()
     def test_job_dismiss_complete_single(self):
         """
-        Jobs that are already *completed* (regardless of success/failure) state flushes results.
+        Jobs that are already *completed* (regardless of success/failure) state removes result artifacts.
 
         Subsequent calls to the same job dismiss operation must respond with HTTP Gone (410) status.
 
         .. seealso::
             OGC specification of dismiss operation: https://docs.ogc.org/DRAFTS/18-062.html#sec_cons_dismiss
         """
+        job_success = self.job_info[0]
+        job_failed = self.job_info[1]
+        assert job_success.status == STATUS_SUCCEEDED, "Job must be in successful state for test"
+        assert job_failed.status == STATUS_FAILED, "Job must be in failed state for test"
 
+        # create dummy files to validate results flush of successful job
+        wps_out_dir = self.settings["weaver.wps_output_dir"]
+        job_out_dir = os.path.join(wps_out_dir, job_success.id)
+        job_out_log = os.path.join(wps_out_dir, job_success.id + ".log")
+        job_out_xml = os.path.join(wps_out_dir, job_success.id + ".xml")
+        os.makedirs(job_out_dir, exist_ok=True)
+        try:
+            with contextlib.ExitStack() as stack:
+                tmp_out1 = stack.enter_context(tempfile.NamedTemporaryFile(mode="w", dir=job_out_dir, suffix=".yml"))
+                tmp_out2 = stack.enter_context(tempfile.NamedTemporaryFile(mode="w", dir=job_out_dir, suffix=".txt"))
+                tmp_out3 = stack.enter_context(tempfile.NamedTemporaryFile(mode="w", dir=job_out_dir, suffix=".tif"))
+                tmp_log = stack.enter_context(open(job_out_log, "w"))  # noqa
+                tmp_xml = stack.enter_context(open(job_out_xml, "w"))  # noqa
+                for tmp_file in [tmp_out1, tmp_out2, tmp_out3, tmp_log, tmp_xml]:
+                    assert os.path.isfile(tmp_file.name)
+
+                job_path = sd.job_service.path.format(job_id=job_success.id)
+                resp = self.app.delete(job_path, headers=self.json_headers)
+                assert resp.status_code == 200
+                assert resp.json["status"] == STATUS_DISMISSED
+
+                for tmp_file in [tmp_out1, tmp_out2, tmp_out3, tmp_log, tmp_xml]:
+                    assert not os.path.exists(tmp_file.name)
+                assert not os.path.exists(job_out_dir)
+
+                # subsequent operations returns Gone for sub-resources of the job execution
+                for sub_path in ["", "/outputs", "/results", "/logs", "/exceptions"]:
+                    path = job_path + sub_path
+                    func = self.app.get if sub_path else self.app.delete
+                    resp = func(path, headers=self.json_headers, expect_errors=True)
+                    assert resp.status_code == 410, "Dismissed job should return 'Gone' status for: [{}]".format(path)
+        except OSError:
+            pass
+        finally:
+            shutil.rmtree(job_out_dir, ignore_errors=True)
+
+        # test on failed job that could have no artifacts at all
+        path = sd.job_service.path.format(job_id=job_failed.id)
+        resp = self.app.delete(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.json["status"] == STATUS_DISMISSED
+        resp = self.app.delete(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 410
 
     @mocked_dismiss_process()
     def test_job_dismiss_batch(self):
@@ -1196,5 +1250,10 @@ class WpsRestApiJobsTest(unittest.TestCase):
 
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
-        self.assert_equal_with_jobs_diffs(resp.json["jobs"], jobs[:2], invert=True)
-        self.assert_equal_with_jobs_diffs(resp.json["jobs"], jobs[2:])
+        self.assert_equal_with_jobs_diffs(resp.json["jobs"], jobs, message="All jobs should still exist after dismiss.")
+
+        for job in jobs[:2]:
+            path = sd.job_service.path.format(job_id=job)
+            resp = self.app.get(path, headers=self.json_headers)
+            assert resp.status_code == 200
+            assert resp.json["status"] == STATUS_DISMISSED, "Job status should have been updated to dismissed."

@@ -1,0 +1,35 @@
+{
+  "code": "JobDismissed",
+  "description": "Job was dismissed and artifacts have been removed.",
+  "value": "29af3a33-0a3e-477d-863e-efccc97e0b02",
+  "links": [
+    {
+      "href": "http://schema-example.com/processes/sleep/jobs/29af3a33-0a3e-477d-863e-efccc97e0b02",
+      "rel": "status",
+      "title": "Job status.",
+      "type": "application/json",
+      "hreflang": "en-CA"
+    },
+    {
+      "href": "http://schema-example.com/jobs",
+      "rel": "alternate",
+      "title": "Job status specific endpoint.",
+      "type": "application/json",
+      "hreflang": "en-CA"
+    },
+    {
+      "href": "http://schema-example.com/jobs",
+      "rel": "collection",
+      "title": "List of submitted jobs.",
+      "type": "application/json",
+      "hreflang": "en-CA"
+    },
+    {
+      "href": "http://schema-example.com/jobs",
+      "rel": "up",
+      "title": "List of submitted jobs.",
+      "type": "application/json",
+      "hreflang": "en-CA"
+    }
+  ]
+}
