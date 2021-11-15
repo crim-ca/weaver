@@ -118,7 +118,7 @@ ways as presented below.
     accomplished. See :ref:`cwl-wps-mapping` section for more details.
 
 
-Package as Literal Unit Block
+Package as Literal Execution Unit Block
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 In this situation, the :term:`CWL` definition is provided as is using JSON-formatted package embedded within the
@@ -146,6 +146,9 @@ In this situation, the :term:`CWL` definition is provided as is using JSON-forma
     }
 
 .. _process-esgf-cwt:
+
+Package as External Execution Unit Reference
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ESGF-CWT
 ----------
@@ -260,9 +263,9 @@ An example body of the `register provider`_ request could be as follows:
     }
 
 
-Then, processes of this registered :ref:`remote-provider` will be accessible. For example, if the referenced service by
-the above URL add a WPS process identified by ``my-process``, its JSON description would be obtained with following
-request (`DescribeProviderProcess`_):
+Then, processes of this registered :ref:`process-remote-provider` will be accessible. For example, if the referenced
+service by the above URL add a WPS process identified by ``my-process``, its JSON description would be obtained with
+following request (`DescribeProviderProcess`_):
 
 .. code-block::
 
@@ -541,7 +544,7 @@ combinations.
 | |ADES|    | - `WPS-1/2`_                              | |file_scheme| | Convert to |http_scheme| [#file2http]_    |
 |           | - `ESGF-CWT`_                             +---------------+-------------------------------------------+
 |           | - `WPS-REST`_ (remote) [#wps3]_           | |http_scheme| | Nothing (unmodified)                      |
-|           | - :ref:`remote-provider`                  +---------------+-------------------------------------------+
+|           | - :ref:`process-remote-provider`          +---------------+-------------------------------------------+
 |           |                                           | |s3_scheme|   | Fetch and convert to |http_scheme| [#s3]_ |
 |           +-------------------------------------------+---------------+-------------------------------------------+
 |           | - `WPS-REST`_ (`CWL`) [#wps3]_            | |file_scheme| | Nothing (file already local)              |
@@ -559,7 +562,7 @@ combinations.
 | |HYBRID|  | - `WPS-1/2`_                              | |file_scheme| | Convert to |http_scheme| [#file2http]_    |
 |           | - `ESGF-CWT`_                             +---------------+-------------------------------------------+
 |           | - `WPS-REST`_ (remote) [#wps3]_           | |http_scheme| | Nothing (unmodified)                      |
-|           | - :ref:`remote-provider`                  +---------------+-------------------------------------------+
+|           | - :ref:`process-remote-provider`          +---------------+-------------------------------------------+
 |           |                                           | |s3_scheme|   | Fetch and convert to |http_scheme| [#s3]_ |
 |           | *Note*: |HYBRID| assumes |ADES| role      |               |                                           |
 |           | (remote processes)                        |               |                                           |
@@ -612,7 +615,7 @@ combinations.
     execution, therefore files are handled just as for any other type of remote :term:`WPS`-like servers. When the
     process contains an actual :term:`CWL` :ref:`Application Package` that defines a ``CommandLineTool`` class
     (including applications with :term:`Docker` image requirement), files are fetched as it will be executed locally.
-    See :ref:`CWL CommandLineTool`, :ref:`WPS-REST` and :ref:`Remote Providers` for further details.
+    See :ref:`CWL CommandLineTool`, :ref:`WPS-REST` and :ref:`Remote Provider` for further details.
 
 .. [#s3]
     When an ``s3://`` file is fetched, is gets downloaded to a temporary ``file://`` location, which is **NOT**
@@ -819,7 +822,7 @@ For example, providing ``X-WPS-Output-Context: project/test-1`` will result in o
 If desired, parameter ``weaver.wps_output_context`` can also be defined in the :ref:`conf_settings` in order to employ
 a default directory location nested under ``weaver.wps_output_dir`` when ``X-WPS-Output-Context`` header is omitted
 from the request. By default, this parameter is not defined (empty) in order to store :term:`Job` results directly under
-the configured :ter:`WPS` output directory.
+the configured :term:`WPS` output directory.
 
 .. note::
     Header ``X-WPS-Output-Context`` is ignored when using `S3` buckets for output location since they are stored
@@ -853,7 +856,8 @@ Obtaining output results, logs or errors
 In the case of successful :term:`Job` execution, the outputs can be retrieved with |result-req|_ request to list
 each corresponding output ``id`` with the generated file reference URL. Keep in mind that those URL's purpose are
 only to fetch the results (not persistent storage), and could therefore be purged after some reasonable amount of time.
-The format should be similar to the following example, with minor variations according to :ref:`Configurations`:
+The format should be similar to the following example, with minor variations according to :ref:`Configuration`
+parameters for the base :term:`WPS` output location:
 
 .. code-block:: json
 

@@ -435,12 +435,12 @@ def _load_package_content(package_dict,                             # type: Dict
     :param loading_context: cwltool context used to create the cwl package (required if ``only_dump_file=False``)
     :param runtime_context: cwltool context used to execute the cwl package (required if ``only_dump_file=False``)
     :param process_offering: JSON body of the process description payload (used as I/O hint ordering)
-    :return:
-        if ``only_dump_file`` is ``True``: ``None``
-        otherwise, tuple of:
-            - instance of ``CWLFactoryCallable``
-            - package type (``PROCESS_WORKFLOW`` or ``PROCESS_APPLICATION``)
-            - mapping of each step ID with their package name that must be run
+    :returns:
+        If ``only_dump_file`` is ``True``: ``None``.
+        Otherwise, tuple of:
+        - instance of ``CWLFactoryCallable``
+        - package type (``PROCESS_WORKFLOW`` or ``PROCESS_APPLICATION``)
+        - mapping of each step ID with their package name that must be run
 
     .. warning::
         Specified :paramref:`tmp_dir` will be deleted on exit.
@@ -656,7 +656,7 @@ def check_package_instance_compatible(package):
     regardless whether remote should be an :term:`ADES` or a remote :term:`Provider` (:term:`WPS` or :term:`ESGF-CWT`).
 
     :param package: CWL definition for the process.
-    :returns reason message if must be executed remotely or ``None`` if it *could* be executed locally.
+    :returns: reason message if must be executed remotely or ``None`` if it *could* be executed locally.
     """
     if _get_package_type(package) == PROCESS_WORKFLOW:
         return "CWL package defines a [{}] process that uses remote step-processes.".format(PROCESS_WORKFLOW)
