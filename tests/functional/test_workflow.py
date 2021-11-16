@@ -19,7 +19,6 @@ import yaml
 from pyramid import testing
 from pyramid.httpexceptions import HTTPCreated, HTTPNotFound, HTTPOk
 from pyramid.settings import asbool
-from responses import RequestsMock
 # use 'Web' prefix to avoid pytest to pick up these classes and throw warnings
 from webtest import TestApp as WebTestApp
 
@@ -29,6 +28,7 @@ from tests.utils import (
     get_test_weaver_app,
     mocked_execute_process,
     mocked_sub_requests,
+    mocked_wps_output,
     setup_config_with_mongodb
 )
 from weaver import WEAVER_ROOT_DIR
@@ -612,7 +612,10 @@ class WorkflowTestRunnerBase(TestCase):
                 cls.app.set_cookie(cookie_name, cookie_value)
 
             if with_mock_req:
-                resp = mocked_sub_requests(cls.app, method, url, **kw)
+                # NOTE:
+                #  Very important to mock requests only matching local test application.
+                #  Otherwise, other mocks like 'mock_wps_output' cannot do their job since no real request gets fired.
+                resp = mocked_sub_requests(cls.app, method, url, only_local=True, **kw)
             else:
                 resp = cls.app._gen_request(method, url, **kw)
 
@@ -652,7 +655,7 @@ class WorkflowTestRunnerBase(TestCase):
         # test will log basic information
         self.__class__.log_full_trace = log_full_trace
 
-        # deploy processes and make them visible for workflows
+        # deploy processes and make them visible for workflow
         path_deploy = "/processes"
         for process_id in test_application_ids:
             path_visible = "{}/{}/visibility".format(path_deploy, self.test_processes_info[process_id].test_id)
@@ -663,30 +666,27 @@ class WorkflowTestRunnerBase(TestCase):
             self.request("PUT", path_visible, status=HTTPOk.code, headers=self.headers, json=data_visible,
                          message="Expect visible application process.")
 
+        # deploy workflow process itself and make visible
+        workflow_info = self.test_processes_info[test_workflow_id]
+        self.request("POST", path_deploy, status=HTTPCreated.code, headers=self.headers,
+                     json=workflow_info.deploy_payload,
+                     message="Expect deployed workflow process.")
+        process_path = "{}/{}".format(path_deploy, workflow_info.test_id)
+        visible_path = "{}/visibility".format(process_path)
+        visible = {"value": VISIBILITY_PUBLIC}
+        resp = self.request("PUT", visible_path, json=visible, status=HTTPOk.code, headers=self.headers)
+        self.assert_test(lambda: resp.json.get("value") == VISIBILITY_PUBLIC,
+                         message="Process should be public.")
+
         with contextlib.ExitStack() as stack_exec:
             stack_exec.enter_context(mock.patch("weaver.processes.sources.get_data_source_from_url",
                                                 side_effect=self.mock_get_data_source_from_url))
             if self.is_webtest:
                 # mock execution when running on local Web Test app since no Celery runner is available
-                # mock HTTP HEAD request to validate WPS output access (see 'setUpClass')
                 for mock_exec in mocked_execute_process():
                     stack_exec.enter_context(mock_exec)
-                    mock_resp = RequestsMock()
-                    mock_resp.add("HEAD", self.settings()["weaver.wps_output_url"] + "/*")
-                    stack_exec.enter_context(mock_resp)
-
-            workflow_info = self.test_processes_info[test_workflow_id]
-            self.request("POST", path_deploy, status=HTTPCreated.code, headers=self.headers,
-                         json=workflow_info.deploy_payload,
-                         message="Expect deployed workflow process.")
-
-            # make process visible
-            process_path = "{}/{}".format(path_deploy, workflow_info.test_id)
-            visible_path = "{}/visibility".format(process_path)
-            visible = {"value": VISIBILITY_PUBLIC}
-            resp = self.request("PUT", visible_path, json=visible, status=HTTPOk.code, headers=self.headers)
-            self.assert_test(lambda: resp.json.get("value") == VISIBILITY_PUBLIC,
-                             message="Process should be public.")
+                # mock HTTP HEAD request to validate WPS output access (see 'setUpClass' details)
+                stack_exec.enter_context(mocked_wps_output(self.settings(), mock_head=True, mock_get=False))
 
             # execute workflow
             execute_body = workflow_info.execute_payload

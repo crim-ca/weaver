@@ -1,6 +1,8 @@
 """
 Utility methods for various TestCase setup operations.
 """
+import datetime
+
 import json
 
 import contextlib
@@ -17,6 +19,7 @@ from typing import TYPE_CHECKING
 
 # Note: do NOT import 'boto3' here otherwise 'moto' will not be able to mock it effectively
 import colander
+import mimetypes
 import mock
 import moto
 import pkg_resources
@@ -34,19 +37,28 @@ from weaver.app import main as weaver_app
 from weaver.config import WEAVER_CONFIGURATION_HYBRID, WEAVER_DEFAULT_INI_CONFIG, get_weaver_config_file
 from weaver.database import get_db
 from weaver.datatype import Service
-from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML, CONTENT_TYPE_TEXT_XML, get_extension
+from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML, CONTENT_TYPE_TEXT_PLAIN, CONTENT_TYPE_TEXT_XML
 from weaver.store.mongodb import MongodbJobStore, MongodbProcessStore, MongodbServiceStore
-from weaver.utils import fetch_file, get_header, get_path_kvp, get_url_without_query, get_weaver_url, null
+from weaver.utils import (
+    fetch_file,
+    get_header,
+    get_path_kvp,
+    get_url_without_query,
+    get_weaver_url,
+    null,
+    request_extra
+)
 from weaver.warning import MissingParameterWarning, UnsupportedOperationWarning
+from weaver.wps.utils import get_wps_output_url, map_wps_output_location
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Iterable, List, Optional, Sequence, Type, Union
+    from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Type, Union
 
     import botocore.client  # noqa
     from owslib.wps import Process as ProcessOWSWPS
     from pywps.app import Process as ProcessPyWPS
 
-    from weaver.typedefs import AnyResponseType, SettingsType
+    from weaver.typedefs import AnyRequestType, AnyResponseType, SettingsType
 
     # pylint: disable=C0103,invalid-name,E1101,no-member
     MockPatch = mock._patch  # noqa
@@ -402,7 +414,7 @@ def mocked_sub_requests(app, method_function, *args, only_local=False, **kwargs)
         if getattr(response, "url", None) is None:
             setattr(response, "url", url)
 
-    def mocked_app_request(method, url=None, **req_kwargs):
+    def mocked_app_request(method, url=None, session=None, **req_kwargs):
         """
         Mock requests under the web test application under specific conditions.
 
@@ -413,7 +425,7 @@ def mocked_sub_requests(app, method_function, *args, only_local=False, **kwargs)
         # otherwise, filter according to full URL hostname
         url_test_app = get_weaver_url(app.app.registry)
         if only_local and not url.startswith("/") and not url.startswith(url_test_app):
-            with RealSession() as session:
+            with session or RealSession() as session:
                 return real_request(session, method, url, **req_kwargs)
 
         url, func, req_kwargs = _parse_for_app_req(method, url, **req_kwargs)
@@ -436,12 +448,18 @@ def mocked_sub_requests(app, method_function, *args, only_local=False, **kwargs)
         def json(self):
             return self.json_body
 
+    # ensure that previously created session object is passed to the mocked sub-request to consider
+    # any configured adapters, such as the 'file://' adapter added by 'request_extra' (within '_request_call')
+    class TestSession(RealSession):
+        def request(self, *req_args, **req_kwargs):
+            return mocked_app_request(*req_args, **req_kwargs, session=self)
+
     # permit schema validation against 'mock' scheme during test only
     mock_file_regex = mock.PropertyMock(return_value=colander.Regex(r"^((file|mock)://)?(?:/|[/?]\S+)$"))
     with contextlib.ExitStack() as stack:
         stack.enter_context(mock.patch("requests.request", side_effect=mocked_app_request))
-        stack.enter_context(mock.patch("requests.Session.request", side_effect=mocked_app_request))
-        stack.enter_context(mock.patch("requests.sessions.Session.request", side_effect=mocked_app_request))
+        stack.enter_context(mock.patch("requests.Session.request", new=TestSession.request))
+        stack.enter_context(mock.patch("requests.sessions.Session.request", new=TestSession.request))
         stack.enter_context(mock.patch.object(FileLocal, "validator", new_callable=mock_file_regex))
         stack.enter_context(mock.patch.object(TestResponse, "json", new=TestResponseJsonCallable.json))
         req_url, req_func, kwargs = _parse_for_app_req(method_function, *args, **kwargs)
@@ -603,6 +621,54 @@ def mocked_remote_server_requests_wps1(server_configs,          # type: Union[Mo
         return
 
     return mocked_remote_server_wrapper
+
+
+def mocked_wps_output(settings, mock_get=True, mock_head=True):
+    # type: (SettingsType, bool, bool) -> Union[responses.RequestsMock, MockPatch]
+    """
+    Mocks the mapping resolution from HTTP WPS output URL to hosting of matched local file in WPS output directory.
+
+    .. warning::
+        When combined in a test where :func:`mocked_sub_requests` is employed, parameter ``local_only=True`` must be
+        provided. Otherwise, this mocked response will never be reached since HTTP requests themselves would be mocked
+        beforehand by a :class:`TestApp` request.
+
+    :param settings: Application settings to retrieve WPS output configuration.
+    :param mock_get: Whether to mock HTTP GET methods received on WPS output URL.
+    :param mock_head: Whether to mock HTTP HEAD methods received on WPS output URL.
+    :return: Mocked response that would normally be obtained by a file server hosting WPS output directory.
+    """
+    wps_output_url = get_wps_output_url(settings)
+
+    def request_callback(request):
+        # type: (AnyRequestType) -> Tuple[int, Dict[str, str], str]
+        wps_out_file = map_wps_output_location(request.url, settings, exists=True, file_scheme=True)
+        if wps_out_file and (mock_head and request.method == "HEAD") or (mock_get and request.method == "GET"):
+            resp = request_extra(request.method, wps_out_file, settings=settings)
+            if request.method == "HEAD" and resp.status_code == 200:
+                wps_output_file_path = wps_out_file.replace("file://", "")
+                mime_type, encoding = mimetypes.guess_type(wps_output_file_path)
+                headers = {
+                    "Server": "mocked_wps_output",
+                    "Date": str(datetime.datetime.utcnow()),
+                    "Content-Type": mime_type or CONTENT_TYPE_TEXT_PLAIN,
+                    "Content-Encoding": encoding,
+                    "Content-Length": resp.headers.get("Content-Length", len(resp.content)),
+                    "Last-Modified": str(datetime.datetime.fromtimestamp(os.stat(wps_output_file_path).st_mtime))
+                }
+                return 200, headers, ""
+            return resp.status_code, resp.headers, resp.content
+        elif wps_out_file:
+            return 405, {}, ""
+        return 404, {}, ""
+
+    mock_req = responses.RequestsMock(assert_all_requests_are_fired=False)
+    any_wps_output_url = re.compile(r"{}/[\w\-_/.]+".format(wps_output_url))  # match any sub-directory/file structure
+    if mock_get:
+        mock_req.add_callback(responses.GET, any_wps_output_url, callback=request_callback)
+    if mock_head:
+        mock_req.add_callback(responses.HEAD, any_wps_output_url, callback=request_callback)
+    return mock_req
 
 
 def mocked_execute_process():
