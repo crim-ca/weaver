@@ -15,6 +15,10 @@ Changes:
 - Add more detection of map-able WPS output location to avoid fetching files unnecessarily. Common cases
   are ``Workflow`` running multiple steps on the same server or `Application Package` ``Process`` that reuses an output
   produced by a previous execution. Relates to `#183 <https://github.com/crim-ca/weaver/issues/183>`_.
+- Add pre-validation of file accessibility using HTTP HEAD request when a subsequent ``Workflow`` step
+  employs an automatically mapped WPS output location from a previous step to verify that the file would otherwise
+  be downloadable if it could not have been mapped. This is to ensure consistency and security validation of the
+  reference WPS output location, although the unnecessary file download operation can be avoided.
 - Add functional ``Workflow`` tests to validate execution without the need of remote `Weaver` test application
   (relates to `#141 <https://github.com/crim-ca/weaver/issues/141>`_,
   relates to `#281 <https://github.com/crim-ca/weaver/issues/281>`_).

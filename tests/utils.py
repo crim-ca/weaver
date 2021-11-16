@@ -34,7 +34,7 @@ from weaver.app import main as weaver_app
 from weaver.config import WEAVER_CONFIGURATION_HYBRID, WEAVER_DEFAULT_INI_CONFIG, get_weaver_config_file
 from weaver.database import get_db
 from weaver.datatype import Service
-from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML, CONTENT_TYPE_TEXT_XML
+from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML, CONTENT_TYPE_TEXT_XML, get_extension
 from weaver.store.mongodb import MongodbJobStore, MongodbProcessStore, MongodbServiceStore
 from weaver.utils import fetch_file, get_header, get_path_kvp, get_url_without_query, get_weaver_url, null
 from weaver.warning import MissingParameterWarning, UnsupportedOperationWarning

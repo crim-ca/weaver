@@ -158,7 +158,7 @@ def get_any_message(info):
     return info.get("message", "").strip()
 
 
-def get_registry(container, nothrow=False):
+def get_registry(container=None, nothrow=False):
     # type: (Optional[AnyRegistryContainer], bool) -> Optional[Registry]
     """
     Retrieves the application ``registry`` from various containers referencing to it.
@@ -963,14 +963,14 @@ def request_extra(method,                       # type: str
     return err
 
 
-def fetch_file(file_reference, file_outdir, settings=None, **request_kwargs):
-    # type: (str, str, Optional[AnySettingsContainer], **Any) -> str
+def fetch_file(file_reference, file_outdir, settings=None, link=None, **request_kwargs):
+    # type: (str, str, Optional[AnySettingsContainer], Optional[bool], **Any) -> str
     """
     Fetches a file from local path, AWS-S3 bucket or remote URL, and dumps it's content to the output directory.
 
     The output directory is expected to exist prior to this function call.
     The file reference scheme (protocol) determines from where to fetch the content.
-    Output file name and extension will be the same as the original.
+    Output file name and extension will be the same as the original (after link resolution if applicable).
     Requests will consider ``weaver.request_options`` when using ``http(s)://`` scheme.
 
     :param file_reference:
@@ -978,13 +978,20 @@ def fetch_file(file_reference, file_outdir, settings=None, **request_kwargs):
         remote URL file reference. Reference ``https://s3.[...]`` are also considered as ``s3://``.
     :param file_outdir: Output local directory path under which to place the fetched file.
     :param settings: Additional request-related settings from the application configuration (notably request-options).
+    :param link:
+        If ``True``, force generation of a symbolic link instead of hard copy, regardless if source is a file or link.
+        If ``False``, force hard copy of the file to destination, regardless if source is a file or link.
+        If ``None`` (default), resolve automatically as follows.
+        When the source is a symbolic link itself, the destination will also be a link.
+        When the source is a direct file reference, the destination will be a hard copy of the file.
+        Only applicable when the file reference is local.
     :param request_kwargs: Additional keywords to forward to request call (if needed).
     :return: Path of the local copy of the fetched file.
     :raises HTTPException: applicable HTTP-based exception if any occurred during the operation.
     :raises ValueError: when the reference scheme cannot be identified.
     """
     file_href = file_reference
-    file_name = os.path.basename(file_reference)
+    file_name = os.path.basename(os.path.realpath(file_reference))  # resolve any different name to use the original
     file_path = os.path.join(file_outdir, file_name)
     if file_reference.startswith("file://"):
         file_reference = file_reference[7:]
@@ -992,15 +999,22 @@ def fetch_file(file_reference, file_outdir, settings=None, **request_kwargs):
     if os.path.isfile(file_reference):
         LOGGER.debug("Fetch file resolved as local reference.")
         # NOTE:
-        #   If file is available locally and referenced as a system link, disabling follow symlink
+        #   If file is available locally and referenced as a system link, disabling 'follow_symlinks'
         #   creates a copy of the symlink instead of an extra hard-copy of the linked file.
-        #   PyWPS will tend to generate symlink to pre-fetched files to avoid this kind of extra hard-copy.
-        #   Do symlink operation by hand instead of with argument to have Python-2 compatibility.
-        if os.path.islink(file_reference):
-            os.symlink(os.readlink(file_reference), file_path)
+        if os.path.islink(file_reference) and not os.path.isfile(file_path):
+            if link is True:
+                os.symlink(os.readlink(file_reference), file_path)
+            else:
+                shutil.copyfile(file_reference, file_path, follow_symlinks=link is False)
         # otherwise copy the file if not already available
+        # expand directory of 'file_path' and full 'file_reference' to ensure many symlink don't result in same place
         elif not os.path.isfile(file_path) or os.path.realpath(file_path) != os.path.realpath(file_reference):
-            shutil.copyfile(file_reference, file_path)
+            if link is True:
+                os.symlink(file_reference, file_path)
+            else:
+                shutil.copyfile(file_reference, file_path)
+        else:
+            LOGGER.debug("Fetch file as local reference has no action to take, file already exists: [%s]", file_path)
     elif file_reference.startswith("s3://"):
         LOGGER.debug("Fetch file resolved as S3 bucket reference.")
         s3 = boto3.resource("s3")
@@ -1038,8 +1052,8 @@ def fetch_file(file_reference, file_outdir, settings=None, **request_kwargs):
     else:
         scheme = file_reference.split("://")
         scheme = "<none>" if len(scheme) < 2 else scheme[0]
-        raise ValueError("Unresolved fetch file scheme: '{!s}', supported: {}"
-                         .format(scheme, list(SUPPORTED_FILE_SCHEMES)))
+        raise ValueError("Unresolved location and/or fetch file scheme: '{!s}', supported: {}, reference: [{!s}]"
+                         .format(scheme, list(SUPPORTED_FILE_SCHEMES), file_reference))
     LOGGER.debug("Fetch file resolved:\n"
                  "  Reference: [%s]\n"
                  "  File Path: [%s]", file_href, file_path)

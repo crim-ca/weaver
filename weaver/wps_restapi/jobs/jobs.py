@@ -14,7 +14,7 @@ from pyramid.httpexceptions import (
 )
 from pyramid.request import Request
 from pyramid.settings import asbool
-from pyramid_celery import celery_app as app
+from pyramid_celery import celery_app
 
 from notify import encrypt_email
 from weaver import status
@@ -389,7 +389,8 @@ def get_job_status(request):
 
 def cancel_job_task(job, container):
     # type: (Job, AnySettingsContainer) -> Job
-    app.control.revoke(job.task_id, terminate=True)  # signal to stop celery task. Up to it to terminate remote if any.
+    # signal to stop celery task. Up to it to terminate remote if any.
+    celery_app.control.revoke(job.task_id, terminate=True)
     store = get_db(container).get_store(StoreJobs)
     job.status_message = "Job dismissed."
     job.status = status.map_status(status.STATUS_DISMISSED)

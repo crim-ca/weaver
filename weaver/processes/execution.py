@@ -86,6 +86,7 @@ def execute_process(self, job_id, wps_url, headers=None):
 
     # reset the connection because we are in a forked celery process
     registry = get_registry(None)  # local thread, whether locally or dispatched celery
+    settings = get_settings(registry)
     db = get_db(registry, reset_connection=True)
     store = db.get_store(StoreJobs)
     job = store.fetch_by_id(job_id)
@@ -96,7 +97,6 @@ def execute_process(self, job_id, wps_url, headers=None):
 
     task_logger = get_task_logger(__name__)
     job.save_log(logger=task_logger, message="Job task setup initiated.")
-    settings = get_settings(app)
     load_pywps_config(settings)
     job.progress = JOB_PROGRESS_SETUP
     job.task_id = self.request.id

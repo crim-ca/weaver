@@ -8,7 +8,6 @@ from cwltool.command_line_tool import CommandLineTool
 from cwltool.docker import DockerCommandLineJob
 from cwltool.job import CommandLineJob, JobBase
 from cwltool.singularity import SingularityCommandLineJob
-from pyramid_celery import celery_app as app
 
 from weaver import WEAVER_ROOT_DIR
 from weaver.database import get_db
@@ -18,7 +17,7 @@ from weaver.processes.constants import CWL_REQUIREMENT_APP_BUILTIN
 from weaver.processes.types import PROCESS_BUILTIN
 from weaver.processes.wps_package import PACKAGE_EXTENSIONS, get_process_definition
 from weaver.store.base import StoreProcesses
-from weaver.utils import clean_json_text_body, ows_context_href
+from weaver.utils import clean_json_text_body, get_registry, ows_context_href
 from weaver.visibility import VISIBILITY_PUBLIC
 from weaver.wps.utils import get_wps_url
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
@@ -161,7 +160,8 @@ class BuiltinProcessJobBase(CommandLineJob):
 
     def _validate_process(self):
         try:
-            store = get_db(app).get_store(StoreProcesses)
+            registry = get_registry()
+            store = get_db(registry).get_store(StoreProcesses)
             process = store.fetch_by_id(self.process)  # raise if not found
         except (ProcessNotAccessible, ProcessNotFound):
             raise PackageNotFound("Cannot find '{}' package for process '{}'".format(PROCESS_BUILTIN, self.process))

@@ -19,6 +19,7 @@ import yaml
 from pyramid import testing
 from pyramid.httpexceptions import HTTPCreated, HTTPNotFound, HTTPOk
 from pyramid.settings import asbool
+from responses import RequestsMock
 # use 'Web' prefix to avoid pytest to pick up these classes and throw warnings
 from webtest import TestApp as WebTestApp
 
@@ -27,7 +28,8 @@ from tests.utils import (
     get_settings_from_testapp,
     get_test_weaver_app,
     mocked_execute_process,
-    mocked_sub_requests
+    mocked_sub_requests,
+    setup_config_with_mongodb
 )
 from weaver import WEAVER_ROOT_DIR
 from weaver.config import WEAVER_CONFIGURATION_EMS, WEAVER_CONFIGURATION_HYBRID
@@ -168,13 +170,24 @@ class WorkflowTestRunnerBase(TestCase):
         cls.WEAVER_TEST_SERVER_API_PATH = cls.get_option("WEAVER_TEST_SERVER_API_PATH", "/")
         cls.WEAVER_TEST_CONFIG_INI_PATH = cls.get_option("WEAVER_TEST_CONFIG_INI_PATH")    # none uses default path
         if cls.WEAVER_TEST_SERVER_HOSTNAME in [None, ""]:
-            cls.app = get_test_weaver_app(settings={
+            # running with a local-only Web Test application
+            config = setup_config_with_mongodb(settings={
                 "weaver.configuration": cls.WEAVER_TEST_CONFIGURATION,
-                "weaver.wps_output_url": "file:///tmp/weaver-test/wpsoutputs",
-                "weaver.wps_output_dir": "/tmp",  # nosec: B108 # don't care hardcoded for test
+                # NOTE:
+                #   Because everything is running locally in this case, all processes should automatically map between
+                #   the two following dir/URL as equivalents locations, accordingly to what they require for execution.
+                #   Because of this, there is no need to mock any file servicing for WPS output URL for local test app.
+                #   The only exception is the HEAD request that validates accessibility of intermediate files. If any
+                #   other HTTP 404 errors arise with this WPS output URL endpoint, it is most probably because file path
+                #   or mapping was incorrectly handled at some point when passing references between Workflow steps.
+                "weaver.wps_output_url": "http://localhost/wps-outputs",
+                "weaver.wps_output_dir": "/tmp/weaver-test/wps-outputs",  # nosec: B108 # don't care hardcoded for test
             })
-            cls.__settings__ = get_settings_from_testapp(cls.app)
+            cls.app = get_test_weaver_app(config=config)
+            cls.__settings__ = get_settings_from_testapp(cls.app)  # override settings to avoid re-setup by method
+            os.makedirs(cls.__settings__["weaver.wps_output_dir"], exist_ok=True)
         else:
+            # running on a remote service (remote server or can be "localhost", but in parallel application)
             if cls.WEAVER_TEST_SERVER_HOSTNAME.startswith("http"):
                 url = cls.WEAVER_TEST_SERVER_HOSTNAME
             else:
@@ -654,8 +667,13 @@ class WorkflowTestRunnerBase(TestCase):
             stack_exec.enter_context(mock.patch("weaver.processes.sources.get_data_source_from_url",
                                                 side_effect=self.mock_get_data_source_from_url))
             if self.is_webtest:
+                # mock execution when running on local Web Test app since no Celery runner is available
+                # mock HTTP HEAD request to validate WPS output access (see 'setUpClass')
                 for mock_exec in mocked_execute_process():
                     stack_exec.enter_context(mock_exec)
+                    mock_resp = RequestsMock()
+                    mock_resp.add("HEAD", self.settings()["weaver.wps_output_url"] + "/*")
+                    stack_exec.enter_context(mock_resp)
 
             workflow_info = self.test_processes_info[test_workflow_id]
             self.request("POST", path_deploy, status=HTTPCreated.code, headers=self.headers,

@@ -1,4 +1,5 @@
 # pylint: disable=C0103,invalid-name
+import uuid
 
 import contextlib
 import inspect
@@ -495,6 +496,51 @@ def test_request_extra_zero_values():
     # proper detection of input backoff=0 makes all sleep calls equal to zero
     assert all(backoff == 0 for backoff in sleep_counter["called_with"])
     assert sleep_counter["called_count"] == 3  # first direct call doesn't have any sleep from retry
+
+
+def test_fetch_file_local_links():
+    """
+    Test handling of symbolic links by function :func:`weaver.utils.fetch_file` for local files.
+    """
+    tmp_dir = tempfile.gettempdir()
+    src_dir = os.path.join(tmp_dir, str(uuid.uuid4()))
+    dst_dir = os.path.join(tmp_dir, str(uuid.uuid4()))
+    try:
+        make_dirs(src_dir, exist_ok=True)
+        make_dirs(dst_dir, exist_ok=True)
+        with tempfile.NamedTemporaryFile(dir=src_dir, mode="w", suffix=".json") as tmp_json:
+            tmp_data = {"message": "fetch-file-link"}
+            tmp_json.write(json.dumps(tmp_data))
+            tmp_json.seek(0)
+            tmp_file = tmp_json.name
+            tmp_path, tmp_name = os.path.split(tmp_file)
+            tmp_link = os.path.join(tmp_path, "link.json")
+            os.symlink(tmp_file, tmp_link)
+            dst_path = os.path.join(dst_dir, tmp_name)
+            for src_path, as_link, result_link in [
+                (tmp_file, True, True),
+                (tmp_file, False, False),
+                (tmp_file, None, False),
+                (tmp_link, True, True),
+                (tmp_link, False, False),
+                (tmp_link, None, True),
+            ]:
+                if os.path.exists(dst_path):
+                    os.remove(dst_path)
+                fetch_file(src_path, dst_dir, link=as_link)
+                assert os.path.isfile(dst_path), "File [{}] should be accessible under [{}]. Failed with: {}".format(
+                    tmp_file, dst_path, (src_path, as_link, result_link)
+                )
+                if result_link:
+                    assert os.path.islink(dst_path), "Result is not a link when it is expected to be one."
+                else:
+                    assert not os.path.islink(dst_path), "Result is a link when it is expected not to be one."
+                assert json.load(open(dst_path)) == tmp_data, "File should be properly copied/referenced from original"
+    except OSError as exc:
+        pytest.fail("Unexpected error raised during test: [{}]".format(exc))
+    finally:
+        shutil.rmtree(src_dir, ignore_errors=True)
+        shutil.rmtree(dst_dir, ignore_errors=True)
 
 
 def test_fetch_file_local_with_protocol():

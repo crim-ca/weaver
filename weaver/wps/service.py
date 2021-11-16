@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING
 
 from owslib.wps import WPSExecution
 from pyramid.httpexceptions import HTTPBadRequest, HTTPSeeOther
-from pyramid_celery import celery_app as app
 from pywps.app import Process as ProcessWPS, WPSRequest
 from pywps.app.Service import Service as ServiceWPS
 from pywps.inout.storage import StorageAbstract
@@ -22,7 +21,7 @@ from weaver.processes.execution import submit_job_handler
 from weaver.processes.types import PROCESS_WORKFLOW
 from weaver.processes.utils import get_job_submission_response, get_process
 from weaver.store.base import StoreProcesses
-from weaver.utils import get_header, get_settings, get_weaver_url
+from weaver.utils import get_header, get_registry, get_settings, get_weaver_url
 from weaver.visibility import VISIBILITY_PUBLIC
 from weaver.wps.utils import check_wps_status, get_wps_local_status_location, get_wps_output_context, load_pywps_config
 from weaver.wps_restapi import swagger_definitions as sd
@@ -111,7 +110,7 @@ class WorkerService(ServiceWPS):
     def __init__(self, *_, is_worker=False, settings=None, **__):
         super(WorkerService, self).__init__(*_, **__)
         self.is_worker = is_worker
-        self.settings = settings or get_settings(app)
+        self.settings = settings or get_settings()
         self.dispatched_processes = {}  # type: Dict[str, Process]
 
     @handle_known_exceptions
@@ -310,13 +309,14 @@ def get_pywps_service(environ=None, is_worker=False):
     environ = environ or {}
     try:
         # get config file
-        settings = get_settings(app)
+        registry = get_registry()
+        settings = get_settings(registry)
         pywps_cfg = environ.get("PYWPS_CFG") or settings.get("PYWPS_CFG") or os.getenv("PYWPS_CFG")
         if not isinstance(pywps_cfg, ConfigParser) or not settings.get("weaver.wps_configured"):
-            load_pywps_config(app, config=pywps_cfg)
+            load_pywps_config(settings, config=pywps_cfg)
 
         # call pywps application with processes filtered according to the adapter's definition
-        process_store = get_db(app).get_store(StoreProcesses)  # type: StoreProcesses
+        process_store = get_db(registry).get_store(StoreProcesses)  # type: StoreProcesses
         processes_wps = [process.wps() for process in
                          process_store.list_processes(visibility=VISIBILITY_PUBLIC)]
         service = WorkerService(processes_wps, is_worker=is_worker, settings=settings)

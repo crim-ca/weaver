@@ -27,7 +27,6 @@ from cwltool.process import (
 from cwltool.stdfsaccess import StdFsAccess
 from cwltool.utils import aslist, bytes2str_in_dicts, onWindows
 from cwltool.workflow import Workflow
-from pyramid_celery import celery_app as app
 from schema_salad import validate
 from schema_salad.sourceline import SourceLine
 
@@ -145,7 +144,7 @@ class WpsWorkflow(ProcessCWL):
         jobname = uniquename(runtime_context.name or shortname(self.tool.get("id", "job")))
 
         # outdir must be served by the EMS because downstream step will need access to upstream steps output
-        weaver_out_dir = get_wps_output_dir(get_settings(app))
+        weaver_out_dir = get_wps_output_dir(get_settings())
         runtime_context.outdir = tempfile.mkdtemp(
             prefix=getdefault(runtime_context.tmp_outdir_prefix, DEFAULT_TMP_PREFIX),
             dir=weaver_out_dir)
@@ -410,7 +409,6 @@ class WpsWorkflowJob(JobBase):
                  ):                 # type: (...) -> None
         super(WpsWorkflowJob, self).__init__(builder, joborder, None, requirements, hints, name)
         self.wps_process = wps_process
-        self.results = None
         self.expected_outputs = {}  # type: Dict[str, str]  # {id: file-pattern}
         for output in expected_outputs:
             # TODO Should we support something else?
@@ -461,7 +459,7 @@ class WpsWorkflowJob(JobBase):
 
         # pylint: disable=R1260,too-complex  # FIXME: simplify operations
 
-        self.results = self.wps_process.execute(self.builder.job, self.outdir, self.expected_outputs)
+        self.wps_process.execute(self.builder.job, self.outdir, self.expected_outputs)
 
         if self.joborder and runtime_context.research_obj:
             job_order = self.joborder
@@ -506,8 +504,7 @@ class WpsWorkflowJob(JobBase):
         except Exception:  # noqa: W0703 # nosec: B110
             LOGGER.exception("Exception while running job")
             process_status = "permanentFail"
-        if runtime_context.research_obj and self.prov_obj and \
-                runtime_context.process_run_id:
+        if runtime_context.research_obj and self.prov_obj and runtime_context.process_run_id:
             # creating entities for the outputs produced by each step (in the provenance document)
             self.prov_obj.generate_output_prov(
                 outputs, runtime_context.process_run_id, str(self.name))

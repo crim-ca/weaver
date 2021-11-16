@@ -49,12 +49,14 @@ if TYPE_CHECKING:
     JSON = Union[Dict[str, _JsonItem], List[_JsonItem], AnyValue]
 
     # CWL definition
+    GlobType = TypedDict("GlobType", {"glob": str}, total=False)
     CWL_IO_EnumType = TypedDict("CWL_IO_EnumType", {"type": str, "symbols": List[str]})  # "symbols" => allowed values
     CWL_IO_ArrayType = TypedDict("CWL_IO_ArrayType", {"type": str, "items": str})  # "items" => type of every item
     CWL_IO_MultiType = List[str, CWL_IO_ArrayType, CWL_IO_EnumType]  # single string allowed for "null"
     CWL_IO_DataType = Union[str, CWL_IO_ArrayType, CWL_IO_EnumType, CWL_IO_MultiType]
     CWL_Input_Type = TypedDict("CWL_Input_Type", {"id": str, "type": CWL_IO_DataType, "default": AnyValue}, total=False)
-    CWL_Output_Type = TypedDict("CWL_Output_Type", {"id": str, "type": CWL_IO_DataType}, total=False)
+    CWL_Output_Type = TypedDict("CWL_Output_Type",
+                                {"id": str, "type": CWL_IO_DataType, "outputBinding": Optional[GlobType]}, total=False)
     CWL_Inputs = Union[List[CWL_Input_Type], Dict[str, CWL_Input_Type]]
     CWL_Outputs = Union[List[CWL_Output_Type], Dict[str, CWL_Output_Type]]
     CWL = TypedDict("CWL", {"cwlVersion": str, "class": str, "inputs": CWL_Inputs, "outputs": CWL_Outputs,
@@ -62,9 +64,7 @@ if TYPE_CHECKING:
                             "$namespaces": Dict[str, str], "$schemas": Dict[str, str]}, total=False)
 
     # CWL loading
-    GlobType = TypedDict("GlobType", {"glob": str})
-    ExpectedOutputType = TypedDict("ExpectedOutputType",
-                                   {"type": str, "id": str, "outputBinding": GlobType}, total=False)
+    ExpectedOutputType = CWL_Output_Type
     GetJobProcessDefinitionFunction = Callable[[str, Dict[str, str], Dict[str, Any]], WpsProcessInterface]
     ToolPathObjectType = Dict[str, Any]
 

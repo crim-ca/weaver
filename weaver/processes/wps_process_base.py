@@ -1,3 +1,4 @@
+import os
 from abc import abstractmethod
 from time import sleep
 from typing import TYPE_CHECKING
@@ -24,7 +25,7 @@ class WpsProcessInterface(object):
                 workflow_inputs,        # type: CWL_RuntimeInputsMap
                 out_dir,                # type: str
                 expected_outputs,       # type: Dict[str, str]
-                ):
+                ):                      # type: (...) -> None
         """
         Execute a remote process using the given inputs.
 
@@ -58,12 +59,10 @@ class WpsProcessInterface(object):
             response.status_code = status_code_mock
         return response
 
-    @staticmethod
-    def host_file(file_name):
-        settings = get_settings()
-        weaver_output_url = get_wps_output_url(settings)
-        weaver_output_dir = get_wps_output_dir(settings)
-        file_name = file_name.replace("file://", "")
+    def host_file(self, file_name):
+        weaver_output_url = get_wps_output_url(self.settings)
+        weaver_output_dir = get_wps_output_dir(self.settings)
+        file_name = os.path.realpath(file_name.replace("file://", ""))  # in case CWL->WPS outputs link was made
 
         if not file_name.startswith(weaver_output_dir):
             raise Exception("Cannot host files outside of the output path : {0}".format(file_name))
