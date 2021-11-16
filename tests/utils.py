@@ -652,8 +652,8 @@ def mocked_wps_output(settings, mock_get=True, mock_head=True):
                     "Server": "mocked_wps_output",
                     "Date": str(datetime.datetime.utcnow()),
                     "Content-Type": mime_type or CONTENT_TYPE_TEXT_PLAIN,
-                    "Content-Encoding": encoding,
-                    "Content-Length": resp.headers.get("Content-Length", len(resp.content)),
+                    "Content-Encoding": encoding or "",
+                    "Content-Length": str(resp.headers.get("Content-Length", len(resp.content))),
                     "Last-Modified": str(datetime.datetime.fromtimestamp(os.stat(wps_output_file_path).st_mtime))
                 }
                 return 200, headers, ""
