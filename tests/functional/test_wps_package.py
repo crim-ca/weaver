@@ -47,7 +47,7 @@ from weaver.formats import (
 )
 from weaver.processes.constants import CWL_REQUIREMENT_APP_DOCKER, CWL_REQUIREMENT_INIT_WORKDIR
 from weaver.processes.types import PROCESS_APPLICATION, PROCESS_BUILTIN
-from weaver.status import STATUS_DISMISSED
+from weaver.status import STATUS_DISMISSED, STATUS_RUNNING
 from weaver.utils import get_any_value
 
 if TYPE_CHECKING:
@@ -1632,7 +1632,7 @@ class WpsPackageAppTest(WpsConfigBase):
             # patch the job as if still running but dismissed midway
             job = self.job_store.fetch_by_id(job_id)
             job.logs = job.logs[:len(job.logs)//2]
-            job.status = STATUS_DISMISSED
+            job.status = STATUS_RUNNING
             job.progress = 50
             self.job_store.update_job(job)
 
@@ -1642,6 +1642,13 @@ class WpsPackageAppTest(WpsConfigBase):
             assert resp.status_code == 200
             assert resp.json["status"] == STATUS_DISMISSED
             assert mock_del.control.revoke.called_with(job.task_id, terminate=True)
+            assert mock_del.control.revoke.call_count == 1
+
+            # subsequent calls to dismiss should be refused
+            path = "/jobs/{}".format(job_id)
+            resp = self.app.delete(path, headers=self.json_headers, expect_errors=True)
+            assert resp.status_code == 410
+            assert mock_del.control.revoke.call_count == 1  # not called again
 
     def test_invalid_io_min_max_occurs_wrong_format(self):
         """

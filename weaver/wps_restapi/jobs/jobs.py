@@ -16,7 +16,7 @@ from pyramid.httpexceptions import (
 )
 from pyramid.request import Request
 from pyramid.settings import asbool
-from pyramid_celery import celery_app as app
+from pyramid_celery import celery_app
 
 from notify import encrypt_email
 from weaver import status
@@ -423,7 +423,7 @@ def dismiss_job_task(job, container):
     if job.status in status.JOB_STATUS_CATEGORIES[status.JOB_STATUS_CATEGORY_RUNNING]:
         # signal to stop celery task. Up to it to terminate remote if any.
         LOGGER.debug("Job [%s] dismiss operation: Canceling task [%s]", job.id, job.task_id)
-        app.control.revoke(job.task_id, terminate=True)
+        celery_app.control.revoke(job.task_id, terminate=True)
 
     wps_out_dir = get_wps_output_dir(container)
     job_out_dir = os.path.join(wps_out_dir, job.id)
