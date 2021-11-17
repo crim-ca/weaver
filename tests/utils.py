@@ -8,6 +8,7 @@ import json
 import contextlib
 import functools
 import inspect
+import mimetypes
 import os
 import re
 import tempfile
@@ -19,7 +20,6 @@ from typing import TYPE_CHECKING
 
 # Note: do NOT import 'boto3' here otherwise 'moto' will not be able to mock it effectively
 import colander
-import mimetypes
 import mock
 import moto
 import pkg_resources
@@ -425,8 +425,8 @@ def mocked_sub_requests(app, method_function, *args, only_local=False, **kwargs)
         # otherwise, filter according to full URL hostname
         url_test_app = get_weaver_url(app.app.registry)
         if only_local and not url.startswith("/") and not url.startswith(url_test_app):
-            with session or RealSession() as session:
-                return real_request(session, method, url, **req_kwargs)
+            with session or RealSession() as request_session:
+                return real_request(request_session, method, url, **req_kwargs)
 
         url, func, req_kwargs = _parse_for_app_req(method, url, **req_kwargs)
         redirects = req_kwargs.pop("allow_redirects", True)
@@ -445,7 +445,7 @@ def mocked_sub_requests(app, method_function, *args, only_local=False, **kwargs)
     # Patch TestResponse json 'property' into method to align with code that calls 'requests.Response.json()'.
     # Must be done with class mock because TestResponse json property cannot be overridden in '_patch_response_methods'.
     class TestResponseJsonCallable(TestResponse):
-        def json(self):
+        def json(self):  # pylint: disable=W0236,invalid-overridden-method  # mismatch property/method is intentional
             return self.json_body
 
     # ensure that previously created session object is passed to the mocked sub-request to consider

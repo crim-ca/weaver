@@ -681,7 +681,7 @@ class WorkflowTestRunnerBase(TestCase):
         with contextlib.ExitStack() as stack_exec:
             stack_exec.enter_context(mock.patch("weaver.processes.sources.get_data_source_from_url",
                                                 side_effect=self.mock_get_data_source_from_url))
-            if self.is_webtest:
+            if self.is_webtest():
                 # mock execution when running on local Web Test app since no Celery runner is available
                 for mock_exec in mocked_execute_process():
                     stack_exec.enter_context(mock_exec)

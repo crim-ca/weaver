@@ -31,7 +31,7 @@ class WorkflowTestRunnerRemoteWithAuth(WorkflowTestRunnerBase):
     def __init__(self, *args, **kwargs):
         # won't run this as a test suite, only its derived classes
         setattr(self, "__test__", self is WorkflowTestRunnerBase)
-        super(WorkflowTestRunnerBase, self).__init__(*args, **kwargs)
+        super(WorkflowTestRunnerRemoteWithAuth, self).__init__(*args, **kwargs)
 
     @classmethod
     def setup_test_processes_before(cls):
@@ -313,18 +313,18 @@ class End2EndEMSTestCase(WorkflowTestRunnerRemoteWithAuth):
     @pytest.mark.xfail(reason="Workflow not working anymore. IO to be repaired.")
     def test_workflow_ice_days(self):
         self.workflow_runner(WorkflowProcesses.WORKFLOW_SUBSET_ICE_DAYS,
-                             [WorkflowProcesses.SUBSET_BBOX, WorkflowProcesses.ICE_DAYS],
+                             [WorkflowProcesses.APP_SUBSET_BBOX, WorkflowProcesses.APP_ICE_DAYS],
                              log_full_trace=True)
 
     @pytest.mark.xfail(reason="Workflow not working anymore. IO to be repaired.")
     def test_workflow_llnl_subset_esgf(self):
-        self.workflow_runner(WorkflowProcesses.WORKFLOW_SUBSETLLNL_SUBSET_CRIM,
+        self.workflow_runner(WorkflowProcesses.WORKFLOW_SUBSET_LLNL_SUBSET_CRIM,
                              [WorkflowProcesses.APP_SUBSET_ESGF, WorkflowProcesses.APP_SUBSET_BBOX],
                              log_full_trace=True)
 
     @pytest.mark.xfail(reason="Workflow not working anymore. IO to be repaired.")
     def test_workflow_esgf_requirements(self):
-        self.workflow_runner(WorkflowProcesses.WORKFLOW_SUBSETNASAESGF_SUBSET_CRIM,
+        self.workflow_runner(WorkflowProcesses.WORKFLOW_SUBSET_NASA_ESGF_SUBSET_CRIM,
                              [WorkflowProcesses.APP_SUBSET_NASA_ESGF, WorkflowProcesses.APP_SUBSET_BBOX],
                              log_full_trace=True)
 
