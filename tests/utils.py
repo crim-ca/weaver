@@ -338,7 +338,7 @@ def mocked_file_response(path, url):
 
 
 def mocked_sub_requests(app, method_function, *args, only_local=False, **kwargs):
-    # type: (TestApp, str, *Any, bool, Any) -> AnyResponseType
+    # type: (TestApp, str, Any, bool, Any) -> AnyResponseType
     """
     Mocks request calls under :class:`webTest.TestApp` to avoid sending real requests.
 
