@@ -37,6 +37,12 @@ def includeme(config):
     config.add_route(**sd.service_api_route_info(sd.process_result_service, settings))
     config.add_route(**sd.service_api_route_info(sd.provider_result_service, settings))
 
+    config.add_view(j.cancel_job_batch, route_name=sd.jobs_service.name,
+                    request_method="DELETE", renderer=OUTPUT_FORMAT_JSON)
+    config.add_view(j.cancel_job_batch, route_name=sd.process_jobs_service.name,
+                    request_method="DELETE", renderer=OUTPUT_FORMAT_JSON)
+    config.add_view(j.cancel_job_batch, route_name=sd.provider_jobs_service.name,
+                    request_method="DELETE", renderer=OUTPUT_FORMAT_JSON)
     config.add_view(j.get_queried_jobs, route_name=sd.process_jobs_service.name,
                     request_method="GET", renderer=OUTPUT_FORMAT_JSON)
     config.add_view(j.get_queried_jobs, route_name=sd.jobs_service.name,

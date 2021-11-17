@@ -12,6 +12,7 @@ from pyramid.httpexceptions import (
     HTTPBadRequest,
     HTTPException,
     HTTPForbidden,
+    HTTPGone,
     HTTPInternalServerError,
     HTTPNotFound,
     HTTPUnprocessableEntity
@@ -25,6 +26,7 @@ from weaver.formats import CONTENT_TYPE_TEXT_XML
 from weaver.owsexceptions import (
     OWSAccessForbidden,
     OWSException,
+    OWSGone,
     OWSInvalidParameterValue,
     OWSMissingParameterValue,
     OWSNoApplicableCode,
@@ -163,6 +165,15 @@ class JobNotFound(HTTPNotFound, OWSNotFound, JobException):
 
     Error indicating that a job could not be read from the
     storage backend by an instance of :class:`weaver.store.JobStore`.
+    """
+
+
+class JobGone(HTTPGone, OWSGone, JobException):
+    """
+    Error related to job resource that is gone.
+
+    Error indicating that an existing job, although recognized, was
+    dismissed and underlying resources including results are gone.
     """
 
 

@@ -997,7 +997,7 @@ class Job(Base):
         return "{base_job_url}{job_path}".format(base_job_url=base_url, job_path=job_path)
 
     def links(self, container=None, self_link=None):
-        # type: (Optional[AnySettingsContainer], Optional[str]) -> JSON
+        # type: (Optional[AnySettingsContainer], Optional[str]) -> List[JSON]
         """
         Obtains the JSON links section of many response body for jobs.
 
@@ -1010,13 +1010,13 @@ class Job(Base):
         settings = get_settings(container)
         base_url = get_wps_restapi_base_url(settings)
         job_url = self._job_url(base_url)  # full URL
-        job_path = "{}/{}".format(base_url, sd.jobs_service.path.format(job_id=self.id))
+        job_path = "{}{}".format(base_url, sd.job_service.path.format(job_id=self.id))
         job_exec = job_url.rsplit("/", 1)[0] + "/execution"
-        job_list = "{}/{}".format(base_url, sd.jobs_service.path)
+        job_list = "{}{}".format(base_url, sd.jobs_service.path)
         job_links = [
             {"href": job_url, "rel": "status", "title": "Job status."},  # OGC
             {"href": job_url, "rel": "monitor", "title": "Job monitoring location."},  # IANA
-            {"href": job_path, "rel": "alternate", "title": "Job status specific endpoint."},  # IANA
+            {"href": job_path, "rel": "alternate", "title": "Job status generic endpoint."},  # IANA
             {"href": job_list, "rel": "collection", "title": "List of submitted jobs."},  # IANA
             {"href": job_list, "rel": "http://www.opengis.net/def/rel/ogc/1.0/job-list",  # OGC
              "title": "List of submitted jobs."},
@@ -1057,7 +1057,7 @@ class Job(Base):
         link_meta = {"type": CONTENT_TYPE_APP_JSON, "hreflang": ACCEPT_LANGUAGE_EN_CA}
         for link in job_links:
             link.update(link_meta)
-        return {"links": job_links}
+        return job_links
 
     def json(self, container=None, self_link=None):     # pylint: disable=W0221,arguments-differ
         # type: (Optional[AnySettingsContainer], Optional[str]) -> JSON
@@ -1089,9 +1089,9 @@ class Job(Base):
             "percentCompleted": self.progress,
             # new name as per OGC-API, enforced integer
             # https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/statusInfo.yaml
-            "progress": int(self.progress)
+            "progress": int(self.progress),
+            "links": self.links(settings, self_link=self_link)
         }
-        job_json.update(self.links(settings, self_link=self_link))
         return sd.JobStatusInfo().deserialize(job_json)
 
     def params(self):

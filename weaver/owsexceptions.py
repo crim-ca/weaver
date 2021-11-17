@@ -16,6 +16,7 @@ from pyramid.httpexceptions import (
     HTTPBadRequest,
     HTTPException,
     HTTPForbidden,
+    HTTPGone,
     HTTPInternalServerError,
     HTTPNotAcceptable,
     HTTPNotFound,
@@ -72,7 +73,7 @@ class OWSException(Response, Exception):
         elif not status:
             status = HTTPOk().status
         self.code = str(kw.pop("code", self.code))
-        self.description = str(detail or kw.pop("description", self.description))
+        desc = str(detail or kw.pop("description", self.description))
         Response.__init__(self, status=status, **kw)
         Exception.__init__(self, detail)
         self.message = detail or self.description or getattr(self, "explanation", None)
@@ -80,6 +81,15 @@ class OWSException(Response, Exception):
         value = kw.get("locator", value)
         if value:
             self.locator = value
+        try:
+            json_desc = self.json.get("description")
+            if json_desc:
+                desc = json_desc
+            else:
+                self.json["description"] = desc
+        except Exception:  # noqa: W0703 # nosec: B110
+            pass
+        self.description = desc
 
     def __str__(self, skip_body=False):
         return self.message
@@ -188,6 +198,16 @@ class OWSNotFound(OWSException):
     def __init__(self, *args, **kwargs):
         kwargs["status"] = HTTPNotFound
         super(OWSNotFound, self).__init__(*args, **kwargs)
+
+
+class OWSGone(OWSException):
+    code = "ResourceGone"
+    locator = ""
+    explanation = "Resource is gone."
+
+    def __init__(self, *args, **kwargs):
+        kwargs["status"] = HTTPGone
+        super(OWSGone, self).__init__(*args, **kwargs)
 
 
 class OWSNotAcceptable(OWSException):
