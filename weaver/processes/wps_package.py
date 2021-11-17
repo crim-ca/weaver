@@ -56,6 +56,7 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_BUILTIN,
     CWL_REQUIREMENT_APP_DOCKER,
     CWL_REQUIREMENT_APP_ESGF_CWT,
+    CWL_REQUIREMENT_APP_REMOTE,
     CWL_REQUIREMENT_APP_TYPES,
     CWL_REQUIREMENT_APP_WPS1,
     CWL_REQUIREMENT_INIT_WORKDIR,
@@ -1247,7 +1248,7 @@ class WpsPackage(Process):
         if self.remote_execution or self.package_type == PROCESS_WORKFLOW:
             return False
         app_req = get_application_requirement(self.package)
-        if app_req["class"] not in [CWL_REQUIREMENT_APP_BUILTIN, CWL_REQUIREMENT_APP_DOCKER]:
+        if app_req["class"] in CWL_REQUIREMENT_APP_REMOTE:
             if input_ref.startswith("s3://"):
                 return True
             return False

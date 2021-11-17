@@ -7,6 +7,8 @@ Local test web application is employed to run operations by mocking external req
 .. seealso::
     - :mod:`tests.processes.wps_package`.
 """
+import uuid
+
 import contextlib
 import json
 import logging
@@ -23,11 +25,13 @@ from tests import resources
 from tests.functional.utils import WpsConfigBase
 from tests.utils import (
     MOCK_AWS_REGION,
+    MOCK_HTTP_REF,
     mocked_aws_credentials,
     mocked_aws_s3,
     mocked_aws_s3_bucket_test_file,
     mocked_dismiss_process,
     mocked_execute_process,
+    mocked_file_server,
     mocked_http_file,
     mocked_reference_test_file,
     mocked_sub_requests
@@ -49,6 +53,7 @@ from weaver.processes.constants import CWL_REQUIREMENT_APP_DOCKER, CWL_REQUIREME
 from weaver.processes.types import PROCESS_APPLICATION, PROCESS_BUILTIN
 from weaver.status import STATUS_DISMISSED, STATUS_RUNNING
 from weaver.utils import get_any_value
+from weaver.wps.utils import get_wps_output_dir, map_wps_output_location
 
 if TYPE_CHECKING:
     from typing import List
@@ -86,7 +91,7 @@ class WpsPackageAppTest(WpsConfigBase):
             "weaver.wps_path": "/ows/wps",
             "weaver.wps_restapi_path": "/",
             "weaver.wps_output_path": "/wpsoutputs",
-            "weaver.wps_output_dir": "/tmp",  # nosec: B108 # don't care hardcoded for test
+            "weaver.wps_output_dir": "/tmp/weaver-test/wps-outputs",  # nosec: B108 # don't care hardcoded for test
         }
         super(WpsPackageAppTest, cls).setUpClass()
 
@@ -1336,7 +1341,7 @@ class WpsPackageAppTest(WpsConfigBase):
 
         test_http_ref = mocked_reference_test_file(
             "input_file_http.txt",
-            "http",
+            MOCK_HTTP_REF,  # converted to HTTP
             "This is a generated file for http test"
         )
 
@@ -1586,6 +1591,75 @@ class WpsPackageAppTest(WpsConfigBase):
                 res_path = os.path.join(ctx_dir, job_id, "stdout.log")
                 assert results["output"]["href"] == res_url, "Invalid output URL with context: {}".format(ctx)
                 assert os.path.isfile(res_path), "Invalid output path with context: {}".format(ctx)
+
+    def test_execute_job_with_custom_file_name(self):
+        """
+        Verify that remote HTTP files providing valid ``Content-Disposition`` header will be fetched with ``filename``.
+
+        .. versionadded:: 4.4.0
+        """
+        cwl = {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "baseCommand": "echo",
+            "inputs": {"input_file": {"type": "File", "inputBinding": {"position": 1}}},
+            "outputs": {"output": {"type": "File", "outputBinding": {"glob": "stdout.log"}}}
+        }
+        body = {
+            "processDescription": {"process": {"id": self._testMethodName}},
+            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "executionUnit": [{"unit": cwl}],
+        }
+        self.deploy_process(body)
+        headers = deepcopy(self.json_headers)
+
+        with contextlib.ExitStack() as stack_exec:
+            for mock_exec in mocked_execute_process():
+                stack_exec.enter_context(mock_exec)
+            tmp_dir = stack_exec.enter_context(tempfile.TemporaryDirectory())
+            tmp_file = stack_exec.enter_context(
+                # NOTE:
+                #   It is important here that the base directory is NOT the WPS output dir.
+                #   Otherwise, mapping functions when executing the process will automatically resolve the file
+                #   as if "already available" and won't trigger HTTP download that is required for this test.
+                tempfile.NamedTemporaryFile(dir=tmp_dir, prefix="", suffix=".txt")
+            )
+            tmp_name_target = "custom-filename-desired.txt"
+            tmp_name_random = os.path.split(tmp_file.name)[-1]
+            tmp_path = mocked_reference_test_file(tmp_file.name, "", "random data")
+            tmp_http = map_wps_output_location(tmp_path, self.settings, reverse=True, exists=True)
+            assert tmp_http is None, "Failed setup of test file. Must not be available on WPS output location."
+            tmp_host = "http://random-file-server.com"
+            tmp_http = f"{tmp_host}/{tmp_name_random}"
+            headers.update({"Content-Disposition": f"filename=\"{tmp_name_target}\""})
+            stack_exec.enter_context(mocked_file_server(tmp_dir, tmp_host, self.settings, headers_override=headers))
+
+            proc_url = "/processes/{}/jobs".format(self._testMethodName)
+            exec_body = {
+                "mode": EXECUTE_MODE_ASYNC,
+                "response": EXECUTE_RESPONSE_DOCUMENT,
+                "inputs": [{"id": "input_file", "href": tmp_http}],
+                "outputs": [{"id": "output", "transmissionMode": EXECUTE_TRANSMISSION_MODE_REFERENCE}]
+            }
+            resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
+                                       data=exec_body, headers=headers, only_local=True)
+            code = resp.status_code
+            assert code in [200, 201], "Failed with: [{}]\nReason:\n{}".format(code, resp.json)
+            status_url = resp.json.get("location")
+            job_id = resp.json["jobID"]
+            self.monitor_job(status_url, timeout=5)
+            wps_dir = get_wps_output_dir(self.settings)
+            job_dir = os.path.join(wps_dir, job_id)
+            job_out = os.path.join(job_dir, "stdout.log")
+            assert os.path.isfile(job_out), f"Invalid output file not found: [{job_out}]"
+            with open(job_out, "r") as out_fd:
+                out_data = out_fd.read()
+            assert tmp_name_target in out_data and tmp_name_random not in out_data, (
+                "Expected input file fetched and staged with Content-Disposition preferred filename "
+                "to be printed into the output log file. Expected name was not found.\n"
+                f"Expected: [{tmp_name_target}]\n" 
+                f"Original: [{tmp_name_random}]"
+            )
 
     # FIXME: create a real async test (threading/multiprocess) to evaluate this correctly
     def test_dismiss_job(self):

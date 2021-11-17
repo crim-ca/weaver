@@ -1,3 +1,9 @@
+import tempfile
+
+import shutil
+
+import os
+
 import contextlib
 import copy
 
@@ -8,7 +14,7 @@ from pyramid.testing import DummyRequest
 
 from tests.utils import mocked_remote_wps
 from weaver.formats import ACCEPT_LANGUAGE_EN_US, ACCEPT_LANGUAGE_FR_CA, CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML
-from weaver.wps.utils import get_wps_client, get_wps_output_context, set_wps_language
+from weaver.wps.utils import get_wps_client, get_wps_output_context, map_wps_output_location, set_wps_language
 
 
 def test_set_wps_language():
@@ -158,3 +164,68 @@ def test_get_wps_output_context_resolution():
             pytest.fail(
                 "Exception raised when none is expected [{}]: {!s}: ${!s}".format(i, exc.__class__.__name__, exc)
             )
+
+
+def test_map_wps_output_location_duplicate_subdir():
+    for tmp_dir in [
+        "/tmp/tmp/tmp",
+        "/tmp/tmpdir"
+    ]:
+        wps_out = "http:///localhost/wps-output/tmp"
+        settings = {
+            "weaver.wps_output_dir": tmp_dir,
+            "weaver.wps_output_url": wps_out
+        }
+        path = map_wps_output_location(f"{wps_out}/tmp/some-file-tmp.tmp", settings, exists=False)
+        assert path == f"{tmp_dir}/tmp/some-file-tmp.tmp"
+
+        path = map_wps_output_location(f"{tmp_dir}/here/some-file-tmp.tmp", settings, exists=False, reverse=True)
+        assert path == f"{wps_out}/here/some-file-tmp.tmp"
+
+
+def test_map_wps_output_location_exists():
+    wps_url = "http:///localhost/wps-output/tmp"
+    wps_dir = "/tmp/weaver-test/test-outputs"
+    settings = {
+        "weaver.wps_output_dir": wps_dir,
+        "weaver.wps_output_url": wps_url
+    }
+    try:
+        os.makedirs(wps_dir, exist_ok=True)
+        with tempfile.NamedTemporaryFile(dir=wps_dir, suffix="test.txt", mode="w") as tmp_file:
+            tmp_file.write("fake data")
+            tmp_file.flush()
+            tmp_file.seek(0)
+            tmp_path = tmp_file.name
+            tmp_name = os.path.split(tmp_file.name)[-1]
+            tmp_http = f"{wps_url}/{tmp_name}"
+            assert os.path.isfile(tmp_path), "failed setup test file"
+
+            path = map_wps_output_location(tmp_http, settings, exists=True)
+            assert path == tmp_path
+            path = map_wps_output_location(tmp_http, settings, exists=False)
+            assert path == tmp_path
+
+            path = map_wps_output_location(tmp_path, settings, exists=True, reverse=True)
+            assert path == tmp_http
+            path = map_wps_output_location(tmp_path, settings, exists=False, reverse=True)
+            assert path == tmp_http
+
+        assert not os.path.isfile(tmp_path), "test file expected to be auto-cleaned"
+
+        path = map_wps_output_location(tmp_http, settings, exists=True)
+        assert path is None
+        path = map_wps_output_location(tmp_http, settings, exists=False)
+        assert path == tmp_path
+
+        path = map_wps_output_location(tmp_path, settings, exists=True, reverse=True)
+        assert path is None
+        path = map_wps_output_location(tmp_path, settings, exists=False, reverse=True)
+        assert path == tmp_http
+
+    except AssertionError:
+        raise
+    except Exception as exc:
+        pytest.fail(f"Failed due to unexpected exception: [{exc}]")
+    finally:
+        shutil.rmtree(wps_dir, ignore_errors=True)

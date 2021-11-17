@@ -47,7 +47,7 @@ from weaver.utils import (
     request_extra
 )
 from weaver.warning import MissingParameterWarning, UnsupportedOperationWarning
-from weaver.wps.utils import get_wps_output_url, map_wps_output_location
+from weaver.wps.utils import get_wps_output_dir, get_wps_output_url
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Type, Union
@@ -56,7 +56,7 @@ if TYPE_CHECKING:
     from owslib.wps import Process as ProcessOWSWPS
     from pywps.app import Process as ProcessPyWPS
 
-    from weaver.typedefs import AnyRequestType, AnyResponseType, SettingsType
+    from weaver.typedefs import AnyHeadersContainer, AnyRequestType, AnyResponseType, SettingsType
 
     # pylint: disable=C0103,invalid-name,E1101,no-member
     MockPatch = mock._patch  # noqa
@@ -621,52 +621,99 @@ def mocked_remote_server_requests_wps1(server_configs,          # type: Union[Mo
     return mocked_remote_server_wrapper
 
 
-def mocked_wps_output(settings, mock_get=True, mock_head=True):
-    # type: (SettingsType, bool, bool) -> Union[responses.RequestsMock, MockPatch]
+def mocked_file_server(directory, url, settings, mock_get=True, mock_head=True, headers_override=None):
+    """
+    Mocks a file server endpoint hosting some local directory files.
+
+    .. warning::
+        When combined in a test where :func:`mocked_sub_requests` is employed, parameter ``local_only=True``
+        and the targeted :paramref:`url` should differ from the :class:`TestApp` URL to avoid incorrect handling
+        by different mocks.
+
+    .. seealso::
+        For WPS output directory/endpoint, consider using :func:`mocked_wps_output` instead.
+
+    :param directory: Path of the directory to mock as file server resources.
+    :param url: HTTP URL to mock as file server endpoint.
+    :param settings: Application settings to retrieve requests options.
+    :param mock_get: Whether to mock HTTP GET methods received on WPS output URL.
+    :param mock_head: Whether to mock HTTP HEAD methods received on WPS output URL.
+    :param headers_override: Override specified headers in produced response.
+    :return: Mocked response that would normally be obtained by a file server hosting WPS output directory.
+    """
+    if directory.startswith("file://"):
+        directory = directory[7:]
+    directory = os.path.abspath(directory)
+    assert os.path.isdir(directory) and directory.startswith("/"), (
+        "Invalid directory does not exist or has invalid scheme."
+    )
+
+    def request_callback(request):
+        # type: (AnyRequestType) -> Tuple[int, Dict[str, str], str]
+        """
+        Operation called when the file-server URL is matched against incoming requests that have been mocked.
+        """
+        if (mock_head and request.method == "HEAD") or (mock_get and request.method == "GET"):
+            file_url = "file://{}".format(request.url.replace(url, directory, 1))
+            resp = request_extra(request.method, file_url, settings=settings)
+            if resp.status_code == 200:
+                headers = resp.headers
+                content = resp.content
+                file_path = file_url.replace("file://", "")
+                mime_type, encoding = mimetypes.guess_type(file_path)
+                headers.update({
+                    "Server": "mocked_wps_output",
+                    "Date": str(datetime.datetime.utcnow()),
+                    "Content-Type": mime_type or CONTENT_TYPE_TEXT_PLAIN,
+                    "Content-Encoding": encoding or "",
+                    "Last-Modified": str(datetime.datetime.fromtimestamp(os.stat(file_path).st_mtime))
+                })
+                if request.method == "HEAD":
+                    headers.pop("Content-Length", None)
+                    content = ""
+                if request.method == "GET":
+                    headers.update({
+                        "Content-Length": str(headers.get("Content-Length", len(resp.content))),
+                    })
+                headers.update(headers_override or {})
+                return resp.status_code, headers, content
+        else:
+            return 405, {}, ""
+        return 404, {}, ""
+
+    mock_req = responses.RequestsMock(assert_all_requests_are_fired=False)
+    any_file_url = re.compile(r"{}/[\w\-_/.]+".format(url))  # match any sub-directory/file structure
+    if mock_get:
+        mock_req.add_callback(responses.GET, any_file_url, callback=request_callback)
+    if mock_head:
+        mock_req.add_callback(responses.HEAD, any_file_url, callback=request_callback)
+    return mock_req
+
+
+def mocked_wps_output(settings, mock_get=True, mock_head=True, headers_override=None):
+    # type: (SettingsType, bool, bool, Optional[AnyHeadersContainer]) -> Union[responses.RequestsMock, MockPatch]
     """
     Mocks the mapping resolution from HTTP WPS output URL to hosting of matched local file in WPS output directory.
 
     .. warning::
         When combined in a test where :func:`mocked_sub_requests` is employed, parameter ``local_only=True`` must be
-        provided. Otherwise, this mocked response will never be reached since HTTP requests themselves would be mocked
-        beforehand by a :class:`TestApp` request.
+        provided. Furthermore, the endpoint corresponding to ``weaver.wps_output_url`` would be different than the
+        :class:`TestApp` URL (typically ``https://localhost``). Simply changing ``https`` to ``http`` can be sufficient.
+        Without those modifications, this mocked response will never be reached since HTTP requests themselves would
+        be mocked beforehand by the :class:`TestApp` request.
+
+    .. seealso::
+        This case is a specific use of :func:`mocked_file_server` for auto-mapping endpoint/directory of WPS outputs.
 
     :param settings: Application settings to retrieve WPS output configuration.
     :param mock_get: Whether to mock HTTP GET methods received on WPS output URL.
     :param mock_head: Whether to mock HTTP HEAD methods received on WPS output URL.
+    :param headers_override: Override specified headers in produced response.
     :return: Mocked response that would normally be obtained by a file server hosting WPS output directory.
     """
-    wps_output_url = get_wps_output_url(settings)
-
-    def request_callback(request):
-        # type: (AnyRequestType) -> Tuple[int, Dict[str, str], str]
-        wps_out_file = map_wps_output_location(request.url, settings, exists=True, file_scheme=True)
-        if wps_out_file and (mock_head and request.method == "HEAD") or (mock_get and request.method == "GET"):
-            resp = request_extra(request.method, wps_out_file, settings=settings)
-            if request.method == "HEAD" and resp.status_code == 200:
-                wps_output_file_path = wps_out_file.replace("file://", "")
-                mime_type, encoding = mimetypes.guess_type(wps_output_file_path)
-                headers = {
-                    "Server": "mocked_wps_output",
-                    "Date": str(datetime.datetime.utcnow()),
-                    "Content-Type": mime_type or CONTENT_TYPE_TEXT_PLAIN,
-                    "Content-Encoding": encoding or "",
-                    "Content-Length": str(resp.headers.get("Content-Length", len(resp.content))),
-                    "Last-Modified": str(datetime.datetime.fromtimestamp(os.stat(wps_output_file_path).st_mtime))
-                }
-                return 200, headers, ""
-            return resp.status_code, resp.headers, resp.content
-        elif wps_out_file:
-            return 405, {}, ""
-        return 404, {}, ""
-
-    mock_req = responses.RequestsMock(assert_all_requests_are_fired=False)
-    any_wps_output_url = re.compile(r"{}/[\w\-_/.]+".format(wps_output_url))  # match any sub-directory/file structure
-    if mock_get:
-        mock_req.add_callback(responses.GET, any_wps_output_url, callback=request_callback)
-    if mock_head:
-        mock_req.add_callback(responses.HEAD, any_wps_output_url, callback=request_callback)
-    return mock_req
+    wps_url = get_wps_output_url(settings)
+    wps_dir = get_wps_output_dir(settings)
+    return mocked_file_server(wps_dir, wps_url, settings, mock_get, mock_head, headers_override)
 
 
 def mocked_execute_process():
@@ -798,7 +845,7 @@ def mocked_aws_s3(test_func):
 
 
 def mocked_aws_s3_bucket_test_file(bucket_name, file_name, file_content="Test file inside test S3 bucket"):
-    # type: (str,str, str) -> str
+    # type: (str, str, str) -> str
     """
     Mock a test file as if retrieved from an AWS-S3 bucket reference.
 
@@ -847,16 +894,20 @@ def mocked_http_file(test_func):
     return wrapped
 
 
-def mocked_reference_test_file(file_name, href_type, file_content="This is a generated file for href test"):
-    # type: (str,str,str) -> str
+def mocked_reference_test_file(file_name_or_path, href_type, file_content=""):
+    # type: (str, str, str) -> str
     """
     Generates a test file reference from dummy data for http and file href types.
 
     .. seealso::
         - :func:`mocked_http_file`
     """
-    tmpdir = tempfile.mkdtemp()
-    path = os.path.join(tmpdir, file_name)
+    if os.path.isfile(file_name_or_path):
+        path = file_name_or_path
+    else:
+        tmpdir = tempfile.mkdtemp()
+        path = os.path.join(tmpdir, file_name_or_path)
     with open(path, "w") as tmp_file:
         tmp_file.write(file_content)
-    return "file://{}".format(path) if href_type == "file" else os.path.join(MOCK_HTTP_REF, path)
+        tmp_file.seek(0)
+    return "{}://{}".format(href_type, path) if href_type else path
