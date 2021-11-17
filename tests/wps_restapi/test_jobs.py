@@ -1,12 +1,9 @@
-import shutil
-
-import os
-
-import tempfile
-
 import contextlib
 import datetime
 import json
+import os
+import shutil
+import tempfile
 import unittest
 import warnings
 from collections import OrderedDict
