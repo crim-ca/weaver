@@ -1526,7 +1526,7 @@ class Process(Base):
 
     @staticmethod
     def from_wps(wps_process, **extra_params):
-        # type: (ProcessWPS, **Any) -> Process
+        # type: (ProcessWPS, Any) -> Process
         """
         Converts a :mod:`pywps` Process into a :class:`weaver.datatype.Process` using provided parameters.
         """
