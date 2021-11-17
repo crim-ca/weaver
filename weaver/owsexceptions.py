@@ -87,7 +87,7 @@ class OWSException(Response, Exception):
                 desc = json_desc
             else:
                 self.json["description"] = desc
-        except Exception:  # noqa
+        except Exception:  # noqa: W0703 # nosec: B110
             pass
         self.description = desc
 
