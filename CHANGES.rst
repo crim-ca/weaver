@@ -10,6 +10,17 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+`4.3.0 <https://github.com/crim-ca/weaver/tree/4.3.0>`_ (2021-11-16)
+========================================================================
+
+Changes:
+--------
 - Add support of ``type`` and ``processID`` query parameters for ``Job`` listing
   (resolves some tasks in `#268 <https://github.com/crim-ca/weaver/issues/268>`_).
 - Add ``type`` field to ``Job`` status information
