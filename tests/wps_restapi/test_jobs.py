@@ -186,6 +186,9 @@ class WpsRestApiJobsTest(unittest.TestCase):
 
     def assert_equal_with_jobs_diffs(self, jobs_result, jobs_expect,
                                      test_values=None, message="", indent=2, index=None, invert=False):
+        mapping = {job.id: job.task_id for job in self.job_info}
+        missing = set(jobs_expect) - set(jobs_result)
+        unknown = set(jobs_result) - set(jobs_expect)
         assert (
             (invert or len(jobs_result) == len(jobs_expect)) and
             all((job not in jobs_expect if invert else job in jobs_expect) for job in jobs_result)
@@ -194,6 +197,8 @@ class WpsRestApiJobsTest(unittest.TestCase):
             (" (index: {})".format(index) if index is not None else "") +
             ("\nResponse: {}".format(json.dumps(sorted(jobs_result), indent=indent))) +
             ("\nExpected: {}".format(json.dumps(sorted(jobs_expect), indent=indent))) +
+            ("\nMissing: {}".format(json.dumps(sorted(f"{job} ({mapping[job]})" for job in missing), indent=indent))) +
+            ("\nUnknown: {}".format(json.dumps(sorted(f"{job} ({mapping[job]})" for job in unknown), indent=indent))) +
             ("\nTesting: {}".format(test_values) if test_values else "") +
             (self.message_with_jobs_mapping())
         )
@@ -336,8 +341,8 @@ class WpsRestApiJobsTest(unittest.TestCase):
                 assert len(grouped_jobs["jobs"]) == 1
                 assert set(grouped_jobs["jobs"]) == {self.job_info[1].id}
             elif categories["process"] == self.process_other.identifier:
-                assert len(grouped_jobs["jobs"]) == 2
-                assert set(grouped_jobs["jobs"]) == {self.job_info[9].id, self.job_info[10].id}
+                assert len(grouped_jobs["jobs"]) == 4
+                assert set(grouped_jobs["jobs"]) == {self.job_info[i].id for i in [9, 10, 11, 12]}
             else:
                 pytest.fail("Unknown job grouping 'process' value: {}".format(categories["process"]))
 
@@ -366,8 +371,8 @@ class WpsRestApiJobsTest(unittest.TestCase):
                 assert len(grouped_jobs["jobs"]) == 1
                 assert set(grouped_jobs["jobs"]) == {self.job_info[9].id}
             elif categories[service_or_provider] == self.service_two.name:
-                assert len(grouped_jobs["jobs"]) == 1
-                assert set(grouped_jobs["jobs"]) == {self.job_info[10].id}
+                assert len(grouped_jobs["jobs"]) == 3
+                assert set(grouped_jobs["jobs"]) == {self.job_info[10].id, self.job_info[11].id, self.job_info[12].id}
             elif categories[service_or_provider] is None:
                 assert len(grouped_jobs["jobs"]) == 2
                 assert set(grouped_jobs["jobs"]) == {self.job_info[0].id, self.job_info[2].id}
@@ -406,14 +411,15 @@ class WpsRestApiJobsTest(unittest.TestCase):
 
         base_url = self.settings["weaver.url"]
         jobs_url = base_url + sd.jobs_service.path
-        limit = 2  # expect 9 jobs to be visible, making 5 pages of 2
-        last = 4
+        limit = 2  # expect 11 jobs to be visible, making 6 pages of 2 each (except last that is 1)
+        last = 5   # zero-based index of last page
         last_page = "page={}".format(last)
         prev_last_page = "page={}".format(last - 1)
         limit_kvp = "limit={}".format(limit)
         path = get_path_kvp(sd.jobs_service.path, limit=limit)
         resp = self.app.get(path, headers=self.json_headers)
         links = get_links(resp.json["links"])
+        assert resp.json["total"] == expect_jobs_visible
         assert len(resp.json["jobs"]) == limit
         assert links["alternate"] is None
         assert links["collection"] == jobs_url
@@ -493,9 +499,9 @@ class WpsRestApiJobsTest(unittest.TestCase):
         assert links["last"].startswith(p_j_url) and limit_kvp in links["last"] and "page=1" in links["last"]
         assert all(p_kvp not in links[rel] for rel in ["current", "next", "prev", "first", "last"] if links[rel])
 
-        over_limit = 10
-        limit_kvp = "limit={}".format(over_limit)
-        path = get_path_kvp(sd.jobs_service.path, limit=over_limit)
+        limit_over_total = expect_jobs_visible * 2
+        limit_kvp = "limit={}".format(limit_over_total)
+        path = get_path_kvp(sd.jobs_service.path, limit=limit_over_total)
         resp = self.app.get(path, headers=self.json_headers)
         links = get_links(resp.json["links"])
         assert len(resp.json["jobs"]) == expect_jobs_visible
@@ -616,7 +622,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         path = get_path_kvp(sd.jobs_service.path, type="provider", process=self.process_other.identifier, detail=True)
         resp = self.app.get(path, headers=self.json_headers)
         self.check_basic_jobs_info(resp)
-        expect_jobs = [self.job_info[i].id for i in [9, 10]]
+        expect_jobs = [self.job_info[i].id for i in [9, 10, 11, 12]]
         result_jobs = [job["jobID"] for job in resp.json["jobs"]]
         self.assert_equal_with_jobs_diffs(result_jobs, expect_jobs)
         assert resp.json["total"] == len(expect_jobs)
@@ -859,15 +865,17 @@ class WpsRestApiJobsTest(unittest.TestCase):
         assert resp.content_type == CONTENT_TYPE_APP_JSON
         # generated datetime interval have an offset that makes all job in the future
         # anything created "recently" and publicly visible will be listed here
-        assert len(resp.json["jobs"]) == 6
+        job_result = resp.json["jobs"]
+        job_expect = [self.job_info[i].id for i in [0, 1, 2, 5, 9, 10, 11, 12]]
+        self.assert_equal_with_jobs_diffs(job_result, job_expect, {"datetime": datetime_before})
         for job in resp.json["jobs"]:
             base_uri = sd.jobs_service.path + "/{}".format(job)
             path = get_path_kvp(base_uri)
             resp = self.app.get(path, headers=self.json_headers)
             assert resp.status_code == 200
             assert resp.content_type == CONTENT_TYPE_APP_JSON
-            assert date_parser.parse(resp.json["created"]) <= date_parser.parse(
-                datetime_before.replace(DATETIME_INTERVAL_OPEN_START_SYMBOL, ""))
+            interval = datetime_before.replace(DATETIME_INTERVAL_OPEN_START_SYMBOL, "")
+            assert date_parser.parse(resp.json["created"]) <= date_parser.parse(interval)
 
     def test_get_jobs_datetime_after(self):
         """
@@ -889,8 +897,8 @@ class WpsRestApiJobsTest(unittest.TestCase):
             resp = self.app.get(path, headers=self.json_headers)
             assert resp.status_code == 200
             assert resp.content_type == CONTENT_TYPE_APP_JSON
-            assert date_parser.parse(resp.json["created"]) >= date_parser.parse(
-                datetime_after.replace(DATETIME_INTERVAL_OPEN_END_SYMBOL, ""))
+            interval = datetime_after.replace(DATETIME_INTERVAL_OPEN_END_SYMBOL, "")
+            assert date_parser.parse(resp.json["created"]) >= date_parser.parse(interval)
 
     def test_get_jobs_datetime_interval(self):
         """
@@ -1018,7 +1026,8 @@ class WpsRestApiJobsTest(unittest.TestCase):
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
         result_jobs = resp.json["jobs"]
-        expect_idx = [0, 1, 2, 5, 6, 9, 10]  # 3, 4 are private, 9, 10 dynamic since running, others fixed < 30
+        # 3, 4 are private, >9 except 11 are dynamic since running (11 only accepted), others fixed duration <30s
+        expect_idx = [0, 1, 2, 5, 6, 9, 10, 12]
         expect_jobs = [self.job_info[i].id for i in expect_idx]
         self.assert_equal_with_jobs_diffs(result_jobs, expect_jobs, test)
 
@@ -1027,7 +1036,8 @@ class WpsRestApiJobsTest(unittest.TestCase):
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
         result_jobs = resp.json["jobs"]
-        expect_idx = [0, 1, 2, 5, 6, 7, 9, 10]  # everything except 3, 4 that are private, and 8 that is == 50
+        # same as previous for repeated indices except 7 == 40s now also < max duration, 8 is 50s just below range
+        expect_idx = [0, 1, 2, 5, 6, 7, 9, 10, 12]
         expect_jobs = [self.job_info[i].id for i in expect_idx]
         self.assert_equal_with_jobs_diffs(result_jobs, expect_jobs, test)
 
