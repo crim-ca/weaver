@@ -170,7 +170,7 @@ class BuiltinProcessJobBase(CommandLineJob):
 
     # pylint: disable=W0221,arguments-differ    # naming using python like arguments
     def run(self, runtime_context, **kwargs):
-        # type: (RuntimeContext, **Any) -> None
+        # type: (RuntimeContext, Any) -> None
         try:
             self._validate_process()
             super(BuiltinProcessJobBase, self).run(runtime_context, **kwargs)

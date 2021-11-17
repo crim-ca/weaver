@@ -68,31 +68,31 @@ class MongoDatabase(DatabaseInterface):
 
     @overload
     def get_store(self, store_type, *store_args, **store_kwargs):
-        # type: (Type[StoreBills], *Any, **Any) -> MongodbBillStore
+        # type: (Type[StoreBills], Any, Any) -> MongodbBillStore
         ...
 
     @overload
     def get_store(self, store_type, *store_args, **store_kwargs):
-        # type: (Type[StoreQuotes], *Any, **Any) -> MongodbQuoteStore
+        # type: (Type[StoreQuotes], Any, Any) -> MongodbQuoteStore
         ...
 
     @overload
     def get_store(self, store_type, *store_args, **store_kwargs):
-        # type: (Type[StoreJobs], *Any, **Any) -> MongodbJobStore
+        # type: (Type[StoreJobs], Any, Any) -> MongodbJobStore
         ...
 
     @overload
     def get_store(self, store_type, *store_args, **store_kwargs):
-        # type: (Type[StoreProcesses], *Any, **Any) -> MongodbProcessStore
+        # type: (Type[StoreProcesses], Any, Any) -> MongodbProcessStore
         ...
 
     @overload
     def get_store(self, store_type, *store_args, **store_kwargs):
-        # type: (Type[StoreServices], *Any, **Any) -> MongodbServiceStore
+        # type: (Type[StoreServices], Any, Any) -> MongodbServiceStore
         ...
 
     def get_store(self, store_type, *store_args, **store_kwargs):
-        # type: (Union[str, Type[StoreInterface], AnyMongodbStoreType], *Any, **Any) -> AnyMongodbStore
+        # type: (Union[str, Type[StoreInterface], AnyMongodbStoreType], Any, Any) -> AnyMongodbStore
         """
         Retrieve a store from the database.
 

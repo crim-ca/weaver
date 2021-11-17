@@ -36,27 +36,27 @@ class DatabaseInterface(metaclass=abc.ABCMeta):
 
     @overload
     def get_store(self, store_type, *store_args, **store_kwargs):
-        # type: (Type[StoreBills], *Any, **Any) -> StoreBills
+        # type: (Type[StoreBills], Any, Any) -> StoreBills
         ...
 
     @overload
     def get_store(self, store_type, *store_args, **store_kwargs):
-        # type: (Type[StoreQuotes], *Any, **Any) -> StoreQuotes
+        # type: (Type[StoreQuotes], Any, Any) -> StoreQuotes
         ...
 
     @overload
     def get_store(self, store_type, *store_args, **store_kwargs):
-        # type: (Type[StoreJobs], *Any, **Any) -> StoreJobs
+        # type: (Type[StoreJobs], Any, Any) -> StoreJobs
         ...
 
     @overload
     def get_store(self, store_type, *store_args, **store_kwargs):
-        # type: (Type[StoreProcesses], *Any, **Any) -> StoreProcesses
+        # type: (Type[StoreProcesses], Any, Any) -> StoreProcesses
         ...
 
     @overload
     def get_store(self, store_type, *store_args, **store_kwargs):
-        # type: (Type[StoreServices], *Any, **Any) -> StoreServices
+        # type: (Type[StoreServices], Any, Any) -> StoreServices
         ...
 
     @abc.abstractmethod
