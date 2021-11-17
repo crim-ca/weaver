@@ -22,6 +22,7 @@ from beaker.cache import cache_region, region_invalidate
 from beaker.exceptions import BeakerException
 from celery.app import Celery
 from pyramid.config import Configurator
+from pyramid.exceptions import ConfigurationError
 from pyramid.httpexceptions import HTTPError as PyramidHTTPError, HTTPGatewayTimeout, HTTPTooManyRequests
 from pyramid.registry import Registry
 from pyramid.request import Request as PyramidRequest
@@ -32,6 +33,7 @@ from requests import HTTPError as RequestsHTTPError, Response
 from requests.structures import CaseInsensitiveDict
 from requests_file import FileAdapter
 from urlmatch import urlmatch
+from urllib.parse import unquote
 from webob.headers import EnvironHeaders, ResponseHeaders
 from werkzeug.wrappers import Request as WerkzeugRequest
 
@@ -64,6 +66,12 @@ SUPPORTED_FILE_SCHEMES = frozenset([
     "https",
     "s3"
 ])
+
+# note: word characters also match unicode in this case
+FILE_NAME_QUOTE_PATTERN = re.compile(r"^\"?([\w\-.]+\.\w+)\"?$")  # extension required, permissive extra quotes
+FILE_NAME_LOOSE_PATTERN = re.compile(r"^[\w\-.]+$")  # no extension required
+
+UUID_PATTERN = re.compile(colander.UUID_REGEX, re.IGNORECASE)
 
 
 class _Singleton(type):
@@ -245,9 +253,6 @@ def is_valid_url(url):
         return False
 
 
-UUID_PATTERN = re.compile(colander.UUID_REGEX, re.IGNORECASE)
-
-
 def is_uuid(maybe_uuid):
     # type: (Any) -> bool
     """
@@ -258,27 +263,27 @@ def is_uuid(maybe_uuid):
     return re.match(UUID_PATTERN, str(maybe_uuid)) is not None
 
 
-def parse_extra_options(option_str):
-    # type: (str) -> Dict[str, str]
+def parse_extra_options(option_str, sep=","):
+    # type: (str, str) -> Dict[str, Optional[str]]
     """
     Parses the extra options parameter.
 
     The option_str is a string with coma separated ``opt=value`` pairs.
-    Example::
+
+    .. code-block:: http
 
         tempdir=/path/to/tempdir,archive_root=/path/to/archive
 
     :param option_str: A string parameter with the extra options.
+    :param sep: separator to employ in order to split the multiple values within the option string.
     :return: A dict with the parsed extra options.
     """
     if option_str:
         try:
-            # pylint: disable=R1717,consider-using-dict-comprehension
-            extra_options = option_str.split(",")
-            extra_options = dict([("=" in opt) and opt.split("=", 1) for opt in extra_options])  # noqa
-        except Exception:
-            msg = "Can not parse extra-options: {}".format(option_str)
-            from pyramid.exceptions import ConfigurationError
+            extra_options = [opt.split("=", 1) for opt in option_str.split(sep)]
+            extra_options = {opt[0].strip(): (opt[1].strip() if len(opt) > 1 else None) for opt in extra_options}
+        except Exception as exc:
+            msg = "Can not parse extra-options: [{}]. Caused by: [{}]".format(option_str, exc)
             raise ConfigurationError(msg)
     else:
         extra_options = {}
@@ -963,6 +968,75 @@ def request_extra(method,                       # type: str
     return err
 
 
+def download_file_http(file_reference, file_outdir, settings=None, **request_kwargs):
+    # type: (str, str, Optional[AnySettingsContainer], Any) -> str
+    """
+    Downloads the file referenced by an HTTP URL location.
+
+    Respects :rfc:`2183`, :rfc:`5987` and :rfc:`6266` regarding ``Content-Disposition`` header handling to resolve
+    any preferred file name. This value is employed if it fulfill validation criteria. Otherwise, the name is extracted
+    from the last part of the URL path.
+
+    :param file_reference: HTTP URL where the file is hosted.
+    :param file_outdir: Output local directory path under which to place the downloaded file.
+    :param settings: Additional request-related settings from the application configuration (notably request-options).
+    :param request_kwargs: Additional keywords to forward to request call (if needed).
+    :return: Path of the local copy of the fetched file.
+    :raises HTTPException: applicable HTTP-based exception if any unrecoverable problem occurred during fetch request.
+    :raises ValueError: when resulting file name value is considered invalid.
+    """
+
+    LOGGER.debug("Fetch file resolved as remote URL reference.")
+    request_kwargs.pop("stream", None)
+    resp = request_extra("get", file_reference, stream=True, retries=3, settings=settings, **request_kwargs)
+    if resp.status_code >= 400:
+        # use method since response object does not derive from Exception, therefore cannot be raised directly
+        if hasattr(resp, "raise_for_status"):
+            resp.raise_for_status()
+        raise resp
+
+    # resolve preferred file name or default to last fragment of request path
+    file_name = None
+    content_disposition = get_header("Content-Disposition", resp.headers)
+    if content_disposition:
+        LOGGER.debug("Detected Content-Disposition, looking for preferred file name...")
+        options = CaseInsensitiveDict(parse_extra_options(content_disposition, sep=";"))
+        file_name_param = options.get("filename")
+        file_name_star = options.get("filename*")
+        if file_name_star and "''" in file_name_star:
+            file_name_encoding, file_name_star = file_name_star.split("''")
+            try:
+                file_name_star = unquote(file_name_star, file_name_encoding, errors="strict")
+            except (LookupError, UnicodeDecodeError):
+                file_name_star = None
+
+        # security validation, remove any nested path and abort if any invalid characters
+        try:
+            file_name_maybe = (file_name_star or file_name_param or "").split("/")[-1].strip().replace(" ", "_")
+            file_name_maybe = FILE_NAME_QUOTE_PATTERN.match(file_name_maybe)[1]
+            if file_name_maybe and (3 < len(file_name_maybe) < 256):
+                file_name = file_name_maybe
+                LOGGER.debug("Using validated Content-Disposition preferred file name: [%s]", file_name)
+        except (IndexError, TypeError):
+            LOGGER.debug("Discarding Content-Disposition preferred file name due to failed validation.")
+
+    if not file_name:
+        file_name = urlparse(file_reference).path.split("/")[-1]
+        LOGGER.debug("Using default file name from URL path fragment: [%s]", file_name)
+
+    if not FILE_NAME_LOOSE_PATTERN.match(file_name):
+        raise ValueError(f"Invalid file name [{file_name!s}] resolved from URL [{file_reference}]. Aborting download.")
+
+    file_path = os.path.join(file_outdir, file_name)
+    with open(file_path, "wb") as file:
+        # NOTE:
+        #   Setting 'chunk_size=None' lets the request find a suitable size according to
+        #   available memory. Without this, it defaults to 1 which is extremely slow.
+        for chunk in resp.iter_content(chunk_size=None):
+            file.write(chunk)
+    return file_path
+
+
 def fetch_file(file_reference, file_outdir, settings=None, link=None, **request_kwargs):
     # type: (str, str, Optional[AnySettingsContainer], Optional[bool], Any) -> str
     """
@@ -1022,6 +1096,7 @@ def fetch_file(file_reference, file_outdir, settings=None, link=None, **request_
         bucket = s3.Bucket(bucket_name)
         bucket.download_file(file_key, file_path)
     elif file_reference.startswith("http"):
+        # pseudo-http URL referring to S3 bucket, try to redirect to above S3 handling method if applicable
         if file_reference.startswith("https://s3."):
             s3 = boto3.resource("s3")
             # endpoint in the form: "https://s3.[region-name.]amazonaws.com/<bucket>/<file-key>"
@@ -1034,21 +1109,7 @@ def fetch_file(file_reference, file_outdir, settings=None, link=None, **request_
                              "  Initial: [%s]\n"
                              "  Updated: [%s]", file_reference, file_ref_updated)
                 return fetch_file(file_ref_updated, file_outdir, settings=settings, **request_kwargs)
-
-        LOGGER.debug("Fetch file resolved as remote URL reference.")
-        request_kwargs.pop("stream", None)
-        with open(file_path, "wb") as file:
-            resp = request_extra("get", file_reference, stream=True, retries=3, settings=settings, **request_kwargs)
-            if resp.status_code >= 400:
-                # use method since response object does not derive from Exception, therefore cannot be raised directly
-                if hasattr(resp, "raise_for_status"):
-                    resp.raise_for_status()
-                raise resp
-            # NOTE:
-            #   Setting 'chunk_size=None' lets the request find a suitable size according to
-            #   available memory. Without this, it defaults to 1 which is extremely slow.
-            for chunk in resp.iter_content(chunk_size=None):
-                file.write(chunk)
+        file_path = download_file_http(file_reference, file_outdir, settings=settings, **request_kwargs)
     else:
         scheme = file_reference.split("://")
         scheme = "<none>" if len(scheme) < 2 else scheme[0]
