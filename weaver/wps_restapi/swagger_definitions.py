@@ -3561,6 +3561,14 @@ class GetJobsEndpoint(GetJobsRequest):
     pass
 
 
+class GetProcessJobsEndpoint(GetJobsRequest, ProcessPath):
+    pass
+
+
+class GetProviderJobsEndpoint(GetJobsRequest, ProviderPath, ProcessPath):
+    pass
+
+
 class JobIdentifierList(ExtendedSequenceSchema):
     job_id = UUID(description="ID of a job to dismiss. Identifiers not matching any known job are ignored.")
 
@@ -3574,11 +3582,11 @@ class DeleteJobsEndpoint(ExtendedMappingSchema):
     body = DeleteJobsBodySchema()
 
 
-class GetProcessJobsEndpoint(GetJobsRequest, ProcessPath):
+class DeleteProcessJobsEndpoint(DeleteJobsEndpoint, ProcessPath):
     pass
 
 
-class GetProviderJobsEndpoint(GetJobsRequest, ProviderPath, ProcessPath):
+class DeleteProviderJobsEndpoint(DeleteJobsEndpoint, ProviderPath, ProcessPath):
     pass
 
 
@@ -3970,6 +3978,18 @@ class NotFoundJobResponseSchema(ExtendedMappingSchema):
     body = ErrorJsonResponseBodySchema()
 
 
+class GoneJobResponseSchema(ExtendedMappingSchema):
+    description = "Job reference UUID cannot be dismissed again or its result artifacts were removed."
+    examples = {
+        "JobDismissed": {
+            "summary": "Example response when specified job reference was already dismissed.",
+            "value": EXAMPLES["job_dismissed_error.json"]
+        }
+    }
+    header = ResponseHeaders()
+    body = ErrorJsonResponseBodySchema()
+
+
 class OkGetJobInputsResponse(ExtendedMappingSchema):
     header = ResponseHeaders()
     body = JobInputsSchema()
@@ -4218,6 +4238,7 @@ get_prov_single_job_status_responses.update({
 delete_job_responses = {
     "200": OkDismissJobResponse(description="success"),
     "404": NotFoundJobResponseSchema(),
+    "410": GoneJobResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 delete_prov_job_responses = copy(delete_job_responses)
@@ -4246,6 +4267,7 @@ get_job_outputs_responses = {
         }
     }),
     "404": NotFoundJobResponseSchema(),
+    "410": GoneJobResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_prov_outputs_responses = copy(get_job_outputs_responses)
@@ -4263,6 +4285,7 @@ get_job_results_responses = {
         }
     }),
     "404": NotFoundJobResponseSchema(),
+    "410": GoneJobResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_prov_results_responses = copy(get_job_results_responses)
@@ -4277,6 +4300,7 @@ get_exceptions_responses = {
         }
     }),
     "404": NotFoundJobResponseSchema(),
+    "410": GoneJobResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_prov_exceptions_responses = copy(get_exceptions_responses)
@@ -4291,6 +4315,7 @@ get_logs_responses = {
         }
     }),
     "404": NotFoundJobResponseSchema(),
+    "410": GoneJobResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_prov_logs_responses = copy(get_logs_responses)
