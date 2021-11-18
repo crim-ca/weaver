@@ -53,7 +53,16 @@ if TYPE_CHECKING:
 
     from pyramid.request import Request
 
-    from weaver.typedefs import AnyContainer, AnySettingsContainer, FileSystemPathType, JSON, Number, SettingsType
+    from weaver.typedefs import (
+        AnyContainer,
+        AnyHeadersContainer,
+        AnySettingsContainer,
+        CWL,
+        FileSystemPathType,
+        JSON,
+        Number,
+        SettingsType
+    )
 
 
 # FIXME:
@@ -152,7 +161,8 @@ def _check_deploy(payload):
 
 @log_unhandled_exceptions(logger=LOGGER, message="Unhandled error occurred during parsing of process definition.",
                           is_request=False)
-def _validate_deploy_process_info(process_info, reference, package, settings):
+def _validate_deploy_process_info(process_info, reference, package, settings, headers):
+    # type: (JSON, Optional[str], Optional[CWL], SettingsType, Optional[AnyHeadersContainer]) -> JSON
     """
     Obtain the process definition from deploy payload with exception handling.
 
@@ -162,7 +172,7 @@ def _validate_deploy_process_info(process_info, reference, package, settings):
     from weaver.processes.wps_package import check_package_instance_compatible, get_process_definition
     try:
         # data_source `None` forces workflow process to search locally for deployed step applications
-        info = get_process_definition(process_info, reference, package, data_source=None)
+        info = get_process_definition(process_info, reference, package, data_source=None, headers=headers)
 
         # validate process type and package against weaver configuration
         cfg = get_weaver_configuration(settings)
@@ -249,7 +259,8 @@ def deploy_process_from_payload(payload, container, overwrite=False):
 
     # update and validate process information using WPS process offering, CWL/WPS reference or CWL package definition
     settings = get_settings(container)
-    process_info = _validate_deploy_process_info(process_info, reference, package, settings)
+    headers = getattr(container, "headers", {})  # container is any request (as when called from API Deploy request)
+    process_info = _validate_deploy_process_info(process_info, reference, package, settings, headers)
 
     restapi_url = get_wps_restapi_base_url(settings)
     description_url = "/".join([restapi_url, "processes", process_info["identifier"]])

@@ -40,6 +40,7 @@ from yaml.scanner import ScannerError
 
 from weaver.config import WEAVER_CONFIGURATION_HYBRID, WEAVER_CONFIGURATIONS_REMOTE, get_weaver_configuration
 from weaver.database import get_db
+from weaver.datatype import DockerAuthentication
 from weaver.exceptions import (
     PackageException,
     PackageExecutionError,
@@ -57,6 +58,7 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_REMOTE,
     CWL_REQUIREMENT_APP_TYPES,
     CWL_REQUIREMENT_APP_WPS1,
+    CWL_REQUIREMENT_ENV_VAR,
     CWL_REQUIREMENT_INIT_WORKDIR,
     WPS_INPUT,
     WPS_OUTPUT
@@ -109,7 +111,7 @@ if TYPE_CHECKING:
     from pywps.app import WPSRequest
     from pywps.response.execute import ExecuteResponse
 
-    from weaver.datatype import Job
+    from weaver.datatype import Authentication, Job
     from weaver.processes.convert import (
         ANY_IO_Type,
         CWL_Input_Type,
@@ -119,7 +121,16 @@ if TYPE_CHECKING:
         WPS_Output_Type
     )
     from weaver.status import AnyStatusType
-    from weaver.typedefs import AnyValueType, CWL, JSON, Number, ToolPathObjectType, TypedDict, ValueType
+    from weaver.typedefs import (
+        AnyValueType,
+        AnyHeadersContainer,
+        CWL,
+        JSON,
+        Number,
+        ToolPathObjectType,
+        TypedDict,
+        ValueType
+    )
 
     # note: below requirements also include 'hints'
     CWLRequirement = TypedDict("CWLRequirement", {"class": str}, total=False)
@@ -634,8 +645,45 @@ def check_package_instance_compatible(package):
     return None
 
 
-def get_process_definition(process_offering, reference=None, package=None, data_source=None):
-    # type: (JSON, Optional[str], Optional[CWL], Optional[str]) -> JSON
+def get_auth_requirements(requirement, headers):
+    # type: (JSON, Optional[AnyHeadersContainer]) -> Optional[Authentication]
+    """
+    Extract any authentication related definitions provided in request headers corresponding to the application type.
+
+    :param requirement: :term:`Application Package` requirement as defined by :term:`CWL` requirements.
+    :param headers: Requests headers received during deployment.
+    :return: Matched authentication details when applicable, otherwise None.
+    :raises TypeError: When the authentication object cannot be created due to invalid or missing inputs.
+    :raises ValueError: When the authentication object cannot be created due to incorrectly formed inputs.
+    """
+    if not headers:
+        LOGGER.debug("No headers provided, cannot extract any authentication requirements.")
+        return None
+    if requirement["class"] == CWL_REQUIREMENT_APP_DOCKER:
+        x_auth_docker = get_header("X-Auth-Docker", headers)
+        link_ref_docker = requirement.get("dockerPull", None)
+        if x_auth_docker and link_ref_docker:
+            LOGGER.info("Detected authentication details for Docker image reference in Application Package.")
+            auth_details = x_auth_docker.split(":")
+            # note: never provide any parts in errors in case of incorrect parsing, first could be token by mistake
+            if not len(auth_details) == 2:
+                raise ValueError("Invalid authentication header provided without an authentication scheme "
+                                 "(see also: https://www.iana.org/assignments/http-authschemes/http-authschemes.xhtml)")
+            # FIXME: Only support direct auth bearer token for now. Implement others if needed.
+            auth_scheme, auth_token = auth_details[0].strip().lower(), auth_details[1].strip().lower()
+            if auth_scheme != "bearer":
+                raise ValueError("Invalid authentication header scheme is not supported. "
+                                 "Supported scheme are: [Bearer (https://www.rfc-editor.org/rfc/rfc6750.html)].")
+            auth = DockerAuthentication(auth_token, link_ref_docker)
+            LOGGER.debug("Authentication details for Docker image reference in Application Package correctly parsed.")
+            return auth
+
+    LOGGER.debug("No associated authentication details for application requirement: %s", requirement["class"])
+    return None
+
+
+def get_process_definition(process_offering, reference=None, package=None, data_source=None, headers=None):
+    # type: (JSON, Optional[str], Optional[CWL], Optional[str], Optional[AnyHeadersContainer]) -> JSON
     """
     Resolve the process definition considering corresponding metadata from the offering, package and references.
 
@@ -647,7 +695,8 @@ def get_process_definition(process_offering, reference=None, package=None, data_
     :param reference: URL to `CWL` package definition, `WPS-1 DescribeProcess` endpoint or `WPS-3 Process` endpoint.
     :param package: literal `CWL` package definition (`YAML` or `JSON` format).
     :param data_source: where to resolve process IDs (default: localhost if ``None``).
-    :return: updated process definition with resolved/merged information from ``package``/``reference``.
+    :param headers: Request headers provided during deployment to retrieve details such as authentication tokens.
+    :return: Updated process definition with resolved/merged information from ``package``/``reference``.
     """
 
     def try_or_raise_package_error(call, reason):
@@ -696,7 +745,14 @@ def get_process_definition(process_offering, reference=None, package=None, data_
         lambda: _merge_package_inputs_outputs(process_inputs, package_inputs, process_outputs, package_outputs),
         reason="Merging of inputs/outputs")
 
-    try_or_raise_package_error(lambda: get_application_requirement(package), reason="Validate requirements and hints")
+    app_requirement = try_or_raise_package_error(
+        lambda: get_application_requirement(package),
+        reason="Validate requirements and hints")
+
+    auth_requirements = try_or_raise_package_error(
+        lambda: get_auth_requirements(app_requirement, headers),
+        reason="Obtaining authentication requirements"
+    )
 
     # obtain any retrieved process id if not already provided from upstream process offering, and clean it
     process_id = get_sane_name(get_any_id(process_info), assert_invalid=False)
@@ -708,7 +764,8 @@ def get_process_definition(process_offering, reference=None, package=None, data_
         "package": package,
         "type": process_type,
         "inputs": package_inputs,
-        "outputs": package_outputs
+        "outputs": package_outputs,
+        "auth": auth_requirements
     })
     return process_offering
 
@@ -926,16 +983,16 @@ class WpsPackage(Process):
             req_items = self.package.get("requirements", {})
             if not isinstance(req_items, dict):
                 # definition as list
-                req_env = {"class": "EnvVarRequirement", "envDef": {}}
+                req_env = {"class": CWL_REQUIREMENT_ENV_VAR, "envDef": {}}
                 for req in req_items:
-                    if req["class"] == "EnvVarRequirement":
+                    if req["class"] == CWL_REQUIREMENT_ENV_VAR:
                         req_env = req
                         break
                 req_items.append(req_env)
             else:
                 # definition as mapping
-                req_items.setdefault("EnvVarRequirement", {"envDef": {}})
-                req_env = req_items.get("EnvVarRequirement")
+                req_items.setdefault(CWL_REQUIREMENT_ENV_VAR, {"envDef": {}})
+                req_env = req_items.get(CWL_REQUIREMENT_ENV_VAR)
             active_python_path = os.path.join(sys.exec_prefix, "bin")
             env_path = "{}:{}".format(active_python_path, os.getenv("PATH"))
             req_env["envDef"].update({"PATH": env_path})
