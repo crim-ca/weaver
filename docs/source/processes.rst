@@ -185,30 +185,32 @@ handled in :mod:`weaver/processes/wps_package.py`. We can define :term:`ESGF-CWT
       }
     }
 
+.. _proc_workflow:
+
 Workflow
 ----------
 
-Processes categorized as ``Workflow`` are very similar to `WPS-REST`_ processes. From the API standpoint, they
+Processes categorized as :term:`Workflow` are very similar to `WPS-REST`_ processes. From the API standpoint, they
 actually look exactly the same as an atomic process when calling `DescribeProcess`_ or `Execute`_ requests.
 The difference lies within the referenced :ref:`Application Package` which uses a :ref:`CWL Workflow` instead of
 typical :ref:`CWL CommandLineTool`, and therefore, modifies how the process is internally executed.
 
-For ``Workflow`` processes to be deploy-able and executable, it is **mandatory** that `Weaver` is configured as
-:term:`EMS` or :term:`HYBRID` (see: :ref:`Configuration Settings`). This requirement is due to the nature of workflows
-that chain processes that need to be dispatched to known remote :term:`ADES` servers
+For :term:`Workflow` processes to be deploy-able and executable, it is **mandatory** that `Weaver` is configured as
+:term:`EMS` or :term:`HYBRID` (see: :ref:`Configuration Settings`). This requirement is due to the nature
+of :term:`Workflow` that chain processes that need to be dispatched to known remote :term:`ADES` servers
 (see: :ref:`Configuration of Data Sources` and `Workflow Operations`_).
 
-Given that a ``Workflow`` process was successfully deployed and that all process steps can be resolved, calling
+Given that a :term:`Workflow` process was successfully deployed and that all process steps can be resolved, calling
 its `Execute`_ request will tell `Weaver` to parse the chain of operations and send step process execution requests
 to relevant :term:`ADES` picked according to data sources. Each step's job will then gradually be monitored from the
 remote :term:`ADES` until completion, and upon successful result, the :term:`EMS` will retrieve the data references to
 pass it down to the following step. When the complete chain succeeds, the final results of the last step will be
-provided as ``Workflow`` output as for atomic processes. In case of failure, the error will be indicated in the log
+provided as :term:`Workflow` output as for atomic processes. In case of failure, the error will be indicated in the log
 with the appropriate step and message where the error occurred.
 
 .. note::
 
-    Although chaining sub-workflow(s) within a bigger scoped workflow is technically possible, this have not yet
+    Although chaining sub-workflow(s) within a bigger scoped :term:`Workflow` is technically possible, this have not yet
     been fully explored (tested) in `Weaver`. There is a chance that |data-source|_ resolution fails to identify where
     to dispatch the step in this situation. If this impacts you, please vote and indicate your concern on issue
     `#171 <https://github.com/crim-ca/weaver/issues/171>`_.
@@ -219,8 +221,8 @@ Remote Provider
 --------------------
 
 Remote provider correspond to a remote service that provides similar interfaces as supported by `Weaver`
-(:term:`WPS`-like). For example, a remote WPS-1 XML endpoint can be referenced as a provider. When an API
-`Providers`_-scoped request is executed, for example to list is processes capabilities (see `GetCapabilities`_),
+(:term:`WPS`-like). For example, a remote :term:`WPS`-1 :term:`XML` endpoint can be referenced as a provider. When an
+API `Providers`_-scoped request is executed, for example to list is processes capabilities (see `GetCapabilities`_),
 `Weaver` will send the corresponding request using the registered reference URL to access the remote server and
 reply with parsed response, as if they its processes were registered locally.
 
@@ -228,12 +230,13 @@ Since remote providers obviously require access to the remote service, `Weaver` 
 if the service is accessible with respect to standard implementation features and supported specifications.
 
 The main advantage of using `Weaver`'s endpoint rather than directly accessing the referenced remote provider processes
-is in the case of limited functionality offered by the service. For instance, WPS-1 do not always offer `GetStatus`_
-feature, and there is no extensive job monitoring availability. Since `Weaver` *wraps* the original reference with its
-own endpoints, these features indirectly become employable. Similarly, although WPS-1 offer XML-only endpoints, the
-parsing operation accomplished by `Weaver` makes theses services available as WPS-REST JSON endpoints. On top of that,
-registering remote providers into `Weaver` allows the user to use it as a central hub to keep references to all his
-accessible services and dispatch jobs from a common location.
+is in the case of limited functionality offered by the service. For instance, :term:`WPS`-1 do not always offer
+:ref:`proc_req_status` feature, and there is no extensive job monitoring availability. Since `Weaver` *wraps* the
+original reference with its own endpoints, these features indirectly become employable. Similarly, although
+:term:`WPS`-1 offers :term:`XML`-only endpoints, the parsing operation accomplished by `Weaver` makes theses services
+available as :term:`WPS-REST` :term:`JSON` endpoints. On top of that, registering a remote :term:`Provider`
+into `Weaver` allows the user to use it as a central hub to keep references to all his accessible services and dispatch
+:term:`Job` executions from a common location.
 
 A *remote provider* differs from previously presented `WPS-1/2`_ processes such that the underlying processes of the
 service are not registered locally. For example, if a remote service has two WPS processes, only top-level service URL
@@ -396,8 +399,8 @@ for the *whole* execution to complete to obtain the result. Given that :term:`Pr
 complete, it is not practical to execute them in this manner and potentially have to wait hours to retrieve outputs.
 Instead, the preferred and default approach is to request an ``async`` :term:`Job` execution. When doing so, `Weaver`
 will add this to a task queue for processing, and will immediately return a :term:`Job` identifier and location where
-the user can probe for its status, using `GetStatus`_ monitoring request. As soon as any task worker becomes available,
-it will pick any leftover queued :term:`Job` to execute it.
+the user can probe for its status, using :ref:`proc_req_status` monitoring request. As soon as any task worker becomes
+available, it will pick any leftover queued :term:`Job` to execute it.
 
 The second field is ``response``. At the time being, `Weaver` only supports ``document`` value. This parameter is
 present only for compatibility with other :term:`ADES` implementation, but does not actually affects `Weaver`'s
@@ -840,7 +843,7 @@ upon :term:`Job` completion. The format of the email is configurable from `weave
 email-specific settings (see: :ref:`Configuration`).
 
 
-.. _GetStatus:
+.. _proc_req_status:
 
 Monitoring of a process (GetStatus)
 ---------------------------------------------------------------------
@@ -902,42 +905,8 @@ A minimalistic example of logging output is presented below. This can be retriev
 moment during :term:`Job` execution (with logs up to that point in time) or after its completion (for full output).
 Note again that the more the :term:`Process` is verbose, the more tracking will be provided here.
 
-.. code-block:: json
-
-    [
-      "[2020-03-24 21:32:32] INFO     [weaver.datatype.Job] 0:00:00   1% accepted   Job task setup completed.",
-      "[2020-03-24 21:32:32] INFO     [weaver.datatype.Job] 0:00:00   2% accepted   Execute WPS request for process [jsonarray2netcdf]",
-      "[2020-03-24 21:32:33] INFO     [weaver.datatype.Job] 0:00:01   4% accepted   Fetching job input definitions.",
-      "[2020-03-24 21:32:33] INFO     [weaver.datatype.Job] 0:00:01   6% accepted   Fetching job output definitions.",
-      "[2020-03-24 21:32:33] INFO     [weaver.datatype.Job] 0:00:01   8% accepted   Starting job process execution",
-      "[2020-03-24 21:32:34] INFO     [weaver.datatype.Job] 0:00:01  10% accepted   Verifying job status location.",
-      "[2020-03-24 21:32:34] WARNING  [weaver.datatype.Job] 0:00:01  10% accepted   WPS status location could not be found",
-      "[2020-03-24 21:32:34] INFO     [weaver.datatype.Job] 0:00:01  20% running    Starting monitoring of job execution.",
-      "[2020-03-24 21:33:59] INFO     [weaver.datatype.Job] 0:01:26  90% succeeded  [2020-03-24 17:32:34] INFO     [wps_package.jsonarray2netcdf]    1% running    Preparing package logs done.",
-      "[2020-03-24 21:33:59] INFO     [weaver.datatype.Job] 0:01:26  90% succeeded  [2020-03-24 17:32:34] INFO     [wps_package.jsonarray2netcdf]    2% running    Launching package...",
-      "[2020-03-24 21:33:59] INFO     [weaver.datatype.Job] 0:01:26  90% succeeded  [2020-03-24 17:32:34] INFO     [cwltool] Resolved '/tmp/tmpse3pi1gj/jsonarray2netcdf' to 'file:///tmp/tmpse3pi1gj/jsonarray2netcdf'",
-      "[2020-03-24 21:33:59] INFO     [weaver.datatype.Job] 0:01:26  90% succeeded  [2020-03-24 17:32:34] INFO     [cwltool] ../../../../../tmp/tmpse3pi1gj/jsonarray2netcdf:1:1: Unknown hint",
-      "[2020-03-24 21:33:59] INFO     [weaver.datatype.Job] 0:01:26  90% succeeded                                                       file:///tmp/tmpse3pi1gj/BuiltinRequirement",
-      "[2020-03-24 21:33:59] INFO     [weaver.datatype.Job] 0:01:26  90% succeeded  [2020-03-24 17:32:34] INFO     [wps_package.jsonarray2netcdf]    5% running    Loading package content done.",
-      "[2020-03-24 21:33:59] INFO     [weaver.datatype.Job] 0:01:26  90% succeeded  [2020-03-24 17:32:34] INFO     [wps_package.jsonarray2netcdf]    6% running    Retrieve package inputs done.",
-      "[2020-03-24 21:33:59] INFO     [weaver.datatype.Job] 0:01:26  90% succeeded  [2020-03-24 17:32:34] INFO     [wps_package.jsonarray2netcdf]    8% running    Convert package inputs done.",
-      "[2020-03-24 21:33:59] INFO     [weaver.datatype.Job] 0:01:26  90% succeeded  [2020-03-24 17:32:34] INFO     [wps_package.jsonarray2netcdf]   10% running    Running package...",
-      "[2020-03-24 21:33:59] INFO     [weaver.datatype.Job] 0:01:26  90% succeeded  [2020-03-24 17:32:34] INFO     [cwltool] [job jsonarray2netcdf] /tmp/tmpqy1t8dp3$ python \\",
-      "[2020-03-24 21:33:59] INFO     [weaver.datatype.Job] 0:01:26  90% succeeded      /opt/weaver/processes/builtin/jsonarray2netcdf.py \\",
-      "[2020-03-24 21:33:59] INFO     [weaver.datatype.Job] 0:01:26  90% succeeded      -o \\",
-      "[2020-03-24 21:33:59] INFO     [weaver.datatype.Job] 0:01:26  90% succeeded      /tmp/tmpqy1t8dp3 \\",
-      "[2020-03-24 21:33:59] INFO     [weaver.datatype.Job] 0:01:26  90% succeeded      -i \\",
-      "[2020-03-24 21:33:59] INFO     [weaver.datatype.Job] 0:01:26  90% succeeded      /tmp/tmpla2utn2c/stgb5787338-4a34-4771-88c0-cae95f4d82dd/test_nc_array.json",
-      "[2020-03-24 21:33:59] INFO     [weaver.datatype.Job] 0:01:26  90% succeeded  [2020-03-24 17:32:41] INFO     [cwltool] [job jsonarray2netcdf] Max memory used: 36MiB",
-      "[2020-03-24 21:33:59] INFO     [weaver.datatype.Job] 0:01:26  90% succeeded  [2020-03-24 17:32:41] INFO     [cwltool] [job jsonarray2netcdf] completed success",
-      "[2020-03-24 21:33:59] INFO     [weaver.datatype.Job] 0:01:26  90% succeeded  [2020-03-24 17:32:41] INFO     [wps_package.jsonarray2netcdf]   95% running    Package execution done.",
-      "[2020-03-24 21:33:59] INFO     [weaver.datatype.Job] 0:01:26  90% succeeded  [2020-03-24 17:33:53] INFO     [wps_package.jsonarray2netcdf]   98% running    Generate package outputs done.",
-      "[2020-03-24 21:33:59] INFO     [weaver.datatype.Job] 0:01:26  90% succeeded  [2020-03-24 17:33:55] INFO     [wps_package.jsonarray2netcdf]  100% succeeded  Package complete.",
-      "[2020-03-24 21:33:59] INFO     [weaver.datatype.Job] 0:01:26  90% succeeded  Job succeeded (status: Package complete.).",
-      "[2020-03-24 21:34:45] INFO     [weaver.datatype.Job] 0:01:26  90% succeeded  Job succeeded.",
-      "[2020-03-24 21:34:45] INFO     [weaver.datatype.Job] 0:01:26 100% succeeded  Job task complete."
-    ]
-
+.. literalinclude:: ../../weaver/wps_restapi/examples/job_logs.json
+    :language: json
 
 Special Weaver EMS use-cases
 ==================================================
@@ -945,15 +914,40 @@ Special Weaver EMS use-cases
 This section highlight the additional behaviour available only through an :term:`EMS`-configured `Weaver` instance.
 Some other points are already described in other sections, but are briefly indicated here for conciseness.
 
-.. |data-source| replace:: Data-Source
+.. |data-source| replace:: Data Source
 .. _data-source:
 
-ADES dispatching using Data-Sources
+ADES dispatching using Data Sources
 --------------------------------------
 
+When using either the :term:`EMS` or :term:`HYBRID` [#notedatasource]_ configurations, :term:`Process`
+executions are dispatched to the relevant :term:`ADES` or another :term:`HYBRID` server supporting |process-deploy-op|_
+when inputs are matched against one of the configured :term:`Data Sources`. Minimal implementations
+of :term:`OGC-API - Processes` can also work as external :term:`Provider` where to dispatch executions, but in
+the case of *core* implementations, the :term:`Process` should be already available since it cannot be deployed.
 
-.. todo:: add details, data-source defines where to send request of *known* ADES
-.. todo:: reference config ``weaver.data_sources``
+In more details, when an |exec-req-name|_ request is received, `Weaver` will analyse any file references in the
+specified inputs and try to match them against specified :term:`Data Sources` configuration. When a match is found
+and that the corresponding :ref:`file_reference_types` indicates that the reference is located remotely in a known
+:term:`Data Source` provider that should take care of its processing, `Weaver` will attempt to |deploy-req-name|_
+the targeted :term:`Process` (and the underlying :term:`Application Package`) followed by its remote execution.
+It will then monitor the :term:`Job` until completion and retrieve results if the full operation was successful.
+
+The :term:`Data Source` configuration therefore indicates to `Weaver` how to map a given data reference to a specific
+instance or server where that data is expected to reside. This procedure effectively allows `Weaver` to deliver
+applications *close to the data* which can be extremely more efficient (both in terms of time and quantity) than
+pulling the data locally when :term:`Data Source` become substantial. Furthermore, it allows :term:`Data Source`
+providers to define custom or private data retrieval mechanisms, where data cannot be exposed or offered externally,
+but are still available for use when requested.
+
+.. rubric:: Footnotes
+
+.. [#notedatasource]
+    Configuration :term:`HYBRID` applies here in cases where `Weaver` acts as an :term:`EMS` for remote dispatch
+    of :term:`Process` execution based on applicable :ref:`file_reference_types`.
+
+.. seealso::
+    Specific details about configuration :term:`Data Sources` are provided in the :ref:`conf_data_sources` section.
 
 
 Workflow (Chaining Step Processes)
@@ -964,5 +958,6 @@ Workflow (Chaining Step Processes)
 .. seealso::
 
     - :ref:`CWL Workflow`
+    - :ref:`Workflow Operations`
     - :ref:`Workflow` process type
 

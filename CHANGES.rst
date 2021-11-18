@@ -22,6 +22,8 @@ Changes:
 - Add functional ``Workflow`` tests to validate execution without the need of remote `Weaver` test application
   (relates to `#141 <https://github.com/crim-ca/weaver/issues/141>`_,
   relates to `#281 <https://github.com/crim-ca/weaver/issues/281>`_).
+- Add missing documentation details about `Data Sources` and connect chapters with other relevant
+  documentation details and updated ``Workflow`` tests.
 
 Fixes:
 ------

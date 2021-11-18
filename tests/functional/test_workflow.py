@@ -384,9 +384,18 @@ class WorkflowTestRunnerBase(TestCase):
 
     @staticmethod
     def mock_get_data_source_from_url(data_url):
-        # type: (str) -> str
+        # type: (str) -> Optional[str]
         """
-        Hook available to subclasses to mock any data-source resolution to remote ADES based on data reference URL.
+        Hook available to subclasses to mock any data-source resolution to remote :term:`ADES` based on data reference.
+
+        By default, nothing is returned, meaning that no :term:`Data Source` will be resolved.
+        In the case of :term:`HYBRID` configuration, this will indicate that :term:`Process` is to be executed locally.
+        In the case of alternate configurations, failing to provide an overridden configuration will most probably fail
+        the :term:`Workflow` execution since it will not be possible to map references.
+
+        .. seealso::
+            - :ref:`data-source`
+            - :ref:`conf_data_sources`
         """
 
     @staticmethod
@@ -394,6 +403,11 @@ class WorkflowTestRunnerBase(TestCase):
         # type: () -> Iterable[str]
         """
         Hook available to subclasses to substitute any known collection to data references during resolution.
+
+        This feature mostly applies to :term:`EOImage` or :term:`OpenSearch` data sources.
+
+        .. seealso::
+            - :ref:`opensearch_data_source`
         """
         return []
 
@@ -679,8 +693,11 @@ class WorkflowTestRunnerBase(TestCase):
                          message="Process should be public.")
 
         with contextlib.ExitStack() as stack_exec:
-            stack_exec.enter_context(mock.patch("weaver.processes.sources.get_data_source_from_url",
-                                                side_effect=self.mock_get_data_source_from_url))
+            for data_source_use in [
+                "weaver.processes.sources.get_data_source_from_url",
+                "weaver.processes.wps3_process.get_data_source_from_url"
+            ]:
+                stack_exec.enter_context(mock.patch(data_source_use, side_effect=self.mock_get_data_source_from_url))
             if self.is_webtest():
                 # mock execution when running on local Web Test app since no Celery runner is available
                 for mock_exec in mocked_execute_process():
