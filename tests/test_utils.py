@@ -8,7 +8,7 @@ import shutil
 import tempfile
 import uuid
 from typing import Type
-from urllib.parse import urlparse, quote
+from urllib.parse import quote, urlparse
 
 import mock
 import pytest

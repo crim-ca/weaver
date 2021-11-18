@@ -12,7 +12,7 @@ import warnings
 from copy import deepcopy
 from datetime import datetime
 from typing import TYPE_CHECKING
-from urllib.parse import ParseResult, urlparse, urlunsplit
+from urllib.parse import ParseResult, unquote, urlparse, urlunsplit
 
 import boto3
 import colander
@@ -33,7 +33,6 @@ from requests import HTTPError as RequestsHTTPError, Response
 from requests.structures import CaseInsensitiveDict
 from requests_file import FileAdapter
 from urlmatch import urlmatch
-from urllib.parse import unquote
 from webob.headers import EnvironHeaders, ResponseHeaders
 from werkzeug.wrappers import Request as WerkzeugRequest
 

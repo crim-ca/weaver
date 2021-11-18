@@ -1,11 +1,8 @@
-import tempfile
-
-import shutil
-
-import os
-
 import contextlib
 import copy
+import os
+import shutil
+import tempfile
 
 import mock
 import pytest

@@ -7,13 +7,12 @@ Local test web application is employed to run operations by mocking external req
 .. seealso::
     - :mod:`tests.processes.wps_package`.
 """
-import uuid
-
 import contextlib
 import json
 import logging
 import os
 import tempfile
+import uuid
 from copy import deepcopy
 from inspect import cleandoc
 from typing import TYPE_CHECKING
