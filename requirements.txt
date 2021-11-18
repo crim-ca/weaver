@@ -9,7 +9,7 @@ billiard; sys_platform != "win32"
 billiard>3.2,<3.4; sys_platform == "win32"
 # celery 5 to be released in near future
 # celery >=4.4.3 breaks on 'future.utils' import
-celery[mongodb]==4.4.2; sys_platform != "win32"
+celery[mongodb]==4.4.2; sys_platform != "win32"  # pyup: ignore
 celery[mongodb]<4; sys_platform == "win32"
 cffi
 colander
