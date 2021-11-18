@@ -1,12 +1,11 @@
 # pylint: disable=C0103,invalid-name
-import uuid
-
 import contextlib
 import inspect
 import json
 import os
 import shutil
 import tempfile
+import uuid
 from typing import Type
 from urllib.parse import urlparse
 

@@ -1,13 +1,11 @@
 """
 Utility methods for various TestCase setup operations.
 """
-import datetime
-
-import json
-
 import contextlib
+import datetime
 import functools
 import inspect
+import json
 import mimetypes
 import os
 import re

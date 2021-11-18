@@ -7,8 +7,8 @@ import pytest
 from pyramid.httpexceptions import HTTPCreated, HTTPNotFound, HTTPOk, HTTPUnauthorized
 from pyramid.settings import asbool
 
-from tests.utils import get_setting
 from tests.functional.test_workflow import WorkflowProcesses, WorkflowTestRunnerBase
+from tests.utils import get_setting
 from weaver.config import WEAVER_CONFIGURATION_EMS
 from weaver.formats import CONTENT_TYPE_APP_FORM, CONTENT_TYPE_APP_JSON
 from weaver.processes.sources import fetch_data_sources
