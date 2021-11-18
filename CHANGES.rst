@@ -22,7 +22,7 @@ Changes:
 - Add functional ``Workflow`` tests to validate execution without the need of remote `Weaver` test application
   (relates to `#141 <https://github.com/crim-ca/weaver/issues/141>`_,
   relates to `#281 <https://github.com/crim-ca/weaver/issues/281>`_).
-- Add missing documentation details about `Data Sources` and connect chapters with other relevant
+- Add missing documentation details about `Data Source` and connect chapters with other relevant
   documentation details and updated ``Workflow`` tests.
 
 Fixes:
@@ -39,7 +39,7 @@ Changes:
   (resolves some tasks in `#268 <https://github.com/crim-ca/weaver/issues/268>`_).
 - Add ``type`` field to ``Job`` status information
   (resolves `#351 <https://github.com/crim-ca/weaver/issues/351>`_).
-- Add `OGC-API - Processes` conformance references regarding supported operations for ``Job`` listing and filtering.
+- Add `OGC API - Processes` conformance references regarding supported operations for ``Job`` listing and filtering.
 - Add ``minDuration`` and ``maxDuration`` parameters to query ``Job`` listing filtered by specific execution time range
   (resolves `#268 <https://github.com/crim-ca/weaver/issues/268>`_).
   Range duration parameters are limited to single values each

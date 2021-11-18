@@ -198,7 +198,7 @@ typical :ref:`CWL CommandLineTool`, and therefore, modifies how the process is i
 For :term:`Workflow` processes to be deploy-able and executable, it is **mandatory** that `Weaver` is configured as
 :term:`EMS` or :term:`HYBRID` (see: :ref:`Configuration Settings`). This requirement is due to the nature
 of :term:`Workflow` that chain processes that need to be dispatched to known remote :term:`ADES` servers
-(see: :ref:`Configuration of Data Sources` and `Workflow Operations`_).
+(see: :ref:`conf_data_sources` and :ref:`proc_workflow_ops`).
 
 Given that a :term:`Workflow` process was successfully deployed and that all process steps can be resolved, calling
 its `Execute`_ request will tell `Weaver` to parse the chain of operations and send step process execution requests
@@ -459,6 +459,8 @@ Process Operations
 
 .. todo:: detail 'operations' accomplished (stage-in, exec-cwl, stage-out)
 
+
+.. _proc_workflow_ops:
 
 Workflow Operations
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -748,7 +750,7 @@ input where ``EOImage`` was specified and will be forwarded to the underlying :t
 
 .. note::
     Collection identifiers are mapped against URL endpoints defined in configuration to execute the
-    appropriate :term:`OpenSearch` requests. See :ref:`Configuration of Data Sources` for more details.
+    appropriate :term:`OpenSearch` requests. See :ref:`conf_data_sources` for more details.
 
 .. seealso::
     Definitions in |opensearch-deploy|_ request body provides a more detailed example of the expected structure and
@@ -922,12 +924,12 @@ ADES dispatching using Data Sources
 
 When using either the :term:`EMS` or :term:`HYBRID` [#notedatasource]_ configurations, :term:`Process`
 executions are dispatched to the relevant :term:`ADES` or another :term:`HYBRID` server supporting |process-deploy-op|_
-when inputs are matched against one of the configured :term:`Data Sources`. Minimal implementations
-of :term:`OGC-API - Processes` can also work as external :term:`Provider` where to dispatch executions, but in
+when inputs are matched against one of the configured :term:`Data Source`. Minimal implementations
+of :term:`OGC API - Processes` can also work as external :term:`Provider` where to dispatch executions, but in
 the case of *core* implementations, the :term:`Process` should be already available since it cannot be deployed.
 
 In more details, when an |exec-req-name|_ request is received, `Weaver` will analyse any file references in the
-specified inputs and try to match them against specified :term:`Data Sources` configuration. When a match is found
+specified inputs and try to match them against specified :term:`Data Source` configuration. When a match is found
 and that the corresponding :ref:`file_reference_types` indicates that the reference is located remotely in a known
 :term:`Data Source` provider that should take care of its processing, `Weaver` will attempt to |deploy-req-name|_
 the targeted :term:`Process` (and the underlying :term:`Application Package`) followed by its remote execution.
@@ -947,7 +949,11 @@ but are still available for use when requested.
     of :term:`Process` execution based on applicable :ref:`file_reference_types`.
 
 .. seealso::
-    Specific details about configuration :term:`Data Sources` are provided in the :ref:`conf_data_sources` section.
+    Specific details about configuration of :term:`Data Source` are provided in the :ref:`conf_data_sources` section.
+
+.. seealso::
+    Details regarding :ref:`opensearch_data_source` are also relevant when resolving possible matches
+    of :term:`Data Source` provider when the applicable :ref:`file_reference_types` are detected.
 
 
 Workflow (Chaining Step Processes)

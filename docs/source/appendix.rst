@@ -36,7 +36,7 @@ Glossary
           in :term:`JSON` in the context of `Weaver` for its easier inclusion within HTTP request contents.
           See :ref:`application-package` section for further details.
 
-    Data Sources
+    Data Source
         Known locations of remote servers where an :term:`ADES` or :term:`EMS`
         (either `Weaver` or other implementation) can accept :term:`Process` deployment,
         or any other server supporting :term:`OGC API - Processes` with pre-deployed :term:`Process`, where
