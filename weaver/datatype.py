@@ -2,6 +2,11 @@
 Definitions of types used by tokens.
 """
 import copy
+import enum
+import json
+
+import re
+
 import inspect
 import traceback
 import uuid
@@ -103,7 +108,7 @@ class Base(dict):
         elif item in self:
             return getattr(self, item, None)
         else:
-            raise AttributeError("Can't get attribute '{}'.".format(item))
+            raise AttributeError(f"Can't get attribute '{item}' in '{type(self)}'.")
 
     def __str__(self):
         # type: () -> str
@@ -1127,6 +1132,162 @@ class Job(Base):
         }
 
 
+class AuthenticationTypes(enum.Enum):
+    DOCKER = "docker"
+
+
+class Authentication(Base):
+    """
+    Authentication details to store details required for process operations.
+    """
+    def __init__(self, auth_type, auth_token, auth_link, **kwargs):
+        # type: (Union[AuthenticationTypes, str], str, str, Any) -> None
+        super(Authentication, self).__init__(**kwargs)
+        # ensure values are provided and of valid format
+        self.type = auth_type
+        self.link = auth_link
+        self.token = auth_token
+        self.setdefault("id", uuid.uuid4())
+
+    @property
+    def id(self):
+        return dict.__getitem__(self, "id")
+
+    @property
+    def type(self):
+        # type: () -> AuthenticationTypes
+        return dict.__getitem__(self, "type")
+
+    @type.setter
+    def type(self, auth_type):
+        # type: (Union[AuthenticationTypes, str]) -> None
+        if not isinstance(auth_type, (str, AuthenticationTypes)):
+            raise TypeError(f"Type 'AuthenticationTypes' or 'str' is required for '{type(self).__name__}.type', "
+                            f"not '{type(auth_type)}'.")
+        auth_type = AuthenticationTypes(auth_type)  # invalid raises ValueError
+        self["type"] = auth_type
+
+    @property
+    def link(self):
+        # type: () -> str
+        return dict.__getitem__(self, "link")
+
+    @link.setter
+    def link(self, link):
+        # type: (str) -> None
+        if not isinstance(link, str):
+            raise TypeError(f"Type 'str' is required for '{type(self).__name__}.url', not '{type(link)}'.")
+        self["link"] = link
+
+    @property
+    def token(self):
+        # type: () -> str
+        return dict.__getitem__(self, "token")
+
+    @token.setter
+    def token(self, token):
+        # type: (str) -> None
+        if not isinstance(token, str):
+            raise TypeError(f"Type 'str' is required for '{type(self).__name__}.token', not '{type(token)}'.")
+        self["token"] = token
+
+    def json(self):
+        return None  # in case it bubbles up by error, never provide it as JSON
+
+    def params(self):
+        # type: () -> Dict[str, Any]
+        return {
+            "id": self.id,
+            "type": self.type,
+            "link": self.link,
+            "token": self.token,
+        }
+
+
+class DockerAuthentication(Authentication):
+    DOCKER_LINK_REGEX = re.compile(r"""
+        (?:^(?P<uri>
+            # protocol
+            (?P<protocol>(?:http)s?:\/\/)?
+            # registry
+            (?:(?P<registry>
+                (?:
+                # IPv4
+                (?P<reg_ipv4>(?:\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}))
+                |
+                # IPv6
+                (?P<reg_ipv6>(?:\[[a-f0-9:]+\]))
+                |
+                # domain
+                (?P<reg_domain>
+                    (?:[a-zA-Z](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+
+                    (?:[a-zA-Z]{2,6}\.?|[a-zA-Z0-9-]{2,}\.?))
+                |
+                # hostname
+                (?P<reg_host>([A-Za-z][A-Za-z0-9\-]*[A-Za-z0-9]))
+                )
+                # port
+                (?P<reg_port>:\d+)?
+                # path, but leaving at least one slash out for 'repo/image' part
+                # the last '/' is matched in <image_ref> portion
+                (?:\/?|[\/?\.](?P<reg_path>\S+(\/[\/?\.]\S)*))
+            ))
+            # registry is optional and not greedy, default to DockerHub
+            \/)?
+            # image reference
+            (?P<image>
+                # force 'repo/image:label'
+                # disallow plain 'image:label' since remote dockers are always expected
+                (?P<image_repo>[0-9a-z_-]{1,40}
+                # nested project/repo parts
+                (?:\/?|[\/?\.]\S+(\/[\/?\.]\S))*)
+                (?:\/
+                (?P<image_name>[0-9a-z_-]{1,40})
+                )
+                # label can be a literal or a variable, optional for 'latest'
+                (?::
+                (?P<label>[a-z0-9][a-z0-9._-]{1,38}[a-z0-9]|\${[A-Z][A-Z0-9_]{,38}[A-Z0-9]})
+                )?
+            )
+        $)
+    """, re.X)  # extended to ignore whitespaces and comments
+    DOCKER_REGISTRY_DEFAULT_DOMAIN = "index.docker.io"
+    DOCKER_REGISTRY_DEFAULT_URI = f"https://{DOCKER_REGISTRY_DEFAULT_DOMAIN}/v1/"  # DockerHub
+
+    def __init__(self, auth_token, docker_image_link, **kwargs):
+        # type: (str, str, Any) -> None
+        matches = re.match(self.DOCKER_LINK_REGEX, docker_image_link)
+        if not matches:
+            raise ValueError(f"Invalid Docker image link does not conform to expected format: [{docker_image_link}]")
+        groups = matches.groupdict()
+        LOGGER.debug("Parsed Docker image/registry link:\n%s", json.dumps(groups, indent=2))
+        if not groups["image"]:
+            raise ValueError(f"Invalid Docker image reference does not conform to image format: {docker_image_link}")
+        # special case for DockerHub, since it is default, it is often omitted, but could be partially provided
+        # swap the domain by the full URI in that case because that's what is expected when doing plain 'docker login'
+        registry = groups["reg_domain"]
+        image = groups["image"]
+        if registry in [self.DOCKER_REGISTRY_DEFAULT_DOMAIN, "", None]:
+            if not registry:
+                LOGGER.debug("No registry specified for Docker image, using default DockerHub registry.")
+            # when "URI" fragment was detected but is not a real URI (since 'reg_domain' empty), link is invalid
+            # (i.e.: there is no URI repository, so nowhere to send Auth token since not default DockerHub)
+            if groups["uri"] not in [self.DOCKER_REGISTRY_DEFAULT_URI, "", None]:
+                registry = groups["uri"]
+                raise ValueError(f"Invalid registry specifier detected but not a valid URI: [{registry}]")
+            registry = self.DOCKER_REGISTRY_DEFAULT_URI
+        # otherwise, resolve the possible confusion between nested URI/paths vs nested repository/project
+        elif groups["reg_path"]:
+            image = groups["reg_path"] + "/" + groups["image"]
+        LOGGER.debug("Resolved Docker image/registry from link: [%s, %s]", registry, image)
+        self["image"] = image
+        super(DockerAuthentication, self).__init__(AuthenticationTypes.DOCKER, auth_token, auth_link=registry, **kwargs)
+
+    @property
+    def image(self):
+        return dict.__getitem__(self, "image")
+
+
 class Process(Base):
     # pylint: disable=C0103,invalid-name
     """
@@ -1394,6 +1555,25 @@ class Process(Base):
                              .format(visibility, type(self), list(VISIBILITY_VALUES)))
         self["visibility"] = visibility
 
+    @property
+    def auth(self):
+        # type: () -> Optional[Authentication]
+        """
+        Authentication token required for operations with the process.
+        """
+        return self.get("auth", None)
+
+    @auth.setter
+    def auth(self, auth):
+        # type: (Optional[Authentication]) -> None
+        if auth is None:
+            return
+        if isinstance(auth, dict):
+            auth = Authentication(**auth)
+        if not isinstance(auth, Authentication):
+            raise TypeError(f"Type 'Authentication' is required for '{type(self)}.auth', not '{type(auth)}'.")
+        self["auth"] = auth
+
     def params(self):
         # type: () -> Dict[str, Any]
         return {
@@ -1415,6 +1595,7 @@ class Process(Base):
             "package": self._encode(self.package),
             "payload": self._encode(self.payload),
             "visibility": self.visibility,
+            "auth": self.auth.params()
         }
 
     @property
