@@ -4,7 +4,6 @@ from urllib.parse import urlparse
 
 import yaml
 from pyramid.settings import asbool
-from pyramid_celery import celery_app as app
 
 from weaver import WEAVER_ROOT_DIR
 from weaver.config import WEAVER_DEFAULT_DATA_SOURCES_CONFIG, get_weaver_config_file
@@ -53,12 +52,13 @@ Following JSON schema format is expected (corresponding YAML also supported):
 
 
 def fetch_data_sources():
-    global DATA_SOURCES     # pylint: disable=W0603,global-statement
+    global DATA_SOURCES  # pylint: disable=W0603,global-statement
 
     if DATA_SOURCES:
         return DATA_SOURCES
 
-    data_source_config = get_settings(app).get("weaver.data_sources", "")
+    settings = get_settings()
+    data_source_config = settings.get("weaver.data_sources", "")
     if data_source_config:
         data_source_config = get_weaver_config_file(str(data_source_config), WEAVER_DEFAULT_DATA_SOURCES_CONFIG)
         if not os.path.isabs(data_source_config):
@@ -70,7 +70,7 @@ def fetch_data_sources():
             raise ValueError("Data sources file [{0}] cannot be loaded due to error: [{1!r}]."
                              .format(data_source_config, exc))
     if not DATA_SOURCES:
-        raise ValueError("No data sources found in setting 'weaver.data_sources'.")
+        raise ValueError("No data sources found in setting 'weaver.data_sources'. Data source required for EMS.")
     return DATA_SOURCES
 
 
@@ -93,7 +93,7 @@ def retrieve_data_source_url(data_source):
     """
     if data_source is None:
         # get local data source
-        return get_wps_restapi_base_url(get_settings(app))
+        return get_wps_restapi_base_url(get_settings())
     data_sources = fetch_data_sources()
     return data_sources[data_source if data_source in data_sources else get_default_data_source(data_sources)]["ades"]
 

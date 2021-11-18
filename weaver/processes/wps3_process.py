@@ -24,6 +24,7 @@ from weaver.processes.sources import get_data_source_from_url, retrieve_data_sou
 from weaver.processes.utils import map_progress
 from weaver.processes.wps_process_base import WpsProcessInterface
 from weaver.utils import (
+    fetch_file,
     get_any_id,
     get_any_message,
     get_any_value,
@@ -34,10 +35,11 @@ from weaver.utils import (
 )
 from weaver.visibility import VISIBILITY_PUBLIC
 from weaver.warning import MissingParameterWarning
+from weaver.wps.utils import map_wps_output_location
 from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
-    from typing import Union
+    from typing import List, Union
 
     from pywps.app import WPSRequest
 
@@ -46,9 +48,10 @@ if TYPE_CHECKING:
 LOGGER = logging.getLogger(__name__)
 
 REMOTE_JOB_PROGRESS_PROVIDER = 1
-REMOTE_JOB_PROGRESS_DEPLOY = 2
-REMOTE_JOB_PROGRESS_VISIBLE = 3
-REMOTE_JOB_PROGRESS_REQ_PREP = 5
+REMOTE_JOB_PROGRESS_PREPARE = 2
+REMOTE_JOB_PROGRESS_DEPLOY = 3
+REMOTE_JOB_PROGRESS_VISIBLE = 4
+REMOTE_JOB_PROGRESS_READY = 5
 REMOTE_JOB_PROGRESS_EXECUTION = 9
 REMOTE_JOB_PROGRESS_MONITORING = 10
 REMOTE_JOB_PROGRESS_FETCH_OUT = 90
@@ -213,8 +216,7 @@ class Wps3Process(WpsProcessInterface):
                                      status_code_mock=HTTPOk.code)
         response.raise_for_status()
 
-    def execute(self, workflow_inputs, out_dir, expected_outputs):
-        # TODO: test
+    def prepare(self):
         visible = self.is_visible()
         if not visible:  # includes private visibility and non-existing cases
             if visible is None:
@@ -228,66 +230,54 @@ class Wps3Process(WpsProcessInterface):
                 # FIXME: support for Spacebel, avoid conflict error incorrectly handled, remove 500 when fixed
                 pass_http_error(exc, [HTTPConflict, HTTPInternalServerError])
 
-        LOGGER.info("Process [%s] enforced to public visibility.", self.process)
-        try:
-            self.set_visibility(visibility=VISIBILITY_PUBLIC)
-        # TODO: support for Spacebel, remove when visibility route properly implemented on ADES
-        except Exception as exc:
-            pass_http_error(exc, HTTPNotFound)
+        if visible:
+            LOGGER.info("Process [%s] already deployed and visible on [%s] - executing.", self.process, self.url)
+        else:
+            LOGGER.info("Process [%s] enforced to public visibility.", self.process)
+            try:
+                self.set_visibility(visibility=VISIBILITY_PUBLIC)
+            # TODO: support for Spacebel, remove when visibility route properly implemented on ADES
+            except Exception as exc:
+                pass_http_error(exc, HTTPNotFound)
 
-        self.update_status("Preparing execute request for remote ADES.",
-                           REMOTE_JOB_PROGRESS_REQ_PREP, status.STATUS_RUNNING)
+    def execute(self, workflow_inputs, out_dir, expected_outputs):
+        self.update_status("Preparing process on remote ADES.",
+                           REMOTE_JOB_PROGRESS_PREPARE, status.STATUS_RUNNING)
+        self.prepare()
+
+        self.update_status("Process ready for execute request on remote ADES.",
+                           REMOTE_JOB_PROGRESS_READY, status.STATUS_RUNNING)
         LOGGER.debug("Execute process WPS request for [%s]", self.process)
-
-        execute_body_inputs = []
-        execute_req_id = "id"
-        execute_req_input_val_href = "href"
-        execute_req_input_val_data = "data"
-        for workflow_input_key, workflow_input_value in workflow_inputs.items():
-            if isinstance(workflow_input_value, list):
-                for workflow_input_value_item in workflow_input_value:
-                    if isinstance(workflow_input_value_item, dict) and "location" in workflow_input_value_item:
-                        execute_body_inputs.append({execute_req_id: workflow_input_key,
-                                                    execute_req_input_val_href: workflow_input_value_item["location"]})
-                    else:
-                        execute_body_inputs.append({execute_req_id: workflow_input_key,
-                                                    execute_req_input_val_data: workflow_input_value_item})
-            else:
-                if isinstance(workflow_input_value, dict) and "location" in workflow_input_value:
-                    execute_body_inputs.append({execute_req_id: workflow_input_key,
-                                                execute_req_input_val_href: workflow_input_value["location"]})
-                else:
-                    execute_body_inputs.append({execute_req_id: workflow_input_key,
-                                                execute_req_input_val_data: workflow_input_value})
-        for exec_input in execute_body_inputs:
-            if execute_req_input_val_href in exec_input and isinstance(exec_input[execute_req_input_val_href], str):
-                if exec_input[execute_req_input_val_href].startswith("{0}://".format(OPENSEARCH_LOCAL_FILE_SCHEME)):
-                    exec_input[execute_req_input_val_href] = "file{0}".format(
-                        exec_input[execute_req_input_val_href][len(OPENSEARCH_LOCAL_FILE_SCHEME):])
-                elif exec_input[execute_req_input_val_href].startswith("file://"):
-                    exec_input[execute_req_input_val_href] = self.host_file(exec_input[execute_req_input_val_href])
-                    LOGGER.debug("Hosting intermediate input [%s] : [%s]",
-                                 exec_input[execute_req_id], exec_input[execute_req_input_val_href])
-
-        execute_body_outputs = [{execute_req_id: output, "transmissionMode": EXECUTE_TRANSMISSION_MODE_REFERENCE}
-                                for output in expected_outputs]
+        execute_body_inputs = self.stage_job_inputs(workflow_inputs)
+        execute_body_outputs = [
+            {"id": output, "transmissionMode": EXECUTE_TRANSMISSION_MODE_REFERENCE} for output in expected_outputs
+        ]
         self.update_status("Executing job on remote ADES.", REMOTE_JOB_PROGRESS_EXECUTION, status.STATUS_RUNNING)
-
-        execute_body = dict(mode=EXECUTE_MODE_ASYNC,
-                            response=EXECUTE_RESPONSE_DOCUMENT,
-                            inputs=execute_body_inputs,
-                            outputs=execute_body_outputs)
+        execute_body = {
+            "mode": EXECUTE_MODE_ASYNC,
+            "response": EXECUTE_RESPONSE_DOCUMENT,
+            "inputs": execute_body_inputs,
+            "outputs": execute_body_outputs
+        }
         request_url = self.url + sd.process_jobs_service.path.format(process_id=self.process)
-        response = self.make_request(method="POST",
-                                     url=request_url,
-                                     json=execute_body,
-                                     retry=True)
+        response = self.make_request(method="POST", url=request_url, json=execute_body, retry=True)
         if response.status_code != 201:
             raise Exception("Was expecting a 201 status code from the execute request : {0}".format(request_url))
 
         job_status_uri = response.headers["Location"]
+        job_id = self.monitor(job_status_uri)
+
+        self.update_status("Fetching job outputs from remote ADES.",
+                           REMOTE_JOB_PROGRESS_FETCH_OUT, status.STATUS_RUNNING)
+        results = self.get_job_results(job_id)
+        self.stage_job_results(results, expected_outputs, out_dir)
+        self.update_status("Execution on remote ADES completed.",
+                           REMOTE_JOB_PROGRESS_COMPLETED, status.STATUS_SUCCEEDED)
+
+    def monitor(self, job_status_uri):
         job_status = self.get_job_status(job_status_uri)
         job_status_value = status.map_status(job_status["status"])
+        job_id = job_status["jobID"]
 
         self.update_status("Monitoring job on remote ADES : {0}".format(job_status_uri),
                            REMOTE_JOB_PROGRESS_MONITORING, status.STATUS_RUNNING)
@@ -297,7 +287,7 @@ class Wps3Process(WpsProcessInterface):
             job_status = self.get_job_status(job_status_uri)
             job_status_value = status.map_status(job_status["status"])
 
-            LOGGER.debug(get_log_monitor_msg(job_status["jobID"], job_status_value,
+            LOGGER.debug(get_log_monitor_msg(job_id, job_status_value,
                                              job_status.get("percentCompleted", 0),
                                              get_any_message(job_status), job_status.get("statusLocation")))
             self.update_status(get_job_log_msg(status=job_status_value,
@@ -309,29 +299,11 @@ class Wps3Process(WpsProcessInterface):
                                status.STATUS_RUNNING)
 
         if job_status_value != status.STATUS_SUCCEEDED:
-            LOGGER.debug(get_log_monitor_msg(job_status["jobID"], job_status_value,
+            LOGGER.debug(get_log_monitor_msg(job_id, job_status_value,
                                              job_status.get("percentCompleted", 0),
                                              get_any_message(job_status), job_status.get("statusLocation")))
             raise Exception(job_status)
-
-        self.update_status("Fetching job outputs from remote ADES.",
-                           REMOTE_JOB_PROGRESS_FETCH_OUT, status.STATUS_RUNNING)
-        results = self.get_job_results(job_status["jobID"])
-        for result in results:
-            if get_any_id(result) in expected_outputs:
-                # This is where cwl expect the output file to be written
-                # TODO We will probably need to handle multiple output value...
-                dst_fn = "/".join([out_dir.rstrip("/"), expected_outputs[get_any_id(result)]])
-
-                # TODO Should we handle other type than File reference?
-                resp = request_extra("get", get_any_value(result), allow_redirects=True, settings=self.settings)
-                LOGGER.debug("Fetching result output from [%s] to cwl output destination: [%s]",
-                             get_any_value(result), dst_fn)
-                with open(dst_fn, mode="wb") as dst_fh:
-                    dst_fh.write(resp.content)
-
-        self.update_status("Execution on remote ADES completed.",
-                           REMOTE_JOB_PROGRESS_COMPLETED, status.STATUS_SUCCEEDED)
+        return job_id
 
     def get_job_status(self, job_status_uri, retry=True):
         response = self.make_request(method="GET",
@@ -356,9 +328,89 @@ class Wps3Process(WpsProcessInterface):
         return job_status
 
     def get_job_results(self, job_id):
+        # type: (str) -> List[JSON]
+        """
+        Obtains produced output results from successful job status ID.
+        """
+        # use results endpoint instead of '/outputs' to ensure support with other
         result_url = self.url + sd.process_results_service.path.format(process_id=self.process, job_id=job_id)
-        response = self.make_request(method="GET",
-                                     url=result_url,
-                                     retry=True)
+        response = self.make_request(method="GET", url=result_url, retry=True)
         response.raise_for_status()
-        return response.json().get("outputs", {})
+        contents = response.json()
+
+        # backward compatibility for ADES that returns output IDs nested under 'outputs'
+        if "outputs" in contents:
+            # ensure that we don't incorrectly pick a specific output ID named 'outputs'
+            maybe_outputs = contents["outputs"]
+            if isinstance(maybe_outputs, dict) and get_any_id(maybe_outputs) is None:
+                contents = maybe_outputs
+            # backward compatibility for ADES that returns list of outputs nested under 'outputs'
+            # (i.e.: as Weaver-specific '/outputs' endpoint)
+            elif isinstance(maybe_outputs, list) and all(get_any_id(out) is not None for out in maybe_outputs):
+                contents = maybe_outputs
+
+        # rebuild the expected (old) list format for calling method
+        if isinstance(contents, dict) and all(get_any_value(out) is not None for out in contents.values()):
+            outputs = []
+            for out_id, out_val in contents.items():
+                out_val.update({"id": out_id})
+                outputs.append(out_val)
+            contents = outputs
+        return contents
+
+    def stage_job_results(self, results, expected_outputs, out_dir):
+        for result in results:
+            res_id = get_any_id(result)
+            # CWL expect the output file to be written matching definition in 'expected_outputs',
+            # but this definition could be a glob pattern to match multiple file.
+            # Therefore, we cannot rely on a specific name from it.
+            if res_id in expected_outputs:
+                # plan ahead when list of multiple output values could be supported
+                result_values = get_any_value(result)
+                if not isinstance(result_values, list):
+                    result_values = [result_values]
+                cwl_out_dir = out_dir.rstrip("/")
+                for value in result_values:
+                    src_name = value.split("/")[-1]
+                    dst_path = "/".join([cwl_out_dir, src_name])
+                    # performance improvement:
+                    #   Bypass download if file can be resolved as local resource (already fetched or same server).
+                    #   Because CWL expects the file to be in specified 'out_dir', make a link for it to be found
+                    #   even though the file is stored in the full job output location instead (already staged by step).
+                    map_path = map_wps_output_location(value, self.settings)
+                    as_link = False
+                    if map_path:
+                        LOGGER.info("Detected result [%s] from [%s] as local reference to this instance. "
+                                    "Skipping fetch and using local copy in output destination: [%s]",
+                                    res_id, value, dst_path)
+                        LOGGER.debug("Mapped result [%s] to local reference: [%s]", value, map_path)
+                        src_path = map_path
+                        as_link = True
+                    else:
+                        LOGGER.info("Fetching result [%s] from [%s] to CWL output destination: [%s]",
+                                    res_id, value, dst_path)
+                        src_path = value
+                    fetch_file(src_path, cwl_out_dir, settings=self.settings, link=as_link)
+
+    def stage_job_inputs(self, workflow_inputs):
+        execute_body_inputs = []
+        for workflow_input_key, workflow_input_value in workflow_inputs.items():
+            if not isinstance(workflow_input_value, list):
+                workflow_input_value = [workflow_input_value]
+            for workflow_input_value_item in workflow_input_value:
+                if isinstance(workflow_input_value_item, dict) and "location" in workflow_input_value_item:
+                    location = workflow_input_value_item["location"]
+                    execute_body_inputs.append({"id": workflow_input_key, "href": location})
+                else:
+                    execute_body_inputs.append({"id": workflow_input_key, "data": workflow_input_value_item})
+
+        for exec_input in execute_body_inputs:
+            if "href" in exec_input and isinstance(exec_input["href"], str):
+                LOGGER.debug("Original input location [%s] : [%s]", exec_input["id"], exec_input["href"])
+                if exec_input["href"].startswith("{0}://".format(OPENSEARCH_LOCAL_FILE_SCHEME)):
+                    exec_input["href"] = "file{0}".format(exec_input["href"][len(OPENSEARCH_LOCAL_FILE_SCHEME):])
+                    LOGGER.debug("OpenSearch intermediate input [%s] : [%s]", exec_input["id"], exec_input["href"])
+                elif exec_input["href"].startswith("file://"):
+                    exec_input["href"] = self.host_file(exec_input["href"])
+                    LOGGER.debug("Hosting intermediate input [%s] : [%s]", exec_input["id"], exec_input["href"])
+        return execute_body_inputs

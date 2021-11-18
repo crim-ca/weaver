@@ -62,6 +62,9 @@
 .. _weaver-issues: https://github.com/crim-ca/weaver/issues
 .. |submit-issue| replace:: submit a new issue
 .. _submit-issue: https://github.com/crim-ca/weaver/issues/new/choose
+.. inter-reference to 'process->Deploy' section, but cannot be a link since not included
+.. _process-deploy-op: :ref:`Deploy`
+.. |process-deploy-op| replace:: Process deployment operation
 
 .. Example references
 .. |examples| replace:: Examples
@@ -116,6 +119,8 @@
 .. _log-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Logs%2Fpaths%2F~1processes~1%7Bprocess_id%7D~1jobs~1%7Bjob_id%7D~1logs%2Fget
 .. |except-req| replace:: ``GET {WEAVER_URL}/processes/{id}/jobs/{id}/exceptions`` (GetLogs)
 .. _except-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Logs%2Fpaths%2F~1processes~1%7Bprocess_id%7D~1jobs~1%7Bjob_id%7D~1logs%2Fget
+.. |status-req-name| replace:: Status
+.. _status-req-name: `status-req`_
 .. |status-req| replace:: ``GET {WEAVER_URL}/processes/{id}/jobs/{id}`` (GetStatus)
 .. _status-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Status%2Fpaths%2F~1processes~1{process_id}~1jobs~1{job_id}%2Fget
 .. |result-req| replace:: ``GET {WEAVER_URL}/processes/{id}/jobs/{id}/result`` (GetResult)

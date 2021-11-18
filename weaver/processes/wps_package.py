@@ -32,7 +32,6 @@ import yaml
 from cwltool.context import LoadingContext, RuntimeContext
 from cwltool.factory import Factory as CWLFactory, WorkflowStatus as CWLException
 from pyramid.httpexceptions import HTTPOk, HTTPServiceUnavailable
-from pyramid_celery import celery_app as app
 from pywps import Process
 from pywps.inout import BoundingBoxInput, ComplexInput, LiteralInput
 from pywps.inout.basic import SOURCE_TYPE
@@ -99,7 +98,7 @@ from weaver.utils import (
     request_extra,
     setup_loggers
 )
-from weaver.wps.utils import get_wps_output_dir, get_wps_output_url
+from weaver.wps.utils import get_wps_output_dir, get_wps_output_url, map_wps_output_location
 from weaver.wps_restapi.swagger_definitions import process_service
 
 if TYPE_CHECKING:
@@ -170,7 +169,7 @@ def retrieve_package_job_log(execution, job, progress_min=0, progress_max=100):
     """
     try:
         # weaver package log every status update into this file (we no longer rely on the http monitoring)
-        out_dir = get_wps_output_dir(get_settings(app))
+        out_dir = get_wps_output_dir(get_settings())
         # if the process is a weaver package this status xml should be available in the process output dir
         log_path = get_status_location_log_path(execution.statusLocation, out_dir=out_dir)
         with open(log_path, "r") as log_file:
@@ -240,7 +239,7 @@ def _fetch_process_info(process_info_url, fetch_error):
 
     if not isinstance(process_info_url, str):
         raise _info_not_found_error()
-    resp = request_extra("get", process_info_url, headers={"Accept": CONTENT_TYPE_APP_JSON}, settings=get_settings(app))
+    resp = request_extra("get", process_info_url, headers={"Accept": CONTENT_TYPE_APP_JSON}, settings=get_settings())
     if resp.status_code != HTTPOk.code:
         raise _info_not_found_error()
     body = resp.json()
@@ -371,7 +370,7 @@ def _check_package_file(cwl_file_path_or_url):
         is_url = True
     if is_url:
         cwl_path = cwl_file_path_or_url
-        cwl_resp = request_extra("head", cwl_path, settings=get_settings(app))
+        cwl_resp = request_extra("head", cwl_path, settings=get_settings())
         is_url = True
         if cwl_resp.status_code != HTTPOk.code:
             raise PackageRegistrationError("Cannot find CWL file at: '{}'.".format(cwl_path))
@@ -397,7 +396,7 @@ def _load_package_file(file_path):
     # yaml properly loads json as well, error can print out the parsing error location
     try:
         if is_url:
-            settings = get_settings(app)
+            settings = get_settings()
             cwl_resp = request_extra("get", file_path, headers={"Accept": CONTENT_TYPE_TEXT_PLAIN}, settings=settings)
             return yaml.safe_load(cwl_resp.content)
         with open(file_path, "r") as f:
@@ -588,7 +587,7 @@ def _generate_process_with_cwl_from_reference(reference):
 
     # match against WPS-1/2 reference
     else:
-        settings = get_settings(app)
+        settings = get_settings()
         response = request_extra("GET", reference, retries=3, settings=settings)
         if response.status_code != HTTPOk.code:
             raise HTTPServiceUnavailable("Couldn't obtain a valid response from [{}]. Service response: [{} {}]"
@@ -785,7 +784,7 @@ class WpsPackage(Process):
         """
         self.payload = kw.pop("payload")
         self.package = kw.pop("package")
-        self.settings = get_settings(app)
+        self.settings = get_settings()
         if not self.package:
             raise PackageRegistrationError("Missing required package definition for package process.")
         if not isinstance(self.package, dict):
@@ -830,7 +829,7 @@ class WpsPackage(Process):
         log_file_handler.setFormatter(log_file_formatter)
 
         # prepare package logger
-        self.logger = logging.getLogger("{}.{}".format(LOGGER.name, self.package_id))
+        self.logger = logging.getLogger("{}|{}".format(LOGGER.name, self.package_id))
         self.logger.addHandler(log_file_handler)
         self.logger.setLevel(self.log_level)
 
@@ -1252,7 +1251,7 @@ class WpsPackage(Process):
             if input_ref.startswith("s3://"):
                 return True
             return False
-        return True
+        return not os.path.isfile(input_ref)
 
     def make_inputs(self,
                     wps_inputs,         # type: Dict[str, Deque[WPS_Input_Type]]
@@ -1305,9 +1304,18 @@ class WpsPackage(Process):
         """
         Generates the JSON content required to specify a `CWL` ``File`` input definition from a location.
 
-        .. note::
-            If the process requires ``OpenSearch`` references that should be preserved as is, use scheme defined by
-            :py:data:`weaver.processes.constants.OPENSEARCH_LOCAL_FILE_SCHEME` prefix instead of ``http(s)://``.
+        If the input reference corresponds to an HTTP URL that is detected as matching the local WPS output endpoint,
+        implicitly convert the reference to the local WPS output directory to avoid useless download of available file.
+        Since that endpoint could be protected though, perform a minimal HEAD request to validate its accessibility.
+        Otherwise, this operation could incorrectly grant unauthorized access to protected files by forging the URL.
+
+        If the process requires ``OpenSearch`` references that should be preserved as is, scheme defined by
+        :py:data:`weaver.processes.constants.OPENSEARCH_LOCAL_FILE_SCHEME` prefix instead of ``http(s)://`` is expected.
+
+        Any other variant of file reference will be fetched as applicable by the relevant schemes.
+
+        .. seealso::
+            Documentation details of resolution based on schemes defined in :ref:`file_reference_types` section.
         """
         # NOTE:
         #   When running as EMS, must not call data/file methods if URL reference, otherwise contents
@@ -1360,11 +1368,23 @@ class WpsPackage(Process):
         ):
             self.logger.debug("File input (%s) DROPPED. Detected default format as data.", input_definition.identifier)
             return None
+
+        # auto-map local if possible after security check
+        input_local_ref = map_wps_output_location(input_location, self.settings)
+        if input_local_ref:
+            resp = request_extra("HEAD", input_location, settings=self.settings)
+            if resp.status_code == 200:  # if failed, following fetch will produce the appropriate HTTP error
+                self.logger.debug("Detected and validated remotely accessible reference [%s] "
+                                  "matching local WPS outputs [%s]. Skipping fetch using direct reference.",
+                                  input_location, input_local_ref)
+                input_location = input_local_ref
+
         if self.must_fetch(input_location):
             self.logger.info("File input (%s) ATTEMPT fetch: [%s]", input_definition.identifier, input_location)
             input_location = fetch_file(input_location, input_definition.workdir, settings=self.settings)
         else:
             self.logger.info("File input (%s) SKIPPED fetch: [%s]", input_definition.identifier, input_location)
+
         location = {"location": input_location, "class": input_type}
         if input_definition.data_format is not None and input_definition.data_format.mime_type:
             fmt = get_cwl_file_format(input_definition.data_format.mime_type, make_reference=True)
@@ -1384,6 +1404,12 @@ class WpsPackage(Process):
                     self.logger.warning(
                         "Dropping additional output values (%s total), only 1 supported per identifier.",
                         len(cwl_result[output_id])
+                    )
+                # provide more details than poorly descriptive IndexError
+                if not len(cwl_result[output_id]):
+                    raise PackageExecutionError(
+                        "Process output '{}' expects at least one value but none was found. "
+                        "Possible incorrect glob pattern definition in CWL Application Package.".format(output_id)
                     )
                 cwl_result[output_id] = cwl_result[output_id][0]  # expect only one output
 

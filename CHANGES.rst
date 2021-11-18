@@ -10,11 +10,25 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add ``map_wps_output_location`` utility function to handle recurrent mapping of ``weaver.wps_output_dir`` back and
+  forth with resolved ``weaver.wps_output_url``.
+- Add more detection of map-able WPS output location to avoid fetching files unnecessarily. Common cases
+  are ``Workflow`` running multiple steps on the same server or `Application Package` ``Process`` that reuses an output
+  produced by a previous execution. Relates to `#183 <https://github.com/crim-ca/weaver/issues/183>`_.
+- Add pre-validation of file accessibility using HTTP HEAD request when a subsequent ``Workflow`` step
+  employs an automatically mapped WPS output location from a previous step to verify that the file would otherwise
+  be downloadable if it could not have been mapped. This is to ensure consistency and security validation of the
+  reference WPS output location, although the unnecessary file download operation can be avoided.
+- Add functional ``Workflow`` tests to validate execution without the need of remote `Weaver` test application
+  (relates to `#141 <https://github.com/crim-ca/weaver/issues/141>`_,
+  relates to `#281 <https://github.com/crim-ca/weaver/issues/281>`_).
+- Add missing documentation details about `Data Source` and connect chapters with other relevant
+  documentation details and updated ``Workflow`` tests.
 
 Fixes:
 ------
-- No change.
+- Fix incorrect resolution of ``Process`` results endpoint to pass contents from one step to another
+  during ``Workflow`` execution (resolves `#358 <https://github.com/crim-ca/weaver/issues/358>`_).
 
 `4.3.0 <https://github.com/crim-ca/weaver/tree/4.3.0>`_ (2021-11-16)
 ========================================================================
@@ -25,7 +39,7 @@ Changes:
   (resolves some tasks in `#268 <https://github.com/crim-ca/weaver/issues/268>`_).
 - Add ``type`` field to ``Job`` status information
   (resolves `#351 <https://github.com/crim-ca/weaver/issues/351>`_).
-- Add `OGC-API - Processes` conformance references regarding supported operations for ``Job`` listing and filtering.
+- Add `OGC API - Processes` conformance references regarding supported operations for ``Job`` listing and filtering.
 - Add ``minDuration`` and ``maxDuration`` parameters to query ``Job`` listing filtered by specific execution time range
   (resolves `#268 <https://github.com/crim-ca/weaver/issues/268>`_).
   Range duration parameters are limited to single values each

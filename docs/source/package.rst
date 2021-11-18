@@ -45,7 +45,7 @@ Following CWL package definition represents the :py:mod:`weaver.processes.builti
     :language: YAML
     :linenos:
 
-The first main components is the ``class: CommandLineTool`` that tells `Weaver` it will be a *base* process
+The first main components is the ``class: CommandLineTool`` that tells `Weaver` it will be an *atomic* process
 (contrarily to `CWL Workflow`_ presented later).
 
 The other important sections are ``inputs`` and ``outputs``. These define which parameters will be expected and
@@ -60,10 +60,6 @@ CWL Workflow
 |process-deploy-op|_ will attempt to resolve each ``step`` as another process. The reference to the :term:`CWL`
 definition can be placed in any location supported as for the case of atomic processes
 (see details about :ref:`supported package locations <WPS-REST>`).
-
-.. inter-reference to 'process', but cannot be a link since not included
-.. _process-deploy-op: :ref:`Deploy`
-.. |process-deploy-op| replace:: Process deployment operation
 
 The following :term:`CWL` definition demonstrates an example ``Workflow`` process that would resolve each ``step`` with
 local processes of match IDs.

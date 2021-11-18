@@ -1,0 +1,16 @@
+{
+    "mode": "async",
+    "response": "document",
+    "inputs": [
+        {
+            "id": "contents",
+            "data": "FAKE TIF IMAGES CONTENTS"
+        }
+    ],
+    "outputs": [
+        {
+            "id": "staging_output",
+            "transmissionMode": "reference"
+        }
+    ]
+}

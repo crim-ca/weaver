@@ -25,6 +25,7 @@ from weaver.utils import fully_qualified_name
 class WpsProviderBase(unittest.TestCase):
     remote_provider_name = None
     settings = {}
+    config = None
 
     def fully_qualified_test_process_name(self):
         return fully_qualified_name(self).replace(".", "-")
