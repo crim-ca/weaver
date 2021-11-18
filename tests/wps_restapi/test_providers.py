@@ -500,7 +500,7 @@ class WpsRestApiProvidersTest(WpsProviderBase):
         assert "literalDataDomains" in inputs[7] and len(inputs[7]["literalDataDomains"]) == 1
         assert inputs[7]["literalDataDomains"][0]["dataType"]["name"] == "string"
         assert inputs[7]["literalDataDomains"][0]["valueDefinition"] == [
-            "24MODELS", "PCIC12", "BNU-ESM", "CCSM4", "CESM1-CAM5", "CNRS-CM5", "CSIRO-Mk3-6-0", "CanESM2",
+            "24MODELS", "PCIC12", "BNU-ESM", "CCSM4", "CESM1-CAM5", "CNRM-CM5", "CSIRO-Mk3-6-0", "CanESM2",
             "FGOALS-g2", "GFDL-CM3", "GFDL-ESM2G", "GFDL-ESM2M", "HadGEM2-AO", "HadGEM2-ES", "IPSL-CM5A-LR",
             "IPSL-CM5A-MR", "MIROC-ESM-CHEM", "MIROC-ESM", "MIROC5", "MPI-ESM-LR", "MPI-ESM-MR", "MRI-CGCM3",
             "NorESM1-M", "NorESM1-ME", "bcc-csm1-1-m", "bcc-csm1-1"
