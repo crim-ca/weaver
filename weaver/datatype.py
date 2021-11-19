@@ -3,11 +3,9 @@ Definitions of types used by tokens.
 """
 import copy
 import enum
-import json
-
-import re
-
 import inspect
+import json
+import re
 import traceback
 import uuid
 import warnings
@@ -77,6 +75,9 @@ if TYPE_CHECKING:
 
     from weaver.typedefs import AnyProcess, AnySettingsContainer, Number, CWL, JSON
 
+    AnyParams = Dict[str, Any]
+    AnyAuthentication = Union["Authentication", "DockerAuthentication"]
+
 LOGGER = getLogger(__name__)
 
 
@@ -140,7 +141,7 @@ class Base(dict):
         raise NotImplementedError("Method 'json' must be defined for JSON request item representation.")
 
     def params(self):
-        # type: () -> Dict[str, Any]
+        # type: () -> AnyParams
         """
         Obtain the internal data representation for storage.
 
@@ -226,7 +227,7 @@ class Service(Base):
         return self.params()
 
     def params(self):
-        # type: () -> Dict[str, Any]
+        # type: () -> AnyParams
         return {
             "url": self.url,
             "name": self.name,
@@ -628,13 +629,13 @@ class Job(Base):
         return "provider"
 
     def _get_inputs(self):
-        # type: () -> List[Optional[Dict[str, Any]]]
+        # type: () -> List[Optional[Dict[str, JSON]]]
         if self.get("inputs") is None:
             self["inputs"] = list()
         return dict.__getitem__(self, "inputs")
 
     def _set_inputs(self, inputs):
-        # type: (List[Optional[Dict[str, Any]]]) -> None
+        # type: (List[Optional[Dict[str, JSON]]]) -> None
         if not isinstance(inputs, list):
             raise TypeError("Type 'list' is required for '{}.inputs'".format(type(self)))
         self["inputs"] = inputs
@@ -862,13 +863,13 @@ class Job(Base):
         self["progress"] = progress
 
     def _get_results(self):
-        # type: () -> List[Optional[Dict[str, Any]]]
+        # type: () -> List[Optional[Dict[str, JSON]]]
         if self.get("results") is None:
             self["results"] = list()
         return dict.__getitem__(self, "results")
 
     def _set_results(self, results):
-        # type: (List[Optional[Dict[str, Any]]]) -> None
+        # type: (List[Optional[Dict[str, JSON]]]) -> None
         if not isinstance(results, list):
             raise TypeError("Type 'list' is required for '{}.results'".format(type(self)))
         self["results"] = results
@@ -1100,7 +1101,7 @@ class Job(Base):
         return sd.JobStatusInfo().deserialize(job_json)
 
     def params(self):
-        # type: () -> Dict[str, Any]
+        # type: () -> AnyParams
         return {
             "id": self.id,
             "task_id": self.task_id,
@@ -1149,16 +1150,6 @@ class Authentication(Base):
         self.token = auth_token
         self.setdefault("id", uuid.uuid4())
 
-    @classmethod
-    def from_type(cls, **params):
-        for param in list(params):
-            if not param.startswith("auth_"):
-                params[f"auth_{param}"] = params[param]
-        auth_type = params.get("auth_type")
-        if auth_type and AuthenticationTypes(auth_type) == AuthenticationTypes.DOCKER:
-            return DockerAuthentication(docker_image_link=params.get("link"), **params)
-        raise TypeError(f"Unknown authentication type: {auth_type!s}")
-
     @property
     def id(self):
         return dict.__getitem__(self, "id")
@@ -1205,13 +1196,27 @@ class Authentication(Base):
         return None  # in case it bubbles up by error, never provide it as JSON
 
     def params(self):
-        # type: () -> Dict[str, Any]
+        # type: () -> AnyParams
         return {
             "id": self.id,
             "type": self.type.value,
             "link": self.link,
             "token": self.token,
         }
+
+    @classmethod
+    def from_params(cls, **params):
+        # type: (Any) -> AnyAuthentication
+        """
+        Obtains the specialized :class:`Authentication` using loaded parameters from :meth:`params`.
+        """
+        for param in list(params):
+            if not param.startswith("auth_"):
+                params[f"auth_{param}"] = params[param]
+        auth_type = params.get("auth_type")
+        if auth_type and AuthenticationTypes(auth_type) == AuthenticationTypes.DOCKER:
+            return DockerAuthentication.from_params(**params)
+        raise TypeError(f"Unknown authentication type: {auth_type!s}")
 
 
 class DockerAuthentication(Authentication):
@@ -1300,17 +1305,55 @@ class DockerAuthentication(Authentication):
             image = groups["reg_path"] + "/" + groups["image"]
         LOGGER.debug("Resolved Docker image/registry from link: [%s, %s]", registry, image)
         self["image"] = image
-        super(DockerAuthentication, self).__init__(AuthenticationTypes.DOCKER, auth_token, auth_link=registry, **kwargs)
+        self["registry"] = registry
+        super(DockerAuthentication, self).__init__(
+            AuthenticationTypes.DOCKER, auth_token, auth_link=docker_image_link, **kwargs
+        )
 
     @property
     def image(self):
+        """
+        Obtains the image portion of the reference without repository prefix.
+        """
         return dict.__getitem__(self, "image")
 
+    @property
+    def registry(self):
+        """
+        Obtains the registry entry that must used for ``docker login <registry>``.
+        """
+        return dict.__getitem__(self, "registry")
+
+    @property
+    def docker(self):
+        """
+        Obtains the full reference required when doing :term:`Docker` operations such as ``docker pull <reference>``.
+        """
+        return self.image if self.registry == self.DOCKER_REGISTRY_DEFAULT_URI else f"{self.registry}/{self.image}"
+
     def params(self):
-        # type: () -> Dict[str, Any]
+        # type: () -> AnyParams
         params = super(DockerAuthentication, self).params()
-        params["image"] = self.image
+        params.update({"image": self.image, "registry": self.registry})
         return params
+
+    @classmethod
+    def from_params(cls, **params):
+        # type: (Any) -> DockerAuthentication
+        """
+        Generate class with parameters directly skipping validation/parsing from initialization.
+
+        .. warning::
+            This should be reserved for self-manipulation only when resolving :class:`Authentication` type.
+        """
+        auth = Authentication(**params)
+        object.__setattr__(auth, "__class__", DockerAuthentication)  # avoid setattr from inherited dict == insert key
+        # flush anything irrelevant or duplicate data from passing around fields
+        keys = list(auth.params())
+        for key in list(auth):
+            if key not in keys:
+                del auth[key]
+        return auth
 
 
 class Process(Base):
@@ -1384,7 +1427,7 @@ class Process(Base):
 
     @property
     def inputs(self):
-        # type: () -> Optional[List[Dict[str, Any]]]
+        # type: () -> Optional[List[Dict[str, JSON]]]
         """
         Inputs of the process following backward-compatible conversion of stored parameters.
 
@@ -1419,7 +1462,7 @@ class Process(Base):
 
     @property
     def outputs(self):
-        # type: () -> Optional[List[Dict[str, Any]]]
+        # type: () -> Optional[List[Dict[str, JSON]]]
         """
         Outputs of the process following backward-compatible conversion of stored parameters.
 
@@ -1582,18 +1625,22 @@ class Process(Base):
 
     @property
     def auth(self):
-        # type: () -> Optional[Authentication]
+        # type: () -> Optional[AnyAuthentication]
         """
         Authentication token required for operations with the process.
         """
         auth = self.get("auth", None)
-        if auth:
-            return Authentication.from_type(**auth)
+        if isinstance(auth, Authentication):
+            return auth
+        if isinstance(auth, dict):
+            auth = Authentication.from_params(**auth)
+            self["auth"] = auth  # store for later reference without reprocess
+            return auth
         return None
 
     @auth.setter
     def auth(self, auth):
-        # type: (Optional[Authentication]) -> None
+        # type: (Optional[AnyAuthentication]) -> None
         if auth is None:
             return
         if isinstance(auth, dict):
@@ -1603,7 +1650,7 @@ class Process(Base):
         self["auth"] = auth
 
     def params(self):
-        # type: () -> Dict[str, Any]
+        # type: () -> AnyParams
         return {
             "identifier": self.identifier,
             "title": self.title,
@@ -1628,7 +1675,7 @@ class Process(Base):
 
     @property
     def params_wps(self):
-        # type: () -> Dict[str, Any]
+        # type: () -> AnyParams
         """
         Values applicable to create an instance of :class:`pywps.app.Process`.
         """
@@ -1644,6 +1691,11 @@ class Process(Base):
             "package": self.package,
             "payload": self.payload,
         }
+
+    def dict(self):
+        data = super(Process, self).dict()
+        data.pop("auth", None)  # remote preemptively just in case any deserialize fails to drop it
+        return data
 
     def json(self):
         # type: () -> JSON
@@ -1986,7 +2038,7 @@ class Quote(Base):
         return self.get("steps", [])
 
     def params(self):
-        # type: () -> Dict[str, Any]
+        # type: () -> AnyParams
         return {
             "id": self.id,
             "price": self.price,
@@ -2111,7 +2163,7 @@ class Bill(Base):
         return self.get("description")
 
     def params(self):
-        # type: () -> Dict[str, Any]
+        # type: () -> AnyParams
         return {
             "id": self.id,
             "user": self.user,

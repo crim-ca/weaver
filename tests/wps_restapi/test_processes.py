@@ -421,7 +421,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert process.auth is not None
         assert process.auth.type == AuthenticationTypes.DOCKER
         assert process.auth.token == token
-        assert process.auth.link == docker
+        assert process.auth.docker == docker
 
     # FIXME: implement
     @pytest.mark.skip(reason="not implemented")

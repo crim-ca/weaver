@@ -149,7 +149,7 @@ Whenever a :term:`Docker` image reference is detected, `Weaver` will ensure that
 using :term:`CWL` capabilities in order to run it.
 
 Because :term:`Application Package` providers could desire to make use of :term:`Docker` images hosted on private
-registries, `Weaver` offers the capability to specify an authentication token through HTTP request headers during
+registries, `Weaver` offers the capability to specify an authorization token through HTTP request headers during
 the :term:`Process` deployment. More specifically, the following definition can be provided during a `Deploy`_ request.
 
 .. code-block:: http
@@ -162,9 +162,9 @@ the :term:`Process` deployment. More specifically, the following definition can 
     { "processDescription": { }, "executionUnit": { } }
 
 
-The ``X-Auth-Docker`` header should be defined exactly like typical ``Authentication`` headers specified by :rfc:`6750`.
+The ``X-Auth-Docker`` header should be defined exactly like a typical ``Authorization`` header specified by :rfc:`6750`.
 The name ``X-Auth-Docker`` is inspired from existing implementations that employ ``X-Auth-Token`` in a similar fashion.
-The reason why ``Authentication`` and ``X-Auth-Token`` headers are not themselves employed in this case is to ensure
+The reason why ``Authorization`` and ``X-Auth-Token`` headers are not themselves employed in this case is to ensure
 that they do not interfere with any proxy or server authentication mechanism, which `Weaver` could be located behind.
 
 When the HTTP ``X-Auth-Docker`` header is detected in combination of a |cwl-docker-req|_ entry within
