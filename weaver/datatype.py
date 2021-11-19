@@ -1149,6 +1149,16 @@ class Authentication(Base):
         self.token = auth_token
         self.setdefault("id", uuid.uuid4())
 
+    @classmethod
+    def from_type(cls, **params):
+        for param in list(params):
+            if not param.startswith("auth_"):
+                params[f"auth_{param}"] = params[param]
+        auth_type = params.get("auth_type")
+        if auth_type and AuthenticationTypes(auth_type) == AuthenticationTypes.DOCKER:
+            return DockerAuthentication(docker_image_link=params.get("link"), **params)
+        raise TypeError(f"Unknown authentication type: {auth_type!s}")
+
     @property
     def id(self):
         return dict.__getitem__(self, "id")
@@ -1198,13 +1208,22 @@ class Authentication(Base):
         # type: () -> Dict[str, Any]
         return {
             "id": self.id,
-            "type": self.type,
+            "type": self.type.value,
             "link": self.link,
             "token": self.token,
         }
 
 
 class DockerAuthentication(Authentication):
+    """
+    Authentication associated to a :term:`Docker` image to retrieve from a private registry given by the reference link.
+
+    .. seealso::
+        :ref:`app_pkg_docker`
+    """
+    # note:
+    #   Below regex does not match *every* possible name, but rather ones that need authentication.
+    #   Public DockerHub images for example do not require authentication, and are therefore not matched.
     DOCKER_LINK_REGEX = re.compile(r"""
         (?:^(?P<uri>
             # protocol
@@ -1286,6 +1305,12 @@ class DockerAuthentication(Authentication):
     @property
     def image(self):
         return dict.__getitem__(self, "image")
+
+    def params(self):
+        # type: () -> Dict[str, Any]
+        params = super(DockerAuthentication, self).params()
+        params["image"] = self.image
+        return params
 
 
 class Process(Base):
@@ -1561,7 +1586,10 @@ class Process(Base):
         """
         Authentication token required for operations with the process.
         """
-        return self.get("auth", None)
+        auth = self.get("auth", None)
+        if auth:
+            return Authentication.from_type(**auth)
+        return None
 
     @auth.setter
     def auth(self, auth):

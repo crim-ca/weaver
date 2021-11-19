@@ -59,7 +59,8 @@ if TYPE_CHECKING:
                                 {"id": str, "type": CWL_IO_DataType, "outputBinding": Optional[GlobType]}, total=False)
     CWL_Inputs = Union[List[CWL_Input_Type], Dict[str, CWL_Input_Type]]
     CWL_Outputs = Union[List[CWL_Output_Type], Dict[str, CWL_Output_Type]]
-    CWL = TypedDict("CWL", {"cwlVersion": str, "class": str, "inputs": CWL_Inputs, "outputs": CWL_Outputs,
+    CWL = TypedDict("CWL", {"cwlVersion": str, "class": str, "baseCommand": Optional[Union[str, List[str]]],
+                            "parameters": Optional[List[str]], "inputs": CWL_Inputs, "outputs": CWL_Outputs,
                             "requirements": JSON, "hints": JSON, "label": str, "doc": str, "s:keywords": str,
                             "$namespaces": Dict[str, str], "$schemas": Dict[str, str]}, total=False)
 

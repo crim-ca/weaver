@@ -89,7 +89,8 @@ def test_auth_docker_image_registry_format():
          docker_hub, "repository/image-name"),
     ]
     invalid_references = [
-        # missing repo part, not allowed local images
+        # missing repo part, not allowed local/public images
+        "debian:stretch-slim",  # valid image, but public so no reason to have auth applied for it
         "image-name:version",
         "image-name",
         # not a URI repository (nowhere to send Auth token since not default DockerHub)
