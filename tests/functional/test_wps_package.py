@@ -1339,8 +1339,9 @@ class WpsPackageAppTest(WpsConfigBase):
 
         test_http_ref = mocked_reference_test_file(
             "input_file_http.txt",
-            MOCK_HTTP_REF,  # converted to HTTP
-            "This is a generated file for http test"
+            "http",
+            "This is a generated file for http test",
+            MOCK_HTTP_REF  # hosted under mock endpoint to avoid missing location when fetching file
         )
 
         test_file_ref = mocked_reference_test_file(

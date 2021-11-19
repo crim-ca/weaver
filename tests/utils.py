@@ -65,7 +65,7 @@ if TYPE_CHECKING:
     MockConfigWPS1 = Sequence[str, str, Optional[Sequence[str]], Optional[Sequence[str]]]
 
 MOCK_AWS_REGION = "us-central-1"
-MOCK_HTTP_REF = "http://mock.localhost"
+MOCK_HTTP_REF = "http://localhost.mock"
 
 
 def ignore_warning_regex(func, warning_message_regex, warning_categories=DeprecationWarning):
@@ -844,7 +844,7 @@ def mocked_aws_s3(test_func):
     return wrapped
 
 
-def mocked_aws_s3_bucket_test_file(bucket_name, file_name, file_content="Test file inside test S3 bucket"):
+def mocked_aws_s3_bucket_test_file(bucket_name, file_name, file_content="mock"):
     # type: (str, str, str) -> str
     """
     Mock a test file as if retrieved from an AWS-S3 bucket reference.
@@ -894,13 +894,19 @@ def mocked_http_file(test_func):
     return wrapped
 
 
-def mocked_reference_test_file(file_name_or_path, href_type, file_content=""):
-    # type: (str, str, str) -> str
+def mocked_reference_test_file(file_name_or_path, href_type, file_content="mock", href_prefix=None):
+    # type: (str, str, str, Optional[str]) -> str
     """
-    Generates a test file reference from dummy data for http and file href types.
+    Generates a test file reference from dummy data for HTTP and file href types.
 
     .. seealso::
         - :func:`mocked_http_file`
+
+    :param file_name_or_path: desired output file name, or full path to an existing file to fill with mock data.
+    :param href_type: scheme of the href location to generate.
+    :param file_content: text to write into the created temporary file or referenced file by path.
+    :param href_prefix: specific prefix to employ to generate the href location instead of href_type and temporary path.
+    :returns: generated temporary href location.
     """
     if os.path.isfile(file_name_or_path):
         path = file_name_or_path
@@ -910,4 +916,7 @@ def mocked_reference_test_file(file_name_or_path, href_type, file_content=""):
     with open(path, "w") as tmp_file:
         tmp_file.write(file_content)
         tmp_file.seek(0)
+    if href_prefix:
+        path = "{}{}".format(href_prefix, path)
+        href_type = None if "://" in path else href_type
     return "{}://{}".format(href_type, path) if href_type else path
