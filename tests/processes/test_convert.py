@@ -1,6 +1,8 @@
 """
 Unit tests of functions within :mod:`weaver.processes.convert`.
 """
+# pylint: disable=R1729  # ignore non-generator representation employed for displaying test log results
+
 from collections import OrderedDict
 from copy import deepcopy
 
