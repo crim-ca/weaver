@@ -131,6 +131,7 @@ PROCESS_DESCRIPTION_FIELD_FIRST = [
     "id",
     "title",
     "version",
+    "abstract",  # backward compat for deployment
     "description",
     "keywords",
     "metadata",
@@ -1099,7 +1100,7 @@ class DescribeInputType(AllOfKeywordSchema):
 
 
 class DescribeInputTypeWithID(InputIdentifierType, DescribeInputType):
-    pass
+    title = "DescribeInputTypeWithID"
 
 
 # Different definition than 'Describe' such that nested 'complex' type 'formats' can be validated and backward
@@ -2475,6 +2476,9 @@ class ProcessDeployment(ProcessSummary, ProcessContext, ProcessDeployMeta):
                     "overrides (see '{}/package.html#correspondence-between-cwl-and-wps-fields')".format(DOC_URL))
     visibility = VisibilityValue(missing=drop)
 
+    _sort_first = PROCESS_DESCRIPTION_FIELD_FIRST
+    _sort_after = PROCESS_DESCRIPTION_FIELD_AFTER
+
 
 class JobStatusInfo(ExtendedMappingSchema):
     jobID = UUID(example="a9d14bf4-84e0-449a-bac8-16e598efe807", description="ID of the job.")
@@ -3484,8 +3488,8 @@ class ProcessDescriptionChoiceType(OneOfKeywordSchema):
 
 class Deploy(ExtendedMappingSchema):
     processDescription = ProcessDescriptionChoiceType()
-    immediateDeployment = ExtendedSchemaNode(Boolean(), missing=drop, default=True)
     executionUnit = ExecutionUnitList()
+    immediateDeployment = ExtendedSchemaNode(Boolean(), missing=drop, default=True)
     deploymentProfileName = URL(missing=drop)
     owsContext = OWSContext(missing=drop)
 

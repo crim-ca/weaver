@@ -18,12 +18,15 @@ from weaver.processes.constants import (
     OPENSEARCH_START_DATE,
     WPS_LITERAL
 )
+from weaver.processes.convert import normalize_ordered_io
 from weaver.processes.sources import fetch_data_sources
 from weaver.utils import get_any_id, request_extra
 
 if TYPE_CHECKING:
-    from weaver.typedefs import AnySettingsContainer
     from typing import Deque, Dict, Iterable, List, Optional, Tuple
+
+    from weaver.processes.convert import WPS_Input_Type, JSON_IO_Type
+    from weaver.typedefs import AnySettingsContainer, DataSourceOpenSearch, JSON
 
 LOGGER = logging.getLogger("PACKAGE")
 
@@ -50,10 +53,10 @@ def validate_bbox(bbox):
 
 
 def query_eo_images_from_wps_inputs(wps_inputs,             # type: Dict[str, Deque]
-                                    eoimage_source_info,    # type: Dict[str, Dict]
+                                    eoimage_source_info,    # type: Dict[str, DataSourceOpenSearch]
                                     accept_mime_types,      # type: Dict[str, List[str]]
                                     settings=None,          # type: Optional[AnySettingsContainer]
-                                    ):                      # type: (...) -> Dict[str, Deque]
+                                    ):                      # type: (...) -> Dict[str, Deque[WPS_Input_Type]]
     """
     Query `OpenSearch` using parameters in inputs and return file links.
 
@@ -138,6 +141,7 @@ def query_eo_images_from_wps_inputs(wps_inputs,             # type: Dict[str, De
 
 
 def replace_with_opensearch_scheme(link):
+    # type: (str) -> str
     """
     Replaces ``file://`` scheme by ``opensearch://`` scheme.
     """
@@ -151,6 +155,7 @@ def replace_with_opensearch_scheme(link):
 
 # FIXME: move appropriately when adding BoundingBox support (https://github.com/crim-ca/weaver/issues/51)
 def load_wkt(wkt):
+    # type: (str) -> str
     bounds = shapely.wkt.loads(wkt).bounds
     bbox_str = ",".join(map(str, bounds))
     return bbox_str
@@ -197,7 +202,7 @@ class OpenSearchQuery(object):
         return url.attrib["template"]
 
     def _prepare_query_url(self, template_url, params):
-        # type: (str, Dict) -> Tuple[str, Dict]
+        # type: (str, Dict) -> Tuple[str, JSON]
         """
         Prepare the URL for the `OpenSearch` query.
 
@@ -242,7 +247,7 @@ class OpenSearchQuery(object):
         return []
 
     def _query_features_paginated(self, params):
-        # type: (Dict) -> Iterable[Dict, str]
+        # type: (JSON) -> Iterable[JSON, str]
         """
         Iterates over paginated results until all features are retrieved.
 
@@ -275,7 +280,7 @@ class OpenSearchQuery(object):
             start_index += n_received_features
 
     def query_datasets(self, params, accept_schemes, accept_mime_types):
-        # type: (Dict, Tuple, List) -> Iterable[str]
+        # type: (JSON, List[str], List[str]) -> Iterable[str]
         """
         Query the specified datasets.
 
@@ -319,7 +324,7 @@ class OpenSearchQuery(object):
 
 
 def get_additional_parameters(input_data):
-    # type: (Dict) -> List[Tuple[str, str]]
+    # type: (JSON) -> List[Tuple[str, str]]
     """
     Retrieve the values from the ``additionalParameters`` of the input.
 
@@ -340,13 +345,13 @@ def get_additional_parameters(input_data):
 
 class EOImageDescribeProcessHandler(object):
     def __init__(self, inputs):
-        # type: (List[Dict]) -> None
+        # type: (List[JSON_IO_Type]) -> None
         self.eoimage_inputs = list(filter(self.is_eoimage_input, inputs))
         self.other_inputs = list(filter(lambda i: self.is_eoimage_input(i) is False, inputs))
 
     @staticmethod
     def is_eoimage_input(input_data):
-        # type: (Dict) -> bool
+        # type: (JSON) -> bool
         for name, value in get_additional_parameters(input_data):
             if name.upper() == "EOIMAGE" and value and len(value) and asbool(value[0]):
                 return True
@@ -354,7 +359,7 @@ class EOImageDescribeProcessHandler(object):
 
     @staticmethod
     def get_allowed_collections(input_data):
-        # type: (Dict) -> List
+        # type: (JSON) -> List[str]
         for name, value in get_additional_parameters(input_data):
             if name.upper() == "ALLOWEDCOLLECTIONS":
                 return value.split(",")
@@ -362,6 +367,7 @@ class EOImageDescribeProcessHandler(object):
 
     @staticmethod
     def make_aoi(id_):
+        # type: (str) -> JSON
         data = {
             u"id": id_,
             u"title": u"Area of Interest",
@@ -382,6 +388,7 @@ class EOImageDescribeProcessHandler(object):
 
     @staticmethod
     def make_collection(identifier, allowed_values):  # noqa: W0613
+        # type: (str, List[str]) -> JSON
         description = u"Collection of the data."
         data = {
             u"id": u"{}".format(identifier),
@@ -407,6 +414,7 @@ class EOImageDescribeProcessHandler(object):
 
     @staticmethod
     def make_toi(id_, start_date=True):
+        # type: (str, bool) -> JSON
         """
         Generate the Time-Of-Interest definition.
 
@@ -435,7 +443,7 @@ class EOImageDescribeProcessHandler(object):
         return data
 
     def to_opensearch(self, unique_aoi, unique_toi):
-        # type: (bool, bool) -> List[Dict]
+        # type: (bool, bool) -> List[JSON]
         """
         Convert the inputs with `OpenSearch` request parameters considering Area-Of-Interest and Time-Of-Interest.
 
@@ -496,7 +504,7 @@ def get_eo_images_inputs_from_payload(payload):
 
 
 def get_original_collection_id(payload, wps_inputs):
-    # type: (Dict, Dict[str, deque]) -> Dict[str, deque]
+    # type: (JSON, Dict[str, deque[WPS_Input_Type]]) -> Dict[str, deque[WPS_Input_Type]]
     """
     Obtains modified WPS inputs considering mapping to known `OpenSearch` collection IDs.
 
@@ -526,7 +534,7 @@ def get_original_collection_id(payload, wps_inputs):
 
 
 def get_eo_images_data_sources(payload, wps_inputs):
-    # type: (Dict, Dict[str, deque]) -> Dict[str, Dict]
+    # type: (Dict, Dict[str, deque[WPS_Input_Type]]) -> Dict[str, DataSourceOpenSearch]
     """
     Resolve the data source of an ``EOImage`` input reference.
 
@@ -541,7 +549,7 @@ def get_eo_images_data_sources(payload, wps_inputs):
 
 
 def get_eo_images_mime_types(payload):
-    # type: (Dict) -> Dict[str, List]
+    # type: (JSON) -> Dict[str, List[str]]
     """
     Get the accepted media-types from the deployment payload.
 
@@ -561,7 +569,7 @@ def get_eo_images_mime_types(payload):
 
 
 def insert_max_occurs(payload, wps_inputs):
-    # type: (Dict, Dict[str, Deque]) -> None
+    # type: (JSON, Dict[str, Deque[WPS_Input_Type]]) -> None
     """
     Insert maxOccurs value in wps inputs using the deploy payload.
 
@@ -587,6 +595,14 @@ def modified_collection_identifiers(eo_image_identifiers):
 
 
 def get_data_source(collection_id):
+    # type: (str) -> DataSourceOpenSearch
+    """
+    Obtain the applicable :term:`Data Source` based on the provided collection identifier.
+
+    .. seealso::
+        - :ref:`conf_data_sources`
+        - :ref:`opensearch_data_source`
+    """
     data_sources = fetch_data_sources()
     for source_data in data_sources.values():
         try:
@@ -606,7 +622,7 @@ def get_eo_images_ids_from_payload(payload):
 
 
 def replace_inputs_describe_process(inputs, payload):
-    # type: (List[Dict], Dict) -> List[Dict]
+    # type: (List[JSON], JSON) -> List[JSON]
     """
     Replace ``EOImage`` inputs (if ``additionalParameter -> EOImage -> true``) with `OpenSearch` query parameters.
     """
@@ -614,7 +630,8 @@ def replace_inputs_describe_process(inputs, payload):
         return inputs
 
     payload_process = payload.get("processDescription", {}).get("process", {})
-    process_inputs = payload_process.get("inputs", {})
+    process_inputs = payload_process.get("inputs", [])
+    process_inputs = normalize_ordered_io(process_inputs)
 
     # add "additionalParameters" property from the payload
     payload_inputs = {get_any_id(i): i for i in process_inputs}
@@ -643,6 +660,7 @@ def replace_inputs_describe_process(inputs, payload):
 
 
 def _make_specific_identifier(param_name, identifier):
+    # type: (str, str) -> str
     """
     Only adds an underscore between the parameters.
     """

@@ -14,7 +14,9 @@ from weaver.wps_restapi.utils import get_wps_restapi_base_url
 if TYPE_CHECKING:
     from typing import Optional, Text
 
-DATA_SOURCES = {}
+    from weaver.typedefs import DataSource, DataSourceConfig
+
+DATA_SOURCES = {}  # type: DataSourceConfig
 """Data sources configuration.
 
 Unless explicitly overridden, the configuration will be loaded from file as specified by``weaver.data_sources`` setting.
@@ -52,6 +54,7 @@ Following JSON schema format is expected (corresponding YAML also supported):
 
 
 def fetch_data_sources():
+    # type: () -> DataSourceConfig
     global DATA_SOURCES  # pylint: disable=W0603,global-statement
 
     if DATA_SOURCES:
@@ -75,6 +78,8 @@ def fetch_data_sources():
 
 
 def get_default_data_source(data_sources):
+    # type: (DataSourceConfig) -> str
+
     # Check for a data source with the default property
     for src, val in data_sources.items():
         if asbool(val.get("default", False)):
@@ -85,7 +90,7 @@ def get_default_data_source(data_sources):
 
 
 def retrieve_data_source_url(data_source):
-    # type: (Optional[Text]) -> Text
+    # type: (Optional[Text]) -> str
     """
     Finds the data source URL using the provided data source identifier.
 
@@ -99,6 +104,7 @@ def retrieve_data_source_url(data_source):
 
 
 def get_data_source_from_url(data_url):
+    # type: (str) -> str
     data_sources = fetch_data_sources()
     try:
         parsed = urlparse(data_url)

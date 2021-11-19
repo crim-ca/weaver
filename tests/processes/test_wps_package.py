@@ -9,8 +9,6 @@ import os
 import shutil
 import sys
 import tempfile
-from collections import OrderedDict
-from copy import deepcopy
 
 import mock
 import pytest
@@ -18,98 +16,9 @@ from pywps.app import WPSRequest
 
 from weaver.datatype import Process
 from weaver.exceptions import PackageExecutionError
-from weaver.processes.wps_package import WpsPackage, _check_package_file, _get_package_ordered_io  # noqa: W0212
+from weaver.processes.wps_package import WpsPackage, _check_package_file  # noqa: W0212
 
 # pylint: disable=R1729  # ignore non-generator representation employed for displaying test log results
-
-
-def test_get_package_ordered_io_with_builtin_dict_and_hints():
-    """
-    Validate that I/O are all still there in the results with their respective contents.
-
-    Literal types should be modified to a dictionary with ``type`` key.
-    All dictionary contents should then remain as is, except with added ``id``.
-
-    .. note::
-        Ordering is not mandatory, so we don't validate this.
-        Also actually hard to test since employed python version running the test changes the behaviour.
-    """
-    test_inputs = {
-        "id-literal-type": "float",
-        "id-dict-details": {
-            "type": "string"
-        },
-        "id-array-type": {
-            "type": {
-                "type": "array",
-                "items": "float"
-            }
-        },
-        "id-literal-array": "string[]"
-    }
-    test_wps_hints = [
-        {"id": "id-literal-type"},
-        {"id": "id-array-type"},
-        {"id": "id-dict-with-more-stuff"},
-        {"id": "id-dict-details"},
-    ]
-    expected_result = [
-        {"id": "id-literal-type", "type": "float"},
-        {"id": "id-dict-details", "type": "string"},
-        {"id": "id-array-type", "type": {"type": "array", "items": "float"}},
-        {"id": "id-literal-array", "type": "string[]"}
-    ]
-    result = _get_package_ordered_io(test_inputs, test_wps_hints)
-    assert isinstance(result, list) and len(result) == len(expected_result)
-    # *maybe* not same order, so validate values accordingly
-    for expect in expected_result:
-        validated = False
-        for res in result:
-            if res["id"] == expect["id"]:
-                assert res == expect
-                validated = True
-        if not validated:
-            raise AssertionError("expected '{}' was not validated against any result value".format(expect["id"]))
-
-
-def test_get_package_ordered_io_with_ordered_dict():
-    test_inputs = OrderedDict([
-        ("id-literal-type", "float"),
-        ("id-dict-details", {"type": "string"}),
-        ("id-array-type", {
-            "type": {
-                "type": "array",
-                "items": "float"
-            }
-        }),
-        ("id-literal-array", "string[]"),
-    ])
-    expected_result = [
-        {"id": "id-literal-type", "type": "float"},
-        {"id": "id-dict-details", "type": "string"},
-        {"id": "id-array-type", "type": {"type": "array", "items": "float"}},
-        {"id": "id-literal-array", "type": "string[]"}
-    ]
-    result = _get_package_ordered_io(test_inputs)
-    assert isinstance(result, list) and len(result) == len(expected_result)
-    assert result == expected_result
-
-
-def test_get_package_ordered_io_with_list():
-    """
-    Everything should remain the same as list variant is only allowed to have I/O objects.
-
-    (i.e.: not allowed to have both objects and literal string-type simultaneously as for dictionary variant).
-    """
-    expected_result = [
-        {"id": "id-literal-type", "type": "float"},
-        {"id": "id-dict-details", "type": "string"},
-        {"id": "id-array-type", "type": {"type": "array", "items": "float"}},
-        {"id": "id-literal-array", "type": "string[]"}
-    ]
-    result = _get_package_ordered_io(deepcopy(expected_result))
-    assert isinstance(result, list) and len(result) == len(expected_result)
-    assert result == expected_result
 
 
 class MockResponseOk(object):
@@ -151,19 +60,6 @@ def test_check_package_file_with_windows_path():
         mock_isfile.assert_called_with(test_file)
     assert res_path == test_file
     assert is_url is False
-
-
-def test_get_package_ordered_io_when_direct_type_string():
-    inputs_as_strings = {
-        "input-1": "File[]",
-        "input-2": "float"
-    }
-    result = _get_package_ordered_io(inputs_as_strings)
-    assert isinstance(result, list)
-    assert len(result) == len(inputs_as_strings)
-    assert all([isinstance(res_i, dict) for res_i in result])
-    assert all([i in [res_i["id"] for res_i in result] for i in inputs_as_strings])
-    assert all(["type" in res_i and res_i["type"] == inputs_as_strings[res_i["id"]] for res_i in result])
 
 
 class MockWpsPackage(WpsPackage):

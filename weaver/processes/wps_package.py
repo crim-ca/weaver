@@ -21,8 +21,6 @@ import sys
 import tempfile
 import time
 import uuid
-from collections import OrderedDict  # pylint: disable=E0611,no-name-in-module   # moved to .abc in Python 3
-from copy import deepcopy
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
@@ -65,11 +63,11 @@ from weaver.processes.constants import (
 )
 from weaver.processes.convert import (
     cwl2wps_io,
-    get_field,
     is_cwl_array_type,
     json2wps_field,
     json2wps_io,
     merge_package_io,
+    normalize_ordered_io,
     wps2json_io,
     xml_wps2cwl
 )
@@ -300,61 +298,6 @@ def _get_package_requirements_as_class_list(requirements):
     return [dict(req) for req in requirements]  # ensure list-of-dict instead of sequence of dict-like
 
 
-def _get_package_ordered_io(io_section, order_hints=None):
-    # type: (Union[List[JSON], Dict[str, Union[JSON, str]]], Optional[List[JSON]]) -> List[JSON]
-    """
-    Reorders and converts `CWL` I/O from any representation and considering specified ordering hints.
-
-    First, converts `CWL` package I/O definitions defined as dictionary to an equivalent :class:`list` representation,
-    in order to work only with a single representation method. The :class:`list` is chosen over :class:`dict` because
-    sequences can enforce a specific order, while mapping have no particular order. The list representation ensures
-    that I/O order is preserved when written to file and reloaded afterwards regardless of each server and/or library's
-    implementation of the mapping container.
-
-    If this function fails to correctly order any I/O or cannot correctly guarantee such result because of the provided
-    parameters (e.g.: no hints given when required), the result will not break nor change the final processing behaviour
-    of the `CWL` engine. This is merely *cosmetic* adjustments to ease readability of I/O to avoid always shuffling
-    their order across multiple :term:`Application Package` reporting.
-
-    The important result of this function is to provide the `CWL` I/O as a consistent list of objects so it is less
-    cumbersome to compare/merge/iterate over the elements with all functions that will follow.
-
-    .. note::
-        When defined as a dictionary, an :class:`OrderedDict` is expected as input to ensure preserved field order.
-        Prior to Python 3.7 or CPython 3.5, preserved order is not guaranteed for *builtin* :class:`dict`.
-        In this case the :paramref:`order_hints` is required to ensure same order.
-
-    :param io_section: Definition contained under the `CWL` ``inputs`` or ``outputs`` package fields.
-    :param order_hints: Optional/partial list of WPS I/O definitions hinting an order to sort CWL unsorted-dict I/O.
-    :returns: I/O specified as list of dictionary definitions with preserved order (as best as possible).
-    """
-    if isinstance(io_section, list):
-        return io_section
-    io_list = []
-    io_dict = OrderedDict()
-    if isinstance(io_section, dict) and not isinstance(io_section, OrderedDict) and order_hints and len(order_hints):
-        # pre-order I/O that can be resolved with hint when the specified I/O section is not ordered
-        io_section = deepcopy(io_section)
-        for hint in order_hints:
-            hint_id = get_field(hint, "identifier", search_variations=True)
-            if hint_id in io_section:
-                io_dict[hint_id] = io_section.pop(hint_id)
-        for hint in io_section:
-            io_dict[hint] = io_section[hint]
-    else:
-        io_dict = io_section
-    for io_id, io_value in io_dict.items():
-        # I/O value can be a literal type string or dictionary with more details at this point
-        # make it always detailed dictionary to avoid problems for later parsing
-        # this is also required to make the list, since all list items must have a matching type
-        if isinstance(io_value, str):
-            io_list.append({"type": io_value})
-        else:
-            io_list.append(io_value)
-        io_list[-1]["id"] = io_id
-    return io_list
-
-
 def _check_package_file(cwl_file_path_or_url):
     # type: (str) -> Tuple[str, bool]
     """
@@ -467,8 +410,8 @@ def _load_package_content(package_dict,                             # type: Dict
     process_offering_hint = process_offering or {}
     package_input_hint = process_offering_hint.get("inputs", [])
     package_output_hint = process_offering_hint.get("outputs", [])
-    package_dict["inputs"] = _get_package_ordered_io(package_dict["inputs"], order_hints=package_input_hint)
-    package_dict["outputs"] = _get_package_ordered_io(package_dict["outputs"], order_hints=package_output_hint)
+    package_dict["inputs"] = normalize_ordered_io(package_dict["inputs"], order_hints=package_input_hint)
+    package_dict["outputs"] = normalize_ordered_io(package_dict["outputs"], order_hints=package_output_hint)
 
     with open(tmp_json_cwl, "w") as f:
         json.dump(package_dict, f)
@@ -481,23 +424,38 @@ def _load_package_content(package_dict,                             # type: Dict
     return package, package_type, step_packages
 
 
-def _merge_package_inputs_outputs(wps_inputs_list,      # type: List[ANY_IO_Type]
+def _merge_package_inputs_outputs(wps_inputs_defs,      # type: Union[List[ANY_IO_Type], Dict[str, ANY_IO_Type]]
                                   cwl_inputs_list,      # type: List[WPS_Input_Type]
-                                  wps_outputs_list,     # type: List[ANY_IO_Type]
+                                  wps_outputs_defs,     # type: Union[List[ANY_IO_Type], Dict[str, ANY_IO_Type]]
                                   cwl_outputs_list,     # type: List[WPS_Output_Type]
                                   ):                    # type: (...) -> Tuple[List[JSON_IO_Type], List[JSON_IO_Type]]
     """
-    Merges corresponding metadata of I/O definitions from `CWL` and `WPS` sources.
+    Merges corresponding metadata of I/O definitions from :term:`CWL` and :term:`WPS` sources.
 
     Merges I/O definitions to use for process creation and returned by ``GetCapabilities``, ``DescribeProcess``
     using the `WPS` specifications (from request ``POST``) and `CWL` specifications (extracted from file).
 
     .. note::
-        Parameters ``cwl_inputs_list`` and ``cwl_outputs_list`` are expected to be in `WPS`-like format
-        (ie: `CWL` I/O converted to corresponding `WPS` I/O).
+        Parameters :paramref:`cwl_inputs_list` and :paramref:`cwl_outputs_list` are expected to be
+        in :term:`WPS`-like format (i.e.: :term:`CWL` I/O converted to corresponding :term:`WPS` I/O objects).
+
+    .. seealso::
+        Conversion of :term:`CWL` to :term:`WPS`-equivalent objects is handled by :func:`_get_package_inputs_outputs`
+        and its underlying functions.
+
+    :param wps_inputs_defs: list or mapping of provided :term:`WPS` input definitions.
+    :param cwl_inputs_list: processed list of :term:`CWL` inputs from the :term:`Application Package`.
+    :param wps_outputs_defs: list or mapping of provided :term:`WPS` output definitions.
+    :param cwl_outputs_list: processed list of :term:`CWL` inputs from the :term:`Application Package`.
+    :returns:
+        Tuple of (inputs, outputs) consisting of lists of I/O with merged contents between :term:`CWL` and :term:`WPS`.
     """
-    wps_inputs_merged = merge_package_io(wps_inputs_list, cwl_inputs_list, WPS_INPUT)
-    wps_outputs_merged = merge_package_io(wps_outputs_list, cwl_outputs_list, WPS_OUTPUT)
+    if isinstance(wps_inputs_defs, dict):
+        wps_inputs_defs = normalize_ordered_io(wps_inputs_defs)
+    if isinstance(wps_outputs_defs, dict):
+        wps_outputs_defs = normalize_ordered_io(wps_outputs_defs)
+    wps_inputs_merged = merge_package_io(wps_inputs_defs, cwl_inputs_list, WPS_INPUT)
+    wps_outputs_merged = merge_package_io(wps_outputs_defs, cwl_outputs_list, WPS_OUTPUT)
     return [wps2json_io(i) for i in wps_inputs_merged], [wps2json_io(o) for o in wps_outputs_merged]
 
 

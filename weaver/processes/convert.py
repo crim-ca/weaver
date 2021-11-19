@@ -94,6 +94,7 @@ if TYPE_CHECKING:
     WPS_IO_Type = Union[WPS_Input_Type, WPS_Output_Type]
     OWS_IO_Type = Union[OWS_Input_Type, OWS_Output_Type]
     JSON_IO_Type = JSON
+    JSON_IO_ListOrMap = Union[List[JSON], Dict[str, Union[JSON, str]]]
     CWL_IO_Type = Union[CWL_Input_Type, CWL_Output_Type]
     PKG_IO_Type = Union[JSON_IO_Type, WPS_IO_Type]
     ANY_IO_Type = Union[CWL_IO_Type, JSON_IO_Type, WPS_IO_Type, OWS_IO_Type]
@@ -1525,6 +1526,65 @@ def is_equal_formats(format1, format2):
     ):
         return True
     return False
+
+
+def normalize_ordered_io(io_section, order_hints=None):
+    # type: (JSON_IO_ListOrMap, Optional[JSON_IO_ListOrMap]) -> List[JSON]
+    """
+    Reorders and converts I/O from any representation (:class:`dict` or :class:`list`) considering given ordering hints.
+
+    First, converts I/O definitions defined as dictionary to an equivalent :class:`list` representation,
+    in order to work only with a single representation method. The :class:`list` is chosen over :class:`dict` because
+    sequences can enforce a specific order, while mapping have no particular order. The list representation ensures
+    that I/O order is preserved when written to file and reloaded afterwards regardless of each server and/or library's
+    implementation of the mapping container.
+
+    If this function fails to correctly order any I/O or cannot correctly guarantee such result because of the provided
+    parameters (e.g.: no hints given when required), the result will not break nor change the final processing behaviour
+    of parsers. This is merely *cosmetic* adjustments to ease readability of I/O to avoid always shuffling their order
+    across multiple :term:`Application Package` and :term:`Process` reporting formats.
+
+    The important result of this function is to provide the I/O as a consistent list of objects so it is less
+    cumbersome to compare/merge/iterate over the elements with all functions that will follow.
+
+    .. note::
+        When defined as a dictionary, an :class:`OrderedDict` is expected as input to ensure preserved field order.
+        Prior to Python 3.7 or CPython 3.5, preserved order is not guaranteed for *builtin* :class:`dict`.
+        In this case the :paramref:`order_hints` is required to ensure same order.
+
+    :param io_section: Definition contained under the ``inputs`` or ``outputs`` fields.
+    :param order_hints: Optional/partial I/O definitions hinting an order to sort unsorted-dict I/O.
+    :returns: I/O specified as list of dictionary definitions with preserved order (as best as possible).
+    """
+    if isinstance(io_section, list):
+        return io_section
+    io_list = []
+    io_dict = OrderedDict()
+    if isinstance(io_section, dict) and not isinstance(io_section, OrderedDict) and order_hints and len(order_hints):
+        # convert the hints themselves to list if they are provided as mapping
+        if isinstance(order_hints, dict):
+            order_hints = [dict(id=key, **values) for key, values in order_hints.items()]
+
+        # pre-order I/O that can be resolved with hint when the specified I/O section is not ordered
+        io_section = deepcopy(io_section)
+        for hint in order_hints:
+            hint_id = get_field(hint, "identifier", search_variations=True)
+            if hint_id and hint_id in io_section:  # ignore hint where ID could not be resolved
+                io_dict[hint_id] = io_section.pop(hint_id)
+        for hint in io_section:
+            io_dict[hint] = io_section[hint]
+    else:
+        io_dict = io_section
+    for io_id, io_value in io_dict.items():
+        # I/O value can be a literal type string or dictionary with more details at this point
+        # make it always detailed dictionary to avoid problems for later parsing
+        # this is also required to make the list, since all list items must have a matching type
+        if isinstance(io_value, str):
+            io_list.append({"type": io_value})
+        else:
+            io_list.append(io_value)
+        io_list[-1]["id"] = io_id
+    return io_list
 
 
 def merge_io_formats(wps_formats, cwl_formats):
