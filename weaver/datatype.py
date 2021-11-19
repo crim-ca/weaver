@@ -1595,7 +1595,7 @@ class Process(Base):
             "package": self._encode(self.package),
             "payload": self._encode(self.payload),
             "visibility": self.visibility,
-            "auth": self.auth.params()
+            "auth": self.auth.params() if self.auth else None
         }
 
     @property
