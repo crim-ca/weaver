@@ -1,6 +1,5 @@
-
-.. _processes:
 .. include:: references.rst
+.. _processes:
 
 **********
 Processes
@@ -57,11 +56,11 @@ All `builtin` processes are marked with :py:data:`weaver.processes.constants.CWL
 WPS-1/2
 -------
 
-This kind of process corresponds to a *traditional* WPS XML or JSON endpoint (depending of supported version) prior to
-WPS-REST specification. When the `WPS-REST`_ process is deployed in `Weaver` using an URL reference to an WPS-1/2
-process, `Weaver` parses and converts the XML or JSON body of the response and registers the process locally using this
-definition. This allows a remote server offering limited functionalities (e.g.: no REST bindings supported) to provide
-them through `Weaver`.
+This kind of process corresponds to a *traditional* :term:`WPS` :term:`XML` or :term:`JSON` endpoint
+(depending of supported version) prior to `WPS-REST`_ specification. When the `WPS-REST`_ process is deployed
+in `Weaver` using an URL reference to an WPS-1/2 process, `Weaver` parses and converts the :term:`XML` or :term:`JSON`
+body of the response and registers the process locally using this definition. This allows a remote server offering
+limited functionalities (e.g.: no REST bindings supported) to provide them through `Weaver`.
 
 A minimal `Deploy`_ request body for this kind of process could be as follows:
 
@@ -81,10 +80,10 @@ A minimal `Deploy`_ request body for this kind of process could be as follows:
     }
 
 
-This would tell `Weaver` to locally deploy the ``my-process-reference`` process using the WPS-1 URL reference that is
-expected to return a ``DescribeProcess`` XML schema. Provided that this endpoint can be resolved and parsed according
-to typical WPS specification, this should result into a successful process registration. The deployed process would
-then be accessible with `DescribeProcess`_  requests.
+This would tell `Weaver` to locally `Deploy`_ the ``my-process-reference`` process using the WPS-1 URL reference that is
+expected to return a ``DescribeProcess`` :term:`XML` schema. Provided that this endpoint can be resolved and parsed
+according to typical WPS specification, this should result into a successful process registration.
+The deployed :term:`Process` would then be accessible with `DescribeProcess`_  requests.
 
 The above deployment procedure can be automated on startup using `Weaver`'s ``wps_processes.yml`` configuration file.
 Please refer to :ref:`Configuration of WPS Processes` section for more details on this matter.
@@ -103,13 +102,14 @@ Please refer to :ref:`Configuration of WPS Processes` section for more details o
 WPS-REST
 --------
 
-This process type is the main component of `Weaver`. All other process types are converted to this one either
+This :term:`Process` type is the main component of `Weaver`. All other types are converted to this one either
 through some parsing (e.g.: `WPS-1/2`_) or with some requirement indicators (e.g.: `Builtin`_, `Workflow`_) for
 special handling.
 
-When deploying one such process directly, it is expected to have a reference to a CWL `Application Package`_. This is
-most of the time employed to wrap a reference docker image process. The reference package can be provided in multiple
-ways as presented below.
+When deploying one such :term:`Process` directly, it is expected to have a definition specified
+with a :term:`CWL` `Application Package`_.
+This is most of the time employed to wrap an operations packaged in a reference :term:`Docker` image.
+The reference package can be provided in multiple ways as presented below.
 
 .. note::
 
@@ -118,10 +118,12 @@ ways as presented below.
     accomplished. See :ref:`cwl-wps-mapping` section for more details.
 
 
+.. _app_pkg_exec_unit_literal:
+
 Package as Literal Execution Unit Block
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-In this situation, the :term:`CWL` definition is provided as is using JSON-formatted package embedded within the
+In this situation, the :term:`CWL` definition is provided as is using :term:`JSON`-formatted package embedded within the
 |deploy-req|_ request. The request payload would take the following shape:
 
 .. code-block:: json
@@ -129,7 +131,7 @@ In this situation, the :term:`CWL` definition is provided as is using JSON-forma
     {
       "processDescription": {
         "process": {
-          "id": "my-process-reference"
+          "id": "my-process-literal-package"
         }
       },
       "executionUnit": [
@@ -145,10 +147,47 @@ In this situation, the :term:`CWL` definition is provided as is using JSON-forma
       ]
     }
 
-.. _process-esgf-cwt:
+.. _app_pkg_exec_unit_literal:
 
 Package as External Execution Unit Reference
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In this situation, the :term:`CWL` is provided indirectly using an external file reference which is expected to have
+contents describing the :term:`Application Package` (as presented in the :ref:`app_pkg_exec_unit_literal` case).
+Because an external file is employed instead of embedding the package within the :term:`JSON` HTTP request contents,
+it is possible to employ both :term:`JSON` and :term:`YAML` definitions.
+
+An example is presented below:
+
+.. code-block:: json
+
+    {
+      "processDescription": {
+        "process": {
+          "id": "my-process-reference-package"
+        }
+      },
+      "executionUnit": [
+        {
+          "href": "https://remote-file-server.com/my-package.cwl"
+        }
+      ]
+    }
+
+Where the referenced file hosted at ``"https://remote-file-server.com/my-package.cwl"`` could contain:
+
+.. code-block:: yaml
+
+    cwlVersion: "v1.0"
+    class: CommandLineTool
+    inputs:
+      - "<...>"
+    outputs:
+      - "<...>"
+    "<...>": "<...">
+
+
+.. _process-esgf-cwt:
 
 ESGF-CWT
 ----------
@@ -302,7 +341,7 @@ The request body requires mainly two components:
 
 - | ``processDescription``:
   | Defines the process identifier, metadata, inputs, outputs, and some execution specifications. This mostly
-    corresponds to information that corresponds to a traditional :term:`WPS` definition.
+    corresponds to information that is provided by traditional :term:`WPS` definition.
 - | ``executionUnit``:
   | Defines the core details of the `Application Package`_. This corresponds to the explicit :term:`CWL` definition
     that indicates how to execute the given application.
@@ -315,17 +354,23 @@ result in this process to become available for following steps.
 
 .. warning::
     When a process is deployed, it is not necessarily available immediately. This is because process *visibility* also
-    needs to be updated. The process must be made *public* to allow its discovery. For updating visibility, please
-    refer to the |vis-req|_ request.
+    needs to be updated. The process must be made *public* to allow its discovery. Alternatively, the visibility can
+    be directly provided within the body of the deploy request to skip this extra step.
+    For specifying or updating visibility, please refer to corresponding |deploy-req|_ and |vis-req|_ requests.
 
 After deployment and visibility preconditions have been met, the corresponding process should become available
 through `DescribeProcess`_ requests and other routes that depend on an existing process.
 
-Note that when a process is deployed using the WPS-REST interface, it also becomes available through the WPS-1/2
+Note that when a process is deployed using the `WPS-REST`_ interface, it also becomes available through the `WPS-1/2`_
 interface with the same identifier and definition. Because of compatibility limitations, some parameters in the
-WPS-1/2 might not be perfectly mapped to the equivalent or adjusted WPS-REST interface, although this concerns mostly
-only new features such as status monitoring. For most traditional use cases, properties are mapped between the two
-interfaces, but it is recommended to use the WPS-REST one because of the added features.
+`WPS-1/2`_ side might not be perfectly mapped to the equivalent or adjusted `WPS-REST`_ interface, although this
+concerns mostly only new features such as :term:`Job` status monitoring. For most traditional use cases, properties
+are mapped between the two interfaces, but it is recommended to use the `WPS-REST`_ one because of the added features.
+
+.. seealso::
+    Please refer to :ref:`application-package` chapter for any additional parameters that can be
+    provided for specific types of :term:`Application Package` and :term:`Process` definitions.
+
 
 .. _GetCapabilities:
 .. _DescribeProcess:

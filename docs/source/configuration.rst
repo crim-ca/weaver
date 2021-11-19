@@ -1,5 +1,5 @@
-.. _configuration:
 .. include:: references.rst
+.. _configuration:
 
 ******************
 Configuration

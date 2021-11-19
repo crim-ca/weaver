@@ -414,6 +414,17 @@ class XmlHeader(ExtendedMappingSchema):
     content_type = ContentTypeHeader(example=CONTENT_TYPE_APP_XML, default=CONTENT_TYPE_APP_XML)
 
 
+class XAuthDockerHeader(ExtendedSchemaNode):
+    description = (
+        "Authentication header for private registry access in order to retrieve the Docker image reference "
+        "specified in an Application Package during Process deployment. When provided, this header should "
+        "contain similar details as typical Authentication or X-Auth-Token headers."
+    )
+    name = "X-Auth-Docker"
+    schema_type = String
+    missing = drop
+
+
 class RequestContentTypeHeader(OneOfKeywordSchema):
     _one_of = [
         JsonHeader(),
@@ -3494,8 +3505,12 @@ class Deploy(ExtendedMappingSchema):
     owsContext = OWSContext(missing=drop)
 
 
+class DeployHeaders(RequestHeaders):
+    x_auth_docker = XAuthDockerHeader()
+
+
 class PostProcessesEndpoint(ExtendedMappingSchema):
-    header = RequestHeaders()
+    header = DeployHeaders(description="Headers employed for process deployment.")
     body = Deploy(title="Deploy")
 
 

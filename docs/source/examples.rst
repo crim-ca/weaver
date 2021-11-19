@@ -1,5 +1,5 @@
-.. _examples-page:
 .. include:: references.rst
+.. _examples-page:
 
 ********************************************
 Process and Application Package Examples

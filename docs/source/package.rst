@@ -1,6 +1,6 @@
+.. include:: references.rst
 .. _package:
 .. _application-package:
-.. include:: references.rst
 
 *************************
 Application Package
@@ -39,7 +39,7 @@ Typical CWL Package Definition
 CWL CommandLineTool
 ------------------------
 
-Following CWL package definition represents the :py:mod:`weaver.processes.builtin.jsonarray2netcdf` process.
+Following :term:`CWL` package definition represents the :py:mod:`weaver.processes.builtin.jsonarray2netcdf` process.
 
 .. literalinclude:: ../../weaver/processes/builtin/jsonarray2netcdf.cwl
     :language: YAML
@@ -52,6 +52,139 @@ The other important sections are ``inputs`` and ``outputs``. These define which 
 produced by the described application. `Weaver` supports most formats and types as specified by |cwl-spec|_.
 See `Inputs/Outputs Type`_ for more details.
 
+
+.. _app_pkg_script:
+
+Script Application
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+When deploying a ``CommandLineTool`` that only needs to execute script or shell commands, it is recommended
+to define an appropriate |cwl-docker-req|_ to containerize the :term:`Process`, even though no *advanced*
+operation is needed. The reason for this is because there is no way for `Weaver` to otherwise know for sure
+how to provide all appropriate dependencies that this operation might need. In order to preserve processing
+environment and results separate between any :term:`Process` and `Weaver` itself, the executions will either be
+automatically containerized (with some default image), or blocked entirely when `Weaver` cannot resolve the
+appropriate execution environment. Therefore, it is recommended that the :term:`Application Package` provider
+defines a specific image to avoid unexpected failures if this auto-resolution changes across versions.
+
+Below are minimalistic :term:`Application Package` samples that make use of a shell command
+and a custom Python script for quickly running some operations, without actually needing to package any
+specialized :term:`Docker` image.
+
+The first example simply outputs the contents of a ``file`` input using the ``cat`` command.
+Because the :term:`Docker` image ``debian:stretch-slim`` is specified, we can guarantee that the command will be
+available within its containerized environment. In this case, we also take advantage of the ``stdout.log`` which
+is always collected by `Weaver` (along with the ``stderr``) in order to obtain traces produced by any
+:term:`Application Package` when performing :term:`Job` executions.
+
+.. code-block:: yaml
+    :caption: Sample CWL definition of a shell script
+
+        cwlVersion: v1.0
+        class: CommandLineTool
+        baseCommand: cat
+        requirements:
+          DockerRequirement:
+            dockerPull: "debian:stretch-slim"
+        inputs:
+          - id: file
+            type: File
+            inputBinding:
+              position: 1
+        outputs:
+          - id: output
+            type: File
+            outputBinding:
+              glob: stdout.log
+
+
+The second example takes advantage of the |cwl-workdir-req|_ to generate a Python script dynamically
+(i.e.: ``script.py``), prior to executing it for processing the received inputs and produce the output file.
+Because a Python runner is required, the |cwl-docker-req|_ specification defines a basic :term:`Docker` image that
+meets our needs. Note that in this case, special interpretation of ``$(...)`` entries within the definition can be
+provided to tell :term:`CWL` how to map :term:`Job` input values to the dynamically created script.
+
+.. code-block:: yaml
+    :caption: Sample CWL definition of a Python script
+
+        cwlVersion: v1.0
+        class: CommandLineTool
+        baseCommand:
+          - python3
+          - script.py
+        inputs:
+          - id: amount
+            type: int
+          - id: cost
+            type: float
+        outputs:
+          - id: quote
+            type: File
+            outputBinding:
+              glob: report.txt
+        requirements:
+          DockerRequirement:
+            dockerPull: "python:3.7-alpine"
+          InitialWorkDirRequirement:
+            listing:
+              # below script is generated dynamically in the working directory, and then called by the base command
+              entryname: script.py
+              entry: |
+                amount = $(inputs.amount)
+                cost = $(inputs.cost)
+                with open("report.txt", "w") as report:
+                    report.write(f"Order Total: {amount * cost}$\n")
+
+.. _app_pkg_docker:
+
+Dockerized Applications
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+When advanced processing capabilities and more complicated environment preparation are required, it is recommended
+to package and push pre-built :term:`Docker` images to a remote registry. In this situation, just like
+for :ref:`app_pkg_script` examples, the |cwl-docker-req|_ is needed. The definitions would also be essentially the
+same as previous examples, but with more complicated operations and possibly larger amount of inputs or outputs.
+
+Whenever a :term:`Docker` image reference is detected, `Weaver` will ensure that the application will be pulled
+using :term:`CWL` capabilities in order to run it.
+
+Because :term:`Application Package` providers could desire to make use of :term:`Docker` images hosted on private
+registries, `Weaver` offers the capability to specify an authentication token through HTTP request headers during
+the :term:`Process` deployment. More specifically, the following definition can be provided during a `Deploy`_ request.
+
+.. code-block:: http
+
+    POST /processes HTTP/1.1
+    Host: weaver.example.com
+    Content-Type: application/json;charset=UTF-8
+    X-Auth-Docker: Bearer <access_token>
+
+    { "processDescription": { }, "executionUnit": { } }
+
+
+The ``X-Auth-Docker`` header should be defined exactly like typical ``Authentication`` headers specified by :rfc:`6750`.
+The name ``X-Auth-Docker`` is inspired from existing implementations that employ ``X-Auth-Token`` in a similar fashion.
+The reason why ``Authentication`` and ``X-Auth-Token`` headers are not themselves employed in this case is to ensure
+that they do not interfere with any proxy or server authentication mechanism, which `Weaver` could be located behind.
+
+When the HTTP ``X-Auth-Docker`` header is detected in combination of a |cwl-docker-req|_ entry within
+the :term:`Application Package` of the :term:`Process` being deployed, `Weaver` will parse the targeted :term:`Docker`
+registry defined in ``dockerPull`` and will attempt to identify it for later authentication towards it with the
+provided token. Given a successful authentication, `Weaver` should then be able to pull the :term:`Docker` image
+whenever required for launching new :term:`Job` executions.
+
+.. note::
+    `Weaver` only attempts to authenticate itself temporarily at the moment when the :term:`Job` is submitted to
+    retrieve the :term:`Docker` image, and only if the image is not already available locally. Because of this, the
+    provided authentication token should have a sufficient lifetime to run the :term:`Job` at later times, considering
+    any retention time of cached :term:`Docker` images on the server. If the cache is cleaned, and the :term:`Docker`
+    image is made unavailable, `Weaver` will attempt to authenticate itself again when receiving the new :term:`Job`.
+    It is left up to the developer and :term:`Application Package` provider to manage expired tokens in `Weaver`
+    according to their needs. To resolve such cases, the |update-token-req|_ request or an entire re-deployment
+    of the :term:`Process` could be accomplished, whichever is more convenient for them.
+
+.. versionadded:: 4.5.0
+    Specification and handling of the ``X-Auth-Docker`` header for providing an authentication token.
 
 CWL Workflow
 ------------------------

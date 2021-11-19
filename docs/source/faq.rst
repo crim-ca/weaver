@@ -1,5 +1,5 @@
-.. _faq:
 .. include:: references.rst
+.. _faq:
 
 *************************
 FAQ

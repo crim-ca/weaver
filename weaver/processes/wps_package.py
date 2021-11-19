@@ -664,7 +664,7 @@ def get_auth_requirements(requirement, headers):
         link_ref_docker = requirement.get("dockerPull", None)
         if x_auth_docker and link_ref_docker:
             LOGGER.info("Detected authentication details for Docker image reference in Application Package.")
-            auth_details = x_auth_docker.split(":")
+            auth_details = x_auth_docker.split(" ")
             # note: never provide any parts in errors in case of incorrect parsing, first could be token by mistake
             if not len(auth_details) == 2:
                 raise ValueError("Invalid authentication header provided without an authentication scheme "

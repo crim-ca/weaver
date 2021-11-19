@@ -1,5 +1,5 @@
-.. _appendix:
 .. include:: references.rst
+.. _appendix:
 
 ************
 Glossary
