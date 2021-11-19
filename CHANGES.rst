@@ -10,6 +10,17 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+`4.4.0 <https://github.com/crim-ca/weaver/tree/4.4.0>`_ (2021-11-19)
+========================================================================
+
+Changes:
+--------
 - Add ``map_wps_output_location`` utility function to handle recurrent mapping of ``weaver.wps_output_dir`` back and
   forth with resolved ``weaver.wps_output_url``.
 - Add more detection of map-able WPS output location to avoid fetching files unnecessarily. Common cases
