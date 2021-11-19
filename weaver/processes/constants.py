@@ -26,6 +26,7 @@ CWL_REQUIREMENT_APP_DOCKER = "DockerRequirement"
 CWL_REQUIREMENT_APP_DOCKER_GPU = "DockerGpuRequirement"
 CWL_REQUIREMENT_APP_ESGF_CWT = "ESGF-CWTRequirement"
 CWL_REQUIREMENT_APP_WPS1 = "WPS1Requirement"
+
 CWL_REQUIREMENT_APP_TYPES = frozenset([
     CWL_REQUIREMENT_APP_BUILTIN,
     CWL_REQUIREMENT_APP_DOCKER,
@@ -36,8 +37,19 @@ CWL_REQUIREMENT_APP_TYPES = frozenset([
     CWL_REQUIREMENT_APP_ESGF_CWT,
     CWL_REQUIREMENT_APP_WPS1,
 ])
+"""
+Set of :term:`CWL` requirements consisting of known :term:`Application Package` by this `Weaver` instance.
+"""
+
+CWL_REQUIREMENT_APP_REMOTE = frozenset([
+    CWL_REQUIREMENT_APP_ESGF_CWT,
+    CWL_REQUIREMENT_APP_WPS1,
+])
+"""
+Set of :term:`CWL` requirements that correspond to remote execution of an :term:`Application Package`.
+"""
+
 CWL_REQUIREMENT_INIT_WORKDIR = "InitialWorkDirRequirement"
-CWL_REQUIREMENT_APP_DOCKER = "DockerRequirement"
 
 # CWL package types and extensions
 PACKAGE_SIMPLE_TYPES = frozenset(["string", "boolean", "float", "int", "integer", "long", "double"])

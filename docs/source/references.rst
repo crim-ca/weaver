@@ -7,6 +7,10 @@
 .. _aws-credentials: https://boto3.amazonaws.com/v1/documentation/api/latest/guide/credentials.html
 .. |aws-config| replace:: AWS Configuration
 .. _aws-config: https://boto3.amazonaws.com/v1/documentation/api/latest/guide/configuration.html
+.. |aws_s3_bucket_names| replace:: AWS S3 bucket naming rules
+.. _aws_s3_bucket_names: https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucketnamingrules.html
+.. |aws_s3_obj_key_names| replace:: AWS S3 object key naming guidelines
+.. _aws_s3_obj_key_names: https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-keys.html
 .. |cwl| replace:: Common Workflow Language
 .. _cwl: `cwl-home`_
 .. |cwl-home| replace:: CWL Homepage
@@ -81,6 +85,8 @@
 .. _MongoDB: https://www.mongodb.com/
 .. |mongodb-docs| replace:: MongoDB official documentation
 .. _mongodb-docs: https://docs.mongodb.com/manual
+.. |media-types| replace:: Media Types
+.. _media-types: https://www.iana.org/assignments/media-types/media-types.xhtml
 
 .. Weaver Configurations
 .. |weaver-config| replace:: ``weaver/config``

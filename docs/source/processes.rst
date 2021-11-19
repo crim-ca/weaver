@@ -474,7 +474,7 @@ File Reference Types
 
 Most inputs can be categorized into two of the most commonly employed types, namely ``LiteralData`` and ``ComplexData``.
 The former represents basic values such as integers or strings, while the other represents a file reference.
-Files in `Weaver` (and :term:`WPS` in general) can be specified with any ``formats`` as MIME-type.
+Files in `Weaver` (and :term:`WPS` in general) can be specified with any ``formats`` as |media-types|_.
 
 .. seealso::
     - :ref:`cwl-wps-mapping`
@@ -499,18 +499,18 @@ package requirements. These use-cases are described below.
     operation that `Weaver` uses to provide the file locally to underlying :term:`CWL` application package to be
     executed.
 
-When `Weaver` is able to figure out that the process needs to be executed locally in :term:`ADES` mode, it will fetch
-all necessary files prior to process execution in order to make them available to the :term:`CWL` package. When `Weaver`
-is in :term:`EMS` configuration, it will **always** forward remote references (regardless of scheme) exactly as provided
-as input of the process execution request, since it assumes it needs to dispatch the execution to another :term:`ADES`
-remote server, and therefore only needs to verify that the file reference is reachable remotely. In this case, it
-becomes the responsibility of this remote instance to handle the reference appropriately. This also avoids potential
-problems such as if `Weaver` as :term:`EMS` doesn't have authorized access to a link that only the target :term:`ADES`
-would have access to.
+When `Weaver` is able to figure out that the :term:`Process` needs to be executed locally in :term:`ADES` mode, it
+will fetch all necessary files prior to process execution in order to make them available to the :term:`CWL` package.
+When `Weaver` is in :term:`EMS` configuration, it will **always** forward remote references (regardless of scheme)
+exactly as provided as input of the process execution request, since it assumes it needs to dispatch the execution
+to another :term:`ADES` remote server, and therefore only needs to verify that the file reference is reachable remotely.
+In this case, it becomes the responsibility of this remote instance to handle the reference appropriately. This also
+avoids potential problems such as if `Weaver` as :term:`EMS` doesn't have authorized access to a link that only the
+target :term:`ADES` would have access to.
 
 When :term:`CWL` package defines ``WPS1Requirement`` under ``hints`` for corresponding `WPS-1/2`_ remote processes being
 monitored by `Weaver`, it will skip fetching of ``http(s)``-based references since that would otherwise lead to useless
-double downloads (one on `Weaver` and the other on the :term:`WPS` side). It is the same in case of
+double downloads (one on `Weaver` and the other on the :term:`WPS` side). It is the same in situation for
 ``ESGF-CWTRequirement`` employed for `ESGF-CWT`_ processes. Because these processes do not always support :term:`S3`
 buckets, and because `Weaver` supports many variants of :term:`S3` reference formats, it will first fetch the :term:`S3`
 reference using its internal |aws-config|_, and then expose this downloaded file as ``https(s)`` reference
@@ -638,6 +638,31 @@ combinations.
 .. todo::
     add tests that validate each combination of operation
 
+.. _file_reference_names:
+
+File Reference Names
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When processing any of the previous :ref:`file_reference_types`, the resulting name of the file after retrieval can
+depend on the applicable scheme. In most cases, the file name is simply the last fragment of the path, whether it is
+an URL, an :term:`S3` bucket or plainly a file directory path. The following cases are exceptions.
+
+.. versionchanged:: 4.4.0
+    When using |http_scheme| references, the ``Content-Disposition`` header can be provided with ``filename``
+    and/or ``filename*`` as specified by :rfc:`2183`, :rfc:`5987` and :rfc:`6266` specifications in order to define a
+    staging file name. Note that `Weaver` takes this name only as a suggestion as will ignore the preferred name if it
+    does not conform to basic naming conventions for security reasons. As a general rule of thumb, common alphanumeric
+    characters and separators such as dash (``-``), underscores (``_``) or dots (``.``) should be employed to limit
+    chances of errors. If none of the suggested names are valid, `Weaver` falls back to the typical last fragment of
+    the URL as file name.
+
+When using |s3_scheme| references (or equivalent |http_scheme| referring to :term:`S3` bucket), the staged file names
+will depend on the stored object names within the bucket. In that regard, naming conventions from :term:`AWS` should be
+respected.
+
+.. seealso::
+    - |aws_s3_bucket_names|_
+    - |aws_s3_obj_key_names|_
 
 .. _opensearch_data_source:
 

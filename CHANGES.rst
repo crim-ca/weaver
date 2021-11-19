@@ -24,11 +24,18 @@ Changes:
   relates to `#281 <https://github.com/crim-ca/weaver/issues/281>`_).
 - Add missing documentation details about `Data Source` and connect chapters with other relevant
   documentation details and updated ``Workflow`` tests.
+- Add handling of ``Content-Disposition`` header providing preferred ``filename`` or ``filename*`` parameters when
+  fetching file references instead of the last URL fragment employed by default
+  (resolves `#364 <https://github.com/crim-ca/weaver/issues/364>`_).
+- Add more security validation of the obtained file name from HTTP reference, whether generated from URL path fragment
+  or other header specification.
 
 Fixes:
 ------
 - Fix incorrect resolution of ``Process`` results endpoint to pass contents from one step to another
   during ``Workflow`` execution (resolves `#358 <https://github.com/crim-ca/weaver/issues/358>`_).
+- Fix logic of remotely and locally executed applications based on `CWL` requirements when attempting to resolve
+  whether an input file reference should be fetched.
 
 `4.3.0 <https://github.com/crim-ca/weaver/tree/4.3.0>`_ (2021-11-16)
 ========================================================================

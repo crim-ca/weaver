@@ -1,4 +1,5 @@
 # pylint: disable=C0103,invalid-name
+
 import contextlib
 import inspect
 import json
@@ -7,10 +8,11 @@ import shutil
 import tempfile
 import uuid
 from typing import Type
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 import mock
 import pytest
+import responses
 from pyramid.httpexceptions import (
     HTTPConflict,
     HTTPCreated,
@@ -26,6 +28,7 @@ from requests.exceptions import HTTPError as RequestsHTTPError
 
 from tests.utils import mocked_aws_credentials, mocked_aws_s3, mocked_aws_s3_bucket_test_file, mocked_file_response
 from weaver import status, xml_util
+from weaver.formats import CONTENT_TYPE_APP_JSON
 from weaver.utils import (
     NullType,
     assert_sane_name,
@@ -605,6 +608,87 @@ def test_fetch_file_remote_with_request():
             assert os.path.isfile(res_path), "File [{}] should be accessible under [{}]".format(tmp_http, res_path)
             assert m_request.call_count == 2, "Request method should have been called twice because of retries"
             assert json.load(open(res_path)) == tmp_data, "File should be properly generated from HTTP reference"
+        except Exception:
+            raise
+        finally:
+            shutil.rmtree(res_dir, ignore_errors=True)
+
+
+def test_fetch_file_http_content_disposition_filename():
+    tmp_dir = tempfile.gettempdir()
+    with contextlib.ExitStack() as stack:
+        tmp_json = stack.enter_context(tempfile.NamedTemporaryFile(dir=tmp_dir, mode="w", suffix=".json"))  # noqa
+        tmp_data = {"message": "fetch-file-request"}
+        tmp_text = json.dumps(tmp_data)
+        tmp_json.write(tmp_text)
+        tmp_json.seek(0)
+
+        tmp_random = "123456"
+        tmp_normal = "spécial.json"
+        tmp_escape = quote(tmp_normal)  # % characters
+        tmp_name = os.path.split(tmp_json.name)[-1]
+        tmp_http = "http://weaver.mock/{}".format(tmp_random)  # pseudo endpoint where file name is not directly visible
+
+        def mock_response(__request, test_headers):
+            test_headers.update({
+                "Content-Type": CONTENT_TYPE_APP_JSON,
+                "Content-Length": str(len(tmp_text))
+            })
+            return 200, headers, tmp_text
+
+        res_dir = os.path.join(tmp_dir, str(uuid.uuid4()))
+        req_mock = stack.enter_context(responses.RequestsMock())
+        try:
+            make_dirs(res_dir, exist_ok=True)
+            for target, headers in [
+                (tmp_name, {
+                    "Content-Disposition": f"attachment; filename=\"{tmp_name}\";filename*=UTF-8''{tmp_name}"
+                }),
+                (tmp_name, {  # unusual spacing/order does not matter
+                    "Content-Disposition": f" filename*=UTF-8''{tmp_name};   filename=\"{tmp_name}\";attachment;"
+                }),
+                (tmp_name, {
+                    "Content-Disposition": f"attachment; filename=\"{tmp_name}\""
+                }),
+                (tmp_name, {
+                    "Content-Disposition": f"attachment; filename={tmp_name}"
+                }),
+                (tmp_normal, {
+                    "Content-Disposition": f"attachment; filename=\"{tmp_normal}\";filename*=UTF-8''{tmp_escape}"
+                }),
+                (tmp_normal, {  # disallowed escape character in 'filename', but 'filename*' is valid and used first
+                    "Content-Disposition": f"attachment; filename=\"{tmp_escape}\";filename*=UTF-8''{tmp_normal}"
+                }),
+                (tmp_random, {  # disallowed escape character in 'filename', reject since no alternative
+                    "Content-Disposition": f"attachment; filename=\"{tmp_escape}\""
+                }),
+                (tmp_random, {  # empty header
+                    "Content-Disposition": ""
+                }),
+                (tmp_random, {  # missing header
+                }),
+                (tmp_random, {  # missing filename
+                    "Content-Disposition": "attachment"
+                }),
+                (tmp_random, {  # invalid filename
+                    "Content-Disposition": "attachment; filename*=UTF-8''exec%20'echo%20test'"
+                }),
+                (tmp_random, {  # invalid encoding
+                    "Content-Disposition": "attachment; filename*=random''%47%4F%4F%44.json"
+                }),
+                ("GOOD.json", {  # valid encoding and allowed characters after escape
+                    "Content-Disposition": "attachment; filename*=UTF-8''%47%4F%4F%44.json"
+                })
+            ]:
+                req_mock.remove("GET", tmp_http)  # reset previous iter
+                req_mock.add_callback("GET", tmp_http, callback=lambda req: mock_response(req, headers))
+                try:
+                    res_path = fetch_file(tmp_http, res_dir)
+                except Exception as exc:
+                    raise AssertionError(f"Unexpected exception when testing with: [{headers}]. Exception: [{exc}]")
+                assert res_path == os.path.join(res_dir, target), f"Not expected name when testing with: [{headers}]"
+                assert os.path.isfile(res_path), f"File [{tmp_http}] should be accessible under [{res_path}]"
+                assert json.load(open(res_path)) == tmp_data, "File should be properly generated from HTTP reference"
         except Exception:
             raise
         finally:

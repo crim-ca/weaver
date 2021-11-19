@@ -201,11 +201,11 @@ def map_wps_output_location(reference, container, reverse=False, exists=True, fi
     if reverse and reference.startswith("file://"):
         reference = reference[7:]
     if reverse and reference.startswith(wps_out_dir):
-        wps_out_ref = reference.replace(wps_out_dir, wps_out_url)
-        if not exists or os.path.isfile(wps_out_ref):
+        wps_out_ref = reference.replace(wps_out_dir, wps_out_url, 1)
+        if not exists or os.path.isfile(reference):
             return wps_out_ref
     elif not reverse and reference.startswith(wps_out_url):
-        wps_out_ref = reference.replace(wps_out_url, wps_out_dir)
+        wps_out_ref = reference.replace(wps_out_url, wps_out_dir, 1)
         if not exists or os.path.isfile(wps_out_ref):
             if file_scheme:
                 return "file://" + wps_out_ref
