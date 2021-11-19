@@ -85,7 +85,7 @@
 .. _MongoDB: https://www.mongodb.com/
 .. |mongodb-docs| replace:: MongoDB official documentation
 .. _mongodb-docs: https://docs.mongodb.com/manual
-.. |media-types| replace Media Types
+.. |media-types| replace:: Media Types
 .. _media-types: https://www.iana.org/assignments/media-types/media-types.xhtml
 
 .. Weaver Configurations
