@@ -119,3 +119,21 @@ if TYPE_CHECKING:
     # others
     DatetimeIntervalType = TypedDict("DatetimeIntervalType",
                                      {"before": datetime, "after": datetime, "match": datetime}, total=False)
+
+    # data source configuration
+    DataSourceFileRef = TypedDict("DataSourceFileRef", {
+        "ades": str,                # target ADES to dispatch
+        "netloc": str,              # definition to match file references against
+        "default": Optional[bool],  # default ADES when no match was possible (single one allowed in config)
+    }, total=True)
+    DataSourceOpenSearch = TypedDict("DataSourceOpenSearch", {
+        "ades": str,                     # target ADES to dispatch
+        "netloc": str,                   # where to send OpenSearch request
+        "collection_id": Optional[str],  # OpenSearch collection ID to match against
+        "default": Optional[bool],       # default ADES when no match was possible (single one allowed)
+        "accept_schemes": List[str],     # URL schemes (http, https, etc.)
+        "rootdir": str,                  # root position of the data to retrieve
+        "osdd_url": str,                 # global OpenSearch description document to employ
+    }, total=True)
+    DataSource = Union[DataSourceFileRef, DataSourceOpenSearch]
+    DataSourceConfig = Dict[str, DataSource]  # JSON/YAML file contents

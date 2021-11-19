@@ -93,7 +93,7 @@ class WpsPackageAppTest(WpsConfigBase):
         }
         super(WpsPackageAppTest, cls).setUpClass()
 
-    def test_cwl_label_as_process_title(self):
+    def test_deploy_cwl_label_as_process_title(self):
         title = "This process title comes from the CWL label"
         cwl = {
             "cwlVersion": "v1.0",
@@ -111,7 +111,7 @@ class WpsPackageAppTest(WpsConfigBase):
         assert desc["title"] == title
         assert pkg["label"] == title
 
-    def test_literal_io_from_package(self):
+    def test_deploy_merge_literal_io_from_package(self):
         """
         Test validates that literal I/O definitions *only* defined in the `CWL` package as `JSON` within the deployment
         body generates expected `WPS` process description I/O with corresponding formats and values.
@@ -178,7 +178,7 @@ class WpsPackageAppTest(WpsConfigBase):
             assert len(fields) == 0, \
                 "Unexpected fields found:\n  Unknown: {}\n  Expected: {}".format(list(fields), list(expect))
 
-    def test_literal_io_from_package_and_offering(self):
+    def test_deploy_merge_literal_io_from_package_and_offering(self):
         """
         Test validates that literal I/O definitions simultaneously defined in *both* (but not necessarily for each one
         and exhaustively) `CWL` and `WPS` payloads are correctly resolved. More specifically, verifies that:
@@ -304,7 +304,7 @@ class WpsPackageAppTest(WpsConfigBase):
             "Additional detail only within WPS output", \
             "Additional details defined only in WPS matching CWL I/O by ID should be preserved."
 
-    def test_complex_io_format_references(self):
+    def test_deploy_merge_complex_io_format_references(self):
         """
         Test validates that known `WPS` I/O formats (i.e.: `MIME-type`) considered as valid, but not corresponding to
         any *real* `IANA/EDAM` reference for `CWL` are preserved on the `WPS` side and dropped on `CWL` side to avoid
@@ -421,12 +421,11 @@ class WpsPackageAppTest(WpsConfigBase):
         assert desc["inputs"]["wps_only_format_both"]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
         assert desc["inputs"]["wps_only_format_both"]["formats"][1]["mediaType"] == ct_not_exists
 
-    def test_mediatype_io_format_references(self):
+    def test_deploy_merge_mediatype_io_format_references(self):
         """
         Test to validates ``mimeType`` is replaced by ``mediaType`` for all descriptions.
 
-        Also we validate
-        that processes that use ``mimeType`` or ``mediaType`` can be deployed successfully.
+        Also we validate that processes that use ``mimeType`` or ``mediaType`` can be deployed successfully.
         """
         ns_json, type_json = get_cwl_file_format(CONTENT_TYPE_APP_JSON)
         namespaces = dict(list(ns_json.items()))
@@ -518,7 +517,7 @@ class WpsPackageAppTest(WpsConfigBase):
         assert desc["outputs"]["wps_format_mimeType"]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
         assert desc["outputs"]["wps_format_mediaType"]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
 
-    def test_block_builtin_processes_from_api(self):
+    def test_deploy_block_builtin_processes_from_api(self):
         """
         Test to validates if ``builtin`` process type is explicitly blocked during deployment from API.
 
@@ -566,7 +565,7 @@ class WpsPackageAppTest(WpsConfigBase):
             process = self.process_store.fetch_by_id(self._testMethodName)
             assert process.type == PROCESS_APPLICATION
 
-    def test_block_unknown_processes(self):
+    def test_deploy_block_unknown_processes(self):
         """
         Test to validates that any process that cannot be resolved against one of known
         :py:data:`weaver.processes.constants.CWL_REQUIREMENT_APP_TYPES` is explicitly blocked.
@@ -605,7 +604,7 @@ class WpsPackageAppTest(WpsConfigBase):
                                        headers=self.json_headers, only_local=True, expect_errors=True)
             assert resp.status_code == 422
 
-    def test_complex_io_with_multiple_formats_and_defaults(self):
+    def test_deploy_merge_complex_io_with_multiple_formats_and_defaults(self):
         """
         Test validates that different format types are set on different input variations simultaneously:
 
@@ -954,7 +953,7 @@ class WpsPackageAppTest(WpsConfigBase):
         # assert pkg["outputs"][3]["items"] == "File"
         # assert "format" not in pkg["outputs"][3], "CWL format array not allowed for outputs."
 
-    def test_resolution_io_min_max_occurs(self):
+    def test_deploy_merge_resolution_io_min_max_occurs(self):
         """
         Test validates that various merging/resolution strategies of I/O definitions are properly applied for
         corresponding ``minOccurs`` and ``maxOccurs`` fields across `CWL` and `WPS` payloads. Also, fields that can help
@@ -1123,7 +1122,7 @@ class WpsPackageAppTest(WpsConfigBase):
         assert pkg["inputs"][13]["id"] == "optional_array_max_fixed_by_wps"
         # assert pkg["inputs"][13]["type"] == "string[]?"
 
-    def test_valid_io_min_max_occurs_as_str_or_int(self):
+    def test_deploy_merge_valid_io_min_max_occurs_as_str_or_int(self):
         """
         Test validates that I/O definitions with ``minOccurs`` and/or ``maxOccurs`` are permitted as both integer and
         string definitions in order to support (1, "1", "unbounded") variations.
@@ -1183,6 +1182,57 @@ class WpsPackageAppTest(WpsConfigBase):
                 assert proc_in_res == proc_in_exp, \
                     "Field '{}' of input '{}'({}) is expected to be '{}' but was '{}'" \
                     .format(field, process_input, i, proc_in_exp, proc_in_res)
+
+    def test_deploy_merge_wps_io_as_mappings(self):
+        """
+        Validate that WPS I/O submitted during deployment as mapping (OGC format) are converted to merge with CWL I/O.
+        """
+
+        cwl = {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            # use different list/map representation in CWL to check that WPS can be merged with any of them
+            "inputs": [
+                {"id": "input_num", "type": {"type": "array", "items": "float"}},
+                {"id": "input_file", "type": "File"},
+            ],
+            "outputs": {"values": {"type": "string"}, "out_file": {"type": "File"}}
+        }
+        body = {
+            "processDescription": {
+                "process": {
+                    "id": self._testMethodName,
+                    "inputs": {
+                        "input_num": {"title": "Input numbers", "maxOccurs": 20},
+                        "input_file": {"title": "Test File", "formats": [{"mediaType": CONTENT_TYPE_APP_ZIP}]},
+                    },
+                    "outputs": {
+                        "values": {"title": "Test Output", "description": "CSV raw values"},
+                        "out_file": {"title": "Result File", "formats": [{"mediaType": "text/csv"}]}
+                    }
+                }
+            },
+            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "executionUnit": [{"unit": cwl}],
+        }
+        desc, _ = self.deploy_process(body, describe_schema="OGC")
+
+        assert isinstance(desc["inputs"], dict)
+        assert len(desc["inputs"]) == len(body["processDescription"]["process"]["inputs"])
+        assert isinstance(desc["outputs"], dict)
+        assert len(desc["outputs"]) == len(body["processDescription"]["process"]["outputs"])
+
+        # following inputs metadata were correctly parsed from WPS mapping entries if defined and not using defaults
+        assert desc["inputs"]["input_num"]["title"] == "Input numbers"
+        assert desc["inputs"]["input_num"]["maxOccurs"] == 20
+        assert desc["inputs"]["input_num"]["literalDataDomains"][0]["dataType"]["name"] == "float"
+        assert desc["inputs"]["input_file"]["title"] == "Test File"
+        assert desc["inputs"]["input_file"]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_ZIP
+        assert desc["outputs"]["values"]["title"] == "Test Output"
+        assert desc["outputs"]["values"]["description"] == "CSV raw values"
+        assert desc["outputs"]["values"]["literalDataDomains"][0]["dataType"]["name"] == "string"
+        assert desc["outputs"]["out_file"]["title"] == "Result File"
+        assert desc["outputs"]["out_file"]["formats"][0]["mediaType"] == "text/csv"
 
     def test_execute_job_with_accept_languages(self):
         """
@@ -1723,7 +1773,7 @@ class WpsPackageAppTest(WpsConfigBase):
             assert resp.status_code == 410
             assert mock_del.control.revoke.call_count == 1  # not called again
 
-    def test_invalid_io_min_max_occurs_wrong_format(self):
+    def test_deploy_invalid_io_min_max_occurs_wrong_format(self):
         """
         Test verifies that ``minOccurs`` and/or ``maxOccurs`` definitions other than allowed formats are raised as
         invalid schemas.
@@ -1766,7 +1816,7 @@ class WpsPackageAppTest(WpsConfigBase):
         assert "DeployMinMaxOccurs" in resp.json["cause"]
         assert "Invalid" in resp.json["error"]
 
-    def test_complex_io_from_package(self):
+    def test_deploy_merge_complex_io_from_package(self):
         """
         Test validates that complex I/O definitions *only* defined in the `CWL` package as `JSON` within the deployment
         body generates expected `WPS` process description I/O with corresponding formats and values.
@@ -1829,7 +1879,7 @@ class WpsPackageAppTest(WpsConfigBase):
         assert len(fields) == 0, \
             "Unexpected fields found:\n  Unknown: {}\n  Expected: {}".format(list(fields), list(expect))
 
-    def test_complex_io_from_package_and_offering(self):
+    def test_deploy_merge_complex_io_from_package_and_offering(self):
         """
         Test validates that complex I/O definitions simultaneously defined in *both* (but not necessarily for each one
         and exhaustively) `CWL` and `WPS` payloads are correctly resolved. More specifically, verifies that:
@@ -1961,7 +2011,7 @@ class WpsPackageAppTest(WpsConfigBase):
         assert "format" not in pkg["outputs"][1], "Omitted formats in CWL and WPS I/O definitions during deployment" \
                                                   "should not add them to the generated CWL package definition"
 
-    def test_literal_and_complex_io_from_wps_xml_reference(self):
+    def test_deploy_literal_and_complex_io_from_wps_xml_reference(self):
         body = {
             "processDescription": {"process": {"id": self._testMethodName}},
             "executionUnit": [{"href": "mock://{}".format(resources.WPS_LITERAL_COMPLEX_IO_XML)}],
@@ -2048,7 +2098,7 @@ class WpsPackageAppTest(WpsConfigBase):
         assert proc["outputs"][1]["formats"][0]["default"] is True
         assert proc["outputs"][1]["formats"][0]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
 
-    def test_enum_array_and_multi_format_inputs_from_wps_xml_reference(self):
+    def test_deploy_enum_array_and_multi_format_inputs_from_wps_xml_reference(self):
         body = {
             "processDescription": {"process": {"id": self._testMethodName}},
             "executionUnit": [{"href": "mock://{}".format(resources.WPS_ENUM_ARRAY_IO_XML)}],
@@ -2164,7 +2214,7 @@ class WpsPackageAppTest(WpsConfigBase):
     #   multi-output (with same ID) would be an indirect 1-output with ref to multi (Metalink file)
     #   (https://github.com/crim-ca/weaver/issues/25)
     @pytest.mark.skip(reason="not implemented")
-    def test_multi_outputs_file_from_wps_xml_reference(self):
+    def test_deploy_multi_outputs_file_from_wps_xml_reference(self):
         raise NotImplementedError
 
 

@@ -36,6 +36,9 @@ Fixes:
   during ``Workflow`` execution (resolves `#358 <https://github.com/crim-ca/weaver/issues/358>`_).
 - Fix logic of remotely and locally executed applications based on `CWL` requirements when attempting to resolve
   whether an input file reference should be fetched.
+- Fix resolution of `WPS` I/O provided as mapping instead of listing during deployment in order to properly parse
+  them and merge their metadata with corresponding `CWL` I/O definitions.
+- Fix `DataSource` and `OpenSearch` typing definitions to more rapidly detect incorrect data structures during parsing.
 
 `4.3.0 <https://github.com/crim-ca/weaver/tree/4.3.0>`_ (2021-11-16)
 ========================================================================

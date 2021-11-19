@@ -18,12 +18,12 @@ from pywps.app import WPSRequest
 
 from weaver.datatype import Process
 from weaver.exceptions import PackageExecutionError
-from weaver.processes.wps_package import WpsPackage, _check_package_file, _get_package_ordered_io  # noqa: W0212
+from weaver.processes.wps_package import WpsPackage, _check_package_file, _normalize_ordered_io  # noqa: W0212
 
 # pylint: disable=R1729  # ignore non-generator representation employed for displaying test log results
 
 
-def test_get_package_ordered_io_with_builtin_dict_and_hints():
+def test_normalize_ordered_io_with_builtin_dict_and_hints():
     """
     Validate that I/O are all still there in the results with their respective contents.
 
@@ -59,7 +59,7 @@ def test_get_package_ordered_io_with_builtin_dict_and_hints():
         {"id": "id-array-type", "type": {"type": "array", "items": "float"}},
         {"id": "id-literal-array", "type": "string[]"}
     ]
-    result = _get_package_ordered_io(test_inputs, test_wps_hints)
+    result = _normalize_ordered_io(test_inputs, test_wps_hints)
     assert isinstance(result, list) and len(result) == len(expected_result)
     # *maybe* not same order, so validate values accordingly
     for expect in expected_result:
@@ -72,7 +72,7 @@ def test_get_package_ordered_io_with_builtin_dict_and_hints():
             raise AssertionError("expected '{}' was not validated against any result value".format(expect["id"]))
 
 
-def test_get_package_ordered_io_with_ordered_dict():
+def test_normalize_ordered_io_with_ordered_dict():
     test_inputs = OrderedDict([
         ("id-literal-type", "float"),
         ("id-dict-details", {"type": "string"}),
@@ -90,12 +90,12 @@ def test_get_package_ordered_io_with_ordered_dict():
         {"id": "id-array-type", "type": {"type": "array", "items": "float"}},
         {"id": "id-literal-array", "type": "string[]"}
     ]
-    result = _get_package_ordered_io(test_inputs)
+    result = _normalize_ordered_io(test_inputs)
     assert isinstance(result, list) and len(result) == len(expected_result)
     assert result == expected_result
 
 
-def test_get_package_ordered_io_with_list():
+def test_normalize_ordered_io_with_list():
     """
     Everything should remain the same as list variant is only allowed to have I/O objects.
 
@@ -107,7 +107,7 @@ def test_get_package_ordered_io_with_list():
         {"id": "id-array-type", "type": {"type": "array", "items": "float"}},
         {"id": "id-literal-array", "type": "string[]"}
     ]
-    result = _get_package_ordered_io(deepcopy(expected_result))
+    result = _normalize_ordered_io(deepcopy(expected_result))
     assert isinstance(result, list) and len(result) == len(expected_result)
     assert result == expected_result
 
@@ -153,12 +153,12 @@ def test_check_package_file_with_windows_path():
     assert is_url is False
 
 
-def test_get_package_ordered_io_when_direct_type_string():
+def test_normalize_ordered_io_when_direct_type_string():
     inputs_as_strings = {
         "input-1": "File[]",
         "input-2": "float"
     }
-    result = _get_package_ordered_io(inputs_as_strings)
+    result = _normalize_ordered_io(inputs_as_strings)
     assert isinstance(result, list)
     assert len(result) == len(inputs_as_strings)
     assert all([isinstance(res_i, dict) for res_i in result])
