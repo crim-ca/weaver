@@ -12,7 +12,6 @@ import json
 import logging
 import os
 import tempfile
-import uuid
 from copy import deepcopy
 from inspect import cleandoc
 from typing import TYPE_CHECKING
@@ -1656,7 +1655,7 @@ class WpsPackageAppTest(WpsConfigBase):
             assert tmp_name_target in out_data and tmp_name_random not in out_data, (
                 "Expected input file fetched and staged with Content-Disposition preferred filename "
                 "to be printed into the output log file. Expected name was not found.\n"
-                f"Expected: [{tmp_name_target}]\n" 
+                f"Expected: [{tmp_name_target}]\n"
                 f"Original: [{tmp_name_random}]"
             )
 
