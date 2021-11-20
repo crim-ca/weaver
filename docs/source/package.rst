@@ -157,15 +157,28 @@ the :term:`Process` deployment. More specifically, the following definition can 
     POST /processes HTTP/1.1
     Host: weaver.example.com
     Content-Type: application/json;charset=UTF-8
-    X-Auth-Docker: Bearer <access_token>
+    X-Auth-Docker: Basic <base64_token>
 
     { "processDescription": { }, "executionUnit": { } }
 
 
-The ``X-Auth-Docker`` header should be defined exactly like a typical ``Authorization`` header specified by :rfc:`6750`.
+The ``X-Auth-Docker`` header should be defined exactly like any typical ``Authorization`` headers (|auth-schemes|_).
 The name ``X-Auth-Docker`` is inspired from existing implementations that employ ``X-Auth-Token`` in a similar fashion.
 The reason why ``Authorization`` and ``X-Auth-Token`` headers are not themselves employed in this case is to ensure
 that they do not interfere with any proxy or server authentication mechanism, which `Weaver` could be located behind.
+
+For the moment, only ``Basic`` (:rfc:`7617`) authentication is supported.
+To generate the base64 token, following methods can be used:
+
+.. code-block:: shell
+
+    echo -n "<username>:<password>" | base64
+
+.. code-block:: python
+
+    import base64
+    base64.b64encode(b"<username>:<password>")
+
 
 When the HTTP ``X-Auth-Docker`` header is detected in combination of a |cwl-docker-req|_ entry within
 the :term:`Application Package` of the :term:`Process` being deployed, `Weaver` will parse the targeted :term:`Docker`

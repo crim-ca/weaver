@@ -26,6 +26,7 @@ from urllib.parse import urlparse
 
 import cwltool
 import cwltool.docker
+import docker
 import yaml
 from cwltool.context import LoadingContext, RuntimeContext
 from cwltool.factory import Factory as CWLFactory, WorkflowStatus as CWLException
@@ -42,6 +43,7 @@ from weaver.config import WEAVER_CONFIGURATION_HYBRID, WEAVER_CONFIGURATIONS_REM
 from weaver.database import get_db
 from weaver.datatype import DockerAuthentication
 from weaver.exceptions import (
+    PackageAuthenticationError,
     PackageException,
     PackageExecutionError,
     PackageNotFound,
@@ -85,7 +87,7 @@ from weaver.status import (
     STATUS_SUCCEEDED,
     map_status
 )
-from weaver.store.base import StoreJobs
+from weaver.store.base import StoreJobs, StoreProcesses
 from weaver.utils import (
     SUPPORTED_FILE_SCHEMES,
     fetch_file,
@@ -160,6 +162,7 @@ PACKAGE_PROGRESS_LOADING = 5
 PACKAGE_PROGRESS_GET_INPUT = 6
 PACKAGE_PROGRESS_ADD_EO_IMAGES = 7
 PACKAGE_PROGRESS_CONVERT_INPUT = 8
+PACKAGE_PROGRESS_PREPARATION = 9
 PACKAGE_PROGRESS_CWL_RUN = 10
 PACKAGE_PROGRESS_CWL_DONE = 95
 PACKAGE_PROGRESS_PREP_OUT = 98
@@ -667,14 +670,23 @@ def get_auth_requirements(requirement, headers):
             auth_details = x_auth_docker.split(" ")
             # note: never provide any parts in errors in case of incorrect parsing, first could be token by mistake
             if not len(auth_details) == 2:
-                raise ValueError("Invalid authentication header provided without an authentication scheme "
-                                 "(see also: https://www.iana.org/assignments/http-authschemes/http-authschemes.xhtml)")
-            # FIXME: Only support direct auth bearer token for now. Implement others if needed.
+                raise ValueError(
+                    "Invalid authentication header provided without an authentication scheme or content "
+                    "(see also: https://www.iana.org/assignments/http-authschemes/http-authschemes.xhtml)."
+                )
             auth_scheme, auth_token = auth_details[0].strip().lower(), auth_details[1].strip().lower()
-            if auth_scheme != "bearer":
-                raise ValueError("Invalid authentication header scheme is not supported. "
-                                 "Supported scheme are: [Bearer (https://www.rfc-editor.org/rfc/rfc6750.html)].")
-            auth = DockerAuthentication(auth_token, link_ref_docker)
+            auth_supported = {
+                "Basic": "https://datatracker.ietf.org/doc/html/rfc7617",
+                # "Bearer": "https://datatracker.ietf.org/doc/html/rfc6750"  # FIXME: Docker client not supporting it
+            }
+            if auth_scheme not in auth_supported:
+                if auth_scheme.capitalize() not in auth_supported:
+                    raise ValueError(
+                        "Invalid authentication header scheme is not supported. Supported schemes are: {}.".format(
+                            ", ".join([f"{scheme} ({rfc_spec})" for scheme, rfc_spec in auth_supported.items()]))
+                    )
+                auth_scheme = auth_scheme.capitalize()
+            auth = DockerAuthentication(auth_scheme, auth_token, link_ref_docker)
             LOGGER.debug("Authentication details for Docker image reference in Application Package correctly parsed.")
             return auth
 
@@ -947,6 +959,52 @@ class WpsPackage(Process):
                                    message="Error occurred when retrieving internal application log.")
         return captured_log
 
+    def setup_docker_image(self):
+        # type: () -> Optional[bool]
+        """
+        Pre-pull the :term:`Docker` image locally for running the process if authentication is required to get it.
+
+        :returns: success status if operation was successful, or ``None`` when it does not apply.
+        """
+        # check multiple conditions where Docker authentication never applies
+        if self.remote_execution:
+            self.logger.debug("Skipping Docker setup not needed for remote execution.")
+            return None
+        if self.package_type != PROCESS_APPLICATION:
+            self.logger.debug("Skipping Docker setup not needed for CWL Workflow. "
+                              "Sub-step must take care of it if needed.")
+            return None
+        if self.package_requirement != CWL_REQUIREMENT_APP_DOCKER:
+            self.logger.debug("Skipping Docker setup not needed for CWL application without Docker requirement.")
+            return None
+        if self.job.service:
+            self.logger.debug("Skipping Docker setup not needed for remote WPS provider process.")
+            return None
+
+        store = get_db(self.settings).get_store(StoreProcesses)
+        process = store.fetch_by_id(self.job.process)
+        if not isinstance(process.auth, DockerAuthentication):
+            self.logger.debug("Skipping Docker setup not needed for public repository access.")
+            return None
+
+        image = None
+        try:
+            client = docker.from_env()  # same as CLI
+            # following login does not store in '~/.docker/config.json' by design, but can use it if available
+            body = client.login(process.auth.credentials)
+            if body.get("Status") != "Login Succeeded":
+                self.logger.debug("Failed authentication to Docker private registry.")
+                return False
+            # docker client pulls all available images when no tag, provide the default to limit
+            tag = process.auth.tag or "latest"
+            image = client.images.pull(process.auth.repository, tag)
+        except Exception:  # noqa: W0703 # nosec: B110  # do not let anything up to avoid leaking auths
+            pass
+        if not image or process.auth.docker not in image.tags:
+            self.logger.debug("Failed authorization or could not retrieve Docker image from private registry.")
+            return False
+        return True
+
     def update_requirements(self):
         """
         Inplace modification of :attr:`package` to adjust invalid items that would break behaviour we must enforce.
@@ -1113,9 +1171,11 @@ class WpsPackage(Process):
         self.package_id = self.request.identifier
 
         try:
+            # prepare some metadata about the package that are often reused
+            self.package_type = _get_package_type(self.package)
+            self.package_requirement = get_application_requirement(self.package)
             try:
                 # workflows do not support stdout/stderr
-                self.package_type = _get_package_type(self.package)
                 log_stdout_stderr = self.package_type != PROCESS_WORKFLOW
                 self.setup_loggers(log_stdout_stderr)
                 self.update_status("Preparing package logs done.", PACKAGE_PROGRESS_PREP_LOG, STATUS_RUNNING)
@@ -1219,6 +1279,13 @@ class WpsPackage(Process):
                 raise self.exception_message(type(exc), None, str(exc))  # re-raise as is, but with extra log entry
             except Exception as exc:
                 raise self.exception_message(PackageExecutionError, exc, "Failed to load package inputs.")
+
+            try:
+                self.update_status("Checking package prerequisites...", PACKAGE_PROGRESS_PREPARATION, STATUS_RUNNING)
+                if not self.setup_docker_image():  # can take a while if applicable and must pull depending on size
+                    raise PackageAuthenticationError
+            except Exception:  # noqa: W0703 # nosec: B110  # don't pass exception to below message
+                raise self.exception_message(PackageAuthenticationError, None, "Failed Docker image preparation.")
 
             try:
                 self.update_status("Running package...", PACKAGE_PROGRESS_CWL_RUN, STATUS_RUNNING)

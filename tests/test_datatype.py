@@ -101,7 +101,7 @@ def test_auth_docker_image_registry_format():
     token = str(uuid.uuid4())
     for docker_input, docker_ref, docker_registry, docker_image in valid_references:
         try:
-            auth = DockerAuthentication(token, docker_input)
+            auth = DockerAuthentication("Basic", token, docker_input)
             assert auth.token == token, f"Testing: [{docker_input}]"
             assert auth.registry == docker_registry, f"Testing: [{docker_input}]"
             assert auth.image == docker_image, f"Testing: [{docker_input}]"
@@ -111,7 +111,7 @@ def test_auth_docker_image_registry_format():
             pytest.fail(f"Unexpected failure when [{docker_input}] was expected to be valid: [{exc}]")
     for docker_input in invalid_references:
         try:
-            DockerAuthentication(token, docker_input)
+            DockerAuthentication("Basic", token, docker_input)
         except (TypeError, ValueError):
             pass
         else:
@@ -140,7 +140,7 @@ def test_auth_docker_image_from_parent_params():
     assert auth.registry == registry
 
     # not extra fields remaining
-    auth_docker = DockerAuthentication(token, link)
+    auth_docker = DockerAuthentication("Basic", token, link)
     auth_docker.id = auth.id  # noqa  # randomly generated for both, must be passed down
     assert auth == auth_docker
     assert dict(auth_docker) == dict(auth_docker)

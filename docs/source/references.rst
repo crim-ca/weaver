@@ -3,6 +3,8 @@
 
 .. Util text/reference replace
 .. |ades| replace:: Application Deployment and Execution Service
+.. |auth-schemes| replace:: HTTP Authentication Schemes
+.. _auth-schemes: https://www.iana.org/assignments/http-authschemes/http-authschemes.xhtml
 .. |aws-credentials| replace:: AWS Credentials
 .. _aws-credentials: https://boto3.amazonaws.com/v1/documentation/api/latest/guide/credentials.html
 .. |aws-config| replace:: AWS Configuration

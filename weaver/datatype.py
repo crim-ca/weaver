@@ -17,6 +17,7 @@ from urllib.parse import urljoin, urlparse
 import pyramid.httpexceptions
 import requests.exceptions
 from dateutil.parser import parse as dt_parse
+from docker.auth import decode_auth
 from owslib.wps import Process as ProcessOWS, WPSException
 from pywps import Process as ProcessWPS
 
@@ -1141,10 +1142,11 @@ class Authentication(Base):
     """
     Authentication details to store details required for process operations.
     """
-    def __init__(self, auth_type, auth_token, auth_link, **kwargs):
-        # type: (Union[AuthenticationTypes, str], str, str, Any) -> None
+    def __init__(self, auth_type, auth_scheme, auth_token, auth_link, **kwargs):
+        # type: (Union[AuthenticationTypes, str], str, str, str, Any) -> None
         super(Authentication, self).__init__(**kwargs)
         # ensure values are provided and of valid format
+        self.scheme = auth_scheme
         self.type = auth_type
         self.link = auth_link
         self.token = auth_token
@@ -1192,6 +1194,18 @@ class Authentication(Base):
             raise TypeError(f"Type 'str' is required for '{type(self).__name__}.token', not '{type(token)}'.")
         self["token"] = token
 
+    @property
+    def scheme(self):
+        # type: () -> str
+        return dict.__getitem__(self, "scheme")
+
+    @scheme.setter
+    def scheme(self, scheme):
+        # type: (str) -> None
+        if not isinstance(scheme, str):
+            raise TypeError(f"Type 'str' is required for '{type(self).__name__}.scheme', not '{type(scheme)}'.")
+        self["scheme"] = scheme
+
     def json(self):
         return None  # in case it bubbles up by error, never provide it as JSON
 
@@ -1202,6 +1216,7 @@ class Authentication(Base):
             "type": self.type.value,
             "link": self.link,
             "token": self.token,
+            "scheme": self.scheme
         }
 
     @classmethod
@@ -1278,8 +1293,8 @@ class DockerAuthentication(Authentication):
     DOCKER_REGISTRY_DEFAULT_DOMAIN = "index.docker.io"
     DOCKER_REGISTRY_DEFAULT_URI = f"https://{DOCKER_REGISTRY_DEFAULT_DOMAIN}/v1/"  # DockerHub
 
-    def __init__(self, auth_token, docker_image_link, **kwargs):
-        # type: (str, str, Any) -> None
+    def __init__(self, auth_scheme, auth_token, docker_image_link, **kwargs):
+        # type: (str, str, str, Any) -> None
         matches = re.match(self.DOCKER_LINK_REGEX, docker_image_link)
         if not matches:
             raise ValueError(f"Invalid Docker image link does not conform to expected format: [{docker_image_link}]")
@@ -1307,11 +1322,23 @@ class DockerAuthentication(Authentication):
         self["image"] = image
         self["registry"] = registry
         super(DockerAuthentication, self).__init__(
-            AuthenticationTypes.DOCKER, auth_token, auth_link=docker_image_link, **kwargs
+            AuthenticationTypes.DOCKER, auth_scheme, auth_token, auth_link=docker_image_link, **kwargs
         )
 
     @property
+    def credentials(self):
+        # type: () -> JSON
+        """
+        Generates the credentials to submit the login operation based on the authentication token and scheme.
+        """
+        if self.scheme == "Basic":
+            usr, pwd = decode_auth(self.token)
+            return {"registry": self.registry, "username": usr, "password": pwd}  # nosec
+        return {}
+
+    @property
     def image(self):
+        # type: () -> str
         """
         Obtains the image portion of the reference without repository prefix.
         """
@@ -1319,6 +1346,7 @@ class DockerAuthentication(Authentication):
 
     @property
     def registry(self):
+        # type: () -> str
         """
         Obtains the registry entry that must used for ``docker login <registry>``.
         """
@@ -1326,10 +1354,30 @@ class DockerAuthentication(Authentication):
 
     @property
     def docker(self):
+        # type: () -> str
         """
         Obtains the full reference required when doing :term:`Docker` operations such as ``docker pull <reference>``.
         """
         return self.image if self.registry == self.DOCKER_REGISTRY_DEFAULT_URI else f"{self.registry}/{self.image}"
+
+    @property
+    def repository(self):
+        # type: () -> str
+        """
+        Obtains the full :term:`Docker` repository reference without any tag.
+        """
+        return self.docker.rsplit(":", 1)[0]
+
+    @property
+    def tag(self):
+        # type: () -> Optional[str]
+        """
+        Obtain the requested tag from the :term:`Docker` reference.
+        """
+        repo_tag = self.docker.rsplit(":", 1)
+        if len(repo_tag) < 2:
+            return None
+        return repo_tag[-1]
 
     def params(self):
         # type: () -> AnyParams

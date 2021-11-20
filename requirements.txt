@@ -26,6 +26,7 @@ git+https://github.com/fmigneault/cornice.ext.swagger.git@openapi-3#egg=cornice-
 #   - changes since cause error with invalid get_listing import location
 #   - https://github.com/crim-ca/weaver/issues/154
 cwltool>=2,<=3.0.20200324120055
+docker
 duration
 git+https://github.com/ESGF/esgf-compute-api.git@v2.3.7#egg=esgf-compute-api
 # gunicorn >20 breaks some config.ini loading parameters (paste)
