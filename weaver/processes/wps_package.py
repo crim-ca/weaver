@@ -1301,7 +1301,8 @@ class WpsPackage(Process):
                 self.update_status("Checking package prerequisites... "
                                    "(operation could take a while depending on requirements)",
                                    PACKAGE_PROGRESS_PREPARATION, STATUS_RUNNING)
-                if not self.setup_docker_image():  # can take a while if applicable and must pull depending on size
+                setup_status = self.setup_docker_image()
+                if setup_status not in [None, True]:
                     raise PackageAuthenticationError
                 self.update_status("Package ready for execution.", PACKAGE_PROGRESS_PREPARATION, STATUS_RUNNING)
             except Exception:  # noqa: W0703 # nosec: B110  # don't pass exception to below message
