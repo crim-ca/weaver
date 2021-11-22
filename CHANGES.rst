@@ -16,7 +16,8 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Fix parsing of inputs for `OpenSearch` parameters lookup that was assuming inputs were always provided as
+  listing definition, not considering possible mapping definition.
 
 `4.4.0 <https://github.com/crim-ca/weaver/tree/4.4.0>`_ (2021-11-19)
 ========================================================================

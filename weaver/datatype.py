@@ -1332,7 +1332,11 @@ class DockerAuthentication(Authentication):
         Generates the credentials to submit the login operation based on the authentication token and scheme.
         """
         if self.scheme == "Basic":
-            usr, pwd = decode_auth(self.token)
+            try:
+                usr, pwd = decode_auth(self.token)
+            # when token is invalid such as wrong encoding or missing ':', error is raised
+            except ValueError:
+                return {}
             return {"registry": self.registry, "username": usr, "password": pwd}  # nosec
         return {}
 

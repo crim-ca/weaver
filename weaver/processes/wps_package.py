@@ -674,7 +674,7 @@ def get_auth_requirements(requirement, headers):
                     "Invalid authentication header provided without an authentication scheme or content "
                     "(see also: https://www.iana.org/assignments/http-authschemes/http-authschemes.xhtml)."
                 )
-            auth_scheme, auth_token = auth_details[0].strip().lower(), auth_details[1].strip().lower()
+            auth_scheme, auth_token = auth_details[0].strip(), auth_details[1].strip()
             auth_supported = {
                 "Basic": "https://datatracker.ietf.org/doc/html/rfc7617",
                 # "Bearer": "https://datatracker.ietf.org/doc/html/rfc6750"  # FIXME: Docker client not supporting it
@@ -974,7 +974,7 @@ class WpsPackage(Process):
             self.logger.debug("Skipping Docker setup not needed for CWL Workflow. "
                               "Sub-step must take care of it if needed.")
             return None
-        if self.package_requirement != CWL_REQUIREMENT_APP_DOCKER:
+        if self.package_requirement["class"] != CWL_REQUIREMENT_APP_DOCKER:
             self.logger.debug("Skipping Docker setup not needed for CWL application without Docker requirement.")
             return None
         if self.job.service:
@@ -986,20 +986,35 @@ class WpsPackage(Process):
         if not isinstance(process.auth, DockerAuthentication):
             self.logger.debug("Skipping Docker setup not needed for public repository access.")
             return None
+        if self.package_requirement["dockerPull"] != process.auth.link:
+            # this is mostly to make sure references are still valid (process/package modified after deployment?)
+            # since they should originate from the same CWL 'dockerPull', something went wrong if they don't match
+            self.logger.debug("Skipping Docker setup not applicable for Application Package's Docker reference "
+                              "mismatching registered Process Authentication Docker reference.")
+            return None
 
         image = None
         try:
             client = docker.from_env()  # same as CLI
-            # following login does not store in '~/.docker/config.json' by design, but can use it if available
-            body = client.login(process.auth.credentials)
+            # following login does not update '~/.docker/config.json' by design, but can use it if available
+            # session remains active only within the client
+            # Note:
+            #   Force re-auth to ensure credentials are validated against remote registry and API Status is returned.
+            #   This way, even if the auth were pre-resolved, we make sure they are still valid.
+            #   This is important mostly because Docker images could still be present in cache, so pull doesn't occur.
+            # Warning:
+            #   Without re-auth, plain credentials resolved from auth config are returned in body instead!
+            #   With re-auth, body *could* contain an identity token depending on auth method.
+            body = client.login(reauth=True, **process.auth.credentials)
             if body.get("Status") != "Login Succeeded":
                 self.logger.debug("Failed authentication to Docker private registry.")
                 return False
             # docker client pulls all available images when no tag, provide the default to limit
             tag = process.auth.tag or "latest"
-            image = client.images.pull(process.auth.repository, tag)
-        except Exception:  # noqa: W0703 # nosec: B110  # do not let anything up to avoid leaking auths
-            pass
+            image = client.images.pull(process.auth.repository, tag)  # actual pull or resolved from cache
+        except Exception as exc:  # noqa: W0703 # nosec: B110  # do not let anything up to avoid leaking auths
+            self.logger.debug("Unhandled exception [%s] during Docker registry authentication or image retrieval.",
+                              exc.__class__.__name__, exc_info=False)  # only class name to help debug, but no contents
         if not image or process.auth.docker not in image.tags:
             self.logger.debug("Failed authorization or could not retrieve Docker image from private registry.")
             return False
