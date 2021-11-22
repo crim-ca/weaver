@@ -1,6 +1,5 @@
-import copy
-
 import contextlib
+import copy
 import json
 import unittest
 from copy import deepcopy

@@ -1,6 +1,7 @@
-import pytest
 import uuid
 from copy import deepcopy
+
+import pytest
 
 from weaver.datatype import Authentication, AuthenticationTypes, DockerAuthentication, Process
 from weaver.execute import EXECUTE_CONTROL_OPTION_ASYNC, EXECUTE_CONTROL_OPTION_SYNC
