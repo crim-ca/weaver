@@ -184,7 +184,7 @@ Where the referenced file hosted at ``"https://remote-file-server.com/my-package
       - "<...>"
     outputs:
       - "<...>"
-    "<...>": "<...">
+    "<...>": "<...>"
 
 
 .. _process-esgf-cwt:
