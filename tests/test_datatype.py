@@ -129,7 +129,8 @@ def test_auth_docker_image_from_parent_params():
     image = "crim.ca/category/group/project:1.2.3"
     link = f"{registry}/{image}"
     token = "12345"  # nosec
-    auth = Authentication.from_params(type="docker", token=token, link=link, image=image, registry=registry)
+    auth = Authentication.from_params(type="docker", scheme="Basic", token=token,
+                                      link=link, image=image, registry=registry)
     assert auth.type == AuthenticationTypes.DOCKER
     assert isinstance(auth, DockerAuthentication)
     assert auth.image == image
