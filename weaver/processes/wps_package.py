@@ -1009,6 +1009,7 @@ class WpsPackage(Process):
             if body.get("Status") != "Login Succeeded":
                 self.logger.debug("Failed authentication to Docker private registry.")
                 return False
+            self.logger.debug("Retrieving image from Docker registry or cache.")
             # docker client pulls all available images when no tag, provide the default to limit
             tag = process.auth.tag or "latest"
             image = client.images.pull(process.auth.repository, tag)  # actual pull or resolved from cache
@@ -1018,6 +1019,7 @@ class WpsPackage(Process):
         if not image or process.auth.docker not in image.tags:
             self.logger.debug("Failed authorization or could not retrieve Docker image from private registry.")
             return False
+        self.logger.debug("Docker image retrieved.")
         return True
 
     def update_requirements(self):
@@ -1296,9 +1298,12 @@ class WpsPackage(Process):
                 raise self.exception_message(PackageExecutionError, exc, "Failed to load package inputs.")
 
             try:
-                self.update_status("Checking package prerequisites...", PACKAGE_PROGRESS_PREPARATION, STATUS_RUNNING)
+                self.update_status("Checking package prerequisites... "
+                                   "(operation could take a while depending on requirements)",
+                                   PACKAGE_PROGRESS_PREPARATION, STATUS_RUNNING)
                 if not self.setup_docker_image():  # can take a while if applicable and must pull depending on size
                     raise PackageAuthenticationError
+                self.update_status("Package ready for execution.", PACKAGE_PROGRESS_PREPARATION, STATUS_RUNNING)
             except Exception:  # noqa: W0703 # nosec: B110  # don't pass exception to below message
                 raise self.exception_message(PackageAuthenticationError, None, "Failed Docker image preparation.")
 
