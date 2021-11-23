@@ -1,3 +1,4 @@
+import base64
 import contextlib
 import copy
 import json
@@ -404,15 +405,15 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         body = self.get_process_deploy_template(cwl=cwl)
         headers = copy.deepcopy(self.json_headers)
 
-        for bad_token in ["0123456789", "Bearer:0123456789", "Basic fake:0123456789"]:  # nosec
+        for bad_token in ["0123456789", "Basic:0123456789", "Bearer fake:0123456789"]:  # nosec
             headers.update({"X-Auth-Docker": bad_token})
             resp = self.app.post_json("/processes", params=body, headers=headers, expect_errors=True)
             assert resp.status_code == 422
             assert resp.content_type == CONTENT_TYPE_APP_JSON
             assert "authentication header" in resp.json["description"]
 
-        token = "0123456789"  # nosec
-        headers.update({"X-Auth-Docker": f"Bearer {token}"})  # nosec
+        token = base64.b64encode(b"fake:0123456789").decode("utf-8")  # nosec
+        headers.update({"X-Auth-Docker": f"Basic {token}"})  # nosec
         resp = self.app.post_json("/processes", params=body, headers=headers)
         assert resp.status_code == 201
         proc_id = body["processDescription"]["process"]["id"]  # noqa
