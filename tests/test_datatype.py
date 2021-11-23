@@ -116,7 +116,7 @@ def test_auth_docker_image_registry_format():
         except (TypeError, ValueError):
             pass
         else:
-            raise AssertionError(f"Testing [{docker_input}] have raised invalid format but it did not.")
+            raise AssertionError(f"Testing [{docker_input}] did not raise invalid format when expected to raise.")
 
 
 def test_auth_docker_image_from_parent_params():
