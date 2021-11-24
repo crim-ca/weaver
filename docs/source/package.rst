@@ -150,7 +150,8 @@ using :term:`CWL` capabilities in order to run it.
 
 Because :term:`Application Package` providers could desire to make use of :term:`Docker` images hosted on private
 registries, `Weaver` offers the capability to specify an authorization token through HTTP request headers during
-the :term:`Process` deployment. More specifically, the following definition can be provided during a `Deploy`_ request.
+the :term:`Process` deployment. More specifically, the following definition can be provided during a
+:ref:`Deploy` request.
 
 .. code-block:: http
 

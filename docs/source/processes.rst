@@ -147,7 +147,7 @@ In this situation, the :term:`CWL` definition is provided as is using :term:`JSO
       ]
     }
 
-.. _app_pkg_exec_unit_literal:
+.. _app_pkg_exec_unit_reference:
 
 Package as External Execution Unit Reference
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
