@@ -133,7 +133,7 @@ if TYPE_CHECKING:
         CWL_Results,
         JSON,
         Number,
-        ToolPathObjectType,
+        CWL_ToolPathObjectType,
         ValueType
     )
 
@@ -1596,7 +1596,7 @@ class WpsPackage(Process):
         self.logger.info("Resolved WPS output [%s] as file reference: [%s]", output_id, result_wps)
 
     def make_tool(self, toolpath_object, loading_context):
-        # type: (ToolPathObjectType, LoadingContext) -> ProcessCWL
+        # type: (CWL_ToolPathObjectType, LoadingContext) -> ProcessCWL
         from weaver.processes.wps_workflow import default_make_tool
         return default_make_tool(toolpath_object, loading_context, self.get_job_process_definition)
 
@@ -1638,7 +1638,7 @@ class WpsPackage(Process):
         self.update_status("Preparing to launch {type} {name}.".format(type=jobtype, name=jobname),
                            start_step_progress, STATUS_RUNNING)
 
-        def _update_status_dispatch(_provider, _message, _progress, _status):
+        def _update_status_dispatch(_message, _progress, _status, _provider):
             self.step_update_status(
                 _message, _progress, start_step_progress, end_step_progress, jobname, _provider, _status
             )

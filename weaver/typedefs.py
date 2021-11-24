@@ -5,7 +5,7 @@ if TYPE_CHECKING:
     import typing
     import uuid
     from datetime import datetime
-    from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Type, Union
+    from typing import Any, Callable, Dict, List, Literal, Optional, Protocol, Sequence, Tuple, Type, Union
     if hasattr(typing, "TypedDict"):
         from typing import TypedDict  # pylint: disable=E0611,no-name-in-module
     else:
@@ -70,16 +70,18 @@ if TYPE_CHECKING:
     CWL_ResultValue = Union[AnyValueType, List[AnyValueType]]
     CWL_ResultEntry = Union[Dict[str, CWL_ResultValue], CWL_ResultFile, List[CWL_ResultFile]]
     CWL_Results = Dict[str, CWL_ResultEntry]
-    CWL = TypedDict("CWL", {"cwlVersion": str, "class": str, "baseCommand": Optional[Union[str, List[str]]],
+    CWL_Class = Literal["CommandLineTool", "ExpressionTool", "Workflow"]
+    CWL = TypedDict("CWL", {"cwlVersion": str, "class": CWL_Class, "baseCommand": Optional[Union[str, List[str]]],
                             "parameters": Optional[List[str]], "inputs": CWL_Inputs, "outputs": CWL_Outputs,
                             "requirements": CWL_AnyRequirements, "hints": CWL_AnyRequirements,
                             "label": str, "doc": str, "s:keywords": str,
                             "$namespaces": Dict[str, str], "$schemas": Dict[str, str]}, total=False)
 
     # CWL loading
-    ExpectedOutputType = CWL_Output_Type
-    GetJobProcessDefinitionFunction = Callable[[str, Dict[str, str], Dict[str, Any]], WpsProcessInterface]
-    ToolPathObjectType = Dict[str, Any]
+    CWL_WorkflowInputs = Dict[str, AnyValueType]  # mapping of ID:value
+    CWL_ExpectedOutputs = Dict[str, AnyValueType]  # mapping of ID:value
+    CWL_ToolPathObjectType = Dict[str, Any]
+    JobProcessDefinitionCallback = Callable[[str, Dict[str, str], Dict[str, Any]], WpsProcessInterface]
 
     # CWL runtime
     CWL_RuntimeLiteral = Union[str, float, int]
@@ -126,8 +128,10 @@ if TYPE_CHECKING:
     AnyProcess = Union[Process, ProcessOWS, ProcessWPS, JSON]
     AnyProcessType = Union[Type[Process], Type[ProcessWPS]]
 
-    # update_status(provider, message, progress, status)
-    UpdateStatusPartialFunction = Callable[[str, str, int, AnyStatusType], None]
+    # update_status(message, progress, status, *args, **kwargs)
+    class UpdateStatusPartialFunction(Protocol):
+        def __call__(self, message: str, progress: Number, status: AnyStatusType, *args: Any, **kwargs: Any) -> None:
+            pass
 
     # others
     DatetimeIntervalType = TypedDict("DatetimeIntervalType",
@@ -151,3 +155,11 @@ if TYPE_CHECKING:
     }, total=True)
     DataSource = Union[DataSourceFileRef, DataSourceOpenSearch]
     DataSourceConfig = Dict[str, DataSource]  # JSON/YAML file contents
+
+    JobValueItem = TypedDict("JobValueItem",
+                             {"id": str, "href": Optional[str], "data": Optional[AnyValue]}, total=False)
+    JobExpectItem = TypedDict("JobExpectItem", {"id": str}, total=True)
+    JobInputs = List[Union[JobValueItem, Dict[str, AnyValueType]]]
+    JobOutputs = List[Union[JobExpectItem, Dict[str, AnyValueType]]]
+    JobResults = List[JobValueItem]
+    JobMonitorReference = str  # typically an URI of the remote job

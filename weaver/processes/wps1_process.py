@@ -26,11 +26,17 @@ from weaver.wps.utils import check_wps_status, get_wps_client
 if TYPE_CHECKING:
     from pywps.app import WPSRequest
 
-    from weaver.typedefs import CWL_RuntimeInputsMap, OWS_InputDataValues, ProcessOWS, UpdateStatusPartialFunction
+    from weaver.typedefs import (
+        CWL_ExpectedOutputs,
+        CWL_RuntimeInputsMap,
+        OWS_InputDataValues,
+        ProcessOWS,
+        UpdateStatusPartialFunction
+    )
 
 LOGGER = logging.getLogger(__name__)
 
-REMOTE_JOB_PROGRESS_REQ_PREP = 2
+REMOTE_JOB_PROGRESS_PREPARE = 2
 REMOTE_JOB_PROGRESS_EXECUTION = 5
 REMOTE_JOB_PROGRESS_MONITORING = 10
 REMOTE_JOB_PROGRESS_FETCH_OUT = 90
@@ -113,8 +119,10 @@ class Wps1Process(WpsProcessInterface):
         return wps_inputs
 
     def execute(self, workflow_inputs, out_dir, expected_outputs):
+        # type: (CWL_RuntimeInputsMap, str, CWL_ExpectedOutputs) -> None
+
         self.update_status("Preparing execute request for remote WPS1 provider.",
-                           REMOTE_JOB_PROGRESS_REQ_PREP, status.STATUS_RUNNING)
+                           REMOTE_JOB_PROGRESS_PREPARE, status.STATUS_RUNNING)
         LOGGER.debug("Execute process WPS request for %s", self.process)
         try:
             try:
@@ -127,6 +135,9 @@ class Wps1Process(WpsProcessInterface):
             except Exception as ex:
                 raise OWSNoApplicableCode("Failed to retrieve WPS process description. Error: [{}].".format(str(ex)))
 
+            # FIXME: above -> prepare() operation
+            # FIXME: here -> stage_job_inputs (must adapt dict/list formats accordingly)
+
             wps_inputs = self.get_input_values(process, workflow_inputs)
 
             # prepare outputs
@@ -137,6 +148,8 @@ class Wps1Process(WpsProcessInterface):
 
             self.update_status("Executing job on remote WPS1 provider.",
                                REMOTE_JOB_PROGRESS_EXECUTION, status.STATUS_RUNNING)
+
+            # FIXME: below -> execute_process() [aka execute() becomes partial impl with calls to sub-operations)
 
             mode = EXECUTE_MODE_ASYNC
             execution = wps.execute(self.process, inputs=wps_inputs, output=outputs_as_ref, mode=mode, lineage=True)
@@ -181,6 +194,8 @@ class Wps1Process(WpsProcessInterface):
                                                  execution.percentCompleted, exec_msg, execution.statusLocation))
                 raise Exception(execution.statusMessage or "Job failed.")
 
+            # FIXME: below -> stage_job_results()
+
             self.update_status("Fetching job outputs from remote WPS1 provider.",
                                REMOTE_JOB_PROGRESS_FETCH_OUT, status.STATUS_RUNNING)
 
@@ -208,6 +223,8 @@ class Wps1Process(WpsProcessInterface):
                     LOGGER.debug("Fetching result output from [%s] to cwl output destination: [%s]", result_val, dst_fn)
                     with open(dst_fn, mode="wb") as dst_fh:
                         dst_fh.write(resp.content)
+
+        # FIXME: below -> move to execute()
 
         except Exception as exc:
             exception_class = "{}.{}".format(type(exc).__module__, type(exc).__name__)
