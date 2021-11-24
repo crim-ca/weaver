@@ -124,26 +124,19 @@ if TYPE_CHECKING:
     )
     from weaver.status import AnyStatusType
     from weaver.typedefs import (
-        AnyValueType,
         AnyHeadersContainer,
+        AnyValueType,
         CWL,
+        CWL_AnyRequirements,
+        CWL_RequirementsDict,
+        CWL_RequirementsList,
+        CWL_Results,
         JSON,
         Number,
         ToolPathObjectType,
-        TypedDict,
         ValueType
     )
 
-    # note: below requirements also include 'hints'
-    CWLRequirement = TypedDict("CWLRequirement", {"class": str}, total=False)
-    DictCWLRequirements = Dict[str, Dict[str, str]]  # {'<req>': {<param>: <val>}}
-    ListCWLRequirements = List[CWLRequirement]       # [{'class': <req>, <param>: <val>}]
-    AnyCWLRequirements = Union[DictCWLRequirements, ListCWLRequirements]
-    # results from CWL execution
-    CWLResultFile = TypedDict("CWLResultFile", {"location": str}, total=False)
-    CWLResultValue = Union[AnyValueType, List[AnyValueType]]
-    CWLResultEntry = Union[Dict[str, CWLResultValue], CWLResultFile, List[CWLResultFile]]
-    CWLResults = Dict[str, CWLResultEntry]
 
 # NOTE:
 #   Only use this logger for 'utility' methods (not residing under WpsPackage).
@@ -295,7 +288,7 @@ def _get_package_type(package_dict):
 
 
 def _get_package_requirements_as_class_list(requirements):
-    # type: (AnyCWLRequirements) -> ListCWLRequirements
+    # type: (CWL_AnyRequirements) -> CWL_RequirementsList
     """
     Converts `CWL` package ``requirements`` or ``hints`` into list representation.
 
@@ -788,6 +781,7 @@ class WpsPackage(Process):
     # defined only after/while _handler is called (or sub-methods)
     package_id = None               # type: Optional[str]
     package_type = None             # type: Optional[str]
+    package_requirement = None      # type: Optional[CWL_RequirementsDict]
     package_log_hook_stderr = None  # type: Optional[str]
     package_log_hook_stdout = None  # type: Optional[str]
     percent = None                  # type: Optional[Number]
@@ -889,7 +883,7 @@ class WpsPackage(Process):
         weaver_tweens_logger.setLevel(self.log_level)
 
     def insert_package_log(self, result):
-        # type: (Union[CWLResults, CWLException]) -> List[str]
+        # type: (Union[CWL_Results, CWLException]) -> List[str]
         """
         Retrieves additional `CWL` sub-process logs captures to retrieve internal application output and/or errors.
 
@@ -1021,6 +1015,38 @@ class WpsPackage(Process):
             return False
         self.logger.debug("Docker image retrieved.")
         return True
+
+    def setup_runtime(self):
+        # type: () -> Dict[str, AnyValueType]
+        """
+        Prepares the runtime parameters for the :term:`CWL` package execution.
+
+        Parameter ``weaver.wps_workdir`` is the base-dir where sub-dir per application packages will be generated.
+        Parameter :attr:`workdir` is the actual location PyWPS reserved for this process (already with sub-dir).
+        If no ``weaver.wps_workdir`` was provided, reuse PyWps parent workdir since we got access to it.
+        Other steps handling outputs need to consider that ``CWL<->WPS`` out dirs could match because of this.
+
+        :return: resolved runtime parameters
+        """
+        wps_workdir = self.settings.get("weaver.wps_workdir", os.path.dirname(self.workdir))
+        # cwltool will add additional unique characters after prefix paths
+        cwl_workdir = os.path.join(wps_workdir, "cwltool_tmp_")
+        cwl_outdir = os.path.join(wps_workdir, "cwltool_out_")
+        runtime_params = {
+            # force explicit staging if write needed (InitialWorkDirRequirement in CWL package)
+            # protect input paths that can be re-used to avoid potential in-place modifications
+            "no_read_only": False,
+            # employ enforced user/group from provided config or auto-resolved ones from running user
+            "no_match_user": False,
+            # directories for CWL to move files around, auto cleaned up by cwltool when finished processing
+            # (paths used are according to DockerRequirement and InitialWorkDirRequirement)
+            "tmpdir_prefix": cwl_workdir,
+            "tmp_outdir_prefix": cwl_outdir,
+            # ask CWL to move tmp outdir results to the WPS process workdir (otherwise we loose them on cleanup)
+            "outdir": self.workdir,
+            "debug": self.logger.isEnabledFor(logging.DEBUG)
+        }
+        return runtime_params
 
     def update_requirements(self):
         """
@@ -1180,6 +1206,7 @@ class WpsPackage(Process):
         """
         Method called when process receives the WPS execution request.
         """
+        # pylint: disable=R1260,too-complex  # FIXME
 
         # note: only 'LOGGER' call allowed here, since 'setup_loggers' not called yet
         LOGGER.debug("HOME=%s, Current Dir=%s", os.environ.get("HOME"), os.path.abspath(os.curdir))
@@ -1233,29 +1260,7 @@ class WpsPackage(Process):
             self.update_effective_user()
             self.update_requirements()
 
-            # note:
-            #   Parameter 'weaver.wps_workdir' is the base-dir where sub-dir per application packages will be generated.
-            #   Parameter 'self.workdir' is the actual location PyWPS reserved for this process (already with sub-dir).
-            #   If no 'weaver.wps_workdir' was provided, reuse PyWps parent workdir since we got access to it.
-            #   Other steps handling outputs need to consider that CWL<->WPS out dirs could match because of this.
-            wps_workdir = self.settings.get("weaver.wps_workdir", os.path.dirname(self.workdir))
-            # cwltool will add additional unique characters after prefix paths
-            cwl_workdir = os.path.join(wps_workdir, "cwltool_tmp_")
-            cwl_outdir = os.path.join(wps_workdir, "cwltool_out_")
-            runtime_params = {
-                # force explicit staging if write needed (InitialWorkDirRequirement in CWL package)
-                # protect input paths that can be re-used to avoid potential in-place modifications
-                "no_read_only": False,
-                # employ enforced user/group from provided config or auto-resolved ones from running user
-                "no_match_user": False,
-                # directories for CWL to move files around, auto cleaned up by cwltool when finished processing
-                # (paths used are according to DockerRequirement and InitialWorkDirRequirement)
-                "tmpdir_prefix": cwl_workdir,
-                "tmp_outdir_prefix": cwl_outdir,
-                # ask CWL to move tmp outdir results to the WPS process workdir (otherwise we loose them on cleanup)
-                "outdir": self.workdir,
-                "debug": self.logger.isEnabledFor(logging.DEBUG)
-            }
+            runtime_params = self.setup_runtime()
             self.logger.debug("Using cwltool.RuntimeContext args:\n%s", json.dumps(runtime_params, indent=2))
             runtime_context = RuntimeContext(kwargs=runtime_params)
             try:
@@ -1311,7 +1316,7 @@ class WpsPackage(Process):
             try:
                 self.update_status("Running package...", PACKAGE_PROGRESS_CWL_RUN, STATUS_RUNNING)
                 self.logger.debug("Launching process package with inputs:\n%s", json.dumps(cwl_inputs, indent=2))
-                result = package_inst(**cwl_inputs)  # type: CWLResults
+                result = package_inst(**cwl_inputs)  # type: CWL_Results
                 self.update_status("Package execution done.", PACKAGE_PROGRESS_CWL_DONE, STATUS_RUNNING)
             except Exception as exc:
                 if isinstance(exc, CWLException):
@@ -1497,7 +1502,7 @@ class WpsPackage(Process):
         return location
 
     def make_outputs(self, cwl_result):
-        # type: (CWLResults) -> None
+        # type: (CWL_Results) -> None
         """
         Maps `CWL` result outputs to corresponding `WPS` outputs.
         """
@@ -1530,7 +1535,7 @@ class WpsPackage(Process):
             self.logger.info("Resolved WPS output [%s] as literal data", output_id)
 
     def make_location_output(self, cwl_result, output_id):
-        # type: (CWLResults, str) -> None
+        # type: (CWL_Results, str) -> None
         """
         Rewrite the `WPS` output with required location using result path from `CWL` execution.
 

@@ -132,8 +132,10 @@ def test_auth_docker_image_from_parent_params():
     token = "12345"  # nosec
     auth = Authentication.from_params(type="docker", scheme="Basic", token=token,
                                       link=link, image=image, registry=registry)
-    assert auth.type == AuthenticationTypes.DOCKER
+
+    # pylint: disable=E1101,no-member  # that's what we want to test!
     assert isinstance(auth, DockerAuthentication)
+    assert auth.type == AuthenticationTypes.DOCKER
     assert auth.image == image
     assert auth.link == link
 

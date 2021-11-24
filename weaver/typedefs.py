@@ -59,9 +59,19 @@ if TYPE_CHECKING:
                                 {"id": str, "type": CWL_IO_DataType, "outputBinding": Optional[GlobType]}, total=False)
     CWL_Inputs = Union[List[CWL_Input_Type], Dict[str, CWL_Input_Type]]
     CWL_Outputs = Union[List[CWL_Output_Type], Dict[str, CWL_Output_Type]]
+    CWL_Requirement = TypedDict("CWL_Requirement", {"class": str}, total=False)  # includes 'hints'
+    CWL_RequirementsDict = Dict[str, Dict[str, str]]  # {'<req>': {<param>: <val>}}
+    CWL_RequirementsList = List[CWL_Requirement]       # [{'class': <req>, <param>: <val>}]
+    CWL_AnyRequirements = Union[CWL_RequirementsDict, CWL_RequirementsList]
+    # results from CWL execution
+    CWL_ResultFile = TypedDict("CWL_ResultFile", {"location": str}, total=False)
+    CWL_ResultValue = Union[AnyValueType, List[AnyValueType]]
+    CWL_ResultEntry = Union[Dict[str, CWL_ResultValue], CWL_ResultFile, List[CWL_ResultFile]]
+    CWL_Results = Dict[str, CWL_ResultEntry]
     CWL = TypedDict("CWL", {"cwlVersion": str, "class": str, "baseCommand": Optional[Union[str, List[str]]],
                             "parameters": Optional[List[str]], "inputs": CWL_Inputs, "outputs": CWL_Outputs,
-                            "requirements": JSON, "hints": JSON, "label": str, "doc": str, "s:keywords": str,
+                            "requirements": CWL_AnyRequirements, "hints": CWL_AnyRequirements,
+                            "label": str, "doc": str, "s:keywords": str,
                             "$namespaces": Dict[str, str], "$schemas": Dict[str, str]}, total=False)
 
     # CWL loading
