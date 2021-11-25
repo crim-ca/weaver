@@ -440,7 +440,7 @@ coverage: test-coverage  ## alias to run test with coverage analysis
 ## -- [variants '<target>-only' without '-only' suffix are also available with pre-install setup]
 
 # autogen check variants with pre-install of dependencies using the '-only' target references
-CHECKS := pep8 lint security doc8 docf docstring links imports
+CHECKS := pep8 lint security security-code security-deps doc8 docf docstring links imports
 CHECKS := $(addprefix check-, $(CHECKS))
 
 # items that should not install python dev packages should be added here instead
@@ -484,12 +484,30 @@ check-lint-only: mkdir-reports  	## check linting of code style
 		1> >(tee "$(REPORTS_DIR)/check-lint.txt")'
 
 .PHONY: check-security-only
-check-security-only: mkdir-reports	## check for security code issues
+check-security-only: check-security-code-only check-security-deps-only  ## run security checks
+
+# ignored codes:
+#	42194: https://github.com/kvesteri/sqlalchemy-utils/issues/166  # not fixed since 2015
+.PHONY: check-security-deps-only
+check-security-deps-only: mkdir-reports  ## run security checks on package dependencies
+	@echo "Running security checks of dependencies..."
+	@-rm -fr "$(REPORTS_DIR)/check-security-deps.txt"
+	@bash -c '$(CONDA_CMD) \
+		safety check \
+			-r "$(APP_ROOT)/requirements.txt" \
+			-r "$(APP_ROOT)/requirements-dev.txt" \
+			-r "$(APP_ROOT)/requirements-doc.txt" \
+			-r "$(APP_ROOT)/requirements-sys.txt" \
+			-i 42194 \
+		1> >(tee "$(REPORTS_DIR)/check-security-deps.txt")'
+
+.PHONY: check-security-code-only
+check-security-code-only: mkdir-reports  ## run security checks on source code
 	@echo "Running security code checks..."
-	@-rm -fr "$(REPORTS_DIR)/check-security.txt"
+	@-rm -fr "$(REPORTS_DIR)/check-security-code.txt"
 	@bash -c '$(CONDA_CMD) \
 		bandit -v --ini "$(APP_ROOT)/setup.cfg" -r \
-		1> >(tee "$(REPORTS_DIR)/check-security.txt")'
+		1> >(tee "$(REPORTS_DIR)/check-security-code.txt")'
 
 .PHONY: check-doc8-only
 check-doc8-only: mkdir-reports	  ## check documentation RST styles and linting

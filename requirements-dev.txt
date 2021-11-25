@@ -20,6 +20,7 @@ pydocstyle
 pylint>=2.7,<2.8
 pylint_quotes
 responses==0.12.0
+safety
 stopit
 # typing extension required for TypedDict
 typing_extensions; python_version < "3.8"
