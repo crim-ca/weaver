@@ -10,6 +10,17 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+`4.5.0 <https://github.com/crim-ca/weaver/tree/4.5.0>`_ (2021-11-25)
+========================================================================
+
+Changes:
+--------
 - Add support of ``X-Auth-Docker`` request header that can be specified during `Process` deployment as
   authentication token that `Weaver` can use to obtain access and retrieve the `Docker` image referenced
   by the `Application Package` (`CWL`) located on a private registry.
