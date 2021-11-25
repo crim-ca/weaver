@@ -499,7 +499,12 @@ class EOImageDescribeProcessHandler(object):
 
 
 def get_eo_images_inputs_from_payload(payload):
+    # type: (JSON) -> List[JSON]
+    """
+    Extracts only inputs that correspond to an :term:`EOImage` based on provided ``additionalParameters``.
+    """
     inputs = payload.get("processDescription", {}).get("process", {}).get("inputs", {})
+    inputs = normalize_ordered_io(inputs)
     return list(filter(EOImageDescribeProcessHandler.is_eoimage_input, inputs))
 
 

@@ -226,6 +226,15 @@ class PackageRegistrationError(HTTPInternalServerError, OWSNoApplicableCode, Pac
     """
 
 
+class PackageAuthenticationError(HTTPForbidden, OWSAccessForbidden, PackageException):
+    """
+    Error related to a runtime failure caused by failing authentication prerequisite.
+
+    Error indicating that an instance of :class:`weaver.processes.wps_package.WpsPackage` could
+    not properly prepare the package because an authentication requirement could not be fulfilled.
+    """
+
+
 class PackageExecutionError(HTTPInternalServerError, OWSNoApplicableCode, PackageException):
     """
     Error related to a runtime issue during package execution.

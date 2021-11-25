@@ -1,5 +1,5 @@
-.. _running:
 .. include:: references.rst
+.. _running:
 
 ****************
 Running Weaver

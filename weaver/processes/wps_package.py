@@ -26,6 +26,7 @@ from urllib.parse import urlparse
 
 import cwltool
 import cwltool.docker
+import docker
 import yaml
 from cwltool.context import LoadingContext, RuntimeContext
 from cwltool.factory import Factory as CWLFactory, WorkflowStatus as CWLException
@@ -40,7 +41,9 @@ from yaml.scanner import ScannerError
 
 from weaver.config import WEAVER_CONFIGURATION_HYBRID, WEAVER_CONFIGURATIONS_REMOTE, get_weaver_configuration
 from weaver.database import get_db
+from weaver.datatype import DockerAuthentication
 from weaver.exceptions import (
+    PackageAuthenticationError,
     PackageException,
     PackageExecutionError,
     PackageNotFound,
@@ -57,6 +60,7 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_REMOTE,
     CWL_REQUIREMENT_APP_TYPES,
     CWL_REQUIREMENT_APP_WPS1,
+    CWL_REQUIREMENT_ENV_VAR,
     CWL_REQUIREMENT_INIT_WORKDIR,
     WPS_INPUT,
     WPS_OUTPUT
@@ -83,7 +87,7 @@ from weaver.status import (
     STATUS_SUCCEEDED,
     map_status
 )
-from weaver.store.base import StoreJobs
+from weaver.store.base import StoreJobs, StoreProcesses
 from weaver.utils import (
     SUPPORTED_FILE_SCHEMES,
     fetch_file,
@@ -109,7 +113,7 @@ if TYPE_CHECKING:
     from pywps.app import WPSRequest
     from pywps.response.execute import ExecuteResponse
 
-    from weaver.datatype import Job
+    from weaver.datatype import Authentication, Job
     from weaver.processes.convert import (
         ANY_IO_Type,
         CWL_Input_Type,
@@ -119,18 +123,20 @@ if TYPE_CHECKING:
         WPS_Output_Type
     )
     from weaver.status import AnyStatusType
-    from weaver.typedefs import AnyValueType, CWL, JSON, Number, ToolPathObjectType, TypedDict, ValueType
+    from weaver.typedefs import (
+        AnyHeadersContainer,
+        AnyValueType,
+        CWL,
+        CWL_AnyRequirements,
+        CWL_RequirementsDict,
+        CWL_RequirementsList,
+        CWL_Results,
+        JSON,
+        Number,
+        ToolPathObjectType,
+        ValueType
+    )
 
-    # note: below requirements also include 'hints'
-    CWLRequirement = TypedDict("CWLRequirement", {"class": str}, total=False)
-    DictCWLRequirements = Dict[str, Dict[str, str]]  # {'<req>': {<param>: <val>}}
-    ListCWLRequirements = List[CWLRequirement]       # [{'class': <req>, <param>: <val>}]
-    AnyCWLRequirements = Union[DictCWLRequirements, ListCWLRequirements]
-    # results from CWL execution
-    CWLResultFile = TypedDict("CWLResultFile", {"location": str}, total=False)
-    CWLResultValue = Union[AnyValueType, List[AnyValueType]]
-    CWLResultEntry = Union[Dict[str, CWLResultValue], CWLResultFile, List[CWLResultFile]]
-    CWLResults = Dict[str, CWLResultEntry]
 
 # NOTE:
 #   Only use this logger for 'utility' methods (not residing under WpsPackage).
@@ -149,6 +155,7 @@ PACKAGE_PROGRESS_LOADING = 5
 PACKAGE_PROGRESS_GET_INPUT = 6
 PACKAGE_PROGRESS_ADD_EO_IMAGES = 7
 PACKAGE_PROGRESS_CONVERT_INPUT = 8
+PACKAGE_PROGRESS_PREPARATION = 9
 PACKAGE_PROGRESS_CWL_RUN = 10
 PACKAGE_PROGRESS_CWL_DONE = 95
 PACKAGE_PROGRESS_PREP_OUT = 98
@@ -281,7 +288,7 @@ def _get_package_type(package_dict):
 
 
 def _get_package_requirements_as_class_list(requirements):
-    # type: (AnyCWLRequirements) -> ListCWLRequirements
+    # type: (CWL_AnyRequirements) -> CWL_RequirementsList
     """
     Converts `CWL` package ``requirements`` or ``hints`` into list representation.
 
@@ -634,8 +641,54 @@ def check_package_instance_compatible(package):
     return None
 
 
-def get_process_definition(process_offering, reference=None, package=None, data_source=None):
-    # type: (JSON, Optional[str], Optional[CWL], Optional[str]) -> JSON
+def get_auth_requirements(requirement, headers):
+    # type: (JSON, Optional[AnyHeadersContainer]) -> Optional[Authentication]
+    """
+    Extract any authentication related definitions provided in request headers corresponding to the application type.
+
+    :param requirement: :term:`Application Package` requirement as defined by :term:`CWL` requirements.
+    :param headers: Requests headers received during deployment.
+    :return: Matched authentication details when applicable, otherwise None.
+    :raises TypeError: When the authentication object cannot be created due to invalid or missing inputs.
+    :raises ValueError: When the authentication object cannot be created due to incorrectly formed inputs.
+    """
+    if not headers:
+        LOGGER.debug("No headers provided, cannot extract any authentication requirements.")
+        return None
+    if requirement["class"] == CWL_REQUIREMENT_APP_DOCKER:
+        x_auth_docker = get_header("X-Auth-Docker", headers)
+        link_ref_docker = requirement.get("dockerPull", None)
+        if x_auth_docker and link_ref_docker:
+            LOGGER.info("Detected authentication details for Docker image reference in Application Package.")
+            auth_details = x_auth_docker.split(" ")
+            # note: never provide any parts in errors in case of incorrect parsing, first could be token by mistake
+            if not len(auth_details) == 2:
+                raise ValueError(
+                    "Invalid authentication header provided without an authentication scheme or content "
+                    "(see also: https://www.iana.org/assignments/http-authschemes/http-authschemes.xhtml)."
+                )
+            auth_scheme, auth_token = auth_details[0].strip(), auth_details[1].strip()
+            auth_supported = {
+                "Basic": "https://datatracker.ietf.org/doc/html/rfc7617",
+                # "Bearer": "https://datatracker.ietf.org/doc/html/rfc6750"  # FIXME: Docker client not supporting it
+            }
+            if auth_scheme not in auth_supported:
+                if auth_scheme.capitalize() not in auth_supported:
+                    raise ValueError(
+                        "Invalid authentication header scheme is not supported. Supported schemes are: {}.".format(
+                            ", ".join([f"{scheme} ({rfc_spec})" for scheme, rfc_spec in auth_supported.items()]))
+                    )
+                auth_scheme = auth_scheme.capitalize()
+            auth = DockerAuthentication(auth_scheme, auth_token, link_ref_docker)
+            LOGGER.debug("Authentication details for Docker image reference in Application Package correctly parsed.")
+            return auth
+
+    LOGGER.debug("No associated authentication details for application requirement: %s", requirement["class"])
+    return None
+
+
+def get_process_definition(process_offering, reference=None, package=None, data_source=None, headers=None):
+    # type: (JSON, Optional[str], Optional[CWL], Optional[str], Optional[AnyHeadersContainer]) -> JSON
     """
     Resolve the process definition considering corresponding metadata from the offering, package and references.
 
@@ -647,7 +700,8 @@ def get_process_definition(process_offering, reference=None, package=None, data_
     :param reference: URL to `CWL` package definition, `WPS-1 DescribeProcess` endpoint or `WPS-3 Process` endpoint.
     :param package: literal `CWL` package definition (`YAML` or `JSON` format).
     :param data_source: where to resolve process IDs (default: localhost if ``None``).
-    :return: updated process definition with resolved/merged information from ``package``/``reference``.
+    :param headers: Request headers provided during deployment to retrieve details such as authentication tokens.
+    :return: Updated process definition with resolved/merged information from ``package``/``reference``.
     """
 
     def try_or_raise_package_error(call, reason):
@@ -696,7 +750,14 @@ def get_process_definition(process_offering, reference=None, package=None, data_
         lambda: _merge_package_inputs_outputs(process_inputs, package_inputs, process_outputs, package_outputs),
         reason="Merging of inputs/outputs")
 
-    try_or_raise_package_error(lambda: get_application_requirement(package), reason="Validate requirements and hints")
+    app_requirement = try_or_raise_package_error(
+        lambda: get_application_requirement(package),
+        reason="Validate requirements and hints")
+
+    auth_requirements = try_or_raise_package_error(
+        lambda: get_auth_requirements(app_requirement, headers),
+        reason="Obtaining authentication requirements"
+    )
 
     # obtain any retrieved process id if not already provided from upstream process offering, and clean it
     process_id = get_sane_name(get_any_id(process_info), assert_invalid=False)
@@ -708,7 +769,8 @@ def get_process_definition(process_offering, reference=None, package=None, data_
         "package": package,
         "type": process_type,
         "inputs": package_inputs,
-        "outputs": package_outputs
+        "outputs": package_outputs,
+        "auth": auth_requirements
     })
     return process_offering
 
@@ -719,6 +781,7 @@ class WpsPackage(Process):
     # defined only after/while _handler is called (or sub-methods)
     package_id = None               # type: Optional[str]
     package_type = None             # type: Optional[str]
+    package_requirement = None      # type: Optional[CWL_RequirementsDict]
     package_log_hook_stderr = None  # type: Optional[str]
     package_log_hook_stdout = None  # type: Optional[str]
     percent = None                  # type: Optional[Number]
@@ -820,7 +883,7 @@ class WpsPackage(Process):
         weaver_tweens_logger.setLevel(self.log_level)
 
     def insert_package_log(self, result):
-        # type: (Union[CWLResults, CWLException]) -> List[str]
+        # type: (Union[CWL_Results, CWLException]) -> List[str]
         """
         Retrieves additional `CWL` sub-process logs captures to retrieve internal application output and/or errors.
 
@@ -890,6 +953,101 @@ class WpsPackage(Process):
                                    message="Error occurred when retrieving internal application log.")
         return captured_log
 
+    def setup_docker_image(self):
+        # type: () -> Optional[bool]
+        """
+        Pre-pull the :term:`Docker` image locally for running the process if authentication is required to get it.
+
+        :returns: success status if operation was successful, or ``None`` when it does not apply.
+        """
+        # check multiple conditions where Docker authentication never applies
+        if self.remote_execution:
+            self.logger.debug("Skipping Docker setup not needed for remote execution.")
+            return None
+        if self.package_type != PROCESS_APPLICATION:
+            self.logger.debug("Skipping Docker setup not needed for CWL Workflow. "
+                              "Sub-step must take care of it if needed.")
+            return None
+        if self.package_requirement["class"] != CWL_REQUIREMENT_APP_DOCKER:
+            self.logger.debug("Skipping Docker setup not needed for CWL application without Docker requirement.")
+            return None
+        if self.job.service:
+            self.logger.debug("Skipping Docker setup not needed for remote WPS provider process.")
+            return None
+
+        store = get_db(self.settings).get_store(StoreProcesses)
+        process = store.fetch_by_id(self.job.process)
+        if not isinstance(process.auth, DockerAuthentication):
+            self.logger.debug("Skipping Docker setup not needed for public repository access.")
+            return None
+        if self.package_requirement["dockerPull"] != process.auth.link:
+            # this is mostly to make sure references are still valid (process/package modified after deployment?)
+            # since they should originate from the same CWL 'dockerPull', something went wrong if they don't match
+            self.logger.debug("Skipping Docker setup not applicable for Application Package's Docker reference "
+                              "mismatching registered Process Authentication Docker reference.")
+            return None
+
+        image = None
+        try:
+            client = docker.from_env()  # same as CLI
+            # following login does not update '~/.docker/config.json' by design, but can use it if available
+            # session remains active only within the client
+            # Note:
+            #   Force re-auth to ensure credentials are validated against remote registry and API Status is returned.
+            #   This way, even if the auth were pre-resolved, we make sure they are still valid.
+            #   This is important mostly because Docker images could still be present in cache, so pull doesn't occur.
+            # Warning:
+            #   Without re-auth, plain credentials resolved from auth config are returned in body instead!
+            #   With re-auth, body *could* contain an identity token depending on auth method.
+            body = client.login(reauth=True, **process.auth.credentials)
+            if body.get("Status") != "Login Succeeded":
+                self.logger.debug("Failed authentication to Docker private registry.")
+                return False
+            self.logger.debug("Retrieving image from Docker registry or cache.")
+            # docker client pulls all available images when no tag, provide the default to limit
+            tag = process.auth.tag or "latest"
+            image = client.images.pull(process.auth.repository, tag)  # actual pull or resolved from cache
+        except Exception as exc:  # noqa: W0703 # nosec: B110  # do not let anything up to avoid leaking auths
+            self.logger.debug("Unhandled exception [%s] during Docker registry authentication or image retrieval.",
+                              exc.__class__.__name__, exc_info=False)  # only class name to help debug, but no contents
+        if not image or process.auth.docker not in image.tags:
+            self.logger.debug("Failed authorization or could not retrieve Docker image from private registry.")
+            return False
+        self.logger.debug("Docker image retrieved.")
+        return True
+
+    def setup_runtime(self):
+        # type: () -> Dict[str, AnyValueType]
+        """
+        Prepares the runtime parameters for the :term:`CWL` package execution.
+
+        Parameter ``weaver.wps_workdir`` is the base-dir where sub-dir per application packages will be generated.
+        Parameter :attr:`workdir` is the actual location PyWPS reserved for this process (already with sub-dir).
+        If no ``weaver.wps_workdir`` was provided, reuse PyWps parent workdir since we got access to it.
+        Other steps handling outputs need to consider that ``CWL<->WPS`` out dirs could match because of this.
+
+        :return: resolved runtime parameters
+        """
+        wps_workdir = self.settings.get("weaver.wps_workdir", os.path.dirname(self.workdir))
+        # cwltool will add additional unique characters after prefix paths
+        cwl_workdir = os.path.join(wps_workdir, "cwltool_tmp_")
+        cwl_outdir = os.path.join(wps_workdir, "cwltool_out_")
+        runtime_params = {
+            # force explicit staging if write needed (InitialWorkDirRequirement in CWL package)
+            # protect input paths that can be re-used to avoid potential in-place modifications
+            "no_read_only": False,
+            # employ enforced user/group from provided config or auto-resolved ones from running user
+            "no_match_user": False,
+            # directories for CWL to move files around, auto cleaned up by cwltool when finished processing
+            # (paths used are according to DockerRequirement and InitialWorkDirRequirement)
+            "tmpdir_prefix": cwl_workdir,
+            "tmp_outdir_prefix": cwl_outdir,
+            # ask CWL to move tmp outdir results to the WPS process workdir (otherwise we loose them on cleanup)
+            "outdir": self.workdir,
+            "debug": self.logger.isEnabledFor(logging.DEBUG)
+        }
+        return runtime_params
+
     def update_requirements(self):
         """
         Inplace modification of :attr:`package` to adjust invalid items that would break behaviour we must enforce.
@@ -926,16 +1084,16 @@ class WpsPackage(Process):
             req_items = self.package.get("requirements", {})
             if not isinstance(req_items, dict):
                 # definition as list
-                req_env = {"class": "EnvVarRequirement", "envDef": {}}
+                req_env = {"class": CWL_REQUIREMENT_ENV_VAR, "envDef": {}}
                 for req in req_items:
-                    if req["class"] == "EnvVarRequirement":
+                    if req["class"] == CWL_REQUIREMENT_ENV_VAR:
                         req_env = req
                         break
                 req_items.append(req_env)
             else:
                 # definition as mapping
-                req_items.setdefault("EnvVarRequirement", {"envDef": {}})
-                req_env = req_items.get("EnvVarRequirement")
+                req_items.setdefault(CWL_REQUIREMENT_ENV_VAR, {"envDef": {}})
+                req_env = req_items.get(CWL_REQUIREMENT_ENV_VAR)
             active_python_path = os.path.join(sys.exec_prefix, "bin")
             env_path = "{}:{}".format(active_python_path, os.getenv("PATH"))
             req_env["envDef"].update({"PATH": env_path})
@@ -1048,6 +1206,7 @@ class WpsPackage(Process):
         """
         Method called when process receives the WPS execution request.
         """
+        # pylint: disable=R1260,too-complex  # FIXME
 
         # note: only 'LOGGER' call allowed here, since 'setup_loggers' not called yet
         LOGGER.debug("HOME=%s, Current Dir=%s", os.environ.get("HOME"), os.path.abspath(os.curdir))
@@ -1056,9 +1215,11 @@ class WpsPackage(Process):
         self.package_id = self.request.identifier
 
         try:
+            # prepare some metadata about the package that are often reused
+            self.package_type = _get_package_type(self.package)
+            self.package_requirement = get_application_requirement(self.package)
             try:
                 # workflows do not support stdout/stderr
-                self.package_type = _get_package_type(self.package)
                 log_stdout_stderr = self.package_type != PROCESS_WORKFLOW
                 self.setup_loggers(log_stdout_stderr)
                 self.update_status("Preparing package logs done.", PACKAGE_PROGRESS_PREP_LOG, STATUS_RUNNING)
@@ -1099,29 +1260,7 @@ class WpsPackage(Process):
             self.update_effective_user()
             self.update_requirements()
 
-            # note:
-            #   Parameter 'weaver.wps_workdir' is the base-dir where sub-dir per application packages will be generated.
-            #   Parameter 'self.workdir' is the actual location PyWPS reserved for this process (already with sub-dir).
-            #   If no 'weaver.wps_workdir' was provided, reuse PyWps parent workdir since we got access to it.
-            #   Other steps handling outputs need to consider that CWL<->WPS out dirs could match because of this.
-            wps_workdir = self.settings.get("weaver.wps_workdir", os.path.dirname(self.workdir))
-            # cwltool will add additional unique characters after prefix paths
-            cwl_workdir = os.path.join(wps_workdir, "cwltool_tmp_")
-            cwl_outdir = os.path.join(wps_workdir, "cwltool_out_")
-            runtime_params = {
-                # force explicit staging if write needed (InitialWorkDirRequirement in CWL package)
-                # protect input paths that can be re-used to avoid potential in-place modifications
-                "no_read_only": False,
-                # employ enforced user/group from provided config or auto-resolved ones from running user
-                "no_match_user": False,
-                # directories for CWL to move files around, auto cleaned up by cwltool when finished processing
-                # (paths used are according to DockerRequirement and InitialWorkDirRequirement)
-                "tmpdir_prefix": cwl_workdir,
-                "tmp_outdir_prefix": cwl_outdir,
-                # ask CWL to move tmp outdir results to the WPS process workdir (otherwise we loose them on cleanup)
-                "outdir": self.workdir,
-                "debug": self.logger.isEnabledFor(logging.DEBUG)
-            }
+            runtime_params = self.setup_runtime()
             self.logger.debug("Using cwltool.RuntimeContext args:\n%s", json.dumps(runtime_params, indent=2))
             runtime_context = RuntimeContext(kwargs=runtime_params)
             try:
@@ -1164,9 +1303,20 @@ class WpsPackage(Process):
                 raise self.exception_message(PackageExecutionError, exc, "Failed to load package inputs.")
 
             try:
+                self.update_status("Checking package prerequisites... "
+                                   "(operation could take a while depending on requirements)",
+                                   PACKAGE_PROGRESS_PREPARATION, STATUS_RUNNING)
+                setup_status = self.setup_docker_image()
+                if setup_status not in [None, True]:
+                    raise PackageAuthenticationError
+                self.update_status("Package ready for execution.", PACKAGE_PROGRESS_PREPARATION, STATUS_RUNNING)
+            except Exception:  # noqa: W0703 # nosec: B110  # don't pass exception to below message
+                raise self.exception_message(PackageAuthenticationError, None, "Failed Docker image preparation.")
+
+            try:
                 self.update_status("Running package...", PACKAGE_PROGRESS_CWL_RUN, STATUS_RUNNING)
                 self.logger.debug("Launching process package with inputs:\n%s", json.dumps(cwl_inputs, indent=2))
-                result = package_inst(**cwl_inputs)  # type: CWLResults
+                result = package_inst(**cwl_inputs)  # type: CWL_Results
                 self.update_status("Package execution done.", PACKAGE_PROGRESS_CWL_DONE, STATUS_RUNNING)
             except Exception as exc:
                 if isinstance(exc, CWLException):
@@ -1352,7 +1502,7 @@ class WpsPackage(Process):
         return location
 
     def make_outputs(self, cwl_result):
-        # type: (CWLResults) -> None
+        # type: (CWL_Results) -> None
         """
         Maps `CWL` result outputs to corresponding `WPS` outputs.
         """
@@ -1385,7 +1535,7 @@ class WpsPackage(Process):
             self.logger.info("Resolved WPS output [%s] as literal data", output_id)
 
     def make_location_output(self, cwl_result, output_id):
-        # type: (CWLResults, str) -> None
+        # type: (CWL_Results, str) -> None
         """
         Rewrite the `WPS` output with required location using result path from `CWL` execution.
 

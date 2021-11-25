@@ -1,4 +1,6 @@
+import base64
 import contextlib
+import copy
 import json
 import unittest
 from copy import deepcopy
@@ -20,6 +22,7 @@ from tests.utils import (
     setup_mongodb_jobstore,
     setup_mongodb_processstore
 )
+from weaver.datatype import AuthenticationTypes
 from weaver.exceptions import JobNotFound, ProcessNotFound
 from weaver.execute import (
     EXECUTE_CONTROL_OPTION_ASYNC,
@@ -39,12 +42,15 @@ from weaver.wps.utils import get_wps_url
 from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
-    from weaver.typedefs import JSON
+    from typing import Optional
+
+    from weaver.typedefs import CWL, JSON
 
 
 # pylint: disable=C0103,invalid-name
 class WpsRestApiProcessesTest(unittest.TestCase):
     remote_server = None
+    config = None
 
     @classmethod
     def setUpClass(cls):
@@ -61,7 +67,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         pyramid.testing.tearDown()
 
     def fully_qualified_test_process_name(self):
-        return fully_qualified_name(self).replace(".", "-")
+        return (fully_qualified_name(self) + "-" + self._testMethodName).replace(".", "-")
 
     def setUp(self):
         # rebuild clean db on each test
@@ -79,14 +85,54 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         self.process_store.set_visibility(self.process_private.identifier, VISIBILITY_PRIVATE)
 
     @staticmethod
-    def get_process_deploy_template(process_id):
-        # type: (str) -> JSON
+    def get_sample_cwl_docker():
+        # type: () -> CWL
+        """
+        Sample :term:`CWL` with ``DockerRequirement``.
+
+        .. note::
+            Same definition as the one provided in :ref:`app_pkg_script` documentation.
+        """
+        cwl = {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "baseCommand": "cat",
+            "requirements": {
+                "DockerRequirement": {
+                    "dockerPull": "debian:stretch-slim"
+                }
+            },
+            "inputs": [
+                {
+                    "id": "file",
+                    "type": "File",
+                    "inputBinding": {
+                        "position": 1
+                    }
+                }
+            ],
+            "outputs": [
+                {
+                    "id": "output",
+                    "type": "File",
+                    "outputBinding": {
+                        "glob": "stdout.log"
+                    }
+                }
+            ]
+        }
+        return cwl  # noqa  # type: CWL
+
+    def get_process_deploy_template(self, process_id=None, cwl=None):
+        # type: (Optional[str], Optional[CWL]) -> JSON
         """
         Provides deploy process bare minimum template with undefined execution unit.
 
         To be used in conjunction with `get_process_package_mock` to avoid extra package content-specific validations.
         """
-        return {
+        if not process_id:
+            process_id = self.fully_qualified_test_process_name()
+        body = {
             "processDescription": {
                 "process": {
                     "id": process_id,
@@ -94,15 +140,18 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                 }
             },
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication",
-            "executionUnit": [
-                # full definition not required with mock
-                # use 'href' variant to avoid invalid schema validation via more explicit 'unit'
-                # note:
-                #   hostname cannot have underscores according to [RFC-1123](https://www.ietf.org/rfc/rfc1123.txt)
-                #   schema validator of Reference URL will appropriately raise such invalid string
-                {"href": "http://weaver.test/{}.cwl".format(process_id)}
-            ]
+            "executionUnit": []
         }
+        if cwl:
+            body["executionUnit"].append({"unit": cwl})
+        else:
+            # full definition not required with mock
+            # use 'href' variant to avoid invalid schema validation via more explicit 'unit'
+            # note:
+            #   hostname cannot have underscores according to [RFC-1123](https://www.ietf.org/rfc/rfc1123.txt)
+            #   schema validator of Reference URL will appropriately raise such invalid string
+            body["executionUnit"].append({"href": "http://weaver.test/{}.cwl".format(process_id)})
+        return body
 
     @staticmethod
     def get_process_execute_template(test_input="not-specified"):
@@ -349,6 +398,31 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert resp.status_code == 200
         self.assert_deployed_wps3(resp.json, expected_process_id)
 
+    def test_deploy_process_CWL_DockerRequirement_auth_header_format(self):
+        cwl = self.get_sample_cwl_docker()
+        docker = "fake.repo/org/private-image:latest"
+        cwl["requirements"]["DockerRequirement"]["dockerPull"] = docker
+        body = self.get_process_deploy_template(cwl=cwl)
+        headers = copy.deepcopy(self.json_headers)
+
+        for bad_token in ["0123456789", "Basic:0123456789", "Bearer fake:0123456789"]:  # nosec
+            headers.update({"X-Auth-Docker": bad_token})
+            resp = self.app.post_json("/processes", params=body, headers=headers, expect_errors=True)
+            assert resp.status_code == 422
+            assert resp.content_type == CONTENT_TYPE_APP_JSON
+            assert "authentication header" in resp.json["description"]
+
+        token = base64.b64encode(b"fake:0123456789").decode("utf-8")  # nosec
+        headers.update({"X-Auth-Docker": f"Basic {token}"})  # nosec
+        resp = self.app.post_json("/processes", params=body, headers=headers)
+        assert resp.status_code == 201
+        proc_id = body["processDescription"]["process"]["id"]  # noqa
+        process = self.process_store.fetch_by_id(proc_id)
+        assert process.auth is not None
+        assert process.auth.type == AuthenticationTypes.DOCKER
+        assert process.auth.token == token
+        assert process.auth.docker == docker
+
     # FIXME: implement
     @pytest.mark.skip(reason="not implemented")
     def test_deploy_process_CWL_DockerRequirement_href(self):
@@ -570,7 +644,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         execute_data_tests[2].pop("response")
         execute_data_tests[3]["mode"] = "random"
         execute_data_tests[4]["response"] = "random"
-        execute_data_tests[5]["inputs"] = [{"test_input": "test_value"}]  # bad format
+        execute_data_tests[5]["inputs"] = [{"test_input": "test_value"}]  # noqa  # bad format on purpose
         execute_data_tests[6]["outputs"] = [{"id": "test_output", "transmissionMode": "random"}]
 
         path = "/processes/{}/jobs".format(self.process_public.identifier)

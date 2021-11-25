@@ -3,6 +3,8 @@
 
 .. Util text/reference replace
 .. |ades| replace:: Application Deployment and Execution Service
+.. |auth-schemes| replace:: HTTP Authentication Schemes
+.. _auth-schemes: https://www.iana.org/assignments/http-authschemes/http-authschemes.xhtml
 .. |aws-credentials| replace:: AWS Credentials
 .. _aws-credentials: https://boto3.amazonaws.com/v1/documentation/api/latest/guide/credentials.html
 .. |aws-config| replace:: AWS Configuration
@@ -23,8 +25,10 @@
 .. _cwl-cmdtool: https://www.commonwl.org/v1.1/CommandLineTool.html
 .. |cwl-workflow| replace:: CWL Workflow
 .. _cwl-workflow: https://www.commonwl.org/v1.1/Workflow.html
+.. |cwl-workdir-req| replace:: InitialWorkDirRequirement
 .. _cwl-workdir-req: https://www.commonwl.org/v1.1/CommandLineTool.html#InitialWorkDirRequirement
 .. _cwl-workdir-ex: https://www.commonwl.org/user_guide/15-staging/
+.. |cwl-docker-req| replace:: DockerRequirement
 .. _cwl-docker-req: https://www.commonwl.org/v1.1/CommandLineTool.html#DockerRequirement
 .. |cwl-io-map| replace:: CWL Mapping
 .. _cwl-io-map: https://www.commonwl.org/v1.1/CommandLineTool.html#map
@@ -131,3 +135,5 @@
 .. _status-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Status%2Fpaths%2F~1processes~1{process_id}~1jobs~1{job_id}%2Fget
 .. |result-req| replace:: ``GET {WEAVER_URL}/processes/{id}/jobs/{id}/result`` (GetResult)
 .. _result-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Results%2Fpaths%2F~1processes~1%7Bprocess_id%7D~1jobs~1%7Bjob_id%7D~1result%2Fget
+.. |update-token-req| replace:: Update Token
+.. _update-token-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/UpdateToken/paths/~1processes~1{process_id}/put

@@ -49,6 +49,7 @@ CWL_REQUIREMENT_APP_REMOTE = frozenset([
 Set of :term:`CWL` requirements that correspond to remote execution of an :term:`Application Package`.
 """
 
+CWL_REQUIREMENT_ENV_VAR = "EnvVarRequirement"
 CWL_REQUIREMENT_INIT_WORKDIR = "InitialWorkDirRequirement"
 
 # CWL package types and extensions

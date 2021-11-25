@@ -10,11 +10,17 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add support of ``X-Auth-Docker`` request header that can be specified during `Process` deployment as
+  authentication token that `Weaver` can use to obtain access and retrieve the `Docker` image referenced
+  by the `Application Package` (`CWL`) located on a private registry.
+- Add more documentation details about sample `CWL` definitions to execute script, Python and Dockerized applications.
 
 Fixes:
 ------
-- No change.
+- Fix parsing of inputs for `OpenSearch` parameters lookup that was assuming inputs were always provided as
+  listing definition, not considering possible mapping definition.
+- Fix incorrect documentation section ``Package as External Execution Unit Reference`` where content was omitted
+  and incorrectly anchored as following ``process-esgf-cwt`` section.
 
 `4.4.0 <https://github.com/crim-ca/weaver/tree/4.4.0>`_ (2021-11-19)
 ========================================================================
