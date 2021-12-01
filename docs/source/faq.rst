@@ -125,3 +125,12 @@ Where can I find examples of Process Deployment, Execution and Application Packa
 =====================================================================================================
 
 Many examples are reported in detail in the |examples|_ chapter.
+
+
+Is there an easier way to interact with `Weaver` for its multiple requests and operations?
+=====================================================================================================
+
+Yes!
+
+Take a look at the :ref:`cli` chapter for available utilities to interact with `Weaver`
+using shell or Python scripting.

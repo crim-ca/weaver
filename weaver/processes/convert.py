@@ -49,6 +49,8 @@ from weaver.processes.constants import (
     PACKAGE_CUSTOM_TYPES,
     PACKAGE_ENUM_BASE,
     PACKAGE_LITERAL_TYPES,
+    PROCESS_SCHEMA_OGC,
+    PROCESS_SCHEMA_OLD,
     WPS_BOUNDINGBOX,
     WPS_COMPLEX,
     WPS_COMPLEX_DATA,
@@ -82,6 +84,8 @@ if TYPE_CHECKING:
         AnySettingsContainer,
         AnyValueType,
         CWL,
+        CWL_IO_EnumSymbols,
+        CWL_IO_Value,
         CWL_Input_Type,
         CWL_Output_Type,
         JSON
@@ -281,7 +285,7 @@ def ows2json_io(ows_io):
         #   input is valid, but rather that given an input without explicit 'format' specified, that 'default' is used.
         return json_io
 
-    # add value contrains specifications if missing
+    # add value constraints in specifications
     elif io_type in WPS_LITERAL_DATA_TYPE_NAMES:
         domains = any2json_literal_data_domains(ows_io)
         if domains:
@@ -652,7 +656,7 @@ def is_cwl_file_type(io_info):
 
 
 def is_cwl_array_type(io_info):
-    # type: (CWL_IO_Type) -> Tuple[bool, str, MODE, Union[AnyValue, List[Any]]]
+    # type: (CWL_IO_Type) -> Tuple[bool, str, MODE, Union[AnyValueType, List[Any]]]
     """
     Verifies if the specified I/O corresponds to one of various CWL array type definitions.
 
@@ -696,8 +700,12 @@ def is_cwl_array_type(io_info):
 
     # array type conversion when defined as '{"type": "array", "items": "<type>"}'
     # validate against 'Hashable' instead of 'dict' since 'OrderedDict'/'CommentedMap' can fail 'isinstance()'
-    if not isinstance(io_return["type"], str) and not isinstance(io_return["type"], Hashable) \
-            and "items" in io_return["type"] and "type" in io_return["type"]:
+    if (
+        not isinstance(io_return["type"], str)
+        and not isinstance(io_return["type"], Hashable)
+        and "items" in io_return["type"]
+        and "type" in io_return["type"]
+    ):
         io_type = dict(io_return["type"])  # make hashable to allow comparison
         if io_type["type"] != PACKAGE_ARRAY_BASE:
             raise PackageTypeError("Unsupported I/O 'array' definition: '{}'.".format(repr(io_info)))
@@ -725,7 +733,7 @@ def is_cwl_array_type(io_info):
 
 
 def is_cwl_enum_type(io_info):
-    # type: (CWL_IO_Type) -> Tuple[bool, str, int, Union[List[str], None]]
+    # type: (CWL_IO_Type) -> Tuple[bool, str, int, Optional[CWL_IO_EnumSymbols]]
     """
     Verifies if the specified I/O corresponds to a CWL enum definition.
 
@@ -947,6 +955,56 @@ def cwl2wps_io(io_info, io_select):
         return io_complex(**kw)
 
 
+def cwl2json_input_values(data, schema=PROCESS_SCHEMA_OGC):
+    # type: (Dict[str, CWL_IO_Value], str) -> JSON
+    """
+    Converts :term:`CWL` formatted :term:`Job` inputs to corresponding :term:`OGC API - Processes` format.
+
+    :param data: dictionary with inputs formatted as key-value pairs with relevant structure based on :term:`CWL` types.
+    :param schema: either ``OGC`` or ``OLD`` format respectively for mapping/listing representations.
+    :raises TypeError: if input data is invalid.
+    :raises ValueError: if any input value could not be parsed with expected schema.
+    :returns: converted inputs for :term:`Job` submission either in ``OGC`` or ``OLD`` format.
+    """
+    if not isinstance(data, dict):
+        raise TypeError(f"Invalid CWL input values format must be a dictionary of keys to values. Got [{type(data)}].")
+    inputs = {}
+    for input_id, input_value in data.items():
+        # single file
+        if isinstance(input_value, dict) and input_value.get("class") == "File":
+            inputs[input_id] = {"href": input_value.get("path")}
+        # single literal value
+        elif isinstance(input_value, (str, int, float, bool)):
+            inputs[input_id] = {"value": input_value}
+        # multiple files
+        elif isinstance(input_value, list) and all(
+            isinstance(val, dict) and val.get("class") == "File" for val in input_value
+        ):
+            inputs[input_id] = [{"href": val.get("path")} for val in input_value]
+        # multiple literal values
+        elif isinstance(input_value, list) and all(
+            isinstance(val, (str, int, float, bool)) for val in input_value
+        ):
+            inputs[input_id] = [{"value": val} for val in input_value]
+        else:
+            raise ValueError(f"Input [{input_id}] value definition could not be parsed: {input_value!s}")
+    schema = schema.upper()
+    if schema == PROCESS_SCHEMA_OGC:
+        return inputs
+    if schema != PROCESS_SCHEMA_OLD:
+        raise NotImplementedError(f"Unknown conversion format of input values for schema: [{schema}]")
+    input_list = []
+    for input_id, input_value in inputs.items():
+        if isinstance(input_value, list):
+            input_key = list(input_value[0])[0]
+            input_list.extend([{"id": input_id, input_key: val[input_key]} for val in input_value])
+        else:
+            input_key = list(input_value)[0]
+            input_value = input_value[input_key]
+            input_list.append({"id": input_id, input_key: input_value})
+    return input_list
+
+
 def any2cwl_literal_datatype(io_type):
     # type: (str) -> Union[str, Type[null]]
     """
@@ -1108,7 +1166,7 @@ def json2wps_datatype(io_info):
 
 
 def json2wps_field(field_info, field_category):
-    # type: (JSON_IO_Type, str) -> Any
+    # type: (JSON, str) -> Any
     """
     Converts an I/O field from a JSON literal data, list, or dictionary to corresponding WPS types.
 

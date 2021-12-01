@@ -19,6 +19,7 @@ from tests.utils import (
 )
 from weaver.database import get_db
 from weaver.formats import CONTENT_TYPE_APP_JSON
+from weaver.processes.constants import PROCESS_SCHEMA_OLD
 from weaver.status import STATUS_ACCEPTED, STATUS_RUNNING, STATUS_SUCCEEDED
 from weaver.utils import fully_qualified_name
 from weaver.visibility import VISIBILITY_PUBLIC
@@ -58,14 +59,14 @@ class WpsConfigBase(unittest.TestCase):
         pyramid.testing.tearDown()
 
     @classmethod
-    def describe_process(cls, process_id, describe_schema="OGC"):
+    def describe_process(cls, process_id, describe_schema=PROCESS_SCHEMA_OGC):
         path = "/processes/{}?schema={}".format(process_id, describe_schema)
         resp = cls.app.get(path, headers=cls.json_headers)
         assert resp.status_code == 200
         return deepcopy(resp.json)
 
     @classmethod
-    def deploy_process(cls, payload, describe_schema="OGC"):
+    def deploy_process(cls, payload, describe_schema=PROCESS_SCHEMA_OGC):
         # type: (JSON, str) -> JSON
         """
         Deploys a process with :paramref:`payload`.

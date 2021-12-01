@@ -4,15 +4,18 @@ import inspect
 import json
 import logging
 import os
+import posixpath
 import re
 import shutil
 import sys
 import time
+import yaml
 import warnings
 from copy import deepcopy
 from datetime import datetime
 from typing import TYPE_CHECKING
 from urllib.parse import ParseResult, unquote, urlparse, urlunsplit
+from yaml.scanner import ScannerError
 
 import boto3
 import colander
@@ -49,7 +52,7 @@ if TYPE_CHECKING:
         AnySettingsContainer,
         AnyRegistryContainer,
         AnyResponseType,
-        AnyValue,
+        AnyValueType,
         HeadersType,
         JSON,
         KVP_Item,
@@ -144,7 +147,7 @@ def get_any_id(info):
 
 
 def get_any_value(info):
-    # type: (JSON) -> AnyValue
+    # type: (JSON) -> AnyValueType
     """
     Retrieves a dictionary `value-like` key using multiple common variations ``[href, value, reference]``.
 
@@ -521,8 +524,13 @@ def get_job_log_msg(status, message, progress=0, duration=None):
     return "{d} {p:3d}% {s:10} {m}".format(d=duration or "", p=int(progress or 0), s=map_status(status), m=message)
 
 
-def setup_loggers(settings, level=None):
-    # type: (AnySettingsContainer, Optional[Union[int, str]]) -> None
+def setup_loggers(settings=None,            # type: Optional[AnySettingsContainer]
+                  level=None,               # type: Optional[Union[int, str]]
+                  force_stdout=False,       # type: bool
+                  message_format=None,      # type: Optional[str]
+                  datetime_format=None,     # type: Optional[str]
+                  log_file=None,            # type: Optional[str]
+                  ):                        # type: (...) -> logging.Logger
     """
     Update logging configuration known loggers based on application settings.
 
@@ -530,7 +538,7 @@ def setup_loggers(settings, level=None):
     Otherwise, undefined logger levels will be set according to whichever is found first between ``weaver.log_level``,
     the :paramref:`level` parameter or default :py:data:`logging.INFO`.
     """
-    log_level = settings.get("weaver.log_level")
+    log_level = (settings or {}).get("weaver.log_level")
     override = False
     if log_level:
         override = True
@@ -538,6 +546,9 @@ def setup_loggers(settings, level=None):
         log_level = level or logging.INFO
     if not isinstance(log_level, int):
         log_level = logging.getLevelName(log_level.upper())
+    message_format = message_format or get_log_fmt()
+    datetime_format = datetime_format or get_log_date_fmt()
+    formatter = logging.Formatter(fmt=message_format, datefmt=datetime_format)
     for logger_name in ["weaver", "cwltool"]:
         logger = logging.getLogger(logger_name)
         if override or logger.level == logging.NOTSET:
@@ -545,9 +556,21 @@ def setup_loggers(settings, level=None):
         # define basic formatter/handler if config INI did not provide it
         if not logger.handlers:
             handler = logging.StreamHandler()
-            formatter = logging.Formatter(get_log_fmt())
             handler.setFormatter(formatter)
             logger.addHandler(handler)
+        if force_stdout:
+            all_handlers = logging.root.handlers + logger.handlers
+            if not any(isinstance(h, logging.StreamHandler) for h in all_handlers):
+                handler = logging.StreamHandler(sys.stdout)
+                handler.setFormatter(formatter)
+                logger.addHandler(handler)  # noqa: type
+        if log_file:
+            all_handlers = logging.root.handlers + logger.handlers
+            if not any(isinstance(h, logging.FileHandler) for h in all_handlers):
+                handler = logging.FileHandler(log_file)
+                handler.setFormatter(formatter)
+                logger.addHandler(handler)
+    return logging.getLogger("weaver")
 
 
 def make_dirs(path, mode=0o755, exist_ok=False):
@@ -783,7 +806,7 @@ def retry_on_cache_error(func):
 
 
 def _request_call(method, url, kwargs):
-    # type: (str, str, Dict[str, AnyValue]) -> Response
+    # type: (str, str, Dict[str, AnyValueType]) -> Response
     """
     Request operation employed by :func:`request_extra` without caching.
     """
@@ -797,7 +820,7 @@ def _request_call(method, url, kwargs):
 
 @cache_region("request")
 def _request_cached(method, url, kwargs):
-    # type: (str, str, Dict[str, AnyValue]) -> Response
+    # type: (str, str, Dict[str, AnyValueType]) -> Response
     """
     Cached-enabled request operation employed by :func:`request_extra`.
     """
@@ -1118,6 +1141,39 @@ def fetch_file(file_reference, file_outdir, settings=None, link=None, **request_
                  "  Reference: [%s]\n"
                  "  File Path: [%s]", file_href, file_path)
     return file_path
+
+
+def load_file(file_path):
+    """
+    Load JSON or YAML file contents from local path or remote URL.
+
+    If URL, get the content and validate it by loading, otherwise load file directly.
+
+    :raises ValueError: if YAML or JSON cannot be parsed or loaded from location.
+    """
+    from weaver.formats import CONTENT_TYPE_TEXT_PLAIN
+
+    try:
+        if is_remote_file(file_path):
+            settings = get_settings()
+            headers = {"Accept": CONTENT_TYPE_TEXT_PLAIN}
+            cwl_resp = request_extra("get", file_path, headers=headers, settings=settings)
+            return yaml.safe_load(cwl_resp.content)
+        with open(file_path, "r") as f:
+            return yaml.safe_load(f)
+    except ScannerError as exc:
+        LOGGER.debug("Parsing error: %s", exc, exc_info=exc)
+        raise ValueError("Failed parsing file content as JSON or YAML.")
+
+
+def is_remote_file(file_location):
+    # type: (str) -> bool
+    """
+    Parses to file location to figure out if it is remotely available or a local path.
+    """
+    cwl_file_path_or_url = file_location.replace("file://", "")
+    scheme = urlparse(cwl_file_path_or_url).scheme
+    return scheme != "" and not posixpath.ismount("{}:".format(scheme))  # windows partition
 
 
 REGEX_SEARCH_INVALID_CHARACTERS = re.compile(r"[^a-zA-Z0-9_\-]")

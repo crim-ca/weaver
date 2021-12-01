@@ -59,6 +59,8 @@ from weaver.processes.constants import (
     PACKAGE_CUSTOM_TYPES,
     PACKAGE_ENUM_BASE,
     PACKAGE_TYPE_POSSIBLE_VALUES,
+    PROCESS_SCHEMA_OGC,
+    PROCESS_SCHEMAS,
     WPS_LITERAL_DATA_TYPE_NAMES
 )
 from weaver.sort import JOB_SORT_VALUES, QUOTE_SORT_VALUES, SORT_CREATED, SORT_ID, SORT_PROCESS
@@ -2166,7 +2168,8 @@ class ProviderEndpoint(ProviderPath):
 class ProcessDescriptionSchemaQuery(ExtendedMappingSchema):
     # see: 'ProcessDescription' schema and 'Process.offering' method
     schema = ExtendedSchemaNode(
-        String(), example="OGC", default="OGC", validator=OneOfCaseInsensitive(["OGC", "OLD"]),
+        String(), example=PROCESS_SCHEMA_OGC, default=PROCESS_SCHEMA_OGC,
+        validator=OneOfCaseInsensitive(PROCESS_SCHEMAS),
         description="Selects the desired schema representation of the process description."
     )
 

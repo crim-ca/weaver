@@ -33,6 +33,7 @@ from weaver.execute import (
     EXECUTE_TRANSMISSION_MODE_REFERENCE
 )
 from weaver.formats import ACCEPT_LANGUAGE_EN_CA, CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML
+from weaver.processes.constants import PROCESS_SCHEMA_OGC, PROCESS_SCHEMA_OLD
 from weaver.processes.convert import get_field, null, ows2json, wps2json_io
 from weaver.processes.types import (
     PROCESS_APPLICATION,
@@ -1800,7 +1801,7 @@ class Process(Base):
             link.setdefault("hreflang", ACCEPT_LANGUAGE_EN_CA)
         return {"links": links}
 
-    def offering(self, schema="OGC"):
+    def offering(self, schema=PROCESS_SCHEMA_OGC):
         # type: (str) -> JSON
         """
         Obtains the JSON serializable offering/description representation of the process.
@@ -1816,7 +1817,7 @@ class Process(Base):
         process = self.dict()
         links = self.links()
         # force selection of schema to avoid ambiguity
-        if str(schema or "OGC").upper() == "OLD":
+        if str(schema or PROCESS_SCHEMA_OGC).upper() == PROCESS_SCHEMA_OLD:
             # nested process fields + I/O as lists
             process.update({"process": dict(process)})
             process.update(links)

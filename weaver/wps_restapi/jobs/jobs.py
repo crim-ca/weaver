@@ -46,7 +46,7 @@ from weaver.wps_restapi.swagger_definitions import datetime_interval_parser
 if TYPE_CHECKING:
     from typing import Dict, List, Optional, Tuple, Union
     from pyramid.httpexceptions import HTTPException
-    from weaver.typedefs import AnySettingsContainer, AnyValue, JSON
+    from weaver.typedefs import AnySettingsContainer, AnyValueType, JSON
 
 LOGGER = get_task_logger(__name__)
 
@@ -87,7 +87,7 @@ def get_job(request):
 
 
 def get_job_list_links(job_total, filters, request):
-    # type: (int, Dict[str, AnyValue], Request) -> List[JSON]
+    # type: (int, Dict[str, AnyValueType], Request) -> List[JSON]
     """
     Obtains a list of all relevant links for the corresponding job listing defined by query parameter filters.
     """

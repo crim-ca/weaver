@@ -15,7 +15,6 @@ generate :term:`ADES`/:term:`EMS` deployable :term:`Application Package`.
 import json
 import logging
 import os
-import posixpath  # pylint: disable=C0411,wrong-import-order
 import shutil
 import sys
 import tempfile
@@ -27,17 +26,14 @@ from urllib.parse import urlparse
 import cwltool
 import cwltool.docker
 import docker
-import yaml
 from cwltool.context import LoadingContext, RuntimeContext
 from cwltool.factory import Factory as CWLFactory, WorkflowStatus as CWLException
 from pyramid.httpexceptions import HTTPOk, HTTPServiceUnavailable
 from pywps import Process
 from pywps.inout import BoundingBoxInput, ComplexInput, LiteralInput
 from pywps.inout.basic import SOURCE_TYPE
-from pywps.inout.literaltypes import AnyValue
 from pywps.inout.storage.file import FileStorageBuilder
 from pywps.inout.storage.s3 import S3StorageBuilder
-from yaml.scanner import ScannerError
 
 from weaver.config import WEAVER_CONFIGURATION_HYBRID, WEAVER_CONFIGURATIONS_REMOTE, get_weaver_configuration
 from weaver.database import get_db
@@ -51,7 +47,7 @@ from weaver.exceptions import (
     PackageTypeError,
     PayloadNotFound
 )
-from weaver.formats import CONTENT_TYPE_ANY_XML, CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_PLAIN, get_cwl_file_format
+from weaver.formats import CONTENT_TYPE_ANY_XML, CONTENT_TYPE_APP_JSON, get_cwl_file_format
 from weaver.processes import opensearch
 from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_BUILTIN,
@@ -98,6 +94,8 @@ from weaver.utils import (
     get_log_fmt,
     get_sane_name,
     get_settings,
+    is_remote_file,
+    load_file,
     request_extra,
     setup_loggers
 )
@@ -306,23 +304,17 @@ def _get_package_requirements_as_class_list(requirements):
 
 
 def _check_package_file(cwl_file_path_or_url):
-    # type: (str) -> Tuple[str, bool]
+    # type: (str) -> str
     """
     Validates that the specified CWL file path or URL points to an existing and allowed file format.
 
     :param cwl_file_path_or_url: one of allowed file types path on disk, or an URL pointing to one served somewhere.
-    :return: absolute_path, is_url: absolute path or URL, and boolean indicating if it is a remote URL file.
+    :returns: absolute path or URL, and boolean indicating if it is a remote URL file.
     :raises PackageRegistrationError: in case of missing file, invalid format or invalid HTTP status code.
     """
-    is_url = False
-    cwl_file_path_or_url = cwl_file_path_or_url.replace("file://", "")
-    scheme = urlparse(cwl_file_path_or_url).scheme
-    if scheme != "" and not posixpath.ismount("{}:".format(scheme)):    # windows partition
-        is_url = True
-    if is_url:
+    if is_remote_file(cwl_file_path_or_url):
         cwl_path = cwl_file_path_or_url
         cwl_resp = request_extra("head", cwl_path, settings=get_settings())
-        is_url = True
         if cwl_resp.status_code != HTTPOk.code:
             raise PackageRegistrationError("Cannot find CWL file at: '{}'.".format(cwl_path))
     else:
@@ -333,7 +325,7 @@ def _check_package_file(cwl_file_path_or_url):
     file_ext = os.path.splitext(cwl_path)[-1].replace(".", "")
     if file_ext not in PACKAGE_EXTENSIONS:
         raise PackageRegistrationError("Not a valid CWL file type: '{}'.".format(file_ext))
-    return cwl_path, is_url
+    return cwl_path
 
 
 def _load_package_file(file_path):
@@ -342,17 +334,10 @@ def _load_package_file(file_path):
     Loads the package in YAML/JSON format specified by the file path.
     """
 
-    file_path, is_url = _check_package_file(file_path)
-    # if URL, get the content and validate it by loading, otherwise load file directly
-    # yaml properly loads json as well, error can print out the parsing error location
+    file_path = _check_package_file(file_path)
     try:
-        if is_url:
-            settings = get_settings()
-            cwl_resp = request_extra("get", file_path, headers={"Accept": CONTENT_TYPE_TEXT_PLAIN}, settings=settings)
-            return yaml.safe_load(cwl_resp.content)
-        with open(file_path, "r") as f:
-            return yaml.safe_load(f)
-    except ScannerError as ex:
+        return load_file(file_path)
+    except ValueError as ex:
         raise PackageRegistrationError("Package parsing generated an error: [{!s}]".format(ex))
 
 
@@ -566,8 +551,9 @@ def _generate_process_with_cwl_from_reference(reference):
         elif any(ct in content_type for ct in [CONTENT_TYPE_APP_JSON]):
             payload = response.json()
             # attempt to retrieve a WPS-3 Process definition, owsContext is expected in body
-            if "process" in payload:
-                process_info = payload["process"]
+            # OLD schema nests everything under 'process', OGC schema provides everything at the root
+            if "process" in payload or "owsContext" in payload:
+                process_info = payload.get("process", payload)
                 ows_ref = process_info.get("owsContext", {}).get("offering", {}).get("content", {}).get("href")
                 cwl_package = _load_package_file(ows_ref)
             # if somehow the CWL was referenced without an extension, handle it here
@@ -1148,7 +1134,7 @@ class WpsPackage(Process):
 
     def step_update_status(self, message, progress, start_step_progress, end_step_progress, step_name,
                            target_host, status):
-        # type: (str, Number, Number, Number, str, AnyValue, str) -> None
+        # type: (str, Number, Number, Number, str, AnyValueType, str) -> None
         self.update_status(
             message="{0} [{1}] - {2}".format(target_host, step_name, str(message).strip()),
             progress=map_progress(progress, start_step_progress, end_step_progress),
