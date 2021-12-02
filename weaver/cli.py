@@ -230,6 +230,19 @@ class WeaverClient(object):
         resp = request_extra("POST", path, data=data, headers=headers, settings=self._settings)
         return self._parse_result(resp)
 
+    def undeploy(self, process_id, url=None):
+        # type: (str, Optional[str]) -> OperationResult
+        """
+        Undeploy an existing :term:`Process`.
+
+        :param process_id: Identifier of the process to undeploy.
+        :param url: Instance URL if not already provided during client creation.
+        """
+        base = self._get_url(url)
+        path = f"{base}/processes/{process_id}"
+        resp = request_extra("DELETE", path, headers=self._headers, settings=self._settings)
+        return self._parse_result(resp)
+
     def capabilities(self, url=None):
         # type: (Optional[str]) -> OperationResult
         """
