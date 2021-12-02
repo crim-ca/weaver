@@ -146,15 +146,16 @@ def get_any_id(info):
     return info.get("id", info.get("identifier", info.get("_id")))
 
 
-def get_any_value(info):
-    # type: (JSON) -> AnyValueType
+def get_any_value(info, default=None):
+    # type: (JSON, Any) -> AnyValueType
     """
-    Retrieves a dictionary `value-like` key using multiple common variations ``[href, value, reference]``.
+    Retrieves a dictionary `value-like` key using multiple common variations ``[href, value, reference, data]``.
 
     :param info: dictionary that potentially contains a `value-like` key.
+    :param default: default value to be returned if none of the known keys were matched.
     :returns: value of the matched `value-like` key or ``None`` if not found.
     """
-    return info.get("href", info.get("value", info.get("reference", info.get("data"))))
+    return info.get("href", info.get("value", info.get("reference", info.get("data", default))))
 
 
 def get_any_message(info):

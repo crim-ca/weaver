@@ -117,7 +117,7 @@ class WpsConfigBase(unittest.TestCase):
             assert body["status"] in statuses, "Error job info:\n{}\n{}".format(pretty, self._try_get_logs(status_url))
             return body["status"] == wait_for_status
 
-        time.sleep(1)  # small delay to ensure process execution had a change to start before monitoring
+        time.sleep(1)  # small delay to ensure process execution had a chance to start before monitoring
         left = timeout or self.monitor_timeout
         delta = delta or self.monitor_delta
         once = True

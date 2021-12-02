@@ -4,59 +4,98 @@ import json
 import logging
 import os
 import sys
+import time
 from argparse import ArgumentParser, Namespace
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 from weaver import __meta__
+from weaver.datatype import AutoBase
 from weaver.exceptions import PackageRegistrationError
+from weaver.execute import EXECUTE_MODE_ASYNC, EXECUTE_RESPONSE_DOCUMENT
 from weaver.formats import CONTENT_TYPE_APP_JSON
 from weaver.processes.convert import cwl2json_input_values
 from weaver.processes.wps_package import get_process_definition
-from weaver.utils import load_file, request_extra, setup_loggers
+from weaver.utils import fetch_file, get_any_value, load_file, null, request_extra, setup_loggers
+from weaver.status import JOB_STATUS_CATEGORIES, JOB_STATUS_CATEGORY_FINISHED, STATUS_SUCCEEDED
+from weaver.visibility import VISIBILITY_PUBLIC
 
 if TYPE_CHECKING:
-    from typing import Optional, Tuple, Union
+    from typing import Any, Optional, Tuple, Union
 
     from requests import Response
 
     from weaver.typedefs import CWL, HeadersType, JSON
 
-    OperationResult = Tuple[bool, str, Union[str, JSON]]
-
 LOGGER = logging.getLogger(__name__)
 
 
+class OperationResult(AutoBase):
+    """
+    Data container for any :class:`WeaverClient` operation results.
+    """
+    status = False  # type: Optional[bool]
+    message = ""    # type: Optional[str]
+    body = {}       # type: Optional[Union[str, JSON]]
+    headers = {}    # type: Optional[HeadersType]
+
+    def __init__(self, status=None, message=None, body=None, headers=None, **kwargs):
+        # type: (Optional[bool], Optional[str], Optional[Union[str, JSON]], Optional[HeadersType], Any) -> None
+        super(OperationResult, self).__init__(status=status, message=message, body=body, headers=headers, **kwargs)
+
+
 class WeaverClient(object):
-    def __init__(self, url):
-        # type: (str) -> None
+    """
+    Client that handles common HTTP requests with a `Weaver` or similar :term:`OGC-API - Processes` instance.
+    """
+    # default configuration parameters, overridable by corresponding method parameters
+    monitor_timeout = 60    # maximum delay to wait for job completion
+    monitor_delta = 5       # interval between monitor pooling job status requests
+
+    def __init__(self, url=None):
+        # type: (Optional[str]) -> None
+        if url:
+            self._url = self._parse_url(url)
+            LOGGER.debug("Using URL: [%s]", self._url)
+        else:
+            self._url = None
+            LOGGER.warning("No URL provided. All operations must provide it directly or through another parameter!")
+        self._headers = {"Accept": CONTENT_TYPE_APP_JSON, "Content-Type": CONTENT_TYPE_APP_JSON}
+        self._settings = {}  # FIXME: load from INI, overrides as input (cumul arg '--setting weaver.x=value') ?
+
+    def _get_url(self, url):
+        if not self._url and not url:
+            raise ValueError("No URL available. Client was not created with an URL and operation did not receive one.")
+        return self._url or self._parse_url(url)
+
+    @staticmethod
+    def _parse_url(url):
         parsed = urlparse("http://" + url if not url.startswith("http") else url)
         parsed_netloc_path = f"{parsed.netloc}{parsed.path}".replace("//", "/")
         parsed_url = f"{parsed.scheme}://{parsed_netloc_path}"
-        self._url = parsed_url.rsplit("/", 1)[0] if parsed_url.endswith("/") else parsed_url
-        LOGGER.debug("Using URL: [%s]", self._url)
-        self._headers = {"Accept": CONTENT_TYPE_APP_JSON, "Content-Type": CONTENT_TYPE_APP_JSON}
-        self._settings = {}  # FIXME: load from INI, overrides as input (cumul '--setting weaver.x=value') ?
+        return parsed_url.rsplit("/", 1)[0] if parsed_url.endswith("/") else parsed_url
 
     @staticmethod
     def _parse_result(response):
         # type: (Response) -> OperationResult
+        hdr = dict(response.headers)
         try:
             body = response.json()
             msg = body.get("description", body.get("message", "undefined"))
             if response.status_code >= 400 and not msg:
                 msg = body.get("error", body.get("exception", "unknown"))
-            body = WeaverClient._json2text(body)
+            text = WeaverClient._json2text(body)
         except Exception:  # noqa
-            body = response.text
+            text = body = response.text
             msg = "Could not parse body."
-        return True, msg, body
+        return OperationResult(True, msg, body, hdr, text=text)
 
     @staticmethod
     def _json2text(data):
         return json.dumps(data, indent=2, ensure_ascii=False)
 
-    def _parse_deploy_body(self, body, process_id):
+    @staticmethod
+    def _parse_deploy_body(body, process_id):
         # type: (Optional[Union[JSON, str]], Optional[str]) -> OperationResult
         data = {}  # type: JSON
         try:
@@ -66,7 +105,8 @@ class WeaverClient(object):
                 elif isinstance(body, dict):
                     data = body
                 else:
-                    return False, "Cannot load badly formed body. Deploy JSON object or file reference expected.", body
+                    msg = "Cannot load badly formed body. Deploy JSON object or file reference expected."
+                    return OperationResult(False, msg, body, {})
             elif not body:
                 data = {
                     "processDescription": {
@@ -78,11 +118,28 @@ class WeaverClient(object):
                 data.setdefault("processDescription", {})
                 data["processDescription"].setdefault("process", {})
                 data["processDescription"]["process"]["id"] = process_id  # type: ignore
+            # for convenience, always set visibility by default
+            data.setdefault("processDescription", {})
+            data["processDescription"].setdefault("process", {})
+            data["processDescription"]["process"]["visibility"] = VISIBILITY_PUBLIC  # type: ignore
         except (ValueError, TypeError) as exc:
-            return False, "Failed resolution of body definition: [{exc!s}]", body
-        return True, "", data
+            return OperationResult(False, f"Failed resolution of body definition: [{exc!s}]", body)
+        return OperationResult(True, "", data)
 
-    def _parse_auth_token(self, token, username, password):
+    def _parse_job_ref(self, job_reference, url=None):
+        # type: (str, Optional[str]) -> Tuple[Optional[str], Optional[str]]
+        if job_reference.startswith("http"):
+            job_url = job_reference
+            job_parts = [part for part in job_url.split("/") if part.strip()]
+            job_id = job_parts[-1]
+        else:
+            url = self._get_url(url)
+            job_id = job_reference
+            job_url = f"{url}/jobs/{job_id}"
+        return job_id, job_url
+
+    @staticmethod
+    def _parse_auth_token(token, username, password):
         # type: (Optional[str], Optional[str], Optional[str]) -> HeadersType
         if token or (username and password):
             if not token:
@@ -98,6 +155,7 @@ class WeaverClient(object):
                token=None,          # type: Optional[str]
                username=None,       # type: Optional[str]
                password=None,       # type: Optional[str]
+               url=None,            # type: Optional[str]
                ):                   # type: (...) -> OperationResult
         """
         Deploy a new :term:`Process` with specified metadata and reference to an :term:`Application Package`.
@@ -128,11 +186,13 @@ class WeaverClient(object):
             Username to form the authentication token to a private Docker registry.
         :param password:
             Password to form the authentication token to a private Docker registry.
+        :param url:
+            Instance URL if not already provided during client creation.
         :returns: results of the operation.
         """
-        ok, msg, data = self._parse_deploy_body()
+        ok, msg, data = self._parse_deploy_body(body, process_id)
         if not ok:
-            return False, msg, data
+            return OperationResult(False, msg, data)
         headers = copy.deepcopy(self._headers)
         headers.update(self._parse_auth_token(token, username, password))
         try:
@@ -146,59 +206,169 @@ class WeaverClient(object):
                 data["executionUnit"] = [{"unit": cwl}]
         except PackageRegistrationError as exc:
             message = f"Failed resolution of package definition: [{exc!s}]"
-            return False, message, cwl
-        path = f"{self._url}/processes"
+            return OperationResult(False, message, cwl)
+        base = self._get_url(url)
+        path = f"{base}/processes"
         resp = request_extra("POST", path, data=data, headers=headers, settings=self._settings)
         return self._parse_result(resp)
 
-    def describe(self, process_id):
+    def describe(self, process_id, url=None):
+        # type: (str, Optional[str]) -> OperationResult
         """
         Describe the specified :term:`Process`.
+
+        :param process_id: Identifier of the process to describe.
+        :param url: Instance URL if not already provided during client creation.
         """
-        path = f"{self._url}/processes/{process_id}"
+        base = self._get_url(url)
+        path = f"{base}/processes/{process_id}"
         resp = request_extra("GET", path, headers=self._headers, settings=self._settings)
         return self._parse_result(resp)
 
-    def execute(self, process_id, inputs=None, inputs_file=None, inputs_cwl=False, execute_async=True):
+    # FIXME: support sync (https://github.com/crim-ca/weaver/issues/247)
+    # :param execute_async:
+    #   Execute the process asynchronously (user must call :meth:`monitor` themselves,
+    #   or synchronously were monitoring is done automatically until completion before returning.
+    def execute(self, process_id, inputs=None, monitor=False, timeout=None, url=None):
+        # type: (str, Optional[Union[str, JSON]], bool, Optional[int], Optional[str]) -> OperationResult
         """
         Execute a :term:`Job` for the specified :term:`Process` with provided inputs.
 
-        :param process_id: Desired process identifier.xxx
-        :param inputs: Literal :term:`JSON` contents of the inputs inputs submitted in the execution body.
-        :param inputs_file: Path to :term:`YAML` or :term:`JSON` file of inputs submitted in the execution body.
-        :param inputs_cwl: Indicate if the inputs are formatted as :term:`CWL`. Otherwise, OGC-API schema is expected.
-        :param execute_async:
-            Execute the process asynchronously (user must call :meth:`monitor` themselves,
-            or synchronously were monitoring is done automatically until completion before returning.
+        When submitting inputs with :term:`OGC-API - Processes` schema, top-level ``inputs`` key is expected.
+        Under it, either the mapping (key-value) or listing (id,value) representation are accepted.
+        If ``inputs`` is not found, the alternative :term:`CWL` will be assumed.
+
+        When submitting inputs with :term:`CWL` *job* schema, plain key-value(s) pairs are expected.
+        All values should be provided directly under the key (including arrays), except for ``File``
+        type that must include the ``class`` and ``path`` details.
+
+        :param process_id: Identifier of the process to execute.
+        :param inputs:
+            Literal :term:`JSON` or :term:`YAML` contents of the inputs submitted and inserted into the execution body,
+            using either the :term:`OGC-API - Processes` or :term:`CWL` format, or a file path/URL referring to them.
+        :param monitor:
+            Automatically perform :term:`Job` execution monitoring until completion or timeout to obtain final results.
+            If requested, this operation will become blocking until either the completed status or timeout is reached.
+        :param timeout:
+            Monitoring timeout (seconds) if requested.
+        :param url: Instance URL if not already provided during client creation.
         :returns: results of the operation.
         """
-        if inputs_file:
-            inputs = load_file(inputs_file)
-        if not inputs:
-            return False, "No inputs provided.", {}
-        if inputs_cwl:
+        if isinstance(inputs, str):
+            inputs = load_file(inputs)
+        if not inputs or not isinstance(inputs, dict):
+            return OperationResult(False, "No inputs or invalid schema provided.", inputs)
+        if "inputs" not in inputs or get_any_value(inputs.get("inputs", null)) is null:  # consider literal CWL 'inputs'
             inputs = cwl2json_input_values(inputs)
-
         data = {
-            "inputs": inputs
+            # NOTE: since sync is not yet properly implemented in Weaver, simulate with monitoring after if requested
+            "mode": EXECUTE_MODE_ASYNC,
+            "inputs": inputs,
+            "response": EXECUTE_RESPONSE_DOCUMENT,
         }
-
         LOGGER.info("Executing [%s] with inputs:\n%s", self._json2text(inputs))
-        path = f"{self._url}/processes/{process_id}"
+        base = self._get_url(url)
+        path = f"{base}/processes/{process_id}"
         resp = request_extra("GET", path, data=data, headers=self._headers, settings=self._settings)
-        success, _, _ = self._parse_result(resp)
+        results = self._parse_result(resp)
+        if monitor:
+            return results
+        # although Weaver returns "jobID" in the body for convenience,
+        # employ the "Location" header to be OGC-API compliant
+        job_url = resp.headers.get("Location", "")
+        time.sleep(1)  # small delay to ensure process execution had a chance to start before monitoring
+        return self.monitor(job_url, timeout=timeout)
 
-        return
-
-    def status(self, job_id):
+    def status(self, job_reference, url=None):
         """
         Obtain the status of a :term:`Job`.
-        """
 
-    def monitor(self):
+        :param job_reference: Either the full :term:`Job` status URL or only its UUID.
+        :param url: Instance URL if not already provided during client creation.
+        :returns: retrieved status of the job.
+        """
+        job_id, job_url = self._parse_job_ref(job_reference, url)
+        LOGGER.info("Getting job status: [%s]", job_id)
+        resp = request_extra("GET", job_url, headers=self._headers)
+        return self._parse_result(resp)
+
+    def monitor(self, job_reference, timeout=None, delta=None, wait_for_status=STATUS_SUCCEEDED, url=None):
+        # type: (str, Optional[int], Optional[int], str, Optional[str]) -> OperationResult
         """
         Monitor the execution of a :term:`Job` until completion.
+
+        :param job_reference: Either the full :term:`Job` status URL or only its UUID.
+        :param timeout: timeout (seconds) of monitoring until completion or abort.
+        :param delta: interval (seconds) between polling monitor requests.
+        :param wait_for_status: monitor until the requested status is reached (default: job failed or succeeded).
+        :param url: Instance URL if not already provided during client creation.
+        :return: result of the successful or failed job, or timeout of monitoring process.
         """
+        job_id, job_url = self._parse_job_ref(job_reference, url)
+        timeout = timeout or self.monitor_timeout
+        delta = delta or self.monitor_delta
+        LOGGER.info("Monitoring job [%s] for %ss at intervals of %ss.", job_id, timeout, delta)
+        once = True
+        body = None
+        while timeout >= 0 or once:
+            resp = request_extra("GET", job_url, headers=self._headers)
+            if resp.status_code != 200:
+                return OperationResult(False, "Could not find job with specified reference.", {"job": job_reference})
+            body = resp.json()
+            status = body.get("status")
+            if status == wait_for_status:
+                return OperationResult(True, f"Requested job status reached [{wait_for_status}].", body)
+            if status in JOB_STATUS_CATEGORIES[JOB_STATUS_CATEGORY_FINISHED]:
+                return OperationResult(False, "Requested job status not reached, but job has finished.", body)
+            time.sleep(delta)
+            timeout -= delta
+            once = False
+        return OperationResult(False, f"Monitoring timeout reached ({timeout}s). Job did not complete in time.", body)
+
+    def results(self, job_reference, out_dir=None, download=False, url=None):
+        # type: (str, Optional[str], bool, Optional[str]) -> OperationResult
+        """
+        Obtain the results of a successful :term:`Job` execution.
+
+        :param job_reference: Either the full :term:`Job` status URL or only its UUID.
+        :param out_dir: Output directory where to store downloaded files if requested (default: CURDIR/JobID/<outputs>).
+        :param download: Download any file reference found within results (CAUTION: could transfer lots of data!).
+        :param url: Instance URL if not already provided during client creation.
+        :returns: Result details and local paths if downloaded.
+        """
+        job_id, job_url = self._parse_job_ref(job_reference, url)
+        res = self.status(job_url)
+        if not res.status:
+            return OperationResult(False, "Cannot process results from incomplete or failed job.", res.body)
+        # use results endpoint instead of outputs to be OGC-API compliant
+        result_url = f"{job_url}/results"
+        resp = request_extra("GET", result_url, headers=self._headers)
+        results = resp.json()
+        if (
+            resp.status_code != 200 or
+            "outputs" not in results or
+            not isinstance(results["outputs"], dict) or
+            not not any("href" in value for value in results["outputs"])
+        ):
+            return OperationResult(False, "Could not retrieve any output results from job.", results)
+        if not out_dir:
+            out_dir = os.path.join(os.path.realpath(os.path.curdir), job_id)
+        os.makedirs(out_dir, exist_ok=True)
+        LOGGER.info("Will store job [%s] output results in [%s]", job_id, out_dir)
+        for output, value in results["outputs"].items():
+            is_list = True
+            if not isinstance(value, list):
+                value = [value]
+                is_list = False
+            for i, item in enumerate(value):
+                if "href" in item:
+                    file_path = fetch_file(item["href"], out_dir, link=False)
+                    if is_list:
+                        results[output][i]["path"] = file_path
+                    else:
+                        results[output]["path"] = file_path
+        msg = "Retrieved job results." if download else "Listing job results."
+        return OperationResult(True, msg, results)
 
 
 def setup_logger_from_options(logger, args):  # pragma: no cover
@@ -241,32 +411,145 @@ def make_logging_options(parser):
                           help="Explicit log level to employ (default: %(default)s).")
 
 
+def add_url_param(parser, required=True):
+    args = ["url"] if required else ["-u", "--url"]
+    parser.add_argument(*args, help="URL of the instance to run operations.")
+
+
+def add_process_param(parser, description=None):
+    operation = parser.prog.split(" ")[-1]
+    parser.add_argument(
+        "-p", "--id", "--process", dest="process_id",
+        help=description if description else f"Identifier of the process to run {operation} operation."
+    )
+
+
+def add_job_ref_param(parser):
+    operation = parser.prog.split(" ")[-1]
+    parser.add_argument(
+        "-j", "--job", dest="job_reference",
+        help=f"Job URL or UUID to run {operation} operation. "
+             "If full URL is provided, the '--url' parameter can be omitted."
+    )
+
+
+def add_timeout_param(parser):
+    parser.add_argument(
+        "-T", "--timeout", dest="timeout",
+        help="Timeout (seconds) of the job execution monitoring. "
+             "If this timeout is reached but job is still running, another call directly to the monitoring operation "
+             "can be done to resume monitoring. The job execution itself will not stop in case of timeout."
+    )
+
+
 def make_parser():
     # type: () -> ArgumentParser
     """
     Generate the CLI parser.
     """
-    parser = ArgumentParser(description="Execute {} operations.".format(__meta__.__title__))
-    parser.add_argument("--version", "-V", action="version", version="%(prog)s {}".format(__meta__.__version__),
-                        help="Display the version of the package.")
-    parser.add_argument("url", help="URL of the instance to run operations.")
-    ops_parsers = parser.add_subparsers(title="Operation", dest="operation",
-                                        description="Name of the operation to execute.")
+    parser = ArgumentParser(prog=__meta__.__name__, description="Run {} operations.".format(__meta__.__title__))
+    parser._optionals.title = "Optional Arguments"
+    parser.add_argument(
+        "--version", "-V",
+        action="version",
+        version="%(prog)s {}".format(__meta__.__version__),
+        help="Display the version of the package."
+    )
+    ops_parsers = parser.add_subparsers(
+        title="Operation", dest="operation",
+        description="Name of the operation to run."
+    )
 
     op_deploy = ops_parsers.add_parser("deploy", help="Deploy a process.")
-    op_deploy.add_argument("--cwl", "--package", help="File or URL of the CWL Application Package to deploy.")
-    op_deploy_proc = op_deploy.add_mutually_exclusive_group()
-    op_deploy_proc.add_argument("--id", "--name", dest="process_id", help="Process identifier for deployment.")
-    op_deploy_proc.add_argument("-b", "--body", help="")
+    add_url_param(op_deploy)
+    add_process_param(op_deploy, description=(
+        "Process identifier for deployment. If no body is provided, this is required. "
+        "Otherwise, provided value overrides the corresponding ID in the body."
+    ))
+    op_deploy.add_argument(
+        "-b", "--body", dest="body",
+        help="Deployment body directly provided. Allows both JSON and YAML format. "
+             "If provided in combination with process ID or CWL, they will override the corresponding content."
+    )
+    op_deploy_app_pkg = op_deploy.add_mutually_exclusive_group()
+    op_deploy_app_pkg.add_argument(
+        "--cwl", dest="cwl",
+        help="Application Package of the process defined using Common Workflow Language (CWL) as JSON or YAML format. "
+             "It will be inserted into an automatically generated request deploy body or into the provided one."
+    )
+    op_deploy_app_pkg.add_argument(
+        "--wps", dest="wps",
+        help="Reference URL to a specific process under a Web Processing Service (WPS) to package as OGC-API Process."
+    )
+    op_deploy_token = op_deploy.add_mutually_exclusive_group()
+    op_deploy_token.add_argument(
+        "-t", "--token", dest="token",
+        help="Authentication token to retrieve a Docker image reference from a private registry during execution."
+    )
+    op_deploy_creds = op_deploy_token.add_argument_group("Credentials")
+    op_deploy_creds.add_argument(
+        "-U", "--username", dest="username",
+        help="Username to compute the authentication token for Docker image retrieval from a private registry."
+    )
+    op_deploy_creds.add_argument(
+        "-P", "--password", dest="password",
+        help="Password to compute the authentication token for Docker image retrieval from a private registry."
+    )
 
-    op_describe = ops_parsers.add_parser("describe")
-    # FIXME: params
-    op_execute = ops_parsers.add_parser("execute")
-    # FIXME: params
+    op_describe = ops_parsers.add_parser("describe", help="Obtain an existing process description.")
+    add_url_param(op_describe)
+    add_process_param(op_describe)
+
+    op_execute = ops_parsers.add_parser("execute", help="Submit a job execution for an existing process.")
+    add_url_param(op_execute)
+    add_process_param(op_execute)
+    # FIXME: support cumulative inputs for convenience? (ex: '-I input=value -I array=1,2 -I other=http://file')
+    op_execute.add_argument(
+        "-I", "--inputs", dest="inputs",
+        help="File path or URL reference to JSON or YAML contents defining job inputs with OGC-API or CWL schema."
+    )
+    # FIXME: support sync (https://github.com/crim-ca/weaver/issues/247)
+    # op_execute.add_argument(
+    #     "-A", "--async", dest="execute_async",
+    #     help=""
+    # )
+    op_execute.add_argument(
+        "-M", "--monitor", dest="monitor",
+        help="Automatically perform the monitoring operation following job submission to retrieve final results. "
+             "If not requested, the created job status location is directly returned."
+    )
+    add_timeout_param(op_execute)
+
+    op_dismiss = ops_parsers.add_parser(
+        "dismiss", help="Dismiss a pending or running job, or wipe any finished job results."
+    )
+    add_url_param(op_dismiss, required=False)
+    add_job_ref_param(op_dismiss)
+
+    op_monitor = ops_parsers.add_parser(
+        "monitor", help="Monitor a pending or running job execution until completion or timeout is reached."
+    )
+    add_url_param(op_monitor, required=False)
+    add_job_ref_param(op_monitor)
+    add_timeout_param(op_monitor)
+
     op_status = ops_parsers.add_parser("status")
-    # FIXME: params
-    op_result = ops_parsers.add_parser("result")
-    # FIXME: params
+    add_url_param(op_status, required=False)
+    add_job_ref_param(op_status)
+
+    op_results = ops_parsers.add_parser("results")
+    add_url_param(op_results, required=False)
+    add_job_ref_param(op_results)
+    op_results.add_argument(
+        "-D", "--download", dest="download", default=False,
+        help="Download all found job results file references to output location. "
+             "If not requested, the operation simply displays the job results (default: %(default)s)."
+    )
+    op_results.add_argument(
+        "-O", "--outdir", dest="out_dir",
+        help="Output directory where to store downloaded files from job results if requested "
+             "(default: ${CURDIR}/{JobID}/<outputs.files>)."
+    )
 
     make_logging_options(parser)
     return parser
@@ -274,10 +557,11 @@ def make_parser():
 
 def main(*args):
     parser = make_parser()
-    ns = parser.parse_args(args=args)
+    ns = parser.parse_args(args=args or None)
     setup_logger_from_options(LOGGER, ns)
     args = vars(ns)
     op = args.pop("operation", None)
+    LOGGER.debug("Requested operation: [%s]", op)
     if not op or op not in dir(WeaverClient):
         parser.print_help()
         return 0

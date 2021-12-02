@@ -83,7 +83,7 @@ if TYPE_CHECKING:
 LOGGER = getLogger(__name__)
 
 
-class Base(dict):
+class DictBase(dict):
     """
     Dictionary with extended attributes auto-``getter``/``setter`` for convenience.
 
@@ -99,7 +99,7 @@ class Base(dict):
         if isinstance(prop, property) and prop.fset is not None:
             prop.fset(self, value)  # noqa
         else:
-            super(Base, self).__setitem__(item, value)
+            super(DictBase, self).__setitem__(item, value)
 
     def __getitem__(self, item):
         """
@@ -115,13 +115,75 @@ class Base(dict):
 
     def __str__(self):
         # type: () -> str
-        return "{0} <{1}>".format(type(self).__name__, self.id)
+        return type(self).__name__
 
     def __repr__(self):
         # type: () -> str
         cls = type(self)
         repr_ = dict.__repr__(self)
         return "{0}.{1} ({2})".format(cls.__module__, cls.__name__, repr_)
+
+    def dict(self):
+        """
+        Generate a dictionary representation of the object, but with inplace resolution of attributes as applicable.
+        """
+        # update any entries by key with their attribute
+        _dict = {key: getattr(self, key, dict.__getitem__(self, key)) for key, val in self.items()}
+        # then, ensure any missing key gets added if a getter property exists for it
+        props = {prop[0] for prop in inspect.getmembers(self) if not prop[0].startswith("_") and prop[0] not in _dict}
+        for key in props:
+            prop = getattr(type(self), key)
+            if isinstance(prop, property) and prop.fget is not None:
+                _dict[key] = prop.fget(self)  # noqa
+        return _dict
+
+
+class AutoBase(DictBase):
+    """
+    Base that automatically converts literal class members to properties also accessible by dictionary keys.
+
+    .. code-block: python
+
+        class Data(AutoBase):
+            field = 1
+            other = None
+
+        d = Data()
+        d.other         # returns None
+        d.other = 2     # other is modified
+        d.other         # returns 2
+        dict(d)         # returns {'field': 1, 'other': 2}
+        d.field         # returns 1
+        d["field"]      # also 1 !
+
+    """
+    def __new__(cls, **kwargs):
+        extra_props = set(dir(cls)) - set(dir(DictBase))
+        auto_cls = DictBase.__new__(cls, **kwargs)
+        for prop in extra_props:
+            prop_func = property(
+                lambda self, key: dict.__getitem__(self, key),
+                lambda self, key, value: dict.__setattr__(self, key, value)
+            )
+            default = getattr(auto_cls, prop, None)
+            setattr(auto_cls, prop, prop_func)
+            AutoBase.__setattr__(auto_cls, prop, default)
+        return auto_cls
+
+    def __getitem__(self, item):
+        # can use any of the object/dict location since both have it
+        return DictBase.__getitem__(self, item)
+
+    def __setattr__(self, key, value):
+        # set both as object and dict reference
+        DictBase.__setattr__(self, key, value)
+        dict.__setattr__(self, key, value)
+
+
+class Base(DictBase):
+    def __str__(self):
+        # type: () -> str
+        return "{0} <{1}>".format(type(self).__name__, self.id)
 
     @property
     def id(self):
@@ -152,20 +214,6 @@ class Base(dict):
             the object to store.
         """
         raise NotImplementedError("Method 'params' must be defined for storage item representation.")
-
-    def dict(self):
-        """
-        Generate a dictionary representation of the object, but with inplace resolution of attributes as applicable.
-        """
-        # update any entries by key with their attribute
-        _dict = {key: getattr(self, key, dict.__getitem__(self, key)) for key, val in self.items()}
-        # then, ensure any missing key gets added if a getter property exists for it
-        props = {prop[0] for prop in inspect.getmembers(self) if not prop[0].startswith("_") and prop[0] not in _dict}
-        for key in props:
-            prop = getattr(type(self), key)
-            if isinstance(prop, property) and prop.fget is not None:
-                _dict[key] = prop.fget(self)  # noqa
-        return _dict
 
 
 class Service(Base):
