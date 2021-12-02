@@ -10,11 +10,30 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add ``WeaverClient`` and ``weaver`` `CLI` as new utilities to interact with `Weaver` instead of using the HTTP `API`.
+  This provides shell and Python script interfaces to run operations toward `Weaver` (or `OGC-API - Processes`)
+  instances. It also facilitates new `Process` deployments by helping with the integration of a local `CWL` file into
+  a full-fledged ``Deploy`` HTTP request, and other recurrent tasks such as ``Execute`` requests followed by `Job`
+  monitoring and results retrieval once completed successfully.
+- Added ``weaver`` command installation to ``setup.py`` script.
+- Added ``cwl2json_input_values`` function to help converting between `CWL` *parameters* and `OGC-API - Processes`
+  input value definitions for `Job` submission.
+- Added ``weaver.datatype.AutoBase`` that allows quick definition of data containers with fields accessible both as
+  properties and dictionary keys, simply by detecting predefined class attributes, avoiding a lot of boilerplate code.
+- Split multiple file loading, remote validation and resolution procedures into distinct functions in order for the
+  new `CLI` to make use of the same methodologies as needed.
+- Updated documentation with new details relevant to the added `CLI` and corresponding references.
+- Updated some tests utilities to facilitate definitions of new tests for ``WeaverClient`` feature validation.
+- Replaced literal string ``"OGC"`` and ``"OLD"`` used for schema selection by properly defined constants.
 
 Fixes:
 ------
-- No change.
+- Fix some typing definitions related to `CWL` function parameters.
+- Fix multiple typing inconsistencies or ambiguities between ``AnyValue`` (as Python typing for any literal value)
+  against the actual class ``AnyValue`` of ``PyWPS``. Typing definitions now all use ``AnyValueType`` instead.
+- Fix resolution of ``owsContext`` location in the payload of remote `Process` provided by ``href`` link in
+  the ``executionUnit`` due to `OGC-API - Processes` (``"OGC"`` schema) not nested under ``process`` key
+  (in contrast to ``"OLD"`` schema).
 
 `4.5.0 <https://github.com/crim-ca/weaver/tree/4.5.0>`_ (2021-11-25)
 ========================================================================
