@@ -14,7 +14,10 @@ Changes:
   This provides shell and Python script interfaces to run operations toward `Weaver` (or `OGC-API - Processes`)
   instances. It also facilitates new `Process` deployments by helping with the integration of a local `CWL` file into
   a full-fledged ``Deploy`` HTTP request, and other recurrent tasks such as ``Execute`` requests followed by `Job`
-  monitoring and results retrieval once completed successfully.
+  monitoring and results retrieval once completed successfully
+  (addresses `#363 <https://github.com/crim-ca/weaver/issues/363>`_,
+  resolves `DAC-198 <https://www.crim.ca/jira/browse/DAC-198>`_,
+  relates to `DAC-203 <https://www.crim.ca/jira/browse/DAC-203>`_).
 - Added ``weaver`` command installation to ``setup.py`` script.
 - Added ``cwl2json_input_values`` function to help converting between `CWL` *parameters* and `OGC-API - Processes`
   input value definitions for `Job` submission.
