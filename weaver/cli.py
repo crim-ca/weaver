@@ -16,7 +16,7 @@ from weaver.execute import EXECUTE_MODE_ASYNC, EXECUTE_RESPONSE_DOCUMENT
 from weaver.formats import CONTENT_TYPE_APP_JSON
 from weaver.processes.convert import cwl2json_input_values
 from weaver.processes.wps_package import get_process_definition
-from weaver.utils import fetch_file, get_any_value, load_file, null, request_extra, setup_loggers
+from weaver.utils import fetch_file, get_any_id, get_any_value, load_file, null, request_extra, setup_loggers
 from weaver.status import JOB_STATUS_CATEGORIES, JOB_STATUS_CATEGORY_FINISHED, STATUS_SUCCEEDED
 from weaver.visibility import VISIBILITY_PUBLIC
 
@@ -33,15 +33,33 @@ LOGGER = logging.getLogger(__name__)
 class OperationResult(AutoBase):
     """
     Data container for any :class:`WeaverClient` operation results.
-    """
-    status = False  # type: Optional[bool]
-    message = ""    # type: Optional[str]
-    body = {}       # type: Optional[Union[str, JSON]]
-    headers = {}    # type: Optional[HeadersType]
 
-    def __init__(self, status=None, message=None, body=None, headers=None, **kwargs):
-        # type: (Optional[bool], Optional[str], Optional[Union[str, JSON]], Optional[HeadersType], Any) -> None
-        super(OperationResult, self).__init__(status=status, message=message, body=body, headers=headers, **kwargs)
+    :param success: Success status of the operation.
+    :param message: Detail extracted from response content if available.
+    :param headers: Headers returned by the response for reference.
+    :param body: Content of :term:`JSON` response or fallback in plain text.
+    :param text: Pre-formatted text representation of :paramref:`body`.
+    """
+    success = False     # type: Optional[bool]
+    message = ""        # type: Optional[str]
+    headers = {}        # type: Optional[HeadersType]
+    body = {}           # type: Optional[Union[JSON, str]]
+    text = ""           # type: Optional[str]
+
+    def __init__(self,
+                 success=None,  # type: Optional[bool]
+                 message=None,  # type: Optional[str]
+                 body=None,     # type: Optional[Union[str, JSON]]
+                 headers=None,  # type: Optional[HeadersType]
+                 text=None,     # type: Optional[str]
+                 **kwargs,      # type: Any
+                 ):             # type: (...) -> None
+        super(OperationResult, self).__init__(**kwargs)
+        self.success = success
+        self.message = message
+        self.headers = headers
+        self.body = body
+        self.text = text
 
 
 class WeaverClient(object):
@@ -212,6 +230,26 @@ class WeaverClient(object):
         resp = request_extra("POST", path, data=data, headers=headers, settings=self._settings)
         return self._parse_result(resp)
 
+    def capabilities(self, url=None):
+        # type: (Optional[str]) -> OperationResult
+        """
+        List all available :term:`Process` on the instance.
+
+        :param url: Instance URL if not already provided during client creation.
+        """
+        base = self._get_url(url)
+        path = f"{base}/processes"
+        query = {"detail": False}  # not supported by non-Weaver, but save the work if possible
+        resp = request_extra("GET", path, params=query, headers=self._headers, settings=self._settings)
+        result = self._parse_result(resp)
+        processes = result.body.get("processes")
+        if isinstance(processes, list) and all(isinstance(proc, dict) for proc in processes):
+            processes = [get_any_id(proc) for proc in processes]
+            result.body = processes
+        return result
+
+    processes = capabilities  # alias
+
     def describe(self, process_id, url=None):
         # type: (str, Optional[str]) -> OperationResult
         """
@@ -258,7 +296,19 @@ class WeaverClient(object):
             inputs = load_file(inputs)
         if not inputs or not isinstance(inputs, dict):
             return OperationResult(False, "No inputs or invalid schema provided.", inputs)
-        if "inputs" not in inputs or get_any_value(inputs.get("inputs", null)) is null:  # consider literal CWL 'inputs'
+        # consider possible ambiguity if literal CWL input is named 'inputs'
+        # - if value of 'inputs' is an object, it can collide with 'OGC' schema,
+        #   unless 'value/href' are present or their sub-dict don't have CWL 'class'
+        # - if value of 'inputs' is an array, it can collide with 'OLD' schema,
+        #   unless 'value/href' (and 'id' technically) are present
+        named_inputs = inputs.get("inputs", null)
+        if (
+            named_inputs is null or
+            (isinstance(named_inputs, dict) and
+             all(get_any_value(named_inputs) is null and "class" not in named_inputs)) or
+            (isinstance(named_inputs, list) and
+             all(get_any_value(item) is null for item in named_inputs))
+        ):
             inputs = cwl2json_input_values(inputs)
         data = {
             # NOTE: since sync is not yet properly implemented in Weaver, simulate with monitoring after if requested
@@ -338,7 +388,7 @@ class WeaverClient(object):
         """
         job_id, job_url = self._parse_job_ref(job_reference, url)
         res = self.status(job_url)
-        if not res.status:
+        if not res.success:
             return OperationResult(False, "Cannot process results from incomplete or failed job.", res.body)
         # use results endpoint instead of outputs to be OGC-API compliant
         result_url = f"{job_url}/results"
@@ -376,7 +426,7 @@ def setup_logger_from_options(logger, args):  # pragma: no cover
     """
     Uses argument parser options to setup logging level from specified flags.
 
-    Setup both the specific CLI logger that is provided and the generic `magpie` logger.
+    Setup both the specific CLI logger that is provided and the top-level package logger.
     """
     if args.log_level:
         logger.setLevel(logging.getLevelName(args.log_level.upper()))
@@ -389,8 +439,8 @@ def setup_logger_from_options(logger, args):  # pragma: no cover
     else:
         logger.setLevel(logging.WARNING)
     setup_loggers({}, force_stdout=args.stdout)
-    if logger.name != "magpie":
-        setup_logger_from_options(logging.getLogger("magpie"), args)
+    if logger.name != __meta__.__name__:
+        setup_logger_from_options(logging.getLogger(__meta__.__name__), args)
 
 
 def make_logging_options(parser):
@@ -496,6 +546,9 @@ def make_parser():
         help="Password to compute the authentication token for Docker image retrieval from a private registry."
     )
 
+    op_capabilities = ops_parsers.add_parser("capabilities", aliases=["processes"], help="List available processes.")
+    add_url_param(op_capabilities)
+
     op_describe = ops_parsers.add_parser("describe", help="Obtain an existing process description.")
     add_url_param(op_describe)
     add_process_param(op_describe)
@@ -559,21 +612,23 @@ def main(*args):
     parser = make_parser()
     ns = parser.parse_args(args=args or None)
     setup_logger_from_options(LOGGER, ns)
-    args = vars(ns)
-    op = args.pop("operation", None)
+    kwargs = vars(ns)
+    # remove logging params not known by operations
+    for param in ["stdout", "log", "log_level", "quiet", "debug", "verbose"]:
+        kwargs.pop(param, None)
+    op = kwargs.pop("operation", None)
     LOGGER.debug("Requested operation: [%s]", op)
     if not op or op not in dir(WeaverClient):
         parser.print_help()
         return 0
-    url = args.pop("url", None)
+    url = kwargs.pop("url", None)
     client = WeaverClient(url)
-    result = getattr(client, op)(*args)
-    status, message, data = result
-    if status:
-        LOGGER.info("%s successful. %s", op.title(), message)
-        print(data)
+    result = getattr(client, op)(**kwargs)
+    if result.success:
+        LOGGER.info("%s successful. %s", op.title(), result.message)
+        print(result.text)  # use print in case logger disabled or level error/warn
         return 0
-    LOGGER.error("%s failed. %s\n%s", op.title(), message, data)
+    LOGGER.error("%s failed. %s\n%s", op.title(), result.message, result.text)
     return -1
 
 

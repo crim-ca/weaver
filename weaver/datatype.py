@@ -157,9 +157,9 @@ class AutoBase(DictBase):
         d["field"]      # also 1 !
 
     """
-    def __new__(cls, **kwargs):
+    def __new__(cls, *args, **kwargs):
         extra_props = set(dir(cls)) - set(dir(DictBase))
-        auto_cls = DictBase.__new__(cls, **kwargs)
+        auto_cls = DictBase.__new__(cls, *args, **kwargs)
         for prop in extra_props:
             prop_func = property(
                 lambda self, key: dict.__getitem__(self, key),
@@ -171,8 +171,7 @@ class AutoBase(DictBase):
         return auto_cls
 
     def __getitem__(self, item):
-        # can use any of the object/dict location since both have it
-        return DictBase.__getitem__(self, item)
+        return dict.__getitem__(self, item)
 
     def __setattr__(self, key, value):
         # set both as object and dict reference

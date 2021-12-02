@@ -1,0 +1,4 @@
+# YAML representation supported by WeaverClient
+# This is the OGC direct representation by key-value pairs (applicable only for literal data).
+inputs:
+  message: "Test message"

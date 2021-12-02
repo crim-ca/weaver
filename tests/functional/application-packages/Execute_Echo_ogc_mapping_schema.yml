@@ -1,0 +1,5 @@
+# YAML representation supported by WeaverClient
+# This is the OGC mapping representation with more explicit value/href definitions.
+inputs:
+  message:
+    value: "Test message"

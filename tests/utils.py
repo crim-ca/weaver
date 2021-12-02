@@ -338,9 +338,9 @@ def mocked_file_response(path, url):
 
 
 def mocked_sub_requests(app, method_function, *args, only_local=False, **kwargs):
-    # type: (TestApp, str, Any, bool, Any) -> AnyResponseType
+    # type: (TestApp, Union[str, Callable[[Any], Any]], Any, bool, Any) -> AnyResponseType
     """
-    Mocks request calls under :class:`webTest.TestApp` to avoid sending real requests.
+    Mocks request calls targeting a :class:`webTest.TestApp` to avoid sub-request calls to send real requests.
 
     Executes ``app.function(*args, **kwargs)`` with a mock of every underlying :func:`requests.request` call
     to relay their execution to the :class:`webTest.TestApp`.
@@ -351,7 +351,11 @@ def mocked_sub_requests(app, method_function, *args, only_local=False, **kwargs)
     argument of :paramref:`args`) doesn't correspond to the base URL of :paramref:`app`.
 
     :param app: application employed for the test
-    :param method_function: test application method to call (i.e.: ``post``, ``post_json``, ``get``, etc.)
+    :param method_function:
+        Test application method, which represents an HTTP method name (i.e.: ``post``, ``post_json``, ``get``, etc.).
+        All ``*args`` and ``**kwargs`` should be request related items that will be passed down to a request-like call.
+        Otherwise, it can be any other function which will be called directly instead of doing the request toward the
+        test application. In this case, ``*args`` and ``**kwargs`` should correspond to the arguments of this function.
     :param only_local:
         When ``True``, only mock requests targeted at :paramref:`app` based on request URL hostname (ignore external).
         Otherwise, mock every underlying request regardless of hostname, including ones not targeting the application.
@@ -460,11 +464,13 @@ def mocked_sub_requests(app, method_function, *args, only_local=False, **kwargs)
         stack.enter_context(mock.patch("requests.sessions.Session.request", new=TestSession.request))
         stack.enter_context(mock.patch.object(FileLocal, "validator", new_callable=mock_file_regex))
         stack.enter_context(mock.patch.object(TestResponse, "json", new=TestResponseJsonCallable.json))
-        req_url, req_func, kwargs = _parse_for_app_req(method_function, *args, **kwargs)
-        kwargs.setdefault("expect_errors", True)
-        resp = req_func(req_url, **kwargs)
-        _patch_response_methods(resp, req_url)
-        return resp
+        if isinstance(method_function, str):
+            req_url, req_func, kwargs = _parse_for_app_req(method_function, *args, **kwargs)
+            kwargs.setdefault("expect_errors", True)
+            resp = req_func(req_url, **kwargs)
+            _patch_response_methods(resp, req_url)
+            return resp
+        return method_function(*args, **kwargs)
 
 
 def mocked_remote_wps(processes, languages=None):
@@ -536,7 +542,7 @@ def mocked_remote_server_requests_wps1(server_configs,          # type: Union[Mo
             # Call requests here, both provided WPS and above requests will be mocked.
 
     The generated responses mock can also be passed back into the function to register further WPS services with
-    similar handling as the decorator to register relavant requests based on provided server configurations.
+    similar handling as the decorator to register relevant requests based on provided server configurations.
 
     .. code-block:: python
 

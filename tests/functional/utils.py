@@ -1,4 +1,5 @@
 import json
+import os
 import time
 import unittest
 from copy import deepcopy
@@ -17,11 +18,12 @@ from tests.utils import (
     setup_mongodb_jobstore,
     setup_mongodb_processstore
 )
+from weaver import WEAVER_ROOT_DIR
 from weaver.database import get_db
 from weaver.formats import CONTENT_TYPE_APP_JSON
-from weaver.processes.constants import PROCESS_SCHEMA_OLD
+from weaver.processes.constants import PROCESS_SCHEMA_OGC
 from weaver.status import STATUS_ACCEPTED, STATUS_RUNNING, STATUS_SUCCEEDED
-from weaver.utils import fully_qualified_name
+from weaver.utils import fully_qualified_name, load_file
 from weaver.visibility import VISIBILITY_PUBLIC
 
 if TYPE_CHECKING:
@@ -66,13 +68,22 @@ class WpsConfigBase(unittest.TestCase):
         return deepcopy(resp.json)
 
     @classmethod
-    def deploy_process(cls, payload, describe_schema=PROCESS_SCHEMA_OGC):
-        # type: (JSON, str) -> JSON
+    def deploy_process(cls, payload, process_id=None, describe_schema=PROCESS_SCHEMA_OGC):
+        # type: (JSON, Optional[str], str) -> JSON
         """
         Deploys a process with :paramref:`payload`.
 
         :returns: resulting tuple of ``(process-description, package)`` JSON responses.
         """
+        if process_id:
+            payload["processDescription"]["process"]["id"] = process_id  # type: ignore
+        exec_list = payload.get("executionUnit", [])
+        if len(exec_list):
+            exec_href = exec_list[0].get("href", "")
+            if exec_href.startswith("tests/"):
+                exec_unit = load_file(os.path.join(WEAVER_ROOT_DIR, exec_href))
+                exec_list[0]["unit"] = exec_unit
+                exec_list[0].pop("href")
         resp = mocked_sub_requests(cls.app, "post_json", "/processes", data=payload, headers=cls.json_headers)
         assert resp.status_code == 201, "Expected successful deployment.\nError:\n{}".format(resp.text)
         path = resp.json["processSummary"]["processDescriptionURL"]
