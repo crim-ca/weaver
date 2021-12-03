@@ -722,8 +722,8 @@ def mocked_wps_output(settings, mock_get=True, mock_head=True, headers_override=
     return mocked_file_server(wps_dir, wps_url, settings, mock_get, mock_head, headers_override)
 
 
-def mocked_execute_process():
-    # type: () -> Iterable[MockPatch]
+def mocked_execute_process(func_execute_process=None):
+    # type: (Optional[Callable[[str, str, AnyHeadersContainer], str]]) -> Iterable[MockPatch]
     """
     Contextual mock of a process execution to run locally instead of dispatched :mod:`celery` worker.
 
@@ -733,11 +733,18 @@ def mocked_execute_process():
     Bypasses ``execute_process.delay`` call by directly invoking the ``execute_process``.
 
     .. note::
-        Since ``delay`` and ``Celery`` are bypassed, the process execution becomes blocking (not asynchronous).
+        Since ``delay`` and :mod:`celery` are bypassed, the process execution becomes blocking (not asynchronous).
 
     .. seealso::
         - :func:`mocked_process_job_runner` to completely skip process execution.
         - :func:`setup_config_with_celery`
+
+    :param func_execute_process:
+        Function that should be called as substitute of the real :func:`process_execution`.
+        It is expected to receive the ``(job_id, wps_url, headers)`` parameters and return a valid member
+        of :mod:`weaver.status` as return value for proper integration with calling methods.
+        If not provided, the real :func:`process_execution` will be called, but with prior mock of any :mod:`celery`
+        related asynchronous dispatching to execute the actual process definition inline.
     """
     from weaver.processes.execution import execute_process as real_execute_process
 
@@ -760,7 +767,10 @@ def mocked_execute_process():
     task = MockTask()
 
     def mock_execute_process(job_id, wps_url, headers):
-        real_execute_process(job_id, wps_url, headers)
+        if func_execute_process is None:
+            real_execute_process(job_id, wps_url, headers)
+        else:
+            func_execute_process(job_id, wps_url, headers)
         return task
 
     return (

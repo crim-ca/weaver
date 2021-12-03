@@ -12,7 +12,7 @@ from urllib.parse import urlparse
 from weaver import __meta__
 from weaver.datatype import AutoBase
 from weaver.exceptions import PackageRegistrationError
-from weaver.execute import EXECUTE_MODE_ASYNC, EXECUTE_RESPONSE_DOCUMENT
+from weaver.execute import EXECUTE_MODE_ASYNC, EXECUTE_RESPONSE_DOCUMENT, EXECUTE_TRANSMISSION_MODE_VALUE
 from weaver.formats import CONTENT_TYPE_APP_JSON
 from weaver.processes.convert import cwl2json_input_values
 from weaver.processes.wps_package import get_process_definition
@@ -97,16 +97,20 @@ class WeaverClient(object):
     def _parse_result(response):
         # type: (Response) -> OperationResult
         hdr = dict(response.headers)
+        success = False
         try:
             body = response.json()
             msg = body.get("description", body.get("message", "undefined"))
-            if response.status_code >= 400 and not msg:
-                msg = body.get("error", body.get("exception", "unknown"))
+            if response.status_code >= 400:
+                if not msg:
+                    msg = body.get("error", body.get("exception", "unknown"))
+            else:
+                success = True
             text = WeaverClient._json2text(body)
         except Exception:  # noqa
             text = body = response.text
             msg = "Could not parse body."
-        return OperationResult(True, msg, body, hdr, text=text)
+        return OperationResult(success, msg, body, hdr, text=text)
 
     @staticmethod
     def _json2text(data):
@@ -317,25 +321,37 @@ class WeaverClient(object):
         named_inputs = inputs.get("inputs", null)
         if (
             named_inputs is null or
-            (isinstance(named_inputs, dict) and
-             all(get_any_value(named_inputs) is null and "class" not in named_inputs)) or
-            (isinstance(named_inputs, list) and
-             all(get_any_value(item) is null for item in named_inputs))
+            (isinstance(named_inputs, dict) and get_any_value(named_inputs) is null and "class" not in named_inputs) or
+            (isinstance(named_inputs, list) and all(get_any_value(item) is null for item in named_inputs))
         ):
             inputs = cwl2json_input_values(inputs)
         data = {
             # NOTE: since sync is not yet properly implemented in Weaver, simulate with monitoring after if requested
+            # FIXME: support 'sync' (https://github.com/crim-ca/weaver/issues/247)
             "mode": EXECUTE_MODE_ASYNC,
             "inputs": inputs,
+            # FIXME: support 'response: raw' (https://github.com/crim-ca/weaver/issues/376)
             "response": EXECUTE_RESPONSE_DOCUMENT,
+            # FIXME: allow omitting 'outputs' (https://github.com/crim-ca/weaver/issues/375)
+            # FIXME: allow 'transmissionMode: value/reference' selection (https://github.com/crim-ca/weaver/issues/377)
+            "outputs": {}
         }
-        LOGGER.info("Executing [%s] with inputs:\n%s", self._json2text(inputs))
+        # FIXME: since (https://github.com/crim-ca/weaver/issues/375) not implemented, auto-populate all the outputs
         base = self._get_url(url)
-        path = f"{base}/processes/{process_id}"
-        resp = request_extra("GET", path, data=data, headers=self._headers, settings=self._settings)
-        results = self._parse_result(resp)
-        if monitor:
-            return results
+        result = self.describe(process_id, url=base)
+        if not result.success:
+            return result
+        outputs = result.body.get("outputs")
+        for output_id in outputs:
+            # use 'value' to have all outputs reported in body as 'value/href' rather than 'Link' headers
+            data["outputs"][output_id] = {"transmissionMode": EXECUTE_TRANSMISSION_MODE_VALUE}
+
+        LOGGER.info("Executing [%s] with inputs:\n%s", process_id, self._json2text(inputs))
+        path = f"{base}/processes/{process_id}/execution"  # use OGC-API compliant endpoint (not '/jobs')
+        resp = request_extra("POST", path, data=data, headers=self._headers, settings=self._settings)
+        result = self._parse_result(resp)
+        if not monitor or not result.success:
+            return result
         # although Weaver returns "jobID" in the body for convenience,
         # employ the "Location" header to be OGC-API compliant
         job_url = resp.headers.get("Location", "")
@@ -368,12 +384,12 @@ class WeaverClient(object):
         :return: result of the successful or failed job, or timeout of monitoring process.
         """
         job_id, job_url = self._parse_job_ref(job_reference, url)
-        timeout = timeout or self.monitor_timeout
+        remain = timeout = timeout or self.monitor_timeout
         delta = delta or self.monitor_delta
         LOGGER.info("Monitoring job [%s] for %ss at intervals of %ss.", job_id, timeout, delta)
         once = True
         body = None
-        while timeout >= 0 or once:
+        while remain >= 0 or once:
             resp = request_extra("GET", job_url, headers=self._headers)
             if resp.status_code != 200:
                 return OperationResult(False, "Could not find job with specified reference.", {"job": job_reference})
@@ -384,7 +400,7 @@ class WeaverClient(object):
             if status in JOB_STATUS_CATEGORIES[JOB_STATUS_CATEGORY_FINISHED]:
                 return OperationResult(False, "Requested job status not reached, but job has finished.", body)
             time.sleep(delta)
-            timeout -= delta
+            remain -= delta
             once = False
         return OperationResult(False, f"Monitoring timeout reached ({timeout}s). Job did not complete in time.", body)
 

@@ -37,6 +37,10 @@ Fixes:
 - Fix resolution of ``owsContext`` location in the payload of remote `Process` provided by ``href`` link in
   the ``executionUnit`` due to `OGC-API - Processes` (``"OGC"`` schema) not nested under ``process`` key
   (in contrast to ``"OLD"`` schema).
+- Fix resolution of ``outputs`` submitted as mapping (`OGC-API - Processes` schema) during `Job` execution
+  to provide desired filtered outputs in results and their ``transmissionMode``. Note that filtering and handling of
+  all ``transmissionMode`` variants are themselves not yet supported (relates to
+  `#377 <https://github.com/crim-ca/weaver/issues/377>`_ and `#380 <https://github.com/crim-ca/weaver/issues/380>`_).
 
 `4.5.0 <https://github.com/crim-ca/weaver/tree/4.5.0>`_ (2021-11-25)
 ========================================================================

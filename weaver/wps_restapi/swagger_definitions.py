@@ -982,9 +982,9 @@ class AllowedRangesList(ExtendedSequenceSchema):
 
 class AllowedValues(OneOfKeywordSchema):
     _one_of = [
-        AllowedRangesList(description="List of value ranges and contrains."),   # array of {range}
-        AllowedValuesList(description="List of enumerated allowed values."),    # array of "value"
-        ExtendedSchemaNode(String(), description="Single allowed value."),      # single "value"
+        AllowedRangesList(description="List of value ranges and constraints."),  # array of {range}
+        AllowedValuesList(description="List of enumerated allowed values."),     # array of "value"
+        ExtendedSchemaNode(String(), description="Single allowed value."),       # single "value"
     ]
 
 
@@ -2309,21 +2309,40 @@ class ExecuteInputDataType(InputIdentifierType):
 
 
 class ExecuteOutputDataType(OutputIdentifierType):
+    pass
+
+
+class ExecuteOutputDefinition(ExtendedMappingSchema):
+    transmissionMode = TransmissionModeEnum(missing=drop)
     format = Format(missing=drop)
 
 
-class ExecuteOutputDefinition(ExecuteOutputDataType):
-    transmissionMode = TransmissionModeEnum(missing=drop)
+class ExecuteOutputItem(ExecuteOutputDataType, ExecuteOutputDefinition):
+    pass
 
 
-class ExecuteOutputFilterList(ExtendedSequenceSchema):
+class ExecuteOutputSpecList(ExtendedSequenceSchema):
     """
-    Filter list of outputs to be obtained from execution.
+    Filter list of outputs to be obtained from execution and their reporting method.
     """
-    # FIXME:
-    #   nothing done with this currently... execution just generates all outputs anyway
-    #   useful only in for limiting reported outputs in 'sync' mode that should reply after only with those specified
-    output = ExecuteOutputDefinition()
+    output = ExecuteOutputItem()
+
+
+class ExecuteOutputSpecMap(ExtendedMappingSchema):
+    input_id = ExecuteOutputDefinition(variable="<input-id>", title="ExecuteOutputSpecMap",
+                                       description="Desired output reporting method.")
+
+
+class ExecuteOutputSpec(OneOfKeywordSchema):
+    """
+    Filter list of outputs to be obtained from execution and define their reporting method.
+    """
+    _one_of = [
+        # OLD format: {"outputs": [{"id": "<id>", "transmissionMode": "value|reference"}, ...]}
+        ExecuteOutputSpecList(),
+        # OGC-API:    {"inputs": {"<id>": {"transmissionMode": "value|reference"}, ...}}
+        ExecuteOutputSpecMap(),
+    ]
 
 
 class ProviderSummarySchema(DescriptionType, ProviderPublic, DescriptionMeta, DescriptionLinks):
@@ -2800,8 +2819,16 @@ class Execute(ExtendedMappingSchema):
     #   - 'tests.wps_restapi.test_providers.WpsRestApiProcessesTest.test_execute_process_no_error_not_required_params'
     #   - 'tests.wps_restapi.test_providers.WpsRestApiProcessesTest.test_get_provider_process_no_inputs'
     #   - 'tests.wps_restapi.test_colander_extras.test_oneof_variable_dict_or_list'
-    inputs = ExecuteInputValues(default={})
-    outputs = ExecuteOutputFilterList(description="Filter list of outputs to be obtained from execution.")
+    inputs = ExecuteInputValues(default={}, description="Values submitted for execution.")
+    outputs = ExecuteOutputSpec(
+        # FIXME: add documentation reference link OGC/Weaver for further details.
+        description="Defines which outputs to be obtained from the execution (filtered or all), "
+                    "as well as the reporting method for each output according to 'transmissionMode', "
+                    "the 'response' type, and the execution 'mode' provided.",
+        # FIXME: allow omitting 'outputs' (https://github.com/crim-ca/weaver/issues/375)
+        #        maybe this is good enough, but should have a proper test for it
+        # default={}
+    )
     mode = JobExecuteModeEnum()
     notification_email = ExtendedSchemaNode(
         String(),
@@ -3311,9 +3338,13 @@ class JobOutputValue(OneOfKeywordSchema):
     ]
 
 
+class JobOutputFile(OutputIdentifierType):
+    format = Format(missing=drop)
+
+
 class JobOutput(AllOfKeywordSchema):
     _all_of = [
-        ExecuteOutputDataType(),
+        JobOutputFile(),
         JobOutputValue(),
     ]
 

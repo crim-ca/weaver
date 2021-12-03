@@ -1,5 +1,5 @@
 # YAML representation supported by WeaverClient
 # This is the OLD (Testbeds/Pilot) listing representation with most explicit value/href definitions.
 inputs:
-  - id: message
+  - id: "message"
     value: "Test message"
