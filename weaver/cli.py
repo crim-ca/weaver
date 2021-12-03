@@ -318,18 +318,20 @@ class WeaverClient(object):
         #   unless 'value/href' are present or their sub-dict don't have CWL 'class'
         # - if value of 'inputs' is an array, it can collide with 'OLD' schema,
         #   unless 'value/href' (and 'id' technically) are present
-        named_inputs = inputs.get("inputs", null)
+        values = inputs.get("inputs", null)
         if (
-            named_inputs is null or
-            (isinstance(named_inputs, dict) and get_any_value(named_inputs) is null and "class" not in named_inputs) or
-            (isinstance(named_inputs, list) and all(get_any_value(item) is null for item in named_inputs))
+            values is null or
+            values is not null and (
+                (isinstance(values, dict) and get_any_value(values) is null and "class" not in values) or
+                (isinstance(values, list) and all(get_any_value(item) is null for item in values))
+            )
         ):
-            inputs = cwl2json_input_values(inputs)
+            values = cwl2json_input_values(inputs)
         data = {
             # NOTE: since sync is not yet properly implemented in Weaver, simulate with monitoring after if requested
             # FIXME: support 'sync' (https://github.com/crim-ca/weaver/issues/247)
             "mode": EXECUTE_MODE_ASYNC,
-            "inputs": inputs,
+            "inputs": values,
             # FIXME: support 'response: raw' (https://github.com/crim-ca/weaver/issues/376)
             "response": EXECUTE_RESPONSE_DOCUMENT,
             # FIXME: allow omitting 'outputs' (https://github.com/crim-ca/weaver/issues/375)

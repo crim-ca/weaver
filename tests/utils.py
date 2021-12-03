@@ -50,7 +50,7 @@ from weaver.warning import MissingParameterWarning, UnsupportedOperationWarning
 from weaver.wps.utils import get_wps_output_dir, get_wps_output_url
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Type, Union
+    from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Type, TypeVar, Union
 
     import botocore.client  # noqa
     from owslib.wps import Process as ProcessOWSWPS
@@ -63,6 +63,7 @@ if TYPE_CHECKING:
 
     # [WPS1-URL, GetCapPathXML, [DescribePathXML], [ExecutePathXML]]
     MockConfigWPS1 = Sequence[str, str, Optional[Sequence[str]], Optional[Sequence[str]]]
+    MockReturnType = TypeVar("MockReturnType")
 
 MOCK_AWS_REGION = "us-central-1"
 MOCK_HTTP_REF = "http://localhost.mock"
@@ -337,8 +338,12 @@ def mocked_file_response(path, url):
     return resp
 
 
-def mocked_sub_requests(app, method_function, *args, only_local=False, **kwargs):
-    # type: (TestApp, Union[str, Callable[[Any], Any]], Any, bool, Any) -> AnyResponseType
+def mocked_sub_requests(app,                # type: TestApp
+                        method_function,    # type: Union[str, Callable[[Any], MockReturnType]]
+                        *args,              # type: Any
+                        only_local=False,   # type: bool
+                        **kwargs,           # type: Any
+                        ):                  # type: (...) -> Union[AnyResponseType, MockReturnType]
     """
     Mocks request calls targeting a :class:`webTest.TestApp` to avoid sub-request calls to send real requests.
 

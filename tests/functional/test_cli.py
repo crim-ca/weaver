@@ -76,7 +76,7 @@ class TestWeaverClient(WpsConfigBase):
         assert result.body["inputs"]["message"]["minOccurs"] == 1
         assert result.body["inputs"]["message"]["maxOccurs"] == 1
         assert result.body["inputs"]["message"]["literalDataDomains"][0]["dataType"]["name"] == "string"
-        assert "outputs" in result.body["outputs"]
+        assert "output" in result.body["outputs"]
         assert result.body["outputs"]["output"]["title"] == "output"
         assert result.body["outputs"]["output"]["description"] == "Output file with echo message."
         assert result.body["outputs"]["output"]["formats"] == [{"default": True, "mediaType": CONTENT_TYPE_TEXT_PLAIN}]
