@@ -20,6 +20,8 @@ Changes:
   resolves `DAC-198 <https://www.crim.ca/jira/browse/DAC-198>`_,
   relates to `DAC-203 <https://www.crim.ca/jira/browse/DAC-203>`_).
 - Added ``weaver`` command installation to ``setup.py`` script.
+- Added auto-documentation utilities for new ``weaver`` CLI (argparse parameter definitions) and provide relevant
+  references in new chapter in Sphinx documentation.
 - Added ``cwl2json_input_values`` function to help converting between `CWL` *parameters* and `OGC API - Processes`
   input value definitions for `Job` submission.
 - Added ``weaver.datatype.AutoBase`` that allows quick definition of data containers with fields accessible both as
