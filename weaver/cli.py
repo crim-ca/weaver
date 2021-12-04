@@ -311,8 +311,10 @@ class WeaverClient(object):
         """
         if isinstance(inputs, str):
             inputs = load_file(inputs)
-        if not inputs or not isinstance(inputs, dict):
+        if not inputs or not isinstance(inputs, (dict, list)):
             return OperationResult(False, "No inputs or invalid schema provided.", inputs)
+        if isinstance(inputs, list):  # OLD format provided directly
+            inputs = {"inputs": inputs}
         # consider possible ambiguity if literal CWL input is named 'inputs'
         # - if value of 'inputs' is an object, it can collide with 'OGC' schema,
         #   unless 'value/href' are present or their sub-dict don't have CWL 'class'
@@ -323,7 +325,7 @@ class WeaverClient(object):
             values is null or
             values is not null and (
                 (isinstance(values, dict) and get_any_value(values) is null and "class" not in values) or
-                (isinstance(values, list) and all(get_any_value(item) is null for item in values))
+                (isinstance(values, list) and all(isinstance(v, dict) and get_any_value(v) is null for v in values))
             )
         ):
             values = cwl2json_input_values(inputs)
@@ -418,25 +420,28 @@ class WeaverClient(object):
         :returns: Result details and local paths if downloaded.
         """
         job_id, job_url = self._parse_job_ref(job_reference, url)
-        res = self.status(job_url)
-        if not res.success:
-            return OperationResult(False, "Cannot process results from incomplete or failed job.", res.body)
-        # use results endpoint instead of outputs to be OGC-API compliant
+        status = self.status(job_url)
+        if not status.success:
+            return OperationResult(False, "Cannot process results from incomplete or failed job.", status.body)
+        # use results endpoint instead of outputs to be OGC-API compliant, should be able to target non-Weaver instance
+        # with this endpoint, outputs IDs are directly at the root of the body
         result_url = f"{job_url}/results"
         resp = request_extra("GET", result_url, headers=self._headers)
-        results = resp.json()
-        if (
-            resp.status_code != 200 or
-            "outputs" not in results or
-            not isinstance(results["outputs"], dict) or
-            not not any("href" in value for value in results["outputs"])
-        ):
-            return OperationResult(False, "Could not retrieve any output results from job.", results)
+        res_out = self._parse_result(resp)
+        outputs = res_out.body
+        if not res_out.success or not isinstance(res_out.body, dict):
+            return OperationResult(False, "Could not retrieve any output results from job.", outputs)
+        if not download:
+            return OperationResult(True, "Listing job results.", outputs)
+
+        # download file results
+        if not any("href" in value for value in outputs.values()):
+            return OperationResult(False, "Outputs were found but none are downloadable (only raw values?).", outputs)
         if not out_dir:
             out_dir = os.path.join(os.path.realpath(os.path.curdir), job_id)
         os.makedirs(out_dir, exist_ok=True)
         LOGGER.info("Will store job [%s] output results in [%s]", job_id, out_dir)
-        for output, value in results["outputs"].items():
+        for output, value in outputs.items():
             is_list = True
             if not isinstance(value, list):
                 value = [value]
@@ -445,11 +450,10 @@ class WeaverClient(object):
                 if "href" in item:
                     file_path = fetch_file(item["href"], out_dir, link=False)
                     if is_list:
-                        results[output][i]["path"] = file_path
+                        outputs[output][i]["path"] = file_path
                     else:
-                        results[output]["path"] = file_path
-        msg = "Retrieved job results." if download else "Listing job results."
-        return OperationResult(True, msg, results)
+                        outputs[output]["path"] = file_path
+        return OperationResult(True, "Retrieved job results.", outputs)
 
 
 def setup_logger_from_options(logger, args):  # pragma: no cover
