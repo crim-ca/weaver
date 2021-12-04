@@ -16,8 +16,8 @@ from weaver.execute import EXECUTE_MODE_ASYNC, EXECUTE_RESPONSE_DOCUMENT, EXECUT
 from weaver.formats import CONTENT_TYPE_APP_JSON
 from weaver.processes.convert import cwl2json_input_values
 from weaver.processes.wps_package import get_process_definition
-from weaver.utils import fetch_file, get_any_id, get_any_value, load_file, null, request_extra, setup_loggers
 from weaver.status import JOB_STATUS_CATEGORIES, JOB_STATUS_CATEGORY_FINISHED, STATUS_SUCCEEDED
+from weaver.utils import fetch_file, get_any_id, get_any_value, load_file, null, request_extra, setup_loggers
 from weaver.visibility import VISIBILITY_PUBLIC
 
 if TYPE_CHECKING:

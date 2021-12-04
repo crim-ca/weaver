@@ -5,14 +5,14 @@ import contextlib
 import copy
 import os
 import shutil
-
 import tempfile
+
 import pytest
 import yaml
 
-from tests.utils import get_weaver_url, mocked_execute_process, mocked_sub_requests, mocked_wps_output
 from tests.functional import APP_PKG_ROOT
 from tests.functional.utils import WpsConfigBase
+from tests.utils import get_weaver_url, mocked_execute_process, mocked_sub_requests, mocked_wps_output
 from weaver.cli import WeaverClient
 from weaver.formats import CONTENT_TYPE_TEXT_PLAIN
 from weaver.status import STATUS_ACCEPTED, STATUS_SUCCEEDED

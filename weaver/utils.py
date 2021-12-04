@@ -9,18 +9,17 @@ import re
 import shutil
 import sys
 import time
-import yaml
 import warnings
 from copy import deepcopy
 from datetime import datetime
 from typing import TYPE_CHECKING
 from urllib.parse import ParseResult, unquote, urlparse, urlunsplit
-from yaml.scanner import ScannerError
 
 import boto3
 import colander
 import pytz
 import requests
+import yaml
 from beaker.cache import cache_region, region_invalidate
 from beaker.exceptions import BeakerException
 from celery.app import Celery
@@ -38,6 +37,7 @@ from requests_file import FileAdapter
 from urlmatch import urlmatch
 from webob.headers import EnvironHeaders, ResponseHeaders
 from werkzeug.wrappers import Request as WerkzeugRequest
+from yaml.scanner import ScannerError
 
 from weaver.status import map_status
 from weaver.warning import TimeZoneInfoAlreadySetWarning
