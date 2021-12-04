@@ -25,7 +25,12 @@ if TYPE_CHECKING:
 
     from requests import Response
 
-    from weaver.typedefs import CWL, HeadersType, JSON
+    # avoid failing sphinx-argparse documentation
+    # https://github.com/ashb/sphinx-argparse/issues/7
+    try:
+        from weaver.typedefs import CWL, HeadersType, JSON
+    except ImportError:
+        pass
 
 LOGGER = logging.getLogger(__name__)
 
