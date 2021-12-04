@@ -212,18 +212,18 @@ class WeaverClient(object):
             Instance URL if not already provided during client creation.
         :returns: results of the operation.
         """
-        ok, msg, data = self._parse_deploy_body(body, process_id)
-        if not ok:
+        success, msg, data = self._parse_deploy_body(body, process_id)
+        if not success:
             return OperationResult(False, msg, data)
         headers = copy.deepcopy(self._headers)
         headers.update(self._parse_auth_token(token, username, password))
         try:
             if isinstance(cwl, str) or isinstance(wps, str):
-                LOGGER.debug("Override loaded CWL into provided/loaded body.", process_id)
+                LOGGER.debug("Override loaded CWL into provided/loaded body for process: [%s]", process_id)
                 proc = get_process_definition({}, reference=cwl or wps, headers=headers)  # validate
                 data["executionUnit"] = [{"unit": proc["package"]}]
             elif isinstance(cwl, dict):
-                LOGGER.debug("Override provided CWL into provided/loaded body.", process_id)
+                LOGGER.debug("Override provided CWL into provided/loaded body for process: [%s]", process_id)
                 get_process_definition({}, package=cwl, headers=headers)  # validate
                 data["executionUnit"] = [{"unit": cwl}]
         except PackageRegistrationError as exc:
@@ -651,19 +651,19 @@ def main(*args):
     # remove logging params not known by operations
     for param in ["stdout", "log", "log_level", "quiet", "debug", "verbose"]:
         kwargs.pop(param, None)
-    op = kwargs.pop("operation", None)
-    LOGGER.debug("Requested operation: [%s]", op)
-    if not op or op not in dir(WeaverClient):
+    oper = kwargs.pop("operation", None)
+    LOGGER.debug("Requested operation: [%s]", oper)
+    if not oper or oper not in dir(WeaverClient):
         parser.print_help()
         return 0
     url = kwargs.pop("url", None)
     client = WeaverClient(url)
-    result = getattr(client, op)(**kwargs)
+    result = getattr(client, oper)(**kwargs)
     if result.success:
-        LOGGER.info("%s successful. %s", op.title(), result.message)
+        LOGGER.info("%s successful. %s", oper.title(), result.message)
         print(result.text)  # use print in case logger disabled or level error/warn
         return 0
-    LOGGER.error("%s failed. %s\n%s", op.title(), result.message, result.text)
+    LOGGER.error("%s failed. %s\n%s", oper.title(), result.message, result.text)
     return -1
 
 
