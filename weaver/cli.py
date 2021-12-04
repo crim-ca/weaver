@@ -271,6 +271,9 @@ class WeaverClient(object):
         return result
 
     processes = capabilities  # alias
+    """
+    Alias of :meth:`capabilities` for :term:`Process` listing.
+    """
 
     def describe(self, process_id, url=None):
         # type: (str, Optional[str]) -> OperationResult
