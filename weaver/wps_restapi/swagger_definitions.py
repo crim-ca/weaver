@@ -294,7 +294,7 @@ class MediaType(ExtendedSchemaNode):
 class DateTimeInterval(ExtendedSchemaNode):
     schema_type = String
     description = (
-        "DateTime format against OGC-API - Processes, "
+        "DateTime format against OGC API - Processes, "
         "to get values before a certain date-time use '../' before the date-time, "
         "to get values after a certain date-time use '/..' after the date-time like the example, "
         "to get values between two date-times use '/' between the date-times, "
@@ -666,7 +666,7 @@ class DeploymentFormat(FormatSelection, FormatDescription, FormatDefault):
 
 class ResultFormat(FormatDescription):
     """
-    Format employed for reference results respecting 'OGC-API - Processes' schemas.
+    Format employed for reference results respecting 'OGC API - Processes' schemas.
     """
     schema_ref = "{}/master/core/openapi/schemas/formatDescription.yaml".format(OGC_API_SCHEMA_URL)
     mediaType = MediaType(String())
@@ -3414,7 +3414,7 @@ class Result(ExtendedMappingSchema):
     output_id = ResultData(
         variable="<output-id>", title="Output Identifier",
         description=(
-            "Resulting value of the output that conforms to 'OGC-API - Processes' standard. "
+            "Resulting value of the output that conforms to 'OGC API - Processes' standard. "
             "(Note: '<output-id>' is a variable corresponding for each output identifier of the process)"
         )
     )

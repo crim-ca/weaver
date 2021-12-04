@@ -142,7 +142,7 @@ class AutoBase(DictBase):
     """
     Base that automatically converts literal class members to properties also accessible by dictionary keys.
 
-    .. code-block: python
+    .. code-block:: python
 
         class Data(AutoBase):
             field = 1

@@ -591,7 +591,7 @@ def xml_wps2cwl(wps_process_response, settings):
     Obtains the ``CWL`` definition that corresponds to a XML WPS-1 process.
 
     Converts a `WPS-1 ProcessDescription XML` tree structure to an equivalent `WPS-3 Process JSON`.  and builds the
-    associated `CWL` package in conformance to :ref:`weaver.processes.wps_package.CWL_REQUIREMENT_APP_WPS1`.
+    associated `CWL` package in conformance to :data:`weaver.processes.wps_package.CWL_REQUIREMENT_APP_WPS1`.
 
     :param wps_process_response: valid response (XML, 200) from a `WPS-1 ProcessDescription`.
     :param settings: application settings to retrieve additional request options.

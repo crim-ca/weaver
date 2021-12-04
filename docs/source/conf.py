@@ -52,6 +52,7 @@ needs_sphinx = "3.5"    # see requirements-doc.txt
 sys.path.append(os.path.join(DOC_DIR_ROOT, "_extensions"))
 extensions = [
     "doc_redirect",         # redirect literal RST references -> built HTML page
+    "sphinxarg.ext",        # render argparse CLI definitions
     "sphinxcontrib.redoc",  # generate live OpenAPI with this doc
     "sphinx.ext.autodoc",   # document code docstrings
     "sphinx.ext.autosectionlabel",  # help make cross-references to title/sections

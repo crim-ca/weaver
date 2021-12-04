@@ -12,7 +12,7 @@ Changes:
 --------
 - Add ``WeaverClient`` and ``weaver`` `CLI` as new utilities to interact with `Weaver` instead of using the HTTP `API`.
   This provides both shell and Python script interfaces to run operations toward `Weaver` instances
-  (or any other `OGC-API - Processes` compliant instance *except for deployment operations*).
+  (or any other `OGC API - Processes` compliant instance *except for deployment operations*).
   It also facilitates new `Process` deployments by helping with the integration of a local `CWL` file into
   a full-fledged ``Deploy`` HTTP request, and other recurrent tasks such as ``Execute`` requests followed by `Job`
   monitoring and results retrieval once completed successfully
@@ -20,7 +20,7 @@ Changes:
   resolves `DAC-198 <https://www.crim.ca/jira/browse/DAC-198>`_,
   relates to `DAC-203 <https://www.crim.ca/jira/browse/DAC-203>`_).
 - Added ``weaver`` command installation to ``setup.py`` script.
-- Added ``cwl2json_input_values`` function to help converting between `CWL` *parameters* and `OGC-API - Processes`
+- Added ``cwl2json_input_values`` function to help converting between `CWL` *parameters* and `OGC API - Processes`
   input value definitions for `Job` submission.
 - Added ``weaver.datatype.AutoBase`` that allows quick definition of data containers with fields accessible both as
   properties and dictionary keys, simply by detecting predefined class attributes, avoiding a lot of boilerplate code.
@@ -36,9 +36,9 @@ Fixes:
 - Fix multiple typing inconsistencies or ambiguities between ``AnyValue`` (as Python typing for any literal value)
   against the actual class ``AnyValue`` of ``PyWPS``. Typing definitions now all use ``AnyValueType`` instead.
 - Fix resolution of ``owsContext`` location in the payload of remote `Process` provided by ``href`` link in
-  the ``executionUnit`` due to `OGC-API - Processes` (``"OGC"`` schema) not nested under ``process`` key
+  the ``executionUnit`` due to `OGC API - Processes` (``"OGC"`` schema) not nested under ``process`` key
   (in contrast to ``"OLD"`` schema).
-- Fix resolution of ``outputs`` submitted as mapping (`OGC-API - Processes` schema) during `Job` execution
+- Fix resolution of ``outputs`` submitted as mapping (`OGC API - Processes` schema) during `Job` execution
   to provide desired filtered outputs in results and their ``transmissionMode``. Note that filtering and handling of
   all ``transmissionMode`` variants are themselves not yet supported (relates to
   `#377 <https://github.com/crim-ca/weaver/issues/377>`_ and `#380 <https://github.com/crim-ca/weaver/issues/380>`_).
@@ -286,7 +286,7 @@ Fixes:
 Changes:
 --------
 - Apply conformance updates to better align with expected ``ProcessDescription`` schema from
-  `OGC-API - Processes v1.0-draft6 <https://github.com/opengeospatial/ogcapi-processes/tree/1.0-draft.6>`_.
+  `OGC API - Processes v1.0-draft6 <https://github.com/opengeospatial/ogcapi-processes/tree/1.0-draft.6>`_.
   The principal change introduced in this case is that process description contents will be directly at the root
   of the object returned by ``/processes/{id}`` response instead of being nested under ``"process"`` field.
   Furthermore, ``inputs`` and ``outputs`` definitions are reported as mapping of ``{"<id>": {<parameters>}}`` as

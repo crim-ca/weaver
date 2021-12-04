@@ -271,9 +271,9 @@ def parse_extra_options(option_str, sep=","):
     """
     Parses the extra options parameter.
 
-    The option_str is a string with coma separated ``opt=value`` pairs.
+    The :paramref:`option_str` is a string with coma separated ``opt=value`` pairs.
 
-    .. code-block:: http
+    .. code-block:: text
 
         tempdir=/path/to/tempdir,archive_root=/path/to/archive
 

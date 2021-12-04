@@ -182,7 +182,7 @@ def get_results(job, container, value_key=None, ogc_api=False):
         If not specified, the returned values will have the appropriate ``data``/``href`` key according to the content.
         Otherwise, all values will have the specified key.
     :param ogc_api:
-        If ``True``, formats the results using the ``OGC-API - Processes`` format.
+        If ``True``, formats the results using the ``OGC API - Processes`` format.
     :returns: list of all outputs each with minimally an ID and value under the requested key.
     """
     wps_url = get_wps_output_url(container)

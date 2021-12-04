@@ -64,7 +64,7 @@ class OperationResult(AutoBase):
 
 class WeaverClient(object):
     """
-    Client that handles common HTTP requests with a `Weaver` or similar :term:`OGC-API - Processes` instance.
+    Client that handles common HTTP requests with a `Weaver` or similar :term:`OGC API - Processes` instance.
     """
     # default configuration parameters, overridable by corresponding method parameters
     monitor_timeout = 60    # maximum delay to wait for job completion
@@ -186,7 +186,7 @@ class WeaverClient(object):
         - :term:`CWL` body, local file or URL in :term:`JSON` or :term:`YAML` format
         - :term:`WPS` process URL with :term:`XML` response
         - :term:`WPS-REST` process URL with :term:`JSON` response
-        - :term:`OGC-API - Processes` process URL with :term:`JSON` response
+        - :term:`OGC API - Processes` process URL with :term:`JSON` response
 
         If the reference is resolved to be a :term:`Workflow`, all its underlying :term:`Process` steps must be
         available under the same URL that this client was initialized with.
@@ -289,7 +289,7 @@ class WeaverClient(object):
         """
         Execute a :term:`Job` for the specified :term:`Process` with provided inputs.
 
-        When submitting inputs with :term:`OGC-API - Processes` schema, top-level ``inputs`` key is expected.
+        When submitting inputs with :term:`OGC API - Processes` schema, top-level ``inputs`` key is expected.
         Under it, either the mapping (key-value) or listing (id,value) representation are accepted.
         If ``inputs`` is not found, the alternative :term:`CWL` will be assumed.
 
@@ -300,7 +300,7 @@ class WeaverClient(object):
         :param process_id: Identifier of the process to execute.
         :param inputs:
             Literal :term:`JSON` or :term:`YAML` contents of the inputs submitted and inserted into the execution body,
-            using either the :term:`OGC-API - Processes` or :term:`CWL` format, or a file path/URL referring to them.
+            using either the :term:`OGC API - Processes` or :term:`CWL` format, or a file path/URL referring to them.
         :param monitor:
             Automatically perform :term:`Job` execution monitoring until completion or timeout to obtain final results.
             If requested, this operation will become blocking until either the completed status or timeout is reached.

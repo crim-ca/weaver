@@ -42,7 +42,7 @@ cache.result.enabled = false
 
 # --- Weaver Configuration ---
 # See documentation for more details
-#   DEFAULT: current instance offers a minimal subset of operations as 'basic' OGC-API - Processes (i.e.: no deploy)
+#   DEFAULT: current instance offers a minimal subset of operations as 'basic' OGC API - Processes (i.e.: no deploy)
 #   ADES:    current instance deploys and executes applications locally (disable remote, providers and Workflow support)
 #   EMS:     current instance dispatches execution to other remote ADES or WPS providers
 #   HYBRID:  current instance does both ADES and EMS roles with flexible combinations depending on situation
