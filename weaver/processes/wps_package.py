@@ -318,9 +318,10 @@ def _check_package_file(cwl_file_path_or_url):
         if cwl_resp.status_code != HTTPOk.code:
             raise PackageRegistrationError("Cannot find CWL file at: '{}'.".format(cwl_path))
     else:
-        cwl_path = os.path.abspath(cwl_file_path_or_url)
+        cwl_path = cwl_file_path_or_url[7:] if cwl_file_path_or_url.startswith("file://") else cwl_file_path_or_url
+        cwl_path = os.path.abspath(cwl_path)
         if not os.path.isfile(cwl_path):
-            raise PackageRegistrationError("Cannot find CWL file at: '{}'.".format(cwl_path))
+            raise PackageRegistrationError("Cannot find CWL file at: '{}'.".format(cwl_file_path_or_url))
 
     file_ext = os.path.splitext(cwl_path)[-1].replace(".", "")
     if file_ext not in PACKAGE_EXTENSIONS:
