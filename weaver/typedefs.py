@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     import os
     import typing
+    import uuid
     from datetime import datetime
     from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Type, Union
     if hasattr(typing, "TypedDict"):
@@ -41,6 +42,7 @@ if TYPE_CHECKING:
     AnyValue = Optional[ValueType]
     AnyValueType = AnyValue  # alias
     AnyKey = Union[str, int]
+    AnyUUID = Union[str, uuid.UUID]
     # add more levels of explicit definitions than necessary to simulate JSON recursive structure better than 'Any'
     # amount of repeated equivalent definition makes typing analysis 'work well enough' for most use cases
     _JsonObjectItem = Dict[str, Union["JSON", "_JsonListItem"]]

@@ -15,6 +15,7 @@ on `Weaver`'s `ReadTheDocs` page.
 # pylint: disable=C0103,invalid-name
 
 import os
+import uuid
 from copy import copy
 from typing import TYPE_CHECKING
 

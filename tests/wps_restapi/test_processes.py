@@ -319,7 +319,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         process_data_tests[8]["executionUnit"] = list()
         process_data_tests[9]["executionUnit"][0] = {"unit": "something"}  # unit as string instead of package
         process_data_tests[10]["executionUnit"][0] = {"href": {}}  # noqa  # href as package instead of URL
-        process_data_tests[11]["executionUnit"][0] = {"unit": {}, "href": ""}  # can"t have both unit/href together
+        process_data_tests[11]["executionUnit"][0] = {"unit": {}, "href": ""}  # can't have both unit/href together
 
         with contextlib.ExitStack() as stack:
             for pkg in package_mock:

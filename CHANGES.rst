@@ -10,11 +10,12 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add database revision number for traceability of migration procedures as needed.
+- Add first database revision with conversion of UUID-like strings to literal UUID objects.
 
 Fixes:
 ------
-- No change.
+- Fix resolution of unspecified UUID representation format in `MongoDB`.
 
 `4.5.0 <https://github.com/crim-ca/weaver/tree/4.5.0>`_ (2021-11-25)
 ========================================================================

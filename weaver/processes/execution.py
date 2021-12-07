@@ -399,8 +399,8 @@ def map_locations(job, settings):
         return
     base_dir, status_xml = os.path.split(local_path)
     job.wps_id = os.path.splitext(status_xml)[0]
-    wps_loc = os.path.join(base_dir, job.wps_id)
-    job_loc = os.path.join(base_dir, job.id)
+    wps_loc = os.path.join(base_dir, str(job.wps_id))
+    job_loc = os.path.join(base_dir, str(job.id))
     if wps_loc == job_loc:
         LOGGER.debug("Job already refers to WPS locations.")
         return

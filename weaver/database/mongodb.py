@@ -1,5 +1,7 @@
 # MongoDB
 # http://docs.pylonsproject.org/projects/pyramid-cookbook/en/latest/database/mongodb.html
+import logging
+import uuid
 import warnings
 from typing import TYPE_CHECKING, overload
 
@@ -14,7 +16,7 @@ from weaver.store.mongodb import (
     MongodbQuoteStore,
     MongodbServiceStore
 )
-from weaver.utils import get_settings
+from weaver.utils import get_settings, is_uuid
 
 if TYPE_CHECKING:
     from typing import Any, Optional, Type, Union
@@ -24,6 +26,8 @@ if TYPE_CHECKING:
     from weaver.database.base import StoreSelector
     from weaver.store.base import StoreBills, StoreJobs, StoreProcesses, StoreQuotes, StoreServices
     from weaver.typedefs import AnySettingsContainer, JSON
+
+LOGGER = logging.getLogger(__name__)
 
 # pylint: disable=C0103,invalid-name
 MongoDB = None  # type: Optional[Database]
@@ -50,6 +54,7 @@ if TYPE_CHECKING:
 
 
 class MongoDatabase(DatabaseInterface):
+    _revision = 1
     _database = None
     _settings = None
     _stores = None
@@ -125,9 +130,9 @@ class MongoDatabase(DatabaseInterface):
 
         :returns: JSON with parameters: ``{"version": "<version>", "type": "<db_type>"}``.
         """
-        result = list(self._database.version.find().limit(1))[0]
-        db_version = result["version_num"]
-        return {"version": db_version, "type": self.type}
+        result = list(self._database.version.find().limit(1))
+        revision = result[0]["revision"] if result else 0
+        return {"version": revision, "type": self.type}
 
     def is_ready(self):
         # type: (...) -> bool
@@ -135,7 +140,37 @@ class MongoDatabase(DatabaseInterface):
 
     def run_migration(self):
         # type: (...) -> None
-        warnings.warn("Not implemented {}.run_migration implementation.".format(self.type))
+        """
+        Runs any necessary data-schema migration steps.
+        """
+        db_info = self.get_information()
+        LOGGER.info("Running database migration as needed for %s", db_info)
+        version = db_info["version"]
+        assert self._revision >= version, "Cannot process future DB revision."
+        for rev in range(version, self._revision):
+            from_to_msg = f"[Migrating revision: {rev} -> {rev + 1}]"
+
+            if rev == 0:
+                LOGGER.info("%s Convert objects with string for UUID-like fields to real UUID types.", from_to_msg)
+                collection = self._database.jobs
+                for cur in collection.find({"id": {"$type": "string"}}):
+                    collection.update_one(
+                        {"_id": cur["_id"]},
+                        {"$set": {
+                            "id": uuid.UUID(str(cur["id"])),
+                            "task_id": uuid.UUID(str(cur["task_id"])) if is_uuid(cur["task_id"]) else cur["task_id"],
+                            "wps_id": uuid.UUID(str(cur["wps_id"])) if is_uuid(cur["wps_id"]) else None
+                        }}
+                    )
+                for collection in [self._database.bills, self._database.quotes]:
+                    for cur in collection.find({"id": {"$type": "string"}}):
+                        collection.update_one({"_id": cur["_id"]}, {"$set": {"id": uuid.UUID(str(cur["id"]))}})
+
+            # NOTE: add any needed migration revisions here with (if rev = next-index)...
+
+            # update and move to next revision
+            self._database.version.update_one({"revision": rev}, {"$set": {"revision": rev + 1}}, upsert=True)
+        LOGGER.info("Database up-to-date with: %s", db_info)
 
 
 def get_mongodb_connection(container):
@@ -149,7 +184,10 @@ def get_mongodb_connection(container):
         if settings.get(setting, None) is None:
             warnings.warn("Setting '{}' not defined in registry, using default [{}].".format(setting, default))
             settings[setting] = default
-    client = pymongo.MongoClient(settings["mongodb.host"], int(settings["mongodb.port"]), connect=False)
+    client = pymongo.MongoClient(settings["mongodb.host"], int(settings["mongodb.port"]), connect=False,
+                                 # Must specify representation since PyMongo 4.0 and also to avoid Python 3.6 error
+                                 #  https://pymongo.readthedocs.io/en/stable/examples/uuid.html#unspecified
+                                 uuidRepresentation="pythonLegacy")
     return client[settings["mongodb.db_name"]]
 
 

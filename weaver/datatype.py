@@ -74,7 +74,7 @@ if TYPE_CHECKING:
 
     from owslib.wps import WebProcessingService
 
-    from weaver.typedefs import AnyProcess, AnySettingsContainer, Number, CWL, JSON
+    from weaver.typedefs import AnyProcess, AnySettingsContainer, AnyUUID, Number, CWL, JSON
 
     AnyParams = Dict[str, Any]
     AnyAuthentication = Union["Authentication", "DockerAuthentication"]
@@ -453,8 +453,8 @@ class Job(Base):
         super(Job, self).__init__(*args, **kwargs)
         if "task_id" not in self:
             raise TypeError("Parameter 'task_id' is required for '{}' creation.".format(type(self)))
-        if not isinstance(self.id, str):
-            raise TypeError("Type 'str' is required for '{}.id'".format(type(self)))
+        if not isinstance(self.id, (str, uuid.UUID)):
+            raise TypeError("Type 'str' or 'UUID' is required for '{}.id'".format(type(self)))
 
     def _get_log_msg(self, msg=None, status=None, progress=None):
         # type: (Optional[str], Optional[str], Optional[Number]) -> str
@@ -532,34 +532,43 @@ class Job(Base):
 
     @property
     def id(self):
-        # type: () -> str
+        # type: () -> uuid.UUID
         """
         Job UUID to retrieve the details from storage.
         """
         job_id = self.get("id")
         if not job_id:
-            job_id = str(uuid.uuid4())
+            job_id = uuid.uuid4()
             self["id"] = job_id
+        if isinstance(job_id, str):
+            return uuid.UUID(job_id)
         return job_id
 
     @property
     def task_id(self):
-        # type: () -> Optional[str]
+        # type: () -> Optional[AnyUUID]
         """
         Reference Task UUID attributed by the ``Celery`` worker that monitors and executes this job.
         """
-        return self.get("task_id", None)
+        task_id = self.get("task_id", None)
+        try:
+            # task ID can be a temporary non-UUID value
+            if isinstance(task_id, str):
+                return uuid.UUID(task_id)
+        except ValueError:
+            pass
+        return task_id
 
     @task_id.setter
     def task_id(self, task_id):
-        # type: (str) -> None
-        if not isinstance(task_id, str):
-            raise TypeError("Type 'str' is required for '{}.task_id'".format(type(self)))
+        # type: (AnyUUID) -> None
+        if not isinstance(task_id, (str, uuid.UUID)):
+            raise TypeError("Type 'str' or 'UUID' is required for '{}.task_id'".format(type(self)))
         self["task_id"] = task_id
 
     @property
     def wps_id(self):
-        # type: () -> Optional[str]
+        # type: () -> Optional[uuid.UUID]
         """
         Reference WPS Request/Response UUID attributed by the executed ``PyWPS`` process.
 
@@ -570,13 +579,16 @@ class Job(Base):
             - :attr:`Job.request`
             - :attr:`Job.response`
         """
-        return self.get("wps_id", None)
+        wps_id = self.get("wps_id", None)
+        if isinstance(wps_id, str):
+            return uuid.UUID(wps_id)
+        return wps_id
 
     @wps_id.setter
     def wps_id(self, wps_id):
-        # type: (str) -> None
-        if not isinstance(wps_id, str):
-            raise TypeError("Type 'str' is required for '{}.wps_id'".format(type(self)))
+        # type: (AnyUUID) -> None
+        if not isinstance(wps_id, (str, uuid.UUID)):
+            raise TypeError("Type 'str' or 'UUID' is required for '{}.wps_id'".format(type(self)))
         self["wps_id"] = wps_id
 
     @property
@@ -1154,7 +1166,11 @@ class Authentication(Base):
 
     @property
     def id(self):
-        return dict.__getitem__(self, "id")
+        # type: () -> uuid.UUID
+        _id = dict.__getitem__(self, "id")
+        if isinstance(_id, str):
+            return uuid.UUID(_id)
+        return _id
 
     @property
     def type(self):
@@ -1989,7 +2005,7 @@ class Quote(Base):
         except ValueError:
             raise ValueError("Field 'Quote.expire' must be an ISO-8601 datetime string.")
         if "id" not in self:
-            self["id"] = str(uuid.uuid4())
+            self["id"] = uuid.uuid4()
 
     @property
     def id(self):
@@ -2149,7 +2165,7 @@ class Bill(Base):
         except ValueError:
             raise ValueError("Field 'Bill.created' must be an ISO-8601 datetime string.")
         if "id" not in self:
-            self["id"] = str(uuid.uuid4())
+            self["id"] = uuid.uuid4()
 
     @property
     def id(self):
