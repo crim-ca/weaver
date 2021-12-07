@@ -155,7 +155,6 @@ class AutoBase(DictBase):
         dict(d)         # returns {'field': 1, 'other': 2}
         d.field         # returns 1
         d["field"]      # also 1 !
-
     """
     def __new__(cls, *args, **kwargs):
         extra_props = set(dir(cls)) - set(dir(DictBase))
