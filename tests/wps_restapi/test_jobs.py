@@ -331,19 +331,16 @@ class WpsRestApiJobsTest(unittest.TestCase):
 
             # validate groups with expected jobs counts and ids (nb: only public jobs are returned)
             if categories["process"] == self.process_public.identifier:
-                assert len(grouped_jobs["jobs"]) == 3
-                assert set(grouped_jobs["jobs"]) == {self.job_info[0].id, self.job_info[5].id, self.job_info[7].id}
+                expect = {self.job_info[0].id, self.job_info[5].id, self.job_info[7].id}
             elif categories["process"] == self.process_private.identifier:
-                assert len(grouped_jobs["jobs"]) == 3
-                assert set(grouped_jobs["jobs"]) == {self.job_info[2].id, self.job_info[6].id, self.job_info[8].id}
+                expect = {self.job_info[2].id, self.job_info[6].id, self.job_info[8].id}
             elif categories["process"] == self.process_unknown:
-                assert len(grouped_jobs["jobs"]) == 1
-                assert set(grouped_jobs["jobs"]) == {self.job_info[1].id}
+                expect = {self.job_info[1].id}
             elif categories["process"] == self.process_other.identifier:
-                assert len(grouped_jobs["jobs"]) == 4
-                assert set(grouped_jobs["jobs"]) == {self.job_info[i].id for i in [9, 10, 11, 12]}
+                expect = {self.job_info[i].id for i in [9, 10, 11, 12]}
             else:
                 pytest.fail("Unknown job grouping 'process' value: {}".format(categories["process"]))
+            self.assert_equal_with_jobs_diffs(grouped_jobs["jobs"], expect)  # noqa
 
     def template_get_jobs_valid_grouping_by_service_provider(self, service_or_provider):
         path = get_path_kvp(sd.jobs_service.path, detail="false", groups=service_or_provider)
@@ -361,22 +358,18 @@ class WpsRestApiJobsTest(unittest.TestCase):
 
             # validate groups with expected jobs counts and ids (nb: only public jobs are returned)
             if categories[service_or_provider] == self.service_public.name:
-                assert len(grouped_jobs["jobs"]) == 3
-                assert set(grouped_jobs["jobs"]) == {self.job_info[1].id, self.job_info[5].id, self.job_info[6].id}
+                expect = {self.job_info[1].id, self.job_info[5].id, self.job_info[6].id}
             elif categories[service_or_provider] == self.service_private.name:
-                assert len(grouped_jobs["jobs"]) == 2
-                assert set(grouped_jobs["jobs"]) == {self.job_info[7].id, self.job_info[8].id}
+                expect = {self.job_info[7].id, self.job_info[8].id}
             elif categories[service_or_provider] == self.service_one.name:
-                assert len(grouped_jobs["jobs"]) == 1
-                assert set(grouped_jobs["jobs"]) == {self.job_info[9].id}
+                expect = {self.job_info[9].id}
             elif categories[service_or_provider] == self.service_two.name:
-                assert len(grouped_jobs["jobs"]) == 3
-                assert set(grouped_jobs["jobs"]) == {self.job_info[10].id, self.job_info[11].id, self.job_info[12].id}
+                expect = {self.job_info[10].id, self.job_info[11].id, self.job_info[12].id}
             elif categories[service_or_provider] is None:
-                assert len(grouped_jobs["jobs"]) == 2
-                assert set(grouped_jobs["jobs"]) == {self.job_info[0].id, self.job_info[2].id}
+                expect = {self.job_info[0].id, self.job_info[2].id}
             else:
                 pytest.fail("Unknown job grouping 'service' value: {}".format(categories[service_or_provider]))
+            self.assert_equal_with_jobs_diffs(grouped_jobs["jobs"], expect)  # noqa
 
     def test_get_jobs_valid_grouping_by_service(self):
         self.template_get_jobs_valid_grouping_by_service_provider("service")
@@ -561,8 +554,9 @@ class WpsRestApiJobsTest(unittest.TestCase):
         resp = self.app.get(path, headers=self.json_headers)
         self.check_basic_jobs_info(resp)
         assert len(resp.json["jobs"]) == 1
-        expect_job = self.job_info[0].id
-        assert resp.json["jobs"][0] == expect_job, self.message_with_jobs_mapping("expected only matching process")
+        expect_jobs = [self.job_info[0].id]
+        result_jobs = resp.json["jobs"]
+        self.assert_equal_with_jobs_diffs(result_jobs, expect_jobs, message="expected only matching process")
 
     def test_get_jobs_by_type_process_and_specific_service_name(self):
         """
@@ -636,31 +630,41 @@ class WpsRestApiJobsTest(unittest.TestCase):
         path = get_path_kvp(sd.jobs_service.path, process=self.job_info[0].process)
         resp = self.app.get(path, headers=self.json_headers)
         self.check_basic_jobs_info(resp)
-        assert self.job_info[0].id in resp.json["jobs"], self.message_with_jobs_mapping("expected in")
-        assert self.job_info[1].id not in resp.json["jobs"], self.message_with_jobs_mapping("expected not in")
+        result_jobs = resp.json["jobs"]
+        expect_jobs = [self.job_info[0].id, self.job_info[5].id, self.job_info[7].id]
+        invert_jobs = [self.job_info[1].id]
+        self.assert_equal_with_jobs_diffs(result_jobs, expect_jobs)
+        self.assert_equal_with_jobs_diffs(invert_jobs, expect_jobs, invert=True)
 
     def test_get_jobs_process_in_query_detail(self):
         path = get_path_kvp(sd.jobs_service.path, process=self.job_info[0].process, detail="true")
         resp = self.app.get(path, headers=self.json_headers)
         self.check_basic_jobs_info(resp)
-        job_ids = [j["jobID"] for j in resp.json["jobs"]]
-        assert self.job_info[0].id in job_ids, self.message_with_jobs_mapping("expected in")
-        assert self.job_info[1].id not in job_ids, self.message_with_jobs_mapping("expected not in")
+        result_jobs = [job["jobID"] for job in resp.json["jobs"]]
+        expect_jobs = [self.job_info[0].id, self.job_info[5].id, self.job_info[7].id]
+        invert_jobs = [self.job_info[1].id]
+        self.assert_equal_with_jobs_diffs(result_jobs, expect_jobs)
+        self.assert_equal_with_jobs_diffs(invert_jobs, expect_jobs, invert=True)
 
     def test_get_jobs_process_in_path_normal(self):
         path = sd.process_jobs_service.path.format(process_id=self.job_info[0].process)
         resp = self.app.get(path, headers=self.json_headers)
         self.check_basic_jobs_info(resp)
-        assert self.job_info[0].id in resp.json["jobs"], self.message_with_jobs_mapping("expected in")
-        assert self.job_info[1].id not in resp.json["jobs"], self.message_with_jobs_mapping("expected not in")
+        result_jobs = resp.json["jobs"]
+        expect_jobs = [self.job_info[0].id, self.job_info[5].id, self.job_info[7].id]
+        invert_jobs = [self.job_info[1].id]
+        self.assert_equal_with_jobs_diffs(result_jobs, expect_jobs)
+        self.assert_equal_with_jobs_diffs(invert_jobs, expect_jobs, invert=True)
 
     def test_get_jobs_process_in_path_detail(self):
         path = sd.process_jobs_service.path.format(process_id=self.job_info[0].process) + "?detail=true"
         resp = self.app.get(path, headers=self.json_headers)
         self.check_basic_jobs_info(resp)
-        job_ids = [j["jobID"] for j in resp.json["jobs"]]
-        assert self.job_info[0].id in job_ids, self.message_with_jobs_mapping("expected in")
-        assert self.job_info[1].id not in job_ids, self.message_with_jobs_mapping("expected not in")
+        result_jobs = [job["jobID"] for job in resp.json["jobs"]]
+        expect_jobs = [self.job_info[0].id, self.job_info[5].id, self.job_info[7].id]
+        invert_jobs = [self.job_info[1].id]
+        self.assert_equal_with_jobs_diffs(result_jobs, expect_jobs)
+        self.assert_equal_with_jobs_diffs(invert_jobs, expect_jobs, invert=True)
 
     def test_get_jobs_process_unknown_in_path(self):
         path = sd.process_jobs_service.path.format(process_id="unknown-process-id")
@@ -1158,7 +1162,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         base_path = sd.job_service.path.format(job_id="thisisnt-some-real-uuid-allerrordata")
         for sub_path in ["", "/inputs", "/outputs", "/results", "/logs", "exceptions"]:
             path = f"{base_path}{sub_path}"
-            resp = self.app.delete(path, headers=self.json_headers, expect_errors=True)
+            resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
             assert resp.status_code == 400
             assert resp.json["title"] == "NoSuchJob"
             assert resp.json["type"].endswith("no-such-job")
