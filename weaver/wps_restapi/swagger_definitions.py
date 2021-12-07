@@ -15,7 +15,6 @@ on `Weaver`'s `ReadTheDocs` page.
 # pylint: disable=C0103,invalid-name
 
 import os
-import uuid
 from copy import copy
 from typing import TYPE_CHECKING
 
@@ -3986,6 +3985,12 @@ class OkGetJobStatusResponse(ExtendedMappingSchema):
     body = JobStatusInfo()
 
 
+class InvalidJobResponseSchema(ExtendedMappingSchema):
+    description = "Job reference is not a valid UUID."
+    header = ResponseHeaders()
+    body = ErrorJsonResponseBodySchema()
+
+
 class NotFoundJobResponseSchema(ExtendedMappingSchema):
     description = "Job reference UUID cannot be found."
     examples = {
@@ -4248,6 +4253,7 @@ get_single_job_status_responses = {
             "value": EXAMPLES["job_status_failed.json"],
         }
     }),
+    "400": InvalidJobResponseSchema(),
     "404": NotFoundJobResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
@@ -4257,6 +4263,7 @@ get_prov_single_job_status_responses.update({
 })
 delete_job_responses = {
     "200": OkDismissJobResponse(description="success"),
+    "400": InvalidJobResponseSchema(),
     "404": NotFoundJobResponseSchema(),
     "410": GoneJobResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
@@ -4272,6 +4279,7 @@ get_job_inputs_responses = {
             "value": EXAMPLES["job_inputs.json"],
         }
     }),
+    "400": InvalidJobResponseSchema(),
     "404": NotFoundJobResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
@@ -4286,6 +4294,7 @@ get_job_outputs_responses = {
             "value": EXAMPLES["job_outputs.json"],
         }
     }),
+    "400": InvalidJobResponseSchema(),
     "404": NotFoundJobResponseSchema(),
     "410": GoneJobResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
@@ -4304,6 +4313,7 @@ get_job_results_responses = {
             "value": EXAMPLES["job_results.json"],
         }
     }),
+    "400": InvalidJobResponseSchema(),
     "404": NotFoundJobResponseSchema(),
     "410": GoneJobResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
@@ -4319,6 +4329,7 @@ get_exceptions_responses = {
             "value": EXAMPLES["job_exceptions.json"],
         }
     }),
+    "400": InvalidJobResponseSchema(),
     "404": NotFoundJobResponseSchema(),
     "410": GoneJobResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
@@ -4334,6 +4345,7 @@ get_logs_responses = {
             "value": EXAMPLES["job_logs.json"],
         }
     }),
+    "400": InvalidJobResponseSchema(),
     "404": NotFoundJobResponseSchema(),
     "410": GoneJobResponseSchema(),
     "500": InternalServerErrorResponseSchema(),

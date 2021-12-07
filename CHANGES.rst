@@ -16,6 +16,8 @@ Changes:
 Fixes:
 ------
 - Fix resolution of unspecified UUID representation format in `MongoDB`.
+- Fix conformance with error type reporting of missing `Job` or `Process`
+  (resolves `#320 <https://github.com/crim-ca/weaver/issues/320>`_).
 
 `4.5.0 <https://github.com/crim-ca/weaver/tree/4.5.0>`_ (2021-11-25)
 ========================================================================

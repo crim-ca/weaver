@@ -178,12 +178,14 @@ class WpsRestApiJobsTest(unittest.TestCase):
         """
         For helping debugging of auto-generated job ids.
         """
-        mapping = OrderedDict(sorted((j.task_id, j.id) for j in self.job_store.list_jobs()))
+        mapping = OrderedDict(sorted((str(j.task_id), str(j.id)) for j in self.job_store.list_jobs()))
         return message + "\nMapping Task-ID/Job-ID:\n{}".format(json.dumps(mapping, indent=indent))
 
     def assert_equal_with_jobs_diffs(self, jobs_result, jobs_expect,
                                      test_values=None, message="", indent=2, index=None, invert=False):
-        mapping = {job.id: job.task_id for job in self.job_info}
+        jobs_result = [str(job_id) for job_id in jobs_result]
+        jobs_expect = [str(job_id) for job_id in jobs_expect]
+        mapping = {str(job.id): str(job.task_id) for job in self.job_info}
         missing = set(jobs_expect) - set(jobs_result)
         unknown = set(jobs_result) - set(jobs_expect)
         assert (
@@ -1146,6 +1148,22 @@ class WpsRestApiJobsTest(unittest.TestCase):
 
         assert resp.json["processID"] == "process-public"
 
+    def test_get_job_invalid_uuid(self):
+        """
+        .. versionchanged:: 4.6.0
+            Jobs must explicitly use an :class:`uuid.UUID` object to search.
+            Any value provided in path parameter that does not correspond to such definition raises a bad request.
+        """
+        # to make sure UUID is applied, use the "same format" (8-4-4-4-12), but with invalid definitions
+        base_path = sd.job_service.path.format(job_id="thisisnt-some-real-uuid-allerrordata")
+        for sub_path in ["", "/inputs", "/outputs", "/results", "/logs", "exceptions"]:
+            path = f"{base_path}{sub_path}"
+            resp = self.app.delete(path, headers=self.json_headers, expect_errors=True)
+            assert resp.status_code == 400
+            assert resp.json["title"] == "NoSuchJob"
+            assert resp.json["type"].endswith("no-such-job")
+            assert "UUID" in resp.json["detail"]
+
     @mocked_dismiss_process()
     def test_job_dismiss_running_single(self):
         """
@@ -1201,9 +1219,10 @@ class WpsRestApiJobsTest(unittest.TestCase):
 
         # create dummy files to validate results flush of successful job
         wps_out_dir = self.settings["weaver.wps_output_dir"]
-        job_out_dir = os.path.join(wps_out_dir, job_success.id)
-        job_out_log = os.path.join(wps_out_dir, job_success.id + ".log")
-        job_out_xml = os.path.join(wps_out_dir, job_success.id + ".xml")
+        job_id_str = str(job_success.id)
+        job_out_dir = os.path.join(wps_out_dir, job_id_str)
+        job_out_log = os.path.join(wps_out_dir, job_id_str + ".log")
+        job_out_xml = os.path.join(wps_out_dir, job_id_str + ".xml")
         os.makedirs(job_out_dir, exist_ok=True)
         try:
             with contextlib.ExitStack() as stack:
