@@ -161,7 +161,7 @@ class JobException(WeaverException):
 
 class JobNotFound(HTTPNotFound, OWSNotFound, JobException):
     """
-    Error related to a non existant job definition.
+    Error related to a non existing job definition.
 
     Error indicating that a job could not be read from the
     storage backend by an instance of :class:`weaver.store.JobStore`.

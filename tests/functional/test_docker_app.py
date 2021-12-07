@@ -75,7 +75,7 @@ class WpsPackageDockerAppTest(WpsConfigBase):
 
     def validate_outputs(self, job_id, result_payload, outputs_payload, result_file_content):
         # get generic details
-        wps_uuid = self.job_store.fetch_by_id(job_id).wps_id
+        wps_uuid = str(self.job_store.fetch_by_id(job_id).wps_id)
         wps_out_path = "{}{}".format(self.settings["weaver.url"], self.settings["weaver.wps_output_path"])
         wps_output = "{}/{}/{}".format(wps_out_path, wps_uuid, self.out_file)
 

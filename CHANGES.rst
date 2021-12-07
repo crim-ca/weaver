@@ -31,6 +31,8 @@ Changes:
 - Updated documentation with new details relevant to the added `CLI` and corresponding references.
 - Updated some tests utilities to facilitate definitions of new tests for ``WeaverClient`` feature validation.
 - Replaced literal string ``"OGC"`` and ``"OLD"`` used for schema selection by properly defined constants.
+- Add database revision number for traceability of migration procedures as needed.
+- Add first database revision with conversion of UUID-like strings to literal UUID objects.
 
 Fixes:
 ------
@@ -44,6 +46,9 @@ Fixes:
   to provide desired filtered outputs in results and their ``transmissionMode``. Note that filtering and handling of
   all ``transmissionMode`` variants are themselves not yet supported (relates to
   `#377 <https://github.com/crim-ca/weaver/issues/377>`_ and `#380 <https://github.com/crim-ca/weaver/issues/380>`_).
+- Fix resolution of unspecified UUID representation format in `MongoDB`.
+- Fix conformance with error type reporting of missing `Job` or `Process`
+  (resolves `#320 <https://github.com/crim-ca/weaver/issues/320>`_).
 
 `4.5.0 <https://github.com/crim-ca/weaver/tree/4.5.0>`_ (2021-11-25)
 ========================================================================

@@ -3,6 +3,7 @@ Stores to read/write data to from/to `MongoDB` using pymongo.
 """
 
 import logging
+import uuid
 from typing import TYPE_CHECKING
 
 import pymongo
@@ -54,7 +55,7 @@ if TYPE_CHECKING:
     from pymongo.collection import Collection
 
     from weaver.store.base import DatetimeIntervalType, JobGroupCategory, JobSearchResult
-    from weaver.typedefs import AnyProcess, AnyProcessType, AnyValueType
+    from weaver.typedefs import AnyProcess, AnyProcessType, AnyUUID, AnyValueType
 
     MongodbValue = Union[AnyValueType, datetime.datetime]
     MongodbSearchFilter = Dict[str, Union[MongodbValue, List[MongodbValue], Dict[str, AnyValueType]]]
@@ -442,7 +443,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
         MongodbStore.__init__(self, *db_args, **db_kwargs)
 
     def save_job(self,
-                 task_id,                   # type: str
+                 task_id,                   # type: AnyUUID
                  process,                   # type: str
                  service=None,              # type: Optional[str]
                  inputs=None,               # type: Optional[List[Any]]
@@ -525,10 +526,12 @@ class MongodbJobStore(StoreJobs, MongodbStore):
         return True
 
     def fetch_by_id(self, job_id):
-        # type: (str) -> Job
+        # type: (AnyUUID) -> Job
         """
         Gets job for given ``job_id`` from `MongoDB` storage.
         """
+        if isinstance(job_id, str):
+            job_id = uuid.UUID(job_id)
         job = self.collection.find_one({"id": job_id})
         if not job:
             raise JobNotFound("Could not find job matching: '{}'".format(job_id))
@@ -894,10 +897,12 @@ class MongodbQuoteStore(StoreQuotes, MongodbStore):
         return quote
 
     def fetch_by_id(self, quote_id):
-        # type: (str) -> Quote
+        # type: (AnyUUID) -> Quote
         """
         Gets quote for given ``quote_id`` from `MongoDB` storage.
         """
+        if isinstance(quote_id, str):
+            quote_id = uuid.UUID(quote_id)
         quote = self.collection.find_one({"id": quote_id})
         if not quote:
             raise QuoteNotFound("Could not find quote matching: '{}'".format(quote_id))
@@ -972,6 +977,8 @@ class MongodbBillStore(StoreBills, MongodbStore):
         """
         Gets bill for given ``bill_id`` from `MongoDB` storage.
         """
+        if isinstance(bill_id, str):
+            bill_id = uuid.UUID(bill_id)
         bill = self.collection.find_one({"id": bill_id})
         if not bill:
             raise BillNotFound("Could not find bill matching: '{}'".format(bill_id))

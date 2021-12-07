@@ -352,12 +352,8 @@ def api_conformance(request):  # noqa: F811
         ogcapi_processes + "/req/core/conformance-success",
         ogcapi_processes + "/req/core/http",
         ogcapi_processes + "/req/core/job",
-        # FIXME: process/job error details (for all below: https://github.com/crim-ca/weaver/issues/320)
-        #   https://github.com/opengeospatial/ogcapi-processes/blob/master/core/requirements/core/REQ_job-exception-no-such-job.adoc
-        #   https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/master/core/openapi/schemas/exception.yaml
-        #   type of exception SHALL be: "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/no-such-job"
-        # ogcapi_processes + "/req/core/job-exception-no-such-job",
-        # ogcapi_processes + "/req/core/job-results-exception/no-such-job",
+        ogcapi_processes + "/req/core/job-exception-no-such-job",
+        ogcapi_processes + "/req/core/job-results-exception/no-such-job",
         ogcapi_processes + "/req/job-list/links",
         ogcapi_processes + "/rec/job-list/job-list-landing-page",
         ogcapi_processes + "/req/job-list/job-list-op",
@@ -384,7 +380,6 @@ def api_conformance(request):  # noqa: F811
         ogcapi_processes + "/req/core/pl-links",
         ogcapi_processes + "/req/core/process",
         ogcapi_processes + "/req/core/process-success",
-        # FIXME: process error details (for all below: https://github.com/crim-ca/weaver/issues/320)
         ogcapi_processes + "/req/core/process-exception/no-such-process",
         # FIXME: https://github.com/crim-ca/weaver/issues/247 (Prefer header)
         # ogcapi_processes + "/req/core/process-execute-auto-execution-mode",
