@@ -53,6 +53,7 @@ complementary support of one-another features.
 """
 import inspect
 import re
+import uuid
 from abc import abstractmethod
 from typing import TYPE_CHECKING
 
@@ -344,7 +345,24 @@ class ExtendedInteger(ExtendedNumber, colander.Integer):
 
 
 class ExtendedString(colander.String):
-    pass
+    """
+    String with auto-conversion for known OpenAPI ``format`` field where no direct :mod:`colander` type exist.
+
+    Converts :class:`uuid.UUID` to corresponding string when detected in the node if it defined ``format="uuid"``.
+
+    For ``format="date"`` and ``format="date-time"``, consider instead using :class:`colander.Date`
+    and :class:`colander.DateTime` respectively since more advanced support and features are provided with them.
+    """
+    def deserialize(self, node, cstruct):
+        try:
+            if str(getattr(node, "format", "")).lower() == "uuid":
+                if isinstance(cstruct, str):
+                    return str(uuid.UUID(cstruct))
+                if isinstance(cstruct, uuid.UUID):
+                    return str(cstruct)
+        except ValueError:
+            raise colander.Invalid(node, msg="Not a valid UUID string.", value=str(cstruct))
+        return super(ExtendedString, self).deserialize(node, cstruct)
 
 
 class XMLObject(object):

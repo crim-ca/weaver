@@ -2324,7 +2324,7 @@ class WpsPackageAppWithS3BucketTest(WpsConfigBase):
         # check that outputs are S3 bucket references
         output_values = {out["id"]: get_any_value(out) for out in outputs["outputs"]}
         output_bucket = self.settings["weaver.wps_output_s3_bucket"]
-        wps_uuid = self.job_store.fetch_by_id(job_id).wps_id
+        wps_uuid = str(self.job_store.fetch_by_id(job_id).wps_id)
         for out_key, out_file in [("output_from_s3", input_file_s3), ("output_from_http", input_file_http)]:
             output_ref = "{}/{}/{}".format(output_bucket, wps_uuid, out_file)
             output_ref_abbrev = "s3://{}".format(output_ref)

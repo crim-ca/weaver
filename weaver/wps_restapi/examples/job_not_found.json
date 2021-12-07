@@ -1,5 +1,6 @@
 {
   "description": "Could not find job with specified 'job_id'.",
+  "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/no-such-job",
   "code": "NoSuchJob",
   "error": {
     "code": 404,

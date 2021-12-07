@@ -319,7 +319,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         process_data_tests[8]["executionUnit"] = list()
         process_data_tests[9]["executionUnit"][0] = {"unit": "something"}  # unit as string instead of package
         process_data_tests[10]["executionUnit"][0] = {"href": {}}  # noqa  # href as package instead of URL
-        process_data_tests[11]["executionUnit"][0] = {"unit": {}, "href": ""}  # can"t have both unit/href together
+        process_data_tests[11]["executionUnit"][0] = {"unit": {}, "href": ""}  # can't have both unit/href together
 
         with contextlib.ExitStack() as stack:
             for pkg in package_mock:
@@ -605,7 +605,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                 job = self.job_store.fetch_by_id(resp.json["jobID"])
             except JobNotFound:
                 self.fail("Job should have been created and be retrievable.")
-            assert job.id == resp.json["jobID"]
+            assert str(job.id) == resp.json["jobID"]
             assert job.task_id == STATUS_ACCEPTED  # temporary value until processed by celery
 
     def test_execute_process_language(self):
@@ -625,7 +625,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                 job = self.job_store.fetch_by_id(resp.json["jobID"])
             except JobNotFound:
                 self.fail("Job should have been created and be retrievable.")
-            assert job.id == resp.json["jobID"]
+            assert str(job.id) == resp.json["jobID"]
             assert job.accept_language == ACCEPT_LANGUAGE_FR_CA
 
     def test_execute_process_no_json_body(self):

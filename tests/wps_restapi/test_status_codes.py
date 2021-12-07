@@ -1,4 +1,5 @@
 import unittest
+import uuid
 
 import pytest
 
@@ -17,7 +18,7 @@ TEST_FORBIDDEN_ROUTES = [
     sd.provider_jobs_service.path,  # could be 401
 ]
 TEST_NOTFOUND_ROUTES = [
-    sd.job_service.path.format(job_id="not-found"),
+    sd.job_service.path.format(job_id=str(uuid.uuid4())),  # if not UUID, 400 instead
     sd.provider_service.path.format(provider_id="not-found"),
 ]
 

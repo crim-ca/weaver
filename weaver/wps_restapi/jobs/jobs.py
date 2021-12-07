@@ -25,6 +25,7 @@ from weaver.datatype import Job
 from weaver.exceptions import (
     InvalidIdentifierValue,
     JobGone,
+    JobInvalidParameter,
     JobNotFound,
     ProcessNotAccessible,
     ProcessNotFound,
@@ -36,7 +37,7 @@ from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_PLAIN, OUTPU
 from weaver.owsexceptions import OWSNotFound
 from weaver.processes.convert import any2wps_literal_datatype
 from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
-from weaver.utils import get_any_id, get_any_value, get_path_kvp, get_settings, get_weaver_url, repr_json
+from weaver.utils import get_any_id, get_any_value, get_path_kvp, get_settings, get_weaver_url, is_uuid, repr_json
 from weaver.visibility import VISIBILITY_PUBLIC
 from weaver.wps.utils import get_wps_output_dir, get_wps_output_url
 from weaver.wps_restapi import swagger_definitions as sd
@@ -60,11 +61,29 @@ def get_job(request):
     :raise HTTPNotFound: with JSON body details on missing/non-matching job, process, provider IDs.
     """
     job_id = request.matchdict.get("job_id")
-    store = get_db(request).get_store(StoreJobs)
     try:
+        if not is_uuid(job_id):
+            raise JobInvalidParameter
+        store = get_db(request).get_store(StoreJobs)
         job = store.fetch_by_id(job_id)
-    except JobNotFound:
-        raise OWSNotFound(code="NoSuchJob", locator="JobID", description="Could not find job with specified 'job_id'.")
+    except (JobInvalidParameter, JobNotFound) as exc:
+        exception = type(exc)
+        if exception is JobInvalidParameter:
+            desc = "Invalid job reference is not a valid UUID."
+        else:
+            desc = "Could not find job with specified reference."
+        title = "NoSuchJob"
+        raise exception(
+            # new format: https://docs.ogc.org/DRAFTS/18-062.html#_error_situations_7
+            json={
+                "title": title,
+                "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/no-such-job",
+                "detail": desc,
+                "status": exception.code,
+                "cause": str(job_id)
+            },
+            code=title, locator="JobID", description=desc  # old format
+        )
 
     provider_id = request.matchdict.get("provider_id", job.service)
     process_id = request.matchdict.get("process_id", job.process)
@@ -72,16 +91,32 @@ def get_job(request):
         forbid_local_only(request)
 
     if job.service != provider_id:
+        title = "NoSuchProvider"
+        desc = "Could not find job reference corresponding to specified provider reference."
         raise OWSNotFound(
-            code="NoSuchProvider",
-            locator="provider",
-            description="Could not find job corresponding to specified 'provider_id'."
+            # new format: https://docs.ogc.org/DRAFTS/18-062.html#_error_situations_5
+            json={
+                "title": title,
+                "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/no-such-job",
+                "detail": desc,
+                "status": OWSNotFound.code,
+                "cause": str(process_id)
+            },
+            code=title, locator="provider", description=desc  # old format
         )
     if job.process != process_id:
+        title = "NoSuchProcess"
+        desc = "Could not find job reference corresponding to specified process reference."
         raise OWSNotFound(
-            code="NoSuchProcess",
-            locator="process",
-            description="Could not find job corresponding to specified 'process_id'."
+            # new format: https://docs.ogc.org/DRAFTS/18-062.html#_error_situations_5
+            json={
+                "title": title,
+                "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/no-such-job",
+                "detail": desc,
+                "status": OWSNotFound.code,
+                "cause": str(process_id)
+            },
+            code=title, locator="process", description=desc  # old format
         )
     return job
 
@@ -426,9 +461,9 @@ def dismiss_job_task(job, container):
         celery_app.control.revoke(job.task_id, terminate=True)
 
     wps_out_dir = get_wps_output_dir(container)
-    job_out_dir = os.path.join(wps_out_dir, job.id)
-    job_out_log = os.path.join(wps_out_dir, job.id + ".log")
-    job_out_xml = os.path.join(wps_out_dir, job.id + ".xml")
+    job_out_dir = os.path.join(wps_out_dir, str(job.id))
+    job_out_log = os.path.join(wps_out_dir, str(job.id) + ".log")
+    job_out_xml = os.path.join(wps_out_dir, str(job.id) + ".xml")
     if os.path.isdir(job_out_dir):
         LOGGER.debug("Job [%s] dismiss operation: Removing output results.", job.id)
         shutil.rmtree(job_out_dir, onerror=lambda func, path, _exc: LOGGER.warning(

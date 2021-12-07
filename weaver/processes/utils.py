@@ -91,7 +91,13 @@ def get_process(process_id=None, request=None, settings=None, store=None):
     except ProcessNotAccessible:
         raise HTTPForbidden("Process with ID '{!s}' is not accessible.".format(process_id))
     except ProcessNotFound:
-        raise HTTPNotFound("Process with ID '{!s}' does not exist.".format(process_id))
+        raise ProcessNotFound(json={
+            "title": "NoSuchProcess",
+            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/no-such-process",
+            "detail": "Process with specified reference identifier does not exist.",
+            "status": ProcessNotFound.code,
+            "cause": str(process_id)
+        })
     except colander.Invalid as ex:
         raise HTTPBadRequest("Invalid schema:\n[{0!r}].".format(ex))
 
