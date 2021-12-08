@@ -47,6 +47,13 @@ class WeaverException(Exception):
     detail = message = comment = explanation = "Unknown error"
 
 
+class ListingInvalidParameter(WeaverException, OWSInvalidParameterValue, ValueError):
+    """
+    Error related to an invalid parameter for listing queries.
+    """
+    code = 400
+
+
 class InvalidIdentifierValue(HTTPBadRequest, OWSInvalidParameterValue, WeaverException, ValueError):
     """
     Error related to an invalid identifier parameter.

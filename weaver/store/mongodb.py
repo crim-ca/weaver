@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 import pymongo
 from pymongo import ASCENDING, DESCENDING
+from pymongo.collation import Collation
 from pymongo.errors import DuplicateKeyError
 from pyramid.request import Request
 from pywps import Process as ProcessWPS
@@ -21,6 +22,7 @@ from weaver.exceptions import (
     JobNotFound,
     JobRegistrationError,
     JobUpdateError,
+    ListingInvalidParameter,
     ProcessInstanceError,
     ProcessNotAccessible,
     ProcessNotFound,
@@ -37,10 +39,13 @@ from weaver.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW, PROCES
 from weaver.sort import (
     BILL_SORT_VALUES,
     JOB_SORT_VALUES,
+    PROCESS_SORT_VALUES,
     QUOTE_SORT_VALUES,
     SORT_CREATED,
     SORT_FINISHED,
     SORT_ID,
+    SORT_ID_LONG,
+    SORT_PROCESS,
     SORT_USER
 )
 from weaver.status import JOB_STATUS_CATEGORIES, STATUS_ACCEPTED, map_status
@@ -182,7 +187,55 @@ class MongodbServiceStore(StoreServices, MongodbStore):
         return True
 
 
-class MongodbProcessStore(StoreProcesses, MongodbStore):
+class ListingMixin(object):
+    @staticmethod
+    def _apply_paging_pipeline(page, limit):
+        # type: (int, int) -> List[MongodbSearchStep]
+        return [{"$skip": page * limit}, {"$limit": limit}]
+
+    @staticmethod
+    def _apply_sort_method(sort_field, sort_default, sort_allowed):
+        # type: (Optional[str], str, List[str]) -> MongodbSearchFilter
+        sort = sort_field  # keep original sort field in case of error
+        if sort is None:
+            sort = sort_default
+        elif sort == SORT_USER:
+            sort = "user_id"
+        if sort not in sort_allowed:
+            raise ListingInvalidParameter(json={
+                "description": "Invalid sorting method.",
+                "cause": "sort",
+                "value": str(sort_field),
+            })
+        sort_order = DESCENDING if sort in (SORT_FINISHED, SORT_CREATED) else ASCENDING
+        return {sort: sort_order}
+
+    @staticmethod
+    def _apply_total_result(search_pipeline, extra_pipeline):
+        # type: (MongodbSearchPipeline, MongodbSearchPipeline) -> MongodbSearchPipeline
+        """
+        Extends the pipeline operations in order to obtain the grand total of matches in parallel to other filtering.
+
+        A dual-branch search pipeline is created to apply distinct operations on each facet.
+        The initial search are executed only once for both facets.
+        The first obtains results with other processing steps specified, and the second calculates the total results.
+
+        :param search_pipeline: pipeline employed to obtain initial matches against search filters.
+        :param extra_pipeline: additional steps to generate specific results.
+        :return: combination of the grand total of all items and their following processing representation.
+        """
+        total_pipeline = [{
+            "$facet": {
+                "itemsPipeline": extra_pipeline,
+                "totalPipeline": [
+                    {"$count": "total"}
+                ]
+            }
+        }]
+        return search_pipeline + total_pipeline  # noqa
+
+
+class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
     """
     Registry for processes.
 
@@ -355,14 +408,25 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
             raise ProcessNotFound("Process '{}' could not be found.".format(sane_name))
         return bool(self.collection.delete_one({"identifier": sane_name}).deleted_count)
 
-    def list_processes(self, visibility=None):
-        # type: (Optional[str]) -> List[Process]
+    def list_processes(self,
+                       visibility=None,     # type: Optional[str]
+                       page=None,           # type: Optional[int]
+                       limit=None,          # type: Optional[int]
+                       sort=None,           # type: Optional[str]
+                       total=False,         # type: bool
+                       ):                   # type: (...) -> Union[List[Process], Tuple[List[Process], int]]
         """
         Lists all processes in database, optionally filtered by `visibility`.
 
         :param visibility: One value amongst `weaver.visibility`.
+        :param page: page number to return when using result paging.
+        :param limit: number of processes per page when using result paging.
+        :param sort: field which is used for sorting results (default: process ID, descending).
+        :param total: request the total number of processes to be calculated (ignoring paging).
+        :returns:
+            List of sorted, and possibly page-filtered, processes matching queries.
+            If ``total`` was requested, return a tuple of this list and the number of processes.
         """
-        db_processes = []
         search_filters = {}
         if visibility is None:
             visibility = VISIBILITY_VALUES
@@ -373,9 +437,32 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
                 raise ValueError("Invalid visibility value '{0!s}' is not one of {1!s}"
                                  .format(v, list(VISIBILITY_VALUES)))
         search_filters["visibility"] = {"$in": list(visibility)}
-        for process in self.collection.find(search_filters).sort("identifier", pymongo.ASCENDING):
-            db_processes.append(Process(process))
-        return db_processes
+
+        # processes do not have 'created', but ObjectID in '_id' has the particularity of embedding creation time
+        if sort == SORT_CREATED:
+            sort = "_id"
+        # replace equivalent aliases to corresponding fields in db
+        if sort in [SORT_ID, SORT_PROCESS]:
+            sort = SORT_ID_LONG
+        sort_allowed = list(PROCESS_SORT_VALUES) + ["_id"]
+        sort_method = {"$sort": self._apply_sort_method(sort, SORT_ID_LONG, sort_allowed)}
+
+        search_pipeline = [{"$match": search_filters}, sort_method]
+        paging_pipeline = []
+        if page is not None and limit is not None:
+            paging_pipeline = self._apply_paging_pipeline(page, limit)
+        if total:
+            pipeline = self._apply_total_result(search_pipeline, paging_pipeline)
+        else:
+            pipeline = search_pipeline + paging_pipeline
+        LOGGER.debug("Process listing pipeline:\n%s", repr_json(pipeline, indent=2))
+
+        found = list(self.collection.aggregate(pipeline, collation=Collation(locale="en")))
+        if total:
+            items = [Process(item) for item in found[0]["itemsPipeline"]]
+            total = found[0]["totalPipeline"][0]["total"] if items else 0
+            return items, total
+        return [Process(item) for item in found]
 
     def fetch_by_id(self, process_id, visibility=None):
         # type: (str, Optional[str]) -> Process
@@ -430,7 +517,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
         return True
 
 
-class MongodbJobStore(StoreJobs, MongodbStore):
+class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
     """
     Registry for process jobs tracking.
 
@@ -623,7 +710,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
         pipeline = [{"$match": search_filters}]  # expected for all filters except 'duration'
         self._apply_duration_filter(pipeline, min_duration, max_duration)
 
-        sort_method = {"$sort": self._apply_sort_method(sort)}
+        sort_method = {"$sort": self._apply_sort_method(sort, SORT_CREATED, JOB_SORT_VALUES)}
         pipeline.append(sort_method)
 
         # results by group categories or with job list paging
@@ -660,7 +747,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
         pipeline = self._apply_total_result(pipeline, group_pipeline)
         LOGGER.debug("Job search pipeline:\n%s", repr_json(pipeline, indent=2))
 
-        found = list(self.collection.aggregate(pipeline))
+        found = list(self.collection.aggregate(pipeline, collation=Collation(locale="en")))
         items = found[0]["itemsPipeline"]
         # convert to Job object where applicable, since pipeline result contains (category, jobs, count)
         items = [{k: (v if k != "jobs" else [Job(j) for j in v]) for k, v in i.items()} for i in items]
@@ -671,43 +758,19 @@ class MongodbJobStore(StoreJobs, MongodbStore):
         total = found[0]["totalPipeline"][0]["total"] if items else 0
         return items, total
 
-    def _find_jobs_paging(self, pipeline, page, limit):
+    def _find_jobs_paging(self, search_pipeline, page, limit):
         # type: (MongodbSearchPipeline, int, int) -> Tuple[List[Job], int]
         """
         Retrieves jobs limited by specified paging parameters and predefined search pipeline filters.
         """
-        paging_pipeline = [{"$skip": page * limit}, {"$limit": limit}]  # type: List[MongodbSearchStep]
-        pipeline = self._apply_total_result(pipeline, paging_pipeline)
+        paging_pipeline = self._apply_paging_pipeline(page, limit)
+        pipeline = self._apply_total_result(search_pipeline, paging_pipeline)
         LOGGER.debug("Job search pipeline:\n%s", repr_json(pipeline, indent=2))
 
         found = list(self.collection.aggregate(pipeline))
         items = [Job(item) for item in found[0]["itemsPipeline"]]
         total = found[0]["totalPipeline"][0]["total"] if items else 0
         return items, total
-
-    @staticmethod
-    def _apply_total_result(search_pipeline, extra_pipeline):
-        # type: (MongodbSearchPipeline, MongodbSearchPipeline) -> MongodbSearchPipeline
-        """
-        Extends the pipeline operations in order to obtain the grand total of matches in parallel to other filtering.
-
-        A dual-branch search pipeline is created to apply distinct operations on each facet.
-        The initial search are executed only once for both facets.
-        The first obtains results with other processing steps specified, and the second calculates the total results.
-
-        :param search_pipeline: pipeline employed to obtain initial matches against search filters.
-        :param extra_pipeline: additional steps to generate specific results.
-        :return: combination of the grand total of all items and their following processing representation.
-        """
-        total_pipeline = [{
-            "$facet": {
-                "itemsPipeline": extra_pipeline,
-                "totalPipeline": [
-                    {"$count": "total"}
-                ]
-            }
-        }]
-        return search_pipeline + total_pipeline  # noqa
 
     @staticmethod
     def _apply_tags_filter(tags):
@@ -841,23 +904,6 @@ class MongodbJobStore(StoreJobs, MongodbStore):
                 duration_filter["$lte"] = max_duration
             pipeline[1]["$match"].update({"duration": duration_filter})
         return pipeline
-
-    @staticmethod
-    def _apply_sort_method(sort_field):
-        # type: (Optional[str]) -> MongodbSearchFilter
-        sort = sort_field  # keep original sort field in case of error
-        if sort is None:
-            sort = SORT_CREATED
-        elif sort == SORT_USER:
-            sort = "user_id"
-        if sort not in JOB_SORT_VALUES:
-            raise JobInvalidParameter(json={
-                "description": "Invalid sorting method.",
-                "cause": "sort",
-                "value": str(sort),
-            })
-        sort_order = DESCENDING if sort in (SORT_FINISHED, SORT_CREATED) else ASCENDING
-        return {sort: sort_order}
 
     def clear_jobs(self):
         # type: () -> bool

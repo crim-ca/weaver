@@ -12,12 +12,21 @@ Changes:
 --------
 - Add database revision number for traceability of migration procedures as needed.
 - Add first database revision with conversion of UUID-like strings to literal UUID objects.
+- Add ``links`` to ``/processes`` and ``/providers/{id}/processes`` listings
+  (resolves `#269 <https://github.com/crim-ca/weaver/issues/269>`_).
+- Add ``limit``, ``page`` and ``sort`` query parameters for ``/processes`` listing
+  (resolves `#269 <https://github.com/crim-ca/weaver/issues/269>`_).
+- Add ``ignore`` parameter to ``/processes`` listing when combined with ``providers=true`` to allow the similar
+  behaviour supported by ``ignore`` on ``/providers`` endpoint, to effectively ignore services that cause parsing
+  errors or failure to retrieve details from the remote reference.
+- Add schema validation of contents returned on ``/processes`` endpoint.
 
 Fixes:
 ------
 - Fix resolution of unspecified UUID representation format in `MongoDB`.
 - Fix conformance with error type reporting of missing `Job` or `Process`
   (resolves `#320 <https://github.com/crim-ca/weaver/issues/320>`_).
+- Fix sorting of text fields using alphabetical case-insensitive ordering.
 
 `4.5.0 <https://github.com/crim-ca/weaver/tree/4.5.0>`_ (2021-11-25)
 ========================================================================

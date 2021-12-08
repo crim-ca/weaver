@@ -10,48 +10,26 @@ from pyramid.httpexceptions import (
     HTTPServiceUnavailable,
     HTTPUnprocessableEntity
 )
-from pyramid.request import Request
 from pyramid.settings import asbool
 
-from weaver.config import WEAVER_CONFIGURATIONS_REMOTE, get_weaver_configuration
 from weaver.database import get_db
-from weaver.exceptions import ProcessNotFound, log_unhandled_exceptions
+from weaver.exceptions import ProcessNotFound, ServiceException, log_unhandled_exceptions
 from weaver.formats import OUTPUT_FORMAT_JSON
 from weaver.processes import opensearch
 from weaver.processes.execution import submit_job
 from weaver.processes.types import PROCESS_BUILTIN
 from weaver.processes.utils import deploy_process_from_payload, get_job_submission_response, get_process
 from weaver.store.base import StoreProcesses
-from weaver.utils import get_any_id, get_settings
+from weaver.utils import get_any_id, fully_qualified_name
 from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_VALUES
 from weaver.wps_restapi import swagger_definitions as sd
+from weaver.wps_restapi.processes.utils import get_process_list_links, get_processes_filtered_by_valid_schemas
 from weaver.wps_restapi.providers.utils import get_provider_services
 
 if TYPE_CHECKING:
     from weaver.typedefs import JSON
-    from typing import List, Tuple
 
 LOGGER = logging.getLogger(__name__)
-
-
-def get_processes_filtered_by_valid_schemas(request):
-    # type: (Request) -> Tuple[List[JSON], List[str]]
-    """
-    Validates the processes summary schemas and returns them into valid/invalid lists.
-
-    :returns: list of valid process summaries and invalid processes IDs for manual cleanup.
-    """
-    store = get_db(request).get_store(StoreProcesses)
-    processes = store.list_processes(visibility=VISIBILITY_PUBLIC)
-    valid_processes = list()
-    invalid_processes_ids = list()
-    for process in processes:
-        try:
-            valid_processes.append(process.summary())
-        except colander.Invalid as invalid:
-            LOGGER.debug("Invalid process [%s] because:\n%s", process.identifier, invalid)
-            invalid_processes_ids.append(process.identifier)
-    return valid_processes, invalid_processes_ids
 
 
 @sd.processes_service.get(schema=sd.GetProcessesEndpoint(), tags=[sd.TAG_PROCESSES, sd.TAG_GETCAPABILITIES],
@@ -64,31 +42,58 @@ def get_processes(request):
     Optionally list both local and provider processes.
     """
     detail = asbool(request.params.get("detail", True))
+    ignore = asbool(request.params.get("ignore", True))
     try:
         # get local processes and filter according to schema validity
         # (previously deployed process schemas can become invalid because of modified schema definitions
-        processes, invalid_processes = get_processes_filtered_by_valid_schemas(request)
+        results = get_processes_filtered_by_valid_schemas(request)
+        processes, invalid_processes, paging, with_providers, total_processes = results
         if invalid_processes:
             raise HTTPServiceUnavailable(
                 "Previously deployed processes are causing invalid schema integrity errors. "
                 "Manual cleanup of following processes is required: {}".format(invalid_processes))
-        response_body = {"processes": processes if detail else [get_any_id(p) for p in processes]}
+        body = {"processes": processes if detail else [get_any_id(p) for p in processes]}  # type: JSON
+        if not with_providers:
+            body.update(paging)
+        else:
+            paging = {}  # disable to remove paging-related links
+        body["links"] = get_process_list_links(request, paging, total_processes)
 
-        # if 'EMS' and '?providers=True', also fetch each provider's processes
-        settings = get_settings(request)
-        if get_weaver_configuration(settings) in WEAVER_CONFIGURATIONS_REMOTE:
-            with_providers = asbool(request.params.get("providers", False))
-            if with_providers:
-                services = get_provider_services(request)  # must fetch for listing of available processes
-                response_body.update({
-                    "providers": [svc.summary(request) if detail else {"id": svc.name} for svc in services]
+        # if 'EMS/HYBRID' and '?providers=True', also fetch each provider's processes
+        if with_providers:
+            # param 'check' enforced because must fetch for listing of available processes (GetCapabilities)
+            services = get_provider_services(request, ignore=ignore, check=True)
+            body.update({
+                "providers": [svc.summary(request, ignore=ignore) if detail else {"id": svc.name} for svc in services]
+            })
+            invalid_services = [False] * len(services)
+            for i, provider in enumerate(services):
+                processes = provider.processes(request, ignore=ignore)
+                if processes is None:
+                    invalid_services[i] = True
+                    continue
+                total_processes += len(processes)
+                body["providers"][i].update({
+                    "processes": processes if detail else [get_any_id(proc) for proc in processes]
                 })
-                for i, provider in enumerate(services):
-                    processes = provider.processes(request)
-                    response_body["providers"][i].update({
-                        "processes": processes if detail else [get_any_id(proc) for proc in processes]
-                    })
-        return HTTPOk(json=response_body)
+            if any(invalid_services):
+                LOGGER.debug("Invalid providers dropped due to failing parsing and ignore query: %s",
+                             [svc.name for svc, status in zip(services, invalid_services) if status])
+                body["providers"] = [svc for svc, ignore in zip(body["providers"], invalid_services) if not ignore]
+
+        body["total"] = total_processes
+        LOGGER.debug("Process listing generated, validating schema...")
+        body = sd.MultiProcessesListing().deserialize(body)
+        return HTTPOk(json=body)
+
+    except ServiceException as exc:
+        LOGGER.debug("Error when listing provider processes using query parameter raised: [%s]", exc, exc_info=exc)
+        raise HTTPServiceUnavailable(json={
+            "description": "At least one provider could not list its processes. "
+                           "Failing provider errors were requested to not be ignored.",
+            "exception": fully_qualified_name(exc),
+            "error": str(exc)
+        })
     # FIXME: handle colander invalid directly in tween (https://github.com/crim-ca/weaver/issues/112)
     except colander.Invalid as ex:
         raise HTTPBadRequest("Invalid schema: [{!s}]".format(ex))
