@@ -300,6 +300,15 @@ def init_weaver_service(registry):
     }))
 
 
+def get_links(resp_links):
+    nav_links = ["up", "current", "next", "prev", "first", "last", "search", "alternate", "collection"]
+    link_dict = {rel: None for rel in nav_links}
+    for _link in resp_links:
+        if _link["rel"] in link_dict:
+            link_dict[_link["rel"]] = _link["href"]
+    return link_dict
+
+
 def mocked_file_response(path, url):
     # type: (str, str) -> Union[Response, HTTPException]
     """
@@ -536,7 +545,7 @@ def mocked_remote_server_requests_wps1(server_configs,          # type: Union[Mo
             # Call requests here, both provided WPS and above requests will be mocked.
 
     The generated responses mock can also be passed back into the function to register further WPS services with
-    similar handling as the decorator to register relavant requests based on provided server configurations.
+    similar handling as the decorator to register relevant requests based on provided server configurations.
 
     .. code-block:: python
 

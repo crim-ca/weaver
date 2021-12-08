@@ -17,6 +17,7 @@ import pytest
 from dateutil import parser as date_parser
 
 from tests.utils import (
+    get_links,
     get_module_version,
     get_test_weaver_app,
     mocked_dismiss_process,
@@ -384,14 +385,6 @@ class WpsRestApiJobsTest(unittest.TestCase):
         """
         Verifies that relation links update according to context in order to allow natural navigation between responses.
         """
-        def get_links(resp_links):
-            nav_links = ["up", "current", "next", "prev", "first", "last", "search", "alternate", "collection"]
-            link_dict = {rel: None for rel in nav_links}
-            for _link in resp_links:
-                if _link["rel"] in link_dict:
-                    link_dict[_link["rel"]] = _link["href"]
-            return link_dict
-
         expect_jobs_total = len(self.job_info)
         expect_jobs_visible = len(list(filter(lambda j: VISIBILITY_PUBLIC in j.access, self.job_info)))
         assert len(self.job_store.list_jobs()) == expect_jobs_total, (

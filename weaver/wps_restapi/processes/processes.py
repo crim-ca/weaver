@@ -62,12 +62,18 @@ def get_processes(request):
         # if 'EMS/HYBRID' and '?providers=True', also fetch each provider's processes
         if with_providers:
             # param 'check' enforced because must fetch for listing of available processes (GetCapabilities)
+            # when 'ignore' is not enabled, any failing definition should raise any derived 'ServiceException'
             services = get_provider_services(request, ignore=ignore, check=True)
             body.update({
                 "providers": [svc.summary(request, ignore=ignore) if detail else {"id": svc.name} for svc in services]
             })
             invalid_services = [False] * len(services)
             for i, provider in enumerate(services):
+                # ignore failing parsing of the service description
+                if body["providers"][i] is None:
+                    invalid_services[i] = True
+                    continue
+                # attempt parsing available processes and ignore again failing items
                 processes = provider.processes(request, ignore=ignore)
                 if processes is None:
                     invalid_services[i] = True

@@ -1,6 +1,7 @@
 """
 Definitions of types used by tokens.
 """
+import colander
 import copy
 import enum
 import inspect
@@ -384,21 +385,19 @@ class Service(Base):
                     "metadata": self.metadata(container),
                 })
             return sd.ProviderSummarySchema().deserialize(data)
-        except ServiceParsingError as exc:
-            err_msg = repr(exc)
-            LOGGER.debug(err_msg, exc_info=exc)
-            if ignore:
-                warnings.warn(err_msg, NonBreakingExceptionWarning)
-                return None
-            raise
+        except colander.Invalid as exc:
+            LOGGER.error("Failed schema validation on otherwise valid parsing of provider definition.", exc_info=exc)
+            raise  # invalid schema on our side, don't ignore it
         except Exception as exc:
-            msg = "Exception occurred while fetching WPS [{}] at [{}]".format(self.name, self.url)
+            msg = "Exception occurred while fetching or parsing WPS [{}] at [{}]".format(self.name, self.url)
             err_msg = "{}: {!r}".format(msg, exc)
             LOGGER.debug(err_msg, exc_info=exc)
             if ignore:
                 warnings.warn(err_msg, NonBreakingExceptionWarning)
                 return None
-            raise ServiceParsingError(json={"description": msg, "cause": str(exc), "error": exc.__class__.__name__})
+            if isinstance(exc, ServiceParsingError):
+                raise
+            raise ServiceParsingError(json={"description": msg, "cause": str(exc), "error": fully_qualified_name(exc)})
 
     def processes(self, container, ignore=False):
         # type: (AnySettingsContainer, bool) -> Optional[List[Process]]
