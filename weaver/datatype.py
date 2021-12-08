@@ -1,7 +1,6 @@
 """
 Definitions of types used by tokens.
 """
-import colander
 import copy
 import enum
 import inspect
@@ -15,6 +14,7 @@ from logging import ERROR, INFO, Logger, getLevelName, getLogger
 from typing import TYPE_CHECKING
 from urllib.parse import urljoin, urlparse
 
+import colander
 import pyramid.httpexceptions
 import requests.exceptions
 from dateutil.parser import parse as dt_parse

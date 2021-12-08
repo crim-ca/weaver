@@ -20,7 +20,7 @@ from weaver.processes.execution import submit_job
 from weaver.processes.types import PROCESS_BUILTIN
 from weaver.processes.utils import deploy_process_from_payload, get_job_submission_response, get_process
 from weaver.store.base import StoreProcesses
-from weaver.utils import get_any_id, fully_qualified_name
+from weaver.utils import fully_qualified_name, get_any_id
 from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_VALUES
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.processes.utils import get_process_list_links, get_processes_filtered_by_valid_schemas

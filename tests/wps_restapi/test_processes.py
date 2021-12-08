@@ -1,3 +1,5 @@
+# pylint: disable=R1729  # ignore non-generator representation employed for displaying test log results
+
 import base64
 import contextlib
 import copy
