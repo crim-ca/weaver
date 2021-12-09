@@ -1,6 +1,7 @@
 """
 Test processes consisting of a Workflow of sub-processes defining Application Package.
 """
+import tempfile
 
 import contextlib
 import enum
@@ -17,7 +18,7 @@ import mock
 import pytest
 import yaml
 from pyramid import testing
-from pyramid.httpexceptions import HTTPCreated, HTTPNotFound, HTTPOk
+from pyramid.httpexceptions import HTTPConflict, HTTPCreated, HTTPNotFound, HTTPOk
 from pyramid.settings import asbool
 # use 'Web' prefix to avoid pytest to pick up these classes and throw warnings
 from webtest import TestApp as WebTestApp
@@ -27,6 +28,7 @@ from tests.utils import (
     get_settings_from_testapp,
     get_test_weaver_app,
     mocked_execute_process,
+    mocked_file_server,
     mocked_sub_requests,
     mocked_wps_output,
     setup_config_with_mongodb
@@ -66,9 +68,11 @@ class WorkflowProcesses(enum.Enum):
     APP_SUBSET_NASA_ESGF = "SubsetNASAESGF"
     APP_DOCKER_STAGE_IMAGES = "DockerStageImages"
     APP_DOCKER_COPY_IMAGES = "DockerCopyImages"
+    APP_DOCKER_COPY_NESTED_OUTDIR = "DockerCopyNestedOutDir"
     WORKFLOW_STACKER_SFS = "Workflow"
     WORKFLOW_SC = "WorkflowSimpleChain"
     WORKFLOW_S2P = "WorkflowS2ProbaV"
+    WORKFLOW_CHAIN_COPY = "WorkflowChainCopy"
     WORKFLOW_CUSTOM = "CustomWorkflow"
     WORKFLOW_FLOOD_DETECTION = "WorkflowFloodDetection"
     WORKFLOW_SUBSET_ICE_DAYS = "WorkflowSubsetIceDays"
@@ -458,6 +462,12 @@ class WorkflowTestRunnerBase(TestCase):
         deploy_payload["processDescription"]["process"]["id"] = new_process_id
         execute_payload = cls.retrieve_payload(execute_path)
 
+        # replace derived reference
+        test_app_pkg = deploy_payload.get("executionUnit", [{}])[0].pop("test", None)
+        if test_app_pkg:
+            unit_app_pkg = cls.retrieve_payload(test_app_pkg)
+            deploy_payload["executionUnit"][0]["unit"] = unit_app_pkg
+
         # Apply collection swapping
         for swap in cls.swap_data_collection():
             for i in execute_payload["inputs"]:
@@ -470,20 +480,29 @@ class WorkflowTestRunnerBase(TestCase):
     def retrieve_payload(cls, url):
         # type: (str) -> Dict
         local_path = os.path.join(os.path.dirname(__file__), "application-packages", url.split("/")[-1])
+        tested_ref = []
         try:
+            extension = os.path.splitext(local_path)[-1]
+            retry_extensions = [".json", ".yaml", ".yml"]
+            if extension not in retry_extensions:
+                retry_extensions = [extension]
             # Try to find it locally, then fallback to remote
-            if os.path.isfile(local_path):
-                with open(local_path, "r") as f:
-                    json_payload = yaml.safe_load(f)  # both JSON/YAML
-                    return json_payload
+            for ext in retry_extensions:
+                local_path_ext = os.path.splitext(local_path)[0] + ext
+                if os.path.isfile(local_path_ext):
+                    with open(local_path_ext, "r", encoding="utf-8") as f:
+                        json_payload = yaml.safe_load(f)  # both JSON/YAML
+                        return json_payload
+                tested_ref.append(local_path_ext)
             if urlparse(url).scheme != "":
                 resp = cls.request("GET", url, force_requests=True, ignore_errors=True)
                 if resp.status_code == HTTPOk.code:
                     return yaml.safe_load(resp.text)  # both JSON/YAML
+                tested_ref.append(url)
         except (IOError, ValueError):
             pass
-        cls.log("{}Cannot find payload from either references:\n[{}]\n[{}]\n"
-                .format(cls.logger_separator_calls, url, local_path), exception=True)
+        cls.log("{}Cannot find payload from any of the following references:\n- {}"
+                .format(cls.logger_separator_calls, "\n- ".join(tested_ref)), exception=True)
 
     @classmethod
     def get_test_process_id(cls, real_process_id):
@@ -620,7 +639,9 @@ class WorkflowTestRunnerBase(TestCase):
             body_key = "data" if with_mock_req else "params"
             if json_body is not None:
                 kw.update({body_key: json.dumps(json_body, cls=json.JSONEncoder)})
-            kw.update({"expect_errors": status and status >= 400 or expect_errors})
+            if isinstance(status, int):
+                status = [status]
+            kw.update({"expect_errors": (status and any(code >= 400 for code in status)) or expect_errors})
             cookies = kw.pop("cookies", dict()) or {}
             for cookie_name, cookie_value in cookies.items():
                 cls.app.set_cookie(cookie_name, cookie_value)
@@ -660,8 +681,8 @@ class WorkflowTestRunnerBase(TestCase):
                     cls.indent("Headers: {headers}\n".format(headers=headers), 1))
         return resp
 
-    def workflow_runner(self, test_workflow_id, test_application_ids, log_full_trace=False):
-        # type: (WorkflowProcesses, Iterable[WorkflowProcesses], bool) -> None
+    def workflow_runner(self, test_workflow_id, test_application_ids, log_full_trace=False, allow_conflict=False):
+        # type: (WorkflowProcesses, Iterable[WorkflowProcesses], bool, bool) -> None
         """
         Simplify test for demonstration purpose.
         """
@@ -674,9 +695,11 @@ class WorkflowTestRunnerBase(TestCase):
         for process_id in test_application_ids:
             path_visible = "{}/{}/visibility".format(path_deploy, self.test_processes_info[process_id].test_id)
             data_visible = {"value": VISIBILITY_PUBLIC}
-            self.request("POST", path_deploy, status=HTTPCreated.code, headers=self.headers,
+            allowed_status = [HTTPCreated.code, HTTPConflict.code] if allow_conflict else HTTPCreated.code
+            self.request("POST", path_deploy, headers=self.headers,
                          json=self.test_processes_info[process_id].deploy_payload,
-                         message="Expect deployed application process.")
+                         message="Expect deployed application process.",
+                         ignore_errors=allow_conflict, status=allowed_status)
             self.request("PUT", path_visible, status=HTTPOk.code, headers=self.headers, json=data_visible,
                          message="Expect visible application process.")
 
@@ -799,10 +822,12 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
 
     WEAVER_TEST_APPLICATION_SET = {
         WorkflowProcesses.APP_DOCKER_STAGE_IMAGES,
-        WorkflowProcesses.APP_DOCKER_COPY_IMAGES
+        WorkflowProcesses.APP_DOCKER_COPY_IMAGES,
+        WorkflowProcesses.APP_DOCKER_COPY_NESTED_OUTDIR,
     }
     WEAVER_TEST_WORKFLOW_SET = {
-        WorkflowProcesses.WORKFLOW_STAGE_COPY_IMAGES
+        WorkflowProcesses.WORKFLOW_CHAIN_COPY,
+        WorkflowProcesses.WORKFLOW_STAGE_COPY_IMAGES,
     }
 
     @pytest.mark.xfail(reason="Workflow not working anymore. IO to be repaired.")
@@ -813,3 +838,38 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
         self.workflow_runner(WorkflowProcesses.WORKFLOW_STAGE_COPY_IMAGES,
                              [WorkflowProcesses.APP_DOCKER_STAGE_IMAGES, WorkflowProcesses.APP_DOCKER_COPY_IMAGES],
                              log_full_trace=True)
+
+    def test_workflow_subdir_output_glob(self):
+        """
+        Test that validates the retrieval of nested directory output files between workflow steps.
+
+        Following the execution of a :term:`Workflow` step, :term:`Application Package` that use an ``outputBinding``
+        with ``glob`` looking for the file to stage out within a sub-directory as follows are automatically generated
+        under the output directory by :term:`CWL` within the same structure.
+
+        .. code-block:: yaml
+            outputs:
+                text-output:
+                    outputBinding:
+                        glob": "sub/dir/to/*.txt"
+
+        In other words, a file generated as ``/tmp/cwl-tmpXYZ/sub/dir/to/result.txt`` by the Docker application would
+        be staged out in the output directory with the full path. This poses problem in the case of `Weaver` workflows
+        because each of those files are then staged out to the :term:`WPS` output directory under the :term:`Job` UUID.
+        Therefore, the following step in the workflow receives a nested-directory path that does not correspond to the
+        expected non-nested location after mapping between :term:`WPS` output directory and URL.
+
+        .. seealso::
+            Handling of this behaviour to adjust nested directory within the application against staged-out non-nested
+            directories is accomplished in :meth:`weaver.processes.wps_process_base.WpsProcessInterface.stage_results`.
+        """
+        with contextlib.ExitStack() as stack:
+            tmp_host = "https://mocked-file-server.com"  # must match in 'Execute_WorkflowCopyNestedOutDir.json'
+            tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())
+            stack.enter_context(mocked_file_server(tmp_dir, tmp_host, self.settings))
+            with open(os.path.join(tmp_dir, "test-file.txt"), "w") as tmp_file:  # must match execution body
+                tmp_file.write("DUMMY DATA")
+            self.workflow_runner(WorkflowProcesses.WORKFLOW_CHAIN_COPY,
+                                 [WorkflowProcesses.APP_DOCKER_COPY_NESTED_OUTDIR,
+                                  WorkflowProcesses.APP_DOCKER_COPY_NESTED_OUTDIR],
+                                 log_full_trace=True, allow_conflict=True)
