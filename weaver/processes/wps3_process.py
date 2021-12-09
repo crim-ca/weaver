@@ -72,7 +72,7 @@ class Wps3Process(WpsProcessInterface):
                  ):
         super(Wps3Process, self).__init__(
             request,
-            lambda _message, _progress, _status: update_status(_message, _progress, _status, self.provider)
+            lambda _message, _progress, _status: update_status(_message, _progress, _status, self.provider or "local")
         )
         self.provider, self.url, self.deploy_body = self.resolve_data_source(step_payload, joborder)
         self.process = process
@@ -98,8 +98,8 @@ class Wps3Process(WpsProcessInterface):
         except (IndexError, KeyError) as exc:
             raise PackageExecutionError("Failed to save package outputs. [{!r}]".format(exc))
 
-        self.provider = data_source  # fix immediately for `update_status`
-        self.update_status("{provider} is selected {reason}.".format(provider=data_source, reason=reason),
+        self.provider = data_source  # fix immediately for below `update_status` call
+        self.update_status("Provider {provider} is selected {reason}.".format(provider=data_source, reason=reason),
                            REMOTE_JOB_PROGRESS_PROVIDER, status.STATUS_RUNNING)
 
         return data_source, url, deploy_body

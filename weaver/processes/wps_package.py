@@ -1150,7 +1150,7 @@ class WpsPackage(Process):
                            target_host, status):
         # type: (str, Number, Number, Number, str, AnyValue, str) -> None
         self.update_status(
-            message="{0} [{1}] - {2}".format(target_host, step_name, str(message).strip()),
+            message="[provider: {0}, step: {1}] - {2}".format(target_host, step_name, str(message).strip()),
             progress=map_progress(progress, start_step_progress, end_step_progress),
             status=status,
         )

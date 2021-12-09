@@ -37,7 +37,6 @@ if TYPE_CHECKING:
         JobInputs,
         JobOutputs,
         JobResults,
-        UpdateStatusPartialFunction,
         OWS_InputDataValues,
         ProcessOWS,
         UpdateStatusPartialFunction
