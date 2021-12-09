@@ -1,0 +1,14 @@
+{
+    "processDescription": {
+        "process": {
+            "id": "DockerNetCDF2Text",
+            "description": "Mock WPS-1 operation followed by copy of images."
+        }
+    },
+    "executionUnit": [
+        {
+            "test": "DockerNetCDF2Text.cwl"
+        }
+    ],
+    "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication"
+}

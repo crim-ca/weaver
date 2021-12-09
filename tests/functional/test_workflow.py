@@ -71,6 +71,8 @@ class WorkflowProcesses(enum.Enum):
     APP_DOCKER_STAGE_IMAGES = "DockerStageImages"
     APP_DOCKER_COPY_IMAGES = "DockerCopyImages"
     APP_DOCKER_COPY_NESTED_OUTDIR = "DockerCopyNestedOutDir"
+    APP_DOCKER_NETCDF_2_TEXT = "DockerNetCDF2Text"
+    APP_WPS1_JSON_ARRAY_2_NETCDF = "WPS1JsonArray2NetCDF"
     WORKFLOW_STACKER_SFS = "Workflow"
     WORKFLOW_SC = "WorkflowSimpleChain"
     WORKFLOW_S2P = "WorkflowS2ProbaV"
@@ -83,6 +85,7 @@ class WorkflowProcesses(enum.Enum):
     WORKFLOW_SUBSET_NASA_ESGF_SUBSET_CRIM = "WorkflowSubsetNASAESGF_SubsetCRIM"
     WORKFLOW_FILE_TO_SUBSET_CRIM = "WorkflowFile_To_SubsetCRIM"
     WORKFLOW_STAGE_COPY_IMAGES = "WorkflowStageCopyImages"
+    WORKFLOW_WPS1_COPY_NETCDF = "WorkflowWPS1CopyNetCDF"
 
 
 class ProcessInfo(object):
@@ -621,7 +624,8 @@ class WorkflowTestRunnerBase(TestCase):
         if with_requests:
             kw.update({"verify": False, "timeout": cls.WEAVER_TEST_REQUEST_TIMEOUT})
             # retry request if the error was caused by some connection error
-            resp = request_extra(method, url, json=json_body, data=data_body, retries=3, settings=cls.settings, **kw)
+            settings = cls.settings.fget(cls)
+            resp = request_extra(method, url, json=json_body, data=data_body, retries=3, settings=settings, **kw)
 
             # add some properties similar to `webtest.TestApp`
             resp_body = getattr(resp, "body", None)  # if error is pyramid HTTPException, body is byte only
@@ -704,8 +708,8 @@ class WorkflowTestRunnerBase(TestCase):
             Identifier of the :term:`Workflow` to test.
             Must be a member amongst preloaded :attr:`WEAVER_TEST_WORKFLOW_SET` definitions.
         :param test_application_ids:
-            Identifiers of all intermediate :term:`Process` steps expected by the :term:`Workflow` to test.
-            Must be members amongst preloaded :attr:`WEAVER_TEST_APPLICATION_SET` definitions.
+            Identifiers of all intermediate :term:`Process` steps to be deployed prior to the tested :term:`Workflow`
+            expecting them to exist. Must be members amongst preloaded :attr:`WEAVER_TEST_APPLICATION_SET` definitions.
         :param log_full_trace:
             Flag to provide extensive trace logs of all request and response details for each operation.
         :param requests_mock_callback:
@@ -851,18 +855,49 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
     WEAVER_TEST_SERVER_BASE_PATH = ""
 
     WEAVER_TEST_APPLICATION_SET = {
-        WorkflowProcesses.APP_DOCKER_STAGE_IMAGES,
         WorkflowProcesses.APP_DOCKER_COPY_IMAGES,
         WorkflowProcesses.APP_DOCKER_COPY_NESTED_OUTDIR,
+        WorkflowProcesses.APP_DOCKER_NETCDF_2_TEXT,
+        WorkflowProcesses.APP_DOCKER_STAGE_IMAGES,
+        WorkflowProcesses.APP_WPS1_JSON_ARRAY_2_NETCDF,
     }
     WEAVER_TEST_WORKFLOW_SET = {
         WorkflowProcesses.WORKFLOW_CHAIN_COPY,
         WorkflowProcesses.WORKFLOW_STAGE_COPY_IMAGES,
+        WorkflowProcesses.WORKFLOW_WPS1_COPY_NETCDF,
     }
 
-    @pytest.mark.xfail(reason="Workflow not working anymore. IO to be repaired.")
-    def test_workflow_wps1_requirements(self):
-        raise NotImplementedError()
+    # FIXME: implement + re-enable 'CWL_REQUIREMENT_SCATTER'
+    @pytest.mark.xfail(reason="WIP")
+    def test_workflow_mixed_wps1_docker_scatter_requirements(self):
+        """
+        Test the use of multiple applications of different :term:`Process` type in a :term:`Workflow`.
+
+        Steps:
+            1. Convert JSON array of NetCDF references to corresponding NetCDF files
+               (using WPS-1 interface rather than WPS-REST).
+            2. Convert NetCDF file to raw text data dumps (using scattered applications per-file).
+        """
+
+        with contextlib.ExitStack() as stack:
+            tmp_host = "https://mocked-file-server.com"  # must match in 'Execute_WorkflowCopyNestedOutDir.json'
+            tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())
+            nc_refs = []
+            for i in range(3):
+                nc_name = f"test-file-{i}.nc"
+                nc_refs.append(os.path.join(tmp_host, nc_name))
+                with open(os.path.join(tmp_dir, nc_name), "w") as tmp_file:
+                    tmp_file.write(f"DUMMY NETCDF DATA #{i}")
+            with open(os.path.join(tmp_dir, "netcdf-array.json"), "w") as tmp_file:  # must match execution body
+                json.dump(nc_refs, tmp_file)
+
+            def mock_tmp_input(requests_mock):
+                mocked_file_server(tmp_dir, tmp_host, self.settings, requests_mock=requests_mock)
+
+            self.workflow_runner(WorkflowProcesses.WORKFLOW_WPS1_COPY_NETCDF,
+                                 [WorkflowProcesses.APP_WPS1_JSON_ARRAY_2_NETCDF,
+                                  WorkflowProcesses.APP_DOCKER_NETCDF_2_TEXT],
+                                 log_full_trace=True, requests_mock_callback=mock_tmp_input)
 
     def test_workflow_docker_applications(self):
         self.workflow_runner(WorkflowProcesses.WORKFLOW_STAGE_COPY_IMAGES,

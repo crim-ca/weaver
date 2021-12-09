@@ -4,7 +4,7 @@
     "inputs": [
         {
             "id": "input_files",
-            "href": "https://mocked-file-server/test-file.txt"
+            "href": "https://mocked-file-server.com/test-file.txt"
         }
     ],
     "outputs": [

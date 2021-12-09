@@ -51,6 +51,25 @@ Set of :term:`CWL` requirements that correspond to remote execution of an :term:
 
 CWL_REQUIREMENT_ENV_VAR = "EnvVarRequirement"
 CWL_REQUIREMENT_INIT_WORKDIR = "InitialWorkDirRequirement"
+CWL_REQUIREMENT_SCATTER = "ScatterFeatureRequirement"
+
+CWL_REQUIREMENT_FEATURES = frozenset([
+    CWL_REQUIREMENT_ENV_VAR,
+    CWL_REQUIREMENT_INIT_WORKDIR,
+    # CWL_REQUIREMENT_SCATTER,  # FIXME: see workflow test + fix https://github.com/crim-ca/weaver/issues/105
+])
+"""
+Set of :term:`CWL` requirements that corresponds to extra functionalities not completely defining 
+an :term:`Application Package` by themselves.
+"""
+
+CWL_REQUIREMENTS_SUPPORTED = frozenset(
+    list(CWL_REQUIREMENT_APP_TYPES) +
+    list(CWL_REQUIREMENT_FEATURES)
+)
+"""
+Set of all :term:`CWL` requirements or hints that are supported for deployment of valid :term:`Application Package`.
+"""
 
 # CWL package types and extensions
 PACKAGE_SIMPLE_TYPES = frozenset(["string", "boolean", "float", "int", "integer", "long", "double"])

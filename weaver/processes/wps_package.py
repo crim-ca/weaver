@@ -61,7 +61,7 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_TYPES,
     CWL_REQUIREMENT_APP_WPS1,
     CWL_REQUIREMENT_ENV_VAR,
-    CWL_REQUIREMENT_INIT_WORKDIR,
+    CWL_REQUIREMENTS_SUPPORTED,
     WPS_INPUT,
     WPS_OUTPUT
 )
@@ -601,7 +601,7 @@ def get_application_requirement(package):
                          "only one permitted amongst {}.".format(list(app_hints), list(CWL_REQUIREMENT_APP_TYPES)))
     requirement = app_hints[0] if app_hints else {"class": ""}
 
-    cwl_supported_reqs = [item for item in CWL_REQUIREMENT_APP_TYPES] + [CWL_REQUIREMENT_INIT_WORKDIR]
+    cwl_supported_reqs = list(CWL_REQUIREMENTS_SUPPORTED)
     if not all(item.get("class") in cwl_supported_reqs for item in all_hints):
         raise PackageTypeError("Invalid requirement, the requirements supported are {0}".format(cwl_supported_reqs))
 
@@ -1654,9 +1654,13 @@ class WpsPackage(Process):
 
         requirement = get_application_requirement(self.package)
         req_class = requirement["class"]
+        req_source = "requirement/hint"
+        if self.package_type == PROCESS_WORKFLOW:
+            req_class = PROCESS_WORKFLOW
+            req_source = "tool class"
 
         if req_class.endswith(CWL_REQUIREMENT_APP_WPS1):
-            self.logger.info("WPS-1 Package resolved from requirement/hint: %s", req_class)
+            self.logger.info("WPS-1 Package resolved from %s: %s", req_source, req_class)
             from weaver.processes.wps1_process import Wps1Process
             params = _get_wps1_params(requirement)
             return Wps1Process(
@@ -1666,7 +1670,7 @@ class WpsPackage(Process):
                 update_status=_update_status_dispatch,
             )
         elif req_class.endswith(CWL_REQUIREMENT_APP_ESGF_CWT):
-            self.logger.info("ESGF-CWT Package resolved from requirement/hint: %s", req_class)
+            self.logger.info("ESGF-CWT Package resolved from %s: %s", req_source, req_class)
             from weaver.processes.esgf_process import ESGFProcess
             params = _get_wps1_params(requirement)
             return ESGFProcess(
@@ -1677,7 +1681,7 @@ class WpsPackage(Process):
             )
         else:
             # implements both `PROCESS_APPLICATION` with `CWL_REQUIREMENT_APP_DOCKER` and `PROCESS_WORKFLOW`
-            self.logger.info("WPS-3 Package resolved from requirement/hint: %s", req_class)
+            self.logger.info("WPS-3 Package resolved from %s: %s", req_source, req_class)
             from weaver.processes.wps3_process import Wps3Process
             return Wps3Process(step_payload=step_payload,
                                joborder=joborder,

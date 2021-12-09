@@ -1,0 +1,8 @@
+mode: async
+response: document
+inputs:
+  - id: input_json
+    href: https://mocked-file-server.com/netcdf-array.json
+outputs:
+  - id: output_files
+    transmissionMode: reference

@@ -157,6 +157,7 @@ def _check_deploy(payload):
                 })
         return results
     except colander.Invalid as exc:
+        LOGGER.debug("Failed deploy body schema validation:\n%s", exc)
         raise HTTPBadRequest(json={
             "description": message,
             "cause": "Invalid schema: [{!s}]".format(exc.msg),
