@@ -16,7 +16,14 @@ from weaver.processes.wps_process_base import (
     REMOTE_JOB_PROGRESS_RESULTS,
     WpsProcessInterface
 )
-from weaver.utils import get_job_log_msg, get_log_monitor_msg, raise_on_xml_exception, wait_secs
+from weaver.utils import (
+    get_any_id,
+    get_any_value,
+    get_job_log_msg,
+    get_log_monitor_msg,
+    raise_on_xml_exception,
+    wait_secs
+)
 from weaver.wps.utils import check_wps_status, get_wps_client
 
 if TYPE_CHECKING:
@@ -70,12 +77,10 @@ class Wps1Process(WpsProcessInterface):
             if WPS_COMPLEX_DATA in process_input.dataType:
                 complex_inputs.append(process_input.identifier)
 
-        # remove any 'null' input, should employ the 'default' of the remote WPS process
-        inputs_provided_keys = filter(lambda i: workflow_inputs[i] != "null", workflow_inputs)
-
         wps_inputs = []
-        for input_key in inputs_provided_keys:
-            input_val = workflow_inputs[input_key]
+        for input_item in workflow_inputs:
+            input_key = get_any_id(input_item)
+            input_val = get_any_value(input_item)
 
             # ignore optional inputs resolved as omitted
             if input_val is None:
