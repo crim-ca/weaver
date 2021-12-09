@@ -176,7 +176,7 @@ EXAMPLES = {}
 for name in os.listdir(SCHEMA_EXAMPLE_DIR):
     path = os.path.join(SCHEMA_EXAMPLE_DIR, name)
     ext = os.path.splitext(name)[-1]
-    with open(path, "r") as f:
+    with open(path, "r", encoding="utf-8") as f:
         if ext in [".json", ".yaml", ".yml"]:
             EXAMPLES[name] = yaml.safe_load(f)  # both JSON/YAML
         else:
