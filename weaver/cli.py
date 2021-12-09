@@ -30,7 +30,7 @@ if TYPE_CHECKING:
     try:
         from weaver.typedefs import CWL, HeadersType, JSON
     except ImportError:
-        pass
+        CWL = HeadersType = JSON = Any  # avoid linter issue
 
 LOGGER = logging.getLogger(__name__)
 
