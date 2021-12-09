@@ -217,19 +217,22 @@ class WeaverClient(object):
             Instance URL if not already provided during client creation.
         :returns: results of the operation.
         """
-        success, msg, data = self._parse_deploy_body(body, process_id)
-        if not success:
-            return OperationResult(False, msg, data)
+        result = self._parse_deploy_body(body, process_id)
+        if not result.success:
+            return result
         headers = copy.deepcopy(self._headers)
         headers.update(self._parse_auth_token(token, username, password))
+        data = result.body
         try:
+            p_id = data.get("processDescription", {}).get("process", {}).get("id", process_id)
+            info = {"id": p_id}  # minimum requirement for process offering validation
             if isinstance(cwl, str) or isinstance(wps, str):
                 LOGGER.debug("Override loaded CWL into provided/loaded body for process: [%s]", process_id)
-                proc = get_process_definition({}, reference=cwl or wps, headers=headers)  # validate
+                proc = get_process_definition(info, reference=cwl or wps, headers=headers)  # validate
                 data["executionUnit"] = [{"unit": proc["package"]}]
             elif isinstance(cwl, dict):
                 LOGGER.debug("Override provided CWL into provided/loaded body for process: [%s]", process_id)
-                get_process_definition({}, package=cwl, headers=headers)  # validate
+                get_process_definition(info, package=cwl, headers=headers)  # validate
                 data["executionUnit"] = [{"unit": cwl}]
         except PackageRegistrationError as exc:
             message = f"Failed resolution of package definition: [{exc!s}]"

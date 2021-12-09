@@ -3,6 +3,7 @@ Functional tests for :mod:`weaver.cli`.
 """
 import contextlib
 import copy
+import json
 import os
 import shutil
 import tempfile
@@ -30,10 +31,18 @@ class TestWeaverClient(WpsConfigBase):
         cls.url = get_weaver_url(cls.app.app.registry)
         cls.client = WeaverClient(cls.url)
 
+        cls.test_process_prefix = "test-client"
+
+    def setUp(self):
+        processes = self.process_store.list_processes()
+        test_processes = filter(lambda _proc: _proc.id.startswith(self.test_process_prefix), processes)
+        for proc in test_processes:
+            self.process_store.delete_process(proc.id)
+
         # make one process available for testing features
-        cls.test_process = "test-client-echo"
-        cls.test_payload = cls.load_resource_file("DeployProcess_Echo.yml")
-        cls.deploy_process(cls.test_payload, process_id=cls.test_process)
+        self.test_process = f"{self.test_process_prefix}-echo"
+        self.test_payload = self.load_resource_file("DeployProcess_Echo.yml")
+        self.deploy_process(self.test_payload, process_id=self.test_process)
 
     @classmethod
     def tearDownClass(cls):
@@ -65,6 +74,62 @@ class TestWeaverClient(WpsConfigBase):
 
     def test_processes(self):
         self.process_listing_op(self.client.processes)
+
+    def test_deploy_payload_body_cwl_embedded(self):
+        test_id = f"{self.test_process_prefix}-deploy-body-no-cwl"
+        payload = self.load_resource_file("DeployProcess_Echo.yml")
+        package = self.load_resource_file("echo.cwl")
+        payload["executionUnit"][0] = {"unit": package}
+
+        result = mocked_sub_requests(self.app, self.client.deploy, test_id, payload)
+        assert result.success
+        assert "processSummary" in result.body
+        assert result.body["processSummary"]["id"] == test_id
+        assert "deploymentDone" in result.body
+        assert result.body["deploymentDone"] is True
+
+    def test_deploy_payload_file_cwl_embedded(self):
+        test_id = f"{self.test_process_prefix}-deploy-file-no-cwl"
+        payload = self.load_resource_file("DeployProcess_Echo.yml")
+        package = os.path.abspath(os.path.join(APP_PKG_ROOT, "echo.cwl"))
+        payload["executionUnit"][0] = {"href": package}
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".cwl") as body_file:
+            json.dump(payload, body_file)
+            body_file.flush()
+            body_file.seek(0)
+            result = mocked_sub_requests(self.app, self.client.deploy, test_id, body_file.name)
+        assert result.success
+        assert "processSummary" in result.body
+        assert result.body["processSummary"]["id"] == test_id
+        assert "deploymentDone" in result.body
+        assert result.body["deploymentDone"] is True
+
+    def test_deploy_payload_inject_cwl_body(self):
+        test_id = f"{self.test_process_prefix}-deploy-body-with-cwl-body"
+        payload = self.load_resource_file("DeployProcess_Echo.yml")
+        package = self.load_resource_file("echo.cwl")
+        payload.pop("executionUnit", None)
+
+        result = mocked_sub_requests(self.app, self.client.deploy, test_id, payload, package)
+        assert result.success
+        assert "processSummary" in result.body
+        assert result.body["processSummary"]["id"] == test_id
+        assert "deploymentDone" in result.body
+        assert result.body["deploymentDone"] is True
+
+    def test_deploy_payload_inject_cwl_file(self):
+        test_id = f"{self.test_process_prefix}-deploy-body-with-cwl-file"
+        payload = self.load_resource_file("DeployProcess_Echo.yml")
+        package = os.path.abspath(os.path.join(APP_PKG_ROOT, "echo.cwl"))
+        payload.pop("executionUnit", None)
+
+        result = mocked_sub_requests(self.app, self.client.deploy, test_id, payload, package)
+        assert result.success
+        assert "processSummary" in result.body
+        assert result.body["processSummary"]["id"] == test_id
+        assert "deploymentDone" in result.body
+        assert result.body["deploymentDone"] is True
 
     def test_undeploy(self):
         # deploy a new process to leave the test one available
