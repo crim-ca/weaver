@@ -2427,7 +2427,7 @@ class ProcessPagingQuery(ExtendedMappingSchema):
     sort = ProcessSortEnum(missing=drop)
     # if page is omitted but limit provided, use reasonable zero by default
     page = ExtendedSchemaNode(Integer(allow_string=True), missing=0, default=0, validator=Range(min=0))
-    limit = ExtendedSchemaNode(Integer(allow_string=True), missing=None, default=None, validator=Range(min=0))
+    limit = ExtendedSchemaNode(Integer(allow_string=True), missing=None, default=None, validator=Range(min=1))
 
 
 class ProcessVisibility(ExtendedMappingSchema):
@@ -2577,7 +2577,7 @@ class CreatedQuotedJobStatusSchema(CreatedJobStatusSchema):
 
 class GetPagingJobsSchema(ExtendedMappingSchema):
     jobs = JobCollection()
-    limit = ExtendedSchemaNode(Integer(), missing=10, default=10, validator=Range(min=0, max=10000))
+    limit = ExtendedSchemaNode(Integer(), missing=10, default=10, validator=Range(min=1, max=10000))
     page = ExtendedSchemaNode(Integer(), validator=Range(min=0))
 
 
@@ -3570,7 +3570,7 @@ class GetJobsQueries(ExtendedMappingSchema):
                                 description="Comma-separated list of grouping fields with which to list jobs.",
                                 default=False, example="process,service", missing=drop)
     page = ExtendedSchemaNode(Integer(allow_string=True), missing=0, default=0, validator=Range(min=0))
-    limit = ExtendedSchemaNode(Integer(allow_string=True), missing=10, default=10, validator=Range(min=0, max=10000))
+    limit = ExtendedSchemaNode(Integer(allow_string=True), missing=10, default=10, validator=Range(min=1, max=10000))
     min_duration = ExtendedSchemaNode(
         Integer(allow_string=True), name="minDuration", missing=drop, default=null, validator=Range(min=0),
         description="Minimal duration (seconds) between started time and current/finished time of jobs to find.")
@@ -3656,7 +3656,7 @@ class ProcessQuoteEndpoint(ProcessPath, QuotePath):
 
 class GetQuotesQueries(ExtendedMappingSchema):
     page = ExtendedSchemaNode(Integer(), missing=drop, default=0)
-    limit = ExtendedSchemaNode(Integer(), missing=10, default=10, validator=Range(min=0, max=10000))
+    limit = ExtendedSchemaNode(Integer(), missing=10, default=10, validator=Range(min=1, max=10000))
     process = AnyIdentifier(missing=None)
     sort = QuoteSortEnum(missing=drop)
 
@@ -3911,7 +3911,7 @@ class ProvidersProcessesCollection(ExtendedMappingSchema):
 class ProcessListingMetadata(ExtendedMappingSchema):
     description = "Metadata relative to the listed processes."
     page = ExtendedSchemaNode(Integer(), misisng=drop, default=None, validator=Range(min=0))
-    limit = ExtendedSchemaNode(Integer(), missing=drop, default=None, validator=Range(min=0))
+    limit = ExtendedSchemaNode(Integer(), missing=drop, default=None, validator=Range(min=1))
     total = ExtendedSchemaNode(Integer(), description="Total number of local processes, or also including all "
                                                       "remote processes across providers if requested.")
     links = LinkList(missing=drop)
