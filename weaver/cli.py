@@ -84,7 +84,14 @@ class WeaverClient(object):
             self._url = None
             LOGGER.warning("No URL provided. All operations must provide it directly or through another parameter!")
         self._headers = {"Accept": CONTENT_TYPE_APP_JSON, "Content-Type": CONTENT_TYPE_APP_JSON}
-        self._settings = {}  # FIXME: load from INI, overrides as input (cumul arg '--setting weaver.x=value') ?
+        self._settings = {
+            "weaver.request_options": {
+                "requests": [
+                    {"url": "http://localhost:4002",
+                     "timeout": 1000}
+                ]
+            }
+        }  # FIXME: load from INI, overrides as input (cumul arg '--setting weaver.x=value') ?
 
     def _get_url(self, url):
         if not self._url and not url:
@@ -239,7 +246,7 @@ class WeaverClient(object):
             return OperationResult(False, message, cwl)
         base = self._get_url(url)
         path = f"{base}/processes"
-        resp = request_extra("POST", path, data=data, headers=headers, settings=self._settings)
+        resp = request_extra("POST", path, json=data, headers=headers, settings=self._settings)
         return self._parse_result(resp)
 
     def undeploy(self, process_id, url=None):
@@ -363,7 +370,7 @@ class WeaverClient(object):
 
         LOGGER.info("Executing [%s] with inputs:\n%s", process_id, self._json2text(inputs))
         path = f"{base}/processes/{process_id}/execution"  # use OGC-API compliant endpoint (not '/jobs')
-        resp = request_extra("POST", path, data=data, headers=self._headers, settings=self._settings)
+        resp = request_extra("POST", path, json=data, headers=self._headers, settings=self._settings)
         result = self._parse_result(resp)
         if not monitor or not result.success:
             return result
