@@ -2,16 +2,21 @@ import glob
 import logging
 import os
 from abc import abstractmethod
-from time import sleep
 from typing import TYPE_CHECKING
-
-from pyramid.httpexceptions import HTTPBadGateway
 
 from weaver.exceptions import PackageExecutionError
 from weaver.formats import CONTENT_TYPE_APP_JSON
 from weaver.processes.constants import OPENSEARCH_LOCAL_FILE_SCHEME
 from weaver.status import STATUS_RUNNING, STATUS_SUCCEEDED
-from weaver.utils import fetch_file, get_any_id, get_any_value, get_cookie_headers, get_settings, request_extra
+from weaver.utils import (
+    fetch_file,
+    fully_qualified_name,
+    get_any_id,
+    get_any_value,
+    get_cookie_headers,
+    get_settings,
+    request_extra
+)
 from weaver.wps.utils import get_wps_output_dir, get_wps_output_url, map_wps_output_location
 
 if TYPE_CHECKING:
@@ -20,6 +25,7 @@ if TYPE_CHECKING:
     from pywps.app import WPSRequest
 
     from weaver.typedefs import (
+        AnyResponseType,
         CWL_RuntimeInputsMap,
         CWL_ExpectedOutputs,
         CWL_WorkflowInputs,
@@ -146,7 +152,10 @@ class WpsProcessInterface(object):
             if not job_success:
                 raise PackageExecutionError("Failed dispatch and monitoring of remote process execution.")
         except Exception as exc:
-            raise PackageExecutionError("Dispatch and monitoring of remote process caused an unhandled error.") from exc
+            err_msg = "{0}: {1!s}".format(fully_qualified_name(exc), exc)
+            err_ctx = "Dispatch and monitoring of remote process caused an unhandled error."
+            LOGGER.exception("%s [%s]", err_ctx, err_msg, exc_info=exc)
+            raise PackageExecutionError(err_ctx) from exc
         finally:
             self.update_status("Running final cleanup operations following failed execution.",
                                REMOTE_JOB_PROGRESS_CLEANUP, STATUS_RUNNING)
@@ -164,6 +173,7 @@ class WpsProcessInterface(object):
                            REMOTE_JOB_PROGRESS_COMPLETED, STATUS_SUCCEEDED)
 
     def prepare(self):
+        # type: () -> None
         """
         Implementation dependent operations to prepare the :term:`Process` for :term:`Job` execution.
 
@@ -229,21 +239,21 @@ class WpsProcessInterface(object):
         raise NotImplementedError
 
     def cleanup(self):
+        # type: () -> None
         """
         Implementation dependent operations to clean the :term:`Process` or :term:`Job` execution.
 
         This is an optional step that can be omitted entirely if not needed.
         """
 
-    def make_request(self, method, url, retry, status_code_mock=None, **kwargs):
-        response = request_extra(method, url=url, settings=self.settings,
+    def make_request(self, method, url, retry=False, **kwargs):
+        # type: (str, str, Union[bool, int], Any) -> AnyResponseType
+        """
+        Sends the request with additional parameter handling for the current process definition.
+        """
+        retries = int(retry) if retry is not None else 0
+        response = request_extra(method, url=url, settings=self.settings, retries=retries,
                                  headers=self.headers, cookies=self.cookies, **kwargs)
-        # TODO: Remove patch for Geomatys unreliable server
-        if response.status_code == HTTPBadGateway.code and retry:
-            sleep(10)
-            response = self.make_request(method, url, False, **kwargs)
-        if response.status_code == HTTPBadGateway.code and status_code_mock:
-            response.status_code = status_code_mock
         return response
 
     def host_file(self, file_name):

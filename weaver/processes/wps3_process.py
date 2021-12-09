@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING
 from pyramid.httpexceptions import (
     HTTPConflict,
     HTTPForbidden,
-    HTTPInternalServerError,
     HTTPNotFound,
     HTTPOk,
     HTTPUnauthorized
@@ -43,6 +42,7 @@ if TYPE_CHECKING:
     from weaver.typedefs import (
         JSON,
         JobInputs,
+        JobMonitorReference,
         JobOutputs,
         JobResults,
         UpdateStatusPartialFunction
@@ -159,17 +159,13 @@ class Wps3Process(WpsProcessInterface):
         LOGGER.debug("Get process WPS visibility request for [%s]", self.process)
         response = self.make_request(method="GET",
                                      url=self.url + sd.process_visibility_service.path.format(process_id=self.process),
-                                     retry=False,
-                                     status_code_mock=HTTPUnauthorized.code)
+                                     retry=False)
         if response.status_code in (HTTPUnauthorized.code, HTTPForbidden.code):
             return None
         if response.status_code == HTTPNotFound.code:
             return False
         if response.status_code == HTTPOk.code:
             json_body = response.json()
-            # FIXME: support for Spacebel, always returns dummy visibility response, enforce deploy with `False`
-            if json_body.get("message") == "magic!" or json_body.get("type") == "ok" or json_body.get("code") == 4:
-                return False
             return json_body.get("value") == VISIBILITY_PUBLIC
         response.raise_for_status()
 
@@ -185,7 +181,7 @@ class Wps3Process(WpsProcessInterface):
                                      url=path,
                                      json={"value": visibility},
                                      retry=False,
-                                     status_code_mock=HTTPOk.code)
+                                     swap_error_status_code=HTTPOk.code)
         response.raise_for_status()
 
     def describe_process(self):
@@ -194,17 +190,11 @@ class Wps3Process(WpsProcessInterface):
         response = self.make_request(method="GET",
                                      url=path,
                                      retry=False,
-                                     status_code_mock=HTTPOk.code)
+                                     swap_error_status_code=HTTPOk.code)
 
         if response.status_code == HTTPOk.code:
-            # FIXME: Remove patch for Geomatys ADES (Missing process return a 200 InvalidParameterValue error !)
-            if response.content.lower().find("InvalidParameterValue") >= 0:
-                return None
             return response.json()
         elif response.status_code == HTTPNotFound.code:
-            return None
-        # FIXME: Remove patch for Spacebel ADES (Missing process return a 500 error)
-        elif response.status_code == HTTPInternalServerError.code:
             return None
         response.raise_for_status()
 
@@ -216,8 +206,7 @@ class Wps3Process(WpsProcessInterface):
         user_headers.update(self.get_user_auth_header())
 
         LOGGER.debug("Deploy process WPS request for [%s] at [%s]", self.process, path)
-        response = self.make_request(method="POST", url=path, json=self.deploy_body, retry=True,
-                                     status_code_mock=HTTPOk.code)
+        response = self.make_request(method="POST", url=path, json=self.deploy_body, retry=True)
         response.raise_for_status()
 
     def prepare(self):
@@ -231,18 +220,18 @@ class Wps3Process(WpsProcessInterface):
             try:
                 self.deploy()
             except Exception as exc:
-                # FIXME: support for Spacebel, avoid conflict error incorrectly handled, remove 500 when fixed
-                pass_http_error(exc, [HTTPConflict, HTTPInternalServerError])
+                pass_http_error(exc, [HTTPConflict])
 
         if visible:
             LOGGER.info("Process [%s] already deployed and visible on [%s] - executing.", self.process, self.url)
         else:
-            LOGGER.info("Process [%s] enforced to public visibility.", self.process)
+            LOGGER.info("Process [%s] enforcing to public visibility.", self.process)
             try:
                 self.set_visibility(visibility=VISIBILITY_PUBLIC)
-            # TODO: support for Spacebel, remove when visibility route properly implemented on ADES
             except Exception as exc:
                 pass_http_error(exc, HTTPNotFound)
+                LOGGER.info("Process [%s] failed setting public visibility. "
+                            "Assuming feature is not supported by ADES and process is already public.", self.process)
 
     def format_outputs(self, workflow_outputs):
         # type: (JobOutputs) -> JobOutputs
@@ -299,29 +288,21 @@ class Wps3Process(WpsProcessInterface):
         return job_id
 
     def get_job_status(self, job_status_uri, retry=True):
-        response = self.make_request(method="GET",
-                                     url=job_status_uri,
-                                     retry=True,
-                                     status_code_mock=HTTPNotFound.code)
-        # Retry on 404 since job may not be fully ready
-        if retry and response.status_code == HTTPNotFound.code:
-            sleep(5)
-            return self.get_job_status(job_status_uri, retry=False)
-
+        # type: (JobMonitorReference, Union[bool, int]) -> JSON
+        """
+        Obtains the contents from the :term:`Job` status response.
+        """
+        response = self.make_request(method="GET", url=job_status_uri, retry=retry)  # retry in case not yet ready
         response.raise_for_status()
         job_status = response.json()
-
-        # TODO Remove patch for Geomatys not conforming to the status schema
-        #  - jobID is missing
-        #  - handled by 'map_status': status are upper cases and succeeded process are indicated as successful
         job_id = job_status_uri.split("/")[-1]
         if "jobID" not in job_status:
-            job_status["jobID"] = job_id
+            job_status["jobID"] = job_id  # provide if not implemented by ADES
         job_status["status"] = status.map_status(job_status["status"])
         return job_status
 
     def get_results(self, job_status_uri):
-        # type: (str) -> JobResults
+        # type: (JobMonitorReference) -> JobResults
         """
         Obtains produced output results from successful job status ID.
         """

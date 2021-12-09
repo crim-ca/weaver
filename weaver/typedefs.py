@@ -162,4 +162,4 @@ if TYPE_CHECKING:
     JobInputs = List[Union[JobValueItem, Dict[str, AnyValueType]]]
     JobOutputs = List[Union[JobExpectItem, Dict[str, AnyValueType]]]
     JobResults = List[JobValueItem]
-    JobMonitorReference = str  # typically an URI of the remote job
+    JobMonitorReference = Any  # typically an URI of the remote job status or an execution object/handler
