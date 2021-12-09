@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 import colander
 from pyramid.httpexceptions import (
     HTTPBadRequest,
+    HTTPException,
     HTTPForbidden,
     HTTPNotFound,
     HTTPOk,
@@ -57,7 +58,16 @@ def get_processes(request):
             body.update(paging)
         else:
             paging = {}  # disable to remove paging-related links
-        body["links"] = get_process_list_links(request, paging, total_processes)
+
+        try:
+            body["links"] = get_process_list_links(request, paging, total_processes)
+        except IndexError as exc:
+            raise HTTPBadRequest(json={
+                "description": str(exc),
+                "cause": "Invalid paging parameters.",
+                "error": type(exc).__name__,
+                "value": paging.get("page")
+            })
 
         # if 'EMS/HYBRID' and '?providers=True', also fetch each provider's processes
         if with_providers:
@@ -100,6 +110,8 @@ def get_processes(request):
             "exception": fully_qualified_name(exc),
             "error": str(exc)
         })
+    except HTTPException:
+        raise
     # FIXME: handle colander invalid directly in tween (https://github.com/crim-ca/weaver/issues/112)
     except colander.Invalid as ex:
         raise HTTPBadRequest("Invalid schema: [{!s}]".format(ex))

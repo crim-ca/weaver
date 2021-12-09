@@ -63,6 +63,8 @@ def get_process_list_links(request, paging, total, provider=None):
     # type: (Request, Dict[str, int], Optional[int], Optional[Service]) -> List[JSON]
     """
     Obtains a list of all relevant links for the corresponding :term:`Process` listing defined by query parameters.
+
+    :raises IndexError: if the paging values are out of bounds compared to available total processes.
     """
     # reapply queries that must be given to obtain the same result in case of subsequent requests (sort, limits, etc.)
     kvp_params = {param: value for param, value in request.params.items() if param != "page"}
@@ -96,6 +98,8 @@ def get_process_list_links(request, paging, total, provider=None):
     per_page = paging.get("limit", None)
     if all(isinstance(num, int) for num in [cur_page, per_page, total]):
         max_page = math.ceil(total / per_page) - 1
+        if cur_page < 0 or cur_page > max_page:
+            raise IndexError(f"Page index {cur_page} is out of range from [0,{max_page}].")
         links.extend([
             {"href": get_path_kvp(proc_url, page=cur_page, **kvp_params), "rel": "current",
              "type": CONTENT_TYPE_APP_JSON, "title": "Current page of processes query listing."},
