@@ -991,7 +991,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         datetime_invalid = "2022-31-12 23:59:59"
         path = get_path_kvp(sd.jobs_service.path, datetime=datetime_invalid)
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
-        assert resp.status_code == 422
+        assert resp.status_code == 400
 
     def test_get_jobs_datetime_interval_invalid(self):
         """
@@ -1007,7 +1007,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         datetime_interval = self.datetime_interval[3] + DATETIME_INTERVAL_CLOSED_SYMBOL + self.datetime_interval[1]
         path = get_path_kvp(sd.jobs_service.path, datetime=datetime_interval)
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
-        assert resp.status_code == 422
+        assert resp.status_code == 400
 
     def test_get_jobs_datetime_before_invalid(self):
         """
@@ -1022,7 +1022,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         datetime_before = "./" + self.datetime_interval[3]
         path = get_path_kvp(sd.jobs_service.path, datetime=datetime_before)
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
-        assert resp.status_code == 422
+        assert resp.status_code == 400
 
     def test_get_jobs_duration_min_only(self):
         test = {"minDuration": 35}
@@ -1147,7 +1147,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
     def test_get_jobs_by_status_invalid(self):
         path = get_path_kvp(sd.jobs_service.path, status="random")
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
-        assert resp.status_code == 422
+        assert resp.status_code == 400
         assert resp.json["code"] == "JobInvalidParameter"
         assert resp.json["value"]["status"] == "random"
         assert "status" in resp.json["cause"]
@@ -1155,7 +1155,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         status = "random,{}".format(STATUS_RUNNING)
         path = get_path_kvp(sd.jobs_service.path, status=status)
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
-        assert resp.status_code == 422
+        assert resp.status_code == 400
         assert resp.json["code"] == "JobInvalidParameter"
         assert resp.json["value"]["status"] == status
         assert "status" in resp.json["cause"]

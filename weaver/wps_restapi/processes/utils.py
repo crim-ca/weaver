@@ -97,7 +97,7 @@ def get_process_list_links(request, paging, total, provider=None):
     cur_page = paging.get("page", None)
     per_page = paging.get("limit", None)
     if all(isinstance(num, int) for num in [cur_page, per_page, total]):
-        max_page = math.ceil(total / per_page) - 1
+        max_page = max(math.ceil(total / per_page) - 1, 0)
         if cur_page < 0 or cur_page > max_page:
             raise IndexError(f"Page index {cur_page} is out of range from [0,{max_page}].")
         links.extend([

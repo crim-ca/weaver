@@ -245,8 +245,9 @@ class ListingMixin(object):
             {
                 # reproject to avoid nested list of dicts (direct access)
                 "$project": {
-                    # if no items matched, behaviour of 'arrayElemAt' index 0 causes out-of-bound
-                    # this causes 'items' to be dropped completely
+                    # if no items matched, 'items' is empty
+                    # if items were matched, but then skipped over the last element due to paging 'skip'
+                    # behaviour of 'arrayElemAt' index 0 causes out-of-bound which drops 'items'
                     # replace the removed 'items' by the empty list by default
                     "items": {
                         "$ifNull": [
@@ -254,8 +255,15 @@ class ListingMixin(object):
                             []  # default
                         ],
                     },
-                    # total always present, just need to move it up
-                    "total": {"$arrayElemAt": ["$totalPipeline.total", 0]}
+                    # in the case of 'total', it is always present when any item is matched (whether skipped or not)
+                    # but if none was matched, 'arrayElemAt' removes it
+                    # set the default while it also gets moved it up for direct access
+                    "total": {
+                        "$ifNull": [
+                            {"$arrayElemAt": ["$totalPipeline.total", 0]},  # if matched
+                            0  # default
+                        ]
+                    }
                 }
             }
         ]
@@ -775,14 +783,14 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
         LOGGER.debug("Job search pipeline:\n%s", repr_json(pipeline, indent=2))
 
         found = list(self.collection.aggregate(pipeline, collation=Collation(locale="en")))
-        items = found[0]["itemsPipeline"]
+        items = found[0]["items"]
         # convert to Job object where applicable, since pipeline result contains (category, jobs, count)
         items = [{k: (v if k != "jobs" else [Job(j) for j in v]) for k, v in i.items()} for i in items]
         if has_provider:
             for group_result in items:
                 group_service = group_result["category"].pop("service", None)
                 group_result["category"]["provider"] = group_service
-        total = found[0]["totalPipeline"][0]["total"] if items else 0
+        total = found[0]["total"] if items else 0
         return items, total
 
     def _find_jobs_paging(self, search_pipeline, page, limit):

@@ -20,6 +20,7 @@ Changes:
   behaviour supported by ``ignore`` on ``/providers`` endpoint, to effectively ignore services that cause parsing
   errors or failure to retrieve details from the remote reference.
 - Add schema validation of contents returned on ``/processes`` endpoint.
+- Add more validation of paging applicable index ranges and produce ``HTTPBadRequest [400]`` when values are invalid.
 
 Fixes:
 ------
@@ -27,6 +28,7 @@ Fixes:
 - Fix conformance with error type reporting of missing `Job` or `Process`
   (resolves `#320 <https://github.com/crim-ca/weaver/issues/320>`_).
 - Fix sorting of text fields using alphabetical case-insensitive ordering.
+- Fix search with paging reporting invalid ``total`` when out of range.
 
 `4.5.0 <https://github.com/crim-ca/weaver/tree/4.5.0>`_ (2021-11-25)
 ========================================================================

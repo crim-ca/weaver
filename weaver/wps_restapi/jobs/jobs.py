@@ -165,7 +165,7 @@ def get_job_list_links(job_total, filters, request):
 
     cur_page = filters["page"]
     per_page = filters["limit"]
-    max_page = math.ceil(job_total / per_page) - 1
+    max_page = max(math.ceil(job_total / per_page) - 1, 0)
     if cur_page < 0 or cur_page > max_page:
         raise IndexError(f"Page index {cur_page} is out of range from [0,{max_page}].")
 
