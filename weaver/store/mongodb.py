@@ -65,7 +65,7 @@ if TYPE_CHECKING:
     MongodbValue = Union[AnyValue, datetime.datetime]
     MongodbSearchFilter = Dict[str, Union[MongodbValue, List[MongodbValue], Dict[str, AnyValue]]]
     MongodbSearchStep = Union[MongodbValue, MongodbSearchFilter]
-    MongodbSearchPipeline = List[Dict[str, Dict[str, MongodbSearchStep]]]
+    MongodbSearchPipeline = List[Dict[str, Union[str, Dict[str, MongodbSearchStep]]]]
 
 LOGGER = logging.getLogger(__name__)
 
@@ -220,18 +220,45 @@ class ListingMixin(object):
         The initial search are executed only once for both facets.
         The first obtains results with other processing steps specified, and the second calculates the total results.
 
+        The result of the aggregation pipeline following this operation will be returned in the following format:
+
+        .. code-block:: python
+
+            [{
+                "items": [ MatchedDocument, MatchedDocument, ... ],
+                "total": int
+            }]
+
         :param search_pipeline: pipeline employed to obtain initial matches against search filters.
         :param extra_pipeline: additional steps to generate specific results.
         :return: combination of the grand total of all items and their following processing representation.
         """
-        total_pipeline = [{
-            "$facet": {
-                "itemsPipeline": extra_pipeline,
-                "totalPipeline": [
-                    {"$count": "total"}
-                ]
+        total_pipeline = [
+            {
+                "$facet": {
+                    "itemsPipeline": extra_pipeline,
+                    "totalPipeline": [
+                        {"$count": "total"}
+                    ]
+                },
+            },
+            {
+                # reproject to avoid nested list of dicts (direct access)
+                "$project": {
+                    # if no items matched, behaviour of 'arrayElemAt' index 0 causes out-of-bound
+                    # this causes 'items' to be dropped completely
+                    # replace the removed 'items' by the empty list by default
+                    "items": {
+                        "$ifNull": [
+                            "$itemsPipeline",  # if matched
+                            []  # default
+                        ],
+                    },
+                    # total always present, just need to move it up
+                    "total": {"$arrayElemAt": ["$totalPipeline.total", 0]}
+                }
             }
-        }]
+        ]
         return search_pipeline + total_pipeline  # noqa
 
 
@@ -459,8 +486,8 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
 
         found = list(self.collection.aggregate(pipeline, collation=Collation(locale="en")))
         if total:
-            items = [Process(item) for item in found[0]["itemsPipeline"]]
-            total = found[0]["totalPipeline"][0]["total"] if items else 0
+            items = [Process(item) for item in found[0]["items"]]
+            total = found[0]["total"]
             return items, total
         return [Process(item) for item in found]
 
@@ -768,8 +795,8 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
         LOGGER.debug("Job search pipeline:\n%s", repr_json(pipeline, indent=2))
 
         found = list(self.collection.aggregate(pipeline))
-        items = [Job(item) for item in found[0]["itemsPipeline"]]
-        total = found[0]["totalPipeline"][0]["total"] if items else 0
+        items = [Job(item) for item in found[0]["items"]]
+        total = found[0]["total"]
         return items, total
 
     @staticmethod
