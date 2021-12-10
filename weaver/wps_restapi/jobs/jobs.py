@@ -125,6 +125,8 @@ def get_job_list_links(job_total, filters, request):
     # type: (int, Dict[str, AnyValue], Request) -> List[JSON]
     """
     Obtains a list of all relevant links for the corresponding job listing defined by query parameter filters.
+
+    :raises IndexError: if the paging values are out of bounds compared to available total :term:`Job` matching search.
     """
     base_url = get_weaver_url(request)
 
@@ -164,6 +166,8 @@ def get_job_list_links(job_total, filters, request):
     cur_page = filters["page"]
     per_page = filters["limit"]
     max_page = math.ceil(job_total / per_page) - 1
+    if cur_page < 0 or cur_page > max_page:
+        raise IndexError(f"Page index {cur_page} is out of range from [0,{max_page}].")
 
     alt_links = []
     if alt_path:
@@ -360,7 +364,7 @@ def get_queried_jobs(request):
     try:
         filters = sd.GetJobsQueries().deserialize(filters)
     except Invalid as ex:
-        raise HTTPUnprocessableEntity(json={
+        raise HTTPBadRequest(json={
             "code": "JobInvalidParameter",
             "description": "Job query parameters failed validation.",
             "error": Invalid.__name__,
@@ -398,13 +402,24 @@ def get_queried_jobs(request):
     def _job_list(jobs):
         return [j.json(settings) if detail else j.id for j in jobs]
 
+    paging = {}
     if groups:
         for grouped_jobs in items:
             grouped_jobs["jobs"] = _job_list(grouped_jobs["jobs"])
         body.update({"groups": items})
     else:
-        body.update({"jobs": _job_list(items), "page": filters["page"], "limit": filters["limit"]})
-    body.update({"links": get_job_list_links(total, filters, request)})
+        paging = {"page": filters["page"], "limit": filters["limit"]}
+        body.update({"jobs": _job_list(items), **paging})
+    try:
+        body.update({"links": get_job_list_links(total, filters, request)})
+    except IndexError as exc:
+        raise HTTPBadRequest(json={
+            "code": "JobInvalidParameter",
+            "description": str(exc),
+            "cause": "Invalid paging parameters.",
+            "error": type(exc).__name__,
+            "value": repr_json(paging, force_str=False)
+        })
     body = sd.GetQueriedJobsSchema().deserialize(body)
     return HTTPOk(json=body)
 

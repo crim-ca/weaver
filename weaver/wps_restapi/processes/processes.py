@@ -21,7 +21,7 @@ from weaver.processes.execution import submit_job
 from weaver.processes.types import PROCESS_BUILTIN
 from weaver.processes.utils import deploy_process_from_payload, get_job_submission_response, get_process
 from weaver.store.base import StoreProcesses
-from weaver.utils import fully_qualified_name, get_any_id
+from weaver.utils import fully_qualified_name, get_any_id, repr_json
 from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_VALUES
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.processes.utils import get_process_list_links, get_processes_filtered_by_valid_schemas
@@ -42,8 +42,19 @@ def get_processes(request):
 
     Optionally list both local and provider processes.
     """
-    detail = asbool(request.params.get("detail", True))
-    ignore = asbool(request.params.get("ignore", True))
+    try:
+        params = sd.GetProcessesQuery().deserialize(request.params)
+    except colander.Invalid as ex:
+        raise HTTPBadRequest(json={
+            "code": "ProcessInvalidParameter",
+            "description": "Process query parameters failed validation.",
+            "error": colander.Invalid.__name__,
+            "cause": str(ex),
+            "value": repr_json(ex.value or dict(request.params), force_str=False),
+        })
+
+    detail = asbool(params.get("detail", True))
+    ignore = asbool(params.get("ignore", True))
     try:
         # get local processes and filter according to schema validity
         # (previously deployed process schemas can become invalid because of modified schema definitions
@@ -55,6 +66,7 @@ def get_processes(request):
                 "Manual cleanup of following processes is required: {}".format(invalid_processes))
         body = {"processes": processes if detail else [get_any_id(p) for p in processes]}  # type: JSON
         if not with_providers:
+            paging = {"page": paging.get("page"), "limit": paging.get("limit")}  # remove other params
             body.update(paging)
         else:
             paging = {}  # disable to remove paging-related links
@@ -66,7 +78,7 @@ def get_processes(request):
                 "description": str(exc),
                 "cause": "Invalid paging parameters.",
                 "error": type(exc).__name__,
-                "value": paging.get("page")
+                "value": repr_json(paging, force_str=False)
             })
 
         # if 'EMS/HYBRID' and '?providers=True', also fetch each provider's processes

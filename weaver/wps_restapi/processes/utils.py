@@ -64,7 +64,7 @@ def get_process_list_links(request, paging, total, provider=None):
     """
     Obtains a list of all relevant links for the corresponding :term:`Process` listing defined by query parameters.
 
-    :raises IndexError: if the paging values are out of bounds compared to available total processes.
+    :raises IndexError: if the paging values are out of bounds compared to available total :term:`Process`.
     """
     # reapply queries that must be given to obtain the same result in case of subsequent requests (sort, limits, etc.)
     kvp_params = {param: value for param, value in request.params.items() if param != "page"}

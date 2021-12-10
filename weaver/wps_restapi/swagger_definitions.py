@@ -4182,6 +4182,7 @@ get_processes_responses = {
             "value": EXAMPLES["providers_processes_listing.json"],
         }
     }),
+    "400": BadRequestResponseSchema(description="Error in case of invalid listing query parameters."),
     "500": InternalServerErrorResponseSchema(),
 }
 post_processes_responses = {
@@ -4308,6 +4309,7 @@ get_all_jobs_responses = {
             "value": EXAMPLES["jobs_listing.json"]
         }
     }),
+    "400": BadRequestResponseSchema(description="Error in case of invalid search query parameters."),
     "422": UnprocessableEntityResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
