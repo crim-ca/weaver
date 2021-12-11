@@ -131,6 +131,13 @@ class TestWeaverClient(WpsConfigBase):
         assert "deploymentDone" in result.body
         assert result.body["deploymentDone"] is True
 
+    def test_deploy_with_undeploy(self):
+        test_id = f"{self.test_process_prefix}-deploy-undeploy-flag"
+        result = mocked_sub_requests(self.app, self.client.deploy, test_id, self.test_payload)
+        assert result.success
+        result = mocked_sub_requests(self.app, self.client.deploy, test_id, self.test_payload, undeploy=True)
+        assert result.success
+
     def test_undeploy(self):
         # deploy a new process to leave the test one available
         other_payload = copy.deepcopy(self.test_payload)
