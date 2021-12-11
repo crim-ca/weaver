@@ -325,7 +325,7 @@ def now_secs():
     return int(time.time())
 
 
-def repr_json(data, force_str=True, **kwargs):
+def repr_json(data, force_string=True, **kwargs):
     # type: (Any, bool, Any) -> Union[JSON, str, None]
     """
     Ensure that the input data can be serialized as JSON to return it formatted representation as such.
@@ -336,7 +336,7 @@ def repr_json(data, force_str=True, **kwargs):
         return None
     try:
         data_str = json.dumps(data, **kwargs)
-        return data_str if force_str else data
+        return data_str if force_string else data
     except Exception:  # noqa: W0703 # nosec: B110
         return str(data)
 

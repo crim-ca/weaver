@@ -300,7 +300,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert "limit" in resp.json["value"] and resp.json["value"]["limit"] == str(0)
 
     def test_get_processes_bad_request_paging_providers(self):
-        path = get_path_kvp("/processes", page=1, limit=10, providers=True)
+        path = get_path_kvp("/processes", page=0, limit=10, providers=True)
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 400
         assert "ListingInvalidParameter" in resp.json["error"]

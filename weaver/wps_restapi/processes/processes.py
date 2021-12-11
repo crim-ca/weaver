@@ -50,7 +50,7 @@ def get_processes(request):
             "description": "Process query parameters failed validation.",
             "error": colander.Invalid.__name__,
             "cause": str(ex),
-            "value": repr_json(ex.value or dict(request.params), force_str=False),
+            "value": repr_json(ex.value or dict(request.params), force_string=False),
         })
 
     detail = asbool(params.get("detail", True))
@@ -78,7 +78,7 @@ def get_processes(request):
                 "description": str(exc),
                 "cause": "Invalid paging parameters.",
                 "error": type(exc).__name__,
-                "value": repr_json(paging, force_str=False)
+                "value": repr_json(paging, force_string=False)
             })
 
         # if 'EMS/HYBRID' and '?providers=True', also fetch each provider's processes

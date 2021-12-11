@@ -244,8 +244,8 @@ class WpsRestApiJobsTest(unittest.TestCase):
             assert len([link for link in job["links"] if link["rel"].endswith("exceptions")])
 
     @staticmethod
-    def check_basic_jobs_info(response):
-        assert response.status_code == 200
+    def check_basic_jobs_info(response, message=""):
+        assert response.status_code == 200, message
         assert response.content_type == CONTENT_TYPE_APP_JSON
         assert "jobs" in response.json and isinstance(response.json["jobs"], list)
         assert "page" in response.json and isinstance(response.json["page"], int)
@@ -291,8 +291,8 @@ class WpsRestApiJobsTest(unittest.TestCase):
     def test_get_jobs_detail_paged(self):
         for detail in ("true", 1, "True", "yes"):
             path = get_path_kvp(sd.jobs_service.path, detail=detail)
-            resp = self.app.get(path, headers=self.json_headers)
-            self.check_basic_jobs_info(resp)
+            resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+            self.check_basic_jobs_info(resp, f"Test: detail={detail}")
             for job in resp.json["jobs"]:
                 self.check_job_format(job)
 
@@ -1007,7 +1007,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         datetime_interval = self.datetime_interval[3] + DATETIME_INTERVAL_CLOSED_SYMBOL + self.datetime_interval[1]
         path = get_path_kvp(sd.jobs_service.path, datetime=datetime_interval)
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
-        assert resp.status_code == 400
+        assert resp.status_code == 422
 
     def test_get_jobs_datetime_before_invalid(self):
         """

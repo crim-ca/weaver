@@ -291,6 +291,17 @@ class MediaType(ExtendedSchemaNode):
     pattern = r"^\w+\/[-.\w]+(?:\+[-.\w]+)?(?:\;\s*.+)*$"
 
 
+class QueryBoolean(Boolean):
+    description = "Boolean query parameter that allows handles common truthy/falsy values."
+
+    def __init__(self, *_, **__):
+        super(QueryBoolean, self).__init__(
+            allow_string=True,
+            false_choices=("False", "false", "0", "off", "no", "null"),
+            true_choices=("True", "true", "1", "on", "yes")
+        )
+
+
 class DateTimeInterval(ExtendedSchemaNode):
     schema_type = String
     description = (
@@ -3564,8 +3575,8 @@ class GetJobsQueries(ExtendedMappingSchema):
     # note:
     #   This schema is also used to generate any missing defaults during filter parameter handling.
     #   Items with default value are added if omitted, except 'default=null' which are removed after handling by alias.
-    detail = ExtendedSchemaNode(Boolean(), description="Provide job details instead of IDs.",
-                                default=False, example=True, missing=drop)
+    detail = ExtendedSchemaNode(QueryBoolean(), default=False, example=True, missing=drop,
+                                description="Provide job details instead of IDs.")
     groups = ExtendedSchemaNode(String(),
                                 description="Comma-separated list of grouping fields with which to list jobs.",
                                 default=False, example="process,service", missing=drop)
@@ -3692,17 +3703,18 @@ class PostProcessQuoteRequestEndpoint(ProcessPath, QuotePath):
 
 class ProvidersQuerySchema(ExtendedMappingSchema):
     detail = ExtendedSchemaNode(
-        Boolean(), example=True, default=True, missing=drop,
+        QueryBoolean(), example=True, default=True, missing=drop,
         description="Return summary details about each provider, or simply their IDs."
     )
     check = ExtendedSchemaNode(
-        Boolean(), example=True, default=True, missing=drop,
+        QueryBoolean(),
+        example=True, default=True, missing=drop,
         description="List only reachable providers, dropping unresponsive ones that cannot be checked for listing. "
                     "Otherwise, all registered providers are listed regardless of their availability. When requesting "
                     "details, less metadata will be provided since it will not be fetched from remote services."
     )
     ignore = ExtendedSchemaNode(
-        Boolean(), example=True, default=True, missing=drop,
+        QueryBoolean(), example=True, default=True, missing=drop,
         description="When listing providers with check of reachable remote service definitions, unresponsive response "
                     "or unprocessable contents will be silently ignored and dropped from full listing in the response. "
                     "Disabling this option will raise an error immediately instead of ignoring invalid services."
@@ -3721,7 +3733,7 @@ class PostProvider(ExtendedMappingSchema):
 
 class ProcessDetailQuery(ExtendedMappingSchema):
     detail = ExtendedSchemaNode(
-        Boolean(), example=True, default=True, missing=drop,
+        QueryBoolean(), example=True, default=True, missing=drop,
         description="Return summary details about each process, or simply their IDs."
     )
 
@@ -3877,14 +3889,14 @@ class OkGetProviderProcessesSchema(ExtendedMappingSchema):
 
 class GetProcessesQuery(ProcessPagingQuery, ProcessDetailQuery):
     providers = ExtendedSchemaNode(
-        Boolean(), example=True, default=False, missing=drop,
+        QueryBoolean(), example=True, default=False, missing=drop,
         description="List local processes as well as all sub-processes of all registered providers. "
                     "Paging and sorting query parameters are unavailable when providers are requested since lists are "
                     "populated dynamically and cannot ensure consistent process lists per page across providers. "
                     "Applicable only for Weaver configurations {}, ignored otherwise.".format(WEAVER_CONFIG_REMOTE_LIST)
     )
     ignore = ExtendedSchemaNode(
-        Boolean(), example=True, default=True, missing=drop,
+        QueryBoolean(), example=True, default=True, missing=drop,
         description="Only when listing provider processes, any unreachable remote service definitions "
                     "or unprocessable contents will be silently ignored and dropped from full listing in the response. "
                     "Disabling this option will raise an error immediately instead of ignoring invalid providers."

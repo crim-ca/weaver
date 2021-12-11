@@ -15,7 +15,6 @@ from pyramid.httpexceptions import (
     HTTPUnprocessableEntity
 )
 from pyramid.request import Request
-from pyramid.settings import asbool
 from pyramid_celery import celery_app
 
 from notify import encrypt_email
@@ -355,8 +354,6 @@ def get_queried_jobs(request):
         params.pop(param_name, None)
     filters = {**params, "process": process, "provider": service}
 
-    filters["detail"] = asbool(params.get("detail"))
-
     if params.get("datetime", False):
         # replace white space with '+' since request.params replaces '+' with whitespaces when parsing
         filters["datetime"] = params["datetime"].replace(" ", "+")
@@ -369,7 +366,7 @@ def get_queried_jobs(request):
             "description": "Job query parameters failed validation.",
             "error": Invalid.__name__,
             "cause": str(ex),
-            "value": repr_json(ex.value or filters, force_str=False),
+            "value": repr_json(ex.value or filters, force_string=False),
         })
 
     detail = filters.pop("detail", False)
@@ -418,7 +415,7 @@ def get_queried_jobs(request):
             "description": str(exc),
             "cause": "Invalid paging parameters.",
             "error": type(exc).__name__,
-            "value": repr_json(paging, force_str=False)
+            "value": repr_json(paging, force_string=False)
         })
     body = sd.GetQueriedJobsSchema().deserialize(body)
     return HTTPOk(json=body)

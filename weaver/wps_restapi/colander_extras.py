@@ -184,7 +184,7 @@ class SemanticVersion(colander.Regex):
 
 class ExtendedBoolean(colander.Boolean):
 
-    def __init__(self, *args, true_choices=None, false_choices=None, **kwargs):
+    def __init__(self, *args, true_choices=None, false_choices=None, allow_string=False, **kwargs):
         """
         Initializes the extended boolean schema node.
 
@@ -199,7 +199,7 @@ class ExtendedBoolean(colander.Boolean):
         a ``oneOf`` keyword of all relevant schemas it supports, an any applicable validators for explicit values.
         This is the safest way to ensure the generated `OpenAPI` schema corresponds to expected type validation.
         """
-        if true_choices is None and false_choices is None:
+        if not allow_string and true_choices is None and false_choices is None:
             # use strict variant
             self.true_choices = ()
             self.false_choices = ()
@@ -227,10 +227,7 @@ class ExtendedBoolean(colander.Boolean):
             raise colander.Invalid(node, colander._("\"${val}\" is neither True or False.", mapping={"val": cstruct}))
 
         # normal type variant
-        result = super(ExtendedBoolean, self).deserialize(node, cstruct)
-        if result is not colander.null:
-            result = result == "true"
-        return result
+        return super(ExtendedBoolean, self).deserialize(node, cstruct)
 
 
 class ExtendedNumber(colander.Number):
