@@ -667,7 +667,7 @@ def make_parser():
     add_url_param(op_results, required=False)
     add_job_ref_param(op_results)
     op_results.add_argument(
-        "-D", "--download", dest="download", default=False,
+        "-D", "--download", dest="download", action="store_true",
         help="Download all found job results file references to output location. "
              "If not requested, the operation simply displays the job results (default: %(default)s)."
     )
