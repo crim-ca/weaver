@@ -313,7 +313,7 @@ class WeaverClient(object):
     # FIXME: support sync (https://github.com/crim-ca/weaver/issues/247)
     # :param execute_async:
     #   Execute the process asynchronously (user must call :meth:`monitor` themselves,
-    #   or synchronously were monitoring is done automatically until completion before returning.
+    #   or synchronously where monitoring is done automatically until completion before returning.
     def execute(self, process_id, inputs=None, monitor=False, timeout=None, url=None):
         # type: (str, Optional[Union[str, JSON]], bool, Optional[int], Optional[str]) -> OperationResult
         """
@@ -659,11 +659,19 @@ def make_parser():
     add_job_ref_param(op_monitor)
     add_timeout_param(op_monitor)
 
-    op_status = ops_parsers.add_parser("status")
+    op_status = ops_parsers.add_parser(
+        "status",
+        help="Obtain the status of a job using a reference UUID or URL. "
+             "This is equivalent to doing a single-shot 'monitor' operation without any pooling or retries."
+    )
     add_url_param(op_status, required=False)
     add_job_ref_param(op_status)
 
-    op_results = ops_parsers.add_parser("results")
+    op_results = ops_parsers.add_parser(
+        "results",
+        help="Obtain the output results description of a job. "
+             "This operation can also download them from the remote server if requested."
+    )
     add_url_param(op_results, required=False)
     add_job_ref_param(op_results)
     op_results.add_argument(
