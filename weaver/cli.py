@@ -50,6 +50,7 @@ class OperationResult(AutoBase):
     headers = {}        # type: Optional[HeadersType]
     body = {}           # type: Optional[Union[JSON, str]]
     text = ""           # type: Optional[str]
+    code = None         # type: Optional[int]
 
     def __init__(self,
                  success=None,  # type: Optional[bool]
@@ -57,6 +58,7 @@ class OperationResult(AutoBase):
                  body=None,     # type: Optional[Union[str, JSON]]
                  headers=None,  # type: Optional[HeadersType]
                  text=None,     # type: Optional[str]
+                 code=None,     # type: Optional[int]
                  **kwargs,      # type: Any
                  ):             # type: (...) -> None
         super(OperationResult, self).__init__(**kwargs)
@@ -65,6 +67,7 @@ class OperationResult(AutoBase):
         self.headers = headers
         self.body = body
         self.text = text
+        self.code = code
 
 
 class WeaverClient(object):
@@ -122,7 +125,7 @@ class WeaverClient(object):
         except Exception:  # noqa
             text = body = response.text
             msg = "Could not parse body."
-        return OperationResult(success, msg, body, hdr, text=text)
+        return OperationResult(success, msg, body, hdr, text=text, code=response.status_code)
 
     @staticmethod
     def _json2text(data):
@@ -189,6 +192,7 @@ class WeaverClient(object):
                token=None,          # type: Optional[str]
                username=None,       # type: Optional[str]
                password=None,       # type: Optional[str]
+               undeploy=False,      # type: bool
                url=None,            # type: Optional[str]
                ):                   # type: (...) -> OperationResult
         """
@@ -220,6 +224,8 @@ class WeaverClient(object):
             Username to form the authentication token to a private Docker registry.
         :param password:
             Password to form the authentication token to a private Docker registry.
+        :param undeploy:
+            Perform undeploy step as applicable prior to deployment to avoid conflict with exiting :term:`Process`.
         :param url:
             Instance URL if not already provided during client creation.
         :returns: results of the operation.
@@ -245,6 +251,12 @@ class WeaverClient(object):
             message = f"Failed resolution of package definition: [{exc!s}]"
             return OperationResult(False, message, cwl)
         base = self._get_url(url)
+        if undeploy:
+            LOGGER.debug("Performing requested undeploy of process: [%s]", process_id)
+            result = self.undeploy(process_id=process_id, url=base)
+            if result.code not in [200, 404]:
+                return OperationResult(False, "Failed requested undeployment prior deployment.",
+                                       body=result.body, text=result.text, code=result.code, headers=result.headers)
         path = f"{base}/processes"
         resp = request_extra("POST", path, json=data, headers=headers, settings=self._settings)
         return self._parse_result(resp)
@@ -598,6 +610,14 @@ def make_parser():
         "-P", "--password", dest="password",
         help="Password to compute the authentication token for Docker image retrieval from a private registry."
     )
+    op_deploy.add_argument(
+        "-D", "--delete", "--undeploy", dest="undeploy", action="store_true",
+        help="Perform undeploy step as applicable prior to deployment to avoid conflict with exiting process."
+    )
+
+    op_undeploy = ops_parsers.add_parser("undeploy", help="Undeploy an existing process.")
+    add_url_param(op_undeploy)
+    add_process_param(op_undeploy)
 
     op_capabilities = ops_parsers.add_parser("capabilities", aliases=["processes"], help="List available processes.")
     add_url_param(op_capabilities)
