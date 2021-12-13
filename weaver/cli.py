@@ -1,7 +1,6 @@
 import base64
 import copy
 import inspect
-import json
 import logging
 import os
 import sys
@@ -19,7 +18,7 @@ from weaver.formats import CONTENT_TYPE_APP_JSON
 from weaver.processes.convert import cwl2json_input_values
 from weaver.processes.wps_package import get_process_definition
 from weaver.status import JOB_STATUS_CATEGORIES, JOB_STATUS_CATEGORY_FINISHED, STATUS_SUCCEEDED
-from weaver.utils import fetch_file, get_any_id, get_any_value, load_file, null, request_extra, setup_loggers
+from weaver.utils import fetch_file, get_any_id, get_any_value, load_file, null, repr_json, request_extra, setup_loggers
 from weaver.visibility import VISIBILITY_PUBLIC
 
 if TYPE_CHECKING:
@@ -37,6 +36,10 @@ if TYPE_CHECKING:
 LOGGER = logging.getLogger(__name__)
 
 
+def _json2text(data):
+    return repr_json(data, indent=2, ensure_ascii=False)
+
+
 class OperationResult(AutoBase):
     """
     Data container for any :class:`WeaverClient` operation results.
@@ -51,7 +54,6 @@ class OperationResult(AutoBase):
     message = ""        # type: Optional[str]
     headers = {}        # type: Optional[HeadersType]
     body = {}           # type: Optional[Union[JSON, str]]
-    text = ""           # type: Optional[str]
     code = None         # type: Optional[int]
 
     def __init__(self,
@@ -70,6 +72,20 @@ class OperationResult(AutoBase):
         self.body = body
         self.text = text
         self.code = code
+
+    @property
+    def text(self):
+        # type: () -> str
+        text = dict.get(self, "text", None)
+        if not text and self.body:
+            text = _json2text(self.body)
+            self["text"] = text
+        return text
+
+    @text.setter
+    def text(self, text):
+        # type: (str) -> None
+        self["text"] = text
 
 
 class WeaverClient(object):
@@ -118,15 +134,11 @@ class WeaverClient(object):
                     msg = body.get("error", body.get("exception", "unknown"))
             else:
                 success = True
-            text = WeaverClient._json2text(body)
+            text = _json2text(body)
         except Exception:  # noqa
             text = body = response.text
             msg = "Could not parse body."
         return OperationResult(success, msg, body, hdr, text=text, code=response.status_code)
-
-    @staticmethod
-    def _json2text(data):
-        return json.dumps(data, indent=2, ensure_ascii=False)
 
     @staticmethod
     def _parse_deploy_body(body, process_id):
@@ -373,13 +385,14 @@ class WeaverClient(object):
         base = self._get_url(url)
         result = self.describe(process_id, url=base)
         if not result.success:
-            return result
+            return OperationResult(False, "Could not obtain process description for execution.",
+                                   body=result.body, headers=result.headers, code=result.code, text=result.text)
         outputs = result.body.get("outputs")
         for output_id in outputs:
             # use 'value' to have all outputs reported in body as 'value/href' rather than 'Link' headers
             data["outputs"][output_id] = {"transmissionMode": EXECUTE_TRANSMISSION_MODE_VALUE}
 
-        LOGGER.info("Executing [%s] with inputs:\n%s", process_id, self._json2text(inputs))
+        LOGGER.info("Executing [%s] with inputs:\n%s", process_id, _json2text(inputs))
         path = f"{base}/processes/{process_id}/execution"  # use OGC-API compliant endpoint (not '/jobs')
         resp = request_extra("POST", path, json=data, headers=self._headers, settings=self._settings)
         result = self._parse_result(resp)
