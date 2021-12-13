@@ -201,7 +201,11 @@ def delete_local_process(request):
     if process.type == PROCESS_BUILTIN:
         raise HTTPForbidden("Cannot delete a builtin process.")
     if store.delete_process(process_id, visibility=VISIBILITY_PUBLIC):
-        return HTTPOk(json={"undeploymentDone": True, "identifier": process_id})
+        return HTTPOk(json={
+            "description": sd.OkDeleteProcessResponse.description,
+            "identifier": process_id,
+            "undeploymentDone": True,
+        })
     LOGGER.error("Existing process [%s] should have been deleted with success status.", process_id)
     raise HTTPForbidden("Deletion of process has been refused by the database or could not have been validated.")
 

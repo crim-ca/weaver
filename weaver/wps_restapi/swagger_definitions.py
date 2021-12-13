@@ -3958,6 +3958,7 @@ class OkDeleteProcessUndeployBodySchema(ExtendedMappingSchema):
 
 
 class OkDeleteProcessResponse(ExtendedMappingSchema):
+    description = "Process successfully undeployed."
     header = ResponseHeaders()
     body = OkDeleteProcessUndeployBodySchema()
 
@@ -3981,13 +3982,9 @@ class CreatedJobLocationHeader(ResponseHeaders):
 
 
 class CreatedLaunchJobResponse(ExtendedMappingSchema):
+    description = "Job successfully submitted to processing queue. Execution should begin when resources are available."
     header = CreatedJobLocationHeader()
     body = CreatedJobStatusSchema()
-
-
-class OkGetProcessJobResponse(ExtendedMappingSchema):
-    header = ResponseHeaders()
-    body = JobStatusInfo()
 
 
 class OkDeleteProcessJobResponse(ExtendedMappingSchema):
@@ -4192,7 +4189,7 @@ put_process_visibility_responses = {
     "500": InternalServerErrorResponseSchema(),
 }
 delete_process_responses = {
-    "200": OkDeleteProcessResponse(description="success"),
+    "200": OkDeleteProcessResponse(),
     "403": ForbiddenProcessAccessResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
