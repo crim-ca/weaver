@@ -68,6 +68,7 @@ class TestWeaverClient(WpsConfigBase):
             # test process
             self.test_process,
         ]
+        assert "undefined" not in result.message
 
     def test_capabilities(self):
         self.process_listing_op(self.client.capabilities)
@@ -87,6 +88,7 @@ class TestWeaverClient(WpsConfigBase):
         assert result.body["processSummary"]["id"] == test_id
         assert "deploymentDone" in result.body
         assert result.body["deploymentDone"] is True
+        assert "undefined" not in result.message
 
     def test_deploy_payload_file_cwl_embedded(self):
         test_id = f"{self.test_process_prefix}-deploy-file-no-cwl"
@@ -104,6 +106,7 @@ class TestWeaverClient(WpsConfigBase):
         assert result.body["processSummary"]["id"] == test_id
         assert "deploymentDone" in result.body
         assert result.body["deploymentDone"] is True
+        assert "undefined" not in result.message
 
     def test_deploy_payload_inject_cwl_body(self):
         test_id = f"{self.test_process_prefix}-deploy-body-with-cwl-body"
@@ -117,6 +120,7 @@ class TestWeaverClient(WpsConfigBase):
         assert result.body["processSummary"]["id"] == test_id
         assert "deploymentDone" in result.body
         assert result.body["deploymentDone"] is True
+        assert "undefined" not in result.message
 
     def test_deploy_payload_inject_cwl_file(self):
         test_id = f"{self.test_process_prefix}-deploy-body-with-cwl-file"
@@ -130,6 +134,7 @@ class TestWeaverClient(WpsConfigBase):
         assert result.body["processSummary"]["id"] == test_id
         assert "deploymentDone" in result.body
         assert result.body["deploymentDone"] is True
+        assert "undefined" not in result.message
 
     def test_deploy_with_undeploy(self):
         test_id = f"{self.test_process_prefix}-deploy-undeploy-flag"
@@ -137,6 +142,7 @@ class TestWeaverClient(WpsConfigBase):
         assert result.success
         result = mocked_sub_requests(self.app, self.client.deploy, test_id, self.test_payload, undeploy=True)
         assert result.success
+        assert "undefined" not in result.message
 
     def test_undeploy(self):
         # deploy a new process to leave the test one available
@@ -151,6 +157,7 @@ class TestWeaverClient(WpsConfigBase):
         path = f"/processes/{other_process}"
         resp = mocked_sub_requests(self.app, "get", path, expect_errors=True)
         assert resp.status_code == 404
+        assert "undefined" not in result.message
 
     def test_describe(self):
         result = mocked_sub_requests(self.app, self.client.describe, self.test_process)
@@ -169,6 +176,7 @@ class TestWeaverClient(WpsConfigBase):
         assert result.body["outputs"]["output"]["title"] == "output"
         assert result.body["outputs"]["output"]["description"] == "Output file with echo message."
         assert result.body["outputs"]["output"]["formats"] == [{"default": True, "mediaType": CONTENT_TYPE_TEXT_PLAIN}]
+        assert "undefined" not in result.message
 
     def run_execute_inputs_schema_variant(self, inputs_param, preload=False, expect_success=True, mock_exec=True):
         if isinstance(inputs_param, str):
@@ -194,6 +202,7 @@ class TestWeaverClient(WpsConfigBase):
             assert result.body["processID"] == self.test_process
             assert result.body["status"] == STATUS_ACCEPTED
             assert result.body["location"] == result.headers["Location"]
+            assert "undefined" not in result.message
         else:
             assert not result.success, result.text
         return result
@@ -255,6 +264,7 @@ class TestWeaverClient(WpsConfigBase):
         job_id = result.body["jobID"]
         result = mocked_sub_requests(self.app, self.client.monitor, job_id, timeout=1, delta=1)
         assert result.success, result.text
+        assert "undefined" not in result.message
         assert result.body.get("status") == STATUS_SUCCEEDED
         links = result.body.get("links")
         assert isinstance(links, list)
@@ -263,6 +273,7 @@ class TestWeaverClient(WpsConfigBase):
         # first test to get job results details, but not downloading yet
         result = mocked_sub_requests(self.app, self.client.results, job_id)
         assert result.success, result.text
+        assert "undefined" not in result.message
         outputs_body = result.body
         assert isinstance(outputs_body, dict) and len(outputs_body) == 1
         output = outputs_body.get("output")  # single of this process
@@ -278,6 +289,7 @@ class TestWeaverClient(WpsConfigBase):
                                          job_id, download=True, out_dir=target_dir,  # 'client.results' parameters
                                          only_local=True)  # mock parameter (avoid download HTTP redirect to TestApp)
             assert result.success, result.text
+            assert "undefined" not in result.message
             assert result.body != outputs_body, "Download operation should modify the original outputs body."
             output = result.body.get("output", {})
             assert output.get("href") == output_href

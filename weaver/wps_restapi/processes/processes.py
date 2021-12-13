@@ -72,7 +72,7 @@ def get_processes(request):
             raise HTTPServiceUnavailable(
                 "Previously deployed processes are causing invalid schema integrity errors. "
                 "Manual cleanup of following processes is required: {}".format(invalid_processes))
-        response_body = {"processes": processes if detail else [get_any_id(p) for p in processes]}
+        body = {"processes": processes if detail else [get_any_id(p) for p in processes]}
 
         # if 'EMS' and '?providers=True', also fetch each provider's processes
         settings = get_settings(request)
@@ -80,15 +80,16 @@ def get_processes(request):
             with_providers = asbool(request.params.get("providers", False))
             if with_providers:
                 services = get_provider_services(request)  # must fetch for listing of available processes
-                response_body.update({
+                body.update({
                     "providers": [svc.summary(request) if detail else {"id": svc.name} for svc in services]
                 })
                 for i, provider in enumerate(services):
                     processes = provider.processes(request)
-                    response_body["providers"][i].update({
+                    body["providers"][i].update({
                         "processes": processes if detail else [get_any_id(proc) for proc in processes]
                     })
-        return HTTPOk(json=response_body)
+        body["description"] = sd.OkGetProcessesListResponse.description
+        return HTTPOk(json=body)
     # FIXME: handle colander invalid directly in tween (https://github.com/crim-ca/weaver/issues/112)
     except colander.Invalid as ex:
         raise HTTPBadRequest("Invalid schema: [{!s}]".format(ex))
@@ -116,6 +117,7 @@ def get_local_process(request):
         process["inputs"] = opensearch.replace_inputs_describe_process(process.inputs, process.payload)
         schema = request.params.get("schema")
         offering = process.offering(schema)
+        offering["description"] = sd.OkGetProcessInfoResponse.description
         return HTTPOk(json=offering)
     # FIXME: handle colander invalid directly in tween (https://github.com/crim-ca/weaver/issues/112)
     except colander.Invalid as ex:

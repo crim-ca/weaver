@@ -3892,6 +3892,7 @@ class GetProcessesEndpoint(ExtendedMappingSchema):
 
 
 class OkGetProcessesListResponse(ExtendedMappingSchema):
+    description = "Listing of available processes successful."
     header = ResponseHeaders()
     body = ProcessCollection()
 
@@ -3905,6 +3906,7 @@ class OkPostProcessDeployBodySchema(ExtendedMappingSchema):
 
 
 class OkPostProcessesResponse(ExtendedMappingSchema):
+    description = "Process successfully deployed."
     header = ResponseHeaders()
     body = OkPostProcessDeployBodySchema()
 
@@ -4130,7 +4132,7 @@ get_api_conformance_responses = {
     "500": InternalServerErrorResponseSchema(),
 }
 get_processes_responses = {
-    "200": OkGetProcessesListResponse(description="success", examples={
+    "200": OkGetProcessesListResponse(examples={
         "ProcessesList": {
             "summary": "Listing of local processes registered in Weaver.",
             "value": EXAMPLES["local_process_listing.json"],
@@ -4139,7 +4141,7 @@ get_processes_responses = {
     "500": InternalServerErrorResponseSchema(),
 }
 post_processes_responses = {
-    "201": OkPostProcessesResponse(description="success"),
+    "201": OkPostProcessesResponse(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_process_responses = {

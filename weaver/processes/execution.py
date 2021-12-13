@@ -541,7 +541,6 @@ def submit_job_handler(payload,             # type: JSON
         process_id=process_id,
         job_id=job.id)
     body_data = {
-        "description": sd.CreatedLaunchJobResponse.description,
         "jobID": job.id,
         "processID": job.process,
         "providerID": provider_id,  # dropped by validator if not applicable
