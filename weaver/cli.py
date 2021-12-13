@@ -640,7 +640,7 @@ def make_parser():
     #     help=""
     # )
     op_execute.add_argument(
-        "-M", "--monitor", dest="monitor",
+        "-M", "--monitor", dest="monitor", action="store_true",
         help="Automatically perform the monitoring operation following job submission to retrieve final results. "
              "If not requested, the created job status location is directly returned."
     )
