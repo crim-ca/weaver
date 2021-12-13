@@ -5,6 +5,7 @@ import unittest
 from collections import deque
 from copy import deepcopy
 from pprint import pformat
+from typing import TYPE_CHECKING
 from urllib.parse import parse_qsl, urlparse
 
 import mock
@@ -19,6 +20,11 @@ from weaver.processes.constants import OPENSEARCH_AOI, OPENSEARCH_END_DATE, OPEN
 from weaver.processes.opensearch import _make_specific_identifier  # noqa: W0212
 from weaver.utils import get_any_id
 from weaver.wps_restapi.processes import processes
+
+if TYPE_CHECKING:
+    from typing import Dict
+
+    from weaver.typedefs import DataSourceOpenSearch
 
 OSDD_URL = "http://geo.spacebel.be/opensearch/description.xml"
 
@@ -159,7 +165,7 @@ def test_deploy_opensearch():
         def __init__(self, *args):
             pass
 
-        def get_store(self, *args):  # noqa: E811
+        def get_store(self, *_):  # noqa: E811
             return store
 
     def _get_mocked(req):
@@ -168,7 +174,8 @@ def test_deploy_opensearch():
     # mock db functions called by add_local_process
     with contextlib.ExitStack() as stack:
         stack.enter_context(mock.patch("weaver.wps_restapi.processes.processes.get_db", side_effect=MockDB))
-        stack.enter_context(mock.patch("weaver.wps_restapi.processes.processes.get_settings", side_effect=_get_mocked))
+        stack.enter_context(mock.patch("weaver.wps_restapi.processes.utils.get_db", side_effect=MockDB))
+        stack.enter_context(mock.patch("weaver.wps_restapi.processes.utils.get_settings", side_effect=_get_mocked))
         stack.enter_context(mock.patch("weaver.processes.utils.get_db", side_effect=MockDB))
         stack.enter_context(mock.patch("weaver.processes.utils.get_settings", side_effect=_get_mocked))
         # given
@@ -363,6 +370,7 @@ def probav_inputs(unique_aoi_toi=True):
 
 
 def make_eo_image_source_info(name, collection_id):
+    # type: (str, str) -> Dict[str, DataSourceOpenSearch]
     return {
         name: {
             "collection_id": collection_id,

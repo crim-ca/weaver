@@ -1,0 +1,1576 @@
+{
+  "processes": [
+    {
+      "id": "ColibriFlyingpigeon_SubsetBbox",
+      "title": "ColibriFlyingpigeon_SubsetBbox",
+      "keywords": [
+        "application"
+      ],
+      "metadata": [],
+      "jobControlOptions": [
+        "async-execute"
+      ],
+      "outputTransmission": [
+        "reference"
+      ],
+      "processDescriptionURL": "http://localhost:4002/processes/ColibriFlyingpigeon_SubsetBbox",
+      "processEndpointWPS1": "http://localhost:4002/ows/wps",
+      "executeEndpoint": "http://localhost:4002/processes/ColibriFlyingpigeon_SubsetBbox/jobs"
+    },
+    {
+      "id": "OutardeFlyingpigeon_SubsetBbox",
+      "title": "OutardeFlyingpigeon_SubsetBbox",
+      "keywords": [
+        "application"
+      ],
+      "metadata": [],
+      "jobControlOptions": [
+        "async-execute"
+      ],
+      "outputTransmission": [
+        "reference"
+      ],
+      "processDescriptionURL": "http://localhost:4002/processes/OutardeFlyingpigeon_SubsetBbox",
+      "processEndpointWPS1": "http://localhost:4002/ows/wps",
+      "executeEndpoint": "http://localhost:4002/processes/OutardeFlyingpigeon_SubsetBbox/jobs"
+    },
+    {
+      "id": "Staging_S2L1C",
+      "title": "Sentinel-2 L1C image staging",
+      "version": "0.0.1",
+      "description": "The test application to deploy docker image and display text",
+      "keywords": [
+        "application"
+      ],
+      "metadata": [],
+      "jobControlOptions": [
+        "async-execute"
+      ],
+      "outputTransmission": [
+        "reference"
+      ],
+      "processDescriptionURL": "http://localhost:4002/processes/Staging_S2L1C",
+      "processEndpointWPS1": "http://localhost:4002/ows/wps",
+      "executeEndpoint": "http://localhost:4002/processes/Staging_S2L1C/jobs"
+    },
+    {
+      "id": "Staging_S2L1C-mock-docker",
+      "title": "Mock of Sentinel-2 L1C image staging (dummy TIF generated).",
+      "version": "0.0.1",
+      "description": "Work around private docker image.",
+      "keywords": [
+        "application"
+      ],
+      "metadata": [],
+      "jobControlOptions": [
+        "async-execute"
+      ],
+      "outputTransmission": [
+        "reference"
+      ],
+      "processDescriptionURL": "http://localhost:4002/processes/Staging_S2L1C-mock-docker",
+      "processEndpointWPS1": "http://localhost:4002/ows/wps",
+      "executeEndpoint": "http://localhost:4002/processes/Staging_S2L1C-mock-docker/jobs"
+    },
+    {
+      "id": "WaterExtent_S2-mock-docker",
+      "title": "Mock docker with passtrhough image instead of RME's Water Extent for Sentinel-2",
+      "version": "0.0.1",
+      "description": "It gets the water extent given a Sentinel-2 L1C image",
+      "keywords": [
+        "application"
+      ],
+      "metadata": [],
+      "jobControlOptions": [
+        "async-execute"
+      ],
+      "outputTransmission": [
+        "reference"
+      ],
+      "processDescriptionURL": "http://localhost:4002/processes/WaterExtent_S2-mock-docker",
+      "processEndpointWPS1": "http://localhost:4002/ows/wps",
+      "executeEndpoint": "http://localhost:4002/processes/WaterExtent_S2-mock-docker/jobs"
+    },
+    {
+      "id": "WorkflowWaterExtent",
+      "title": "Workflow to test Water Extent for Sentinel-2",
+      "version": "0.0.1",
+      "description": "Workflow to save our beautiful necks",
+      "keywords": [
+        "workflow"
+      ],
+      "metadata": [],
+      "jobControlOptions": [
+        "async-execute"
+      ],
+      "outputTransmission": [
+        "reference"
+      ],
+      "processDescriptionURL": "http://localhost:4002/processes/WorkflowWaterExtent",
+      "processEndpointWPS1": "http://localhost:4002/ows/wps",
+      "executeEndpoint": "http://localhost:4002/processes/WorkflowWaterExtent/jobs"
+    },
+    {
+      "id": "WorkflowWaterExtent-mock",
+      "title": "Mocked Workflow to test Water Extent for Sentinel-2 using dummy data.",
+      "version": "0.0.1",
+      "description": "Workflow to save our beautiful necks",
+      "keywords": [
+        "workflow"
+      ],
+      "metadata": [],
+      "jobControlOptions": [
+        "async-execute"
+      ],
+      "outputTransmission": [
+        "reference"
+      ],
+      "processDescriptionURL": "http://localhost:4002/processes/WorkflowWaterExtent-mock",
+      "processEndpointWPS1": "http://localhost:4002/ows/wps",
+      "executeEndpoint": "http://localhost:4002/processes/WorkflowWaterExtent-mock/jobs"
+    },
+    {
+      "id": "anti-spoofing",
+      "title": "anti-spoofing",
+      "version": "0.1.0",
+      "keywords": [
+        "anti-spoofing",
+        "audio",
+        "verification",
+        "application"
+      ],
+      "metadata": [
+        {
+          "type": "provider-name",
+          "title": "Provider Name",
+          "lang": "en-CA",
+          "value": "Computer Research Institute of Montreal (CRIM)",
+          "role": "http://www.opengis.net/eoc/applicationContext/providerMetadata"
+        },
+        {
+          "type": "provider-name",
+          "title": "Fournisseur",
+          "lang": "fr-CA",
+          "value": "Centre de Recherche Informatique de Montréal (CRIM)",
+          "role": "http://www.opengis.net/eoc/applicationContext/providerMetadata"
+        }
+      ],
+      "jobControlOptions": [
+        "async-execute"
+      ],
+      "outputTransmission": [
+        "reference"
+      ],
+      "processDescriptionURL": "http://localhost:4002/processes/anti-spoofing",
+      "processEndpointWPS1": "http://localhost:4002/ows/wps",
+      "executeEndpoint": "http://localhost:4002/processes/anti-spoofing/jobs"
+    },
+    {
+      "id": "docker-demo-cat",
+      "description": "Demo Docker appplication that dumps input file content to output.",
+      "keywords": [
+        "demo",
+        "docker",
+        "application"
+      ],
+      "metadata": [],
+      "jobControlOptions": [
+        "async-execute"
+      ],
+      "outputTransmission": [
+        "reference"
+      ],
+      "processDescriptionURL": "http://localhost:4002/processes/docker-demo-cat",
+      "processEndpointWPS1": "http://localhost:4002/ows/wps",
+      "executeEndpoint": "http://localhost:4002/processes/docker-demo-cat/jobs"
+    },
+    {
+      "id": "docker-python-script",
+      "title": "Python script inline-generated into Docker for execution.",
+      "keywords": [
+        "application"
+      ],
+      "metadata": [],
+      "jobControlOptions": [
+        "async-execute"
+      ],
+      "outputTransmission": [
+        "reference"
+      ],
+      "processDescriptionURL": "http://localhost:4002/processes/docker-python-script",
+      "processEndpointWPS1": "http://localhost:4002/ows/wps",
+      "executeEndpoint": "http://localhost:4002/processes/docker-python-script/jobs"
+    },
+    {
+      "id": "file2string_array",
+      "description": "Transforms a file input into JSON file containing an array of file references as value.",
+      "keywords": [
+        "builtin"
+      ],
+      "metadata": [],
+      "jobControlOptions": [
+        "async-execute"
+      ],
+      "outputTransmission": [
+        "reference"
+      ],
+      "processDescriptionURL": "http://localhost:4002/processes/file2string_array",
+      "processEndpointWPS1": "http://localhost:4002/ows/wps",
+      "executeEndpoint": "http://localhost:4002/processes/file2string_array/jobs"
+    },
+    {
+      "id": "image-utils",
+      "title": "Test image generation",
+      "version": "0.0.1",
+      "description": "Generates some test GeoTIFF",
+      "keywords": [
+        "application"
+      ],
+      "metadata": [
+        {
+          "title": "Source Code",
+          "hreflang": "en-CA",
+          "href": "https://github.com/lhcorralo/image-utils",
+          "rel": "source-code",
+          "role": "http://www.opengis.net/eoc/applicationContext/providerMetadata"
+        }
+      ],
+      "jobControlOptions": [
+        "async-execute"
+      ],
+      "outputTransmission": [
+        "reference"
+      ],
+      "processDescriptionURL": "http://localhost:4002/processes/image-utils",
+      "processEndpointWPS1": "http://localhost:4002/ows/wps",
+      "executeEndpoint": "http://localhost:4002/processes/image-utils/jobs"
+    },
+    {
+      "id": "jsonarray2netcdf",
+      "title": "JSON array to NetCDF",
+      "version": "1.1",
+      "description": "Extracts and fetches NetCDF files from a JSON file containing an URL string array, and provides them on the output directory.",
+      "keywords": [
+        "builtin"
+      ],
+      "metadata": [],
+      "jobControlOptions": [
+        "async-execute"
+      ],
+      "outputTransmission": [
+        "reference"
+      ],
+      "processDescriptionURL": "http://localhost:4002/processes/jsonarray2netcdf",
+      "processEndpointWPS1": "http://localhost:4002/ows/wps",
+      "executeEndpoint": "http://localhost:4002/processes/jsonarray2netcdf/jobs"
+    },
+    {
+      "id": "las2tif",
+      "title": "LAS point cloud conversion to GeoTiff raster.",
+      "description": "Converts the provided LAS or LAZ file and returns its reprojected representation as GeoTiff, preserving original classifications of points.",
+      "keywords": [
+        "crim",
+        "lidar",
+        "raster",
+        "geotiff",
+        "conversion",
+        "utility",
+        "application"
+      ],
+      "metadata": [
+        {
+          "type": "provider-name",
+          "title": "Provider Name",
+          "lang": "en-CA",
+          "value": "Computer Research Institute of Montreal (CRIM)",
+          "role": "http://www.opengis.net/eoc/applicationContext/providerMetadata"
+        },
+        {
+          "type": "provider-name",
+          "title": "Fournisseur",
+          "lang": "fr-CA",
+          "value": "Centre de Recherche Informatique de Montréal (CRIM)",
+          "role": "http://www.opengis.net/eoc/applicationContext/providerMetadata"
+        },
+        {
+          "type": "provider-site",
+          "title": "Provider Site",
+          "hreflang": "en-CA",
+          "href": "https://www.crim.ca/en",
+          "rel": "provider-site-en",
+          "role": "http://www.opengis.net/eoc/applicationContext/providerMetadata"
+        },
+        {
+          "type": "provider-site",
+          "title": "Page du fournisseur",
+          "hreflang": "fr-CA",
+          "href": "https://www.crim.ca/fr",
+          "rel": "provider-site-fr",
+          "role": "http://www.opengis.net/eoc/applicationContext/providerMetadata"
+        }
+      ],
+      "jobControlOptions": [
+        "async-execute"
+      ],
+      "outputTransmission": [
+        "reference"
+      ],
+      "processDescriptionURL": "http://localhost:4002/processes/las2tif",
+      "processEndpointWPS1": "http://localhost:4002/ows/wps",
+      "executeEndpoint": "http://localhost:4002/processes/las2tif/jobs"
+    },
+    {
+      "id": "metalink2netcdf",
+      "title": "Metalink to NetCDF",
+      "version": "1.0",
+      "description": "Extracts and fetches NetCDF files from a Metalink file containing an URL, and outputs the NetCDF file at a given. Index of the list.",
+      "keywords": [
+        "builtin"
+      ],
+      "metadata": [],
+      "jobControlOptions": [
+        "async-execute"
+      ],
+      "outputTransmission": [
+        "reference"
+      ],
+      "processDescriptionURL": "http://localhost:4002/processes/metalink2netcdf",
+      "processEndpointWPS1": "http://localhost:4002/ows/wps",
+      "executeEndpoint": "http://localhost:4002/processes/metalink2netcdf/jobs"
+    },
+    {
+      "id": "python-script",
+      "title": "Test literal Python script",
+      "description": "Test literal Python script.",
+      "keywords": [
+        "python",
+        "test",
+        "application"
+      ],
+      "metadata": [],
+      "jobControlOptions": [
+        "async-execute"
+      ],
+      "outputTransmission": [
+        "reference"
+      ],
+      "processDescriptionURL": "http://localhost:4002/processes/python-script",
+      "processEndpointWPS1": "http://localhost:4002/ows/wps",
+      "executeEndpoint": "http://localhost:4002/processes/python-script/jobs"
+    },
+    {
+      "id": "sleep",
+      "keywords": [
+        "util",
+        "test",
+        "application"
+      ],
+      "metadata": [],
+      "jobControlOptions": [
+        "async-execute"
+      ],
+      "outputTransmission": [
+        "reference"
+      ],
+      "processDescriptionURL": "http://localhost:4002/processes/sleep",
+      "processEndpointWPS1": "http://localhost:4002/ows/wps",
+      "executeEndpoint": "http://localhost:4002/processes/sleep/jobs"
+    },
+    {
+      "id": "test_blurring",
+      "title": "Test image blurring",
+      "version": "0.0.1",
+      "description": "Test image blurring",
+      "keywords": [
+        "application"
+      ],
+      "metadata": [
+        {
+          "title": "Source Code",
+          "hreflang": "en-CA",
+          "href": "https://github.com/lhcorralo/image-utils",
+          "rel": "source-code",
+          "role": "http://www.opengis.net/eoc/applicationContext/providerMetadata"
+        }
+      ],
+      "jobControlOptions": [
+        "async-execute"
+      ],
+      "outputTransmission": [
+        "reference"
+      ],
+      "processDescriptionURL": "http://localhost:4002/processes/test_blurring",
+      "processEndpointWPS1": "http://localhost:4002/ows/wps",
+      "executeEndpoint": "http://localhost:4002/processes/test_blurring/jobs"
+    },
+    {
+      "id": "test_generation",
+      "title": "Test image generation",
+      "version": "0.0.1",
+      "description": "Generates some test GeoTIFF",
+      "keywords": [
+        "application"
+      ],
+      "metadata": [
+        {
+          "title": "Source Code",
+          "hreflang": "en-CA",
+          "href": "https://github.com/lhcorralo/image-utils",
+          "rel": "source-code",
+          "role": "http://www.opengis.net/eoc/applicationContext/providerMetadata"
+        }
+      ],
+      "jobControlOptions": [
+        "async-execute"
+      ],
+      "outputTransmission": [
+        "reference"
+      ],
+      "processDescriptionURL": "http://localhost:4002/processes/test_generation",
+      "processEndpointWPS1": "http://localhost:4002/ows/wps",
+      "executeEndpoint": "http://localhost:4002/processes/test_generation/jobs"
+    },
+    {
+      "id": "test_workflow",
+      "title": "Workflow to test Weaver",
+      "version": "0.0.1",
+      "description": "Workflow to test Weaver",
+      "keywords": [
+        "workflow"
+      ],
+      "metadata": [],
+      "jobControlOptions": [
+        "async-execute"
+      ],
+      "outputTransmission": [
+        "reference"
+      ],
+      "processDescriptionURL": "http://localhost:4002/processes/test_workflow",
+      "processEndpointWPS1": "http://localhost:4002/ows/wps",
+      "executeEndpoint": "http://localhost:4002/processes/test_workflow/jobs"
+    }
+  ],
+  "providers": [
+    {
+      "id": "catalog-46",
+      "title": "PyWPS Processing Service",
+      "description": "PyWPS is an implementation of the Web Processing Service standard from the Open Geospatial Consortium. PyWPS is written in Python.",
+      "url": "https://host-140-46.rdext.crim.ca/twitcher/ows/proxy/catalog",
+      "type": "wps-remote",
+      "public": true,
+      "keywords": [
+        "PyWPS",
+        "WPS",
+        "OGC",
+        "processing"
+      ],
+      "metadata": [
+        {
+          "type": "provider-name",
+          "title": "Provider Name",
+          "value": "Organization Name",
+          "role": "http://www.opengis.net/eoc/applicationContext/providerMetadata"
+        },
+        {
+          "type": "provider-site",
+          "title": "Provider Name",
+          "value": "http://pywps.org/",
+          "role": "http://www.opengis.net/eoc/applicationContext/providerMetadata"
+        },
+        {
+          "type": "contact-name",
+          "title": "Contact Name",
+          "value": "Lastname, Firstname",
+          "role": "http://www.opengis.net/eoc/applicationContext/providerMetadata"
+        }
+      ],
+      "links": [
+        {
+          "type": "application/xml",
+          "title": "Service description (GetCapabilities).",
+          "href": "https://host-140-46.rdext.crim.ca/twitcher/ows/proxy/catalog?service=WPS&request=GetCapabilities",
+          "rel": "service-desc"
+        },
+        {
+          "type": "application/json",
+          "title": "Service definition.",
+          "hreflang": "en-CA",
+          "href": "http://localhost:4002/providers/catalog-46",
+          "rel": "service"
+        },
+        {
+          "type": "application/json",
+          "title": "Service definition.",
+          "hreflang": "en-CA",
+          "href": "http://localhost:4002/providers/catalog-46",
+          "rel": "self"
+        },
+        {
+          "type": "application/json",
+          "title": "Listing of processes provided by this service.",
+          "hreflang": "en-CA",
+          "href": "http://localhost:4002/providers/catalog-46/processes",
+          "rel": "http://www.opengis.net/def/rel/ogc/1.0/processes"
+        }
+      ],
+      "processes": [
+        {
+          "id": "getpoint",
+          "keywords": [
+            "catalog-46",
+            "Organization Name"
+          ],
+          "title": "Point value from a NetCDF file",
+          "description": "Return a single value from a NetCDF file at the given grid coordinates.",
+          "version": "0.1",
+          "metadata": [],
+          "inputs": [],
+          "outputs": [],
+          "url": "http://localhost:4002/providers/catalog-46/processes/getpoint",
+          "executeEndpoint": "http://localhost:4002/providers/catalog-46/processes/getpoint/jobs",
+          "processEndpointWPS1": "https://host-140-46.rdext.crim.ca/twitcher/ows/proxy/catalog?service=WPS&request=DescribeProcess&version=1.0.0&identifier=getpoint",
+          "processDescriptionURL": "http://localhost:4002/providers/catalog-46/processes/getpoint",
+          "type": "wps-remote",
+          "package": {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "hints": {
+              "WPS1Requirement": {
+                "provider": "https://host-140-46.rdext.crim.ca/twitcher/ows/proxy/catalog",
+                "process": "getpoint"
+              }
+            },
+            "inputs": [],
+            "outputs": []
+          },
+          "service": "catalog-46"
+        },
+        {
+          "id": "ncplotly",
+          "keywords": [
+            "catalog-46",
+            "Organization Name"
+          ],
+          "title": "Plotly time series data from netCDF file.",
+          "description": "Return a dictionary storing the data necessary to create a simple plotly time series.",
+          "version": "0.1",
+          "metadata": [],
+          "inputs": [],
+          "outputs": [],
+          "url": "http://localhost:4002/providers/catalog-46/processes/ncplotly",
+          "executeEndpoint": "http://localhost:4002/providers/catalog-46/processes/ncplotly/jobs",
+          "processEndpointWPS1": "https://host-140-46.rdext.crim.ca/twitcher/ows/proxy/catalog?service=WPS&request=DescribeProcess&version=1.0.0&identifier=ncplotly",
+          "processDescriptionURL": "http://localhost:4002/providers/catalog-46/processes/ncplotly",
+          "type": "wps-remote",
+          "package": {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "hints": {
+              "WPS1Requirement": {
+                "provider": "https://host-140-46.rdext.crim.ca/twitcher/ows/proxy/catalog",
+                "process": "ncplotly"
+              }
+            },
+            "inputs": [],
+            "outputs": []
+          },
+          "service": "catalog-46"
+        },
+        {
+          "id": "pavicrawler",
+          "keywords": [
+            "catalog-46",
+            "Organization Name"
+          ],
+          "title": "PAVICS Crawler",
+          "description": "Crawl thredds server and write metadata to SOLR database.",
+          "version": "0.1",
+          "metadata": [],
+          "inputs": [],
+          "outputs": [],
+          "url": "http://localhost:4002/providers/catalog-46/processes/pavicrawler",
+          "executeEndpoint": "http://localhost:4002/providers/catalog-46/processes/pavicrawler/jobs",
+          "processEndpointWPS1": "https://host-140-46.rdext.crim.ca/twitcher/ows/proxy/catalog?service=WPS&request=DescribeProcess&version=1.0.0&identifier=pavicrawler",
+          "processDescriptionURL": "http://localhost:4002/providers/catalog-46/processes/pavicrawler",
+          "type": "wps-remote",
+          "package": {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "hints": {
+              "WPS1Requirement": {
+                "provider": "https://host-140-46.rdext.crim.ca/twitcher/ows/proxy/catalog",
+                "process": "pavicrawler"
+              }
+            },
+            "inputs": [],
+            "outputs": []
+          },
+          "service": "catalog-46"
+        },
+        {
+          "id": "pavicsearch",
+          "keywords": [
+            "catalog-46",
+            "Organization Name"
+          ],
+          "title": "PAVICS Catalogue Search",
+          "description": "Search the PAVICS database and return a catalogue of matches.",
+          "version": "0.1",
+          "metadata": [],
+          "inputs": [],
+          "outputs": [],
+          "url": "http://localhost:4002/providers/catalog-46/processes/pavicsearch",
+          "executeEndpoint": "http://localhost:4002/providers/catalog-46/processes/pavicsearch/jobs",
+          "processEndpointWPS1": "https://host-140-46.rdext.crim.ca/twitcher/ows/proxy/catalog?service=WPS&request=DescribeProcess&version=1.0.0&identifier=pavicsearch",
+          "processDescriptionURL": "http://localhost:4002/providers/catalog-46/processes/pavicsearch",
+          "type": "wps-remote",
+          "package": {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "hints": {
+              "WPS1Requirement": {
+                "provider": "https://host-140-46.rdext.crim.ca/twitcher/ows/proxy/catalog",
+                "process": "pavicsearch"
+              }
+            },
+            "inputs": [],
+            "outputs": []
+          },
+          "service": "catalog-46"
+        },
+        {
+          "id": "pavicsupdate",
+          "keywords": [
+            "catalog-46",
+            "Organization Name"
+          ],
+          "title": "PAVICS Catalogue Update",
+          "description": "Update database entries using key:value pairs and identified by their ids.",
+          "version": "0.1",
+          "metadata": [],
+          "inputs": [],
+          "outputs": [],
+          "url": "http://localhost:4002/providers/catalog-46/processes/pavicsupdate",
+          "executeEndpoint": "http://localhost:4002/providers/catalog-46/processes/pavicsupdate/jobs",
+          "processEndpointWPS1": "https://host-140-46.rdext.crim.ca/twitcher/ows/proxy/catalog?service=WPS&request=DescribeProcess&version=1.0.0&identifier=pavicsupdate",
+          "processDescriptionURL": "http://localhost:4002/providers/catalog-46/processes/pavicsupdate",
+          "type": "wps-remote",
+          "package": {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "hints": {
+              "WPS1Requirement": {
+                "provider": "https://host-140-46.rdext.crim.ca/twitcher/ows/proxy/catalog",
+                "process": "pavicsupdate"
+              }
+            },
+            "inputs": [],
+            "outputs": []
+          },
+          "service": "catalog-46"
+        },
+        {
+          "id": "pavicsvalidate",
+          "keywords": [
+            "catalog-46",
+            "Organization Name"
+          ],
+          "title": "PAVICS Catalogue Validation",
+          "description": "Query database entries for missing required facets.",
+          "version": "0.1",
+          "metadata": [],
+          "inputs": [],
+          "outputs": [],
+          "url": "http://localhost:4002/providers/catalog-46/processes/pavicsvalidate",
+          "executeEndpoint": "http://localhost:4002/providers/catalog-46/processes/pavicsvalidate/jobs",
+          "processEndpointWPS1": "https://host-140-46.rdext.crim.ca/twitcher/ows/proxy/catalog?service=WPS&request=DescribeProcess&version=1.0.0&identifier=pavicsvalidate",
+          "processDescriptionURL": "http://localhost:4002/providers/catalog-46/processes/pavicsvalidate",
+          "type": "wps-remote",
+          "package": {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "hints": {
+              "WPS1Requirement": {
+                "provider": "https://host-140-46.rdext.crim.ca/twitcher/ows/proxy/catalog",
+                "process": "pavicsvalidate"
+              }
+            },
+            "inputs": [],
+            "outputs": []
+          },
+          "service": "catalog-46"
+        },
+        {
+          "id": "period2indices",
+          "keywords": [
+            "catalog-46",
+            "Organization Name"
+          ],
+          "title": "NetCDF time indices from a period",
+          "description": "The final index is inclusive.",
+          "version": "0.1",
+          "metadata": [],
+          "inputs": [],
+          "outputs": [],
+          "url": "http://localhost:4002/providers/catalog-46/processes/period2indices",
+          "executeEndpoint": "http://localhost:4002/providers/catalog-46/processes/period2indices/jobs",
+          "processEndpointWPS1": "https://host-140-46.rdext.crim.ca/twitcher/ows/proxy/catalog?service=WPS&request=DescribeProcess&version=1.0.0&identifier=period2indices",
+          "processDescriptionURL": "http://localhost:4002/providers/catalog-46/processes/period2indices",
+          "type": "wps-remote",
+          "package": {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "hints": {
+              "WPS1Requirement": {
+                "provider": "https://host-140-46.rdext.crim.ca/twitcher/ows/proxy/catalog",
+                "process": "period2indices"
+              }
+            },
+            "inputs": [],
+            "outputs": []
+          },
+          "service": "catalog-46"
+        },
+        {
+          "id": "pavicstestdocs",
+          "keywords": [
+            "catalog-46",
+            "Organization Name"
+          ],
+          "title": "PAVICS Catalog test documents",
+          "description": "Add test documents to Solr index.",
+          "version": "0.1",
+          "metadata": [],
+          "inputs": [],
+          "outputs": [],
+          "url": "http://localhost:4002/providers/catalog-46/processes/pavicstestdocs",
+          "executeEndpoint": "http://localhost:4002/providers/catalog-46/processes/pavicstestdocs/jobs",
+          "processEndpointWPS1": "https://host-140-46.rdext.crim.ca/twitcher/ows/proxy/catalog?service=WPS&request=DescribeProcess&version=1.0.0&identifier=pavicstestdocs",
+          "processDescriptionURL": "http://localhost:4002/providers/catalog-46/processes/pavicstestdocs",
+          "type": "wps-remote",
+          "package": {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "hints": {
+              "WPS1Requirement": {
+                "provider": "https://host-140-46.rdext.crim.ca/twitcher/ows/proxy/catalog",
+                "process": "pavicstestdocs"
+              }
+            },
+            "inputs": [],
+            "outputs": []
+          },
+          "service": "catalog-46"
+        }
+      ]
+    },
+    {
+      "id": "hummingbird-69",
+      "title": "Hummingbird 0.5_dev",
+      "description": "WPS processes for general tools used in the climate science community like cdo and compliance checker.",
+      "url": "https://host-140-69.rdext.crim.ca/twitcher/ows/proxy/hummingbird",
+      "type": "wps-remote",
+      "public": false,
+      "keywords": [
+        "PyWPS",
+        "WPS",
+        "OGC",
+        "processing",
+        "Birdhouse",
+        "hummingbird"
+      ],
+      "metadata": [
+        {
+          "type": "provider-name",
+          "title": "Provider Name",
+          "lang": "en-US",
+          "value": "Hummingbird",
+          "role": "http://www.opengis.net/eoc/applicationContext/providerMetadata"
+        },
+        {
+          "type": "provider-site",
+          "title": "Provider Name",
+          "lang": "en-US",
+          "value": "http://birdhouse-hummingbird.readthedocs.org/en/latest/",
+          "role": "http://www.opengis.net/eoc/applicationContext/providerMetadata"
+        },
+        {
+          "type": "contact-name",
+          "title": "Contact Name",
+          "lang": "en-US",
+          "value": "Lastname, Firstname",
+          "role": "http://www.opengis.net/eoc/applicationContext/providerMetadata"
+        }
+      ],
+      "links": [
+        {
+          "type": "application/xml",
+          "title": "Service description (GetCapabilities).",
+          "hreflang": "en-US",
+          "href": "https://host-140-69.rdext.crim.ca/twitcher/ows/proxy/hummingbird?service=WPS&request=GetCapabilities",
+          "rel": "service-desc"
+        },
+        {
+          "type": "application/json",
+          "title": "Service definition.",
+          "hreflang": "en-CA",
+          "href": "http://localhost:4002/providers/hummingbird-69",
+          "rel": "service"
+        },
+        {
+          "type": "application/json",
+          "title": "Service definition.",
+          "hreflang": "en-CA",
+          "href": "http://localhost:4002/providers/hummingbird-69",
+          "rel": "self"
+        },
+        {
+          "type": "application/json",
+          "title": "Listing of processes provided by this service.",
+          "hreflang": "en-CA",
+          "href": "http://localhost:4002/providers/hummingbird-69/processes",
+          "rel": "http://www.opengis.net/def/rel/ogc/1.0/processes"
+        }
+      ],
+      "processes": [
+        {
+          "id": "ncdump",
+          "keywords": [
+            "hummingbird-69",
+            "Hummingbird"
+          ],
+          "title": "NCDump",
+          "description": "Run ncdump to retrieve NetCDF header metadata.",
+          "version": "4.4.1.1",
+          "metadata": [
+            {
+              "href": "http://bird-house.github.io/",
+              "title": "Birdhouse",
+              "role": null,
+              "rel": "birdhouse"
+            },
+            {
+              "href": "http://birdhouse-hummingbird.readthedocs.io/en/latest/",
+              "title": "User Guide",
+              "role": null,
+              "rel": "user-guide"
+            }
+          ],
+          "inputs": [],
+          "outputs": [],
+          "url": "http://localhost:4002/providers/hummingbird-69/processes/ncdump",
+          "executeEndpoint": "http://localhost:4002/providers/hummingbird-69/processes/ncdump/jobs",
+          "processEndpointWPS1": "https://host-140-69.rdext.crim.ca/twitcher/ows/proxy/hummingbird?service=WPS&request=DescribeProcess&version=1.0.0&identifier=ncdump",
+          "processDescriptionURL": "http://localhost:4002/providers/hummingbird-69/processes/ncdump",
+          "type": "wps-remote",
+          "package": {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "hints": {
+              "WPS1Requirement": {
+                "provider": "https://host-140-69.rdext.crim.ca/twitcher/ows/proxy/hummingbird",
+                "process": "ncdump"
+              }
+            },
+            "inputs": [],
+            "outputs": []
+          },
+          "service": "hummingbird-69"
+        },
+        {
+          "id": "spotchecker",
+          "keywords": [
+            "hummingbird-69",
+            "Hummingbird"
+          ],
+          "title": "Spot Checker",
+          "description": "Checks a single uploaded or remote dataset against a variety of compliance standards. The dataset is either in the NetCDF format or a remote OpenDAP resource. Available compliance standards are the Climate and Forecast conventions (CF) and project specific rules for CMIP6 and CORDEX.",
+          "version": "0.3.0",
+          "metadata": [
+            {
+              "href": "http://birdhouse-hummingbird.readthedocs.io/en/latest/processes.html#spotchecker",
+              "title": "User Guide",
+              "role": null,
+              "rel": "user-guide"
+            },
+            {
+              "href": "http://cfconventions.org/",
+              "title": "CF Conventions",
+              "role": null,
+              "rel": "cf-conventions"
+            },
+            {
+              "href": "http://data.ioos.us/compliance/index.html",
+              "title": "IOOS Compliance Online Checker",
+              "role": null,
+              "rel": "ioos-compliance-online-checker"
+            }
+          ],
+          "inputs": [],
+          "outputs": [],
+          "url": "http://localhost:4002/providers/hummingbird-69/processes/spotchecker",
+          "executeEndpoint": "http://localhost:4002/providers/hummingbird-69/processes/spotchecker/jobs",
+          "processEndpointWPS1": "https://host-140-69.rdext.crim.ca/twitcher/ows/proxy/hummingbird?service=WPS&request=DescribeProcess&version=1.0.0&identifier=spotchecker",
+          "processDescriptionURL": "http://localhost:4002/providers/hummingbird-69/processes/spotchecker",
+          "type": "wps-remote",
+          "package": {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "hints": {
+              "WPS1Requirement": {
+                "provider": "https://host-140-69.rdext.crim.ca/twitcher/ows/proxy/hummingbird",
+                "process": "spotchecker"
+              }
+            },
+            "inputs": [],
+            "outputs": []
+          },
+          "service": "hummingbird-69"
+        },
+        {
+          "id": "cchecker",
+          "keywords": [
+            "hummingbird-69",
+            "Hummingbird"
+          ],
+          "title": "IOOS Compliance Checker",
+          "description": "Runs the IOOS Compliance Checker tool to check datasets against compliance standards. Each compliance standard is executed by a Check Suite, which functions similar to a Python standard Unit Test. A Check Suite runs one or more checks against a dataset, returning a list of Results which are then aggregated into a summary. Development and maintenance for the compliance checker is done by the Integrated Ocean Observing System (IOOS).",
+          "version": "3.1.1",
+          "metadata": [
+            {
+              "href": "http://bird-house.github.io/",
+              "title": "Birdhouse",
+              "role": null,
+              "rel": "birdhouse"
+            },
+            {
+              "href": "http://birdhouse-hummingbird.readthedocs.io/en/latest/",
+              "title": "User Guide",
+              "role": null,
+              "rel": "user-guide"
+            },
+            {
+              "href": "http://cfconventions.org/",
+              "title": "CF Conventions",
+              "role": null,
+              "rel": "cf-conventions"
+            },
+            {
+              "href": "https://ioos.noaa.gov/",
+              "title": "IOOS",
+              "role": null,
+              "rel": "ioos"
+            },
+            {
+              "href": "https://github.com/ioos/compliance-checker",
+              "title": "Compliance Checker on GitHub",
+              "role": null,
+              "rel": "compliance-checker-on-github"
+            },
+            {
+              "href": "http://data.ioos.us/compliance/index.html",
+              "title": "IOOS Compliance Online Checker",
+              "role": null,
+              "rel": "ioos-compliance-online-checker"
+            }
+          ],
+          "inputs": [],
+          "outputs": [],
+          "url": "http://localhost:4002/providers/hummingbird-69/processes/cchecker",
+          "executeEndpoint": "http://localhost:4002/providers/hummingbird-69/processes/cchecker/jobs",
+          "processEndpointWPS1": "https://host-140-69.rdext.crim.ca/twitcher/ows/proxy/hummingbird?service=WPS&request=DescribeProcess&version=1.0.0&identifier=cchecker",
+          "processDescriptionURL": "http://localhost:4002/providers/hummingbird-69/processes/cchecker",
+          "type": "wps-remote",
+          "package": {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "hints": {
+              "WPS1Requirement": {
+                "provider": "https://host-140-69.rdext.crim.ca/twitcher/ows/proxy/hummingbird",
+                "process": "cchecker"
+              }
+            },
+            "inputs": [],
+            "outputs": []
+          },
+          "service": "hummingbird-69"
+        },
+        {
+          "id": "cfchecker",
+          "keywords": [
+            "hummingbird-69",
+            "Hummingbird"
+          ],
+          "title": "CF Checker by CEDA",
+          "description": "The NetCDF Climate Forcast Conventions compliance checker by CEDA. This process allows you to run the compliance checker to check that the contents of a NetCDF file comply with the Climate and Forecasts (CF) Metadata Convention. The CF-checker was developed at the Hadley Centre for Climate Prediction and Research, UK Met Office by Rosalyn Hatcher. This work was supported by PRISM (PRogramme for Integrated Earth System Modelling). Development and maintenance for the CF-checker has now been taken over by the NCAS Computational Modelling Services (NCAS-CMS). If you have suggestions for improvement then please contact Rosalyn Hatcher at NCAS-CMS (r.s.hatcher@reading.ac.uk).",
+          "version": "3.0.5",
+          "metadata": [
+            {
+              "href": "http://birdhouse-hummingbird.readthedocs.io/en/latest/",
+              "title": "User Guide",
+              "role": null,
+              "rel": "user-guide"
+            },
+            {
+              "href": "https://pypi.python.org/pypi/cfchecker/",
+              "title": "Readme on PyPI",
+              "role": null,
+              "rel": "readme-on-pypi"
+            },
+            {
+              "href": "http://cfconventions.org/",
+              "title": "CF Conventions",
+              "role": null,
+              "rel": "cf-conventions"
+            },
+            {
+              "href": "http://cfconventions.org/compliance-checker.html",
+              "title": "Online Compliance Checker",
+              "role": null,
+              "rel": "online-compliance-checker"
+            }
+          ],
+          "inputs": [],
+          "outputs": [],
+          "url": "http://localhost:4002/providers/hummingbird-69/processes/cfchecker",
+          "executeEndpoint": "http://localhost:4002/providers/hummingbird-69/processes/cfchecker/jobs",
+          "processEndpointWPS1": "https://host-140-69.rdext.crim.ca/twitcher/ows/proxy/hummingbird?service=WPS&request=DescribeProcess&version=1.0.0&identifier=cfchecker",
+          "processDescriptionURL": "http://localhost:4002/providers/hummingbird-69/processes/cfchecker",
+          "type": "wps-remote",
+          "package": {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "hints": {
+              "WPS1Requirement": {
+                "provider": "https://host-140-69.rdext.crim.ca/twitcher/ows/proxy/hummingbird",
+                "process": "cfchecker"
+              }
+            },
+            "inputs": [],
+            "outputs": []
+          },
+          "service": "hummingbird-69"
+        },
+        {
+          "id": "cmor_checker",
+          "keywords": [
+            "hummingbird-69",
+            "Hummingbird"
+          ],
+          "title": "CMIP6 CMOR Checker",
+          "description": "Calls the CMIP6 cmor checker to verify CMIP6 compliance.CMIP6 CMOR checker will verify that all attributes in the input file are present and conform to CMIP6 for publication into ESGF.",
+          "version": "3.2.8",
+          "metadata": [
+            {
+              "href": "https://github.com/PCMDI/cmor",
+              "title": "CMOR Checker on GitHub",
+              "role": null,
+              "rel": "cmor-checker-on-github"
+            },
+            {
+              "href": "https://cmor.llnl.gov/mydoc_cmip6_validator/",
+              "title": "User Guide",
+              "role": null,
+              "rel": "user-guide"
+            }
+          ],
+          "inputs": [],
+          "outputs": [],
+          "url": "http://localhost:4002/providers/hummingbird-69/processes/cmor_checker",
+          "executeEndpoint": "http://localhost:4002/providers/hummingbird-69/processes/cmor_checker/jobs",
+          "processEndpointWPS1": "https://host-140-69.rdext.crim.ca/twitcher/ows/proxy/hummingbird?service=WPS&request=DescribeProcess&version=1.0.0&identifier=cmor_checker",
+          "processDescriptionURL": "http://localhost:4002/providers/hummingbird-69/processes/cmor_checker",
+          "type": "wps-remote",
+          "package": {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "hints": {
+              "WPS1Requirement": {
+                "provider": "https://host-140-69.rdext.crim.ca/twitcher/ows/proxy/hummingbird",
+                "process": "cmor_checker"
+              }
+            },
+            "inputs": [],
+            "outputs": []
+          },
+          "service": "hummingbird-69"
+        },
+        {
+          "id": "qa_cfchecker",
+          "keywords": [
+            "hummingbird-69",
+            "Hummingbird"
+          ],
+          "title": "CF Checker by DKRZ",
+          "description": "The NetCDF Climate Forcast Conventions compliance checker by DKRZ. This process allows you to run the compliance checker to check that the contents of a NetCDF file comply with the Climate and Forecasts (CF) Metadata Convention. The CF Conformance checker applies to conventions 1.4 -1.7draft. Development and maintenance for the CF-checker is done by the German Climate Computing Centre (DKRZ). If you have suggestions for improvement then please contact Heinz-Dieter Hollweg at DKRZ (hollweg@dkrz.de).",
+          "version": "0.6.3",
+          "metadata": [
+            {
+              "href": "http://bird-house.github.io/",
+              "title": "Birdhouse",
+              "role": null,
+              "rel": "birdhouse"
+            },
+            {
+              "href": "http://birdhouse-hummingbird.readthedocs.io/en/latest/",
+              "title": "User Guide",
+              "role": null,
+              "rel": "user-guide"
+            },
+            {
+              "href": "http://cfconventions.org/",
+              "title": "CF Conventions",
+              "role": null,
+              "rel": "cf-conventions"
+            },
+            {
+              "href": "http://qa-dkrz.readthedocs.io/en/latest/",
+              "title": "CF Checker Documentation",
+              "role": null,
+              "rel": "cf-checker-documentation"
+            },
+            {
+              "href": "http://anaconda.org/birdhouse/qa-dkrz",
+              "title": "Conda Package",
+              "role": null,
+              "rel": "conda-package"
+            },
+            {
+              "href": "https://github.com/IS-ENES-Data/QA-DKRZ",
+              "title": "GitHub",
+              "role": null,
+              "rel": "github"
+            }
+          ],
+          "inputs": [],
+          "outputs": [],
+          "url": "http://localhost:4002/providers/hummingbird-69/processes/qa_cfchecker",
+          "executeEndpoint": "http://localhost:4002/providers/hummingbird-69/processes/qa_cfchecker/jobs",
+          "processEndpointWPS1": "https://host-140-69.rdext.crim.ca/twitcher/ows/proxy/hummingbird?service=WPS&request=DescribeProcess&version=1.0.0&identifier=qa_cfchecker",
+          "processDescriptionURL": "http://localhost:4002/providers/hummingbird-69/processes/qa_cfchecker",
+          "type": "wps-remote",
+          "package": {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "hints": {
+              "WPS1Requirement": {
+                "provider": "https://host-140-69.rdext.crim.ca/twitcher/ows/proxy/hummingbird",
+                "process": "qa_cfchecker"
+              }
+            },
+            "inputs": [],
+            "outputs": []
+          },
+          "service": "hummingbird-69"
+        },
+        {
+          "id": "qa_checker",
+          "keywords": [
+            "hummingbird-69",
+            "Hummingbird"
+          ],
+          "title": "Quality Assurance Checker by DKRZ",
+          "description": "The Quality Assurance checker QA-DKRZ checks conformance of meta-data of climate simulations given in NetCDF format with conventions and rules of climate model projects. At present, checking of CF Conventions, CMIP5, and CORDEX is supported. Development and maintenance for the QA checker is done by the German Climate Computing Centre (DKRZ). If you have suggestions for improvement then please contact Heinz-Dieter Hollweg at DKRZ (hollweg@dkrz.de).",
+          "version": "0.6.3",
+          "metadata": [
+            {
+              "href": "http://bird-house.github.io/",
+              "title": "Birdhouse",
+              "role": null,
+              "rel": "birdhouse"
+            },
+            {
+              "href": "http://birdhouse-hummingbird.readthedocs.io/en/latest/",
+              "title": "User Guide",
+              "role": null,
+              "rel": "user-guide"
+            },
+            {
+              "href": "http://cfconventions.org/",
+              "title": "CF Conventions",
+              "role": null,
+              "rel": "cf-conventions"
+            },
+            {
+              "href": "http://qa-dkrz.readthedocs.io/en/latest/",
+              "title": "QA Checker Documentation",
+              "role": null,
+              "rel": "qa-checker-documentation"
+            },
+            {
+              "href": "http://anaconda.org/birdhouse/qa-dkrz",
+              "title": "Conda Package",
+              "role": null,
+              "rel": "conda-package"
+            },
+            {
+              "href": "https://github.com/IS-ENES-Data/QA-DKRZ",
+              "title": "GitHub",
+              "role": null,
+              "rel": "github"
+            }
+          ],
+          "inputs": [],
+          "outputs": [],
+          "url": "http://localhost:4002/providers/hummingbird-69/processes/qa_checker",
+          "executeEndpoint": "http://localhost:4002/providers/hummingbird-69/processes/qa_checker/jobs",
+          "processEndpointWPS1": "https://host-140-69.rdext.crim.ca/twitcher/ows/proxy/hummingbird?service=WPS&request=DescribeProcess&version=1.0.0&identifier=qa_checker",
+          "processDescriptionURL": "http://localhost:4002/providers/hummingbird-69/processes/qa_checker",
+          "type": "wps-remote",
+          "package": {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "hints": {
+              "WPS1Requirement": {
+                "provider": "https://host-140-69.rdext.crim.ca/twitcher/ows/proxy/hummingbird",
+                "process": "qa_checker"
+              }
+            },
+            "inputs": [],
+            "outputs": []
+          },
+          "service": "hummingbird-69"
+        },
+        {
+          "id": "cdo_sinfo",
+          "keywords": [
+            "hummingbird-69",
+            "Hummingbird"
+          ],
+          "title": "CDO sinfo",
+          "description": "Runs CDO to retrieve NetCDF metadata information. Calls the sinfo operator of CDO (Climate Data Operator) on a NetCDF file and returns a document with metadata information.",
+          "version": "1.9.0",
+          "metadata": [
+            {
+              "href": "http://birdhouse-hummingbird.readthedocs.io/en/latest/",
+              "title": "User Guide",
+              "role": null,
+              "rel": "user-guide"
+            },
+            {
+              "href": "https://code.zmaw.de/projects/cdo/embedded/index.html",
+              "title": "CDO Documentation",
+              "role": null,
+              "rel": "cdo-documentation"
+            }
+          ],
+          "inputs": [],
+          "outputs": [],
+          "url": "http://localhost:4002/providers/hummingbird-69/processes/cdo_sinfo",
+          "executeEndpoint": "http://localhost:4002/providers/hummingbird-69/processes/cdo_sinfo/jobs",
+          "processEndpointWPS1": "https://host-140-69.rdext.crim.ca/twitcher/ows/proxy/hummingbird?service=WPS&request=DescribeProcess&version=1.0.0&identifier=cdo_sinfo",
+          "processDescriptionURL": "http://localhost:4002/providers/hummingbird-69/processes/cdo_sinfo",
+          "type": "wps-remote",
+          "package": {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "hints": {
+              "WPS1Requirement": {
+                "provider": "https://host-140-69.rdext.crim.ca/twitcher/ows/proxy/hummingbird",
+                "process": "cdo_sinfo"
+              }
+            },
+            "inputs": [],
+            "outputs": []
+          },
+          "service": "hummingbird-69"
+        },
+        {
+          "id": "cdo_operation",
+          "keywords": [
+            "hummingbird-69",
+            "Hummingbird"
+          ],
+          "title": "CDO Operation",
+          "description": "Calls CDO operations like monmax on a NetCDF file.",
+          "version": "1.9.0",
+          "metadata": [
+            {
+              "href": "http://birdhouse-hummingbird.readthedocs.io/en/latest/",
+              "title": "User Guide",
+              "role": null,
+              "rel": "user-guide"
+            },
+            {
+              "href": "https://code.zmaw.de/projects/cdo/embedded/index.html",
+              "title": "CDO Documentation",
+              "role": null,
+              "rel": "cdo-documentation"
+            }
+          ],
+          "inputs": [],
+          "outputs": [],
+          "url": "http://localhost:4002/providers/hummingbird-69/processes/cdo_operation",
+          "executeEndpoint": "http://localhost:4002/providers/hummingbird-69/processes/cdo_operation/jobs",
+          "processEndpointWPS1": "https://host-140-69.rdext.crim.ca/twitcher/ows/proxy/hummingbird?service=WPS&request=DescribeProcess&version=1.0.0&identifier=cdo_operation",
+          "processDescriptionURL": "http://localhost:4002/providers/hummingbird-69/processes/cdo_operation",
+          "type": "wps-remote",
+          "package": {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "hints": {
+              "WPS1Requirement": {
+                "provider": "https://host-140-69.rdext.crim.ca/twitcher/ows/proxy/hummingbird",
+                "process": "cdo_operation"
+              }
+            },
+            "inputs": [],
+            "outputs": []
+          },
+          "service": "hummingbird-69"
+        },
+        {
+          "id": "cdo_copy",
+          "keywords": [
+            "hummingbird-69",
+            "Hummingbird"
+          ],
+          "title": "CDO Copy",
+          "description": "Calls CDO to copy or concatenate datasets. All input datasets need to have the same structure with the same variables on different timesteps.",
+          "version": "1.9.0",
+          "metadata": [
+            {
+              "href": "http://birdhouse-hummingbird.readthedocs.io/en/latest/",
+              "title": "User Guide",
+              "role": null,
+              "rel": "user-guide"
+            },
+            {
+              "href": "https://code.zmaw.de/projects/cdo/embedded/index.html",
+              "title": "CDO Documentation",
+              "role": null,
+              "rel": "cdo-documentation"
+            }
+          ],
+          "inputs": [],
+          "outputs": [],
+          "url": "http://localhost:4002/providers/hummingbird-69/processes/cdo_copy",
+          "executeEndpoint": "http://localhost:4002/providers/hummingbird-69/processes/cdo_copy/jobs",
+          "processEndpointWPS1": "https://host-140-69.rdext.crim.ca/twitcher/ows/proxy/hummingbird?service=WPS&request=DescribeProcess&version=1.0.0&identifier=cdo_copy",
+          "processDescriptionURL": "http://localhost:4002/providers/hummingbird-69/processes/cdo_copy",
+          "type": "wps-remote",
+          "package": {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "hints": {
+              "WPS1Requirement": {
+                "provider": "https://host-140-69.rdext.crim.ca/twitcher/ows/proxy/hummingbird",
+                "process": "cdo_copy"
+              }
+            },
+            "inputs": [],
+            "outputs": []
+          },
+          "service": "hummingbird-69"
+        },
+        {
+          "id": "cdo_bbox",
+          "keywords": [
+            "hummingbird-69",
+            "Hummingbird"
+          ],
+          "title": "CDO select lon/lat box",
+          "description": "Runs CDO to clip a bounding-box from a NetCDF file. Calls the CDO (Climate Data Operators) sellonlatbox operator with a bounding-box and returns the resulting NetCDF file.",
+          "version": "1.9.0",
+          "metadata": [
+            {
+              "href": "http://birdhouse-hummingbird.readthedocs.io/en/latest/",
+              "title": "User Guide",
+              "role": null,
+              "rel": "user-guide"
+            },
+            {
+              "href": "https://code.zmaw.de/projects/cdo/embedded/index.html",
+              "title": "CDO Documentation",
+              "role": null,
+              "rel": "cdo-documentation"
+            },
+            {
+              "href": "http://boundingbox.klokantech.com/",
+              "title": "Bounding Box Finder",
+              "role": null,
+              "rel": "bounding-box-finder"
+            }
+          ],
+          "inputs": [],
+          "outputs": [],
+          "url": "http://localhost:4002/providers/hummingbird-69/processes/cdo_bbox",
+          "executeEndpoint": "http://localhost:4002/providers/hummingbird-69/processes/cdo_bbox/jobs",
+          "processEndpointWPS1": "https://host-140-69.rdext.crim.ca/twitcher/ows/proxy/hummingbird?service=WPS&request=DescribeProcess&version=1.0.0&identifier=cdo_bbox",
+          "processDescriptionURL": "http://localhost:4002/providers/hummingbird-69/processes/cdo_bbox",
+          "type": "wps-remote",
+          "package": {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "hints": {
+              "WPS1Requirement": {
+                "provider": "https://host-140-69.rdext.crim.ca/twitcher/ows/proxy/hummingbird",
+                "process": "cdo_bbox"
+              }
+            },
+            "inputs": [],
+            "outputs": []
+          },
+          "service": "hummingbird-69"
+        },
+        {
+          "id": "cdo_indices",
+          "keywords": [
+            "hummingbird-69",
+            "Hummingbird"
+          ],
+          "title": "CDO Climate Indices",
+          "description": "Calculates climate indices like summer days using CDO. Calls the Climate Data Operators (CDO) tool with a single dataset (NetCDF, OpenDAP) provided and uses the chosen operator to calculate climate indices written to a NetCDF file.",
+          "version": "1.9.0",
+          "metadata": [
+            {
+              "href": "http://birdhouse-hummingbird.readthedocs.io/en/latest/",
+              "title": "User Guide",
+              "role": null,
+              "rel": "user-guide"
+            },
+            {
+              "href": "https://code.zmaw.de/projects/cdo/embedded/index.html",
+              "title": "CDO Documentation",
+              "role": null,
+              "rel": "cdo-documentation"
+            }
+          ],
+          "inputs": [],
+          "outputs": [],
+          "url": "http://localhost:4002/providers/hummingbird-69/processes/cdo_indices",
+          "executeEndpoint": "http://localhost:4002/providers/hummingbird-69/processes/cdo_indices/jobs",
+          "processEndpointWPS1": "https://host-140-69.rdext.crim.ca/twitcher/ows/proxy/hummingbird?service=WPS&request=DescribeProcess&version=1.0.0&identifier=cdo_indices",
+          "processDescriptionURL": "http://localhost:4002/providers/hummingbird-69/processes/cdo_indices",
+          "type": "wps-remote",
+          "package": {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "hints": {
+              "WPS1Requirement": {
+                "provider": "https://host-140-69.rdext.crim.ca/twitcher/ows/proxy/hummingbird",
+                "process": "cdo_indices"
+              }
+            },
+            "inputs": [],
+            "outputs": []
+          },
+          "service": "hummingbird-69"
+        },
+        {
+          "id": "ensembles",
+          "keywords": [
+            "hummingbird-69",
+            "Hummingbird"
+          ],
+          "title": "CDO Ensembles Operations",
+          "description": "Calling cdo to calculate ensembles operations.",
+          "version": "1.9.0",
+          "metadata": [
+            {
+              "href": "http://bird-house.github.io/",
+              "title": "Birdhouse",
+              "role": null,
+              "rel": "birdhouse"
+            },
+            {
+              "href": "http://birdhouse-hummingbird.readthedocs.io/en/latest/",
+              "title": "User Guide",
+              "role": null,
+              "rel": "user-guide"
+            },
+            {
+              "href": "https://code.zmaw.de/projects/cdo",
+              "title": "CDO Homepage",
+              "role": null,
+              "rel": "cdo-homepage"
+            },
+            {
+              "href": "https://code.zmaw.de/projects/cdo/embedded/index.html",
+              "title": "CDO Documentation",
+              "role": null,
+              "rel": "cdo-documentation"
+            }
+          ],
+          "inputs": [],
+          "outputs": [],
+          "url": "http://localhost:4002/providers/hummingbird-69/processes/ensembles",
+          "executeEndpoint": "http://localhost:4002/providers/hummingbird-69/processes/ensembles/jobs",
+          "processEndpointWPS1": "https://host-140-69.rdext.crim.ca/twitcher/ows/proxy/hummingbird?service=WPS&request=DescribeProcess&version=1.0.0&identifier=ensembles",
+          "processDescriptionURL": "http://localhost:4002/providers/hummingbird-69/processes/ensembles",
+          "type": "wps-remote",
+          "package": {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "hints": {
+              "WPS1Requirement": {
+                "provider": "https://host-140-69.rdext.crim.ca/twitcher/ows/proxy/hummingbird",
+                "process": "ensembles"
+              }
+            },
+            "inputs": [],
+            "outputs": []
+          },
+          "service": "hummingbird-69"
+        },
+        {
+          "id": "cdo_inter_mpi",
+          "keywords": [
+            "hummingbird-69",
+            "Hummingbird"
+          ],
+          "title": "CDO Remapping",
+          "description": "CDO Remapping of NetCDF File(s) with multiprocessing",
+          "version": "1.9.0",
+          "metadata": [
+            {
+              "href": "http://bird-house.github.io/",
+              "title": "Birdhouse",
+              "role": null,
+              "rel": "birdhouse"
+            },
+            {
+              "href": "http://birdhouse-hummingbird.readthedocs.io/en/latest/",
+              "title": "User Guide",
+              "role": null,
+              "rel": "user-guide"
+            },
+            {
+              "href": "https://code.zmaw.de/projects/cdo",
+              "title": "CDO Homepage",
+              "role": null,
+              "rel": "cdo-homepage"
+            },
+            {
+              "href": "https://code.zmaw.de/projects/cdo/embedded/index.html",
+              "title": "CDO Documentation",
+              "role": null,
+              "rel": "cdo-documentation"
+            }
+          ],
+          "inputs": [],
+          "outputs": [],
+          "url": "http://localhost:4002/providers/hummingbird-69/processes/cdo_inter_mpi",
+          "executeEndpoint": "http://localhost:4002/providers/hummingbird-69/processes/cdo_inter_mpi/jobs",
+          "processEndpointWPS1": "https://host-140-69.rdext.crim.ca/twitcher/ows/proxy/hummingbird?service=WPS&request=DescribeProcess&version=1.0.0&identifier=cdo_inter_mpi",
+          "processDescriptionURL": "http://localhost:4002/providers/hummingbird-69/processes/cdo_inter_mpi",
+          "type": "wps-remote",
+          "package": {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "hints": {
+              "WPS1Requirement": {
+                "provider": "https://host-140-69.rdext.crim.ca/twitcher/ows/proxy/hummingbird",
+                "process": "cdo_inter_mpi"
+              }
+            },
+            "inputs": [],
+            "outputs": []
+          },
+          "service": "hummingbird-69"
+        }
+      ]
+    }
+  ],
+  "total": 42
+}

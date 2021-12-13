@@ -1,36 +1,24 @@
 {
   "processes": [
-    {
-      "abstract": "Transforms a file input into JSON file containing an array of file references as value.",
-      "keywords": [],
-      "metadata": [],
-      "id": "file2string_array",
-      "processDescriptionURL": "http://schema-example.com/processes/file2string_array"
-    },
-    {
-      "title": "JSON array to NetCDF",
-      "abstract": "Extracts and fetches NetCDF files from a JSON file containing an URL string array, and provides them on the output directory.",
-      "keywords": [],
-      "metadata": [],
-      "id": "jsonarray2netcdf",
-      "version": "1.1",
-      "processDescriptionURL": "http://schema-example.com/processes/jsonarray2netcdf"
-    },
-    {
-      "title": "Metalink to NetCDF",
-      "abstract": "Extracts and fetches NetCDF files from a Metalink file containing an URL, and outputs the NetCDF file at a given. Index of the list.",
-      "keywords": [],
-      "metadata": [],
-      "id": "metalink2netcdf",
-      "version": "1.0",
-      "processDescriptionURL": "http://schema-example.com/processes/metalink2netcdf"
-    },
-    {
-      "title": "process_private",
-      "keywords": [],
-      "metadata": [],
-      "id": "process_private",
-      "version": "0.0"
-    }
+    "ColibriFlyingpigeon_SubsetBbox",
+    "OutardeFlyingpigeon_SubsetBbox",
+    "Staging_S2L1C",
+    "Staging_S2L1C-mock-docker",
+    "WaterExtent_S2-mock-docker",
+    "WorkflowWaterExtent",
+    "WorkflowWaterExtent-mock",
+    "anti-spoofing",
+    "docker-demo-cat",
+    "docker-python-script",
+    "file2string_array",
+    "image-utils",
+    "jsonarray2netcdf",
+    "las2tif",
+    "metalink2netcdf",
+    "python-script",
+    "sleep",
+    "test_blurring",
+    "test_generation",
+    "test_workflow"
   ]
 }

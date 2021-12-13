@@ -24,7 +24,7 @@ from cornice import Service
 from dateutil import parser as date_parser
 
 from weaver import __meta__
-from weaver.config import WEAVER_CONFIGURATION_EMS, WEAVER_CONFIGURATIONS_REMOTE
+from weaver.config import WEAVER_CONFIGURATIONS_REMOTE
 from weaver.execute import (
     EXECUTE_CONTROL_OPTION_ASYNC,
     EXECUTE_CONTROL_OPTIONS,
@@ -61,7 +61,7 @@ from weaver.processes.constants import (
     PACKAGE_TYPE_POSSIBLE_VALUES,
     WPS_LITERAL_DATA_TYPE_NAMES
 )
-from weaver.sort import JOB_SORT_VALUES, QUOTE_SORT_VALUES, SORT_CREATED, SORT_ID, SORT_PROCESS
+from weaver.sort import JOB_SORT_VALUES, PROCESS_SORT_VALUES, QUOTE_SORT_VALUES, SORT_CREATED, SORT_ID, SORT_PROCESS
 from weaver.status import JOB_STATUS_CODE_API, STATUS_ACCEPTED
 from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_VALUES
 from weaver.wps_restapi.colander_extras import (
@@ -89,6 +89,8 @@ if TYPE_CHECKING:
 
     ViewInfo = TypedDict("ViewInfo", {"name": str, "pattern": str})
 
+
+WEAVER_CONFIG_REMOTE_LIST = "[" + ", ".join(WEAVER_CONFIGURATIONS_REMOTE) + "]"
 
 API_TITLE = "Weaver REST API"
 API_INFO = {
@@ -174,7 +176,7 @@ EXAMPLES = {}
 for name in os.listdir(SCHEMA_EXAMPLE_DIR):
     path = os.path.join(SCHEMA_EXAMPLE_DIR, name)
     ext = os.path.splitext(name)[-1]
-    with open(path, "r") as f:
+    with open(path, "r", encoding="utf-8") as f:
         if ext in [".json", ".yaml", ".yml"]:
             EXAMPLES[name] = yaml.safe_load(f)  # both JSON/YAML
         else:
@@ -287,6 +289,17 @@ class MediaType(ExtendedSchemaNode):
     description = "IANA identifier of content and format."
     example = CONTENT_TYPE_APP_JSON
     pattern = r"^\w+\/[-.\w]+(?:\+[-.\w]+)?(?:\;\s*.+)*$"
+
+
+class QueryBoolean(Boolean):
+    description = "Boolean query parameter that allows handles common truthy/falsy values."
+
+    def __init__(self, *_, **__):
+        super(QueryBoolean, self).__init__(
+            allow_string=True,
+            false_choices=("False", "false", "0", "off", "no", "null", "Null", "none", "None", ""),
+            true_choices=("True", "true", "1", "on", "yes")
+        )
 
 
 class DateTimeInterval(ExtendedSchemaNode):
@@ -980,9 +993,9 @@ class AllowedRangesList(ExtendedSequenceSchema):
 
 class AllowedValues(OneOfKeywordSchema):
     _one_of = [
-        AllowedRangesList(description="List of value ranges and contrains."),   # array of {range}
-        AllowedValuesList(description="List of enumerated allowed values."),    # array of "value"
-        ExtendedSchemaNode(String(), description="Single allowed value."),      # single "value"
+        AllowedRangesList(description="List of value ranges and constraints."),  # array of {range}
+        AllowedValuesList(description="List of enumerated allowed values."),     # array of "value"
+        ExtendedSchemaNode(String(), description="Single allowed value."),       # single "value"
     ]
 
 
@@ -1345,6 +1358,14 @@ class JobSortEnum(ExtendedSchemaNode):
     default = SORT_CREATED
     example = SORT_CREATED
     validator = OneOf(JOB_SORT_VALUES)
+
+
+class ProcessSortEnum(ExtendedSchemaNode):
+    schema_type = String
+    title = "ProcessSortMethod"
+    default = SORT_ID
+    example = SORT_CREATED
+    validator = OneOf(PROCESS_SORT_VALUES)
 
 
 class QuoteSortEnum(ExtendedSchemaNode):
@@ -2323,11 +2344,16 @@ class ExecuteOutputFilterList(ExtendedSequenceSchema):
     output = ExecuteOutputDefinition()
 
 
+class ProviderNameSchema(AnyIdentifier):
+    title = "ProviderName"
+    description = "Identifier of the remote provider."
+
+
 class ProviderSummarySchema(DescriptionType, ProviderPublic, DescriptionMeta, DescriptionLinks):
     """
     Service provider summary definition.
     """
-    id = AnyIdentifier()
+    id = ProviderNameSchema()
     url = URL(description="Endpoint of the service provider.")
     type = ExtendedSchemaNode(String())
 
@@ -2406,7 +2432,13 @@ class ProcessListing(OneOfKeywordSchema):
 
 class ProcessCollection(ExtendedMappingSchema):
     processes = ProcessListing()
-    links = LinkList(missing=drop)
+
+
+class ProcessPagingQuery(ExtendedMappingSchema):
+    sort = ProcessSortEnum(missing=drop)
+    # if page is omitted but limit provided, use reasonable zero by default
+    page = ExtendedSchemaNode(Integer(allow_string=True), missing=0, default=0, validator=Range(min=0))
+    limit = ExtendedSchemaNode(Integer(allow_string=True), missing=None, default=None, validator=Range(min=1))
 
 
 class ProcessVisibility(ExtendedMappingSchema):
@@ -2556,7 +2588,7 @@ class CreatedQuotedJobStatusSchema(CreatedJobStatusSchema):
 
 class GetPagingJobsSchema(ExtendedMappingSchema):
     jobs = JobCollection()
-    limit = ExtendedSchemaNode(Integer(), missing=10, default=10, validator=Range(min=0, max=10000))
+    limit = ExtendedSchemaNode(Integer(), missing=10, default=10, validator=Range(min=1, max=10000))
     page = ExtendedSchemaNode(Integer(), validator=Range(min=0))
 
 
@@ -3271,19 +3303,19 @@ class DeploymentResult(ExtendedMappingSchema):
     processSummary = ProcessSummary()
 
 
-class ProvidersListSchema(ExtendedSequenceSchema):
+class ProviderSummaryList(ExtendedSequenceSchema):
     provider_service = ProviderSummarySchema()
 
 
-class ProviderNamesSchema(ExtendedSequenceSchema):
-    provider_name = AnyIdentifier()
+class ProviderNamesList(ExtendedSequenceSchema):
+    provider_name = ProviderNameSchema()
 
 
 class ProviderListing(OneOfKeywordSchema):
     _one_of = [
-        ProvidersListSchema(description="Listing of provider summary details retrieved from remote service."),
-        ProviderNamesSchema(description="Listing of provider names, possibly unvalidated from remote service.",
-                            missing=drop),  # in case of empty list, both schema are valid, drop this one to resolve
+        ProviderSummaryList(description="Listing of provider summary details retrieved from remote service."),
+        ProviderNamesList(description="Listing of provider names, possibly unvalidated from remote service.",
+                          missing=drop),  # in case of empty list, both schema are valid, drop this one to resolve
     ]
 
 
@@ -3543,13 +3575,13 @@ class GetJobsQueries(ExtendedMappingSchema):
     # note:
     #   This schema is also used to generate any missing defaults during filter parameter handling.
     #   Items with default value are added if omitted, except 'default=null' which are removed after handling by alias.
-    detail = ExtendedSchemaNode(Boolean(), description="Provide job details instead of IDs.",
-                                default=False, example=True, missing=drop)
+    detail = ExtendedSchemaNode(QueryBoolean(), default=False, example=True, missing=drop,
+                                description="Provide job details instead of IDs.")
     groups = ExtendedSchemaNode(String(),
                                 description="Comma-separated list of grouping fields with which to list jobs.",
                                 default=False, example="process,service", missing=drop)
     page = ExtendedSchemaNode(Integer(allow_string=True), missing=0, default=0, validator=Range(min=0))
-    limit = ExtendedSchemaNode(Integer(allow_string=True), missing=10, default=10, validator=Range(min=0, max=10000))
+    limit = ExtendedSchemaNode(Integer(allow_string=True), missing=10, default=10, validator=Range(min=1, max=10000))
     min_duration = ExtendedSchemaNode(
         Integer(allow_string=True), name="minDuration", missing=drop, default=null, validator=Range(min=0),
         description="Minimal duration (seconds) between started time and current/finished time of jobs to find.")
@@ -3635,7 +3667,7 @@ class ProcessQuoteEndpoint(ProcessPath, QuotePath):
 
 class GetQuotesQueries(ExtendedMappingSchema):
     page = ExtendedSchemaNode(Integer(), missing=drop, default=0)
-    limit = ExtendedSchemaNode(Integer(), missing=10, default=10, validator=Range(min=0, max=10000))
+    limit = ExtendedSchemaNode(Integer(), missing=10, default=10, validator=Range(min=1, max=10000))
     process = AnyIdentifier(missing=None)
     sort = QuoteSortEnum(missing=drop)
 
@@ -3671,17 +3703,18 @@ class PostProcessQuoteRequestEndpoint(ProcessPath, QuotePath):
 
 class ProvidersQuerySchema(ExtendedMappingSchema):
     detail = ExtendedSchemaNode(
-        Boolean(), example=True, default=True, missing=drop,
+        QueryBoolean(), example=True, default=True, missing=drop,
         description="Return summary details about each provider, or simply their IDs."
     )
     check = ExtendedSchemaNode(
-        Boolean(), example=True, default=True, missing=drop,
+        QueryBoolean(),
+        example=True, default=True, missing=drop,
         description="List only reachable providers, dropping unresponsive ones that cannot be checked for listing. "
                     "Otherwise, all registered providers are listed regardless of their availability. When requesting "
                     "details, less metadata will be provided since it will not be fetched from remote services."
     )
     ignore = ExtendedSchemaNode(
-        Boolean(), example=True, default=True, missing=drop,
+        QueryBoolean(), example=True, default=True, missing=drop,
         description="When listing providers with check of reachable remote service definitions, unresponsive response "
                     "or unprocessable contents will be silently ignored and dropped from full listing in the response. "
                     "Disabling this option will raise an error immediately instead of ignoring invalid services."
@@ -3698,8 +3731,20 @@ class PostProvider(ExtendedMappingSchema):
     body = CreateProviderRequestBody()
 
 
-class GetProviderProcesses(ExtendedMappingSchema):
+class ProcessDetailQuery(ExtendedMappingSchema):
+    detail = ExtendedSchemaNode(
+        QueryBoolean(), example=True, default=True, missing=drop,
+        description="Return summary details about each process, or simply their IDs."
+    )
+
+
+class ProviderProcessesQuery(ProcessPagingQuery, ProcessDetailQuery):
+    pass
+
+
+class ProviderProcessesEndpoint(ProviderPath):
     header = RequestHeaders()
+    querystring = ProviderProcessesQuery()
 
 
 class GetProviderProcess(ExtendedMappingSchema):
@@ -3777,7 +3822,7 @@ class ForbiddenProviderLocalResponseSchema(ExtendedMappingSchema):
     description = (
         "Provider operation is not allowed on local-only Weaver instance. "
         "Applies only when application configuration is not within: {}"
-    ).format(list(WEAVER_CONFIGURATIONS_REMOTE))
+    ).format(WEAVER_CONFIG_REMOTE_LIST)
     header = ResponseHeaders()
     body = ErrorJsonResponseBodySchema()
 
@@ -3842,14 +3887,19 @@ class OkGetProviderProcessesSchema(ExtendedMappingSchema):
     body = ProviderProcessesSchema()
 
 
-class GetProcessesQuery(ExtendedMappingSchema):
+class GetProcessesQuery(ProcessPagingQuery, ProcessDetailQuery):
     providers = ExtendedSchemaNode(
-        Boolean(), example=True, default=False, missing=drop,
+        QueryBoolean(), example=True, default=False, missing=drop,
         description="List local processes as well as all sub-processes of all registered providers. "
-                    "Applicable only for Weaver in {} mode, false otherwise.".format(WEAVER_CONFIGURATION_EMS))
-    detail = ExtendedSchemaNode(
-        Boolean(), example=True, default=True, missing=drop,
-        description="Return summary details about each process, or simply their IDs."
+                    "Paging and sorting query parameters are unavailable when providers are requested since lists are "
+                    "populated dynamically and cannot ensure consistent process lists per page across providers. "
+                    "Applicable only for Weaver configurations {}, ignored otherwise.".format(WEAVER_CONFIG_REMOTE_LIST)
+    )
+    ignore = ExtendedSchemaNode(
+        QueryBoolean(), example=True, default=True, missing=drop,
+        description="Only when listing provider processes, any unreachable remote service definitions "
+                    "or unprocessable contents will be silently ignored and dropped from full listing in the response. "
+                    "Disabling this option will raise an error immediately instead of ignoring invalid providers."
     )
 
 
@@ -3857,9 +3907,36 @@ class GetProcessesEndpoint(ExtendedMappingSchema):
     querystring = GetProcessesQuery()
 
 
+class ProviderProcessesListing(ProcessCollection):
+    _sort_first = ["id", "processes"]
+    id = ProviderNameSchema()
+
+
+class ProviderProcessesList(ExtendedSequenceSchema):
+    item = ProviderProcessesListing(description="Processes offered by the identified remote provider.")
+
+
+class ProvidersProcessesCollection(ExtendedMappingSchema):
+    providers = ProviderProcessesList(missing=drop)
+
+
+class ProcessListingMetadata(ExtendedMappingSchema):
+    description = "Metadata relative to the listed processes."
+    page = ExtendedSchemaNode(Integer(), misisng=drop, default=None, validator=Range(min=0))
+    limit = ExtendedSchemaNode(Integer(), missing=drop, default=None, validator=Range(min=1))
+    total = ExtendedSchemaNode(Integer(), description="Total number of local processes, or also including all "
+                                                      "remote processes across providers if requested.")
+    links = LinkList(missing=drop)
+
+
+class MultiProcessesListing(ProcessCollection, ProvidersProcessesCollection, ProcessListingMetadata):
+    _sort_first = ["processes"]
+    _sort_after = ["links"]
+
+
 class OkGetProcessesListResponse(ExtendedMappingSchema):
     header = ResponseHeaders()
-    body = ProcessCollection()
+    body = MultiProcessesListing()
 
 
 class OkPostProcessDeployBodySchema(ExtendedMappingSchema):
@@ -4100,11 +4177,24 @@ get_api_conformance_responses = {
 }
 get_processes_responses = {
     "200": OkGetProcessesListResponse(description="success", examples={
-        "ProcessesList": {
-            "summary": "Listing of local processes registered in Weaver.",
+        "ProcessesListing": {
+            "summary": "Listing of identifiers of local processes registered in Weaver.",
             "value": EXAMPLES["local_process_listing.json"],
+        },
+        "ProcessesDetails": {
+            "summary": "Detailed definitions of local processes registered in Weaver.",
+            "value": EXAMPLES["local_process_listing.json"],
+        },
+        "ProvidersProcessesListing": {
+            "summary": "List of identifiers combining all local and remote processes known by Weaver.",
+            "value": EXAMPLES["providers_processes_listing.json"],
+        },
+        "ProvidersProcessesDetails": {
+            "summary": "Detailed definitions Combining all local and remote processes known by Weaver.",
+            "value": EXAMPLES["providers_processes_listing.json"],
         }
     }),
+    "400": BadRequestResponseSchema(description="Error in case of invalid listing query parameters."),
     "500": InternalServerErrorResponseSchema(),
 }
 post_processes_responses = {
@@ -4231,6 +4321,7 @@ get_all_jobs_responses = {
             "value": EXAMPLES["jobs_listing.json"]
         }
     }),
+    "400": BadRequestResponseSchema(description="Error in case of invalid search query parameters."),
     "422": UnprocessableEntityResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }

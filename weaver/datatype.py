@@ -14,10 +14,12 @@ from logging import ERROR, INFO, Logger, getLevelName, getLogger
 from typing import TYPE_CHECKING
 from urllib.parse import urljoin, urlparse
 
+import colander
 import pyramid.httpexceptions
 import requests.exceptions
 from dateutil.parser import parse as dt_parse
 from docker.auth import decode_auth
+from owslib.util import ServiceException as OWSServiceException
 from owslib.wps import Process as ProcessOWS, WPSException
 from pywps import Process as ProcessWPS
 
@@ -250,14 +252,18 @@ class Service(Base):
                 # client retrieval could also be cached if recently fetched an not yet invalidated
                 self["_wps"] = _wps = get_wps_client(self.url, container=container, **kwargs)
             return _wps
-        except xml_util.ParseError as exc:
+        except (OWSServiceException, xml_util.ParseError) as exc:
             msg = "Invalid XML returned by WPS [{}] at [{}] cannot be parsed.".format(self.name, self.url)
             raise ServiceParsingError(json={"description": msg, "cause": str(exc), "error": exc.__class__.__name__})
 
-    def links(self, container, fetch=True):
-        # type: (AnySettingsContainer, bool) -> List[JSON]
+    def links(self, container, fetch=True, self_link=None):
+        # type: (AnySettingsContainer, bool, Optional[str]) -> List[JSON]
         """
-        Obtains the links relevant to the service provider.
+        Obtains the links relevant to the service :term:`Provider`.
+
+        :param container: object that helps retrieve instance details, namely the host URL.
+        :param fetch: whether to attempt retrieving more precise details from the remote provider.
+        :param self_link: name of a section that represents the current link that will be returned.
         """
         if fetch:
             wps = self.wps(container=container)
@@ -287,8 +293,8 @@ class Service(Base):
                 "type": CONTENT_TYPE_APP_JSON,
             },
             {
-                "rel": "self",
-                "title": "Service definition.",
+                "rel": self_link or "self",
+                "title": "Provider definition.",
                 "href": svc_url,
                 "hreflang": ACCEPT_LANGUAGE_EN_CA,
                 "type": CONTENT_TYPE_APP_JSON,
@@ -379,33 +385,47 @@ class Service(Base):
                     "metadata": self.metadata(container),
                 })
             return sd.ProviderSummarySchema().deserialize(data)
-        except ServiceParsingError as exc:
-            err_msg = repr(exc)
-            warnings.warn(err_msg, NonBreakingExceptionWarning)
-            LOGGER.debug(err_msg, exc_info=exc)
-            if ignore:
-                return None
-            raise
+        except colander.Invalid as exc:
+            LOGGER.error("Failed schema validation on otherwise valid parsing of provider definition.", exc_info=exc)
+            raise  # invalid schema on our side, don't ignore it
         except Exception as exc:
-            msg = "Exception occurred while fetching WPS [{}] at [{}]".format(self.name, self.url)
+            msg = "Exception occurred while fetching or parsing WPS [{}] at [{}]".format(self.name, self.url)
             err_msg = "{}: {!r}".format(msg, exc)
-            warnings.warn(err_msg, NonBreakingExceptionWarning)
             LOGGER.debug(err_msg, exc_info=exc)
             if ignore:
+                warnings.warn(err_msg, NonBreakingExceptionWarning)
                 return None
-            raise ServiceParsingError(json={"description": msg, "cause": str(exc), "error": exc.__class__.__name__})
+            if isinstance(exc, ServiceParsingError):
+                raise
+            raise ServiceParsingError(json={"description": msg, "cause": str(exc), "error": fully_qualified_name(exc)})
 
-    def processes(self, container):
-        # type: (AnySettingsContainer) -> List[Process]
+    def processes(self, container, ignore=False):
+        # type: (AnySettingsContainer, bool) -> Optional[List[Process]]
         """
         Obtains a list of remote service processes in a compatible :class:`weaver.datatype.Process` format.
 
-        Note: remote processes won't be stored to the local process storage.
+        .. note::
+            Remote processes won't be stored to the local process storage.
+
+        :param container: Employed to retrieve application settings.
+        :param ignore: Indicates if failing service retrieval/parsing should be silently discarded or raised.
+        :raises ServiceParsingError: If parsing failed and was NOT requested to be ignored.
+        :return:
+            If parsing was successful, list of converted remote service processes.
+            If parsing failed and was requested to be ignored, returns ``None`` to distinguish from empty process list.
         """
         # FIXME: support other providers (https://github.com/crim-ca/weaver/issues/130)
         if self.type.lower() not in PROCESS_WPS_TYPES:
             return []
-        wps = self.wps(container)
+        try:
+            wps = self.wps(container)
+        except ServiceParsingError as exc:
+            err_msg = repr(exc)
+            LOGGER.debug(err_msg, exc_info=exc)
+            if ignore:
+                warnings.warn(err_msg, NonBreakingExceptionWarning)
+                return None
+            raise
         settings = get_settings(container)
         return [Process.convert(process, self, settings) for process in wps.processes]
 
@@ -1018,7 +1038,7 @@ class Job(Base):
     def links(self, container=None, self_link=None):
         # type: (Optional[AnySettingsContainer], Optional[str]) -> List[JSON]
         """
-        Obtains the JSON links section of many response body for jobs.
+        Obtains the JSON links section of the response body for a :term:`Job`.
 
         If :paramref:`self_link` is provided (e.g.: `"outputs"`) the link for that corresponding item will also
         be added as `self` entry to the links. It must be a recognized job link field.
@@ -1775,7 +1795,7 @@ class Process(Base):
     def links(self, container=None):
         # type: (Optional[AnySettingsContainer]) -> JSON
         """
-        Obtains the JSON links section of many response body for the process.
+        Obtains the JSON links section of many response body for the :term:`Process`.
 
         :param container: object that helps retrieve instance details, namely the host URL.
         """

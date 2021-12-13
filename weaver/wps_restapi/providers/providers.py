@@ -23,6 +23,7 @@ from weaver.store.base import StoreServices
 from weaver.utils import get_any_id, get_settings
 from weaver.wps.utils import get_wps_client
 from weaver.wps_restapi import swagger_definitions as sd
+from weaver.wps_restapi.processes.utils import get_process_list_links
 from weaver.wps_restapi.providers.utils import check_provider_requirements, get_provider_services, get_service
 from weaver.wps_restapi.utils import get_schema_ref
 
@@ -144,7 +145,7 @@ def get_provider(request):
 
 
 @sd.provider_processes_service.get(tags=[sd.TAG_PROVIDERS, sd.TAG_PROCESSES, sd.TAG_PROVIDERS, sd.TAG_GETCAPABILITIES],
-                                   renderer=OUTPUT_FORMAT_JSON, schema=sd.ProviderEndpoint(),
+                                   renderer=OUTPUT_FORMAT_JSON, schema=sd.ProviderProcessesEndpoint(),
                                    response_schemas=sd.get_provider_processes_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 @check_provider_requirements
@@ -152,11 +153,14 @@ def get_provider_processes(request):
     """
     Retrieve available provider processes (GetCapabilities).
     """
+    detail = asbool(request.params.get("detail", True))
     provider_id = request.matchdict.get("provider_id")
     store = get_db(request).get_store(StoreServices)
     service = store.fetch_by_name(provider_id)
     processes = service.processes(request)
-    return HTTPOk(json={"processes": [p.summary() for p in processes]})
+    processes = [p.summary() if detail else p.id for p in processes]
+    links = get_process_list_links(request, paging={}, total=None, provider=service)
+    return HTTPOk(json={"processes": processes, "links": links})
 
 
 @check_provider_requirements

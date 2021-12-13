@@ -292,10 +292,24 @@ def parse_extra_options(option_str, sep=","):
 def fully_qualified_name(obj):
     # type: (Union[Any, Type[Any]]) -> str
     """
-    Obtains the ``'<module>.<name>'`` full path definition of the object to allow finding and importing it.
+    Obtains the full path definition of the object to allow finding and importing it.
+
+    For classes, functions and exceptions, the following format is returned::
+
+        module.name
+
+    The ``module`` is omitted if it is a builtin object or type.
+
+    For methods, the class is also represented, resulting in the following format::
+
+        module.class.name
     """
+    if inspect.ismethod(obj):
+        return ".".join([obj.__module__, obj.__qualname__])
     cls = obj if inspect.isclass(obj) or inspect.isfunction(obj) else type(obj)
-    return ".".join([obj.__module__, cls.__name__])
+    if "builtins" in getattr(cls, "__module__", "builtins"):  # sometimes '_sitebuiltins'
+        return cls.__name__
+    return ".".join([cls.__module__, cls.__name__])
 
 
 def now():
@@ -311,7 +325,7 @@ def now_secs():
     return int(time.time())
 
 
-def repr_json(data, force_str=True, **kwargs):
+def repr_json(data, force_string=True, **kwargs):
     # type: (Any, bool, Any) -> Union[JSON, str, None]
     """
     Ensure that the input data can be serialized as JSON to return it formatted representation as such.
@@ -322,7 +336,7 @@ def repr_json(data, force_str=True, **kwargs):
         return None
     try:
         data_str = json.dumps(data, **kwargs)
-        return data_str if force_str else data
+        return data_str if force_string else data
     except Exception:  # noqa: W0703 # nosec: B110
         return str(data)
 
