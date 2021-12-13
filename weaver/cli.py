@@ -76,7 +76,7 @@ class WeaverClient(object):
     """
     # default configuration parameters, overridable by corresponding method parameters
     monitor_timeout = 60    # maximum delay to wait for job completion
-    monitor_delta = 5       # interval between monitor pooling job status requests
+    monitor_interval = 5    # interval between monitor pooling job status requests
 
     def __init__(self, url=None):
         # type: (Optional[str]) -> None
@@ -314,8 +314,8 @@ class WeaverClient(object):
     # :param execute_async:
     #   Execute the process asynchronously (user must call :meth:`monitor` themselves,
     #   or synchronously where monitoring is done automatically until completion before returning.
-    def execute(self, process_id, inputs=None, monitor=False, timeout=None, url=None):
-        # type: (str, Optional[Union[str, JSON]], bool, Optional[int], Optional[str]) -> OperationResult
+    def execute(self, process_id, inputs=None, monitor=False, timeout=None, interval=None, url=None):
+        # type: (str, Optional[Union[str, JSON]], bool, Optional[int], Optional[int], Optional[str]) -> OperationResult
         """
         Execute a :term:`Job` for the specified :term:`Process` with provided inputs.
 
@@ -336,6 +336,8 @@ class WeaverClient(object):
             If requested, this operation will become blocking until either the completed status or timeout is reached.
         :param timeout:
             Monitoring timeout (seconds) if requested.
+        :param interval:
+            Monitoring interval (seconds) between job status polling requests.
         :param url: Instance URL if not already provided during client creation.
         :returns: results of the operation.
         """
@@ -390,7 +392,7 @@ class WeaverClient(object):
         # employ the "Location" header to be OGC-API compliant
         job_url = resp.headers.get("Location", "")
         time.sleep(1)  # small delay to ensure process execution had a chance to start before monitoring
-        return self.monitor(job_url, timeout=timeout)
+        return self.monitor(job_url, timeout=timeout, interval=interval)
 
     def status(self, job_reference, url=None):
         """
@@ -405,21 +407,21 @@ class WeaverClient(object):
         resp = request_extra("GET", job_url, headers=self._headers)
         return self._parse_result(resp)
 
-    def monitor(self, job_reference, timeout=None, delta=None, wait_for_status=STATUS_SUCCEEDED, url=None):
+    def monitor(self, job_reference, timeout=None, interval=None, wait_for_status=STATUS_SUCCEEDED, url=None):
         # type: (str, Optional[int], Optional[int], str, Optional[str]) -> OperationResult
         """
         Monitor the execution of a :term:`Job` until completion.
 
         :param job_reference: Either the full :term:`Job` status URL or only its UUID.
         :param timeout: timeout (seconds) of monitoring until completion or abort.
-        :param delta: interval (seconds) between polling monitor requests.
+        :param interval: wait interval (seconds) between polling monitor requests.
         :param wait_for_status: monitor until the requested status is reached (default: job failed or succeeded).
         :param url: Instance URL if not already provided during client creation.
         :return: result of the successful or failed job, or timeout of monitoring process.
         """
         job_id, job_url = self._parse_job_ref(job_reference, url)
         remain = timeout = timeout or self.monitor_timeout
-        delta = delta or self.monitor_delta
+        delta = interval or self.monitor_interval
         LOGGER.info("Monitoring job [%s] for %ss at intervals of %ss.", job_id, timeout, delta)
         once = True
         body = None
@@ -550,10 +552,14 @@ def add_job_ref_param(parser):
 
 def add_timeout_param(parser):
     parser.add_argument(
-        "-T", "--timeout", dest="timeout",
-        help="Timeout (seconds) of the job execution monitoring. "
+        "-T", "--timeout", dest="timeout", type=int, default=WeaverClient.monitor_timeout,
+        help="Timeout (seconds) of the job execution monitoring (default: %(default)ss). "
              "If this timeout is reached but job is still running, another call directly to the monitoring operation "
              "can be done to resume monitoring. The job execution itself will not stop in case of timeout."
+    )
+    parser.add_argument(
+        "-W", "--wait", "--interval", dest="interval", type=int, default=WeaverClient.monitor_interval,
+        help="Wait interval (seconds) between each job status polling during monitoring (default: %(default)ss)."
     )
 
 

@@ -262,7 +262,7 @@ class TestWeaverClient(WpsConfigBase):
         """
         result = self.run_execute_inputs_schema_variant("Execute_Echo_cwl_schema.yml", mock_exec=False)
         job_id = result.body["jobID"]
-        result = mocked_sub_requests(self.app, self.client.monitor, job_id, timeout=1, delta=1)
+        result = mocked_sub_requests(self.app, self.client.monitor, job_id, timeout=1, interval=1)
         assert result.success, result.text
         assert "undefined" not in result.message
         assert result.body.get("status") == STATUS_SUCCEEDED

@@ -35,7 +35,7 @@ if TYPE_CHECKING:
 class WpsConfigBase(unittest.TestCase):
     json_headers = {"Accept": CONTENT_TYPE_APP_JSON, "Content-Type": CONTENT_TYPE_APP_JSON}
     monitor_timeout = 30
-    monitor_delta = 1
+    monitor_interval = 1
     settings = {}  # type: SettingsType
 
     def __init__(self, *args, **kwargs):
@@ -106,14 +106,19 @@ class WpsConfigBase(unittest.TestCase):
     def fully_qualified_test_process_name(self):
         return fully_qualified_name(self).replace(".", "-")
 
-    def monitor_job(self, status_url, timeout=None, delta=None, return_status=False, wait_for_status=STATUS_SUCCEEDED):
-        # type: (str, Optional[int], Optional[int], bool, str) -> Dict[str, JSON]
+    def monitor_job(self,
+                    status_url,                         # type: str
+                    timeout=None,                       # type: Optional[int]
+                    interval=None,                      # type: Optional[int]
+                    return_status=False,                # type: bool
+                    wait_for_status=STATUS_SUCCEEDED,   # type: str
+                    ):                                  # type: (...) -> Dict[str, JSON]
         """
         Job polling of status URL until completion or timeout.
 
         :param status_url: URL with job ID where to monitor execution.
         :param timeout: timeout of monitoring until completion or abort.
-        :param delta: interval (seconds) between polling monitor requests.
+        :param interval: wait interval (seconds) between polling monitor requests.
         :param return_status: return final status body instead of results once job completed.
         :param wait_for_status: monitor until the requested status is reached (default: when job is completed)
         :return: result of the successful job, or the status body if requested.
@@ -130,7 +135,7 @@ class WpsConfigBase(unittest.TestCase):
 
         time.sleep(1)  # small delay to ensure process execution had a chance to start before monitoring
         left = timeout or self.monitor_timeout
-        delta = delta or self.monitor_delta
+        delta = interval or self.monitor_interval
         once = True
         resp = None
         while left >= 0 or once:
