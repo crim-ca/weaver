@@ -9,6 +9,7 @@ from argparse import ArgumentParser, Namespace
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
+from tests.utils import mocked_dismiss_process
 from weaver import __meta__
 from weaver.datatype import AutoBase
 from weaver.exceptions import PackageRegistrationError
@@ -486,6 +487,20 @@ class WeaverClient(object):
                     else:
                         outputs[output]["path"] = file_path
         return OperationResult(True, "Retrieved job results.", outputs)
+
+    @mocked_dismiss_process()
+    def dismiss(self, job_reference, url=None):
+        """
+        Dismiss pending or running :term:`Job`, or clear result artifacts from a completed :term:`Job`.
+
+        :param job_reference: Either the full :term:`Job` status URL or only its UUID.
+        :param url: Instance URL if not already provided during client creation.
+        :returns: Obtained result from the operation.
+        """
+        job_id, job_url = self._parse_job_ref(job_reference, url)
+        LOGGER.debug("Dismissing job: [%s]", job_id)
+        resp = request_extra("DELETE", job_url, headers=self._headers)
+        return self._parse_result(resp)
 
 
 def setup_logger_from_options(logger, args):  # pragma: no cover

@@ -508,7 +508,7 @@ def cancel_job(request):
     job = get_job(request)
     job = dismiss_job_task(job, request)
     return HTTPOk(json={
-        "jobID": job.id,
+        "jobID": str(job.id),
         "status": job.status,
         "message": job.status_message,
         "percentCompleted": job.progress,

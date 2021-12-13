@@ -16,7 +16,7 @@ from tests.functional.utils import WpsConfigBase
 from tests.utils import get_weaver_url, mocked_execute_process, mocked_sub_requests, mocked_wps_output
 from weaver.cli import WeaverClient
 from weaver.formats import CONTENT_TYPE_TEXT_PLAIN
-from weaver.status import STATUS_ACCEPTED, STATUS_SUCCEEDED
+from weaver.status import STATUS_ACCEPTED, STATUS_FAILED, STATUS_RUNNING, STATUS_SUCCEEDED
 
 
 @pytest.mark.cli
@@ -153,11 +153,11 @@ class TestWeaverClient(WpsConfigBase):
         result = mocked_sub_requests(self.app, self.client.undeploy, other_process)
         assert result.success
         assert result.body.get("undeploymentDone", None) is True
+        assert "undefined" not in result.message
 
         path = f"/processes/{other_process}"
         resp = mocked_sub_requests(self.app, "get", path, expect_errors=True)
         assert resp.status_code == 404
-        assert "undefined" not in result.message
 
     def test_describe(self):
         result = mocked_sub_requests(self.app, self.client.describe, self.test_process)
@@ -313,3 +313,13 @@ class TestWeaverClient(WpsConfigBase):
         #   Test should wrap 'get_job' in 'get_job_status' view (or similar wrapping approach) to validate that
         #   status was periodically pooled and returned 'running' until the final 'succeeded' resumes to download.
         raise NotImplementedError
+
+    def test_dismiss(self):
+        for status in [STATUS_ACCEPTED, STATUS_FAILED, STATUS_RUNNING, STATUS_SUCCEEDED]:
+            job = self.job_store.save_job(task_id="12345678-1111-2222-3333-111122223333", process=self.test_process)
+            job.status = status
+            job = self.job_store.update_job(job)
+            result = mocked_sub_requests(self.app, self.client.dismiss, str(job.id))
+            assert result.success
+            assert "undefined" not in result.message
+
