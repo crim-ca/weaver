@@ -1,5 +1,6 @@
 import base64
 import copy
+import inspect
 import json
 import logging
 import os
@@ -89,12 +90,7 @@ class WeaverClient(object):
             LOGGER.warning("No URL provided. All operations must provide it directly or through another parameter!")
         self._headers = {"Accept": CONTENT_TYPE_APP_JSON, "Content-Type": CONTENT_TYPE_APP_JSON}
         self._settings = {
-            "weaver.request_options": {
-                "requests": [
-                    {"url": "http://localhost:4002",
-                     "timeout": 1000}
-                ]
-            }
+            "weaver.request_options": {}
         }  # FIXME: load from INI, overrides as input (cumul arg '--setting weaver.x=value') ?
 
     def _get_url(self, url):
@@ -405,7 +401,7 @@ class WeaverClient(object):
         """
         job_id, job_url = self._parse_job_ref(job_reference, url)
         LOGGER.info("Getting job status: [%s]", job_id)
-        resp = request_extra("GET", job_url, headers=self._headers)
+        resp = request_extra("GET", job_url, headers=self._headers, settings=self._settings)
         return self._parse_result(resp)
 
     def monitor(self, job_reference, timeout=None, interval=None, wait_for_status=STATUS_SUCCEEDED, url=None):
@@ -427,7 +423,7 @@ class WeaverClient(object):
         once = True
         body = None
         while remain >= 0 or once:
-            resp = request_extra("GET", job_url, headers=self._headers)
+            resp = request_extra("GET", job_url, headers=self._headers, settings=self._settings)
             if resp.status_code != 200:
                 return OperationResult(False, "Could not find job with specified reference.", {"job": job_reference})
             body = resp.json()
@@ -459,7 +455,7 @@ class WeaverClient(object):
         # use results endpoint instead of outputs to be OGC-API compliant, should be able to target non-Weaver instance
         # with this endpoint, outputs IDs are directly at the root of the body
         result_url = f"{job_url}/results"
-        resp = request_extra("GET", result_url, headers=self._headers)
+        resp = request_extra("GET", result_url, headers=self._headers, settings=self._settings)
         res_out = self._parse_result(resp)
         outputs = res_out.body
         if not res_out.success or not isinstance(res_out.body, dict):
@@ -499,7 +495,7 @@ class WeaverClient(object):
         """
         job_id, job_url = self._parse_job_ref(job_reference, url)
         LOGGER.debug("Dismissing job: [%s]", job_id)
-        resp = request_extra("DELETE", job_url, headers=self._headers)
+        resp = request_extra("DELETE", job_url, headers=self._headers, settings=self._settings)
         return self._parse_result(resp)
 
 
