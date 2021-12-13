@@ -297,7 +297,7 @@ class QueryBoolean(Boolean):
     def __init__(self, *_, **__):
         super(QueryBoolean, self).__init__(
             allow_string=True,
-            false_choices=("False", "false", "0", "off", "no", "null"),
+            false_choices=("False", "false", "0", "off", "no", "null", "Null", "none", "None", ""),
             true_choices=("True", "true", "1", "on", "yes")
         )
 
