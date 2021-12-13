@@ -154,6 +154,18 @@ DEFAULT_FORMAT = Format(mime_type=CONTENT_TYPE_TEXT_PLAIN)
 DEFAULT_FORMAT_MISSING = "__DEFAULT_FORMAT_MISSING__"
 setattr(DEFAULT_FORMAT, DEFAULT_FORMAT_MISSING, True)
 
+INPUT_VALUE_TYPE_MAPPING = {
+    "bool": bool,
+    "boolean": bool,
+    "file": str,
+    "File": str,
+    "float": float,
+    "int": int,
+    "integer": int,
+    "str": str,
+    "string": str,
+}
+
 LOGGER = logging.getLogger(__name__)
 
 
@@ -1003,6 +1015,50 @@ def cwl2json_input_values(data, schema=PROCESS_SCHEMA_OGC):
             input_value = input_value[input_key]
             input_list.append({"id": input_id, input_key: input_value})
     return input_list
+
+
+def repr2json_input_values(inputs):
+    # type: (List[str]) -> List[JSON]
+    """
+    Converts inputs in string representation to corresponding :term:`JSON` values.
+
+    Expected format is as follows:
+
+    .. code-block:: text
+
+        input_id[:input_type]=input_value[;input_array]
+
+    Where:
+        - ``input_id`` represents the target identifier of the input
+        - ``input_type`` represents the conversion type, as required
+          (includes ``File`` for ``href`` instead of ``value`` key in resulting object)
+        - ``input_value`` represents the desired value subject to conversion by ``input_type``
+        - ``input_array`` represents any additional values for array-like inputs (``maxOccurs > 1``)
+
+    :param inputs: list of string inputs to parse.
+    :return: parsed inputs if successful.
+    """
+    values = []
+    for str_input in inputs:
+        str_id, str_val = str_input.split("=")
+        str_id_typ = str_id.split(":")
+        if len(str_id_typ) == 2:
+            str_id, str_typ = str_id_typ
+        elif len(str_id_typ) != 1:
+            raise ValueError(f"Invalid input value ID representation. Must be 'ID[:TYPE]' for '{str_id!s}'.")
+        else:
+            str_typ = "string"
+        val_typ = any2cwl_literal_datatype(str_typ)
+        if not str_id or (val_typ is null and str_typ not in INPUT_VALUE_TYPE_MAPPING):
+            raise ValueError(f"Invalid input value ID representation. "
+                             f"Missing or unknown 'ID[:type]' parts after resolution as '{str_id!s}:{str_typ!s}'.")
+        map_typ = val_typ if val_typ is not null else str_typ
+        arr_val = str_val.split(";")
+        arr_typ = INPUT_VALUE_TYPE_MAPPING[map_typ]
+        arr_val = [arr_typ(val) for val in arr_val]
+        val_key = "href" if str_typ in ["file", "File"] else "value"
+        values.append({"id": str_id, val_key: arr_val if ";" in str_val else arr_val[0]})
+    return values
 
 
 def any2cwl_literal_datatype(io_type):

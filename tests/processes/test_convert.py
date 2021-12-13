@@ -27,7 +27,8 @@ from weaver.processes.convert import (
     json2wps_allowed_values,
     json2wps_datatype,
     merge_io_formats,
-    normalize_ordered_io
+    normalize_ordered_io,
+    repr2json_input_values
 )
 from weaver.utils import null
 
@@ -697,4 +698,33 @@ def test_cwl2json_input_values_old_format():
         {"id": "test8", "href": "/tmp/other.txt"}
     ]
     result = cwl2json_input_values(values, PROCESS_SCHEMA_OLD)
+    assert result == expect
+
+
+def test_repr2json_input_values():
+    values = [
+        "test1=value",
+        "test2:int=1",
+        "test3:float=1.23",
+        "test4:File=/tmp/random.txt",
+        "test5=val1;val2",
+        "test6:int=1;2",
+        "test7:float=1.23;4.56",
+        "test8:file=/tmp/other.txt",
+        "test9:str=short",
+        "test10:string=long",
+    ]
+    expect = [
+        {"id": "test1", "value": "value"},
+        {"id": "test2", "value": 1},
+        {"id": "test3", "value": 1.23},
+        {"id": "test4", "href": "/tmp/random.txt"},
+        {"id": "test5", "value": ["val1", "val2"]},
+        {"id": "test6", "value": [1, 2]},
+        {"id": "test7", "value": [1.23, 4.56]},
+        {"id": "test8", "href": "/tmp/other.txt"},
+        {"id": "test9", "value": "short"},
+        {"id": "test10", "value": "long"}
+    ]
+    result = repr2json_input_values(values)
     assert result == expect

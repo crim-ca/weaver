@@ -1,3 +1,4 @@
+import argparse
 import base64
 import copy
 import inspect
@@ -5,7 +6,6 @@ import logging
 import os
 import sys
 import time
-from argparse import ArgumentParser, Namespace
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
@@ -15,7 +15,7 @@ from weaver.datatype import AutoBase
 from weaver.exceptions import PackageRegistrationError
 from weaver.execute import EXECUTE_MODE_ASYNC, EXECUTE_RESPONSE_DOCUMENT, EXECUTE_TRANSMISSION_MODE_VALUE
 from weaver.formats import CONTENT_TYPE_APP_JSON
-from weaver.processes.convert import cwl2json_input_values
+from weaver.processes.convert import cwl2json_input_values, repr2json_input_values
 from weaver.processes.wps_package import get_process_definition
 from weaver.status import JOB_STATUS_CATEGORIES, JOB_STATUS_CATEGORY_FINISHED, STATUS_SUCCEEDED
 from weaver.utils import fetch_file, get_any_id, get_any_value, load_file, null, repr_json, request_extra, setup_loggers
@@ -319,6 +319,46 @@ class WeaverClient(object):
         resp = request_extra("GET", path, headers=self._headers, settings=self._settings)
         return self._parse_result(resp)
 
+    @staticmethod
+    def _parse_inputs(inputs):
+        # type: (Optional[Union[str, JSON]]) -> Union[OperationResult, JSON]
+        try:
+            if isinstance(inputs, str):
+                # loaded inputs could be mapping or listing format (any schema: CWL, OGC, OLD)
+                inputs = load_file(inputs) if inputs != "" else []
+            if not inputs or not isinstance(inputs, (dict, list)):
+                return OperationResult(False, "No inputs or invalid schema provided.", inputs)
+            if isinstance(inputs, list):
+                # list of literals from CLI
+                if any("=" in value for value in inputs):
+                    inputs = repr2json_input_values(inputs)
+                # list of single file from CLI (because of 'nargs')
+                elif len(inputs) == 1 and "=" not in inputs[0]:
+                    inputs = load_file(inputs[0])
+                elif len(inputs) == 1 and inputs[0] == "":
+                    inputs = []
+            if isinstance(inputs, list):
+                inputs = {"inputs": inputs}  # OLD format provided directly
+            # consider possible ambiguity if literal CWL input is named 'inputs'
+            # - if value of 'inputs' is an object, it can collide with 'OGC' schema,
+            #   unless 'value/href' are present or their sub-dict don't have CWL 'class'
+            # - if value of 'inputs' is an array, it can collide with 'OLD' schema,
+            #   unless 'value/href' (and 'id' technically) are present
+            values = inputs.get("inputs", null)
+            if (
+                values is null or
+                values is not null and (
+                    (isinstance(values, dict) and get_any_value(values) is null and "class" not in values) or
+                    (isinstance(values, list) and all(isinstance(v, dict) and get_any_value(v) is null for v in values))
+                )
+            ):
+                values = cwl2json_input_values(inputs)
+            if values is null:
+                raise ValueError("Input values parsed as null. Could not properly detect employed schema.")
+        except Exception as exc:
+            return OperationResult(False, f"Failed inputs parsing with error: [{exc!s}].", inputs)
+        return values
+
     # FIXME: support sync (https://github.com/crim-ca/weaver/issues/247)
     # :param execute_async:
     #   Execute the process asynchronously (user must call :meth:`monitor` themselves,
@@ -350,26 +390,9 @@ class WeaverClient(object):
         :param url: Instance URL if not already provided during client creation.
         :returns: results of the operation.
         """
-        if isinstance(inputs, str):
-            inputs = load_file(inputs)
-        if not inputs or not isinstance(inputs, (dict, list)):
-            return OperationResult(False, "No inputs or invalid schema provided.", inputs)
-        if isinstance(inputs, list):  # OLD format provided directly
-            inputs = {"inputs": inputs}
-        # consider possible ambiguity if literal CWL input is named 'inputs'
-        # - if value of 'inputs' is an object, it can collide with 'OGC' schema,
-        #   unless 'value/href' are present or their sub-dict don't have CWL 'class'
-        # - if value of 'inputs' is an array, it can collide with 'OLD' schema,
-        #   unless 'value/href' (and 'id' technically) are present
-        values = inputs.get("inputs", null)
-        if (
-            values is null or
-            values is not null and (
-                (isinstance(values, dict) and get_any_value(values) is null and "class" not in values) or
-                (isinstance(values, list) and all(isinstance(v, dict) and get_any_value(v) is null for v in values))
-            )
-        ):
-            values = cwl2json_input_values(inputs)
+        values = self._parse_inputs(inputs)
+        if isinstance(values, OperationResult):
+            return values
         data = {
             # NOTE: since sync is not yet properly implemented in Weaver, simulate with monitoring after if requested
             # FIXME: support 'sync' (https://github.com/crim-ca/weaver/issues/247)
@@ -513,7 +536,7 @@ class WeaverClient(object):
 
 
 def setup_logger_from_options(logger, args):  # pragma: no cover
-    # type: (logging.Logger, Namespace) -> None
+    # type: (logging.Logger, argparse.Namespace) -> None
     """
     Uses argument parser options to setup logging level from specified flags.
 
@@ -535,7 +558,7 @@ def setup_logger_from_options(logger, args):  # pragma: no cover
 
 
 def make_logging_options(parser):
-    # type: (ArgumentParser) -> None
+    # type: (argparse.ArgumentParser) -> None
     """
     Defines argument parser options for logging operations.
     """
@@ -587,12 +610,37 @@ def add_timeout_param(parser):
     )
 
 
+class InputsFormatter(argparse.HelpFormatter):
+    def _format_action(self, action):
+        """
+        Override the returned help message with available options and shortcuts for email template selection.
+        """
+        if action.dest != "inputs":
+            return super(InputsFormatter, self)._format_action(action)
+        indent_size = min(self._action_max_length + 2, self._max_help_position)  # see _format_action
+        indent_text = indent_size * " "
+        sep = "\n\n"
+        paragraphs = action.help.split(sep)
+        last_index = len(paragraphs) - 1
+        help_text = ""
+        for i, block in enumerate(paragraphs):
+            # process each paragraph individually so it fills the available width space
+            # then remove option information line to keep only formatted text and indent the line for next one
+            action.help = block
+            help_block = super(InputsFormatter, self)._format_action(action)
+            option_idx = help_block.find("\n") if i else 0  # leave option detail on first paragraph
+            help_space = (indent_text if i != last_index else sep)  # don't indent last, next param has it already
+            help_text += help_block[option_idx:] + help_space
+        return help_text
+
+
 def make_parser():
-    # type: () -> ArgumentParser
+    # type: () -> argparse.ArgumentParser
     """
     Generate the CLI parser.
     """
-    parser = ArgumentParser(prog=__meta__.__name__, description="Run {} operations.".format(__meta__.__title__))
+    desc = "Run {} operations.".format(__meta__.__title__)
+    parser = argparse.ArgumentParser(prog=__meta__.__name__, description=desc)
     parser._optionals.title = "Optional Arguments"
     parser.add_argument(
         "--version", "-V",
@@ -656,13 +704,39 @@ def make_parser():
     add_url_param(op_describe)
     add_process_param(op_describe)
 
-    op_execute = ops_parsers.add_parser("execute", help="Submit a job execution for an existing process.")
+    op_execute = ops_parsers.add_parser(
+        "execute", formatter_class=InputsFormatter,
+        help="Submit a job execution for an existing process."
+    )
     add_url_param(op_execute)
     add_process_param(op_execute)
-    # FIXME: support cumulative inputs for convenience? (ex: '-I input=value -I array=1,2 -I other=http://file')
     op_execute.add_argument(
-        "-I", "--inputs", dest="inputs",
-        help="File path or URL reference to JSON or YAML contents defining job inputs with OGC-API or CWL schema."
+        "-I", "--inputs", dest="inputs", nargs="+",
+        # note: below is formatted using 'InputsFormatter' with detected paragraphs
+        help=inspect.cleandoc("""
+            Literal input definitions, or a file path or URL reference to JSON or YAML
+            contents defining job inputs with OGC-API or CWL schema. This parameter is required.
+            
+            To provide inputs using a file reference, refer to relevant CWL Job schema or API request schema 
+            for selected format. Both mapping and listing formats are supported.
+            
+            To execute a process without any inputs (e.g.: using its defaults),
+            supply an explicit empty input (i.e.: -I "" or loaded from file as {}). 
+            
+            To provide inputs using literal command-line definitions, inputs should be specified using '<id>=<value>' 
+            convention, with distinct -I options for each applicable input value. 
+            
+            Values that require other type than string to be converted for job submission can include the type 
+            following the ID using a colon separator (i.e.: '<id>:<type>=<value>'). For example, an integer could be
+            specified as follows: 'number:int=1' while a floating point would be: 'number:float=1.23'. 
+            
+            File references (href) should be specified using 'File' as the type (i.e.: 'input:File=http://...').  
+            
+            Array input (maxOccurs > 1) should be specified using semicolon (;) separated values. 
+            The type of an item of this array can also be provided (i.e.: 'array:int=1;2;3').
+            
+            Example: -I message='Hello Weaver' -I value:int=1234
+        """)
     )
     # FIXME: support sync (https://github.com/crim-ca/weaver/issues/247)
     # op_execute.add_argument(

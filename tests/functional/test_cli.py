@@ -231,6 +231,9 @@ class TestWeaverClient(WpsConfigBase):
     def test_execute_inputs_old_listing_literal_schema(self):
         self.run_execute_inputs_schema_variant("Execute_Echo_old_listing_schema.yml", preload=True)
 
+    def test_execute_inputs_representation_literal_schema(self):
+        self.run_execute_inputs_schema_variant(["message='hello world'"], preload=True)
+
     def test_execute_inputs_invalid(self):
         """
         Mostly check that errors don't raise an error in the client, but are handled and gracefully return a result.
