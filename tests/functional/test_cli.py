@@ -322,4 +322,3 @@ class TestWeaverClient(WpsConfigBase):
             result = mocked_sub_requests(self.app, self.client.dismiss, str(job.id))
             assert result.success
             assert "undefined" not in result.message
-
