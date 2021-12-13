@@ -151,7 +151,8 @@ if TYPE_CHECKING:
         "netloc": str,                   # where to send OpenSearch request
         "collection_id": Optional[str],  # OpenSearch collection ID to match against
         "default": Optional[bool],       # default ADES when no match was possible (single one allowed)
-        "accept_schemes": List[str],     # URL schemes (http, https, etc.)
+        "accept_schemes": Optional[List[str]],     # allowed URL schemes (http, https, etc.)
+        "mime_types": Optional[List[str]],         # allowed Media-Types (text/xml, application/json, etc.)
         "rootdir": str,                  # root position of the data to retrieve
         "osdd_url": str,                 # global OpenSearch description document to employ
     }, total=True)

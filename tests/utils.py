@@ -301,6 +301,15 @@ def init_weaver_service(registry):
     }))
 
 
+def get_links(resp_links):
+    nav_links = ["up", "current", "next", "prev", "first", "last", "search", "alternate", "collection"]
+    link_dict = {rel: None for rel in nav_links}
+    for _link in resp_links:
+        if _link["rel"] in link_dict:
+            link_dict[_link["rel"]] = _link["href"]
+    return link_dict
+
+
 def mocked_file_response(path, url):
     # type: (str, str) -> Union[Response, HTTPException]
     """

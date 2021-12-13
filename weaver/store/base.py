@@ -72,8 +72,13 @@ class StoreProcesses(StoreInterface):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def list_processes(self, visibility=None):
-        # type: (Optional[str]) -> List[Process]
+    def list_processes(self,
+                       visibility=None,     # type: Optional[str]
+                       page=None,           # type: Optional[int]
+                       limit=None,          # type: Optional[int]
+                       sort=None,           # type: Optional[str]
+                       total=False,         # type: bool
+                       ):                   # type: (...) -> Union[List[Process], Tuple[List[Process], int]]
         raise NotImplementedError
 
     @abc.abstractmethod

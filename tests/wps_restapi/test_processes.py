@@ -1,3 +1,5 @@
+# pylint: disable=R1729  # ignore non-generator representation employed for displaying test log results
+
 import base64
 import contextlib
 import copy
@@ -13,6 +15,7 @@ import stopit
 
 from tests import resources
 from tests.utils import (
+    get_links,
     get_test_weaver_app,
     mocked_execute_process,
     mocked_process_job_runner,
@@ -20,9 +23,10 @@ from tests.utils import (
     mocked_remote_server_requests_wps1,
     setup_config_with_mongodb,
     setup_mongodb_jobstore,
-    setup_mongodb_processstore
+    setup_mongodb_processstore,
+    setup_mongodb_servicestore
 )
-from weaver.datatype import AuthenticationTypes
+from weaver.datatype import AuthenticationTypes, Process, Service
 from weaver.exceptions import JobNotFound, ProcessNotFound
 from weaver.execute import (
     EXECUTE_CONTROL_OPTION_ASYNC,
@@ -37,7 +41,7 @@ from weaver.formats import ACCEPT_LANGUAGE_FR_CA, CONTENT_TYPE_APP_JSON
 from weaver.processes.constants import PROCESS_SCHEMA_OLD
 from weaver.processes.wps_testing import WpsTestProcess
 from weaver.status import STATUS_ACCEPTED
-from weaver.utils import fully_qualified_name, ows_context_href
+from weaver.utils import fully_qualified_name, get_path_kvp, ows_context_href
 from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC
 from weaver.wps.utils import get_wps_url
 from weaver.wps_restapi import swagger_definitions as sd
@@ -51,15 +55,16 @@ if TYPE_CHECKING:
 # pylint: disable=C0103,invalid-name
 class WpsRestApiProcessesTest(unittest.TestCase):
     remote_server = None
+    settings = None
     config = None
 
     @classmethod
     def setUpClass(cls):
-        settings = {
+        cls.settings = {
             "weaver.url": "https://localhost",
             "weaver.wps_path": "/ows/wps",
         }
-        cls.config = setup_config_with_mongodb(settings=settings)
+        cls.config = setup_config_with_mongodb(settings=cls.settings)
         cls.app = get_test_weaver_app(config=cls.config)
         cls.json_headers = {"Accept": CONTENT_TYPE_APP_JSON, "Content-Type": CONTENT_TYPE_APP_JSON}
 
@@ -72,6 +77,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
 
     def setUp(self):
         # rebuild clean db on each test
+        self.service_store = setup_mongodb_servicestore(self.config)
         self.process_store = setup_mongodb_processstore(self.config)
         self.job_store = setup_mongodb_jobstore(self.config)
 
@@ -179,19 +185,213 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
         assert resp.content_type == CONTENT_TYPE_APP_JSON
-        assert "processes" in resp.json and isinstance(resp.json["processes"], list) and len(resp.json["processes"]) > 0
+        assert "processes" in resp.json
+        assert isinstance(resp.json["processes"], list) and len(resp.json["processes"]) > 0
         for process in resp.json["processes"]:
             assert "id" in process and isinstance(process["id"], str)
             assert "title" in process and isinstance(process["title"], str)
             assert "version" in process and isinstance(process["version"], str)
             assert "keywords" in process and isinstance(process["keywords"], list)
             assert "metadata" in process and isinstance(process["metadata"], list)
-            assert len(process["jobControlOptions"]
-                       ) == 1 and EXECUTE_CONTROL_OPTION_ASYNC in process["jobControlOptions"]
+            assert len(process["jobControlOptions"]) == 1
+            assert EXECUTE_CONTROL_OPTION_ASYNC in process["jobControlOptions"]
 
         processes_id = [p["id"] for p in resp.json["processes"]]
         assert self.process_public.identifier in processes_id
         assert self.process_private.identifier not in processes_id
+
+    def test_get_processes_with_paging(self):
+        test_prefix = "test-proc-temp"
+        for i in range(10):
+            p_id = "{}-{}".format(test_prefix, i)
+            proc = self.process_private = Process(id=p_id, package={}, visibility=VISIBILITY_PUBLIC)
+            self.process_store.save_process(proc)
+        _, total = self.process_store.list_processes(total=True, visibility=VISIBILITY_PUBLIC)
+        assert 10 < total < 15, "cannot run process paging test with current number of processes"
+        limit = 5  # some value to get 3 pages, 2 full and the last partial
+        remain = total - (2 * limit)
+        limit_kvp = "limit={}".format(limit)
+
+        path = get_path_kvp("/processes", page=1, limit=limit)
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        assert "processes" in resp.json
+        processes = resp.json["processes"]
+        assert isinstance(processes, list)
+        assert resp.json["total"] == total
+
+        base_url = self.settings["weaver.url"]
+        proc_url = base_url + "/processes"
+        assert len(resp.json["processes"]) == limit
+        assert "links" in resp.json
+        links = get_links(resp.json["links"])
+        assert links["collection"] == proc_url
+        assert links["search"] == proc_url
+        assert links["up"] == base_url
+        assert links["current"].startswith(proc_url) and limit_kvp in links["current"] and "page=1" in links["current"]
+        assert links["prev"].startswith(proc_url) and limit_kvp in links["prev"] and "page=0" in links["prev"]
+        assert links["next"].startswith(proc_url) and limit_kvp in links["next"] and "page=2" in links["next"]
+        assert links["first"].startswith(proc_url) and limit_kvp in links["first"] and "page=0" in links["first"]
+        assert links["last"].startswith(proc_url) and limit_kvp in links["last"] and "page=2" in links["last"]
+
+        path = get_path_kvp("/processes", page=0, limit=limit)
+        resp = self.app.get(path, headers=self.json_headers)
+        assert len(resp.json["processes"]) == limit
+        assert "links" in resp.json
+        links = get_links(resp.json["links"])
+        assert links["collection"] == proc_url
+        assert links["search"] == proc_url
+        assert links["up"] == base_url
+        assert links["current"].startswith(proc_url) and limit_kvp in links["current"] and "page=0" in links["current"]
+        assert links["prev"] is None
+        assert links["next"].startswith(proc_url) and limit_kvp in links["next"] and "page=1" in links["next"]
+        assert links["first"].startswith(proc_url) and limit_kvp in links["first"] and "page=0" in links["first"]
+        assert links["last"].startswith(proc_url) and limit_kvp in links["last"] and "page=2" in links["last"]
+
+        path = get_path_kvp("/processes", page=2, limit=limit)
+        resp = self.app.get(path, headers=self.json_headers)
+        assert len(resp.json["processes"]) == remain, "Last page should have only remaining processes."
+        assert "links" in resp.json
+        links = get_links(resp.json["links"])
+        assert links["collection"] == proc_url
+        assert links["search"] == proc_url
+        assert links["up"] == base_url
+        assert links["current"].startswith(proc_url) and limit_kvp in links["current"] and "page=2" in links["current"]
+        assert links["prev"].startswith(proc_url) and limit_kvp in links["prev"] and "page=1" in links["prev"]
+        assert links["next"] is None
+        assert links["first"].startswith(proc_url) and limit_kvp in links["first"] and "page=0" in links["first"]
+        assert links["last"].startswith(proc_url) and limit_kvp in links["last"] and "page=2" in links["last"]
+
+    def test_get_processes_page_out_of_range(self):
+        # ensure we have few items to list
+        for i in range(10):
+            proc = Process(id=f"test-process-paging-{i}", package={}, visibility=VISIBILITY_PUBLIC)
+            self.process_store.save_process(proc)
+        resp = self.app.get(sd.processes_service.path, headers=self.json_headers)
+        total = resp.json["total"]
+        limit = total // 2
+        max_limit = 1 if 2 * limit == total else 2  # exact match or last page remainder
+        bad_page = 4
+
+        path = get_path_kvp(sd.processes_service.path, page=bad_page, limit=limit)
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 400
+        assert "IndexError" in resp.json["error"]
+        assert f"[0,{max_limit}]" in resp.json["description"]
+        assert "page" in resp.json["value"] and resp.json["value"]["page"] == bad_page
+
+        # note:
+        #   Following errors are generated by schema validators (page min=0, limit min=1) rather than above explicit
+        #   checks. They don't provide the range because the error can apply to more than just paging failing value
+        #   is still explicitly reported though. Because comparisons happen at query param level, it reports str values.
+
+        path = get_path_kvp(sd.processes_service.path, page=-1, limit=limit)
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 400
+        assert resp.json["code"] == "ProcessInvalidParameter"
+        assert "page" in str(resp.json["cause"]) and "less than minimum" in str(resp.json["cause"])
+        assert "page" in resp.json["value"] and resp.json["value"]["page"] == str(-1)
+
+        path = get_path_kvp(sd.processes_service.path, page=0, limit=0)
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 400
+        assert resp.json["code"] == "ProcessInvalidParameter"
+        assert "limit" in str(resp.json["cause"]) and "less than minimum" in str(resp.json["cause"])
+        assert "limit" in resp.json["value"] and resp.json["value"]["limit"] == str(0)
+
+    def test_get_processes_bad_request_paging_providers(self):
+        path = get_path_kvp("/processes", page=0, limit=10, providers=True)
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 400
+        assert "ListingInvalidParameter" in resp.json["error"]
+
+    @mocked_remote_server_requests_wps1([
+        resources.TEST_REMOTE_SERVER_URL,
+        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
+        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
+    ])
+    def test_get_processes_with_providers(self):
+        test_svc_id = "test-provider-processes-listing"
+        test_svc = Service(name=test_svc_id, url=resources.TEST_REMOTE_SERVER_URL)
+        self.service_store.save_service(test_svc)
+        _, total = self.process_store.list_processes(total=True, visibility=VISIBILITY_PUBLIC)
+
+        path = get_path_kvp("/processes", providers=True, detail=False)
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert "processes" in resp.json and isinstance(resp.json["processes"], list)
+        assert "providers" in resp.json and isinstance(resp.json["providers"], list)
+        assert all(isinstance(proc, str) for proc in resp.json["processes"])
+        assert all(isinstance(prov, dict) for prov in resp.json["providers"])
+        assert len(resp.json["processes"]) == total
+        assert len(resp.json["providers"]) == 1
+        prov = resp.json["providers"][0]
+        assert "id" in prov and prov["id"] == test_svc_id
+        assert "processes" in prov and isinstance(prov["processes"], list)
+        assert all(isinstance(proc, str) for proc in prov["processes"])
+        assert len(prov["processes"]) == 2  # number of descriptions in TEST_REMOTE_PROCESS_GETCAP_WPS1_XML
+        assert set(prov["processes"]) == {"pavicstestdocs", "test-remote-process-wps1"}
+        assert resp.json["total"] == total + 2, "Grand total of local+remote processes should be reported."
+
+    # register valid server here, and another invalid within test
+    @mocked_remote_server_requests_wps1([
+        resources.TEST_REMOTE_SERVER_URL,
+        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
+        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
+    ])
+    def test_get_processes_with_providers_error_servers(self, mock_responses):
+        # register service reachable but returning invalid XML
+        invalid_id = "test-provider-process-listing-invalid"
+        invalid_url = resources.TEST_REMOTE_SERVER_URL + "/invalid"
+        invalid_data = "<xml> not a wps </xml>"
+        mocked_remote_server_requests_wps1([invalid_url, invalid_data, []], mock_responses, data=True)
+
+        # register a provider that doesn't have any responding server
+        missing_id = "test-provider-process-listing-missing"
+        missing_url = resources.TEST_REMOTE_SERVER_URL + "/does-not-exist"
+
+        valid_id = "test-provider-process-listing-valid"
+        self.service_store.clear_services()
+        self.service_store.save_service(Service(name=valid_id, url=resources.TEST_REMOTE_SERVER_URL))
+        self.service_store.save_service(Service(name=invalid_id, url=invalid_url))
+        self.service_store.save_service(Service(name=missing_id, url=missing_url))
+
+        # with ignore flag and no detail, failing providers are not validated and operation returns successfully
+        # - servers that respond successfully with any content are kept (even if not valid WPS)
+        # - servers without responses (cannot ping) are dropped from response
+        path = get_path_kvp("/processes", providers=True, detail=False, ignore=True)
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert "providers" in resp.json
+        assert len(resp.json["providers"]) == 2
+        providers = [prov["id"] for prov in resp.json["providers"]]
+        assert set(providers) == {valid_id, invalid_id}
+        valid_processes = resp.json["providers"][providers.index(valid_id)]["processes"]
+        invalid_processes = resp.json["providers"][providers.index(invalid_id)]["processes"]
+        assert set(valid_processes) == {"pavicstestdocs", "test-remote-process-wps1"}
+        assert invalid_processes == []
+
+        # with ignore and detail requested, providers must be parsed to obtain the extra metadata
+        # invalid parsing should now also be dropped and return successfully with only the valid provider
+        path = get_path_kvp("/processes", providers=True, detail=True, ignore=True)
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert len(resp.json["providers"]) == 1
+        assert resp.json["providers"][0]["id"] == valid_id
+        prov_proc_info = resp.json["providers"][0]["processes"]
+        assert all(isinstance(proc, dict) for proc in prov_proc_info)
+        expected_fields = ["id", "title", "version", "description", "keywords", "metadata", "executeEndpoint"]
+        assert all([all([field in proc for field in expected_fields]) for proc in prov_proc_info])
+        prov_proc_id = [proc["id"] for proc in prov_proc_info]
+        assert set(prov_proc_id) == {"pavicstestdocs", "test-remote-process-wps1"}
+
+        # with ignore disabled, regardless of detail flag, error should be raised instead
+        # whole listing fails because at least one provider cannot be generated properly
+        for detail in [True, False]:
+            path = get_path_kvp("/processes", providers=True, detail=detail, ignore=False)
+            resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+            assert resp.status_code == 503, "Parsing error should mark service as unavailable."
 
     def test_set_jobControlOptions_async_execute(self):
         path = "/processes"

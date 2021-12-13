@@ -150,7 +150,7 @@ class WpsRestApiProvidersTest(WpsProviderBase):
         assert resp.status_code == 422, "Unprocessable response expected for invalid XML"
         assert unresponsive_id in resp.json["description"]
         assert "not accessible" in resp.json["cause"]
-        assert resp.json["error"] == "ConnectionError", "Expected service to have trouble retrieving metadata"
+        assert "ConnectionError" in resp.json["error"], "Expected service to have trouble retrieving metadata"
 
         # remove 'unresponsive' service, and recheck, service 'invalid' should now be the problematic one
         self.service_store.delete_service(unresponsive_id)
@@ -158,7 +158,7 @@ class WpsRestApiProvidersTest(WpsProviderBase):
         assert resp.status_code == 422, "Unprocessable response expected for invalid XML"
         assert invalid_id in resp.json["description"]
         assert "attribute" in resp.json["cause"]
-        assert resp.json["error"] == "AttributeError", "Expected service to have trouble parsing metadata"
+        assert "AttributeError" in resp.json["error"], "Expected service to have trouble parsing metadata"
 
         # remove 'unresponsive' service, and recheck, now all services are valid/recoverable without error
         self.service_store.delete_service(invalid_id)
@@ -202,7 +202,7 @@ class WpsRestApiProvidersTest(WpsProviderBase):
         assert resp.status_code == 422, "Unprocessable response expected for invalid XML"
         assert unresponsive_id in resp.json["description"]
         assert "Connection refused" in resp.json["cause"]
-        assert resp.json["error"] == "ConnectionError", "Expected service to have trouble retrieving metadata"
+        assert "ConnectionError" in resp.json["error"], "Expected service to have trouble retrieving metadata"
 
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,

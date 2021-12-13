@@ -1,0 +1,59 @@
+{
+  "processes": [
+    "ColibriFlyingpigeon_SubsetBbox",
+    "OutardeFlyingpigeon_SubsetBbox",
+    "Staging_S2L1C",
+    "Staging_S2L1C-mock-docker",
+    "WaterExtent_S2-mock-docker",
+    "WorkflowWaterExtent",
+    "WorkflowWaterExtent-mock",
+    "anti-spoofing",
+    "docker-demo-cat",
+    "docker-python-script",
+    "file2string_array",
+    "image-utils",
+    "jsonarray2netcdf",
+    "las2tif",
+    "metalink2netcdf",
+    "python-script",
+    "sleep",
+    "test_blurring",
+    "test_generation",
+    "test_workflow"
+  ],
+  "providers": [
+    {
+      "id": "catalog",
+      "processes": [
+        "getpoint",
+        "ncplotly",
+        "pavicrawler",
+        "pavicsearch",
+        "pavicsupdate",
+        "pavicsvalidate",
+        "period2indices",
+        "pavicstestdocs"
+      ]
+    },
+    {
+      "id": "hummingbird",
+      "processes": [
+        "ncdump",
+        "spotchecker",
+        "cchecker",
+        "cfchecker",
+        "cmor_checker",
+        "qa_cfchecker",
+        "qa_checker",
+        "cdo_sinfo",
+        "cdo_operation",
+        "cdo_copy",
+        "cdo_bbox",
+        "cdo_indices",
+        "ensembles",
+        "cdo_inter_mpi"
+      ]
+    }
+  ],
+  "total": 42
+}
