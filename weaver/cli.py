@@ -446,7 +446,7 @@ class WeaverClient(object):
         Monitor the execution of a :term:`Job` until completion.
 
         :param job_reference: Either the full :term:`Job` status URL or only its UUID.
-        :param timeout: timeout (seconds) of monitoring until completion or abort.
+        :param timeout: timeout (seconds) of maximum wait time for monitoring if completion is not reached.
         :param interval: wait interval (seconds) between polling monitor requests.
         :param wait_for_status: monitor until the requested status is reached (default: job failed or succeeded).
         :param url: Instance URL if not already provided during client creation.
@@ -600,7 +600,7 @@ def add_job_ref_param(parser):
 def add_timeout_param(parser):
     parser.add_argument(
         "-T", "--timeout", dest="timeout", type=int, default=WeaverClient.monitor_timeout,
-        help="Timeout (seconds) of the job execution monitoring (default: %(default)ss). "
+        help="Wait timeout (seconds) of the maximum monitoring duration of the job execution (default: %(default)ss). "
              "If this timeout is reached but job is still running, another call directly to the monitoring operation "
              "can be done to resume monitoring. The job execution itself will not stop in case of timeout."
     )
@@ -757,7 +757,7 @@ def make_parser():
     add_job_ref_param(op_dismiss)
 
     op_monitor = ops_parsers.add_parser(
-        "monitor", help="Monitor a pending or running job execution until completion or timeout is reached."
+        "monitor", help="Monitor a pending or running job execution until completion or up to a maximum wait time."
     )
     add_url_param(op_monitor, required=False)
     add_job_ref_param(op_monitor)

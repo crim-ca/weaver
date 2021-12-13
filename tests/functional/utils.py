@@ -79,6 +79,9 @@ class WpsConfigBase(unittest.TestCase):
             payload["processDescription"]["process"]["id"] = process_id  # type: ignore
         exec_list = payload.get("executionUnit", [])
         if len(exec_list):
+            # test-only feature:
+            #   substitute 'href' starting by 'tests/' by the corresponding file in test resources
+            #   this allows clean separation of deploy payload from CWL to allow reuse and test CWL locally beforehand
             exec_href = exec_list[0].get("href", "")
             if exec_href.startswith("tests/"):
                 exec_unit = load_file(os.path.join(WEAVER_ROOT_DIR, exec_href))

@@ -306,10 +306,10 @@ def _get_package_requirements_as_class_list(requirements):
 def _check_package_file(cwl_file_path_or_url):
     # type: (str) -> str
     """
-    Validates that the specified CWL file path or URL points to an existing and allowed file format.
+    Validates that the specified :term:`CWL` file path or URL points to an existing and allowed file format.
 
     :param cwl_file_path_or_url: one of allowed file types path on disk, or an URL pointing to one served somewhere.
-    :returns: absolute path or URL, and boolean indicating if it is a remote URL file.
+    :returns: validated absolute path or URL of the file reference.
     :raises PackageRegistrationError: in case of missing file, invalid format or invalid HTTP status code.
     """
     if is_remote_file(cwl_file_path_or_url):
