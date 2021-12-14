@@ -390,6 +390,8 @@ class WeaverClient(object):
         :param url: Instance URL if not already provided during client creation.
         :returns: results of the operation.
         """
+        if isinstance(inputs, list) and all(isinstance(item, list) for item in inputs):
+            inputs = [items for sub in inputs for items in sub]  # flatten 2D->1D list
         values = self._parse_inputs(inputs)
         if isinstance(values, OperationResult):
             return values
@@ -711,7 +713,8 @@ def make_parser():
     add_url_param(op_execute)
     add_process_param(op_execute)
     op_execute.add_argument(
-        "-I", "--inputs", dest="inputs", nargs="+",
+        "-I", "--inputs", dest="inputs",
+        required=True, nargs=1, action="append",  # collect max 1 item per '-I', but allow many '-I'
         # note: below is formatted using 'InputsFormatter' with detected paragraphs
         help=inspect.cleandoc("""
             Literal input definitions, or a file path or URL reference to JSON or YAML
