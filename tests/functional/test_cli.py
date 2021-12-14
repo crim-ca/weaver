@@ -13,21 +13,33 @@ import yaml
 
 from tests.functional import APP_PKG_ROOT
 from tests.functional.utils import WpsConfigBase
-from tests.utils import get_weaver_url, mocked_execute_process, mocked_sub_requests, mocked_wps_output
-from weaver.cli import WeaverClient
+from tests.utils import (
+    get_weaver_url,
+    mocked_execute_process,
+    mocked_sub_requests,
+    mocked_wps_output,
+    run_command
+)
+from weaver.cli import WeaverClient, main as weaver_cli
 from weaver.formats import CONTENT_TYPE_TEXT_PLAIN
 from weaver.status import STATUS_ACCEPTED, STATUS_FAILED, STATUS_RUNNING, STATUS_SUCCEEDED
 
 
 @pytest.mark.cli
-class TestWeaverClient(WpsConfigBase):
+@pytest.mark.functional
+class TestWeaverClientBase(WpsConfigBase):
+    def __init__(self, *args, **kwargs):
+        # won't run this as a test suite, only its derived classes
+        setattr(self, "__test__", self is TestWeaverClientBase)
+        super(TestWeaverClientBase, self).__init__(*args, **kwargs)
+
     @classmethod
     def setUpClass(cls):
         cls.settings.update({
             "weaver.wps_output_dir": tempfile.mkdtemp(prefix="weaver-test-"),
             "weaver.wps_output_url": "http://random-file-server.com/wps-outputs"
         })
-        super(TestWeaverClient, cls).setUpClass()
+        super(TestWeaverClientBase, cls).setUpClass()
         cls.url = get_weaver_url(cls.app.app.registry)
         cls.client = WeaverClient(cls.url)
 
@@ -46,7 +58,7 @@ class TestWeaverClient(WpsConfigBase):
 
     @classmethod
     def tearDownClass(cls):
-        super(TestWeaverClient, cls).tearDownClass()
+        super(TestWeaverClientBase, cls).tearDownClass()
         tmp_wps_out = cls.settings.get("weaver.wps_output_dir", "")
         if os.path.isdir(tmp_wps_out):
             shutil.rmtree(tmp_wps_out, ignore_errors=True)
@@ -56,6 +68,8 @@ class TestWeaverClient(WpsConfigBase):
         with open(os.path.join(APP_PKG_ROOT, name)) as echo_file:
             return yaml.safe_load(echo_file)
 
+
+class TestWeaverClient(TestWeaverClientBase):
     def process_listing_op(self, operation):
         result = mocked_sub_requests(self.app, operation)
         assert result.success
@@ -325,3 +339,142 @@ class TestWeaverClient(WpsConfigBase):
             result = mocked_sub_requests(self.app, self.client.dismiss, str(job.id))
             assert result.success
             assert "undefined" not in result.message
+
+
+class TestWeaverCLI(TestWeaverClientBase):
+    def test_help_operations(self):
+        lines = run_command(
+            [
+                "weaver",
+                "--help",
+            ],
+            trim=False,
+        )
+        operations = [
+            "deploy",
+            "undeploy",
+            "capabilities",
+            "processes",
+            "describe",
+            "execute",
+            "monitor",
+            "dismiss",
+            "results",
+            "status",
+        ]
+        assert all(any(op in line for line in lines) for op in operations)
+
+    def test_describe(self):
+        # prints formatted JSON ProcessDescription over many lines
+        lines = mocked_sub_requests(
+            self.app, run_command,
+            [
+                # "weaver",
+                "describe",
+                self.url,
+                "-p", self.test_process,
+            ],
+            trim=False,
+            entrypoint=weaver_cli,
+            only_local=True,
+        )
+        # ignore indents of fields from formatted JSON content
+        assert any(f"\"id\": \"{self.test_process}\"" in line for line in lines)
+        assert any("\"inputs\": {" in line for line in lines)
+        assert any("\"outputs\": {" in line for line in lines)
+
+    def test_execute_manual_monitor(self):
+        with contextlib.ExitStack() as stack_exec:
+            for mock_exec_proc in mocked_execute_process():
+                stack_exec.enter_context(mock_exec_proc)
+
+            lines = mocked_sub_requests(
+                self.app, run_command,
+                [
+                    # "weaver",
+                    "execute",
+                    self.url,
+                    "-p", self.test_process,
+                    "-I", "message='TEST MESSAGE!'"
+                ],
+                trim=False,
+                entrypoint=weaver_cli,
+                only_local=True,
+            )
+            # ignore indents of fields from formatted JSON content
+            assert any(f"\"processID\": \"{self.test_process}\"" in line for line in lines)
+            assert any("\"jobID\": \"" in line for line in lines)
+            assert any("\"location\": \"" in line for line in lines)
+            job_loc = [line for line in lines if "location" in line][0]
+            job_ref = [line for line in job_loc.split("\"") if line][-1]
+            job_id = job_ref.split("/")[-1]
+
+            lines = mocked_sub_requests(
+                self.app, run_command,
+                [
+                    # "weaver",
+                    "monitor",
+                    "-j", job_ref,
+                    "-T", 10,
+                    "-W", 1,
+                ],
+                trim=False,
+                entrypoint=weaver_cli,
+                only_local=True,
+            )
+
+            assert any(f"\"jobID\": \"{job_id}\"" in line for line in lines)
+            assert any(f"\"status\": \"{STATUS_SUCCEEDED}\"" in line for line in lines)
+            assert any(f"\"href\": \"{job_ref}/results\"" in line for line in lines)
+            assert any("\"rel\": \"http://www.opengis.net/def/rel/ogc/1.0/results\"" in line for line in lines)
+
+    def test_execute_auto_monitor(self):
+        with contextlib.ExitStack() as stack_exec:
+            for mock_exec_proc in mocked_execute_process():
+                stack_exec.enter_context(mock_exec_proc)
+
+            lines = mocked_sub_requests(
+                self.app, run_command,
+                [
+                    # "weaver",
+                    "execute",
+                    self.url,
+                    "-p", self.test_process,
+                    "-I", "message='TEST MESSAGE!'",
+                    "-M",
+                    "-T", 10,
+                    "-W", 1
+                ],
+                trim=False,
+                entrypoint=weaver_cli,
+                only_local=True,
+            )
+            assert any("\"jobID\": \"" in line for line in lines)  # don't care value, self-handled
+            assert any(f"\"status\": \"{STATUS_SUCCEEDED}\"" in line for line in lines)
+            assert any("\"rel\": \"http://www.opengis.net/def/rel/ogc/1.0/results\"" in line for line in lines)
+
+    def test_execute_help_details(self):
+        """
+        Verify that formatting of the execute operation help provides multiple paragraphs with more details.
+        """
+        lines = run_command(
+            [
+                "weaver",
+                "execute",
+                "--help",
+            ],
+            trim=False
+        )
+        start = -1
+        end = -1
+        for index, line in enumerate(lines):
+            if "-I INPUTS, --inputs INPUTS" in line:
+                start = index + 1
+            if "Example:" in line:
+                end = index
+                break
+        assert 0 < start < end
+        indent = "  " * lines[start].count("  ")
+        assert len(indent) > 4
+        assert all(line.startswith(indent) for line in lines[start:end])
+        assert len([line for line in lines[start:end] if line == indent]) > 3, "Inputs should have a few paragraphs."

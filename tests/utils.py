@@ -4,11 +4,13 @@ Utility methods for various TestCase setup operations.
 import contextlib
 import datetime
 import functools
+import io
 import inspect
 import json
 import mimetypes
 import os
 import re
+import subprocess
 import tempfile
 import uuid
 import warnings
@@ -308,6 +310,39 @@ def get_links(resp_links):
         if _link["rel"] in link_dict:
             link_dict[_link["rel"]] = _link["href"]
     return link_dict
+
+
+def run_command(command, trim=True, entrypoint=None):
+    # type: (Union[str, Iterable[str]], bool, Optional[Callable[[Tuple[Any]], int]]) -> List[str]
+    """
+    Run a CLI operation and retrieve the produced output.
+
+    :param command: command to run.
+    :param trim: filter out visually empty lines.
+    :param entrypoint:
+        Main command to pass arguments directly (instead of using subprocess) and returning the command exit status.
+        This is useful to simulate calling the command from the shell, but remain in current
+        Python context to preserve any active mocks.
+    :return: retrieved command outputs.
+    """
+    if isinstance(command, str):
+        command = command.split(" ")
+    command = [str(arg) for arg in command]
+    if entrypoint is None:
+        env = {"PATH": os.path.expandvars(os.environ["PATH"])}  # for debug, explicit expand of install path required
+        proc = subprocess.Popen(command, env=env, universal_newlines=True, stdout=subprocess.PIPE)  # nosec
+        out, err = proc.communicate()
+    else:
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            err = entrypoint(*tuple(command))
+        out = stdout.getvalue()
+    assert not err, "process returned with error code {}".format(err)
+    # when no output is present, it is either because CLI was not installed correctly, or caused by some other error
+    assert out != "", "process did not execute as expected, no output available"
+    out_lines = [line for line in out.splitlines() if not trim or (line and not line.startswith(" "))]
+    assert len(out_lines), "could not retrieve any console output"
+    return out_lines
 
 
 def mocked_file_response(path, url):

@@ -719,25 +719,25 @@ def make_parser():
         help=inspect.cleandoc("""
             Literal input definitions, or a file path or URL reference to JSON or YAML
             contents defining job inputs with OGC-API or CWL schema. This parameter is required.
-            
-            To provide inputs using a file reference, refer to relevant CWL Job schema or API request schema 
+
+            To provide inputs using a file reference, refer to relevant CWL Job schema or API request schema
             for selected format. Both mapping and listing formats are supported.
-            
+
             To execute a process without any inputs (e.g.: using its defaults),
-            supply an explicit empty input (i.e.: -I "" or loaded from file as {}). 
-            
-            To provide inputs using literal command-line definitions, inputs should be specified using '<id>=<value>' 
-            convention, with distinct -I options for each applicable input value. 
-            
-            Values that require other type than string to be converted for job submission can include the type 
+            supply an explicit empty input (i.e.: -I "" or loaded from file as {}).
+
+            To provide inputs using literal command-line definitions, inputs should be specified using '<id>=<value>'
+            convention, with distinct -I options for each applicable input value.
+
+            Values that require other type than string to be converted for job submission can include the type
             following the ID using a colon separator (i.e.: '<id>:<type>=<value>'). For example, an integer could be
-            specified as follows: 'number:int=1' while a floating point would be: 'number:float=1.23'. 
-            
-            File references (href) should be specified using 'File' as the type (i.e.: 'input:File=http://...').  
-            
-            Array input (maxOccurs > 1) should be specified using semicolon (;) separated values. 
+            specified as follows: 'number:int=1' while a floating point would be: 'number:float=1.23'.
+
+            File references (href) should be specified using 'File' as the type (i.e.: 'input:File=http://...').
+
+            Array input (maxOccurs > 1) should be specified using semicolon (;) separated values.
             The type of an item of this array can also be provided (i.e.: 'array:int=1;2;3').
-            
+
             Example: -I message='Hello Weaver' -I value:int=1234
         """)
     )
