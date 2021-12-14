@@ -613,6 +613,7 @@ def add_timeout_param(parser):
 
 
 class InputsFormatter(argparse.HelpFormatter):
+    # pragma: no cover  # somehow marked not covered, but functionality covered by 'test_execute_help_details'
     def _format_action(self, action):
         """
         Override the returned help message with available options and shortcuts for email template selection.

@@ -3968,7 +3968,7 @@ class ProcessListingMetadata(ExtendedMappingSchema):
 
 
 class MultiProcessesListing(DescriptionSchema, ProcessCollection, ProvidersProcessesCollection, ProcessListingMetadata):
-    _sort_first = ["processes"]
+    _sort_first = ["description", "processes"]
     _sort_after = ["links"]
 
 

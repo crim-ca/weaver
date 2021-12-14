@@ -383,6 +383,31 @@ class TestWeaverCLI(TestWeaverClientBase):
         assert any("\"inputs\": {" in line for line in lines)
         assert any("\"outputs\": {" in line for line in lines)
 
+    def test_execute_inputs_capture(self):
+        """
+        Verify that specified inputs are captured for a limited number of 1 item per ``-I`` option.
+        """
+        with contextlib.ExitStack() as stack_exec:
+            for mock_exec_proc in mocked_execute_process():
+                stack_exec.enter_context(mock_exec_proc)
+            lines = mocked_sub_requests(
+                self.app, run_command,
+                [
+                    # "weaver",
+                    "execute",
+                    "-p", self.test_process,
+                    "-I", "message='TEST MESSAGE!'",  # if -I not capture as indented, URL after would be combined in it
+                    self.url,
+                    "-M",
+                    "-T", 10,
+                    "-W", 1,
+                ],
+                trim=False,
+                entrypoint=weaver_cli,
+                only_local=True,
+            )
+            assert any(f"\"status\": \"{STATUS_SUCCEEDED}\"" in line for line in lines)
+
     def test_execute_manual_monitor(self):
         with contextlib.ExitStack() as stack_exec:
             for mock_exec_proc in mocked_execute_process():
