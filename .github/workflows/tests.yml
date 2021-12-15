@@ -100,7 +100,9 @@ jobs:
           hash -r
           env | sort
       - name: List Python bin
-        run: ls -la ${pythonLocation}/bin
+        run: |
+          ls -la ${pythonLocation}/bin
+          ls -la ~/.local/bin
       - name: Run Tests
         run: make stop ${{ matrix.test-case }}
       - name: Upload coverage report
