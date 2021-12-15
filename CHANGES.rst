@@ -60,6 +60,8 @@ Fixes:
   (resolves `#320 <https://github.com/crim-ca/weaver/issues/320>`_).
 - Fix sorting of text fields using alphabetical case-insensitive ordering.
 - Fix search with paging reporting invalid ``total`` when out of range.
+- Pin ``pymongo<4`` until ``celery>=5`` gets resolved
+  (relates to `#386 <https://github.com/crim-ca/weaver/issues/386>`_).
 
 `4.5.0 <https://github.com/crim-ca/weaver/tree/4.5.0>`_ (2021-11-25)
 ========================================================================
