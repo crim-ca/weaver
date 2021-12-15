@@ -70,7 +70,8 @@ def api_frontpage_body(settings):
 
     weaver_api = asbool(settings.get("weaver.wps_restapi"))
     weaver_api_url = get_wps_restapi_base_url(settings) if weaver_api else None
-    weaver_api_def = weaver_api_url + sd.api_swagger_ui_service.path if weaver_api else None
+    weaver_api_oas_ui = weaver_api_url + sd.api_openapi_ui_service.path if weaver_api else None
+    weaver_api_swagger = weaver_api_url + sd.api_swagger_ui_service.path if weaver_api else None
     weaver_api_doc = settings.get("weaver.wps_restapi_doc", None) if weaver_api else None
     weaver_api_ref = settings.get("weaver.wps_restapi_ref", None) if weaver_api else None
     weaver_api_spec = weaver_api_url + sd.openapi_json_service.path if weaver_api else None
@@ -80,21 +81,29 @@ def api_frontpage_body(settings):
     weaver_process_url = weaver_url + sd.processes_service.path
     weaver_jobs_url = weaver_url + sd.jobs_service.path
     weaver_links = [
-        {"href": weaver_url, "rel": "self", "type": CONTENT_TYPE_APP_JSON, "title": "This document"},
+        {"href": weaver_url, "rel": "self", "type": CONTENT_TYPE_APP_JSON, "title": "This landing page."},
         {"href": weaver_conform_url, "rel": "http://www.opengis.net/def/rel/ogc/1.0/conformance",
          "type": CONTENT_TYPE_APP_JSON, "title": "Conformance classes implemented by this service."},
+        {"href": __meta__.__license_url__, "rel": "license",
+         "type": CONTENT_TYPE_TEXT_PLAIN, "title": __meta__.__license_long__}
     ]
     if weaver_api:
         weaver_links.extend([
             {"href": weaver_api_url,
              "rel": "service", "type": CONTENT_TYPE_APP_JSON,
              "title": "WPS REST API endpoint of this service."},
-            {"href": weaver_api_def,
-             "rel": "swagger-ui", "type": CONTENT_TYPE_TEXT_HTML,
-             "title": "WPS REST API definition of this service."},
+            {"href": weaver_api_spec,
+             "rel": "service-desc", "type": CONTENT_TYPE_APP_JSON,
+             "title": "OpenAPI specification of this service."},
+            {"href": weaver_api_oas_ui,
+             "rel": "service-doc", "type": CONTENT_TYPE_TEXT_HTML,
+             "title": "Human readable OpenAPI documentation of this service."},
             {"href": weaver_api_spec,
              "rel": "OpenAPI", "type": CONTENT_TYPE_APP_JSON,
-             "title": "WPS REST API specification of this service."},
+             "title": "OpenAPI specification of this service."},
+            {"href": weaver_api_swagger,
+             "rel": "swagger-ui", "type": CONTENT_TYPE_TEXT_HTML,
+             "title": "WPS REST API definition of this service."},
             {"href": weaver_process_url,
              "rel": "http://www.opengis.net/def/rel/ogc/1.0/processes", "type": CONTENT_TYPE_APP_JSON,
              "title": "Processes offered by this service."},
@@ -167,7 +176,7 @@ def api_frontpage_body(settings):
         "parameters": [
             {"name": "api", "enabled": weaver_api,
              "url": weaver_api_url,
-             "api": weaver_api_def},
+             "api": weaver_api_oas_ui},
             {"name": "wps", "enabled": weaver_wps,
              "url": weaver_wps_url},
         ],
