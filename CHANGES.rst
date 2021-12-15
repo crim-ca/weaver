@@ -10,6 +10,17 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+`4.6.0 <https://github.com/crim-ca/weaver/tree/4.6.0>`_ (2021-12-15)
+========================================================================
+
+Changes:
+--------
 - Add ``WeaverClient`` and ``weaver`` `CLI` as new utilities to interact with `Weaver` instead of using the HTTP `API`.
   This provides both shell and Python script interfaces to run operations toward `Weaver` instances
   (or any other `OGC API - Processes` compliant instance *except for deployment operations*).
