@@ -10,9 +10,11 @@ from weaver.utils import get_cookie_headers, get_settings, request_extra
 from weaver.wps.utils import get_wps_output_dir, get_wps_output_url
 
 if TYPE_CHECKING:
-    from weaver.typedefs import CWL_RuntimeInputsMap
     from typing import Dict
+
     from pywps.app import WPSRequest
+
+    from weaver.typedefs import CWL_RuntimeInputsMap
 
 
 class WpsProcessInterface(object):

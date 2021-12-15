@@ -49,10 +49,15 @@ feature/db:
   - weaver/store/**/*
   - weaver/sort.py
 
+feature/cli:
+  - weaver/cli.py
+  - docs/source/cli.rst
+
 feature/oas:
   - weaver/wps_restapi/templates/swagger_ui.mako
   - weaver/wps_restapi/colander_extras.py
   - weaver/wps_restapi/swagger_definitions.py
+  - docs/source/api.rst
 
 feature/CWL:
   - weaver/processes/wps_process_base.py

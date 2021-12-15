@@ -1,4 +1,5 @@
 import json
+import os
 import time
 import unittest
 from copy import deepcopy
@@ -17,10 +18,12 @@ from tests.utils import (
     setup_mongodb_jobstore,
     setup_mongodb_processstore
 )
+from weaver import WEAVER_ROOT_DIR
 from weaver.database import get_db
 from weaver.formats import CONTENT_TYPE_APP_JSON
+from weaver.processes.constants import PROCESS_SCHEMA_OGC
 from weaver.status import STATUS_ACCEPTED, STATUS_RUNNING, STATUS_SUCCEEDED
-from weaver.utils import fully_qualified_name
+from weaver.utils import fully_qualified_name, load_file
 from weaver.visibility import VISIBILITY_PUBLIC
 
 if TYPE_CHECKING:
@@ -32,7 +35,7 @@ if TYPE_CHECKING:
 class WpsConfigBase(unittest.TestCase):
     json_headers = {"Accept": CONTENT_TYPE_APP_JSON, "Content-Type": CONTENT_TYPE_APP_JSON}
     monitor_timeout = 30
-    monitor_delta = 1
+    monitor_interval = 1
     settings = {}  # type: SettingsType
 
     def __init__(self, *args, **kwargs):
@@ -58,20 +61,32 @@ class WpsConfigBase(unittest.TestCase):
         pyramid.testing.tearDown()
 
     @classmethod
-    def describe_process(cls, process_id, describe_schema="OGC"):
+    def describe_process(cls, process_id, describe_schema=PROCESS_SCHEMA_OGC):
         path = "/processes/{}?schema={}".format(process_id, describe_schema)
         resp = cls.app.get(path, headers=cls.json_headers)
         assert resp.status_code == 200
         return deepcopy(resp.json)
 
     @classmethod
-    def deploy_process(cls, payload, describe_schema="OGC"):
-        # type: (JSON, str) -> JSON
+    def deploy_process(cls, payload, process_id=None, describe_schema=PROCESS_SCHEMA_OGC):
+        # type: (JSON, Optional[str], str) -> JSON
         """
         Deploys a process with :paramref:`payload`.
 
         :returns: resulting tuple of ``(process-description, package)`` JSON responses.
         """
+        if process_id:
+            payload["processDescription"]["process"]["id"] = process_id  # type: ignore
+        exec_list = payload.get("executionUnit", [])
+        if len(exec_list):
+            # test-only feature:
+            #   substitute 'href' starting by 'tests/' by the corresponding file in test resources
+            #   this allows clean separation of deploy payload from CWL to allow reuse and test CWL locally beforehand
+            exec_href = exec_list[0].get("href", "")
+            if exec_href.startswith("tests/"):
+                exec_unit = load_file(os.path.join(WEAVER_ROOT_DIR, exec_href))
+                exec_list[0]["unit"] = exec_unit
+                exec_list[0].pop("href")
         resp = mocked_sub_requests(cls.app, "post_json", "/processes", data=payload, headers=cls.json_headers)
         assert resp.status_code == 201, "Expected successful deployment.\nError:\n{}".format(resp.text)
         path = resp.json["processSummary"]["processDescriptionURL"]
@@ -94,14 +109,19 @@ class WpsConfigBase(unittest.TestCase):
     def fully_qualified_test_process_name(self):
         return fully_qualified_name(self).replace(".", "-")
 
-    def monitor_job(self, status_url, timeout=None, delta=None, return_status=False, wait_for_status=STATUS_SUCCEEDED):
-        # type: (str, Optional[int], Optional[int], bool, str) -> Dict[str, JSON]
+    def monitor_job(self,
+                    status_url,                         # type: str
+                    timeout=None,                       # type: Optional[int]
+                    interval=None,                      # type: Optional[int]
+                    return_status=False,                # type: bool
+                    wait_for_status=STATUS_SUCCEEDED,   # type: str
+                    ):                                  # type: (...) -> Dict[str, JSON]
         """
         Job polling of status URL until completion or timeout.
 
         :param status_url: URL with job ID where to monitor execution.
         :param timeout: timeout of monitoring until completion or abort.
-        :param delta: interval (seconds) between polling monitor requests.
+        :param interval: wait interval (seconds) between polling monitor requests.
         :param return_status: return final status body instead of results once job completed.
         :param wait_for_status: monitor until the requested status is reached (default: when job is completed)
         :return: result of the successful job, or the status body if requested.
@@ -116,9 +136,9 @@ class WpsConfigBase(unittest.TestCase):
             assert body["status"] in statuses, "Error job info:\n{}\n{}".format(pretty, self._try_get_logs(status_url))
             return body["status"] == wait_for_status
 
-        time.sleep(1)  # small delay to ensure process execution had a change to start before monitoring
+        time.sleep(1)  # small delay to ensure process execution had a chance to start before monitoring
         left = timeout or self.monitor_timeout
-        delta = delta or self.monitor_delta
+        delta = interval or self.monitor_interval
         once = True
         resp = None
         while left >= 0 or once:

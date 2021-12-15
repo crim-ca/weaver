@@ -38,6 +38,7 @@ from weaver.execute import (
     EXECUTE_TRANSMISSION_MODE_VALUE
 )
 from weaver.formats import ACCEPT_LANGUAGE_FR_CA, CONTENT_TYPE_APP_JSON
+from weaver.processes.constants import PROCESS_SCHEMA_OLD
 from weaver.processes.wps_testing import WpsTestProcess
 from weaver.status import STATUS_ACCEPTED
 from weaver.utils import fully_qualified_name, get_path_kvp, ows_context_href
@@ -593,7 +594,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         resp = self.app.put_json("{}/visibility".format(proc_url), params=body, headers=self.json_headers)
         assert resp.status_code == 200
 
-        proc_query = {"schema": "OLD"}
+        proc_query = {"schema": PROCESS_SCHEMA_OLD}
         resp = self.app.get(proc_url, params=proc_query, headers=self.json_headers)
         assert resp.status_code == 200
         self.assert_deployed_wps3(resp.json, expected_process_id)
@@ -954,7 +955,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
 
     def test_set_process_visibility_success(self):
         test_process = self.process_private.identifier
-        proc_schema = {"schema": "OLD"}
+        proc_schema = {"schema": PROCESS_SCHEMA_OLD}
         path_describe = "/processes/{}".format(test_process)
         path_visibility = "{}/visibility".format(path_describe)
 

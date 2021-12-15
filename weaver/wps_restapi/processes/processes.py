@@ -64,6 +64,7 @@ def get_processes(request):
             raise HTTPServiceUnavailable(
                 "Previously deployed processes are causing invalid schema integrity errors. "
                 "Manual cleanup of following processes is required: {}".format(invalid_processes))
+
         body = {"processes": processes if detail else [get_any_id(p) for p in processes]}  # type: JSON
         if not with_providers:
             paging = {"page": paging.get("page"), "limit": paging.get("limit")}  # remove other params
@@ -110,6 +111,7 @@ def get_processes(request):
                 body["providers"] = [svc for svc, ignore in zip(body["providers"], invalid_services) if not ignore]
 
         body["total"] = total_processes
+        body["description"] = sd.OkGetProcessesListResponse.description
         LOGGER.debug("Process listing generated, validating schema...")
         body = sd.MultiProcessesListing().deserialize(body)
         return HTTPOk(json=body)
@@ -236,7 +238,11 @@ def delete_local_process(request):
     if process.type == PROCESS_BUILTIN:
         raise HTTPForbidden("Cannot delete a builtin process.")
     if store.delete_process(process_id, visibility=VISIBILITY_PUBLIC):
-        return HTTPOk(json={"undeploymentDone": True, "identifier": process_id})
+        return HTTPOk(json={
+            "description": sd.OkDeleteProcessResponse.description,
+            "identifier": process_id,
+            "undeploymentDone": True,
+        })
     LOGGER.error("Existing process [%s] should have been deleted with success status.", process_id)
     raise HTTPForbidden("Deletion of process has been refused by the database or could not have been validated.")
 

@@ -60,10 +60,10 @@ if TYPE_CHECKING:
     from pymongo.collection import Collection
 
     from weaver.store.base import DatetimeIntervalType, JobGroupCategory, JobSearchResult
-    from weaver.typedefs import AnyProcess, AnyProcessType, AnyUUID, AnyValue
+    from weaver.typedefs import AnyProcess, AnyProcessType, AnyUUID, AnyValueType
 
-    MongodbValue = Union[AnyValue, datetime.datetime]
-    MongodbSearchFilter = Dict[str, Union[MongodbValue, List[MongodbValue], Dict[str, AnyValue]]]
+    MongodbValue = Union[AnyValueType, datetime.datetime]
+    MongodbSearchFilter = Dict[str, Union[MongodbValue, List[MongodbValue], Dict[str, AnyValueType]]]
     MongodbSearchStep = Union[MongodbValue, MongodbSearchFilter]
     MongodbSearchPipeline = List[Dict[str, Union[str, Dict[str, MongodbSearchStep]]]]
 

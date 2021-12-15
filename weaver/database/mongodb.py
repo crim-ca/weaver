@@ -172,6 +172,7 @@ class MongoDatabase(DatabaseInterface):
 
             # update and move to next revision
             self._database.version.update_one({"revision": rev}, {"$set": {"revision": rev + 1}}, upsert=True)
+            db_info["version"] = rev
         LOGGER.info("Database up-to-date with: %s", db_info)
 
 

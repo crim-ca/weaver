@@ -46,7 +46,7 @@ if TYPE_CHECKING:
     from cwltool.command_line_tool import OutputPorts
     from cwltool.provenance import ProvenanceProfile
     from threading import Lock as ThreadLock
-    from weaver.typedefs import AnyValue, ExpectedOutputType, GetJobProcessDefinitionFunction, ToolPathObjectType
+    from weaver.typedefs import AnyValueType, ExpectedOutputType, GetJobProcessDefinitionFunction, ToolPathObjectType
     from weaver.processes.wps_process_base import WpsProcessInterface
 
 LOGGER = logging.getLogger(__name__)
@@ -125,7 +125,7 @@ class WpsWorkflow(ProcessCWL):
 
     # pylint: disable=W0221,arguments-differ    # naming using python like arguments
     def job(self,
-            joborder,           # type: Dict[Text, AnyValue]
+            joborder,           # type: Dict[Text, AnyValueType]
             output_callbacks,   # type: Callable[[Any, Any], Any]
             runtime_context,    # type: RuntimeContext
             ):                  # type: (...) -> Generator[Union[JobBase, CallbackJob], None, None]

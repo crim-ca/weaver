@@ -479,7 +479,10 @@ def _validate_job_parameters(json_body):
     if json_body["response"] != EXECUTE_RESPONSE_DOCUMENT:
         raise HTTPNotImplemented(detail="Execution response type '{}' not supported.".format(json_body["response"]))
 
-    for job_output in json_body["outputs"]:
+    outputs = json_body.get("outputs", [])
+    if isinstance(outputs, dict):
+        outputs = [dict(id=out, **keys) for out, keys in outputs.items()]
+    for job_output in outputs:
         mode = job_output["transmissionMode"]
         if mode not in EXECUTE_TRANSMISSION_MODE_OPTIONS:
             raise HTTPNotImplemented(detail="Execute transmissionMode '{}' not supported.".format(mode))
@@ -510,6 +513,10 @@ def submit_job_handler(payload,             # type: JSON
         raise HTTPBadRequest("Invalid schema: [{}]".format(str(ex)))
 
     # TODO: remove when all parameter variations are supported
+    # FIXME:
+    #   - support 'sync' and 'Prefer' header variants (https://github.com/crim-ca/weaver/issues/247)
+    #   - support 'response: raw' (https://github.com/crim-ca/weaver/issues/376)
+    #   - allow omitting 'outputs' (https://github.com/crim-ca/weaver/issues/375)
     _validate_job_parameters(json_body)
 
     is_execute_async = json_body["mode"] != EXECUTE_MODE_SYNC   # convert auto to async

@@ -325,6 +325,8 @@ following request (`DescribeProviderProcess`_):
     specification.
 
 
+.. _proc_operations:
+
 Managing processes included in Weaver ADES/EMS
 ==================================================
 
@@ -374,6 +376,7 @@ are mapped between the two interfaces, but it is recommended to use the `WPS-RES
 
 .. _GetCapabilities:
 .. _DescribeProcess:
+.. _Describe:
 
 Access registered process(es) (GetCapabilities, DescribeProcess)
 ------------------------------------------------------------------------

@@ -100,7 +100,7 @@ def api_frontpage_body(settings):
              "title": "Processes offered by this service."},
             {"href": sd.OGC_API_REPO_URL,
              "rel": "ogcapi-processes-repository", "type": CONTENT_TYPE_TEXT_HTML,
-             "title": "OGC-API - Processes schema definitions repository."},
+             "title": "OGC API - Processes schema definitions repository."},
             {"href": weaver_jobs_url,
              "rel": "http://www.opengis.net/def/rel/ogc/1.0/job-list", "type": CONTENT_TYPE_APP_JSON,
              "title": "Job search and listing endpoint of executions registered under this service."},

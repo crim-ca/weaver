@@ -39,30 +39,37 @@ if TYPE_CHECKING:
     # pylint: disable=C0103,invalid-name
     Number = Union[int, float]
     ValueType = Union[str, Number, bool]
-    AnyValue = Optional[ValueType]
-    AnyValueType = AnyValue  # alias
+    AnyValueType = Optional[ValueType]  # avoid naming ambiguity with PyWPS AnyValue
     AnyKey = Union[str, int]
     AnyUUID = Union[str, uuid.UUID]
     # add more levels of explicit definitions than necessary to simulate JSON recursive structure better than 'Any'
     # amount of repeated equivalent definition makes typing analysis 'work well enough' for most use cases
     _JsonObjectItem = Dict[str, Union["JSON", "_JsonListItem"]]
-    _JsonListItem = List[Union[AnyValue, _JsonObjectItem, "_JsonListItem", "JSON"]]
-    _JsonItem = Union[AnyValue, _JsonObjectItem, _JsonListItem]
-    JSON = Union[Dict[str, _JsonItem], List[_JsonItem], AnyValue]
+    _JsonListItem = List[Union[AnyValueType, _JsonObjectItem, "_JsonListItem", "JSON"]]
+    _JsonItem = Union[AnyValueType, _JsonObjectItem, _JsonListItem]
+    JSON = Union[Dict[str, _JsonItem], List[_JsonItem], AnyValueType]
 
     # CWL definition
-    GlobType = TypedDict("GlobType", {"glob": str}, total=False)
-    CWL_IO_EnumType = TypedDict("CWL_IO_EnumType", {"type": str, "symbols": List[str]})  # "symbols" => allowed values
-    CWL_IO_ArrayType = TypedDict("CWL_IO_ArrayType", {"type": str, "items": str})  # "items" => type of every item
-    CWL_IO_MultiType = List[str, CWL_IO_ArrayType, CWL_IO_EnumType]  # single string allowed for "null"
-    CWL_IO_DataType = Union[str, CWL_IO_ArrayType, CWL_IO_EnumType, CWL_IO_MultiType]
-    CWL_Input_Type = TypedDict("CWL_Input_Type", {"id": str, "type": CWL_IO_DataType, "default": AnyValue}, total=False)
+    GlobType = TypedDict("GlobType", {"glob": Union[str, List[str]]}, total=False)
+    CWL_IO_FileValue = TypedDict("CWL_IO_FileValue", {"class": str, "path": str}, total=True)
+    CWL_IO_Value = Union[AnyValueType, List[AnyValueType], CWL_IO_FileValue, List[CWL_IO_FileValue]]
+    CWL_IO_NullableType = Union[str, List[str]]  # "<type>?" or ["<type>", "null"]
+    CWL_IO_NestedType = TypedDict("CWL_IO_NestedType", {"type": CWL_IO_NullableType}, total=True)
+    CWL_IO_EnumSymbols = Union[List[str], List[int], List[float]]
+    CWL_IO_EnumType = TypedDict("CWL_IO_EnumType", {"type": str, "symbols": CWL_IO_EnumSymbols})
+    CWL_IO_ArrayType = TypedDict("CWL_IO_ArrayType",
+                                 {"type": str, "items": Union[str, CWL_IO_EnumType]})  # "items" => type of every item
+    CWL_IO_TypeItem = Union[str, CWL_IO_NestedType, CWL_IO_ArrayType, CWL_IO_EnumType]
+    CWL_IO_DataType = Union[CWL_IO_TypeItem, List[CWL_IO_TypeItem]]
+    CWL_Input_Type = TypedDict("CWL_Input_Type",
+                               {"id": str, "type": CWL_IO_DataType, "default": AnyValueType, "name": Optional[str]},
+                               total=False)
     CWL_Output_Type = TypedDict("CWL_Output_Type",
                                 {"id": str, "type": CWL_IO_DataType, "outputBinding": Optional[GlobType]}, total=False)
     CWL_Inputs = Union[List[CWL_Input_Type], Dict[str, CWL_Input_Type]]
     CWL_Outputs = Union[List[CWL_Output_Type], Dict[str, CWL_Output_Type]]
     CWL_Requirement = TypedDict("CWL_Requirement", {"class": str}, total=False)  # includes 'hints'
-    CWL_RequirementsDict = Dict[str, Dict[str, str]]  # {'<req>': {<param>: <val>}}
+    CWL_RequirementsDict = Dict[str, Dict[str, str]]   # {'<req>': {<param>: <val>}}
     CWL_RequirementsList = List[CWL_Requirement]       # [{'class': <req>, <param>: <val>}]
     CWL_AnyRequirements = Union[CWL_RequirementsDict, CWL_RequirementsList]
     # results from CWL execution
@@ -103,7 +110,7 @@ if TYPE_CHECKING:
     KVP = Union[Sequence[Tuple[str, KVP_Item]], Dict[str, KVP_Item]]
 
     AnyContainer = Union[Configurator, Registry, PyramidRequest, WerkzeugRequest, Celery]
-    SettingValue = Optional[Union[JSON, AnyValue]]
+    SettingValue = Optional[Union[JSON, AnyValueType]]
     SettingsType = Dict[str, SettingValue]
     AnySettingsContainer = Union[AnyContainer, SettingsType]
     AnyRegistryContainer = AnyContainer

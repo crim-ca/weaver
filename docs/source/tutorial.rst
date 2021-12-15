@@ -138,4 +138,5 @@ Next Steps
 
 Have a look to the :ref:`Processes`, :ref:`Package` and :ref:`FAQ` sections.
 
-The full |oas|_ is also available for request details.
+The full |oas|_ is also available for request details to target a :ref:`running` service.
+Alternatively, the :ref:`cli` can also be employed to facilitate interactions with a `Weaver` service.

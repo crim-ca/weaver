@@ -110,6 +110,7 @@ def get_job_submission_response(body):
     .. seealso::
         :func:`weaver.processes.execution.submit_job`
     """
+    body["description"] = sd.CreatedLaunchJobResponse.description
     body = sd.CreatedJobStatusSchema().deserialize(body)
     return HTTPCreated(location=body["location"], json=body)
 
@@ -302,8 +303,11 @@ def deploy_process_from_payload(payload, container, overwrite=False):
         # raised on invalid process name
         raise HTTPBadRequest(detail=str(ex))
 
-    json_response = {"processSummary": process_summary, "deploymentDone": True}
-    return HTTPCreated(json=json_response)
+    return HTTPCreated(json={
+        "description": sd.OkPostProcessesResponse.description,
+        "processSummary": process_summary,
+        "deploymentDone": True
+    })
 
 
 def parse_wps_process_config(config_entry):
