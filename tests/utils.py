@@ -330,7 +330,10 @@ def run_command(command, trim=True, expect_error=False, entrypoint=None):
         command = command.split(" ")
     command = [str(arg) for arg in command]
     if entrypoint is None:
-        env = {"PATH": os.path.expandvars(os.environ["PATH"])}  # for debug, explicit expand of install path required
+        out, _ = subprocess.Popen(["which", "python"], universal_newlines=True, stdout=subprocess.PIPE).communicate()
+        python_path = os.path.split(out)[0]
+        debug_path = os.path.expandvars(os.environ["PATH"])
+        env = {"PATH": f"{python_path}:{debug_path}"}
         std = {"stderr": subprocess.PIPE} if expect_error else {"stdout": subprocess.PIPE}
         proc = subprocess.Popen(command, env=env, universal_newlines=True, **std)  # nosec
         out, err = proc.communicate()
