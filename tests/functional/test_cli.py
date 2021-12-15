@@ -503,3 +503,24 @@ class TestWeaverCLI(TestWeaverClientBase):
         assert len(indent) > 4
         assert all(line.startswith(indent) for line in lines[start:end])
         assert len([line for line in lines[start:end] if line == indent]) > 3, "Inputs should have a few paragraphs."
+
+    def test_execute_invalid_format(self):
+        bad_input_value = "'this is my malformed message'"  # missing '<id>=' portion
+        lines = mocked_sub_requests(
+            self.app, run_command,
+            [
+                # "weaver",
+                "execute",
+                self.url,
+                "-p", self.test_process,
+                "-I", bad_input_value,
+                "-M",
+                "-T", 10,
+                "-W", 1
+            ],
+            trim=False,
+            entrypoint=weaver_cli,
+            expect_error=True,
+            only_local=True,
+        )
+        assert any(bad_input_value in line for line in lines)

@@ -817,7 +817,8 @@ def main(*args):
         LOGGER.info("%s successful. %s", oper.title(), result.message)
         print(result.text)  # use print in case logger disabled or level error/warn
         return 0
-    LOGGER.error("%s failed. %s\n%s", oper.title(), result.message, result.text)
+    LOGGER.error("%s failed. %s", oper.title(), result.message)
+    print(result.text)
     return -1
 
 

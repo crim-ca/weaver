@@ -312,13 +312,14 @@ def get_links(resp_links):
     return link_dict
 
 
-def run_command(command, trim=True, entrypoint=None):
-    # type: (Union[str, Iterable[str]], bool, Optional[Callable[[Tuple[Any]], int]]) -> List[str]
+def run_command(command, trim=True, expect_error=False, entrypoint=None):
+    # type: (Union[str, Iterable[str]], bool, bool, Optional[Callable[[Tuple[Any]], int]]) -> List[str]
     """
     Run a CLI operation and retrieve the produced output.
 
-    :param command: command to run.
-    :param trim: filter out visually empty lines.
+    :param command: Command to run.
+    :param trim: Filter out visually empty lines.
+    :param expect_error: Expect the returned code to be any non-zero value.
     :param entrypoint:
         Main command to pass arguments directly (instead of using subprocess) and returning the command exit status.
         This is useful to simulate calling the command from the shell, but remain in current
@@ -330,18 +331,23 @@ def run_command(command, trim=True, entrypoint=None):
     command = [str(arg) for arg in command]
     if entrypoint is None:
         env = {"PATH": os.path.expandvars(os.environ["PATH"])}  # for debug, explicit expand of install path required
-        proc = subprocess.Popen(command, env=env, universal_newlines=True, stdout=subprocess.PIPE)  # nosec
+        std = {"stderr": subprocess.PIPE} if expect_error else {"stdout": subprocess.PIPE}
+        proc = subprocess.Popen(command, env=env, universal_newlines=True, **std)  # nosec
         out, err = proc.communicate()
     else:
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
             err = entrypoint(*tuple(command))
         out = stdout.getvalue()
-    assert not err, "process returned with error code {}".format(err)
-    # when no output is present, it is either because CLI was not installed correctly, or caused by some other error
-    assert out != "", "process did not execute as expected, no output available"
+    if expect_error:
+        assert err, "process returned successfully when error was expected: {}".format(err)
+    else:
+        assert not err, "process returned with error code: {}".format(err)
+        # when no output is present, it is either because CLI was not installed correctly, or caused by some other error
+        assert out != "", "process did not execute as expected, no output available"
     out_lines = [line for line in out.splitlines() if not trim or (line and not line.startswith(" "))]
-    assert len(out_lines), "could not retrieve any console output"
+    if not expect_error:
+        assert len(out_lines), "could not retrieve any console output"
     return out_lines
 
 
