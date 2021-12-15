@@ -2,6 +2,7 @@
 Unit test for :mod:`weaver.cli` utilities.
 """
 import inspect
+
 import pytest
 
 from weaver.cli import OperationResult
