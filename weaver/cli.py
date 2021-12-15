@@ -35,6 +35,10 @@ if TYPE_CHECKING:
 
 LOGGER = logging.getLogger(__name__)
 
+OPERATION_ARGS_TITLE = "Operation Arguments"
+OPTIONAL_ARGS_TITLE = "Optional Arguments"
+REQUIRED_ARGS_TITLE = "Required Arguments"
+
 
 def _json2text(data):
     return repr_json(data, indent=2, ensure_ascii=False)
@@ -573,10 +577,14 @@ def make_logging_options(parser):
     """
     Defines argument parser options for logging operations.
     """
-    log_opts = parser.add_argument_group(title="Logging Options", description="Options that configure output logging.")
+    log_title = "Logging Options"
+    log_desc = "Options that configure output logging."
+    log_opts = parser.add_argument_group(title=log_title, description=log_desc)
     log_opts.add_argument("--stdout", action="store_true", help="Enforce logging to stdout for display in console.")
     log_opts.add_argument("--log", "--log-file", help="Output file to write generated logs.")
     lvl_opts = log_opts.add_mutually_exclusive_group()
+    lvl_opts.title = log_title
+    lvl_opts.description = log_desc
     lvl_opts.add_argument("--quiet", "-q", action="store_true", help="Do not output anything else than error.")
     lvl_opts.add_argument("--debug", "-d", action="store_true", help="Enable extra debug logging.")
     lvl_opts.add_argument("--verbose", "-v", action="store_true", help="Output informative logging details.")
@@ -587,28 +595,32 @@ def make_logging_options(parser):
 
 
 def add_url_param(parser, required=True):
+    # type: (argparse.ArgumentParser, bool) -> None
     args = ["url"] if required else ["-u", "--url"]
-    parser.add_argument(*args, help="URL of the instance to run operations.")
+    parser.add_argument(*args, metavar="URL", help="URL of the instance to run operations.")
 
 
 def add_process_param(parser, description=None):
+    # type: (argparse.ArgumentParser, Optional[str]) -> None
     operation = parser.prog.split(" ")[-1]
     parser.add_argument(
-        "-p", "--id", "--process", dest="process_id",
+        "-p", "--id", "--process", dest="process_id", required=True,
         help=description if description else f"Identifier of the process to run {operation} operation."
     )
 
 
 def add_job_ref_param(parser):
+    # type: (argparse.ArgumentParser) -> None
     operation = parser.prog.split(" ")[-1]
     parser.add_argument(
-        "-j", "--job", dest="job_reference",
+        "-j", "--job", dest="job_reference", required=True,
         help=f"Job URL or UUID to run {operation} operation. "
-             "If full URL is provided, the '--url' parameter can be omitted."
+             "If full Job URL is provided, the instance '--url' parameter can be omitted."
     )
 
 
 def add_timeout_param(parser):
+    # type: (argparse.ArgumentParser) -> None
     parser.add_argument(
         "-T", "--timeout", dest="timeout", type=int, default=WeaverClient.monitor_timeout,
         help="Wait timeout (seconds) of the maximum monitoring duration of the job execution (default: %(default)ss). "
@@ -619,6 +631,12 @@ def add_timeout_param(parser):
         "-W", "--wait", "--interval", dest="interval", type=int, default=WeaverClient.monitor_interval,
         help="Wait interval (seconds) between each job status polling during monitoring (default: %(default)ss)."
     )
+
+
+def set_parser_sections(parser):
+    # type: (argparse.ArgumentParser) -> None
+    parser._optionals.title = OPTIONAL_ARGS_TITLE
+    parser._positionals.title = REQUIRED_ARGS_TITLE
 
 
 class InputsFormatter(argparse.HelpFormatter):
@@ -646,10 +664,38 @@ class InputsFormatter(argparse.HelpFormatter):
         return help_text
 
 
+class SubArgumentParserFixedMutexGroups(argparse.ArgumentParser):
+    """
+    Patch incorrectly handled mutually exclusive groups sections in subparsers.
+
+    .. seealso::
+        - https://bugs.python.org/issue43259
+        - https://bugs.python.org/issue16807
+    """
+    def _add_container_actions(self, container):
+        # pylint: disable=W0212
+        groups = container._mutually_exclusive_groups
+        tmp_mutex_groups = container._mutually_exclusive_groups
+        container._mutually_exclusive_groups = []
+        super(SubArgumentParserFixedMutexGroups, self)._add_container_actions(container)
+        for group in groups:
+            mutex_group = self.add_mutually_exclusive_group(required=group.required)
+            for action in group._group_actions:
+                mutex_group._group_actions.append(action)
+        container._mutually_exclusive_groups = tmp_mutex_groups
+
+
 def make_parser():
     # type: () -> argparse.ArgumentParser
     """
     Generate the CLI parser.
+
+    .. note::
+        Instead of employing :class:`argparse.ArgumentParser` instances returned
+        by :meth:`argparse._SubParsersAction.add_parser`, distinct :class:`argparse.ArgumentParser` instances are
+        created for each operation an then  merged back by ourselves as subparsers under the main parser.
+        This provides more flexibility in arguments passed down and resolves, amongst other things, incorrect
+        handling of exclusive argument groups and their grouping under corresponding section titles.
     """
     # generic logging parser to pass down to each operation
     # this allows providing logging options to any of them
@@ -657,8 +703,8 @@ def make_parser():
     make_logging_options(log_parser)
 
     desc = "Run {} operations.".format(__meta__.__title__)
-    parser = argparse.ArgumentParser(prog=__meta__.__name__, description=desc, parents=[log_parser])
-    parser._optionals.title = "Optional Arguments"
+    parser = SubArgumentParserFixedMutexGroups(prog=__meta__.__name__, description=desc, parents=[log_parser])
+    set_parser_sections(parser)
     parser.add_argument(
         "--version", "-V",
         action="version",
@@ -666,15 +712,15 @@ def make_parser():
         help="Display the version of the package."
     )
     ops_parsers = parser.add_subparsers(
-        title="Operation", dest="operation",
+        title="Operations", dest="operation",
         description="Name of the operation to run."
     )
 
-    op_deploy = ops_parsers.add_parser(
+    op_deploy = argparse.ArgumentParser(
         "deploy",
-        help="Deploy a process.",
-        parents=[log_parser],
+        description="Deploy a process.",
     )
+    set_parser_sections(op_deploy)
     add_url_param(op_deploy)
     add_process_param(op_deploy, description=(
         "Process identifier for deployment. If no body is provided, this is required. "
@@ -714,36 +760,35 @@ def make_parser():
         help="Perform undeploy step as applicable prior to deployment to avoid conflict with exiting process."
     )
 
-    op_undeploy = ops_parsers.add_parser(
+    op_undeploy = argparse.ArgumentParser(
         "undeploy",
-        help="Undeploy an existing process.",
-        parents=[log_parser],
+        description="Undeploy an existing process.",
     )
+    set_parser_sections(op_deploy)
     add_url_param(op_undeploy)
     add_process_param(op_undeploy)
 
-    op_capabilities = ops_parsers.add_parser(
+    op_capabilities = argparse.ArgumentParser(
         "capabilities",
-        help="List available processes.",
-        aliases=["processes"],
-        parents=[log_parser],
+        description="List available processes.",
     )
+    set_parser_sections(op_deploy)
     add_url_param(op_capabilities)
 
-    op_describe = ops_parsers.add_parser(
+    op_describe = argparse.ArgumentParser(
         "describe",
-        help="Obtain an existing process description.",
-        parents=[log_parser],
+        description="Obtain an existing process description.",
     )
+    set_parser_sections(op_deploy)
     add_url_param(op_describe)
     add_process_param(op_describe)
 
-    op_execute = ops_parsers.add_parser(
+    op_execute = argparse.ArgumentParser(
         "execute",
-        help="Submit a job execution for an existing process.",
+        description="Submit a job execution for an existing process.",
         formatter_class=InputsFormatter,
-        parents=[log_parser],
     )
+    set_parser_sections(op_deploy)
     add_url_param(op_execute)
     add_process_param(op_execute)
     op_execute.add_argument(
@@ -787,36 +832,41 @@ def make_parser():
     )
     add_timeout_param(op_execute)
 
-    op_dismiss = ops_parsers.add_parser(
+    op_dismiss = argparse.ArgumentParser(
         "dismiss",
-        help="Dismiss a pending or running job, or wipe any finished job results.",
-        parents=[log_parser],
+        description="Dismiss a pending or running job, or wipe any finished job results.",
     )
+    set_parser_sections(op_deploy)
     add_url_param(op_dismiss, required=False)
     add_job_ref_param(op_dismiss)
 
-    op_monitor = ops_parsers.add_parser(
-        "monitor", help="Monitor a pending or running job execution until completion or up to a maximum wait time."
+    op_monitor = argparse.ArgumentParser(
+        "monitor",
+        description="Monitor a pending or running job execution until completion or up to a maximum wait time."
     )
     add_url_param(op_monitor, required=False)
     add_job_ref_param(op_monitor)
     add_timeout_param(op_monitor)
 
-    op_status = ops_parsers.add_parser(
+    op_status = argparse.ArgumentParser(
         "status",
-        help="Obtain the status of a job using a reference UUID or URL. "
-             "This is equivalent to doing a single-shot 'monitor' operation without any pooling or retries.",
-        parents=[log_parser],
+        description=(
+            "Obtain the status of a job using a reference UUID or URL. "
+            "This is equivalent to doing a single-shot 'monitor' operation without any pooling or retries."
+        ),
     )
+    set_parser_sections(op_deploy)
     add_url_param(op_status, required=False)
     add_job_ref_param(op_status)
 
-    op_results = ops_parsers.add_parser(
+    op_results = argparse.ArgumentParser(
         "results",
-        help="Obtain the output results description of a job. "
-             "This operation can also download them from the remote server if requested.",
-        parents=[log_parser],
+        description=(
+            "Obtain the output results description of a job. "
+            "This operation can also download them from the remote server if requested."
+        ),
     )
+    set_parser_sections(op_deploy)
     add_url_param(op_results, required=False)
     add_job_ref_param(op_results)
     op_results.add_argument(
@@ -830,6 +880,30 @@ def make_parser():
              "(default: ${CURDIR}/{JobID}/<outputs.files>)."
     )
 
+    operations = [
+        op_deploy,
+        op_undeploy,
+        op_capabilities,
+        op_describe,
+        op_execute,
+        op_monitor,
+        op_dismiss,
+        op_results,
+        op_status,
+    ]
+    aliases = {
+        "processes": op_capabilities
+    }
+    for op_parser in operations:
+        op_aliases = [alias for alias, op_alias in aliases.items() if op_alias is op_parser]
+        # add help disabled otherwise conflicts with main parser help
+        sub_op_parser = ops_parsers.add_parser(
+            op_parser.prog, aliases=op_aliases, parents=[log_parser, op_parser],
+            add_help=False, help=op_parser.description,
+            formatter_class=op_parser.formatter_class,
+            description=op_parser.description, usage=op_parser.usage
+        )
+        set_parser_sections(sub_op_parser)
     return parser
 
 
