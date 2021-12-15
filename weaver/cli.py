@@ -651,8 +651,13 @@ def make_parser():
     """
     Generate the CLI parser.
     """
+    # generic logging parser to pass down to each operation
+    # this allows providing logging options to any of them
+    log_parser = argparse.ArgumentParser(add_help=False)
+    make_logging_options(log_parser)
+
     desc = "Run {} operations.".format(__meta__.__title__)
-    parser = argparse.ArgumentParser(prog=__meta__.__name__, description=desc)
+    parser = argparse.ArgumentParser(prog=__meta__.__name__, description=desc, parents=[log_parser])
     parser._optionals.title = "Optional Arguments"
     parser.add_argument(
         "--version", "-V",
@@ -665,7 +670,11 @@ def make_parser():
         description="Name of the operation to run."
     )
 
-    op_deploy = ops_parsers.add_parser("deploy", help="Deploy a process.")
+    op_deploy = ops_parsers.add_parser(
+        "deploy",
+        help="Deploy a process.",
+        parents=[log_parser],
+    )
     add_url_param(op_deploy)
     add_process_param(op_deploy, description=(
         "Process identifier for deployment. If no body is provided, this is required. "
@@ -705,20 +714,35 @@ def make_parser():
         help="Perform undeploy step as applicable prior to deployment to avoid conflict with exiting process."
     )
 
-    op_undeploy = ops_parsers.add_parser("undeploy", help="Undeploy an existing process.")
+    op_undeploy = ops_parsers.add_parser(
+        "undeploy",
+        help="Undeploy an existing process.",
+        parents=[log_parser],
+    )
     add_url_param(op_undeploy)
     add_process_param(op_undeploy)
 
-    op_capabilities = ops_parsers.add_parser("capabilities", aliases=["processes"], help="List available processes.")
+    op_capabilities = ops_parsers.add_parser(
+        "capabilities",
+        help="List available processes.",
+        aliases=["processes"],
+        parents=[log_parser],
+    )
     add_url_param(op_capabilities)
 
-    op_describe = ops_parsers.add_parser("describe", help="Obtain an existing process description.")
+    op_describe = ops_parsers.add_parser(
+        "describe",
+        help="Obtain an existing process description.",
+        parents=[log_parser],
+    )
     add_url_param(op_describe)
     add_process_param(op_describe)
 
     op_execute = ops_parsers.add_parser(
-        "execute", formatter_class=InputsFormatter,
-        help="Submit a job execution for an existing process."
+        "execute",
+        help="Submit a job execution for an existing process.",
+        formatter_class=InputsFormatter,
+        parents=[log_parser],
     )
     add_url_param(op_execute)
     add_process_param(op_execute)
@@ -764,7 +788,9 @@ def make_parser():
     add_timeout_param(op_execute)
 
     op_dismiss = ops_parsers.add_parser(
-        "dismiss", help="Dismiss a pending or running job, or wipe any finished job results."
+        "dismiss",
+        help="Dismiss a pending or running job, or wipe any finished job results.",
+        parents=[log_parser],
     )
     add_url_param(op_dismiss, required=False)
     add_job_ref_param(op_dismiss)
@@ -779,7 +805,8 @@ def make_parser():
     op_status = ops_parsers.add_parser(
         "status",
         help="Obtain the status of a job using a reference UUID or URL. "
-             "This is equivalent to doing a single-shot 'monitor' operation without any pooling or retries."
+             "This is equivalent to doing a single-shot 'monitor' operation without any pooling or retries.",
+        parents=[log_parser],
     )
     add_url_param(op_status, required=False)
     add_job_ref_param(op_status)
@@ -787,7 +814,8 @@ def make_parser():
     op_results = ops_parsers.add_parser(
         "results",
         help="Obtain the output results description of a job. "
-             "This operation can also download them from the remote server if requested."
+             "This operation can also download them from the remote server if requested.",
+        parents=[log_parser],
     )
     add_url_param(op_results, required=False)
     add_job_ref_param(op_results)
@@ -802,7 +830,6 @@ def make_parser():
              "(default: ${CURDIR}/{JobID}/<outputs.files>)."
     )
 
-    make_logging_options(parser)
     return parser
 
 

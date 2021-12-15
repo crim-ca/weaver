@@ -359,6 +359,24 @@ class TestWeaverCLI(TestWeaverClientBase):
         ]
         assert all(any(op in line for line in lines) for op in operations)
 
+    def test_log_options_any_level(self):
+        """
+        Logging parameters should be allowed at main parser level or under any operation subparser.
+        """
+        for options in [
+            ["--verbose", "describe", self.url, "-p", self.test_process],
+            ["describe", self.url, "--verbose", "-p", self.test_process],
+            ["describe", self.url, "-p", self.test_process, "--verbose"],
+        ]:
+            lines = mocked_sub_requests(
+                self.app, run_command,
+                options,
+                trim=False,
+                entrypoint=weaver_cli,
+                only_local=True,
+            )
+            assert any(f"\"id\": \"{self.test_process}\"" in line for line in lines)
+
     def test_describe(self):
         # prints formatted JSON ProcessDescription over many lines
         lines = mocked_sub_requests(
