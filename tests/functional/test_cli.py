@@ -13,13 +13,7 @@ import yaml
 
 from tests.functional import APP_PKG_ROOT
 from tests.functional.utils import WpsConfigBase
-from tests.utils import (
-    get_weaver_url,
-    mocked_execute_process,
-    mocked_sub_requests,
-    mocked_wps_output,
-    run_command
-)
+from tests.utils import get_weaver_url, mocked_execute_process, mocked_sub_requests, mocked_wps_output, run_command
 from weaver.cli import WeaverClient, main as weaver_cli
 from weaver.formats import CONTENT_TYPE_TEXT_PLAIN
 from weaver.status import STATUS_ACCEPTED, STATUS_FAILED, STATUS_RUNNING, STATUS_SUCCEEDED

@@ -4,8 +4,8 @@ Utility methods for various TestCase setup operations.
 import contextlib
 import datetime
 import functools
-import io
 import inspect
+import io
 import json
 import mimetypes
 import os
