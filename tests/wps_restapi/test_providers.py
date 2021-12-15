@@ -18,6 +18,7 @@ from weaver.config import WEAVER_CONFIGURATION_ADES, WEAVER_CONFIGURATION_HYBRID
 from weaver.datatype import Service
 from weaver.execute import EXECUTE_CONTROL_OPTION_ASYNC, EXECUTE_TRANSMISSION_MODE_REFERENCE
 from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_NETCDF, CONTENT_TYPE_APP_ZIP, CONTENT_TYPE_TEXT_PLAIN
+from weaver.processes.constants import PROCESS_SCHEMA_OGC, PROCESS_SCHEMA_OLD
 from weaver.utils import fully_qualified_name
 
 
@@ -296,7 +297,8 @@ class WpsRestApiProvidersTest(WpsProviderBase):
         Test only the version field which depends on a fix from :mod:`OWSLib`.
 
         The process description retrieved from a remote WPS-1 DescribeProcess request should provide
-        its version converted into JSON schema, for both the ``"OLD"`` and ``"OGC"`` schema representations.
+        its version converted into JSON schema, for known :data:`weaver.processes.constants.PROCESS_SCHEMAS`
+        representations.
 
         .. seealso::
             - Full description validation (OGC schema): :meth:`test_get_provider_process_description_ogc_schema`
@@ -304,12 +306,12 @@ class WpsRestApiProvidersTest(WpsProviderBase):
             - Fix in PR `geopython/OWSLib#794 <https://github.com/geopython/OWSLib/pull/794>`_
         """
         path = "/providers/{}/processes/{}".format(self.remote_provider_name, resources.TEST_REMOTE_PROCESS_WPS1_ID)
-        resp = self.app.get(path, params={"schema": "OLD"}, headers=self.json_headers)
+        resp = self.app.get(path, params={"schema": PROCESS_SCHEMA_OLD}, headers=self.json_headers)
         assert resp.status_code == 200
         assert resp.content_type == CONTENT_TYPE_APP_JSON
         proc = resp.json["process"]
 
-        resp = self.app.get(path, params={"schema": "OGC"}, headers=self.json_headers)
+        resp = self.app.get(path, params={"schema": PROCESS_SCHEMA_OGC}, headers=self.json_headers)
         assert resp.status_code == 200
         assert resp.content_type == CONTENT_TYPE_APP_JSON
         desc = resp.json
@@ -325,7 +327,7 @@ class WpsRestApiProvidersTest(WpsProviderBase):
     def test_get_provider_process_description_old_schema(self):
         self.register_provider()
 
-        query = {"schema": "OLD"}
+        query = {"schema": PROCESS_SCHEMA_OLD}
         path = "/providers/{}/processes/{}".format(self.remote_provider_name, resources.TEST_REMOTE_PROCESS_WPS1_ID)
         resp = self.app.get(path, params=query, headers=self.json_headers)
         body = resp.json
@@ -395,14 +397,14 @@ class WpsRestApiProvidersTest(WpsProviderBase):
         self.register_provider()
 
         path = "/providers/{}/processes/{}".format(self.remote_provider_name, resources.WPS_NO_INPUTS_ID)
-        resp = self.app.get(path, params={"schema": "OLD"}, headers=self.json_headers)
+        resp = self.app.get(path, params={"schema": PROCESS_SCHEMA_OLD}, headers=self.json_headers)
         assert resp.status_code == 200
         assert resp.content_type == CONTENT_TYPE_APP_JSON
         inputs = resp.json["process"]["inputs"]
         assert isinstance(inputs, list) and len(inputs) == 0
 
         path = "/providers/{}/processes/{}".format(self.remote_provider_name, resources.WPS_NO_INPUTS_ID)
-        resp = self.app.get(path, params={"schema": "OGC"}, headers=self.json_headers)
+        resp = self.app.get(path, params={"schema": PROCESS_SCHEMA_OGC}, headers=self.json_headers)
         assert resp.status_code == 200
         assert resp.content_type == CONTENT_TYPE_APP_JSON
         inputs = resp.json["inputs"]
@@ -419,7 +421,7 @@ class WpsRestApiProvidersTest(WpsProviderBase):
         """
         self.register_provider()
         path = "/providers/{}/processes/{}".format(self.remote_provider_name, resources.WPS_LITERAL_VALUES_IO_ID)
-        resp = self.app.get(path, params={"schema": "OLD"}, headers=self.json_headers)
+        resp = self.app.get(path, params={"schema": PROCESS_SCHEMA_OLD}, headers=self.json_headers)
         assert resp.status_code == 200
         assert resp.content_type == CONTENT_TYPE_APP_JSON
         inputs = resp.json["process"]["inputs"]
@@ -606,7 +608,7 @@ class WpsRestApiProvidersTest(WpsProviderBase):
         """
         self.register_provider()
         path = "/providers/{}/processes/{}".format(self.remote_provider_name, resources.WPS_LITERAL_VALUES_IO_ID)
-        resp = self.app.get(path, params={"schema": "OLD"}, headers=self.json_headers)
+        resp = self.app.get(path, params={"schema": PROCESS_SCHEMA_OLD}, headers=self.json_headers)
         assert resp.status_code == 200
         assert resp.content_type == CONTENT_TYPE_APP_JSON
         inputs = resp.json["process"]["inputs"]

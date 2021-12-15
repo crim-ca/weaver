@@ -9,7 +9,7 @@ MAKEFILE_NAME := $(word $(words $(MAKEFILE_LIST)),$(MAKEFILE_LIST))
 # Application
 APP_ROOT    := $(abspath $(lastword $(MAKEFILE_NAME))/..)
 APP_NAME    := $(shell basename $(APP_ROOT))
-APP_VERSION ?= 4.5.0
+APP_VERSION ?= 4.6.0
 APP_INI     ?= $(APP_ROOT)/config/$(APP_NAME).ini
 DOCKER_REPO ?= pavics/weaver
 #DOCKER_REPO ?= docker-registry.crim.ca/ogc/weaver
@@ -359,7 +359,7 @@ clean-dist: clean	## remove *all* files that are not controlled by 'git' except 
 TEST_VERBOSITY ?= -v
 
 # autogen tests variants with pre-install of dependencies using the '-only' target references
-TESTS := unit func workflow online offline no-tb14 spec coverage
+TESTS := unit func cli workflow online offline no-tb14 spec coverage
 TESTS := $(addprefix test-, $(TESTS))
 
 $(TESTS): test-%: install-dev test-%-only
@@ -387,6 +387,12 @@ test-func-only: mkdir-reports   	## run functional tests (online and usage speci
 	@echo "Running functional tests..."
 	@bash -c '$(CONDA_CMD) pytest tests $(TEST_VERBOSITY) \
 		-m "functional" --junitxml "$(REPORTS_DIR)/test-results.xml"'
+
+.PHONY: test-cli-only
+test-cli-only: mkdir-reports   		## run WeaverClient and CLI tests
+	@echo "Running CLI tests..."
+	@bash -c '$(CONDA_CMD) pytest tests $(TEST_VERBOSITY) \
+		-m "cli" --junitxml "$(REPORTS_DIR)/test-results.xml"'
 
 .PHONY: test-workflow-only
 test-workflow-only:	mkdir-reports	## run EMS workflow End-2-End tests

@@ -46,7 +46,7 @@ from weaver.wps_restapi.swagger_definitions import datetime_interval_parser
 if TYPE_CHECKING:
     from typing import Dict, List, Optional, Tuple, Union
     from pyramid.httpexceptions import HTTPException
-    from weaver.typedefs import AnySettingsContainer, AnyValue, JSON
+    from weaver.typedefs import AnySettingsContainer, AnyValueType, JSON
 
 LOGGER = get_task_logger(__name__)
 
@@ -121,7 +121,7 @@ def get_job(request):
 
 
 def get_job_list_links(job_total, filters, request):
-    # type: (int, Dict[str, AnyValue], Request) -> List[JSON]
+    # type: (int, Dict[str, AnyValueType], Request) -> List[JSON]
     """
     Obtains a list of all relevant links for the corresponding job listing defined by query parameter filters.
 
@@ -220,7 +220,7 @@ def get_results(job, container, value_key=None, ogc_api=False):
         If not specified, the returned values will have the appropriate ``data``/``href`` key according to the content.
         Otherwise, all values will have the specified key.
     :param ogc_api:
-        If ``True``, formats the results using the ``OGC-API - Processes`` format.
+        If ``True``, formats the results using the ``OGC API - Processes`` format.
     :returns: list of all outputs each with minimally an ID and value under the requested key.
     """
     wps_url = get_wps_output_url(container)
@@ -520,7 +520,7 @@ def cancel_job(request):
     job = get_job(request)
     job = dismiss_job_task(job, request)
     return HTTPOk(json={
-        "jobID": job.id,
+        "jobID": str(job.id),
         "status": job.status,
         "message": job.status_message,
         "percentCompleted": job.progress,
@@ -563,8 +563,8 @@ def cancel_job_batch(request):
         except JobNotFound as exc:
             LOGGER.debug("Job [%s] cannot be dismissed: %s.", job_id, exc.description)
 
-    body = sd.BatchDismissJobsBodySchema().deserialize({"jobs": found_jobs})
     body["description"] = "Following jobs have been successfully dismissed."
+    body = sd.BatchDismissJobsBodySchema().deserialize({"jobs": found_jobs})
     return HTTPOk(json=body)
 
 

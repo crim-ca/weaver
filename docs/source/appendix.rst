@@ -28,6 +28,11 @@ Glossary
     AWS
         Amazon Web Services
 
+    CLI
+        | Command Line Interface
+        | Script that offers interactions through shell commands or Python scripts to execute any described operations.
+          Details of the provided `Weaver` commands are described in :ref:`cli` chapter.
+
     CWL
         | |cwl|_
         | Representation of the internal :term:`Application Package` of the :term:`Process` to provide execution

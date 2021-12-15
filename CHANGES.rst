@@ -10,6 +10,38 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+`4.6.0 <https://github.com/crim-ca/weaver/tree/4.6.0>`_ (2021-12-15)
+========================================================================
+
+Changes:
+--------
+- Add ``WeaverClient`` and ``weaver`` `CLI` as new utilities to interact with `Weaver` instead of using the HTTP `API`.
+  This provides both shell and Python script interfaces to run operations toward `Weaver` instances
+  (or any other `OGC API - Processes` compliant instance *except for deployment operations*).
+  It also facilitates new `Process` deployments by helping with the integration of a local `CWL` file into
+  a full-fledged ``Deploy`` HTTP request, and other recurrent tasks such as ``Execute`` requests followed by `Job`
+  monitoring and results retrieval once completed successfully
+  (resolves `#363 <https://github.com/crim-ca/weaver/issues/363>`_,
+  resolves `DAC-198 <https://www.crim.ca/jira/browse/DAC-198>`_,
+  relates to `DAC-203 <https://www.crim.ca/jira/browse/DAC-203>`_).
+- Added ``weaver`` command installation to ``setup.py`` script.
+- Added auto-documentation utilities for new ``weaver`` CLI (argparse parameter definitions) and provide relevant
+  references in new chapter in Sphinx documentation.
+- Added ``cwl2json_input_values`` function to help converting between `CWL` *parameters* and `OGC API - Processes`
+  input value definitions for `Job` submission.
+- Added ``weaver.datatype.AutoBase`` that allows quick definition of data containers with fields accessible both as
+  properties and dictionary keys, simply by detecting predefined class attributes, avoiding a lot of boilerplate code.
+- Split multiple file loading, remote validation and resolution procedures into distinct functions in order for the
+  new `CLI` to make use of the same methodologies as needed.
+- Updated documentation with new details relevant to the added `CLI` and corresponding references.
+- Updated some tests utilities to facilitate definitions of new tests for ``WeaverClient`` feature validation.
+- Replaced literal string ``"OGC"`` and ``"OLD"`` used for schema selection by properly defined constants.
 - Add database revision number for traceability of migration procedures as needed.
 - Add first database revision with conversion of UUID-like strings to literal UUID objects.
 - Add ``links`` to ``/processes`` and ``/providers/{id}/processes`` listings
@@ -24,11 +56,23 @@ Changes:
 
 Fixes:
 ------
+- Fix some typing definitions related to `CWL` function parameters.
+- Fix multiple typing inconsistencies or ambiguities between ``AnyValue`` (as Python typing for any literal value)
+  against the actual class ``AnyValue`` of ``PyWPS``. Typing definitions now all use ``AnyValueType`` instead.
+- Fix resolution of ``owsContext`` location in the payload of remote `Process` provided by ``href`` link in
+  the ``executionUnit`` due to `OGC API - Processes` (``"OGC"`` schema) not nested under ``process`` key
+  (in contrast to ``"OLD"`` schema).
+- Fix resolution of ``outputs`` submitted as mapping (`OGC API - Processes` schema) during `Job` execution
+  to provide desired filtered outputs in results and their ``transmissionMode``. Note that filtering and handling of
+  all ``transmissionMode`` variants are themselves not yet supported (relates to
+  `#377 <https://github.com/crim-ca/weaver/issues/377>`_ and `#380 <https://github.com/crim-ca/weaver/issues/380>`_).
 - Fix resolution of unspecified UUID representation format in `MongoDB`.
 - Fix conformance with error type reporting of missing `Job` or `Process`
   (resolves `#320 <https://github.com/crim-ca/weaver/issues/320>`_).
 - Fix sorting of text fields using alphabetical case-insensitive ordering.
 - Fix search with paging reporting invalid ``total`` when out of range.
+- Pin ``pymongo<4`` until ``celery>=5`` gets resolved
+  (relates to `#386 <https://github.com/crim-ca/weaver/issues/386>`_).
 
 `4.5.0 <https://github.com/crim-ca/weaver/tree/4.5.0>`_ (2021-11-25)
 ========================================================================
@@ -273,7 +317,7 @@ Fixes:
 Changes:
 --------
 - Apply conformance updates to better align with expected ``ProcessDescription`` schema from
-  `OGC-API - Processes v1.0-draft6 <https://github.com/opengeospatial/ogcapi-processes/tree/1.0-draft.6>`_.
+  `OGC API - Processes v1.0-draft6 <https://github.com/opengeospatial/ogcapi-processes/tree/1.0-draft.6>`_.
   The principal change introduced in this case is that process description contents will be directly at the root
   of the object returned by ``/processes/{id}`` response instead of being nested under ``"process"`` field.
   Furthermore, ``inputs`` and ``outputs`` definitions are reported as mapping of ``{"<id>": {<parameters>}}`` as

@@ -4,6 +4,7 @@
 -r requirements.txt
 cloud_sptheme
 sphinx>=3.5,<4
+sphinx-argparse
 sphinx-autoapi>=1.7.0
 sphinx-paramlinks>=0.4.1
 # adds redoc OpenAPI directly served on readthedocs

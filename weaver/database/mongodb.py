@@ -66,6 +66,8 @@ class MongoDatabase(DatabaseInterface):
         self._database = get_mongodb_engine(container)
         self._settings = get_settings(container)
         self._stores = dict()
+        LOGGER.debug("Database [%s] using versions: {MongoDB: %s, pymongo: %s}",
+                     self._database.name, self._database.client.server_info()["version"], pymongo.__version__)
 
     def reset_store(self, store_type):
         store_type = self._get_store_type(store_type)
@@ -170,6 +172,7 @@ class MongoDatabase(DatabaseInterface):
 
             # update and move to next revision
             self._database.version.update_one({"revision": rev}, {"$set": {"revision": rev + 1}}, upsert=True)
+            db_info["version"] = rev
         LOGGER.info("Database up-to-date with: %s", db_info)
 
 

@@ -28,38 +28,34 @@ class MockResponseOk(object):
 def test_check_package_file_with_url():
     package_url = "https://example.com/package.cwl"
     with mock.patch("requests.Session.request", return_value=MockResponseOk()) as mock_request:
-        res_path, is_url = _check_package_file(package_url)
+        res_path = _check_package_file(package_url)
         assert mock_request.call_count == 1
         assert mock_request.call_args[0][:2] == ("head", package_url)  # ignore extra args
     assert res_path == package_url
-    assert is_url is True
 
 
 def test_check_package_file_with_file_scheme():
     with mock.patch("requests.Session.request", return_value=MockResponseOk()) as mock_request:
         with tempfile.NamedTemporaryFile(mode="r", suffix="test-package.cwl") as tmp_file:
             package_file = "file://{}".format(tmp_file.name)
-            res_path, is_url = _check_package_file(package_file)
+            res_path = _check_package_file(package_file)
             mock_request.assert_not_called()
             assert res_path == tmp_file.name
-            assert is_url is False
 
 
 def test_check_package_file_with_posix_path():
     with tempfile.NamedTemporaryFile(mode="r", suffix="test-package.cwl") as tmp_file:
-        res_path, is_url = _check_package_file(tmp_file.name)
+        res_path = _check_package_file(tmp_file.name)
         assert res_path == tmp_file.name
-        assert is_url is False
 
 
 @pytest.mark.skipif(not sys.platform.startswith("win"), reason="Test for Windows only.")
 def test_check_package_file_with_windows_path():
     test_file = "C:/Windows/Temp/package.cwl"   # fake existing, just test format handled correctly
     with mock.patch("os.path.isfile", return_value=True) as mock_isfile:
-        res_path, is_url = _check_package_file(test_file)
+        res_path = _check_package_file(test_file)
         mock_isfile.assert_called_with(test_file)
     assert res_path == test_file
-    assert is_url is False
 
 
 class MockWpsPackage(WpsPackage):

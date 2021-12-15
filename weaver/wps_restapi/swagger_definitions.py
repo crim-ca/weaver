@@ -59,6 +59,8 @@ from weaver.processes.constants import (
     PACKAGE_CUSTOM_TYPES,
     PACKAGE_ENUM_BASE,
     PACKAGE_TYPE_POSSIBLE_VALUES,
+    PROCESS_SCHEMA_OGC,
+    PROCESS_SCHEMAS,
     WPS_LITERAL_DATA_TYPE_NAMES
 )
 from weaver.sort import JOB_SORT_VALUES, PROCESS_SORT_VALUES, QUOTE_SORT_VALUES, SORT_CREATED, SORT_ID, SORT_PROCESS
@@ -305,7 +307,7 @@ class QueryBoolean(Boolean):
 class DateTimeInterval(ExtendedSchemaNode):
     schema_type = String
     description = (
-        "DateTime format against OGC-API - Processes, "
+        "DateTime format against OGC API - Processes, "
         "to get values before a certain date-time use '../' before the date-time, "
         "to get values after a certain date-time use '/..' after the date-time like the example, "
         "to get values between two date-times use '/' between the date-times, "
@@ -474,6 +476,10 @@ class RedirectHeaders(ResponseHeaders):
 class NoContent(ExtendedMappingSchema):
     description = "Empty response body."
     default = {}
+
+
+class DescriptionSchema(ExtendedMappingSchema):
+    description = ExtendedSchemaNode(String(), description="Description of the obtained contents.")
 
 
 class KeywordList(ExtendedSequenceSchema):
@@ -677,7 +683,7 @@ class DeploymentFormat(FormatSelection, FormatDescription, FormatDefault):
 
 class ResultFormat(FormatDescription):
     """
-    Format employed for reference results respecting 'OGC-API - Processes' schemas.
+    Format employed for reference results respecting 'OGC API - Processes' schemas.
     """
     schema_ref = "{}/master/core/openapi/schemas/formatDescription.yaml".format(OGC_API_SCHEMA_URL)
     mediaType = MediaType(String())
@@ -2187,7 +2193,8 @@ class ProviderEndpoint(ProviderPath):
 class ProcessDescriptionSchemaQuery(ExtendedMappingSchema):
     # see: 'ProcessDescription' schema and 'Process.offering' method
     schema = ExtendedSchemaNode(
-        String(), example="OGC", default="OGC", validator=OneOfCaseInsensitive(["OGC", "OLD"]),
+        String(), example=PROCESS_SCHEMA_OGC, default=PROCESS_SCHEMA_OGC,
+        validator=OneOfCaseInsensitive(PROCESS_SCHEMAS),
         description="Selects the desired schema representation of the process description."
     )
 
@@ -2327,21 +2334,40 @@ class ExecuteInputDataType(InputIdentifierType):
 
 
 class ExecuteOutputDataType(OutputIdentifierType):
+    pass
+
+
+class ExecuteOutputDefinition(ExtendedMappingSchema):
+    transmissionMode = TransmissionModeEnum(missing=drop)
     format = Format(missing=drop)
 
 
-class ExecuteOutputDefinition(ExecuteOutputDataType):
-    transmissionMode = TransmissionModeEnum(missing=drop)
+class ExecuteOutputItem(ExecuteOutputDataType, ExecuteOutputDefinition):
+    pass
 
 
-class ExecuteOutputFilterList(ExtendedSequenceSchema):
+class ExecuteOutputSpecList(ExtendedSequenceSchema):
     """
-    Filter list of outputs to be obtained from execution.
+    Filter list of outputs to be obtained from execution and their reporting method.
     """
-    # FIXME:
-    #   nothing done with this currently... execution just generates all outputs anyway
-    #   useful only in for limiting reported outputs in 'sync' mode that should reply after only with those specified
-    output = ExecuteOutputDefinition()
+    output = ExecuteOutputItem()
+
+
+class ExecuteOutputSpecMap(ExtendedMappingSchema):
+    input_id = ExecuteOutputDefinition(variable="<input-id>", title="ExecuteOutputSpecMap",
+                                       description="Desired output reporting method.")
+
+
+class ExecuteOutputSpec(OneOfKeywordSchema):
+    """
+    Filter list of outputs to be obtained from execution and define their reporting method.
+    """
+    _one_of = [
+        # OLD format: {"outputs": [{"id": "<id>", "transmissionMode": "value|reference"}, ...]}
+        ExecuteOutputSpecList(),
+        # OGC-API:    {"inputs": {"<id>": {"transmissionMode": "value|reference"}, ...}}
+        ExecuteOutputSpecMap(),
+    ]
 
 
 class ProviderNameSchema(AnyIdentifier):
@@ -2574,7 +2600,7 @@ class JobCollection(ExtendedSequenceSchema):
     item = JobEntrySchema()
 
 
-class CreatedJobStatusSchema(ExtendedMappingSchema):
+class CreatedJobStatusSchema(DescriptionSchema):
     jobID = UUID(description="Unique identifier of the created job for execution.")
     processID = ProcessIdentifier(description="Identifier of the process that will be executed.")
     providerID = AnyIdentifier(description="Remote provider identifier if applicable.", missing=drop)
@@ -2829,8 +2855,16 @@ class Execute(ExtendedMappingSchema):
     #   - 'tests.wps_restapi.test_providers.WpsRestApiProcessesTest.test_execute_process_no_error_not_required_params'
     #   - 'tests.wps_restapi.test_providers.WpsRestApiProcessesTest.test_get_provider_process_no_inputs'
     #   - 'tests.wps_restapi.test_colander_extras.test_oneof_variable_dict_or_list'
-    inputs = ExecuteInputValues(default={})
-    outputs = ExecuteOutputFilterList(description="Filter list of outputs to be obtained from execution.")
+    inputs = ExecuteInputValues(default={}, description="Values submitted for execution.")
+    outputs = ExecuteOutputSpec(
+        # FIXME: add documentation reference link OGC/Weaver for further details.
+        description="Defines which outputs to be obtained from the execution (filtered or all), "
+                    "as well as the reporting method for each output according to 'transmissionMode', "
+                    "the 'response' type, and the execution 'mode' provided.",
+        # FIXME: allow omitting 'outputs' (https://github.com/crim-ca/weaver/issues/375)
+        #        maybe this is good enough, but should have a proper test for it
+        # default={}
+    )
     mode = JobExecuteModeEnum()
     notification_email = ExtendedSchemaNode(
         String(),
@@ -3340,9 +3374,13 @@ class JobOutputValue(OneOfKeywordSchema):
     ]
 
 
+class JobOutputFile(OutputIdentifierType):
+    format = Format(missing=drop)
+
+
 class JobOutput(AllOfKeywordSchema):
     _all_of = [
-        ExecuteOutputDataType(),
+        JobOutputFile(),
         JobOutputValue(),
     ]
 
@@ -3412,7 +3450,7 @@ class Result(ExtendedMappingSchema):
     output_id = ResultData(
         variable="<output-id>", title="Output Identifier",
         description=(
-            "Resulting value of the output that conforms to 'OGC-API - Processes' standard. "
+            "Resulting value of the output that conforms to 'OGC API - Processes' standard. "
             "(Note: '<output-id>' is a variable corresponding for each output identifier of the process)"
         )
     )
@@ -3929,12 +3967,13 @@ class ProcessListingMetadata(ExtendedMappingSchema):
     links = LinkList(missing=drop)
 
 
-class MultiProcessesListing(ProcessCollection, ProvidersProcessesCollection, ProcessListingMetadata):
-    _sort_first = ["processes"]
+class MultiProcessesListing(DescriptionSchema, ProcessCollection, ProvidersProcessesCollection, ProcessListingMetadata):
+    _sort_first = ["description", "processes"]
     _sort_after = ["links"]
 
 
 class OkGetProcessesListResponse(ExtendedMappingSchema):
+    description = "Listing of available processes successful."
     header = ResponseHeaders()
     body = MultiProcessesListing()
 
@@ -3948,6 +3987,7 @@ class OkPostProcessDeployBodySchema(ExtendedMappingSchema):
 
 
 class OkPostProcessesResponse(ExtendedMappingSchema):
+    description = "Process successfully deployed."
     header = ResponseHeaders()
     body = OkPostProcessDeployBodySchema()
 
@@ -4001,6 +4041,7 @@ class OkDeleteProcessUndeployBodySchema(ExtendedMappingSchema):
 
 
 class OkDeleteProcessResponse(ExtendedMappingSchema):
+    description = "Process successfully undeployed."
     header = ResponseHeaders()
     body = OkDeleteProcessUndeployBodySchema()
 
@@ -4024,13 +4065,9 @@ class CreatedJobLocationHeader(ResponseHeaders):
 
 
 class CreatedLaunchJobResponse(ExtendedMappingSchema):
+    description = "Job successfully submitted to processing queue. Execution should begin when resources are available."
     header = CreatedJobLocationHeader()
     body = CreatedJobStatusSchema()
-
-
-class OkGetProcessJobResponse(ExtendedMappingSchema):
-    header = ResponseHeaders()
-    body = JobStatusInfo()
 
 
 class OkDeleteProcessJobResponse(ExtendedMappingSchema):
@@ -4043,7 +4080,7 @@ class OkGetQueriedJobsResponse(ExtendedMappingSchema):
     body = GetQueriedJobsSchema()
 
 
-class BatchDismissJobsBodySchema(ExtendedMappingSchema):
+class BatchDismissJobsBodySchema(DescriptionSchema):
     jobs = JobIdentifierList(description="Confirmation of jobs that have been dismissed.")
 
 
@@ -4176,7 +4213,7 @@ get_api_conformance_responses = {
     "500": InternalServerErrorResponseSchema(),
 }
 get_processes_responses = {
-    "200": OkGetProcessesListResponse(description="success", examples={
+    "200": OkGetProcessesListResponse(examples={
         "ProcessesListing": {
             "summary": "Listing of identifiers of local processes registered in Weaver.",
             "value": EXAMPLES["local_process_listing.json"],
@@ -4198,7 +4235,7 @@ get_processes_responses = {
     "500": InternalServerErrorResponseSchema(),
 }
 post_processes_responses = {
-    "201": OkPostProcessesResponse(description="success"),
+    "201": OkPostProcessesResponse(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_process_responses = {
@@ -4248,7 +4285,7 @@ put_process_visibility_responses = {
     "500": InternalServerErrorResponseSchema(),
 }
 delete_process_responses = {
-    "200": OkDeleteProcessResponse(description="success"),
+    "200": OkDeleteProcessResponse(),
     "403": ForbiddenProcessAccessResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }

@@ -5,10 +5,12 @@ import contextlib
 import datetime
 import functools
 import inspect
+import io
 import json
 import mimetypes
 import os
 import re
+import subprocess
 import tempfile
 import uuid
 import warnings
@@ -50,7 +52,7 @@ from weaver.warning import MissingParameterWarning, UnsupportedOperationWarning
 from weaver.wps.utils import get_wps_output_dir, get_wps_output_url
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Type, Union
+    from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Type, TypeVar, Union
 
     import botocore.client  # noqa
     from owslib.wps import Process as ProcessOWSWPS
@@ -63,6 +65,7 @@ if TYPE_CHECKING:
 
     # [WPS1-URL, GetCapPathXML, [DescribePathXML], [ExecutePathXML]]
     MockConfigWPS1 = Sequence[str, str, Optional[Sequence[str]], Optional[Sequence[str]]]
+    MockReturnType = TypeVar("MockReturnType")
 
 MOCK_AWS_REGION = "us-central-1"
 MOCK_HTTP_REF = "http://localhost.mock"
@@ -309,6 +312,48 @@ def get_links(resp_links):
     return link_dict
 
 
+def run_command(command, trim=True, expect_error=False, entrypoint=None):
+    # type: (Union[str, Iterable[str]], bool, bool, Optional[Callable[[Tuple[Any]], int]]) -> List[str]
+    """
+    Run a CLI operation and retrieve the produced output.
+
+    :param command: Command to run.
+    :param trim: Filter out visually empty lines.
+    :param expect_error: Expect the returned code to be any non-zero value.
+    :param entrypoint:
+        Main command to pass arguments directly (instead of using subprocess) and returning the command exit status.
+        This is useful to simulate calling the command from the shell, but remain in current
+        Python context to preserve any active mocks.
+    :return: retrieved command outputs.
+    """
+    if isinstance(command, str):
+        command = command.split(" ")
+    command = [str(arg) for arg in command]
+    if entrypoint is None:
+        out, _ = subprocess.Popen(["which", "python"], universal_newlines=True, stdout=subprocess.PIPE).communicate()
+        python_path = os.path.split(out)[0]
+        debug_path = os.path.expandvars(os.environ["PATH"])
+        env = {"PATH": f"{python_path}:{debug_path}"}
+        std = {"stderr": subprocess.PIPE} if expect_error else {"stdout": subprocess.PIPE}
+        proc = subprocess.Popen(command, env=env, universal_newlines=True, **std)  # nosec
+        out, err = proc.communicate()
+    else:
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            err = entrypoint(*tuple(command))
+        out = stdout.getvalue()
+    if expect_error:
+        assert err, "process returned successfully when error was expected: {}".format(err)
+    else:
+        assert not err, "process returned with error code: {}".format(err)
+        # when no output is present, it is either because CLI was not installed correctly, or caused by some other error
+        assert out != "", "process did not execute as expected, no output available"
+    out_lines = [line for line in out.splitlines() if not trim or (line and not line.startswith(" "))]
+    if not expect_error:
+        assert len(out_lines), "could not retrieve any console output"
+    return out_lines
+
+
 def mocked_file_response(path, url):
     # type: (str, str) -> Union[Response, HTTPException]
     """
@@ -346,10 +391,14 @@ def mocked_file_response(path, url):
     return resp
 
 
-def mocked_sub_requests(app, method_function, *args, only_local=False, **kwargs):
-    # type: (TestApp, str, Any, bool, Any) -> AnyResponseType
+def mocked_sub_requests(app,                # type: TestApp
+                        method_function,    # type: Union[str, Callable[[Any], MockReturnType]]
+                        *args,              # type: Any
+                        only_local=False,   # type: bool
+                        **kwargs,           # type: Any
+                        ):                  # type: (...) -> Union[AnyResponseType, MockReturnType]
     """
-    Mocks request calls under :class:`webTest.TestApp` to avoid sending real requests.
+    Mocks request calls targeting a :class:`webTest.TestApp` to avoid sub-request calls to send real requests.
 
     Executes ``app.function(*args, **kwargs)`` with a mock of every underlying :func:`requests.request` call
     to relay their execution to the :class:`webTest.TestApp`.
@@ -360,7 +409,11 @@ def mocked_sub_requests(app, method_function, *args, only_local=False, **kwargs)
     argument of :paramref:`args`) doesn't correspond to the base URL of :paramref:`app`.
 
     :param app: application employed for the test
-    :param method_function: test application method to call (i.e.: ``post``, ``post_json``, ``get``, etc.)
+    :param method_function:
+        Test application method, which represents an HTTP method name (i.e.: ``post``, ``post_json``, ``get``, etc.).
+        All ``*args`` and ``**kwargs`` should be request related items that will be passed down to a request-like call.
+        Otherwise, it can be any other function which will be called directly instead of doing the request toward the
+        test application. In this case, ``*args`` and ``**kwargs`` should correspond to the arguments of this function.
     :param only_local:
         When ``True``, only mock requests targeted at :paramref:`app` based on request URL hostname (ignore external).
         Otherwise, mock every underlying request regardless of hostname, including ones not targeting the application.
@@ -469,11 +522,13 @@ def mocked_sub_requests(app, method_function, *args, only_local=False, **kwargs)
         stack.enter_context(mock.patch("requests.sessions.Session.request", new=TestSession.request))
         stack.enter_context(mock.patch.object(FileLocal, "validator", new_callable=mock_file_regex))
         stack.enter_context(mock.patch.object(TestResponse, "json", new=TestResponseJsonCallable.json))
-        req_url, req_func, kwargs = _parse_for_app_req(method_function, *args, **kwargs)
-        kwargs.setdefault("expect_errors", True)
-        resp = req_func(req_url, **kwargs)
-        _patch_response_methods(resp, req_url)
-        return resp
+        if isinstance(method_function, str):
+            req_url, req_func, kwargs = _parse_for_app_req(method_function, *args, **kwargs)
+            kwargs.setdefault("expect_errors", True)
+            resp = req_func(req_url, **kwargs)
+            _patch_response_methods(resp, req_url)
+            return resp
+        return method_function(*args, **kwargs)
 
 
 def mocked_remote_wps(processes, languages=None):
@@ -743,8 +798,8 @@ def mocked_wps_output(settings,                 # type: SettingsType
     return mocked_file_server(wps_dir, wps_url, settings, mock_get, mock_head, headers_override, requests_mock)
 
 
-def mocked_execute_process():
-    # type: () -> Iterable[MockPatch]
+def mocked_execute_process(func_execute_process=None):
+    # type: (Optional[Callable[[str, str, AnyHeadersContainer], str]]) -> Iterable[MockPatch]
     """
     Contextual mock of a process execution to run locally instead of dispatched :mod:`celery` worker.
 
@@ -754,11 +809,18 @@ def mocked_execute_process():
     Bypasses ``execute_process.delay`` call by directly invoking the ``execute_process``.
 
     .. note::
-        Since ``delay`` and ``Celery`` are bypassed, the process execution becomes blocking (not asynchronous).
+        Since ``delay`` and :mod:`celery` are bypassed, the process execution becomes blocking (not asynchronous).
 
     .. seealso::
         - :func:`mocked_process_job_runner` to completely skip process execution.
         - :func:`setup_config_with_celery`
+
+    :param func_execute_process:
+        Function that should be called as substitute of the real :func:`process_execution`.
+        It is expected to receive the ``(job_id, wps_url, headers)`` parameters and return a valid member
+        of :mod:`weaver.status` as return value for proper integration with calling methods.
+        If not provided, the real :func:`process_execution` will be called, but with prior mock of any :mod:`celery`
+        related asynchronous dispatching to execute the actual process definition inline.
     """
     from weaver.processes.execution import execute_process as real_execute_process
 
@@ -781,7 +843,10 @@ def mocked_execute_process():
     task = MockTask()
 
     def mock_execute_process(job_id, wps_url, headers):
-        real_execute_process(job_id, wps_url, headers)
+        if func_execute_process is None:
+            real_execute_process(job_id, wps_url, headers)
+        else:
+            func_execute_process(job_id, wps_url, headers)
         return task
 
     return (

@@ -47,7 +47,12 @@ from weaver.formats import (
     IANA_NAMESPACE,
     get_cwl_file_format
 )
-from weaver.processes.constants import CWL_REQUIREMENT_APP_DOCKER, CWL_REQUIREMENT_INIT_WORKDIR
+from weaver.processes.constants import (
+    CWL_REQUIREMENT_APP_DOCKER,
+    CWL_REQUIREMENT_INIT_WORKDIR,
+    PROCESS_SCHEMA_OGC,
+    PROCESS_SCHEMA_OLD
+)
 from weaver.processes.types import PROCESS_APPLICATION, PROCESS_BUILTIN
 from weaver.status import STATUS_DISMISSED, STATUS_RUNNING
 from weaver.utils import get_any_value
@@ -107,7 +112,7 @@ class WpsPackageAppTest(WpsConfigBase):
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
             "executionUnit": [{"unit": cwl}],
         }
-        desc, pkg = self.deploy_process(body, describe_schema="OGC")
+        desc, pkg = self.deploy_process(body, describe_schema=PROCESS_SCHEMA_OGC)
         assert desc["title"] == title
         assert pkg["label"] == title
 
@@ -144,7 +149,7 @@ class WpsPackageAppTest(WpsConfigBase):
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
             "executionUnit": [{"unit": cwl}],
         }
-        desc, _ = self.deploy_process(body, describe_schema="OLD")
+        desc, _ = self.deploy_process(body, describe_schema=PROCESS_SCHEMA_OLD)
         proc = desc["process"]
 
         assert proc["id"] == self._testMethodName
@@ -246,7 +251,7 @@ class WpsPackageAppTest(WpsConfigBase):
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
             "executionUnit": [{"unit": cwl}],
         }
-        desc, pkg = self.deploy_process(body, describe_schema="OLD")
+        desc, pkg = self.deploy_process(body, describe_schema=PROCESS_SCHEMA_OLD)
         proc = desc["process"]
 
         assert proc["id"] == self._testMethodName
@@ -286,7 +291,7 @@ class WpsPackageAppTest(WpsConfigBase):
         # assert pkg["outputs"][1]["label"] == "Additional detail only within WPS output", \
         #     "WPS I/O title should be converted to CWL label of corresponding I/O from additional details"
 
-        desc = self.describe_process(self._testMethodName, describe_schema="OGC")
+        desc = self.describe_process(self._testMethodName, describe_schema=PROCESS_SCHEMA_OGC)
         assert desc["id"] == self._testMethodName
         assert desc["title"] == "some title"
         assert desc["description"] == "this is a test"
@@ -376,7 +381,7 @@ class WpsPackageAppTest(WpsConfigBase):
                 "$namespaces": dict(list(ns_json.items()))
             }}],
         }
-        desc, pkg = self.deploy_process(body, describe_schema="OLD")
+        desc, pkg = self.deploy_process(body, describe_schema=PROCESS_SCHEMA_OLD)
         proc = desc["process"]
 
         assert proc["inputs"][0]["id"] == "wps_only_format_exists"
@@ -412,7 +417,7 @@ class WpsPackageAppTest(WpsConfigBase):
         assert pkg["inputs"][3]["type"] == "File"
         assert pkg["inputs"][3]["format"] == type_json
 
-        desc = self.describe_process(self._testMethodName, describe_schema="OGC")
+        desc = self.describe_process(self._testMethodName, describe_schema=PROCESS_SCHEMA_OGC)
         assert len(desc["inputs"]["wps_only_format_exists"]["formats"]) == 1
         assert desc["inputs"]["wps_only_format_exists"]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
         assert len(desc["inputs"]["wps_only_format_not_exists"]["formats"]) == 1
@@ -500,7 +505,7 @@ class WpsPackageAppTest(WpsConfigBase):
                 }
             }]
         }
-        desc, _ = self.deploy_process(body, describe_schema="OLD")
+        desc, _ = self.deploy_process(body, describe_schema=PROCESS_SCHEMA_OLD)
         proc = desc["process"]
         assert proc["inputs"][0]["id"] == "wps_format_mimeType"
         assert proc["inputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
@@ -511,7 +516,7 @@ class WpsPackageAppTest(WpsConfigBase):
         assert proc["outputs"][1]["id"] == "wps_format_mediaType"
         assert proc["outputs"][1]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
 
-        desc = self.describe_process(self._testMethodName, describe_schema="OGC")
+        desc = self.describe_process(self._testMethodName, describe_schema=PROCESS_SCHEMA_OGC)
         assert desc["inputs"]["wps_format_mimeType"]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
         assert desc["inputs"]["wps_format_mediaType"]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
         assert desc["outputs"]["wps_format_mimeType"]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
@@ -791,7 +796,7 @@ class WpsPackageAppTest(WpsConfigBase):
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
             "executionUnit": [{"unit": cwl}],
         }
-        desc, pkg = self.deploy_process(body, describe_schema="OLD")
+        desc, pkg = self.deploy_process(body, describe_schema=PROCESS_SCHEMA_OLD)
         proc = desc["process"]
 
         # process description input validation
@@ -1033,7 +1038,7 @@ class WpsPackageAppTest(WpsConfigBase):
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
             "executionUnit": [{"unit": cwl}],
         }
-        desc, pkg = self.deploy_process(body, describe_schema="OLD")
+        desc, pkg = self.deploy_process(body, describe_schema=PROCESS_SCHEMA_OLD)
         proc = desc["process"]
 
         assert proc["inputs"][0]["id"] == "required_literal"
@@ -1164,7 +1169,7 @@ class WpsPackageAppTest(WpsConfigBase):
             "executionUnit": [{"unit": cwl}],
         }
         try:
-            desc, _ = self.deploy_process(body, describe_schema="OLD")
+            desc, _ = self.deploy_process(body, describe_schema=PROCESS_SCHEMA_OLD)
         except colander.Invalid:
             self.fail("MinOccurs/MaxOccurs values defined as valid int/str should not raise an invalid schema error")
 
@@ -1215,7 +1220,7 @@ class WpsPackageAppTest(WpsConfigBase):
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
             "executionUnit": [{"unit": cwl}],
         }
-        desc, _ = self.deploy_process(body, describe_schema="OGC")
+        desc, _ = self.deploy_process(body, describe_schema=PROCESS_SCHEMA_OGC)
 
         assert isinstance(desc["inputs"], dict)
         assert len(desc["inputs"]) == len(body["processDescription"]["process"]["inputs"])
@@ -1375,7 +1380,7 @@ class WpsPackageAppTest(WpsConfigBase):
             "executionUnit": [{"unit": cwl}],
         }
         try:
-            desc, _ = self.deploy_process(body, describe_schema="OLD")
+            desc, _ = self.deploy_process(body, describe_schema=PROCESS_SCHEMA_OLD)
         except colander.Invalid:
             self.fail("Test")
 
@@ -1524,7 +1529,7 @@ class WpsPackageAppTest(WpsConfigBase):
             "executionUnit": [{"unit": cwl}],
         }
         try:
-            desc, _ = self.deploy_process(body, describe_schema="OLD")
+            desc, _ = self.deploy_process(body, describe_schema=PROCESS_SCHEMA_OLD)
         except colander.Invalid:
             self.fail("Test")
 
@@ -1849,7 +1854,7 @@ class WpsPackageAppTest(WpsConfigBase):
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
             "executionUnit": [{"unit": cwl}],
         }
-        desc, _ = self.deploy_process(body, describe_schema="OLD")
+        desc, _ = self.deploy_process(body, describe_schema=PROCESS_SCHEMA_OLD)
         proc = desc["process"]
         assert proc["id"] == self._testMethodName
         assert proc["title"] == "some title"
@@ -1947,7 +1952,7 @@ class WpsPackageAppTest(WpsConfigBase):
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
             "executionUnit": [{"unit": cwl}],
         }
-        desc, pkg = self.deploy_process(body, describe_schema="OLD")
+        desc, pkg = self.deploy_process(body, describe_schema=PROCESS_SCHEMA_OLD)
         proc = desc["process"]
 
         assert proc["id"] == self._testMethodName
@@ -2017,7 +2022,7 @@ class WpsPackageAppTest(WpsConfigBase):
             "executionUnit": [{"href": "mock://{}".format(resources.WPS_LITERAL_COMPLEX_IO_XML)}],
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication"
         }
-        desc, pkg = self.deploy_process(body, describe_schema="OLD")
+        desc, pkg = self.deploy_process(body, describe_schema=PROCESS_SCHEMA_OLD)
 
         # basic contents validation
         assert "cwlVersion" in pkg
@@ -2104,7 +2109,7 @@ class WpsPackageAppTest(WpsConfigBase):
             "executionUnit": [{"href": "mock://{}".format(resources.WPS_ENUM_ARRAY_IO_XML)}],
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication"
         }
-        desc, pkg = self.deploy_process(body, describe_schema="OLD")
+        desc, pkg = self.deploy_process(body, describe_schema=PROCESS_SCHEMA_OLD)
 
         # basic contents validation
         assert "cwlVersion" in pkg

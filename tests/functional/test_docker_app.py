@@ -138,8 +138,7 @@ class WpsPackageDockerAppTest(WpsConfigBase):
         with contextlib.ExitStack() as stack_exec:
             # setup
             dir_name = tempfile.gettempdir()
-            tmp_path = tempfile.NamedTemporaryFile(dir=dir_name, mode="w", suffix=".txt")
-            tmp_file = stack_exec.enter_context(tmp_path)  # noqa
+            tmp_file = stack_exec.enter_context(tempfile.NamedTemporaryFile(dir=dir_name, mode="w", suffix=".txt"))
             tmp_file.write(test_content)
             tmp_file.seek(0)
             exec_body = {
@@ -184,8 +183,7 @@ class WpsPackageDockerAppTest(WpsConfigBase):
         with contextlib.ExitStack() as stack_exec:
             # setup
             dir_name = tempfile.gettempdir()
-            tmp_path = tempfile.NamedTemporaryFile(dir=dir_name, mode="w", suffix=".txt")
-            tmp_file = stack_exec.enter_context(tmp_path)  # noqa
+            tmp_file = stack_exec.enter_context(tempfile.NamedTemporaryFile(dir=dir_name, mode="w", suffix=".txt"))
             tmp_file.write(test_content)
             tmp_file.seek(0)
             for mock_exec in mocked_execute_process():
