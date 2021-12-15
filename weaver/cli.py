@@ -129,13 +129,13 @@ class WeaverClient(object):
         return parsed_url.rsplit("/", 1)[0] if parsed_url.endswith("/") else parsed_url
 
     @staticmethod
-    def _parse_result(response):
-        # type: (Response) -> OperationResult
+    def _parse_result(response, message=None):
+        # type: (Response, Optional[str]) -> OperationResult
         hdr = dict(response.headers)
         success = False
         try:
             body = response.json()
-            msg = body.get("description", body.get("message", "undefined"))
+            msg = message or body.get("description", body.get("message", "undefined"))
             if response.status_code >= 400:
                 if not msg:
                     msg = body.get("error", body.get("exception", "unknown"))
@@ -324,7 +324,9 @@ class WeaverClient(object):
         base = self._get_url(url)
         path = f"{base}/processes/{process_id}"
         resp = request_extra("GET", path, headers=self._headers, settings=self._settings)
-        return self._parse_result(resp)
+        # API response from this request can contain 'description' matching the process description
+        # rather than a generic response 'description'. Enforce the provided message to avoid confusion.
+        return self._parse_result(resp, message="Process description successfully retrieved.")
 
     @staticmethod
     def _parse_inputs(inputs):

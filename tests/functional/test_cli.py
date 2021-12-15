@@ -184,7 +184,8 @@ class TestWeaverClient(TestWeaverClientBase):
         assert result.body["outputs"]["output"]["title"] == "output"
         assert result.body["outputs"]["output"]["description"] == "Output file with echo message."
         assert result.body["outputs"]["output"]["formats"] == [{"default": True, "mediaType": CONTENT_TYPE_TEXT_PLAIN}]
-        assert "undefined" not in result.message
+        assert "undefined" not in result.message, "CLI should not have confused process description as response detail."
+        assert "echo" in result.body["description"], "CLI should not have overridden the process description field."
 
     def run_execute_inputs_schema_variant(self, inputs_param, preload=False, expect_success=True, mock_exec=True):
         if isinstance(inputs_param, str):
