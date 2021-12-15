@@ -153,7 +153,6 @@ def get_local_process(request):
         process["inputs"] = opensearch.replace_inputs_describe_process(process.inputs, process.payload)
         schema = request.params.get("schema")
         offering = process.offering(schema)
-        offering["description"] = sd.OkGetProcessInfoResponse.description
         return HTTPOk(json=offering)
     # FIXME: handle colander invalid directly in tween (https://github.com/crim-ca/weaver/issues/112)
     except colander.Invalid as ex:
