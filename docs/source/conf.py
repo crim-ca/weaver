@@ -126,7 +126,7 @@ autoapi_python_class_content = "both"   # class|both|init
 autoapi_template_dir = "../_templates/autoapi"
 
 # sphinx_autodoc_typehints
-set_type_checking_flag = True
+set_type_checking_flag = False
 typehints_fully_qualified = True
 always_document_param_types = True
 
