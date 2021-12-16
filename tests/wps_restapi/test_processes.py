@@ -4,6 +4,7 @@ import base64
 import contextlib
 import copy
 import json
+import os
 import unittest
 from copy import deepcopy
 from typing import TYPE_CHECKING
@@ -26,6 +27,7 @@ from tests.utils import (
     setup_mongodb_processstore,
     setup_mongodb_servicestore
 )
+from weaver import WEAVER_ROOT_DIR
 from weaver.datatype import AuthenticationTypes, Process, Service
 from weaver.exceptions import JobNotFound, ProcessNotFound
 from weaver.execute import (
@@ -38,10 +40,10 @@ from weaver.execute import (
     EXECUTE_TRANSMISSION_MODE_VALUE
 )
 from weaver.formats import ACCEPT_LANGUAGE_FR_CA, CONTENT_TYPE_APP_JSON
-from weaver.processes.constants import PROCESS_SCHEMA_OLD
+from weaver.processes.constants import CWL_REQUIREMENT_APP_WPS1, PROCESS_SCHEMA_OLD
 from weaver.processes.wps_testing import WpsTestProcess
 from weaver.status import STATUS_ACCEPTED
-from weaver.utils import fully_qualified_name, get_path_kvp, ows_context_href
+from weaver.utils import fully_qualified_name, get_path_kvp, load_file, ows_context_href
 from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC
 from weaver.wps.utils import get_wps_url
 from weaver.wps_restapi import swagger_definitions as sd
@@ -90,45 +92,6 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         self.process_store.save_process(self.process_private)
         self.process_store.set_visibility(self.process_public.identifier, VISIBILITY_PUBLIC)
         self.process_store.set_visibility(self.process_private.identifier, VISIBILITY_PRIVATE)
-
-    @staticmethod
-    def get_sample_cwl_docker():
-        # type: () -> CWL
-        """
-        Sample :term:`CWL` with ``DockerRequirement``.
-
-        .. note::
-            Same definition as the one provided in :ref:`app_pkg_script` documentation.
-        """
-        cwl = {
-            "cwlVersion": "v1.0",
-            "class": "CommandLineTool",
-            "baseCommand": "cat",
-            "requirements": {
-                "DockerRequirement": {
-                    "dockerPull": "debian:stretch-slim"
-                }
-            },
-            "inputs": [
-                {
-                    "id": "file",
-                    "type": "File",
-                    "inputBinding": {
-                        "position": 1
-                    }
-                }
-            ],
-            "outputs": [
-                {
-                    "id": "output",
-                    "type": "File",
-                    "outputBinding": {
-                        "glob": "stdout.log"
-                    }
-                }
-            ]
-        }
-        return cwl  # noqa  # type: CWL
 
     def get_process_deploy_template(self, process_id=None, cwl=None):
         # type: (Optional[str], Optional[CWL]) -> JSON
@@ -598,9 +561,21 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         resp = self.app.get(proc_url, params=proc_query, headers=self.json_headers)
         assert resp.status_code == 200
         self.assert_deployed_wps3(resp.json, expected_process_id)
+        return resp.json
+
+    def get_process_package(self, process_id):
+        resp = self.app.get(f"/processes/{process_id}/package", headers=self.json_headers)
+        assert resp.status_code == 200
+        return resp.json
 
     def test_deploy_process_CWL_DockerRequirement_auth_header_format(self):
-        cwl = self.get_sample_cwl_docker()
+        """
+        Test deployment ofa process with authentication to access the referenced repository.
+
+        .. note::
+            Use same definition as the one provided in :ref:`app_pkg_script` documentation.
+        """
+        cwl = load_file(os.path.join(WEAVER_ROOT_DIR, "docs/examples/docker-shell-script-cat.cwl"))
         docker = "fake.repo/org/private-image:latest"
         cwl["requirements"]["DockerRequirement"]["dockerPull"] = docker
         body = self.get_process_deploy_template(cwl=cwl)
@@ -639,10 +614,23 @@ class WpsRestApiProcessesTest(unittest.TestCase):
     def test_deploy_process_CWL_DockerRequirement_executionUnit(self):
         raise NotImplementedError
 
-    # FIXME: implement
-    @pytest.mark.skip(reason="not implemented")
+    @mocked_remote_server_requests_wps1([
+        resources.TEST_REMOTE_SERVER_URL,
+        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
+        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
+    ])
     def test_deploy_process_CWL_WPS1Requirement_href(self):
-        raise NotImplementedError
+        body = {
+            "processDescription": {"process": {"id": resources.TEST_REMOTE_PROCESS_WPS1_ID}},
+            "executionUnit": [{"href": resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_URL}]
+        }
+        self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_PROCESS_WPS1_ID)
+        cwl = self.get_process_package(resources.TEST_REMOTE_PROCESS_WPS1_ID)
+        assert "hints" in cwl and CWL_REQUIREMENT_APP_WPS1 in cwl["hints"]
+        assert "process" in cwl["hints"][CWL_REQUIREMENT_APP_WPS1]
+        assert "provider" in cwl["hints"][CWL_REQUIREMENT_APP_WPS1]
+        assert cwl["hints"][CWL_REQUIREMENT_APP_WPS1]["process"] == resources.TEST_REMOTE_PROCESS_WPS1_ID
+        assert cwl["hints"][CWL_REQUIREMENT_APP_WPS1]["provider"] == resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_URL
 
     # FIXME: implement
     @pytest.mark.skip(reason="not implemented")
