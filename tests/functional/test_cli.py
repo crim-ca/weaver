@@ -65,8 +65,12 @@ class TestWeaverClientBase(WpsConfigBase):
             shutil.rmtree(tmp_wps_out, ignore_errors=True)
 
     @staticmethod
-    def load_resource_file(name):
-        with open(os.path.join(APP_PKG_ROOT, name)) as echo_file:
+    def get_resource_file(name):
+        return os.path.join(APP_PKG_ROOT, name)
+
+    @classmethod
+    def load_resource_file(cls, name):
+        with open(cls.get_resource_file(APP_PKG_ROOT, name)) as echo_file:
             return yaml.safe_load(echo_file)
 
 
