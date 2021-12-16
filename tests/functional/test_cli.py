@@ -70,7 +70,7 @@ class TestWeaverClientBase(WpsConfigBase):
 
     @classmethod
     def load_resource_file(cls, name):
-        with open(cls.get_resource_file(APP_PKG_ROOT, name)) as echo_file:
+        with open(cls.get_resource_file(name)) as echo_file:
             return yaml.safe_load(echo_file)
 
 
