@@ -401,8 +401,8 @@ class TestWeaverCLI(TestWeaverClientBase):
             entrypoint=weaver_cli,
             only_local=True,
         )
-        assert any(f"\"id\": \"Echo\"" in line for line in lines)
-        assert any(f"\"deploymentDone\": true" in line for line in lines)
+        assert any("\"id\": \"Echo\"" in line for line in lines)
+        assert any("\"deploymentDone\": true" in line for line in lines)
 
     def test_deploy_payload_body_cwl_embedded(self):
         test_id = f"{self.test_process_prefix}-deploy-body-no-cwl"
@@ -424,7 +424,7 @@ class TestWeaverCLI(TestWeaverClientBase):
             only_local=True,
         )
         assert any(f"\"id\": \"{test_id}\"" in line for line in lines)
-        assert any(f"\"deploymentDone\": true" in line for line in lines)
+        assert any("\"deploymentDone\": true" in line for line in lines)
 
     def test_deploy_payload_file_cwl_embedded(self):
         test_id = f"{self.test_process_prefix}-deploy-file-no-cwl"
@@ -451,7 +451,7 @@ class TestWeaverCLI(TestWeaverClientBase):
                 only_local=True,
             )
             assert any(f"\"id\": \"{test_id}\"" in line for line in lines)
-            assert any(f"\"deploymentDone\": true" in line for line in lines)
+            assert any("\"deploymentDone\": true" in line for line in lines)
 
     def test_deploy_payload_inject_cwl_body(self):
         test_id = f"{self.test_process_prefix}-deploy-body-with-cwl-body"
@@ -474,7 +474,7 @@ class TestWeaverCLI(TestWeaverClientBase):
             only_local=True,
         )
         assert any(f"\"id\": \"{test_id}\"" in line for line in lines)
-        assert any(f"\"deploymentDone\": true" in line for line in lines)
+        assert any("\"deploymentDone\": true" in line for line in lines)
 
     def test_deploy_payload_inject_cwl_file(self):
         test_id = f"{self.test_process_prefix}-deploy-body-with-cwl-file"
@@ -497,7 +497,7 @@ class TestWeaverCLI(TestWeaverClientBase):
             only_local=True,
         )
         assert any(f"\"id\": \"{test_id}\"" in line for line in lines)
-        assert any(f"\"deploymentDone\": true" in line for line in lines)
+        assert any("\"deploymentDone\": true" in line for line in lines)
 
     def test_describe(self):
         # prints formatted JSON ProcessDescription over many lines
