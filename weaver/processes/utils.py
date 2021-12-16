@@ -156,6 +156,22 @@ def _check_deploy(payload):
                     "error": "Invalid",
                     "value": d_inputs
                 })
+        p_exec_unit = payload.get("executionUnit", [{}])[0].get("unit")
+        r_exec_unit = results.get("executionUnit", [{}])[0].get("unit")
+        if p_exec_unit and p_exec_unit != r_exec_unit:
+            message = "Process deployment execution unit is invalid."
+            d_exec_unit = sd.CWL().deserialize(p_exec_unit)  # raises directly if cause is due to invalid schema
+            if r_exec_unit != d_exec_unit:  # otherwise raise a generic error, don't allow differing definitions
+                message = (
+                    "Process deployment execution unit resolved as valid definition but differs from submitted "
+                    "package. Aborting deployment to avoid mismatching package definitions."
+                )
+                raise HTTPBadRequest(json={
+                    "description": message,
+                    "cause": "unknown",
+                    "error": PackageRegistrationError.__name__,
+                    "value": d_exec_unit
+                })
         return results
     except colander.Invalid as exc:
         LOGGER.debug("Failed deploy body schema validation:\n%s", exc)
