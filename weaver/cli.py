@@ -9,7 +9,6 @@ import time
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
-from tests.utils import mocked_dismiss_process
 from weaver import __meta__
 from weaver.datatype import AutoBase
 from weaver.exceptions import PackageRegistrationError
@@ -535,7 +534,6 @@ class WeaverClient(object):
                         outputs[output]["path"] = file_path
         return OperationResult(True, "Retrieved job results.", outputs)
 
-    @mocked_dismiss_process()
     def dismiss(self, job_reference, url=None):
         """
         Dismiss pending or running :term:`Job`, or clear result artifacts from a completed :term:`Job`.
