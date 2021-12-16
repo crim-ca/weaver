@@ -126,7 +126,7 @@ autoapi_python_class_content = "both"   # class|both|init
 autoapi_template_dir = "../_templates/autoapi"
 
 # sphinx_autodoc_typehints
-set_type_checking_flag = True
+set_type_checking_flag = False
 typehints_fully_qualified = True
 always_document_param_types = True
 
@@ -165,6 +165,11 @@ release = __meta__.__version__
 # This is also used if you do content translation via gettext catalogs.
 # Usually you set "language" from the command line for these cases.
 language = "en"
+
+# allow conversion of quotes and repeated dashes to other representation characters
+# https://www.sphinx-doc.org/en/master/usage/configuration.html#confval-smartquotes
+# disable to avoid problems with '--param' employed in document of CLI.
+smartquotes = False
 
 # There are two options for replacing |today|: either, you set today to some
 # non-false value, then it is used:

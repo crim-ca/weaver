@@ -14,7 +14,9 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Fix help message of CLI arguments not properly grouped within intended sections.
+- Fix handling of mutually exclusive CLI arguments in distinct operation sub-parsers.
+- Fix requirement of ``--process`` and ``--job`` CLI arguments.
 
 `4.6.0 <https://github.com/crim-ca/weaver/tree/4.6.0>`_ (2021-12-15)
 ========================================================================
