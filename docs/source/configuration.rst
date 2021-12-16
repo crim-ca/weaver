@@ -333,10 +333,14 @@ simply set setting ``weaver.wps_processes_file`` as *undefined* (i.e.: nothing a
     - `wps_processes.yml.example`_
 
 
+.. _conf_request_options:
+
 Configuration of Request Options
 =======================================
 
 .. todo:: complete docs
+
+:term:`Request Options`
 
 ``weaver.ssl_verify``
 

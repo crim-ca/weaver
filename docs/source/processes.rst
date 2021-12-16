@@ -556,19 +556,26 @@ In this case, it becomes the responsibility of this remote instance to handle th
 avoids potential problems such as if `Weaver` as :term:`EMS` doesn't have authorized access to a link that only the
 target :term:`ADES` would have access to.
 
-When :term:`CWL` package defines ``WPS1Requirement`` under ``hints`` for corresponding `WPS-1/2`_ remote processes being
-monitored by `Weaver`, it will skip fetching of ``http(s)``-based references since that would otherwise lead to useless
-double downloads (one on `Weaver` and the other on the :term:`WPS` side). It is the same in situation for
+When :term:`CWL` package defines ``WPS1Requirement`` under ``hints`` for corresponding `WPS-1/2`_ remote processes
+being monitored by `Weaver`, it will skip fetching of |http_scheme|-based references since that would otherwise lead
+to useless double downloads (one on `Weaver` and the other on the :term:`WPS` side). It is the same in situation for
 ``ESGF-CWTRequirement`` employed for `ESGF-CWT`_ processes. Because these processes do not always support :term:`S3`
 buckets, and because `Weaver` supports many variants of :term:`S3` reference formats, it will first fetch the :term:`S3`
-reference using its internal |aws-config|_, and then expose this downloaded file as ``https(s)`` reference
+reference using its internal |aws-config|_, and then expose this downloaded file as |http_scheme| reference
 accessible by the remote :term:`WPS` process.
 
 .. note::
-    When `Weaver` is fetching remote files with |http_scheme|, it can take advantage of additional request options to
-    support unusual or server-specific handling of remote reference as necessary. This could be employed for instance
-    to attribute access permissions only to some given :term:`ADES` server by providing additional authorization tokens
-    to the requests. Please refer to :ref:`Configuration of Request Options` for this matter.
+    When `Weaver` is fetching remote files with |http_scheme|, it can take advantage of additional
+    :term:`Request Options` to support unusual or server-specific handling of remote reference as necessary.
+    This could be employed for instance to attribute access permissions only to some given :term:`ADES` server by
+    providing additional authorization tokens to the requests. Please refer to :ref:`Configuration of Request Options`
+    for this matter.
+
+.. note::
+    An exception to above mentioned skipped fetching of |http_scheme| files is when the corresponding :term:`Process`
+    types are intermediate steps within a `Workflow`_. In this case, local staging of remote results occurs between
+    each step because `Weaver` cannot assume any of the remote :term:`Provider` is able to communicate with each other,
+    according to potential :term:`Request Options` or :term:`Data Source` only configured for access by `Weaver`.
 
 When using :term:`S3` references, `Weaver` will attempt to retrieve the file using server |aws-config|_ and
 |aws-credentials|_. Provided that the corresponding :term:`S3` bucket can be accessed by the running `Weaver`

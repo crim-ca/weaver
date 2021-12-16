@@ -579,7 +579,7 @@ Fixes:
 Changes:
 --------
 - Add ``weaver.wps.utils.get_wps_client`` function to handle the creation of ``owslib.wps.WebProcessingService`` client
-  with appropriate request options configuration from application settings.
+  with appropriate *request options* configuration from application settings.
 
 Fixes:
 ------

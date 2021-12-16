@@ -498,20 +498,17 @@ class WorkflowTestRunnerBase(TestCase):
         :param process_id: identifier of the process to retrieve contents.
         :return: found content definitions.
         """
-        base = os.getenv("TEST_GITHUB_SOURCE_URL",
-                         "https://raw.githubusercontent.com/crim-ca/testbed14/master/application-packages")
         pid = process_id.value
-        deploy_path = "{base}/{proc}/DeployProcess_{proc}.json".format(base=base, proc=pid)
-        execute_path = "{base}/{proc}/Execute_{proc}.json".format(base=base, proc=pid)
-        deploy_payload = cls.retrieve_payload(pid, [deploy_path])
+        deploy_payload = cls.retrieve_payload(pid, "deploy")
         new_process_id = cls.get_test_process_id(deploy_payload["processDescription"]["process"]["id"])
         deploy_payload["processDescription"]["process"]["id"] = new_process_id
-        execute_payload = cls.retrieve_payload(pid, [execute_path])
+        execute_payload = cls.retrieve_payload(pid, "execute")
 
         # replace derived reference (local only, remote must used full 'href' references)
         test_app_pkg = deploy_payload.get("executionUnit", [{}])[0].pop("test", None)
         if test_app_pkg:
-            unit_app_pkg = cls.retrieve_payload(pid, [test_app_pkg])
+            test_app_pkg = os.path.join(os.path.dirname(__file__), "application-packages", test_app_pkg)
+            unit_app_pkg = cls.retrieve_payload(pid, location=test_app_pkg)
             deploy_payload["executionUnit"][0]["unit"] = unit_app_pkg
 
         # Apply collection swapping
@@ -523,8 +520,8 @@ class WorkflowTestRunnerBase(TestCase):
         return ProcessInfo(process_id, new_process_id, deploy_payload, execute_payload)
 
     @classmethod
-    def retrieve_payload(cls, process, ref_type=None, url=None):
-        # type: (str, Optional[str], Optional[str]) -> JSON
+    def retrieve_payload(cls, process, ref_type=None, location=None):
+        # type: (str, Optional[str], Optional[str]) -> Dict[str, JSON]
         """
         Retrieve content using known structures and locations.
 
@@ -533,11 +530,11 @@ class WorkflowTestRunnerBase(TestCase):
 
         :param process: process identifier
         :param ref_type: content reference type to retrieve {deploy, execute, package}.
-        :param url: override URL (unique location with exact lookup instead of variations).
+        :param location: override location (unique location with exact lookup instead of variations).
         :return: first matched contents.
         """
-        if url:
-            locations = [url]
+        if location:
+            locations = [location]
         else:
             var_locations = {
                 os.path.join(os.path.dirname(__file__), "application-packages"),
@@ -583,10 +580,10 @@ class WorkflowTestRunnerBase(TestCase):
                             return json_payload
                     tested_ref.append(path_ext)
                     if urlparse(path_ext).scheme != "":
-                        resp = cls.request("GET", url, force_requests=True, ignore_errors=True)
+                        resp = cls.request("GET", path, force_requests=True, ignore_errors=True)
                         if resp.status_code == HTTPOk.code:
                             return yaml.safe_load(resp.text)  # both JSON/YAML
-                        tested_ref.append(url)
+                        tested_ref.append(path)
         except (IOError, ValueError):
             pass
         cls.log("{}Cannot find payload from any of the following references:\n- {}"

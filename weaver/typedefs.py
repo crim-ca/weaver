@@ -164,7 +164,7 @@ if TYPE_CHECKING:
     DataSourceConfig = Dict[str, DataSource]  # JSON/YAML file contents
 
     JobValueItem = TypedDict("JobValueItem",
-                             {"id": str, "href": Optional[str], "data": Optional[AnyValue]}, total=False)
+                             {"id": str, "href": Optional[str], "data": Optional[AnyValueType]}, total=False)
     JobExpectItem = TypedDict("JobExpectItem", {"id": str}, total=True)
     JobInputs = List[Union[JobValueItem, Dict[str, AnyValueType]]]
     JobOutputs = List[Union[JobExpectItem, Dict[str, AnyValueType]]]

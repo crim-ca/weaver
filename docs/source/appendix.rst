@@ -125,6 +125,11 @@ Glossary
         Entity that offers an ensemble of :term:`Process` under it. It is typically a reference to a remote service,
         where any :term:`Process` it provides is fetched dynamically on demand.
 
+    Request Options
+        Configuration settings that can be defined for `Weaver` in order to automatically insert additional
+        HTTP request parameters, authentication or other any relevant rules when target URLs are matched.
+        See also :ref:`conf_request_options`.
+
     S3
         Simple Storage Service (:term:`AWS` S3), bucket file storage.
 

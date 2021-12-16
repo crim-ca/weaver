@@ -108,8 +108,8 @@ a registered process execution with received inputs from a WPS request to expose
 in a *EMS* workflow execution chain.
 
 `Weaver` **extends** the |ogc-proc-api|_ by providing additional functionalities such as more detailed job log routes,
-adding more process management request options than required by the standard, and supporting *remote providers* to name
-a few. Because of this, not all features offered in `Weaver` are guaranteed to be applicable on other similarly
+adding more process management :term:`Request Options` than required by the standard, and supporting *remote providers*
+to name a few. Because of this, not all features offered in `Weaver` are guaranteed to be applicable on other similarly
 behaving `ADES` and/or `EMS` instances. The reference specification is tracked to preserve the minimal conformance
 requirements and provide feedback to |ogc|_ (OGC) in this effect.
 
