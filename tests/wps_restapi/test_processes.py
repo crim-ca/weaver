@@ -5,6 +5,7 @@ import contextlib
 import copy
 import json
 import os
+import tempfile
 import unittest
 from copy import deepcopy
 from typing import TYPE_CHECKING
@@ -22,6 +23,7 @@ from tests.utils import (
     mocked_process_job_runner,
     mocked_process_package,
     mocked_remote_server_requests_wps1,
+    mocked_wps_output,
     setup_config_with_mongodb,
     setup_mongodb_jobstore,
     setup_mongodb_processstore,
@@ -98,7 +100,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         """
         Provides deploy process bare minimum template with undefined execution unit.
 
-        To be used in conjunction with `get_process_package_mock` to avoid extra package content-specific validations.
+        To be used in conjunction with `get_application_package_mock` to avoid extra package content-specific validations.
         """
         if not process_id:
             process_id = self.fully_qualified_test_process_name()
@@ -563,10 +565,22 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         self.assert_deployed_wps3(resp.json, expected_process_id)
         return resp.json
 
-    def get_process_package(self, process_id):
+    def get_application_package(self, process_id):
         resp = self.app.get(f"/processes/{process_id}/package", headers=self.json_headers)
         assert resp.status_code == 200
         return resp.json
+
+    def validate_wps1_package(self, process_id, provider_url):
+        cwl = self.get_application_package(process_id)
+        assert "hints" in cwl and CWL_REQUIREMENT_APP_WPS1 in cwl["hints"]
+        assert "process" in cwl["hints"][CWL_REQUIREMENT_APP_WPS1]
+        assert "provider" in cwl["hints"][CWL_REQUIREMENT_APP_WPS1]
+        assert cwl["hints"][CWL_REQUIREMENT_APP_WPS1]["process"] == process_id
+        if provider_url.endswith("/"):
+            valid_urls = [provider_url, provider_url[:-1]]
+        else:
+            valid_urls = [provider_url, provider_url + "/"]
+        assert cwl["hints"][CWL_REQUIREMENT_APP_WPS1]["provider"] in valid_urls
 
     def test_deploy_process_CWL_DockerRequirement_auth_header_format(self):
         """
@@ -575,7 +589,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         .. note::
             Use same definition as the one provided in :ref:`app_pkg_script` documentation.
         """
-        cwl = load_file(os.path.join(WEAVER_ROOT_DIR, "docs/examples/docker-shell-script-cat.cwl"))
+        cwl = load_file(os.path.join(WEAVER_ROOT_DIR, "docs/examples/docker-shell-script-cat.cwl"))  # type: CWL
         docker = "fake.repo/org/private-image:latest"
         cwl["requirements"]["DockerRequirement"]["dockerPull"] = docker
         body = self.get_process_deploy_template(cwl=cwl)
@@ -620,27 +634,65 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
     ])
     def test_deploy_process_CWL_WPS1Requirement_href(self):
-        body = {
-            "processDescription": {"process": {"id": resources.TEST_REMOTE_PROCESS_WPS1_ID}},
-            "executionUnit": [{"href": resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_URL}]
-        }
-        self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_PROCESS_WPS1_ID)
-        cwl = self.get_process_package(resources.TEST_REMOTE_PROCESS_WPS1_ID)
-        assert "hints" in cwl and CWL_REQUIREMENT_APP_WPS1 in cwl["hints"]
-        assert "process" in cwl["hints"][CWL_REQUIREMENT_APP_WPS1]
-        assert "provider" in cwl["hints"][CWL_REQUIREMENT_APP_WPS1]
-        assert cwl["hints"][CWL_REQUIREMENT_APP_WPS1]["process"] == resources.TEST_REMOTE_PROCESS_WPS1_ID
-        assert cwl["hints"][CWL_REQUIREMENT_APP_WPS1]["provider"] == resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_URL
+        with contextlib.ExitStack() as stack:
+            stack.enter_context(mocked_wps_output(self.settings))
+            out_dir = self.settings["weaver.wps_output_dir"]
+            out_url = self.settings["weaver.wps_output_url"]
+            tmp_dir = stack.enter_context(tempfile.TemporaryDirectory(dir=out_dir))
+            tmp_file = os.path.join(tmp_dir, "wps1.cwl")
+            tmp_href = tmp_file.replace(out_dir, out_url)
+            with open(tmp_file, "w") as cwl_file:
+                json.dump({
+                    "cwlVersion": "v1.0",
+                    "class": "CommandLineTool",
+                    "hints": {
+                        CWL_REQUIREMENT_APP_WPS1: {
+                            "process": resources.TEST_REMOTE_PROCESS_WPS1_ID,
+                            "provider": resources.TEST_REMOTE_SERVER_URL
+                        }
+                    }
+                }, cwl_file)
+
+            body = {
+                "processDescription": {"process": {"id": resources.TEST_REMOTE_PROCESS_WPS1_ID}},
+                "executionUnit": [{"href": tmp_href}]
+            }
+            self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_PROCESS_WPS1_ID)
+            self.validate_wps1_package(
+                resources.TEST_REMOTE_PROCESS_WPS1_ID,
+                resources.TEST_REMOTE_SERVER_URL
+            )
 
     # FIXME: implement
     @pytest.mark.skip(reason="not implemented")
     def test_deploy_process_CWL_WPS1Requirement_owsContext(self):
         raise NotImplementedError
 
-    # FIXME: implement
-    @pytest.mark.skip(reason="not implemented")
+    @mocked_remote_server_requests_wps1([
+        resources.TEST_REMOTE_SERVER_URL,
+        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
+        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
+    ])
     def test_deploy_process_CWL_WPS1Requirement_executionUnit(self):
-        raise NotImplementedError
+        cwl = {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "hints": {
+                CWL_REQUIREMENT_APP_WPS1: {
+                    "process": resources.TEST_REMOTE_PROCESS_WPS1_ID,
+                    "provider": resources.TEST_REMOTE_SERVER_URL
+                }
+            }
+        }
+        body = {
+            "processDescription": {"process": {"id": resources.TEST_REMOTE_PROCESS_WPS1_ID}},
+            "executionUnit": [{"unit": cwl}]
+        }
+        self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_PROCESS_WPS1_ID)
+        self.validate_wps1_package(
+            resources.TEST_REMOTE_PROCESS_WPS1_ID,
+            resources.TEST_REMOTE_SERVER_URL
+        )
 
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
@@ -653,6 +705,10 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             "executionUnit": [{"href": resources.TEST_REMOTE_SERVER_URL}]  # some URL just to fulfill schema validation
         }
         self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_PROCESS_WPS1_ID)
+        self.validate_wps1_package(
+            resources.TEST_REMOTE_PROCESS_WPS1_ID,
+            resources.TEST_REMOTE_SERVER_URL
+        )
 
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
@@ -674,7 +730,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
     ])
     def test_deploy_process_WPS1_DescribeProcess_executionUnit(self):
         """
-        Test process deployment using a WPS-1 DescribeProcess URL specified as process description reference.
+        Test process deployment using a WPS-1 DescribeProcess URL specified as an execution unit reference.
         """
         body = {
             "processDescription": {"process": {"id": resources.TEST_REMOTE_PROCESS_WPS1_ID}},
@@ -682,6 +738,10 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
         }
         self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_PROCESS_WPS1_ID)
+        self.validate_wps1_package(
+            resources.TEST_REMOTE_PROCESS_WPS1_ID,
+            resources.TEST_REMOTE_SERVER_URL
+        )
 
     @pytest.mark.skip(reason="not implemented")
     @mocked_remote_server_requests_wps1([
