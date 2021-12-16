@@ -68,8 +68,8 @@ class TestWeaverClientBase(WpsConfigBase):
     def get_resource_file(name, process="Echo"):
         return os.path.join(APP_PKG_ROOT, process, name)
 
-    @staticmethod
-    def load_resource_file(name, process="Echo"):
+    @classmethod
+    def load_resource_file(cls, name, process="Echo"):
         with open(TestWeaverClientBase.get_resource_file(name, process)) as res_file:
             return yaml.safe_load(res_file)
 
