@@ -64,15 +64,16 @@ def _get_builtin_metadata(process_id, process_path, meta_field, clean=False):
 
 
 def _replace_template(pkg, var, val):
-    # type: (CWL, str, str) -> CWL
+    # type: (Union[CWL, str], str, str) -> CWL
     if isinstance(pkg, str):
-        return Template(pkg).safe_substitute({var: val})
-    for k in pkg:  # type: str
-        if isinstance(pkg[k], list):
-            for i, _ in enumerate(pkg[k]):
-                pkg[k][i] = _replace_template(pkg[k][i], var, val)
-        elif isinstance(pkg[k], (dict, str)):
-            pkg[k] = _replace_template(pkg[k], var, val)
+        return Template(pkg).safe_substitute({var: val})  # type: ignore
+    for key in pkg:  # type: str
+        field = pkg[key]  # type: ignore
+        if isinstance(field, list):
+            for i, _ in enumerate(field):
+                field[i] = _replace_template(field[i], var, val)
+        elif isinstance(field, (dict, str)):
+            pkg[key] = _replace_template(field, var, val)  # type: ignore
     return pkg
 
 

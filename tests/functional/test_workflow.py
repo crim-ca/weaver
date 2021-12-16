@@ -85,7 +85,8 @@ class WorkflowProcesses(enum.Enum):
     WORKFLOW_SUBSET_NASA_ESGF_SUBSET_CRIM = "WorkflowSubsetNASAESGF_SubsetCRIM"
     WORKFLOW_FILE_TO_SUBSET_CRIM = "WorkflowFile_To_SubsetCRIM"
     WORKFLOW_STAGE_COPY_IMAGES = "WorkflowStageCopyImages"
-    WORKFLOW_WPS1_COPY_NETCDF = "WorkflowWPS1CopyNetCDF"
+    WORKFLOW_WPS1_SCATTER_COPY_NETCDF = "WorkflowWPS1ScatterCopyNetCDF"
+    WORKFLOW_WPS1_SELECT_COPY_NETCDF = "WorkflowWPS1SelectCopyNetCDF"
 
 
 class ProcessInfo(object):
@@ -864,7 +865,8 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
     WEAVER_TEST_WORKFLOW_SET = {
         WorkflowProcesses.WORKFLOW_CHAIN_COPY,
         WorkflowProcesses.WORKFLOW_STAGE_COPY_IMAGES,
-        WorkflowProcesses.WORKFLOW_WPS1_COPY_NETCDF,
+        WorkflowProcesses.WORKFLOW_WPS1_SCATTER_COPY_NETCDF,
+        WorkflowProcesses.WORKFLOW_WPS1_SELECT_COPY_NETCDF,
     }
 
     # FIXME: implement + re-enable 'CWL_REQUIREMENT_SCATTER'
@@ -880,7 +882,7 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
         """
 
         with contextlib.ExitStack() as stack:
-            tmp_host = "https://mocked-file-server.com"  # must match in 'Execute_WorkflowCopyNestedOutDir.json'
+            tmp_host = "https://mocked-file-server.com"  # must match in 'Execute_WorkflowScatterCopyNestedOutDir.json'
             tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())
             nc_refs = []
             for i in range(3):
@@ -894,10 +896,56 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
             def mock_tmp_input(requests_mock):
                 mocked_file_server(tmp_dir, tmp_host, self.settings, requests_mock=requests_mock)
 
-            self.workflow_runner(WorkflowProcesses.WORKFLOW_WPS1_COPY_NETCDF,
+            self.workflow_runner(WorkflowProcesses.WORKFLOW_WPS1_SCATTER_COPY_NETCDF,
                                  [WorkflowProcesses.APP_WPS1_JSON_ARRAY_2_NETCDF,
                                   WorkflowProcesses.APP_DOCKER_NETCDF_2_TEXT],
                                  log_full_trace=True, requests_mock_callback=mock_tmp_input)
+
+    def test_workflow_mixed_wps1_docker_select_requirements(self):
+        """
+        Test the use of multiple applications of different :term:`Process` type in a :term:`Workflow`.
+
+        Steps:
+            1. Convert JSON array of NetCDF references to corresponding NetCDF files
+               (using WPS-1 interface rather than WPS-REST).
+            2. Select only the first file within the list.
+            3. Convert NetCDF file to raw text data dumps.
+        """
+
+        with contextlib.ExitStack() as stack:
+            tmp_host = "https://mocked-file-server.com"  # must match in 'Execute_WorkflowSelectCopyNestedOutDir.json'
+            tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())
+            nc_refs = []
+            for i in range(3):
+                nc_name = f"test-file-{i}.nc"
+                nc_refs.append(os.path.join(tmp_host, nc_name))
+                with open(os.path.join(tmp_dir, nc_name), "w") as tmp_file:
+                    tmp_file.write(f"DUMMY NETCDF DATA #{i}")
+            with open(os.path.join(tmp_dir, "netcdf-array.json"), "w") as tmp_file:  # must match execution body
+                json.dump(nc_refs, tmp_file)
+
+            def mock_tmp_input(requests_mock):
+                mocked_file_server(tmp_dir, tmp_host, self.settings, requests_mock=requests_mock)
+
+            results = self.workflow_runner(WorkflowProcesses.WORKFLOW_WPS1_SELECT_COPY_NETCDF,
+                                           [WorkflowProcesses.APP_WPS1_JSON_ARRAY_2_NETCDF,
+                                            WorkflowProcesses.APP_DOCKER_NETCDF_2_TEXT],
+                                           log_full_trace=True, requests_mock_callback=mock_tmp_input)
+
+            stack.enter_context(mocked_wps_output(self.settings))  # allow retrieval of HTTP WPS output
+            stage_out_tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())  # different dir to avoid override
+            final_output = results.get("output", {}).get("href", "")
+            expected_index = 1  # see 'Execute_WorkflowSelectCopyNestedOutDir.json'
+            result_file = f"test-file-{expected_index}.txt"  # extension converted from NetCDF data dump
+            self.assert_test(lambda: final_output.startswith("http") and final_output.endswith(result_file),
+                             message="Workflow output file with nested directory globs should have been automatically"
+                                     "mapped between steps until the final staging WPS output URL.")
+            output_path = fetch_file(final_output, stage_out_tmp_dir, self.settings)
+            with open(output_path, "r") as out_file:
+                output_data = out_file.read()
+            self.assert_test(lambda: output_data == f"COPY:\nCOPY:\nDUMMY DATA #{expected_index}",
+                             message="Workflow output file with nested directory globs should contain "
+                                     "two COPY prefixes, one added by each intermediate step of the Workflow.")
 
     def test_workflow_docker_applications(self):
         self.workflow_runner(WorkflowProcesses.WORKFLOW_STAGE_COPY_IMAGES,

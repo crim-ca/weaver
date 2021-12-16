@@ -71,6 +71,7 @@ class TestWeaverClient(TestWeaverClientBase):
         assert result.body["processes"] == [
             # builtin
             "file2string_array",
+            "file_index_selector",
             "jsonarray2netcdf",
             "metalink2netcdf",
             # test process

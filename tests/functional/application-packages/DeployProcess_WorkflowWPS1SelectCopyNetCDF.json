@@ -1,0 +1,14 @@
+{
+    "processDescription": {
+        "process": {
+            "id": "WorkflowWPS1SelectCopyNetCDF",
+            "description": "Mock WPS-1 operation followed by copy of selected image."
+        }
+    },
+    "executionUnit": [
+        {
+            "test": "WorkflowWPS1SelectCopyNetCDF.cwl"
+        }
+    ],
+    "deploymentProfileName": "http://www.opengis.net/profiles/eoc/workflow"
+}
