@@ -9,6 +9,9 @@ import time
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
+import yaml
+from yaml.scanner import ScannerError
+
 from weaver import __meta__
 from weaver.datatype import AutoBase
 from weaver.exceptions import PackageRegistrationError
@@ -158,6 +161,8 @@ class WeaverClient(object):
             if body:
                 if isinstance(body, str) and (body.startswith("http") or os.path.isfile(body)):
                     data = load_file(body)
+                elif isinstance(body, str) and body.startswith("{") and body.endswith("}"):
+                    data = yaml.safe_load(body)
                 elif isinstance(body, dict):
                     data = body
                 else:
@@ -178,9 +183,35 @@ class WeaverClient(object):
             data.setdefault("processDescription", {})
             data["processDescription"].setdefault("process", {})
             data["processDescription"]["process"]["visibility"] = VISIBILITY_PUBLIC  # type: ignore
-        except (ValueError, TypeError) as exc:
+        except (ValueError, TypeError, ScannerError) as exc:
             return OperationResult(False, f"Failed resolution of body definition: [{exc!s}]", body)
         return OperationResult(True, "", data)
+
+    @staticmethod
+    def _parse_deploy_package(body, cwl, wps, process_id, headers):
+        # type: (JSON, Optional[CWL], Optional[str], Optional[str], HeadersType) -> OperationResult
+        try:
+            p_id = body.get("processDescription", {}).get("process", {}).get("id", process_id)
+            info = {"id": p_id}  # minimum requirement for process offering validation
+            if (isinstance(cwl, str) and not cwl.startswith("{")) or isinstance(wps, str):
+                LOGGER.debug("Override loaded CWL into provided/loaded body for process: [%s]", p_id)
+                proc = get_process_definition(info, reference=cwl or wps, headers=headers)  # validate
+                body["executionUnit"] = [{"unit": proc["package"]}]
+            elif isinstance(cwl, str) and cwl.startswith("{") and cwl.endswith("}"):
+                LOGGER.debug("Override parsed CWL into provided/loaded body for process: [%s]", p_id)
+                pkg = yaml.safe_load(cwl)
+                if not isinstance(pkg, dict) or pkg.get("cwlVersion") is None:
+                    raise PackageRegistrationError("Failed parsing or invalid CWL from expected literal JSON string.")
+                proc = get_process_definition(info, package=pkg, headers=headers)  # validate
+                body["executionUnit"] = [{"unit": proc["package"]}]
+            elif isinstance(cwl, dict):
+                LOGGER.debug("Override provided CWL into provided/loaded body for process: [%s]", p_id)
+                get_process_definition(info, package=cwl, headers=headers)  # validate
+                body["executionUnit"] = [{"unit": cwl}]
+        except (PackageRegistrationError, ScannerError) as exc:
+            message = f"Failed resolution of package definition: [{exc!s}]"
+            return OperationResult(False, message, cwl)
+        return OperationResult(True, p_id, body)
 
     def _parse_job_ref(self, job_reference, url=None):
         # type: (str, Optional[str]) -> Tuple[Optional[str], Optional[str]]
@@ -230,11 +261,14 @@ class WeaverClient(object):
             Desired process identifier.
             Can be omitted if already provided in body contents or file.
         :param body:
-            Literal :term:`JSON` contents forming the request body, or file path/URL to :term:`YAML` or :term:`JSON`
-            contents of the request body. Can be updated with other provided parameters.
+            Literal :term:`JSON` contents, either using string representation of actual Python objects forming the
+            request body, or file path/URL to :term:`YAML` or :term:`JSON` contents of the request body.
+            Other parameters (:paramref:`process_id`, :paramref:`cwl`) can override corresponding fields within the
+            provided body.
         :param cwl:
-            Literal :term:`JSON` or :term:`YAML` contents, or file path/URL with contents of the :term:`CWL` definition
-            of the :term:`Application package` to be inserted into the body.
+            Literal :term:`JSON` or :term:`YAML` contents, either using string representation of actual Python objects,
+            or file path/URL with contents of the :term:`CWL` definition of the :term:`Application package` to be
+            inserted into the body.
         :param wps:
             URL to an existing :term:`WPS` process (WPS-1/2 or WPS-REST/OGC-API).
         :param token:
@@ -255,24 +289,15 @@ class WeaverClient(object):
         headers = copy.deepcopy(self._headers)
         headers.update(self._parse_auth_token(token, username, password))
         data = result.body
-        try:
-            p_id = data.get("processDescription", {}).get("process", {}).get("id", process_id)
-            info = {"id": p_id}  # minimum requirement for process offering validation
-            if isinstance(cwl, str) or isinstance(wps, str):
-                LOGGER.debug("Override loaded CWL into provided/loaded body for process: [%s]", process_id)
-                proc = get_process_definition(info, reference=cwl or wps, headers=headers)  # validate
-                data["executionUnit"] = [{"unit": proc["package"]}]
-            elif isinstance(cwl, dict):
-                LOGGER.debug("Override provided CWL into provided/loaded body for process: [%s]", process_id)
-                get_process_definition(info, package=cwl, headers=headers)  # validate
-                data["executionUnit"] = [{"unit": cwl}]
-        except PackageRegistrationError as exc:
-            message = f"Failed resolution of package definition: [{exc!s}]"
-            return OperationResult(False, message, cwl)
+        result = self._parse_deploy_package(data, cwl, wps, process_id, headers)
+        if not result.success:
+            return result
+        p_id = result.message
+        data = result.body
         base = self._get_url(url)
         if undeploy:
-            LOGGER.debug("Performing requested undeploy of process: [%s]", process_id)
-            result = self.undeploy(process_id=process_id, url=base)
+            LOGGER.debug("Performing requested undeploy of process: [%s]", p_id)
+            result = self.undeploy(process_id=p_id, url=base)
             if result.code not in [200, 404]:
                 return OperationResult(False, "Failed requested undeployment prior deployment.",
                                        body=result.body, text=result.text, code=result.code, headers=result.headers)
@@ -598,11 +623,11 @@ def add_url_param(parser, required=True):
     parser.add_argument(*args, metavar="URL", help="URL of the instance to run operations.")
 
 
-def add_process_param(parser, description=None):
-    # type: (argparse.ArgumentParser, Optional[str]) -> None
+def add_process_param(parser, description=None, required=True):
+    # type: (argparse.ArgumentParser, Optional[str], bool) -> None
     operation = parser.prog.split(" ")[-1]
     parser.add_argument(
-        "-p", "--id", "--process", dest="process_id", required=True,
+        "-p", "--id", "--process", dest="process_id", required=required,
         help=description if description else f"Identifier of the process to run {operation} operation."
     )
 
@@ -720,20 +745,23 @@ def make_parser():
     )
     set_parser_sections(op_deploy)
     add_url_param(op_deploy)
-    add_process_param(op_deploy, description=(
-        "Process identifier for deployment. If no body is provided, this is required. "
+    add_process_param(op_deploy, required=False, description=(
+        "Process identifier for deployment. If no '--body' is provided, this is required. "
         "Otherwise, provided value overrides the corresponding ID in the body."
     ))
     op_deploy.add_argument(
         "-b", "--body", dest="body",
-        help="Deployment body directly provided. Allows both JSON and YAML format. "
-             "If provided in combination with process ID or CWL, they will override the corresponding content."
+        help="Deployment body directly provided. Allows both JSON and YAML format when using file reference. "
+             "If provided in combination with process ID or CWL, they will override the corresponding content. "
+             "Can be provided either with a local file, an URL or literal string contents formatted as JSON."
     )
     op_deploy_app_pkg = op_deploy.add_mutually_exclusive_group()
     op_deploy_app_pkg.add_argument(
         "--cwl", dest="cwl",
-        help="Application Package of the process defined using Common Workflow Language (CWL) as JSON or YAML format. "
-             "It will be inserted into an automatically generated request deploy body or into the provided one."
+        help="Application Package of the process defined using Common Workflow Language (CWL) as JSON or YAML "
+             "format when provide by file reference. It will be inserted into an automatically generated request "
+             "deploy body or into the provided if '--body' was specified. "
+             "Can be provided either with a local file, an URL or literal string contents formatted as JSON."
     )
     op_deploy_app_pkg.add_argument(
         "--wps", dest="wps",
