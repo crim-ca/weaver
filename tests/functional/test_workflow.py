@@ -83,7 +83,7 @@ class WorkflowProcesses(enum.Enum):
     WORKFLOW_SUBSET_PICKER = "WorkflowSubsetPicker"
     WORKFLOW_SUBSET_LLNL_SUBSET_CRIM = "WorkflowSubsetLLNL_SubsetCRIM"
     WORKFLOW_SUBSET_NASA_ESGF_SUBSET_CRIM = "WorkflowSubsetNASAESGF_SubsetCRIM"
-    WORKFLOW_FILE_TO_SUBSET_CRIM = "WorkflowFile_To_SubsetCRIM"
+    WORKFLOW_FILE_TO_SUBSET_CRIM = "WorkflowFileToSubsetCRIM"
     WORKFLOW_STAGE_COPY_IMAGES = "WorkflowStageCopyImages"
     WORKFLOW_WPS1_SCATTER_COPY_NETCDF = "WorkflowWPS1ScatterCopyNetCDF"
     WORKFLOW_WPS1_SELECT_COPY_NETCDF = "WorkflowWPS1SelectCopyNetCDF"
@@ -291,7 +291,7 @@ class WorkflowTestRunnerBase(TestCase):
             for exec_unit in range(len(workflow_deploy["executionUnit"])):
                 try:
                     workflow_cwl_ref = workflow_deploy["executionUnit"][exec_unit].pop("href")
-                    workflow_cwl_raw = cls.retrieve_payload(workflow_cwl_ref)
+                    workflow_cwl_raw = cls.retrieve_payload(workflow_id, workflow_cwl_ref)
                 except KeyError:
                     workflow_cwl_raw = workflow_deploy["executionUnit"][exec_unit].pop("unit")
                 for step in workflow_cwl_raw.get("steps"):
@@ -458,20 +458,60 @@ class WorkflowTestRunnerBase(TestCase):
     @classmethod
     def retrieve_process_info(cls, process_id):
         # type: (WorkflowProcesses) -> ProcessInfo
+        """
+        Retrieves the deployment, execution and package contents for a process referenced by ID.
+
+        The lookup procedure attempts multiple formats for historical reasons:
+
+            1. Look in the local ``tests.functional`` directory.
+            2. Look in remote repository:
+                https://github.com/crim-ca/testbed14
+                i.e.:  directory ``TB14`` under in
+                https://github.com/crim-ca/application-packages/tree/master/OGC
+            3. Look in remote repository directory:
+                https://github.com/crim-ca/application-packages/tree/master/OGC/TB16
+            4. An extra URL defined by ``TEST_GITHUB_SOURCE_URL`` if provided.
+
+        .. note::
+            URL endpoints must be provided with 'raw' contents.
+            In the case of GitHub references for example, ``https://raw.githubusercontent.com`` prefix must be used.
+
+        For each location, content retrieval is attempted with the following file structures:
+
+            1. Contents defined as flat list with type of content and process ID in name:
+                - ``DeployProcess_<PROCESS_ID>.[json|yaml|yml]``
+                - ``Execute_<PROCESS_ID>.[json|yaml|yml]``
+                - ``<PROCESS_ID>.[cwl|json|yaml|yml]`` (package)
+
+            2. Contents defined within a sub0directory named ``<PROCESS_ID>`` with either the previous names or simply:
+                - ``deploy.[json|yaml|yml]``
+                - ``execute.[json|yaml|yml]``
+                - ``package.[cwl|json|yaml|yml]``
+
+        For each group of content definitions, Deploy and Execute contents are mandatory.
+        The package file can be omitted if it is already explicitly embedded within the Deploy contents.
+
+        .. note::
+            Only when references are local (tests), the package can be referred by relative ``tests/...`` path
+            within the Deploy content ``executionUnit`` using ``test`` key instead of ``unit`` or ``href``.
+
+        :param process_id: identifier of the process to retrieve contents.
+        :return: found content definitions.
+        """
         base = os.getenv("TEST_GITHUB_SOURCE_URL",
                          "https://raw.githubusercontent.com/crim-ca/testbed14/master/application-packages")
         pid = process_id.value
         deploy_path = "{base}/{proc}/DeployProcess_{proc}.json".format(base=base, proc=pid)
         execute_path = "{base}/{proc}/Execute_{proc}.json".format(base=base, proc=pid)
-        deploy_payload = cls.retrieve_payload(deploy_path)
+        deploy_payload = cls.retrieve_payload(pid, [deploy_path])
         new_process_id = cls.get_test_process_id(deploy_payload["processDescription"]["process"]["id"])
         deploy_payload["processDescription"]["process"]["id"] = new_process_id
-        execute_payload = cls.retrieve_payload(execute_path)
+        execute_payload = cls.retrieve_payload(pid, [execute_path])
 
-        # replace derived reference
+        # replace derived reference (local only, remote must used full 'href' references)
         test_app_pkg = deploy_payload.get("executionUnit", [{}])[0].pop("test", None)
         if test_app_pkg:
-            unit_app_pkg = cls.retrieve_payload(test_app_pkg)
+            unit_app_pkg = cls.retrieve_payload(pid, [test_app_pkg])
             deploy_payload["executionUnit"][0]["unit"] = unit_app_pkg
 
         # Apply collection swapping
@@ -483,28 +523,70 @@ class WorkflowTestRunnerBase(TestCase):
         return ProcessInfo(process_id, new_process_id, deploy_payload, execute_payload)
 
     @classmethod
-    def retrieve_payload(cls, url):
-        # type: (str) -> Dict
-        local_path = os.path.join(os.path.dirname(__file__), "application-packages", url.split("/")[-1])
+    def retrieve_payload(cls, process, ref_type=None, url=None):
+        # type: (str, Optional[str], Optional[str]) -> JSON
+        """
+        Retrieve content using known structures and locations.
+
+        .. seealso::
+            :meth:`retrieve_process_info`
+
+        :param process: process identifier
+        :param ref_type: content reference type to retrieve {deploy, execute, package}.
+        :param url: override URL (unique location with exact lookup instead of variations).
+        :return: first matched contents.
+        """
+        if url:
+            locations = [url]
+        else:
+            var_locations = {
+                os.path.join(os.path.dirname(__file__), "application-packages"),
+                "https://raw.githubusercontent.com/crim-ca/testbed14/master/application-packages",
+                "https://raw.githubusercontent.com/crim-ca/application-packages/master/OGC/TB16/application-packages",
+                os.getenv("TEST_GITHUB_SOURCE_URL")
+            }
+            var_locations = [url for url in var_locations if isinstance(url, str) and url.startswith("http")]
+
+            if ref_type == "deploy":
+                flat_ref = f"DeployProcess_{process}.json"
+                pdir_ref = f"{process}/deploy.json"
+                both_ref = f"{process}/DeployProcess_{process}.json"
+            elif ref_type == "execute":
+                flat_ref = f"Execute_{process}.json"
+                pdir_ref = f"{process}/execute.json"
+                both_ref = f"{process}/Execute_{process}.json"
+            elif ref_type == "execute":
+                flat_ref = f"Execute_{process}.json"
+                pdir_ref = f"{process}/execute.json"
+                both_ref = f"{process}/Execute_{process}.json"
+            else:
+                raise ValueError(f"unknown reference type: {ref_type}")
+
+            locations = []
+            for var_loc in var_locations:
+                for var_ref in [flat_ref, pdir_ref, both_ref]:
+                    locations.append(f"{var_loc}/{var_ref}")
+
         tested_ref = []
         try:
-            extension = os.path.splitext(local_path)[-1]
-            retry_extensions = [".json", ".yaml", ".yml"]
-            if extension not in retry_extensions:
-                retry_extensions = [extension]
-            # Try to find it locally, then fallback to remote
-            for ext in retry_extensions:
-                local_path_ext = os.path.splitext(local_path)[0] + ext
-                if os.path.isfile(local_path_ext):
-                    with open(local_path_ext, "r", encoding="utf-8") as f:
-                        json_payload = yaml.safe_load(f)  # both JSON/YAML
-                        return json_payload
-                tested_ref.append(local_path_ext)
-            if urlparse(url).scheme != "":
-                resp = cls.request("GET", url, force_requests=True, ignore_errors=True)
-                if resp.status_code == HTTPOk.code:
-                    return yaml.safe_load(resp.text)  # both JSON/YAML
-                tested_ref.append(url)
+            for path in locations:
+                extension = os.path.splitext(path)[-1]
+                retry_extensions = [".json", ".yaml", ".yml"]
+                if extension not in retry_extensions:
+                    retry_extensions = [extension]
+                # Try to find it locally, then fallback to remote
+                for ext in retry_extensions:
+                    path_ext = os.path.splitext(path)[0] + ext
+                    if os.path.isfile(path_ext):
+                        with open(path_ext, "r", encoding="utf-8") as f:
+                            json_payload = yaml.safe_load(f)  # both JSON/YAML
+                            return json_payload
+                    tested_ref.append(path_ext)
+                    if urlparse(path_ext).scheme != "":
+                        resp = cls.request("GET", url, force_requests=True, ignore_errors=True)
+                        if resp.status_code == HTTPOk.code:
+                            return yaml.safe_load(resp.text)  # both JSON/YAML
+                        tested_ref.append(url)
         except (IOError, ValueError):
             pass
         cls.log("{}Cannot find payload from any of the following references:\n- {}"

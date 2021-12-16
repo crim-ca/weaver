@@ -44,7 +44,7 @@
     },
     "executionUnit": [
         {
-            "href": "tests/functional/application-packages/catalog_search.cwl"
+            "href": "tests/functional/application-packages/CatalogSearch/package.cwl"
         }
     ],
     "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication"

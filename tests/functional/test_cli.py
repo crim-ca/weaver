@@ -58,9 +58,13 @@ class TestWeaverClientBase(WpsConfigBase):
             shutil.rmtree(tmp_wps_out, ignore_errors=True)
 
     @staticmethod
-    def load_resource_file(name):
-        with open(os.path.join(APP_PKG_ROOT, name)) as echo_file:
-            return yaml.safe_load(echo_file)
+    def get_resource_file(name, process="Echo"):
+        return os.path.join(APP_PKG_ROOT, process, name)
+
+    @staticmethod
+    def load_resource_file(name, process="Echo"):
+        with open(TestWeaverClientBase.get_resource_file(name, process)) as res_file:
+            return yaml.safe_load(res_file)
 
 
 class TestWeaverClient(TestWeaverClientBase):
@@ -193,7 +197,7 @@ class TestWeaverClient(TestWeaverClientBase):
             if preload:
                 inputs_param = self.load_resource_file(inputs_param)
             else:
-                inputs_param = os.path.join(APP_PKG_ROOT, inputs_param)
+                inputs_param = self.get_resource_file(inputs_param)
         with contextlib.ExitStack() as stack_exec:
             # use pass-through function because don't care about execution result here, only the parsing of I/O
             if mock_exec:
