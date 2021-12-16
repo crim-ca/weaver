@@ -78,7 +78,7 @@ is always collected by `Weaver` (along with the ``stderr``) in order to obtain t
 :term:`Application Package` when performing :term:`Job` executions.
 
 .. literalinclude:: ../examples/docker-shell-script-cat.cwl
-    :code: yaml
+    :language: yaml
     :caption: Sample CWL definition of a shell script
 
 The second example takes advantage of the |cwl-workdir-req|_ to generate a Python script dynamically
@@ -88,7 +88,7 @@ meets our needs. Note that in this case, special interpretation of ``$(...)`` en
 provided to tell :term:`CWL` how to map :term:`Job` input values to the dynamically created script.
 
 .. literalinclude:: ../examples/docker-python-script-report.cwl
-    :code: yaml
+    :language: yaml
     :caption: Sample CWL definition of a Python script
 
 .. _app_pkg_docker:
