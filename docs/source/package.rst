@@ -77,26 +77,9 @@ available within its containerized environment. In this case, we also take advan
 is always collected by `Weaver` (along with the ``stderr``) in order to obtain traces produced by any
 :term:`Application Package` when performing :term:`Job` executions.
 
-.. code-block:: yaml
+.. literalinclude:: ../examples/docker-shell-script-cat.cwl
+    :code: yaml
     :caption: Sample CWL definition of a shell script
-
-        cwlVersion: v1.0
-        class: CommandLineTool
-        baseCommand: cat
-        requirements:
-          DockerRequirement:
-            dockerPull: "debian:stretch-slim"
-        inputs:
-          - id: file
-            type: File
-            inputBinding:
-              position: 1
-        outputs:
-          - id: output
-            type: File
-            outputBinding:
-              glob: stdout.log
-
 
 The second example takes advantage of the |cwl-workdir-req|_ to generate a Python script dynamically
 (i.e.: ``script.py``), prior to executing it for processing the received inputs and produce the output file.
@@ -104,36 +87,9 @@ Because a Python runner is required, the |cwl-docker-req|_ specification defines
 meets our needs. Note that in this case, special interpretation of ``$(...)`` entries within the definition can be
 provided to tell :term:`CWL` how to map :term:`Job` input values to the dynamically created script.
 
-.. code-block:: yaml
+.. literalinclude:: ../examples/docker-python-script-report.cwl
+    :code: yaml
     :caption: Sample CWL definition of a Python script
-
-        cwlVersion: v1.0
-        class: CommandLineTool
-        baseCommand:
-          - python3
-          - script.py
-        inputs:
-          - id: amount
-            type: int
-          - id: cost
-            type: float
-        outputs:
-          - id: quote
-            type: File
-            outputBinding:
-              glob: report.txt
-        requirements:
-          DockerRequirement:
-            dockerPull: "python:3.7-alpine"
-          InitialWorkDirRequirement:
-            listing:
-              # below script is generated dynamically in the working directory, and then called by the base command
-              entryname: script.py
-              entry: |
-                amount = $(inputs.amount)
-                cost = $(inputs.cost)
-                with open("report.txt", "w") as report:
-                    report.write(f"Order Total: {amount * cost}$\n")
 
 .. _app_pkg_docker:
 
@@ -211,7 +167,7 @@ definition can be placed in any location supported as for the case of atomic pro
 The following :term:`CWL` definition demonstrates an example ``Workflow`` process that would resolve each ``step`` with
 local processes of match IDs.
 
-.. literalinclude:: ../../tests/functional/application-packages/workflow_subset_ice_days.cwl
+.. literalinclude:: ../../tests/functional/application-packages/WorkflowSubsetIceDays/package.cwl
     :language: JSON
     :linenos:
 

@@ -1158,12 +1158,16 @@ def fetch_file(file_reference, file_outdir, settings=None, link=None, **request_
     return file_path
 
 
-def load_file(file_path):
+def load_file(file_path, text=False):
+    # type: (str, bool) -> Union[JSON, str]
     """
     Load JSON or YAML file contents from local path or remote URL.
 
     If URL, get the content and validate it by loading, otherwise load file directly.
 
+    :param file_path: Local path or URL endpoint where file to load is located.
+    :param text: load contents as plain text rather than parsing it from :term:`JSON`/:term:`YAML`.
+    :returns: loaded contents either parsed and converted to Python objects or as plain text.
     :raises ValueError: if YAML or JSON cannot be parsed or loaded from location.
     """
     from weaver.formats import CONTENT_TYPE_TEXT_PLAIN
@@ -1173,9 +1177,12 @@ def load_file(file_path):
             settings = get_settings()
             headers = {"Accept": CONTENT_TYPE_TEXT_PLAIN}
             cwl_resp = request_extra("get", file_path, headers=headers, settings=settings)
-            return yaml.safe_load(cwl_resp.content)
+            return cwl_resp.content if text else yaml.safe_load(cwl_resp.content)
         with open(file_path, "r") as f:
-            return yaml.safe_load(f)
+            return f.read() if text else yaml.safe_load(f)
+    except OSError as exc:
+        LOGGER.debug("Loading error: %s", exc, exc_info=exc)
+        raise
     except ScannerError as exc:
         LOGGER.debug("Parsing error: %s", exc, exc_info=exc)
         raise ValueError("Failed parsing file content as JSON or YAML.")

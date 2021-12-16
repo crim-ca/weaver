@@ -6,12 +6,12 @@ import pytest
 from owslib.wps import ComplexDataInput, WPSExecution
 
 from tests.functional.utils import WpsConfigBase
-from tests.utils import mocked_execute_process, mocked_sub_requests
-from weaver import xml_util
+from tests.utils import mocked_execute_process, mocked_sub_requests, mocked_wps_output
+from weaver import WEAVER_ROOT_DIR, xml_util
 from weaver.execute import EXECUTE_MODE_ASYNC, EXECUTE_RESPONSE_DOCUMENT, EXECUTE_TRANSMISSION_MODE_REFERENCE
 from weaver.formats import CONTENT_TYPE_ANY_XML, CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML, CONTENT_TYPE_TEXT_PLAIN
 from weaver.processes.wps_package import CWL_REQUIREMENT_APP_DOCKER
-from weaver.utils import get_any_value, str2bytes
+from weaver.utils import fetch_file, get_any_value, load_file, str2bytes
 from weaver.wps.utils import get_wps_url
 
 
@@ -291,3 +291,46 @@ class WpsPackageDockerAppTest(WpsConfigBase):
             - :meth:`test_execute_wps_xml_post_resp_json`
         """
         self.wps_execute("2.0.0", CONTENT_TYPE_APP_JSON)
+
+    def test_execute_docker_embedded_python_script(self):
+        test_proc = "test-docker-python-script"
+        cwl = load_file(os.path.join(WEAVER_ROOT_DIR, "docs/examples/docker-python-script-report.cwl"))
+        body = {
+            "processDescription": {
+                "process": {
+                    "id": test_proc
+                }
+            },
+            "executionUnit": [{"unit": cwl}],
+            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication"
+        }
+        self.deploy_process(body)
+
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_process():
+                stack.enter_context(mock_exec)
+
+            path = f"/processes/{test_proc}/execution"
+            cost = 2.45
+            amount = 3
+            body = {
+                "mode": EXECUTE_MODE_ASYNC,
+                "response": EXECUTE_RESPONSE_DOCUMENT,
+                "inputs": [
+                    {"id": "amount", "value": amount},
+                    {"id": "cost", "value": cost}
+                ],
+                "outputs": [
+                    {"id": "quote", "transmissionMode": EXECUTE_TRANSMISSION_MODE_REFERENCE},
+                ]
+            }
+            resp = mocked_sub_requests(self.app, "POST", path, json=body, headers=self.json_headers, only_local=True)
+            status_url = resp.headers["Location"]
+            results = self.monitor_job(status_url)
+
+            assert results["quote"]["href"].startswith("http")
+            stack.enter_context(mocked_wps_output(self.settings))
+            tmpdir = stack.enter_context(tempfile.TemporaryDirectory())
+            report_file = fetch_file(results["quote"]["href"], tmpdir, self.settings)
+            report_data = load_file(report_file, text=True)
+            assert report_data == f"Order Total: {amount * cost:0.2f}$\n"
