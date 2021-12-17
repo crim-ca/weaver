@@ -65,8 +65,12 @@ class TestWeaverClientBase(WpsConfigBase):
             shutil.rmtree(tmp_wps_out, ignore_errors=True)
 
     @staticmethod
-    def load_resource_file(name):
-        with open(os.path.join(APP_PKG_ROOT, name)) as echo_file:
+    def get_resource_file(name):
+        return os.path.join(APP_PKG_ROOT, name)
+
+    @classmethod
+    def load_resource_file(cls, name):
+        with open(cls.get_resource_file(name)) as echo_file:
             return yaml.safe_load(echo_file)
 
 
@@ -108,7 +112,7 @@ class TestWeaverClient(TestWeaverClientBase):
     def test_deploy_payload_file_cwl_embedded(self):
         test_id = f"{self.test_process_prefix}-deploy-file-no-cwl"
         payload = self.load_resource_file("DeployProcess_Echo.yml")
-        package = os.path.abspath(os.path.join(APP_PKG_ROOT, "echo.cwl"))
+        package = self.get_resource_file("echo.cwl")
         payload["executionUnit"][0] = {"href": package}
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".cwl") as body_file:
@@ -140,7 +144,7 @@ class TestWeaverClient(TestWeaverClientBase):
     def test_deploy_payload_inject_cwl_file(self):
         test_id = f"{self.test_process_prefix}-deploy-body-with-cwl-file"
         payload = self.load_resource_file("DeployProcess_Echo.yml")
-        package = os.path.abspath(os.path.join(APP_PKG_ROOT, "echo.cwl"))
+        package = self.get_resource_file("echo.cwl")
         payload.pop("executionUnit", None)
 
         result = mocked_sub_requests(self.app, self.client.deploy, test_id, payload, package)
@@ -384,6 +388,120 @@ class TestWeaverCLI(TestWeaverClientBase):
                 only_local=True,
             )
             assert any(f"\"id\": \"{self.test_process}\"" in line for line in lines)
+
+    def test_deploy_no_process_id_option(self):
+        payload = self.get_resource_file("DeployProcess_Echo.yml")
+        package = self.get_resource_file("echo.cwl")
+        lines = mocked_sub_requests(
+            self.app, run_command,
+            [
+                # weaver
+                "deploy",
+                "--body", payload,  # no --process/--id, but available through --body
+                "--cwl", package,
+                self.url
+            ],
+            trim=False,
+            entrypoint=weaver_cli,
+            only_local=True,
+        )
+        assert any("\"id\": \"Echo\"" in line for line in lines)
+        assert any("\"deploymentDone\": true" in line for line in lines)
+
+    def test_deploy_payload_body_cwl_embedded(self):
+        test_id = f"{self.test_process_prefix}-deploy-body-no-cwl"
+        payload = self.load_resource_file("DeployProcess_Echo.yml")
+        package = self.load_resource_file("echo.cwl")
+        payload["executionUnit"][0] = {"unit": package}
+
+        lines = mocked_sub_requests(
+            self.app, run_command,
+            [
+                # weaver
+                "deploy",
+                "-p", test_id,
+                "-b", json.dumps(payload),  # literal JSON string accepted for CLI
+                self.url
+            ],
+            trim=False,
+            entrypoint=weaver_cli,
+            only_local=True,
+        )
+        assert any(f"\"id\": \"{test_id}\"" in line for line in lines)
+        assert any("\"deploymentDone\": true" in line for line in lines)
+
+    def test_deploy_payload_file_cwl_embedded(self):
+        test_id = f"{self.test_process_prefix}-deploy-file-no-cwl"
+        payload = self.load_resource_file("DeployProcess_Echo.yml")
+        package = self.get_resource_file("echo.cwl")
+        payload["executionUnit"][0] = {"href": package}
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".cwl") as body_file:
+            json.dump(payload, body_file)
+            body_file.flush()
+            body_file.seek(0)
+
+            lines = mocked_sub_requests(
+                self.app, run_command,
+                [
+                    # weaver
+                    "deploy",
+                    "-p", test_id,
+                    "-b", body_file.name,
+                    self.url
+                ],
+                trim=False,
+                entrypoint=weaver_cli,
+                only_local=True,
+            )
+            assert any(f"\"id\": \"{test_id}\"" in line for line in lines)
+            assert any("\"deploymentDone\": true" in line for line in lines)
+
+    def test_deploy_payload_inject_cwl_body(self):
+        test_id = f"{self.test_process_prefix}-deploy-body-with-cwl-body"
+        payload = self.load_resource_file("DeployProcess_Echo.yml")
+        package = self.load_resource_file("echo.cwl")
+        payload.pop("executionUnit", None)
+
+        lines = mocked_sub_requests(
+            self.app, run_command,
+            [
+                # weaver
+                "deploy",
+                "-p", test_id,
+                "--body", json.dumps(payload),  # literal JSON string accepted for CLI
+                "--cwl", json.dumps(package),   # literal JSON string accepted for CLI
+                self.url
+            ],
+            trim=False,
+            entrypoint=weaver_cli,
+            only_local=True,
+        )
+        assert any(f"\"id\": \"{test_id}\"" in line for line in lines)
+        assert any("\"deploymentDone\": true" in line for line in lines)
+
+    def test_deploy_payload_inject_cwl_file(self):
+        test_id = f"{self.test_process_prefix}-deploy-body-with-cwl-file"
+        payload = self.load_resource_file("DeployProcess_Echo.yml")
+        package = self.get_resource_file("echo.cwl")
+        payload.pop("executionUnit", None)
+
+        lines = mocked_sub_requests(
+            self.app, run_command,
+            [
+                # weaver
+                "deploy",
+                "-p", test_id,
+                "--body", json.dumps(payload),  # literal JSON string accepted for CLI
+                "--cwl", package,
+                self.url
+            ],
+            trim=False,
+            entrypoint=weaver_cli,
+            only_local=True,
+        )
+        assert any(f"\"id\": \"{test_id}\"" in line for line in lines)
+        assert any("\"deploymentDone\": true" in line for line in lines)
 
     def test_describe(self):
         # prints formatted JSON ProcessDescription over many lines
