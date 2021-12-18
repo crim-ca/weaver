@@ -170,7 +170,7 @@ class Wps1Process(WpsProcessInterface):
             try:
                 execution = check_wps_status(location=execution.statusLocation,
                                              sleep_secs=wait_secs(run_step), settings=self.settings)
-                job_id = execution.statusLocation.replace(".xml", "").split("/")[-1]
+                job_id = execution.statusLocation.split("/")[-1].replace(".xml", "")
                 exec_status = status.map_status(execution.getStatus())
                 LOGGER.debug(get_log_monitor_msg(job_id,
                                                  exec_status,

@@ -18,7 +18,7 @@ executionUnit:
       hints:  # cannot be in requirements since not official CWL
         WPS1Requirement:
           # note: this must match the WebTest TestApp endpoint and settings
-          provider: "https://localhost/ows/wps"
+          provider: "https://localhost/wps"
           process: jsonarray2netcdf
       inputs:
         input_json:

@@ -954,7 +954,7 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
 
         Steps:
             1. Convert JSON array of NetCDF references to corresponding NetCDF files
-               (using WPS-1 interface rather than WPS-REST).
+               (process registered with ``WPS1Requirement`` using WPS-1 interface of builtin ``jsonarray2netcdf``).
             2. Convert NetCDF file to raw text data dumps (using scattered applications per-file).
         """
 
@@ -984,7 +984,7 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
 
         Steps:
             1. Convert JSON array of NetCDF references to corresponding NetCDF files
-               (using WPS-1 interface rather than WPS-REST).
+               (process registered with ``WPS1Requirement`` using WPS-1 interface of builtin ``jsonarray2netcdf``).
             2. Select only the first file within the list.
             3. Convert NetCDF file to raw text data dumps.
         """
