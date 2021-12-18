@@ -231,7 +231,7 @@ standards in the context of natural resources applications. The advancements are
 Developments are continued in |ogc-tb16|_ to improve methodologies in order to provide better
 interoperable geospatial data processing in the areas of Earth Observation Application Packages.
 
-Videos and more functionalities were introduced in `Weaver` following |ogc-eo-apps-pilot|.
+Videos and more functionalities were introduced in `Weaver` following |ogc-eo-apps-pilot|_.
 Corresponding developments are reported in the |ogc-eo-apps-pilot-er|_.
 
 The project is furthermore developed through the *Data Analytics for Canadian Climate Services* (`DACCS`_) initiative.
