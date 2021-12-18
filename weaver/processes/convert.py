@@ -434,7 +434,7 @@ def any2cwl_io(wps_io, io_select):
     wps_io_type = get_field(wps_io, "type", search_variations=True)
     wps_io_id = get_field(wps_io, "identifier", search_variations=True)
     cwl_ns = dict()
-    cwl_io = {"id": wps_io_id}  # type: CWL_IO_Type
+    cwl_io = {"id": wps_io_id}  # type: CWL_IO_Type  # noqa
     if wps_io_type not in WPS_COMPLEX_TYPES:
         cwl_io_type = any2cwl_literal_datatype(wps_io_type)
         wps_allow = get_field(wps_io, "allowed_values", search_variations=True)
@@ -668,7 +668,7 @@ def is_cwl_file_type(io_info):
 
 
 def is_cwl_array_type(io_info):
-    # type: (CWL_IO_Type) -> Tuple[bool, str, MODE, Union[AnyValueType, List[Any]]]
+    # type: (CWL_IO_Type) -> Tuple[bool, str, MODE, Optional[Union[Type[AnyValue], CWL_IO_EnumSymbols]]]
     """
     Verifies if the specified I/O corresponds to one of various CWL array type definitions.
 
@@ -701,7 +701,7 @@ def is_cwl_array_type(io_info):
             LOGGER.debug("I/O [%s] parsed as 'array' with sub-item as 'enum'", io_info["name"])
             io_return["type"] = _enum_type
             io_return["mode"] = _enum_mode
-            io_return["allow"] = _enum_allow
+            io_return["allow"] = _enum_allow  # type: ignore
         return _is_enum
 
     # optional I/O could be an array of '["null", "<type>"]' with "<type>" being any of the formats parsed after
@@ -940,7 +940,12 @@ def cwl2wps_io(io_info, io_select):
             "abstract": io_info.get("doc", ""),
         }
         if "format" in io_info:
-            io_formats = [io_info["format"]] if isinstance(io_info["format"], str) else io_info["format"]
+            io_fmt = io_info["format"]
+            # when 'format' comes from parsed CWL tool instance, the input/output record sets the value
+            # using a temporary local file path after resolution against remote namespace ontology
+            if io_fmt.startswith("file://") and "#" in io_fmt:
+                io_fmt = io_fmt.split("#")[-1]
+            io_formats = [io_fmt] if isinstance(io_fmt, str) else io_fmt
             kw["supported_formats"] = [get_format(fmt) for fmt in io_formats]
             kw["mode"] = MODE.SIMPLE  # only validate the extension (not file contents)
         else:

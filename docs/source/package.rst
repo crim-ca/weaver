@@ -361,7 +361,7 @@ In the :term:`CWL` context, the ``type`` field indicates the type of I/O. Availa
     **intentional** as :term:`WPS` does not offer equivalents. Furthermore, both of these types make the process
     description too ambiguous. For instance, most processes expect remote file references, and providing a
     ``Directory`` doesn't indicate an explicit reference to which files to retrieve during stage-in operation of
-    a job execution.
+    a :term:`Job` execution.
 
 
 In the :term:`WPS` context, three data types exist, namely ``Literal``, ``BoundingBox`` and ``Complex`` data.

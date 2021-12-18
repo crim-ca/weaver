@@ -41,7 +41,7 @@ from weaver.execute import (
     EXECUTE_TRANSMISSION_MODE_REFERENCE,
     EXECUTE_TRANSMISSION_MODE_VALUE
 )
-from weaver.formats import ACCEPT_LANGUAGE_FR_CA, CONTENT_TYPE_APP_JSON
+from weaver.formats import ACCEPT_LANGUAGE_FR_CA, CONTENT_TYPE_APP_JSON, get_cwl_file_format
 from weaver.processes.constants import CWL_REQUIREMENT_APP_WPS1, PROCESS_SCHEMA_OLD
 from weaver.processes.wps_testing import WpsTestProcess
 from weaver.status import STATUS_ACCEPTED
@@ -663,17 +663,13 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                 resources.TEST_REMOTE_SERVER_URL
             )
 
-    # FIXME: implement
-    @pytest.mark.skip(reason="not implemented")
-    def test_deploy_process_CWL_WPS1Requirement_owsContext(self):
-        raise NotImplementedError
-
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
         resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
         [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
     ])
-    def test_deploy_process_CWL_WPS1Requirement_executionUnit(self):
+    def test_deploy_process_CWL_WPS1Requirement_owsContext(self):
+        ns, fmt = get_cwl_file_format(CONTENT_TYPE_APP_JSON)
         cwl = {
             "cwlVersion": "v1.0",
             "class": "CommandLineTool",
@@ -682,11 +678,96 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                     "process": resources.TEST_REMOTE_PROCESS_WPS1_ID,
                     "provider": resources.TEST_REMOTE_SERVER_URL
                 }
+            },
+            # FIXME: must provide inputs/outputs since CWL provided explicitly.
+            #   Update from CWL->WPS complementary details is supported.
+            #   Inverse update WPS->CWL is not supported (https://github.com/crim-ca/weaver/issues/50).
+            # following are based on expected results for I/O defined in XML
+            "inputs": {
+                "input-1": {
+                    "type": "string"
+                },
+            },
+            "outputs": {
+                "output": {
+                    "type": "File",
+                    "format": fmt,
+                    "outputBinding": {
+                        "glob": "*.json"
+                    },
+                }
+            },
+            "$namespace": ns
+        }
+        with contextlib.ExitStack() as stack:
+            stack.enter_context(mocked_wps_output(self.settings))
+            wps_dir = self.settings["weaver.wps_output_dir"]
+            wps_url = self.settings["weaver.wps_output_url"]
+            tmp_file = stack.enter_context(tempfile.NamedTemporaryFile(dir=wps_dir, mode="w"))
+            tmp_http = tmp_file.name.replace(wps_dir, wps_url, 1)
+            json.dump(cwl, tmp_file)
+            tmp_file.flush()
+            tmp_file.seek(0)
+
+            body = {
+                "processDescription": {"process": {
+                    "id": resources.TEST_REMOTE_PROCESS_WPS1_ID,
+                }},
+                "executionUnit": [{"href": resources.TEST_REMOTE_SERVER_URL}],  # just to fulfill schema validation
+                # FIXME: avoid error on omitted deploymentProfileName (https://github.com/crim-ca/weaver/issues/319)
+                "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
             }
+            ows_ctx = ows_context_href(tmp_http)
+            body["processDescription"]["process"].update(ows_ctx)
+            self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_PROCESS_WPS1_ID)
+            self.validate_wps1_package(
+                resources.TEST_REMOTE_PROCESS_WPS1_ID,
+                resources.TEST_REMOTE_SERVER_URL
+            )
+
+    @mocked_remote_server_requests_wps1([
+        resources.TEST_REMOTE_SERVER_URL,
+        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
+        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
+    ])
+    def test_deploy_process_CWL_WPS1Requirement_executionUnit(self):
+        ns, fmt = get_cwl_file_format(CONTENT_TYPE_APP_JSON)
+        cwl = {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "hints": {
+                CWL_REQUIREMENT_APP_WPS1: {
+                    "process": resources.TEST_REMOTE_PROCESS_WPS1_ID,
+                    "provider": resources.TEST_REMOTE_SERVER_URL
+                }
+            },
+            # FIXME: must provide inputs/outputs since CWL provided explicitly.
+            #   Update from CWL->WPS complementary details is supported.
+            #   Inverse update WPS->CWL is not supported (https://github.com/crim-ca/weaver/issues/50).
+            # following are based on expected results for I/O defined in XML
+            "inputs": {
+                "input-1": {
+                    "type": "string"
+                },
+            },
+            "outputs": {
+                "output": {
+                    "type": "File",
+                    "format": fmt,
+                    "outputBinding": {
+                        "glob": "*.json"
+                    },
+                }
+            },
+            "$namespace": ns
         }
         body = {
-            "processDescription": {"process": {"id": resources.TEST_REMOTE_PROCESS_WPS1_ID}},
-            "executionUnit": [{"unit": cwl}]
+            "processDescription": {"process": {
+                "id": resources.TEST_REMOTE_PROCESS_WPS1_ID,
+            }},
+            "executionUnit": [{"unit": cwl}],
+            # FIXME: avoid error on omitted deploymentProfileName (https://github.com/crim-ca/weaver/issues/319)
+            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
         }
         self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_PROCESS_WPS1_ID)
         self.validate_wps1_package(
