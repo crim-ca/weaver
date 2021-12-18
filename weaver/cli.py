@@ -759,9 +759,11 @@ def make_parser():
     op_deploy_app_pkg.add_argument(
         "--cwl", dest="cwl",
         help="Application Package of the process defined using Common Workflow Language (CWL) as JSON or YAML "
-             "format when provide by file reference. It will be inserted into an automatically generated request "
-             "deploy body or into the provided if '--body' was specified. "
-             "Can be provided either with a local file, an URL or literal string contents formatted as JSON."
+             "format when provided by file reference. File reference can be a local file or URL location. "
+             "Can also be provided as literal string contents formatted as JSON. "
+             "Provided contents will be inserted into an automatically generated request deploy body if none was "
+             "specified with '--body' option (note: '--process' must be specified instead in that case). "
+             "Otherwise, it will override the appropriate execution unit section within the provided deploy body."
     )
     op_deploy_app_pkg.add_argument(
         "--wps", dest="wps",
