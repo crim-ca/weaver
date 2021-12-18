@@ -507,8 +507,7 @@ class WorkflowTestRunnerBase(TestCase):
         # replace derived reference (local only, remote must used full 'href' references)
         test_app_pkg = deploy_payload.get("executionUnit", [{}])[0].pop("test", None)
         if test_app_pkg:
-            test_app_pkg = os.path.join(os.path.dirname(__file__), "application-packages", test_app_pkg)
-            unit_app_pkg = cls.retrieve_payload(pid, location=test_app_pkg)
+            unit_app_pkg = cls.retrieve_payload(pid, "package")
             deploy_payload["executionUnit"][0]["unit"] = unit_app_pkg
 
         # Apply collection swapping
@@ -536,13 +535,13 @@ class WorkflowTestRunnerBase(TestCase):
         if location:
             locations = [location]
         else:
-            var_locations = {
+            var_locations = list(dict.fromkeys([  # don't use set to preserve this prioritized order
                 os.path.join(os.path.dirname(__file__), "application-packages"),
+                os.getenv("TEST_GITHUB_SOURCE_URL"),
                 "https://raw.githubusercontent.com/crim-ca/testbed14/master/application-packages",
                 "https://raw.githubusercontent.com/crim-ca/application-packages/master/OGC/TB16/application-packages",
-                os.getenv("TEST_GITHUB_SOURCE_URL")
-            }
-            var_locations = [url for url in var_locations if isinstance(url, str) and url.startswith("http")]
+            ]))
+            var_locations = [url for url in var_locations if url]
 
             if ref_type == "deploy":
                 flat_ref = f"DeployProcess_{process}.json"
@@ -552,10 +551,10 @@ class WorkflowTestRunnerBase(TestCase):
                 flat_ref = f"Execute_{process}.json"
                 pdir_ref = f"{process}/execute.json"
                 both_ref = f"{process}/Execute_{process}.json"
-            elif ref_type == "execute":
-                flat_ref = f"Execute_{process}.json"
-                pdir_ref = f"{process}/execute.json"
-                both_ref = f"{process}/Execute_{process}.json"
+            elif ref_type == "package":
+                flat_ref = f"{process}.cwl"
+                pdir_ref = f"{process}/package.cwl"
+                both_ref = f"{process}/{process}.cwl"
             else:
                 raise ValueError(f"unknown reference type: {ref_type}")
 
@@ -578,12 +577,11 @@ class WorkflowTestRunnerBase(TestCase):
                         with open(path_ext, "r", encoding="utf-8") as f:
                             json_payload = yaml.safe_load(f)  # both JSON/YAML
                             return json_payload
-                    tested_ref.append(path_ext)
                     if urlparse(path_ext).scheme != "":
                         resp = cls.request("GET", path, force_requests=True, ignore_errors=True)
                         if resp.status_code == HTTPOk.code:
                             return yaml.safe_load(resp.text)  # both JSON/YAML
-                        tested_ref.append(path)
+                    tested_ref.append(path)
         except (IOError, ValueError):
             pass
         cls.log("{}Cannot find payload from any of the following references:\n- {}"
