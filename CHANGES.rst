@@ -10,13 +10,13 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add CLI ``--body`` and ``--cwl`` arguments support of literal JSON string for ``deploy`` operation.
 
 Fixes:
 ------
 - Fix help message of CLI arguments not properly grouped within intended sections.
 - Fix handling of mutually exclusive CLI arguments in distinct operation sub-parsers.
-- Fix requirement of ``--process`` and ``--job`` CLI arguments.
+- Fix CLI requirement of ``--process`` and ``--job`` arguments.
 
 `4.6.0 <https://github.com/crim-ca/weaver/tree/4.6.0>`_ (2021-12-15)
 ========================================================================
