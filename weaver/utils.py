@@ -961,6 +961,12 @@ def request_extra(method,                       # type: str
     resp = None
     failures = []
     no_cache = get_no_cache_option(request_kwargs.get("headers", {}), request_options)
+    # remove leftover options unknown to requests method in case of multiple entries
+    # see 'requests.request' detailed signature for applicable args
+    known_req_opts = set(inspect.signature(requests.Session.request).parameters)
+    known_req_opts -= {"url", "method"}  # add as unknown to always remove them since they are passed by arguments
+    for req_opt in set(request_kwargs) - known_req_opts:
+        request_kwargs.pop(req_opt)
     region = "request"
     request_args = (method, url, request_kwargs)
     caching_args = (_request_cached, region, *request_args)

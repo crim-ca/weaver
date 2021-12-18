@@ -160,7 +160,7 @@ class Wps1Process(WpsProcessInterface):
     def monitor(self, monitor_reference):
         # type: (WPSExecution) -> bool
         execution = monitor_reference
-        max_retries = 5
+        max_retries = 20  # using 'wait_secs' incremental delays, this is ~3min of retry attempts
         num_retries = 0
         run_step = 0
         job_id = "<undefined>"

@@ -3,12 +3,16 @@ processDescription:
     id: WPS1JsonArray2NetCDF
     version: 0.0.1
     description: Process that calls Weaver's own builtin process using its WPS-1 interface.
+    # NOTE:
+    #   Since the process simply employs the OWS WPS-1 endpoint for builtin 'jsonarray2netcdf' as if it
+    #   was a 'remote provider', below inputs and outputs must match exactly the original local process
+    #   to allow its execution requirements to be fulfilled when forwarding them.
     inputs:
-      - id: input_json
+      - id: input
         formats:
           - mediaType: application/json
     outputs:
-      - id: output_files
+      - id: output
         formats:
           - mediaType: application/x-netcdf
 executionUnit:
