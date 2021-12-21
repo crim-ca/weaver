@@ -1,7 +1,9 @@
 cwlVersion: v1.0
 class: Workflow
 inputs:
-  input_json: File
+  input_json:
+    type: File
+    format: iana:application/json
   index_json: int
 outputs:
   output:
@@ -9,8 +11,8 @@ outputs:
     outputSource: convert/output_txt
 steps:
   parse:
-    # note: This cannot exist as CWL by itself. It uses Weaver WSP1Requirement.
-    run: WPS1JsonArray2NetCDF.cwl
+    # note: Builtin process. CWL within corresponding directory.
+    run: jsonarray2netcdf
     in:
       input: input_json
     out:
@@ -24,8 +26,12 @@ steps:
     out:
       - output
   convert:
-    run: DockerNetCDF2Text.cwl
+    # note: This cannot exist as CWL by itself. It uses Weaver WPS1Requirement.
+    run: WPS1DockerNetCDF2Text.cwl
     in:
       input_nc: select/output
     out:
       - output_txt
+
+$namespaces:
+  iana: "https://www.iana.org/assignments/media-types/"

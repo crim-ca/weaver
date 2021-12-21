@@ -1,0 +1,14 @@
+{
+    "processDescription": {
+        "process": {
+            "id": "WorkflowRESTScatterCopyNetCDF",
+            "description": "Builtin WPS-REST operation generating an array of files scattered to WPS-1 copy of images."
+        }
+    },
+    "executionUnit": [
+        {
+            "test": "WorkflowRESTScatterCopyNetCDF.cwl"
+        }
+    ],
+    "deploymentProfileName": "http://www.opengis.net/profiles/eoc/workflow"
+}

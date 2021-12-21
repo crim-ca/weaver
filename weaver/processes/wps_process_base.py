@@ -1,6 +1,7 @@
-import glob
 import logging
 import os
+import shutil
+import tempfile
 from abc import abstractmethod
 from typing import TYPE_CHECKING
 
@@ -93,6 +94,7 @@ class WpsProcessInterface(object):
         * - :meth:`cleanup`
           - I*
           - Perform any final steps before completing the execution or after failed execution.
+            Derived classes should call the parent :meth:`WpsProcessInterface.cleanup` before their own cleanup steps.
 
     .. note::
         - Steps marked by ``*`` are optional.
@@ -113,6 +115,7 @@ class WpsProcessInterface(object):
         self.headers = {"Accept": CONTENT_TYPE_APP_JSON, "Content-Type": CONTENT_TYPE_APP_JSON}
         self.settings = get_settings()
         self.update_status = update_status  # type: UpdateStatusPartialFunction
+        self.temp_staging = set()
 
     def execute(self, workflow_inputs, out_dir, expected_outputs):
         # type: (CWL_RuntimeInputsMap, str, CWL_ExpectedOutputs) -> None
@@ -155,10 +158,10 @@ class WpsProcessInterface(object):
             err_msg = "{0}: {1!s}".format(fully_qualified_name(exc), exc)
             err_ctx = "Dispatch and monitoring of remote process caused an unhandled error."
             LOGGER.exception("%s [%s]", err_ctx, err_msg, exc_info=exc)
-            raise PackageExecutionError(err_ctx) from exc
-        finally:
             self.update_status("Running final cleanup operations following failed execution.",
                                REMOTE_JOB_PROGRESS_CLEANUP, STATUS_RUNNING)
+            self.cleanup()
+            raise PackageExecutionError(err_ctx) from exc
 
         self.update_status("Retrieving job results definitions.",
                            REMOTE_JOB_PROGRESS_RESULTS, STATUS_RUNNING)
@@ -169,6 +172,8 @@ class WpsProcessInterface(object):
 
         self.update_status("Running final cleanup operations before completion.",
                            REMOTE_JOB_PROGRESS_CLEANUP, STATUS_RUNNING)
+        self.cleanup()
+
         self.update_status("Execution of remote process execution completed successfully.",
                            REMOTE_JOB_PROGRESS_COMPLETED, STATUS_SUCCEEDED)
 
@@ -243,8 +248,18 @@ class WpsProcessInterface(object):
         """
         Implementation dependent operations to clean the :term:`Process` or :term:`Job` execution.
 
-        This is an optional step that can be omitted entirely if not needed.
+        This is an optional step that doesn't require any override if not needed by derived classes.
         """
+        for path in self.temp_staging:
+            try:
+                if os.path.isfile(path):
+                    LOGGER.debug("Removing temporary staging file: [%s]", path)
+                    os.remove(path)
+                elif os.path.isdir(path):
+                    LOGGER.debug("Removing temporary staging directory: [%s]", path)
+                    shutil.rmtree(path)
+            except OSError:
+                LOGGER.warning("Ignore failure to cleanup temporary staging path: [%s]", path)
 
     def make_request(self, method, url, retry=False, **kwargs):
         # type: (str, str, Union[bool, int], Any) -> AnyResponseType
@@ -256,14 +271,26 @@ class WpsProcessInterface(object):
                                  headers=self.headers, cookies=self.cookies, **kwargs)
         return response
 
-    def host_file(self, file_name):
-        weaver_output_url = get_wps_output_url(self.settings)
-        weaver_output_dir = get_wps_output_dir(self.settings)
-        file_name = os.path.realpath(file_name.replace("file://", ""))  # in case CWL->WPS outputs link was made
+    def host_file(self, file_path):
+        """
+        Hosts an intermediate file between :term:`Workflow` steps for processes that require external or remote access.
 
-        if not file_name.startswith(weaver_output_dir):
-            raise Exception("Cannot host files outside of the output path : {0}".format(file_name))
-        return file_name.replace(weaver_output_dir, weaver_output_url)
+        :param file_path: Intermediate file location (local path expected).
+        :return: Hosted temporary HTTP file location.
+        """
+        wps_out_url = get_wps_output_url(self.settings)
+        wps_out_dir = get_wps_output_dir(self.settings)
+        file_path = os.path.realpath(file_path.replace("file://", ""))  # in case CWL->WPS outputs link was made
+        if file_path.startswith(wps_out_dir):
+            file_href = file_path.replace(wps_out_dir, wps_out_url, 1)
+            LOGGER.debug("Hosting file [%s] skipped since already on WPS outputs as [%s]", file_path, file_href)
+        else:
+            tmp_out_dir = tempfile.mkdtemp(dir=wps_out_dir)
+            file_link = fetch_file(file_path, tmp_out_dir, self.settings, link=True)
+            file_href = file_link.replace(wps_out_dir, wps_out_url, 1)
+            self.temp_staging.add(tmp_out_dir)
+            LOGGER.debug("Hosting file [%s] as [%s] on [%s]", file_path, file_link, file_href)
+        return file_href
 
     def stage_results(self, results, expected_outputs, out_dir):
         # type: (JobResults, CWL_ExpectedOutputs, str) -> None

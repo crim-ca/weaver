@@ -60,6 +60,11 @@ if TYPE_CHECKING:
 class WorkflowProcesses(enum.Enum):
     """
     Known process ID definitions for tests.
+
+    .. note::
+        Make sure to name processes accordingly if one depends on another (e.g.: `WPS-1` pointing at `WPS-REST`).
+        They will be loaded by :class:`WorkflowTestRunnerBase` derived classes in alphabetical order.
+        All atomic :term:`Application Package` will be loaded before :term:`Workflow` definitions.
     """
     APP_STACKER = "Stacker"
     APP_SFS = "SFS"
@@ -72,6 +77,7 @@ class WorkflowProcesses(enum.Enum):
     APP_DOCKER_COPY_IMAGES = "DockerCopyImages"
     APP_DOCKER_COPY_NESTED_OUTDIR = "DockerCopyNestedOutDir"
     APP_DOCKER_NETCDF_2_TEXT = "DockerNetCDF2Text"
+    APP_WPS1_DOCKER_NETCDF_2_TEXT = "WPS1DockerNetCDF2Text"
     APP_WPS1_JSON_ARRAY_2_NETCDF = "WPS1JsonArray2NetCDF"
     WORKFLOW_STACKER_SFS = "Workflow"
     WORKFLOW_SC = "WorkflowSimpleChain"
@@ -84,6 +90,8 @@ class WorkflowProcesses(enum.Enum):
     WORKFLOW_SUBSET_LLNL_SUBSET_CRIM = "WorkflowSubsetLLNL_SubsetCRIM"
     WORKFLOW_SUBSET_NASA_ESGF_SUBSET_CRIM = "WorkflowSubsetNASAESGF_SubsetCRIM"
     WORKFLOW_FILE_TO_SUBSET_CRIM = "WorkflowFileToSubsetCRIM"
+    WORKFLOW_REST_SCATTER_COPY_NETCDF = "WorkflowRESTScatterCopyNetCDF"
+    WORKFLOW_REST_SELECT_COPY_NETCDF = "WorkflowRESTSelectCopyNetCDF"
     WORKFLOW_STAGE_COPY_IMAGES = "WorkflowStageCopyImages"
     WORKFLOW_WPS1_SCATTER_COPY_NETCDF = "WorkflowWPS1ScatterCopyNetCDF"
     WORKFLOW_WPS1_SELECT_COPY_NETCDF = "WorkflowWPS1SelectCopyNetCDF"
@@ -272,7 +280,7 @@ class WorkflowTestRunnerBase(TestCase):
     def setup_test_processes(cls):
         # type: (...) -> None
         test_set = cls.WEAVER_TEST_APPLICATION_SET | cls.WEAVER_TEST_WORKFLOW_SET
-        for process in test_set:
+        for process in sorted(test_set, key=lambda proc: proc.value):
             cls.test_processes_info.update({process: cls.retrieve_process_info(process)})
 
         # replace max occur of processes to minimize data size during tests
@@ -284,25 +292,25 @@ class WorkflowTestRunnerBase(TestCase):
                     if proc_input.get("maxOccurs") == "unbounded":
                         process_deploy_inputs[i_input]["maxOccurs"] = str(2)
 
-        # update workflows to use "test_id" instead of originals
-        raw_app_ids = [app.value for app in cls.WEAVER_TEST_APPLICATION_SET]
-        for workflow_id in cls.WEAVER_TEST_WORKFLOW_SET:
-            workflow_deploy = cls.test_processes_info[workflow_id].deploy_payload
-            for exec_unit in range(len(workflow_deploy["executionUnit"])):
-                try:
-                    workflow_cwl_ref = workflow_deploy["executionUnit"][exec_unit].pop("href")
-                    workflow_cwl_raw = cls.retrieve_payload(workflow_id, workflow_cwl_ref)
-                except KeyError:
-                    workflow_cwl_raw = workflow_deploy["executionUnit"][exec_unit].pop("unit")
-                for step in workflow_cwl_raw.get("steps"):
-                    step_id = workflow_cwl_raw["steps"][step]["run"].strip(".cwl")
-                    for raw_app_id in raw_app_ids:
-                        if raw_app_id == step_id:
-                            app_id = WorkflowProcesses(raw_app_id)
-                            test_id = cls.test_processes_info[app_id].test_id
-                            real_id = workflow_cwl_raw["steps"][step]["run"]
-                            workflow_cwl_raw["steps"][step]["run"] = real_id.replace(raw_app_id, test_id)
-                workflow_deploy["executionUnit"][exec_unit]["unit"] = workflow_cwl_raw
+        # update workflows to use "test_id" instead of originals  # FIXME: remove?
+        # raw_app_ids = set(app.value for app in cls.WEAVER_TEST_APPLICATION_SET)
+        # for workflow_id in cls.WEAVER_TEST_WORKFLOW_SET:
+        #     workflow_deploy = cls.test_processes_info[workflow_id].deploy_payload
+        #     for exec_unit in range(len(workflow_deploy["executionUnit"])):
+        #         try:
+        #             workflow_cwl_ref = workflow_deploy["executionUnit"][exec_unit].pop("href")
+        #             workflow_cwl_raw = cls.retrieve_payload(workflow_id, workflow_cwl_ref)
+        #         except KeyError:
+        #             workflow_cwl_raw = workflow_deploy["executionUnit"][exec_unit].pop("unit")
+        #         for step in workflow_cwl_raw.get("steps"):
+        #             step_id = workflow_cwl_raw["steps"][step]["run"].strip(".cwl")
+        #             for raw_app_id in raw_app_ids:
+        #                 if raw_app_id == step_id:
+        #                     app_id = WorkflowProcesses(raw_app_id)
+        #                     test_id = cls.test_processes_info[app_id].test_id
+        #                     real_id = workflow_cwl_raw["steps"][step]["run"]
+        #                     workflow_cwl_raw["steps"][step]["run"] = real_id.replace(raw_app_id, test_id)
+        #         workflow_deploy["executionUnit"][exec_unit]["unit"] = workflow_cwl_raw
 
     @classmethod
     def setup_logger(cls):
@@ -407,7 +415,8 @@ class WorkflowTestRunnerBase(TestCase):
     def clean_test_processes(cls, allowed_codes=frozenset([HTTPOk.code, HTTPNotFound.code])):
         for process_info in cls.test_processes_info.values():
             cls.clean_test_processes_iter_before(process_info)
-            path = "/processes/{}".format(process_info.test_id)
+            ##path = "/processes/{}".format(process_info.test_id)  # FIXME: remove?
+            path = "/processes/{}".format(process_info.id)
             resp = cls.request("DELETE", path,
                                headers=cls.headers, cookies=cls.cookies,
                                ignore_errors=True, log_enabled=False)
@@ -500,8 +509,8 @@ class WorkflowTestRunnerBase(TestCase):
         """
         pid = process_id.value
         deploy_payload = cls.retrieve_payload(pid, "deploy")
-        new_process_id = cls.get_test_process_id(deploy_payload["processDescription"]["process"]["id"])
-        deploy_payload["processDescription"]["process"]["id"] = new_process_id
+        test_process_id = "{}_{}".format(cls.__name__, deploy_payload["processDescription"]["process"]["id"])
+        ##deploy_payload["processDescription"]["process"]["id"] = test_process_id  # FIXME: remove?
         execute_payload = cls.retrieve_payload(pid, "execute")
 
         # replace derived reference (local only, remote must used full 'href' references)
@@ -516,7 +525,7 @@ class WorkflowTestRunnerBase(TestCase):
                 if "data" in i and i["data"] == swap[0]:
                     i["data"] = swap[1]
 
-        return ProcessInfo(process_id, new_process_id, deploy_payload, execute_payload)
+        return ProcessInfo(process_id, test_process_id, deploy_payload, execute_payload)
 
     @classmethod
     def retrieve_payload(cls, process, ref_type=None, location=None):
@@ -586,11 +595,6 @@ class WorkflowTestRunnerBase(TestCase):
             pass
         cls.log("{}Cannot find payload from any of the following references:\n- {}"
                 .format(cls.logger_separator_calls, "\n- ".join(tested_ref)), exception=True)
-
-    @classmethod
-    def get_test_process_id(cls, real_process_id):
-        # type: (str) -> str
-        return "{}_{}".format(cls.__name__, real_process_id)
 
     @classmethod
     def assert_response(cls, response, status=None, message=""):
@@ -802,7 +806,8 @@ class WorkflowTestRunnerBase(TestCase):
         has_duplicate_apps = len(set(test_application_ids)) != len(list(test_application_ids))
         path_deploy = "/processes"
         for process_id in test_application_ids:
-            path_visible = "{}/{}/visibility".format(path_deploy, self.test_processes_info[process_id].test_id)
+            ##path_visible = "{}/{}/visibility".format(path_deploy, self.test_processes_info[process_id].test_id)  # FIXME: remove?
+            path_visible = "{}/{}/visibility".format(path_deploy, self.test_processes_info[process_id].id)
             data_visible = {"value": VISIBILITY_PUBLIC}
             allowed_status = [HTTPCreated.code, HTTPConflict.code] if has_duplicate_apps else HTTPCreated.code
             self.request("POST", path_deploy, status=allowed_status, headers=self.headers,
@@ -816,7 +821,8 @@ class WorkflowTestRunnerBase(TestCase):
         self.request("POST", path_deploy, status=HTTPCreated.code, headers=self.headers,
                      json=workflow_info.deploy_payload,
                      message="Expect deployed workflow process.")
-        process_path = "{}/{}".format(path_deploy, workflow_info.test_id)
+        ##process_path = "{}/{}".format(path_deploy, workflow_info.test_id)  # FIXME: remove?
+        process_path = "{}/{}".format(path_deploy, workflow_info.id)
         visible_path = "{}/visibility".format(process_path)
         visible = {"value": VISIBILITY_PUBLIC}
         resp = self.request("PUT", visible_path, json=visible, status=HTTPOk.code, headers=self.headers)
@@ -937,48 +943,21 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
         WorkflowProcesses.APP_DOCKER_COPY_NESTED_OUTDIR,
         WorkflowProcesses.APP_DOCKER_NETCDF_2_TEXT,
         WorkflowProcesses.APP_DOCKER_STAGE_IMAGES,
+        WorkflowProcesses.APP_WPS1_DOCKER_NETCDF_2_TEXT,
         WorkflowProcesses.APP_WPS1_JSON_ARRAY_2_NETCDF,
     }
     WEAVER_TEST_WORKFLOW_SET = {
         WorkflowProcesses.WORKFLOW_CHAIN_COPY,
         WorkflowProcesses.WORKFLOW_STAGE_COPY_IMAGES,
+        WorkflowProcesses.WORKFLOW_REST_SCATTER_COPY_NETCDF,
+        WorkflowProcesses.WORKFLOW_REST_SELECT_COPY_NETCDF,
         WorkflowProcesses.WORKFLOW_WPS1_SCATTER_COPY_NETCDF,
         WorkflowProcesses.WORKFLOW_WPS1_SELECT_COPY_NETCDF,
     }
 
-    # FIXME: implement + re-enable 'CWL_REQUIREMENT_SCATTER'
-    @pytest.mark.xfail(reason="WIP")
-    def test_workflow_mixed_wps1_docker_scatter_requirements(self):
-        """
-        Test the use of multiple applications of different :term:`Process` type in a :term:`Workflow`.
-
-        Steps:
-            1. Convert JSON array of NetCDF references to corresponding NetCDF files
-               (process registered with ``WPS1Requirement`` using WPS-1 interface of builtin ``jsonarray2netcdf``).
-            2. Convert NetCDF file to raw text data dumps (using scattered applications per-file).
-        """
-
-        with contextlib.ExitStack() as stack:
-            tmp_host = "https://mocked-file-server.com"  # must match in 'Execute_WorkflowScatterCopyNestedOutDir.json'
-            tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())
-            nc_refs = []
-            for i in range(3):
-                nc_name = f"test-file-{i}.nc"
-                nc_refs.append(os.path.join(tmp_host, nc_name))
-                with open(os.path.join(tmp_dir, nc_name), "w") as tmp_file:
-                    tmp_file.write(f"DUMMY NETCDF DATA #{i}")
-            with open(os.path.join(tmp_dir, "netcdf-array.json"), "w") as tmp_file:  # must match execution body
-                json.dump(nc_refs, tmp_file)
-
-            def mock_tmp_input(requests_mock):
-                mocked_file_server(tmp_dir, tmp_host, self.settings, requests_mock=requests_mock)
-
-            self.workflow_runner(WorkflowProcesses.WORKFLOW_WPS1_SCATTER_COPY_NETCDF,
-                                 [WorkflowProcesses.APP_WPS1_JSON_ARRAY_2_NETCDF,
-                                  WorkflowProcesses.APP_DOCKER_NETCDF_2_TEXT],
-                                 log_full_trace=True, requests_mock_callback=mock_tmp_input)
-
-    def test_workflow_mixed_wps1_docker_select_requirements(self):
+    # FIXME: https://github.com/crim-ca/weaver/issues/25
+    @pytest.mark.xfail(reason="WPS-1 multiple outputs not supported (https://github.com/crim-ca/weaver/issues/25)")
+    def test_workflow_mixed_wps1_builtin_rest_docker_select_requirements(self):
         """
         Test the use of multiple applications of different :term:`Process` type in a :term:`Workflow`.
 
@@ -987,6 +966,10 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
                (process registered with ``WPS1Requirement`` using WPS-1 interface of builtin ``jsonarray2netcdf``).
             2. Select only the first file within the list.
             3. Convert NetCDF file to raw text data dumps.
+
+        .. note::
+            Because ``jsonarray2netcdf`` is running in subprocess instantiated by :mod:`cwltool`, file-server
+            location cannot be mocked by the test suite. Employ local test paths as if they where already fetched.
         """
 
         with contextlib.ExitStack() as stack:
@@ -995,7 +978,7 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
             nc_refs = []
             for i in range(3):
                 nc_name = f"test-file-{i}.nc"
-                nc_refs.append(os.path.join(tmp_host, nc_name))
+                nc_refs.append(os.path.join("file://" + tmp_dir, nc_name))
                 with open(os.path.join(tmp_dir, nc_name), "w") as tmp_file:
                     tmp_file.write(f"DUMMY NETCDF DATA #{i}")
             with open(os.path.join(tmp_dir, "netcdf-array.json"), "w") as tmp_file:  # must match execution body
@@ -1020,9 +1003,89 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
             output_path = fetch_file(final_output, stage_out_tmp_dir, self.settings)
             with open(output_path, "r") as out_file:
                 output_data = out_file.read()
-            self.assert_test(lambda: output_data == f"COPY:\nCOPY:\nDUMMY DATA #{expected_index}",
-                             message="Workflow output file with nested directory globs should contain "
-                                     "two COPY prefixes, one added by each intermediate step of the Workflow.")
+            self.assert_test(lambda: output_data == f"DUMMY NETCDF DATA #{expected_index}",
+                             message="Workflow output data should have made it through the "
+                                     "workflow of different process types.")
+
+    def test_workflow_mixed_rest_builtin_wps1_docker_select_requirements(self):
+        """
+        Test the use of multiple applications of different :term:`Process` type in a :term:`Workflow`.
+
+        Steps:
+            1. Convert JSON array of NetCDF references to corresponding NetCDF files (builtin ``jsonarray2netcdf``).
+            2. Select only the first file within the list.
+            3. Convert NetCDF file to raw text data dumps (using WPS-1 interface of process with ``DockerRequirement``).
+
+        .. note::
+            Because ``jsonarray2netcdf`` is running in subprocess instantiated by :mod:`cwltool`, file-server
+            location cannot be mocked by the test suite. Employ local test paths as if they where already fetched.
+        """
+
+        with contextlib.ExitStack() as stack:
+            tmp_host = "https://mocked-file-server.com"  # must match in 'Execute_WorkflowSelectCopyNestedOutDir.json'
+            tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())
+            nc_refs = []
+            for i in range(3):
+                nc_name = f"test-file-{i}.nc"
+                nc_refs.append(os.path.join("file://" + tmp_dir, nc_name))
+                with open(os.path.join(tmp_dir, nc_name), "w") as tmp_file:
+                    tmp_file.write(f"DUMMY NETCDF DATA #{i}")
+            with open(os.path.join(tmp_dir, "netcdf-array.json"), "w") as tmp_file:  # must match execution body
+                json.dump(nc_refs, tmp_file)
+
+            def mock_tmp_input(requests_mock):
+                mocked_file_server(tmp_dir, tmp_host, self.settings, requests_mock=requests_mock)
+
+            results = self.workflow_runner(WorkflowProcesses.WORKFLOW_REST_SELECT_COPY_NETCDF,
+                                           [WorkflowProcesses.APP_DOCKER_NETCDF_2_TEXT,  # indirectly needed by WPS-1
+                                            WorkflowProcesses.APP_WPS1_DOCKER_NETCDF_2_TEXT],
+                                           log_full_trace=True, requests_mock_callback=mock_tmp_input)
+
+            stack.enter_context(mocked_wps_output(self.settings))  # allow retrieval of HTTP WPS output
+            stage_out_tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())  # different dir to avoid override
+            final_output = results.get("output", {}).get("href", "")
+            expected_index = 1  # see execute payload
+            result_file = f"test-file-{expected_index}.txt"  # extension converted from NetCDF data dump
+            self.assert_test(lambda: final_output.startswith("http") and final_output.endswith(result_file),
+                             message="Workflow output file with nested directory globs should have been automatically"
+                                     "mapped between steps until the final staging WPS output URL.")
+            output_path = fetch_file(final_output, stage_out_tmp_dir, self.settings)
+            with open(output_path, "r") as out_file:
+                output_data = out_file.read()
+            self.assert_test(lambda: output_data == f"DUMMY NETCDF DATA #{expected_index}",
+                             message="Workflow output data should have made it through the "
+                                     "workflow of different process types.")
+
+    # FIXME: implement + re-enable 'CWL_REQUIREMENT_SCATTER'
+    @pytest.mark.xfail(reason="WIP")
+    def test_workflow_mixed_rest_builtin_wps1_docker_scatter_requirements(self):
+        """
+        Test the use of multiple applications of different :term:`Process` type in a :term:`Workflow`.
+
+        Steps:
+            1. Convert JSON array of NetCDF references to corresponding NetCDF files
+               (process registered with ``WPS1Requirement`` using WPS-1 interface of builtin ``jsonarray2netcdf``).
+            2. Convert NetCDF file to raw text data dumps (using scattered applications per-file).
+        """
+
+        with contextlib.ExitStack() as stack:
+            tmp_host = "https://mocked-file-server.com"  # must match in 'Execute_WorkflowScatterCopyNestedOutDir.json'
+            tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())
+            nc_refs = []
+            for i in range(3):
+                nc_name = f"test-file-{i}.nc"
+                nc_refs.append(os.path.join(tmp_host, nc_name))
+                with open(os.path.join(tmp_dir, nc_name), "w") as tmp_file:
+                    tmp_file.write(f"DUMMY NETCDF DATA #{i}")
+            with open(os.path.join(tmp_dir, "netcdf-array.json"), "w") as tmp_file:  # must match execution body
+                json.dump(nc_refs, tmp_file)
+
+            def mock_tmp_input(requests_mock):
+                mocked_file_server(tmp_dir, tmp_host, self.settings, requests_mock=requests_mock)
+
+            self.workflow_runner(WorkflowProcesses.WORKFLOW_REST_SCATTER_COPY_NETCDF,
+                                 [WorkflowProcesses.APP_WPS1_DOCKER_NETCDF_2_TEXT],
+                                 log_full_trace=True, requests_mock_callback=mock_tmp_input)
 
     def test_workflow_docker_applications(self):
         self.workflow_runner(WorkflowProcesses.WORKFLOW_STAGE_COPY_IMAGES,

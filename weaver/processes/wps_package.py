@@ -129,9 +129,10 @@ if TYPE_CHECKING:
         CWL_RequirementsDict,
         CWL_RequirementsList,
         CWL_Results,
+        CWL_ToolPathObjectType,
+        CWL_WorkflowStepPackageMap,
         JSON,
         Number,
-        CWL_ToolPathObjectType,
         ValueType
     )
 
@@ -342,7 +343,7 @@ def _load_package_file(file_path):
         raise PackageRegistrationError("Package parsing generated an error: [{!s}]".format(ex))
 
 
-def _load_package_content(package_dict,                             # type: Dict
+def _load_package_content(package_dict,                             # type: CWL
                           package_name=PACKAGE_DEFAULT_FILE_NAME,   # type: str
                           data_source=None,                         # type: Optional[str]
                           only_dump_file=False,                     # type: bool
@@ -350,7 +351,7 @@ def _load_package_content(package_dict,                             # type: Dict
                           loading_context=None,                     # type: Optional[LoadingContext]
                           runtime_context=None,                     # type: Optional[RuntimeContext]
                           process_offering=None,                    # type: Optional[JSON]
-                          ):  # type: (...) -> Optional[Tuple[CWLFactoryCallable, str, Dict[str, str]]]
+                          ):  # type: (...) -> Optional[Tuple[CWLFactoryCallable, str, CWL_WorkflowStepPackageMap]]
     """
     Loads `CWL` package definition using various contextual resources.
 
@@ -375,9 +376,10 @@ def _load_package_content(package_dict,                             # type: Dict
     :returns:
         If ``only_dump_file`` is ``True``: ``None``.
         Otherwise, tuple of:
-        - instance of ``CWLFactoryCallable``
-        - package type (``PROCESS_WORKFLOW`` or ``PROCESS_APPLICATION``)
-        - mapping of each step ID with their package name that must be run
+        - Instance of ``CWLFactoryCallable``
+        - Package type (``PROCESS_WORKFLOW`` or ``PROCESS_APPLICATION``)
+        - Package sub-steps definitions if it is of type ``PROCESS_WORKFLOW``, otherwise empty mapping.
+          Mapping of each step name to their respective package ID and definition that must be run.
 
     .. warning::
         Specified :paramref:`tmp_dir` will be deleted on exit.
@@ -396,8 +398,9 @@ def _load_package_content(package_dict,                             # type: Dict
         package_body, package_name = _get_process_package(step_process_url)
         _load_package_content(package_body, package_name, tmp_dir=tmp_dir,
                               data_source=data_source, only_dump_file=True)
-        package_dict["steps"][step["name"]]["run"] = package_name
-        step_packages[step["name"]] = package_name
+        step_name = step["name"]
+        package_dict["steps"][step_name]["run"] = package_name
+        step_packages[step_name] = {"id": package_name, "package": package_body}
 
     # fix I/O to preserve ordering from dump/load, and normalize them to consistent list of objects
     process_offering_hint = process_offering or {}
@@ -776,7 +779,7 @@ class WpsPackage(Process):
     log_file = None                 # type: Optional[str]
     log_level = None                # type: Optional[int]
     logger = None                   # type: Optional[logging.Logger]
-    step_packages = None            # type: Optional[Dict[str, str]]
+    step_packages = None            # type: Optional[CWL_WorkflowStepPackageMap]
     step_launched = None            # type: Optional[List[str]]
     request = None                  # type: Optional[WPSRequest]
     response = None                 # type: Optional[ExecuteResponse]
@@ -1251,14 +1254,13 @@ class WpsPackage(Process):
             self.logger.debug("Using cwltool.RuntimeContext args:\n%s", json.dumps(runtime_params, indent=2))
             runtime_context = RuntimeContext(kwargs=runtime_params)
             try:
+                self.step_launched = []
                 package_inst, _, self.step_packages = _load_package_content(self.package,
                                                                             package_name=self.package_id,
                                                                             # no data source for local package
                                                                             data_source=None,
                                                                             loading_context=loading_context,
                                                                             runtime_context=runtime_context)
-                self.step_launched = []
-
             except Exception as ex:
                 raise PackageRegistrationError("Exception occurred on package instantiation: '{!r}'".format(ex))
             self.update_status("Loading package content done.", PACKAGE_PROGRESS_LOADING, STATUS_RUNNING)
@@ -1590,11 +1592,13 @@ class WpsPackage(Process):
     def get_job_process_definition(self, jobname, joborder, tool):  # noqa: E811
         # type: (str, JSON, CWL) -> WpsPackage
         """
-        Obtain the execution job definition for the given process.
+        Obtain the execution job definition for the given process (:term:`Workflow` step implementation).
 
-        This function is called before running an `ADES` job (either from a workflow step or a simple `EMS` dispatch).
-        It must return a :class:`weaver.processes.wps_process.WpsProcess` instance configured with the proper ``CWL``
-        package definition, ADES target and cookies to access it (if protected).
+        This function is called before running an :term:`ADES` :term:`Job` (either from a :term:`workflow` step or
+        simple :term:`EMS` :term:`Job` dispatching).
+
+        It must return a :class:`weaver.processes.wps_process.WpsProcess` instance configured with the
+        proper :term:`CWL` package definition, :term:`ADES` target and cookies to access it (if protected).
 
         :param jobname: The workflow step or the package id that must be launched on an ADES :class:`string`
         :param joborder: The params for the job :class:`dict {input_name: input_value}`
@@ -1608,13 +1612,18 @@ class WpsPackage(Process):
         if jobname == self.package_id:
             # A step is the package itself only for non-workflow package being executed on the EMS
             # default action requires ADES dispatching but hints can indicate also WPS1 or ESGF-CWT provider
+            step_package_type = self.package_type
             step_payload = self.payload
-            process = self.package_id
+            step_package = self.package
+            step_process = self.package_id
             jobtype = "package"
         else:
             # Here we got a step part of a workflow (self is the workflow package)
-            step_payload = _get_process_payload(self.step_packages[jobname])
-            process = self.step_packages[jobname]
+            step_details = self.step_packages[jobname]
+            step_process = step_details["id"]
+            step_package = step_details["package"]
+            step_package_type = _get_package_type(step_package)
+            step_payload = {}  # defer until package requirement resolve to avoid unnecessary fetch
             jobtype = "step"
 
         # Progress made with steps presumes that they are done sequentially and have the same progress weight
@@ -1639,12 +1648,18 @@ class WpsPackage(Process):
                 _wps_params[_param] = _requirement[_param]
             return _wps_params
 
-        requirement = get_application_requirement(self.package)
+        requirement = get_application_requirement(step_package)
         req_class = requirement["class"]
         req_source = "requirement/hint"
-        if self.package_type == PROCESS_WORKFLOW:
+        if step_package_type == PROCESS_WORKFLOW:
             req_class = PROCESS_WORKFLOW
             req_source = "tool class"
+
+        if jobtype == "step" and not any(
+            req_class.endswith(req) for req in [CWL_REQUIREMENT_APP_WPS1, CWL_REQUIREMENT_APP_ESGF_CWT]
+        ):
+            LOGGER.debug("Retrieve WPS-3 process payload for potential Data Source definitions to resolve.")
+            step_payload = _get_process_payload(step_process)
 
         if req_class.endswith(CWL_REQUIREMENT_APP_WPS1):
             self.logger.info("WPS-1 Package resolved from %s: %s", req_source, req_class)
@@ -1672,6 +1687,6 @@ class WpsPackage(Process):
             from weaver.processes.wps3_process import Wps3Process
             return Wps3Process(step_payload=step_payload,
                                joborder=joborder,
-                               process=process,
+                               process=step_process,
                                request=self.request,
                                update_status=_update_status_dispatch)

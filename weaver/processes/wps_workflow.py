@@ -42,11 +42,18 @@ from weaver.utils import get_settings, make_dirs, now
 from weaver.wps.utils import get_wps_output_dir
 
 if TYPE_CHECKING:
+    from threading import Lock as ThreadLock
     from typing import Any, Dict, Generator, List, Optional, Set, Union
+
     from cwltool.command_line_tool import OutputPorts
     from cwltool.provenance import ProvenanceProfile
-    from threading import Lock as ThreadLock
-    from weaver.typedefs import AnyValueType, ExpectedOutputType, GetJobProcessDefinitionFunction, ToolPathObjectType
+
+    from weaver.typedefs import (
+        AnyValueType,
+        CWL_ExpectedOutputs,
+        CWL_ToolPathObjectType,
+        JobProcessDefinitionCallback,
+    )
     from weaver.processes.wps_process_base import WpsProcessInterface
 
 LOGGER = logging.getLogger(__name__)

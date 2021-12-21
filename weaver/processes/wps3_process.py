@@ -28,6 +28,7 @@ from weaver.utils import (
     get_job_log_msg,
     get_log_monitor_msg,
     pass_http_error,
+    repr_json,
     request_extra
 )
 from weaver.visibility import VISIBILITY_PUBLIC
@@ -96,7 +97,8 @@ class Wps3Process(WpsProcessInterface):
             deploy_body = step_payload
             url = retrieve_data_source_url(data_source)
         except (IndexError, KeyError) as exc:
-            raise PackageExecutionError("Failed to save package outputs. [{!r}]".format(exc))
+            LOGGER.error("Error during WPS-3 process data source resolution: [%s]", exc, exc_info=exc)
+            raise PackageExecutionError("Failed resolution of WPS-3 process data source: [{!r}]".format(exc))
 
         self.provider = data_source  # fix immediately for below `update_status` call
         self.update_status("Provider {provider} is selected {reason}.".format(provider=data_source, reason=reason),
@@ -248,9 +250,11 @@ class Wps3Process(WpsProcessInterface):
             "inputs": process_inputs,
             "outputs": process_outputs
         }
+        LOGGER.debug("Execute process WPS body for [%s]:\n%s", self.process, repr_json(execute_body))
         request_url = self.url + sd.process_jobs_service.path.format(process_id=self.process)
         response = self.make_request(method="POST", url=request_url, json=execute_body, retry=True)
         if response.status_code != 201:
+            LOGGER.error("Request [POST %s] failed with: [%s]", request_url, response.status_code)
             raise Exception("Was expecting a 201 status code from the execute request : {0}".format(request_url))
 
         job_status_uri = response.headers["Location"]
@@ -284,7 +288,7 @@ class Wps3Process(WpsProcessInterface):
             LOGGER.debug(get_log_monitor_msg(job_id, job_status_value,
                                              job_status.get("percentCompleted", 0),
                                              get_any_message(job_status), job_status.get("statusLocation")))
-            raise Exception(job_status)
+            raise PackageExecutionError(job_status)
         return job_id
 
     def get_job_status(self, job_status_uri, retry=True):

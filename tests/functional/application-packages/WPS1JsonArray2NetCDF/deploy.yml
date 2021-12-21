@@ -24,11 +24,12 @@ executionUnit:
           # note: this must match the WebTest TestApp endpoint and settings
           provider: "https://localhost/wps"
           process: jsonarray2netcdf
+      # note: following I/O must match 'jsonarray2netcdf' (see above)
       inputs:
-        input_json:
+        input:
           type: File
       outputs:
-        output_files:
+        output:
           type: File[]
           outputBinding:
             glob: "*.nc"

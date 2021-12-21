@@ -421,6 +421,7 @@ def mocked_sub_requests(app,                # type: TestApp
     from weaver.wps_restapi.swagger_definitions import FileLocal
     from requests.sessions import Session as RealSession
     real_request = RealSession.request
+    real_signature = inspect.signature(real_request)
 
     def _parse_for_app_req(method, url, **req_kwargs):
         """
@@ -519,7 +520,8 @@ def mocked_sub_requests(app,                # type: TestApp
     with contextlib.ExitStack() as stack:
         stack.enter_context(mock.patch("requests.request", side_effect=mocked_app_request))
         stack.enter_context(mock.patch("requests.Session.request", new=TestSession.request))
-        stack.enter_context(mock.patch("requests.sessions.Session.request", new=TestSession.request))
+        mocked_request = stack.enter_context(mock.patch("requests.sessions.Session.request", new=TestSession.request))
+        mocked_request.__signature__ = real_signature  # replicate signature for 'request_extra' using it
         stack.enter_context(mock.patch.object(FileLocal, "validator", new_callable=mock_file_regex))
         stack.enter_context(mock.patch.object(TestResponse, "json", new=TestResponseJsonCallable.json))
         if isinstance(method_function, str):

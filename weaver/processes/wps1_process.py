@@ -27,7 +27,7 @@ from weaver.utils import (
 from weaver.wps.utils import check_wps_status, get_wps_client
 
 if TYPE_CHECKING:
-    from typing import Optional
+    from typing import Optional, TypedDict
 
     from owslib.wps import WebProcessingService, WPSExecution
     from pywps.app import WPSRequest
@@ -41,6 +41,8 @@ if TYPE_CHECKING:
         ProcessOWS,
         UpdateStatusPartialFunction
     )
+
+    JobExecution = TypedDict("JobExecution", {"execution": WPSExecution})
 
 LOGGER = logging.getLogger(__name__)
 
@@ -106,11 +108,6 @@ class Wps1Process(WpsProcessInterface):
                 if isinstance(val, (int, float)):
                     val = str(val)
 
-                # FIXME: needed?
-                if val.startswith("file://"):
-                    # we need to host file starting with file:// scheme
-                    val = self.host_file(val)
-
                 input_values.append((val, mime_type, encoding))
 
             # need to use ComplexDataInput structure for complex input
@@ -124,10 +121,16 @@ class Wps1Process(WpsProcessInterface):
 
     def format_outputs(self, workflow_outputs):
         # type: (JobOutputs) -> JobOutputs
+        expected_outputs = {get_any_id(out) for out in workflow_outputs}
+        provided_outputs = self.wps_process.processOutputs
         outputs_as_ref = [
             {"id": out.identifier, "as_ref": out.dataType == WPS_COMPLEX_DATA}
-            for out in self.wps_process.processOutputs if out.identifier in workflow_outputs  # expected outputs
+            for out in provided_outputs if out.identifier in expected_outputs
         ]
+        if not outputs_as_ref:
+            provided_outputs = {out.identifier for out in provided_outputs}
+            LOGGER.warning("No matching outputs between intersect of WPS-1 expected and provided outputs.\n"
+                           "Provided: %s\nExpected: %s", list(expected_outputs), list(provided_outputs))
         return outputs_as_ref
 
     def prepare(self):
@@ -144,7 +147,7 @@ class Wps1Process(WpsProcessInterface):
             raise OWSNoApplicableCode("Failed to retrieve WPS process description. Error: [{}].".format(str(ex)))
 
     def dispatch(self, process_inputs, process_outputs):
-        # type: (JobInputs, JobOutputs) -> WPSExecution
+        # type: (JobInputs, JobOutputs) -> JobExecution
         wps_outputs = [(output["id"], output["as_ref"]) for output in process_outputs]
         execution = self.wps_provider.execute(
             self.process,
@@ -155,11 +158,11 @@ class Wps1Process(WpsProcessInterface):
         )
         if not execution.process and execution.errors:
             raise execution.errors[0]
-        return execution
+        return {"execution": execution}  # return a dict to allow update by reference
 
     def monitor(self, monitor_reference):
-        # type: (WPSExecution) -> bool
-        execution = monitor_reference
+        # type: (JobExecution) -> bool
+        execution = monitor_reference["execution"]
         max_retries = 20  # using 'wait_secs' incremental delays, this is ~3min of retry attempts
         num_retries = 0
         run_step = 0
@@ -170,6 +173,7 @@ class Wps1Process(WpsProcessInterface):
             try:
                 execution = check_wps_status(location=execution.statusLocation,
                                              sleep_secs=wait_secs(run_step), settings=self.settings)
+                monitor_reference["execution"] = execution  # update reference for later stages
                 job_id = execution.statusLocation.split("/")[-1].replace(".xml", "")
                 exec_status = status.map_status(execution.getStatus())
                 LOGGER.debug(get_log_monitor_msg(job_id,
@@ -205,11 +209,12 @@ class Wps1Process(WpsProcessInterface):
         return True
 
     def get_results(self, monitor_reference):
-        # type: (WPSExecution) -> JobResults
+        # type: (JobExecution) -> JobResults
         self.update_status("Retrieving job output definitions from remote WPS-1 provider.",
                            REMOTE_JOB_PROGRESS_RESULTS, status.STATUS_RUNNING)
+        execution = monitor_reference["execution"]
         ows_results = [
             ows2json_output_data(output, self.wps_process, self.settings)
-            for output in monitor_reference.processOutputs
+            for output in execution.processOutputs
         ]
         return ows_results

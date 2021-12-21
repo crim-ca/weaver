@@ -1,5 +1,6 @@
 import logging
 import os
+import sys
 from importlib import import_module
 from string import Template
 from typing import TYPE_CHECKING
@@ -169,11 +170,17 @@ class BuiltinProcessJobBase(CommandLineJob):
         if process.type != PROCESS_BUILTIN:
             raise PackageExecutionError("Invalid package is not of type '{}'".format(PROCESS_BUILTIN))
 
+    def _update_command(self):
+        if len(self.command_line) and self.command_line[0] == "python":
+            LOGGER.debug("Mapping generic builtin Python command to environment: [python] => [%s]", sys.executable)
+            self.command_line[0] = sys.executable
+
     # pylint: disable=W0221,arguments-differ    # naming using python like arguments
     def run(self, runtime_context, **kwargs):
         # type: (RuntimeContext, Any) -> None
         try:
             self._validate_process()
+            self._update_command()
             super(BuiltinProcessJobBase, self).run(runtime_context, **kwargs)
         except Exception as err:
             LOGGER.warning(u"Failed to run process:\n%s", err, exc_info=runtime_context.debug)

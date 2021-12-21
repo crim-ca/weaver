@@ -95,6 +95,12 @@ if TYPE_CHECKING:
     CWL_ResultEntry = Union[Dict[str, CWL_ResultValue], CWL_ResultFile, List[CWL_ResultFile]]
     CWL_Results = Dict[str, CWL_ResultEntry]
     CWL_Class = Literal["CommandLineTool", "ExpressionTool", "Workflow"]
+    CWL_WorkflowStep = TypedDict("CWL_WorkflowStep", {
+        "run": str,
+        "in": Dict[str, str],   # mapping of <step input: workflow input | other-step output>
+        "out": List[str],       # output to retrieve from step, for mapping with other steps
+    })
+    CWL_WorkflowStepID = str
     CWL = TypedDict("CWL", {
         "cwlVersion": str,
         "class": CWL_Class,
@@ -107,9 +113,16 @@ if TYPE_CHECKING:
         "hints": CWL_AnyRequirements,
         "inputs": CWL_Inputs,
         "outputs": CWL_Outputs,
+        "steps": Dict[CWL_WorkflowStepID, CWL_WorkflowStep],
         "$namespaces": Dict[str, str],
         "$schemas": Dict[str, str]
     }, total=False)
+
+    CWL_WorkflowStepPackage = TypedDict("CWL_WorkflowStepPackage", {
+        "id": str,          # reference ID of the package
+        "package":  CWL     # definition of the package as sub-step of a Workflow
+    })
+    CWL_WorkflowStepPackageMap = Dict[CWL_WorkflowStepID, CWL_WorkflowStepPackage]
 
     # CWL loading
     CWL_WorkflowInputs = Dict[str, AnyValueType]  # mapping of ID:value

@@ -1,0 +1,27 @@
+
+processDescription:
+  process:
+    id: WPS1DockerNetCDF2Text
+    version: 0.0.1
+    description: Process that calls DockerNetCDF2Text process using the WPS-1 interface.
+executionUnit:
+  - unit:
+      cwlVersion: v1.0
+      class: CommandLineTool
+      hints:  # cannot be in requirements since not official CWL
+        WPS1Requirement:
+          # note: this must match the WebTest TestApp endpoint and settings
+          provider: "https://localhost/wps"
+          process: DockerNetCDF2Text
+      # NOTE: Process simply employs the OWS WPS-1 endpoint, I/O must match original deployment.
+      inputs:
+        input_nc:
+          type: File
+          inputBinding:
+            position: 1
+      outputs:
+        output_txt:
+          type: File
+          outputBinding:
+            glob: "*.txt"
+deploymentProfileName: http://www.opengis.net/profiles/eoc/wpsApplication

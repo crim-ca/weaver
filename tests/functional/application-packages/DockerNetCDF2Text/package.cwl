@@ -12,10 +12,11 @@ requirements:
         entry: |
           set -x 
           in="\${1}"
-          out="\${2%.*}.txt"
+          out="\$(basename \${1%.*}.txt)"
           echo "Input: \${in}"
           echo "Output: \${out}"
-          mv "\${in}" "\${out}"
+          ls "$(runtime.outdir)"
+          cp "\${in}" "\${out}"
 inputs:
   input_nc:
     type: File
