@@ -336,32 +336,6 @@ class WpsProcessInterface(object):
                     src_path = value
                 fetch_file(src_path, cwl_out_dir, settings=self.settings, link=as_link)
 
-            # patch expected output sub-dir by following workflow steps if employed in outputBindings
-            # https://www.commonwl.org/v1.0/CommandLineTool.html#CommandOutputBinding
-            # res_loc = expected_outputs[res_id]
-            # if not isinstance(res_loc, list):
-            #     res_loc = [res_loc]
-            # for res_path in res_loc:
-            #     if res_path.startswith("./"):
-            #         res_path = res_path.split("/", 1)[-1]
-            #     if not res_path:
-            #         continue
-            #     if any(res_path.startswith(part) for part in ["..", "/", "~"]):
-            #         LOGGER.debug("Skipping forbidden path for outputBinding: [%s]", res_path)
-            #         continue
-            #     res_parts = res_path.split("/")
-            #     res_base = cwl_out_dir
-            #     res_name = res_parts[-1]
-            #     for part in res_parts[:-1]:
-            #         res_base = os.path.join(res_base, part)
-            #         os.makedirs(res_base, exist_ok=True)
-            #     if res_base != cwl_out_dir:
-            #         for file_match in glob.glob(cwl_out_dir):
-            #             file_stage = os.path.join(cwl_out_dir, os.path.split(file_match)[-1])
-            #             if not os.path.exists(file_match) and os.path.isfile(file_stage):
-            #                 LOGGER.debug("Resolved outputBinding [%s]->[%s]", file_stage, file_match)
-            #                 os.symlink(file_stage, file_match, target_is_directory=False)
-
     def stage_inputs(self, workflow_inputs):
         # type: (CWL_WorkflowInputs) -> JobInputs
         """
