@@ -10,6 +10,17 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+`4.7.0 <https://github.com/crim-ca/weaver/tree/4.7.0>`_ (2021-12-21)
+========================================================================
+
+Changes:
+--------
 - Add CLI ``--body`` and ``--cwl`` arguments support of literal JSON string for ``deploy`` operation.
 
 Fixes:
