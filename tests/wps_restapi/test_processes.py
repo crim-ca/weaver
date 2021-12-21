@@ -100,7 +100,8 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         """
         Provides deploy process bare minimum template with undefined execution unit.
 
-        To be used in conjunction with `get_application_package_mock` to avoid extra package content-specific validations.
+        To be used in conjunction with :meth:`get_application_package` and :meth:`validate_wps1_package`
+        to avoid extra package content-specific validations.
         """
         if not process_id:
             process_id = self.fully_qualified_test_process_name()

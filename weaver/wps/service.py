@@ -1,8 +1,8 @@
 import logging
 import os
 from configparser import ConfigParser
-from urllib.parse import urlparse
 from typing import TYPE_CHECKING
+from urllib.parse import urlparse
 
 from owslib.wps import WPSExecution
 from pyramid.httpexceptions import HTTPBadRequest, HTTPSeeOther

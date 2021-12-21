@@ -5,18 +5,26 @@ if TYPE_CHECKING:
     import typing
     import uuid
     from datetime import datetime
-    from typing import Any, Callable, Dict, List, Literal, Optional, Protocol, Sequence, Tuple, Type, Union
+    from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Type, Union
     if hasattr(typing, "TypedDict"):
-        from typing import TypedDict  # pylint: disable=E0611,no-name-in-module
+        from typing import TypedDict  # pylint: disable=E0611,no-name-in-module  # Python >= 3.8
     else:
         from typing_extensions import TypedDict
+    if hasattr(typing, "Literal"):
+        from typing import Literal  # pylint: disable=E0611,no-name-in-module  # Python >= 3.8
+    else:
+        from typing_extensions import Literal
+    if hasattr(typing, "Protocol"):
+        from typing import Protocol  # pylint: disable=E0611,no-name-in-module  # Python >= 3.8
+    else:
+        from typing_extensions import Protocol
     if hasattr(os, "PathLike"):
         FileSystemPathType = Union[os.PathLike, str]
     else:
         FileSystemPathType = str
 
     from celery.app import Celery
-    from owslib.wps import BoundingBoxDataInput, ComplexDataInput, Process as ProcessOWS
+    from owslib.wps import BoundingBoxDataInput, ComplexDataInput, Process as ProcessOWS, WPSExecution
     from pyramid.httpexceptions import HTTPSuccessful, HTTPRedirection
     from pyramid.registry import Registry
     from pyramid.request import Request as PyramidRequest
@@ -120,12 +128,12 @@ if TYPE_CHECKING:
 
     CWL_WorkflowStepPackage = TypedDict("CWL_WorkflowStepPackage", {
         "id": str,          # reference ID of the package
-        "package":  CWL     # definition of the package as sub-step of a Workflow
+        "package": CWL      # definition of the package as sub-step of a Workflow
     })
     CWL_WorkflowStepPackageMap = Dict[CWL_WorkflowStepID, CWL_WorkflowStepPackage]
 
     # CWL loading
-    CWL_WorkflowInputs = Dict[str, AnyValueType]  # mapping of ID:value
+    CWL_WorkflowInputs = Dict[str, AnyValueType]   # mapping of ID:value
     CWL_ExpectedOutputs = Dict[str, AnyValueType]  # mapping of ID:value
     CWL_ToolPathObjectType = Dict[str, Any]
     JobProcessDefinitionCallback = Callable[[str, Dict[str, str], Dict[str, Any]], WpsProcessInterface]
@@ -227,3 +235,6 @@ if TYPE_CHECKING:
     JobOutputs = List[Union[JobExpectItem, Dict[str, AnyValueType]]]
     JobResults = List[JobValueItem]
     JobMonitorReference = Any  # typically an URI of the remote job status or an execution object/handler
+
+    # reference employed as 'JobMonitorReference' by 'WPS1Process'
+    JobExecution = TypedDict("JobExecution", {"execution": WPSExecution})

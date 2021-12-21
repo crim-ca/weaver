@@ -59,7 +59,7 @@ CWL_REQUIREMENT_FEATURES = frozenset([
     # CWL_REQUIREMENT_SCATTER,  # FIXME: see workflow test + fix https://github.com/crim-ca/weaver/issues/105
 ])
 """
-Set of :term:`CWL` requirements that corresponds to extra functionalities not completely defining 
+Set of :term:`CWL` requirements that corresponds to extra functionalities not completely defining
 an :term:`Application Package` by themselves.
 """
 

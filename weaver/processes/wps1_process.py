@@ -27,13 +27,14 @@ from weaver.utils import (
 from weaver.wps.utils import check_wps_status, get_wps_client
 
 if TYPE_CHECKING:
-    from typing import Optional, TypedDict
+    from typing import Optional
 
-    from owslib.wps import WebProcessingService, WPSExecution
+    from owslib.wps import WebProcessingService
     from pywps.app import WPSRequest
 
     from weaver.typedefs import (
         CWL_RuntimeInputsMap,
+        JobExecution,
         JobInputs,
         JobOutputs,
         JobResults,
@@ -41,8 +42,6 @@ if TYPE_CHECKING:
         ProcessOWS,
         UpdateStatusPartialFunction
     )
-
-    JobExecution = TypedDict("JobExecution", {"execution": WPSExecution})
 
 LOGGER = logging.getLogger(__name__)
 

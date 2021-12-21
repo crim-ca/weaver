@@ -1,14 +1,13 @@
 """
 Test processes consisting of a Workflow of sub-processes defining Application Package.
 """
-import tempfile
-
 import contextlib
 import enum
 import json
 import logging
 import os
 import re
+import tempfile
 import time
 from typing import TYPE_CHECKING
 from unittest import TestCase
@@ -684,7 +683,7 @@ class WorkflowTestRunnerBase(TestCase):
         if with_requests:
             kw.update({"verify": False, "timeout": cls.WEAVER_TEST_REQUEST_TIMEOUT})
             # retry request if the error was caused by some connection error
-            settings = cls.settings.fget(cls)
+            settings = cls.settings.fget(cls)  # pylint: disable=E1111,assignment-from-no-return
             resp = request_extra(method, url, json=json_body, data=data_body, retries=3, settings=settings, **kw)
 
             # add some properties similar to `webtest.TestApp`

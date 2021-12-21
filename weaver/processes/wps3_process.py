@@ -4,13 +4,7 @@ from copy import deepcopy
 from time import sleep
 from typing import TYPE_CHECKING
 
-from pyramid.httpexceptions import (
-    HTTPConflict,
-    HTTPForbidden,
-    HTTPNotFound,
-    HTTPOk,
-    HTTPUnauthorized
-)
+from pyramid.httpexceptions import HTTPConflict, HTTPForbidden, HTTPNotFound, HTTPOk, HTTPUnauthorized
 from pyramid.settings import asbool
 
 from weaver import status
@@ -260,35 +254,37 @@ class Wps3Process(WpsProcessInterface):
         job_status_uri = response.headers["Location"]
         return job_status_uri
 
-    def monitor(self, job_status_uri):
-        job_status = self.get_job_status(job_status_uri)
-        job_status_value = status.map_status(job_status["status"])
-        job_id = job_status["jobID"]
+    def monitor(self, monitor_reference):
+        # type: (str) -> bool
+        job_status_uri = monitor_reference
+        job_status_data = self.get_job_status(job_status_uri)
+        job_status_value = status.map_status(job_status_data["status"])
+        job_id = job_status_data["jobID"]
 
         self.update_status("Monitoring job on remote ADES : {0}".format(job_status_uri),
                            REMOTE_JOB_PROGRESS_MONITORING, status.STATUS_RUNNING)
 
         while job_status_value not in status.JOB_STATUS_CATEGORIES[status.JOB_STATUS_CATEGORY_FINISHED]:
             sleep(5)
-            job_status = self.get_job_status(job_status_uri)
-            job_status_value = status.map_status(job_status["status"])
+            job_status_data = self.get_job_status(job_status_uri)
+            job_status_value = status.map_status(job_status_data["status"])
 
             LOGGER.debug(get_log_monitor_msg(job_id, job_status_value,
-                                             job_status.get("percentCompleted", 0),
-                                             get_any_message(job_status), job_status.get("statusLocation")))
+                                             job_status_data.get("percentCompleted", 0),
+                                             get_any_message(job_status_data), job_status_data.get("statusLocation")))
             self.update_status(get_job_log_msg(status=job_status_value,
-                                               message=get_any_message(job_status),
-                                               progress=job_status.get("percentCompleted", 0),
-                                               duration=job_status.get("duration", None)),  # get if available
-                               map_progress(job_status.get("percentCompleted", 0),
+                                               message=get_any_message(job_status_data),
+                                               progress=job_status_data.get("percentCompleted", 0),
+                                               duration=job_status_data.get("duration", None)),  # get if available
+                               map_progress(job_status_data.get("percentCompleted", 0),
                                             REMOTE_JOB_PROGRESS_MONITORING, REMOTE_JOB_PROGRESS_FETCH_OUT),
                                status.STATUS_RUNNING)
 
         if job_status_value != status.STATUS_SUCCEEDED:
             LOGGER.debug(get_log_monitor_msg(job_id, job_status_value,
-                                             job_status.get("percentCompleted", 0),
-                                             get_any_message(job_status), job_status.get("statusLocation")))
-            raise PackageExecutionError(job_status)
+                                             job_status_data.get("percentCompleted", 0),
+                                             get_any_message(job_status_data), job_status_data.get("statusLocation")))
+            raise PackageExecutionError(job_status_data)
         return job_id
 
     def get_job_status(self, job_status_uri, retry=True):
@@ -305,13 +301,13 @@ class Wps3Process(WpsProcessInterface):
         job_status["status"] = status.map_status(job_status["status"])
         return job_status
 
-    def get_results(self, job_status_uri):
-        # type: (JobMonitorReference) -> JobResults
+    def get_results(self, monitor_reference):
+        # type: (str) -> JobResults
         """
         Obtains produced output results from successful job status ID.
         """
         # use '/results' endpoint instead of '/outputs' to ensure support with other
-        result_url = job_status_uri + "/results"
+        result_url = monitor_reference + "/results"
         response = self.make_request(method="GET", url=result_url, retry=True)
         response.raise_for_status()
         contents = response.json()
