@@ -292,26 +292,6 @@ class WorkflowTestRunnerBase(TestCase):
                     if proc_input.get("maxOccurs") == "unbounded":
                         process_deploy_inputs[i_input]["maxOccurs"] = str(2)
 
-        # update workflows to use "test_id" instead of originals  # FIXME: remove?
-        # raw_app_ids = set(app.value for app in cls.WEAVER_TEST_APPLICATION_SET)
-        # for workflow_id in cls.WEAVER_TEST_WORKFLOW_SET:
-        #     workflow_deploy = cls.test_processes_info[workflow_id].deploy_payload
-        #     for exec_unit in range(len(workflow_deploy["executionUnit"])):
-        #         try:
-        #             workflow_cwl_ref = workflow_deploy["executionUnit"][exec_unit].pop("href")
-        #             workflow_cwl_raw = cls.retrieve_payload(workflow_id, workflow_cwl_ref)
-        #         except KeyError:
-        #             workflow_cwl_raw = workflow_deploy["executionUnit"][exec_unit].pop("unit")
-        #         for step in workflow_cwl_raw.get("steps"):
-        #             step_id = workflow_cwl_raw["steps"][step]["run"].strip(".cwl")
-        #             for raw_app_id in raw_app_ids:
-        #                 if raw_app_id == step_id:
-        #                     app_id = WorkflowProcesses(raw_app_id)
-        #                     test_id = cls.test_processes_info[app_id].test_id
-        #                     real_id = workflow_cwl_raw["steps"][step]["run"]
-        #                     workflow_cwl_raw["steps"][step]["run"] = real_id.replace(raw_app_id, test_id)
-        #         workflow_deploy["executionUnit"][exec_unit]["unit"] = workflow_cwl_raw
-
     @classmethod
     def setup_logger(cls):
         if cls.logger_enabled:
@@ -415,7 +395,6 @@ class WorkflowTestRunnerBase(TestCase):
     def clean_test_processes(cls, allowed_codes=frozenset([HTTPOk.code, HTTPNotFound.code])):
         for process_info in cls.test_processes_info.values():
             cls.clean_test_processes_iter_before(process_info)
-            ##path = "/processes/{}".format(process_info.test_id)  # FIXME: remove?
             path = "/processes/{}".format(process_info.id)
             resp = cls.request("DELETE", path,
                                headers=cls.headers, cookies=cls.cookies,
@@ -510,7 +489,6 @@ class WorkflowTestRunnerBase(TestCase):
         pid = process_id.value
         deploy_payload = cls.retrieve_payload(pid, "deploy")
         test_process_id = "{}_{}".format(cls.__name__, deploy_payload["processDescription"]["process"]["id"])
-        ##deploy_payload["processDescription"]["process"]["id"] = test_process_id  # FIXME: remove?
         execute_payload = cls.retrieve_payload(pid, "execute")
 
         # replace derived reference (local only, remote must used full 'href' references)
@@ -806,7 +784,6 @@ class WorkflowTestRunnerBase(TestCase):
         has_duplicate_apps = len(set(test_application_ids)) != len(list(test_application_ids))
         path_deploy = "/processes"
         for process_id in test_application_ids:
-            ##path_visible = "{}/{}/visibility".format(path_deploy, self.test_processes_info[process_id].test_id)  # FIXME: remove?
             path_visible = "{}/{}/visibility".format(path_deploy, self.test_processes_info[process_id].id)
             data_visible = {"value": VISIBILITY_PUBLIC}
             allowed_status = [HTTPCreated.code, HTTPConflict.code] if has_duplicate_apps else HTTPCreated.code
@@ -821,7 +798,6 @@ class WorkflowTestRunnerBase(TestCase):
         self.request("POST", path_deploy, status=HTTPCreated.code, headers=self.headers,
                      json=workflow_info.deploy_payload,
                      message="Expect deployed workflow process.")
-        ##process_path = "{}/{}".format(path_deploy, workflow_info.test_id)  # FIXME: remove?
         process_path = "{}/{}".format(path_deploy, workflow_info.id)
         visible_path = "{}/visibility".format(process_path)
         visible = {"value": VISIBILITY_PUBLIC}
