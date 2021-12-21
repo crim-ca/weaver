@@ -1033,7 +1033,9 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
                                      "workflow of different process types.")
 
     # FIXME: implement + re-enable 'CWL_REQUIREMENT_SCATTER'
-    @pytest.mark.xfail(reason="WIP")
+    @pytest.mark.xfail(
+        reason="ScatterFeatureRequirement not yet supported (https://github.com/crim-ca/weaver/issues/105)"
+    )
     def test_workflow_mixed_rest_builtin_wps1_docker_scatter_requirements(self):
         """
         Test the use of multiple applications of different :term:`Process` type in a :term:`Workflow`.
