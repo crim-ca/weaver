@@ -257,6 +257,9 @@ class WeaverClient(object):
         If the reference is resolved to be a :term:`Workflow`, all its underlying :term:`Process` steps must be
         available under the same URL that this client was initialized with.
 
+        .. seealso::
+            :ref:`proc_op_deploy`
+
         :param process_id:
             Desired process identifier.
             Can be omitted if already provided in body contents or file.
@@ -323,6 +326,9 @@ class WeaverClient(object):
         """
         List all available :term:`Process` on the instance.
 
+        .. seealso::
+            :ref:`proc_op_getcap`
+
         :param url: Instance URL if not already provided during client creation.
         """
         base = self._get_url(url)
@@ -345,6 +351,9 @@ class WeaverClient(object):
         # type: (str, Optional[str]) -> OperationResult
         """
         Describe the specified :term:`Process`.
+
+        .. seealso::
+            :ref:`proc_op_describe`
 
         :param process_id: Identifier of the process to describe.
         :param url: Instance URL if not already provided during client creation.
@@ -413,6 +422,9 @@ class WeaverClient(object):
         All values should be provided directly under the key (including arrays), except for ``File``
         type that must include the ``class`` and ``path`` details.
 
+        .. seealso::
+            :ref:`proc_op_execute`
+
         :param process_id: Identifier of the process to execute.
         :param inputs:
             Literal :term:`JSON` or :term:`YAML` contents of the inputs submitted and inserted into the execution body,
@@ -470,6 +482,9 @@ class WeaverClient(object):
         """
         Obtain the status of a :term:`Job`.
 
+        .. seealso::
+            :ref:`proc_op_status`
+
         :param job_reference: Either the full :term:`Job` status URL or only its UUID.
         :param url: Instance URL if not already provided during client creation.
         :returns: retrieved status of the job.
@@ -483,6 +498,9 @@ class WeaverClient(object):
         # type: (str, Optional[int], Optional[int], str, Optional[str]) -> OperationResult
         """
         Monitor the execution of a :term:`Job` until completion.
+
+        .. seealso::
+            :ref:`proc_op_monitor`
 
         :param job_reference: Either the full :term:`Job` status URL or only its UUID.
         :param timeout: timeout (seconds) of maximum wait time for monitoring if completion is not reached.
@@ -638,7 +656,7 @@ def add_job_ref_param(parser):
     parser.add_argument(
         "-j", "--job", dest="job_reference", required=True,
         help=f"Job URL or UUID to run {operation} operation. "
-             "If full Job URL is provided, the instance '--url' parameter can be omitted."
+             "If full Job URL is provided, the instance ``--url`` parameter can be omitted."
     )
 
 
@@ -746,7 +764,7 @@ def make_parser():
     set_parser_sections(op_deploy)
     add_url_param(op_deploy)
     add_process_param(op_deploy, required=False, description=(
-        "Process identifier for deployment. If no '--body' is provided, this is required. "
+        "Process identifier for deployment. If no ``--body`` is provided, this is required. "
         "Otherwise, provided value overrides the corresponding ID in the body."
     ))
     op_deploy.add_argument(
@@ -762,7 +780,7 @@ def make_parser():
              "format when provided by file reference. File reference can be a local file or URL location. "
              "Can also be provided as literal string contents formatted as JSON. "
              "Provided contents will be inserted into an automatically generated request deploy body if none was "
-             "specified with '--body' option (note: '--process' must be specified instead in that case). "
+             "specified with ``--body`` option (note: ``--process`` must be specified instead in that case). "
              "Otherwise, it will override the appropriate execution unit section within the provided deploy body."
     )
     op_deploy_app_pkg.add_argument(

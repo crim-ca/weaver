@@ -168,8 +168,8 @@ language = "en"
 
 # allow conversion of quotes and repeated dashes to other representation characters
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#confval-smartquotes
-# disable to avoid problems with '--param' employed in document of CLI.
-smartquotes = False
+# To avoid problems with '--param' employed in document of CLI, provide them as ``--param``.
+smartquotes = True
 
 # There are two options for replacing |today|: either, you set today to some
 # non-false value, then it is used:

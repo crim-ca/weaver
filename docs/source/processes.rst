@@ -457,7 +457,7 @@ for the *whole* execution to complete to obtain the result. Given that :term:`Pr
 complete, it is not practical to execute them in this manner and potentially have to wait hours to retrieve outputs.
 Instead, the preferred and default approach is to request an ``async`` :term:`Job` execution. When doing so, `Weaver`
 will add this to a task queue for processing, and will immediately return a :term:`Job` identifier and location where
-the user can probe for its status, using :ref:`proc_op_status` monitoring request. As soon as any task worker becomes
+the user can probe for its status, using :ref:`Monitoring <proc_op_monitor>` request. As soon as any task worker becomes
 available, it will pick any leftover queued :term:`Job` to execute it.
 
 The second field is ``response``. At the time being, `Weaver` only supports ``document`` value. This parameter is
@@ -466,7 +466,7 @@ response.
 
 Following are the ``inputs`` definition. This is the most important section of the request body. It defines which
 parameters to forward to the referenced :term:`Process` to be executed. All ``id`` elements in this :term:`Job` request
-body must correspond to valid ``inputs`` from the definition returned by :ref:`DescribeProcess <proc_op_describe>`_
+body must correspond to valid ``inputs`` from the definition returned by :ref:`DescribeProcess <proc_op_describe>`
 response. Obviously, all formatting requirements (i.e.: proper file :term:`MIME-types`),
 data types (e.g.: ``int``, ``string``, etc.) and validations rules (e.g.: ``minOccurs``, ``AllowedValues``, etc.)
 must also be fulfilled. When providing files as input,
@@ -510,7 +510,7 @@ possible that the :term:`Job` be already in ``running`` state, or even ``failed`
 When the :term:`Job` reaches its final state, multiple parameters will be adjusted in the status response to
 indicate its completion, notably the completed percentage, time it finished execution and full duration. At that
 moment, the requests for retrieving either error details or produced outputs become accessible. Examples are presented
-in :ref:`proc_op_result <Result>` section.
+in :ref:`Result <proc_op_result>` section.
 
 
 Process Operations
@@ -527,8 +527,8 @@ Workflow Step Operations
 For each :ref:`proc_types` known by `Weaver`, specific :term:`Workflow` step implementations must be provided.
 
 In order to simplify the chaining procedure of file references, step implementations are only required to provide
-the relevant methodology for their :ref:`Deploy <proc_op_deploy>`, :ref:`proc_op_execute <Execute>`,
-:ref:`proc_op_monitor <Monitor>` and ref:`proc_op_result <Result>` operations.
+the relevant methodology for their :ref:`Deploy <proc_op_deploy>`, :ref:`Execute <proc_op_execute>`,
+:ref:`Monitor <proc_op_monitor>` and ref:`Result <proc_op_result>` operations.
 Operations related to staging of files, :term:`Process` preparation and cleanup are abstracted away from specific
 implementations to ensure consistent functionalities between each type.
 
@@ -987,6 +987,7 @@ upon :term:`Job` completion. The format of the email is configurable from `weave
 email-specific settings (see: :ref:`Configuration`).
 
 .. _proc_op_status:
+.. _proc_op_monitor:
 
 Monitoring of a process (GetStatus)
 ---------------------------------------------------------------------

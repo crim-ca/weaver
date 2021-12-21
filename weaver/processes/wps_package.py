@@ -376,10 +376,11 @@ def _load_package_content(package_dict,                             # type: CWL
     :returns:
         If ``only_dump_file`` is ``True``, returns ``None``.
         Otherwise, tuple of:
-          - Instance of ``CWLFactoryCallable``
-          - Package type (``PROCESS_WORKFLOW`` or ``PROCESS_APPLICATION``)
-          - Package sub-steps definitions if it is of type ``PROCESS_WORKFLOW``, otherwise empty mapping.
-            Mapping of each step name to their respective package ID and definition that must be run.
+
+        - Instance of ``CWLFactoryCallable``
+        - Package type (``PROCESS_WORKFLOW`` or ``PROCESS_APPLICATION``)
+        - Package sub-steps definitions if package is of type ``PROCESS_WORKFLOW``. Otherwise, empty mapping.
+          Mapping of each step name contains their respective package ID and definition that must be run.
 
     .. warning::
         Specified :paramref:`tmp_dir` will be deleted on exit.

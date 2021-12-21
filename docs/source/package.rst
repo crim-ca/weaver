@@ -199,7 +199,7 @@ figure out how to parse it.
 
 Because `Weaver` and the underlying `CWL` executor need to resolve all steps in order to validate their input and
 output definitions correspond (id, format, type, etc.) in order to chain them, all intermediate processes **MUST**
-be available. This means that you cannot :ref:`Deploy <proc_op_deploy>` nor :ref:`proc_op_execute <Execute>`
+be available. This means that you cannot :ref:`Deploy <proc_op_deploy>` nor :ref:`Execute <proc_op_execute>`
 a ``Workflow``-flavored :term:`Application Package` until all referenced steps have themselves been deployed and
 made visible.
 
