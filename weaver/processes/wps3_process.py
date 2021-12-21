@@ -232,8 +232,8 @@ class Wps3Process(WpsProcessInterface):
                 self.set_visibility(visibility=VISIBILITY_PUBLIC)
             except Exception as exc:
                 pass_http_error(exc, HTTPNotFound)
-                LOGGER.info("Process [%s] failed setting public visibility. "
-                            "Assuming feature is not supported by ADES and process is already public.", self.process)
+                LOGGER.warning("Process [%s] failed setting public visibility. "
+                               "Assuming feature is not supported by ADES and process is already public.", self.process)
 
     def format_outputs(self, workflow_outputs):
         # type: (JobOutputs) -> JobOutputs
