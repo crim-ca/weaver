@@ -9,6 +9,8 @@ Processes
     :local:
     :depth: 3
 
+.. _proc_types:
+
 Type of Processes
 =====================
 
@@ -232,20 +234,22 @@ Workflow
 Processes categorized as :term:`Workflow` are very similar to `WPS-REST`_ processes. From the API standpoint, they
 actually look exactly the same as an atomic process when calling `DescribeProcess`_ or `Execute`_ requests.
 The difference lies within the referenced :ref:`Application Package` which uses a :ref:`CWL Workflow` instead of
-typical :ref:`CWL CommandLineTool`, and therefore, modifies how the process is internally executed.
+typical :ref:`CWL CommandLineTool`, and therefore, modifies how the :term:`Process` is internally executed.
 
 For :term:`Workflow` processes to be deploy-able and executable, it is **mandatory** that `Weaver` is configured as
 :term:`EMS` or :term:`HYBRID` (see: :ref:`Configuration Settings`). This requirement is due to the nature
 of :term:`Workflow` that chain processes that need to be dispatched to known remote :term:`ADES` servers
-(see: :ref:`conf_data_sources` and :ref:`proc_workflow_ops`).
+(see: :ref:`conf_data_sources` and :ref:`proc_workflow_ops`) according to defined :term:`Data Source` configuration.
 
 Given that a :term:`Workflow` process was successfully deployed and that all process steps can be resolved, calling
 its `Execute`_ request will tell `Weaver` to parse the chain of operations and send step process execution requests
-to relevant :term:`ADES` picked according to data sources. Each step's job will then gradually be monitored from the
-remote :term:`ADES` until completion, and upon successful result, the :term:`EMS` will retrieve the data references to
-pass it down to the following step. When the complete chain succeeds, the final results of the last step will be
-provided as :term:`Workflow` output as for atomic processes. In case of failure, the error will be indicated in the log
-with the appropriate step and message where the error occurred.
+to relevant :term:`ADES` picked according to :term:`Data Source`. Each step's job will then gradually be monitored from
+the relevant :term:`ADES` until completion.
+
+Upon successful intermediate result, the :term:`EMS` (or :term:`HYBRID` acting as such) will stage the data references
+locally to chain them to the following step. When the complete chain succeeds, the final results of the last step will
+be provided as :term:`Workflow` output in the same manner as for atomic processes. In case of failure, the error will
+be indicated in the logs with the appropriate step and message where the error occurred.
 
 .. note::
 
@@ -253,6 +257,10 @@ with the appropriate step and message where the error occurred.
     been fully explored (tested) in `Weaver`. There is a chance that |data-source|_ resolution fails to identify where
     to dispatch the step in this situation. If this impacts you, please vote and indicate your concern on issue
     `#171 <https://github.com/crim-ca/weaver/issues/171>`_.
+
+.. seealso::
+    :ref:`proc_workflow_ops` provides more details on each of the internal operations accomplished by
+    individual step :term:`Process` chained in a :term:`Workflow`.
 
 .. _process-remote-provider:
 
@@ -510,10 +518,60 @@ Process Operations
 
 .. _proc_workflow_ops:
 
-Workflow Operations
+Workflow Step Operations
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. todo:: same as prev + 'operations' (deploy based on data-source, visibility, exec-remote for each step, pull-result)
+For each :ref:`proc_types` known by `Weaver`, specific :term:`Workflow` step implementations must be provided.
+
+In order to simplify the chaining procedure of file references, step implementations are only required to provide the
+relevant methodology for their :ref:`Deploy`, :ref:`Execute`, :ref:`Monitor` and :ref:`Result` operations. Operations
+related to staging of files, :term:`Process` preparation and cleanup are abstracted away from specific implementations
+to ensure consistent functionalities between each type.
+
+Operations are accomplished in the following order for each individual step:
+
+.. list-table::
+    :header-rows: 1
+
+    * - Step Method
+      - Requirements
+      - Description
+    * - ``prepare``
+      - I*
+      - Setup any prerequisites for the :term:`Process` or :term:`Job`.
+    * - ``stage_inputs``
+      - R
+      - Retrieve input locations (considering remote files and :term:`Workflow` previous-step staging).
+    * - ``format_inputs``
+      - I*
+      - Perform operations on staged inputs to obtain desired format expected by the target :term:`Process`.
+    * - ``format_outputs``
+      - I*
+      - Perform operations on expected outputs to obtain desired format expected by the target :term:`Process`.
+    * - ``dispatch``
+      - R,I
+      - Perform request for remote execution of the :term:`Process`.
+    * - ``monitor``
+      - R,I
+      - Perform monitoring of the :term:`Job` status until completion.
+    * - ``get_results``
+      - R,I
+      - Perform operations to obtain results location in the expected format from the target :term:`Process`.
+    * - ``stage_results``
+      - R
+      - Retrieve results from remote :term:`Job` for local storage using output locations.
+    * - ``cleanup``
+      - I*
+      - Perform any final steps before completing the execution or after failed execution.
+
+.. note::
+    - All methods are defined within :class:`weaver.processes.wps_process_base.WpsProcessInterface`.
+    - Steps marked by ``*`` are optional.
+    - Steps marked by ``R`` are required.
+    - Steps marked by ``I`` are implementation dependant.
+
+.. seealso::
+    :meth:`weaver.processes.wps_process_base.WpsProcessInterface.execute` for the implementation of operations order.
 
 .. _file_reference_types:
 
@@ -924,22 +982,54 @@ Doing so will tell `Weaver` to send an email to the specified address with succe
 upon :term:`Job` completion. The format of the email is configurable from `weaver.ini.example`_ file with
 email-specific settings (see: :ref:`Configuration`).
 
-
+.. _Monitor:
+.. _GetStatus:
 .. _proc_req_status:
 
 Monitoring of a process (GetStatus)
 ---------------------------------------------------------------------
 
-.. todo::
-    job status body example (success vs fail)
+Monitoring the execution of a :term:`Job` consists of polling the status ``Location`` provided from the :ref:`Execute`
+operation and verifying the indicated ``status`` for the expected result. The ``status`` can correspond to any of the
+value defined by :data:`weaver.status.JOB_STATUS_VALUES` accordingly to the internal state of the workers processing
+their execution.
 
+When targeting a :term:`Job` submitted to a `Weaver` instance, monitoring is usually accomplished through
+the :term:`OGC API - Processes` endpoint using |status-req|_, which will return a :term:`JSON` body.
+Alternatively, the :term:`XML` status location document returned by the :ref:`wps_endpoint` could also be
+employed to monitor the execution.
+
+In general, both endpoints should be interchangeable, using below mapping. The :term:`Job` monitoring process
+keeps both contents equivalent according to their standard. For convenience, requesting the :ref:`Execute` with
+``Accept: <content-type>`` header corresponding to either :term:`JSON` or :term:`XML` should redirect to the response
+of the relevant endpoint, regardless of where the original request was submitted. Otherwise, the default contents
+format is employed according to the chosen location.
+
+.. list-table::
+    :header-rows: 1
+    :widths: 20,20,60
+
+    * - Standard
+      - Contents
+      - Location
+    * - :term:`OGC API - Processes`
+      - JSON
+      - ``{WEAVER_URL}/jobs/{JobUUID}``
+    * - :term:`WPS`
+      - :term:`XML`
+      - ``{WEAVER_WPS_OUTPUTS}/{JobUUID}.xml``
+
+.. seealso::
+    For the :term:`WPS` endpoint, refer to :ref:`conf_settings`.
+
+.. _Result:
 .. _GetResult:
 
 Obtaining output results, logs or errors
 ---------------------------------------------------------------------
 
 In the case of successful :term:`Job` execution, the outputs can be retrieved with |result-req|_ request to list
-each corresponding output ``id`` with the generated file reference URL. Keep in mind that those URL's purpose are
+each corresponding output ``id`` with the generated file reference URL. Keep in mind that the purpose of those URLs are
 only to fetch the results (not persistent storage), and could therefore be purged after some reasonable amount of time.
 The format should be similar to the following example, with minor variations according to :ref:`Configuration`
 parameters for the base :term:`WPS` output location:
@@ -989,6 +1079,21 @@ Note again that the more the :term:`Process` is verbose, the more tracking will 
 
 .. literalinclude:: ../../weaver/wps_restapi/examples/job_logs.json
     :language: json
+
+.. _wps_endpoint:
+
+WPS Endpoint
+---------------
+
+This endpoint is available if ``weaver.wps`` setting was enabled (``true`` by default).
+The specific location where :term:`WPS` requests it will be accessible depends on the resolution
+of relevant :ref:`conf_settings`, namely ``weaver.wps_path`` and ``weaver.wps_url``.
+
+Details regarding contents for each request is provided in schemas under |wps-req|_.
+
+.. note::
+    Using the :term:`WPS` endpoint allows fewer control over functionalities than the
+    corresponding :term:`OGC API - Processes` (:term:`WPS-REST`) endpoints since it is the preceding standard.
 
 Special Weaver EMS use-cases
 ==================================================

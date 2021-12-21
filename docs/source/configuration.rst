@@ -82,9 +82,12 @@ they are optional and which default value or operation is applied in each situat
   |
   | Enables the WPS-1/2 endpoint.
 
+.. seealso::
+    :ref:`wps_endpoint`
+
 .. warning::
 
-     At the moment, this setting must be ``true`` to allow job execution as the worker monitors this endpoint.
+     At the moment, this setting must be ``true`` to allow :term:`Job` execution as the worker monitors this endpoint.
      This could change with future developments (see issue `#21 <https://github.com/crim-ca/weaver/issues/21>`_).
 
 - | ``weaver.wps_path = <url-path>``

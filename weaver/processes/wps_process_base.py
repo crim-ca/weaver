@@ -61,45 +61,8 @@ class WpsProcessInterface(object):
     Multiple convenience methods are provide.
     Processes inheriting from this base should provide abstract method implementation as needed or required.
 
-    The operations are accomplished in the following order:
-
-    .. list-table::
-        * - Step Method
-          - Requirements
-          - Description
-        * - :meth:`prepare`
-          - I*
-          - Setup any prerequisites for the :term:`Process` or :term:`Job`.
-        * - :meth:`stage_inputs`
-          - R
-          - Retrieve input locations (considering remote files and workflow previous-step staging).
-        * - :meth:`format_inputs`
-          - I*
-          - Perform operations on staged inputs to obtain desired format.
-        * - :meth:`format_outputs`
-          - I*
-          - Perform operations on expected outputs to obtain desired format.
-        * - :meth:`dispatch`
-          - R,I
-          - Perform requests for remote execution of the :term:`Process`.
-        * - :meth:`monitor`
-          - R,I
-          - Perform monitoring of the :term:`Job` status until completion.
-        * - :meth:`get_results`
-          - R,I
-          - Perform operations to obtain results location in the expected format.
-        * - :meth:`stage_results`
-          - R
-          - Retrieve results from remote :term:`Job` for local storage using output locations.
-        * - :meth:`cleanup`
-          - I*
-          - Perform any final steps before completing the execution or after failed execution.
-            Derived classes should call the parent :meth:`WpsProcessInterface.cleanup` before their own cleanup steps.
-
     .. note::
-        - Steps marked by ``*`` are optional.
-        - Steps marked by ``R`` are required.
-        - Steps marked by ``I`` are implementation dependant.
+        For expected operations details and their execution order, please refer to :ref:`proc_workflow_ops`.
 
     .. seealso::
         :meth:`execute` for complete details of the operations and ordering.

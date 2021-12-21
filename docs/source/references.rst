@@ -137,3 +137,5 @@
 .. _result-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Results%2Fpaths%2F~1processes~1%7Bprocess_id%7D~1jobs~1%7Bjob_id%7D~1result%2Fget
 .. |update-token-req| replace:: Update Token
 .. _update-token-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/UpdateToken/paths/~1processes~1{process_id}/put
+.. |wps-req| replace:: WPS Endpoint Requests
+.. _wps-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/WPS
