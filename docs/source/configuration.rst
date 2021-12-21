@@ -209,7 +209,8 @@ they are optional and which default value or operation is applied in each situat
   |
   | Encryption settings as well as custom email templates are available. Default email template defined in
     `email-template`_ is employed if none is provided. Email notifications are sent only on job
-    completion if an email was provided in the :ref:`Execute` request body (see also: :ref:`Email Notification`).
+    completion if an email was provided in the :ref:`Execute <proc_op_execute>` request body
+    (see also: :ref:`Email Notification`).
 
 
 .. note::

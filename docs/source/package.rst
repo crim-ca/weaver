@@ -107,7 +107,7 @@ using :term:`CWL` capabilities in order to run it.
 Because :term:`Application Package` providers could desire to make use of :term:`Docker` images hosted on private
 registries, `Weaver` offers the capability to specify an authorization token through HTTP request headers during
 the :term:`Process` deployment. More specifically, the following definition can be provided during a
-:ref:`Deploy` request.
+:ref:`Deploy <proc_op_deploy>` request.
 
 .. code-block:: http
 
@@ -199,8 +199,9 @@ figure out how to parse it.
 
 Because `Weaver` and the underlying `CWL` executor need to resolve all steps in order to validate their input and
 output definitions correspond (id, format, type, etc.) in order to chain them, all intermediate processes **MUST**
-be available. This means that you cannot :ref:`Deploy` nor :ref:`Execute` a ``Workflow``-flavored
-:term:`Application Package` until all referenced steps have themselves been deployed and made visible.
+be available. This means that you cannot :ref:`Deploy <proc_op_deploy>` nor :ref:`proc_op_execute <Execute>`
+a ``Workflow``-flavored :term:`Application Package` until all referenced steps have themselves been deployed and
+made visible.
 
 .. warning::
 
@@ -212,7 +213,7 @@ be available. This means that you cannot :ref:`Deploy` nor :ref:`Execute` a ``Wo
 .. seealso::
 
     - :py:func:`weaver.processes.wps_package.get_package_workflow_steps`
-    - :ref:`Deploy` request details.
+    - :ref:`Deploy <proc_op_deploy>` request details.
 
 Step Inputs/Outputs
 ~~~~~~~~~~~~~~~~~~~~~
@@ -287,8 +288,8 @@ structures are supported, whether they are specified using an array list with ex
 variant, or using key-value pairs (see |cwl-io-map|_ for more details). Regardless of array or mapping format,
 :term:`CWL` requires that all I/O have unique ``id``. On the :term:`WPS` side, a list of I/O is *always* expected.
 This is because :term:`WPS` I/O with multiple values (array in :term:`CWL`) are specified by repeating the ``id`` with
-each value instead of defining the value as a list of those values during :ref:`Execute` request (see also
-:ref:`Multiple Inputs`).
+each value instead of defining the value as a list of those values during :ref:`Execute <proc_op_execute>` request
+(see also :ref:`Multiple Inputs`).
 
 To summarize, the following :term:`CWL` and :term:`WPS` I/O definitions are all equivalent and will result into the
 same process definition after deployment. For simplification purpose, below examples omit all but mandatory fields
@@ -331,8 +332,8 @@ Other fields are discussed afterward in specific sections.
 The :term:`WPS` example above requires a ``format`` field for the corresponding :term:`CWL` ``File`` type in order to
 distinguish it from a plain string. More details are available in `Inputs/Outputs Type`_ below about this requirement.
 
-Finally, it is to be noted that above :term:`CWL` and :term:`WPS` definitions can be specified in the :ref:`Deploy`
-request body with any of the following variations:
+Finally, it is to be noted that above :term:`CWL` and :term:`WPS` definitions can be specified in
+the :ref:`Deploy <proc_op_deploy>` request body with any of the following variations:
 
 1. Both are simultaneously fully specified (valid although extremely verbose).
 2. Both partially specified as long as sufficient complementary information is provided.
@@ -560,7 +561,7 @@ employed as deciding definition to resolve erroneous mismatches (as for any othe
 .. note::
     Although :term:`WPS` multi-value inputs are defined as a single entity during deployment, special care must be taken
     to the format in which to specify these values during execution. Please refer to :ref:`Multiple Inputs` section
-    of :ref:`Execute` request.
+    of :ref:`Execute <proc_op_execute>` request.
 
 Following are a few examples of equivalent :term:`WPS` and :term:`CWL` definitions to represent multiple values under
 a given input. Some parts of the following definitions are purposely omitted to better highlight the concise details

@@ -47,7 +47,7 @@ Please refer to below references for more details.
 .. seealso::
 
     - Supported :term:`Application Package` definitions in :ref:`process-wps-rest` deployment.
-    - :ref:`Deploy` request.
+    - :ref:`Deploy <proc_op_deploy>` request.
 
 
 Fixing permission error on input files

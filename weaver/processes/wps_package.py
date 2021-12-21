@@ -374,12 +374,12 @@ def _load_package_content(package_dict,                             # type: CWL
     :param runtime_context: cwltool context used to execute the cwl package (required if ``only_dump_file=False``)
     :param process_offering: JSON body of the process description payload (used as I/O hint ordering)
     :returns:
-        If ``only_dump_file`` is ``True``: ``None``.
+        If ``only_dump_file`` is ``True``, returns ``None``.
         Otherwise, tuple of:
-        - Instance of ``CWLFactoryCallable``
-        - Package type (``PROCESS_WORKFLOW`` or ``PROCESS_APPLICATION``)
-        - Package sub-steps definitions if it is of type ``PROCESS_WORKFLOW``, otherwise empty mapping.
-          Mapping of each step name to their respective package ID and definition that must be run.
+          - Instance of ``CWLFactoryCallable``
+          - Package type (``PROCESS_WORKFLOW`` or ``PROCESS_APPLICATION``)
+          - Package sub-steps definitions if it is of type ``PROCESS_WORKFLOW``, otherwise empty mapping.
+            Mapping of each step name to their respective package ID and definition that must be run.
 
     .. warning::
         Specified :paramref:`tmp_dir` will be deleted on exit.

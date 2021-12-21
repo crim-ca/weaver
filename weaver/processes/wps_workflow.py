@@ -258,6 +258,8 @@ class WpsWorkflow(ProcessCWL):
                        ):
         # type: (...) -> Optional[Union[Dict[Text, Any], List[Union[Dict[Text, Any], Text]]]]
         """
+        Collect outputs from the step :term:`Process` following its execution.
+
         .. note:
             When :term:`CWL` runner tries to forward ``step(i) outputs -> step(i+1) inputs``
             using :meth:`collect_outputs`, it expects exact ``outputBindings`` locations to be matched.

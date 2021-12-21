@@ -9,8 +9,8 @@ Once `Weaver` package is installed (see :ref:`installation`), it provides a comm
 as well as a :py:class:`weaver.cli.WeaverClient` to allow simplified interactions through shell calls or Python scripts.
 
 This offers to the user methods to use file references (e.g.: local :term:`CWL` :term:`Application Package` definition)
-to rapidly operate with functionalities such as :ref:`Deploy`, :ref:`Describe`, :ref:`Execute` and any other operation
-described in :ref:`proc_operations` section.
+to rapidly operate with functionalities such as :ref:`Deploy <proc_op_deploy>`, :ref:`Describe <proc_op_describe>`,
+:ref:`Execute <proc_op_execute>` and any other operation described in :ref:`proc_operations` section.
 
 For details about using the Python :py:class:`weaver.cli.WeaverClient`, please refer directly to its documentation
 and its underlying methods.
