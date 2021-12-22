@@ -79,7 +79,7 @@ class TestWeaverClient(TestWeaverClientBase):
         result = mocked_sub_requests(self.app, operation)
         assert result.success
         assert "processes" in result.body
-        assert result.body["processes"] == [
+        assert set(result.body["processes"]) == {
             # builtin
             "file2string_array",
             "file_index_selector",
@@ -87,7 +87,7 @@ class TestWeaverClient(TestWeaverClientBase):
             "metalink2netcdf",
             # test process
             self.test_process,
-        ]
+        }
         assert "undefined" not in result.message
 
     def test_capabilities(self):

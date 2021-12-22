@@ -656,7 +656,9 @@ class WpsRestApiProcessesTest(unittest.TestCase):
 
             body = {
                 "processDescription": {"process": {"id": resources.TEST_REMOTE_PROCESS_WPS1_ID}},
-                "executionUnit": [{"href": tmp_href}]
+                "executionUnit": [{"href": tmp_href}],
+                # FIXME: avoid error on omitted deploymentProfileName (https://github.com/crim-ca/weaver/issues/319)
+                "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
             }
             self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_PROCESS_WPS1_ID)
             self.validate_wps1_package(

@@ -934,7 +934,7 @@ class WpsPackage(Process):
                 if cwl_end_search in pkg_log[i]:
                     cwl_end_index = i
                     break
-            captured_log = out_log + err_log
+            captured_log = out_log + err_log + ["----- End of Logs -----\n"]
             merged_log = pkg_log[:cwl_end_index] + captured_log + pkg_log[cwl_end_index:]
             with open(self.log_file, "w") as pkg_log_fd:
                 pkg_log_fd.writelines(merged_log)

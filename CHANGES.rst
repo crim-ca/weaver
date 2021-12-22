@@ -23,6 +23,8 @@ Changes:
 - Move all ``tests/functional/application-packages`` definitions into distinct directories to facilitate categorization
   of corresponding deployment, execution and package contents, and better support the various Workflow testing location
   of those files with backward compatibility.
+- Add logs final entry after retrieved internal `CWL` application logs to help highlight delimitation with following
+  entries from the parent `Process`.
 
 Fixes:
 ------
@@ -35,6 +37,8 @@ Fixes:
   of the intended application package.
 - Fix resolution of ``format`` reference within `CWL` I/O record after interpretation of the loaded application package.
 - Fix missing `WPS` endpoint responses in generated `OpenAPI` for `ReadTheDocs` documentation.
+- Fix reporting of `WPS-1` status location as the `XML` file URL instead of the `JSON` `OGC-API` endpoint when `Job`
+  was originally submitted through the `WPS-1` interface.
 - Fix and improve multiple typing definitions.
 
 `4.7.0 <https://github.com/crim-ca/weaver/tree/4.7.0>`_ (2021-12-21)
