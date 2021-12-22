@@ -941,10 +941,6 @@ def cwl2wps_io(io_info, io_select):
         }
         if "format" in io_info:
             io_fmt = io_info["format"]
-            # when 'format' comes from parsed CWL tool instance, the input/output record sets the value
-            # using a temporary local file path after resolution against remote namespace ontology
-            if io_fmt.startswith("file://") and "#" in io_fmt:
-                io_fmt = io_fmt.split("#")[-1]
             io_formats = [io_fmt] if isinstance(io_fmt, str) else io_fmt
             kw["supported_formats"] = [get_format(fmt) for fmt in io_formats]
             kw["mode"] = MODE.SIMPLE  # only validate the extension (not file contents)
