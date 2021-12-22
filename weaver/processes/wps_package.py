@@ -20,13 +20,13 @@ import sys
 import tempfile
 import time
 import uuid
-import yaml
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 import cwltool
 import cwltool.docker
 import docker
+import yaml
 from cwltool.context import LoadingContext, RuntimeContext
 from cwltool.factory import Factory as CWLFactory, WorkflowStatus as CWLException
 from pyramid.httpexceptions import HTTPOk, HTTPServiceUnavailable

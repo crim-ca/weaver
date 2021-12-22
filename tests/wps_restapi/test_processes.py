@@ -672,6 +672,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                             },
                         }
                     },
+                    "$namespace": ns
                 }, cwl_file)
 
             body = {
