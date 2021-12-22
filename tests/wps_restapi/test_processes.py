@@ -474,7 +474,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         package_mock = mocked_process_package()
 
         # remove components for testing different cases
-        process_data_tests = [deepcopy(process_data) for _ in range(12)]
+        process_data_tests = [deepcopy(process_data) for _ in range(13)]
         process_data_tests[0].pop("processDescription")
         process_data_tests[1]["processDescription"].pop("process")
         process_data_tests[2]["processDescription"]["process"].pop("id")  # noqa
@@ -487,6 +487,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         process_data_tests[9]["executionUnit"][0] = {"unit": "something"}  # unit as string instead of package
         process_data_tests[10]["executionUnit"][0] = {"href": {}}  # noqa  # href as package instead of URL
         process_data_tests[11]["executionUnit"][0] = {"unit": {}, "href": ""}  # can't have both unit/href together
+        process_data_tests[12]["executionUnit"][0] = {"href": ""}  # href correct type, but missing link reference
 
         with contextlib.ExitStack() as stack:
             for pkg in package_mock:

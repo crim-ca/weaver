@@ -156,11 +156,13 @@ def _check_deploy(payload):
                     "error": "Invalid",
                     "value": d_inputs
                 })
-        p_exec_unit = payload.get("executionUnit", [{}])[0].get("unit")
-        r_exec_unit = results.get("executionUnit", [{}])[0].get("unit")
+        # Execution Unit is optional since process reference (e.g.: WPS-1 href) can be provided in processDescription
+        # Cannot validate as CWL yet, since execution unit can also be an href that is not yet fetched (it will later)
+        p_exec_unit = payload.get("executionUnit", [{}])
+        r_exec_unit = results.get("executionUnit", [{}])
         if p_exec_unit and p_exec_unit != r_exec_unit:
             message = "Process deployment execution unit is invalid."
-            d_exec_unit = sd.CWL().deserialize(p_exec_unit)  # raises directly if cause is due to invalid schema
+            d_exec_unit = sd.ExecutionUnit().deserialize(p_exec_unit)  # raises directly if caused by invalid schema
             if r_exec_unit != d_exec_unit:  # otherwise raise a generic error, don't allow differing definitions
                 message = (
                     "Process deployment execution unit resolved as valid definition but differs from submitted "
