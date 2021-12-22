@@ -26,8 +26,8 @@ Each one of them are accessible through the same API interface, but they have di
 
 
 .. seealso::
-    Section |examples|_ provides multiple concrete use cases of :ref:`proc_op_deploy` and :ref:`proc_op_execute`
-    request payloads for diverse set of applications.
+    Section |examples|_ provides multiple concrete use cases of :ref:`Deploy <proc_op_deploy>`
+    and :ref:`Execute <proc_op_execute>` request payloads for diverse set of applications.
 
 
 Builtin
@@ -64,7 +64,7 @@ in `Weaver` using an URL reference to an WPS-1/2 process, `Weaver` parses and co
 body of the response and registers the process locally using this definition. This allows a remote server offering
 limited functionalities (e.g.: no REST bindings supported) to provide them through `Weaver`.
 
-A minimal :ref:`proc_op_deploy` request body for this kind of process could be as follows:
+A minimal :ref:`Deploy <proc_op_deploy>` request body for this kind of process could be as follows:
 
 .. code-block:: JSON
 
@@ -82,8 +82,8 @@ A minimal :ref:`proc_op_deploy` request body for this kind of process could be a
     }
 
 
-This would tell `Weaver` to locally :ref:`proc_op_deploy` the ``my-process-reference`` process using the WPS-1 URL
-reference that is expected to return a ``DescribeProcess`` :term:`XML` schema. Provided that this endpoint can be
+This would tell `Weaver` to locally :ref:`Deploy <proc_op_deploy>` the ``my-process-reference`` process using the WPS-1
+URL reference that is expected to return a ``DescribeProcess`` :term:`XML` schema. Provided that this endpoint can be
 resolved and parsed according to typical WPS specification, this should result into a successful process registration.
 The deployed :term:`Process` would then be accessible with :ref:`DescribeProcess <proc_op_describe>`  requests.
 
