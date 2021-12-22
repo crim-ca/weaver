@@ -20,6 +20,7 @@ import sys
 import tempfile
 import time
 import uuid
+import yaml
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
@@ -47,7 +48,14 @@ from weaver.exceptions import (
     PackageTypeError,
     PayloadNotFound
 )
-from weaver.formats import CONTENT_TYPE_ANY_XML, CONTENT_TYPE_APP_JSON, get_cwl_file_format
+from weaver.formats import (
+    CONTENT_TYPE_ANY_XML,
+    CONTENT_TYPE_APP_JSON,
+    CONTENT_TYPE_APP_YAML,
+    CONTENT_TYPE_TEXT_PLAIN,
+    CONTENT_TYPE_TEXT_XML,
+    get_cwl_file_format
+)
 from weaver.processes import opensearch
 from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_BUILTIN,
@@ -549,12 +557,28 @@ def _generate_process_with_cwl_from_reference(reference):
             raise HTTPServiceUnavailable("Couldn't obtain a valid response from [{}]. Service response: [{} {}]"
                                          .format(reference, response.status_code, response.reason))
         content_type = get_header("Content-Type", response.headers)
+
+        # try to detect incorrectly reported media-type using common structures
+        if CONTENT_TYPE_TEXT_PLAIN in content_type:
+            data = response.text
+            if (data.startswith("{") and data.endswith("}")) or reference.endswith(".json"):
+                LOGGER.warning("Attempting auto-resolution of invalid Content-Type [%s] to [%s] "
+                               "for CWL reference [%s].", content_type, CONTENT_TYPE_APP_JSON, reference)
+                content_type = CONTENT_TYPE_APP_JSON
+            elif data.startswith("<?xml") or reference.endswith(".xml"):
+                LOGGER.warning("Attempting auto-resolution of invalid Content-Type [%s] to [%s] "
+                               "for WPS reference [%s].", content_type, CONTENT_TYPE_TEXT_XML, reference)
+                content_type = CONTENT_TYPE_TEXT_XML
+
         if any(ct in content_type for ct in CONTENT_TYPE_ANY_XML):
             # attempt to retrieve a WPS-1 ProcessDescription definition
             cwl_package, process_info = xml_wps2cwl(response, settings)
 
-        elif any(ct in content_type for ct in [CONTENT_TYPE_APP_JSON]):
-            payload = response.json()
+        elif any(ct in content_type for ct in [CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_YAML]):
+            if content_type == CONTENT_TYPE_APP_YAML:
+                payload = yaml.safe_load(response.text)
+            else:
+                payload = response.json()
             # attempt to retrieve a WPS-3 Process definition, owsContext is expected in body
             # OLD schema nests everything under 'process', OGC schema provides everything at the root
             if "process" in payload or "owsContext" in payload:
@@ -566,6 +590,8 @@ def _generate_process_with_cwl_from_reference(reference):
             elif "cwlVersion" in payload:
                 cwl_package = _load_package_file(reference)
                 process_info = {"identifier": reference_name}
+        else:
+            raise ValueError(f"Unknown parsing methodology of Content-Type [{content_type}] for reference resolution.")
 
     return cwl_package, process_info
 
@@ -715,7 +741,9 @@ def get_process_definition(process_offering, reference=None, package=None, data_
 
     process_info = process_offering
     if reference:
-        package, process_info = _generate_process_with_cwl_from_reference(reference)
+        package, process_info = try_or_raise_package_error(
+            lambda: _generate_process_with_cwl_from_reference(reference),
+            reason="Loading package from reference")
         process_info.update(process_offering)   # override upstream details
     if not isinstance(package, dict):
         raise PackageRegistrationError("Cannot decode process package contents.")

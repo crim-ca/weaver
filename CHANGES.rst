@@ -35,6 +35,8 @@ Fixes:
 - Fix resolution of ``WPS1Requirement`` directly provided as `CWL` execution unit within the deployment body.
 - Fix deployment body partially dropping invalid ``executionUnit`` sub-fields causing potential misinterpretation
   of the intended application package.
+- Fix resolution of package or `WPS-1` reference provided by ``href`` with erroneous ``Content-Type`` reported by the
+  returned response. Attempts auto-resolution of detected `CWL` (as `JSON` or `YAML`) and `WPS-1` (as `XML`) contents.
 - Fix resolution of ``format`` reference within `CWL` I/O record after interpretation of the loaded application package.
 - Fix missing `WPS` endpoint responses in generated `OpenAPI` for `ReadTheDocs` documentation.
 - Fix reporting of `WPS-1` status location as the `XML` file URL instead of the `JSON` `OGC-API` endpoint when `Job`

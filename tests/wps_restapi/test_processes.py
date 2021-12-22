@@ -496,7 +496,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                 resp = self.app.post_json(path, params=data, headers=self.json_headers, expect_errors=True)
                 msg = "Failed with test variation '{}' with value '{}' using data:\n{}"
                 assert resp.status_code in [400, 422], msg.format(i, resp.status_code, json.dumps(data, indent=2))
-                assert resp.content_type == CONTENT_TYPE_APP_JSON, msg.format(i, resp.content_type)
+                assert resp.content_type == CONTENT_TYPE_APP_JSON, msg.format(i, resp.content_type, "")
 
     def test_deploy_process_default_endpoint_wps1(self):
         """
@@ -641,7 +641,8 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             out_url = self.settings["weaver.wps_output_url"]
             tmp_dir = stack.enter_context(tempfile.TemporaryDirectory(dir=out_dir))
             tmp_file = os.path.join(tmp_dir, "wps1.cwl")
-            tmp_href = tmp_file.replace(out_dir, out_url)
+            tmp_href = tmp_file.replace(out_dir, out_url, 1)
+            ns, fmt = get_cwl_file_format(CONTENT_TYPE_APP_JSON)
             with open(tmp_file, "w") as cwl_file:
                 json.dump({
                     "cwlVersion": "v1.0",
@@ -651,7 +652,25 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                             "process": resources.TEST_REMOTE_PROCESS_WPS1_ID,
                             "provider": resources.TEST_REMOTE_SERVER_URL
                         }
-                    }
+                    },
+                    # FIXME: must provide inputs/outputs since CWL provided explicitly.
+                    #   Update from CWL->WPS complementary details is supported.
+                    #   Inverse update WPS->CWL is not supported (https://github.com/crim-ca/weaver/issues/50).
+                    # following are based on expected results for I/O defined in XML
+                    "inputs": {
+                        "input-1": {
+                            "type": "string"
+                        },
+                    },
+                    "outputs": {
+                        "output": {
+                            "type": "File",
+                            "format": fmt,
+                            "outputBinding": {
+                                "glob": "*.json"
+                            },
+                        }
+                    },
                 }, cwl_file)
 
             body = {
@@ -706,7 +725,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             stack.enter_context(mocked_wps_output(self.settings))
             wps_dir = self.settings["weaver.wps_output_dir"]
             wps_url = self.settings["weaver.wps_output_url"]
-            tmp_file = stack.enter_context(tempfile.NamedTemporaryFile(dir=wps_dir, mode="w"))
+            tmp_file = stack.enter_context(tempfile.NamedTemporaryFile(dir=wps_dir, mode="w", suffix=".cwl"))
             tmp_http = tmp_file.name.replace(wps_dir, wps_url, 1)
             json.dump(cwl, tmp_file)
             tmp_file.flush()
