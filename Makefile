@@ -492,21 +492,25 @@ check-lint-only: mkdir-reports  	## check linting of code style
 .PHONY: check-security-only
 check-security-only: check-security-code-only check-security-deps-only  ## run security checks
 
+# FIXME: safety ignore file (https://github.com/pyupio/safety/issues/351)
 # ignored codes:
 #	42194: https://github.com/kvesteri/sqlalchemy-utils/issues/166  # not fixed since 2015
 #   42498: celery<5.2.0 bumps kombu>=5.2.1 with security fixes to {redis,sqs}  # mongo is used by default in Weaver
+#	43738: celery<5.2.2 CVE-2021-23727: trusts the messages and metadata stored in backends
 .PHONY: check-security-deps-only
 check-security-deps-only: mkdir-reports  ## run security checks on package dependencies
 	@echo "Running security checks of dependencies..."
 	@-rm -fr "$(REPORTS_DIR)/check-security-deps.txt"
 	@bash -c '$(CONDA_CMD) \
 		safety check \
+			--full-report \
 			-r "$(APP_ROOT)/requirements.txt" \
 			-r "$(APP_ROOT)/requirements-dev.txt" \
 			-r "$(APP_ROOT)/requirements-doc.txt" \
 			-r "$(APP_ROOT)/requirements-sys.txt" \
 			-i 42194 \
 			-i 42498 \
+			-i 43738 \
 		1> >(tee "$(REPORTS_DIR)/check-security-deps.txt")'
 
 .PHONY: check-security-code-only
