@@ -285,7 +285,7 @@ class Wps3Process(WpsProcessInterface):
                                              job_status_data.get("percentCompleted", 0),
                                              get_any_message(job_status_data), job_status_data.get("statusLocation")))
             raise PackageExecutionError(job_status_data)
-        return job_id
+        return True
 
     def get_job_status(self, job_status_uri, retry=True):
         # type: (JobMonitorReference, Union[bool, int]) -> JSON
