@@ -10,6 +10,17 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+`4.8.0 <https://github.com/crim-ca/weaver/tree/4.8.0>`_ (2022-01-11)
+========================================================================
+
+Changes:
+--------
 - Refactor Workflow operation flow to reuse shared input and output staging operations between implementations.
   Each new step process implementation now only requires to implement the specific operations related to deployment,
   execution, monitoring and result retrieval for their process, without need to consider Workflow intermediate staging
