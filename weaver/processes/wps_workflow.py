@@ -42,11 +42,18 @@ from weaver.utils import get_settings, make_dirs, now
 from weaver.wps.utils import get_wps_output_dir
 
 if TYPE_CHECKING:
+    from threading import Lock as ThreadLock
     from typing import Any, Dict, Generator, List, Optional, Set, Union
+
     from cwltool.command_line_tool import OutputPorts
     from cwltool.provenance import ProvenanceProfile
-    from threading import Lock as ThreadLock
-    from weaver.typedefs import AnyValueType, ExpectedOutputType, GetJobProcessDefinitionFunction, ToolPathObjectType
+
+    from weaver.typedefs import (
+        AnyValueType,
+        CWL_ExpectedOutputs,
+        CWL_ToolPathObjectType,
+        JobProcessDefinitionCallback,
+    )
     from weaver.processes.wps_process_base import WpsProcessInterface
 
 LOGGER = logging.getLogger(__name__)
@@ -63,9 +70,9 @@ supportedProcessRequirements += [
 ]
 
 
-def default_make_tool(toolpath_object,              # type: ToolPathObjectType
+def default_make_tool(toolpath_object,              # type: CWL_ToolPathObjectType
                       loading_context,              # type: LoadingContext
-                      get_job_process_definition,   # type: GetJobProcessDefinitionFunction
+                      get_job_process_definition,   # type: JobProcessDefinitionCallback
                       ):                            # type: (...) -> ProcessCWL
     if not isinstance(toolpath_object, collections.abc.MutableMapping):
         raise WorkflowException(u"Not a dict: '%s'" % toolpath_object)
@@ -114,7 +121,7 @@ class WpsWorkflow(ProcessCWL):
     # pylint: disable=R1260,too-complex  # FIXME: simplify operations
 
     def __init__(self, toolpath_object, loading_context, get_job_process_definition):
-        # type: (Dict[Text, Any], LoadingContext, GetJobProcessDefinitionFunction) -> None
+        # type: (Dict[Text, Any], LoadingContext, JobProcessDefinitionCallback) -> None
         super(WpsWorkflow, self).__init__(toolpath_object, loading_context)
         self.prov_obj = loading_context.prov_obj
         self.get_job_process_definition = get_job_process_definition
@@ -250,6 +257,23 @@ class WpsWorkflow(ProcessCWL):
                        compute_checksum=True  # type: bool
                        ):
         # type: (...) -> Optional[Union[Dict[Text, Any], List[Union[Dict[Text, Any], Text]]]]
+        """
+        Collect outputs from the step :term:`Process` following its execution.
+
+        .. note:
+            When :term:`CWL` runner tries to forward ``step(i) outputs -> step(i+1) inputs``
+            using :meth:`collect_outputs`, it expects exact ``outputBindings`` locations to be matched.
+            In other words, a definition like ``outputBindings: {glob: outputs/*.txt}`` will generate results located
+            in ``step(i)`` as ``"<tmp-workdir>/outputs/file.txt"`` and ``step(i+1)`` will look explicitly
+            in ``"<tmp-workdir>/outputs`` using the ``glob`` pattern. Because each of our :term:`Process` in
+            the workflow are distinct/remote entities, each one stages its outputs at different URL locations,
+            not sharing the same *root directory*. When we stage intermediate results locally, the sub-dirs are lost.
+            Therefore, they act like individual :term:`CWL` runner calls where the *final results* are moved back
+            to the local directory for convenient access, but our *local directory* is the URL WPS-outputs location.
+            To let :term:`CWL` :term:`Workflow` inter-steps mapping work as intended, we must remap the locations
+            ignoring any nested dirs where the modified *outputBindings* definition will be able to match as if each
+            step :term:`Process` outputs were generated locally.
+        """
         result = []  # type: List[Any]
         empty_and_optional = False
         debug = LOGGER.isEnabledFor(logging.DEBUG)
@@ -265,6 +289,13 @@ class WpsWorkflow(ProcessCWL):
                         glob = builder.do_eval(glob)
                         if glob:
                             globpatterns.extend(aslist(glob))
+
+                    # rebase glob pattern as applicable (see note)
+                    for glob in list(globpatterns):
+                        if not any(glob.startswith(part) for part in [".", "/", "~"]) and "/" in glob:
+                            glob = builder.do_eval(glob.split("/")[-1])
+                            if glob:
+                                globpatterns.extend(aslist(glob))
 
                     for glob in globpatterns:
                         if glob.startswith(outdir):
@@ -405,7 +436,7 @@ class WpsWorkflowJob(JobBase):
                  hints,             # type: List[Dict[Text, Text]]
                  name,              # type: Text
                  wps_process,       # type: WpsProcessInterface
-                 expected_outputs,  # type: List[ExpectedOutputType]
+                 expected_outputs,  # type: List[CWL_ExpectedOutputs]
                  ):                 # type: (...) -> None
         super(WpsWorkflowJob, self).__init__(builder, joborder, None, requirements, hints, name)
         self.wps_process = wps_process
@@ -456,6 +487,9 @@ class WpsWorkflowJob(JobBase):
     # pylint: disable=W0221,arguments-differ    # naming using python like arguments
     def execute(self, runtime, env, runtime_context):   # noqa: E811
         # type: (List[Text], MutableMapping[Text, Text], RuntimeContext) -> None
+        """
+        Execute the :term:`WPS` :term:`Process` defined as :term:`Workflow` step and chains their intermediate results.
+        """
 
         # pylint: disable=R1260,too-complex  # FIXME: simplify operations
 
@@ -487,7 +521,7 @@ class WpsWorkflowJob(JobBase):
                     self.generatemapper, self.outdir, self.builder.outdir,
                     inplace_update=self.inplace_update)
 
-            outputs = self.collect_outputs(self.outdir)
+            outputs = self.collect_outputs(self.outdir)  # type: ignore
             outputs = bytes2str_in_dicts(outputs)  # type: ignore
         except OSError as exc:
             if exc.errno == 2:

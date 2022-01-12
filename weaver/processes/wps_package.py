@@ -26,6 +26,7 @@ from urllib.parse import urlparse
 import cwltool
 import cwltool.docker
 import docker
+import yaml
 from cwltool.context import LoadingContext, RuntimeContext
 from cwltool.factory import Factory as CWLFactory, WorkflowStatus as CWLException
 from pyramid.httpexceptions import HTTPOk, HTTPServiceUnavailable
@@ -47,7 +48,14 @@ from weaver.exceptions import (
     PackageTypeError,
     PayloadNotFound
 )
-from weaver.formats import CONTENT_TYPE_ANY_XML, CONTENT_TYPE_APP_JSON, get_cwl_file_format
+from weaver.formats import (
+    CONTENT_TYPE_ANY_XML,
+    CONTENT_TYPE_APP_JSON,
+    CONTENT_TYPE_APP_YAML,
+    CONTENT_TYPE_TEXT_PLAIN,
+    CONTENT_TYPE_TEXT_XML,
+    get_cwl_file_format
+)
 from weaver.processes import opensearch
 from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_BUILTIN,
@@ -57,7 +65,7 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_TYPES,
     CWL_REQUIREMENT_APP_WPS1,
     CWL_REQUIREMENT_ENV_VAR,
-    CWL_REQUIREMENT_INIT_WORKDIR,
+    CWL_REQUIREMENTS_SUPPORTED,
     WPS_INPUT,
     WPS_OUTPUT
 )
@@ -129,9 +137,10 @@ if TYPE_CHECKING:
         CWL_RequirementsDict,
         CWL_RequirementsList,
         CWL_Results,
+        CWL_ToolPathObjectType,
+        CWL_WorkflowStepPackageMap,
         JSON,
         Number,
-        ToolPathObjectType,
         ValueType
     )
 
@@ -342,7 +351,7 @@ def _load_package_file(file_path):
         raise PackageRegistrationError("Package parsing generated an error: [{!s}]".format(ex))
 
 
-def _load_package_content(package_dict,                             # type: Dict
+def _load_package_content(package_dict,                             # type: CWL
                           package_name=PACKAGE_DEFAULT_FILE_NAME,   # type: str
                           data_source=None,                         # type: Optional[str]
                           only_dump_file=False,                     # type: bool
@@ -350,7 +359,7 @@ def _load_package_content(package_dict,                             # type: Dict
                           loading_context=None,                     # type: Optional[LoadingContext]
                           runtime_context=None,                     # type: Optional[RuntimeContext]
                           process_offering=None,                    # type: Optional[JSON]
-                          ):  # type: (...) -> Optional[Tuple[CWLFactoryCallable, str, Dict[str, str]]]
+                          ):  # type: (...) -> Optional[Tuple[CWLFactoryCallable, str, CWL_WorkflowStepPackageMap]]
     """
     Loads `CWL` package definition using various contextual resources.
 
@@ -373,11 +382,13 @@ def _load_package_content(package_dict,                             # type: Dict
     :param runtime_context: cwltool context used to execute the cwl package (required if ``only_dump_file=False``)
     :param process_offering: JSON body of the process description payload (used as I/O hint ordering)
     :returns:
-        If ``only_dump_file`` is ``True``: ``None``.
+        If ``only_dump_file`` is ``True``, returns ``None``.
         Otherwise, tuple of:
-        - instance of ``CWLFactoryCallable``
-        - package type (``PROCESS_WORKFLOW`` or ``PROCESS_APPLICATION``)
-        - mapping of each step ID with their package name that must be run
+
+        - Instance of ``CWLFactoryCallable``
+        - Package type (``PROCESS_WORKFLOW`` or ``PROCESS_APPLICATION``)
+        - Package sub-steps definitions if package is of type ``PROCESS_WORKFLOW``. Otherwise, empty mapping.
+          Mapping of each step name contains their respective package ID and definition that must be run.
 
     .. warning::
         Specified :paramref:`tmp_dir` will be deleted on exit.
@@ -396,8 +407,9 @@ def _load_package_content(package_dict,                             # type: Dict
         package_body, package_name = _get_process_package(step_process_url)
         _load_package_content(package_body, package_name, tmp_dir=tmp_dir,
                               data_source=data_source, only_dump_file=True)
-        package_dict["steps"][step["name"]]["run"] = package_name
-        step_packages[step["name"]] = package_name
+        step_name = step["name"]
+        package_dict["steps"][step_name]["run"] = package_name
+        step_packages[step_name] = {"id": package_name, "package": package_body}
 
     # fix I/O to preserve ordering from dump/load, and normalize them to consistent list of objects
     process_offering_hint = process_offering or {}
@@ -545,12 +557,28 @@ def _generate_process_with_cwl_from_reference(reference):
             raise HTTPServiceUnavailable("Couldn't obtain a valid response from [{}]. Service response: [{} {}]"
                                          .format(reference, response.status_code, response.reason))
         content_type = get_header("Content-Type", response.headers)
+
+        # try to detect incorrectly reported media-type using common structures
+        if CONTENT_TYPE_TEXT_PLAIN in content_type:
+            data = response.text
+            if (data.startswith("{") and data.endswith("}")) or reference.endswith(".json"):
+                LOGGER.warning("Attempting auto-resolution of invalid Content-Type [%s] to [%s] "
+                               "for CWL reference [%s].", content_type, CONTENT_TYPE_APP_JSON, reference)
+                content_type = CONTENT_TYPE_APP_JSON
+            elif data.startswith("<?xml") or reference.endswith(".xml"):
+                LOGGER.warning("Attempting auto-resolution of invalid Content-Type [%s] to [%s] "
+                               "for WPS reference [%s].", content_type, CONTENT_TYPE_TEXT_XML, reference)
+                content_type = CONTENT_TYPE_TEXT_XML
+
         if any(ct in content_type for ct in CONTENT_TYPE_ANY_XML):
             # attempt to retrieve a WPS-1 ProcessDescription definition
             cwl_package, process_info = xml_wps2cwl(response, settings)
 
-        elif any(ct in content_type for ct in [CONTENT_TYPE_APP_JSON]):
-            payload = response.json()
+        elif any(ct in content_type for ct in [CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_YAML]):
+            if content_type == CONTENT_TYPE_APP_YAML:
+                payload = yaml.safe_load(response.text)
+            else:
+                payload = response.json()
             # attempt to retrieve a WPS-3 Process definition, owsContext is expected in body
             # OLD schema nests everything under 'process', OGC schema provides everything at the root
             if "process" in payload or "owsContext" in payload:
@@ -562,6 +590,8 @@ def _generate_process_with_cwl_from_reference(reference):
             elif "cwlVersion" in payload:
                 cwl_package = _load_package_file(reference)
                 process_info = {"identifier": reference_name}
+        else:
+            raise ValueError(f"Unknown parsing methodology of Content-Type [{content_type}] for reference resolution.")
 
     return cwl_package, process_info
 
@@ -588,7 +618,7 @@ def get_application_requirement(package):
                          "only one permitted amongst {}.".format(list(app_hints), list(CWL_REQUIREMENT_APP_TYPES)))
     requirement = app_hints[0] if app_hints else {"class": ""}
 
-    cwl_supported_reqs = [item for item in CWL_REQUIREMENT_APP_TYPES] + [CWL_REQUIREMENT_INIT_WORKDIR]
+    cwl_supported_reqs = list(CWL_REQUIREMENTS_SUPPORTED)
     if not all(item.get("class") in cwl_supported_reqs for item in all_hints):
         raise PackageTypeError("Invalid requirement, the requirements supported are {0}".format(cwl_supported_reqs))
 
@@ -711,7 +741,9 @@ def get_process_definition(process_offering, reference=None, package=None, data_
 
     process_info = process_offering
     if reference:
-        package, process_info = _generate_process_with_cwl_from_reference(reference)
+        package, process_info = try_or_raise_package_error(
+            lambda: _generate_process_with_cwl_from_reference(reference),
+            reason="Loading package from reference")
         process_info.update(process_offering)   # override upstream details
     if not isinstance(package, dict):
         raise PackageRegistrationError("Cannot decode process package contents.")
@@ -776,7 +808,7 @@ class WpsPackage(Process):
     log_file = None                 # type: Optional[str]
     log_level = None                # type: Optional[int]
     logger = None                   # type: Optional[logging.Logger]
-    step_packages = None            # type: Optional[Dict[str, str]]
+    step_packages = None            # type: Optional[CWL_WorkflowStepPackageMap]
     step_launched = None            # type: Optional[List[str]]
     request = None                  # type: Optional[WPSRequest]
     response = None                 # type: Optional[ExecuteResponse]
@@ -930,7 +962,7 @@ class WpsPackage(Process):
                 if cwl_end_search in pkg_log[i]:
                     cwl_end_index = i
                     break
-            captured_log = out_log + err_log
+            captured_log = out_log + err_log + ["----- End of Logs -----\n"]
             merged_log = pkg_log[:cwl_end_index] + captured_log + pkg_log[cwl_end_index:]
             with open(self.log_file, "w") as pkg_log_fd:
                 pkg_log_fd.writelines(merged_log)
@@ -1137,7 +1169,7 @@ class WpsPackage(Process):
                            target_host, status):
         # type: (str, Number, Number, Number, str, AnyValueType, str) -> None
         self.update_status(
-            message="{0} [{1}] - {2}".format(target_host, step_name, str(message).strip()),
+            message="[provider: {0}, step: {1}] - {2}".format(target_host, step_name, str(message).strip()),
             progress=map_progress(progress, start_step_progress, end_step_progress),
             status=status,
         )
@@ -1251,14 +1283,13 @@ class WpsPackage(Process):
             self.logger.debug("Using cwltool.RuntimeContext args:\n%s", json.dumps(runtime_params, indent=2))
             runtime_context = RuntimeContext(kwargs=runtime_params)
             try:
+                self.step_launched = []
                 package_inst, _, self.step_packages = _load_package_content(self.package,
                                                                             package_name=self.package_id,
                                                                             # no data source for local package
                                                                             data_source=None,
                                                                             loading_context=loading_context,
                                                                             runtime_context=runtime_context)
-                self.step_launched = []
-
             except Exception as ex:
                 raise PackageRegistrationError("Exception occurred on package instantiation: '{!r}'".format(ex))
             self.update_status("Loading package content done.", PACKAGE_PROGRESS_LOADING, STATUS_RUNNING)
@@ -1583,18 +1614,20 @@ class WpsPackage(Process):
         self.logger.info("Resolved WPS output [%s] as file reference: [%s]", output_id, result_wps)
 
     def make_tool(self, toolpath_object, loading_context):
-        # type: (ToolPathObjectType, LoadingContext) -> ProcessCWL
+        # type: (CWL_ToolPathObjectType, LoadingContext) -> ProcessCWL
         from weaver.processes.wps_workflow import default_make_tool
         return default_make_tool(toolpath_object, loading_context, self.get_job_process_definition)
 
     def get_job_process_definition(self, jobname, joborder, tool):  # noqa: E811
         # type: (str, JSON, CWL) -> WpsPackage
         """
-        Obtain the execution job definition for the given process.
+        Obtain the execution job definition for the given process (:term:`Workflow` step implementation).
 
-        This function is called before running an `ADES` job (either from a workflow step or a simple `EMS` dispatch).
-        It must return a :class:`weaver.processes.wps_process.WpsProcess` instance configured with the proper ``CWL``
-        package definition, ADES target and cookies to access it (if protected).
+        This function is called before running an :term:`ADES` :term:`Job` (either from a :term:`workflow` step or
+        simple :term:`EMS` :term:`Job` dispatching).
+
+        It must return a :class:`weaver.processes.wps_process.WpsProcess` instance configured with the
+        proper :term:`CWL` package definition, :term:`ADES` target and cookies to access it (if protected).
 
         :param jobname: The workflow step or the package id that must be launched on an ADES :class:`string`
         :param joborder: The params for the job :class:`dict {input_name: input_value}`
@@ -1608,13 +1641,18 @@ class WpsPackage(Process):
         if jobname == self.package_id:
             # A step is the package itself only for non-workflow package being executed on the EMS
             # default action requires ADES dispatching but hints can indicate also WPS1 or ESGF-CWT provider
+            step_package_type = self.package_type
             step_payload = self.payload
-            process = self.package_id
+            step_package = self.package
+            step_process = self.package_id
             jobtype = "package"
         else:
             # Here we got a step part of a workflow (self is the workflow package)
-            step_payload = _get_process_payload(self.step_packages[jobname])
-            process = self.step_packages[jobname]
+            step_details = self.step_packages[jobname]
+            step_process = step_details["id"]
+            step_package = step_details["package"]
+            step_package_type = _get_package_type(step_package)
+            step_payload = {}  # defer until package requirement resolve to avoid unnecessary fetch
             jobtype = "step"
 
         # Progress made with steps presumes that they are done sequentially and have the same progress weight
@@ -1625,7 +1663,7 @@ class WpsPackage(Process):
         self.update_status("Preparing to launch {type} {name}.".format(type=jobtype, name=jobname),
                            start_step_progress, STATUS_RUNNING)
 
-        def _update_status_dispatch(_provider, _message, _progress, _status):
+        def _update_status_dispatch(_message, _progress, _status, _provider):
             self.step_update_status(
                 _message, _progress, start_step_progress, end_step_progress, jobname, _provider, _status
             )
@@ -1639,11 +1677,21 @@ class WpsPackage(Process):
                 _wps_params[_param] = _requirement[_param]
             return _wps_params
 
-        requirement = get_application_requirement(self.package)
+        requirement = get_application_requirement(step_package)
         req_class = requirement["class"]
+        req_source = "requirement/hint"
+        if step_package_type == PROCESS_WORKFLOW:
+            req_class = PROCESS_WORKFLOW
+            req_source = "tool class"
+
+        if jobtype == "step" and not any(
+            req_class.endswith(req) for req in [CWL_REQUIREMENT_APP_WPS1, CWL_REQUIREMENT_APP_ESGF_CWT]
+        ):
+            LOGGER.debug("Retrieve WPS-3 process payload for potential Data Source definitions to resolve.")
+            step_payload = _get_process_payload(step_process)
 
         if req_class.endswith(CWL_REQUIREMENT_APP_WPS1):
-            self.logger.info("WPS-1 Package resolved from requirement/hint: %s", req_class)
+            self.logger.info("WPS-1 Package resolved from %s: %s", req_source, req_class)
             from weaver.processes.wps1_process import Wps1Process
             params = _get_wps1_params(requirement)
             return Wps1Process(
@@ -1653,7 +1701,7 @@ class WpsPackage(Process):
                 update_status=_update_status_dispatch,
             )
         elif req_class.endswith(CWL_REQUIREMENT_APP_ESGF_CWT):
-            self.logger.info("ESGF-CWT Package resolved from requirement/hint: %s", req_class)
+            self.logger.info("ESGF-CWT Package resolved from %s: %s", req_source, req_class)
             from weaver.processes.esgf_process import ESGFProcess
             params = _get_wps1_params(requirement)
             return ESGFProcess(
@@ -1664,10 +1712,10 @@ class WpsPackage(Process):
             )
         else:
             # implements both `PROCESS_APPLICATION` with `CWL_REQUIREMENT_APP_DOCKER` and `PROCESS_WORKFLOW`
-            self.logger.info("WPS-3 Package resolved from requirement/hint: %s", req_class)
+            self.logger.info("WPS-3 Package resolved from %s: %s", req_source, req_class)
             from weaver.processes.wps3_process import Wps3Process
             return Wps3Process(step_payload=step_payload,
                                joborder=joborder,
-                               process=process,
+                               process=step_process,
                                request=self.request,
                                update_status=_update_status_dispatch)

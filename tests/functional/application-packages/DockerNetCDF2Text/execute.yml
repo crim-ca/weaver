@@ -1,0 +1,8 @@
+mode: async
+response: document
+inputs:
+  - id: input_nc
+    href: https://mocked-file-server.com/file.nc
+outputs:
+  - id: output_txt
+    transmissionMode: reference

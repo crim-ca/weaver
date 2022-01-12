@@ -1,0 +1,36 @@
+processDescription:
+  process:
+    id: WPS1JsonArray2NetCDF
+    version: 0.0.1
+    description: Process that calls Weaver's own builtin process using its WPS-1 interface.
+    # NOTE:
+    #   Since the process simply employs the OWS WPS-1 endpoint for builtin 'jsonarray2netcdf' as if it
+    #   was a 'remote provider', below inputs and outputs must match exactly the original local process
+    #   to allow its execution requirements to be fulfilled when forwarding them.
+    inputs:
+      - id: input
+        formats:
+          - mediaType: application/json
+    outputs:
+      - id: output
+        formats:
+          - mediaType: application/x-netcdf
+executionUnit:
+  - unit:
+      cwlVersion: v1.0
+      class: CommandLineTool
+      hints:  # cannot be in requirements since not official CWL
+        WPS1Requirement:
+          # note: this must match the WebTest TestApp endpoint and settings
+          provider: "https://localhost/wps"
+          process: jsonarray2netcdf
+      # note: following I/O must match 'jsonarray2netcdf' (see above)
+      inputs:
+        input:
+          type: File
+      outputs:
+        output:
+          type: File[]
+          outputBinding:
+            glob: "*.nc"
+deploymentProfileName: http://www.opengis.net/profiles/eoc/wpsApplication

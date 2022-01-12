@@ -24,5 +24,5 @@ processDescription:
     - reference
 executionUnit:
   # note: This does not work by itself! The test suite injects the file dynamically.
-  - href: "tests/functional/application-packages/echo.cwl"
+  - href: "tests/functional/application-packages/Echo/echo.cwl"
 deploymentProfileName: "http://www.opengis.net/profiles/eoc/dockerizedApplication"

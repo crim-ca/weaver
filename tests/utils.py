@@ -421,6 +421,7 @@ def mocked_sub_requests(app,                # type: TestApp
     from weaver.wps_restapi.swagger_definitions import FileLocal
     from requests.sessions import Session as RealSession
     real_request = RealSession.request
+    real_signature = inspect.signature(real_request)
 
     def _parse_for_app_req(method, url, **req_kwargs):
         """
@@ -519,7 +520,8 @@ def mocked_sub_requests(app,                # type: TestApp
     with contextlib.ExitStack() as stack:
         stack.enter_context(mock.patch("requests.request", side_effect=mocked_app_request))
         stack.enter_context(mock.patch("requests.Session.request", new=TestSession.request))
-        stack.enter_context(mock.patch("requests.sessions.Session.request", new=TestSession.request))
+        mocked_request = stack.enter_context(mock.patch("requests.sessions.Session.request", new=TestSession.request))
+        mocked_request.__signature__ = real_signature  # replicate signature for 'request_extra' using it
         stack.enter_context(mock.patch.object(FileLocal, "validator", new_callable=mock_file_regex))
         stack.enter_context(mock.patch.object(TestResponse, "json", new=TestResponseJsonCallable.json))
         if isinstance(method_function, str):
@@ -685,7 +687,14 @@ def mocked_remote_server_requests_wps1(server_configs,          # type: Union[Mo
     return mocked_remote_server_wrapper
 
 
-def mocked_file_server(directory, url, settings, mock_get=True, mock_head=True, headers_override=None):
+def mocked_file_server(directory,               # type: str
+                       url,                     # type: str
+                       settings,                # type: SettingsType
+                       mock_get=True,           # type: bool
+                       mock_head=True,          # type: bool
+                       headers_override=None,   # type: Optional[AnyHeadersContainer]
+                       requests_mock=None,      # type: Optional[responses.RequestsMock]
+                       ):                       # type: (...) -> responses.RequestsMock
     """
     Mocks a file server endpoint hosting some local directory files.
 
@@ -693,6 +702,11 @@ def mocked_file_server(directory, url, settings, mock_get=True, mock_head=True, 
         When combined in a test where :func:`mocked_sub_requests` is employed, parameter ``local_only=True``
         and the targeted :paramref:`url` should differ from the :class:`TestApp` URL to avoid incorrect handling
         by different mocks.
+
+    .. note::
+        Multiple requests patch operations by calling this function more than once can be applied by providing back
+        the mock returned on a previous call to the subsequent ones as input. In such case, each mock call should
+        refer to distinct endpoints that will not cause conflicting request patching configurations.
 
     .. seealso::
         For WPS output directory/endpoint, consider using :func:`mocked_wps_output` instead.
@@ -703,6 +717,7 @@ def mocked_file_server(directory, url, settings, mock_get=True, mock_head=True, 
     :param mock_get: Whether to mock HTTP GET methods received on WPS output URL.
     :param mock_head: Whether to mock HTTP HEAD methods received on WPS output URL.
     :param headers_override: Override specified headers in produced response.
+    :param requests_mock: Previously defined request mock instance to extend with new definitions.
     :return: Mocked response that would normally be obtained by a file server hosting WPS output directory.
     """
     if directory.startswith("file://"):
@@ -745,7 +760,7 @@ def mocked_file_server(directory, url, settings, mock_get=True, mock_head=True, 
             return 405, {}, ""
         return 404, {}, ""
 
-    mock_req = responses.RequestsMock(assert_all_requests_are_fired=False)
+    mock_req = requests_mock or responses.RequestsMock(assert_all_requests_are_fired=False)
     any_file_url = re.compile(r"{}/[\w\-_/.]+".format(url))  # match any sub-directory/file structure
     if mock_get:
         mock_req.add_callback(responses.GET, any_file_url, callback=request_callback)
@@ -754,8 +769,12 @@ def mocked_file_server(directory, url, settings, mock_get=True, mock_head=True, 
     return mock_req
 
 
-def mocked_wps_output(settings, mock_get=True, mock_head=True, headers_override=None):
-    # type: (SettingsType, bool, bool, Optional[AnyHeadersContainer]) -> Union[responses.RequestsMock, MockPatch]
+def mocked_wps_output(settings,                 # type: SettingsType
+                      mock_get=True,            # type: bool
+                      mock_head=True,           # type: bool
+                      headers_override=None,    # type: Optional[AnyHeadersContainer]
+                      requests_mock=None,       # type: Optional[responses.RequestsMock]
+                      ):                        # type: (...) -> Union[responses.RequestsMock, MockPatch]
     """
     Mocks the mapping resolution from HTTP WPS output URL to hosting of matched local file in WPS output directory.
 
@@ -773,11 +792,12 @@ def mocked_wps_output(settings, mock_get=True, mock_head=True, headers_override=
     :param mock_get: Whether to mock HTTP GET methods received on WPS output URL.
     :param mock_head: Whether to mock HTTP HEAD methods received on WPS output URL.
     :param headers_override: Override specified headers in produced response.
+    :param requests_mock: Previously defined request mock instance to extend with new definitions.
     :return: Mocked response that would normally be obtained by a file server hosting WPS output directory.
     """
     wps_url = get_wps_output_url(settings)
     wps_dir = get_wps_output_dir(settings)
-    return mocked_file_server(wps_dir, wps_url, settings, mock_get, mock_head, headers_override)
+    return mocked_file_server(wps_dir, wps_url, settings, mock_get, mock_head, headers_override, requests_mock)
 
 
 def mocked_execute_process(func_execute_process=None):

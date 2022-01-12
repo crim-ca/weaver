@@ -6,12 +6,12 @@ import pytest
 from owslib.wps import ComplexDataInput, WPSExecution
 
 from tests.functional.utils import WpsConfigBase
-from tests.utils import mocked_execute_process, mocked_sub_requests
-from weaver import xml_util
+from tests.utils import mocked_execute_process, mocked_sub_requests, mocked_wps_output
+from weaver import WEAVER_ROOT_DIR, xml_util
 from weaver.execute import EXECUTE_MODE_ASYNC, EXECUTE_RESPONSE_DOCUMENT, EXECUTE_TRANSMISSION_MODE_REFERENCE
 from weaver.formats import CONTENT_TYPE_ANY_XML, CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML, CONTENT_TYPE_TEXT_PLAIN
 from weaver.processes.wps_package import CWL_REQUIREMENT_APP_DOCKER
-from weaver.utils import get_any_value, str2bytes
+from weaver.utils import fetch_file, get_any_value, load_file, str2bytes
 from weaver.wps.utils import get_wps_url
 
 
@@ -20,10 +20,10 @@ class WpsPackageDockerAppTest(WpsConfigBase):
     @classmethod
     def setUpClass(cls):
         cls.settings = {
-            "weaver.url": "http://localhost",
+            "weaver.url": "https://localhost",
             "weaver.wps": True,
             "weaver.wps_output": True,
-            "weaver.wps_output_path": "/wpsoutputs",
+            "weaver.wps_output_url": "http://hosted-output.com/wpsoutputs",
             "weaver.wps_output_dir": "/tmp",  # nosec: B108 # don't care hardcoded for test
             "weaver.wps_path": "/ows/wps",
             "weaver.wps_restapi_path": "/",
@@ -76,8 +76,8 @@ class WpsPackageDockerAppTest(WpsConfigBase):
     def validate_outputs(self, job_id, result_payload, outputs_payload, result_file_content):
         # get generic details
         wps_uuid = str(self.job_store.fetch_by_id(job_id).wps_id)
-        wps_out_path = "{}{}".format(self.settings["weaver.url"], self.settings["weaver.wps_output_path"])
-        wps_output = "{}/{}/{}".format(wps_out_path, wps_uuid, self.out_file)
+        wps_out_url = self.settings["weaver.wps_output_url"]
+        wps_output = "{}/{}/{}".format(wps_out_url, wps_uuid, self.out_file)
 
         # --- validate /results path format ---
         assert len(result_payload) == 1
@@ -211,15 +211,16 @@ class WpsPackageDockerAppTest(WpsConfigBase):
                 wps_params = None
             resp = mocked_sub_requests(self.app, wps_method, wps_url,
                                        params=wps_params, data=wps_data, headers=wps_headers, only_local=True)
-            assert resp.status_code in [200, 201], \
+            assert resp.status_code in [200, 201], (
                 "Failed with: [{}]\nTest: [{}]\nReason:\n{}".format(resp.status_code, test_content, resp.text)
+            )
 
             # parse response status
             if accept == CONTENT_TYPE_APP_XML:
                 assert resp.content_type in CONTENT_TYPE_ANY_XML, test_content
                 xml_body = xml_util.fromstring(str2bytes(resp.text))
                 status_url = xml_body.get("statusLocation")
-                job_id = status_url.split("/")[-1]
+                job_id = status_url.split("/")[-1].split(".")[0]
             elif accept == CONTENT_TYPE_APP_JSON:
                 assert resp.content_type == CONTENT_TYPE_APP_JSON, test_content
                 status_url = resp.json["location"]
@@ -227,9 +228,22 @@ class WpsPackageDockerAppTest(WpsConfigBase):
             assert status_url
             assert job_id
 
+            if accept == CONTENT_TYPE_APP_XML:
+                wps_out_url = self.settings["weaver.wps_output_url"]
+                weaver_url = self.settings["weaver.url"]
+                assert status_url == f"{wps_out_url}/{job_id}.xml", "Status URL should be XML file for WPS-1 request"
+                # remap to employ JSON monitor method (could be done with XML parsing otherwise)
+                status_url = f"{weaver_url}/jobs/{job_id}"
+
             # job monitoring
             results = self.monitor_job(status_url)
             outputs = self.get_outputs(status_url)
+
+            # validate XML status is updated accordingly
+            wps_xml_status = os.path.join(self.settings["weaver.wps_output_dir"], job_id + ".xml")
+            assert os.path.isfile(wps_xml_status)
+            with open(wps_xml_status, "r") as status_file:
+                assert "ProcessSucceeded" in status_file.read()
 
         self.validate_outputs(job_id, results, outputs, test_content)
 
@@ -291,3 +305,46 @@ class WpsPackageDockerAppTest(WpsConfigBase):
             - :meth:`test_execute_wps_xml_post_resp_json`
         """
         self.wps_execute("2.0.0", CONTENT_TYPE_APP_JSON)
+
+    def test_execute_docker_embedded_python_script(self):
+        test_proc = "test-docker-python-script"
+        cwl = load_file(os.path.join(WEAVER_ROOT_DIR, "docs/examples/docker-python-script-report.cwl"))
+        body = {
+            "processDescription": {
+                "process": {
+                    "id": test_proc
+                }
+            },
+            "executionUnit": [{"unit": cwl}],
+            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication"
+        }
+        self.deploy_process(body)
+
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_process():
+                stack.enter_context(mock_exec)
+
+            path = f"/processes/{test_proc}/execution"
+            cost = 2.45
+            amount = 3
+            body = {
+                "mode": EXECUTE_MODE_ASYNC,
+                "response": EXECUTE_RESPONSE_DOCUMENT,
+                "inputs": [
+                    {"id": "amount", "value": amount},
+                    {"id": "cost", "value": cost}
+                ],
+                "outputs": [
+                    {"id": "quote", "transmissionMode": EXECUTE_TRANSMISSION_MODE_REFERENCE},
+                ]
+            }
+            resp = mocked_sub_requests(self.app, "POST", path, json=body, headers=self.json_headers, only_local=True)
+            status_url = resp.headers["Location"]
+            results = self.monitor_job(status_url)
+
+            assert results["quote"]["href"].startswith("http")
+            stack.enter_context(mocked_wps_output(self.settings))
+            tmpdir = stack.enter_context(tempfile.TemporaryDirectory())
+            report_file = fetch_file(results["quote"]["href"], tmpdir, self.settings)
+            report_data = load_file(report_file, text=True)
+            assert report_data == f"Order Total: {amount * cost:0.2f}$\n"

@@ -95,7 +95,7 @@ for _dir in [DOC_SRC_ROOT, DOC_PRJ_ROOT]:
 # note:
 #   setting 'weaver.build_docs' allows to ignore part of code that cause problem or require unnecessary
 #   configuration for the purpose of parsing the source to generate the OpenAPI
-config = Configurator(settings={"weaver.wps": False, "weaver.wps_restapi": True, "weaver.build_docs": True})
+config = Configurator(settings={"weaver.wps": True, "weaver.wps_restapi": True, "weaver.build_docs": True})
 config.include("weaver")  # need to include package to apply decorators and parse routes
 api_spec_file = os.path.join(DOC_BLD_ROOT, "api.json")
 # must disable references when using redoc (alpha version note rendering them correctly)
@@ -168,8 +168,8 @@ language = "en"
 
 # allow conversion of quotes and repeated dashes to other representation characters
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#confval-smartquotes
-# disable to avoid problems with '--param' employed in document of CLI.
-smartquotes = False
+# To avoid problems with '--param' employed in document of CLI, provide them as ``--param``.
+smartquotes = True
 
 # There are two options for replacing |today|: either, you set today to some
 # non-false value, then it is used:

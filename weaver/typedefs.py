@@ -7,16 +7,24 @@ if TYPE_CHECKING:
     from datetime import datetime
     from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Type, Union
     if hasattr(typing, "TypedDict"):
-        from typing import TypedDict  # pylint: disable=E0611,no-name-in-module
+        from typing import TypedDict  # pylint: disable=E0611,no-name-in-module  # Python >= 3.8
     else:
         from typing_extensions import TypedDict
+    if hasattr(typing, "Literal"):
+        from typing import Literal  # pylint: disable=E0611,no-name-in-module  # Python >= 3.8
+    else:
+        from typing_extensions import Literal
+    if hasattr(typing, "Protocol"):
+        from typing import Protocol  # pylint: disable=E0611,no-name-in-module  # Python >= 3.8
+    else:
+        from typing_extensions import Protocol
     if hasattr(os, "PathLike"):
         FileSystemPathType = Union[os.PathLike, str]
     else:
         FileSystemPathType = str
 
     from celery.app import Celery
-    from owslib.wps import BoundingBoxDataInput, ComplexDataInput, Process as ProcessOWS
+    from owslib.wps import BoundingBoxDataInput, ComplexDataInput, Process as ProcessOWS, WPSExecution
     from pyramid.httpexceptions import HTTPSuccessful, HTTPRedirection
     from pyramid.registry import Registry
     from pyramid.request import Request as PyramidRequest
@@ -56,16 +64,33 @@ if TYPE_CHECKING:
     CWL_IO_NullableType = Union[str, List[str]]  # "<type>?" or ["<type>", "null"]
     CWL_IO_NestedType = TypedDict("CWL_IO_NestedType", {"type": CWL_IO_NullableType}, total=True)
     CWL_IO_EnumSymbols = Union[List[str], List[int], List[float]]
-    CWL_IO_EnumType = TypedDict("CWL_IO_EnumType", {"type": str, "symbols": CWL_IO_EnumSymbols})
-    CWL_IO_ArrayType = TypedDict("CWL_IO_ArrayType",
-                                 {"type": str, "items": Union[str, CWL_IO_EnumType]})  # "items" => type of every item
+    CWL_IO_EnumType = TypedDict("CWL_IO_EnumType", {
+        "type": str,
+        "symbols": CWL_IO_EnumSymbols,
+    })
+    CWL_IO_ArrayType = TypedDict("CWL_IO_ArrayType", {
+        "type": str,
+        "items": Union[str, CWL_IO_EnumType],  # "items" => type of every item
+    })
     CWL_IO_TypeItem = Union[str, CWL_IO_NestedType, CWL_IO_ArrayType, CWL_IO_EnumType]
     CWL_IO_DataType = Union[CWL_IO_TypeItem, List[CWL_IO_TypeItem]]
-    CWL_Input_Type = TypedDict("CWL_Input_Type",
-                               {"id": str, "type": CWL_IO_DataType, "default": AnyValueType, "name": Optional[str]},
-                               total=False)
-    CWL_Output_Type = TypedDict("CWL_Output_Type",
-                                {"id": str, "type": CWL_IO_DataType, "outputBinding": Optional[GlobType]}, total=False)
+    CWL_Input_Type = TypedDict("CWL_Input_Type", {
+        "id": Optional[str],    # representation used by plain CWL definition
+        "name": Optional[str],  # representation used by parsed tool instance
+        "type": CWL_IO_DataType,
+        "items": Union[str, CWL_IO_EnumType],
+        "symbols": Optional[CWL_IO_EnumSymbols],
+        "format": Optional[Union[str, List[str]]],
+        "inputBinding": Optional[Any],
+        "default": Optional[AnyValueType],
+    }, total=False)
+    CWL_Output_Type = TypedDict("CWL_Output_Type", {
+        "id": Optional[str],    # representation used by plain CWL definition
+        "name": Optional[str],  # representation used by parsed tool instance
+        "type": CWL_IO_DataType,
+        "format": Optional[Union[str, List[str]]],
+        "outputBinding": Optional[GlobType]
+    }, total=False)
     CWL_Inputs = Union[List[CWL_Input_Type], Dict[str, CWL_Input_Type]]
     CWL_Outputs = Union[List[CWL_Output_Type], Dict[str, CWL_Output_Type]]
     CWL_Requirement = TypedDict("CWL_Requirement", {"class": str}, total=False)  # includes 'hints'
@@ -77,26 +102,62 @@ if TYPE_CHECKING:
     CWL_ResultValue = Union[AnyValueType, List[AnyValueType]]
     CWL_ResultEntry = Union[Dict[str, CWL_ResultValue], CWL_ResultFile, List[CWL_ResultFile]]
     CWL_Results = Dict[str, CWL_ResultEntry]
-    CWL = TypedDict("CWL", {"cwlVersion": str, "class": str, "baseCommand": Optional[Union[str, List[str]]],
-                            "parameters": Optional[List[str]], "inputs": CWL_Inputs, "outputs": CWL_Outputs,
-                            "requirements": CWL_AnyRequirements, "hints": CWL_AnyRequirements,
-                            "label": str, "doc": str, "s:keywords": str,
-                            "$namespaces": Dict[str, str], "$schemas": Dict[str, str]}, total=False)
+    CWL_Class = Literal["CommandLineTool", "ExpressionTool", "Workflow"]
+    CWL_WorkflowStep = TypedDict("CWL_WorkflowStep", {
+        "run": str,
+        "in": Dict[str, str],   # mapping of <step input: workflow input | other-step output>
+        "out": List[str],       # output to retrieve from step, for mapping with other steps
+    })
+    CWL_WorkflowStepID = str
+    CWL = TypedDict("CWL", {
+        "cwlVersion": str,
+        "class": CWL_Class,
+        "label": str,
+        "doc": str,
+        "s:keywords": List[str],
+        "baseCommand": Optional[Union[str, List[str]]],
+        "parameters": Optional[List[str]],
+        "requirements": CWL_AnyRequirements,
+        "hints": CWL_AnyRequirements,
+        "inputs": CWL_Inputs,
+        "outputs": CWL_Outputs,
+        "steps": Dict[CWL_WorkflowStepID, CWL_WorkflowStep],
+        "$namespaces": Dict[str, str],
+        "$schemas": Dict[str, str]
+    }, total=False)
+
+    CWL_WorkflowStepPackage = TypedDict("CWL_WorkflowStepPackage", {
+        "id": str,          # reference ID of the package
+        "package": CWL      # definition of the package as sub-step of a Workflow
+    })
+    CWL_WorkflowStepPackageMap = Dict[CWL_WorkflowStepID, CWL_WorkflowStepPackage]
 
     # CWL loading
-    ExpectedOutputType = CWL_Output_Type
-    GetJobProcessDefinitionFunction = Callable[[str, Dict[str, str], Dict[str, Any]], WpsProcessInterface]
-    ToolPathObjectType = Dict[str, Any]
+    CWL_WorkflowInputs = Dict[str, AnyValueType]   # mapping of ID:value
+    CWL_ExpectedOutputs = Dict[str, AnyValueType]  # mapping of ID:value
+    CWL_ToolPathObjectType = Dict[str, Any]
+    JobProcessDefinitionCallback = Callable[[str, Dict[str, str], Dict[str, Any]], WpsProcessInterface]
 
     # CWL runtime
     CWL_RuntimeLiteral = Union[str, float, int]
-    CWL_RuntimeInputFile = TypedDict("CWL_RuntimeInputFile",
-                                     {"class": str, "location": str, "format": Optional[str],
-                                      "basename": str, "nameroot": str, "nameext": str}, total=False)
-    CWL_RuntimeOutputFile = TypedDict("CWL_RuntimeOutputFile",
-                                      {"class": str, "location": str, "format": Optional[str],
-                                       "basename": str, "nameroot": str, "nameext": str,
-                                       "checksum": Optional[str], "size": Optional[str]}, total=False)
+    CWL_RuntimeInputFile = TypedDict("CWL_RuntimeInputFile", {
+        "class": str,
+        "location": str,
+        "format": Optional[str],
+        "basename": str,
+        "nameroot": str,
+        "nameext": str
+    }, total=False)
+    CWL_RuntimeOutputFile = TypedDict("CWL_RuntimeOutputFile", {
+        "class": str,
+        "location": str,
+        "format": Optional[str],
+        "basename": str,
+        "nameroot": str,
+        "nameext": str,
+        "checksum": Optional[str],
+        "size": Optional[str]
+    }, total=False)
     CWL_RuntimeInput = Union[CWL_RuntimeLiteral, CWL_RuntimeInputFile]
     CWL_RuntimeInputsMap = Dict[str, CWL_RuntimeInput]
     CWL_RuntimeOutput = Union[CWL_RuntimeLiteral, CWL_RuntimeOutputFile]
@@ -133,12 +194,17 @@ if TYPE_CHECKING:
     AnyProcess = Union[Process, ProcessOWS, ProcessWPS, JSON]
     AnyProcessType = Union[Type[Process], Type[ProcessWPS]]
 
-    # update_status(provider, message, progress, status)
-    UpdateStatusPartialFunction = Callable[[str, str, int, AnyStatusType], None]
+    # update_status(message, progress, status, *args, **kwargs)
+    class UpdateStatusPartialFunction(Protocol):
+        def __call__(self, message: str, progress: Number, status: AnyStatusType, *args: Any, **kwargs: Any) -> None:
+            pass
 
     # others
-    DatetimeIntervalType = TypedDict("DatetimeIntervalType",
-                                     {"before": datetime, "after": datetime, "match": datetime}, total=False)
+    DatetimeIntervalType = TypedDict("DatetimeIntervalType", {
+        "before": datetime,
+        "after": datetime,
+        "match": datetime
+    }, total=False)
 
     # data source configuration
     DataSourceFileRef = TypedDict("DataSourceFileRef", {
@@ -158,3 +224,17 @@ if TYPE_CHECKING:
     }, total=True)
     DataSource = Union[DataSourceFileRef, DataSourceOpenSearch]
     DataSourceConfig = Dict[str, DataSource]  # JSON/YAML file contents
+
+    JobValueItem = TypedDict("JobValueItem", {
+        "id": str,
+        "href": Optional[str],
+        "data": Optional[AnyValueType]
+    }, total=False)
+    JobExpectItem = TypedDict("JobExpectItem", {"id": str}, total=True)
+    JobInputs = List[Union[JobValueItem, Dict[str, AnyValueType]]]
+    JobOutputs = List[Union[JobExpectItem, Dict[str, AnyValueType]]]
+    JobResults = List[JobValueItem]
+    JobMonitorReference = Any  # typically an URI of the remote job status or an execution object/handler
+
+    # reference employed as 'JobMonitorReference' by 'WPS1Process'
+    JobExecution = TypedDict("JobExecution", {"execution": WPSExecution})

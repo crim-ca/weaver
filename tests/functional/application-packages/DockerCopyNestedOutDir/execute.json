@@ -1,0 +1,16 @@
+{
+    "mode": "async",
+    "response": "document",
+    "inputs": [
+        {
+            "id": "input_files",
+            "href": "https://mocked-file-server.com/test-file.txt"
+        }
+    ],
+    "outputs": [
+        {
+            "id": "output_files",
+            "transmissionMode": "reference"
+        }
+    ]
+}

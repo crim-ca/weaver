@@ -1,0 +1,21 @@
+processDescription:
+  process:
+    visibility: public
+    id: DockerCopyNestedOutDir
+    title: Mock docker with pass-through text files via shell copy with nested output directory location.
+    version: "0.0.1"
+    inputs:
+      - id: input_files
+        formats:
+          - mimeType: text/plain
+            default: true
+        minOccurs: 1
+    outputs:
+      - id: output_files
+        formats:
+          - mimeType: text/plain
+            default: true
+executionUnit:
+  - test: DockerCopyNestedOutDir.cwl
+immediateDeployment: true
+deploymentProfileName: "http://www.opengis.net/profiles/eoc/dockerizedApplication"

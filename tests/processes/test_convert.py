@@ -10,11 +10,12 @@ import pytest
 from pywps.inout.formats import Format
 from pywps.inout.inputs import LiteralInput
 from pywps.inout.literaltypes import AllowedValue, AnyValue
+from pywps.inout.outputs import ComplexOutput
 from pywps.validator.mode import MODE
 
 from weaver.exceptions import PackageTypeError
 from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_NETCDF, CONTENT_TYPE_APP_XML, CONTENT_TYPE_TEXT_PLAIN
-from weaver.processes.constants import PROCESS_SCHEMA_OGC, PROCESS_SCHEMA_OLD, WPS_INPUT, WPS_LITERAL
+from weaver.processes.constants import PROCESS_SCHEMA_OGC, PROCESS_SCHEMA_OLD, WPS_INPUT, WPS_LITERAL, WPS_OUTPUT
 from weaver.processes.convert import _are_different_and_set  # noqa: W0212
 from weaver.processes.convert import (
     DEFAULT_FORMAT,
@@ -181,6 +182,27 @@ def test_cwl2wps_io_raise_mixed_types():
         io_info = {"name": "test-{}".format(i), "type": test_type}
         with pytest.raises(PackageTypeError):
             cwl2wps_io(io_info, WPS_INPUT)
+
+
+def test_cwl2wps_io_record_format():
+    """
+    Validate handling of alternative representation by CWL I/O record after parsing contents into a tool instance.
+
+    CWL record for an application named ``package`` rewrites ``format`` field of a ``File`` I/O
+    originally defined as ``iana:application/json`` to ``file:///tmp/<tmpXYZ>/package#application/json``
+    after it resolved the remote ontology ``iana`` from ``$namespace``.
+    """
+    cwl_io_record = {
+        "name": "output",
+        "type": "File",
+        "outputBinding": {"glob": "*.json"},
+        "format": f"file:///tmp/tmp-random-dir/package#{CONTENT_TYPE_APP_JSON}",
+    }
+    wps_io = cwl2wps_io(cwl_io_record, WPS_OUTPUT)
+    assert isinstance(wps_io, ComplexOutput)
+    assert len(wps_io.supported_formats) == 1
+    assert isinstance(wps_io.supported_formats[0], Format)
+    assert wps_io.supported_formats[0].mime_type == CONTENT_TYPE_APP_JSON
 
 
 def testis_cwl_array_type_explicit_invalid_item():

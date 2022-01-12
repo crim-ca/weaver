@@ -8,7 +8,7 @@
     },
     "executionUnit": [
         {
-            "href": "tests/functional/application-packages/workflow_file_to_subset_crim.cwl"
+            "href": "tests/functional/application-packages/WorkflowFileToSubsetCRIM/package.cwl"
         }
     ],
     "deploymentProfileName": "http://www.opengis.net/profiles/eoc/workflow"

@@ -1,0 +1,14 @@
+{
+    "processDescription": {
+        "process": {
+            "id": "WorkflowRESTSelectCopyNetCDF",
+            "description": "Builtin WPS-REST operation followed by copy of selected image with WPS-1 interface."
+        }
+    },
+    "executionUnit": [
+        {
+            "test": "WorkflowRESTSelectCopyNetCDF.cwl"
+        }
+    ],
+    "deploymentProfileName": "http://www.opengis.net/profiles/eoc/workflow"
+}

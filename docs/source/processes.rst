@@ -9,6 +9,8 @@ Processes
     :local:
     :depth: 3
 
+.. _proc_types:
+
 Type of Processes
 =====================
 
@@ -24,8 +26,8 @@ Each one of them are accessible through the same API interface, but they have di
 
 
 .. seealso::
-    Section |examples|_ provides multiple concrete use cases of `Deploy`_ and `Execute`_ request payloads
-    for diverse set of applications.
+    Section |examples|_ provides multiple concrete use cases of :ref:`Deploy <proc_op_deploy>`
+    and :ref:`Execute <proc_op_execute>` request payloads for diverse set of applications.
 
 
 Builtin
@@ -62,7 +64,7 @@ in `Weaver` using an URL reference to an WPS-1/2 process, `Weaver` parses and co
 body of the response and registers the process locally using this definition. This allows a remote server offering
 limited functionalities (e.g.: no REST bindings supported) to provide them through `Weaver`.
 
-A minimal `Deploy`_ request body for this kind of process could be as follows:
+A minimal :ref:`Deploy <proc_op_deploy>` request body for this kind of process could be as follows:
 
 .. code-block:: JSON
 
@@ -80,10 +82,10 @@ A minimal `Deploy`_ request body for this kind of process could be as follows:
     }
 
 
-This would tell `Weaver` to locally `Deploy`_ the ``my-process-reference`` process using the WPS-1 URL reference that is
-expected to return a ``DescribeProcess`` :term:`XML` schema. Provided that this endpoint can be resolved and parsed
-according to typical WPS specification, this should result into a successful process registration.
-The deployed :term:`Process` would then be accessible with `DescribeProcess`_  requests.
+This would tell `Weaver` to locally :ref:`Deploy <proc_op_deploy>` the ``my-process-reference`` process using the WPS-1
+URL reference that is expected to return a ``DescribeProcess`` :term:`XML` schema. Provided that this endpoint can be
+resolved and parsed according to typical WPS specification, this should result into a successful process registration.
+The deployed :term:`Process` would then be accessible with :ref:`DescribeProcess <proc_op_describe>`  requests.
 
 The above deployment procedure can be automated on startup using `Weaver`'s ``wps_processes.yml`` configuration file.
 Please refer to :ref:`Configuration of WPS Processes` section for more details on this matter.
@@ -91,8 +93,8 @@ Please refer to :ref:`Configuration of WPS Processes` section for more details o
 .. warning::
 
     Because `Weaver` creates a *snapshot* of the reference process at the moment it was deployed, the local process
-    definition could become out-of-sync with the remote reference where the `Execute`_ request will be sent. Refer to
-    `Remote Provider`_ section for more details to work around this issue.
+    definition could become out-of-sync with the remote reference where the :ref:`Execute <proc_op_execute>` request
+    will be sent. Refer to `Remote Provider`_ section for more details to work around this issue.
 
 .. seealso::
     - `Remote Provider`_
@@ -230,22 +232,25 @@ Workflow
 ----------
 
 Processes categorized as :term:`Workflow` are very similar to `WPS-REST`_ processes. From the API standpoint, they
-actually look exactly the same as an atomic process when calling `DescribeProcess`_ or `Execute`_ requests.
+actually look exactly the same as an atomic process when calling :ref:`DescribeProcess <proc_op_describe>`
+or :ref:`Execute <proc_op_execute>` requests.
 The difference lies within the referenced :ref:`Application Package` which uses a :ref:`CWL Workflow` instead of
-typical :ref:`CWL CommandLineTool`, and therefore, modifies how the process is internally executed.
+typical :ref:`CWL CommandLineTool`, and therefore, modifies how the :term:`Process` is internally executed.
 
 For :term:`Workflow` processes to be deploy-able and executable, it is **mandatory** that `Weaver` is configured as
 :term:`EMS` or :term:`HYBRID` (see: :ref:`Configuration Settings`). This requirement is due to the nature
 of :term:`Workflow` that chain processes that need to be dispatched to known remote :term:`ADES` servers
-(see: :ref:`conf_data_sources` and :ref:`proc_workflow_ops`).
+(see: :ref:`conf_data_sources` and :ref:`proc_workflow_ops`) according to defined :term:`Data Source` configuration.
 
 Given that a :term:`Workflow` process was successfully deployed and that all process steps can be resolved, calling
-its `Execute`_ request will tell `Weaver` to parse the chain of operations and send step process execution requests
-to relevant :term:`ADES` picked according to data sources. Each step's job will then gradually be monitored from the
-remote :term:`ADES` until completion, and upon successful result, the :term:`EMS` will retrieve the data references to
-pass it down to the following step. When the complete chain succeeds, the final results of the last step will be
-provided as :term:`Workflow` output as for atomic processes. In case of failure, the error will be indicated in the log
-with the appropriate step and message where the error occurred.
+its :ref:`Execute <proc_op_execute>` request will tell `Weaver` to parse the chain of operations and send step process
+execution requests to relevant :term:`ADES` picked according to :term:`Data Source`. Each step's job will then gradually
+be monitored from the relevant :term:`ADES` until completion.
+
+Upon successful intermediate result, the :term:`EMS` (or :term:`HYBRID` acting as such) will stage the data references
+locally to chain them to the following step. When the complete chain succeeds, the final results of the last step will
+be provided as :term:`Workflow` output in the same manner as for atomic processes. In case of failure, the error will
+be indicated in the logs with the appropriate step and message where the error occurred.
 
 .. note::
 
@@ -254,6 +259,10 @@ with the appropriate step and message where the error occurred.
     to dispatch the step in this situation. If this impacts you, please vote and indicate your concern on issue
     `#171 <https://github.com/crim-ca/weaver/issues/171>`_.
 
+.. seealso::
+    :ref:`proc_workflow_ops` provides more details on each of the internal operations accomplished by
+    individual step :term:`Process` chained in a :term:`Workflow`.
+
 .. _process-remote-provider:
 
 Remote Provider
@@ -261,7 +270,8 @@ Remote Provider
 
 Remote provider correspond to a remote service that provides similar interfaces as supported by `Weaver`
 (:term:`WPS`-like). For example, a remote :term:`WPS`-1 :term:`XML` endpoint can be referenced as a provider. When an
-API `Providers`_-scoped request is executed, for example to list is processes capabilities (see `GetCapabilities`_),
+API `Providers`_-scoped request is executed, for example to list is processes capabilities
+(see :ref:`GetCapabilities <proc_op_getcap>`),
 `Weaver` will send the corresponding request using the registered reference URL to access the remote server and
 reply with parsed response, as if they its processes were registered locally.
 
@@ -270,7 +280,7 @@ if the service is accessible with respect to standard implementation features an
 
 The main advantage of using `Weaver`'s endpoint rather than directly accessing the referenced remote provider processes
 is in the case of limited functionality offered by the service. For instance, :term:`WPS`-1 do not always offer
-:ref:`proc_req_status` feature, and there is no extensive job monitoring availability. Since `Weaver` *wraps* the
+:ref:`proc_op_status` feature, and there is no extensive job monitoring availability. Since `Weaver` *wraps* the
 original reference with its own endpoints, these features indirectly become employable. Similarly, although
 :term:`WPS`-1 offers :term:`XML`-only endpoints, the parsing operation accomplished by `Weaver` makes theses services
 available as :term:`WPS-REST` :term:`JSON` endpoints. On top of that, registering a remote :term:`Provider`
@@ -280,13 +290,15 @@ into `Weaver` allows the user to use it as a central hub to keep references to a
 A *remote provider* differs from previously presented `WPS-1/2`_ processes such that the underlying processes of the
 service are not registered locally. For example, if a remote service has two WPS processes, only top-level service URL
 will be registered locally (in `Weaver`'s database) and the application will have no explicit knowledge of these remote
-processes. When calling process-specific requests (e.g.: `DescribeProcess`_ or `Execute`_), `Weaver` will re-send the
+processes. When calling process-specific requests (e.g.: :ref:`DescribeProcess <proc_op_describe>` or
+:ref:`Execute <proc_op_execute>`), `Weaver` will re-send the
 corresponding request directly to the remote provider each time and return the result accordingly. On the other hand,
 a `WPS-1/2`_ reference would be parsed and saved locally with the response *at the time of deployment*. This means that
 a deployed `WPS-1/2`_ reference would act as a *snapshot* of the reference (which could become out-of-sync), while
 `Remote Provider`_ will dynamically update according to the re-fetched response from the remote service. If our example
-remote service was extended to have a third WPS process, it would immediately be reflected in `GetCapabilities`_ and
-`DescribeProcess`_ retrieved via `Weaver` `Providers`_-scoped requests. This would not be the case for the `WPS-1/2`_
+remote service was extended to have a third WPS process, it would immediately be reflected in
+:ref:`GetCapabilities <proc_op_getcap>` and :ref:`DescribeProcess <proc_op_describe>` retrieved via `Weaver`
+`Providers`_-scoped requests. This would not be the case for the `WPS-1/2`_
 reference that would need manual update (deploy the third process to register it in `Weaver`).
 
 
@@ -332,7 +344,7 @@ Managing processes included in Weaver ADES/EMS
 
 Following steps represent the typical steps applied to deploy a process, execute it and retrieve the results.
 
-.. _Deploy:
+.. _proc_op_deploy:
 
 Register a new process (Deploy)
 -----------------------------------------
@@ -361,7 +373,7 @@ result in this process to become available for following steps.
     For specifying or updating visibility, please refer to corresponding |deploy-req|_ and |vis-req|_ requests.
 
 After deployment and visibility preconditions have been met, the corresponding process should become available
-through `DescribeProcess`_ requests and other routes that depend on an existing process.
+through :ref:`DescribeProcess <proc_op_describe>` requests and other routes that depend on an existing process.
 
 Note that when a process is deployed using the `WPS-REST`_ interface, it also becomes available through the `WPS-1/2`_
 interface with the same identifier and definition. Because of compatibility limitations, some parameters in the
@@ -373,12 +385,10 @@ are mapped between the two interfaces, but it is recommended to use the `WPS-RES
     Please refer to :ref:`application-package` chapter for any additional parameters that can be
     provided for specific types of :term:`Application Package` and :term:`Process` definitions.
 
+.. _proc_op_getcap:
+.. _proc_op_describe:
 
-.. _GetCapabilities:
-.. _DescribeProcess:
-.. _Describe:
-
-Access registered process(es) (GetCapabilities, DescribeProcess)
+Access registered processes (GetCapabilities, DescribeProcess)
 ------------------------------------------------------------------------
 
 Available processes can all be listed using |getcap-req|_ request. This request will return all locally registered
@@ -391,7 +401,7 @@ that define the process references and expected inputs/outputs.
 .. note::
     For *remote processes* (see: `Remote Provider`_), `Provider requests`_ are also available for more fine-grained
     search of underlying processes. These processes are not necessarily listed as local processes, and will therefore
-    sometime not yield any result if using the typical ``DescribeProcess`` endpoint.
+    sometime not yield any result if using the typical ``DescribeProcess`` request on `wps_endpoint`.
 
     All routes listed under `Process requests`_ should normally be applicable for *remote processes* by prefixing
     them with ``/providers/{id}``.
@@ -399,7 +409,7 @@ that define the process references and expected inputs/outputs.
 .. _`Provider requests`: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Providers
 .. _`Process requests`: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Processes
 
-.. _Execute:
+.. _proc_op_execute:
 
 Execution of a process (Execute)
 ---------------------------------------------------------------------
@@ -447,7 +457,7 @@ for the *whole* execution to complete to obtain the result. Given that :term:`Pr
 complete, it is not practical to execute them in this manner and potentially have to wait hours to retrieve outputs.
 Instead, the preferred and default approach is to request an ``async`` :term:`Job` execution. When doing so, `Weaver`
 will add this to a task queue for processing, and will immediately return a :term:`Job` identifier and location where
-the user can probe for its status, using :ref:`proc_req_status` monitoring request. As soon as any task worker becomes
+the user can probe for its status, using :ref:`Monitoring <proc_op_monitor>` request. As soon as any task worker becomes
 available, it will pick any leftover queued :term:`Job` to execute it.
 
 The second field is ``response``. At the time being, `Weaver` only supports ``document`` value. This parameter is
@@ -456,9 +466,10 @@ response.
 
 Following are the ``inputs`` definition. This is the most important section of the request body. It defines which
 parameters to forward to the referenced :term:`Process` to be executed. All ``id`` elements in this :term:`Job` request
-body must correspond to valid ``inputs`` from the definition returned by `DescribeProcess`_ response. Obviously, all
-formatting requirements (i.e.: proper file :term:`MIME-types`), data types (e.g.: ``int``, ``string``, etc.) and
-validations rules (e.g.: ``minOccurs``, ``AllowedValues``, etc.) must also be fulfilled. When providing files as input,
+body must correspond to valid ``inputs`` from the definition returned by :ref:`DescribeProcess <proc_op_describe>`
+response. Obviously, all formatting requirements (i.e.: proper file :term:`MIME-types`),
+data types (e.g.: ``int``, ``string``, etc.) and validations rules (e.g.: ``minOccurs``, ``AllowedValues``, etc.)
+must also be fulfilled. When providing files as input,
 multiple protocols are supported. See later section :ref:`File Reference Types` for details.
 
 Finally, the ``outputs`` section defines, for each ``id`` corresponding to the :term:`Process` definition, how to
@@ -499,7 +510,7 @@ possible that the :term:`Job` be already in ``running`` state, or even ``failed`
 When the :term:`Job` reaches its final state, multiple parameters will be adjusted in the status response to
 indicate its completion, notably the completed percentage, time it finished execution and full duration. At that
 moment, the requests for retrieving either error details or produced outputs become accessible. Examples are presented
-in `GetResult`_ section.
+in :ref:`Result <proc_op_result>` section.
 
 
 Process Operations
@@ -510,10 +521,61 @@ Process Operations
 
 .. _proc_workflow_ops:
 
-Workflow Operations
+Workflow Step Operations
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. todo:: same as prev + 'operations' (deploy based on data-source, visibility, exec-remote for each step, pull-result)
+For each :ref:`proc_types` known by `Weaver`, specific :term:`Workflow` step implementations must be provided.
+
+In order to simplify the chaining procedure of file references, step implementations are only required to provide
+the relevant methodology for their :ref:`Deploy <proc_op_deploy>`, :ref:`Execute <proc_op_execute>`,
+:ref:`Monitor <proc_op_monitor>` and ref:`Result <proc_op_result>` operations.
+Operations related to staging of files, :term:`Process` preparation and cleanup are abstracted away from specific
+implementations to ensure consistent functionalities between each type.
+
+Operations are accomplished in the following order for each individual step:
+
+.. list-table::
+    :header-rows: 1
+
+    * - Step Method
+      - Requirements
+      - Description
+    * - ``prepare``
+      - I*
+      - Setup any prerequisites for the :term:`Process` or :term:`Job`.
+    * - ``stage_inputs``
+      - R
+      - Retrieve input locations (considering remote files and :term:`Workflow` previous-step staging).
+    * - ``format_inputs``
+      - I*
+      - Perform operations on staged inputs to obtain desired format expected by the target :term:`Process`.
+    * - ``format_outputs``
+      - I*
+      - Perform operations on expected outputs to obtain desired format expected by the target :term:`Process`.
+    * - ``dispatch``
+      - R,I
+      - Perform request for remote execution of the :term:`Process`.
+    * - ``monitor``
+      - R,I
+      - Perform monitoring of the :term:`Job` status until completion.
+    * - ``get_results``
+      - R,I
+      - Perform operations to obtain results location in the expected format from the target :term:`Process`.
+    * - ``stage_results``
+      - R
+      - Retrieve results from remote :term:`Job` for local storage using output locations.
+    * - ``cleanup``
+      - I*
+      - Perform any final steps before completing the execution or after failed execution.
+
+.. note::
+    - All methods are defined within :class:`weaver.processes.wps_process_base.WpsProcessInterface`.
+    - Steps marked by ``*`` are optional.
+    - Steps marked by ``R`` are required.
+    - Steps marked by ``I`` are implementation dependant.
+
+.. seealso::
+    :meth:`weaver.processes.wps_process_base.WpsProcessInterface.execute` for the implementation of operations order.
 
 .. _file_reference_types:
 
@@ -556,19 +618,26 @@ In this case, it becomes the responsibility of this remote instance to handle th
 avoids potential problems such as if `Weaver` as :term:`EMS` doesn't have authorized access to a link that only the
 target :term:`ADES` would have access to.
 
-When :term:`CWL` package defines ``WPS1Requirement`` under ``hints`` for corresponding `WPS-1/2`_ remote processes being
-monitored by `Weaver`, it will skip fetching of ``http(s)``-based references since that would otherwise lead to useless
-double downloads (one on `Weaver` and the other on the :term:`WPS` side). It is the same in situation for
+When :term:`CWL` package defines ``WPS1Requirement`` under ``hints`` for corresponding `WPS-1/2`_ remote processes
+being monitored by `Weaver`, it will skip fetching of |http_scheme|-based references since that would otherwise lead
+to useless double downloads (one on `Weaver` and the other on the :term:`WPS` side). It is the same in situation for
 ``ESGF-CWTRequirement`` employed for `ESGF-CWT`_ processes. Because these processes do not always support :term:`S3`
 buckets, and because `Weaver` supports many variants of :term:`S3` reference formats, it will first fetch the :term:`S3`
-reference using its internal |aws-config|_, and then expose this downloaded file as ``https(s)`` reference
+reference using its internal |aws-config|_, and then expose this downloaded file as |http_scheme| reference
 accessible by the remote :term:`WPS` process.
 
 .. note::
-    When `Weaver` is fetching remote files with |http_scheme|, it can take advantage of additional request options to
-    support unusual or server-specific handling of remote reference as necessary. This could be employed for instance
-    to attribute access permissions only to some given :term:`ADES` server by providing additional authorization tokens
-    to the requests. Please refer to :ref:`Configuration of Request Options` for this matter.
+    When `Weaver` is fetching remote files with |http_scheme|, it can take advantage of additional
+    :term:`Request Options` to support unusual or server-specific handling of remote reference as necessary.
+    This could be employed for instance to attribute access permissions only to some given :term:`ADES` server by
+    providing additional authorization tokens to the requests. Please refer to :ref:`Configuration of Request Options`
+    for this matter.
+
+.. note::
+    An exception to above mentioned skipped fetching of |http_scheme| files is when the corresponding :term:`Process`
+    types are intermediate steps within a `Workflow`_. In this case, local staging of remote results occurs between
+    each step because `Weaver` cannot assume any of the remote :term:`Provider` is able to communicate with each other,
+    according to potential :term:`Request Options` or :term:`Data Source` only configured for access by `Weaver`.
 
 When using :term:`S3` references, `Weaver` will attempt to retrieve the file using server |aws-config|_ and
 |aws-credentials|_. Provided that the corresponding :term:`S3` bucket can be accessed by the running `Weaver`
@@ -718,14 +787,14 @@ OpenSearch Data Source
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 In order to provide :term:`OpenSearch` query results as input to :term:`Process` for execution, the
-corresponding `Deploy`_ request body must be provided with ``additionalParameters`` in order to indicate
-how to interpret any specified metadata. The appropriate :term:`OpenSearch` queries can then be applied
+corresponding :ref:`Deploy <proc_op_deploy>` request body must be provided with ``additionalParameters`` in order
+to indicate how to interpret any specified metadata. The appropriate :term:`OpenSearch` queries can then be applied
 prior the execution to retrieve the explicit file reference(s) of :term:`EOImage` elements that have
 been found and to be submitted to the :term:`Job`.
 
 Depending on the desired context (application or per-input) over which the :term:`AOI`, :term:`TOI`, :term:`EOImage` and
 multiple other metadata search filters are to be applied, their definition can be provided in the following locations
-within the `Deploy`_ body.
+within the :ref:`Deploy <proc_op_deploy>` body.
 
 .. list-table::
     :header-rows: 1
@@ -917,22 +986,52 @@ Doing so will tell `Weaver` to send an email to the specified address with succe
 upon :term:`Job` completion. The format of the email is configurable from `weaver.ini.example`_ file with
 email-specific settings (see: :ref:`Configuration`).
 
-
-.. _proc_req_status:
+.. _proc_op_status:
+.. _proc_op_monitor:
 
 Monitoring of a process (GetStatus)
 ---------------------------------------------------------------------
 
-.. todo::
-    job status body example (success vs fail)
+Monitoring the execution of a :term:`Job` consists of polling the status ``Location`` provided from the :ref:`Execute`
+operation and verifying the indicated ``status`` for the expected result. The ``status`` can correspond to any of the
+value defined by :data:`weaver.status.JOB_STATUS_VALUES` accordingly to the internal state of the workers processing
+their execution.
 
-.. _GetResult:
+When targeting a :term:`Job` submitted to a `Weaver` instance, monitoring is usually accomplished through
+the :term:`OGC API - Processes` endpoint using |status-req|_, which will return a :term:`JSON` body.
+Alternatively, the :term:`XML` status location document returned by the :ref:`wps_endpoint` could also be
+employed to monitor the execution.
+
+In general, both endpoints should be interchangeable, using below mapping. The :term:`Job` monitoring process
+keeps both contents equivalent according to their standard. For convenience, requesting the :ref:`Execute` with
+``Accept: <content-type>`` header corresponding to either :term:`JSON` or :term:`XML` should redirect to the response
+of the relevant endpoint, regardless of where the original request was submitted. Otherwise, the default contents
+format is employed according to the chosen location.
+
+.. list-table::
+    :header-rows: 1
+    :widths: 20,20,60
+
+    * - Standard
+      - Contents
+      - Location
+    * - :term:`OGC API - Processes`
+      - JSON
+      - ``{WEAVER_URL}/jobs/{JobUUID}``
+    * - :term:`WPS`
+      - :term:`XML`
+      - ``{WEAVER_WPS_OUTPUTS}/{JobUUID}.xml``
+
+.. seealso::
+    For the :term:`WPS` endpoint, refer to :ref:`conf_settings`.
+
+.. _proc_op_result:
 
 Obtaining output results, logs or errors
 ---------------------------------------------------------------------
 
 In the case of successful :term:`Job` execution, the outputs can be retrieved with |result-req|_ request to list
-each corresponding output ``id`` with the generated file reference URL. Keep in mind that those URL's purpose are
+each corresponding output ``id`` with the generated file reference URL. Keep in mind that the purpose of those URLs are
 only to fetch the results (not persistent storage), and could therefore be purged after some reasonable amount of time.
 The format should be similar to the following example, with minor variations according to :ref:`Configuration`
 parameters for the base :term:`WPS` output location:
@@ -982,6 +1081,21 @@ Note again that the more the :term:`Process` is verbose, the more tracking will 
 
 .. literalinclude:: ../../weaver/wps_restapi/examples/job_logs.json
     :language: json
+
+.. _wps_endpoint:
+
+WPS Endpoint
+---------------
+
+This endpoint is available if ``weaver.wps`` setting was enabled (``true`` by default).
+The specific location where :term:`WPS` requests it will be accessible depends on the resolution
+of relevant :ref:`conf_settings`, namely ``weaver.wps_path`` and ``weaver.wps_url``.
+
+Details regarding contents for each request is provided in schemas under |wps-req|_.
+
+.. note::
+    Using the :term:`WPS` endpoint allows fewer control over functionalities than the
+    corresponding :term:`OGC API - Processes` (:term:`WPS-REST`) endpoints since it is the preceding standard.
 
 Special Weaver EMS use-cases
 ==================================================

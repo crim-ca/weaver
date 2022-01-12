@@ -235,6 +235,9 @@ def clean_mime_type_format(mime_type, suffix_subtype=False, strip_parameters=Fal
     representation (e.g.: ``application/json``) instead of the ``<namespace-name>:<format>`` mapping variant used
     in `CWL->inputs/outputs->File->format` or the complete URL reference.
 
+    Removes any leading temporary local file prefix inserted by :term:`CWL` when resolving namespace mapping.
+    This transforms ``file:///tmp/dir/path/package#application/json`` to plain ``application/json``.
+
     According to provided arguments, it also cleans up additional parameters or extracts sub-type suffixes.
 
     :param mime_type:
@@ -249,6 +252,10 @@ def clean_mime_type_format(mime_type, suffix_subtype=False, strip_parameters=Fal
     .. note::
         Parameters :paramref:`suffix_subtype` and :paramref:`strip_parameters` are not necessarily exclusive.
     """
+    # when 'format' comes from parsed CWL tool instance, the input/output record sets the value
+    # using a temporary local file path after resolution against remote namespace ontology
+    if mime_type.startswith("file://") and "#" in mime_type:
+        mime_type = mime_type.split("#")[-1]
     if strip_parameters:
         mime_type = mime_type.split(";")[0]
     if suffix_subtype and "+" in mime_type:

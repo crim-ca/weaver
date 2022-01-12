@@ -5,6 +5,7 @@ import pytest
 from pywps.app import WPSRequest
 from requests.models import Request, Response
 
+from weaver.exceptions import PackageExecutionError
 from weaver.formats import CONTENT_TYPE_APP_NETCDF
 from weaver.processes.wps3_process import Wps3Process
 from weaver.visibility import VISIBILITY_PUBLIC
@@ -72,6 +73,11 @@ def test_wps3_process_step_io_data_or_href():
                 wps.execute(test_cwl_inputs, "", {})
             except TestDoneEarlyExit:
                 pass  # successful test / expected handling
+            except PackageExecutionError as exc:
+                if isinstance(exc.__cause__, TestDoneEarlyExit):
+                    return  # successful test / expected handling
+                msg = "Other error was raised [{}], inputs where not correctly handled somewhere".format(exc)
+                pytest.fail(msg)
             except Exception as exc:  # noqa
                 if not test_reached_parse_inputs:
                     msg = "Prior error was raised [{}], could not evaluate intended handling of inputs".format(exc)

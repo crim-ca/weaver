@@ -10,11 +10,38 @@ Changes
 
 Changes:
 --------
-- No change.
+- Refactor Workflow operation flow to reuse shared input and output staging operations between implementations.
+  Each new step process implementation now only requires to implement the specific operations related to deployment,
+  execution, monitoring and result retrieval for their process, without need to consider Workflow intermediate staging
+  operations to transfer files between steps.
+- Refactor ``Wps1Process`` and ``Wps3Process`` step processes to follow new workflow operation flow.
+- Add ``builtin`` process ``file_index_selector`` that allows the selection of a specific file within an array of files.
+- Add tests to validate chaining of Workflow steps using different combinations of process types
+  including `WPS-1`, `OGC-API` and ``builtin`` implementations.
+- Move `CWL` script examples in documentation to separate package files in order to directly reference them in
+  tests validating their deployment and execution requests.
+- Move all ``tests/functional/application-packages`` definitions into distinct directories to facilitate categorization
+  of corresponding deployment, execution and package contents, and better support the various Workflow testing location
+  of those files with backward compatibility.
+- Add logs final entry after retrieved internal `CWL` application logs to help highlight delimitation with following
+  entries from the parent `Process`.
 
 Fixes:
 ------
-- No change.
+- Fix handling of `CWL` Workflow outputs between steps when nested glob output binding are employed
+  (resolves `#371 <https://github.com/crim-ca/weaver/issues/371>`_).
+- Fix resolution of ``builtin`` process Python reference when executed locally within a Workflow step.
+- Fix resolution of process type `WPS-1` from its package within a Workflow step executed as `OGC-API` process.
+- Fix resolution of ``WPS1Requirement`` directly provided as `CWL` execution unit within the deployment body.
+- Fix deployment body partially dropping invalid ``executionUnit`` sub-fields causing potential misinterpretation
+  of the intended application package.
+- Fix resolution of package or `WPS-1` reference provided by ``href`` with erroneous ``Content-Type`` reported by the
+  returned response. Attempts auto-resolution of detected `CWL` (as `JSON` or `YAML`) and `WPS-1` (as `XML`) contents.
+- Fix resolution of ``format`` reference within `CWL` I/O record after interpretation of the loaded application package.
+- Fix missing `WPS` endpoint responses in generated `OpenAPI` for `ReadTheDocs` documentation.
+- Fix reporting of `WPS-1` status location as the `XML` file URL instead of the `JSON` `OGC-API` endpoint when `Job`
+  was originally submitted through the `WPS-1` interface.
+- Fix and improve multiple typing definitions.
 
 `4.7.0 <https://github.com/crim-ca/weaver/tree/4.7.0>`_ (2021-12-21)
 ========================================================================
@@ -592,7 +619,7 @@ Fixes:
 Changes:
 --------
 - Add ``weaver.wps.utils.get_wps_client`` function to handle the creation of ``owslib.wps.WebProcessingService`` client
-  with appropriate request options configuration from application settings.
+  with appropriate *request options* configuration from application settings.
 
 Fixes:
 ------

@@ -1,5 +1,6 @@
 import logging
 import os
+import sys
 from importlib import import_module
 from string import Template
 from typing import TYPE_CHECKING
@@ -64,15 +65,16 @@ def _get_builtin_metadata(process_id, process_path, meta_field, clean=False):
 
 
 def _replace_template(pkg, var, val):
-    # type: (CWL, str, str) -> CWL
+    # type: (Union[CWL, str], str, str) -> CWL
     if isinstance(pkg, str):
-        return Template(pkg).safe_substitute({var: val})
-    for k in pkg:  # type: str
-        if isinstance(pkg[k], list):
-            for i, _ in enumerate(pkg[k]):
-                pkg[k][i] = _replace_template(pkg[k][i], var, val)
-        elif isinstance(pkg[k], (dict, str)):
-            pkg[k] = _replace_template(pkg[k], var, val)
+        return Template(pkg).safe_substitute({var: val})  # type: ignore
+    for key in pkg:  # type: str
+        field = pkg[key]  # type: ignore
+        if isinstance(field, list):
+            for i, _ in enumerate(field):
+                field[i] = _replace_template(field[i], var, val)
+        elif isinstance(field, (dict, str)):
+            pkg[key] = _replace_template(field, var, val)  # type: ignore
     return pkg
 
 
@@ -168,11 +170,17 @@ class BuiltinProcessJobBase(CommandLineJob):
         if process.type != PROCESS_BUILTIN:
             raise PackageExecutionError("Invalid package is not of type '{}'".format(PROCESS_BUILTIN))
 
+    def _update_command(self):
+        if len(self.command_line) and self.command_line[0] == "python":
+            LOGGER.debug("Mapping generic builtin Python command to environment: [python] => [%s]", sys.executable)
+            self.command_line[0] = sys.executable
+
     # pylint: disable=W0221,arguments-differ    # naming using python like arguments
     def run(self, runtime_context, **kwargs):
         # type: (RuntimeContext, Any) -> None
         try:
             self._validate_process()
+            self._update_command()
             super(BuiltinProcessJobBase, self).run(runtime_context, **kwargs)
         except Exception as err:
             LOGGER.warning(u"Failed to run process:\n%s", err, exc_info=runtime_context.debug)

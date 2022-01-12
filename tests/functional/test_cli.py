@@ -65,13 +65,13 @@ class TestWeaverClientBase(WpsConfigBase):
             shutil.rmtree(tmp_wps_out, ignore_errors=True)
 
     @staticmethod
-    def get_resource_file(name):
-        return os.path.join(APP_PKG_ROOT, name)
+    def get_resource_file(name, process="Echo"):
+        return os.path.join(APP_PKG_ROOT, process, name)
 
     @classmethod
-    def load_resource_file(cls, name):
-        with open(cls.get_resource_file(name)) as echo_file:
-            return yaml.safe_load(echo_file)
+    def load_resource_file(cls, name, process="Echo"):
+        with open(TestWeaverClientBase.get_resource_file(name, process)) as res_file:
+            return yaml.safe_load(res_file)
 
 
 class TestWeaverClient(TestWeaverClientBase):
@@ -79,14 +79,15 @@ class TestWeaverClient(TestWeaverClientBase):
         result = mocked_sub_requests(self.app, operation)
         assert result.success
         assert "processes" in result.body
-        assert result.body["processes"] == [
+        assert set(result.body["processes"]) == {
             # builtin
             "file2string_array",
+            "file_index_selector",
             "jsonarray2netcdf",
             "metalink2netcdf",
             # test process
             self.test_process,
-        ]
+        }
         assert "undefined" not in result.message
 
     def test_capabilities(self):
@@ -203,7 +204,7 @@ class TestWeaverClient(TestWeaverClientBase):
             if preload:
                 inputs_param = self.load_resource_file(inputs_param)
             else:
-                inputs_param = os.path.join(APP_PKG_ROOT, inputs_param)
+                inputs_param = self.get_resource_file(inputs_param)
         with contextlib.ExitStack() as stack_exec:
             # use pass-through function because don't care about execution result here, only the parsing of I/O
             if mock_exec:

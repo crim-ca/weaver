@@ -3042,7 +3042,7 @@ class ESGF_CWT_RequirementSpecification(PermissiveMappingSchema):  # noqa: N802
         "(note: can only be an 'hint' as it is unofficial CWL specification)."
     )
     process = AnyIdentifier(description="Process identifier of the remote ESGF-CWT provider.")
-    provider = AnyIdentifier(description="ESGF-CWT provider endpoint.")
+    provider = URL(description="ESGF-CWT provider endpoint.")
 
 
 class ESGF_CWT_RequirementMap(ExtendedMappingSchema):  # noqa: N802
@@ -3061,7 +3061,7 @@ class WPS1RequirementSpecification(PermissiveMappingSchema):
         "(note: can only be an 'hint' as it is unofficial CWL specification)."
     )
     process = AnyIdentifier(description="Process identifier of the remote WPS provider.")
-    provider = AnyIdentifier(description="WPS provider endpoint.")
+    provider = URL(description="WPS provider endpoint.")
 
 
 class WPS1RequirementMap(ExtendedMappingSchema):

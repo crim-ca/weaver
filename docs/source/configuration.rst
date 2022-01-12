@@ -82,9 +82,12 @@ they are optional and which default value or operation is applied in each situat
   |
   | Enables the WPS-1/2 endpoint.
 
+.. seealso::
+    :ref:`wps_endpoint`
+
 .. warning::
 
-     At the moment, this setting must be ``true`` to allow job execution as the worker monitors this endpoint.
+     At the moment, this setting must be ``true`` to allow :term:`Job` execution as the worker monitors this endpoint.
      This could change with future developments (see issue `#21 <https://github.com/crim-ca/weaver/issues/21>`_).
 
 - | ``weaver.wps_path = <url-path>``
@@ -206,7 +209,8 @@ they are optional and which default value or operation is applied in each situat
   |
   | Encryption settings as well as custom email templates are available. Default email template defined in
     `email-template`_ is employed if none is provided. Email notifications are sent only on job
-    completion if an email was provided in the :ref:`Execute` request body (see also: :ref:`Email Notification`).
+    completion if an email was provided in the :ref:`Execute <proc_op_execute>` request body
+    (see also: :ref:`Email Notification`).
 
 
 .. note::
@@ -333,10 +337,14 @@ simply set setting ``weaver.wps_processes_file`` as *undefined* (i.e.: nothing a
     - `wps_processes.yml.example`_
 
 
+.. _conf_request_options:
+
 Configuration of Request Options
 =======================================
 
 .. todo:: complete docs
+
+:term:`Request Options`
 
 ``weaver.ssl_verify``
 
