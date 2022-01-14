@@ -19,7 +19,6 @@ from pyramid.httpexceptions import (
 )
 from pyramid.renderers import render_to_response
 from pyramid.request import Request
-from pyramid.response import Response
 from pyramid.settings import asbool
 from simplejson import JSONDecodeError
 
@@ -39,7 +38,8 @@ from weaver.wps_restapi.colander_extras import OAS3TypeConversionDispatcher
 from weaver.wps_restapi.utils import get_wps_restapi_base_url, wps_restapi_base_path
 
 if TYPE_CHECKING:
-    from typing import Optional
+    from typing import Callable, Optional
+
     from weaver.typedefs import JSON, SettingsType
 
 LOGGER = logging.getLogger(__name__)
@@ -80,6 +80,7 @@ def api_frontpage_body(settings):
     weaver_conform_url = weaver_url + sd.api_conformance_service.path
     weaver_process_url = weaver_url + sd.processes_service.path
     weaver_jobs_url = weaver_url + sd.jobs_service.path
+    weaver_vault = asbool(settings.get("weaver.vault"))
     weaver_links = [
         {"href": weaver_url, "rel": "self", "type": CONTENT_TYPE_APP_JSON, "title": "This landing page."},
         {"href": weaver_conform_url, "rel": "http://www.opengis.net/def/rel/ogc/1.0/conformance",
@@ -174,11 +175,9 @@ def api_frontpage_body(settings):
         "configuration": weaver_config,
         "description": __meta__.__description__,
         "parameters": [
-            {"name": "api", "enabled": weaver_api,
-             "url": weaver_api_url,
-             "api": weaver_api_oas_ui},
-            {"name": "wps", "enabled": weaver_wps,
-             "url": weaver_wps_url},
+            {"name": "api", "enabled": weaver_api, "url": weaver_api_url, "api": weaver_api_oas_ui},
+            {"name": "vault", "enabled": weaver_vault},
+            {"name": "wps", "enabled": weaver_wps, "url": weaver_wps_url},
         ],
         "links": weaver_links,
     }
@@ -631,11 +630,12 @@ def get_request_info(request, detail=None):
 
 
 def ows_json_format(function):
+    # type: (Callable[[Request], HTTPException]) -> Callable[[HTTPException, Request], HTTPException]
     """
     Decorator that adds additional detail in the response's JSON body if this is the returned content-type.
     """
     def format_response_details(response, request):
-        # type: (Response, Request) -> HTTPException
+        # type: (HTTPException, Request) -> HTTPException
         http_response = function(request)
         http_headers = get_header("Content-Type", http_response.headers) or []
         req_headers = get_header("Accept", request.headers) or []

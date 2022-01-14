@@ -373,6 +373,35 @@ def localize_datetime(dt, tz_name="UTC"):
     return tz_aware_dt
 
 
+def get_file_header_datetime(dt):
+    # type: (datetime) -> str
+    """
+    Obtains the standard header datetime representation.
+
+    .. seealso::
+        Format of the date defined in :rfc:`5322#section-3.3`.
+    """
+    dt_gmt = localize_datetime(dt, "GMT")
+    dt_str = dt_gmt.strftime("%a, %d %b %Y %H:%M:%S GMT")
+    return dt_str
+
+
+def get_file_headers(path, download=False):
+    # type: (str, bool) -> HeadersType
+    stat = os.stat(path)
+    f_modified = get_file_header_datetime(datetime.fromtimestamp(stat.st_mtime))
+    f_created = get_file_header_datetime(datetime.fromtimestamp(stat.st_ctime))
+    headers = {
+        "Date": f_created,
+        "Last-Modified": f_modified
+    }
+    if download:
+        headers.update({
+            "Content-Disposition": f"attachment; {os.path.basename(path)}",
+        })
+    return headers
+
+
 def get_base_url(url):
     # type: (str) -> str
     """

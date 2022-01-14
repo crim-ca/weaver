@@ -204,6 +204,7 @@ TAG_DEPLOY = "Deploy"
 TAG_RESULTS = "Results"
 TAG_EXCEPTIONS = "Exceptions"
 TAG_LOGS = "Logs"
+TAG_VAULT = "Vault"
 TAG_WPS = "WPS"
 TAG_DEPRECATED = "Deprecated Endpoints"
 
@@ -267,6 +268,9 @@ provider_execution_service = Service(name="provider_execution", path=provider_se
 job_result_service = Service(name="job_result", path=job_service.path + "/result")
 process_result_service = Service(name="process_result", path=process_service.path + job_result_service.path)
 provider_result_service = Service(name="provider_result", path=provider_service.path + process_result_service.path)
+
+vault_service = Service(name="vault", path="/vault")
+vault_file_service = Service(name="vault_file", path=vault_service.path + "/{file_id}")
 
 #########################################################
 # Generic schemas
@@ -343,11 +347,19 @@ class FileURL(ExtendedSchemaNode):
     validator = SchemeURL(schemes=["http", "https"])
 
 
+class VaultReference(ExtendedSchemaNode):
+    schema_type = String
+    description = "Vault file reference."
+    example = "vault:399dc5ac-ff66-48d9-9c02-b144a975abe4"
+    pattern = r"^vault:[a-f0-9]{8}(?:-?[a-f0-9]{4}){3}-?[a-f0-9]{12}$"
+
+
 class ReferenceURL(AnyOfKeywordSchema):
     _any_of = [
         FileURL(),
         FileLocal(),
         S3Bucket(),
+        VaultReference(),
     ]
 
 
@@ -387,6 +399,32 @@ class ContentTypeHeader(ExtendedSchemaNode):
     # be that specific value but cannot have a field named with this format
     name = "Content-Type"
     schema_type = String
+
+
+class ContentLengthHeader(ExtendedSchemaNode):
+    name = "Content-Length"
+    schema_type = String
+    example = "125"
+
+
+class ContentDispositionHeader(ExtendedSchemaNode):
+    name = "Content-Disposition"
+    schema_type = String
+    example = "attachment; filename=test.json"
+
+
+class DateHeader(ExtendedSchemaNode):
+    description = "Creation date and time of the contents."
+    name = "Date"
+    schema_type = String
+    example = "Thu, 13 Jan 2022 12:37:19 GMT"
+
+
+class LastModifiedHeader(ExtendedSchemaNode):
+    description = "Modification date and time of the contents."
+    name = "Last-Modified"
+    schema_type = String
+    example = "Thu, 13 Jan 2022 12:37:19 GMT"
 
 
 class AcceptHeader(ExtendedSchemaNode):
@@ -476,6 +514,18 @@ class RedirectHeaders(ResponseHeaders):
 class NoContent(ExtendedMappingSchema):
     description = "Empty response body."
     default = {}
+
+
+class FileResponseHeaders(NoContent):
+    content_type = ContentTypeHeader(example=CONTENT_TYPE_APP_JSON)
+    content_length = ContentLengthHeader()
+    content_disposition = ContentDispositionHeader()
+    date = DateHeader()
+    last_modified = LastModifiedHeader()
+
+
+class AccessToken(ExtendedSchemaNode):
+    schema_type = String
 
 
 class DescriptionSchema(ExtendedMappingSchema):
@@ -4188,6 +4238,93 @@ class OkGetJobLogsResponse(ExtendedMappingSchema):
     body = JobLogsSchema()
 
 
+class VaultFileID(UUID):
+    description = "Vault file identifier."
+    example = "78977deb-28af-46f3-876b-cdd272742678"
+
+
+class VaultAccessToken(UUID):
+    description = "Vault file access token."
+    example = "30d889cfb7ae3a63229a8de5f91abc1ef5966bb664972f234a4db9d28f8148e0e"  # nosec
+
+
+class VaultEndpoint(ExtendedMappingSchema):
+    header = RequestHeaders()
+
+
+class VaultFileUploadedBodySchema(ExtendedMappingSchema):
+    file_id = VaultFileID()
+    file_href = VaultReference()
+    access_token = AccessToken()
+
+
+class VaultFileUploadedHeaders(ResponseHeaders):
+    location = URL(name="Location", description="File download location.",
+                   example="https://localhost:4002" + vault_file_service.path.format(file_id=VaultFileID.example))
+
+
+class OkVaultFileUploadedResponse(ExtendedMappingSchema):
+    description = "File successfully uploaded to vault."
+    header = VaultFileUploadedHeaders()
+    body = VaultFileUploadedBodySchema()
+
+
+class BadRequestVaultFileUploadResponse(ExtendedMappingSchema):
+    description = "Missing or incorrectly formed file contents."
+    header = ResponseHeaders()
+    body = ErrorJsonResponseBodySchema()
+
+
+class VaultFileAuthorizationHeader(ExtendedSchemaNode):
+    description = "Authorization token header for vault file access."
+    name = "X-Auth-Vault"
+    example = "token <access_token>"
+    schema_type = String
+    missing = drop
+
+
+class VaultFileRequestHeaders(ExtendedMappingSchema):
+    access_token = VaultFileAuthorizationHeader()
+
+
+class VaultFileEndpoint(VaultEndpoint):
+    header = VaultFileRequestHeaders()
+    file_id = VaultFileID()
+
+
+class OkVaultFileDetailResponse(ExtendedMappingSchema):
+    header = FileResponseHeaders()
+    body = NoContent(default="")
+
+
+class OkVaultFileDownloadResponse(OkVaultFileDetailResponse):
+    pass
+
+
+class BadRequestVaultFileDownloadResponse(ExtendedMappingSchema):
+    description = "Invalid file vault reference."
+    header = ResponseHeaders()
+    body = ErrorJsonResponseBodySchema()
+
+
+class UnauthorizedVaultFileDownloadResponse(ExtendedMappingSchema):
+    description = "Missing authentication token to obtain access to vault file."
+    header = ResponseHeaders()
+    body = ErrorJsonResponseBodySchema()
+
+
+class ForbiddenVaultFileDownloadResponse(ExtendedMappingSchema):
+    description = "Forbidden access to vault file. Invalid authorization from provided access token."
+    header = ResponseHeaders()
+    body = ErrorJsonResponseBodySchema()
+
+
+class GoneVaultFileDownloadResponse(ExtendedMappingSchema):
+    description = "Vault File resource corresponding to specified ID is not available anymore."
+    header = ResponseHeaders()
+    body = ErrorJsonResponseBodySchema()
+
+
 get_api_frontpage_responses = {
     "200": OkGetFrontpageResponse(description="success"),
     "500": InternalServerErrorResponseSchema(),
@@ -4504,6 +4641,27 @@ get_bill_list_responses = {
 }
 get_bill_responses = {
     "200": OkGetBillDetailResponse(description="success"),
+    "500": InternalServerErrorResponseSchema(),
+}
+post_vault_responses = {
+    "200": OkVaultFileUploadedResponse(description="success"),
+    "400": BadRequestVaultFileUploadResponse(),
+    "500": InternalServerErrorResponseSchema(),
+}
+head_vault_file_responses = {
+    "200": OkVaultFileDetailResponse(description="success"),
+    "400": BadRequestVaultFileDownloadResponse(),
+    "401": UnauthorizedVaultFileDownloadResponse(),
+    "403": ForbiddenVaultFileDownloadResponse(),
+    "410": GoneVaultFileDownloadResponse(),
+    "500": InternalServerErrorResponseSchema(),
+}
+get_vault_file_responses = {
+    "200": OkVaultFileDownloadResponse(description="success"),
+    "400": BadRequestVaultFileDownloadResponse(),
+    "401": UnauthorizedVaultFileDownloadResponse(),
+    "403": ForbiddenVaultFileDownloadResponse(),
+    "410": GoneVaultFileDownloadResponse(),
     "500": InternalServerErrorResponseSchema(),
 }
 wps_responses = {

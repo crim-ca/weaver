@@ -11,6 +11,7 @@ import uuid
 import warnings
 from datetime import datetime, timedelta
 from logging import ERROR, INFO, Logger, getLevelName, getLogger
+from secrets import compare_digest, token_hex
 from typing import TYPE_CHECKING
 from urllib.parse import urljoin, urlparse
 
@@ -113,7 +114,7 @@ class DictBase(dict):
         elif item in self:
             return getattr(self, item, None)
         else:
-            raise AttributeError(f"Can't get attribute '{item}' in '{type(self)}'.")
+            raise AttributeError(f"Can't get attribute '{item}' in '{self.__name__}'.")
 
     def __str__(self):
         # type: () -> str
@@ -183,7 +184,11 @@ class AutoBase(DictBase):
 class Base(DictBase):
     def __str__(self):
         # type: () -> str
-        return "{0} <{1}>".format(type(self).__name__, self.id)
+        return f"{type(self).__name__} <{self.id}>"
+
+    @property
+    def __name__(self):
+        return fully_qualified_name(self)
 
     @property
     def id(self):
@@ -519,9 +524,9 @@ class Job(Base):
     def __init__(self, *args, **kwargs):
         super(Job, self).__init__(*args, **kwargs)
         if "task_id" not in self:
-            raise TypeError("Parameter 'task_id' is required for '{}' creation.".format(type(self)))
+            raise TypeError(f"Parameter 'task_id' is required for '{self.__name__}' creation.")
         if not isinstance(self.id, (str, uuid.UUID)):
-            raise TypeError("Type 'str' or 'UUID' is required for '{}.id'".format(type(self)))
+            raise TypeError(f"Type 'str' or 'UUID' is required for '{self.__name__}.id'")
 
     def _get_log_msg(self, msg=None, status=None, progress=None):
         # type: (Optional[str], Optional[str], Optional[Number]) -> str
@@ -590,7 +595,7 @@ class Job(Base):
         for lvl, msg in log_msg:
             fmt_msg = get_log_fmt() % dict(asctime=now().strftime(get_log_date_fmt()),
                                            levelname=getLevelName(lvl),
-                                           name=fully_qualified_name(self),
+                                           name=self.__name__,
                                            message=msg)
             if len(self.logs) == 0 or self.logs[-1] != fmt_msg:
                 self.logs.append(fmt_msg)
@@ -630,7 +635,7 @@ class Job(Base):
     def task_id(self, task_id):
         # type: (AnyUUID) -> None
         if not isinstance(task_id, (str, uuid.UUID)):
-            raise TypeError("Type 'str' or 'UUID' is required for '{}.task_id'".format(type(self)))
+            raise TypeError(f"Type 'str' or 'UUID' is required for '{self.__name__}.task_id'")
         self["task_id"] = task_id
 
     @property
@@ -655,7 +660,7 @@ class Job(Base):
     def wps_id(self, wps_id):
         # type: (AnyUUID) -> None
         if not isinstance(wps_id, (str, uuid.UUID)):
-            raise TypeError("Type 'str' or 'UUID' is required for '{}.wps_id'".format(type(self)))
+            raise TypeError(f"Type 'str' or 'UUID' is required for '{self.__name__}.wps_id'")
         self["wps_id"] = wps_id
 
     @property
@@ -673,7 +678,7 @@ class Job(Base):
     def service(self, service):
         # type: (Optional[str]) -> None
         if not isinstance(service, str) or service is None:
-            raise TypeError("Type 'str' is required for '{}.service'".format(type(self)))
+            raise TypeError(f"Type 'str' is required for '{self.__name__}.service'")
         self["service"] = service
 
     @property
@@ -691,7 +696,7 @@ class Job(Base):
     def process(self, process):
         # type: (Optional[str]) -> None
         if not isinstance(process, str) or process is None:
-            raise TypeError("Type 'str' is required for '{}.process'".format(type(self)))
+            raise TypeError(f"Type 'str' is required for '{self.__name__}.process'")
         self["process"] = process
 
     @property
@@ -717,7 +722,7 @@ class Job(Base):
     def _set_inputs(self, inputs):
         # type: (List[Optional[Dict[str, JSON]]]) -> None
         if not isinstance(inputs, list):
-            raise TypeError("Type 'list' is required for '{}.inputs'".format(type(self)))
+            raise TypeError(f"Type 'list' is required for '{self.__name__}.inputs'")
         self["inputs"] = inputs
 
     # allows to correctly update list by ref using 'job.inputs.extend()'
@@ -732,7 +737,7 @@ class Job(Base):
     def user_id(self, user_id):
         # type: (Optional[str]) -> None
         if not isinstance(user_id, int) or user_id is None:
-            raise TypeError("Type 'int' is required for '{}.user_id'".format(type(self)))
+            raise TypeError(f"Type 'int' is required for '{self.__name__}.user_id'")
         self["user_id"] = user_id
 
     @property
@@ -746,10 +751,11 @@ class Job(Base):
         if status == STATUS_ACCEPTED and self.status == STATUS_RUNNING:
             LOGGER.debug(traceback.extract_stack())
         if not isinstance(status, str):
-            raise TypeError("Type 'str' is required for '{}.status'".format(type(self)))
+            raise TypeError(f"Type 'str' is required for '{self.__name__}.status'")
         if status not in JOB_STATUS_VALUES:
-            raise ValueError("Status '{0}' is not valid for '{1}.status', must be one of {2!s}'"
-                             .format(status, type(self), list(JOB_STATUS_VALUES)))
+            statuses = list(JOB_STATUS_VALUES)
+            name = self.__name__
+            raise ValueError(f"Status '{status}' is not valid for '{name}.status', must be one of {statuses!s}'")
         self["status"] = status
 
     @property
@@ -763,7 +769,7 @@ class Job(Base):
         if message is None:
             return
         if not isinstance(message, str):
-            raise TypeError("Type 'str' is required for '{}.status_message'".format(type(self)))
+            raise TypeError(f"Type 'str' is required for '{self.__name__}.status_message'")
         self["status_message"] = message
 
     @property
@@ -775,7 +781,7 @@ class Job(Base):
     def status_location(self, location_url):
         # type: (Optional[str]) -> None
         if not isinstance(location_url, str) or location_url is None:
-            raise TypeError("Type 'str' is required for '{}.status_location'".format(type(self)))
+            raise TypeError(f"Type 'str' is required for '{self.__name__}.status_location'")
         self["status_location"] = location_url
 
     @property
@@ -787,7 +793,7 @@ class Job(Base):
     def notification_email(self, email):
         # type: (Optional[Union[str]]) -> None
         if not isinstance(email, str):
-            raise TypeError("Type 'str' is required for '{}.notification_email'".format(type(self)))
+            raise TypeError(f"Type 'str' is required for '{self.__name__}.notification_email'")
         self["notification_email"] = email
 
     @property
@@ -799,7 +805,7 @@ class Job(Base):
     def accept_language(self, language):
         # type: (Optional[Union[str]]) -> None
         if not isinstance(language, str):
-            raise TypeError("Type 'str' is required for '{}.accept_language'".format(type(self)))
+            raise TypeError(f"Type 'str' is required for '{self.__name__}.accept_language'")
         self["accept_language"] = language
 
     @property
@@ -821,11 +827,10 @@ class Job(Base):
     def execution_mode(self, mode):
         # type: (str) -> None
         if not isinstance(mode, str):
-            raise TypeError("Type 'str' is required for '{}.execution_mode'".format(type(self)))
+            raise TypeError(f"Type 'str' is required for '{self.__name__}.execution_mode'")
         if mode not in EXECUTE_MODE_OPTIONS:
-            raise ValueError("Invalid value for '{}.execution_mode'. Must be one of {}".format(
-                type(self), list(EXECUTE_MODE_OPTIONS)
-            ))
+            modes = list(EXECUTE_MODE_OPTIONS)
+            raise ValueError(f"Invalid value for '{self.__name__}.execution_mode'. Must be one of {modes}")
         self["execution_mode"] = mode
 
     @property
@@ -837,7 +842,7 @@ class Job(Base):
     def is_local(self, is_local):
         # type: (bool) -> None
         if not isinstance(is_local, bool):
-            raise TypeError("Type 'bool' is required for '{}.is_local'".format(type(self)))
+            raise TypeError(f"Type 'bool' is required for '{self.__name__}.is_local'")
         self["is_local"] = is_local
 
     @property
@@ -849,7 +854,7 @@ class Job(Base):
     def is_workflow(self, is_workflow):
         # type: (bool) -> None
         if not isinstance(is_workflow, bool):
-            raise TypeError("Type 'bool' is required for '{}.is_workflow'".format(type(self)))
+            raise TypeError(f"Type 'bool' is required for '{self.__name__}.is_workflow'")
         self["is_workflow"] = is_workflow
 
     @property
@@ -872,7 +877,7 @@ class Job(Base):
     def started(self, started):
         # type: (datetime) -> None
         if not isinstance(started, datetime):
-            raise TypeError("Type 'datetime' is required for '{}.started'".format(type(self)))
+            raise TypeError(f"Type 'datetime' is required for '{self.__name__}.started'")
         self["started"] = started
 
     @property
@@ -909,7 +914,7 @@ class Job(Base):
     def updated(self, updated):
         # type: (datetime) -> None
         if not isinstance(updated, datetime):
-            raise TypeError("Type 'datetime' is required for '{}.updated'".format(type(self)))
+            raise TypeError(f"Type 'datetime' is required for '{self.__name__}.updated'")
         self["updated"] = updated
 
     @property
@@ -937,9 +942,9 @@ class Job(Base):
     def progress(self, progress):
         # type: (Number) -> None
         if not isinstance(progress, (int, float)):
-            raise TypeError("Number is required for '{}.progress'".format(type(self)))
+            raise TypeError(f"Number is required for '{self.__name__}.progress'")
         if progress < 0 or progress > 100:
-            raise ValueError("Value must be in range [0,100] for '{}.progress'".format(type(self)))
+            raise ValueError(f"Value must be in range [0,100] for '{self.__name__}.progress'")
         self["progress"] = progress
 
     def _get_results(self):
@@ -951,7 +956,7 @@ class Job(Base):
     def _set_results(self, results):
         # type: (List[Optional[Dict[str, JSON]]]) -> None
         if not isinstance(results, list):
-            raise TypeError("Type 'list' is required for '{}.results'".format(type(self)))
+            raise TypeError(f"Type 'list' is required for '{self.__name__}.results'")
         self["results"] = results
 
     # allows to correctly update list by ref using 'job.results.extend()'
@@ -966,7 +971,7 @@ class Job(Base):
     def _set_exceptions(self, exceptions):
         # type: (List[Optional[Dict[str, str]]]) -> None
         if not isinstance(exceptions, list):
-            raise TypeError("Type 'list' is required for '{}.exceptions'".format(type(self)))
+            raise TypeError(f"Type 'list' is required for '{self.__name__}.exceptions'")
         self["exceptions"] = exceptions
 
     # allows to correctly update list by ref using 'job.exceptions.extend()'
@@ -981,7 +986,7 @@ class Job(Base):
     def _set_logs(self, logs):
         # type: (List[Dict[str, str]]) -> None
         if not isinstance(logs, list):
-            raise TypeError("Type 'list' is required for '{}.logs'".format(type(self)))
+            raise TypeError(f"Type 'list' is required for '{self.__name__}.logs'")
         self["logs"] = logs
 
     # allows to correctly update list by ref using 'job.logs.extend()'
@@ -996,7 +1001,7 @@ class Job(Base):
     def _set_tags(self, tags):
         # type: (List[Optional[str]]) -> None
         if not isinstance(tags, list):
-            raise TypeError("Type 'list' is required for '{}.tags'".format(type(self)))
+            raise TypeError(f"Type 'list' is required for '{self.__name__}.tags'")
         self["tags"] = tags
 
     # allows to correctly update list by ref using 'job.tags.extend()'
@@ -1017,9 +1022,9 @@ class Job(Base):
         Job visibility access from execution.
         """
         if not isinstance(visibility, str):
-            raise TypeError("Type 'str' is required for '{}.access'".format(type(self)))
+            raise TypeError(f"Type 'str' is required for '{self.__name__}.access'")
         if visibility not in VISIBILITY_VALUES:
-            raise ValueError("Invalid 'visibility' value specified for '{}.access'".format(type(self)))
+            raise ValueError(f"Invalid 'visibility' value specified for '{self.__name__}.access'")
         self["access"] = visibility
 
     @property
@@ -1037,7 +1042,7 @@ class Job(Base):
         Job outputs context.
         """
         if not (isinstance(context, str) or context is None):
-            raise TypeError("Type 'str' or 'None' is required for '{}.context'".format(type(self)))
+            raise TypeError(f"Type 'str' or 'None' is required for '{self.__name__}.context'")
         self["context"] = context
 
     @property
@@ -1215,6 +1220,7 @@ class Job(Base):
 
 class AuthenticationTypes(enum.Enum):
     DOCKER = "docker"
+    VAULT = "vault"
 
 
 class Authentication(Base):
@@ -1222,12 +1228,13 @@ class Authentication(Base):
     Authentication details to store details required for process operations.
     """
     def __init__(self, auth_type, auth_scheme, auth_token, auth_link, **kwargs):
-        # type: (Union[AuthenticationTypes, str], str, str, str, Any) -> None
+        # type: (Union[AuthenticationTypes, str], str, str, Optional[str], Any) -> None
         super(Authentication, self).__init__(**kwargs)
         # ensure values are provided and of valid format
         self.scheme = auth_scheme
         self.type = auth_type
-        self.link = auth_link
+        if auth_link:
+            self.link = auth_link
         self.token = auth_token
         self.setdefault("id", uuid.uuid4())
 
@@ -1248,21 +1255,21 @@ class Authentication(Base):
     def type(self, auth_type):
         # type: (Union[AuthenticationTypes, str]) -> None
         if not isinstance(auth_type, (str, AuthenticationTypes)):
-            raise TypeError(f"Type 'AuthenticationTypes' or 'str' is required for '{type(self).__name__}.type', "
+            raise TypeError(f"Type 'AuthenticationTypes' or 'str' is required for '{self.__name__}.type', "
                             f"not '{type(auth_type)}'.")
         auth_type = AuthenticationTypes(auth_type)  # invalid raises ValueError
         self["type"] = auth_type
 
     @property
     def link(self):
-        # type: () -> str
-        return dict.__getitem__(self, "link")
+        # type: () -> Optional[str]
+        return dict.get(self, "link", None)
 
     @link.setter
     def link(self, link):
         # type: (str) -> None
         if not isinstance(link, str):
-            raise TypeError(f"Type 'str' is required for '{type(self).__name__}.url', not '{type(link)}'.")
+            raise TypeError(f"Type 'str' is required for '{self.__name__}.url', not '{type(link)}'.")
         self["link"] = link
 
     @property
@@ -1274,7 +1281,7 @@ class Authentication(Base):
     def token(self, token):
         # type: (str) -> None
         if not isinstance(token, str):
-            raise TypeError(f"Type 'str' is required for '{type(self).__name__}.token', not '{type(token)}'.")
+            raise TypeError(f"Type 'str' is required for '{self.__name__}.token', not '{type(token)}'.")
         self["token"] = token
 
     @property
@@ -1286,7 +1293,7 @@ class Authentication(Base):
     def scheme(self, scheme):
         # type: (str) -> None
         if not isinstance(scheme, str):
-            raise TypeError(f"Type 'str' is required for '{type(self).__name__}.scheme', not '{type(scheme)}'.")
+            raise TypeError(f"Type 'str' is required for '{self.__name__}.scheme', not '{type(scheme)}'.")
         self["scheme"] = scheme
 
     def json(self):
@@ -1314,6 +1321,8 @@ class Authentication(Base):
         auth_type = params.get("auth_type")
         if auth_type and AuthenticationTypes(auth_type) == AuthenticationTypes.DOCKER:
             return DockerAuthentication.from_params(**params)
+        if auth_type and AuthenticationTypes(auth_type) == AuthenticationTypes.VAULT:
+            return VaultFile(**params)
         raise TypeError(f"Unknown authentication type: {auth_type!s}")
 
 
@@ -1491,6 +1500,114 @@ class DockerAuthentication(Authentication):
         return auth
 
 
+class VaultFile(Authentication):
+    """
+    Dictionary that contains vault file and its authentication information.
+
+    It always has ``id``, ``token`` and ``file_name`` keys.
+    """
+
+    def __init__(self, name, auth_token=None, **kwargs):
+        # type: (str, Optional[str], Any) -> None
+        super(VaultFile, self).__init__(
+            auth_type=AuthenticationTypes.VAULT,
+            auth_scheme="token",
+            auth_link=None,  # don't care
+            auth_token=auth_token or token_hex(32),
+            name=name,
+            **kwargs
+        )
+
+    @classmethod
+    def authorized(cls, file, token):
+        # type: (Optional[VaultFile], Optional[str]) -> bool
+        """
+        Determine whether the file access is authorized.
+
+        This method should be employed to validate access and reduce impact of timing attack analysis.
+        """
+        default = VaultFile("")
+        access = file.token if file else default.token
+        return compare_digest(str(access), str(token))
+
+    @property
+    def id(self):
+        # type: () -> uuid.UUID
+        """
+        Vault file UUID to retrieve the details from storage.
+        """
+        file_id = self.get("id")
+        if not file_id:
+            file_id = uuid.uuid4()
+            self["id"] = file_id
+        if isinstance(file_id, str):
+            return uuid.UUID(file_id)
+        return file_id
+
+    @property
+    def name(self):
+        # type: () -> str
+        """
+        Name to retrieve the file.
+        """
+        return dict.__getitem__(self, "name")
+
+    @name.setter
+    def name(self, name):
+        # type: (str) -> None
+        if not isinstance(name, str):
+            raise TypeError(f"Type 'str' is required for '{self.__name__}.name'")
+        self["name"] = name
+
+    @property
+    def href(self):
+        # type: () -> str
+        """
+        Obtain the vault input reference corresponding to the file.
+
+        This corresponds to the ``href`` value to be provided when submitting an input that should be updated using
+        the vault file of specified UUID and using the respective authorization token in ``X-Auth-Vault`` header.
+        """
+        return f"vault:{self.id!s}"
+
+    def json(self):
+        # type: () -> JSON
+        body = {
+            "file_id": self.id,
+            "file_href": self.href,
+            "access_token": self.token,
+        }
+        return sd.VaultFileUploadedBodySchema().deserialize(body)
+
+    def params(self):
+        # type: () -> AnyParams
+        return {
+            "id": self.id,
+            "name": self.name,
+            "type": self.type.value,
+            "token": self.token,
+            "scheme": self.scheme,
+        }
+
+    @classmethod
+    def from_params(cls, **params):
+        # type: (Any) -> VaultFile
+        """
+        Generate class with parameters directly skipping validation/parsing from initialization.
+
+        .. warning::
+            This should be reserved for self-manipulation only when resolving :class:`Authentication` type.
+        """
+        auth = Authentication(**params)
+        object.__setattr__(auth, "__class__", VaultFile)  # avoid setattr from inherited dict == insert key
+        # flush anything irrelevant or duplicate data from passing around fields
+        keys = list(auth.params())
+        for key in list(auth):
+            if key not in keys:
+                del auth[key]
+        return auth
+
+
 class Process(Base):
     # pylint: disable=C0103,invalid-name
     """
@@ -1501,6 +1618,7 @@ class Process(Base):
     """
 
     def __init__(self, *args, **kwargs):
+        # type: (Any, Any) -> None
         super(Process, self).__init__(*args, **kwargs)
         # use both 'id' and 'identifier' to support any call (WPS and recurrent 'id')
         if "id" not in self and "identifier" not in self:
@@ -1752,10 +1870,12 @@ class Process(Base):
     def visibility(self, visibility):
         # type: (str) -> None
         if not isinstance(visibility, str):
-            raise TypeError("Type 'str' is required for '{}.visibility'".format(type(self)))
+            raise TypeError(f"Type 'str' is required for '{self.__name__}.visibility'")
         if visibility not in VISIBILITY_VALUES:
-            raise ValueError("Status '{0}' is not valid for '{1}.visibility, must be one of {2!s}'"
-                             .format(visibility, type(self), list(VISIBILITY_VALUES)))
+            values = list(VISIBILITY_VALUES)
+            raise ValueError(
+                f"Status '{visibility}' is not valid for '{self.__name__}.visibility, must be one of {values!s}'"
+            )
         self["visibility"] = visibility
 
     @property
@@ -1988,7 +2108,7 @@ class Process(Base):
     def service(self, service):
         # type: (Optional[str]) -> None
         if not (isinstance(service, str) or service is None):
-            raise TypeError("Type 'str' is required for '{}.service'".format(type(self)))
+            raise TypeError(f"Type 'str' is required for '{self.__name__}.service'")
         self["service"] = service
 
     @staticmethod

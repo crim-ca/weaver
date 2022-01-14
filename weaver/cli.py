@@ -22,6 +22,7 @@ from weaver.processes.wps_package import get_process_definition
 from weaver.status import JOB_STATUS_CATEGORIES, JOB_STATUS_CATEGORY_FINISHED, STATUS_SUCCEEDED
 from weaver.utils import fetch_file, get_any_id, get_any_value, load_file, null, repr_json, request_extra, setup_loggers
 from weaver.visibility import VISIBILITY_PUBLIC
+from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
     from typing import Any, Optional, Tuple, Union
@@ -231,7 +232,7 @@ class WeaverClient(object):
         if token or (username and password):
             if not token:
                 token = base64.b64encode(f"{username}:{password}".encode("utf-8")).decode("utf-8")
-            return {"X-Auth-Docker": f"Basic {token}"}
+            return {sd.XAuthDockerHeader.name: f"Basic {token}"}
         return {}
 
     def deploy(self,

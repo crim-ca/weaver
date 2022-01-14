@@ -29,6 +29,7 @@ from weaver.utils import (
     request_extra,
     retry_on_cache_error
 )
+from weaver.wps_restapi import swagger_definitions as sd
 
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
@@ -123,7 +124,7 @@ def get_wps_output_context(request):
     :returns: validated context or None if not specified.
     """
     headers = getattr(request, "headers", {})
-    ctx = get_header("X-WPS-Output-Context", headers)
+    ctx = get_header(sd.WpsOutputContextHeader.name, headers)
     if not ctx:
         settings = get_settings(request)
         ctx_default = settings.get("weaver.wps_output_context", None)
@@ -138,7 +139,7 @@ def get_wps_output_context(request):
         return ctx_matched
     raise HTTPUnprocessableEntity(json={
         "code": "InvalidHeaderValue",
-        "name": "X-WPS-Output-Context",
+        "name": sd.WpsOutputContextHeader.name,
         "description": "Provided value for 'X-WPS-Output-Context' request header is invalid.",
         "cause": "Value must be an alphanumeric context directory or tree hierarchy of sub-directory names.",
         "value": str(ctx)
@@ -447,8 +448,8 @@ def set_wps_language(wps, accept_language=None, request=None):
         https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Accept-Language
 
     .. note::
-        This function considers quality-factor weighting and parsing resolution of ``Accept-Language`` header
-        according to :rfc:`RFC 7231, section 5.3.2 <7231#section-5.3.2>`.
+        This function considers quality-factor weighting and parsing resolution
+        of ``Accept-Language`` header according to :rfc:`7231#section-5.3.2`.
 
     :param wps: service for which to apply a supported language if matched.
     :param str accept_language: value of the Accept-Language header.

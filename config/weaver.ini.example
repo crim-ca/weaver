@@ -136,6 +136,9 @@ weaver.wps_processes_file = wps_processes.yml
 weaver.data_sources = data_sources.yml
 # comma-separated list of key=value options to add to settings
 weaver.extra_options =
+# vault location
+weaver.vault = true
+weaver.vault_dir = /tmp/vault
 
 ###
 # celery scheduler config

@@ -14,7 +14,8 @@ from weaver.store.mongodb import (
     MongodbJobStore,
     MongodbProcessStore,
     MongodbQuoteStore,
-    MongodbServiceStore
+    MongodbServiceStore,
+    MongodbVaultStore
 )
 from weaver.utils import get_settings, is_uuid
 
@@ -24,7 +25,7 @@ if TYPE_CHECKING:
     from pymongo.database import Database
 
     from weaver.database.base import StoreSelector
-    from weaver.store.base import StoreBills, StoreJobs, StoreProcesses, StoreQuotes, StoreServices
+    from weaver.store.base import StoreBills, StoreJobs, StoreProcesses, StoreQuotes, StoreServices, StoreVault
     from weaver.typedefs import AnySettingsContainer, JSON
 
 LOGGER = logging.getLogger(__name__)
@@ -37,6 +38,7 @@ MongodbStores = frozenset([
     MongodbJobStore,
     MongodbQuoteStore,
     MongodbBillStore,
+    MongodbVaultStore,
 ])
 
 if TYPE_CHECKING:
@@ -50,6 +52,7 @@ if TYPE_CHECKING:
         Type[MongodbJobStore],
         Type[MongodbQuoteStore],
         Type[MongodbBillStore],
+        Type[MongodbVaultStore],
     ]
 
 
@@ -96,6 +99,11 @@ class MongoDatabase(DatabaseInterface):
     @overload
     def get_store(self, store_type, *store_args, **store_kwargs):
         # type: (Type[StoreServices], Any, Any) -> MongodbServiceStore
+        ...
+
+    @overload
+    def get_store(self, store_type, *store_args, **store_kwargs):
+        # type: (Type[StoreVault], Any, Any) -> MongodbVaultStore
         ...
 
     def get_store(self, store_type, *store_args, **store_kwargs):

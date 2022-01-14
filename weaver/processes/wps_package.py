@@ -108,7 +108,7 @@ from weaver.utils import (
     setup_loggers
 )
 from weaver.wps.utils import get_wps_output_dir, get_wps_output_url, map_wps_output_location
-from weaver.wps_restapi.swagger_definitions import process_service
+from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
     from typing import Any, Deque, Dict, List, Optional, Tuple, Type, Union
@@ -211,7 +211,7 @@ def get_process_location(process_id_or_url, data_source=None):
         return process_id_or_url
     data_source_url = retrieve_data_source_url(data_source)
     process_id = get_sane_name(process_id_or_url)
-    process_url = process_service.path.format(process_id=process_id)
+    process_url = sd.process_service.path.format(process_id=process_id)
     return "{host}{path}".format(host=data_source_url, path=process_url)
 
 
@@ -673,7 +673,7 @@ def get_auth_requirements(requirement, headers):
         LOGGER.debug("No headers provided, cannot extract any authentication requirements.")
         return None
     if requirement["class"] == CWL_REQUIREMENT_APP_DOCKER:
-        x_auth_docker = get_header("X-Auth-Docker", headers)
+        x_auth_docker = get_header(sd.XAuthDockerHeader.name, headers)
         link_ref_docker = requirement.get("dockerPull", None)
         if x_auth_docker and link_ref_docker:
             LOGGER.info("Detected authentication details for Docker image reference in Application Package.")

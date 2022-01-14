@@ -5,6 +5,7 @@ Weaver Web Application (``weaver-manager``).
 """
 
 import logging
+from typing import TYPE_CHECKING
 
 import yaml
 from pyramid.config import Configurator
@@ -15,10 +16,16 @@ from weaver.processes.builtin import register_builtin_processes
 from weaver.processes.utils import register_wps_processes_from_config
 from weaver.utils import get_settings, parse_extra_options, setup_cache, setup_loggers
 
+if TYPE_CHECKING:
+    from typing import Any
+
+    from weaver.typedefs import SettingsType
+
 LOGGER = logging.getLogger(__name__)
 
 
 def main(global_config, **settings):
+    # type: (SettingsType, Any) -> None
     """
     Creates a Pyramid WSGI application for Weaver.
     """
