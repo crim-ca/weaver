@@ -1,4 +1,6 @@
+import logging
 import os
+from tempfile import mkdtemp
 from typing import TYPE_CHECKING
 
 import colander
@@ -17,6 +19,8 @@ if TYPE_CHECKING:
 
     from weaver.typedefs import AnySettingsContainer
 
+LOGGER = logging.getLogger(__name__)
+
 
 def get_vault_dir(container=None):
     # type: (Optional[AnySettingsContainer]) -> str
@@ -24,7 +28,11 @@ def get_vault_dir(container=None):
     Get the base directory of the secure file vault.
     """
     settings = get_settings(container)
-    vault_dir = settings.get("weaver.vault_dir", "/tmp/vault")
+    vault_dir = settings.get("weaver.vault_dir")
+    if not vault_dir:
+        vault_dir = mkdtemp(prefix="weaver_vault_")
+        LOGGER.warning("Setting 'weaver.vault_dir' undefined. Using random vault base directory: [%s]", vault_dir)
+        settings["weaver.vault_dir"] = vault_dir
     os.makedirs(vault_dir, mode=0o755, exist_ok=True)
     return vault_dir
 

@@ -1,6 +1,6 @@
 import logging
 import os
-from io import BufferedRandom
+from io import BufferedIOBase
 from typing import TYPE_CHECKING
 
 from pyramid.httpexceptions import HTTPBadRequest, HTTPOk
@@ -17,7 +17,7 @@ from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import HTTPHeadFileResponse
 
 if TYPE_CHECKING:
-    from typing import Optional
+    from typing import Optional, Union
 
     from pyramid.httpexceptions import HTTPException
     from pyramid.request import Request
@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 LOGGER = logging.getLogger(__name__)
 
 
-@sd.vault_service.post(tags=[sd.TAG_VAULT], schema=sd.VaultEndpoint(), response_schemas=sd.post_vault_responses)
+@sd.vault_service.post(tags=[sd.TAG_VAULT], schema=sd.VaultUploadEndpoint(), response_schemas=sd.post_vault_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def upload_file(request):
     # type: (Request) -> HTTPException
@@ -34,8 +34,8 @@ def upload_file(request):
     Upload a file to secured vault.
     """
     req_file = request.POST.get("file")         # type: Optional[cgi_FieldStorage]
-    req_fs = getattr(req_file, "file", None)    # type: Optional[BufferedRandom]
-    if not isinstance(req_fs, BufferedRandom):
+    req_fs = getattr(req_file, "file", None)    # type: Optional[BufferedIOBase]
+    if not isinstance(req_fs, BufferedIOBase):
         raise HTTPBadRequest(json={
             "code": "MissingParameterValue",    # FIXME: detail headers multiform ?
             "name": "file",

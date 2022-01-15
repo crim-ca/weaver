@@ -520,10 +520,12 @@ class NoContent(ExtendedMappingSchema):
     default = {}
 
 
-class FileUploadHeaders(NoContent):
+class FileUploadHeaders(RequestContentTypeHeader):
     # MUST be multipart for upload
-    content_type = ContentTypeHeader(example=CONTENT_TYPE_MULTI_PART_FORM, default=CONTENT_TYPE_MULTI_PART_FORM,
-                                     description="Desired Content-Type of the file being uploaded.")
+    content_type = ContentTypeHeader(
+        example=f"{CONTENT_TYPE_MULTI_PART_FORM}; boundary=43003e2f205a180ace9cd34d98f911ff",
+        default=CONTENT_TYPE_MULTI_PART_FORM,
+        description="Desired Content-Type of the file being uploaded.", missing=required)
     content_length = ContentLengthHeader(description="Uploaded file contents size in bytes.")
     content_disposition = ContentDispositionHeader(example="form-data; name=\"file\"; filename=\"desired-name.ext\"",
                                                    description="Expected ")
@@ -4278,7 +4280,12 @@ class VaultEndpoint(ExtendedMappingSchema):
 class VaultUploadBody(ExtendedSchemaNode):
     schema_type = String
     description = "Multipart file contents for upload to the vault."
-    example = EXAMPLES["vault_file_upload.txt"]
+    examples = {
+        CONTENT_TYPE_MULTI_PART_FORM: {
+            "summary": "Upload JSON file to vault as multipart content.",
+            "value": EXAMPLES["vault_file_upload.txt"],
+        }
+    }
 
 
 class VaultUploadEndpoint(ExtendedMappingSchema):
@@ -4287,9 +4294,9 @@ class VaultUploadEndpoint(ExtendedMappingSchema):
 
 
 class VaultFileUploadedBodySchema(ExtendedMappingSchema):
+    access_token = AccessToken()
     file_id = VaultFileID()
     file_href = VaultReference()
-    access_token = AccessToken()
 
 
 class VaultFileUploadedHeaders(ResponseHeaders):
@@ -4677,7 +4684,12 @@ get_bill_responses = {
     "500": InternalServerErrorResponseSchema(),
 }
 post_vault_responses = {
-    "200": OkVaultFileUploadedResponse(description="success"),
+    "200": OkVaultFileUploadedResponse(description="success", examples={
+        "VaultFileUploaded": {
+            "summary": "File successfully uploaded to vault.",
+            "value": EXAMPLES["vault_file_uploaded.json"],
+        }
+    }),
     "400": BadRequestVaultFileUploadResponse(),
     "500": InternalServerErrorResponseSchema(),
 }
