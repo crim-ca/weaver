@@ -1,0 +1,12 @@
+{
+  "Server": "gunicorn/20.0.4",
+  "Date": "Sat, 15 Jan 2022 00:13:00 GMT",
+  "Connection": "close",
+  "Content-Type": "application/json; charset=UTF-8",
+  "Content-Encoding": "",
+  "Content-Length": "2601",
+  "Content-Disposition": "attachment; filename=\"desired-name.json\"",
+  "Last-Modified": "Fri, 14 Jan 2022 12:20:44 GMT",
+  "Location": "https://weaver.example.com/vault/32129e2a-a284-4a89-91db-0e873747142d",
+  "X-Content-Type-Options": "nosniff"
+}

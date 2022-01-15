@@ -1,18 +1,75 @@
 import inspect
 import logging
+from copy import deepcopy
 from typing import TYPE_CHECKING
 
 from colander import SchemaNode
+from pyramid.httpexceptions import HTTPSuccessful, status_map
 
-from weaver.utils import get_settings, get_weaver_url
+from weaver.utils import get_header, get_settings, get_weaver_url
 from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
-    from typing import Dict
+    from typing import Any, Dict, Optional
 
-    from weaver.typedefs import AnySettingsContainer
+    from pyramid.httpexceptions import HTTPException
+
+    from weaver.typedefs import AnySettingsContainer, HeadersType
 
 LOGGER = logging.getLogger(__name__)
+
+
+class HTTPHeadFileResponse(HTTPSuccessful):
+    """
+    Provides additional header handing when returning a response to HTTP HEAD request.
+
+    When returning from HTTP HEAD, the body contents are omitted from the response.
+    The response **MUST NOT** contain the body contents, but the HTTP headers **SHOULD**
+    be identical to the corresponding HTTP GET request.
+
+    .. seealso::
+        :rfc:`2616#section-9.4`
+
+    .. note::
+        Even though no content is provided for HEAD response, ``204`` **SHOULD NOT** be used
+        since it must emulate the GET response that would contain the content.
+
+    When setting :attr:`HTTPException.empty_body` on :class:`HTTPException` derived classes, :mod:`pyramid` incorrectly
+    drops important headers such as ``Content-Type`` and ``Content-Length`` that should be reported as if the file was
+    returned when the represented entity is a file, although no content is actually present. When instead the body is
+    omitted (``text=""`` or ``body=b''``), the :meth:`HTTPException.prepare` method also incorrectly overrides
+    the ``Content-Type`` and ``Content-Length`` values. Finally, ``Content-Length`` also gets recalculated when the
+    content iterator is created from the initialization parameters. This class takes care of all these edge cases to
+    properly report content headers of HEAD requests although none is provided.
+    """
+    def __init__(self, code=200, headers=None, **kwargs):
+        # type: (int, Optional[HeadersType], Any) -> None
+        # drop any 'app_iter' content generator that would recalculate and reset the content_length
+        kwargs.pop("body", None)
+        kwargs.pop("json", None)
+        kwargs.pop("text", None)
+        self.code = code
+        http_class = status_map[code]
+        self.title = http_class.title
+        self.explanation = http_class.explanation
+        content_type = None
+        if headers:
+            # in order to automatically add charset when needed, 'content_type' creates a duplicate
+            # remove the original preemptively to avoid errors in parsers receiving the response
+            headers = deepcopy(headers)
+            content_type = get_header("Content-Type", headers, pop=True)
+        super(HTTPHeadFileResponse, self).__init__(
+            content_type=content_type,  # don't override content-type
+            headerlist=None,    # extend content-type with charset as applicable
+            headers=headers,
+            app_iter=[b""],  # don't recalculate content-length
+            **kwargs
+        )
+
+    def prepare(self, environ):
+        """
+        No contents for HEAD request.
+        """
 
 
 def wps_restapi_base_path(container):

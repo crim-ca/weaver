@@ -20,7 +20,6 @@ from typing import TYPE_CHECKING
 
 import yaml
 from colander import DateTime, Email, OneOf, Range, Regex, drop, null, required
-from cornice import Service
 from dateutil import parser as date_parser
 
 from weaver import __meta__
@@ -42,6 +41,7 @@ from weaver.formats import (
     CONTENT_TYPE_ANY,
     CONTENT_TYPE_APP_JSON,
     CONTENT_TYPE_APP_XML,
+    CONTENT_TYPE_MULTI_PART_FORM,
     CONTENT_TYPE_TEXT_HTML,
     CONTENT_TYPE_TEXT_PLAIN,
     CONTENT_TYPE_TEXT_XML
@@ -85,8 +85,11 @@ from weaver.wps_restapi.colander_extras import (
     StringRange,
     XMLObject
 )
+from weaver.wps_restapi.patches import ServiceOnlyExplicitGetHead as Service  # warning: don't use 'cornice.Service'
 
 if TYPE_CHECKING:
+    from typing import Any
+
     from weaver.typedefs import DatetimeIntervalType, SettingsType, TypedDict
 
     ViewInfo = TypedDict("ViewInfo", {"name": str, "pattern": str})
@@ -301,6 +304,7 @@ class QueryBoolean(Boolean):
     description = "Boolean query parameter that allows handles common truthy/falsy values."
 
     def __init__(self, *_, **__):
+        # type: (Any, Any) -> None
         super(QueryBoolean, self).__init__(
             allow_string=True,
             false_choices=("False", "false", "0", "off", "no", "null", "Null", "none", "None", ""),
@@ -514,6 +518,24 @@ class RedirectHeaders(ResponseHeaders):
 class NoContent(ExtendedMappingSchema):
     description = "Empty response body."
     default = {}
+
+
+class FileUploadHeaders(NoContent):
+    # MUST be multipart for upload
+    content_type = ContentTypeHeader(example=CONTENT_TYPE_MULTI_PART_FORM, default=CONTENT_TYPE_MULTI_PART_FORM,
+                                     description="Desired Content-Type of the file being uploaded.")
+    content_length = ContentLengthHeader(description="Uploaded file contents size in bytes.")
+    content_disposition = ContentDispositionHeader(example="form-data; name=\"file\"; filename=\"desired-name.ext\"",
+                                                   description="Expected ")
+
+
+class FileUploadContent(ExtendedSchemaNode):
+    schema_type = String()
+    description = (
+        "Contents of the file being uploaded with multipart. When prefixed with 'Content-Type: <media-type>', the "
+        "specified format will be applied to the input that will be attributed the 'vault:<UUID>' during execution. "
+        "Contents can also have 'Content-Disposition' definition to provide the desired file name."
+    )
 
 
 class FileResponseHeaders(NoContent):
@@ -873,6 +895,7 @@ class ProcessDeployMeta(ExtendedMappingSchema):
 class InputOutputDescriptionMeta(ExtendedMappingSchema):
     # remove unnecessary empty lists by default if nothing is provided for inputs/outputs
     def __init__(self, *args, **kwargs):
+        # type: (Any, Any) -> None
         super(InputOutputDescriptionMeta, self).__init__(*args, **kwargs)
         for child in self.children:
             if child.name in ["keywords", "metadata"]:
@@ -4252,6 +4275,17 @@ class VaultEndpoint(ExtendedMappingSchema):
     header = RequestHeaders()
 
 
+class VaultUploadBody(ExtendedSchemaNode):
+    schema_type = String
+    description = "Multipart file contents for upload to the vault."
+    example = EXAMPLES["vault_file_upload.txt"]
+
+
+class VaultUploadEndpoint(ExtendedMappingSchema):
+    header = FileUploadHeaders()
+    body = VaultUploadBody()
+
+
 class VaultFileUploadedBodySchema(ExtendedMappingSchema):
     file_id = VaultFileID()
     file_href = VaultReference()
@@ -4280,7 +4314,6 @@ class VaultFileAuthorizationHeader(ExtendedSchemaNode):
     name = "X-Auth-Vault"
     example = "token <access_token>"
     schema_type = String
-    missing = drop
 
 
 class VaultFileRequestHeaders(ExtendedMappingSchema):
@@ -4649,7 +4682,12 @@ post_vault_responses = {
     "500": InternalServerErrorResponseSchema(),
 }
 head_vault_file_responses = {
-    "200": OkVaultFileDetailResponse(description="success"),
+    "200": OkVaultFileDetailResponse(description="success", examples={
+        "VaultFileDetails": {
+            "summary": "Obtain vault file metadata.",
+            "value": EXAMPLES["vault_file_head.json"],
+        }
+    }),
     "400": BadRequestVaultFileDownloadResponse(),
     "401": UnauthorizedVaultFileDownloadResponse(),
     "403": ForbiddenVaultFileDownloadResponse(),

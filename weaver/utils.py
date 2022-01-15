@@ -28,6 +28,7 @@ from pyramid.exceptions import ConfigurationError
 from pyramid.httpexceptions import HTTPError as PyramidHTTPError, HTTPGatewayTimeout, HTTPTooManyRequests
 from pyramid.registry import Registry
 from pyramid.request import Request as PyramidRequest
+from pyramid.response import _guess_type as guess_file_contents  # noqa: W0212
 from pyramid.settings import asbool, aslist
 from pyramid.threadlocal import get_current_registry
 from pyramid_beaker import set_cache_regions_from_settings
@@ -201,8 +202,8 @@ def get_settings(container=None):
     raise TypeError("Could not retrieve settings from container object of type [{}]".format(type(container)))
 
 
-def get_header(header_name, header_container):
-    # type: (str, AnyHeadersContainer) -> Union[str, None]
+def get_header(header_name, header_container, pop=False):
+    # type: (str, AnyHeadersContainer, bool) -> Union[str, None]
     """
     Searches for the specified header by case/dash/underscore-insensitive ``header_name`` inside ``header_container``.
     """
@@ -214,8 +215,13 @@ def get_header(header_name, header_container):
     if isinstance(headers, dict):
         headers = header_container.items()
     header_name = header_name.lower().replace("-", "_")
-    for h, v in headers:
+    for i, (h, v) in enumerate(list(headers)):
         if h.lower().replace("-", "_") == header_name:
+            if pop:
+                if isinstance(header_container, dict):
+                    del header_container[h]
+                else:
+                    del header_container[i]
             return v
     return None
 
@@ -386,19 +392,36 @@ def get_file_header_datetime(dt):
     return dt_str
 
 
-def get_file_headers(path, download=False):
-    # type: (str, bool) -> HeadersType
+def get_file_headers(path, download_headers=False, content_headers=False, content_type=None):
+    # type: (str, bool, bool, Optional[str]) -> HeadersType
+    """
+    Obtain headers applicable for the provided file.
+
+    :param path: File to describe.
+    :param download_headers: If enabled, add the attachment filename for downloading the file.
+    :param content_headers: If enabled, add ``Content-`` prefixed headers.
+    :param content_type: Explicit ``Content-Type`` to provide. Otherwise, use default guessed by file system.
+    :return: Headers for the file.
+    """
     stat = os.stat(path)
+    headers = {}
+    if content_headers:
+        c_type, c_enc = guess_file_contents(path)
+        headers.update({
+            "Content-Type": content_type or c_type,
+            "Content-Encoding": c_enc or "",
+            "Content-Length": str(stat.st_size)
+        })
+        if download_headers:
+            headers.update({
+                "Content-Disposition": f"attachment; filename=\"{os.path.basename(path)}\"",
+            })
     f_modified = get_file_header_datetime(datetime.fromtimestamp(stat.st_mtime))
     f_created = get_file_header_datetime(datetime.fromtimestamp(stat.st_ctime))
-    headers = {
+    headers.update({
         "Date": f_created,
         "Last-Modified": f_modified
-    }
-    if download:
-        headers.update({
-            "Content-Disposition": f"attachment; {os.path.basename(path)}",
-        })
+    })
     return headers
 
 

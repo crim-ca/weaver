@@ -1,6 +1,8 @@
 """
 Definitions of types used by tokens.
 """
+import abc
+
 import copy
 import enum
 import inspect
@@ -35,7 +37,7 @@ from weaver.execute import (
     EXECUTE_TRANSMISSION_MODE_OPTIONS,
     EXECUTE_TRANSMISSION_MODE_REFERENCE
 )
-from weaver.formats import ACCEPT_LANGUAGE_EN_CA, CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML
+from weaver.formats import ACCEPT_LANGUAGE_EN_CA, CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML, CONTENT_TYPE_TEXT_PLAIN
 from weaver.processes.constants import PROCESS_SCHEMA_OGC, PROCESS_SCHEMA_OLD
 from weaver.processes.convert import get_field, null, ows2json, wps2json_io
 from weaver.processes.types import (
@@ -1227,16 +1229,22 @@ class Authentication(Base):
     """
     Authentication details to store details required for process operations.
     """
-    def __init__(self, auth_type, auth_scheme, auth_token, auth_link, **kwargs):
-        # type: (Union[AuthenticationTypes, str], str, str, Optional[str], Any) -> None
+
+    def __init__(self, auth_scheme, auth_token, auth_link, **kwargs):
+        # type: (str, str, Optional[str], Any) -> None
         super(Authentication, self).__init__(**kwargs)
         # ensure values are provided and of valid format
         self.scheme = auth_scheme
-        self.type = auth_type
         if auth_link:
             self.link = auth_link
         self.token = auth_token
         self.setdefault("id", uuid.uuid4())
+
+    @property
+    @abc.abstractmethod
+    def type(self):
+        # type: () -> AuthenticationTypes
+        raise NotImplementedError
 
     @property
     def id(self):
@@ -1245,20 +1253,6 @@ class Authentication(Base):
         if isinstance(_id, str):
             return uuid.UUID(_id)
         return _id
-
-    @property
-    def type(self):
-        # type: () -> AuthenticationTypes
-        return dict.__getitem__(self, "type")
-
-    @type.setter
-    def type(self, auth_type):
-        # type: (Union[AuthenticationTypes, str]) -> None
-        if not isinstance(auth_type, (str, AuthenticationTypes)):
-            raise TypeError(f"Type 'AuthenticationTypes' or 'str' is required for '{self.__name__}.type', "
-                            f"not '{type(auth_type)}'.")
-        auth_type = AuthenticationTypes(auth_type)  # invalid raises ValueError
-        self["type"] = auth_type
 
     @property
     def link(self):
@@ -1319,11 +1313,15 @@ class Authentication(Base):
             if not param.startswith("auth_"):
                 params[f"auth_{param}"] = params[param]
         auth_type = params.get("auth_type")
-        if auth_type and AuthenticationTypes(auth_type) == AuthenticationTypes.DOCKER:
-            return DockerAuthentication.from_params(**params)
-        if auth_type and AuthenticationTypes(auth_type) == AuthenticationTypes.VAULT:
-            return VaultFile(**params)
-        raise TypeError(f"Unknown authentication type: {auth_type!s}")
+        auth_cls = list(filter(lambda auth: auth_type == auth.type.value, [DockerAuthentication, VaultFile]))
+        if not auth_cls:
+            raise TypeError(f"Unknown authentication type: {auth_type!s}")
+        auth_obj = auth_cls[0](**params)
+        keys = list(auth_obj.params())
+        for key in list(auth_obj):
+            if key not in keys:
+                del auth_obj[key]
+        return auth_obj
 
 
 class DockerAuthentication(Authentication):
@@ -1384,6 +1382,7 @@ class DockerAuthentication(Authentication):
     """, re.X)  # extended to ignore whitespaces and comments
     DOCKER_REGISTRY_DEFAULT_DOMAIN = "index.docker.io"
     DOCKER_REGISTRY_DEFAULT_URI = f"https://{DOCKER_REGISTRY_DEFAULT_DOMAIN}/v1/"  # DockerHub
+    type = AuthenticationTypes.DOCKER
 
     def __init__(self, auth_scheme, auth_token, docker_image_link, **kwargs):
         # type: (str, str, str, Any) -> None
@@ -1414,7 +1413,7 @@ class DockerAuthentication(Authentication):
         self["image"] = image
         self["registry"] = registry
         super(DockerAuthentication, self).__init__(
-            AuthenticationTypes.DOCKER, auth_scheme, auth_token, auth_link=docker_image_link, **kwargs
+            auth_scheme, auth_token, auth_link=docker_image_link, **kwargs
         )
 
     @property
@@ -1481,40 +1480,28 @@ class DockerAuthentication(Authentication):
         params.update({"image": self.image, "registry": self.registry})
         return params
 
-    @classmethod
-    def from_params(cls, **params):
-        # type: (Any) -> DockerAuthentication
-        """
-        Generate class with parameters directly skipping validation/parsing from initialization.
-
-        .. warning::
-            This should be reserved for self-manipulation only when resolving :class:`Authentication` type.
-        """
-        auth = Authentication(**params)
-        object.__setattr__(auth, "__class__", DockerAuthentication)  # avoid setattr from inherited dict == insert key
-        # flush anything irrelevant or duplicate data from passing around fields
-        keys = list(auth.params())
-        for key in list(auth):
-            if key not in keys:
-                del auth[key]
-        return auth
-
 
 class VaultFile(Authentication):
     """
-    Dictionary that contains vault file and its authentication information.
-
-    It always has ``id``, ``token`` and ``file_name`` keys.
+    Dictionary that contains :term:`Vault` file and its authentication information.
     """
+    type = AuthenticationTypes.VAULT
 
-    def __init__(self, name, auth_token=None, **kwargs):
-        # type: (str, Optional[str], Any) -> None
+    def __init__(self, file_name="", file_format=None, auth_token=None, **kwargs):
+        # type: (str, Optional[str], Optional[str], Any) -> None
+        for key in ["type", "scheme", "link", "token"]:
+            kwargs.pop(f"auth_{key}", None)
+            kwargs.pop(key, None)
+        if not file_name:
+            file_name = kwargs.pop("name", "")
+        if not file_format:
+            file_format = kwargs.pop("format", CONTENT_TYPE_TEXT_PLAIN)
         super(VaultFile, self).__init__(
-            auth_type=AuthenticationTypes.VAULT,
             auth_scheme="token",
             auth_link=None,  # don't care
             auth_token=auth_token or token_hex(32),
-            name=name,
+            name=file_name,
+            format=file_format,
             **kwargs
         )
 
@@ -1560,6 +1547,21 @@ class VaultFile(Authentication):
         self["name"] = name
 
     @property
+    def format(self):
+        # type: () -> str
+        """
+        Format Media-Type of the file.
+        """
+        return dict.__getitem__(self, "format")
+
+    @format.setter
+    def format(self, media_type):
+        # type: (str) -> None
+        if not isinstance(media_type, str):
+            raise TypeError(f"Type 'str' is required for '{self.__name__}.format'")
+        self["format"] = media_type
+
+    @property
     def href(self):
         # type: () -> str
         """
@@ -1584,28 +1586,11 @@ class VaultFile(Authentication):
         return {
             "id": self.id,
             "name": self.name,
+            "format": self.format,
             "type": self.type.value,
             "token": self.token,
             "scheme": self.scheme,
         }
-
-    @classmethod
-    def from_params(cls, **params):
-        # type: (Any) -> VaultFile
-        """
-        Generate class with parameters directly skipping validation/parsing from initialization.
-
-        .. warning::
-            This should be reserved for self-manipulation only when resolving :class:`Authentication` type.
-        """
-        auth = Authentication(**params)
-        object.__setattr__(auth, "__class__", VaultFile)  # avoid setattr from inherited dict == insert key
-        # flush anything irrelevant or duplicate data from passing around fields
-        keys = list(auth.params())
-        for key in list(auth):
-            if key not in keys:
-                del auth[key]
-        return auth
 
 
 class Process(Base):
@@ -1901,7 +1886,8 @@ class Process(Base):
         if isinstance(auth, dict):
             auth = Authentication(**auth)
         if not isinstance(auth, Authentication):
-            raise TypeError(f"Type 'Authentication' is required for '{type(self)}.auth', not '{type(auth)}'.")
+            name = fully_qualified_name(auth)
+            raise TypeError(f"Type 'Authentication' is required for '{self.__name__}.auth', not '{name}'.")
         self["auth"] = auth
 
     def params(self):

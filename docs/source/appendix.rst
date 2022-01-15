@@ -138,6 +138,13 @@ Glossary
         | Corresponds to a date/time interval employed for :term:`OpenSearch` queries in the context
           of :term:`EOImage` inputs.
 
+    Vault
+        Secured storage employed to upload files that should be temporarily stored on the `Weaver` server for
+        later retrieval using an access token.
+
+        .. seealso::
+            :ref:`vault`
+
     WKT
         Well-Known Text geometry representation.
 

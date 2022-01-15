@@ -35,7 +35,7 @@ def get_vault_path(file, container=None):
     Get the full path of the vault file.
     """
     vault_dir = get_vault_dir(container)
-    return os.path.join(vault_dir, str(file.id), file.name)
+    return os.path.join(vault_dir, file.name)
 
 
 def get_vault_url(file, container=None):
@@ -70,7 +70,7 @@ def get_authorized_file(request):
             "value": repr_json(ex.value or dict(request.matchdict), force_string=False),
         })
     auth = get_header(sd.VaultFileAuthorizationHeader.name, request.headers)
-    token = auth.split("token ")[-1]
+    token = auth.split("token ")[-1] if isinstance(auth, str) else None
     if not token:
         raise HTTPUnauthorized(json={
             "code": "InvalidHeaderValue",

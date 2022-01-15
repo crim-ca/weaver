@@ -15,6 +15,7 @@ from weaver.database import get_db
 from weaver.processes.builtin import register_builtin_processes
 from weaver.processes.utils import register_wps_processes_from_config
 from weaver.utils import get_settings, parse_extra_options, setup_cache, setup_loggers
+from weaver.wps_restapi.patches import patch_pyramid_view_no_auto_head_get_method
 
 if TYPE_CHECKING:
     from typing import Any
@@ -59,11 +60,16 @@ def main(global_config, **settings):
         LOGGER.info("Adding default caching options...")
         setup_cache(settings)
 
-    LOGGER.info("Setup celery configuration...")
+    LOGGER.info("Setup pyramid view configuration...")
     local_config = Configurator(settings=settings)
+    patch_pyramid_view_no_auto_head_get_method(local_config)
+
+    LOGGER.info("Setup celery configuration...")
     if global_config.get("__file__") is not None:
         local_config.include("pyramid_celery")
         local_config.configure_celery(global_config["__file__"])
+
+    LOGGER.info("Setup Weaver...")
     local_config.include("weaver")
 
     LOGGER.info("Running database migration...")

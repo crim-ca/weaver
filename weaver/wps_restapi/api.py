@@ -499,6 +499,7 @@ def get_openapi_json(http_scheme="http", http_host="localhost", base_url=None,
     CorniceSwagger.type_converter = OAS3TypeConversionDispatcher
     depth = -1 if use_refs else 0
     swagger = CorniceSwagger(get_services(), def_ref_depth=depth, param_ref=use_refs, resp_ref=use_refs)
+    swagger.ignore_methods = ["OPTIONS"]  # don't ignore HEAD, used by vault
     # function docstrings are used to create the route's summary in Swagger-UI
     swagger.summary_docstrings = use_docstring_summary
     swagger_base_spec = {"schemes": [http_scheme]}
