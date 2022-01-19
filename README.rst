@@ -144,6 +144,14 @@ Observation data processing can evolve, and illustrates the advantages with appl
     </div>
     <br>
 
+.. raw:: html
+
+    <div>
+        <a href="https://www.youtube.com/watch?v=no3REyoxE38">
+            <img src="https://img.youtube.com/vi/no3REyoxE38/mqdefault.jpg" alt="Application Video" />
+        </a>
+    </div>
+
 Platform
 ~~~~~~~~~~~~~~~~
 
@@ -159,6 +167,15 @@ application stores, and shows the potential for multidisciplinary workflows in t
         </iframe>
     </div>
     <br>
+
+
+.. raw:: html
+
+    <div>
+        <a href="https://www.youtube.com/watch?v=QkdDFGEfIAY">
+            <img src="https://img.youtube.com/vi/QkdDFGEfIAY/mqdefault.jpg" alt="Platform Video" />
+        </a>
+    </div>
 
 ----------------
 Links
