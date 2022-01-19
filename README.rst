@@ -134,17 +134,22 @@ Applications
 The video shares the fundamental ideas behind the architecture, illustrates how application stores for Earth
 Observation data processing can evolve, and illustrates the advantages with applications based on machine learning.
 
-.. following renders only in ReadTheDocs/Sphinx generated build
+.. Tag iframe renders the embedded video in ReadTheDocs/Sphinx generated build,
+   but it is filtered out by GitHub (https://github.github.com/gfm/#disallowed-raw-html-extension-).
+   The following div displays instead video thumbnail with an external link only for GitHub.
+   When iframe properly renders, the image/link div is masked under it to avoid seeing two "video displays".
 .. raw:: html
 
-    <div style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; max-width: 100%; height: auto;"
+    <div style="position: relative; padding-bottom: 21.5%; height: 0; overflow: hidden; height: auto; max-width: 50em;"
     >
         <iframe src="https://www.youtube.com/embed/no3REyoxE38" frameborder="0" allowfullscreen
                 alt="Watch the Application video: http://www.youtube.com/watch?v=v=no3REyoxE3"
                 style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;">
 
         </iframe>
-        <div>
+        <div style="max-width: 50em;"> <!-- alternate view for GitHub -->
+            <b>Watch the Application video on YouTube</b>
+            <br>
             <a href="https://www.youtube.com/watch?v=no3REyoxE38">
                 <img src="https://img.youtube.com/vi/no3REyoxE38/mqdefault.jpg"
                      alt="Watch the Application video: http://www.youtube.com/watch?v=v=no3REyoxE3"
@@ -154,43 +159,32 @@ Observation data processing can evolve, and illustrates the advantages with appl
     </div>
     <br>
 
-
-.. ..
-    <div>
-        <a href="https://www.youtube.com/watch?v=no3REyoxE38">
-            <img src="https://img.youtube.com/vi/no3REyoxE38/mqdefault.jpg"
-                 alt="Watch the Application video: http://www.youtube.com/watch?v=v=no3REyoxE3"
-            />
-        </a>
-    </div>
-
 Platform
 ~~~~~~~~~~~~~~~~
 
 The video shares the fundamental ideas behind the architecture, illustrates how platform managers can benefit from
 application stores, and shows the potential for multidisciplinary workflows in thematic platforms.
 
+.. see other video comment
 .. raw:: html
 
-    <div style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; max-width: 100%; height: auto;"
+    <div style="position: relative; padding-bottom: 21.5%; height: 0; overflow: hidden; height: auto; max-width: 50em;"
     >
         <iframe src="https://www.youtube.com/embed/QkdDFGEfIAY" frameborder="0" allowfullscreen
                 alt="Watch the Platform video: http://www.youtube.com/watch?v=v=QkdDFGEfIAY"
                 style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;">
         </iframe>
+        <div style="max-width: 50em;"> <!-- alternate view for GitHub -->
+            <b>Watch the Platform video on YouTube</b>
+            <br>
+            <a href="https://www.youtube.com/watch?v=QkdDFGEfIAY">
+                <img src="https://img.youtube.com/vi/QkdDFGEfIAY/mqdefault.jpg"
+                     alt="Watch the Platform video: http://www.youtube.com/watch?v=v=QkdDFGEfIAY"
+                />
+            </a>
+        </div>
     </div>
     <br>
-
-
-.. raw:: html
-
-    <div>
-        <a href="https://www.youtube.com/watch?v=QkdDFGEfIAY">
-            <img src="https://img.youtube.com/vi/QkdDFGEfIAY/mqdefault.jpg"
-                 alt="Watch the Platform video: http://www.youtube.com/watch?v=v=QkdDFGEfIAY"
-            />
-        </a>
-    </div>
 
 ----------------
 Links
