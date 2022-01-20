@@ -333,7 +333,7 @@ class DateTimeInterval(ExtendedSchemaNode):
 
 class S3Bucket(ExtendedSchemaNode):
     schema_type = String
-    description = "S3 bucket shorthand URL representation [s3://<bucket>/<job-uuid>/<output>.ext]"
+    description = "S3 bucket shorthand URL representation [s3://{bucket}/{job-uuid}/{output}.ext]"
     pattern = r"^s3://\S+$"
 
 
@@ -534,8 +534,8 @@ class FileUploadHeaders(RequestContentTypeHeader):
 class FileUploadContent(ExtendedSchemaNode):
     schema_type = String()
     description = (
-        "Contents of the file being uploaded with multipart. When prefixed with 'Content-Type: <media-type>', the "
-        "specified format will be applied to the input that will be attributed the 'vault:<UUID>' during execution. "
+        "Contents of the file being uploaded with multipart. When prefixed with 'Content-Type: {media-type}', the "
+        "specified format will be applied to the input that will be attributed the 'vault:{UUID}' during execution. "
         "Contents can also have 'Content-Disposition' definition to provide the desired file name."
     )
 
@@ -1241,7 +1241,7 @@ class DescribeInputTypeMap(PermissiveMappingSchema):
     Description of all process inputs under mapping.
     """
     input_id = DescribeInputType(
-        variable="<input-id>",
+        variable="{input-id}",
         description="Input definition under mapping of process description.",
         missing=drop,  # allowed because process can have empty inputs (see schema: ProcessDescriptionOGC)
     )
@@ -1261,7 +1261,7 @@ class DeployInputTypeMap(PermissiveMappingSchema):
     Definition of all process inputs under mapping.
     """
     input_id = DeployInputType(
-        variable="<input-id>",
+        variable="{input-id}",
         description="Input definition under mapping of process deployment."
     )
 
@@ -1333,7 +1333,7 @@ class DescribeOutputTypeMap(PermissiveMappingSchema):
     Definition of all process outputs under mapping.
     """
     output_id = DescribeOutputType(
-        variable="<output-id>", title="ProcessOutputDefinition",
+        variable="{output-id}", title="ProcessOutputDefinition",
         description="Output definition under mapping of process description."
     )
 
@@ -1369,7 +1369,7 @@ class DeployOutputTypeMap(PermissiveMappingSchema):
     Definition of all process outputs under mapping.
     """
     input_id = DeployOutputType(
-        variable="<input-id>",
+        variable="{input-id}",
         description="Output definition under mapping of process deployment."
     )
 
@@ -2429,7 +2429,7 @@ class ExecuteOutputSpecList(ExtendedSequenceSchema):
 
 
 class ExecuteOutputSpecMap(ExtendedMappingSchema):
-    input_id = ExecuteOutputDefinition(variable="<input-id>", title="ExecuteOutputSpecMap",
+    input_id = ExecuteOutputDefinition(variable="{input-id}", title="ExecuteOutputSpecMap",
                                        description="Desired output reporting method.")
 
 
@@ -2694,7 +2694,7 @@ class GetPagingJobsSchema(ExtendedMappingSchema):
 
 
 class JobCategoryFilters(PermissiveMappingSchema):
-    category = ExtendedSchemaNode(String(), title="CategoryFilter", variable="<category>", default=None, missing=None,
+    category = ExtendedSchemaNode(String(), title="CategoryFilter", variable="{category}", default=None, missing=None,
                                   description="Value of the corresponding parameter forming that category group.")
 
 
@@ -2901,7 +2901,7 @@ class ExecuteInputAny(OneOfKeywordSchema):
 # 	        $ref: "inlineOrRefData.yaml"
 #
 class ExecuteInputMapValues(ExtendedMappingSchema):
-    input_id = ExecuteInputAny(variable="<input-id>", title="ExecuteInputValue",
+    input_id = ExecuteInputAny(variable="{input-id}", title="ExecuteInputValue",
                                description="Received mapping input value definition during job submission.")
 
 
@@ -3306,9 +3306,9 @@ class CWLInputType(OneOfKeywordSchema):
 
 
 class CWLInputMap(PermissiveMappingSchema):
-    input_id = CWLInputType(variable="<input-id>", title="CWLInputIdentifierType",
+    input_id = CWLInputType(variable="{input-id}", title="CWLInputIdentifierType",
                             description=IO_INFO_IDS.format(first="CWL", second="WPS", what="input") +
-                            " (Note: '<input-id>' is a variable corresponding for each identifier)")
+                            " (Note: '{input-id}' is a variable corresponding for each identifier)")
 
 
 class CWLInputItem(CWLInputObject):
@@ -3350,9 +3350,9 @@ class CWLOutputType(OneOfKeywordSchema):
 
 
 class CWLOutputMap(ExtendedMappingSchema):
-    output_id = CWLOutputType(variable="<output-id>", title="CWLOutputIdentifierType",
+    output_id = CWLOutputType(variable="{output-id}", title="CWLOutputIdentifierType",
                               description=IO_INFO_IDS.format(first="CWL", second="WPS", what="output") +
-                              " (Note: '<output-id>' is a variable corresponding for each identifier)")
+                              " (Note: '{output-id}' is a variable corresponding for each identifier)")
 
 
 class CWLOutputItem(CWLOutputObject):
@@ -3523,10 +3523,10 @@ class Result(ExtendedMappingSchema):
     """
     example_ref = "{}/master/core/examples/json/Result.json".format(OGC_API_SCHEMA_URL)
     output_id = ResultData(
-        variable="<output-id>", title="Output Identifier",
+        variable="{output-id}", title="Output Identifier",
         description=(
             "Resulting value of the output that conforms to 'OGC API - Processes' standard. "
-            "(Note: '<output-id>' is a variable corresponding for each output identifier of the process)"
+            "(Note: '{output-id}' is a variable corresponding for each output identifier of the process)"
         )
     )
 
@@ -4319,7 +4319,7 @@ class BadRequestVaultFileUploadResponse(ExtendedMappingSchema):
 class VaultFileAuthorizationHeader(ExtendedSchemaNode):
     description = "Authorization token header for vault file access."
     name = "X-Auth-Vault"
-    example = "token <access_token>"
+    example = "token {access_token}"
     schema_type = String
 
 
