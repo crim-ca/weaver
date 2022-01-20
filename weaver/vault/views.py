@@ -10,8 +10,8 @@ from pyramid_storage.local import LocalFileStorage
 from weaver.datatype import VaultFile
 from weaver.database import get_db
 from weaver.exceptions import log_unhandled_exceptions
+from weaver.formats import get_file_headers
 from weaver.store.base import StoreVault
-from weaver.utils import get_file_headers
 from weaver.vault.utils import get_authorized_file, get_vault_dir, get_vault_path, get_vault_url
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import HTTPHeadFileResponse

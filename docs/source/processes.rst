@@ -835,8 +835,10 @@ of the file. This second approach is not guaranteed to work though if intermedia
 such as between steps within a :ref:`Workflow`.
 
 Using the :ref:`Weaver CLI <cli>`, it is possible to upload local files automatically to the :term:`Vault` of a
-remote `Weaver` server. This can help users host their file for remote :term:`Process` execution. Please refer to the
-relevant CLI help for more details.
+remote `Weaver` server. This can help users host their local file for remote :term:`Process` execution. By default,
+the :ref:`cli` will automatically convert any local file path provided as execution input into |vault_ref| reference
+to make use of the :term:`Vault` self-hosting from the target `Weaver` instance. It is also possible to manually
+provide |vault_ref| references if those were uploaded beforehand.
 
 In order to manually upload files, the below code snippet can be employed.
 

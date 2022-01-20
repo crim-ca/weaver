@@ -10,11 +10,14 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add `Vault` endpoints providing a secured self-hosted file storage to upload local files for execution input.
+- Add ``upload`` CLI operation for uploading local files to `Vault`.
+- Improve Media-Type/Content-Type guesses based on known local definitions and extensions in ``weaver.formats``.
 
 Fixes:
 ------
-- No change.
+- Fix rendering of CLI *required* arguments under the appropriate argument group section when those arguments can be
+  specified using prefixed ``-`` and ``--`` optional arguments format.
 
 `4.8.0 <https://github.com/crim-ca/weaver/tree/4.8.0>`_ (2022-01-11)
 ========================================================================

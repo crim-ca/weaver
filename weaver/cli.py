@@ -16,11 +16,21 @@ from weaver import __meta__
 from weaver.datatype import AutoBase
 from weaver.exceptions import PackageRegistrationError
 from weaver.execute import EXECUTE_MODE_ASYNC, EXECUTE_RESPONSE_DOCUMENT, EXECUTE_TRANSMISSION_MODE_VALUE
-from weaver.formats import CONTENT_TYPE_APP_JSON
+from weaver.formats import CONTENT_TYPE_APP_JSON, get_file_headers
 from weaver.processes.convert import cwl2json_input_values, repr2json_input_values
 from weaver.processes.wps_package import get_process_definition
 from weaver.status import JOB_STATUS_CATEGORIES, JOB_STATUS_CATEGORY_FINISHED, STATUS_SUCCEEDED
-from weaver.utils import fetch_file, get_any_id, get_any_value, load_file, null, repr_json, request_extra, setup_loggers
+from weaver.utils import (
+    fetch_file,
+    fully_qualified_name,
+    get_any_id,
+    get_any_value,
+    load_file,
+    null,
+    repr_json,
+    request_extra,
+    setup_loggers
+)
 from weaver.visibility import VISIBILITY_PUBLIC
 from weaver.wps_restapi import swagger_definitions as sd
 
@@ -285,7 +295,7 @@ class WeaverClient(object):
             Perform undeploy step as applicable prior to deployment to avoid conflict with exiting :term:`Process`.
         :param url:
             Instance URL if not already provided during client creation.
-        :returns: results of the operation.
+        :returns: Results of the operation.
         """
         result = self._parse_deploy_body(body, process_id)
         if not result.success:
@@ -438,7 +448,7 @@ class WeaverClient(object):
         :param interval:
             Monitoring interval (seconds) between job status polling requests.
         :param url: Instance URL if not already provided during client creation.
-        :returns: results of the operation.
+        :returns: Results of the operation.
         """
         if isinstance(inputs, list) and all(isinstance(item, list) for item in inputs):
             inputs = [items for sub in inputs for items in sub]  # flatten 2D->1D list
@@ -479,6 +489,45 @@ class WeaverClient(object):
         time.sleep(1)  # small delay to ensure process execution had a chance to start before monitoring
         return self.monitor(job_url, timeout=timeout, interval=interval)
 
+    def upload(self, file_path, content_type=None, url=None):
+        # type: (str, Optional[str], Optional[str]) -> OperationResult
+        """
+        Upload a local file to the :term:`Vault`.
+
+        :param file_path: Location of the file to be uploaded.
+        :param content_type:
+            Explicit Content-Type of the file.
+            This should be an IANA Media-Type, optionally with additional parameters such as charset.
+            If not provided, attempts to guess it based on the file extension.
+        :param url: Instance URL if not already provided during client creation.
+        :returns: Results of the operation.
+        """
+        if not isinstance(file_path, str):
+            file_type = fully_qualified_name(file_path)
+            return OperationResult(False, "Local file reference is not a string.", {"file_path": file_type})
+        if file_path.startswith("file://"):
+            file_path = file_path[7:]
+        if "://" in file_path:
+            scheme = file_path.split("://", 1)[0]
+            return OperationResult(False, "Scheme not supported for local file reference.", {"file_scheme": scheme})
+        file_path = os.path.abspath(os.path.expanduser(file_path))
+        if not os.path.isfile(file_path):
+            return OperationResult(False, "Resolved local file reference does not exist.", {"file_path": file_path})
+        LOGGER.debug("Processing file for vault upload: [%s]", file_path)
+        file_headers = get_file_headers(file_path, content_headers=True, content_type=content_type)
+        base = self._get_url(url)
+        path = f"{base}/vault"
+        files = {
+            "file": (
+                os.path.basename(file_path),
+                open(file_path, "r", encoding="utf-8"),
+                file_headers["Content-Type"]
+            )
+        }
+        req_headers = {"Accept": CONTENT_TYPE_APP_JSON}  # Content-Type auto generated with multipart boundary
+        resp = request_extra("POST", path, headers=req_headers, settings=self._settings, files=files)
+        return self._parse_result(resp)
+
     def status(self, job_reference, url=None):
         """
         Obtain the status of a :term:`Job`.
@@ -488,7 +537,7 @@ class WeaverClient(object):
 
         :param job_reference: Either the full :term:`Job` status URL or only its UUID.
         :param url: Instance URL if not already provided during client creation.
-        :returns: retrieved status of the job.
+        :returns: Retrieved status of the job.
         """
         job_id, job_url = self._parse_job_ref(job_reference, url)
         LOGGER.info("Getting job status: [%s]", job_id)
@@ -508,7 +557,7 @@ class WeaverClient(object):
         :param interval: wait interval (seconds) between polling monitor requests.
         :param wait_for_status: monitor until the requested status is reached (default: job failed or succeeded).
         :param url: Instance URL if not already provided during client creation.
-        :return: result of the successful or failed job, or timeout of monitoring process.
+        :return: Result of the successful or failed job, or timeout of monitoring process.
         """
         job_id, job_url = self._parse_job_ref(job_reference, url)
         remain = timeout = timeout or self.monitor_timeout
@@ -638,8 +687,7 @@ def make_logging_options(parser):
 
 def add_url_param(parser, required=True):
     # type: (argparse.ArgumentParser, bool) -> None
-    args = ["url"] if required else ["-u", "--url"]
-    parser.add_argument(*args, metavar="URL", help="URL of the instance to run operations.")
+    parser.add_argument("-u", "--url", metavar="URL", help="URL of the instance to run operations.", required=required)
 
 
 def add_process_param(parser, description=None, required=True):
@@ -685,7 +733,9 @@ class InputsFormatter(argparse.HelpFormatter):
     # pragma: no cover  # somehow marked not covered, but functionality covered by 'test_execute_help_details'
     def _format_action(self, action):
         """
-        Override the returned help message with available options and shortcuts for email template selection.
+        Override the returned help message with available options and shortcuts for inputs.
+
+        This ensures that paragraphs defined in the "inputs" argument's help remain separated and properly formatted.
         """
         if action.dest != "inputs":
             return super(InputsFormatter, self)._format_action(action)
@@ -727,25 +777,46 @@ class SubArgumentParserFixedMutexGroups(argparse.ArgumentParser):
         container._mutually_exclusive_groups = tmp_mutex_groups
 
 
+class ArgumentParserFixedRequiredArgs(argparse.ArgumentParser):
+    """
+    Override action grouping under 'required' section to consider explicit flag even if action has option prefix.
+
+    Default behaviour places option prefixed (``-``, ``--``) arguments into optionals even if ``required`` is defined.
+    Help string correctly considers this flag and doesn't place those arguments in brackets (``[--<optional-arg>]``).
+    """
+    def _add_action(self, action):
+        if action.option_strings and not action.required:
+            self._optionals._add_action(action)
+        else:
+            self._positionals._add_action(action)
+        return action
+
+
+class WeaverArgumentParser(ArgumentParserFixedRequiredArgs, SubArgumentParserFixedMutexGroups):
+    """
+    Parser that provides fixes for proper representation of `Weaver` :term:`CLI` arguments.
+    """
+
+
 def make_parser():
     # type: () -> argparse.ArgumentParser
     """
-    Generate the CLI parser.
+    Generate the :term:`CLI` parser.
 
     .. note::
         Instead of employing :class:`argparse.ArgumentParser` instances returned
         by :meth:`argparse._SubParsersAction.add_parser`, distinct :class:`argparse.ArgumentParser` instances are
-        created for each operation an then  merged back by ourselves as subparsers under the main parser.
+        created for each operation and then merged back by ourselves as subparsers under the main parser.
         This provides more flexibility in arguments passed down and resolves, amongst other things, incorrect
         handling of exclusive argument groups and their grouping under corresponding section titles.
     """
     # generic logging parser to pass down to each operation
     # this allows providing logging options to any of them
-    log_parser = argparse.ArgumentParser(add_help=False)
+    log_parser = WeaverArgumentParser(add_help=False)
     make_logging_options(log_parser)
 
     desc = "Run {} operations.".format(__meta__.__title__)
-    parser = SubArgumentParserFixedMutexGroups(prog=__meta__.__name__, description=desc, parents=[log_parser])
+    parser = WeaverArgumentParser(prog=__meta__.__name__, description=desc, parents=[log_parser])
     set_parser_sections(parser)
     parser.add_argument(
         "--version", "-V",
@@ -758,7 +829,7 @@ def make_parser():
         description="Name of the operation to run."
     )
 
-    op_deploy = argparse.ArgumentParser(
+    op_deploy = WeaverArgumentParser(
         "deploy",
         description="Deploy a process.",
     )
@@ -807,7 +878,7 @@ def make_parser():
         help="Perform undeploy step as applicable prior to deployment to avoid conflict with exiting process."
     )
 
-    op_undeploy = argparse.ArgumentParser(
+    op_undeploy = WeaverArgumentParser(
         "undeploy",
         description="Undeploy an existing process.",
     )
@@ -815,14 +886,14 @@ def make_parser():
     add_url_param(op_undeploy)
     add_process_param(op_undeploy)
 
-    op_capabilities = argparse.ArgumentParser(
+    op_capabilities = WeaverArgumentParser(
         "capabilities",
         description="List available processes.",
     )
     set_parser_sections(op_deploy)
     add_url_param(op_capabilities)
 
-    op_describe = argparse.ArgumentParser(
+    op_describe = WeaverArgumentParser(
         "describe",
         description="Obtain an existing process description.",
     )
@@ -830,7 +901,7 @@ def make_parser():
     add_url_param(op_describe)
     add_process_param(op_describe)
 
-    op_execute = argparse.ArgumentParser(
+    op_execute = WeaverArgumentParser(
         "execute",
         description="Submit a job execution for an existing process.",
         formatter_class=InputsFormatter,
@@ -879,7 +950,7 @@ def make_parser():
     )
     add_timeout_param(op_execute)
 
-    op_dismiss = argparse.ArgumentParser(
+    op_dismiss = WeaverArgumentParser(
         "dismiss",
         description="Dismiss a pending or running job, or wipe any finished job results.",
     )
@@ -887,7 +958,7 @@ def make_parser():
     add_url_param(op_dismiss, required=False)
     add_job_ref_param(op_dismiss)
 
-    op_monitor = argparse.ArgumentParser(
+    op_monitor = WeaverArgumentParser(
         "monitor",
         description="Monitor a pending or running job execution until completion or up to a maximum wait time."
     )
@@ -895,7 +966,7 @@ def make_parser():
     add_job_ref_param(op_monitor)
     add_timeout_param(op_monitor)
 
-    op_status = argparse.ArgumentParser(
+    op_status = WeaverArgumentParser(
         "status",
         description=(
             "Obtain the status of a job using a reference UUID or URL. "
@@ -906,7 +977,7 @@ def make_parser():
     add_url_param(op_status, required=False)
     add_job_ref_param(op_status)
 
-    op_results = argparse.ArgumentParser(
+    op_results = WeaverArgumentParser(
         "results",
         description=(
             "Obtain the output results description of a job. "
@@ -927,6 +998,26 @@ def make_parser():
              "(default: ${CURDIR}/{JobID}/<outputs.files>)."
     )
 
+    op_upload = WeaverArgumentParser(
+        "upload",
+        description=(
+            "Upload a local file to the remote server vault for reference in process execution inputs. "
+            "This operation is accomplished automatically for all execution inputs submitted using local files."
+        ),
+    )
+    set_parser_sections(op_upload)
+    add_url_param(op_upload, required=True)
+    op_upload.add_argument(
+        "-c", "--content-type", dest="content_type",
+        help="Content-Type of the file to apply. "
+             "This should be an IANA Media-Type, optionally with additional parameters such as charset. "
+             "If not provided, attempts to guess it based on the file extension."
+    )
+    op_upload.add_argument(
+        "-f", "--file", dest="file_path", metavar="FILE", required=True,
+        help="Local file path to upload to the vault."
+    )
+
     operations = [
         op_deploy,
         op_undeploy,
@@ -937,6 +1028,7 @@ def make_parser():
         op_dismiss,
         op_results,
         op_status,
+        op_upload,
     ]
     aliases = {
         "processes": op_capabilities
