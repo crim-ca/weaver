@@ -1,20 +1,17 @@
 import logging
+import mimetypes
 import os
 import re
-from datetime import datetime
 from typing import TYPE_CHECKING
 from urllib.error import HTTPError
 from urllib.request import urlopen
 
 from pyramid.httpexceptions import HTTPNotFound, HTTPOk
-from pyramid.response import _guess_type as guess_file_contents  # noqa: W0212
 from pywps.inout.formats import FORMATS, Format
 from requests.exceptions import ConnectionError
 
-from weaver.utils import localize_datetime, request_extra
-
 if TYPE_CHECKING:
-    from weaver.typedefs import JSON, HeadersType
+    from weaver.typedefs import JSON
     from typing import Dict, Optional, Tuple, Union
 
 # Languages
@@ -58,14 +55,22 @@ CONTENT_TYPE_ANY_XML = {CONTENT_TYPE_APP_XML, CONTENT_TYPE_TEXT_XML}
 CONTENT_TYPE_ANY = "*/*"
 
 # explicit mime-type to extension when not literally written in item after '/' (excluding 'x-' prefix)
-_CONTENT_TYPE_EXTENSION_MAPPING = {
+_CONTENT_TYPE_EXTENSION_OVERRIDES = {
     CONTENT_TYPE_APP_VDN_GEOJSON: ".geojson",  # pywps 4.4 default extension without vdn prefix
     CONTENT_TYPE_APP_NETCDF: ".nc",
     CONTENT_TYPE_APP_GZIP: ".gz",
     CONTENT_TYPE_APP_TAR_GZ: ".tar.gz",
     CONTENT_TYPE_APP_YAML: ".yml",
+    CONTENT_TYPE_IMAGE_TIFF: ".tif",  # common alternate to .tiff
     CONTENT_TYPE_ANY: ".*",   # any for glob
-}  # type: Dict[str, str]
+}
+_EXTENSION_CONTENT_TYPES_OVERRIDES = {
+    ".tiff": CONTENT_TYPE_IMAGE_TIFF,  # avoid defaulting to subtype geotiff
+    ".yaml": CONTENT_TYPE_APP_YAML,  # common alternative to .yml
+}
+
+_CONTENT_TYPE_EXTENSION_MAPPING = {}  # type: Dict[str, str]
+_CONTENT_TYPE_EXTENSION_MAPPING.update(_CONTENT_TYPE_EXTENSION_OVERRIDES)
 # extend with all known pywps formats
 _CONTENT_TYPE_FORMAT_MAPPING = {
     # content-types here are fully defined with extra parameters (e.g.: geotiff as subtype of tiff)
@@ -73,7 +78,9 @@ _CONTENT_TYPE_FORMAT_MAPPING = {
 }  # type: Dict[str, Format]
 # back-propagate changes from new formats
 _CONTENT_TYPE_EXTENSION_MAPPING.update({
-    ctype: fmt.extension for ctype, fmt in _CONTENT_TYPE_FORMAT_MAPPING.items()  # noqa: W0212
+    ctype: fmt.extension
+    for ctype, fmt in _CONTENT_TYPE_FORMAT_MAPPING.items()  # noqa: W0212
+    if ctype not in _CONTENT_TYPE_EXTENSION_MAPPING
 })
 # apply any remaining local types not explicitly or indirectly added by FORMATS
 _CONTENT_TYPE_EXT_PATTERN = re.compile(r"^[a-z]+/(x-)?(?P<ext>([a-z]+)).*$")
@@ -100,13 +107,36 @@ _CONTENT_TYPE_LOCALS_MISSING = sorted(
 )
 # update and back-propagate generated local types
 _CONTENT_TYPE_EXTENSION_MAPPING.update(_CONTENT_TYPE_LOCALS_MISSING)
+_CONTENT_TYPE_EXTENSION_MAPPING.update({
+    ctype: ext
+    for ext, ctype in mimetypes.types_map.items()
+    if ctype not in _CONTENT_TYPE_EXTENSION_MAPPING
+})
 _CONTENT_TYPE_FORMAT_MAPPING.update({
     ctype: Format(ctype, extension=ext)
     for ctype, ext in _CONTENT_TYPE_LOCALS_MISSING
 })
+_CONTENT_TYPE_FORMAT_MAPPING.update({
+    ctype: Format(ctype, extension=ext)
+    for ctype, ext in _CONTENT_TYPE_EXTENSION_MAPPING.items()
+    if ctype not in _CONTENT_TYPE_FORMAT_MAPPING
+})
 _EXTENSION_CONTENT_TYPES_MAPPING = {
-    ext: ctype for ctype, ext in _CONTENT_TYPE_EXTENSION_MAPPING.items()
+    # because the same extension can represent multiple distinct Content-Types,
+    # derive the simplest (shortest) one by default for guessing generic Content-Type
+    ext: ctype for ctype, ext in reversed(sorted(
+        _CONTENT_TYPE_EXTENSION_MAPPING.items(),
+        key=lambda typ_ext: len(typ_ext[0])
+    ))
 }
+_EXTENSION_CONTENT_TYPES_MAPPING.update(_EXTENSION_CONTENT_TYPES_OVERRIDES)
+
+# file types that can contain textual characters
+_CONTENT_TYPE_CHAR_TYPES = [
+    "application",
+    "multipart",
+    "text",
+]
 
 # redirect type resolution semantically equivalent CWL validators
 # should only be used to map CWL 'format' field if they are not already resolved through existing IANA/EDAM reference
@@ -198,9 +228,11 @@ def get_content_type(extension, charset=None, default=None):
     ctype = _EXTENSION_CONTENT_TYPES_MAPPING.get(extension)
     if not ctype:
         return default
+    # no parameters in Media-Type, but explicit Content-Type with charset could exist as needed
     if charset and "charset=" in ctype:
         return re.sub(r"charset\=[A-Za-z0-9\_\-]+", f"charset={charset}", ctype)
-    if charset:
+    # make sure to never include by mistake if the represented type cannot be characters
+    if charset and any(ctype.startswith(_type + "/") for _type in _CONTENT_TYPE_CHAR_TYPES):
         return f"{ctype}; charset={charset}"
     return ctype
 
@@ -259,6 +291,8 @@ def get_cwl_file_format(mime_type, make_reference=False, must_exist=True, allow_
         """
         Attempts multiple request-retry variants to be as permissive as possible to sporadic/temporary failures.
         """
+        from weaver.utils import request_extra
+
         _mime_type_url = "{}{}".format(IANA_NAMESPACE_DEFINITION[IANA_NAMESPACE], _mime_type)
         try:
             resp = request_extra("head", _mime_type_url, retries=3, timeout=0.5,
@@ -341,52 +375,3 @@ def clean_mime_type_format(mime_type, suffix_subtype=False, strip_parameters=Fal
         if v.endswith(mime_type):
             mime_type = [k for k in EDAM_MAPPING if v.endswith(EDAM_MAPPING[k])][0]
     return mime_type
-
-
-def get_file_header_datetime(dt):
-    # type: (datetime) -> str
-    """
-    Obtains the standard header datetime representation.
-
-    .. seealso::
-        Format of the date defined in :rfc:`5322#section-3.3`.
-    """
-    dt_gmt = localize_datetime(dt, "GMT")
-    dt_str = dt_gmt.strftime("%a, %d %b %Y %H:%M:%S GMT")
-    return dt_str
-
-
-def get_file_headers(path, download_headers=False, content_headers=False, content_type=None):
-    # type: (str, bool, bool, Optional[str]) -> HeadersType
-    """
-    Obtain headers applicable for the provided file.
-
-    :param path: File to describe.
-    :param download_headers: If enabled, add the attachment filename for downloading the file.
-    :param content_headers: If enabled, add ``Content-`` prefixed headers.
-    :param content_type: Explicit ``Content-Type`` to provide. Otherwise, use default guessed by file system.
-    :return: Headers for the file.
-    """
-    stat = os.stat(path)
-    headers = {}
-    if content_headers:
-        c_type, c_enc = guess_file_contents(path)
-        if c_type == CONTENT_TYPE_APP_OCTET_STREAM:  # default
-            f_ext = os.path.splitext(path)[-1]
-            c_type = get_content_type(f_ext, charset="UTF-8", default=CONTENT_TYPE_APP_OCTET_STREAM)
-        headers.update({
-            "Content-Type": content_type or c_type,
-            "Content-Encoding": c_enc or "",
-            "Content-Length": str(stat.st_size)
-        })
-        if download_headers:
-            headers.update({
-                "Content-Disposition": f"attachment; filename=\"{os.path.basename(path)}\"",
-            })
-    f_modified = get_file_header_datetime(datetime.fromtimestamp(stat.st_mtime))
-    f_created = get_file_header_datetime(datetime.fromtimestamp(stat.st_ctime))
-    headers.update({
-        "Date": f_created,
-        "Last-Modified": f_modified
-    })
-    return headers

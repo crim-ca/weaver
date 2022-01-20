@@ -23,6 +23,21 @@ def test_get_extension_glob_any():
     assert f.get_extension(f.CONTENT_TYPE_ANY) == ".*"
 
 
+def test_get_content_type():
+    assert f.get_content_type(".json") == f.CONTENT_TYPE_APP_JSON
+    assert f.get_content_type(".tif") == f.CONTENT_TYPE_IMAGE_TIFF
+    assert f.get_content_type(".tiff") == f.CONTENT_TYPE_IMAGE_TIFF
+    assert f.get_content_type(".yml") == f.CONTENT_TYPE_APP_YAML
+    assert f.get_content_type(".yaml") == f.CONTENT_TYPE_APP_YAML
+
+
+def test_get_content_type_extra_parameters():
+    assert f.get_content_type(".unknown") is None
+    assert f.get_content_type(".unknown", default=f.CONTENT_TYPE_TEXT_PLAIN) == f.CONTENT_TYPE_TEXT_PLAIN
+    assert f.get_content_type(".txt", charset="UTF-8") == f"{f.CONTENT_TYPE_TEXT_PLAIN}; charset=UTF-8"
+    assert f.get_content_type(".tif", charset="UTF-8") == f.CONTENT_TYPE_IMAGE_TIFF  # not added by error
+
+
 def test_get_format():
     assert f.get_format(f.CONTENT_TYPE_APP_JSON) == Format(f.CONTENT_TYPE_APP_JSON)  # basic
     assert f.get_format(f.CONTENT_TYPE_APP_JSON + "; charset=UTF-8") == Format(f.CONTENT_TYPE_APP_JSON)
