@@ -472,12 +472,15 @@ class XmlHeader(ExtendedMappingSchema):
 
 
 class XAuthDockerHeader(ExtendedSchemaNode):
+    summary = "Authentication header for private Docker registry access."
     description = (
         "Authentication header for private registry access in order to retrieve the Docker image reference "
         "specified in an Application Package during Process deployment. When provided, this header should "
-        "contain similar details as typical Authentication or X-Auth-Token headers."
+        "contain similar details as typical Authentication or X-Auth-Token headers "
+        f"(see {DOC_URL}/package.html#dockerized-applications for more details)."
     )
     name = "X-Auth-Docker"
+    example = "Basic {base64-auth-credentials}"
     schema_type = String
     missing = drop
 
@@ -4317,9 +4320,16 @@ class BadRequestVaultFileUploadResponse(ExtendedMappingSchema):
 
 
 class VaultFileAuthorizationHeader(ExtendedSchemaNode):
-    description = "Authorization token header for vault file access."
+    summary = "Authorization header with token for Vault file access."
+    description = (
+        "For accessing a single file from the Vault, such as to obtain file metadata, requests can simply provide "
+        "the 'token {access-token}' portion in the header without additional parameters. If multiple files require "
+        "access such as during an Execute request, all applicable tokens should be provided using a comma separated "
+        "list of access tokens, each with their indented input ID and array index if applicable "
+        f"(see {DOC_URL}/processes.html#file-vault for more details)."
+    )
     name = "X-Auth-Vault"
-    example = "token {access_token}"
+    example = "#(token {access-token}[; id={input-id}][; index={array-index}])"
     schema_type = String
 
 

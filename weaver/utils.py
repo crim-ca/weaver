@@ -138,27 +138,42 @@ def get_weaver_url(container):
     return value.rstrip("/").strip()
 
 
-def get_any_id(info):
-    # type: (JSON) -> Union[str, None]
+def get_any_id(info, pop=False, key=False):
+    # type: (JSON, bool, bool) -> Union[str, None]
     """
     Retrieves a dictionary `id-like` key using multiple common variations ``[id, identifier, _id]``.
 
     :param info: dictionary that potentially contains an `id-like` key.
+    :param pop: If enabled, remove the matched key from the input mapping.
+    :param key: If enabled, return the matched key instead of the value.
     :returns: value of the matched `id-like` key or ``None`` if not found.
     """
-    return info.get("id", info.get("identifier", info.get("_id")))
+    for field in ["id", "identifier", "_id"]:
+        if field in info:
+            value = info.pop(field) if pop else info.get(field)
+            return field if key else value
+    return None
 
 
-def get_any_value(info, default=None):
-    # type: (JSON, Any) -> AnyValueType
+def get_any_value(info, default=None, file=True, data=True, pop=False, key=False):
+    # type: (JSON, Any, bool, bool, bool, bool) -> AnyValueType
     """
     Retrieves a dictionary `value-like` key using multiple common variations ``[href, value, reference, data]``.
 
-    :param info: dictionary that potentially contains a `value-like` key.
-    :param default: default value to be returned if none of the known keys were matched.
-    :returns: value of the matched `value-like` key or ``None`` if not found.
+    :param info: Dictionary that potentially contains a `value-like` key.
+    :param default: Default value to be returned if none of the known keys were matched.
+    :param file: If enabled, file-related key names will be considered.
+    :param data: If enabled, data-related key names will be considered.
+    :param pop: If enabled, remove the matched key from the input mapping.
+    :param key: If enabled, return the matched key instead of the value.
+    :returns: Value (or key if requested) of the matched `value-like` key or ``None`` if not found.
     """
-    return info.get("href", info.get("value", info.get("reference", info.get("data", default))))
+    for check, field in [(file, "href"), (data, "value"), (file, "reference"), (data, "data")]:
+        if check:
+            value = info.pop(field, null) if pop else info.get(field, null)
+            if value is not null:
+                return field if key else value
+    return default
 
 
 def get_any_message(info):

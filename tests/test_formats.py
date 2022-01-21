@@ -45,6 +45,29 @@ def test_get_format():
     assert f.get_format(f.CONTENT_TYPE_APP_NETCDF).encoding == "base64"  # extra encoding data available
 
 
+def test_get_format_media_type_no_extension():
+    for ctype in [
+        f.CONTENT_TYPE_APP_OCTET_STREAM,
+        f.CONTENT_TYPE_APP_FORM,
+        f.CONTENT_TYPE_MULTI_PART_FORM,
+    ]:
+        fmt = f.get_format(ctype)
+        assert fmt == Format(ctype, extension=None)
+        assert fmt.extension == ""
+
+
+def test_get_format_default_no_extension():
+    for val in ["", None]:
+        for ctype in [
+            f.CONTENT_TYPE_APP_OCTET_STREAM,
+            f.CONTENT_TYPE_APP_FORM,
+            f.CONTENT_TYPE_MULTI_PART_FORM,
+        ]:
+            fmt = f.get_format(val, default=ctype)
+            assert fmt == Format(ctype, extension=None)
+            assert fmt.extension == ""
+
+
 def test_get_cwl_file_format_tuple():
     tested = set(f.FORMAT_NAMESPACES)
     for mime_type in [f.CONTENT_TYPE_APP_JSON, f.CONTENT_TYPE_APP_NETCDF]:
@@ -208,3 +231,10 @@ def test_clean_mime_type_format_io_strip_base_and_remove_parameters():
     for expect_fmt, test_fmt in test_input_formats:
         res_type = f.clean_mime_type_format(test_fmt, suffix_subtype=True, strip_parameters=True)
         assert res_type == expect_fmt
+
+
+def test_clean_mime_type_format_default():
+    assert f.clean_mime_type_format("", suffix_subtype=False, strip_parameters=False) is None
+    assert f.clean_mime_type_format("", suffix_subtype=False, strip_parameters=True) is None
+    assert f.clean_mime_type_format("", suffix_subtype=True, strip_parameters=False) is None
+    assert f.clean_mime_type_format("", suffix_subtype=True, strip_parameters=True) is None

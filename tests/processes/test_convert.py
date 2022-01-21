@@ -20,6 +20,7 @@ from weaver.processes.convert import _are_different_and_set  # noqa: W0212
 from weaver.processes.convert import (
     DEFAULT_FORMAT,
     PACKAGE_ARRAY_MAX_SIZE,
+    convert_input_values_schema,
     cwl2json_input_values,
     cwl2wps_io,
     is_cwl_array_type,
@@ -721,6 +722,81 @@ def test_cwl2json_input_values_old_format():
     ]
     result = cwl2json_input_values(values, PROCESS_SCHEMA_OLD)
     assert result == expect
+
+
+def test_convert_input_values_schema_from_old():
+    inputs_old = [
+        {"id": "test1", "value": "data"},
+        {"id": "test2", "value": 1},
+        {"id": "test3", "value": 1.23},
+        {"id": "test4", "href": "/data/random.txt"},
+        {"id": "test5", "value": ["val1", "val2"]},
+        {"id": "test6", "value": [1, 2]},
+        {"id": "test7", "value": [1.23, 4.56]},
+        {"id": "test8", "href": "/data/other.txt"},
+        {"id": "test9", "value": "short"},
+        {"id": "test10", "value": "long"},
+        {"id": "test10", "value": "more"},
+        {"id": "test11", "href": "/data/file1.txt", "format": {"mediaType": "text/plain"}},
+        {"id": "test11", "href": "/data/file2.txt", "format": {"mediaType": "text/plain"}},
+    ]
+    inputs_ogc = {
+        "test1": "data",
+        "test2": 1,
+        "test3": 1.23,
+        "test4": {"href": "/data/random.txt"},
+        "test5": ["val1", "val2"],
+        "test6": [1, 2],
+        "test7": [1.23, 4.56],
+        "test8": {"href": "/data/other.txt"},
+        "test9": "short",
+        "test10": ["long", "more"],
+        "test11": [
+            {"href": "/data/file1.txt", "format": {"mediaType": "text/plain"}},
+            {"href": "/data/file2.txt", "format": {"mediaType": "text/plain"}}
+        ]
+    }
+    assert convert_input_values_schema(inputs_old, PROCESS_SCHEMA_OLD) == inputs_old
+    assert convert_input_values_schema(inputs_old, PROCESS_SCHEMA_OGC) == inputs_ogc
+
+
+def test_convert_input_values_schema_from_ogc():
+    inputs_ogc = {
+        "test1": "data",
+        "test2": 1,
+        "test3": 1.23,
+        "test4": {"href": "/data/random.txt"},
+        "test5": ["val1", "val2"],
+        "test6": [1, 2],
+        "test7": [1.23, 4.56],
+        "test8": {"href": "/data/other.txt"},
+        "test9": "short",
+        "test10": ["long", "more"],
+        "test11": [
+            {"href": "/data/file1.txt", "format": {"mediaType": "text/plain"}},
+            {"href": "/data/file2.txt", "format": {"mediaType": "text/plain"}}
+        ]
+    }
+    inputs_old = [
+        {"id": "test1", "value": "data"},
+        {"id": "test2", "value": 1},
+        {"id": "test3", "value": 1.23},
+        {"id": "test4", "href": "/data/random.txt"},
+        {"id": "test5", "value": "val1"},
+        {"id": "test5", "value": "val2"},
+        {"id": "test6", "value": 1},
+        {"id": "test6", "value": 2},
+        {"id": "test7", "value": 1.23},
+        {"id": "test7", "value": 4.56},
+        {"id": "test8", "href": "/data/other.txt"},
+        {"id": "test9", "value": "short"},
+        {"id": "test10", "value": "long"},
+        {"id": "test10", "value": "more"},
+        {"id": "test11", "href": "/data/file1.txt", "format": {"mediaType": "text/plain"}},
+        {"id": "test11", "href": "/data/file2.txt", "format": {"mediaType": "text/plain"}},
+    ]
+    assert convert_input_values_schema(inputs_ogc, PROCESS_SCHEMA_OGC) == inputs_ogc
+    assert convert_input_values_schema(inputs_ogc, PROCESS_SCHEMA_OLD) == inputs_old
 
 
 def test_repr2json_input_values():

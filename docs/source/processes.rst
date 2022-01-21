@@ -809,11 +809,15 @@ the ``Content-Disposition`` within the uploaded content of the ``multipart/form-
 File Vault
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+.. note::
+    The :term:`Vault` is a specific feature of `Weaver`. Other :term:`ADES`, :term:`EMS` and :term:`OGC API - Processes`
+    servers are not expected to provide this endpoint nor support the |vault_ref| reference format.
+
 The :term:`Vault` is available as secured storage for uploading files to be employed later for :term:`Process`
 execution.
 
 When upload succeeds, the response will return a :term:`Vault` UUID and an ``access_token`` to access the file.
-Requests toward the :term:`Vault` should include a ``X-Auth-Vault: token <access_token>`` header in combination to
+Requests toward the :term:`Vault` should include a ``X-Auth-Vault`` header in combination to
 the provided :term:`Vault` UUID in the request path to retrieve the file.
 
 .. note::
@@ -823,12 +827,12 @@ the provided :term:`Vault` UUID in the request path to retrieve the file.
 
 Download of the file is accomplished using the |vault-download-req|_ request.
 In order to either obtain the file metadata without deleting it, or simply to validate its existence,
-the |vault-detail-req|_ request can be used. This HEAD request can be queried any amount without removing the file.
+the |vault-detail-req|_ request can be used. This HEAD request can be queried multiple times without removing the file.
 For both HTTP methods, the ``X-Auth-Vault`` header is required.
 
 Stored files in the :term:`Vault` can be employed as input for :ref:`proc_op_execute` operation using the
-provided ``file_href`` reference in the response following upload. The :ref:`Execute <proc_op_execute>` request must
-also include the authorization header to obtain access to the file.
+provided ``file_href`` reference from the response following upload. The :ref:`Execute <proc_op_execute>` request must
+also include the ``X-Auth-Vault`` header to obtain access to the file.
 
 Alternatively, the direct HTTP location can also be employed as input to a :term:`Process` if it makes immediate use
 of the file. This second approach is not guaranteed to work though if intermediate operations must move the file around,
@@ -836,9 +840,11 @@ such as between steps within a :ref:`Workflow`.
 
 Using the :ref:`Weaver CLI <cli>`, it is possible to upload local files automatically to the :term:`Vault` of a
 remote `Weaver` server. This can help users host their local file for remote :term:`Process` execution. By default,
-the :ref:`cli` will automatically convert any local file path provided as execution input into |vault_ref| reference
-to make use of the :term:`Vault` self-hosting from the target `Weaver` instance. It is also possible to manually
-provide |vault_ref| references if those were uploaded beforehand.
+the :ref:`cli` will automatically convert any local file path provided as execution input into a |vault_ref| reference
+to make use of the :term:`Vault` self-hosting from the target `Weaver` instance. It will also update the provided
+inputs or execution body to apply any transformed |vault_ref| references transparently. It is also possible to manually
+provide |vault_ref| references or endpoints if those were uploaded beforehand using the ``upload`` operation, but the
+user must also generate the ``X-Auth-Vault`` header manually in such case.
 
 In order to manually upload files, the below code snippet can be employed.
 
@@ -846,20 +852,25 @@ In order to manually upload files, the below code snippet can be employed.
     :language: python
     :caption: Sample Python request call to upload file to Vault
 
-This should automatically generate the corresponding request below.
+This should automatically generate a similar request to the result below.
 
 .. literalinclude:: ../examples/vault-upload.txt
     :language: http
     :caption: Sample request contents to upload file to Vault
 
 Note that the ``Content-Type`` located within the multipart content can be important if the :term:`Process` to
-execute must provide a specific choice of media-type as input where the |vault_ref| is provided. This value will be
+execute must provide a specific choice of Media-Type as input where the |vault_ref| is provided. This value will be
 employed to generate the ``format`` portion of the input, unless it is provided once again for that input within
 the :ref:`Execute <proc_op_execute>` request body.
 
-.. note::
-    The :term:`Vault` is a specific feature of `Weaver`. Other :term:`ADES`, :term:`EMS` and :term:`OGC API - Processes`
-    servers are not expected to provide this endpoint nor support the |vault_ref| reference format.
+.. todo::
+    format of ``X-Auth-Vault: token {access-token}``
+    ``#(token {access-token}[; id={input-id}][; index={array-index}])``
+    + examples
+
+.. todo::
+    example Execute with substituted vault href
+
 
 .. _opensearch_data_source:
 

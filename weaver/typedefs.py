@@ -59,7 +59,7 @@ if TYPE_CHECKING:
 
     # CWL definition
     GlobType = TypedDict("GlobType", {"glob": Union[str, List[str]]}, total=False)
-    CWL_IO_FileValue = TypedDict("CWL_IO_FileValue", {"class": str, "path": str}, total=True)
+    CWL_IO_FileValue = TypedDict("CWL_IO_FileValue", {"class": str, "path": str, "format": Optional[str]}, total=True)
     CWL_IO_Value = Union[AnyValueType, List[AnyValueType], CWL_IO_FileValue, List[CWL_IO_FileValue]]
     CWL_IO_NullableType = Union[str, List[str]]  # "<type>?" or ["<type>", "null"]
     CWL_IO_NestedType = TypedDict("CWL_IO_NestedType", {"type": CWL_IO_NullableType}, total=True)
@@ -225,16 +225,42 @@ if TYPE_CHECKING:
     DataSource = Union[DataSourceFileRef, DataSourceOpenSearch]
     DataSourceConfig = Dict[str, DataSource]  # JSON/YAML file contents
 
-    JobValueItem = TypedDict("JobValueItem", {
+    JobValueFormat = TypedDict("JobValueFormat", {
+        "mime_type": Optional[str],
+        "media_type": Optional[str],
+        "encoding": Optional[str],
+        "schema": Optional[str],
+        "extension": Optional[str],
+    }, total=False)
+    JobValueFile = TypedDict("JobValueFile", {
+        "href": Optional[str],
+        "format": Optional[JobValueFormat],
+    }, total=False)
+    JobValueData = TypedDict("JobValueData", {
+        "data": Optional[AnyValueType],
+        "value": Optional[AnyValueType],
+    }, total=False)
+    JobValueObject = Union[JobValueData, JobValueFile]
+    JobValueFileItem = TypedDict("JobValueFileItem", {
         "id": str,
         "href": Optional[str],
-        "data": Optional[AnyValueType]
+        "format": Optional[JobValueFormat],
     }, total=False)
+    JobValueDataItem = TypedDict("JobValueDataItem", {
+        "id": str,
+        "data": Optional[AnyValueType],
+        "value": Optional[AnyValueType],
+    }, total=False)
+    JobValueItem = Union[JobValueDataItem, JobValueFileItem]
     JobExpectItem = TypedDict("JobExpectItem", {"id": str}, total=True)
     JobInputs = List[Union[JobValueItem, Dict[str, AnyValueType]]]
     JobOutputs = List[Union[JobExpectItem, Dict[str, AnyValueType]]]
     JobResults = List[JobValueItem]
     JobMonitorReference = Any  # typically an URI of the remote job status or an execution object/handler
+
+    ExecutionInputsMap = Dict[str, JobValueObject]  # aka 'weaver.processes.constants.PROCESS_SCHEMA_OGC'
+    ExecutionInputsList = List[JobValueItem]        # aka 'weaver.processes.constants.PROCESS_SCHEMA_OLD'
+    ExecutionInputs = Union[ExecutionInputsList, ExecutionInputsMap]
 
     # reference employed as 'JobMonitorReference' by 'WPS1Process'
     JobExecution = TypedDict("JobExecution", {"execution": WPSExecution})

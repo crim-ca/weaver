@@ -16,8 +16,14 @@ from weaver import __meta__
 from weaver.datatype import AutoBase
 from weaver.exceptions import PackageRegistrationError
 from weaver.execute import EXECUTE_MODE_ASYNC, EXECUTE_RESPONSE_DOCUMENT, EXECUTE_TRANSMISSION_MODE_VALUE
-from weaver.formats import CONTENT_TYPE_APP_JSON, get_file_headers
-from weaver.processes.convert import cwl2json_input_values, repr2json_input_values
+from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_PLAIN, get_content_type, get_format
+from weaver.processes.constants import PROCESS_SCHEMA_OGC
+from weaver.processes.convert import (
+    convert_input_values_schema,
+    cwl2json_input_values,
+    get_field,
+    repr2json_input_values
+)
 from weaver.processes.wps_package import get_process_definition
 from weaver.status import JOB_STATUS_CATEGORIES, JOB_STATUS_CATEGORY_FINISHED, STATUS_SUCCEEDED
 from weaver.utils import (
@@ -25,6 +31,8 @@ from weaver.utils import (
     fully_qualified_name,
     get_any_id,
     get_any_value,
+    get_file_headers,
+    get_header,
     load_file,
     null,
     repr_json,
@@ -35,16 +43,16 @@ from weaver.visibility import VISIBILITY_PUBLIC
 from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
-    from typing import Any, Optional, Tuple, Union
+    from typing import Any, List, Optional, Tuple, Union
 
     from requests import Response
 
     # avoid failing sphinx-argparse documentation
     # https://github.com/ashb/sphinx-argparse/issues/7
     try:
-        from weaver.typedefs import CWL, HeadersType, JSON
+        from weaver.typedefs import CWL, JSON, ExecutionInputsMap, HeadersType
     except ImportError:
-        CWL = HeadersType = JSON = Any  # avoid linter issue
+        CWL = JSON = ExecutionInputsMap = HeadersType = Any  # avoid linter issue
 
 LOGGER = logging.getLogger(__name__)
 
@@ -54,6 +62,7 @@ REQUIRED_ARGS_TITLE = "Required Arguments"
 
 
 def _json2text(data):
+    # type: (Any) -> str
     return repr_json(data, indent=2, ensure_ascii=False)
 
 
@@ -134,6 +143,7 @@ class WeaverClient(object):
         }  # FIXME: load from INI, overrides as input (cumul arg '--setting weaver.x=value') ?
 
     def _get_url(self, url):
+        # type: (Optional[str]) -> str
         if not self._url and not url:
             raise ValueError("No URL available. Client was not created with an URL and operation did not receive one.")
         return self._url or self._parse_url(url)
@@ -378,7 +388,16 @@ class WeaverClient(object):
 
     @staticmethod
     def _parse_inputs(inputs):
-        # type: (Optional[Union[str, JSON]]) -> Union[OperationResult, JSON]
+        # type: (Optional[Union[str, JSON]]) -> Union[OperationResult, ExecutionInputsMap]
+        """
+        Parse multiple different representation formats and input sources into standard :term:`OGC` inputs.
+
+        Schema :term:`OGC` is selected to increase compatibility coverage with potential non-`Weaver` servers
+        only conforming to standard :term:`OGC API - Processes`.
+
+        Inputs can be represented as :term:`CLI` option string arguments, file path to load contents from, or
+        directly supported list or mapping of execution inputs definitions.
+        """
         try:
             if isinstance(inputs, str):
                 # loaded inputs could be mapping or listing format (any schema: CWL, OGC, OLD)
@@ -395,7 +414,7 @@ class WeaverClient(object):
                 elif len(inputs) == 1 and inputs[0] == "":
                     inputs = []
             if isinstance(inputs, list):
-                inputs = {"inputs": inputs}  # OLD format provided directly
+                inputs = {"inputs": inputs}  # convert OLD format provided directly into OGC
             # consider possible ambiguity if literal CWL input is named 'inputs'
             # - if value of 'inputs' is an object, it can collide with 'OGC' schema,
             #   unless 'value/href' are present or their sub-dict don't have CWL 'class'
@@ -409,12 +428,70 @@ class WeaverClient(object):
                     (isinstance(values, list) and all(isinstance(v, dict) and get_any_value(v) is null for v in values))
                 )
             ):
-                values = cwl2json_input_values(inputs)
+                values = cwl2json_input_values(inputs, schema=PROCESS_SCHEMA_OGC)
             if values is null:
                 raise ValueError("Input values parsed as null. Could not properly detect employed schema.")
+            values = convert_input_values_schema(values, schema=PROCESS_SCHEMA_OGC)
         except Exception as exc:
             return OperationResult(False, f"Failed inputs parsing with error: [{exc!s}].", inputs)
         return values
+
+    def _update_files(self, inputs, url=None):
+        # type: (ExecutionInputsMap, Optional[str]) -> Tuple[ExecutionInputsMap, HeadersType]
+        """
+        Replaces local file paths by references uploaded to the :term:`Vault`.
+
+        .. seealso::
+            - Headers dictionary limitation by :mod:`requests`:
+              https://docs.python-requests.org/en/latest/user/quickstart/#response-headers
+            - Headers formatting with multiple values must be provided by comma-separated values
+              (:rfc:`7230#section-3.2.2`).
+
+        :param inputs: Input values for submission of :term:`Process` execution.
+        :return: Updated inputs.
+        """
+        auth_tokens = []  # type: List[Tuple[str, int, str]]
+        update_inputs = dict(inputs)
+        for input_id, input_data in dict(inputs).items():
+            if not isinstance(input_data, list):  # support array of files
+                input_data = [input_data]
+            for index, data in enumerate(input_data):
+                if not isinstance(data, dict):
+                    continue
+                file = href = get_any_value(data, default=null, data=False)
+                if not isinstance(href, str):
+                    continue
+                if href.startswith("file://"):
+                    href = href[7:]
+                if "://" not in href and not os.path.isfile(href):
+                    LOGGER.warning(
+                        "Ignoring potential local file reference since it does not exist. "
+                        "Cannot upload to vault: [%s]", file
+                    )
+                    continue
+                fmt = data.get("format", {})
+                ctype = get_field(fmt, "mime_type", search_variations=True)
+                if not ctype:
+                    ext = os.path.splitext(href)[-1]
+                    ctype = get_content_type(ext)
+                fmt = get_format(ctype, default=CONTENT_TYPE_TEXT_PLAIN)
+                res = self.upload(href, content_type=fmt.mime_type, url=url)
+                if res.code != 200:
+                    return res
+                href = get_header("Content-Location",  res.headers)
+                # href = res.body["file_href"]  # FIXME: use file_href directly instead to avoid download from vault
+                token = res.body["access_token"]
+                auth_tokens.append((input_id, index, token))
+                LOGGER.info("Converted [%s] -> [%s]", file, href)
+                update_inputs[input_id] = {"href": href, "format": {"mediaType": ctype}}
+
+        auth_headers = {}
+        if auth_tokens:
+            multi_tokens = ",".join([
+                f"token {token}; id={input_id}; index={index}" for input_id, index, token in auth_tokens
+            ])
+            auth_headers = {sd.VaultFileAuthorizationHeader.name: multi_tokens}
+        return update_inputs, auth_headers
 
     # FIXME: support sync (https://github.com/crim-ca/weaver/issues/247)
     # :param execute_async:
@@ -455,6 +532,10 @@ class WeaverClient(object):
         values = self._parse_inputs(inputs)
         if isinstance(values, OperationResult):
             return values
+        base = self._get_url(url)
+        values, auth_headers = self._update_files(values, url=base)
+        if isinstance(values, OperationResult):
+            return values
         data = {
             # NOTE: since sync is not yet properly implemented in Weaver, simulate with monitoring after if requested
             # FIXME: support 'sync' (https://github.com/crim-ca/weaver/issues/247)
@@ -467,7 +548,6 @@ class WeaverClient(object):
             "outputs": {}
         }
         # FIXME: since (https://github.com/crim-ca/weaver/issues/375) not implemented, auto-populate all the outputs
-        base = self._get_url(url)
         result = self.describe(process_id, url=base)
         if not result.success:
             return OperationResult(False, "Could not obtain process description for execution.",
@@ -479,7 +559,10 @@ class WeaverClient(object):
 
         LOGGER.info("Executing [%s] with inputs:\n%s", process_id, _json2text(inputs))
         path = f"{base}/processes/{process_id}/execution"  # use OGC-API compliant endpoint (not '/jobs')
-        resp = request_extra("POST", path, json=data, headers=self._headers, settings=self._settings)
+        headers = {}
+        headers.update(self._headers)
+        headers.update(auth_headers)
+        resp = request_extra("POST", path, json=data, headers=headers, settings=self._settings)
         result = self._parse_result(resp)
         if not monitor or not result.success:
             return result
@@ -493,6 +576,9 @@ class WeaverClient(object):
         # type: (str, Optional[str], Optional[str]) -> OperationResult
         """
         Upload a local file to the :term:`Vault`.
+
+        .. note::
+            Feature only available for `Weaver` instances. Not available for standard :term:`OGC API - Processes`.
 
         :param file_path: Location of the file to be uploaded.
         :param content_type:
@@ -1002,7 +1088,8 @@ def make_parser():
         "upload",
         description=(
             "Upload a local file to the remote server vault for reference in process execution inputs. "
-            "This operation is accomplished automatically for all execution inputs submitted using local files."
+            "This operation is accomplished automatically for all execution inputs submitted using local files. "
+            "[note: feature only available for Weaver instances]"
         ),
     )
     set_parser_sections(op_upload)
@@ -1047,6 +1134,7 @@ def make_parser():
 
 
 def main(*args):
+    # type: (Any) -> int
     parser = make_parser()
     ns = parser.parse_args(args=args or None)
     setup_logger_from_options(LOGGER, ns)

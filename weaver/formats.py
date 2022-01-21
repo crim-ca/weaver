@@ -1,5 +1,4 @@
 import logging
-import mimetypes
 import os
 import re
 from typing import TYPE_CHECKING
@@ -11,8 +10,10 @@ from pywps.inout.formats import FORMATS, Format
 from requests.exceptions import ConnectionError
 
 if TYPE_CHECKING:
-    from weaver.typedefs import JSON
     from typing import Dict, Optional, Tuple, Union
+
+    from weaver.typedefs import JSON
+
 
 # Languages
 ACCEPT_LANGUAGE_EN_CA = "en-CA"
@@ -63,7 +64,15 @@ _CONTENT_TYPE_EXTENSION_OVERRIDES = {
     CONTENT_TYPE_APP_YAML: ".yml",
     CONTENT_TYPE_IMAGE_TIFF: ".tif",  # common alternate to .tiff
     CONTENT_TYPE_ANY: ".*",   # any for glob
+    CONTENT_TYPE_APP_OCTET_STREAM: "",
+    CONTENT_TYPE_APP_FORM: "",
+    CONTENT_TYPE_MULTI_PART_FORM: "",
 }
+_CONTENT_TYPE_EXCLUDE = [
+    CONTENT_TYPE_APP_OCTET_STREAM,
+    CONTENT_TYPE_APP_FORM,
+    CONTENT_TYPE_MULTI_PART_FORM,
+]
 _EXTENSION_CONTENT_TYPES_OVERRIDES = {
     ".tiff": CONTENT_TYPE_IMAGE_TIFF,  # avoid defaulting to subtype geotiff
     ".yaml": CONTENT_TYPE_APP_YAML,  # common alternative to .yml
@@ -74,7 +83,9 @@ _CONTENT_TYPE_EXTENSION_MAPPING.update(_CONTENT_TYPE_EXTENSION_OVERRIDES)
 # extend with all known pywps formats
 _CONTENT_TYPE_FORMAT_MAPPING = {
     # content-types here are fully defined with extra parameters (e.g.: geotiff as subtype of tiff)
-    fmt.mime_type: fmt for _, fmt in FORMATS._asdict().items()  # noqa: W0212
+    fmt.mime_type: fmt
+    for _, fmt in FORMATS._asdict().items()  # noqa: W0212
+    if fmt.mime_type not in _CONTENT_TYPE_EXCLUDE
 }  # type: Dict[str, Format]
 # back-propagate changes from new formats
 _CONTENT_TYPE_EXTENSION_MAPPING.update({
@@ -84,18 +95,13 @@ _CONTENT_TYPE_EXTENSION_MAPPING.update({
 })
 # apply any remaining local types not explicitly or indirectly added by FORMATS
 _CONTENT_TYPE_EXT_PATTERN = re.compile(r"^[a-z]+/(x-)?(?P<ext>([a-z]+)).*$")
-_CONTENT_TYPE_LOCALS_EXCLUDE = [
-    CONTENT_TYPE_APP_OCTET_STREAM,
-    CONTENT_TYPE_APP_FORM,
-    CONTENT_TYPE_MULTI_PART_FORM,
-]
 _CONTENT_TYPE_LOCALS_MISSING = [
     (ctype, _CONTENT_TYPE_EXT_PATTERN.match(ctype))
     for name, ctype in locals().items()
     if name.startswith("CONTENT_TYPE_")
     and isinstance(ctype, str)
+    and ctype not in _CONTENT_TYPE_EXCLUDE
     and ctype not in _CONTENT_TYPE_FORMAT_MAPPING
-    and ctype not in _CONTENT_TYPE_LOCALS_EXCLUDE
     and ctype not in _CONTENT_TYPE_EXTENSION_MAPPING
 ]
 _CONTENT_TYPE_LOCALS_MISSING = sorted(
@@ -107,19 +113,24 @@ _CONTENT_TYPE_LOCALS_MISSING = sorted(
 )
 # update and back-propagate generated local types
 _CONTENT_TYPE_EXTENSION_MAPPING.update(_CONTENT_TYPE_LOCALS_MISSING)
-_CONTENT_TYPE_EXTENSION_MAPPING.update({
-    ctype: ext
-    for ext, ctype in mimetypes.types_map.items()
-    if ctype not in _CONTENT_TYPE_EXTENSION_MAPPING
-})
+# extend additional types
+# FIXME: disabled for security reasons
+# _CONTENT_TYPE_EXTENSION_MAPPING.update({
+#     ctype: ext
+#     for ext, ctype in mimetypes.types_map.items()
+#     if ctype not in _CONTENT_TYPE_EXCLUDE
+#     and ctype not in _CONTENT_TYPE_EXTENSION_MAPPING
+# })
 _CONTENT_TYPE_FORMAT_MAPPING.update({
     ctype: Format(ctype, extension=ext)
     for ctype, ext in _CONTENT_TYPE_LOCALS_MISSING
+    if ctype not in _CONTENT_TYPE_EXCLUDE
 })
 _CONTENT_TYPE_FORMAT_MAPPING.update({
     ctype: Format(ctype, extension=ext)
     for ctype, ext in _CONTENT_TYPE_EXTENSION_MAPPING.items()
-    if ctype not in _CONTENT_TYPE_FORMAT_MAPPING
+    if ctype not in _CONTENT_TYPE_EXCLUDE
+    and ctype not in _CONTENT_TYPE_FORMAT_MAPPING
 })
 _EXTENSION_CONTENT_TYPES_MAPPING = {
     # because the same extension can represent multiple distinct Content-Types,
@@ -183,17 +194,22 @@ LOGGER = logging.getLogger(__name__)
 
 
 def get_format(mime_type, default=None):
-    # type: (str, Optional[str]) -> Format
+    # type: (str, Optional[str]) -> Optional[Format]
     """
     Obtains a :class:`Format` with predefined extension and encoding details from known MIME-types.
     """
-    ctype = clean_mime_type_format(mime_type, strip_parameters=True)
     fmt = _CONTENT_TYPE_FORMAT_MAPPING.get(mime_type)
     if fmt is not None:
         return fmt
     if default is not None:
         ctype = default
-    return Format(ctype, extension=get_extension(ctype))
+    else:
+        ctype = clean_mime_type_format(mime_type, strip_parameters=True)
+    if not ctype:
+        return None
+    ext = get_extension(ctype)
+    fmt = Format(ctype, extension=ext)
+    return fmt
 
 
 def get_extension(mime_type):
@@ -208,6 +224,8 @@ def get_extension(mime_type):
     if ext:
         return ext
     ctype = clean_mime_type_format(mime_type, strip_parameters=True)
+    if not ctype:
+        return ""
     return _CONTENT_TYPE_EXTENSION_MAPPING.get(ctype, ".{}".format(ctype.split("/")[-1].replace("x-", "")))
 
 
@@ -309,6 +327,8 @@ def get_cwl_file_format(mime_type, make_reference=False, must_exist=True, allow_
             pass
         return None
 
+    if not mime_type:
+        return None if make_reference else (None, None)
     mime_type = clean_mime_type_format(mime_type, strip_parameters=True)
     result = _request_extra_various(mime_type)
     if result is not None:
@@ -324,7 +344,7 @@ def get_cwl_file_format(mime_type, make_reference=False, must_exist=True, allow_
 
 
 def clean_mime_type_format(mime_type, suffix_subtype=False, strip_parameters=False):
-    # type: (str, bool, bool) -> str
+    # type: (str, bool, bool) -> Optional[str]
     """
     Obtains a generic media-type identifier by cleaning up any additional parameters.
 
@@ -349,6 +369,8 @@ def clean_mime_type_format(mime_type, suffix_subtype=False, strip_parameters=Fal
     .. note::
         Parameters :paramref:`suffix_subtype` and :paramref:`strip_parameters` are not necessarily exclusive.
     """
+    if not mime_type:  # avoid mismatching empty string with random type
+        return None
     # when 'format' comes from parsed CWL tool instance, the input/output record sets the value
     # using a temporary local file path after resolution against remote namespace ontology
     if mime_type.startswith("file://") and "#" in mime_type:

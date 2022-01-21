@@ -10,14 +10,14 @@ from pyramid_storage.local import LocalFileStorage
 from weaver.datatype import VaultFile
 from weaver.database import get_db
 from weaver.exceptions import log_unhandled_exceptions
-from weaver.formats import get_file_headers
 from weaver.store.base import StoreVault
 from weaver.vault.utils import get_authorized_file, get_vault_dir, get_vault_path, get_vault_url
+from weaver.utils import get_file_headers
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import HTTPHeadFileResponse
 
 if TYPE_CHECKING:
-    from typing import Optional, Union
+    from typing import Optional
 
     from pyramid.httpexceptions import HTTPException
     from pyramid.request import Request
@@ -57,7 +57,7 @@ def upload_file(request):
     data.update(vault_file.json())
     path = get_vault_path(vault_file, request)
     headers = get_file_headers(path)
-    headers["Location"] = get_vault_url(vault_file, request)
+    headers["Content-Location"] = get_vault_url(vault_file, request)
     return HTTPOk(json=data, headers=headers)
 
 
@@ -72,7 +72,7 @@ def describe_file(request):
     file = get_authorized_file(request)
     path = get_vault_path(file, request)
     headers = get_file_headers(path, download_headers=True, content_headers=True, content_type=file.format)
-    headers["Location"] = get_vault_url(file, request)
+    headers["Content-Location"] = get_vault_url(file, request)
     return HTTPHeadFileResponse(code=200, headers=headers)
 
 
