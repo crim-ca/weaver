@@ -43,7 +43,7 @@ from weaver.visibility import VISIBILITY_PUBLIC
 from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
-    from typing import Any, List, Optional, Tuple, Union
+    from typing import Any, Dict, Optional, Tuple, Union
 
     from requests import Response
 
@@ -450,7 +450,7 @@ class WeaverClient(object):
         :param inputs: Input values for submission of :term:`Process` execution.
         :return: Updated inputs.
         """
-        auth_tokens = []  # type: List[Tuple[str, int, str]]
+        auth_tokens = {}  # type: Dict[str, str]
         update_inputs = dict(inputs)
         for input_id, input_data in dict(inputs).items():
             if not isinstance(input_data, list):  # support array of files
@@ -478,17 +478,18 @@ class WeaverClient(object):
                 res = self.upload(href, content_type=fmt.mime_type, url=url)
                 if res.code != 200:
                     return res
-                href = get_header("Content-Location",  res.headers)
-                # href = res.body["file_href"]  # FIXME: use file_href directly instead to avoid download from vault
+                vault_href = res.body["file_href"]
+                vault_id = res.body["file_id"]
                 token = res.body["access_token"]
-                auth_tokens.append((input_id, index, token))
-                LOGGER.info("Converted [%s] -> [%s]", file, href)
-                update_inputs[input_id] = {"href": href, "format": {"mediaType": ctype}}
+                auth_tokens[vault_id] = token
+                LOGGER.info("Converted [%s] -> [%s]", file, vault_href)
+                update_inputs[input_id] = {"href": vault_href, "format": {"mediaType": ctype}}
 
         auth_headers = {}
         if auth_tokens:
             multi_tokens = ",".join([
-                f"token {token}; id={input_id}; index={index}" for input_id, index, token in auth_tokens
+                f"token {token}; id={input_id}"
+                for input_id, token in auth_tokens.items()
             ])
             auth_headers = {sd.VaultFileAuthorizationHeader.name: multi_tokens}
         return update_inputs, auth_headers

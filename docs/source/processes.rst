@@ -754,12 +754,14 @@ combinations.
 
 .. [#vault2file]
     When a |vault_ref| file is specified, the local :ref:`WPS-REST` process can make use of it directly. The file is
-    therefore retrieved from the :ref:`vault` using the provided UUID and access token to be passed to the application.
+    therefore retrieved from the :term:`Vault` using the provided UUID and access token to be passed to the application.
+    See :ref:`file_vault_inputs` and :ref:`vault` for more details.
 
 .. [#vault2http]
-    When a |vault_ref| file is specified, the remote process needs to access it using the hosted :ref:`vault` endpoint.
+    When a |vault_ref| file is specified, the remote process needs to access it using the hosted :term:`Vault` endpoint.
     Therefore, `Weaver` converts any vault reference to the corresponding location and inserts the access token in the
-    requests headers to authorize download from the remote server.
+    requests headers to authorize download from the remote server. See :ref:`file_vault_inputs` and :ref:`vault` for
+    more details.
 
 .. [#wf]
     Workflows are only available on :term:`EMS` and :term:`HYBRID` instances. Since they chain processes,
@@ -804,73 +806,73 @@ the ``Content-Disposition`` within the uploaded content of the ``multipart/form-
 .. seealso::
     - :ref:`vault`
 
-.. _vault:
+.. _file_vault_token:
+.. _file_vault_inputs:
 
-File Vault
+File Vault Inputs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. note::
-    The :term:`Vault` is a specific feature of `Weaver`. Other :term:`ADES`, :term:`EMS` and :term:`OGC API - Processes`
-    servers are not expected to provide this endpoint nor support the |vault_ref| reference format.
-
-The :term:`Vault` is available as secured storage for uploading files to be employed later for :term:`Process`
-execution.
-
-When upload succeeds, the response will return a :term:`Vault` UUID and an ``access_token`` to access the file.
-Requests toward the :term:`Vault` should include a ``X-Auth-Vault`` header in combination to
-the provided :term:`Vault` UUID in the request path to retrieve the file.
-
-.. note::
-    The :term:`Vault` acts only as temporary file storage. For this reason, once the file has been downloaded, it is
-    immediately deleted. It is assumed that the process that must employ it completed its operation to download it and
-    doesn't require the :term:`Vault` copy anymore.
-
-Download of the file is accomplished using the |vault-download-req|_ request.
-In order to either obtain the file metadata without deleting it, or simply to validate its existence,
-the |vault-detail-req|_ request can be used. This HEAD request can be queried multiple times without removing the file.
-For both HTTP methods, the ``X-Auth-Vault`` header is required.
+.. seealso::
+    Refer to :ref:`vault` section for general details about the :term:`Vault` feature.
 
 Stored files in the :term:`Vault` can be employed as input for :ref:`proc_op_execute` operation using the
-provided ``file_href`` reference from the response following upload. The :ref:`Execute <proc_op_execute>` request must
-also include the ``X-Auth-Vault`` header to obtain access to the file.
+provided |vault_ref| reference from the response following upload. The :ref:`Execute <proc_op_execute>`
+request must also include the ``X-Auth-Vault`` header to obtain access to the file.
 
-Alternatively, the direct HTTP location can also be employed as input to a :term:`Process` if it makes immediate use
-of the file. This second approach is not guaranteed to work though if intermediate operations must move the file around,
-such as between steps within a :ref:`Workflow`.
+.. warning::
+    Avoid using the :term:`Vault` HTTP location as ``href`` input. Prefer the |vault_ref| representation.
 
-Using the :ref:`Weaver CLI <cli>`, it is possible to upload local files automatically to the :term:`Vault` of a
-remote `Weaver` server. This can help users host their local file for remote :term:`Process` execution. By default,
-the :ref:`cli` will automatically convert any local file path provided as execution input into a |vault_ref| reference
-to make use of the :term:`Vault` self-hosting from the target `Weaver` instance. It will also update the provided
-inputs or execution body to apply any transformed |vault_ref| references transparently. It is also possible to manually
-provide |vault_ref| references or endpoints if those were uploaded beforehand using the ``upload`` operation, but the
-user must also generate the ``X-Auth-Vault`` header manually in such case.
+The direct :term:`Vault` HTTP location **SHOULD NOT** be employed as input reference to a :term:`Process` to
+ensure its proper interpretation during execution. There are two main reasons for this.
 
-In order to manually upload files, the below code snippet can be employed.
+Firstly, using the plain HTTP endpoint will not provide any hint to `Weaver` about whether the input link
+is a generic remote file or one hosted in the :term:`Vault`. With the lack of this information, `Weaver` could attempt
+to download the file to retrieve it for its local :term:`Process` execution, creating unnecessary operations and wasting
+bandwidth since it is already available locally. Furthermore, the :term:`Vault` behaviour that deletes the file after
+its download would cause it to become unavailable upon subsequent access attempts, as it could be the case during
+handling and forwarding of references during intermediate :ref:`Workflow` step operations. This could inadvertently
+break the :ref:`Workflow` execution.
 
-.. literalinclude:: ../examples/vault-upload.py
-    :language: python
-    :caption: Sample Python request call to upload file to Vault
+Secondly, without the explicit :term:`Vault` reference, `Weaver` cannot be aware of the necessary ``X-Auth-Vault``
+authorization needed to download it. Using the |vault_ref| not only tells `Weaver` that it must forward any relevant
+access token to obtain the file, but it also ensures that those tokens are not inadvertently sent to other locations.
+Effectively, because the :term:`Vault` can be used to temporarily host sensitive data for :term:`Process` execution,
+`Weaver` can better control and avoid leaking the access token to irrelevant resource locations such that only the
+intended :term:`Job` and specific input can access it. This is even more important in situations where multiple
+:term:`Vault` references are required, to make sure each input forwards the respective access token for retrieving
+its file.
 
-This should automatically generate a similar request to the result below.
+When submitting the :ref:`Execute <proc_op_execute>` request, it is important to provide the ``X-Auth-Vault`` header
+with additional reference to the :term:`Vault` parameter when multiple files are involved. Each token should be
+provided using a comma to separated them, as detailed below. When only one file refers to the :term:`Vault` the
+parameters can be omitted since there is no need to map between tokens and distinct |vault_ref| entries.
 
-.. literalinclude:: ../examples/vault-upload.txt
+.. literalinclude:: ../examples/vault-execute.http
     :language: http
-    :caption: Sample request contents to upload file to Vault
+    :caption: Sample request contents to execute process with vault files
 
-Note that the ``Content-Type`` located within the multipart content can be important if the :term:`Process` to
-execute must provide a specific choice of Media-Type as input where the |vault_ref| is provided. This value will be
-employed to generate the ``format`` portion of the input, unless it is provided once again for that input within
-the :ref:`Execute <proc_op_execute>` request body.
+The notation (:rfc:`5234`, :rfc:`7230#section-1.2`) of the ``X-Auth-Vault`` header is presented below.
 
-.. todo::
-    format of ``X-Auth-Vault: token {access-token}``
-    ``#(token {access-token}[; id={input-id}][; index={array-index}])``
-    + examples
+.. parsed-literal::
 
-.. todo::
-    example Execute with substituted vault href
+    X-Auth-Vault = vault-unique / vault-multi
 
+    vault-unique = credentials [ BWS ";" OWS auth-param ]
+    vault-multi  = credentials BWS ";" OWS auth-param 1*( "," OWS credentials BWS ";" OWS auth-param )
+    credentials  = auth-scheme RWS access-token
+    auth-scheme  = "token"
+    auth-param   = "id" "=" UUID
+    access-token = base64
+    base64       = <base64, see :rfc:`4648#section-4`>
+    UUID         = <UUID, see :rfc:`4122#section-3`>
+    BWS          = <BWS, see :rfc:`7230#section-3.2.3`>
+    OWS          = <OWS, see :rfc:`7230#section-3.2.3`>
+    RWS          = <RWS, see :rfc:`7230#section-3.2.3`>
+
+In summary, the access token can be provided by itself by omitting the :term:`Vault` UUID parameter only
+if a single file is referenced across all inputs within the :ref:`Execute <proc_op_execute>` request.
+Otherwise, multiple :term:`Vault` references all require to specific both their respective access token
+and UUID in a comma separated list.
 
 .. _opensearch_data_source:
 
@@ -1028,6 +1030,12 @@ Outputs Location
 By default, :term:`Job` results will be hosted under the endpoint configured by ``weaver.wps_output_url`` and
 ``weaver.wps_output_path``, and will be stored under directory defined by ``weaver.wps_output_dir`` setting.
 
+.. warning::
+    Hosting of results from the file system is **NOT** handled by `Weaver` itself. The API will only *report* the
+    expected endpoints using configured ``weaver.wps_output_url``. It is up to an alternate service or the platform
+    provider that serves the `Weaver` application to provide the external hosting and availability of files online
+    as desired.
+
 Each :term:`Job` will have its specific UUID employed for all of the outputs files, logs and status in order to
 avoid conflicts. Therefore, outputs will be available with the following location:
 
@@ -1172,6 +1180,71 @@ Note again that the more the :term:`Process` is verbose, the more tracking will 
 
 .. literalinclude:: ../../weaver/wps_restapi/examples/job_logs.json
     :language: json
+
+.. _vault:
+
+Uploading File to the Vault
+-----------------------------
+
+.. note::
+    The :term:`Vault` is a specific feature of `Weaver`. Other :term:`ADES`, :term:`EMS` and :term:`OGC API - Processes`
+    servers are not expected to provide this endpoint nor support the |vault_ref| reference format.
+
+The :term:`Vault` is available as secured storage for uploading files to be employed later for :term:`Process`
+execution (see also :ref:`file_vault_inputs`).
+
+When upload succeeds, the response will return a :term:`Vault` UUID and an ``access_token`` to access the file.
+Uploaded files cannot be accessed unless the proper credentials are provided. Requests toward the :term:`Vault` should
+therefore include a ``X-Auth-Vault: token {access_token]`` header in combination to the provided :term:`Vault` UUID in
+the request path to retrieve the file contents. The upload response will also include a ``file_href`` field formatted
+with a |vault_ref| reference to be used for :ref:`file_vault_inputs`, as well as a ``Content-Location`` header of the
+contextual :term:`Vault` endpoint for that file.
+
+Download of the file is accomplished using the |vault-download-req|_ request.
+In order to either obtain the file metadata without downloading it, or simply to validate its existence,
+the |vault-detail-req|_ request can be used. This HEAD request can be queried any number of times without affecting
+the file from the :term:`Vault`. For both HTTP methods, the ``X-Auth-Vault`` header is required.
+
+.. note::
+    The :term:`Vault` acts only as temporary file storage. For this reason, once the file has been downloaded, it is
+    immediately deleted. Download can only occur once. It is assumed that the resource that must employ it will have
+    created a local copy from the download and the :term:`Vault` doesn't require to preserve it anymore. This behaviour
+    intends to limit the duration for which potentially sensitive data remains available in the :term:`Vault` as well
+    as performing cleanup to limit storage space.
+
+Using the :ref:`Weaver CLI or Python client <cli>`, it is possible to upload local files automatically to the
+:term:`Vault` of a remote `Weaver` server. This can help users host their local file for remote :term:`Process`
+execution. By default, the :ref:`cli` will automatically convert any local file path provided as execution input into
+a |vault_ref| reference to make use of the :term:`Vault` self-hosting from the target `Weaver` instance. It will also
+update the provided inputs or execution body to apply any transformed |vault_ref| references transparently. This will
+allow the executed :term:`Process` to securely retrieve the files using :ref:`file_vault_inputs` behaviour. Transmission
+of any required authorization headers is also handled automatically when using this approach.
+
+It is also possible to manually provide |vault_ref| references or endpoints if those were uploaded beforehand using
+the ``upload`` operation, but the user must also generate the ``X-Auth-Vault`` header manually in such case.
+
+.. seealso::
+    Section :ref:`file_vault_inputs` provides more details about the format of ``X-Auth-Vault`` for submission
+    of multiple inputs.
+
+In order to manually upload files, the below code snippet can be employed.
+
+.. literalinclude:: ../examples/vault-upload.py
+    :language: python
+    :caption: Sample Python request call to upload file to Vault
+
+This should automatically generate a similar request to the result below.
+
+.. literalinclude:: ../examples/vault-upload.http
+    :language: http
+    :caption: Sample request contents to upload file to Vault
+
+Note that the ``Content-Type`` embedded within the multipart content (not to be confused with the
+actual ``Content-Type`` header of the request for uploading the file) can be important if the destination input of
+the :term:`Process` to that will consume that :term:`Vault` file for execution must provide a specific choice of
+Media-Type if multiple are supported. This value will be employed to generate the ``format`` portion of the input,
+unless it is explicitly provided once again for that input within the :ref:`Execute <proc_op_execute>` request body.
+
 
 .. _wps_endpoint:
 

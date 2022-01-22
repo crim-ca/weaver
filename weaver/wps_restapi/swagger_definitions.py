@@ -4326,10 +4326,10 @@ class VaultFileAuthorizationHeader(ExtendedSchemaNode):
         "the 'token {access-token}' portion in the header without additional parameters. If multiple files require "
         "access such as during an Execute request, all applicable tokens should be provided using a comma separated "
         "list of access tokens, each with their indented input ID and array index if applicable "
-        f"(see {DOC_URL}/processes.html#file-vault for more details)."
+        f"(see {DOC_URL}/processes.html#file-vault-inputs for more details)."
     )
     name = "X-Auth-Vault"
-    example = "#(token {access-token}[; id={input-id}][; index={array-index}])"
+    example = "token {access-token}[; id={vault-id}]"
     schema_type = String
 
 
@@ -4351,20 +4351,14 @@ class OkVaultFileDownloadResponse(OkVaultFileDetailResponse):
     pass
 
 
-class BadRequestVaultFileDownloadResponse(ExtendedMappingSchema):
+class BadRequestVaultFileAccessResponse(ExtendedMappingSchema):
     description = "Invalid file vault reference."
     header = ResponseHeaders()
     body = ErrorJsonResponseBodySchema()
 
 
-class UnauthorizedVaultFileDownloadResponse(ExtendedMappingSchema):
-    description = "Missing authentication token to obtain access to vault file."
-    header = ResponseHeaders()
-    body = ErrorJsonResponseBodySchema()
-
-
 class ForbiddenVaultFileDownloadResponse(ExtendedMappingSchema):
-    description = "Forbidden access to vault file. Invalid authorization from provided access token."
+    description = "Forbidden access to vault file. Invalid authorization from provided token."
     header = ResponseHeaders()
     body = ErrorJsonResponseBodySchema()
 
@@ -4710,16 +4704,14 @@ head_vault_file_responses = {
             "value": EXAMPLES["vault_file_head.json"],
         }
     }),
-    "400": BadRequestVaultFileDownloadResponse(),
-    "401": UnauthorizedVaultFileDownloadResponse(),
+    "400": BadRequestVaultFileAccessResponse(),
     "403": ForbiddenVaultFileDownloadResponse(),
     "410": GoneVaultFileDownloadResponse(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_vault_file_responses = {
     "200": OkVaultFileDownloadResponse(description="success"),
-    "400": BadRequestVaultFileDownloadResponse(),
-    "401": UnauthorizedVaultFileDownloadResponse(),
+    "400": BadRequestVaultFileAccessResponse(),
     "403": ForbiddenVaultFileDownloadResponse(),
     "410": GoneVaultFileDownloadResponse(),
     "500": InternalServerErrorResponseSchema(),

@@ -5,6 +5,6 @@ Content-Length: 202
 
 --43003e2f205a180ace9cd34d98f911ff
 Content-Disposition: form-data; name="file"; filename="desired-name.json"
-Content-Type: application/json
+Content-Type: application/json; charset=UTF-8
 {"input": "data"}
 --43003e2f205a180ace9cd34d98f911ff--

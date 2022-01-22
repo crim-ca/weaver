@@ -1486,6 +1486,7 @@ class VaultFile(Authentication):
     Dictionary that contains :term:`Vault` file and its authentication information.
     """
     type = AuthenticationTypes.VAULT
+    bytes = 32
 
     def __init__(self, file_name="", file_format=None, auth_token=None, **kwargs):
         # type: (str, Optional[str], Optional[str], Any) -> None
@@ -1499,7 +1500,7 @@ class VaultFile(Authentication):
         super(VaultFile, self).__init__(
             auth_scheme="token",
             auth_link=None,  # don't care
-            auth_token=auth_token or token_hex(32),
+            auth_token=auth_token or token_hex(VaultFile.bytes),
             name=file_name,
             format=file_format,
             **kwargs

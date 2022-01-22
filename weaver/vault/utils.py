@@ -1,10 +1,12 @@
+import re
+
 import logging
 import os
 from tempfile import mkdtemp
 from typing import TYPE_CHECKING
 
 import colander
-from pyramid.httpexceptions import HTTPBadRequest, HTTPForbidden, HTTPGone, HTTPUnauthorized
+from pyramid.httpexceptions import HTTPBadRequest, HTTPForbidden, HTTPGone
 
 from weaver.database import get_db
 from weaver.datatype import VaultFile
@@ -13,13 +15,16 @@ from weaver.utils import get_header, get_settings, get_weaver_url, repr_json
 from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
-    from typing import Optional
+    from typing import Dict, Optional
 
     from pyramid.request import Request
 
     from weaver.typedefs import AnySettingsContainer
 
 LOGGER = logging.getLogger(__name__)
+
+REGEX_VAULT_TOKEN = re.compile(r"^[a-f0-9]{{{}}}$".format(VaultFile.bytes * 2))
+REGEX_VAULT_UUID = re.compile(r"^[a-f0-9]{8}(?:-?[a-f0-9]{4}){3}-?[a-f0-9]{12}$")
 
 
 def get_vault_dir(container=None):
@@ -57,6 +62,62 @@ def get_vault_url(file, container=None):
     return vault_url
 
 
+def parse_vault_token(header, unique=False):
+    # type: (Optional[str], bool) -> Dict[Optional[str], str]
+    """
+    Parse the authorization header value to retrieve all :term:`Vault` access tokens and optional file UUID.
+
+    .. seealso::
+        - Definition of expected format in :ref:`file_vault_token`.
+        - :class:`sd.VaultFileAuthorizationHeader`
+
+    :param header: Authorization header to parse.
+    :param unique: Whether only one or multiple tokens must be retrieved.
+    :return: Found mapping of UUID to access token. If unique, UUID can be ``None``.
+    """
+    if not isinstance(header, str):
+        return {}
+    header = header.lower()
+    if unique and "," in header:
+        return {}
+    auth_tokens = header.split(",")
+    if not auth_tokens:
+        return {}
+    vault_tokens = {}
+    for auth in auth_tokens:
+        auth = auth.strip()
+        if not unique and ";" not in auth:
+            continue
+        if unique and ";" not in auth:
+            token = auth
+            param = "id="
+        else:
+            token, param = auth.split(";", 1)
+        if param.strip() == "":  # final ';' to ignore
+            param = "="
+        token = token.split("token ")[-1].strip()
+        param = param.split("=")
+        if not len(param) == 2:
+            continue
+        value = param[1].strip()
+        param = param[0].strip()
+        if param != "id" or not (value or unique):
+            continue
+        value = REGEX_VAULT_UUID.match(value) if value else None
+        token = REGEX_VAULT_TOKEN.match(token) if token else None
+        if not token:
+            continue
+        token = token[0]
+        if not value and not unique:
+            continue
+        value = value[0] if not unique else None
+        if vault_tokens.get(value) not in [None, token]:
+            vault_tokens[value] = None  # cannot pick duplicates, drop both
+            continue
+        vault_tokens[value] = token
+    return vault_tokens
+
+
 def get_authorized_file(request):
     # type: (Request) -> VaultFile
     """
@@ -72,18 +133,27 @@ def get_authorized_file(request):
     except colander.Invalid as ex:
         raise HTTPBadRequest(json={
             "code": "VaultInvalidParameter",
-            "description": sd.BadRequestVaultFileDownloadResponse.description,
+            "description": sd.BadRequestVaultFileAccessResponse.description,
             "error": colander.Invalid.__name__,
             "cause": str(ex),
             "value": repr_json(ex.value or dict(request.matchdict), force_string=False),
         })
     auth = get_header(sd.VaultFileAuthorizationHeader.name, request.headers)
-    token = auth.split("token ")[-1] if isinstance(auth, str) else None
+    vault_token = parse_vault_token(auth, unique=True)
+    token = vault_token.get(None, vault_token.get(file_id))
     if not token:
-        raise HTTPUnauthorized(json={
+        # note:
+        #   401 not applicable since no no Authentication endpoint for the Vault
+        #   RFC 2616 requires that a 401 response be accompanied by an RFC 2617 WWW-Authenticate
+        msg = "Missing authorization token to obtain access to vault file."
+        if auth:  # if header provided but parsed as invalid
+            msg = "Incorrectly formed authorization token to obtain access to vault file."
+        if vault_token and list(vault_token)[0] not in [None, file_id]:
+            msg = "Mismatching Vault UUID specified in authorization header."
+        raise HTTPForbidden(json={
             "code": "InvalidHeaderValue",
             "name": sd.VaultFileAuthorizationHeader.name,
-            "description": sd.UnauthorizedVaultFileDownloadResponse.description,
+            "description": msg,
             "value": repr_json(auth, force_string=False),
         })
 
