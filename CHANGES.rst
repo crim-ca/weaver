@@ -18,6 +18,9 @@ Fixes:
 ------
 - Fix rendering of CLI *required* arguments under the appropriate argument group section when those arguments can be
   specified using prefixed ``-`` and ``--`` optional arguments format.
+- Fix rendering of OpenAPI variable names (``additionalParameters``) employed to represent for example ``{input-id}``
+  as the key within the mapping representation of inputs/outputs. The previous notation employed was incorrectly
+  interpreted as HTML tags, making them partially hidden in Swagger UI.
 
 `4.8.0 <https://github.com/crim-ca/weaver/tree/4.8.0>`_ (2022-01-11)
 ========================================================================
@@ -409,12 +412,12 @@ Changes:
   Only utilities are added, not all routes provide the information yet.
 - Add validation of ``schema`` field under ``Format`` schema (as per `opengeospatial/ogcapi-processes schema format.yml
   <https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/format.yaml>`_) such that only
-  URL formatted strings are allowed, or alternatively and explicit JSON definition. Previous definitions that would
+  URL formatted strings are allowed, or alternatively an explicit JSON definition. Previous definitions that would
   indicate an empty string schema are dropped since ``schema`` is optional.
 - Block unknown and ``builtin`` process types during deployment from the API
   (fixes `#276  <https://github.com/crim-ca/weaver/issues/276>`_).
   Type ``builtin`` can only be registered by `Weaver` itself at startup. Other unknown types that have
-  no indication for mapping to an appropriate `Process` implementation are preemptively validated.
+  no indication for mapping to an appropriate ``Process`` implementation are preemptively validated.
 - Add parsing and generation of additional ``literalDataDomains`` for specification of WPS I/O data constrains and
   provide corresponding definitions in process description responses
   (fixes `#41 <https://github.com/crim-ca/weaver/issues/41>`_,
