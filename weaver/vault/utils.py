@@ -83,14 +83,16 @@ def parse_vault_token(header, unique=False):
     auth_tokens = header.split(",")
     if not auth_tokens:
         return {}
+    if len(auth_tokens) > 1 and unique:  # cannot pick which one applies
+        return {}
     vault_tokens = {}
     for auth in auth_tokens:
         auth = auth.strip()
         if not unique and ";" not in auth:
-            continue
+            return {}
         if unique and ";" not in auth:
             token = auth
-            param = "id="
+            param = "="
         else:
             token, param = auth.split(";", 1)
         if param.strip() == "":  # final ';' to ignore
@@ -98,23 +100,26 @@ def parse_vault_token(header, unique=False):
         token = token.split("token ")[-1].strip()
         param = param.split("=")
         if not len(param) == 2:
-            continue
+            return {}
         value = param[1].strip()
         param = param[0].strip()
-        if param != "id" or not (value or unique):
-            continue
-        value = REGEX_VAULT_UUID.match(value) if value else None
-        token = REGEX_VAULT_TOKEN.match(token) if token else None
-        if not token:
-            continue
-        token = token[0]
-        if not value and not unique:
-            continue
-        value = value[0] if not unique else None
-        if vault_tokens.get(value) not in [None, token]:
-            vault_tokens[value] = None  # cannot pick duplicates, drop both
-            continue
-        vault_tokens[value] = token
+        if param != "id" and not (value or unique):
+            return {}
+        if param and unique and not value:  # explicitly provided parameter although optional is allowed
+            return {}
+        if value and value.startswith("\"") and value.endswith("\""):
+            value = value[1:-1]
+        value_match = REGEX_VAULT_UUID.match(value) if value else None
+        token_match = REGEX_VAULT_TOKEN.match(token) if token else None
+        if not token_match:
+            return {}
+        token_match = token_match[0]
+        if not value_match and not (unique and not value):  # allow omitted 'id' if unique, unless explicitly given
+            return {}
+        value_match = None if (unique and not param) else value_match[0]
+        if vault_tokens.get(value_match) is not None:
+            return {}  # cannot pick duplicates, drop both
+        vault_tokens[value_match] = token_match
     return vault_tokens
 
 

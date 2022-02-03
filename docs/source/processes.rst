@@ -861,9 +861,11 @@ The notation (:rfc:`5234`, :rfc:`7230#section-1.2`) of the ``X-Auth-Vault`` head
     vault-multi  = credentials BWS ";" OWS auth-param 1*( "," OWS credentials BWS ";" OWS auth-param )
     credentials  = auth-scheme RWS access-token
     auth-scheme  = "token"
-    auth-param   = "id" "=" UUID
+    auth-param   = "id" "=" vault-id
+    vault-id     = UUID / ( DQUOTE UUID DQUOTE )
     access-token = base64
     base64       = <base64, see :rfc:`4648#section-4`>
+    DQUOTE       = <DQUOTE, see :rfc:`7230#section-1.2`>
     UUID         = <UUID, see :rfc:`4122#section-3`>
     BWS          = <BWS, see :rfc:`7230#section-3.2.3`>
     OWS          = <OWS, see :rfc:`7230#section-3.2.3`>
