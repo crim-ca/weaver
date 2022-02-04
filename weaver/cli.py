@@ -445,6 +445,7 @@ class WeaverClient(object):
               https://docs.python-requests.org/en/latest/user/quickstart/#response-headers
             - Headers formatting with multiple values must be provided by comma-separated values
               (:rfc:`7230#section-3.2.2`).
+            - Multi Vault-Token parsing accomplished by :func:`weaver.vault.utils.parse_vault_token`.
 
         :param inputs: Input values for submission of :term:`Process` execution.
         :return: Updated inputs.
