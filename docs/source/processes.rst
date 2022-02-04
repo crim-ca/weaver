@@ -1235,17 +1235,27 @@ In order to manually upload files, the below code snippet can be employed.
     :language: python
     :caption: Sample Python request call to upload file to Vault
 
-This should automatically generate a similar request to the result below.
+This should automatically generate a *similar* request to the result below.
 
 .. literalinclude:: ../examples/vault-upload.http
     :language: http
     :caption: Sample request contents to upload file to Vault
 
-Note that the ``Content-Type`` embedded within the multipart content (not to be confused with the
+.. warning::
+    When providing literal HTTP request contents as above, make sure to employ ``CRLF`` instead of plain ``LF`` for
+    separating the data using the *boundary*. Also, make sure to omit any additional ``LF`` between the data and each
+    *boundary* if this could impact parsing of the data itself (e.g.: as in the case of non-text readable base64 data)
+    to avoid modifying the file contents during upload. Some additional newlines are presented in the above example
+    only for readability purpose. It is recommended to use utilities like the Python example or
+    the :ref:`Weaver CLI <cli>` so avoid such issues during request content generation.
+    Please refer to :rfc:`7578#section-4.1` for more details regarding multipart content separators.
+
+Note that the ``Content-Type`` embedded within the multipart content in the above example (not to be confused with the
 actual ``Content-Type`` header of the request for uploading the file) can be important if the destination input of
-the :term:`Process` to that will consume that :term:`Vault` file for execution must provide a specific choice of
-Media-Type if multiple are supported. This value will be employed to generate the ``format`` portion of the input,
-unless it is explicitly provided once again for that input within the :ref:`Execute <proc_op_execute>` request body.
+the :term:`Process` that will consume that :term:`Vault` file for execution must provide a specific choice of
+Media-Type if multiple are supported. This value could be employed to generate the explicit ``format`` portion of the
+input, in case it cannot be resolved automatically from the file contents, or unless it is explicitly provided once
+again for that input within the :ref:`Execute <proc_op_execute>` request body.
 
 
 .. _wps_endpoint:
