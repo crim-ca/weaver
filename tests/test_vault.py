@@ -11,6 +11,7 @@ VAULT_FAKE_UUID1 = str(uuid.uuid4())
 VAULT_FAKE_UUID2 = str(uuid.uuid4())
 
 
+@pytest.mark.vault
 @pytest.mark.parametrize("header,unique,expected", [
     (f"Basic {VAULT_FAKE_TOKEN}  ", True,
      {}),

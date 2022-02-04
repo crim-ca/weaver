@@ -32,7 +32,6 @@ from weaver.utils import (
     get_any_id,
     get_any_value,
     get_file_headers,
-    get_header,
     load_file,
     null,
     repr_json,

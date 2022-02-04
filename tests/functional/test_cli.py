@@ -1,12 +1,15 @@
 """
 Functional tests for :mod:`weaver.cli`.
 """
+
 import contextlib
 import copy
 import json
 import os
 import shutil
 import tempfile
+import uuid
+from typing import TYPE_CHECKING
 
 import pytest
 import yaml
@@ -24,6 +27,10 @@ from tests.utils import (
 from weaver.cli import WeaverClient, main as weaver_cli
 from weaver.formats import CONTENT_TYPE_TEXT_PLAIN
 from weaver.status import STATUS_ACCEPTED, STATUS_FAILED, STATUS_RUNNING, STATUS_SUCCEEDED
+from weaver.wps.utils import map_wps_output_location
+
+if TYPE_CHECKING:
+    from typing import Dict
 
 
 @pytest.mark.cli
@@ -66,6 +73,8 @@ class TestWeaverClientBase(WpsConfigBase):
 
     @staticmethod
     def get_resource_file(name, process="Echo"):
+        if os.path.isfile(name):
+            return os.path.abspath(name)
         return os.path.join(APP_PKG_ROOT, process, name)
 
     @classmethod
@@ -75,6 +84,29 @@ class TestWeaverClientBase(WpsConfigBase):
 
 
 class TestWeaverClient(TestWeaverClientBase):
+    @classmethod
+    def setUpClass(cls):
+        super(TestWeaverClient, cls).setUpClass()
+        cls.test_tmp_dir = tempfile.mkdtemp()
+
+    @classmethod
+    def tearDownClass(cls):
+        super(TestWeaverClient, cls).tearDownClass()
+        shutil.rmtree(cls.test_tmp_dir, ignore_errors=True)
+
+    def setup_test_file(self, original_file, substitutions):
+        # type: (str, Dict[str, str]) -> str
+        path = os.path.join(self.test_tmp_dir, str(uuid.uuid4()))
+        os.makedirs(path, exist_ok=True)
+        test_file_path = os.path.join(path, os.path.split(original_file)[-1])
+        with open(original_file, "r") as real_file:
+            data = real_file.read()
+            for sub, new in substitutions.items():
+                data = data.replace(sub, new)
+        with open(test_file_path, "w") as test_file:
+            test_file.write(data)
+        return test_file_path
+
     def process_listing_op(self, operation):
         result = mocked_sub_requests(self.app, operation)
         assert result.success
@@ -199,12 +231,13 @@ class TestWeaverClient(TestWeaverClientBase):
         assert "undefined" not in result.message, "CLI should not have confused process description as response detail."
         assert "description" not in result.body, "CLI should not have overridden the process description field."
 
-    def run_execute_inputs_schema_variant(self, inputs_param, preload=False, expect_success=True, mock_exec=True):
+    def run_execute_inputs_schema_variant(self, inputs_param, process="Echo",
+                                          preload=False, expect_success=True, mock_exec=True):
         if isinstance(inputs_param, str):
             if preload:
-                inputs_param = self.load_resource_file(inputs_param)
+                inputs_param = self.load_resource_file(inputs_param, process=process)
             else:
-                inputs_param = self.get_resource_file(inputs_param)
+                inputs_param = self.get_resource_file(inputs_param, process=process)
         with contextlib.ExitStack() as stack_exec:
             # use pass-through function because don't care about execution result here, only the parsing of I/O
             if mock_exec:
@@ -337,6 +370,65 @@ class TestWeaverClient(TestWeaverClientBase):
         #   Test should wrap 'get_job' in 'get_job_status' view (or similar wrapping approach) to validate that
         #   status was periodically pooled and returned 'running' until the final 'succeeded' resumes to download.
         raise NotImplementedError
+
+    # NOTE:
+    #   For all below '<>_auto_resolve_vault' test cases, the local file referenced in the Execute request body
+    #   should be automatically handled by uploading to the Vault and forwarding the relevant X-Auth-Vault header.
+    def run_execute_inputs_with_vault_file(self, test_execute_file, process="CatFile", preload=False, embed=None):
+        test_data = "DUMMY DATA"
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt") as tmp_file:
+            tmp_file.write(test_data)
+            tmp_file.flush()
+            tmp_file.seek(0)
+            exec_file = self.get_resource_file(test_execute_file, process=process)
+            test_file = self.setup_test_file(exec_file, {"<TEST_FILE>": tmp_file.name})
+            if embed:
+                test_file = embed.format(test_file=test_file)
+            result = self.run_execute_inputs_schema_variant(test_file, preload=preload, mock_exec=False)
+        job_id = result.body["jobID"]
+        result = mocked_sub_requests(self.app, self.client.results, job_id)
+        output = map_wps_output_location(result.body["output"], self.settings, exists=True)
+        assert os.path.isfile(output)
+        with open(output, "r") as out_file:
+            out_data = out_file.read()
+        assert out_data == test_data
+
+    @pytest.mark.vault
+    def test_execute_inputs_cwl_file_schema_auto_resolve_vault(self):
+        self.run_execute_inputs_with_vault_file("Execute_CatFile_cwl_schema.yml", "CatFile", preload=False)
+
+    @pytest.mark.vault
+    def test_execute_inputs_ogc_value_file_schema_auto_resolve_vault(self):
+        self.run_execute_inputs_with_vault_file("Execute_CatFile_ogc_value_schema.yml", "CatFile", preload=False)
+
+    @pytest.mark.vault
+    def test_execute_inputs_ogc_mapping_file_schema_auto_resolve_vault(self):
+        self.run_execute_inputs_with_vault_file("Execute_CatFile_ogc_mapping_schema.yml", "CatFile", preload=False)
+
+    @pytest.mark.vault
+    def test_execute_inputs_old_listing_file_schema_auto_resolve_vault(self):
+        self.run_execute_inputs_with_vault_file("Execute_CatFile_old_listing_schema.yml", "CatFile", preload=False)
+
+    @pytest.mark.vault
+    def test_execute_inputs_cwl_literal_schema_auto_resolve_vault(self):
+        self.run_execute_inputs_with_vault_file("Execute_CatFile_cwl_schema.yml", "CatFile", preload=True)
+
+    @pytest.mark.vault
+    def test_execute_inputs_ogc_value_literal_schema_auto_resolve_vault(self):
+        self.run_execute_inputs_with_vault_file("Execute_CatFile_ogc_value_schema.yml", "CatFile", preload=True)
+
+    @pytest.mark.vault
+    def test_execute_inputs_ogc_mapping_literal_schema_auto_resolve_vault(self):
+        self.run_execute_inputs_with_vault_file("Execute_CatFile_ogc_mapping_schema.yml", "CatFile", preload=True)
+
+    @pytest.mark.vault
+    def test_execute_inputs_old_listing_literal_schema_auto_resolve_vault(self):
+        self.run_execute_inputs_with_vault_file("Execute_CatFile_old_listing_schema.yml", "CatFile", preload=True)
+
+    @pytest.mark.vault
+    def test_execute_inputs_representation_literal_schema_auto_resolve_vault(self):
+        self.run_execute_inputs_with_vault_file("Execute_CatFile_old_listing_schema.yml", "CatFile", preload=False,
+                                                embed="file:file='{test_file}'")
 
     @mocked_dismiss_process()
     def test_dismiss(self):
