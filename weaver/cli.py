@@ -446,6 +446,8 @@ class WeaverClient(object):
             - Headers formatting with multiple values must be provided by comma-separated values
               (:rfc:`7230#section-3.2.2`).
             - Multi Vault-Token parsing accomplished by :func:`weaver.vault.utils.parse_vault_token`.
+            - More details about formats and operations related to :term:`Vault` are provided
+              in :ref:`file_vault_token` and :ref:`vault` chapters.
 
         :param inputs: Input values for submission of :term:`Process` execution.
         :return: Updated inputs.
@@ -580,6 +582,10 @@ class WeaverClient(object):
 
         .. note::
             Feature only available for `Weaver` instances. Not available for standard :term:`OGC API - Processes`.
+
+        .. seealso::
+            More details about formats and operations related to :term:`Vault` are provided
+            in :ref:`file_vault_token` and :ref:`vault` chapters.
 
         :param file_path: Location of the file to be uploaded.
         :param content_type:
