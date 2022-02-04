@@ -1021,9 +1021,12 @@ def make_parser():
 
             Values that require other type than string to be converted for job submission can include the type
             following the ID using a colon separator (i.e.: '<id>:<type>=<value>'). For example, an integer could be
-            specified as follows: 'number:int=1' while a floating point would be: 'number:float=1.23'.
+            specified as follows: 'number:int=1' while a floating point number would be: 'number:float=1.23'.
 
             File references (href) should be specified using 'File' as the type (i.e.: 'input:File=http://...').
+            Note that 'File' in this case is expected to be an URL location where the file can be download from.
+            When a local file is supplied, Weaver will automatically convert it to a remote Vault File in order to
+            upload it and make it available for the remote process.
 
             Array input (maxOccurs > 1) should be specified using semicolon (;) separated values.
             The type of an item of this array can also be provided (i.e.: 'array:int=1;2;3').

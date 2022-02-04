@@ -2,7 +2,6 @@
 Definitions of types used by tokens.
 """
 import abc
-
 import copy
 import enum
 import inspect
