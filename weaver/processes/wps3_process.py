@@ -1,6 +1,5 @@
 import logging
 import warnings
-from copy import deepcopy
 from time import sleep
 from typing import TYPE_CHECKING
 
@@ -32,9 +31,8 @@ from weaver.wps_restapi import swagger_definitions as sd
 if TYPE_CHECKING:
     from typing import Any, Union
 
-    from pywps.app import WPSRequest
-
     from weaver.typedefs import (
+        AnyHeadersContainer,
         JSON,
         JobInputs,
         JobMonitorReference,
@@ -42,6 +40,7 @@ if TYPE_CHECKING:
         JobResults,
         UpdateStatusPartialFunction
     )
+    from weaver.wps.service import WorkerRequest
 
 
 LOGGER = logging.getLogger(__name__)
@@ -62,7 +61,7 @@ class Wps3Process(WpsProcessInterface):
                  step_payload,      # type: JSON
                  joborder,          # type: JSON
                  process,           # type: str
-                 request,           # type: WPSRequest
+                 request,           # type: WorkerRequest
                  update_status,     # type: UpdateStatusPartialFunction
                  ):
         super(Wps3Process, self).__init__(
@@ -131,6 +130,10 @@ class Wps3Process(WpsProcessInterface):
             if not access_token:
                 warnings.warn("Could not retrieve valid access token although response is expected to contain one.",
                               MissingParameterWarning)
+        elif self.request and self.request.auth_headers and "Authorization" in self.request.auth_headers:
+            # FIXME: consider X-Auth-ADES in case of conflict with Authorization for server that hosts this EMS?
+            LOGGER.debug("Detected Authorization header directly specified in request for ADES.")
+            access_token = self.request.auth_headers.get("Authorization")
         else:
             warnings.warn(
                 "Could not retrieve at least one of required login parameters: "
@@ -138,6 +141,17 @@ class Wps3Process(WpsProcessInterface):
                 MissingParameterWarning
             )
         return {"Authorization": "Bearer {}".format(access_token) if access_token else None}
+
+    def get_auth_headers(self):
+        # type: () -> AnyHeadersContainer
+        """
+        Add specific user access headers for :term:`ADES` if provided in :ref:`Configuration Settings`.
+        """
+        headers = super(Wps3Process, self).get_auth_headers()
+        auth = headers.get("Authorization")
+        if not auth:
+            headers.update(self.get_user_auth_header())
+        return headers
 
     def is_deployed(self):
         return self.describe_process() is not None
@@ -169,9 +183,6 @@ class Wps3Process(WpsProcessInterface):
         self.update_status("Updating process visibility on remote ADES.",
                            REMOTE_JOB_PROGRESS_VISIBLE, status.STATUS_RUNNING)
         path = self.url + sd.process_visibility_service.path.format(process_id=self.process)
-        user_headers = deepcopy(self.headers)
-        user_headers.update(self.get_user_auth_header())
-
         LOGGER.debug("Update process WPS visibility request for [%s] at [%s]", self.process, path)
         response = self.make_request(method="PUT",
                                      url=path,
@@ -198,9 +209,6 @@ class Wps3Process(WpsProcessInterface):
         self.update_status("Deploying process on remote ADES.",
                            REMOTE_JOB_PROGRESS_DEPLOY, status.STATUS_RUNNING)
         path = self.url + sd.processes_service.path
-        user_headers = deepcopy(self.headers)
-        user_headers.update(self.get_user_auth_header())
-
         LOGGER.debug("Deploy process WPS request for [%s] at [%s]", self.process, path)
         response = self.make_request(method="POST", url=path, json=self.deploy_body, retry=True)
         response.raise_for_status()

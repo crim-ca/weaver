@@ -176,7 +176,7 @@ def test_map_wps_output_location_duplicate_subdir():
         path = map_wps_output_location(f"{wps_out}/tmp/some-file-tmp.tmp", settings, exists=False)
         assert path == f"{tmp_dir}/tmp/some-file-tmp.tmp"
 
-        path = map_wps_output_location(f"{tmp_dir}/here/some-file-tmp.tmp", settings, exists=False, reverse=True)
+        path = map_wps_output_location(f"{tmp_dir}/here/some-file-tmp.tmp", settings, exists=False, url=True)
         assert path == f"{wps_out}/here/some-file-tmp.tmp"
 
 
@@ -203,9 +203,9 @@ def test_map_wps_output_location_exists():
             path = map_wps_output_location(tmp_http, settings, exists=False)
             assert path == tmp_path
 
-            path = map_wps_output_location(tmp_path, settings, exists=True, reverse=True)
+            path = map_wps_output_location(tmp_path, settings, exists=True, url=True)
             assert path == tmp_http
-            path = map_wps_output_location(tmp_path, settings, exists=False, reverse=True)
+            path = map_wps_output_location(tmp_path, settings, exists=False, url=True)
             assert path == tmp_http
 
         assert not os.path.isfile(tmp_path), "test file expected to be auto-cleaned"
@@ -215,9 +215,9 @@ def test_map_wps_output_location_exists():
         path = map_wps_output_location(tmp_http, settings, exists=False)
         assert path == tmp_path
 
-        path = map_wps_output_location(tmp_path, settings, exists=True, reverse=True)
+        path = map_wps_output_location(tmp_path, settings, exists=True, url=True)
         assert path is None
-        path = map_wps_output_location(tmp_path, settings, exists=False, reverse=True)
+        path = map_wps_output_location(tmp_path, settings, exists=False, url=True)
         assert path == tmp_http
 
     except AssertionError:

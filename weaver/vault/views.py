@@ -11,7 +11,7 @@ from weaver.datatype import VaultFile
 from weaver.database import get_db
 from weaver.exceptions import log_unhandled_exceptions
 from weaver.store.base import StoreVault
-from weaver.vault.utils import get_authorized_file, get_vault_dir, get_vault_path, get_vault_url
+from weaver.vault.utils import get_authorized_file, get_vault_auth, get_vault_dir, get_vault_path, get_vault_url
 from weaver.utils import get_file_headers
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import HTTPHeadFileResponse
@@ -69,7 +69,8 @@ def describe_file(request):
     """
     Get authorized vault file details without downloading it.
     """
-    file = get_authorized_file(request)
+    file_id, auth = get_vault_auth(request)
+    file = get_authorized_file(file_id, auth, request)
     path = get_vault_path(file, request)
     headers = get_file_headers(path, download_headers=True, content_headers=True, content_type=file.format)
     headers["Content-Location"] = get_vault_url(file, request)
@@ -84,16 +85,21 @@ def download_file(request):
     """
     Download authorized vault file and remove it from the vault.
     """
-    file = get_authorized_file(request)
+    file_id, auth = get_vault_auth(request)
+    vault_file = get_authorized_file(file_id, auth, request)
 
     class FileIterAndDelete(FileIter):
+        @property
+        def filelike(self):
+            return self.file
+
         def close(self):
             super().close()
             os.remove(self.file.name)
 
     request.environ["wsgi.file_wrapper"] = FileIterAndDelete
-    path = get_vault_path(file, request)
+    path = get_vault_path(vault_file, request)
     resp = FileResponse(path, request=request)
-    # FIXME: add headers ?
-    # get_file_headers(path, download_headers=True, content_headers=True, content_type=vault_file.format)
+    headers = get_file_headers(path, download_headers=True, content_headers=True, content_type=vault_file.format)
+    resp.headers.update(headers)
     return resp

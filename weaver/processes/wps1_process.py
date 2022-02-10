@@ -30,7 +30,6 @@ if TYPE_CHECKING:
     from typing import Optional
 
     from owslib.wps import WebProcessingService
-    from pywps.app import WPSRequest
 
     from weaver.typedefs import (
         CWL_RuntimeInputsMap,
@@ -42,6 +41,7 @@ if TYPE_CHECKING:
         ProcessOWS,
         UpdateStatusPartialFunction
     )
+    from weaver.wps.service import WorkerRequest
 
 LOGGER = logging.getLogger(__name__)
 
@@ -50,7 +50,7 @@ class Wps1Process(WpsProcessInterface):
     def __init__(self,
                  provider,          # type: str
                  process,           # type: str
-                 request,           # type: WPSRequest
+                 request,           # type: WorkerRequest
                  update_status,     # type: UpdateStatusPartialFunction
                  ):
         self.provider = provider

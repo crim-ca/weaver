@@ -11,6 +11,7 @@ from pywps.app.Service import Service as ServiceWPS
 from pywps.inout.storage import StorageAbstract
 from pywps.response import WPSResponse
 from pywps.response.execute import ExecuteResponse
+from requests.structures import CaseInsensitiveDict
 
 from weaver.database import get_db
 from weaver.datatype import Process
@@ -39,8 +40,16 @@ if TYPE_CHECKING:
     from typing import Any, Dict, List, Optional, Union
 
     from weaver.datatype import Job
-    from weaver.processes.convert import WPS_Input_Type, WPS_Output_Type
-    from weaver.typedefs import HTTPValid, JSON, SettingsType
+    from weaver.typedefs import (
+        AnyRequestType,
+        AnyHeadersContainer,
+        HeadersType,
+        HTTPValid,
+        JSON,
+        SettingsType,
+        WPS_InputData,
+        WPS_OutputRequested
+    )
 
 
 class ReferenceStatusLocationStorage(StorageAbstract):
@@ -74,6 +83,38 @@ class ReferenceStatusLocationStorage(StorageAbstract):
         pass
 
 
+class WorkerRequest(WPSRequest):
+    """
+    Extended :mod:`pywps` request with additional handling provided by :mod:`weaver`.
+    """
+    _auth_headers = CaseInsensitiveDict({  # take advantage of case insensitive only, value don't care
+        "Authorization": None,
+        "X-Auth": None,
+        sd.XAuthVaultFileHeader.name: None,
+    })
+
+    def __init__(self, http_request=None, http_headers=None, **kwargs):
+        # type: (Optional[AnyRequestType], Optional[AnyHeadersContainer], Any) -> None
+        super(WorkerRequest, self).__init__(http_request, **kwargs)
+        self.auth_headers = CaseInsensitiveDict()
+        if http_request:
+            self.auth_headers.update(self.parse_auth_headers(http_request.headers))
+        if http_headers:
+            self.auth_headers.update(self.parse_auth_headers(http_headers))
+
+    def parse_auth_headers(self, headers):
+        # type: (Optional[AnyHeadersContainer]) -> HeadersType
+        if not headers:
+            return {}
+        if isinstance(headers, list):
+            headers = dict(headers)
+        auth_headers = {}
+        for name, value in headers.items():
+            if name in self._auth_headers:
+                auth_headers[name] = value
+        return auth_headers
+
+
 class WorkerExecuteResponse(ExecuteResponse):
     """
     XML response generator from predefined job status URL and executed process definition.
@@ -81,7 +122,7 @@ class WorkerExecuteResponse(ExecuteResponse):
     # pylint: disable=W0231,W0233  # FIXME: tmp until patched
 
     def __init__(self, wps_request, uuid, process, job_url, settings, *_, **__):
-        # type: (WPSRequest, str, ProcessWPS, str, SettingsType, Any, Any) -> None
+        # type: (WorkerRequest, str, ProcessWPS, str, SettingsType, Any, Any) -> None
 
         # FIXME: https://github.com/geopython/pywps/pull/578
         # temp patch, do what 'ExecuteResponse.__init__' does bypassing the problem super() call
@@ -238,7 +279,7 @@ class WorkerService(ServiceWPS):
         return super(WorkerService, self).prepare_process_for_execution(identifier)
 
     def execute(self, identifier, wps_request, uuid):
-        # type: (str, WPSRequest, str) -> Union[WPSResponse, HTTPValid]
+        # type: (str, Union[WPSRequest, WorkerRequest], str) -> Union[WPSResponse, HTTPValid]
         """
         Handles the ``Execute`` KVP/XML request submitted on the WPS endpoint.
 
@@ -279,15 +320,20 @@ class WorkerService(ServiceWPS):
             message = "Failed building XML response from WPS Execute result. Error [{!r}]".format(ex)
             raise OWSNoApplicableCode(message, locator=job_id)
 
-    def execute_job(self, job, wps_inputs, wps_outputs, remote_process):
-        # type: (Job, List[WPS_Input_Type], List[WPS_Output_Type], Optional[Process]) -> WPSExecution
+    def execute_job(self,
+                    job,                # type: Job
+                    wps_inputs,         # type: List[WPS_InputData]
+                    wps_outputs,        # type: List[WPS_OutputRequested]
+                    remote_process,     # type: Optional[Process]
+                    headers,            # type: Optional[AnyHeadersContainer]
+                    ):                  # type: (...) -> WPSExecution
         """
         Real execution of the process by active Celery Worker.
         """
         process_id = job.process
         execution = WPSExecution(version="2.0", url="localhost")
         xml_request = execution.buildRequest(process_id, wps_inputs, wps_outputs, mode=job.execution_mode, lineage=True)
-        wps_request = WPSRequest()
+        wps_request = WorkerRequest(http_headers=headers)
         wps_request.identifier = process_id
         wps_request.check_and_set_language(job.accept_language)
         wps_request.set_version("2.0.0")

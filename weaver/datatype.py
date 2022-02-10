@@ -1570,7 +1570,7 @@ class VaultFile(Authentication):
         This corresponds to the ``href`` value to be provided when submitting an input that should be updated using
         the vault file of specified UUID and using the respective authorization token in ``X-Auth-Vault`` header.
         """
-        return f"vault:{self.id!s}"
+        return f"vault://{self.id!s}"
 
     def json(self):
         # type: () -> JSON

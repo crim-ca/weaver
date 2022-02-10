@@ -31,8 +31,9 @@ if TYPE_CHECKING:
     from pyramid.response import Response as PyramidResponse
     from pyramid.testing import DummyRequest
     from pyramid.config import Configurator
-    from pywps.app import WPSRequest
     from pywps import Process as ProcessWPS
+    from pywps.app import WPSRequest
+    from pywps.inout import BoundingBoxInput, ComplexInput, LiteralInput
     from requests import Request as RequestsRequest
     from requests.structures import CaseInsensitiveDict
     from webob.headers import ResponseHeaders, EnvironHeaders
@@ -166,6 +167,14 @@ if TYPE_CHECKING:
     # inputs of OWSLib are either a string (any literal type, bbox or complex file)
     OWS_InputData = Union[str, BoundingBoxDataInput, ComplexDataInput]
     OWS_InputDataValues = List[Tuple[str, OWS_InputData]]
+
+    AnyInputData = Union[OWS_InputData, BoundingBoxInput, ComplexInput, LiteralInput]
+
+    # PyWPS Execution
+    WPS_InputData = Tuple[str, AnyInputData]
+    WPS_OutputAsRef = Tuple[str, Optional[bool]]                            # (output_id, as_ref)
+    WPS_OutputAsRefMimeType = Tuple[str, Optional[bool], Optional[str]]     # (output_id, as_ref, mime_type)
+    WPS_OutputRequested = Union[WPS_OutputAsRef, WPS_OutputAsRefMimeType]
 
     KVP_Item = Union[ValueType, Sequence[ValueType]]
     KVP = Union[Sequence[Tuple[str, KVP_Item]], Dict[str, KVP_Item]]

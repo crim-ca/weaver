@@ -1,9 +1,10 @@
-import re
-
 import logging
 import os
+import re
+import uuid
 from tempfile import mkdtemp
 from typing import TYPE_CHECKING
+from urllib.parse import urlparse
 
 import colander
 from pyramid.httpexceptions import HTTPBadRequest, HTTPForbidden, HTTPGone
@@ -11,15 +12,18 @@ from pyramid.httpexceptions import HTTPBadRequest, HTTPForbidden, HTTPGone
 from weaver.database import get_db
 from weaver.datatype import VaultFile
 from weaver.store.base import StoreVault
-from weaver.utils import get_header, get_settings, get_weaver_url, repr_json
+from weaver.utils import get_header, get_settings, get_weaver_url, is_uuid, repr_json
 from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
-    from typing import Dict, Optional
+    from typing import Dict, Optional, Tuple, Union
 
     from pyramid.request import Request
 
-    from weaver.typedefs import AnySettingsContainer
+    from weaver.typedefs import AnySettingsContainer, AnyUUID, TypedDict
+
+    # PyWPS-like Complex InputData with additional authentication for Vault access
+    VaultInputData = TypedDict("VaultInputData", {"identifier": str, "href": str, "auth": Dict[str, str]}, total=False)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -52,14 +56,59 @@ def get_vault_path(file, container=None):
 
 
 def get_vault_url(file, container=None):
-    # type: (VaultFile, Optional[AnySettingsContainer]) -> str
+    # type: (Union[VaultFile, uuid.UUID, str], Optional[AnySettingsContainer]) -> str
     """
     Obtain the vault link corresponding to the file.
     """
+    if isinstance(file, uuid.UUID) or is_uuid(file):
+        file_id = str(file)
+    else:
+        file_id = file.id
     settings = get_settings(container)
     base_url = get_weaver_url(settings)
-    vault_url = base_url + sd.vault_file_service.path.format(file_id=file.id)
+    vault_url = base_url + sd.vault_file_service.path.format(file_id=file_id)
     return vault_url
+
+
+def map_vault_location(reference, container=None, url=False, exists=True):
+    # type: (str, AnySettingsContainer, bool, bool) -> Optional[str]
+    """
+    Convert back and forth between the URL and local path references of the :term:`Vault` file.
+
+    .. seealso::
+        Similar operation to :func:`weaver.wps.utils.map_wps_output_location`.
+
+    .. warning::
+        Does not validate access token to retrieve the file. It is assumed that pre-valuation was accomplished.
+
+    :param reference: Local file path or file URL to be mapped.
+    :param container: Retrieve application settings.
+    :param url: Perform URL mapping (local path -> URL endpoint), or map to local path (URL -> local path).
+    :param exists: Ensure that the mapped file exists, otherwise don't map it (otherwise ``None``).
+    :returns: Mapped reference if applicable, otherwise ``None``.
+    """
+    scheme = urlparse(reference).scheme
+    base = get_vault_dir(container)
+    if url and scheme == "file":
+        reference = reference[7:]
+    if scheme in ["http", "https"]:
+        file_id = reference.split(sd.vault_file_service.path, 1)[-1]
+    elif reference.startswith(base):
+        file_id = reference.split(base)[-1].split("/", 1)[0]
+    else:
+        file_id = ""
+    if not file_id:
+        return None
+
+    db = get_db(container)
+    vault = db.get_store(StoreVault)
+    file = vault.get_file(file_id, nothrow=True)
+    href = get_vault_url(file, container)
+    path = get_vault_path(file, container)
+
+    if exists and not os.path.isfile(path):
+        return None
+    return href if url else path
 
 
 def parse_vault_token(header, unique=False):
@@ -69,7 +118,7 @@ def parse_vault_token(header, unique=False):
 
     .. seealso::
         - Definition of expected format in :ref:`file_vault_token`.
-        - :class:`sd.VaultFileAuthorizationHeader`
+        - :class:`sd.XAuthVaultFileHeader`
 
     :param header: Authorization header to parse.
     :param unique: Whether only one or multiple tokens must be retrieved.
@@ -123,13 +172,13 @@ def parse_vault_token(header, unique=False):
     return vault_tokens
 
 
-def get_authorized_file(request):
-    # type: (Request) -> VaultFile
+def get_vault_auth(request):
+    # type: (Request) -> Tuple[AnyUUID, Optional[str]]
     """
     Obtain the requested file if access is granted.
 
     :param request: Request containing reference file UUID and authorization headers.
-    :return: Authorized file.
+    :return: Extracted file reference and authentication token.
     :raises: Appropriate HTTP exception according to use case.
     """
     try:
@@ -143,41 +192,54 @@ def get_authorized_file(request):
             "cause": str(ex),
             "value": repr_json(ex.value or dict(request.matchdict), force_string=False),
         })
-    auth = get_header(sd.VaultFileAuthorizationHeader.name, request.headers)
-    vault_token = parse_vault_token(auth, unique=True)
+    auth = get_header(sd.XAuthVaultFileHeader.name, request.headers)
+    return file_id, auth
+
+
+def get_authorized_file(file_id, auth_token, container=None):
+    # type: (AnyUUID, str, Optional[AnySettingsContainer]) -> VaultFile
+    """
+    Obtain the requested file if access is granted.
+
+    :param file_id: Vault storage reference file UUID.
+    :param auth_token: Token to obtain access to the file.
+    :param container: Application settings.
+    :return: Authorized file.
+    :raises: Appropriate HTTP exception according to use case.
+    """
+    vault_token = parse_vault_token(auth_token, unique=True)
     token = vault_token.get(None, vault_token.get(file_id))
     if not token:
         # note:
         #   401 not applicable since no no Authentication endpoint for the Vault
         #   RFC 2616 requires that a 401 response be accompanied by an RFC 2617 WWW-Authenticate
         msg = "Missing authorization token to obtain access to vault file."
-        if auth:  # if header provided but parsed as invalid
+        if auth_token:  # if header provided but parsed as invalid
             msg = "Incorrectly formed authorization token to obtain access to vault file."
         if vault_token and list(vault_token)[0] not in [None, file_id]:
             msg = "Mismatching Vault UUID specified in authorization header."
         raise HTTPForbidden(json={
             "code": "InvalidHeaderValue",
-            "name": sd.VaultFileAuthorizationHeader.name,
+            "name": sd.XAuthVaultFileHeader.name,
             "description": msg,
-            "value": repr_json(auth, force_string=False),
+            "value": repr_json(auth_token, force_string=False),
         })
 
-    db = get_db(request)
+    db = get_db(container)
     vault = db.get_store(StoreVault)
     file = vault.get_file(file_id, nothrow=True)  # don't indicate if not found if unauthorized
     if not VaultFile.authorized(file, token):
         raise HTTPForbidden(json={
             "code": "InvalidHeaderValue",
-            "name": sd.VaultFileAuthorizationHeader.name,
+            "name": sd.XAuthVaultFileHeader.name,
             "description": sd.ForbiddenVaultFileDownloadResponse.description,
         })
 
-    file_path = get_vault_path(file, request)
+    file_path = get_vault_path(file, container)
     if not os.path.isfile(file_path):
         raise HTTPGone(json={
             "code": "VaultFileGone",
             "value": str(file.id),
             "description": sd.GoneVaultFileDownloadResponse.description,
         })
-
     return file

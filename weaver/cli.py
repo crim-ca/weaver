@@ -493,7 +493,7 @@ class WeaverClient(object):
                 f"token {token}; id={input_id}"
                 for input_id, token in auth_tokens.items()
             ])
-            auth_headers = {sd.VaultFileAuthorizationHeader.name: multi_tokens}
+            auth_headers = {sd.XAuthVaultFileHeader.name: multi_tokens}
         return update_inputs, auth_headers
 
     # FIXME: support sync (https://github.com/crim-ca/weaver/issues/247)

@@ -4,9 +4,11 @@ import contextlib
 import inspect
 import json
 import os
+import pytz
 import shutil
 import tempfile
 import uuid
+from datetime import datetime
 from typing import Type
 from urllib.parse import quote, urlparse
 
@@ -42,6 +44,7 @@ from weaver.utils import (
     get_ssl_verify_option,
     get_url_without_query,
     is_valid_url,
+    localize_datetime,
     make_dirs,
     null,
     pass_http_error,
@@ -738,3 +741,13 @@ def test_get_any_value():
     assert get_any_value({"reference": "http://localhost/test.txt"}, file=False, default=1) == 1
     assert get_any_value({"file": "http://localhost/test.txt"}) is None
     assert get_any_value({"data": 1, "value": 2, "href": "http://localhost/test.txt"}, file=False, data=False) is None
+
+
+def test_localize_datetime():
+    dt_utc = datetime(2000, 10, 10, 6, 12, 50, tzinfo=pytz.timezone("UTC"))
+    dt_utc_tz = localize_datetime(dt_utc)
+    dt_gmt_tz = localize_datetime(dt_utc, "GMT")  # UTC-0
+    dt_est_tz = localize_datetime(dt_utc, "EST")  # UTC-5
+    assert dt_utc_tz.timetuple()[:6] == (2000, 10, 10, 6, 12, 50)
+    assert dt_gmt_tz.timetuple()[:6] == (2000, 10, 10, 6, 12, 50)
+    assert dt_est_tz.timetuple()[:6] == (2000, 10, 10, 1, 12, 50)

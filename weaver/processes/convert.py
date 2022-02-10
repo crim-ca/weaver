@@ -9,13 +9,7 @@ from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
-from owslib.wps import (
-    ComplexData,
-    Input as OWS_Input_Type,
-    Metadata as OWS_Metadata,
-    Output as OWS_Output_Type,
-    is_reference
-)
+from owslib.wps import ComplexData, Metadata as OWS_Metadata, is_reference
 from pywps import Process as ProcessWPS
 from pywps.app.Common import Metadata as WPS_Metadata
 from pywps.inout import BoundingBoxInput, BoundingBoxOutput, ComplexInput, ComplexOutput, LiteralInput, LiteralOutput
@@ -79,7 +73,14 @@ if TYPE_CHECKING:
     from urllib.parse import ParseResult
 
     from pywps.app import WPSRequest
-    from owslib.wps import Process as ProcessOWS
+    from owslib.ows import BoundingBox
+    from owslib.wps import (
+        BoundingBoxDataInput,
+        ComplexDataInput,
+        Input as OWS_Input_Base,
+        Output as OWS_Output_Base,
+        Process as ProcessOWS
+    )
     from requests.models import Response
 
     from weaver.typedefs import (
@@ -102,6 +103,8 @@ if TYPE_CHECKING:
     WPS_Input_Type = Union[LiteralInput, ComplexInput, BoundingBoxInput]
     WPS_Output_Type = Union[LiteralOutput, ComplexOutput, BoundingBoxOutput]
     WPS_IO_Type = Union[WPS_Input_Type, WPS_Output_Type]
+    OWS_Input_Type = Union[OWS_Input_Base, BoundingBox, BoundingBoxDataInput, ComplexDataInput]
+    OWS_Output_Type = Union[OWS_Output_Base, BoundingBox, BoundingBoxDataInput, ComplexData]
     OWS_IO_Type = Union[OWS_Input_Type, OWS_Output_Type]
     JSON_IO_Type = JSON
     JSON_IO_ListOrMap = Union[List[JSON], Dict[str, Union[JSON, str]]]

@@ -68,7 +68,8 @@ SUPPORTED_FILE_SCHEMES = frozenset([
     "file",
     "http",
     "https",
-    "s3"
+    "s3",
+    "vault"
 ])
 
 # note: word characters also match unicode in this case
@@ -387,12 +388,12 @@ def localize_datetime(dt, tz_name="UTC"):
     """
     tz_aware_dt = dt
     if dt.tzinfo is None:
-        utc = pytz.timezone("UTC")
-        aware = utc.localize(dt)
-        timezone = pytz.timezone(tz_name)
-        tz_aware_dt = aware.astimezone(timezone)
-    else:
+        tz_aware_dt = dt.astimezone()  # guess local timezone
+    timezone = pytz.timezone(tz_name)
+    if tz_aware_dt.tzinfo == timezone:
         warnings.warn("tzinfo already set", TimeZoneInfoAlreadySetWarning)
+    else:
+        tz_aware_dt = tz_aware_dt.astimezone(timezone)
     return tz_aware_dt
 
 
@@ -1152,8 +1153,8 @@ def download_file_http(file_reference, file_outdir, settings=None, **request_kwa
     return file_path
 
 
-def fetch_file(file_reference, file_outdir, settings=None, link=None, **request_kwargs):
-    # type: (str, str, Optional[AnySettingsContainer], Optional[bool], Any) -> str
+def fetch_file(file_reference, file_outdir, settings=None, link=None, move=False, **request_kwargs):
+    # type: (str, str, Optional[AnySettingsContainer], Optional[bool], bool, Any) -> str
     """
     Fetches a file from local path, AWS-S3 bucket or remote URL, and dumps it's content to the output directory.
 
@@ -1174,6 +1175,10 @@ def fetch_file(file_reference, file_outdir, settings=None, link=None, **request_
         When the source is a symbolic link itself, the destination will also be a link.
         When the source is a direct file reference, the destination will be a hard copy of the file.
         Only applicable when the file reference is local.
+    :param move:
+        Move local file to the output directory instead of copying or linking it.
+        No effect if the output directory already contains the local file.
+        No effect if download must occurs for remote file.
     :param request_kwargs: Additional keywords to forward to request call (if needed).
     :return: Path of the local copy of the fetched file.
     :raises HTTPException: applicable HTTP-based exception if any occurred during the operation.
@@ -1187,10 +1192,15 @@ def fetch_file(file_reference, file_outdir, settings=None, link=None, **request_
     LOGGER.debug("Fetching file reference: [%s]", file_href)
     if os.path.isfile(file_reference):
         LOGGER.debug("Fetch file resolved as local reference.")
+        if move and os.path.isfile(file_path):
+            LOGGER.debug("Reference [%s] cannot be moved to path [%s] (already exists)", file_href, file_path)
+            raise OSError("Cannot move file, already in output directory!")
+        if move:
+            shutil.move(os.path.realpath(file_reference), file_outdir)
         # NOTE:
         #   If file is available locally and referenced as a system link, disabling 'follow_symlinks'
         #   creates a copy of the symlink instead of an extra hard-copy of the linked file.
-        if os.path.islink(file_reference) and not os.path.isfile(file_path):
+        elif os.path.islink(file_reference) and not os.path.isfile(file_path):
             if link is True:
                 os.symlink(os.readlink(file_reference), file_path)
             else:

@@ -46,7 +46,8 @@ from weaver.utils import (
     get_url_without_query,
     get_weaver_url,
     null,
-    request_extra
+    request_extra,
+    str2bytes,
 )
 from weaver.warning import MissingParameterWarning, UnsupportedOperationWarning
 from weaver.wps.utils import get_wps_output_dir, get_wps_output_url
@@ -444,6 +445,23 @@ def mocked_sub_requests(app,                # type: TestApp
             else:
                 url = get_path_kvp(url, **params)
         req_kwargs["params"] = content = body or _json or {}
+        allow_json = True
+        # convert 'requests.request' parameter 'files' to corresponding 'TestApp' parameter 'upload_files'
+        # requests format:
+        #   { field_name: file_contents | (file_name, file_content/stream, file_content_type)  }
+        # TestApp format:
+        #   (field_name, filename[, file_content_data][, file_content_type])
+        if "files" in req_kwargs:
+            files = req_kwargs.pop("files")
+            if isinstance(files, dict):
+                files = [
+                    (file_key, file_key, str2bytes(file_meta[0].read()))
+                    if len(file_meta) < 2 else
+                    (file_key, file_meta[0], str2bytes(file_meta[1].read()), *file_meta[2:])
+                    for file_key, file_meta in files.items()
+                ]
+            req_kwargs["upload_files"] = files
+            allow_json = False
         # remove unsupported parameters that cannot be passed down to TestApp
         for key in ["timeout", "cert", "auth", "ssl_verify", "verify", "language", "stream"]:
             req_kwargs.pop(key, None)
@@ -457,6 +475,7 @@ def mocked_sub_requests(app,                # type: TestApp
         headers = req_kwargs.get("headers", {}) or {}
         if (
             (get_header("Content-Type", headers) == CONTENT_TYPE_APP_JSON or isinstance(content, (dict, list)))
+            and allow_json
             and hasattr(app, method + "_json")
         ):
             method = method + "_json"

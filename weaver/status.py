@@ -5,7 +5,8 @@ from pywps.response.status import _WPS_STATUS, WPS_STATUS  # noqa: W0212
 if TYPE_CHECKING:
     from typing import Union
 
-    AnyStatusType = Union[str, int]
+    from weaver.typedefs import Literal
+
 
 STATUS_COMPLIANT_OGC = "STATUS_COMPLIANT_OGC"
 STATUS_COMPLIANT_PYWPS = "STATUS_COMPLIANT_PYWPS"
@@ -101,7 +102,7 @@ STATUS_PYWPS_IDS = {k.lower(): v for v, k in STATUS_PYWPS_MAP.items()}
 
 
 def map_status(wps_status, compliant=STATUS_COMPLIANT_OGC):
-    # type: (AnyStatusType, str) -> str
+    # type: ("AnyStatusType", str) -> str
     """
     Maps WPS execution statuses to between compatible values of different implementations.
 
@@ -154,3 +155,18 @@ def map_status(wps_status, compliant=STATUS_COMPLIANT_OGC):
     if job_status in JOB_STATUS_VALUES:
         return job_status
     return STATUS_UNKNOWN
+
+
+if TYPE_CHECKING:
+    StatusType = Literal[
+        STATUS_ACCEPTED,
+        STATUS_STARTED,
+        STATUS_PAUSED,
+        STATUS_SUCCEEDED,
+        STATUS_FAILED,
+        STATUS_RUNNING,
+        STATUS_DISMISSED,
+        STATUS_EXCEPTION,
+        STATUS_UNKNOWN
+    ]
+    AnyStatusType = Union[StatusType, int]

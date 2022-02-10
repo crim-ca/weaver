@@ -354,8 +354,8 @@ class FileURL(ExtendedSchemaNode):
 class VaultReference(ExtendedSchemaNode):
     schema_type = String
     description = "Vault file reference."
-    example = "vault:399dc5ac-ff66-48d9-9c02-b144a975abe4"
-    pattern = r"^vault:[a-f0-9]{8}(?:-?[a-f0-9]{4}){3}-?[a-f0-9]{12}$"
+    example = "vault://399dc5ac-ff66-48d9-9c02-b144a975abe4"
+    pattern = r"^vault://[a-f0-9]{8}(?:-?[a-f0-9]{4}){3}-?[a-f0-9]{12}$"
 
 
 class ReferenceURL(AnyOfKeywordSchema):
@@ -4319,7 +4319,7 @@ class BadRequestVaultFileUploadResponse(ExtendedMappingSchema):
     body = ErrorJsonResponseBodySchema()
 
 
-class VaultFileAuthorizationHeader(ExtendedSchemaNode):
+class XAuthVaultFileHeader(ExtendedSchemaNode):
     summary = "Authorization header with token for Vault file access."
     description = (
         "For accessing a single file from the Vault, such as to obtain file metadata, requests can simply provide "
@@ -4334,7 +4334,7 @@ class VaultFileAuthorizationHeader(ExtendedSchemaNode):
 
 
 class VaultFileRequestHeaders(ExtendedMappingSchema):
-    access_token = VaultFileAuthorizationHeader()
+    access_token = XAuthVaultFileHeader()
 
 
 class VaultFileEndpoint(VaultEndpoint):

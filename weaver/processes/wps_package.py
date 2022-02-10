@@ -104,9 +104,11 @@ from weaver.utils import (
     get_settings,
     is_remote_file,
     load_file,
+    repr_json,
     request_extra,
     setup_loggers
 )
+from weaver.vault.utils import get_vault_url, map_vault_location
 from weaver.wps.utils import get_wps_output_dir, get_wps_output_url, map_wps_output_location
 from weaver.wps_restapi import swagger_definitions as sd
 
@@ -116,7 +118,6 @@ if TYPE_CHECKING:
     from cwltool.factory import Callable as CWLFactoryCallable
     from cwltool.process import Process as ProcessCWL
     from owslib.wps import WPSExecution
-    from pywps.app import WPSRequest
     from pywps.response.execute import ExecuteResponse
 
     from weaver.datatype import Authentication, Job
@@ -143,6 +144,7 @@ if TYPE_CHECKING:
         Number,
         ValueType
     )
+    from weaver.wps.service import WorkerRequest
 
 
 # NOTE:
@@ -810,11 +812,12 @@ class WpsPackage(Process):
     logger = None                   # type: Optional[logging.Logger]
     step_packages = None            # type: Optional[CWL_WorkflowStepPackageMap]
     step_launched = None            # type: Optional[List[str]]
-    request = None                  # type: Optional[WPSRequest]
+    request = None                  # type: Optional[WorkerRequest]
     response = None                 # type: Optional[ExecuteResponse]
     _job = None                     # type: Optional[Job]
 
     def __init__(self, **kw):
+        # type: (Any) -> None
         """
         Creates a `WPS-3 Process` instance to execute a `CWL` application package definition.
 
@@ -1220,8 +1223,15 @@ class WpsPackage(Process):
         """
         return map_progress(100 * step_index / steps_total, PACKAGE_PROGRESS_CWL_RUN, PACKAGE_PROGRESS_CWL_DONE)
 
+    @property
+    def auth(self):
+        # type: () -> AnyHeadersContainer
+        if self.request:
+            return self.request.auth_headers
+        return {}
+
     def _handler(self, request, response):
-        # type: (WPSRequest, ExecuteResponse) -> ExecuteResponse
+        # type: (WorkerRequest, ExecuteResponse) -> ExecuteResponse
         """
         Method called when process receives the WPS execution request.
         """
@@ -1467,13 +1477,17 @@ class WpsPackage(Process):
         # value of 'file' in this case points to a local file path where the wanted link was dumped as raw data
         if input_definition.source_type == SOURCE_TYPE.DATA:
             input_location = input_definition.data
+        input_scheme = None
         if not input_location:
             url = getattr(input_definition, "url")
-            if isinstance(url, str) and any(url.startswith("{}://".format(p)) for p in SUPPORTED_FILE_SCHEMES):
+            if isinstance(url, str):
+                input_scheme = urlparse(url).scheme
+            if input_scheme and input_scheme in SUPPORTED_FILE_SCHEMES:
                 input_location = url
             else:
                 # last option, could not resolve 'lazily' so will fetch data if needed
                 input_location = input_definition.data
+                input_scheme = None
         # FIXME: PyWPS bug (https://github.com/geopython/pywps/issues/633)
         #   Optional File inputs receive 'data' content that correspond to 'default format' definition if not provided.
         #   This is invalid since input is not provided, it should not be there at all (default format != default data).
@@ -1496,19 +1510,40 @@ class WpsPackage(Process):
             self.logger.debug("File input (%s) DROPPED. Detected default format as data.", input_definition.identifier)
             return None
 
-        # auto-map local if possible after security check
-        input_local_ref = map_wps_output_location(input_location, self.settings)
-        if input_local_ref:
-            resp = request_extra("HEAD", input_location, settings=self.settings)
-            if resp.status_code == 200:  # if failed, following fetch will produce the appropriate HTTP error
+        # auto-map local file if possible after security check
+        delete_original = False
+        if input_scheme == "vault":
+            vault_id = urlparse(input_location).hostname
+            input_url = get_vault_url(vault_id, self.settings)
+            resp = request_extra("HEAD", input_url, settings=self.settings, headers=self.auth)
+            if resp.status_code == 200:
                 self.logger.debug("Detected and validated remotely accessible reference [%s] "
-                                  "matching local WPS outputs [%s]. Skipping fetch using direct reference.",
-                                  input_location, input_local_ref)
-                input_location = input_local_ref
+                                  "matching local Vault [%s]. Replacing URL reference for remote access.",
+                                  input_location, input_url)
+                # pre-fetch by move and delete file from vault (as download would)
+                # to save transfer time/data from local file already available
+                input_location = map_vault_location(input_url, self.settings)
+                delete_original = True
+            else:
+                self.logger.error("Detected Vault file reference that is not accessible [%s] caused "
+                                  "by HTTP [%s] Detail:\n%s", resp.status_code, repr_json(resp.text, indent=2))
+                raise PackageAuthenticationError(
+                    f"Input {input_definition.identifier} with Vault reference [{vault_id}] is not accessible."
+                )
+        else:
+            input_local_ref = map_wps_output_location(input_location, self.settings)
+            if input_local_ref:
+                resp = request_extra("HEAD", input_location, settings=self.settings, headers=self.auth)
+                if resp.status_code == 200:  # if failed, following fetch will produce the appropriate HTTP error
+                    self.logger.debug("Detected and validated remotely accessible reference [%s] "
+                                      "matching local WPS outputs [%s]. Skipping fetch using direct reference.",
+                                      input_location, input_local_ref)
+                    input_location = input_local_ref
 
         if self.must_fetch(input_location):
             self.logger.info("File input (%s) ATTEMPT fetch: [%s]", input_definition.identifier, input_location)
-            input_location = fetch_file(input_location, input_definition.workdir, settings=self.settings)
+            input_location = fetch_file(input_location, input_definition.workdir,
+                                        settings=self.settings, headers=self.auth, move=delete_original)
         else:
             self.logger.info("File input (%s) SKIPPED fetch: [%s]", input_definition.identifier, input_location)
 

@@ -182,30 +182,30 @@ def get_wps_local_status_location(url_status_location, container, must_exist=Tru
     return out_path
 
 
-def map_wps_output_location(reference, container, reverse=False, exists=True, file_scheme=False):
+def map_wps_output_location(reference, container, url=False, exists=True, file_scheme=False):
     # type: (str, AnySettingsContainer, bool, bool, bool) -> Optional[str]
     """
     Obtains the mapped WPS output location of a file where applicable.
 
-    :param reference: local file path (normal) or file URL (reverse) to be mapped.
-    :param container: retrieve application settings.
-    :param reverse: perform the reverse operation (local path -> URL endpoint), or process normally (URL -> local path).
-    :param exists: ensure that the mapped file exists, otherwise don't map it.
+    :param reference: Local file path or file URL to be mapped.
+    :param container: Retrieve application settings.
+    :param url: Perform URL mapping (local path -> URL endpoint), or map to local path (URL -> local path).
+    :param exists: Ensure that the mapped file exists, otherwise don't map it (otherwise ``None``).
     :param file_scheme:
         Ensure that the 'file://' scheme is applied to resulting local file location when mapped from WPS output URL.
         When in 'reverse' mode, 'file://' is always removed if present to form a potential local file path.
-    :returns: mapped reference that corresponds to the local WPS output location.
+    :returns: Mapped reference that corresponds to the local/URL WPS output location.
     """
     settings = get_settings(container)
     wps_out_dir = get_wps_output_dir(settings)
     wps_out_url = get_wps_output_url(settings)
-    if reverse and reference.startswith("file://"):
+    if url and reference.startswith("file://"):
         reference = reference[7:]
-    if reverse and reference.startswith(wps_out_dir):
+    if url and reference.startswith(wps_out_dir):
         wps_out_ref = reference.replace(wps_out_dir, wps_out_url, 1)
         if not exists or os.path.isfile(reference):
             return wps_out_ref
-    elif not reverse and reference.startswith(wps_out_url):
+    elif not url and reference.startswith(wps_out_url):
         wps_out_ref = reference.replace(wps_out_url, wps_out_dir, 1)
         if not exists or os.path.isfile(wps_out_ref):
             if file_scheme:

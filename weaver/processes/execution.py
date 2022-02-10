@@ -55,10 +55,16 @@ from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
-    from typing import List, Optional, Union
+    from uuid import UUID
+    from typing import List, Optional, Tuple, Union
+
+    from celery.task import Task
     from pyramid.request import Request
+
     from weaver.datatype import Job
-    from weaver.typedefs import HeaderCookiesType, JSON, SettingsType
+    from weaver.processes.convert import OWS_Input_Type, ProcessOWS
+    from weaver.status import StatusType
+    from weaver.typedefs import HeadersType, HeaderCookiesType, JSON, SettingsType
 
 # job process execution progress
 JOB_PROGRESS_SETUP = 1
@@ -77,6 +83,7 @@ JOB_PROGRESS_DONE = 100
 
 @app.task(bind=True)
 def execute_process(self, job_id, wps_url, headers=None):
+    # type: (Task, UUID, str, Optional[HeadersType]) -> StatusType
     """
     Celery task that executes the WPS process job monitoring as status updates (local and remote).
     """
@@ -139,7 +146,9 @@ def execute_process(self, job_id, wps_url, headers=None):
                      message="Following updates could take a while until the Application Package answers...")
 
         wps_worker = get_pywps_service(environ=settings, is_worker=True)
-        execution = wps_worker.execute_job(job, wps_inputs=wps_inputs, wps_outputs=wps_outputs, remote_process=process)
+        execution = wps_worker.execute_job(job,
+                                           wps_inputs=wps_inputs, wps_outputs=wps_outputs,
+                                           remote_process=process, headers=headers)
         if not execution.process and execution.errors:
             raise execution.errors[0]
 
@@ -263,6 +272,7 @@ def execute_process(self, job_id, wps_url, headers=None):
 
 
 def fetch_wps_process(job, wps_url, headers, settings):
+    # type: (Job, str, HeadersType, SettingsType) -> ProcessOWS
     """
     Retrieves the WPS process description from the local or remote WPS reference URL.
     """
@@ -280,6 +290,7 @@ def fetch_wps_process(job, wps_url, headers, settings):
 
 
 def parse_wps_inputs(wps_process, job):
+    # type: (ProcessOWS, Job) -> List[Tuple[str, OWS_Input_Type]]
     """
     Parses expected WPS process inputs against submitted job input values considering supported process definitions.
     """
@@ -317,13 +328,15 @@ def parse_wps_inputs(wps_process, job):
             # TODO: BoundingBox not supported
             wps_inputs.extend([
                 (input_id, ComplexDataInput(input_value) if input_id in complex_inputs else str(input_value))
-                for input_value in input_values])
+                for input_value in input_values
+            ])
     except KeyError:
         wps_inputs = []
     return wps_inputs
 
 
 def send_job_complete_notification_email(job, task_logger, settings):
+    # type: (Job, logging.Logger, SettingsType) -> None
     """
     Sends the notification email of completed execution if it was requested during job submission.
     """
@@ -470,6 +483,7 @@ def submit_job(request, reference, tags=None):
 
 # FIXME: this should not be necessary if schema validators correctly implement OneOf(values)
 def _validate_job_parameters(json_body):
+    # type: (JSON) -> None
     """
     Tests supported parameters not automatically validated by colander deserialize.
     """
