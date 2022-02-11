@@ -1327,6 +1327,6 @@ Workflow (Chaining Step Processes)
 .. seealso::
 
     - :ref:`CWL Workflow`
-    - :ref:`Workflow Operations`
+    - :ref:`proc_workflow_ops`
     - :ref:`Workflow` process type
 

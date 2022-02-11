@@ -1395,7 +1395,7 @@ class DockerAuthentication(Authentication):
 
         :param auth_scheme: Authentication scheme (Basic, Bearer, etc.)
         :param auth_token: Applied token or credentials according to specified scheme.
-        :param auth_link: Fully qualified Docker registry image link (``<registry-url>/<image>:<label>``).
+        :param auth_link: Fully qualified Docker registry image link (``{registry-url}/{image}:{label}``).
         :param kwargs: Additional parameters for loading contents already parsed from database.
         """
         matches = re.match(self.DOCKER_LINK_REGEX, auth_link)
@@ -1455,7 +1455,7 @@ class DockerAuthentication(Authentication):
     def registry(self):
         # type: () -> str
         """
-        Obtains the registry entry that must used for ``docker login <registry>``.
+        Obtains the registry entry that must used for ``docker login {registry}``.
         """
         return dict.__getitem__(self, "registry")
 

@@ -201,7 +201,8 @@ they are optional and which default value or operation is applied in each situat
 
 - | ``weaver.wps_metadata_[...]`` (multiple settings)
   |
-  | Metadata fields that will be rendered by either or both the WPS-1/2 and WPS-REST endpoints (:ref:`GetCapabilities`).
+  | Metadata fields that will be rendered by either or both the WPS-1/2 and WPS-REST endpoints
+    (:ref:`GetCapabilities <proc_op_getcap>`).
 
 - | ``weaver.wps_email_[...]`` (multiple settings)
   |
@@ -307,9 +308,10 @@ to attempt deployment of corresponding processes locally. Given that the resourc
 will immediately be available from `Weaver`'s API without further request needed.
 
 For convenience, every reference URL in the configuration file can either refer to explicit process definition
-(i.e.: endpoint and query parameters that resolve to :ref:`DescribeProcess` response), or a group of processes
-under a common WPS server to iteratively register, using a :ref:`GetCapabilities` WPS endpoint. Please refer to
-`wps_processes.yml.example`_ for explicit format, keywords supported, and their resulting behaviour.
+(i.e.: endpoint and query parameters that resolve to :ref:`DescribeProcess <proc_op_describe>` response), or a group
+of processes under a common WPS server to iteratively register, using a :ref:`GetCapabilities <proc_op_getcap>` WPS
+endpoint.
+Please refer to `wps_processes.yml.example`_ for explicit format, keywords supported, and their resulting behaviour.
 
 .. note::
     Processes defined under ``processes`` section registered into `Weaver` will correspond to a local snapshot of
