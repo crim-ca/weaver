@@ -113,7 +113,7 @@ from weaver.wps.utils import get_wps_output_dir, get_wps_output_url, map_wps_out
 from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
-    from typing import Any, Deque, Dict, List, Optional, Tuple, Type, Union
+    from typing import Any, Callable, Deque, Dict, List, Optional, Tuple, Type, Union
 
     from cwltool.factory import Callable as CWLFactoryCallable
     from cwltool.process import Process as ProcessCWL
@@ -724,6 +724,7 @@ def get_process_definition(process_offering, reference=None, package=None, data_
     """
 
     def try_or_raise_package_error(call, reason):
+        # type: (Callable[[], Any], str) -> Any
         try:
             LOGGER.debug("Attempting: [%s].", reason)
             return call()
@@ -1071,6 +1072,7 @@ class WpsPackage(Process):
         return runtime_params
 
     def update_requirements(self):
+        # type: () -> None
         """
         Inplace modification of :attr:`package` to adjust invalid items that would break behaviour we must enforce.
         """
@@ -1123,6 +1125,7 @@ class WpsPackage(Process):
                 self.package["baseCommand"] = os.path.join(active_python_path, "python")
 
     def update_effective_user(self):
+        # type: () -> None
         """
         Update effective user/group for the `Application Package` to be executed.
 
@@ -1511,19 +1514,23 @@ class WpsPackage(Process):
             return None
 
         # auto-map local file if possible after security check
-        delete_original = False
         if input_scheme == "vault":
             vault_id = urlparse(input_location).hostname
             input_url = get_vault_url(vault_id, self.settings)
             resp = request_extra("HEAD", input_url, settings=self.settings, headers=self.auth)
             if resp.status_code == 200:
                 self.logger.debug("Detected and validated remotely accessible reference [%s] "
-                                  "matching local Vault [%s]. Replacing URL reference for remote access.",
+                                  "matching local Vault [%s]. Replacing URL reference for local access.",
                                   input_location, input_url)
                 # pre-fetch by move and delete file from vault (as download would)
                 # to save transfer time/data from local file already available
                 input_location = map_vault_location(input_url, self.settings)
-                delete_original = True
+                input_location = fetch_file(input_location, input_definition.workdir,
+                                            settings=self.settings, move=True)
+                self.logger.debug("Moved Vault file to temporary location: [%s]. "
+                                  "File not accessible from Vault endpoint anymore. "
+                                  "Location will be deleted after process execution.",
+                                  input_location)
             else:
                 self.logger.error("Detected Vault file reference that is not accessible [%s] caused "
                                   "by HTTP [%s] Detail:\n%s", resp.status_code, repr_json(resp.text, indent=2))
@@ -1543,7 +1550,7 @@ class WpsPackage(Process):
         if self.must_fetch(input_location):
             self.logger.info("File input (%s) ATTEMPT fetch: [%s]", input_definition.identifier, input_location)
             input_location = fetch_file(input_location, input_definition.workdir,
-                                        settings=self.settings, headers=self.auth, move=delete_original)
+                                        settings=self.settings, headers=self.auth)
         else:
             self.logger.info("File input (%s) SKIPPED fetch: [%s]", input_definition.identifier, input_location)
 

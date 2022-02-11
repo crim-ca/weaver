@@ -393,7 +393,8 @@ class TestWeaverClient(TestWeaverClientBase):
         job_id = result.body["jobID"]
         result = mocked_sub_requests(self.app, self.client.results, job_id)
         assert result.success, result.message
-        output = map_wps_output_location(result.body["output"], self.settings, exists=True)
+        output = result.body["output"]["href"]
+        output = map_wps_output_location(output, self.settings, exists=True)
         assert os.path.isfile(output)
         with open(output, "r") as out_file:
             out_data = out_file.read()
@@ -425,8 +426,13 @@ class TestWeaverClient(TestWeaverClientBase):
 
     @pytest.mark.vault
     def test_execute_inputs_representation_literal_schema_auto_resolve_vault(self):
-        self.run_execute_inputs_with_vault_file("Execute_CatFile_old_listing_schema.yml", "CatFile", preload=False,
-                                                embed="file:file='{test_file}'")
+        # 1st 'file' is the name of the process input
+        # 2nd 'file' is the type (CWL) to ensure proper detection/conversion to href URL
+        # 'test_file' will be replaced by the actual temp file instantiated with dummy data
+        input_data = "file:file='{test_file}'"
+        self.run_execute_inputs_with_vault_file(
+            "Execute_CatFile_old_listing_schema.yml", "CatFile", preload=False, embed=input_data
+        )
 
     @mocked_dismiss_process()
     def test_dismiss(self):

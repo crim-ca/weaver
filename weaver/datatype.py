@@ -128,6 +128,7 @@ class DictBase(dict):
         return "{0}.{1} ({2})".format(cls.__module__, cls.__name__, repr_)
 
     def dict(self):
+        # type: () -> AnyParams
         """
         Generate a dictionary representation of the object, but with inplace resolution of attributes as applicable.
         """
@@ -523,6 +524,7 @@ class Job(Base):
     """
 
     def __init__(self, *args, **kwargs):
+        # type: (Any, Any) -> None
         super(Job, self).__init__(*args, **kwargs)
         if "task_id" not in self:
             raise TypeError(f"Parameter 'task_id' is required for '{self.__name__}' creation.")
@@ -1083,6 +1085,7 @@ class Job(Base):
         self["response"] = response
 
     def _job_url(self, base_url=None):
+        # type: (Optional[str]) -> str
         if self.service is not None:
             base_url += sd.provider_service.path.format(provider_id=self.service)
         job_path = sd.process_job_service.path.format(process_id=self.process, job_id=self.id)
@@ -1934,6 +1937,7 @@ class Process(Base):
         }
 
     def dict(self):
+        # type: () -> AnyParams
         data = super(Process, self).dict()
         data.pop("auth", None)  # remote preemptively just in case any deserialize fails to drop it
         return data

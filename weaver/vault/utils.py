@@ -92,9 +92,11 @@ def map_vault_location(reference, container=None, url=False, exists=True):
     if url and scheme == "file":
         reference = reference[7:]
     if scheme in ["http", "https"]:
-        file_id = reference.split(sd.vault_file_service.path, 1)[-1]
+        file_path = sd.vault_file_service.path.format(file_id="")
+        file_id = reference.split(file_path, 1)[-1]
     elif reference.startswith(base):
-        file_id = reference.split(base)[-1].split("/", 1)[0]
+        file_base = base + "/" if not base.endswith("/") else base
+        file_id = reference.split(file_base)[-1].split("/", 1)[0]
     else:
         file_id = ""
     if not file_id:

@@ -8,7 +8,7 @@ from urllib.parse import urlparse
 
 from beaker.cache import cache_region
 from owslib.wps import WebProcessingService, WPSExecution
-from pyramid.httpexceptions import HTTPNotFound, HTTPUnprocessableEntity
+from pyramid.httpexceptions import HTTPOk, HTTPNotFound, HTTPUnprocessableEntity
 from pywps import configuration as pywps_config
 from webob.acceptparse import create_accept_language_header
 
@@ -294,6 +294,7 @@ def check_wps_status(location=None,     # type: Optional[str]
     :returns: OWSLib.wps.WPSExecution object.
     """
     def _retry_file():
+        # type: () -> str
         LOGGER.warning("Failed retrieving WPS status-location, attempting with local file.")
         out_path = get_wps_local_status_location(location, settings)
         if not out_path:
@@ -308,15 +309,15 @@ def check_wps_status(location=None,     # type: Optional[str]
         xml_data = response
     elif location:
         xml_resp = HTTPNotFound()
+        xml_data = None
         try:
             LOGGER.debug("Attempt to retrieve WPS status-location from URL [%s]...", location)
             xml_resp = request_extra("get", location, verify=verify, settings=settings)
             xml_data = xml_resp.content
         except Exception as ex:
-            LOGGER.debug("Got exception during get status: [%r]", ex)
-            xml_data = _retry_file()
-        if xml_resp.status_code == HTTPNotFound.code:
-            LOGGER.debug("Got not-found during get status: [%r]", xml_data)
+            LOGGER.debug("Got exception during get status: [%r]. Will retry with local reference.", ex)
+        if xml_resp.status_code != HTTPOk.code:
+            LOGGER.debug("WPS XML status not found: [%r]. Retrying with local reference.", xml_data)
             xml_data = _retry_file()
     else:
         raise Exception("Missing status-location URL/file reference or response with XML object.")
@@ -452,7 +453,7 @@ def set_wps_language(wps, accept_language=None, request=None):
         of ``Accept-Language`` header according to :rfc:`7231#section-5.3.2`.
 
     :param wps: service for which to apply a supported language if matched.
-    :param str accept_language: value of the Accept-Language header.
+    :param accept_language: value of the Accept-Language header.
     :param request: request from which to extract Accept-Language header if not provided directly.
     :returns: language that has been set, or ``None`` if no match could be found.
     """
