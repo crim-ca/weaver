@@ -378,16 +378,17 @@ class TestWeaverClient(TestWeaverClientBase):
     # NOTE:
     #   For all below '<>_auto_resolve_vault' test cases, the local file referenced in the Execute request body
     #   should be automatically handled by uploading to the Vault and forwarding the relevant X-Auth-Vault header.
-    def run_execute_inputs_with_vault_file(self, test_execute_file, process="CatFile", preload=False, embed=None):
+    def run_execute_inputs_with_vault_file(self, test_input_file, process="CatFile", preload=False, embed=False):
         test_data = "DUMMY DATA"
         with tempfile.NamedTemporaryFile(mode="w", suffix=".txt") as tmp_file:
             tmp_file.write(test_data)
             tmp_file.flush()
             tmp_file.seek(0)
-            exec_file = self.get_resource_file(test_execute_file, process=process)
-            test_file = self.setup_test_file(exec_file, {"<TEST_FILE>": tmp_file.name})
             if embed:
-                test_file = embed.format(test_file=test_file)
+                test_file = [test_input_file.format(test_file=tmp_file.name)]
+            else:
+                exec_file = self.get_resource_file(test_input_file, process=process)
+                test_file = self.setup_test_file(exec_file, {"<TEST_FILE>": tmp_file.name})
             result = self.run_execute_inputs_schema_variant(test_file, process=process,
                                                             preload=preload, mock_exec=False)
         job_id = result.body["jobID"]
@@ -430,9 +431,7 @@ class TestWeaverClient(TestWeaverClientBase):
         # 2nd 'file' is the type (CWL) to ensure proper detection/conversion to href URL
         # 'test_file' will be replaced by the actual temp file instantiated with dummy data
         input_data = "file:file='{test_file}'"
-        self.run_execute_inputs_with_vault_file(
-            "Execute_CatFile_old_listing_schema.yml", "CatFile", preload=False, embed=input_data
-        )
+        self.run_execute_inputs_with_vault_file(input_data, "CatFile", preload=False, embed=True)
 
     @mocked_dismiss_process()
     def test_dismiss(self):
