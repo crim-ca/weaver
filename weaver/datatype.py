@@ -1386,15 +1386,25 @@ class DockerAuthentication(Authentication):
     DOCKER_REGISTRY_DEFAULT_URI = f"https://{DOCKER_REGISTRY_DEFAULT_DOMAIN}/v1/"  # DockerHub
     type = AuthenticationTypes.DOCKER
 
-    def __init__(self, auth_scheme, auth_token, docker_image_link, **kwargs):
+    # NOTE:
+    #   Specific parameter names are important for reload from database using 'Authentication.from_params'
+    def __init__(self, auth_scheme, auth_token, auth_link, **kwargs):
         # type: (str, str, str, Any) -> None
-        matches = re.match(self.DOCKER_LINK_REGEX, docker_image_link)
+        """
+        Initialize the authentication reference for pulling a Docker image from a protected registry.
+
+        :param auth_scheme: Authentication scheme (Basic, Bearer, etc.)
+        :param auth_token: Applied token or credentials according to specified scheme.
+        :param auth_link: Fully qualified Docker registry image link (``<registry-url>/<image>:<label>``).
+        :param kwargs: Additional parameters for loading contents already parsed from database.
+        """
+        matches = re.match(self.DOCKER_LINK_REGEX, auth_link)
         if not matches:
-            raise ValueError(f"Invalid Docker image link does not conform to expected format: [{docker_image_link}]")
+            raise ValueError(f"Invalid Docker image link does not conform to expected format: [{auth_link}]")
         groups = matches.groupdict()
         LOGGER.debug("Parsed Docker image/registry link:\n%s", json.dumps(groups, indent=2))
         if not groups["image"]:
-            raise ValueError(f"Invalid Docker image reference does not conform to image format: {docker_image_link}")
+            raise ValueError(f"Invalid Docker image reference does not conform to image format: {auth_link}")
         # special case for DockerHub, since it is default, it is often omitted, but could be partially provided
         # swap the domain by the full URI in that case because that's what is expected when doing plain 'docker login'
         registry = groups["reg_domain"]
@@ -1415,7 +1425,7 @@ class DockerAuthentication(Authentication):
         self["image"] = image
         self["registry"] = registry
         super(DockerAuthentication, self).__init__(
-            auth_scheme, auth_token, auth_link=docker_image_link, **kwargs
+            auth_scheme, auth_token, auth_link=auth_link, **kwargs
         )
 
     @property

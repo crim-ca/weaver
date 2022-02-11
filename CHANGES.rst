@@ -24,6 +24,7 @@ Fixes:
 - Fix rendering of OpenAPI variable names (``additionalParameters``) employed to represent for example ``{input-id}``
   as the key within the mapping representation of inputs/outputs. The previous notation employed was incorrectly
   interpreted as HTML tags, making them partially hidden in Swagger UI.
+- Fix reload of ``DockerAuthentication`` reference from database failing due to mismatched parameter names.
 - Fix invalid generation of timezone-aware datetime.
 
 `4.8.0 <https://github.com/crim-ca/weaver/tree/4.8.0>`_ (2022-01-11)
