@@ -14,6 +14,8 @@ Changes:
 - Add ``upload`` CLI operation for uploading local files to `Vault`.
 - Add CLI automatic detection of local files during ``execute`` call to upload to `Vault` and retrieve them from it
   on the remote `Weaver` instance.
+- Add ``-S``/``--schema`` option to CLI ``describe`` operation.
+- Add more documentation examples and references related to CLI and ``WeaverClient`` usage.
 - Improve Media-Type/Content-Type guesses based on known local definitions and extensions in ``weaver.formats``.
 - Extend ``PyWPS`` ``WPSRequest`` to support more authorization header forwarding for inputs that could need it.
 
@@ -26,6 +28,7 @@ Fixes:
   interpreted as HTML tags, making them partially hidden in Swagger UI.
 - Fix reload of ``DockerAuthentication`` reference from database failing due to mismatched parameter names.
 - Fix invalid generation of timezone-aware datetime.
+- Fix invalid setup of generic CLI options headers for other operations than ``dismiss``.
 
 `4.8.0 <https://github.com/crim-ca/weaver/tree/4.8.0>`_ (2022-01-11)
 ========================================================================

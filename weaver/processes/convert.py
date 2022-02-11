@@ -83,6 +83,7 @@ if TYPE_CHECKING:
     )
     from requests.models import Response
 
+    from weaver.processes.constants import ProcessSchemaType
     from weaver.typedefs import (
         AnySettingsContainer,
         AnyValueType,
@@ -978,7 +979,7 @@ def cwl2wps_io(io_info, io_select):
 
 
 def cwl2json_input_values(data, schema=PROCESS_SCHEMA_OGC):
-    # type: (Dict[str, CWL_IO_Value], str) -> ExecutionInputs
+    # type: (Dict[str, CWL_IO_Value], ProcessSchemaType) -> ExecutionInputs
     """
     Converts :term:`CWL` formatted :term:`Job` inputs to corresponding :term:`OGC API - Processes` format.
 
@@ -1029,7 +1030,7 @@ def cwl2json_input_values(data, schema=PROCESS_SCHEMA_OGC):
 
 
 def convert_input_values_schema(inputs, schema):
-    # type: (ExecutionInputs, str) -> ExecutionInputs
+    # type: (ExecutionInputs, ProcessSchemaType) -> ExecutionInputs
     """
     Convert execution input values between equivalent formats.
 

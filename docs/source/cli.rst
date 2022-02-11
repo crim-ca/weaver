@@ -123,7 +123,18 @@ DescribeProcess Example
 
 Accomplishes the :ref:`DescribeProcess <proc_op_describe>` request to obtain the :term:`Process` definition.
 
-.. todo:: example
+.. code-block:: shell
+
+    weaver describe -u {WEAVER_URL} -p jsonarray2netcdf
+
+.. code-block:: python
+
+    client.describe("jsonarray2netcdf")
+
+Sample Output:
+
+.. literalinclude:: ../../weaver/wps_restapi/examples/local_process_description_ogc_api.json
+    :language: json
 
 .. _cli_example_execute:
 

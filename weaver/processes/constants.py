@@ -1,4 +1,5 @@
 import sys
+from typing import TYPE_CHECKING
 
 WPS_INPUT = "input"
 WPS_OUTPUT = "output"
@@ -99,3 +100,8 @@ PROCESS_SCHEMAS = frozenset([
     PROCESS_SCHEMA_OGC,
     PROCESS_SCHEMA_OLD,
 ])
+
+if TYPE_CHECKING:
+    from weaver.typedefs import Literal
+
+    ProcessSchemaType = Literal[PROCESS_SCHEMA_OGC, PROCESS_SCHEMA_OGC]

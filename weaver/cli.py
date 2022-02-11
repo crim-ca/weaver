@@ -17,7 +17,7 @@ from weaver.datatype import AutoBase
 from weaver.exceptions import PackageRegistrationError
 from weaver.execute import EXECUTE_MODE_ASYNC, EXECUTE_RESPONSE_DOCUMENT, EXECUTE_TRANSMISSION_MODE_VALUE
 from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_PLAIN, get_content_type, get_format
-from weaver.processes.constants import PROCESS_SCHEMA_OGC
+from weaver.processes.constants import PROCESS_SCHEMA_OGC, PROCESS_SCHEMAS
 from weaver.processes.convert import (
     convert_input_values_schema,
     cwl2json_input_values,
@@ -52,6 +52,10 @@ if TYPE_CHECKING:
         from weaver.typedefs import CWL, JSON, ExecutionInputsMap, HeadersType
     except ImportError:
         CWL = JSON = ExecutionInputsMap = HeadersType = Any  # avoid linter issue
+    try:
+        from weaver.processes.constants import ProcessSchemaType
+    except ImportError:
+        ProcessSchemaType = str
 
 LOGGER = logging.getLogger(__name__)
 
@@ -367,8 +371,8 @@ class WeaverClient(object):
     Alias of :meth:`capabilities` for :term:`Process` listing.
     """
 
-    def describe(self, process_id, url=None):
-        # type: (str, Optional[str]) -> OperationResult
+    def describe(self, process_id, url=None, schema=PROCESS_SCHEMA_OGC):
+        # type: (str, Optional[str], Optional[ProcessSchemaType]) -> OperationResult
         """
         Describe the specified :term:`Process`.
 
@@ -377,10 +381,14 @@ class WeaverClient(object):
 
         :param process_id: Identifier of the process to describe.
         :param url: Instance URL if not already provided during client creation.
+        :param schema: Representation schema of the returned process description.
         """
         base = self._get_url(url)
         path = f"{base}/processes/{process_id}"
-        resp = request_extra("GET", path, headers=self._headers, settings=self._settings)
+        query = None
+        if isinstance(schema, str) and schema.upper() in PROCESS_SCHEMAS:
+            query = {"schema": schema.upper()}
+        resp = request_extra("GET", path, params=query, headers=self._headers, settings=self._settings)
         # API response from this request can contain 'description' matching the process description
         # rather than a generic response 'description'. Enforce the provided message to avoid confusion.
         return self._parse_result(resp, message="Process description successfully retrieved.")
@@ -976,7 +984,7 @@ def make_parser():
         "undeploy",
         description="Undeploy an existing process.",
     )
-    set_parser_sections(op_deploy)
+    set_parser_sections(op_undeploy)
     add_url_param(op_undeploy)
     add_process_param(op_undeploy)
 
@@ -984,23 +992,27 @@ def make_parser():
         "capabilities",
         description="List available processes.",
     )
-    set_parser_sections(op_deploy)
+    set_parser_sections(op_capabilities)
     add_url_param(op_capabilities)
 
     op_describe = WeaverArgumentParser(
         "describe",
         description="Obtain an existing process description.",
     )
-    set_parser_sections(op_deploy)
+    set_parser_sections(op_describe)
     add_url_param(op_describe)
     add_process_param(op_describe)
+    op_describe.add_argument(
+        "-S", "--schema", dest="schema", choices=PROCESS_SCHEMAS, default=PROCESS_SCHEMA_OGC,
+        help="Representation schema of the returned process description."
+    )
 
     op_execute = WeaverArgumentParser(
         "execute",
         description="Submit a job execution for an existing process.",
         formatter_class=InputsFormatter,
     )
-    set_parser_sections(op_deploy)
+    set_parser_sections(op_execute)
     add_url_param(op_execute)
     add_process_param(op_execute)
     op_execute.add_argument(
@@ -1051,7 +1063,7 @@ def make_parser():
         "dismiss",
         description="Dismiss a pending or running job, or wipe any finished job results.",
     )
-    set_parser_sections(op_deploy)
+    set_parser_sections(op_dismiss)
     add_url_param(op_dismiss, required=False)
     add_job_ref_param(op_dismiss)
 
@@ -1070,7 +1082,7 @@ def make_parser():
             "This is equivalent to doing a single-shot 'monitor' operation without any pooling or retries."
         ),
     )
-    set_parser_sections(op_deploy)
+    set_parser_sections(op_status)
     add_url_param(op_status, required=False)
     add_job_ref_param(op_status)
 
@@ -1081,7 +1093,7 @@ def make_parser():
             "This operation can also download them from the remote server if requested."
         ),
     )
-    set_parser_sections(op_deploy)
+    set_parser_sections(op_results)
     add_url_param(op_results, required=False)
     add_job_ref_param(op_results)
     op_results.add_argument(

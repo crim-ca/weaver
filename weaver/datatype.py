@@ -79,6 +79,7 @@ if TYPE_CHECKING:
 
     from owslib.wps import WebProcessingService
 
+    from weaver.processes.constants import ProcessSchemaType
     from weaver.typedefs import AnyProcess, AnySettingsContainer, AnyUUID, Number, CWL, JSON
 
     AnyParams = Dict[str, Any]
@@ -2004,7 +2005,7 @@ class Process(Base):
         return {"links": links}
 
     def offering(self, schema=PROCESS_SCHEMA_OGC):
-        # type: (str) -> JSON
+        # type: (ProcessSchemaType) -> JSON
         """
         Obtains the JSON serializable offering/description representation of the process.
 
