@@ -1,5 +1,6 @@
 {
-  "access_token": "3d590157b3de62828277fd1f7cb1a2b80767f0f287041761276245cf5c096c74",
-  "file_id": "32129e2a-a284-4a89-91db-0e873747142d",
-  "file_href": "vault:32129e2a-a284-4a89-91db-0e873747142d"
+  "description": "File successfully uploaded to vault.",
+  "access_token": "<ACCESS_TOKEN>",
+  "file_id": "e337a830-dbd6-4915-90ef-bfd46e237a3e",
+  "file_href": "vault://e337a830-dbd6-4915-90ef-bfd46e237a3e"
 }

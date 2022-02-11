@@ -119,8 +119,10 @@
 .. _describe-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Processes%2Fpaths%2F~1processes~1%7Bprocess_id%7D~1package%2Fget
 .. |exec-req-name| replace:: Execute
 .. _exec-req-name: `exec-req`_
-.. |exec-req| replace:: ``POST {WEAVER_URL}/processes/{id}/jobs`` (Execute)
-.. _exec-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Processes%2Fpaths%2F~1processes~1{process_id}~1jobs%2Fpost
+.. |exec-req| replace:: ``POST {WEAVER_URL}/processes/{id}/execution`` (Execute)
+.. _exec-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Processes/paths/~1processes~1{process_id}~1execution/post
+.. |exec-req-job| replace:: ``POST {WEAVER_URL}/processes/{id}/jobs`` (Execute)
+.. _exec-req-job: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Processes%2Fpaths%2F~1processes~1{process_id}~1jobs%2Fpost
 .. |vis-req| replace:: ``PUT {WEAVER_URL}/processes/{id}/visibility`` (Visibility)
 .. _vis-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Processes%2Fpaths%2F~1processes~1%7Bprocess_id%7D~1visibility%2Fput
 .. |pkg-req| replace:: ``GET {WEAVER_URL}/processes/{id}/package`` (Package)

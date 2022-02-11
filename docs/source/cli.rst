@@ -15,6 +15,10 @@ to rapidly operate with functionalities such as :ref:`Deploy <proc_op_deploy>`, 
 
 Please refer to following sections for more details.
 
+.. contents::
+    :local:
+    :depth: 3
+
 .. _client_commands:
 
 ------------------------
@@ -23,6 +27,18 @@ Python Client Commands
 
 For details about using the Python :py:class:`weaver.cli.WeaverClient`, please refer directly to its class
 documentation and its underlying methods.
+
+* :py:meth:`weaver.cli.WeaverClient.deploy`
+* :py:meth:`weaver.cli.WeaverClient.undeploy`
+* :py:meth:`weaver.cli.WeaverClient.capabilities`
+* :py:meth:`weaver.cli.WeaverClient.describe`
+* :py:meth:`weaver.cli.WeaverClient.execute`
+* :py:meth:`weaver.cli.WeaverClient.monitor`
+* :py:meth:`weaver.cli.WeaverClient.dismiss`
+* :py:meth:`weaver.cli.WeaverClient.status`
+* :py:meth:`weaver.cli.WeaverClient.results`
+* :py:meth:`weaver.cli.WeaverClient.upload`
+
 
 .. _cli_commands:
 
@@ -39,6 +55,8 @@ Following are the detail for the shell :term:`CLI` which provides the same featu
     :func: make_parser
     :prog: weaver
 
+.. IMPORTANT:
+..  Avoid using titles with only 'deploy', 'execute', etc., as they will conflict with auto-generated ones from CLI
 .. _cli_examples:
 
 ------------------------
@@ -51,29 +69,35 @@ Operations are equivalent between the :term:`CLI` and Python client.
 Note that more operations and option parameters are available,
 and are not all necessarily represented in below examples.
 
+For each of the following examples, the client is created as follows:
 
-.. _cli_deploy:
+.. code-block:: python
 
-~~~~~~~~~~~~~~~~~
-Deploy
-~~~~~~~~~~~~~~~~~
+    client = WeaverClient(url="{WEAVER_URL}")
+
+
+.. _cli_example_deploy:
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Deploy Example
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. todo:: example
 
 .. _cli_undeploy:
 
-~~~~~~~~~~~~~~~~~
-Undeploy
-~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Undeploy Example
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. todo:: example
 
 
-.. _cli_getcap:
+.. _cli_example_getcap:
 
-~~~~~~~~~~~~~~~~~
-GetCapabilities
-~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+GetCapabilities Example
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Accomplishes the :ref:`GetCapabilities <proc_op_getcap>` request to obtain a list of available :term:`Process`.
 
@@ -83,101 +107,95 @@ Accomplishes the :ref:`GetCapabilities <proc_op_getcap>` request to obtain a lis
 
 .. code-block:: python
 
-    WeaverClient(url="{WEAVER_URL}").capabilities()
+    client.capabilities()
 
 Sample Output:
 
-.. code-block:: json
-
-    {
-      "description": "Listing of available processes successful.",
-      "processes": [
-        "docker-demo-cat",
-        "docker-python-script",
-        "Echo",
-        "file_index_selector",
-        "file2string_array",
-        "image-utils",
-        "jsonarray2netcdf",
-        "las2tif",
-        "metalink2netcdf",
-        "sleep",
-      ],
-      "page": 0,
-      "total": 25,
-    }
+.. literalinclude:: ../../weaver/wps_restapi/examples/local_process_listing.json
+    :language: json
 
 
-.. _cli_describe:
+.. _cli_example_describe:
 
-~~~~~~~~~~~~~~~~~
-DescribeProcess
-~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+DescribeProcess Example
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Accomplishes the :ref:`DescribeProcess <proc_op_describe>` request to obtain the :term:`Process` definition.
 
 .. todo:: example
 
-.. _cli_execute:
+.. _cli_example_execute:
 
-~~~~~~~~~~~~~~~~~
-Execute
-~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Execute Example
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Accomplishes the :ref:`Execute <proc_op_execute>` request to obtain launch a :term:`Job`
 with the specified :term:`Process` and provided inputs.
 
 .. todo:: example
 
-.. _cli_dismiss:
+.. _cli_example_dismiss:
 
-~~~~~~~~~~~~~~~~~
-Dismiss
-~~~~~~~~~~~~~~~~~
-
-.. todo:: example
-
-
-.. _cli_status:
-
-~~~~~~~~~~~~~~~~~
-GetStatus
-~~~~~~~~~~~~~~~~~
-
-
-.. todo:: example
-
-.. _cli_monitor:
-
-~~~~~~~~~~~~~~~~~
-Monitor
-~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Dismiss Example
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. todo:: example
 
 
-.. _cli_results:
+.. _cli_example_status:
 
-~~~~~~~~~~~~~~~~~
-Results
-~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+GetStatus Example
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 .. todo:: example
 
-.. _cli_upload:
+.. _cli_example_monitor:
 
-~~~~~~~~~~~~~~~~~
-Upload
-~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Monitor Example
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. todo:: example
+
+
+.. _cli_example_results:
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Results Example
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+.. todo:: example
+
+.. _cli_example_upload:
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Upload Example
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 This operation allows manual upload of a local file to the :term:`Vault`.
 
 .. note::
-    When running the :ref:`cli_execute` operation, any detected local file reference will be automatically uploaded
+    When running the :ref:`execute` operation, any detected local file reference will be automatically uploaded
     as :term:`Vault` file in order to make it available for the remote `Weaver` server for :term:`Process` execution.
 
 .. seealso::
     :ref:`file_vault_inputs` and :ref:`vault` provide more details about this feature.
 
-.. todo:: example
+.. code-block:: shell
+
+    weaver upload -u {WEAVER_URL} -f /path/to/file.txt
+
+.. code-block:: python
+
+    client.upload("/path/to/file.txt")
+
+Sample Output:
+
+.. literalinclude:: ../../weaver/wps_restapi/examples/vault_file_uploaded.json
+    :language: json

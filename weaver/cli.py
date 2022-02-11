@@ -622,6 +622,7 @@ class WeaverClient(object):
         return self._parse_result(resp)
 
     def status(self, job_reference, url=None):
+        # type: (str, Optional[str]) -> OperationResult
         """
         Obtain the status of a :term:`Job`.
 
@@ -1014,24 +1015,24 @@ def make_parser():
             for selected format. Both mapping and listing formats are supported.
 
             To execute a process without any inputs (e.g.: using its defaults),
-            supply an explicit empty input (i.e.: -I "" or loaded from file as {}).
+            supply an explicit empty input (i.e.: ``-I ""`` or loaded from file as ``{}``).
 
-            To provide inputs using literal command-line definitions, inputs should be specified using '<id>=<value>'
-            convention, with distinct -I options for each applicable input value.
+            To provide inputs using literal command-line definitions, inputs should be specified using ``<id>=<value>``
+            convention, with distinct ``-I`` options for each applicable input value.
 
             Values that require other type than string to be converted for job submission can include the type
-            following the ID using a colon separator (i.e.: '<id>:<type>=<value>'). For example, an integer could be
-            specified as follows: 'number:int=1' while a floating point number would be: 'number:float=1.23'.
+            following the ID using a colon separator (i.e.: ``<id>:<type>=<value>``). For example, an integer could be
+            specified as follows: ``number:int=1`` while a floating point number would be: ``number:float=1.23``.
 
-            File references (href) should be specified using 'File' as the type (i.e.: 'input:File=http://...').
-            Note that 'File' in this case is expected to be an URL location where the file can be download from.
+            File references (``href``) should be specified using ``File`` as the type (i.e.: ``input:File=http://...``).
+            Note that ``File`` in this case is expected to be an URL location where the file can be download from.
             When a local file is supplied, Weaver will automatically convert it to a remote Vault File in order to
             upload it and make it available for the remote process.
 
-            Array input (maxOccurs > 1) should be specified using semicolon (;) separated values.
-            The type of an item of this array can also be provided (i.e.: 'array:int=1;2;3').
+            Array input (``maxOccurs > 1``) should be specified using semicolon (;) separated values.
+            The type of an item of this array can also be provided (i.e.: ``array:int=1;2;3``).
 
-            Example: -I message='Hello Weaver' -I value:int=1234
+            Example: ``-I message='Hello Weaver' -I value:int=1234``
         """)
     )
     # FIXME: support sync (https://github.com/crim-ca/weaver/issues/247)
@@ -1123,8 +1124,8 @@ def make_parser():
         op_execute,
         op_monitor,
         op_dismiss,
-        op_results,
         op_status,
+        op_results,
         op_upload,
     ]
     aliases = {

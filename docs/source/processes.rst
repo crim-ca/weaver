@@ -414,10 +414,15 @@ that define the process references and expected inputs/outputs.
 Execution of a process (Execute)
 ---------------------------------------------------------------------
 
-Process execution (i.e.: submitting a :term:`Job`) is accomplished using the |exec-req|_ request. This section will
-first describe the basics of this request format, and after go into details for specific use cases and parametrization
-of various input/output combinations. Let's employ the following example of JSON body sent to the :term:`Job` execution
-to better illustrate the requirements.
+:term:`Process` execution (i.e.: submitting a :term:`Job`) is accomplished using the |exec-req|_ request.
+
+.. note::
+    For backward compatibility, the |exec-req-job|_ request is also supported as alias to the above
+    :term:`OGC API - Processes` compliant endpoint.
+
+This section will first describe the basics of this request format, and after go into details for specific use cases
+and parametrization of various input/output combinations. Let's employ the following example of JSON body sent to the
+:term:`Job` execution to better illustrate the requirements.
 
 .. code-block:: json
 
