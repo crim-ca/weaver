@@ -48,24 +48,37 @@ feature/db:
   - weaver/database/**/*
   - weaver/store/**/*
   - weaver/sort.py
+  - tests/test_datatype.py
+  - tests/test_mongodb.py
 
 feature/cli:
   - weaver/cli.py
   - docs/source/cli.rst
+  - tests/test_cli.py
+  - tests/functional/test_cli.py
+
+feature/docker:
+  - tests/functional/test_docker_app.py
+  - tests/smoke/**/*
 
 feature/oas:
   - weaver/wps_restapi/templates/swagger_ui.mako
   - weaver/wps_restapi/colander_extras.py
   - weaver/wps_restapi/swagger_definitions.py
   - docs/source/api.rst
+  - tests/test_schemas.py
+  - tests/functional/test_colander_extras.py
 
 feature/CWL:
   - weaver/processes/wps_process_base.py
   - weaver/processes/wps_package.py
   - weaver/processes/wps_workflow.py
+  - tests/processes/test_wps_package.py
 
 feature/opensearch:
   - weaver/processes/opensearch.py
+  - tests/test_opensearch.py
+  - tests/opensearch/**/*
 
 # -- Files that *always* impact jobs --
 feature/job:
@@ -74,24 +87,43 @@ feature/job:
   - weaver/wps_restapi/jobs/**/*
   - weaver/wps_restapi/templates/notification_email_example.mako
 
+feature/providers:
+  - weaver/wps_restapi/providers/**/*
+  - tests/functional/test_wps_provider.py
+  - tests/wps_restapi/test_providers.py
+
+feature/quoting:
+  - weaver/wps_restapi/quotation
+
+feature/vault:
+  - weaver/vault/**/*
+  - tests/test_vault.py
+
 ## -- WPS processes --
 
 process/builtin:
   - weaver/processes/builtin/**/*
+  - tests/functional/test_builtin.py
 
 process/wps1:
   - weaver/wps.py
   - weaver/processes/wps1*
+  - tests/functional/test_wps_app.py
 
 process/wps2:
   - weaver/wps.py
   - weaver/processes/wps2*
+  - tests/functional/test_wps_app.py
 
 process/wps3:
   - weaver/wps_restapi/**/*
+  - tests/processes/test_wps3_process.py
+  - tests/wps_restapi/**/*
 
 process/esgf-cwt:
   - weaver/processes/esgf*
 
 process/workflow:
   - weaver/processes/wps_workflow.py
+  - tests/functional/test_ems_end2end.py
+  - tests/functional/test_workflow.py
