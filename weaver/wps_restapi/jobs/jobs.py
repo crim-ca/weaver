@@ -73,7 +73,7 @@ def get_job(request):
             desc = "Could not find job with specified reference."
         title = "NoSuchJob"
         raise exception(
-            # new format: https://docs.ogc.org/DRAFTS/18-062.html#_error_situations_7
+            # new format: https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_job-exception-no-such-job
             json={
                 "title": title,
                 "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/no-such-job",
@@ -93,7 +93,7 @@ def get_job(request):
         title = "NoSuchProvider"
         desc = "Could not find job reference corresponding to specified provider reference."
         raise OWSNotFound(
-            # new format: https://docs.ogc.org/DRAFTS/18-062.html#_error_situations_5
+            # new format: https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_job-exception-no-such-job
             json={
                 "title": title,
                 "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/no-such-job",
@@ -107,7 +107,8 @@ def get_job(request):
         title = "NoSuchProcess"
         desc = "Could not find job reference corresponding to specified process reference."
         raise OWSNotFound(
-            # new format: https://docs.ogc.org/DRAFTS/18-062.html#_error_situations_5
+            # new format: https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_job-exception-no-such-job
+            # note: although 'no-such-process' error, return 'no-such-job' because process could exist, only mismatches
             json={
                 "title": title,
                 "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/no-such-job",

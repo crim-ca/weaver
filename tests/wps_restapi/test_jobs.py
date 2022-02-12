@@ -1207,7 +1207,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         Subsequent calls to the same job dismiss operation must respond with HTTP Gone (410) status.
 
         .. seealso::
-            OGC specification of dismiss operation: https://docs.ogc.org/DRAFTS/18-062.html#sec_cons_dismiss
+            OGC specification of dismiss operation: https://docs.ogc.org/is/18-062r2/18-062r2.html#toc53
         """
         job_running = self.job_info[10]
         assert job_running.status == STATUS_RUNNING, "Job must be in running state for test"
@@ -1245,7 +1245,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         Subsequent calls to the same job dismiss operation must respond with HTTP Gone (410) status.
 
         .. seealso::
-            OGC specification of dismiss operation: https://docs.ogc.org/DRAFTS/18-062.html#sec_cons_dismiss
+            OGC specification of dismiss operation: https://docs.ogc.org/is/18-062r2/18-062r2.html#toc5
         """
         job_success = self.job_info[0]
         job_failed = self.job_info[1]

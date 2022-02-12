@@ -433,6 +433,10 @@ linkcheck_ignore = [
     # ignore requires.io which just fails periodically - not critical link
     "https://requires.io/github/crim-ca/weaver/.*",
     "https://github.com/crim-ca/weaver/*",  # limit only our repo so others are still checked
+    "https://service.crim.ca/.*",
+    "https://ogc-ems.crim.ca/.*",
+    "https://ogc-ades.crim.ca/.*",
+    "https://ogc.crim.ca/.*",
 ]
 
 linkcheck_timeout = 30

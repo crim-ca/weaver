@@ -227,7 +227,7 @@ Changes:
 - Avoid ``Job.progress`` updates following ``failed`` or ``dismissed`` statuses to keep track of the last real progress
   percentage that was reached when that status was set.
 - Improve typing of database and store getter functions to infer correct types and facilitate code auto-complete.
-- Implement ``Job`` `dismiss operation <https://docs.ogc.org/DRAFTS/18-062.html#sec_cons_dismiss>`_ ensuring
+- Implement ``Job`` `dismiss operation <https://docs.ogc.org/is/18-062r2/18-062r2.html#toc53>`_ ensuring
   pending or running tasks are removed and output result artifacts are removed from disk.
 - Implement HTTP Gone (410) status from already dismissed ``Job`` when requested again or when fetching its artifacts.
 

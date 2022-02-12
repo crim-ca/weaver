@@ -416,6 +416,7 @@ def api_conformance(request):  # noqa: F811
         ogcapi_processes + "/req/core/process-list",
         ogcapi_processes + "/req/core/process-list-success",
         # ogcapi_processes + "/req/core/test-process",
+        ogcapi_processes + "/req/dismiss",
         ogcapi_processes + "/req/dismiss/job-dismiss-op",
         ogcapi_processes + "/req/dismiss/job-dismiss-success",
         # https://github.com/opengeospatial/ogcapi-processes/blob/master/core/clause_7_core.adoc#sc_requirements_class_html
