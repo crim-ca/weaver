@@ -24,6 +24,7 @@ Fixes:
 - Fix rendering of CLI *required* arguments under the appropriate argument group section when those arguments can be
   specified using prefixed ``-`` and ``--`` optional arguments format.
 - Fix CLI ``url`` parameter to be provided using ``-u`` or ``--url`` without specific argument position needed.
+- Fix CLI parsing of ``File`` inputs for ``execute`` operation when provided with quotes to capture full paths.
 - Fix rendering of OpenAPI variable names (``additionalParameters``) employed to represent for example ``{input-id}``
   as the key within the mapping representation of inputs/outputs. The previous notation employed was incorrectly
   interpreted as HTML tags, making them partially hidden in Swagger UI.

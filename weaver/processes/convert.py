@@ -1129,7 +1129,13 @@ def repr2json_input_values(inputs):
         arr_val = str_val.split(";")
         arr_typ = INPUT_VALUE_TYPE_MAPPING[map_typ]
         arr_val = [arr_typ(val) for val in arr_val]
-        val_key = "href" if str_typ in ["file", "File"] else "value"
+        if map_typ.capitalize() == "File":
+            val_key = "href"
+            for i, val in enumerate(list(arr_val)):
+                if (val.startswith("'") and val.endswith("'")) or (val.startswith("\"") and val.endswith("\"")):
+                    arr_val[i] = val[1:-1]
+        else:
+            val_key = "value"
         values.append({"id": str_id, val_key: arr_val if ";" in str_val else arr_val[0]})
     return values
 

@@ -253,7 +253,7 @@ class TestWeaverClient(TestWeaverClientBase):
                 stack_exec.enter_context(mock_exec_proc)
             result = mocked_sub_requests(self.app, self.client.execute, self.test_process[process], inputs=inputs_param)
         if expect_success:
-            assert result.success, result.text
+            assert result.success, result.message + " " + result.text
             assert "jobID" in result.body
             assert "processID" in result.body
             assert "status" in result.body
@@ -429,10 +429,14 @@ class TestWeaverClient(TestWeaverClientBase):
     @pytest.mark.vault
     def test_execute_inputs_representation_literal_schema_auto_resolve_vault(self):
         # 1st 'file' is the name of the process input
-        # 2nd 'file' is the type (CWL) to ensure proper detection/conversion to href URL
+        # 2nd 'File' is the type (CWL) to ensure proper detection/conversion to href URL
         # 'test_file' will be replaced by the actual temp file instantiated with dummy data
-        input_data = "file:file='{test_file}'"
-        self.run_execute_inputs_with_vault_file(input_data, "CatFile", preload=False, embed=True)
+        for input_data in [
+            "file:File={test_file}",
+            "file:File='{test_file}'",
+            "file:File=\"{test_file}\"",
+        ]:
+            self.run_execute_inputs_with_vault_file(input_data, "CatFile", preload=False, embed=True)
 
     @mocked_dismiss_process()
     def test_dismiss(self):
