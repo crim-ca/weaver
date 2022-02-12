@@ -5,6 +5,8 @@ Changes
 
 .. **REPLACE AND/OR ADD SECTION ENTRIES ACCORDINGLY WITH APPLIED CHANGES**
 
+.. _changes_latest:
+
 `Unreleased <https://github.com/crim-ca/weaver/tree/master>`_ (latest)
 ========================================================================
 
@@ -15,6 +17,8 @@ Changes:
 Fixes:
 ------
 - No change.
+
+.. _changes_4.8.0:
 
 `4.8.0 <https://github.com/crim-ca/weaver/tree/4.8.0>`_ (2022-01-11)
 ========================================================================
@@ -54,6 +58,8 @@ Fixes:
   was originally submitted through the `WPS-1` interface.
 - Fix and improve multiple typing definitions.
 
+.. _changes_4.7.0:
+
 `4.7.0 <https://github.com/crim-ca/weaver/tree/4.7.0>`_ (2021-12-21)
 ========================================================================
 
@@ -66,6 +72,8 @@ Fixes:
 - Fix help message of CLI arguments not properly grouped within intended sections.
 - Fix handling of mutually exclusive CLI arguments in distinct operation sub-parsers.
 - Fix CLI requirement of ``--process`` and ``--job`` arguments.
+
+.. _changes_4.6.0:
 
 `4.6.0 <https://github.com/crim-ca/weaver/tree/4.6.0>`_ (2021-12-15)
 ========================================================================
@@ -125,6 +133,8 @@ Fixes:
 - Pin ``pymongo<4`` until ``celery>=5`` gets resolved
   (relates to `#386 <https://github.com/crim-ca/weaver/issues/386>`_).
 
+.. _changes_4.5.0:
+
 `4.5.0 <https://github.com/crim-ca/weaver/tree/4.5.0>`_ (2021-11-25)
 ========================================================================
 
@@ -141,6 +151,8 @@ Fixes:
   listing definition, not considering possible mapping definition.
 - Fix incorrect documentation section ``Package as External Execution Unit Reference`` where content was omitted
   and incorrectly anchored as following ``process-esgf-cwt`` section.
+
+.. _changes_4.4.0:
 
 `4.4.0 <https://github.com/crim-ca/weaver/tree/4.4.0>`_ (2021-11-19)
 ========================================================================
@@ -176,6 +188,8 @@ Fixes:
 - Fix resolution of `WPS` I/O provided as mapping instead of listing during deployment in order to properly parse
   them and merge their metadata with corresponding `CWL` I/O definitions.
 - Fix `DataSource` and `OpenSearch` typing definitions to more rapidly detect incorrect data structures during parsing.
+
+.. _changes_4.3.0:
 
 `4.3.0 <https://github.com/crim-ca/weaver/tree/4.3.0>`_ (2021-11-16)
 ========================================================================
@@ -225,6 +239,8 @@ Fixes:
 - Fix invalid ``Job`` links sometimes containing duplicate ``/`` occurrences.
 - Fix invalid ``Job`` link URL for ``alternate`` relationship.
 
+.. _changes_4.2.1:
+
 `4.2.1 <https://github.com/crim-ca/weaver/tree/4.2.1>`_ (2021-10-20)
 ========================================================================
 
@@ -242,6 +258,8 @@ Fixes:
 ------
 - Fix an inconsistency between the final ``Job`` status and the reported "completed" message in logs due to missing
   push of a newer state prior re-fetch of the latest ``Job`` from the database.
+
+.. _changes_4.2.0:
 
 `4.2.0 <https://github.com/crim-ca/weaver/tree/4.2.0>`_ (2021-10-19)
 ========================================================================
@@ -288,6 +306,8 @@ Fixes:
   (resolves `#266 <https://github.com/crim-ca/weaver/issues/266>`_).
 - Fix incorrect rendering of some table cells in the documentation.
 
+.. _changes_4.1.2:
+
 `4.1.2 <https://github.com/crim-ca/weaver/tree/4.1.2>`_ (2021-10-13)
 ========================================================================
 
@@ -299,6 +319,8 @@ Fixes:
 ------
 - Add ``celery worker`` task events flag (``-E``) to Docker command (``weaver-worker``) to help detect submitted
   delayed tasks when requesting job executions.
+
+.. _changes_4.1.1:
 
 `4.1.1 <https://github.com/crim-ca/weaver/tree/4.1.1>`_ (2021-10-12)
 ========================================================================
@@ -321,6 +343,8 @@ Fixes:
 - Resolve execution failure of `WPS-1 Process` ``ncdump`` under ``hummingbird`` `Provider`
   (fixes issue identified in output logs from notebook in
   `PR pavics-sdi#230 <https://github.com/Ouranosinc/pavics-sdi/pull/230>`_).
+
+.. _changes_4.1.0:
 
 `4.1.0 <https://github.com/crim-ca/weaver/tree/4.1.0>`_ (2021-09-29)
 ========================================================================
@@ -361,6 +385,8 @@ Fixes:
 - Fix ``weaver.exception`` definitions such that raising them directly will employ the corresponding ``HTTPException``
   code (if applicable) to generate the appropriate error response automatically when raising them directly without
   further handling. The order of class inheritance were always using ``500`` due to ``WeaverException`` definition.
+
+.. _changes_4.0.0:
 
 `4.0.0 <https://github.com/crim-ca/weaver/tree/4.0.0>`_ (2021-09-21)
 ========================================================================
@@ -457,6 +483,8 @@ Fixes:
   `geopython/pywps#624 <https://github.com/geopython/pywps/issues/624>`_,
   `CVE-2021-39371 <https://nvd.nist.gov/vuln/detail/CVE-2021-39371>`_).
 
+.. _changes_3.5.0:
+
 `3.5.0 <https://github.com/crim-ca/weaver/tree/3.5.0>`_ (2021-08-19)
 ========================================================================
 
@@ -474,6 +502,8 @@ Fixes:
   of only explicit inserts, as they should be pre-validated for duplicate entries, and only new definitions should
   be registered during this operation (fixes `#246 <https://github.com/crim-ca/weaver/issues/246>`_).
 
+.. _changes_3.4.0:
+
 `3.4.0 <https://github.com/crim-ca/weaver/tree/3.4.0>`_ (2021-08-11)
 ========================================================================
 
@@ -487,6 +517,8 @@ Changes:
 Fixes:
 ------
 - Fix copy of headers when generating the WPS clients created for listing providers capabilities and processes.
+
+.. _changes_3.3.0:
 
 `3.3.0 <https://github.com/crim-ca/weaver/tree/3.3.0>`_ (2021-07-16)
 ========================================================================
@@ -506,6 +538,8 @@ Fixes:
 - Fixed the format of the output file URL. When the prefix ``/`` was not present,
   URL was incorrectly handled by not prepending the required base URL location.
 
+.. _changes_3.2.1:
+
 `3.2.1 <https://github.com/crim-ca/weaver/tree/3.2.1>`_ (2021-06-08)
 ========================================================================
 
@@ -517,6 +551,8 @@ Fixes:
 ------
 - Fix backward compatibility of pre-deployed processes that did not define ``jobControlOptions`` that is now required.
   Missing definition are substituted in-place by default ``["execute-async"]`` mode.
+
+.. _changes_3.2.0:
 
 `3.2.0 <https://github.com/crim-ca/weaver/tree/3.2.0>`_ (2021-06-08)
 ========================================================================
@@ -546,6 +582,8 @@ Fixes:
 - Adjust ``InputType`` and ``OutputType`` schemas to use ``allOf`` instead of ``anyOf`` definition since all sub-schemas
   that define them must be combined, with their respectively required or optional fields.
 
+.. _changes_3.1.0:
+
 `3.1.0 <https://github.com/crim-ca/weaver/tree/3.1.0>`_ (2021-04-23)
 ========================================================================
 
@@ -569,6 +607,8 @@ Fixes:
 - Fix handling of deeply nested schema validator raising for invalid format within optional parent schema.
 - Fix retrieval of database connection from registry reference.
 - Fix test mock according to installed ``pyramid`` version to avoid error with modified mixin implementations.
+
+.. _changes_3.0.0:
 
 `3.0.0 <https://github.com/crim-ca/weaver/tree/3.0.0>`_ (2021-03-16)
 ========================================================================
@@ -624,6 +664,8 @@ Fixes:
   ``ProcessSummary`` schema validation would fail and return ``HTTPBadRequest [400]``. The process is now saved only
   after complete and successful schema validation.
 
+.. _changes_2.2.0:
+
 `2.2.0 <https://github.com/crim-ca/weaver/tree/2.2.0>`_ (2021-03-03)
 ========================================================================
 
@@ -639,6 +681,8 @@ Fixes:
 - Fix `Job` duration not stopped incrementing when its execution failed due to raised error
   (fixes `#222 <https://github.com/crim-ca/weaver/issues/222>`_).
 - Improve race condition handling of ``builtin`` process registration at application startup.
+
+.. _changes_2.1.0:
 
 `2.1.0 <https://github.com/crim-ca/weaver/tree/2.1.0>`_ (2021-02-26)
 ========================================================================
@@ -664,6 +708,8 @@ Fixes:
 ------
 - Avoid failing `WPS-1/2` processes conversion to corresponding `OGC-API` process if metadata fields are omitted.
 - Fix invalid function employed for ``GET /providers/{prov}/processes/{proc}`` route (some error handling was bypassed).
+
+.. _changes_2.0.0:
 
 `2.0.0 <https://github.com/crim-ca/weaver/tree/2.0.0>`_ (2021-02-22)
 ========================================================================
@@ -703,6 +749,8 @@ Fixes:
   (using virtual/conda environment) compared to within Weaver Docker image (using OS python).
 - Fix many typing definitions.
 
+.. _changes_1.14.0:
+
 `1.14.0 <https://github.com/crim-ca/weaver/tree/1.14.0>`_ (2021-01-11)
 ========================================================================
 
@@ -720,6 +768,8 @@ Fixes:
 - Fix ``stdout``/``stderr`` log file not permitted directly within `CWL` `Workflow` (must be inside intermediate steps).
 - Fix missing `S3` bucket location constraint within unittests.
 
+.. _changes_1.13.1:
+
 `1.13.1 <https://github.com/crim-ca/weaver/tree/1.13.1>`_ (2020-07-17)
 ========================================================================
 
@@ -730,6 +780,8 @@ Changes:
 Fixes:
 ------
 - Create an ``stdout.log`` or ``stderr.log`` file in case ``cwltool`` hasn't created it.
+
+.. _changes_1.13.0:
 
 `1.13.0 <https://github.com/crim-ca/weaver/tree/1.13.0>`_ (2020-07-15)
 ========================================================================
@@ -751,6 +803,8 @@ Fixes:
 - Adjust ``weaver.processes.wps_package.WpsPackage`` to use its internal logger when running the process in order to
   preserve log entries under its job execution. They were otherwise lost over time across all process executions.
 
+.. _changes_1.12.0:
+
 `1.12.0 <https://github.com/crim-ca/weaver/tree/1.12.0>`_ (2020-07-03)
 ========================================================================
 
@@ -765,6 +819,8 @@ Changes:
 Fixes:
 ------
 - Reset ``MongoDatabase`` connection when we are in a forked process.
+
+.. _changes_1.11.0:
 
 `1.11.0 <https://github.com/crim-ca/weaver/tree/1.11.0>`_ (2020-07-02)
 ========================================================================
@@ -785,6 +841,8 @@ Fixes:
 ------
 - Fix reported WPS status location to handle when starting with ``/`` although not representing an absolute path.
 
+.. _changes_1.10.1:
+
 `1.10.1 <https://github.com/crim-ca/weaver/tree/1.10.1>`_ (2020-06-03)
 ========================================================================
 
@@ -795,6 +853,8 @@ Changes:
 Fixes:
 ------
 - Pin ``celery==4.4.2`` to avoid import error on missing ``futures.utils`` called internally in following versions.
+
+.. _changes_1.10.0:
 
 `1.10.0 <https://github.com/crim-ca/weaver/tree/1.10.0>`_ (2020-06-03)
 ========================================================================
@@ -807,6 +867,8 @@ Changes:
 Fixes:
 ------
 - Add more examples of supported WPS endpoint metadata (fixes `#84 <https://github.com/crim-ca/weaver/issues/84>`_).
+
+.. _changes_1.9.0:
 
 `1.9.0 <https://github.com/crim-ca/weaver/tree/1.9.0>`_ (2020-06-01)
 ========================================================================
@@ -845,6 +907,8 @@ Fixes:
   behaviour of the function. Since `CWL` usually doesn't need to add ``File.format`` field when no corresponding
   reference actually exists, this default also makes more sense.
 
+.. _changes_1.8.1:
+
 `1.8.1 <https://github.com/crim-ca/weaver/tree/1.8.1>`_ (2020-05-22)
 ========================================================================
 
@@ -866,6 +930,8 @@ Fixes:
 - Fix failing docker image boot due to incorrectly placed ``yaml`` import during setup installation.
 - Fix imports according to ``Makefile`` targets ``check-imports`` and ``fix-imports``.
 - Fix parsing of ``PyWPS`` metadata to correctly employ values provided by ``weaver.ini``.
+
+.. _changes_1.8.0:
 
 `1.8.0 <https://github.com/crim-ca/weaver/tree/1.8.0>`_ (2020-05-21)
 ========================================================================
@@ -898,6 +964,8 @@ Fixes:
 - Fix handling of ``WPS<->CWL`` I/O merge of ``data_format`` field against ``supported_formats`` with ``pywps>=4.2.4``.
 - Fix installation of ``yaml``-related packages for Python 2 backward compatibility.
 
+.. _changes_1.7.0:
+
 `1.7.0 <https://github.com/crim-ca/weaver/tree/1.7.0>`_ (2020-05-15)
 ========================================================================
 
@@ -922,6 +990,8 @@ Fixes:
 - Fix parsing of `CWL` ordered parsing when I/O is specified as shorthand ``"<id>":"<type>"`` directly under the
   ``inputs`` or ``outputs`` dictionary instead of extended JSON object variant such as
   ``{"input": {"type:" "<type>", "format": [...]}}`` (fixes `#137 <https://github.com/crim-ca/weaver/issues/137>`_).
+
+.. _changes_1.6.0:
 
 `1.6.0 <https://github.com/crim-ca/weaver/tree/1.6.0>`_ (2020-05-07)
 ========================================================================
@@ -954,6 +1024,8 @@ Fixes:
 - Fix parsing of MIME-type from ``format`` field to exclude additional parameters (e.g.: ``; charset=UTF-8`` for
   remote IANA validation.
 
+.. _changes_1.5.1:
+
 `1.5.1 <https://github.com/crim-ca/weaver/tree/1.5.1>`_ (2020-03-26)
 ========================================================================
 
@@ -967,6 +1039,8 @@ Fixes:
 ------
 
 - Fix invalid ``retry`` parameter not handled automatically by request.
+
+.. _changes_1.5.0:
 
 `1.5.0 <https://github.com/crim-ca/weaver/tree/1.5.0>`_ (2020-03-25)
 ========================================================================
@@ -992,6 +1066,8 @@ Fixes:
 - Avoid long fetch operation using streamed request that defaulted to chuck size of 1.
   Now, we use an appropriate size according to available memory.
 
+.. _changes_1.4.0:
+
 `1.4.0 <https://github.com/crim-ca/weaver/tree/1.4.0>`_ (2020-03-18)
 ========================================================================
 
@@ -1001,6 +1077,8 @@ Changes:
 - Update owslib to 0.19.2
 - Drop support for python 3.5
 
+.. _changes_1.3.0:
+
 `1.3.0 <https://github.com/crim-ca/weaver/tree/1.3.0>`_ (2020-03-10)
 ========================================================================
 
@@ -1009,6 +1087,8 @@ Changes:
 
 - Provide a way to override the external URL reported by `WPS-1/2` and `WPS-REST` via configuration settings allowing
   for more advanced server-side results in response bodies.
+
+.. _changes_1.2.0:
 
 `1.2.0 <https://github.com/crim-ca/weaver/tree/1.2.0>`_ (2020-03-06)
 ========================================================================
@@ -1022,6 +1102,8 @@ Fixes:
 ------
 
 - Fix a bug where the validation of ``OneOf`` items was casting the value to the first valid possibility.
+
+.. _changes_1.1.0:
 
 `1.1.0 <https://github.com/crim-ca/weaver/tree/1.1.0>`_ (2020-02-17)
 ========================================================================
@@ -1048,6 +1130,8 @@ Fixes:
 - Fix ``geopython/OWSLib>=0.19.1`` requirement for Python 3.8 support
   (`#62 <https://github.com/crim-ca/weaver/issues/62>`_).
 - Fix job update filling due to status location incorrectly resolved according to configured PyWPS output path.
+
+.. _changes_1.0.0:
 
 `1.0.0 <https://github.com/crim-ca/weaver/tree/1.0.0>`_ (2020-01-28)
 ========================================================================
@@ -1117,15 +1201,21 @@ Fixes:
 - Fix docker images to support ``pserve`` when using ``gunicorn>=20.x`` dropping support of ``--paste`` config feature.
 - Fix multiple Python 2/3 compatibility issues.
 
+.. _changes_0.2.2:
+
 `0.2.2 <https://github.com/crim-ca/weaver/tree/0.2.2>`_ (2019-05-31)
 ========================================================================
 
 - Support notification email subject template.
 
+.. _changes_0.2.1:
+
 `0.2.1 <https://github.com/crim-ca/weaver/tree/0.2.1>`_ (2019-05-29)
 ========================================================================
 
 - Add per-process email notification template.
+
+.. _changes_0.2.0:
 
 `0.2.0 <https://github.com/crim-ca/weaver/tree/0.2.0>`_ (2019-03-26)
 ========================================================================
@@ -1139,6 +1229,8 @@ Fixes:
 - Add many deployment and execution validation tests for ``WPS1Requirement``.
 - Add ``builtin`` application packages support for common operations.
 
+.. _changes_0.1.3:
+
 `0.1.3 <https://github.com/crim-ca/weaver/tree/0.1.3>`_ (2019-03-07)
 =============================================================================
 
@@ -1150,6 +1242,8 @@ Fixes:
 - Additional logging of unhandled errors.
 - Improve some typing definitions.
 
+.. _changes_0.1.2:
+
 `0.1.2 <https://github.com/crim-ca/weaver/tree/0.1.2>`_ (2019-03-05)
 =============================================================================
 
@@ -1159,6 +1253,8 @@ Fixes:
 - Fix some problematic imports.
 - Fix some PEP8 issues and PyCharm warnings.
 
+.. _changes_0.1.1:
+
 `0.1.1 <https://github.com/crim-ca/weaver/tree/0.1.1>`_ (2019-03-04)
 =============================================================================
 
@@ -1166,6 +1262,8 @@ Fixes:
 - Modify `Dockerfile` to reduce build time by reusing built image layers (requirements installation mostly).
 - Make some `buildout` dependencies optional to also reduce build time and image size.
 - Some additional striping of deprecated or invalid items from `Twitcher`_.
+
+.. _changes_0.1.0:
 
 `0.1.0 <https://github.com/crim-ca/weaver/tree/0.1.0>`_ (2019-02-26)
 =============================================================================
