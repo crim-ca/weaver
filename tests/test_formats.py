@@ -75,7 +75,7 @@ def test_get_cwl_file_format_tuple():
         assert isinstance(res, tuple) and len(res) == 2
         ns, fmt = res
         assert isinstance(ns, dict) and len(ns) == 1
-        assert any(fmt in ns for fmt in f.FORMAT_NAMESPACES)
+        assert any(fmt in ns for fmt in f.FORMAT_NAMESPACES)  # pylint: disable=E1135
         assert list(ns.values())[0].startswith("http")
         ns_name = list(ns.keys())[0]
         assert fmt.startswith("{}:".format(ns_name))

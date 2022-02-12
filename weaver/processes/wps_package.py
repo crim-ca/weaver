@@ -1533,7 +1533,8 @@ class WpsPackage(Process):
                                   input_location)
             else:
                 self.logger.error("Detected Vault file reference that is not accessible [%s] caused "
-                                  "by HTTP [%s] Detail:\n%s", resp.status_code, repr_json(resp.text, indent=2))
+                                  "by HTTP [%s] Detail:\n%s", input_location,
+                                  resp.status_code, repr_json(resp.text, indent=2))
                 raise PackageAuthenticationError(
                     f"Input {input_definition.identifier} with Vault reference [{vault_id}] is not accessible."
                 )

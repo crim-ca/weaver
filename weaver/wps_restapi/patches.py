@@ -60,6 +60,8 @@ class ServiceOnlyExplicitGetHead(ServiceAutoGetHead):
 
 
 class RequestMethodPredicateNoGetHead(RequestMethodPredicate):
+    # pylint: disable=W0231,super-init-not-called  # whole point of this init is to bypass original behavior
+
     def __init__(self, val, config):  # noqa
         # type: (Union[str, Tuple[str]], Configurator) -> None
         self.val = as_sorted_tuple(val)

@@ -4,7 +4,6 @@ import contextlib
 import inspect
 import json
 import os
-import pytz
 import shutil
 import tempfile
 import uuid
@@ -14,6 +13,7 @@ from urllib.parse import quote, urlparse
 
 import mock
 import pytest
+import pytz
 import responses
 from pyramid.httpexceptions import (
     HTTPConflict,

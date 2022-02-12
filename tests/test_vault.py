@@ -5,7 +5,6 @@ import pytest
 from weaver.datatype import VaultFile
 from weaver.vault.utils import parse_vault_token
 
-
 VAULT_FAKE_TOKEN = VaultFile("").token
 VAULT_FAKE_UUID1 = str(uuid.uuid4())
 VAULT_FAKE_UUID2 = str(uuid.uuid4())
@@ -17,7 +16,7 @@ VAULT_FAKE_UUID2 = str(uuid.uuid4())
      {}),
     (f"Basic {VAULT_FAKE_TOKEN}  ", False,
      {}),
-    (f"token bad", True,
+    ("token bad", True,
      {}),
     (f" token  {VAULT_FAKE_TOKEN}  ", True,
      {None: VAULT_FAKE_TOKEN}),

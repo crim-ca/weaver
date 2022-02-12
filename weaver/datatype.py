@@ -116,7 +116,7 @@ class DictBase(dict):
         elif item in self:
             return getattr(self, item, None)
         else:
-            raise AttributeError(f"Can't get attribute '{item}' in '{self.__name__}'.")
+            raise AttributeError(f"Can't get attribute '{item}' in '{fully_qualified_name(self)}'.")
 
     def __str__(self):
         # type: () -> str

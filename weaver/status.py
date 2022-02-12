@@ -2,12 +2,6 @@ from typing import TYPE_CHECKING
 
 from pywps.response.status import _WPS_STATUS, WPS_STATUS  # noqa: W0212
 
-if TYPE_CHECKING:
-    from typing import Union
-
-    from weaver.typedefs import Literal
-
-
 STATUS_COMPLIANT_OGC = "STATUS_COMPLIANT_OGC"
 STATUS_COMPLIANT_PYWPS = "STATUS_COMPLIANT_PYWPS"
 STATUS_COMPLIANT_OWSLIB = "STATUS_COMPLIANT_OWSLIB"
@@ -158,6 +152,10 @@ def map_status(wps_status, compliant=STATUS_COMPLIANT_OGC):
 
 
 if TYPE_CHECKING:
+    from typing import Union
+
+    from weaver.typedefs import Literal
+
     StatusType = Literal[
         STATUS_ACCEPTED,
         STATUS_STARTED,

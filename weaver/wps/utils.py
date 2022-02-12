@@ -8,7 +8,7 @@ from urllib.parse import urlparse
 
 from beaker.cache import cache_region
 from owslib.wps import WebProcessingService, WPSExecution
-from pyramid.httpexceptions import HTTPOk, HTTPNotFound, HTTPUnprocessableEntity
+from pyramid.httpexceptions import HTTPNotFound, HTTPOk, HTTPUnprocessableEntity
 from pywps import configuration as pywps_config
 from webob.acceptparse import create_accept_language_header
 

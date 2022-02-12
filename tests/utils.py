@@ -47,7 +47,7 @@ from weaver.utils import (
     get_weaver_url,
     null,
     request_extra,
-    str2bytes,
+    str2bytes
 )
 from weaver.warning import MissingParameterWarning, UnsupportedOperationWarning
 from weaver.wps.utils import get_wps_output_dir, get_wps_output_url
@@ -419,6 +419,8 @@ def mocked_sub_requests(app,                # type: TestApp
         When ``True``, only mock requests targeted at :paramref:`app` based on request URL hostname (ignore external).
         Otherwise, mock every underlying request regardless of hostname, including ones not targeting the application.
     """
+    # pylint: disable=R1260,too-complex  # FIXME
+
     from weaver.wps_restapi.swagger_definitions import FileLocal
     from requests.sessions import Session as RealSession
     real_request = RealSession.request

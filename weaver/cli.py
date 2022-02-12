@@ -465,7 +465,7 @@ class WeaverClient(object):
         for input_id, input_data in dict(inputs).items():
             if not isinstance(input_data, list):  # support array of files
                 input_data = [input_data]
-            for index, data in enumerate(input_data):
+            for data in input_data:
                 if not isinstance(data, dict):
                     continue
                 file = href = get_any_value(data, default=null, data=False)
