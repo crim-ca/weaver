@@ -130,7 +130,8 @@ def test_auth_docker_image_from_parent_params():
     image = "crim.ca/category/group/project:1.2.3"
     link = f"{registry}/{image}"
     token = "12345"  # nosec
-    auth = Authentication.from_params(type="docker", scheme="Basic", token=token,
+    scheme = "Basic"
+    auth = Authentication.from_params(type="docker", scheme=scheme, token=token,
                                       link=link, image=image, registry=registry)
 
     # pylint: disable=E1101,no-member  # that's what we want to test!
@@ -144,7 +145,7 @@ def test_auth_docker_image_from_parent_params():
     assert auth.registry == registry
 
     # not extra fields remaining
-    auth_docker = DockerAuthentication("Basic", token, link)
+    auth_docker = DockerAuthentication(scheme, token, link)
     auth_docker.id = auth.id  # noqa  # randomly generated for both, must be passed down
     assert auth == auth_docker
     assert dict(auth_docker) == dict(auth_docker)

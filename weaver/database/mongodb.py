@@ -198,7 +198,12 @@ def get_mongodb_connection(container):
     client = pymongo.MongoClient(settings["mongodb.host"], int(settings["mongodb.port"]), connect=False,
                                  # Must specify representation since PyMongo 4.0 and also to avoid Python 3.6 error
                                  #  https://pymongo.readthedocs.io/en/stable/examples/uuid.html#unspecified
-                                 uuidRepresentation="pythonLegacy")
+                                 uuidRepresentation="pythonLegacy",
+                                 # Require that datetime objects be returned with timezone awareness.
+                                 # This ensures that missing 'tzinfo' does not get misinterpreted as locale time when
+                                 # loading objects from DB, since by default 'datetime.datetime' employs 'tzinfo=None'
+                                 # for locale naive datetime objects, while MongoDB stores Date in ISO-8601 format.
+                                 tz_aware=True)
     return client[settings["mongodb.db_name"]]
 
 

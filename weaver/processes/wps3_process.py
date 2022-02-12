@@ -140,7 +140,7 @@ class Wps3Process(WpsProcessInterface):
                 "[ades.username, ades.password, ades.wso2_hostname, ades.wso2_client_id, ades.wso2_client_secret]",
                 MissingParameterWarning
             )
-        return {"Authorization": "Bearer {}".format(access_token) if access_token else None}
+        return {"Authorization": "Bearer {}".format(access_token)} if access_token else {}
 
     def get_auth_headers(self):
         # type: () -> AnyHeadersContainer

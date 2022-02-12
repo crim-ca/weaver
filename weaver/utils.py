@@ -116,6 +116,7 @@ class NullType(metaclass=_Singleton):
         return null
 
     def __repr__(self):
+        # type: () -> str
         return "<null>"
 
     @staticmethod
@@ -340,17 +341,14 @@ def fully_qualified_name(obj):
     return ".".join([cls.__module__, cls.__name__])
 
 
-def now():
-    # type: (...) -> datetime
-    return localize_datetime(datetime.utcnow())
-
-
-def now_secs():
-    # type: (...) -> int
+def now(tz_name=None):
+    # type: (Optional[str]) -> datetime
     """
-    Return the current time in seconds since the Epoch.
+    Obtain the current time with timezone-awareness.
+
+    :param tz_name: If specified, returned current time will be localized to specified timezone.
     """
-    return int(time.time())
+    return localize_datetime(datetime.now().astimezone(), tz_name=tz_name)
 
 
 def repr_json(data, force_string=True, **kwargs):
@@ -370,25 +368,33 @@ def repr_json(data, force_string=True, **kwargs):
 
 
 def wait_secs(run_step=-1):
+    # type: (int) -> int
+    """
+    Obtain a wait time in seconds within increasing delta intervals based on iteration index.
+    """
     secs_list = (2, 2, 2, 2, 2, 5, 5, 5, 5, 5, 10, 10, 10, 10, 10, 20, 20, 20, 20, 20, 30)
     if run_step >= len(secs_list):
         run_step = -1
     return secs_list[run_step]
 
 
-def expires_at(hours=1):
-    # type: (Optional[int]) -> int
-    return now_secs() + hours * 3600
-
-
-def localize_datetime(dt, tz_name="UTC"):
+def localize_datetime(dt, tz_name=None):
     # type: (datetime, Optional[str]) -> datetime
     """
-    Provide a timezone-aware object for a given datetime and timezone name.
+    Provide a timezone-aware datetime for a given datetime and timezone name.
+
+    .. warning::
+        Any datetime provided as input that is not already timezone-aware will be assumed to be relative to the
+        current locale timezone. This is the default returned by naive :class:`datetime.datetime` instances.
+
+    If no timezone name is provided, the timezone-aware datatime will be localized with locale timezone offset.
+    Otherwise, the desired localization will be applied with the specified timezone offset.
     """
     tz_aware_dt = dt
     if dt.tzinfo is None:
         tz_aware_dt = dt.astimezone()  # guess local timezone
+    if tz_name is None:
+        return tz_aware_dt
     timezone = pytz.timezone(tz_name)
     if tz_aware_dt.tzinfo == timezone:
         warnings.warn("tzinfo already set", TimeZoneInfoAlreadySetWarning)
@@ -576,6 +582,7 @@ def get_path_kvp(path, sep=",", **params):
     """
 
     def _value(_v):
+        # type: (Any) -> str
         if isinstance(_v, (list, set, tuple)):
             return sep.join([str(_) for _ in _v])
         return str(_v)
@@ -662,6 +669,7 @@ def setup_loggers(settings=None,            # type: Optional[AnySettingsContaine
 
 
 def make_dirs(path, mode=0o755, exist_ok=False):
+    # type: (str, int, bool) -> None
     """
     Backward compatible ``make_dirs`` with reduced set of default mode flags.
 
@@ -877,6 +885,7 @@ def retry_on_cache_error(func):
     """
     @functools.wraps(func)
     def wrapped(*args, **kwargs):
+        # type: (Any, Any) -> Any
         try:
             return func(*args, **kwargs)
         except BeakerException as exc:
@@ -1331,6 +1340,7 @@ def get_sane_name(name, min_len=3, max_len=None, assert_invalid=True, replace_ch
 
 
 def assert_sane_name(name, min_len=3, max_len=None):
+    # type: (str, int, Optional[int]) -> None
     """
     Asserts that the sane name respects conditions.
 

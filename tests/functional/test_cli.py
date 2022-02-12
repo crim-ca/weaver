@@ -194,15 +194,16 @@ class TestWeaverClient(TestWeaverClientBase):
 
     def test_deploy_with_undeploy(self):
         test_id = f"{self.test_process_prefix}-deploy-undeploy-flag"
-        result = mocked_sub_requests(self.app, self.client.deploy, test_id, self.test_payload)
+        deploy = self.test_payload["Echo"]
+        result = mocked_sub_requests(self.app, self.client.deploy, test_id, deploy)
         assert result.success
-        result = mocked_sub_requests(self.app, self.client.deploy, test_id, self.test_payload, undeploy=True)
+        result = mocked_sub_requests(self.app, self.client.deploy, test_id, deploy, undeploy=True)
         assert result.success
         assert "undefined" not in result.message
 
     def test_undeploy(self):
         # deploy a new process to leave the test one available
-        other_payload = copy.deepcopy(self.test_payload)
+        other_payload = copy.deepcopy(self.test_payload["Echo"])
         other_process = self.test_process["Echo"] + "-other"
         self.deploy_process(other_payload, process_id=other_process)
 
@@ -474,9 +475,9 @@ class TestWeaverCLI(TestWeaverClientBase):
         """
         proc = self.test_process["Echo"]
         for options in [
-            ["--verbose", "describe", self.url, "-p", proc],
-            ["describe", self.url, "--verbose", "-p", proc],
-            ["describe", self.url, "-p", proc, "--verbose"],
+            ["--verbose", "describe", "-u", self.url, "-p", proc],
+            ["describe", "-u", self.url, "--verbose", "-p", proc],
+            ["describe", "-u", self.url, "-p", proc, "--verbose"],
         ]:
             lines = mocked_sub_requests(
                 self.app, run_command,
@@ -495,9 +496,9 @@ class TestWeaverCLI(TestWeaverClientBase):
             [
                 # weaver
                 "deploy",
+                "-u", self.url,
                 "--body", payload,  # no --process/--id, but available through --body
                 "--cwl", package,
-                self.url
             ],
             trim=False,
             entrypoint=weaver_cli,
@@ -517,9 +518,9 @@ class TestWeaverCLI(TestWeaverClientBase):
             [
                 # weaver
                 "deploy",
+                "-u", self.url,
                 "-p", test_id,
                 "-b", json.dumps(payload),  # literal JSON string accepted for CLI
-                self.url
             ],
             trim=False,
             entrypoint=weaver_cli,
@@ -544,9 +545,9 @@ class TestWeaverCLI(TestWeaverClientBase):
                 [
                     # weaver
                     "deploy",
+                    "-u", self.url,
                     "-p", test_id,
                     "-b", body_file.name,
-                    self.url
                 ],
                 trim=False,
                 entrypoint=weaver_cli,
@@ -566,10 +567,10 @@ class TestWeaverCLI(TestWeaverClientBase):
             [
                 # weaver
                 "deploy",
+                "-u", self.url,
                 "-p", test_id,
                 "--body", json.dumps(payload),  # literal JSON string accepted for CLI
                 "--cwl", json.dumps(package),   # literal JSON string accepted for CLI
-                self.url
             ],
             trim=False,
             entrypoint=weaver_cli,
@@ -589,10 +590,10 @@ class TestWeaverCLI(TestWeaverClientBase):
             [
                 # weaver
                 "deploy",
+                "-u", self.url,
                 "-p", test_id,
                 "--body", json.dumps(payload),  # literal JSON string accepted for CLI
                 "--cwl", package,
-                self.url
             ],
             trim=False,
             entrypoint=weaver_cli,
@@ -609,7 +610,7 @@ class TestWeaverCLI(TestWeaverClientBase):
             [
                 # "weaver",
                 "describe",
-                self.url,
+                "-u", self.url,
                 "-p", proc,
             ],
             trim=False,
@@ -634,9 +635,9 @@ class TestWeaverCLI(TestWeaverClientBase):
                 [
                     # "weaver",
                     "execute",
+                    "-u", self.url,
                     "-p", proc,
                     "-I", "message='TEST MESSAGE!'",  # if -I not capture as indented, URL after would be combined in it
-                    self.url,
                     "-M",
                     "-T", 10,
                     "-W", 1,
@@ -658,7 +659,7 @@ class TestWeaverCLI(TestWeaverClientBase):
                 [
                     # "weaver",
                     "execute",
-                    self.url,
+                    "-u", self.url,
                     "-p", proc,
                     "-I", "message='TEST MESSAGE!'"
                 ],
@@ -704,7 +705,7 @@ class TestWeaverCLI(TestWeaverClientBase):
                 [
                     # "weaver",
                     "execute",
-                    self.url,
+                    "-u", self.url,
                     "-p", proc,
                     "-I", "message='TEST MESSAGE!'",
                     "-M",
@@ -753,7 +754,7 @@ class TestWeaverCLI(TestWeaverClientBase):
             [
                 # "weaver",
                 "execute",
-                self.url,
+                "-u", self.url,
                 "-p", proc,
                 "-I", bad_input_value,
                 "-M",

@@ -23,11 +23,15 @@ Fixes:
 ------
 - Fix rendering of CLI *required* arguments under the appropriate argument group section when those arguments can be
   specified using prefixed ``-`` and ``--`` optional arguments format.
+- Fix CLI ``url`` parameter to be provided using ``-u`` or ``--url`` without specific argument position needed.
 - Fix rendering of OpenAPI variable names (``additionalParameters``) employed to represent for example ``{input-id}``
   as the key within the mapping representation of inputs/outputs. The previous notation employed was incorrectly
   interpreted as HTML tags, making them partially hidden in Swagger UI.
 - Fix reload of ``DockerAuthentication`` reference from database failing due to mismatched parameter names.
-- Fix invalid generation of timezone-aware datetime.
+- Fix invalid generation and interpretation of timezone-aware datetime between local objects and loaded from database.
+  Jobs created or reported without any timezone UTC offset were assumed as UTC+00:00 although corresponding datetimes
+  were generated based on the local machine timezone information. Once reloaded from database, the missing timezone
+  awareness made datetime stored in ISO-8601 format to be interpreted as already localized datetime.
 - Fix invalid setup of generic CLI options headers for other operations than ``dismiss``.
 
 `4.8.0 <https://github.com/crim-ca/weaver/tree/4.8.0>`_ (2022-01-11)

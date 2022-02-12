@@ -1315,7 +1315,8 @@ class Authentication(Base):
         for param in list(params):
             if not param.startswith("auth_"):
                 params[f"auth_{param}"] = params[param]
-        auth_type = params.get("auth_type")
+        auth_type = params.pop("auth_type", None)
+        params.pop("type", None)  # remove type that must be enforced by specialized class property
         auth_cls = list(filter(lambda auth: auth_type == auth.type.value, [DockerAuthentication, VaultFile]))
         if not auth_cls:
             raise TypeError(f"Unknown authentication type: {auth_type!s}")
