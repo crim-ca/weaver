@@ -4,18 +4,14 @@ from typing import TYPE_CHECKING
 
 from owslib.wps import ComplexDataInput
 
-from weaver import status
-from weaver.execute import EXECUTE_MODE_ASYNC
+from weaver.execute import ExecuteMode
 from weaver.formats import get_format
 from weaver.owsexceptions import OWSNoApplicableCode
 from weaver.processes.constants import WPS_COMPLEX_DATA
 from weaver.processes.convert import ows2json_output_data
 from weaver.processes.utils import map_progress
-from weaver.processes.wps_process_base import (
-    REMOTE_JOB_PROGRESS_MONITOR,
-    REMOTE_JOB_PROGRESS_RESULTS,
-    WpsProcessInterface
-)
+from weaver.processes.wps_process_base import WpsProcessInterface, WpsRemoteJobProgress
+from weaver.status import Status, map_status
 from weaver.utils import (
     get_any_id,
     get_any_value,
@@ -44,6 +40,10 @@ if TYPE_CHECKING:
     from weaver.wps.service import WorkerRequest
 
 LOGGER = logging.getLogger(__name__)
+
+
+class Wps1RemoteJobProgress(WpsRemoteJobProgress):
+    pass
 
 
 class Wps1Process(WpsProcessInterface):
@@ -155,7 +155,7 @@ class Wps1Process(WpsProcessInterface):
             self.process,
             inputs=process_inputs,
             output=wps_outputs,
-            mode=EXECUTE_MODE_ASYNC,
+            mode=ExecuteMode.ASYNC,
             lineage=True
         )
         if not execution.process and execution.errors:
@@ -177,7 +177,7 @@ class Wps1Process(WpsProcessInterface):
                                              sleep_secs=wait_secs(run_step), settings=self.settings)
                 monitor_reference["execution"] = execution  # update reference for later stages
                 job_id = execution.statusLocation.split("/")[-1].replace(".xml", "")
-                exec_status = status.map_status(execution.getStatus())
+                exec_status = map_status(execution.getStatus())
                 LOGGER.debug(get_log_monitor_msg(job_id,
                                                  exec_status,
                                                  execution.percentCompleted,
@@ -188,9 +188,9 @@ class Wps1Process(WpsProcessInterface):
                                           progress=execution.percentCompleted,
                                           duration=None)  # get if available
                 log_progress = map_progress(execution.percentCompleted,
-                                            REMOTE_JOB_PROGRESS_MONITOR,
-                                            REMOTE_JOB_PROGRESS_RESULTS)
-                self.update_status(log_msg, log_progress, status.STATUS_RUNNING)
+                                            Wps1RemoteJobProgress.MONITOR,
+                                            Wps1RemoteJobProgress.RESULTS)
+                self.update_status(log_msg, log_progress, Status.RUNNING)
             except Exception as exc:
                 num_retries += 1
                 LOGGER.debug("Exception raised: %r", exc)
@@ -201,7 +201,7 @@ class Wps1Process(WpsProcessInterface):
 
         if not execution.isSucceded():
             exec_msg = execution.statusMessage or "Job failed."
-            exec_status = status.map_status(execution.getStatus())
+            exec_status = map_status(execution.getStatus())
             LOGGER.debug(get_log_monitor_msg(job_id,
                                              exec_status,
                                              execution.percentCompleted,
@@ -213,7 +213,7 @@ class Wps1Process(WpsProcessInterface):
     def get_results(self, monitor_reference):
         # type: (JobExecution) -> JobResults
         self.update_status("Retrieving job output definitions from remote WPS-1 provider.",
-                           REMOTE_JOB_PROGRESS_RESULTS, status.STATUS_RUNNING)
+                           Wps1RemoteJobProgress.RESULTS, Status.RUNNING)
         execution = monitor_reference["execution"]
         ows_results = [
             ows2json_output_data(output, self.wps_process, self.settings)

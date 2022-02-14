@@ -6,15 +6,15 @@ from typing import TYPE_CHECKING
 from duration import to_iso8601
 from pyramid.httpexceptions import HTTPBadRequest, HTTPCreated, HTTPNotFound, HTTPOk
 
-from weaver import sort
-from weaver.config import WEAVER_CONFIGURATION_ADES, WEAVER_CONFIGURATION_EMS, get_weaver_configuration
+from weaver.config import WeaverConfiguration, get_weaver_configuration
 from weaver.database import get_db
 from weaver.datatype import Bill, Quote
 from weaver.exceptions import ProcessNotFound, QuoteNotFound, log_unhandled_exceptions
-from weaver.formats import OUTPUT_FORMAT_JSON
+from weaver.formats import OutputFormat
 from weaver.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
 from weaver.processes.wps_package import get_package_workflow_steps, get_process_location
 from weaver.store.base import StoreBills, StoreQuotes
+from weaver.sort import Sort
 from weaver.utils import get_settings, get_weaver_url
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.processes.processes import submit_local_job
@@ -41,7 +41,7 @@ def process_quote_estimator(process):   # noqa: E811
     return {"price": price, "currency": currency, "estimatedTime": estimated_time}
 
 
-@sd.process_quotes_service.post(tags=[sd.TAG_BILL_QUOTE, sd.TAG_PROCESSES], renderer=OUTPUT_FORMAT_JSON,
+@sd.process_quotes_service.post(tags=[sd.TAG_BILL_QUOTE, sd.TAG_PROCESSES], renderer=OutputFormat.JSON,
                                 schema=sd.PostProcessQuoteRequestEndpoint(), response_schemas=sd.post_quotes_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def request_quote(request):
@@ -51,7 +51,7 @@ def request_quote(request):
     settings = get_settings(request)
     weaver_config = get_weaver_configuration(settings)
 
-    if weaver_config not in [WEAVER_CONFIGURATION_ADES, WEAVER_CONFIGURATION_EMS]:
+    if weaver_config not in WeaverConfiguration.extensions():
         raise HTTPBadRequest("Unsupported request for configuration '{}'.".format(weaver_config))
 
     process_id = request.matchdict.get("process_id")
@@ -77,7 +77,7 @@ def request_quote(request):
     })
 
     # loop workflow sub-process steps to get individual quotes
-    if process_type == PROCESS_WORKFLOW and weaver_config == WEAVER_CONFIGURATION_EMS:
+    if process_type == PROCESS_WORKFLOW and weaver_config == WeaverConfiguration.EMS:
         workflow_quotes = list()
 
         for step in get_package_workflow_steps(process_url):
@@ -107,9 +107,9 @@ def request_quote(request):
     raise HTTPBadRequest("Unsupported quoting process type '{0}' on '{1}'.".format(process_type, weaver_config))
 
 
-@sd.process_quotes_service.get(tags=[sd.TAG_BILL_QUOTE, sd.TAG_PROCESSES], renderer=OUTPUT_FORMAT_JSON,
+@sd.process_quotes_service.get(tags=[sd.TAG_BILL_QUOTE, sd.TAG_PROCESSES], renderer=OutputFormat.JSON,
                                schema=sd.ProcessQuotesEndpoint(), response_schemas=sd.get_quote_list_responses)
-@sd.quotes_service.get(tags=[sd.TAG_BILL_QUOTE], renderer=OUTPUT_FORMAT_JSON,
+@sd.quotes_service.get(tags=[sd.TAG_BILL_QUOTE], renderer=OutputFormat.JSON,
                        schema=sd.QuotesEndpoint(), response_schemas=sd.get_quote_list_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_quote_list(request):
@@ -123,7 +123,7 @@ def get_quote_list(request):
         "process_id": request.params.get("process", None) or request.matchdict.get("process_id", None),
         "page": page,
         "limit": limit,
-        "sort": request.params.get("sort", sort.SORT_CREATED),
+        "sort": request.params.get("sort", Sort.CREATED),
     }
     store = get_db(request).get_store(StoreQuotes)
     items, count = store.find_quotes(**filters)
@@ -135,9 +135,9 @@ def get_quote_list(request):
     })
 
 
-@sd.process_quote_service.get(tags=[sd.TAG_BILL_QUOTE, sd.TAG_PROCESSES], renderer=OUTPUT_FORMAT_JSON,
+@sd.process_quote_service.get(tags=[sd.TAG_BILL_QUOTE, sd.TAG_PROCESSES], renderer=OutputFormat.JSON,
                               schema=sd.ProcessQuoteEndpoint(), response_schemas=sd.get_quote_responses)
-@sd.quote_service.get(tags=[sd.TAG_BILL_QUOTE], renderer=OUTPUT_FORMAT_JSON,
+@sd.quote_service.get(tags=[sd.TAG_BILL_QUOTE], renderer=OutputFormat.JSON,
                       schema=sd.QuoteEndpoint(), response_schemas=sd.get_quote_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_quote_info(request):
@@ -153,9 +153,9 @@ def get_quote_info(request):
     return HTTPOk(json={"quote": quote.json()})
 
 
-@sd.process_quote_service.post(tags=[sd.TAG_BILL_QUOTE, sd.TAG_EXECUTE, sd.TAG_PROCESSES], renderer=OUTPUT_FORMAT_JSON,
+@sd.process_quote_service.post(tags=[sd.TAG_BILL_QUOTE, sd.TAG_EXECUTE, sd.TAG_PROCESSES], renderer=OutputFormat.JSON,
                                schema=sd.PostProcessQuote(), response_schemas=sd.post_quote_responses)
-@sd.quote_service.post(tags=[sd.TAG_BILL_QUOTE, sd.TAG_EXECUTE], renderer=OUTPUT_FORMAT_JSON,
+@sd.quote_service.post(tags=[sd.TAG_BILL_QUOTE, sd.TAG_EXECUTE], renderer=OutputFormat.JSON,
                        schema=sd.PostQuote(), response_schemas=sd.post_quote_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def execute_quote(request):

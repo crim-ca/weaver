@@ -32,21 +32,13 @@ from tests.utils import (
 from weaver import WEAVER_ROOT_DIR
 from weaver.datatype import AuthenticationTypes, Process, Service
 from weaver.exceptions import JobNotFound, ProcessNotFound
-from weaver.execute import (
-    EXECUTE_CONTROL_OPTION_ASYNC,
-    EXECUTE_CONTROL_OPTION_SYNC,
-    EXECUTE_MODE_ASYNC,
-    EXECUTE_MODE_SYNC,
-    EXECUTE_RESPONSE_DOCUMENT,
-    EXECUTE_TRANSMISSION_MODE_REFERENCE,
-    EXECUTE_TRANSMISSION_MODE_VALUE
-)
-from weaver.formats import ACCEPT_LANGUAGE_FR_CA, CONTENT_TYPE_APP_JSON, get_cwl_file_format
-from weaver.processes.constants import CWL_REQUIREMENT_APP_WPS1, PROCESS_SCHEMA_OLD
+from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
+from weaver.formats import AcceptLanguage, ContentType, get_cwl_file_format
+from weaver.processes.constants import CWL_REQUIREMENT_APP_WPS1, ProcessSchema
 from weaver.processes.wps_testing import WpsTestProcess
-from weaver.status import STATUS_ACCEPTED
+from weaver.status import Status
 from weaver.utils import fully_qualified_name, get_path_kvp, load_file, ows_context_href
-from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC
+from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_url
 from weaver.wps_restapi import swagger_definitions as sd
 
@@ -70,7 +62,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         }
         cls.config = setup_config_with_mongodb(settings=cls.settings)
         cls.app = get_test_weaver_app(config=cls.config)
-        cls.json_headers = {"Accept": CONTENT_TYPE_APP_JSON, "Content-Type": CONTENT_TYPE_APP_JSON}
+        cls.json_headers = {"Accept": ContentType.APP_JSON, "Content-Type": ContentType.APP_JSON}
 
     @classmethod
     def tearDownClass(cls):
@@ -92,8 +84,8 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         self.process_private = WpsTestProcess(identifier="process_private")
         self.process_store.save_process(self.process_public)
         self.process_store.save_process(self.process_private)
-        self.process_store.set_visibility(self.process_public.identifier, VISIBILITY_PUBLIC)
-        self.process_store.set_visibility(self.process_private.identifier, VISIBILITY_PRIVATE)
+        self.process_store.set_visibility(self.process_public.identifier, Visibility.PUBLIC)
+        self.process_store.set_visibility(self.process_private.identifier, Visibility.PRIVATE)
 
     def get_process_deploy_template(self, process_id=None, cwl=None):
         # type: (Optional[str], Optional[CWL]) -> JSON
@@ -140,17 +132,17 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             ],
             "outputs": [
                 {"id": "test_output",
-                 "transmissionMode": EXECUTE_TRANSMISSION_MODE_REFERENCE}
+                 "transmissionMode": ExecuteTransmissionMode.REFERENCE}
             ],
-            "mode": EXECUTE_MODE_ASYNC,
-            "response": EXECUTE_RESPONSE_DOCUMENT,
+            "mode": ExecuteMode.ASYNC,
+            "response": ExecuteResponse.DOCUMENT,
         }
 
     def test_get_processes(self):
         path = "/processes"
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
-        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        assert resp.content_type == ContentType.APP_JSON
         assert "processes" in resp.json
         assert isinstance(resp.json["processes"], list) and len(resp.json["processes"]) > 0
         for process in resp.json["processes"]:
@@ -160,7 +152,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             assert "keywords" in process and isinstance(process["keywords"], list)
             assert "metadata" in process and isinstance(process["metadata"], list)
             assert len(process["jobControlOptions"]) == 1
-            assert EXECUTE_CONTROL_OPTION_ASYNC in process["jobControlOptions"]
+            assert ExecuteControlOption.ASYNC in process["jobControlOptions"]
 
         processes_id = [p["id"] for p in resp.json["processes"]]
         assert self.process_public.identifier in processes_id
@@ -170,9 +162,9 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         test_prefix = "test-proc-temp"
         for i in range(10):
             p_id = "{}-{}".format(test_prefix, i)
-            proc = self.process_private = Process(id=p_id, package={}, visibility=VISIBILITY_PUBLIC)
+            proc = self.process_private = Process(id=p_id, package={}, visibility=Visibility.PUBLIC)
             self.process_store.save_process(proc)
-        _, total = self.process_store.list_processes(total=True, visibility=VISIBILITY_PUBLIC)
+        _, total = self.process_store.list_processes(total=True, visibility=Visibility.PUBLIC)
         assert 10 < total < 15, "cannot run process paging test with current number of processes"
         limit = 5  # some value to get 3 pages, 2 full and the last partial
         remain = total - (2 * limit)
@@ -181,7 +173,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         path = get_path_kvp("/processes", page=1, limit=limit)
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
-        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        assert resp.content_type == ContentType.APP_JSON
         assert "processes" in resp.json
         processes = resp.json["processes"]
         assert isinstance(processes, list)
@@ -232,7 +224,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
     def test_get_processes_page_out_of_range(self):
         # ensure we have few items to list
         for i in range(10):
-            proc = Process(id=f"test-process-paging-{i}", package={}, visibility=VISIBILITY_PUBLIC)
+            proc = Process(id=f"test-process-paging-{i}", package={}, visibility=Visibility.PUBLIC)
             self.process_store.save_process(proc)
         resp = self.app.get(sd.processes_service.path, headers=self.json_headers)
         total = resp.json["total"]
@@ -281,7 +273,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         test_svc_id = "test-provider-processes-listing"
         test_svc = Service(name=test_svc_id, url=resources.TEST_REMOTE_SERVER_URL)
         self.service_store.save_service(test_svc)
-        _, total = self.process_store.list_processes(total=True, visibility=VISIBILITY_PUBLIC)
+        _, total = self.process_store.list_processes(total=True, visibility=Visibility.PUBLIC)
 
         path = get_path_kvp("/processes", providers=True, detail=False)
         resp = self.app.get(path, headers=self.json_headers)
@@ -363,7 +355,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         path = "/processes"
         process_name = self.fully_qualified_test_process_name()
         process_data = self.get_process_deploy_template(process_name)
-        process_data["processDescription"]["jobControlOptions"] = [EXECUTE_CONTROL_OPTION_ASYNC]
+        process_data["processDescription"]["jobControlOptions"] = [ExecuteControlOption.ASYNC]
         package_mock = mocked_process_package()
         with contextlib.ExitStack() as stack:
             for pkg in package_mock:
@@ -373,13 +365,13 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             assert resp.json["processSummary"]["id"] == process_name
 
         process = self.process_store.fetch_by_id(process_name)
-        assert EXECUTE_CONTROL_OPTION_ASYNC in process["jobControlOptions"]
+        assert ExecuteControlOption.ASYNC in process["jobControlOptions"]
 
     def test_set_jobControlOptions_sync_execute(self):
         path = "/processes"
         process_name = self.fully_qualified_test_process_name()
         process_data = self.get_process_deploy_template(process_name)
-        process_data["processDescription"]["jobControlOptions"] = [EXECUTE_CONTROL_OPTION_SYNC]
+        process_data["processDescription"]["jobControlOptions"] = [ExecuteControlOption.SYNC]
         package_mock = mocked_process_package()
         with contextlib.ExitStack() as stack:
             for pkg in package_mock:
@@ -389,7 +381,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             assert resp.json["processSummary"]["id"] == process_name
 
         process = self.process_store.fetch_by_id(process_name)
-        assert EXECUTE_CONTROL_OPTION_SYNC in process["jobControlOptions"]
+        assert ExecuteControlOption.SYNC in process["jobControlOptions"]
 
     def test_get_processes_invalid_schemas_handled(self):
         path = "/processes"
@@ -407,25 +399,25 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         # change value that will trigger schema error on check
         process = self.process_store.fetch_by_id(process_name)
         process["version"] = "random"  # invalid (cannot use any property that executes in-place fixes)
-        process["visibility"] = VISIBILITY_PUBLIC
+        process["visibility"] = Visibility.PUBLIC
         self.process_store.save_process(process, overwrite=True)
 
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 503
-        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        assert resp.content_type == ContentType.APP_JSON
         assert process_name in resp.json.get("description")
 
     def test_describe_process_visibility_public(self):
         path = "/processes/{}".format(self.process_public.identifier)
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
-        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        assert resp.content_type == ContentType.APP_JSON
 
     def test_describe_process_visibility_private(self):
         path = "/processes/{}".format(self.process_private.identifier)
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 403
-        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        assert resp.content_type == ContentType.APP_JSON
 
     def test_deploy_process_success(self):
         process_name = self.fully_qualified_test_process_name()
@@ -438,7 +430,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             path = "/processes"
             resp = self.app.post_json(path, params=process_data, headers=self.json_headers, expect_errors=True)
             assert resp.status_code == 201
-            assert resp.content_type == CONTENT_TYPE_APP_JSON
+            assert resp.content_type == ContentType.APP_JSON
             assert resp.json["processSummary"]["id"] == process_name
             assert isinstance(resp.json["deploymentDone"], bool) and resp.json["deploymentDone"]
 
@@ -453,7 +445,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             path = "/processes"
             resp = self.app.post_json(path, params=process_data, headers=self.json_headers, expect_errors=True)
             assert resp.status_code == 400
-            assert resp.content_type == CONTENT_TYPE_APP_JSON
+            assert resp.content_type == ContentType.APP_JSON
 
     def test_deploy_process_conflict(self):
         process_name = self.process_private.identifier
@@ -466,7 +458,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             path = "/processes"
             resp = self.app.post_json(path, params=process_data, headers=self.json_headers, expect_errors=True)
             assert resp.status_code == 409
-            assert resp.content_type == CONTENT_TYPE_APP_JSON
+            assert resp.content_type == ContentType.APP_JSON
 
     def test_deploy_process_missing_or_invalid_components(self):
         process_name = self.fully_qualified_test_process_name()
@@ -478,8 +470,8 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         process_data_tests[0].pop("processDescription")
         process_data_tests[1]["processDescription"].pop("process")
         process_data_tests[2]["processDescription"]["process"].pop("id")  # noqa
-        process_data_tests[3]["processDescription"]["jobControlOptions"] = EXECUTE_CONTROL_OPTION_ASYNC
-        process_data_tests[4]["processDescription"]["jobControlOptions"] = [EXECUTE_MODE_ASYNC]  # noqa
+        process_data_tests[3]["processDescription"]["jobControlOptions"] = ExecuteControlOption.ASYNC
+        process_data_tests[4]["processDescription"]["jobControlOptions"] = [ExecuteMode.ASYNC]  # noqa
         process_data_tests[5].pop("deploymentProfileName")
         process_data_tests[6].pop("executionUnit")
         process_data_tests[7]["executionUnit"] = {}
@@ -497,7 +489,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                 resp = self.app.post_json(path, params=data, headers=self.json_headers, expect_errors=True)
                 msg = "Failed with test variation '{}' with value '{}' using data:\n{}"
                 assert resp.status_code in [400, 422], msg.format(i, resp.status_code, json.dumps(data, indent=2))
-                assert resp.content_type == CONTENT_TYPE_APP_JSON, msg.format(i, resp.content_type, "")
+                assert resp.content_type == ContentType.APP_JSON, msg.format(i, resp.content_type, "")
 
     def test_deploy_process_default_endpoint_wps1(self):
         """
@@ -537,7 +529,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         # assert proc["outputs"][0]["maxOccurs"] == "1"
         assert isinstance(proc["outputs"][0]["formats"], list)
         assert len(proc["outputs"][0]["formats"]) == 1
-        assert proc["outputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
+        assert proc["outputs"][0]["formats"][0]["mediaType"] == ContentType.APP_JSON
 
     def deploy_process_make_visible_and_fetch_deployed(self, deploy_payload, expected_process_id):
         """
@@ -552,16 +544,16 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         """
         resp = self.app.post_json("/processes", params=deploy_payload, headers=self.json_headers)
         assert resp.status_code == 201
-        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        assert resp.content_type == ContentType.APP_JSON
 
         # apply visibility to allow retrieval
         proc_id = resp.json["processSummary"]["id"]  # process id could have been cleaned up
         proc_url = "/processes/{}".format(proc_id)
-        body = {"value": VISIBILITY_PUBLIC}
+        body = {"value": Visibility.PUBLIC}
         resp = self.app.put_json("{}/visibility".format(proc_url), params=body, headers=self.json_headers)
         assert resp.status_code == 200
 
-        proc_query = {"schema": PROCESS_SCHEMA_OLD}
+        proc_query = {"schema": ProcessSchema.OLD}
         resp = self.app.get(proc_url, params=proc_query, headers=self.json_headers)
         assert resp.status_code == 200
         self.assert_deployed_wps3(resp.json, expected_process_id)
@@ -601,7 +593,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             headers.update({"X-Auth-Docker": bad_token})
             resp = self.app.post_json("/processes", params=body, headers=headers, expect_errors=True)
             assert resp.status_code == 422
-            assert resp.content_type == CONTENT_TYPE_APP_JSON
+            assert resp.content_type == ContentType.APP_JSON
             assert "authentication header" in resp.json["description"]
 
         token = base64.b64encode(b"fake:0123456789").decode("utf-8")  # nosec
@@ -643,7 +635,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             tmp_dir = stack.enter_context(tempfile.TemporaryDirectory(dir=out_dir))
             tmp_file = os.path.join(tmp_dir, "wps1.cwl")
             tmp_href = tmp_file.replace(out_dir, out_url, 1)
-            ns, fmt = get_cwl_file_format(CONTENT_TYPE_APP_JSON)
+            ns, fmt = get_cwl_file_format(ContentType.APP_JSON)
             with open(tmp_file, "w") as cwl_file:
                 json.dump({
                     "cwlVersion": "v1.0",
@@ -693,7 +685,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
     ])
     def test_deploy_process_CWL_WPS1Requirement_owsContext(self):
-        ns, fmt = get_cwl_file_format(CONTENT_TYPE_APP_JSON)
+        ns, fmt = get_cwl_file_format(ContentType.APP_JSON)
         cwl = {
             "cwlVersion": "v1.0",
             "class": "CommandLineTool",
@@ -755,7 +747,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
     ])
     def test_deploy_process_CWL_WPS1Requirement_executionUnit(self):
-        ns, fmt = get_cwl_file_format(CONTENT_TYPE_APP_JSON)
+        ns, fmt = get_cwl_file_format(ContentType.APP_JSON)
         cwl = {
             "cwlVersion": "v1.0",
             "class": "CommandLineTool",
@@ -917,7 +909,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         path = "/processes/{}".format(self.process_public.identifier)
         resp = self.app.delete_json(path, headers=self.json_headers)
         assert resp.status_code == 200, "Error: {}".format(resp.text)
-        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        assert resp.content_type == ContentType.APP_JSON
         assert resp.json["identifier"] == self.process_public.identifier
         assert isinstance(resp.json["undeploymentDone"], bool) and resp.json["undeploymentDone"]
         with pytest.raises(ProcessNotFound):
@@ -927,19 +919,19 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         path = "/processes/{}".format(self.process_private.identifier)
         resp = self.app.delete_json(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 403, "Error: {}".format(resp.text)
-        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        assert resp.content_type == ContentType.APP_JSON
 
     def test_delete_process_not_found(self):
         path = "/processes/{}".format(self.fully_qualified_test_process_name())
         resp = self.app.delete_json(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 404, "Error: {}".format(resp.text)
-        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        assert resp.content_type == ContentType.APP_JSON
 
     def test_delete_process_bad_name(self):
         path = "/processes/{}".format(self.fully_qualified_test_process_name() + "...")
         resp = self.app.delete_json(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 400, "Error: {}".format(resp.text)
-        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        assert resp.content_type == ContentType.APP_JSON
 
     def test_execute_process_success(self):
         path = "/processes/{}/jobs".format(self.process_public.identifier)
@@ -952,7 +944,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                 stack.enter_context(exe)
             resp = self.app.post_json(path, params=data, headers=self.json_headers)
             assert resp.status_code == 201, "Error: {}".format(resp.text)
-            assert resp.content_type == CONTENT_TYPE_APP_JSON
+            assert resp.content_type == ContentType.APP_JSON
             assert resp.json["location"].endswith(resp.json["jobID"])
             assert resp.headers["Location"] == resp.json["location"]
             try:
@@ -960,7 +952,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             except JobNotFound:
                 self.fail("Job should have been created and be retrievable.")
             assert str(job.id) == resp.json["jobID"]
-            assert job.task_id == STATUS_ACCEPTED  # temporary value until processed by celery
+            assert job.task_id == Status.ACCEPTED  # temporary value until processed by celery
 
     def test_execute_process_language(self):
         path = "/processes/{}/jobs".format(self.process_public.identifier)
@@ -972,7 +964,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             for exe in mock_execute:
                 stack.enter_context(exe)
             headers = self.json_headers.copy()
-            headers["Accept-Language"] = ACCEPT_LANGUAGE_FR_CA
+            headers["Accept-Language"] = AcceptLanguage.FR_CA
             resp = self.app.post_json(path, params=data, headers=headers)
             assert resp.status_code == 201, "Error: {}".format(resp.text)
             try:
@@ -980,13 +972,13 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             except JobNotFound:
                 self.fail("Job should have been created and be retrievable.")
             assert str(job.id) == resp.json["jobID"]
-            assert job.accept_language == ACCEPT_LANGUAGE_FR_CA
+            assert job.accept_language == AcceptLanguage.FR_CA
 
     def test_execute_process_no_json_body(self):
         path = "/processes/{}/jobs".format(self.process_public.identifier)
         resp = self.app.post_json(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 400
-        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        assert resp.content_type == ContentType.APP_JSON
 
     def test_execute_process_missing_required_params(self):
         execute_data = self.get_process_execute_template(fully_qualified_name(self))
@@ -1008,7 +1000,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                 resp = self.app.post_json(path, params=exec_data, headers=self.json_headers, expect_errors=True)
                 msg = "Failed with test variation '{}' with status '{}' using:\n{}"
                 assert resp.status_code in [400, 422], msg.format(i, resp.status_code, data_json)
-                assert resp.content_type == CONTENT_TYPE_APP_JSON, msg.format(i, resp.content_type)
+                assert resp.content_type == ContentType.APP_JSON, msg.format(i, resp.content_type)
             msg = "Killed test '{}' request taking too long using:\n{}".format(i, data_json)
             assert timeout.state == timeout.EXECUTED, msg
 
@@ -1060,33 +1052,33 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                 resp = self.app.post_json(path, params=data_execute, headers=self.json_headers)
                 assert resp.status_code == 201, "Expected job submission without inputs created without error."
 
-    @pytest.mark.xfail(reason="Mode '{}' not supported for job execution.".format(EXECUTE_MODE_SYNC))
+    @pytest.mark.xfail(reason="Mode '{}' not supported for job execution.".format(ExecuteMode.SYNC))
     def test_execute_process_mode_sync_not_supported(self):
         execute_data = self.get_process_execute_template(fully_qualified_name(self))
-        execute_data["mode"] = EXECUTE_MODE_SYNC
+        execute_data["mode"] = ExecuteMode.SYNC
         path = "/processes/{}/jobs".format(self.process_public.identifier)
         resp = self.app.post_json(path, params=execute_data, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 501
-        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        assert resp.content_type == ContentType.APP_JSON
 
-    @pytest.mark.xfail(reason="Mode '{}' not supported for job execution.".format(EXECUTE_TRANSMISSION_MODE_VALUE))
+    @pytest.mark.xfail(reason="Mode '{}' not supported for job execution.".format(ExecuteTransmissionMode.VALUE))
     def test_execute_process_transmission_mode_value_not_supported(self):
         execute_data = self.get_process_execute_template(fully_qualified_name(self))
-        execute_data["outputs"][0]["transmissionMode"] = EXECUTE_TRANSMISSION_MODE_VALUE
+        execute_data["outputs"][0]["transmissionMode"] = ExecuteTransmissionMode.VALUE
         path = "/processes/{}/jobs".format(self.process_public.identifier)
         with contextlib.ExitStack() as stack_exec:
             for mock_exec in mocked_execute_process():
                 stack_exec.enter_context(mock_exec)
             resp = self.app.post_json(path, params=execute_data, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 501
-        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        assert resp.content_type == ContentType.APP_JSON
 
     def test_execute_process_not_visible(self):
         path = "/processes/{}/jobs".format(self.process_private.identifier)
         data = self.get_process_execute_template()
         resp = self.app.post_json(path, params=data, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 403
-        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        assert resp.content_type == ContentType.APP_JSON
 
     def test_get_process_visibility_expected_response(self):
         for http_code, wps_process in [(403, self.process_private), (200, self.process_public)]:
@@ -1094,7 +1086,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             path = "/processes/{}/visibility".format(process.identifier)
             resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
             assert resp.status_code == http_code
-            assert resp.content_type == CONTENT_TYPE_APP_JSON
+            assert resp.content_type == ContentType.APP_JSON
             if http_code == 200:
                 assert resp.json["value"] == process.visibility
             else:
@@ -1104,11 +1096,11 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         path = "/processes/{}/visibility".format(self.fully_qualified_test_process_name())
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 404
-        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        assert resp.content_type == ContentType.APP_JSON
 
     def test_set_process_visibility_success(self):
         test_process = self.process_private.identifier
-        proc_schema = {"schema": PROCESS_SCHEMA_OLD}
+        proc_schema = {"schema": ProcessSchema.OLD}
         path_describe = "/processes/{}".format(test_process)
         path_visibility = "{}/visibility".format(path_describe)
 
@@ -1117,11 +1109,11 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert resp.status_code == 403
 
         # make public
-        data = {"value": VISIBILITY_PUBLIC}
+        data = {"value": Visibility.PUBLIC}
         resp = self.app.put_json(path_visibility, params=data, headers=self.json_headers)
         assert resp.status_code == 200
-        assert resp.content_type == CONTENT_TYPE_APP_JSON
-        assert resp.json["value"] == VISIBILITY_PUBLIC
+        assert resp.content_type == ContentType.APP_JSON
+        assert resp.json["value"] == Visibility.PUBLIC
 
         # validate now visible and found
         resp = self.app.get(path_describe, params=proc_schema, headers=self.json_headers)
@@ -1129,11 +1121,11 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert resp.json["process"]["id"] == test_process
 
         # make private
-        data = {"value": VISIBILITY_PRIVATE}
+        data = {"value": Visibility.PRIVATE}
         resp = self.app.put_json(path_visibility, params=data, headers=self.json_headers)
         assert resp.status_code == 200
-        assert resp.content_type == CONTENT_TYPE_APP_JSON
-        assert resp.json["value"] == VISIBILITY_PRIVATE
+        assert resp.content_type == ContentType.APP_JSON
+        assert resp.json["value"] == Visibility.PRIVATE
 
         # validate cannot be found anymore
         resp = self.app.get(path_describe, params=proc_schema, headers=self.json_headers, expect_errors=True)
@@ -1142,7 +1134,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
     def test_set_process_visibility_bad_formats(self):
         path = "/processes/{}/visibility".format(self.process_private.identifier)
         test_data = [
-            {"visibility": VISIBILITY_PUBLIC},
+            {"visibility": Visibility.PUBLIC},
             {"visibility": True},
             {"visibility": None},
             {"visibility": 1},
@@ -1155,13 +1147,13 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         for data in test_data:
             resp = self.app.put_json(path, params=data, headers=self.json_headers, expect_errors=True)
             assert resp.status_code in [400, 422]
-            assert resp.content_type == CONTENT_TYPE_APP_JSON
+            assert resp.content_type == ContentType.APP_JSON
 
         # bad method POST
-        data = {"value": VISIBILITY_PUBLIC}
+        data = {"value": Visibility.PUBLIC}
         resp = self.app.post_json(path, params=data, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 405
-        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        assert resp.content_type == ContentType.APP_JSON
 
     def test_process_description_metadata_href_or_value_valid(self):
         """

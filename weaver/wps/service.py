@@ -16,7 +16,7 @@ from requests.structures import CaseInsensitiveDict
 from weaver.database import get_db
 from weaver.datatype import Process
 from weaver.exceptions import handle_known_exceptions
-from weaver.formats import CONTENT_TYPE_APP_JSON
+from weaver.formats import ContentType
 from weaver.owsexceptions import OWSNoApplicableCode
 from weaver.processes.convert import wps2json_job_payload
 from weaver.processes.execution import submit_job_handler
@@ -24,7 +24,7 @@ from weaver.processes.types import PROCESS_WORKFLOW
 from weaver.processes.utils import get_job_submission_response, get_process
 from weaver.store.base import StoreProcesses
 from weaver.utils import get_header, get_registry, get_settings, get_weaver_url
-from weaver.visibility import VISIBILITY_PUBLIC
+from weaver.visibility import Visibility
 from weaver.wps.utils import (
     check_wps_status,
     get_wps_local_status_location,
@@ -170,7 +170,7 @@ class WorkerService(ServiceWPS):
         """
         req = wps_request.http_request
         accept_type = get_header("Accept", req.headers)
-        if accept_type == CONTENT_TYPE_APP_JSON:
+        if accept_type == ContentType.APP_JSON:
             url = get_weaver_url(self.settings)
             resp = HTTPSeeOther(location="{}{}".format(url, sd.processes_service.path))  # redirect
             setattr(resp, "_update_status", lambda *_, **__: None)  # patch to avoid pywps server raising
@@ -195,7 +195,7 @@ class WorkerService(ServiceWPS):
         """
         req = wps_request.http_request
         accept_type = get_header("Accept", req.headers)
-        if accept_type == CONTENT_TYPE_APP_JSON:
+        if accept_type == ContentType.APP_JSON:
             url = get_weaver_url(self.settings)
             proc = wps_request.identifiers
             if not proc:
@@ -237,7 +237,7 @@ class WorkerService(ServiceWPS):
         tags = req.args.get("tags", "").split(",") + ["xml", "wps-{}".format(wps_request.version)]
         data = wps2json_job_payload(wps_request, wps_process)
         body = submit_job_handler(data, self.settings, proc.processEndpointWPS1,
-                                  process_id=pid, is_local=True, is_workflow=is_workflow, visibility=VISIBILITY_PUBLIC,
+                                  process_id=pid, is_local=True, is_workflow=is_workflow, visibility=Visibility.PUBLIC,
                                   language=wps_request.language, tags=tags, auth=dict(req.headers), context=ctx)
 
         # if Accept was JSON, provide response content as is
@@ -246,7 +246,7 @@ class WorkerService(ServiceWPS):
         #   It is very important to respect default XML since 'owslib.wps.WebProcessingService' does not provide any
         #   way to provide explicitly Accept header. Even our Wps1Process as Workflow step depends on this behaviour.
         accept_type = get_header("Accept", req.headers)
-        if accept_type == CONTENT_TYPE_APP_JSON:
+        if accept_type == ContentType.APP_JSON:
             resp = get_job_submission_response(body)
             setattr(resp, "_update_status", lambda *_, **__: None)  # patch to avoid pywps server raising
             return resp
@@ -387,7 +387,7 @@ def get_pywps_service(environ=None, is_worker=False):
         # call pywps application with processes filtered according to the adapter's definition
         process_store = get_db(registry).get_store(StoreProcesses)  # type: StoreProcesses
         processes_wps = [process.wps() for process in
-                         process_store.list_processes(visibility=VISIBILITY_PUBLIC)]
+                         process_store.list_processes(visibility=Visibility.PUBLIC)]
         service = WorkerService(processes_wps, is_worker=is_worker, settings=settings)
     except Exception as ex:
         LOGGER.exception("Error occurred during PyWPS Service and/or Processes setup.")

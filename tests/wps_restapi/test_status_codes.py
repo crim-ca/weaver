@@ -4,7 +4,7 @@ import uuid
 import pytest
 
 from tests.utils import get_test_weaver_app, setup_config_with_mongodb
-from weaver.formats import CONTENT_TYPE_APP_JSON
+from weaver.formats import ContentType
 from weaver.wps_restapi import swagger_definitions as sd
 
 TEST_PUBLIC_ROUTES = [
@@ -43,7 +43,7 @@ class StatusCodeTestCase(unittest.TestCase):
     #   search features
     # receive response and assert that status codes match
 
-    headers = {"Accept": CONTENT_TYPE_APP_JSON}
+    headers = {"Accept": ContentType.APP_JSON}
 
     def setUp(self):
         config = setup_config_with_mongodb()

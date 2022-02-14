@@ -40,7 +40,7 @@ from webob.headers import EnvironHeaders, ResponseHeaders
 from werkzeug.wrappers import Request as WerkzeugRequest
 from yaml.scanner import ScannerError
 
-from weaver.formats import CONTENT_TYPE_APP_OCTET_STREAM, get_content_type
+from weaver.formats import ContentType, get_content_type
 from weaver.status import map_status
 from weaver.warning import TimeZoneInfoAlreadySetWarning
 from weaver.xml_util import XML
@@ -48,6 +48,7 @@ from weaver.xml_util import XML
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, List, Iterable, NoReturn, Optional, Type, Tuple, Union
 
+    from weaver.status import Status
     from weaver.typedefs import (
         AnyKey,
         AnyHeadersContainer,
@@ -431,9 +432,9 @@ def get_file_headers(path, download_headers=False, content_headers=False, conten
     headers = {}
     if content_headers:
         c_type, c_enc = guess_file_contents(path)
-        if c_type == CONTENT_TYPE_APP_OCTET_STREAM:  # default
+        if c_type == ContentType.APP_OCTET_STREAM:  # default
             f_ext = os.path.splitext(path)[-1]
-            c_type = get_content_type(f_ext, charset="UTF-8", default=CONTENT_TYPE_APP_OCTET_STREAM)
+            c_type = get_content_type(f_ext, charset="UTF-8", default=ContentType.APP_OCTET_STREAM)
         headers.update({
             "Content-Type": content_type or c_type,
             "Content-Encoding": c_enc or "",
@@ -615,7 +616,7 @@ def get_log_monitor_msg(job_id, status, percent, message, location):
 
 
 def get_job_log_msg(status, message, progress=0, duration=None):
-    # type: (str, str, Optional[Number], Optional[str]) -> str
+    # type: (Union[Status, str], str, Optional[Number], Optional[str]) -> str
     return "{d} {p:3d}% {s:10} {m}".format(d=duration or "", p=int(progress or 0), s=map_status(status), m=message)
 
 
@@ -1268,12 +1269,10 @@ def load_file(file_path, text=False):
     :returns: loaded contents either parsed and converted to Python objects or as plain text.
     :raises ValueError: if YAML or JSON cannot be parsed or loaded from location.
     """
-    from weaver.formats import CONTENT_TYPE_TEXT_PLAIN
-
     try:
         if is_remote_file(file_path):
             settings = get_settings()
-            headers = {"Accept": CONTENT_TYPE_TEXT_PLAIN}
+            headers = {"Accept": ContentType.TEXT_PLAIN}
             cwl_resp = request_extra("get", file_path, headers=headers, settings=settings)
             return cwl_resp.content if text else yaml.safe_load(cwl_resp.content)
         with open(file_path, "r") as f:

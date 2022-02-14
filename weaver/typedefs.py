@@ -267,8 +267,8 @@ if TYPE_CHECKING:
     JobResults = List[JobValueItem]
     JobMonitorReference = Any  # typically an URI of the remote job status or an execution object/handler
 
-    ExecutionInputsMap = Dict[str, JobValueObject]  # when schema='weaver.processes.constants.PROCESS_SCHEMA_OGC'
-    ExecutionInputsList = List[JobValueItem]        # when schema='weaver.processes.constants.PROCESS_SCHEMA_OLD'
+    ExecutionInputsMap = Dict[str, JobValueObject]  # when schema='weaver.processes.constants.ProcessSchema.OGC'
+    ExecutionInputsList = List[JobValueItem]        # when schema='weaver.processes.constants.ProcessSchema.OLD'
     ExecutionInputs = Union[ExecutionInputsList, ExecutionInputsMap]
 
     # reference employed as 'JobMonitorReference' by 'WPS1Process'

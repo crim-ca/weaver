@@ -23,13 +23,7 @@ from pyramid.settings import asbool
 from simplejson import JSONDecodeError
 
 from weaver import __meta__
-from weaver.formats import (
-    CONTENT_TYPE_APP_JSON,
-    CONTENT_TYPE_TEXT_HTML,
-    CONTENT_TYPE_TEXT_PLAIN,
-    CONTENT_TYPE_TEXT_XML,
-    OUTPUT_FORMAT_JSON
-)
+from weaver.formats import ContentType, OutputFormat
 from weaver.owsexceptions import OWSException
 from weaver.utils import get_header, get_settings, get_weaver_url
 from weaver.wps.utils import get_wps_url
@@ -45,7 +39,7 @@ if TYPE_CHECKING:
 LOGGER = logging.getLogger(__name__)
 
 
-@sd.api_frontpage_service.get(tags=[sd.TAG_API], renderer=OUTPUT_FORMAT_JSON,
+@sd.api_frontpage_service.get(tags=[sd.TAG_API], renderer=OutputFormat.JSON,
                               schema=sd.FrontpageEndpoint(), response_schemas=sd.get_api_frontpage_responses)
 def api_frontpage(request):
     """
@@ -82,61 +76,61 @@ def api_frontpage_body(settings):
     weaver_jobs_url = weaver_url + sd.jobs_service.path
     weaver_vault = asbool(settings.get("weaver.vault"))
     weaver_links = [
-        {"href": weaver_url, "rel": "self", "type": CONTENT_TYPE_APP_JSON, "title": "This landing page."},
+        {"href": weaver_url, "rel": "self", "type": ContentType.APP_JSON, "title": "This landing page."},
         {"href": weaver_conform_url, "rel": "http://www.opengis.net/def/rel/ogc/1.0/conformance",
-         "type": CONTENT_TYPE_APP_JSON, "title": "Conformance classes implemented by this service."},
+         "type": ContentType.APP_JSON, "title": "Conformance classes implemented by this service."},
         {"href": __meta__.__license_url__, "rel": "license",
-         "type": CONTENT_TYPE_TEXT_PLAIN, "title": __meta__.__license_long__}
+         "type": ContentType.TEXT_PLAIN, "title": __meta__.__license_long__}
     ]
     if weaver_api:
         weaver_links.extend([
             {"href": weaver_api_url,
-             "rel": "service", "type": CONTENT_TYPE_APP_JSON,
+             "rel": "service", "type": ContentType.APP_JSON,
              "title": "WPS REST API endpoint of this service."},
             {"href": weaver_api_spec,
-             "rel": "service-desc", "type": CONTENT_TYPE_APP_JSON,
+             "rel": "service-desc", "type": ContentType.APP_JSON,
              "title": "OpenAPI specification of this service."},
             {"href": weaver_api_oas_ui,
-             "rel": "service-doc", "type": CONTENT_TYPE_TEXT_HTML,
+             "rel": "service-doc", "type": ContentType.TEXT_HTML,
              "title": "Human readable OpenAPI documentation of this service."},
             {"href": weaver_api_spec,
-             "rel": "OpenAPI", "type": CONTENT_TYPE_APP_JSON,
+             "rel": "OpenAPI", "type": ContentType.APP_JSON,
              "title": "OpenAPI specification of this service."},
             {"href": weaver_api_swagger,
-             "rel": "swagger-ui", "type": CONTENT_TYPE_TEXT_HTML,
+             "rel": "swagger-ui", "type": ContentType.TEXT_HTML,
              "title": "WPS REST API definition of this service."},
             {"href": weaver_process_url,
-             "rel": "http://www.opengis.net/def/rel/ogc/1.0/processes", "type": CONTENT_TYPE_APP_JSON,
+             "rel": "http://www.opengis.net/def/rel/ogc/1.0/processes", "type": ContentType.APP_JSON,
              "title": "Processes offered by this service."},
             {"href": sd.OGC_API_REPO_URL,
-             "rel": "ogcapi-processes-repository", "type": CONTENT_TYPE_TEXT_HTML,
+             "rel": "ogcapi-processes-repository", "type": ContentType.TEXT_HTML,
              "title": "OGC API - Processes schema definitions repository."},
             {"href": weaver_jobs_url,
-             "rel": "http://www.opengis.net/def/rel/ogc/1.0/job-list", "type": CONTENT_TYPE_APP_JSON,
+             "rel": "http://www.opengis.net/def/rel/ogc/1.0/job-list", "type": ContentType.APP_JSON,
              "title": "Job search and listing endpoint of executions registered under this service."},
             {"href": sd.CWL_BASE_URL,
-             "rel": "cwl-home", "type": CONTENT_TYPE_TEXT_HTML,
+             "rel": "cwl-home", "type": ContentType.TEXT_HTML,
              "title": "Common Workflow Language (CWL) homepage."},
             {"href": sd.CWL_REPO_URL,
-             "rel": "cwl-repository", "type": CONTENT_TYPE_TEXT_HTML,
+             "rel": "cwl-repository", "type": ContentType.TEXT_HTML,
              "title": "Common Workflow Language (CWL) repositories."},
             {"href": sd.CWL_SPEC_URL,
-             "rel": "cwl-specification", "type": CONTENT_TYPE_TEXT_HTML,
+             "rel": "cwl-specification", "type": ContentType.TEXT_HTML,
              "title": "Common Workflow Language (CWL) specification."},
             {"href": sd.CWL_USER_GUIDE_URL,
-             "rel": "cwl-user-guide", "type": CONTENT_TYPE_TEXT_HTML,
+             "rel": "cwl-user-guide", "type": ContentType.TEXT_HTML,
              "title": "Common Workflow Language (CWL) user guide."},
             {"href": sd.CWL_CMD_TOOL_URL,
-             "rel": "cwl-command-line-tool", "type": CONTENT_TYPE_TEXT_HTML,
+             "rel": "cwl-command-line-tool", "type": ContentType.TEXT_HTML,
              "title": "Common Workflow Language (CWL) CommandLineTool specification."},
             {"href": sd.CWL_WORKFLOW_URL,
-             "rel": "cwl-workflow", "type": CONTENT_TYPE_TEXT_HTML,
+             "rel": "cwl-workflow", "type": ContentType.TEXT_HTML,
              "title": "Common Workflow Language (CWL) Workflow specification."},
         ])
         if weaver_api_ref:
             # sample:
             #   https://app.swaggerhub.com/apis/geoprocessing/WPS/
-            weaver_links.append({"href": weaver_api_ref, "rel": "reference", "type": CONTENT_TYPE_APP_JSON,
+            weaver_links.append({"href": weaver_api_ref, "rel": "reference", "type": ContentType.APP_JSON,
                                  "title": "API reference specification of this service."})
         if isinstance(weaver_api_doc, str):
             # sample:
@@ -145,29 +139,29 @@ def api_frontpage_body(settings):
                 ext_type = weaver_api_doc.split(".")[-1]
                 doc_type = "application/{}".format(ext_type)
             else:
-                doc_type = CONTENT_TYPE_TEXT_PLAIN  # default most basic type
+                doc_type = ContentType.TEXT_PLAIN  # default most basic type
             weaver_links.append({"href": weaver_api_doc, "rel": "documentation", "type": doc_type,
                                  "title": "API reference documentation about this service."})
         else:
             weaver_links.append({"href": __meta__.__documentation_url__, "rel": "documentation",
-                                 "type": CONTENT_TYPE_TEXT_HTML,
+                                 "type": ContentType.TEXT_HTML,
                                  "title": "API reference documentation about this service."})
     if weaver_wps:
         weaver_links.extend([
             {"href": weaver_wps_url,
-             "rel": "wps", "type": CONTENT_TYPE_TEXT_XML,
+             "rel": "wps", "type": ContentType.TEXT_XML,
              "title": "WPS 1.0.0/2.0 XML endpoint of this service."},
             {"href": "http://docs.opengeospatial.org/is/14-065/14-065.html",
-             "rel": "wps-specification", "type": CONTENT_TYPE_TEXT_HTML,
+             "rel": "wps-specification", "type": ContentType.TEXT_HTML,
              "title": "WPS 1.0.0/2.0 definition of this service."},
             {"href": "http://schemas.opengis.net/wps/",
-             "rel": "wps-schema-repository", "type": CONTENT_TYPE_TEXT_HTML,
+             "rel": "wps-schema-repository", "type": ContentType.TEXT_HTML,
              "title": "WPS 1.0.0/2.0 XML schemas repository."},
             {"href": "http://schemas.opengis.net/wps/1.0.0/wpsAll.xsd",
-             "rel": "wps-schema-1", "type": CONTENT_TYPE_TEXT_XML,
+             "rel": "wps-schema-1", "type": ContentType.TEXT_XML,
              "title": "WPS 1.0.0 XML validation schemas entrypoint."},
             {"href": "http://schemas.opengis.net/wps/2.0/wps.xsd",
-             "rel": "wps-schema-2", "type": CONTENT_TYPE_TEXT_XML,
+             "rel": "wps-schema-2", "type": ContentType.TEXT_XML,
              "title": "WPS 2.0 XML validation schemas entrypoint."},
         ])
     return {
@@ -183,7 +177,7 @@ def api_frontpage_body(settings):
     }
 
 
-@sd.api_versions_service.get(tags=[sd.TAG_API], renderer=OUTPUT_FORMAT_JSON,
+@sd.api_versions_service.get(tags=[sd.TAG_API], renderer=OutputFormat.JSON,
                              schema=sd.VersionsEndpoint(), response_schemas=sd.get_api_versions_responses)
 def api_versions(request):  # noqa: F811
     # type: (Request) -> HTTPException
@@ -194,7 +188,7 @@ def api_versions(request):  # noqa: F811
     return HTTPOk(json={"versions": [weaver_info]})
 
 
-@sd.api_conformance_service.get(tags=[sd.TAG_API], renderer=OUTPUT_FORMAT_JSON,
+@sd.api_conformance_service.get(tags=[sd.TAG_API], renderer=OutputFormat.JSON,
                                 schema=sd.ConformanceEndpoint(), response_schemas=sd.get_api_conformance_responses)
 def api_conformance(request):  # noqa: F811
     # type: (Request) -> HTTPException
@@ -550,7 +544,7 @@ def openapi_json_cached(*args, **kwargs):
     return get_openapi_json(*args, **kwargs)
 
 
-@sd.openapi_json_service.get(tags=[sd.TAG_API], renderer=OUTPUT_FORMAT_JSON,
+@sd.openapi_json_service.get(tags=[sd.TAG_API], renderer=OutputFormat.JSON,
                              schema=sd.OpenAPIEndpoint(), response_schemas=sd.get_openapi_json_responses)
 def openapi_json(request):  # noqa: F811
     # type: (Request) -> dict
@@ -641,7 +635,7 @@ def ows_json_format(function):
         http_response = function(request)
         http_headers = get_header("Content-Type", http_response.headers) or []
         req_headers = get_header("Accept", request.headers) or []
-        if any([CONTENT_TYPE_APP_JSON in http_headers, CONTENT_TYPE_APP_JSON in req_headers]):
+        if any([ContentType.APP_JSON in http_headers, ContentType.APP_JSON in req_headers]):
             body = OWSException.json_formatter(http_response.status, response.message or "",
                                                http_response.title, request.environ)
             body["detail"] = get_request_info(request)

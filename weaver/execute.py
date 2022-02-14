@@ -1,33 +1,45 @@
-EXECUTE_MODE_AUTO = "auto"
-EXECUTE_MODE_ASYNC = "async"
-EXECUTE_MODE_SYNC = "sync"
+from typing import TYPE_CHECKING
 
-EXECUTE_MODE_OPTIONS = frozenset([
-    EXECUTE_MODE_AUTO,
-    EXECUTE_MODE_ASYNC,
-    EXECUTE_MODE_SYNC,
-])
+from weaver.base import Constants
 
-EXECUTE_CONTROL_OPTION_ASYNC = "async-execute"
-EXECUTE_CONTROL_OPTION_SYNC = "sync-execute"
 
-EXECUTE_CONTROL_OPTIONS = frozenset([
-    EXECUTE_CONTROL_OPTION_ASYNC,
-    EXECUTE_CONTROL_OPTION_SYNC,
-])
+class ExecuteMode(Constants):
+    AUTO = "auto"
+    ASYNC = "async"
+    SYNC = "sync"
 
-EXECUTE_RESPONSE_RAW = "raw"
-EXECUTE_RESPONSE_DOCUMENT = "document"
 
-EXECUTE_RESPONSE_OPTIONS = frozenset([
-    EXECUTE_RESPONSE_RAW,
-    EXECUTE_RESPONSE_DOCUMENT,
-])
+class ExecuteControlOption(Constants):
+    ASYNC = "async-execute"
+    SYNC = "sync-execute"
 
-EXECUTE_TRANSMISSION_MODE_VALUE = "value"
-EXECUTE_TRANSMISSION_MODE_REFERENCE = "reference"
 
-EXECUTE_TRANSMISSION_MODE_OPTIONS = frozenset([
-    EXECUTE_TRANSMISSION_MODE_VALUE,
-    EXECUTE_TRANSMISSION_MODE_REFERENCE,
-])
+class ExecuteResponse(Constants):
+    RAW = "raw"
+    DOCUMENT = "document"
+
+
+class ExecuteTransmissionMode(Constants):
+    VALUE = "value"
+    REFERENCE = "reference"
+
+
+if TYPE_CHECKING:
+    from weaver.typedefs import Literal
+
+    AnyExecuteMode = Literal[
+        ExecuteMode.ASYNC,
+        ExecuteMode.SYNC,
+    ]
+    AnyExecuteControlOption = Literal[
+        ExecuteControlOption.ASYNC,
+        ExecuteControlOption.SYNC,
+    ]
+    AnyExecuteResponse = Literal[
+        ExecuteResponse.DOCUMENT,
+        ExecuteResponse.RAW,
+    ]
+    AnyExecuteTransmissionMode = Literal[
+        ExecuteTransmissionMode.REFERENCE,
+        ExecuteTransmissionMode.VALUE,
+    ]

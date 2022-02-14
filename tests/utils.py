@@ -34,10 +34,10 @@ from requests import Response
 from webtest import TestApp, TestResponse
 
 from weaver.app import main as weaver_app
-from weaver.config import WEAVER_CONFIGURATION_HYBRID, WEAVER_DEFAULT_INI_CONFIG, get_weaver_config_file
+from weaver.config import WEAVER_DEFAULT_INI_CONFIG, WeaverConfiguration, get_weaver_config_file
 from weaver.database import get_db
 from weaver.datatype import Service
-from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML, CONTENT_TYPE_TEXT_PLAIN, CONTENT_TYPE_TEXT_XML
+from weaver.formats import ContentType
 from weaver.store.mongodb import MongodbJobStore, MongodbProcessStore, MongodbServiceStore
 from weaver.utils import (
     fetch_file,
@@ -231,7 +231,7 @@ def get_test_weaver_config(config=None, settings=None):
         config = setup_config_from_settings(settings=settings)
     if "weaver.configuration" not in config.registry.settings:
         # allow both local and remote for testing, alternative test should provide explicitly
-        config.registry.settings["weaver.configuration"] = WEAVER_CONFIGURATION_HYBRID
+        config.registry.settings["weaver.configuration"] = WeaverConfiguration.HYBRID
     # set default log level for tests to ease debugging failing test cases
     if not config.registry.settings.get("weaver.log_level"):
         config.registry.settings["weaver.log_level"] = "DEBUG"
@@ -368,7 +368,7 @@ def mocked_file_response(path, url):
         raise HTTPNotFound("Could not find mock file: [{}]".format(url))
     resp = Response()
     ext = os.path.splitext(path)[-1]
-    typ = CONTENT_TYPE_APP_JSON if ext == ".json" else CONTENT_TYPE_TEXT_XML if ext == ".xml" else None
+    typ = ContentType.APP_JSON if ext == ".json" else ContentType.TEXT_XML if ext == ".xml" else None
     if not typ:
         return HTTPUnprocessableEntity("Unknown Content-Type for mock file: [{}]".format(url))
     resp.status_code = 200
@@ -476,7 +476,7 @@ def mocked_sub_requests(app,                # type: TestApp
         # obtain the corresponding '<method>_json' function to have the proper behaviour
         headers = req_kwargs.get("headers", {}) or {}
         if (
-            (get_header("Content-Type", headers) == CONTENT_TYPE_APP_JSON or isinstance(content, (dict, list)))
+            (get_header("Content-Type", headers) == ContentType.APP_JSON or isinstance(content, (dict, list)))
             and allow_json
             and hasattr(app, method + "_json")
         ):
@@ -681,7 +681,7 @@ def mocked_remote_server_requests_wps1(server_configs,          # type: Union[Mo
             all_request.add((responses.GET, getcap_with_proc_id_url + version_query, get_cap_xml))
 
     def apply_mocks(_mock_resp, _requests):
-        xml_header = {"Content-Type": CONTENT_TYPE_APP_XML}
+        xml_header = {"Content-Type": ContentType.APP_XML}
         for meth, url, body in _requests:
             _mock_resp.add(meth, url, body=body, headers=xml_header)
 
@@ -764,7 +764,7 @@ def mocked_file_server(directory,               # type: str
                 headers.update({
                     "Server": "mocked_wps_output",
                     "Date": str(datetime.datetime.utcnow()),
-                    "Content-Type": mime_type or CONTENT_TYPE_TEXT_PLAIN,
+                    "Content-Type": mime_type or ContentType.TEXT_PLAIN,
                     "Content-Encoding": encoding or "",
                     "Last-Modified": str(datetime.datetime.fromtimestamp(os.stat(file_path).st_mtime))
                 })

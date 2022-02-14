@@ -14,8 +14,8 @@ from pywps.inout.outputs import ComplexOutput
 from pywps.validator.mode import MODE
 
 from weaver.exceptions import PackageTypeError
-from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_NETCDF, CONTENT_TYPE_APP_XML, CONTENT_TYPE_TEXT_PLAIN
-from weaver.processes.constants import PROCESS_SCHEMA_OGC, PROCESS_SCHEMA_OLD, WPS_INPUT, WPS_LITERAL, WPS_OUTPUT
+from weaver.formats import ContentType
+from weaver.processes.constants import ProcessSchema, ProcessSchema, WPS_INPUT, WPS_LITERAL, WPS_OUTPUT
 from weaver.processes.convert import _are_different_and_set  # noqa: W0212
 from weaver.processes.convert import (
     DEFAULT_FORMAT,
@@ -197,13 +197,13 @@ def test_cwl2wps_io_record_format():
         "name": "output",
         "type": "File",
         "outputBinding": {"glob": "*.json"},
-        "format": f"file:///tmp/tmp-random-dir/package#{CONTENT_TYPE_APP_JSON}",
+        "format": f"file:///tmp/tmp-random-dir/package#{ContentType.APP_JSON}",
     }
     wps_io = cwl2wps_io(cwl_io_record, WPS_OUTPUT)
     assert isinstance(wps_io, ComplexOutput)
     assert len(wps_io.supported_formats) == 1
     assert isinstance(wps_io.supported_formats[0], Format)
-    assert wps_io.supported_formats[0].mime_type == CONTENT_TYPE_APP_JSON
+    assert wps_io.supported_formats[0].mime_type == ContentType.APP_JSON
 
 
 def testis_cwl_array_type_explicit_invalid_item():
@@ -525,47 +525,47 @@ def test_merge_io_formats_no_wps():
 
 
 def test_merge_io_formats_with_wps_and_default_cwl():
-    wps_fmt = [Format(CONTENT_TYPE_APP_NETCDF)]
+    wps_fmt = [Format(ContentType.APP_NETCDF)]
     cwl_fmt = [DEFAULT_FORMAT]
     res_fmt = merge_io_formats(wps_fmt, cwl_fmt)
     assert isinstance(res_fmt, list)
-    assert_formats_equal_any_order(res_fmt, [Format(CONTENT_TYPE_APP_NETCDF)])
+    assert_formats_equal_any_order(res_fmt, [Format(ContentType.APP_NETCDF)])
 
 
 def test_merge_io_formats_both_wps_and_cwl():
-    wps_fmt = [Format(CONTENT_TYPE_APP_NETCDF)]
-    cwl_fmt = [Format(CONTENT_TYPE_APP_JSON)]
+    wps_fmt = [Format(ContentType.APP_NETCDF)]
+    cwl_fmt = [Format(ContentType.APP_JSON)]
     res_fmt = merge_io_formats(wps_fmt, cwl_fmt)
     assert isinstance(res_fmt, list)
-    assert_formats_equal_any_order(res_fmt, [Format(CONTENT_TYPE_APP_NETCDF), Format(CONTENT_TYPE_APP_JSON)])
+    assert_formats_equal_any_order(res_fmt, [Format(ContentType.APP_NETCDF), Format(ContentType.APP_JSON)])
 
 
 def test_merge_io_formats_wps_complements_cwl():
-    wps_fmt = [Format(CONTENT_TYPE_APP_JSON, encoding="utf-8")]
-    cwl_fmt = [Format(CONTENT_TYPE_APP_JSON)]
+    wps_fmt = [Format(ContentType.APP_JSON, encoding="utf-8")]
+    cwl_fmt = [Format(ContentType.APP_JSON)]
     res_fmt = merge_io_formats(wps_fmt, cwl_fmt)
     assert isinstance(res_fmt, list)
-    assert_formats_equal_any_order(res_fmt, [Format(CONTENT_TYPE_APP_JSON, encoding="utf-8")])
+    assert_formats_equal_any_order(res_fmt, [Format(ContentType.APP_JSON, encoding="utf-8")])
 
 
 def test_merge_io_formats_wps_overlaps_cwl():
     wps_fmt = [
-        Format(CONTENT_TYPE_APP_JSON, encoding="utf-8"),    # complements CWL details
-        Format(CONTENT_TYPE_APP_NETCDF),                    # duplicated in CWL (but different index)
-        Format(CONTENT_TYPE_TEXT_PLAIN)                     # extra (but not default)
+        Format(ContentType.APP_JSON, encoding="utf-8"),    # complements CWL details
+        Format(ContentType.APP_NETCDF),                    # duplicated in CWL (but different index)
+        Format(ContentType.TEXT_PLAIN)                     # extra (but not default)
     ]
     cwl_fmt = [
-        Format(CONTENT_TYPE_APP_JSON),      # overridden by WPS version
-        Format(CONTENT_TYPE_APP_XML),       # extra preserved
-        Format(CONTENT_TYPE_APP_NETCDF),    # duplicated with WPS, merged
+        Format(ContentType.APP_JSON),      # overridden by WPS version
+        Format(ContentType.APP_XML),       # extra preserved
+        Format(ContentType.APP_NETCDF),    # duplicated with WPS, merged
     ]
     res_fmt = merge_io_formats(wps_fmt, cwl_fmt)
     assert isinstance(res_fmt, list)
     assert_formats_equal_any_order(res_fmt, [
-        Format(CONTENT_TYPE_APP_JSON, encoding="utf-8"),
-        Format(CONTENT_TYPE_APP_NETCDF),
-        Format(CONTENT_TYPE_APP_XML),
-        Format(CONTENT_TYPE_TEXT_PLAIN),
+        Format(ContentType.APP_JSON, encoding="utf-8"),
+        Format(ContentType.APP_NETCDF),
+        Format(ContentType.APP_XML),
+        Format(ContentType.TEXT_PLAIN),
     ])
 
 
@@ -692,7 +692,7 @@ def test_cwl2json_input_values_ogc_format():
         "test7": [{"value": 1.23}, {"value": 4.56}],
         "test8": [{"href": "/tmp/other.txt"}]
     }
-    result = cwl2json_input_values(values, PROCESS_SCHEMA_OGC)
+    result = cwl2json_input_values(values, ProcessSchema.OGC)
     assert result == expect
 
 
@@ -720,7 +720,7 @@ def test_cwl2json_input_values_old_format():
         {"id": "test7", "value": 4.56},
         {"id": "test8", "href": "/tmp/other.txt"}
     ]
-    result = cwl2json_input_values(values, PROCESS_SCHEMA_OLD)
+    result = cwl2json_input_values(values, ProcessSchema.OLD)
     assert result == expect
 
 
@@ -756,8 +756,8 @@ def test_convert_input_values_schema_from_old():
             {"href": "/data/file2.txt", "format": {"mediaType": "text/plain"}}
         ]
     }
-    assert convert_input_values_schema(inputs_old, PROCESS_SCHEMA_OLD) == inputs_old
-    assert convert_input_values_schema(inputs_old, PROCESS_SCHEMA_OGC) == inputs_ogc
+    assert convert_input_values_schema(inputs_old, ProcessSchema.OLD) == inputs_old
+    assert convert_input_values_schema(inputs_old, ProcessSchema.OGC) == inputs_ogc
 
 
 def test_convert_input_values_schema_from_ogc():
@@ -795,8 +795,8 @@ def test_convert_input_values_schema_from_ogc():
         {"id": "test11", "href": "/data/file1.txt", "format": {"mediaType": "text/plain"}},
         {"id": "test11", "href": "/data/file2.txt", "format": {"mediaType": "text/plain"}},
     ]
-    assert convert_input_values_schema(inputs_ogc, PROCESS_SCHEMA_OGC) == inputs_ogc
-    assert convert_input_values_schema(inputs_ogc, PROCESS_SCHEMA_OLD) == inputs_old
+    assert convert_input_values_schema(inputs_ogc, ProcessSchema.OGC) == inputs_ogc
+    assert convert_input_values_schema(inputs_ogc, ProcessSchema.OLD) == inputs_old
 
 
 def test_repr2json_input_values():

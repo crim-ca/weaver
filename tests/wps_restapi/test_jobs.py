@@ -29,22 +29,12 @@ from tests.utils import (
     setup_mongodb_servicestore
 )
 from weaver.datatype import Job, Service
-from weaver.execute import EXECUTE_MODE_ASYNC, EXECUTE_RESPONSE_DOCUMENT, EXECUTE_TRANSMISSION_MODE_REFERENCE
-from weaver.formats import CONTENT_TYPE_APP_JSON
+from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
+from weaver.formats import ContentType
 from weaver.processes.wps_testing import WpsTestProcess
-from weaver.status import (
-    JOB_STATUS_CATEGORIES,
-    JOB_STATUS_CATEGORY_FINISHED,
-    JOB_STATUS_VALUES,
-    STATUS_ACCEPTED,
-    STATUS_DISMISSED,
-    STATUS_FAILED,
-    STATUS_RUNNING,
-    STATUS_STARTED,
-    STATUS_SUCCEEDED
-)
+from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory
 from weaver.utils import get_path_kvp, now
-from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC
+from weaver.visibility import Visibility
 from weaver.warning import TimeZoneInfoAlreadySetWarning
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.swagger_definitions import (
@@ -71,7 +61,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         }
         cls.config = setup_config_with_mongodb(settings=cls.settings)
         cls.app = get_test_weaver_app(config=cls.config)
-        cls.json_headers = {"Accept": CONTENT_TYPE_APP_JSON, "Content-Type": CONTENT_TYPE_APP_JSON}
+        cls.json_headers = {"Accept": ContentType.APP_JSON, "Content-Type": ContentType.APP_JSON}
         cls.datetime_interval = cls.generate_test_datetimes()
 
     @classmethod
@@ -90,13 +80,13 @@ class WpsRestApiJobsTest(unittest.TestCase):
 
         self.process_public = WpsTestProcess(identifier="process-public")
         self.process_store.save_process(self.process_public)
-        self.process_store.set_visibility(self.process_public.identifier, VISIBILITY_PUBLIC)
+        self.process_store.set_visibility(self.process_public.identifier, Visibility.PUBLIC)
         self.process_private = WpsTestProcess(identifier="process-private")
         self.process_store.save_process(self.process_private)
-        self.process_store.set_visibility(self.process_private.identifier, VISIBILITY_PRIVATE)
+        self.process_store.set_visibility(self.process_private.identifier, Visibility.PRIVATE)
         self.process_other = WpsTestProcess(identifier="process-other")
         self.process_store.save_process(self.process_other)
-        self.process_store.set_visibility(self.process_other.identifier, VISIBILITY_PUBLIC)
+        self.process_store.set_visibility(self.process_other.identifier, Visibility.PUBLIC)
         self.process_unknown = "process-unknown"
 
         self.service_public = Service(name="service-public", url="http://localhost/wps/service-public", public=True)
@@ -113,50 +103,50 @@ class WpsRestApiJobsTest(unittest.TestCase):
         self.job_info = []  # type: List[Job]
         self.make_job(task_id="0000-0000-0000-0000",
                       process=self.process_public.identifier, service=None,
-                      user_id=self.user_editor1_id, status=STATUS_SUCCEEDED, progress=100, access=VISIBILITY_PUBLIC)
+                      user_id=self.user_editor1_id, status=Status.SUCCEEDED, progress=100, access=Visibility.PUBLIC)
         self.make_job(task_id="0000-0000-0000-1111",
                       process=self.process_unknown, service=self.service_public.name,
-                      user_id=self.user_editor1_id, status=STATUS_FAILED, progress=99, access=VISIBILITY_PUBLIC)
+                      user_id=self.user_editor1_id, status=Status.FAILED, progress=99, access=Visibility.PUBLIC)
         self.make_job(task_id="0000-0000-0000-2222",
                       process=self.process_private.identifier, service=None,
-                      user_id=self.user_editor1_id, status=STATUS_FAILED, progress=55, access=VISIBILITY_PUBLIC)
+                      user_id=self.user_editor1_id, status=Status.FAILED, progress=55, access=Visibility.PUBLIC)
         # same process as job 0, but private (ex: job ran with private process, then process made public afterwards)
         self.make_job(task_id="0000-0000-0000-3333",
                       process=self.process_public.identifier, service=None,
-                      user_id=self.user_editor1_id, status=STATUS_FAILED, progress=55, access=VISIBILITY_PRIVATE)
+                      user_id=self.user_editor1_id, status=Status.FAILED, progress=55, access=Visibility.PRIVATE)
         # job ran by admin
         self.make_job(task_id="0000-0000-0000-4444",
                       process=self.process_public.identifier, service=None,
-                      user_id=self.user_admin_id, status=STATUS_FAILED, progress=55, access=VISIBILITY_PRIVATE)
+                      user_id=self.user_admin_id, status=Status.FAILED, progress=55, access=Visibility.PRIVATE)
         # job public/private service/process combinations
         self.make_job(task_id="0000-0000-0000-5555", created=self.datetime_interval[0], duration=20,
                       process=self.process_public.identifier, service=self.service_public.name,
-                      user_id=self.user_editor1_id, status=STATUS_FAILED, progress=99, access=VISIBILITY_PUBLIC)
+                      user_id=self.user_editor1_id, status=Status.FAILED, progress=99, access=Visibility.PUBLIC)
         self.make_job(task_id="0000-0000-0000-6666", created=self.datetime_interval[1], duration=30,
                       process=self.process_private.identifier, service=self.service_public.name,
-                      user_id=self.user_editor1_id, status=STATUS_FAILED, progress=99, access=VISIBILITY_PUBLIC)
+                      user_id=self.user_editor1_id, status=Status.FAILED, progress=99, access=Visibility.PUBLIC)
         self.make_job(task_id="0000-0000-0000-7777", created=self.datetime_interval[2], duration=40,
                       process=self.process_public.identifier, service=self.service_private.name,
-                      user_id=self.user_editor1_id, status=STATUS_FAILED, progress=99, access=VISIBILITY_PUBLIC)
+                      user_id=self.user_editor1_id, status=Status.FAILED, progress=99, access=Visibility.PUBLIC)
         self.make_job(task_id="0000-0000-0000-8888", created=self.datetime_interval[3], duration=50,
                       process=self.process_private.identifier, service=self.service_private.name,
-                      user_id=self.user_editor1_id, status=STATUS_FAILED, progress=99, access=VISIBILITY_PUBLIC)
+                      user_id=self.user_editor1_id, status=Status.FAILED, progress=99, access=Visibility.PUBLIC)
         # jobs with duplicate 'process' identifier, but under a different 'service' name
         # WARNING:
         #   For tests that use minDuration/maxDuration, following two jobs could 'eventually' become more/less than
         #   expected test values while debugging (code breakpoints) since their duration is dynamic (current - started)
         self.make_job(task_id="0000-0000-0000-9999", created=now(), duration=20,
                       process=self.process_other.identifier, service=self.service_one.name,
-                      user_id=self.user_editor1_id, status=STATUS_RUNNING, progress=99, access=VISIBILITY_PUBLIC)
+                      user_id=self.user_editor1_id, status=Status.RUNNING, progress=99, access=Visibility.PUBLIC)
         self.make_job(task_id="0000-0000-1111-0000", created=now(), duration=25,
                       process=self.process_other.identifier, service=self.service_two.name,
-                      user_id=self.user_editor1_id, status=STATUS_RUNNING, progress=99, access=VISIBILITY_PUBLIC)
+                      user_id=self.user_editor1_id, status=Status.RUNNING, progress=99, access=Visibility.PUBLIC)
         self.make_job(task_id="0000-0000-2222-0000", created=now(), duration=0,
                       process=self.process_other.identifier, service=self.service_two.name,
-                      user_id=self.user_editor1_id, status=STATUS_ACCEPTED, progress=99, access=VISIBILITY_PUBLIC)
+                      user_id=self.user_editor1_id, status=Status.ACCEPTED, progress=99, access=Visibility.PUBLIC)
         self.make_job(task_id="0000-0000-3333-0000", created=now(), duration=0,
                       process=self.process_other.identifier, service=self.service_two.name,
-                      user_id=self.user_editor1_id, status=STATUS_STARTED, progress=99, access=VISIBILITY_PUBLIC)
+                      user_id=self.user_editor1_id, status=Status.STARTED, progress=99, access=Visibility.PUBLIC)
 
     def make_job(self, task_id, process, service, user_id, status, progress, access,
                  created=None, offset=None, duration=None):
@@ -165,10 +155,10 @@ class WpsRestApiJobsTest(unittest.TestCase):
         job = self.job_store.save_job(task_id=task_id, process=process, service=service, is_workflow=False,
                                       user_id=user_id, execute_async=True, access=access, created=created)
         job.status = status
-        if status != STATUS_ACCEPTED:
+        if status != Status.ACCEPTED:
             job.started = job.created + datetime.timedelta(seconds=offset if offset is not None else 0)
         job.updated = job.created + datetime.timedelta(seconds=duration if duration is not None else 10)
-        if status in JOB_STATUS_CATEGORIES[JOB_STATUS_CATEGORY_FINISHED]:
+        if status in JOB_STATUS_CATEGORIES[StatusCategory.FINISHED]:
             job["finished"] = job.updated
         job.progress = progress
         job = self.job_store.update_job(job)
@@ -241,16 +231,16 @@ class WpsRestApiJobsTest(unittest.TestCase):
         assert all(any(link_info["rel"] == rel for link_info in job["links"]) for rel in ["self", "logs"])
         for link_info in job["links"]:
             assert "href" in link_info and isinstance(link_info["href"], str)
-        assert job["status"] in JOB_STATUS_VALUES
-        if job["status"] == STATUS_SUCCEEDED:
+        assert job["status"] in Status.values()
+        if job["status"] == Status.SUCCEEDED:
             assert len([link for link in job["links"] if link["rel"].endswith("results")])
-        elif job["status"] == STATUS_FAILED:
+        elif job["status"] == Status.FAILED:
             assert len([link for link in job["links"] if link["rel"].endswith("exceptions")])
 
     @staticmethod
     def check_basic_jobs_info(response, message=""):
         assert response.status_code == 200, message
-        assert response.content_type == CONTENT_TYPE_APP_JSON
+        assert response.content_type == ContentType.APP_JSON
         assert "jobs" in response.json and isinstance(response.json["jobs"], list)
         assert "page" in response.json and isinstance(response.json["page"], int)
         assert "total" in response.json and isinstance(response.json["total"], int)
@@ -262,7 +252,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         if isinstance(groups, str):
             groups = [groups]
         assert response.status_code == 200
-        assert response.content_type == CONTENT_TYPE_APP_JSON
+        assert response.content_type == ContentType.APP_JSON
         assert "page" not in response.json
         assert "limit" not in response.json
         assert "total" in response.json and isinstance(response.json["total"], int)
@@ -390,7 +380,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         Verifies that relation links update according to context in order to allow natural navigation between responses.
         """
         expect_jobs_total = len(self.job_info)
-        expect_jobs_visible = len(list(filter(lambda j: VISIBILITY_PUBLIC in j.access, self.job_info)))
+        expect_jobs_visible = len(list(filter(lambda j: Visibility.PUBLIC in j.access, self.job_info)))
         assert len(self.job_store.list_jobs()) == expect_jobs_total, (
             "expected number of jobs mismatch, following test might not work"
         )
@@ -545,9 +535,9 @@ class WpsRestApiJobsTest(unittest.TestCase):
         email = "some.test@crim.ca"
         body = {
             "inputs": [{"id": "test_input", "data": "test"}],
-            "outputs": [{"id": "test_output", "transmissionMode": EXECUTE_TRANSMISSION_MODE_REFERENCE}],
-            "mode": EXECUTE_MODE_ASYNC,
-            "response": EXECUTE_RESPONSE_DOCUMENT,
+            "outputs": [{"id": "test_output", "transmissionMode": ExecuteTransmissionMode.REFERENCE}],
+            "mode": ExecuteMode.ASYNC,
+            "response": ExecuteResponse.DOCUMENT,
             "notification_email": email
         }
         with contextlib.ExitStack() as stack:
@@ -556,7 +546,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
             path = "/processes/{}/jobs".format(self.process_public.identifier)
             resp = self.app.post_json(path, params=body, headers=self.json_headers)
             assert resp.status_code == 201
-            assert resp.content_type == CONTENT_TYPE_APP_JSON
+            assert resp.content_type == ContentType.APP_JSON
         job_id = resp.json["jobID"]
 
         # verify the email is not in plain text
@@ -567,7 +557,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         path = get_path_kvp(sd.jobs_service.path, detail="true", notification_email=email)
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
-        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        assert resp.content_type == ContentType.APP_JSON
         assert resp.json["total"] == 1, "Should match exactly 1 email with specified literal string as query param."
         assert resp.json["jobs"][0]["jobID"] == job_id
 
@@ -701,44 +691,44 @@ class WpsRestApiJobsTest(unittest.TestCase):
         path = sd.process_jobs_service.path.format(process_id="unknown-process-id")
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 404
-        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        assert resp.content_type == ContentType.APP_JSON
 
     def test_get_jobs_process_unknown_in_query(self):
         path = get_path_kvp(sd.jobs_service.path, process="unknown-process-id")
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 404
-        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        assert resp.content_type == ContentType.APP_JSON
 
     def test_get_jobs_private_process_unauthorized_in_path(self):
         path = sd.process_jobs_service.path.format(process_id=self.process_private.identifier)
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 401
-        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        assert resp.content_type == ContentType.APP_JSON
 
     def test_get_jobs_private_process_not_returned_in_query(self):
         path = get_path_kvp(sd.jobs_service.path, process=self.process_private.identifier)
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 401
-        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        assert resp.content_type == ContentType.APP_JSON
 
     def test_get_jobs_service_and_process_unknown_in_path(self):
         path = sd.provider_jobs_service.path.format(provider_id="unknown-service-id", process_id="unknown-process-id")
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 404
-        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        assert resp.content_type == ContentType.APP_JSON
 
     def test_get_jobs_service_and_process_unknown_in_query(self):
         path = get_path_kvp(sd.jobs_service.path, service="unknown-service-id", process="unknown-process-id")
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 404
-        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        assert resp.content_type == ContentType.APP_JSON
 
     def test_get_jobs_private_service_public_process_unauthorized_in_path(self):
         path = sd.provider_jobs_service.path.format(provider_id=self.service_private.name,
                                                     process_id=self.process_public.identifier)
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 401
-        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        assert resp.content_type == ContentType.APP_JSON
 
     def test_get_jobs_private_service_public_process_unauthorized_in_query(self):
         path = get_path_kvp(sd.jobs_service.path,
@@ -746,7 +736,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
                             process=self.process_public.identifier)
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 401
-        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        assert resp.content_type == ContentType.APP_JSON
 
     def test_get_jobs_public_service_private_process_unauthorized_in_query(self):
         """
@@ -762,7 +752,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
                 stack.enter_context(runner)
             resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
             assert resp.status_code == 200
-            assert resp.content_type == CONTENT_TYPE_APP_JSON
+            assert resp.content_type == ContentType.APP_JSON
 
     def test_get_jobs_public_service_no_processes(self):
         """
@@ -778,7 +768,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
                 stack.enter_context(patch)
             resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
             assert resp.status_code == 404
-            assert resp.content_type == CONTENT_TYPE_APP_JSON
+            assert resp.content_type == ContentType.APP_JSON
 
     def test_get_jobs_public_with_access_and_request_user(self):
         """
@@ -789,12 +779,12 @@ class WpsRestApiJobsTest(unittest.TestCase):
         uri_provider_jobs = sd.provider_jobs_service.path.format(
             provider_id=self.service_public.name, process_id=self.process_public.identifier)
 
-        admin_public_jobs = list(filter(lambda j: VISIBILITY_PUBLIC in j.access, self.job_info))
-        admin_private_jobs = list(filter(lambda j: VISIBILITY_PRIVATE in j.access, self.job_info))
+        admin_public_jobs = list(filter(lambda j: Visibility.PUBLIC in j.access, self.job_info))
+        admin_private_jobs = list(filter(lambda j: Visibility.PRIVATE in j.access, self.job_info))
         editor1_all_jobs = list(filter(lambda j: j.user_id == self.user_editor1_id, self.job_info))
-        editor1_public_jobs = list(filter(lambda j: VISIBILITY_PUBLIC in j.access, editor1_all_jobs))
-        editor1_private_jobs = list(filter(lambda j: VISIBILITY_PRIVATE in j.access, editor1_all_jobs))
-        public_jobs = list(filter(lambda j: VISIBILITY_PUBLIC in j.access, self.job_info))
+        editor1_public_jobs = list(filter(lambda j: Visibility.PUBLIC in j.access, editor1_all_jobs))
+        editor1_private_jobs = list(filter(lambda j: Visibility.PRIVATE in j.access, editor1_all_jobs))
+        public_jobs = list(filter(lambda j: Visibility.PUBLIC in j.access, self.job_info))
 
         def filter_process(jobs):  # type: (Iterable[Job]) -> List[Job]
             return list(filter(lambda j: j.process == self.process_public.identifier, jobs))
@@ -810,32 +800,32 @@ class WpsRestApiJobsTest(unittest.TestCase):
             (uri_direct_jobs,   None,               None,                   public_jobs),                               # noqa: E241,E501
             (uri_direct_jobs,   None,               self.user_editor1_id,   editor1_all_jobs),                          # noqa: E241,E501
             (uri_direct_jobs,   None,               self.user_admin_id,     self.job_info),                             # noqa: E241,E501
-            (uri_direct_jobs,   VISIBILITY_PRIVATE, None,                   public_jobs),                               # noqa: E241,E501
-            (uri_direct_jobs,   VISIBILITY_PRIVATE, self.user_editor1_id,   editor1_private_jobs),                      # noqa: E241,E501
-            (uri_direct_jobs,   VISIBILITY_PRIVATE, self.user_admin_id,     admin_private_jobs),                        # noqa: E241,E501
-            (uri_direct_jobs,   VISIBILITY_PUBLIC,  None,                   public_jobs),                               # noqa: E241,E501
-            (uri_direct_jobs,   VISIBILITY_PUBLIC,  self.user_editor1_id,   editor1_public_jobs),                       # noqa: E241,E501
-            (uri_direct_jobs,   VISIBILITY_PUBLIC,  self.user_admin_id,     admin_public_jobs),                         # noqa: E241,E501
+            (uri_direct_jobs,   Visibility.PRIVATE, None,                   public_jobs),                               # noqa: E241,E501
+            (uri_direct_jobs,   Visibility.PRIVATE, self.user_editor1_id,   editor1_private_jobs),                      # noqa: E241,E501
+            (uri_direct_jobs,   Visibility.PRIVATE, self.user_admin_id,     admin_private_jobs),                        # noqa: E241,E501
+            (uri_direct_jobs,   Visibility.PUBLIC,  None,                   public_jobs),                               # noqa: E241,E501
+            (uri_direct_jobs,   Visibility.PUBLIC,  self.user_editor1_id,   editor1_public_jobs),                       # noqa: E241,E501
+            (uri_direct_jobs,   Visibility.PUBLIC,  self.user_admin_id,     admin_public_jobs),                         # noqa: E241,E501
             # ---
             (uri_process_jobs,  None,               None,                   filter_process(public_jobs)),               # noqa: E241,E501
             (uri_process_jobs,  None,               self.user_editor1_id,   filter_process(editor1_all_jobs)),          # noqa: E241,E501
             (uri_process_jobs,  None,               self.user_admin_id,     filter_process(self.job_info)),             # noqa: E241,E501
-            (uri_process_jobs,  VISIBILITY_PRIVATE, None,                   filter_process(public_jobs)),               # noqa: E241,E501
-            (uri_process_jobs,  VISIBILITY_PRIVATE, self.user_editor1_id,   filter_process(editor1_private_jobs)),      # noqa: E241,E501
-            (uri_process_jobs,  VISIBILITY_PRIVATE, self.user_admin_id,     filter_process(admin_private_jobs)),        # noqa: E241,E501
-            (uri_process_jobs,  VISIBILITY_PUBLIC,  None,                   filter_process(public_jobs)),               # noqa: E241,E501
-            (uri_process_jobs,  VISIBILITY_PUBLIC,  self.user_editor1_id,   filter_process(editor1_public_jobs)),       # noqa: E241,E501
-            (uri_process_jobs,  VISIBILITY_PUBLIC,  self.user_admin_id,     filter_process(public_jobs)),               # noqa: E241,E501
+            (uri_process_jobs,  Visibility.PRIVATE, None,                   filter_process(public_jobs)),               # noqa: E241,E501
+            (uri_process_jobs,  Visibility.PRIVATE, self.user_editor1_id,   filter_process(editor1_private_jobs)),      # noqa: E241,E501
+            (uri_process_jobs,  Visibility.PRIVATE, self.user_admin_id,     filter_process(admin_private_jobs)),        # noqa: E241,E501
+            (uri_process_jobs,  Visibility.PUBLIC,  None,                   filter_process(public_jobs)),               # noqa: E241,E501
+            (uri_process_jobs,  Visibility.PUBLIC,  self.user_editor1_id,   filter_process(editor1_public_jobs)),       # noqa: E241,E501
+            (uri_process_jobs,  Visibility.PUBLIC,  self.user_admin_id,     filter_process(public_jobs)),               # noqa: E241,E501
             # ---
             (uri_provider_jobs, None,               None,                   filter_service(public_jobs)),               # noqa: E241,E501
             (uri_provider_jobs, None,               self.user_editor1_id,   filter_service(editor1_all_jobs)),          # noqa: E241,E501
             (uri_provider_jobs, None,               self.user_admin_id,     filter_service(self.job_info)),             # noqa: E241,E501
-            (uri_provider_jobs, VISIBILITY_PRIVATE, None,                   filter_service(public_jobs)),               # noqa: E241,E501
-            (uri_provider_jobs, VISIBILITY_PRIVATE, self.user_editor1_id,   filter_service(editor1_private_jobs)),      # noqa: E241,E501
-            (uri_provider_jobs, VISIBILITY_PRIVATE, self.user_admin_id,     filter_service(admin_private_jobs)),        # noqa: E241,E501
-            (uri_provider_jobs, VISIBILITY_PUBLIC,  None,                   filter_service(public_jobs)),               # noqa: E241,E501
-            (uri_provider_jobs, VISIBILITY_PUBLIC,  self.user_editor1_id,   filter_service(editor1_public_jobs)),       # noqa: E241,E501
-            (uri_provider_jobs, VISIBILITY_PUBLIC,  self.user_admin_id,     filter_service(public_jobs)),               # noqa: E241,E501
+            (uri_provider_jobs, Visibility.PRIVATE, None,                   filter_service(public_jobs)),               # noqa: E241,E501
+            (uri_provider_jobs, Visibility.PRIVATE, self.user_editor1_id,   filter_service(editor1_private_jobs)),      # noqa: E241,E501
+            (uri_provider_jobs, Visibility.PRIVATE, self.user_admin_id,     filter_service(admin_private_jobs)),        # noqa: E241,E501
+            (uri_provider_jobs, Visibility.PUBLIC,  None,                   filter_service(public_jobs)),               # noqa: E241,E501
+            (uri_provider_jobs, Visibility.PUBLIC,  self.user_editor1_id,   filter_service(editor1_public_jobs)),       # noqa: E241,E501
+            (uri_provider_jobs, Visibility.PUBLIC,  self.user_admin_id,     filter_service(public_jobs)),               # noqa: E241,E501
 
         ]   # type: List[Tuple[str, str, Union[None, int], List[Job]]]
 
@@ -865,7 +855,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         path = get_path_kvp(sd.jobs_service.path, limit=limit_parameter)
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
-        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        assert resp.content_type == ContentType.APP_JSON
         assert "limit" in resp.json and isinstance(resp.json["limit"], int)
         assert resp.json["limit"] == limit_parameter
         assert len(resp.json["jobs"]) <= limit_parameter
@@ -896,7 +886,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         path = get_path_kvp(sd.jobs_service.path, datetime=datetime_before)
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
-        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        assert resp.content_type == ContentType.APP_JSON
         # generated datetime interval have an offset that makes all job in the future
         # anything created "recently" and publicly visible will be listed here
         job_result = resp.json["jobs"]
@@ -907,7 +897,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
             path = get_path_kvp(base_uri)
             resp = self.app.get(path, headers=self.json_headers)
             assert resp.status_code == 200
-            assert resp.content_type == CONTENT_TYPE_APP_JSON
+            assert resp.content_type == ContentType.APP_JSON
             interval = datetime_before.replace(DATETIME_INTERVAL_OPEN_START_SYMBOL, "")
             assert date_parser.parse(resp.json["created"]) <= date_parser.parse(interval)
 
@@ -923,14 +913,14 @@ class WpsRestApiJobsTest(unittest.TestCase):
         path = get_path_kvp(sd.jobs_service.path, datetime=datetime_after)
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
-        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        assert resp.content_type == ContentType.APP_JSON
         assert len(resp.json["jobs"]) == 2
         for job in resp.json["jobs"]:
             base_uri = sd.jobs_service.path + "/{}".format(job)
             path = get_path_kvp(base_uri)
             resp = self.app.get(path, headers=self.json_headers)
             assert resp.status_code == 200
-            assert resp.content_type == CONTENT_TYPE_APP_JSON
+            assert resp.content_type == ContentType.APP_JSON
             interval = datetime_after.replace(DATETIME_INTERVAL_OPEN_END_SYMBOL, "")
             assert date_parser.parse(resp.json["created"]) >= date_parser.parse(interval)
 
@@ -946,7 +936,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         path = get_path_kvp(sd.jobs_service.path, datetime=datetime_interval)
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
-        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        assert resp.content_type == ContentType.APP_JSON
 
         datetime_after, datetime_before = datetime_interval.split(DATETIME_INTERVAL_CLOSED_SYMBOL)
         assert len(resp.json["jobs"]) == 3
@@ -955,7 +945,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
             path = get_path_kvp(base_uri)
             resp = self.app.get(path, headers=self.json_headers)
             assert resp.status_code == 200
-            assert resp.content_type == CONTENT_TYPE_APP_JSON
+            assert resp.content_type == ContentType.APP_JSON
             assert date_parser.parse(resp.json["created"]) >= date_parser.parse(datetime_after)
             assert date_parser.parse(resp.json["created"]) <= date_parser.parse(datetime_before)
 
@@ -971,14 +961,14 @@ class WpsRestApiJobsTest(unittest.TestCase):
         path = get_path_kvp(sd.jobs_service.path, datetime=datetime_match)
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
-        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        assert resp.content_type == ContentType.APP_JSON
         assert len(resp.json["jobs"]) == 1
         for job in resp.json["jobs"]:
             base_uri = sd.jobs_service.path + "/{}".format(job)
             path = get_path_kvp(base_uri)
             resp = self.app.get(path, headers=self.json_headers)
             assert resp.status_code == 200
-            assert resp.content_type == CONTENT_TYPE_APP_JSON
+            assert resp.content_type == ContentType.APP_JSON
             assert date_parser.parse(resp.json["created"]) == date_parser.parse(datetime_match)
 
     def test_get_jobs_datetime_invalid(self):
@@ -1122,7 +1112,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         assert resp.status_code in [400, 422]
 
     def test_get_jobs_by_status_single(self):
-        test = {"status": STATUS_SUCCEEDED}
+        test = {"status": Status.SUCCEEDED}
         path = get_path_kvp(sd.jobs_service.path, **test)
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
@@ -1130,7 +1120,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         expect_jobs = [self.job_info[0].id]
         self.assert_equal_with_jobs_diffs(result_jobs, expect_jobs, test)
 
-        test = {"status": STATUS_FAILED}
+        test = {"status": Status.FAILED}
         path = get_path_kvp(sd.jobs_service.path, **test)
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
@@ -1140,7 +1130,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
 
     @pytest.mark.xfail(reason="Multiple statuses not supported")  # FIXME: support comma-separated list of statuses
     def test_get_jobs_by_status_multi(self):
-        test = {"status": "{},{}".format(STATUS_SUCCEEDED, STATUS_RUNNING)}
+        test = {"status": "{},{}".format(Status.SUCCEEDED, Status.RUNNING)}
         path = get_path_kvp(sd.jobs_service.path, **test)
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
@@ -1156,7 +1146,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         assert resp.json["value"]["status"] == "random"
         assert "status" in resp.json["cause"]
 
-        status = "random,{}".format(STATUS_RUNNING)
+        status = "random,{}".format(Status.RUNNING)
         path = get_path_kvp(sd.jobs_service.path, status=status)
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 400
@@ -1170,8 +1160,8 @@ class WpsRestApiJobsTest(unittest.TestCase):
         """
         body = {
             "outputs": [],
-            "mode": EXECUTE_MODE_ASYNC,
-            "response": EXECUTE_RESPONSE_DOCUMENT,
+            "mode": ExecuteMode.ASYNC,
+            "response": ExecuteResponse.DOCUMENT,
         }
         with contextlib.ExitStack() as stack:
             for runner in mocked_process_job_runner():
@@ -1179,7 +1169,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
             path = "/processes/{}/jobs".format(self.process_public.identifier)
             resp = self.app.post_json(path, params=body, headers=self.json_headers)
             assert resp.status_code == 201
-            assert resp.content_type == CONTENT_TYPE_APP_JSON
+            assert resp.content_type == ContentType.APP_JSON
 
         assert resp.json["processID"] == "process-public"
 
@@ -1210,20 +1200,20 @@ class WpsRestApiJobsTest(unittest.TestCase):
             OGC specification of dismiss operation: https://docs.ogc.org/is/18-062r2/18-062r2.html#toc53
         """
         job_running = self.job_info[10]
-        assert job_running.status == STATUS_RUNNING, "Job must be in running state for test"
+        assert job_running.status == Status.RUNNING, "Job must be in running state for test"
         job_accept = self.job_info[11]
-        assert job_accept.status == STATUS_ACCEPTED, "Job must be in accepted state for test"
+        assert job_accept.status == Status.ACCEPTED, "Job must be in accepted state for test"
         job_started = self.job_info[12]
-        assert job_started.status == STATUS_STARTED, "Job must be in started state for test"
+        assert job_started.status == Status.STARTED, "Job must be in started state for test"
 
         for job in [job_running, job_accept, job_started]:
             path = sd.job_service.path.format(job_id=job.id)
             resp = self.app.delete(path, headers=self.json_headers)
             assert resp.status_code == 200
-            assert resp.json["status"] == STATUS_DISMISSED
+            assert resp.json["status"] == Status.DISMISSED
 
             # job are not removed, only dismissed
-            path = get_path_kvp(sd.jobs_service.path, status=STATUS_DISMISSED, limitt=1000)
+            path = get_path_kvp(sd.jobs_service.path, status=Status.DISMISSED, limitt=1000)
             resp = self.app.get(path, headers=self.json_headers)
             assert resp.status_code == 200
             assert job.id in resp.json["jobs"], "Job HTTP DELETE should not have deleted it, but only dismissed it."
@@ -1231,7 +1221,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
             path = sd.job_service.path.format(job_id=job.id)
             resp = self.app.get(path, headers=self.json_headers)
             assert resp.status_code == 200, "Job should still exist even after dismiss"
-            assert resp.json["status"] == STATUS_DISMISSED
+            assert resp.json["status"] == Status.DISMISSED
 
             resp = self.app.delete(path, headers=self.json_headers, expect_errors=True)
             assert resp.status_code == 410, "Job cannot be dismissed again."
@@ -1249,8 +1239,8 @@ class WpsRestApiJobsTest(unittest.TestCase):
         """
         job_success = self.job_info[0]
         job_failed = self.job_info[1]
-        assert job_success.status == STATUS_SUCCEEDED, "Job must be in successful state for test"
-        assert job_failed.status == STATUS_FAILED, "Job must be in failed state for test"
+        assert job_success.status == Status.SUCCEEDED, "Job must be in successful state for test"
+        assert job_failed.status == Status.FAILED, "Job must be in failed state for test"
 
         # create dummy files to validate results flush of successful job
         wps_out_dir = self.settings["weaver.wps_output_dir"]
@@ -1272,7 +1262,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
                 job_path = sd.job_service.path.format(job_id=job_success.id)
                 resp = self.app.delete(job_path, headers=self.json_headers)
                 assert resp.status_code == 200
-                assert resp.json["status"] == STATUS_DISMISSED
+                assert resp.json["status"] == Status.DISMISSED
 
                 for tmp_file in [tmp_out1, tmp_out2, tmp_out3, tmp_log, tmp_xml]:
                     assert not os.path.exists(tmp_file.name)
@@ -1293,7 +1283,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         path = sd.job_service.path.format(job_id=job_failed.id)
         resp = self.app.delete(path, headers=self.json_headers)
         assert resp.status_code == 200
-        assert resp.json["status"] == STATUS_DISMISSED
+        assert resp.json["status"] == Status.DISMISSED
         resp = self.app.delete(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 410
 
@@ -1317,4 +1307,4 @@ class WpsRestApiJobsTest(unittest.TestCase):
             path = sd.job_service.path.format(job_id=job)
             resp = self.app.get(path, headers=self.json_headers)
             assert resp.status_code == 200
-            assert resp.json["status"] == STATUS_DISMISSED, "Job status should have been updated to dismissed."
+            assert resp.json["status"] == Status.DISMISSED, "Job status should have been updated to dismissed."

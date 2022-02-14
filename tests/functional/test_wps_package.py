@@ -34,14 +34,10 @@ from tests.utils import (
     mocked_reference_test_file,
     mocked_sub_requests
 )
-from weaver.execute import EXECUTE_MODE_ASYNC, EXECUTE_RESPONSE_DOCUMENT, EXECUTE_TRANSMISSION_MODE_REFERENCE
+from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import (
-    ACCEPT_LANGUAGES,
-    CONTENT_TYPE_APP_JSON,
-    CONTENT_TYPE_APP_NETCDF,
-    CONTENT_TYPE_APP_TAR,
-    CONTENT_TYPE_APP_ZIP,
-    CONTENT_TYPE_TEXT_PLAIN,
+    AcceptLanguage,
+    ContentType,
     EDAM_MAPPING,
     EDAM_NAMESPACE,
     IANA_NAMESPACE,
@@ -50,11 +46,10 @@ from weaver.formats import (
 from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_DOCKER,
     CWL_REQUIREMENT_INIT_WORKDIR,
-    PROCESS_SCHEMA_OGC,
-    PROCESS_SCHEMA_OLD
+    ProcessSchema
 )
 from weaver.processes.types import PROCESS_APPLICATION, PROCESS_BUILTIN
-from weaver.status import STATUS_DISMISSED, STATUS_RUNNING
+from weaver.status import Status
 from weaver.utils import get_any_value
 from weaver.wps.utils import get_wps_output_dir, map_wps_output_location
 
@@ -63,12 +58,12 @@ if TYPE_CHECKING:
 
     from weaver.typedefs import JSON
 
-EDAM_PLAIN = EDAM_NAMESPACE + ":" + EDAM_MAPPING[CONTENT_TYPE_TEXT_PLAIN]
-EDAM_NETCDF = EDAM_NAMESPACE + ":" + EDAM_MAPPING[CONTENT_TYPE_APP_NETCDF]
+EDAM_PLAIN = EDAM_NAMESPACE + ":" + EDAM_MAPPING[ContentType.TEXT_PLAIN]
+EDAM_NETCDF = EDAM_NAMESPACE + ":" + EDAM_MAPPING[ContentType.APP_NETCDF]
 # note: x-tar cannot be mapped during CWL format resolution (not official schema),
 #       it remains explicit tar definition in WPS context
-IANA_TAR = IANA_NAMESPACE + ":" + CONTENT_TYPE_APP_TAR  # noqa # pylint: disable=unused-variable
-IANA_ZIP = IANA_NAMESPACE + ":" + CONTENT_TYPE_APP_ZIP  # noqa # pylint: disable=unused-variable
+IANA_TAR = IANA_NAMESPACE + ":" + ContentType.APP_TAR  # noqa # pylint: disable=unused-variable
+IANA_ZIP = IANA_NAMESPACE + ":" + ContentType.APP_ZIP  # noqa # pylint: disable=unused-variable
 
 KNOWN_PROCESS_DESCRIPTION_FIELDS = {
     "id", "title", "description", "keywords", "metadata", "inputs", "outputs",
@@ -112,7 +107,7 @@ class WpsPackageAppTest(WpsConfigBase):
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
             "executionUnit": [{"unit": cwl}],
         }
-        desc, pkg = self.deploy_process(body, describe_schema=PROCESS_SCHEMA_OGC)
+        desc, pkg = self.deploy_process(body, describe_schema=ProcessSchema.OGC)
         assert desc["title"] == title
         assert pkg["label"] == title
 
@@ -149,7 +144,7 @@ class WpsPackageAppTest(WpsConfigBase):
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
             "executionUnit": [{"unit": cwl}],
         }
-        desc, _ = self.deploy_process(body, describe_schema=PROCESS_SCHEMA_OLD)
+        desc, _ = self.deploy_process(body, describe_schema=ProcessSchema.OLD)
         proc = desc["process"]
 
         assert proc["id"] == self._testMethodName
@@ -251,7 +246,7 @@ class WpsPackageAppTest(WpsConfigBase):
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
             "executionUnit": [{"unit": cwl}],
         }
-        desc, pkg = self.deploy_process(body, describe_schema=PROCESS_SCHEMA_OLD)
+        desc, pkg = self.deploy_process(body, describe_schema=ProcessSchema.OLD)
         proc = desc["process"]
 
         assert proc["id"] == self._testMethodName
@@ -291,7 +286,7 @@ class WpsPackageAppTest(WpsConfigBase):
         # assert pkg["outputs"][1]["label"] == "Additional detail only within WPS output", \
         #     "WPS I/O title should be converted to CWL label of corresponding I/O from additional details"
 
-        desc = self.describe_process(self._testMethodName, describe_schema=PROCESS_SCHEMA_OGC)
+        desc = self.describe_process(self._testMethodName, describe_schema=ProcessSchema.OGC)
         assert desc["id"] == self._testMethodName
         assert desc["title"] == "some title"
         assert desc["description"] == "this is a test"
@@ -318,7 +313,7 @@ class WpsPackageAppTest(WpsConfigBase):
         We also validate a `MIME-type` that should be found for both `CWL` and `WPS` formats to make sure that `CWL`
         formats are only dropped when necessary.
         """
-        ns_json, type_json = get_cwl_file_format(CONTENT_TYPE_APP_JSON, must_exist=True)
+        ns_json, type_json = get_cwl_file_format(ContentType.APP_JSON, must_exist=True)
         assert "iana" in ns_json  # just to make sure
         # even if IANA media-type does not exist, it must still be well formed (type/sub-type)
         # otherwise, schema 'MediaType' will raise because of invalid string pattern
@@ -334,7 +329,7 @@ class WpsPackageAppTest(WpsConfigBase):
                             "id": "wps_only_format_exists",
                             "formats": [
                                 {
-                                    "mimeType": CONTENT_TYPE_APP_JSON,
+                                    "mimeType": ContentType.APP_JSON,
                                     "default": True,
                                 }
                             ]
@@ -351,7 +346,7 @@ class WpsPackageAppTest(WpsConfigBase):
                         {
                             "id": "wps_only_format_both",
                             "formats": [
-                                {"mimeType": CONTENT_TYPE_APP_JSON},
+                                {"mimeType": ContentType.APP_JSON},
                                 {"mimeType": ct_not_exists, "default": True},
                             ]
                         }
@@ -381,12 +376,12 @@ class WpsPackageAppTest(WpsConfigBase):
                 "$namespaces": dict(list(ns_json.items()))
             }}],
         }
-        desc, pkg = self.deploy_process(body, describe_schema=PROCESS_SCHEMA_OLD)
+        desc, pkg = self.deploy_process(body, describe_schema=ProcessSchema.OLD)
         proc = desc["process"]
 
         assert proc["inputs"][0]["id"] == "wps_only_format_exists"
         assert len(proc["inputs"][0]["formats"]) == 1
-        assert proc["inputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
+        assert proc["inputs"][0]["formats"][0]["mediaType"] == ContentType.APP_JSON
         assert pkg["inputs"][0]["id"] == "wps_only_format_exists"
         assert pkg["inputs"][0]["type"] == "File"
         # FIXME: back-propagate WPS format to CWL without format specified
@@ -402,7 +397,7 @@ class WpsPackageAppTest(WpsConfigBase):
 
         assert proc["inputs"][2]["id"] == "wps_only_format_both"
         assert len(proc["inputs"][2]["formats"]) == 2
-        assert proc["inputs"][2]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
+        assert proc["inputs"][2]["formats"][0]["mediaType"] == ContentType.APP_JSON
         assert proc["inputs"][2]["formats"][1]["mediaType"] == ct_not_exists
         assert pkg["inputs"][2]["id"] == "wps_only_format_both"
         assert pkg["inputs"][2]["type"] == "File"
@@ -412,18 +407,18 @@ class WpsPackageAppTest(WpsConfigBase):
 
         assert proc["inputs"][3]["id"] == "cwl_only_format_exists"
         assert len(proc["inputs"][3]["formats"]) == 1
-        assert proc["inputs"][3]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
+        assert proc["inputs"][3]["formats"][0]["mediaType"] == ContentType.APP_JSON
         assert pkg["inputs"][3]["id"] == "cwl_only_format_exists"
         assert pkg["inputs"][3]["type"] == "File"
         assert pkg["inputs"][3]["format"] == type_json
 
-        desc = self.describe_process(self._testMethodName, describe_schema=PROCESS_SCHEMA_OGC)
+        desc = self.describe_process(self._testMethodName, describe_schema=ProcessSchema.OGC)
         assert len(desc["inputs"]["wps_only_format_exists"]["formats"]) == 1
-        assert desc["inputs"]["wps_only_format_exists"]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
+        assert desc["inputs"]["wps_only_format_exists"]["formats"][0]["mediaType"] == ContentType.APP_JSON
         assert len(desc["inputs"]["wps_only_format_not_exists"]["formats"]) == 1
         assert desc["inputs"]["wps_only_format_not_exists"]["formats"][0]["mediaType"] == ct_not_exists
         assert len(desc["inputs"]["wps_only_format_both"]["formats"]) == 2
-        assert desc["inputs"]["wps_only_format_both"]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
+        assert desc["inputs"]["wps_only_format_both"]["formats"][0]["mediaType"] == ContentType.APP_JSON
         assert desc["inputs"]["wps_only_format_both"]["formats"][1]["mediaType"] == ct_not_exists
 
     def test_deploy_merge_mediatype_io_format_references(self):
@@ -432,7 +427,7 @@ class WpsPackageAppTest(WpsConfigBase):
 
         Also we validate that processes that use ``mimeType`` or ``mediaType`` can be deployed successfully.
         """
-        ns_json, type_json = get_cwl_file_format(CONTENT_TYPE_APP_JSON)
+        ns_json, type_json = get_cwl_file_format(ContentType.APP_JSON)
         namespaces = dict(list(ns_json.items()))
         body = {
             "processDescription": {
@@ -445,7 +440,7 @@ class WpsPackageAppTest(WpsConfigBase):
                             "id": "wps_format_mimeType",
                             "formats": [
                                 {
-                                    "mimeType": CONTENT_TYPE_APP_JSON,
+                                    "mimeType": ContentType.APP_JSON,
                                     "default": True,
                                 }
                             ]
@@ -454,7 +449,7 @@ class WpsPackageAppTest(WpsConfigBase):
                             "id": "wps_format_mediaType",
                             "formats": [
                                 {
-                                    "mediaType": CONTENT_TYPE_APP_JSON,
+                                    "mediaType": ContentType.APP_JSON,
                                     "default": True,
                                 }
                             ]
@@ -463,11 +458,11 @@ class WpsPackageAppTest(WpsConfigBase):
                     "outputs": [
                         {
                             "id": "wps_format_mimeType",
-                            "formats": [{"mediaType": CONTENT_TYPE_APP_JSON}],
+                            "formats": [{"mediaType": ContentType.APP_JSON}],
                         },
                         {
                             "id": "wps_format_mediaType",
-                            "formats": [{"mediaType": CONTENT_TYPE_APP_JSON}],
+                            "formats": [{"mediaType": ContentType.APP_JSON}],
                         },
                     ],
                 },
@@ -505,22 +500,22 @@ class WpsPackageAppTest(WpsConfigBase):
                 }
             }]
         }
-        desc, _ = self.deploy_process(body, describe_schema=PROCESS_SCHEMA_OLD)
+        desc, _ = self.deploy_process(body, describe_schema=ProcessSchema.OLD)
         proc = desc["process"]
         assert proc["inputs"][0]["id"] == "wps_format_mimeType"
-        assert proc["inputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
+        assert proc["inputs"][0]["formats"][0]["mediaType"] == ContentType.APP_JSON
         assert proc["inputs"][1]["id"] == "wps_format_mediaType"
-        assert proc["inputs"][1]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
+        assert proc["inputs"][1]["formats"][0]["mediaType"] == ContentType.APP_JSON
         assert proc["outputs"][0]["id"] == "wps_format_mimeType"
-        assert proc["outputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
+        assert proc["outputs"][0]["formats"][0]["mediaType"] == ContentType.APP_JSON
         assert proc["outputs"][1]["id"] == "wps_format_mediaType"
-        assert proc["outputs"][1]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
+        assert proc["outputs"][1]["formats"][0]["mediaType"] == ContentType.APP_JSON
 
-        desc = self.describe_process(self._testMethodName, describe_schema=PROCESS_SCHEMA_OGC)
-        assert desc["inputs"]["wps_format_mimeType"]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
-        assert desc["inputs"]["wps_format_mediaType"]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
-        assert desc["outputs"]["wps_format_mimeType"]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
-        assert desc["outputs"]["wps_format_mediaType"]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
+        desc = self.describe_process(self._testMethodName, describe_schema=ProcessSchema.OGC)
+        assert desc["inputs"]["wps_format_mimeType"]["formats"][0]["mediaType"] == ContentType.APP_JSON
+        assert desc["inputs"]["wps_format_mediaType"]["formats"][0]["mediaType"] == ContentType.APP_JSON
+        assert desc["outputs"]["wps_format_mimeType"]["formats"][0]["mediaType"] == ContentType.APP_JSON
+        assert desc["outputs"]["wps_format_mediaType"]["formats"][0]["mediaType"] == ContentType.APP_JSON
 
     def test_deploy_block_builtin_processes_from_api(self):
         """
@@ -638,9 +633,9 @@ class WpsPackageAppTest(WpsConfigBase):
         NOTE:
             field 'default' in CWL refers to default "value", in WPS refers to default "format" for complex inputs
         """
-        ns_json, type_json = get_cwl_file_format(CONTENT_TYPE_APP_JSON)
-        ns_text, type_text = get_cwl_file_format(CONTENT_TYPE_TEXT_PLAIN)
-        ns_ncdf, type_ncdf = get_cwl_file_format(CONTENT_TYPE_APP_NETCDF)
+        ns_json, type_json = get_cwl_file_format(ContentType.APP_JSON)
+        ns_text, type_text = get_cwl_file_format(ContentType.TEXT_PLAIN)
+        ns_ncdf, type_ncdf = get_cwl_file_format(ContentType.APP_NETCDF)
         namespaces = dict(list(ns_json.items()) + list(ns_text.items()) + list(ns_ncdf.items()))
         default_file = "https://server.com/file"
         cwl = {
@@ -756,7 +751,7 @@ class WpsPackageAppTest(WpsConfigBase):
                             "id": "multi_value_multi_format",
                             "formats": [
                                 {
-                                    "mimeType": CONTENT_TYPE_TEXT_PLAIN,
+                                    "mimeType": ContentType.TEXT_PLAIN,
                                     "default": True,
                                 }
                             ]
@@ -765,7 +760,7 @@ class WpsPackageAppTest(WpsConfigBase):
                             "id": "multi_value_multi_format_default",
                             "formats": [
                                 {
-                                    "mimeType": CONTENT_TYPE_APP_NETCDF,
+                                    "mimeType": ContentType.APP_NETCDF,
                                     "default": True,
                                 }
                             ]
@@ -776,18 +771,18 @@ class WpsPackageAppTest(WpsConfigBase):
                         {
                             "id": "single_value_multi_format",
                             "formats": [
-                                {"mimeType": CONTENT_TYPE_APP_JSON},
-                                {"mimeType": CONTENT_TYPE_TEXT_PLAIN},
-                                {"mimeType": CONTENT_TYPE_APP_NETCDF},
+                                {"mimeType": ContentType.APP_JSON},
+                                {"mimeType": ContentType.TEXT_PLAIN},
+                                {"mimeType": ContentType.APP_NETCDF},
                             ]
                         },
                         # FIXME: multiple output (array) not implemented (https://github.com/crim-ca/weaver/issues/25)
                         # {
                         #     "id": "multi_value_multi_format",
                         #     "formats": [
-                        #         {"mimeType": CONTENT_TYPE_APP_NETCDF},
-                        #         {"mimeType": CONTENT_TYPE_TEXT_PLAIN},
-                        #         {"mimeType": CONTENT_TYPE_APP_JSON},
+                        #         {"mimeType": ContentType.APP_NETCDF},
+                        #         {"mimeType": ContentType.TEXT_PLAIN},
+                        #         {"mimeType": ContentType.APP_JSON},
                         #     ]
                         # }
                     ]
@@ -796,7 +791,7 @@ class WpsPackageAppTest(WpsConfigBase):
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
             "executionUnit": [{"unit": cwl}],
         }
-        desc, pkg = self.deploy_process(body, describe_schema=PROCESS_SCHEMA_OLD)
+        desc, pkg = self.deploy_process(body, describe_schema=ProcessSchema.OLD)
         proc = desc["process"]
 
         # process description input validation
@@ -804,65 +799,65 @@ class WpsPackageAppTest(WpsConfigBase):
         assert proc["inputs"][0]["minOccurs"] == 1
         assert proc["inputs"][0]["maxOccurs"] == 1
         assert len(proc["inputs"][0]["formats"]) == 1
-        assert proc["inputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
+        assert proc["inputs"][0]["formats"][0]["mediaType"] == ContentType.APP_JSON
         assert proc["inputs"][0]["formats"][0]["default"] is True  # only format available, auto default
         assert proc["inputs"][1]["id"] == "multi_value_single_format"
         assert proc["inputs"][1]["minOccurs"] == 1
         assert proc["inputs"][1]["maxOccurs"] == "unbounded"
         assert len(proc["inputs"][1]["formats"]) == 1
-        assert proc["inputs"][1]["formats"][0]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert proc["inputs"][1]["formats"][0]["mediaType"] == ContentType.TEXT_PLAIN
         assert proc["inputs"][1]["formats"][0]["default"] is True  # only format available, auto default
         assert proc["inputs"][2]["id"] == "single_value_single_format_default"
         assert proc["inputs"][2]["minOccurs"] == 0
         assert proc["inputs"][2]["maxOccurs"] == 1
         assert len(proc["inputs"][2]["formats"]) == 1
-        assert proc["inputs"][2]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_NETCDF
+        assert proc["inputs"][2]["formats"][0]["mediaType"] == ContentType.APP_NETCDF
         assert proc["inputs"][2]["formats"][0]["default"] is True  # only format available, auto default
         assert proc["inputs"][3]["id"] == "multi_value_single_format_default"
         assert proc["inputs"][3]["minOccurs"] == 0
         assert proc["inputs"][3]["maxOccurs"] == "unbounded"
         assert len(proc["inputs"][3]["formats"]) == 1
-        assert proc["inputs"][3]["formats"][0]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert proc["inputs"][3]["formats"][0]["mediaType"] == ContentType.TEXT_PLAIN
         assert proc["inputs"][3]["formats"][0]["default"] is True  # only format available, auto default
         assert proc["inputs"][4]["id"] == "single_value_multi_format"
         assert proc["inputs"][4]["minOccurs"] == 1
         assert proc["inputs"][4]["maxOccurs"] == 1
         assert len(proc["inputs"][4]["formats"]) == 3
-        assert proc["inputs"][4]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
+        assert proc["inputs"][4]["formats"][0]["mediaType"] == ContentType.APP_JSON
         assert proc["inputs"][4]["formats"][0]["default"] is True  # no explicit default, uses first
-        assert proc["inputs"][4]["formats"][1]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert proc["inputs"][4]["formats"][1]["mediaType"] == ContentType.TEXT_PLAIN
         assert proc["inputs"][4]["formats"][1]["default"] is False
-        assert proc["inputs"][4]["formats"][2]["mediaType"] == CONTENT_TYPE_APP_NETCDF
+        assert proc["inputs"][4]["formats"][2]["mediaType"] == ContentType.APP_NETCDF
         assert proc["inputs"][4]["formats"][2]["default"] is False
         assert proc["inputs"][5]["id"] == "multi_value_multi_format"
         assert proc["inputs"][5]["minOccurs"] == 1
         assert proc["inputs"][5]["maxOccurs"] == "unbounded"
         assert len(proc["inputs"][5]["formats"]) == 3
-        assert proc["inputs"][5]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_NETCDF
+        assert proc["inputs"][5]["formats"][0]["mediaType"] == ContentType.APP_NETCDF
         assert proc["inputs"][5]["formats"][0]["default"] is False
-        assert proc["inputs"][5]["formats"][1]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert proc["inputs"][5]["formats"][1]["mediaType"] == ContentType.TEXT_PLAIN
         assert proc["inputs"][5]["formats"][1]["default"] is True  # specified in process description
-        assert proc["inputs"][5]["formats"][2]["mediaType"] == CONTENT_TYPE_APP_JSON
+        assert proc["inputs"][5]["formats"][2]["mediaType"] == ContentType.APP_JSON
         assert proc["inputs"][5]["formats"][2]["default"] is False
         assert proc["inputs"][6]["id"] == "single_value_multi_format_default"
         assert proc["inputs"][6]["minOccurs"] == 0
         assert proc["inputs"][6]["maxOccurs"] == 1
         assert len(proc["inputs"][6]["formats"]) == 3
-        assert proc["inputs"][6]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
+        assert proc["inputs"][6]["formats"][0]["mediaType"] == ContentType.APP_JSON
         assert proc["inputs"][6]["formats"][0]["default"] is True  # no explicit default, uses first
-        assert proc["inputs"][6]["formats"][1]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert proc["inputs"][6]["formats"][1]["mediaType"] == ContentType.TEXT_PLAIN
         assert proc["inputs"][6]["formats"][1]["default"] is False
-        assert proc["inputs"][6]["formats"][2]["mediaType"] == CONTENT_TYPE_APP_NETCDF
+        assert proc["inputs"][6]["formats"][2]["mediaType"] == ContentType.APP_NETCDF
         assert proc["inputs"][6]["formats"][2]["default"] is False
         assert proc["inputs"][7]["id"] == "multi_value_multi_format_default"
         assert proc["inputs"][7]["minOccurs"] == 0
         assert proc["inputs"][7]["maxOccurs"] == "unbounded"
         assert len(proc["inputs"][7]["formats"]) == 3
-        assert proc["inputs"][7]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
+        assert proc["inputs"][7]["formats"][0]["mediaType"] == ContentType.APP_JSON
         assert proc["inputs"][7]["formats"][0]["default"] is False
-        assert proc["inputs"][7]["formats"][1]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert proc["inputs"][7]["formats"][1]["mediaType"] == ContentType.TEXT_PLAIN
         assert proc["inputs"][7]["formats"][1]["default"] is False
-        assert proc["inputs"][7]["formats"][2]["mediaType"] == CONTENT_TYPE_APP_NETCDF
+        assert proc["inputs"][7]["formats"][2]["mediaType"] == ContentType.APP_NETCDF
         assert proc["inputs"][7]["formats"][2]["default"] is True  # specified in process description
 
         # process description output validation
@@ -881,25 +876,25 @@ class WpsPackageAppTest(WpsConfigBase):
 
         assert proc["outputs"][0]["id"] == "single_value_single_format"
         assert len(proc["outputs"][0]["formats"]) == 1
-        assert proc["outputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
+        assert proc["outputs"][0]["formats"][0]["mediaType"] == ContentType.APP_JSON
         assert proc["outputs"][0]["formats"][0]["default"] is True
         assert proc["outputs"][1]["id"] == "single_value_multi_format"
         assert len(proc["outputs"][1]["formats"]) == 3
-        assert proc["outputs"][1]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
-        assert proc["outputs"][1]["formats"][1]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
-        assert proc["outputs"][1]["formats"][2]["mediaType"] == CONTENT_TYPE_APP_NETCDF
+        assert proc["outputs"][1]["formats"][0]["mediaType"] == ContentType.APP_JSON
+        assert proc["outputs"][1]["formats"][1]["mediaType"] == ContentType.TEXT_PLAIN
+        assert proc["outputs"][1]["formats"][2]["mediaType"] == ContentType.APP_NETCDF
         assert proc["outputs"][1]["formats"][0]["default"] is True   # mandatory
         assert proc["outputs"][1]["formats"][1].get("default", False) is False  # omission is allowed
         assert proc["outputs"][1]["formats"][2].get("default", False) is False  # omission is allowed
         # FIXME: enable when issue #25 is implemented
         # assert proc["outputs"][2]["id"] == "multi_value_single_format"
         # assert len(proc["outputs"][2]["formats"]) == 1
-        # assert proc["outputs"][2]["formats"][0] == CONTENT_TYPE_APP_NETCDF
+        # assert proc["outputs"][2]["formats"][0] == ContentType.APP_NETCDF
         # assert proc["outputs"][3]["id"] == "multi_value_multi_format"
         # assert len(proc["outputs"][3]["formats"]) == 3
-        # assert proc["outputs"][3]["formats"][0] == CONTENT_TYPE_APP_NETCDF
-        # assert proc["outputs"][3]["formats"][1] == CONTENT_TYPE_TEXT_PLAIN
-        # assert proc["outputs"][3]["formats"][2] == CONTENT_TYPE_APP_JSON
+        # assert proc["outputs"][3]["formats"][0] == ContentType.APP_NETCDF
+        # assert proc["outputs"][3]["formats"][1] == ContentType.TEXT_PLAIN
+        # assert proc["outputs"][3]["formats"][2] == ContentType.APP_JSON
 
         # package input validation
         assert pkg["inputs"][0]["id"] == "single_value_single_format"
@@ -1038,7 +1033,7 @@ class WpsPackageAppTest(WpsConfigBase):
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
             "executionUnit": [{"unit": cwl}],
         }
-        desc, pkg = self.deploy_process(body, describe_schema=PROCESS_SCHEMA_OLD)
+        desc, pkg = self.deploy_process(body, describe_schema=ProcessSchema.OLD)
         proc = desc["process"]
 
         assert proc["inputs"][0]["id"] == "required_literal"
@@ -1169,7 +1164,7 @@ class WpsPackageAppTest(WpsConfigBase):
             "executionUnit": [{"unit": cwl}],
         }
         try:
-            desc, _ = self.deploy_process(body, describe_schema=PROCESS_SCHEMA_OLD)
+            desc, _ = self.deploy_process(body, describe_schema=ProcessSchema.OLD)
         except colander.Invalid:
             self.fail("MinOccurs/MaxOccurs values defined as valid int/str should not raise an invalid schema error")
 
@@ -1209,7 +1204,7 @@ class WpsPackageAppTest(WpsConfigBase):
                     "id": self._testMethodName,
                     "inputs": {
                         "input_num": {"title": "Input numbers", "maxOccurs": 20},
-                        "input_file": {"title": "Test File", "formats": [{"mediaType": CONTENT_TYPE_APP_ZIP}]},
+                        "input_file": {"title": "Test File", "formats": [{"mediaType": ContentType.APP_ZIP}]},
                     },
                     "outputs": {
                         "values": {"title": "Test Output", "description": "CSV raw values"},
@@ -1220,7 +1215,7 @@ class WpsPackageAppTest(WpsConfigBase):
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
             "executionUnit": [{"unit": cwl}],
         }
-        desc, _ = self.deploy_process(body, describe_schema=PROCESS_SCHEMA_OGC)
+        desc, _ = self.deploy_process(body, describe_schema=ProcessSchema.OGC)
 
         assert isinstance(desc["inputs"], dict)
         assert len(desc["inputs"]) == len(body["processDescription"]["process"]["inputs"])
@@ -1232,7 +1227,7 @@ class WpsPackageAppTest(WpsConfigBase):
         assert desc["inputs"]["input_num"]["maxOccurs"] == 20
         assert desc["inputs"]["input_num"]["literalDataDomains"][0]["dataType"]["name"] == "float"
         assert desc["inputs"]["input_file"]["title"] == "Test File"
-        assert desc["inputs"]["input_file"]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_ZIP
+        assert desc["inputs"]["input_file"]["formats"][0]["mediaType"] == ContentType.APP_ZIP
         assert desc["outputs"]["values"]["title"] == "Test Output"
         assert desc["outputs"]["values"]["description"] == "CSV raw values"
         assert desc["outputs"]["values"]["literalDataDomains"][0]["dataType"]["name"] == "string"
@@ -1259,10 +1254,10 @@ class WpsPackageAppTest(WpsConfigBase):
         }
         self.deploy_process(body)
         exec_body = {
-            "mode": EXECUTE_MODE_ASYNC,
-            "response": EXECUTE_RESPONSE_DOCUMENT,
+            "mode": ExecuteMode.ASYNC,
+            "response": ExecuteResponse.DOCUMENT,
             "inputs": [{"id": "message", "value": "test"}],
-            "outputs": [{"id": "output", "transmissionMode": EXECUTE_TRANSMISSION_MODE_REFERENCE}]
+            "outputs": [{"id": "output", "transmissionMode": ExecuteTransmissionMode.REFERENCE}]
         }
         headers = deepcopy(self.json_headers)
 
@@ -1271,7 +1266,7 @@ class WpsPackageAppTest(WpsConfigBase):
                 stack_exec.enter_context(mock_exec)
             proc_url = "/processes/{}/jobs".format(self._testMethodName)
 
-            valid_languages = [(lang, True) for lang in ACCEPT_LANGUAGES]
+            valid_languages = [(lang, True) for lang in AcceptLanguage.values()]
             wrong_languages = [(lang, False) for lang in ["ru", "fr-CH"]]
             for lang, accept in valid_languages + wrong_languages:
                 headers["Accept-Language"] = lang
@@ -1380,7 +1375,7 @@ class WpsPackageAppTest(WpsConfigBase):
             "executionUnit": [{"unit": cwl}],
         }
         try:
-            desc, _ = self.deploy_process(body, describe_schema=PROCESS_SCHEMA_OLD)
+            desc, _ = self.deploy_process(body, describe_schema=ProcessSchema.OLD)
         except colander.Invalid:
             self.fail("Test")
 
@@ -1406,8 +1401,8 @@ class WpsPackageAppTest(WpsConfigBase):
         )
 
         exec_body = {
-            "mode": EXECUTE_MODE_ASYNC,
-            "response": EXECUTE_RESPONSE_DOCUMENT,
+            "mode": ExecuteMode.ASYNC,
+            "response": ExecuteResponse.DOCUMENT,
             "inputs":
             [
                 {"id": "test_int_array", "value": [10, 20, 30, 40, 50]},
@@ -1529,7 +1524,7 @@ class WpsPackageAppTest(WpsConfigBase):
             "executionUnit": [{"unit": cwl}],
         }
         try:
-            desc, _ = self.deploy_process(body, describe_schema=PROCESS_SCHEMA_OLD)
+            desc, _ = self.deploy_process(body, describe_schema=ProcessSchema.OLD)
         except colander.Invalid:
             self.fail("Test")
 
@@ -1543,8 +1538,8 @@ class WpsPackageAppTest(WpsConfigBase):
             tmp_file.seek(0)
 
             exec_body = {
-                "mode": EXECUTE_MODE_ASYNC,
-                "response": EXECUTE_RESPONSE_DOCUMENT,
+                "mode": ExecuteMode.ASYNC,
+                "response": ExecuteResponse.DOCUMENT,
                 "inputs": {
                     "stringInput": "string_test",
                     "integerInput": 10,
@@ -1614,10 +1609,10 @@ class WpsPackageAppTest(WpsConfigBase):
         }
         self.deploy_process(body)
         exec_body = {
-            "mode": EXECUTE_MODE_ASYNC,
-            "response": EXECUTE_RESPONSE_DOCUMENT,
+            "mode": ExecuteMode.ASYNC,
+            "response": ExecuteResponse.DOCUMENT,
             "inputs": [{"id": "message", "value": "test"}],
-            "outputs": [{"id": "output", "transmissionMode": EXECUTE_TRANSMISSION_MODE_REFERENCE}]
+            "outputs": [{"id": "output", "transmissionMode": ExecuteTransmissionMode.REFERENCE}]
         }
         headers = deepcopy(self.json_headers)
 
@@ -1690,10 +1685,10 @@ class WpsPackageAppTest(WpsConfigBase):
 
             proc_url = "/processes/{}/jobs".format(self._testMethodName)
             exec_body = {
-                "mode": EXECUTE_MODE_ASYNC,
-                "response": EXECUTE_RESPONSE_DOCUMENT,
+                "mode": ExecuteMode.ASYNC,
+                "response": ExecuteResponse.DOCUMENT,
                 "inputs": [{"id": "input_file", "href": tmp_http}],
-                "outputs": [{"id": "output", "transmissionMode": EXECUTE_TRANSMISSION_MODE_REFERENCE}]
+                "outputs": [{"id": "output", "transmissionMode": ExecuteTransmissionMode.REFERENCE}]
             }
             resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
                                        data=exec_body, headers=headers, only_local=True)
@@ -1736,10 +1731,10 @@ class WpsPackageAppTest(WpsConfigBase):
         }
         self.deploy_process(body)
         exec_body = {
-            "mode": EXECUTE_MODE_ASYNC,
-            "response": EXECUTE_RESPONSE_DOCUMENT,
+            "mode": ExecuteMode.ASYNC,
+            "response": ExecuteResponse.DOCUMENT,
             "inputs": [{"id": "delay", "value": 1}],
-            "outputs": [{"id": "output", "transmissionMode": EXECUTE_TRANSMISSION_MODE_REFERENCE}]
+            "outputs": [{"id": "output", "transmissionMode": ExecuteTransmissionMode.REFERENCE}]
         }
 
         with contextlib.ExitStack() as stack_exec:
@@ -1760,7 +1755,7 @@ class WpsPackageAppTest(WpsConfigBase):
             # patch the job as if still running but dismissed midway
             job = self.job_store.fetch_by_id(job_id)
             job.logs = job.logs[:len(job.logs)//2]
-            job.status = STATUS_RUNNING
+            job.status = Status.RUNNING
             job.progress = 50
             self.job_store.update_job(job)
 
@@ -1768,7 +1763,7 @@ class WpsPackageAppTest(WpsConfigBase):
             path = "/jobs/{}".format(job_id)
             resp = self.app.delete(path, headers=self.json_headers)
             assert resp.status_code == 200
-            assert resp.json["status"] == STATUS_DISMISSED
+            assert resp.json["status"] == Status.DISMISSED
             assert mock_del.control.revoke.called_with(job.task_id, terminate=True)
             assert mock_del.control.revoke.call_count == 1
 
@@ -1854,7 +1849,7 @@ class WpsPackageAppTest(WpsConfigBase):
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
             "executionUnit": [{"unit": cwl}],
         }
-        desc, _ = self.deploy_process(body, describe_schema=PROCESS_SCHEMA_OLD)
+        desc, _ = self.deploy_process(body, describe_schema=ProcessSchema.OLD)
         proc = desc["process"]
         assert proc["id"] == self._testMethodName
         assert proc["title"] == "some title"
@@ -1867,7 +1862,7 @@ class WpsPackageAppTest(WpsConfigBase):
         assert isinstance(proc["inputs"][0]["formats"], list)
         assert len(proc["inputs"][0]["formats"]) == 1
         assert isinstance(proc["inputs"][0]["formats"][0], dict)
-        assert proc["inputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert proc["inputs"][0]["formats"][0]["mediaType"] == ContentType.TEXT_PLAIN
         assert proc["inputs"][0]["formats"][0]["default"] is True
         assert isinstance(proc["outputs"], list)
         assert len(proc["outputs"]) == 1
@@ -1877,7 +1872,7 @@ class WpsPackageAppTest(WpsConfigBase):
         assert isinstance(proc["outputs"][0]["formats"], list)
         assert len(proc["outputs"][0]["formats"]) == 1
         assert isinstance(proc["outputs"][0]["formats"][0], dict)
-        assert proc["outputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert proc["outputs"][0]["formats"][0]["mediaType"] == ContentType.TEXT_PLAIN
         assert proc["outputs"][0]["formats"][0]["default"] is True
         expect = KNOWN_PROCESS_DESCRIPTION_FIELDS
         fields = set(proc.keys()) - expect
@@ -1952,7 +1947,7 @@ class WpsPackageAppTest(WpsConfigBase):
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
             "executionUnit": [{"unit": cwl}],
         }
-        desc, pkg = self.deploy_process(body, describe_schema=PROCESS_SCHEMA_OLD)
+        desc, pkg = self.deploy_process(body, describe_schema=ProcessSchema.OLD)
         proc = desc["process"]
 
         assert proc["id"] == self._testMethodName
@@ -1965,14 +1960,14 @@ class WpsPackageAppTest(WpsConfigBase):
         assert proc["inputs"][0]["maxOccurs"] == 1
         assert len(proc["inputs"][0]["formats"]) == 1, \
             "Default format should be added to process definition when omitted from both CWL and WPS"
-        assert proc["inputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert proc["inputs"][0]["formats"][0]["mediaType"] == ContentType.TEXT_PLAIN
         assert proc["inputs"][0]["formats"][0]["default"] is True
         assert proc["inputs"][1]["id"] == "complex_input_both_cwl_and_wps"
         assert proc["inputs"][1]["minOccurs"] == 1
         assert proc["inputs"][1]["maxOccurs"] == 1
         assert len(proc["inputs"][1]["formats"]) == 1, \
             "Default format should be added to process definition when omitted from both CWL and WPS"
-        assert proc["inputs"][1]["formats"][0]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert proc["inputs"][1]["formats"][0]["mediaType"] == ContentType.TEXT_PLAIN
         assert proc["inputs"][1]["formats"][0]["default"] is True
         assert proc["inputs"][1]["title"] == "Extra detail for I/O both in CWL and WPS", \
             "Additional details defined only in WPS matching CWL I/O by ID should be preserved"
@@ -1981,12 +1976,12 @@ class WpsPackageAppTest(WpsConfigBase):
         assert proc["outputs"][0]["id"] == "complex_output_only_cwl_minimal"
         assert len(proc["outputs"][0]["formats"]) == 1, \
             "Default format should be added to process definition when omitted from both CWL and WPS"
-        assert proc["outputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert proc["outputs"][0]["formats"][0]["mediaType"] == ContentType.TEXT_PLAIN
         assert proc["outputs"][0]["formats"][0]["default"] is True
         assert proc["outputs"][1]["id"] == "complex_output_both_cwl_and_wps"
         assert len(proc["outputs"][1]["formats"]) == 1, \
             "Default format should be added to process definition when omitted from both CWL and WPS"
-        assert proc["outputs"][1]["formats"][0]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert proc["outputs"][1]["formats"][0]["mediaType"] == ContentType.TEXT_PLAIN
         assert proc["outputs"][1]["formats"][0]["default"] is True
         assert proc["outputs"][1]["title"] == "Additional detail only within WPS output", \
             "Additional details defined only in WPS matching CWL I/O by ID should be preserved"
@@ -2022,7 +2017,7 @@ class WpsPackageAppTest(WpsConfigBase):
             "executionUnit": [{"href": "mock://{}".format(resources.WPS_LITERAL_COMPLEX_IO_XML)}],
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication"
         }
-        desc, pkg = self.deploy_process(body, describe_schema=PROCESS_SCHEMA_OLD)
+        desc, pkg = self.deploy_process(body, describe_schema=ProcessSchema.OLD)
 
         # basic contents validation
         assert "cwlVersion" in pkg
@@ -2073,7 +2068,7 @@ class WpsPackageAppTest(WpsConfigBase):
         assert proc["inputs"][0]["maxOccurs"] == 1000
         assert len(proc["inputs"][0]["formats"]) == 1
         assert proc["inputs"][0]["formats"][0]["default"] is True
-        assert proc["inputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_NETCDF
+        assert proc["inputs"][0]["formats"][0]["mediaType"] == ContentType.APP_NETCDF
         assert proc["inputs"][0]["formats"][0]["encoding"] == "base64"
         assert proc["inputs"][1]["id"] == "freq"
         assert proc["inputs"][1]["title"] == "Frequency"
@@ -2091,7 +2086,7 @@ class WpsPackageAppTest(WpsConfigBase):
         assert "maxOccurs" not in proc["outputs"][0]
         assert len(proc["outputs"][0]["formats"]) == 1
         assert proc["outputs"][0]["formats"][0]["default"] is True
-        assert proc["outputs"][0]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_NETCDF
+        assert proc["outputs"][0]["formats"][0]["mediaType"] == ContentType.APP_NETCDF
         assert proc["outputs"][0]["formats"][0]["encoding"] == "base64"
         assert proc["outputs"][1]["id"] == "output_log"
         assert proc["outputs"][1]["title"] == "Logging information"
@@ -2101,7 +2096,7 @@ class WpsPackageAppTest(WpsConfigBase):
         assert "maxOccurs" not in proc["outputs"][1]
         assert len(proc["outputs"][1]["formats"]) == 1
         assert proc["outputs"][1]["formats"][0]["default"] is True
-        assert proc["outputs"][1]["formats"][0]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert proc["outputs"][1]["formats"][0]["mediaType"] == ContentType.TEXT_PLAIN
 
     def test_deploy_enum_array_and_multi_format_inputs_from_wps_xml_reference(self):
         body = {
@@ -2109,7 +2104,7 @@ class WpsPackageAppTest(WpsConfigBase):
             "executionUnit": [{"href": "mock://{}".format(resources.WPS_ENUM_ARRAY_IO_XML)}],
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication"
         }
-        desc, pkg = self.deploy_process(body, describe_schema=PROCESS_SCHEMA_OLD)
+        desc, pkg = self.deploy_process(body, describe_schema=ProcessSchema.OLD)
 
         # basic contents validation
         assert "cwlVersion" in pkg
@@ -2205,13 +2200,13 @@ class WpsPackageAppTest(WpsConfigBase):
         # note: TAR should remain as literal format in the WPS context (not mapped/added as GZIP when resolved for CWL)
         assert len(proc["inputs"][2]["formats"]) == 3
         assert proc["inputs"][2]["formats"][0]["default"] is True
-        assert proc["inputs"][2]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_NETCDF
+        assert proc["inputs"][2]["formats"][0]["mediaType"] == ContentType.APP_NETCDF
         assert "encoding" not in proc["inputs"][2]["formats"][0]  # none specified, so omitted in response
         assert proc["inputs"][2]["formats"][1]["default"] is False
-        assert proc["inputs"][2]["formats"][1]["mediaType"] == CONTENT_TYPE_APP_TAR
+        assert proc["inputs"][2]["formats"][1]["mediaType"] == ContentType.APP_TAR
         assert "encoding" not in proc["inputs"][2]["formats"][1]  # none specified, so omitted in response
         assert proc["inputs"][2]["formats"][2]["default"] is False
-        assert proc["inputs"][2]["formats"][2]["mediaType"] == CONTENT_TYPE_APP_ZIP
+        assert proc["inputs"][2]["formats"][2]["mediaType"] == ContentType.APP_ZIP
         assert "encoding" not in proc["inputs"][2]["formats"][2]  # none specified, so omitted in response
 
     # FIXME: implement,
@@ -2299,15 +2294,15 @@ class WpsPackageAppWithS3BucketTest(WpsConfigBase):
         test_http_ref = "https://www.iana.org/assignments/media-types/{}".format(input_file_http)
         test_bucket_ref = mocked_aws_s3_bucket_test_file("wps-process-test-bucket", input_file_s3)
         exec_body = {
-            "mode": EXECUTE_MODE_ASYNC,
-            "response": EXECUTE_RESPONSE_DOCUMENT,
+            "mode": ExecuteMode.ASYNC,
+            "response": ExecuteResponse.DOCUMENT,
             "inputs": [
                 {"id": "input_with_http", "href": test_http_ref},
                 {"id": "input_with_s3", "href": test_bucket_ref},
             ],
             "outputs": [
-                {"id": "output_from_http", "transmissionMode": EXECUTE_TRANSMISSION_MODE_REFERENCE},
-                {"id": "output_from_s3", "transmissionMode": EXECUTE_TRANSMISSION_MODE_REFERENCE},
+                {"id": "output_from_http", "transmissionMode": ExecuteTransmissionMode.REFERENCE},
+                {"id": "output_from_s3", "transmissionMode": ExecuteTransmissionMode.REFERENCE},
             ]
         }
         with contextlib.ExitStack() as stack_exec:

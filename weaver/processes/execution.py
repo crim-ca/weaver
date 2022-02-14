@@ -12,35 +12,18 @@ from pyramid_celery import celery_app as app
 
 from weaver.database import get_db
 from weaver.datatype import Process, Service
-from weaver.execute import (
-    EXECUTE_MODE_ASYNC,
-    EXECUTE_MODE_AUTO,
-    EXECUTE_MODE_SYNC,
-    EXECUTE_RESPONSE_DOCUMENT,
-    EXECUTE_TRANSMISSION_MODE_OPTIONS
-)
-from weaver.formats import ACCEPT_LANGUAGES, CONTENT_TYPE_APP_JSON
+from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
+from weaver.formats import AcceptLanguage, ContentType
 from weaver.notify import encrypt_email, notify_job_complete
 from weaver.owsexceptions import OWSNoApplicableCode
 from weaver.processes import wps_package
 from weaver.processes.constants import WPS_COMPLEX_DATA
 from weaver.processes.convert import ows2json_output_data
 from weaver.processes.types import PROCESS_WORKFLOW
-from weaver.status import (
-    JOB_STATUS_CATEGORIES,
-    JOB_STATUS_CATEGORY_FAILED,
-    JOB_STATUS_CATEGORY_FINISHED,
-    STATUS_ACCEPTED,
-    STATUS_DISMISSED,
-    STATUS_FAILED,
-    STATUS_RUNNING,
-    STATUS_STARTED,
-    STATUS_SUCCEEDED,
-    map_status
-)
+from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.store.base import StoreJobs
 from weaver.utils import get_any_id, get_any_value, get_registry, get_settings, now, raise_on_xml_exception, wait_secs
-from weaver.visibility import VISIBILITY_PUBLIC
+from weaver.visibility import Visibility
 from weaver.wps.utils import (
     check_wps_status,
     get_wps_client,
@@ -65,20 +48,25 @@ if TYPE_CHECKING:
     from weaver.processes.convert import OWS_Input_Type, ProcessOWS
     from weaver.status import StatusType
     from weaver.typedefs import HeadersType, HeaderCookiesType, JSON, SettingsType
+    from weaver.visibility import AnyVisibility
 
-# job process execution progress
-JOB_PROGRESS_SETUP = 1
-JOB_PROGRESS_DESCRIBE = 2
-JOB_PROGRESS_GET_INPUTS = 3
-JOB_PROGRESS_GET_OUTPUTS = 4
-JOB_PROGRESS_EXECUTE_REQUEST = 5
-JOB_PROGRESS_EXECUTE_STATUS_LOCATION = 6
-JOB_PROGRESS_EXECUTE_MONITOR_START = 7
-JOB_PROGRESS_EXECUTE_MONITOR_LOOP = 8
-JOB_PROGRESS_EXECUTE_MONITOR_DONE = 96
-JOB_PROGRESS_EXECUTE_MONITOR_END = 98
-JOB_PROGRESS_NOTIFY = 99
-JOB_PROGRESS_DONE = 100
+
+class JobProgress(object):
+    """
+    Job process execution progress.
+    """
+    SETUP = 1
+    DESCRIBE = 2
+    GET_INPUTS = 3
+    GET_OUTPUTS = 4
+    EXECUTE_REQUEST = 5
+    EXECUTE_STATUS_LOCATION = 6
+    EXECUTE_MONITOR_START = 7
+    EXECUTE_MONITOR_LOOP = 8
+    EXECUTE_MONITOR_DONE = 96
+    EXECUTE_MONITOR_END = 98
+    NOTIFY = 99
+    DONE = 100
 
 
 @app.task(bind=True)
@@ -98,38 +86,38 @@ def execute_process(self, job_id, wps_url, headers=None):
     store = db.get_store(StoreJobs)
     job = store.fetch_by_id(job_id)
     job.started = now()
-    job.status = STATUS_STARTED  # will be mapped to 'RUNNING'
-    job.status_message = "Job {}.".format(STATUS_STARTED)  # will preserve detail of STARTED vs RUNNING
+    job.status = Status.STARTED  # will be mapped to 'RUNNING'
+    job.status_message = "Job {}.".format(Status.STARTED)  # will preserve detail of STARTED vs RUNNING
     job.save_log(message=job.status_message)
 
     task_logger = get_task_logger(__name__)
     job.save_log(logger=task_logger, message="Job task setup initiated.")
     load_pywps_config(settings)
-    job.progress = JOB_PROGRESS_SETUP
+    job.progress = JobProgress.SETUP
     job.task_id = self.request.id
     job.save_log(logger=task_logger, message="Job task setup completed.")
     job = store.update_job(job)
 
     # Flag to keep track if job is running in background (remote-WPS, CWL app, etc.).
     # If terminate signal is sent to worker task via API dismiss request while still running in background,
-    # the raised exception within the task will switch the job to STATUS_FAILED, but this will not raise an
+    # the raised exception within the task will switch the job to Status.FAILED, but this will not raise an
     # exception here. Since the task execution 'succeeds' without raising, it skips directly to the last 'finally'.
-    # Patch it back to STATUS_DISMISSED in this case.
+    # Patch it back to Status.DISMISSED in this case.
     task_terminated = True
 
     try:
-        job.progress = JOB_PROGRESS_DESCRIBE
+        job.progress = JobProgress.DESCRIBE
         job.save_log(logger=task_logger, message="Employed WPS URL: [{!s}]".format(wps_url), level=logging.DEBUG)
         job.save_log(logger=task_logger, message="Execute WPS request for process [{!s}]".format(job.process))
         wps_process = fetch_wps_process(job, wps_url, headers, settings)
 
         # prepare inputs
-        job.progress = JOB_PROGRESS_GET_INPUTS
+        job.progress = JobProgress.GET_INPUTS
         job.save_log(logger=task_logger, message="Fetching job input definitions.")
         wps_inputs = parse_wps_inputs(wps_process, job)
 
         # prepare outputs
-        job.progress = JOB_PROGRESS_GET_OUTPUTS
+        job.progress = JobProgress.GET_OUTPUTS
         job.save_log(logger=task_logger, message="Fetching job output definitions.")
         wps_outputs = [(o.identifier, o.dataType == WPS_COMPLEX_DATA) for o in wps_process.processOutputs]
 
@@ -140,7 +128,7 @@ def execute_process(self, job_id, wps_url, headers=None):
             service = Service(name=job.service, url=wps_url)
             process = Process.from_ows(wps_process, service, settings)
 
-        job.progress = JOB_PROGRESS_EXECUTE_REQUEST
+        job.progress = JobProgress.EXECUTE_REQUEST
         job.save_log(logger=task_logger, message="Starting job process execution.")
         job.save_log(logger=task_logger,
                      message="Following updates could take a while until the Application Package answers...")
@@ -154,19 +142,19 @@ def execute_process(self, job_id, wps_url, headers=None):
 
         # adjust status location
         wps_status_path = get_wps_local_status_location(execution.statusLocation, settings)
-        job.progress = JOB_PROGRESS_EXECUTE_STATUS_LOCATION
+        job.progress = JobProgress.EXECUTE_STATUS_LOCATION
         LOGGER.debug("WPS status location that will be queried: [%s]", wps_status_path)
         if not wps_status_path.startswith("http") and not os.path.isfile(wps_status_path):
             LOGGER.warning("WPS status location not resolved to local path: [%s]", wps_status_path)
         job.save_log(logger=task_logger, level=logging.DEBUG,
                      message="Updated job status location: [{}].".format(wps_status_path))
 
-        job.status = STATUS_RUNNING
+        job.status = Status.RUNNING
         job.status_message = execution.statusMessage or "{} initiation done.".format(str(job))
         job.status_location = wps_status_path
         job.request = execution.request
         job.response = execution.response
-        job.progress = JOB_PROGRESS_EXECUTE_MONITOR_START
+        job.progress = JobProgress.EXECUTE_MONITOR_START
         job.save_log(logger=task_logger, message="Starting monitoring of job execution.")
         job = store.update_job(job)
 
@@ -183,8 +171,8 @@ def execute_process(self, job_id, wps_url, headers=None):
                 #   Don't actually log anything here until process is completed (success or fail) so that underlying
                 #   WPS execution logs can be inserted within the current job log and appear continuously.
                 #   Only update internal job fields in case they get referenced elsewhere.
-                progress_min = JOB_PROGRESS_EXECUTE_MONITOR_LOOP
-                progress_max = JOB_PROGRESS_EXECUTE_MONITOR_DONE
+                progress_min = JobProgress.EXECUTE_MONITOR_LOOP
+                progress_max = JobProgress.EXECUTE_MONITOR_DONE
                 job.progress = progress_min
                 run_delay = wait_secs(run_step)
                 execution = check_wps_status(location=wps_status_path, settings=settings, sleep_secs=run_delay)
@@ -200,7 +188,7 @@ def execute_process(self, job_id, wps_url, headers=None):
                     msg_progress = " (status: {})".format(job_msg) if job_msg else ""
                     if execution.isSucceded():
                         wps_package.retrieve_package_job_log(execution, job, progress_min, progress_max)
-                        job.status = map_status(STATUS_SUCCEEDED)
+                        job.status = map_status(Status.SUCCEEDED)
                         job.status_message = "Job succeeded{}.".format(msg_progress)
                         job.progress = progress_max
                         job.save_log(logger=task_logger)
@@ -238,7 +226,7 @@ def execute_process(self, job_id, wps_url, headers=None):
         LOGGER.exception("Failed running [%s]", job)
         LOGGER.debug("Failed job [%s] raised an exception.", job, exc_info=exc)
         # note: don't update the progress here to preserve last one that was set
-        job.status = map_status(STATUS_FAILED)
+        job.status = map_status(Status.FAILED)
         job.status_message = "Failed to run {!s}.".format(job)
         exception_class = "{}.{}".format(type(exc).__module__, type(exc).__name__)
         errors = "{0}: {1!s}".format(exception_class, exc)
@@ -247,24 +235,24 @@ def execute_process(self, job_id, wps_url, headers=None):
     finally:
         # if task worker terminated, local 'job' is out of date compared to remote/background runner last update
         job = store.fetch_by_id(job.id)
-        if task_terminated and map_status(job.status) == STATUS_FAILED:
-            job.status = STATUS_DISMISSED
-        task_success = map_status(job.status) not in JOB_STATUS_CATEGORIES[JOB_STATUS_CATEGORY_FAILED]
+        if task_terminated and map_status(job.status) == Status.FAILED:
+            job.status = Status.DISMISSED
+        task_success = map_status(job.status) not in JOB_STATUS_CATEGORIES[StatusCategory.FAILED]
         if task_success:
-            job.progress = JOB_PROGRESS_EXECUTE_MONITOR_END
+            job.progress = JobProgress.EXECUTE_MONITOR_END
         job.status_message = "Job {}.".format(job.status)
         job.save_log(logger=task_logger)
 
         if task_success:
-            job.progress = JOB_PROGRESS_NOTIFY
+            job.progress = JobProgress.NOTIFY
         send_job_complete_notification_email(job, task_logger, settings)
 
-        if job.status not in JOB_STATUS_CATEGORIES[JOB_STATUS_CATEGORY_FINISHED]:
-            job.status = STATUS_SUCCEEDED
+        if job.status not in JOB_STATUS_CATEGORIES[StatusCategory.FINISHED]:
+            job.status = Status.SUCCEEDED
         job.status_message = "Job {}.".format(job.status)
         job.mark_finished()
         if task_success:
-            job.progress = JOB_PROGRESS_DONE
+            job.progress = JobProgress.DONE
         job.save_log(logger=task_logger, message="Job task complete.")
         job = store.update_job(job)
 
@@ -433,11 +421,11 @@ def submit_job(request, reference, tags=None):
         :func:`submit_job_handler` to provide elements pre-extracted from requests or from other parsing.
     """
     # validate body with expected JSON content and schema
-    if CONTENT_TYPE_APP_JSON not in request.content_type:
+    if ContentType.APP_JSON not in request.content_type:
         raise HTTPBadRequest(json={
             "code": "InvalidHeaderValue",
             "name": "Content-Type",
-            "description": "Request 'Content-Type' header other than '{}' not supported.".format(CONTENT_TYPE_APP_JSON),
+            "description": "Request 'Content-Type' header other than '{}' not supported.".format(ContentType.APP_JSON),
             "value": str(request.content_type)
         })
     try:
@@ -448,7 +436,7 @@ def submit_job(request, reference, tags=None):
     context = get_wps_output_context(request)
 
     provider_id = None  # None OK if local
-    process_id = None   # None OK if remote, but can be found as well if available from WPS-REST path
+    process_id = None   # None OK if remote, but can be found as well if available from WPS-REST path  # noqa
     tags = tags or []
     lang = request.accept_language.header_value  # can only preemptively check if local process
     if isinstance(reference, Process):
@@ -458,15 +446,15 @@ def submit_job(request, reference, tags=None):
         is_workflow = reference.type == PROCESS_WORKFLOW
         is_local = True
         tags += "local"
-        if lang and request.accept_language.best_match(ACCEPT_LANGUAGES) is None:
+        if lang and request.accept_language.best_match(AcceptLanguage.values()) is None:
             raise HTTPNotAcceptable("Requested language [{}] is not in supported languages [{}].".format(
-                lang, ", ".join(ACCEPT_LANGUAGES)
+                lang, ", ".join(AcceptLanguage.values())
             ))
     elif isinstance(reference, Service):
         service_url = reference.url
         provider_id = reference.id
         process_id = request.matchdict.get("process_id")
-        visibility = VISIBILITY_PUBLIC
+        visibility = Visibility.PUBLIC
         is_workflow = False
         is_local = False
         tags += "remote"
@@ -487,10 +475,10 @@ def _validate_job_parameters(json_body):
     """
     Tests supported parameters not automatically validated by colander deserialize.
     """
-    if json_body["mode"] not in [EXECUTE_MODE_ASYNC, EXECUTE_MODE_AUTO]:
+    if json_body["mode"] not in [ExecuteMode.ASYNC, ExecuteMode.AUTO]:
         raise HTTPNotImplemented(detail="Execution mode '{}' not supported.".format(json_body["mode"]))
 
-    if json_body["response"] != EXECUTE_RESPONSE_DOCUMENT:
+    if json_body["response"] != ExecuteResponse.DOCUMENT:
         raise HTTPNotImplemented(detail="Execution response type '{}' not supported.".format(json_body["response"]))
 
     outputs = json_body.get("outputs", [])
@@ -498,7 +486,7 @@ def _validate_job_parameters(json_body):
         outputs = [dict(id=out, **keys) for out, keys in outputs.items()]
     for job_output in outputs:
         mode = job_output["transmissionMode"]
-        if mode not in EXECUTE_TRANSMISSION_MODE_OPTIONS:
+        if mode not in ExecuteTransmissionMode.values():
             raise HTTPNotImplemented(detail="Execute transmissionMode '{}' not supported.".format(mode))
 
 
@@ -509,7 +497,7 @@ def submit_job_handler(payload,             # type: JSON
                        process_id=None,     # type: str
                        is_workflow=False,   # type: bool
                        is_local=True,       # type: bool
-                       visibility=None,     # type: Optional[str]
+                       visibility=None,     # type: Optional[AnyVisibility]
                        language=None,       # type: Optional[str]
                        auth=None,           # type: Optional[HeaderCookiesType]
                        tags=None,           # type: Optional[List[str]]
@@ -533,16 +521,16 @@ def submit_job_handler(payload,             # type: JSON
     #   - allow omitting 'outputs' (https://github.com/crim-ca/weaver/issues/375)
     _validate_job_parameters(json_body)
 
-    is_execute_async = json_body["mode"] != EXECUTE_MODE_SYNC   # convert auto to async
+    is_execute_async = ExecuteMode.get(json_body["mode"]) != ExecuteMode.SYNC   # convert auto to async
     notification_email = json_body.get("notification_email")
     encrypted_email = encrypt_email(notification_email, settings) if notification_email else None
 
     store = get_db(settings).get_store(StoreJobs)
-    job = store.save_job(task_id=STATUS_ACCEPTED, process=process_id, service=provider_id,
+    job = store.save_job(task_id=Status.ACCEPTED, process=process_id, service=provider_id,
                          inputs=json_body.get("inputs"), is_local=is_local, is_workflow=is_workflow,
                          access=visibility, user_id=user, execute_async=is_execute_async, custom_tags=tags,
                          notification_email=encrypted_email, accept_language=language, context=context)
-    job.save_log(logger=LOGGER, message="Job task submitted for execution.", status=STATUS_ACCEPTED, progress=0)
+    job.save_log(logger=LOGGER, message="Job task submitted for execution.", status=Status.ACCEPTED, progress=0)
     job = store.update_job(job)
     result = execute_process.delay(job_id=job.id, wps_url=clean_ows_url(service_url), headers=auth)
     LOGGER.debug("Celery pending task [%s] for job [%s].", result.id, job.id)
@@ -558,7 +546,7 @@ def submit_job_handler(payload,             # type: JSON
         "jobID": job.id,
         "processID": job.process,
         "providerID": provider_id,  # dropped by validator if not applicable
-        "status": map_status(STATUS_ACCEPTED),
+        "status": map_status(Status.ACCEPTED),
         "location": location
     }
     return body_data

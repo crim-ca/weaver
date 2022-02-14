@@ -9,7 +9,7 @@ from pyramid.httpexceptions import HTTPForbidden, HTTPFound, HTTPUnauthorized
 from webtest import TestApp as WebTestApp
 
 from tests.utils import get_test_weaver_app, get_test_weaver_config
-from weaver.formats import CONTENT_TYPE_ANY_XML, CONTENT_TYPE_APP_JSON
+from weaver.formats import ContentType
 from weaver.utils import request_extra
 from weaver.wps_restapi import swagger_definitions as sd
 
@@ -19,7 +19,7 @@ class GenericApiRoutesTestCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.testapp = get_test_weaver_app(settings={"weaver.wps": True, "weaver.wps_restapi": True})
-        cls.json_headers = {"Accept": CONTENT_TYPE_APP_JSON, "Content-Type": CONTENT_TYPE_APP_JSON}
+        cls.json_headers = {"Accept": ContentType.APP_JSON, "Content-Type": ContentType.APP_JSON}
 
     def test_frontpage_format(self):
         resp = self.testapp.get(sd.api_frontpage_service.path, headers=self.json_headers)
@@ -35,8 +35,8 @@ class GenericApiRoutesTestCase(unittest.TestCase):
         for link in body["links"]:
             path = link["href"]
             rtype = link["type"]
-            if rtype in CONTENT_TYPE_ANY_XML:
-                rtype = CONTENT_TYPE_ANY_XML
+            if rtype in ContentType.ANY_XML:
+                rtype = ContentType.ANY_XML
             else:
                 rtype = [rtype]
             rel = link["rel"]
@@ -126,7 +126,7 @@ class RebasedApiRoutesTestCase(unittest.TestCase):
         cls.app_proxy_url = cls.app_base_url + cls.proxy_path
         cls.app_proxy_json = cls.proxy_path + sd.openapi_json_service.path
         cls.app_proxy_ui = cls.proxy_path + sd.api_swagger_ui_service.path
-        cls.json_headers = {"Accept": CONTENT_TYPE_APP_JSON}
+        cls.json_headers = {"Accept": ContentType.APP_JSON}
 
     def setUp(self):
         self.proxy_calls = []

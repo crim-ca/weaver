@@ -7,12 +7,12 @@ from pyramid.httpexceptions import HTTPBadRequest
 from pyramid.request import Request
 from pyramid.settings import asbool
 
-from weaver.config import WEAVER_CONFIGURATIONS_REMOTE, get_weaver_configuration
+from weaver.config import WeaverFeatures, get_weaver_configuration
 from weaver.database import get_db
-from weaver.formats import CONTENT_TYPE_APP_JSON
+from weaver.formats import ContentType
 from weaver.store.base import StoreProcesses
 from weaver.utils import get_path_kvp, get_settings, get_weaver_url
-from weaver.visibility import VISIBILITY_PUBLIC
+from weaver.visibility import Visibility
 from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
@@ -33,7 +33,7 @@ def get_processes_filtered_by_valid_schemas(request):
     """
     settings = get_settings(request)
     with_providers = False
-    if get_weaver_configuration(settings) in WEAVER_CONFIGURATIONS_REMOTE:
+    if get_weaver_configuration(settings) in WeaverFeatures.REMOTE:
         with_providers = asbool(request.params.get("providers", False))
     paging_query = sd.ProcessPagingQuery()
     paging_value = {param.name: param.default for param in paging_query.children}
@@ -47,7 +47,7 @@ def get_processes_filtered_by_valid_schemas(request):
         })
 
     store = get_db(request).get_store(StoreProcesses)
-    processes, total_local_processes = store.list_processes(visibility=VISIBILITY_PUBLIC, total=True, **paging_param)
+    processes, total_local_processes = store.list_processes(visibility=Visibility.PUBLIC, total=True, **paging_param)
     valid_processes = list()
     invalid_processes_ids = list()
     for process in processes:
@@ -78,21 +78,21 @@ def get_process_list_links(request, paging, total, provider=None):
     proc_url = base_url + proc_path
     links.extend([
         {"href": proc_url, "rel": "collection",
-         "type": CONTENT_TYPE_APP_JSON, "title": "Process listing (no filtering queries applied)."},
+         "type": ContentType.APP_JSON, "title": "Process listing (no filtering queries applied)."},
         {"href": proc_url, "rel": "search",
-         "type": CONTENT_TYPE_APP_JSON, "title": "Generic query endpoint to list processes."},
+         "type": ContentType.APP_JSON, "title": "Generic query endpoint to list processes."},
         {"href": proc_url + "?detail=false", "rel": "preview",
-         "type": CONTENT_TYPE_APP_JSON, "title": "Process listing summary (identifiers and count only)."},
+         "type": ContentType.APP_JSON, "title": "Process listing summary (identifiers and count only)."},
         {"href": proc_url, "rel": "http://www.opengis.net/def/rel/ogc/1.0/processes",
-         "type": CONTENT_TYPE_APP_JSON, "title": "List of registered local processes."},
+         "type": ContentType.APP_JSON, "title": "List of registered local processes."},
         {"href": get_path_kvp(proc_url, **request.params), "rel": "self",
-         "type": CONTENT_TYPE_APP_JSON, "title": "Current process listing."},
+         "type": ContentType.APP_JSON, "title": "Current process listing."},
     ])
     if provider:
         prov_url = proc_url.rsplit("/", 1)[0]
-        links.append({"href": prov_url, "rel": "up", "type": CONTENT_TYPE_APP_JSON, "title": "Provider description."})
+        links.append({"href": prov_url, "rel": "up", "type": ContentType.APP_JSON, "title": "Provider description."})
     else:
-        links.append({"href": base_url, "rel": "up", "type": CONTENT_TYPE_APP_JSON, "title": "API entrypoint."})
+        links.append({"href": base_url, "rel": "up", "type": ContentType.APP_JSON, "title": "API entrypoint."})
 
     cur_page = paging.get("page", None)
     per_page = paging.get("limit", None)
@@ -102,20 +102,20 @@ def get_process_list_links(request, paging, total, provider=None):
             raise IndexError(f"Page index {cur_page} is out of range from [0,{max_page}].")
         links.extend([
             {"href": get_path_kvp(proc_url, page=cur_page, **kvp_params), "rel": "current",
-             "type": CONTENT_TYPE_APP_JSON, "title": "Current page of processes query listing."},
+             "type": ContentType.APP_JSON, "title": "Current page of processes query listing."},
             {"href": get_path_kvp(proc_url, page=0, **kvp_params), "rel": "first",
-             "type": CONTENT_TYPE_APP_JSON, "title": "First page of processes query listing."},
+             "type": ContentType.APP_JSON, "title": "First page of processes query listing."},
             {"href": get_path_kvp(proc_url, page=max_page, **kvp_params), "rel": "last",
-             "type": CONTENT_TYPE_APP_JSON, "title": "Last page of processes query listing."},
+             "type": ContentType.APP_JSON, "title": "Last page of processes query listing."},
         ])
         if cur_page > 0:
             links.append({
                 "href": get_path_kvp(proc_url, page=cur_page - 1, **kvp_params), "rel": "prev",
-                "type": CONTENT_TYPE_APP_JSON, "title": "Previous page of processes query listing."
+                "type": ContentType.APP_JSON, "title": "Previous page of processes query listing."
             })
         if cur_page < max_page:
             links.append({
                 "href": get_path_kvp(proc_url, page=cur_page + 1, **kvp_params), "rel": "next",
-                "type": CONTENT_TYPE_APP_JSON, "title": "Next page of processes query listing."
+                "type": ContentType.APP_JSON, "title": "Next page of processes query listing."
             })
     return links

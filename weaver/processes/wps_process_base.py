@@ -7,10 +7,11 @@ from typing import TYPE_CHECKING
 
 from requests.structures import CaseInsensitiveDict
 
+from weaver.base import Constants
 from weaver.exceptions import PackageExecutionError
-from weaver.formats import CONTENT_TYPE_APP_JSON
-from weaver.processes.constants import OPENSEARCH_LOCAL_FILE_SCHEME
-from weaver.status import STATUS_RUNNING, STATUS_SUCCEEDED
+from weaver.formats import ContentType
+from weaver.processes.constants import OpenSearchField
+from weaver.status import Status
 from weaver.utils import (
     fetch_file,
     fully_qualified_name,
@@ -43,19 +44,25 @@ if TYPE_CHECKING:
 
 LOGGER = logging.getLogger(__name__)
 
-# NOTE:
-#   Implementations can reuse the same progress values or intermediate ones within the range of the relevant sections.
-REMOTE_JOB_PROGRESS_START = 1
-REMOTE_JOB_PROGRESS_PREPARE = 2
-REMOTE_JOB_PROGRESS_READY = 5
-REMOTE_JOB_PROGRESS_STAGE_IN = 10
-REMOTE_JOB_PROGRESS_FORMAT_IO = 12
-REMOTE_JOB_PROGRESS_EXECUTE = 15
-REMOTE_JOB_PROGRESS_MONITOR = 20
-REMOTE_JOB_PROGRESS_RESULTS = 85
-REMOTE_JOB_PROGRESS_STAGE_OUT = 90
-REMOTE_JOB_PROGRESS_CLEANUP = 95
-REMOTE_JOB_PROGRESS_COMPLETED = 100
+
+class WpsRemoteJobProgress(Constants):
+    """
+    Progress of a remotely monitored WPS-1 job process execution.
+
+    .. note::
+        Implementations can reuse same progress values or intermediate ones within the range of the relevant sections.
+    """
+    START = 1
+    PREPARE = 2
+    READY = 5
+    STAGE_IN = 10
+    FORMAT_IO = 12
+    EXECUTE = 15
+    MONITOR = 20
+    RESULTS = 85
+    STAGE_OUT = 90
+    CLEANUP = 95
+    COMPLETED = 100
 
 
 class WpsProcessInterface(object):
@@ -75,7 +82,7 @@ class WpsProcessInterface(object):
     def __init__(self, request, update_status):
         # type: (WorkerRequest, UpdateStatusPartialFunction) -> None
         self.request = request
-        self.headers = {"Accept": CONTENT_TYPE_APP_JSON, "Content-Type": CONTENT_TYPE_APP_JSON}
+        self.headers = {"Accept": ContentType.APP_JSON, "Content-Type": ContentType.APP_JSON}
         self.settings = get_settings()
         self.update_status = update_status  # type: UpdateStatusPartialFunction
         self.temp_staging = set()
@@ -93,27 +100,27 @@ class WpsProcessInterface(object):
         :param expected_outputs: expected value outputs as `{'id': 'value'}`
         """
         self.update_status("Preparing process for remote execution.",
-                           REMOTE_JOB_PROGRESS_PREPARE, STATUS_RUNNING)
+                           WpsRemoteJobProgress.PREPARE, Status.RUNNING)
         self.prepare()
         self.update_status("Process ready for execute remote process.",
-                           REMOTE_JOB_PROGRESS_READY, STATUS_RUNNING)
+                           WpsRemoteJobProgress.READY, Status.RUNNING)
 
         self.update_status("Staging inputs for remote execution.",
-                           REMOTE_JOB_PROGRESS_STAGE_IN, STATUS_RUNNING)
+                           WpsRemoteJobProgress.STAGE_IN, Status.RUNNING)
         staged_inputs = self.stage_inputs(workflow_inputs)
 
         self.update_status("Preparing inputs/outputs for remote execution.",
-                           REMOTE_JOB_PROGRESS_FORMAT_IO, STATUS_RUNNING)
+                           WpsRemoteJobProgress.FORMAT_IO, Status.RUNNING)
         expect_outputs = [{"id": output} for output in expected_outputs]
         process_inputs = self.format_inputs(staged_inputs)
         process_outputs = self.format_outputs(expect_outputs)
 
         try:
             self.update_status("Executing remote process job.",
-                               REMOTE_JOB_PROGRESS_EXECUTE, STATUS_RUNNING)
+                               WpsRemoteJobProgress.EXECUTE, Status.RUNNING)
             monitor_ref = self.dispatch(process_inputs, process_outputs)
             self.update_status("Monitoring remote process job until completion.",
-                               REMOTE_JOB_PROGRESS_MONITOR, STATUS_RUNNING)
+                               WpsRemoteJobProgress.MONITOR, Status.RUNNING)
             job_success = self.monitor(monitor_ref)
             if not job_success:
                 raise PackageExecutionError("Failed dispatch and monitoring of remote process execution.")
@@ -122,23 +129,23 @@ class WpsProcessInterface(object):
             err_ctx = "Dispatch and monitoring of remote process caused an unhandled error."
             LOGGER.exception("%s [%s]", err_ctx, err_msg, exc_info=exc)
             self.update_status("Running final cleanup operations following failed execution.",
-                               REMOTE_JOB_PROGRESS_CLEANUP, STATUS_RUNNING)
+                               WpsRemoteJobProgress.CLEANUP, Status.RUNNING)
             self.cleanup()
             raise PackageExecutionError(err_ctx) from exc
 
         self.update_status("Retrieving job results definitions.",
-                           REMOTE_JOB_PROGRESS_RESULTS, STATUS_RUNNING)
+                           WpsRemoteJobProgress.RESULTS, Status.RUNNING)
         results = self.get_results(monitor_ref)
         self.update_status("Staging job outputs from remote process.",
-                           REMOTE_JOB_PROGRESS_STAGE_OUT, STATUS_RUNNING)
+                           WpsRemoteJobProgress.STAGE_OUT, Status.RUNNING)
         self.stage_results(results, expected_outputs, out_dir)
 
         self.update_status("Running final cleanup operations before completion.",
-                           REMOTE_JOB_PROGRESS_CLEANUP, STATUS_RUNNING)
+                           WpsRemoteJobProgress.CLEANUP, Status.RUNNING)
         self.cleanup()
 
         self.update_status("Execution of remote process execution completed successfully.",
-                           REMOTE_JOB_PROGRESS_COMPLETED, STATUS_SUCCEEDED)
+                           WpsRemoteJobProgress.COMPLETED, Status.SUCCEEDED)
 
     def prepare(self):
         # type: () -> None
@@ -357,8 +364,8 @@ class WpsProcessInterface(object):
         for exec_input in execute_body_inputs:
             if "href" in exec_input and isinstance(exec_input["href"], str):
                 LOGGER.debug("Original input location [%s] : [%s]", exec_input["id"], exec_input["href"])
-                if exec_input["href"].startswith("{0}://".format(OPENSEARCH_LOCAL_FILE_SCHEME)):
-                    exec_input["href"] = "file{0}".format(exec_input["href"][len(OPENSEARCH_LOCAL_FILE_SCHEME):])
+                if exec_input["href"].startswith("{0}://".format(OpenSearchField.LOCAL_FILE_SCHEME)):
+                    exec_input["href"] = "file{0}".format(exec_input["href"][len(OpenSearchField.LOCAL_FILE_SCHEME):])
                     LOGGER.debug("OpenSearch intermediate input [%s] : [%s]", exec_input["id"], exec_input["href"])
                 elif exec_input["href"].startswith("file://"):
                     exec_input["href"] = self.host_file(exec_input["href"])

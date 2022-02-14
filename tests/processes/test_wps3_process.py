@@ -6,9 +6,9 @@ from pywps.app import WPSRequest
 from requests.models import Request, Response
 
 from weaver.exceptions import PackageExecutionError
-from weaver.formats import CONTENT_TYPE_APP_NETCDF
+from weaver.formats import ContentType
 from weaver.processes.wps3_process import Wps3Process
-from weaver.visibility import VISIBILITY_PUBLIC
+from weaver.visibility import Visibility
 
 
 def test_wps3_process_step_io_data_or_href():
@@ -45,8 +45,8 @@ def test_wps3_process_step_io_data_or_href():
         if url.endswith("/visibility"):
             resp = Response()
             resp.status_code = 200
-            resp._content = json.dumps({"value": VISIBILITY_PUBLIC}, ensure_ascii=False).encode()
-            resp.headers = {"Content-Type": CONTENT_TYPE_APP_NETCDF}
+            resp._content = json.dumps({"value": Visibility.PUBLIC}, ensure_ascii=False).encode()
+            resp.headers = {"Content-Type": ContentType.APP_NETCDF}
             resp.encoding = None
             if method == "PUT":
                 test_reached_parse_inputs = True  # last operation before parsing I/O is setting visibility

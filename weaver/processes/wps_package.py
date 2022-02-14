@@ -36,7 +36,7 @@ from pywps.inout.basic import SOURCE_TYPE
 from pywps.inout.storage.file import FileStorageBuilder
 from pywps.inout.storage.s3 import S3StorageBuilder
 
-from weaver.config import WEAVER_CONFIGURATION_HYBRID, WEAVER_CONFIGURATIONS_REMOTE, get_weaver_configuration
+from weaver.config import WeaverConfiguration, WeaverFeatures, get_weaver_configuration
 from weaver.database import get_db
 from weaver.datatype import DockerAuthentication
 from weaver.exceptions import (
@@ -48,14 +48,7 @@ from weaver.exceptions import (
     PackageTypeError,
     PayloadNotFound
 )
-from weaver.formats import (
-    CONTENT_TYPE_ANY_XML,
-    CONTENT_TYPE_APP_JSON,
-    CONTENT_TYPE_APP_YAML,
-    CONTENT_TYPE_TEXT_PLAIN,
-    CONTENT_TYPE_TEXT_XML,
-    get_cwl_file_format
-)
+from weaver.formats import ContentType, get_cwl_file_format
 from weaver.processes import opensearch
 from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_BUILTIN,
@@ -82,15 +75,7 @@ from weaver.processes.convert import (
 from weaver.processes.sources import retrieve_data_source_url
 from weaver.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
 from weaver.processes.utils import map_progress
-from weaver.status import (
-    STATUS_COMPLIANT_PYWPS,
-    STATUS_EXCEPTION,
-    STATUS_FAILED,
-    STATUS_PYWPS_IDS,
-    STATUS_RUNNING,
-    STATUS_SUCCEEDED,
-    map_status
-)
+from weaver.status import STATUS_PYWPS_IDS, Status, StatusCompliant, map_status
 from weaver.store.base import StoreJobs, StoreProcesses
 from weaver.utils import (
     SUPPORTED_FILE_SCHEMES,
@@ -200,7 +185,7 @@ def retrieve_package_job_log(execution, job, progress_min=0, progress_max=100):
         total = float(len(log_lines))
         for i, line in enumerate(log_lines):
             progress = map_progress(i / total * 100, progress_min, progress_max)
-            job.save_log(message=line.rstrip("\n"), progress=progress, status=STATUS_RUNNING)
+            job.save_log(message=line.rstrip("\n"), progress=progress, status=Status.RUNNING)
     except (KeyError, IOError):
         LOGGER.warning("Failed retrieving package log for %s", job)
 
@@ -260,7 +245,7 @@ def _fetch_process_info(process_info_url, fetch_error):
 
     if not isinstance(process_info_url, str):
         raise _info_not_found_error()
-    resp = request_extra("get", process_info_url, headers={"Accept": CONTENT_TYPE_APP_JSON}, settings=get_settings())
+    resp = request_extra("get", process_info_url, headers={"Accept": ContentType.APP_JSON}, settings=get_settings())
     if resp.status_code != HTTPOk.code:
         raise _info_not_found_error()
     body = resp.json()
@@ -567,23 +552,23 @@ def _generate_process_with_cwl_from_reference(reference):
         content_type = get_header("Content-Type", response.headers)
 
         # try to detect incorrectly reported media-type using common structures
-        if CONTENT_TYPE_TEXT_PLAIN in content_type:
+        if ContentType.TEXT_PLAIN in content_type:
             data = response.text
             if (data.startswith("{") and data.endswith("}")) or reference.endswith(".json"):
                 LOGGER.warning("Attempting auto-resolution of invalid Content-Type [%s] to [%s] "
-                               "for CWL reference [%s].", content_type, CONTENT_TYPE_APP_JSON, reference)
-                content_type = CONTENT_TYPE_APP_JSON
+                               "for CWL reference [%s].", content_type, ContentType.APP_JSON, reference)
+                content_type = ContentType.APP_JSON
             elif data.startswith("<?xml") or reference.endswith(".xml"):
                 LOGGER.warning("Attempting auto-resolution of invalid Content-Type [%s] to [%s] "
-                               "for WPS reference [%s].", content_type, CONTENT_TYPE_TEXT_XML, reference)
-                content_type = CONTENT_TYPE_TEXT_XML
+                               "for WPS reference [%s].", content_type, ContentType.TEXT_XML, reference)
+                content_type = ContentType.TEXT_XML
 
-        if any(ct in content_type for ct in CONTENT_TYPE_ANY_XML):
+        if any(ct in content_type for ct in ContentType.ANY_XML):
             # attempt to retrieve a WPS-1 ProcessDescription definition
             cwl_package, process_info = xml_wps2cwl(response, settings)
 
-        elif any(ct in content_type for ct in [CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_YAML]):
-            if content_type == CONTENT_TYPE_APP_YAML:
+        elif any(ct in content_type for ct in [ContentType.APP_JSON, ContentType.APP_YAML]):
+            if content_type == ContentType.APP_YAML:
                 payload = yaml.safe_load(response.text)
             else:
                 payload = response.json()
@@ -937,11 +922,11 @@ class WpsPackage(Process):
         :returns: captured execution log lines retrieved from files
         """
         captured_log = []
-        status = STATUS_RUNNING
+        status = Status.RUNNING
         try:
             if isinstance(result, CWLException):
                 result = getattr(result, "out")
-                status = STATUS_FAILED
+                status = Status.FAILED
             stderr_file = result.get(self.package_log_hook_stderr, {}).get("location", "").replace("file://", "")
             stdout_file = result.get(self.package_log_hook_stdout, {}).get("location", "").replace("file://", "")
             with_stderr_file = os.path.isfile(stderr_file)
@@ -1163,7 +1148,7 @@ class WpsPackage(Process):
         self.percent = progress or self.percent or 0
 
         # find the enum PyWPS status matching the given one as string
-        pywps_status = map_status(status, STATUS_COMPLIANT_PYWPS)
+        pywps_status = map_status(status, StatusCompliant.PYWPS)
         pywps_status_id = STATUS_PYWPS_IDS[pywps_status]
 
         # NOTE:
@@ -1193,7 +1178,7 @@ class WpsPackage(Process):
         self.logger.log(level, message, exc_info=level > logging.INFO)
 
     def exception_message(self, exception_type, exception=None, message="no message",
-                          status=STATUS_EXCEPTION, level=logging.ERROR):
+                          status=Status.EXCEPTION, level=logging.ERROR):
         # type: (Type[Exception], Optional[Exception], str, AnyStatusType, int) -> Exception
         """
         Logs to the job the specified error message with the provided exception type.
@@ -1260,11 +1245,11 @@ class WpsPackage(Process):
                 # workflows do not support stdout/stderr
                 log_stdout_stderr = self.package_type != PROCESS_WORKFLOW
                 self.setup_loggers(log_stdout_stderr)
-                self.update_status("Preparing package logs done.", PACKAGE_PROGRESS_PREP_LOG, STATUS_RUNNING)
+                self.update_status("Preparing package logs done.", PACKAGE_PROGRESS_PREP_LOG, Status.RUNNING)
             except Exception as exc:
                 raise self.exception_message(PackageExecutionError, exc, "Failed preparing package logging.")
 
-            self.update_status("Launching package...", PACKAGE_PROGRESS_LAUNCHING, STATUS_RUNNING)
+            self.update_status("Launching package...", PACKAGE_PROGRESS_LAUNCHING, Status.RUNNING)
 
             # early validation to ensure proper instance is defined for target process/package
             # Note:
@@ -1272,7 +1257,7 @@ class WpsPackage(Process):
             #   remote execution, but cannot accomplish it due to mismatching configuration. This can occur if
             #   configuration was modified and followed by Weaver reboot with persisted WPS-remote process.
             config = get_weaver_configuration(self.settings)
-            self.remote_execution = config in WEAVER_CONFIGURATIONS_REMOTE
+            self.remote_execution = config in WeaverFeatures.REMOTE
             problem_needs_remote = check_package_instance_compatible(self.package)
             if not self.remote_execution:
                 if problem_needs_remote:
@@ -1280,11 +1265,11 @@ class WpsPackage(Process):
                         PackageExecutionError,
                         message="Weaver instance is configured as [{}] but remote execution with one of {} is "
                                 "required for process [{}] because {}. Aborting execution.".format(
-                                    config, list(WEAVER_CONFIGURATIONS_REMOTE), self.package_id, problem_needs_remote
+                                    config, list(WeaverFeatures.REMOTE), self.package_id, problem_needs_remote
                                 )
                     )
             # switch back to local execution if hybrid execution can handle this package by itself (eg: Docker, builtin)
-            elif config == WEAVER_CONFIGURATION_HYBRID:
+            elif config == WeaverConfiguration.HYBRID:
                 self.remote_execution = problem_needs_remote is not None
 
             if self.remote_execution:
@@ -1311,11 +1296,11 @@ class WpsPackage(Process):
                                                                             runtime_context=runtime_context)
             except Exception as ex:
                 raise PackageRegistrationError("Exception occurred on package instantiation: '{!r}'".format(ex))
-            self.update_status("Loading package content done.", PACKAGE_PROGRESS_LOADING, STATUS_RUNNING)
+            self.update_status("Loading package content done.", PACKAGE_PROGRESS_LOADING, Status.RUNNING)
 
             try:
                 cwl_inputs_info = {i["name"]: i for i in package_inst.t.inputs_record_schema["fields"]}
-                self.update_status("Retrieve package inputs done.", PACKAGE_PROGRESS_GET_INPUT, STATUS_RUNNING)
+                self.update_status("Retrieve package inputs done.", PACKAGE_PROGRESS_GET_INPUT, Status.RUNNING)
             except Exception as exc:
                 raise self.exception_message(PackageExecutionError, exc, "Failed retrieving package input types.")
             try:
@@ -1325,7 +1310,7 @@ class WpsPackage(Process):
                 if eoimage_data_sources:
                     self.update_status("Found EOImage data-source definitions. "
                                        "Updating inputs with OpenSearch sources.",
-                                       PACKAGE_PROGRESS_ADD_EO_IMAGES, STATUS_RUNNING)
+                                       PACKAGE_PROGRESS_ADD_EO_IMAGES, Status.RUNNING)
                     accept_mime_types = opensearch.get_eo_images_mime_types(self.payload)
                     opensearch.insert_max_occurs(self.payload, request.inputs)
                     request.inputs = opensearch.query_eo_images_from_wps_inputs(request.inputs,
@@ -1333,7 +1318,7 @@ class WpsPackage(Process):
                                                                                 accept_mime_types,
                                                                                 settings=self.settings)
                 cwl_inputs = self.make_inputs(request.inputs, cwl_inputs_info)
-                self.update_status("Convert package inputs done.", PACKAGE_PROGRESS_CONVERT_INPUT, STATUS_RUNNING)
+                self.update_status("Convert package inputs done.", PACKAGE_PROGRESS_CONVERT_INPUT, Status.RUNNING)
             except PackageException as exc:
                 raise self.exception_message(type(exc), None, str(exc))  # re-raise as is, but with extra log entry
             except Exception as exc:
@@ -1342,19 +1327,19 @@ class WpsPackage(Process):
             try:
                 self.update_status("Checking package prerequisites... "
                                    "(operation could take a while depending on requirements)",
-                                   PACKAGE_PROGRESS_PREPARATION, STATUS_RUNNING)
+                                   PACKAGE_PROGRESS_PREPARATION, Status.RUNNING)
                 setup_status = self.setup_docker_image()
                 if setup_status not in [None, True]:
                     raise PackageAuthenticationError
-                self.update_status("Package ready for execution.", PACKAGE_PROGRESS_PREPARATION, STATUS_RUNNING)
+                self.update_status("Package ready for execution.", PACKAGE_PROGRESS_PREPARATION, Status.RUNNING)
             except Exception:  # noqa: W0703 # nosec: B110  # don't pass exception to below message
                 raise self.exception_message(PackageAuthenticationError, None, "Failed Docker image preparation.")
 
             try:
-                self.update_status("Running package...", PACKAGE_PROGRESS_CWL_RUN, STATUS_RUNNING)
+                self.update_status("Running package...", PACKAGE_PROGRESS_CWL_RUN, Status.RUNNING)
                 self.logger.debug("Launching process package with inputs:\n%s", json.dumps(cwl_inputs, indent=2))
                 result = package_inst(**cwl_inputs)  # type: CWL_Results
-                self.update_status("Package execution done.", PACKAGE_PROGRESS_CWL_DONE, STATUS_RUNNING)
+                self.update_status("Package execution done.", PACKAGE_PROGRESS_CWL_DONE, Status.RUNNING)
             except Exception as exc:
                 if isinstance(exc, CWLException):
                     lines = self.insert_package_log(exc)
@@ -1364,7 +1349,7 @@ class WpsPackage(Process):
             self.insert_package_log(result)
             try:
                 self.make_outputs(result)
-                self.update_status("Generate package outputs done.", PACKAGE_PROGRESS_PREP_OUT, STATUS_RUNNING)
+                self.update_status("Generate package outputs done.", PACKAGE_PROGRESS_PREP_OUT, Status.RUNNING)
             except Exception as exc:
                 raise self.exception_message(PackageExecutionError, exc, "Failed to save package outputs.")
         except Exception:
@@ -1373,10 +1358,10 @@ class WpsPackage(Process):
             error_msg = "Package completed with errors. Server logs: [{}], Available at [{}]:".format(
                 self.log_file, log_url
             )
-            self.update_status(error_msg, self.percent, STATUS_FAILED)
+            self.update_status(error_msg, self.percent, Status.FAILED)
             raise
         else:
-            self.update_status("Package complete.", PACKAGE_PROGRESS_DONE, STATUS_SUCCEEDED)
+            self.update_status("Package complete.", PACKAGE_PROGRESS_DONE, Status.SUCCEEDED)
         return self.response
 
     def must_fetch(self, input_ref):
@@ -1456,7 +1441,7 @@ class WpsPackage(Process):
         Otherwise, this operation could incorrectly grant unauthorized access to protected files by forging the URL.
 
         If the process requires ``OpenSearch`` references that should be preserved as is, scheme defined by
-        :py:data:`weaver.processes.constants.OPENSEARCH_LOCAL_FILE_SCHEME` prefix instead of ``http(s)://`` is expected.
+        :py:data:`weaver.processes.constants.OpenSearchField.LOCAL_FILE_SCHEME` prefix instead of ``http(s)://`` is expected.
 
         Any other variant of file reference will be fetched as applicable by the relevant schemes.
 
@@ -1712,7 +1697,7 @@ class WpsPackage(Process):
 
         self.step_launched.append(jobname)
         self.update_status("Preparing to launch {type} {name}.".format(type=jobtype, name=jobname),
-                           start_step_progress, STATUS_RUNNING)
+                           start_step_progress, Status.RUNNING)
 
         def _update_status_dispatch(_message, _progress, _status, _provider):
             self.step_update_status(

@@ -19,7 +19,7 @@ from weaver.processes.types import PROCESS_BUILTIN
 from weaver.processes.wps_package import PACKAGE_EXTENSIONS, get_process_definition
 from weaver.store.base import StoreProcesses
 from weaver.utils import clean_json_text_body, get_registry, ows_context_href
-from weaver.visibility import VISIBILITY_PUBLIC
+from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_url
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
@@ -145,7 +145,7 @@ def register_builtin_processes(container):
             processDescriptionURL=process_url,
             processEndpointWPS1=get_wps_url(container),
             executeEndpoint="/".join([process_url, "jobs"]),
-            visibility=VISIBILITY_PUBLIC,
+            visibility=Visibility.PUBLIC,
         ))
 
     # registration of missing/updated apps automatically applied with 'default_processes'

@@ -14,7 +14,7 @@ from webob.acceptparse import create_accept_language_header
 
 from weaver import xml_util
 from weaver.config import get_weaver_configuration
-from weaver.formats import ACCEPT_LANGUAGES
+from weaver.formats import AcceptLanguage
 from weaver.utils import (
     get_header,
     get_no_cache_option,
@@ -370,7 +370,7 @@ def load_pywps_config(container, config=None):
 
     # set accepted languages aligned with values provided by REST API endpoints
     # otherwise, execute request could fail due to languages considered not supported
-    languages = ", ".join(ACCEPT_LANGUAGES)
+    languages = ", ".join(AcceptLanguage.values())
     LOGGER.debug("Setting WPS languages: [%s]", languages)
     pywps_config.CONFIG.set("server", "language", languages)
 
@@ -467,7 +467,7 @@ def set_wps_language(wps, accept_language=None, request=None):
         # owslib version doesn't support setting a language
         return
 
-    supported_languages = wps.languages.supported or ACCEPT_LANGUAGES
+    supported_languages = wps.languages.supported or AcceptLanguage.values()
     language = create_accept_language_header(accept_language).best_match(supported_languages)
     if language:
         wps.language = language

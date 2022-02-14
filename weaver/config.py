@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 from pyramid.exceptions import ConfigurationError
 
 from weaver import WEAVER_CONFIG_DIR
+from weaver.base import Constants
 from weaver.utils import get_settings
 
 if TYPE_CHECKING:
@@ -15,20 +16,31 @@ if TYPE_CHECKING:
 
 LOGGER = logging.getLogger(__name__)
 
-WEAVER_CONFIGURATION_DEFAULT = "DEFAULT"
-WEAVER_CONFIGURATION_ADES = "ADES"
-WEAVER_CONFIGURATION_EMS = "EMS"
-WEAVER_CONFIGURATION_HYBRID = "HYBRID"
-WEAVER_CONFIGURATIONS = frozenset([
-    WEAVER_CONFIGURATION_DEFAULT,
-    WEAVER_CONFIGURATION_ADES,
-    WEAVER_CONFIGURATION_EMS,
-    WEAVER_CONFIGURATION_HYBRID,
-])
-WEAVER_CONFIGURATIONS_REMOTE = frozenset([
-    WEAVER_CONFIGURATION_EMS,
-    WEAVER_CONFIGURATION_HYBRID,
-])
+
+class WeaverConfiguration(Constants):
+    """
+    Configuration mode for which the `Weaver` instance should operate to provide different functionalities.
+    """
+    DEFAULT = "DEFAULT"
+    ADES = "ADES"
+    EMS = "EMS"
+    HYBRID = "HYBRID"
+
+
+class WeaverFeatures(Constants):
+    """
+    Features enabled accordingly to different combinations of :class:`WeaverConfiguration` modes.
+    """
+    REMOTE = frozenset([
+        WeaverConfiguration.EMS,
+        WeaverConfiguration.HYBRID,
+    ])
+    QUOTING = frozenset([
+        WeaverConfiguration.ADES,
+        WeaverConfiguration.EMS,
+        WeaverConfiguration.HYBRID,
+    ])
+
 
 WEAVER_DEFAULT_INI_CONFIG = "weaver.ini"
 WEAVER_DEFAULT_DATA_SOURCES_CONFIG = "data_sources.yml"
@@ -52,10 +64,10 @@ def get_weaver_configuration(container):
     settings = get_settings(container)
     weaver_config = settings.get("weaver.configuration")
     if not weaver_config:
-        LOGGER.warning("Setting 'weaver.configuration' not specified, using '%s'", WEAVER_CONFIGURATION_DEFAULT)
-        weaver_config = WEAVER_CONFIGURATION_DEFAULT
+        LOGGER.warning("Setting 'weaver.configuration' not specified, using '%s'", WeaverConfiguration.DEFAULT)
+        weaver_config = WeaverConfiguration.DEFAULT
     weaver_config_up = weaver_config.upper()
-    if weaver_config_up not in WEAVER_CONFIGURATIONS:
+    if weaver_config_up not in WeaverConfiguration:
         raise ConfigurationError("Unknown setting 'weaver.configuration' specified: '{}'".format(weaver_config))
     return weaver_config_up
 

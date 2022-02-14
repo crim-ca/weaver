@@ -11,73 +11,80 @@ from pyramid_storage.extensions import resolve_extensions
 from pywps.inout.formats import FORMATS, Format
 from requests.exceptions import ConnectionError
 
+from weaver.base import Constants
+
 if TYPE_CHECKING:
     from typing import Dict, List, Optional, Tuple, Union
 
     from weaver.typedefs import JSON
 
 
-# Languages
-ACCEPT_LANGUAGE_EN_CA = "en-CA"
-ACCEPT_LANGUAGE_FR_CA = "fr-CA"
-ACCEPT_LANGUAGE_EN_US = "en-US"
+class AcceptLanguage(Constants):
+    """
+    Supported languages.
+    """
+    EN_CA = "en-CA"
+    FR_CA = "fr-CA"
+    EN_US = "en-US"
 
-ACCEPT_LANGUAGES = frozenset([
-    ACCEPT_LANGUAGE_EN_US,  # place first to match default of PyWPS and most existing remote servers
-    ACCEPT_LANGUAGE_EN_CA,
-    ACCEPT_LANGUAGE_FR_CA,
-])
 
-# Content-Types
-#   MIME-type nomenclature:
-#       <type> "/" [x- | <tree> "."] <subtype> ["+" suffix] *[";" parameter=value]
-CONTENT_TYPE_APP_CWL = "application/x-cwl"
-CONTENT_TYPE_APP_FORM = "application/x-www-form-urlencoded"
-CONTENT_TYPE_APP_NETCDF = "application/x-netcdf"
-CONTENT_TYPE_APP_GZIP = "application/gzip"
-CONTENT_TYPE_APP_HDF5 = "application/x-hdf5"
-CONTENT_TYPE_APP_OCTET_STREAM = "application/octet-stream"
-CONTENT_TYPE_APP_TAR = "application/x-tar"          # map to existing gzip for CWL
-CONTENT_TYPE_APP_TAR_GZ = "application/tar+gzip"    # map to existing gzip for CWL
-CONTENT_TYPE_APP_YAML = "application/x-yaml"
-CONTENT_TYPE_APP_ZIP = "application/zip"
-CONTENT_TYPE_TEXT_HTML = "text/html"
-CONTENT_TYPE_TEXT_PLAIN = "text/plain"
-CONTENT_TYPE_APP_PDF = "application/pdf"
-CONTENT_TYPE_APP_JSON = "application/json"
-CONTENT_TYPE_APP_GEOJSON = "application/geo+json"
-CONTENT_TYPE_APP_VDN_GEOJSON = "application/vnd.geo+json"
-CONTENT_TYPE_APP_XML = "application/xml"
-CONTENT_TYPE_IMAGE_GEOTIFF = "image/tiff; subtype=geotiff"
-CONTENT_TYPE_IMAGE_JPEG = "image/jpeg"
-CONTENT_TYPE_IMAGE_PNG = "image/png"
-CONTENT_TYPE_IMAGE_TIFF = "image/tiff"
-CONTENT_TYPE_MULTI_PART_FORM = "multipart/form-data"
-CONTENT_TYPE_TEXT_XML = "text/xml"
-CONTENT_TYPE_ANY_XML = {CONTENT_TYPE_APP_XML, CONTENT_TYPE_TEXT_XML}
-CONTENT_TYPE_ANY = "*/*"
+class ContentType(Constants):
+    """
+    Supported Content-Types
+
+    Media-type nomenclature:
+
+        <type> "/" [x- | <tree> "."] <subtype> ["+" suffix] *[";" parameter=value]
+    """
+
+    APP_CWL = "application/x-cwl"
+    APP_FORM = "application/x-www-form-urlencoded"
+    APP_NETCDF = "application/x-netcdf"
+    APP_GZIP = "application/gzip"
+    APP_HDF5 = "application/x-hdf5"
+    APP_OCTET_STREAM = "application/octet-stream"
+    APP_TAR = "application/x-tar"          # map to existing gzip for CWL
+    APP_TAR_GZ = "application/tar+gzip"    # map to existing gzip for CWL
+    APP_YAML = "application/x-yaml"
+    APP_ZIP = "application/zip"
+    TEXT_HTML = "text/html"
+    TEXT_PLAIN = "text/plain"
+    APP_PDF = "application/pdf"
+    APP_JSON = "application/json"
+    APP_GEOJSON = "application/geo+json"
+    APP_VDN_GEOJSON = "application/vnd.geo+json"
+    APP_XML = "application/xml"
+    IMAGE_GEOTIFF = "image/tiff; subtype=geotiff"
+    IMAGE_JPEG = "image/jpeg"
+    IMAGE_PNG = "image/png"
+    IMAGE_TIFF = "image/tiff"
+    MULTI_PART_FORM = "multipart/form-data"
+    TEXT_XML = "text/xml"
+    ANY_XML = {APP_XML, TEXT_XML}
+    ANY = "*/*"
+
 
 # explicit mime-type to extension when not literally written in item after '/' (excluding 'x-' prefix)
 _CONTENT_TYPE_EXTENSION_OVERRIDES = {
-    CONTENT_TYPE_APP_VDN_GEOJSON: ".geojson",  # pywps 4.4 default extension without vdn prefix
-    CONTENT_TYPE_APP_NETCDF: ".nc",
-    CONTENT_TYPE_APP_GZIP: ".gz",
-    CONTENT_TYPE_APP_TAR_GZ: ".tar.gz",
-    CONTENT_TYPE_APP_YAML: ".yml",
-    CONTENT_TYPE_IMAGE_TIFF: ".tif",  # common alternate to .tiff
-    CONTENT_TYPE_ANY: ".*",   # any for glob
-    CONTENT_TYPE_APP_OCTET_STREAM: "",
-    CONTENT_TYPE_APP_FORM: "",
-    CONTENT_TYPE_MULTI_PART_FORM: "",
+    ContentType.APP_VDN_GEOJSON: ".geojson",  # pywps 4.4 default extension without vdn prefix
+    ContentType.APP_NETCDF: ".nc",
+    ContentType.APP_GZIP: ".gz",
+    ContentType.APP_TAR_GZ: ".tar.gz",
+    ContentType.APP_YAML: ".yml",
+    ContentType.IMAGE_TIFF: ".tif",  # common alternate to .tiff
+    ContentType.ANY: ".*",   # any for glob
+    ContentType.APP_OCTET_STREAM: "",
+    ContentType.APP_FORM: "",
+    ContentType.MULTI_PART_FORM: "",
 }
 _CONTENT_TYPE_EXCLUDE = [
-    CONTENT_TYPE_APP_OCTET_STREAM,
-    CONTENT_TYPE_APP_FORM,
-    CONTENT_TYPE_MULTI_PART_FORM,
+    ContentType.APP_OCTET_STREAM,
+    ContentType.APP_FORM,
+    ContentType.MULTI_PART_FORM,
 ]
 _EXTENSION_CONTENT_TYPES_OVERRIDES = {
-    ".tiff": CONTENT_TYPE_IMAGE_TIFF,  # avoid defaulting to subtype geotiff
-    ".yaml": CONTENT_TYPE_APP_YAML,  # common alternative to .yml
+    ".tiff": ContentType.IMAGE_TIFF,  # avoid defaulting to subtype geotiff
+    ".yaml": ContentType.APP_YAML,  # common alternative to .yml
 }
 
 _CONTENT_TYPE_EXTENSION_MAPPING = {}  # type: Dict[str, str]
@@ -100,7 +107,7 @@ _CONTENT_TYPE_EXT_PATTERN = re.compile(r"^[a-z]+/(x-)?(?P<ext>([a-z]+)).*$")
 _CONTENT_TYPE_LOCALS_MISSING = [
     (ctype, _CONTENT_TYPE_EXT_PATTERN.match(ctype))
     for name, ctype in locals().items()
-    if name.startswith("CONTENT_TYPE_")
+    if name.startswith("ContentType.")
     and isinstance(ctype, str)
     and ctype not in _CONTENT_TYPE_EXCLUDE
     and ctype not in _CONTENT_TYPE_FORMAT_MAPPING
@@ -154,8 +161,8 @@ _CONTENT_TYPE_CHAR_TYPES = [
 # redirect type resolution semantically equivalent CWL validators
 # should only be used to map CWL 'format' field if they are not already resolved through existing IANA/EDAM reference
 _CONTENT_TYPE_SYNONYM_MAPPING = {
-    CONTENT_TYPE_APP_TAR: CONTENT_TYPE_APP_GZIP,
-    CONTENT_TYPE_APP_TAR_GZ: CONTENT_TYPE_APP_GZIP,
+    ContentType.APP_TAR: ContentType.APP_GZIP,
+    ContentType.APP_TAR_GZ: ContentType.APP_GZIP,
 }
 
 # Mappings for "CWL->File->Format"
@@ -171,26 +178,33 @@ EDAM_NAMESPACE = "edam"
 EDAM_NAMESPACE_DEFINITION = {EDAM_NAMESPACE: "http://edamontology.org/"}
 EDAM_SCHEMA = "http://edamontology.org/EDAM_1.24.owl"
 EDAM_MAPPING = {
-    CONTENT_TYPE_APP_CWL: "format_3857",
-    CONTENT_TYPE_APP_HDF5: "format_3590",
-    CONTENT_TYPE_APP_JSON: "format_3464",
-    CONTENT_TYPE_APP_NETCDF: "format_3650",
-    CONTENT_TYPE_APP_YAML: "format_3750",
-    CONTENT_TYPE_TEXT_PLAIN: "format_1964",
+    ContentType.APP_CWL: "format_3857",
+    ContentType.APP_HDF5: "format_3590",
+    ContentType.APP_JSON: "format_3464",
+    ContentType.APP_NETCDF: "format_3650",
+    ContentType.APP_YAML: "format_3750",
+    ContentType.TEXT_PLAIN: "format_1964",
 }
 FORMAT_NAMESPACES = frozenset([IANA_NAMESPACE, EDAM_NAMESPACE])
 
-# renderers output formats for OpenAPI generation
-WPS_VERSION_100 = "1.0.0"
-WPS_VERSION_200 = "2.0.0"
-OUTPUT_FORMAT_JSON = "json"
-OUTPUT_FORMAT_XML = "xml"
-OUTPUT_FORMATS = {
-    WPS_VERSION_100: OUTPUT_FORMAT_XML,
-    WPS_VERSION_200: OUTPUT_FORMAT_JSON,
-    CONTENT_TYPE_APP_XML: OUTPUT_FORMAT_XML,
-    CONTENT_TYPE_APP_JSON: OUTPUT_FORMAT_JSON,
-}
+
+class OutputFormat(Constants):
+    """
+    Renderer output formats for OpenAPI generation.
+    """
+    JSON = "json"
+    XML = "xml"
+
+    @classmethod
+    def get(cls, format_or_version, default=JSON):
+        if format_or_version == "1.0.0":
+            return OutputFormat.XML
+        if format_or_version == "2.0.0":
+            return OutputFormat.JSON
+        if "/" in format_or_version:  # Media-Type to output format renderer
+            format_or_version = format_or_version.split("/")[-1].split(";")[0].strip()
+        return super(OutputFormat, cls).get(format_or_version)
+
 
 LOGGER = logging.getLogger(__name__)
 

@@ -1,7 +1,14 @@
-VISIBILITY_PUBLIC = "public"
-VISIBILITY_PRIVATE = "private"
+from typing import TYPE_CHECKING
 
-VISIBILITY_VALUES = frozenset([
-    VISIBILITY_PUBLIC,
-    VISIBILITY_PRIVATE,
-])
+from weaver.base import Constants
+
+
+class Visibility(Constants):
+    PUBLIC = "public"
+    PRIVATE = "private"
+
+
+if TYPE_CHECKING:
+    from weaver.typedefs import Literal
+
+    AnyVisibility = Literal[Visibility.PUBLIC, Visibility.PRIVATE]

@@ -30,17 +30,9 @@ from pywps import Process as ProcessWPS
 
 from weaver import xml_util
 from weaver.exceptions import ProcessInstanceError, ServiceParsingError
-from weaver.execute import (
-    EXECUTE_CONTROL_OPTION_ASYNC,
-    EXECUTE_CONTROL_OPTIONS,
-    EXECUTE_MODE_ASYNC,
-    EXECUTE_MODE_OPTIONS,
-    EXECUTE_MODE_SYNC,
-    EXECUTE_TRANSMISSION_MODE_OPTIONS,
-    EXECUTE_TRANSMISSION_MODE_REFERENCE
-)
-from weaver.formats import ACCEPT_LANGUAGE_EN_CA, CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML
-from weaver.processes.constants import PROCESS_SCHEMA_OGC, PROCESS_SCHEMA_OLD
+from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteTransmissionMode
+from weaver.formats import AcceptLanguage, ContentType
+from weaver.processes.constants import ProcessSchema
 from weaver.processes.convert import get_field, null, ows2json, wps2json_io
 from weaver.processes.types import (
     PROCESS_APPLICATION,
@@ -51,16 +43,7 @@ from weaver.processes.types import (
     PROCESS_WPS_REMOTE,
     PROCESS_WPS_TYPES
 )
-from weaver.status import (
-    JOB_STATUS_CATEGORIES,
-    JOB_STATUS_CATEGORY_FINISHED,
-    JOB_STATUS_VALUES,
-    STATUS_ACCEPTED,
-    STATUS_RUNNING,
-    STATUS_SUCCEEDED,
-    STATUS_UNKNOWN,
-    map_status
-)
+from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.utils import localize_datetime  # for backward compatibility of previously saved jobs not time-locale-aware
 from weaver.utils import (
     fully_qualified_name,
@@ -71,7 +54,7 @@ from weaver.utils import (
     now,
     request_extra
 )
-from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_VALUES
+from weaver.visibility import Visibility
 from weaver.warning import NonBreakingExceptionWarning
 from weaver.wps.utils import get_wps_client, get_wps_url
 from weaver.wps_restapi import swagger_definitions as sd
@@ -82,8 +65,11 @@ if TYPE_CHECKING:
 
     from owslib.wps import WebProcessingService
 
+    from weaver.execute import AnyExecuteControlOption, AnyExecuteTransmissionMode
     from weaver.processes.constants import ProcessSchemaType
+    from weaver.status import AnyStatusType
     from weaver.typedefs import AnyProcess, AnySettingsContainer, AnyUUID, Number, CWL, JSON
+    from weaver.visibility import AnyVisibility
 
     AnyParams = Dict[str, Any]
     AnyAuthentication = Union["Authentication", "DockerAuthentication"]
@@ -235,6 +221,7 @@ class Service(Base):
     """
 
     def __init__(self, *args, **kwargs):
+        # type: (Any, Any) -> None
         super(Service, self).__init__(*args, **kwargs)
         if "name" not in self:
             raise TypeError("Service 'name' is required")
@@ -329,7 +316,7 @@ class Service(Base):
             wps_url = wps.url
         else:
             wps_url = self.url
-            wps_lang = ACCEPT_LANGUAGE_EN_CA  # assume, cannot validate
+            wps_lang = AcceptLanguage.EN_CA  # assume, cannot validate
 
         wps_url = urljoin(wps_url, urlparse(wps_url).path)
         wps_url = "{}?service=WPS&request=GetCapabilities".format(wps_url)
@@ -341,28 +328,28 @@ class Service(Base):
                 "title": "Service description (GetCapabilities).",
                 "href": wps_url,
                 "hreflang": wps_lang,
-                "type": CONTENT_TYPE_APP_XML,
+                "type": ContentType.APP_XML,
             },
             {
                 "rel": "service",
                 "title": "Service definition.",
                 "href": svc_url,
-                "hreflang": ACCEPT_LANGUAGE_EN_CA,
-                "type": CONTENT_TYPE_APP_JSON,
+                "hreflang": AcceptLanguage.EN_CA,
+                "type": ContentType.APP_JSON,
             },
             {
                 "rel": self_link or "self",
                 "title": "Provider definition.",
                 "href": svc_url,
-                "hreflang": ACCEPT_LANGUAGE_EN_CA,
-                "type": CONTENT_TYPE_APP_JSON,
+                "hreflang": AcceptLanguage.EN_CA,
+                "type": ContentType.APP_JSON,
             },
             {
                 "rel": "http://www.opengis.net/def/rel/ogc/1.0/processes",
                 "title": "Listing of processes provided by this service.",
                 "href": proc_url,
-                "hreflang": ACCEPT_LANGUAGE_EN_CA,
-                "type": CONTENT_TYPE_APP_JSON,
+                "hreflang": AcceptLanguage.EN_CA,
+                "type": ContentType.APP_JSON,
             },
         ]
         return links
@@ -536,7 +523,7 @@ class Job(Base):
             raise TypeError(f"Type 'str' or 'UUID' is required for '{self.__name__}.id'")
 
     def _get_log_msg(self, msg=None, status=None, progress=None):
-        # type: (Optional[str], Optional[str], Optional[Number]) -> str
+        # type: (Optional[str], Optional[AnyStatusType], Optional[Number]) -> str
         if not msg:
             msg = self.status_message
         status = map_status(status or self.status)
@@ -553,7 +540,7 @@ class Job(Base):
                  logger=None,       # type: Optional[Logger]
                  message=None,      # type: Optional[str]
                  level=INFO,        # type: int
-                 status=None,       # type: Optional[str]
+                 status=None,       # type: Optional[AnyStatusType]
                  progress=None,     # type: Optional[Number]
                  ):                 # type: (...) -> None
         """
@@ -749,21 +736,20 @@ class Job(Base):
 
     @property
     def status(self):
-        # type: () -> str
-        return self.get("status", STATUS_UNKNOWN)
+        # type: () -> Status
+        return Status.get(self.get("status"), Status.UNKNOWN)
 
     @status.setter
     def status(self, status):
         # type: (str) -> None
-        if status == STATUS_ACCEPTED and self.status == STATUS_RUNNING:
+        value = Status.get(status)
+        if value == Status.ACCEPTED and self.status == Status.RUNNING:
             LOGGER.debug(traceback.extract_stack())
-        if not isinstance(status, str):
-            raise TypeError(f"Type 'str' is required for '{self.__name__}.status'")
-        if status not in JOB_STATUS_VALUES:
-            statuses = list(JOB_STATUS_VALUES)
+        if value not in Status:
+            statuses = list(Status.values())
             name = self.__name__
             raise ValueError(f"Status '{status}' is not valid for '{name}.status', must be one of {statuses!s}'")
-        self["status"] = status
+        self["status"] = value
 
     @property
     def status_message(self):
@@ -818,25 +804,24 @@ class Job(Base):
     @property
     def execute_async(self):
         # type: () -> bool
-        return self.execution_mode == EXECUTE_MODE_ASYNC
+        return self.execution_mode == ExecuteMode.ASYNC
 
     @property
     def execute_sync(self):
         # type: () -> bool
-        return self.execution_mode == EXECUTE_MODE_SYNC
+        return self.execution_mode == ExecuteMode.SYNC
 
     @property
     def execution_mode(self):
-        # type: () -> str
-        return self.get("execution_mode", EXECUTE_MODE_ASYNC)
+        # type: () -> ExecuteMode
+        return ExecuteMode.get(self.get("execution_mode"), ExecuteMode.ASYNC)
 
     @execution_mode.setter
     def execution_mode(self, mode):
-        # type: (str) -> None
-        if not isinstance(mode, str):
-            raise TypeError(f"Type 'str' is required for '{self.__name__}.execution_mode'")
-        if mode not in EXECUTE_MODE_OPTIONS:
-            modes = list(EXECUTE_MODE_OPTIONS)
+        # type: (Union[ExecuteMode, str]) -> None
+        exec_mode = ExecuteMode.get(mode)
+        if exec_mode not in ExecuteMode:
+            modes = list(ExecuteMode.values())
             raise ValueError(f"Invalid value for '{self.__name__}.execution_mode'. Must be one of {modes}")
         self["execution_mode"] = mode
 
@@ -907,7 +892,7 @@ class Job(Base):
         updated = self.get("updated")
         # backward compatibility when not already set
         if not updated:
-            if self.status == map_status(STATUS_ACCEPTED):
+            if self.status == map_status(Status.ACCEPTED):
                 updated = self.created
             elif self.is_finished:
                 updated = self.finished
@@ -1016,11 +1001,11 @@ class Job(Base):
 
     @property
     def access(self):
-        # type: () -> str
+        # type: () -> Visibility
         """
         Job visibility access from execution.
         """
-        return self.get("access", VISIBILITY_PRIVATE)
+        return Visibility.get(self.get("access"), Visibility.PRIVATE)
 
     @access.setter
     def access(self, visibility):
@@ -1028,11 +1013,11 @@ class Job(Base):
         """
         Job visibility access from execution.
         """
-        if not isinstance(visibility, str):
-            raise TypeError(f"Type 'str' is required for '{self.__name__}.access'")
-        if visibility not in VISIBILITY_VALUES:
-            raise ValueError(f"Invalid 'visibility' value specified for '{self.__name__}.access'")
-        self["access"] = visibility
+        vis = Visibility.get(visibility)
+        if visibility not in Visibility.values():
+            name = fully_qualified_name(self)
+            raise ValueError(f"Invalid 'visibility' value '{visibility!s}' specified for '{name}.access'")
+        self["access"] = vis
 
     @property
     def context(self):
@@ -1124,9 +1109,9 @@ class Job(Base):
             {"href": job_url + "/inputs", "rel": "inputs",  # unofficial
              "title": "Submitted job inputs for process execution."}
         ]
-        if self.status in JOB_STATUS_CATEGORIES[JOB_STATUS_CATEGORY_FINISHED]:
+        if self.status in JOB_STATUS_CATEGORIES[StatusCategory.FINISHED]:
             job_status = map_status(self.status)
-            if job_status == STATUS_SUCCEEDED:
+            if job_status == Status.SUCCEEDED:
                 job_links.extend([
                     {"href": job_url + "/outputs", "rel": "outputs",  # unofficial
                      "title": "Job outputs of successful process execution (extended outputs with metadata)."},
@@ -1153,7 +1138,7 @@ class Job(Base):
             self_link_up = {"href": job_list, "rel": "up", "title": "List of submitted jobs."}
         self_link_body["rel"] = "self"
         job_links.extend([self_link_body, self_link_up])
-        link_meta = {"type": CONTENT_TYPE_APP_JSON, "hreflang": ACCEPT_LANGUAGE_EN_CA}
+        link_meta = {"type": ContentType.APP_JSON, "hreflang": AcceptLanguage.EN_CA}
         for link in job_links:
             link.update(link_meta)
         return job_links
@@ -1795,25 +1780,27 @@ class Process(Base):
 
     @property
     def jobControlOptions(self):  # noqa: N802
-        # type: () -> List[str]
-        jco = self.setdefault("jobControlOptions", [EXECUTE_CONTROL_OPTION_ASYNC])
+        # type: () -> List[AnyExecuteControlOption]
+        jco = self.setdefault("jobControlOptions", [ExecuteControlOption.ASYNC])
         if not isinstance(jco, list):  # eg: None, bw-compat
-            jco = [EXECUTE_CONTROL_OPTION_ASYNC]
-        jco = [mode for mode in jco if mode in EXECUTE_CONTROL_OPTIONS]
+            jco = [ExecuteControlOption.ASYNC]
+        jco = [ExecuteControlOption.get(opt) for opt in jco]
+        jco = [opt for opt in jco if opt is not None]
         if len(jco) == 0:
-            jco.append(EXECUTE_CONTROL_OPTION_ASYNC)
+            jco.append(ExecuteControlOption.ASYNC)
         self["jobControlOptions"] = jco
         return dict.__getitem__(self, "jobControlOptions")
 
     @property
     def outputTransmission(self):  # noqa: N802
-        # type: () -> List[str]
-        out = self.setdefault("outputTransmission", [EXECUTE_TRANSMISSION_MODE_REFERENCE])
+        # type: () -> List[AnyExecuteTransmissionMode]
+        out = self.setdefault("outputTransmission", [ExecuteTransmissionMode.REFERENCE])
         if not isinstance(out, list):  # eg: None, bw-compat
-            out = [EXECUTE_TRANSMISSION_MODE_REFERENCE]
-        out = [mode for mode in out if mode in EXECUTE_TRANSMISSION_MODE_OPTIONS]
+            out = [ExecuteTransmissionMode.REFERENCE]
+        out = [ExecuteTransmissionMode.get(mode) for mode in out]
+        out = [mode for mode in out if mode is not None]
         if len(out) == 0:
-            out.append(EXECUTE_TRANSMISSION_MODE_REFERENCE)
+            out.append(ExecuteTransmissionMode.REFERENCE)
         self["outputTransmission"] = out
         return dict.__getitem__(self, "outputTransmission")
 
@@ -1916,20 +1903,19 @@ class Process(Base):
 
     @property
     def visibility(self):
-        # type: () -> str
-        return self.get("visibility", VISIBILITY_PRIVATE)
+        # type: () -> Visibility
+        return Visibility.get(self.get("visibility"), Visibility.PRIVATE)
 
     @visibility.setter
     def visibility(self, visibility):
-        # type: (str) -> None
-        if not isinstance(visibility, str):
-            raise TypeError(f"Type 'str' is required for '{self.__name__}.visibility'")
-        if visibility not in VISIBILITY_VALUES:
-            values = list(VISIBILITY_VALUES)
+        # type: (AnyVisibility) -> None
+        vis = Visibility.get(visibility)
+        if vis not in Visibility:
+            values = list(Visibility.values())
             raise ValueError(
                 f"Status '{visibility}' is not valid for '{self.__name__}.visibility, must be one of {values!s}'"
             )
-        self["visibility"] = visibility
+        self["visibility"] = vis
 
     @property
     def auth(self):
@@ -2051,14 +2037,14 @@ class Process(Base):
                  "title": "Remote process description."},
             ]
             for link in wps_links:
-                link.setdefault("type", CONTENT_TYPE_APP_XML)
+                link.setdefault("type", ContentType.APP_XML)
             links.extend(wps_links)
         for link in links:
-            link.setdefault("type", CONTENT_TYPE_APP_JSON)
-            link.setdefault("hreflang", ACCEPT_LANGUAGE_EN_CA)
+            link.setdefault("type", ContentType.APP_JSON)
+            link.setdefault("hreflang", AcceptLanguage.EN_CA)
         return {"links": links}
 
-    def offering(self, schema=PROCESS_SCHEMA_OGC):
+    def offering(self, schema=ProcessSchema.OGC):
         # type: (ProcessSchemaType) -> JSON
         """
         Obtains the JSON serializable offering/description representation of the process.
@@ -2074,7 +2060,7 @@ class Process(Base):
         process = self.dict()
         links = self.links()
         # force selection of schema to avoid ambiguity
-        if str(schema or PROCESS_SCHEMA_OGC).upper() == PROCESS_SCHEMA_OLD:
+        if str(schema or ProcessSchema.OGC).upper() == ProcessSchema.OLD:
             # nested process fields + I/O as lists
             process.update({"process": dict(process)})
             process.update(links)
