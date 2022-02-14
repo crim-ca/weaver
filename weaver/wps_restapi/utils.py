@@ -12,8 +12,6 @@ from weaver.wps_restapi import swagger_definitions as sd
 if TYPE_CHECKING:
     from typing import Any, Dict, Optional
 
-    from pyramid.httpexceptions import HTTPException
-
     from weaver.typedefs import AnySettingsContainer, HeadersType
 
 LOGGER = logging.getLogger(__name__)
@@ -30,17 +28,19 @@ class HTTPHeadFileResponse(HTTPSuccessful):
     .. seealso::
         :rfc:`2616#section-9.4`
 
+
+    from pyramid.httpexceptions import HTTPException
     .. note::
         Even though no content is provided for HEAD response, ``204`` **SHOULD NOT** be used
         since it must emulate the GET response that would contain the content.
 
-    When setting :attr:`HTTPException.empty_body` on :class:`HTTPException` derived classes, :mod:`pyramid` incorrectly
-    drops important headers such as ``Content-Type`` and ``Content-Length`` that should be reported as if the file was
-    returned when the represented entity is a file, although no content is actually present. When instead the body is
-    omitted (``text=""`` or ``body=b''``), the :meth:`HTTPException.prepare` method also incorrectly overrides
-    the ``Content-Type`` and ``Content-Length`` values. Finally, ``Content-Length`` also gets recalculated when the
-    content iterator is created from the initialization parameters. This class takes care of all these edge cases to
-    properly report content headers of HEAD requests although none is provided.
+    When setting :attr:`HTTPException.empty_body` on :class:`pyramid.httpexceptions.HTTPException` derived classes,
+    :mod:`pyramid` incorrectly drops important headers such as ``Content-Type`` and ``Content-Length`` that should be
+    reported as if the file was returned when the represented entity is a file, although no content is actually present.
+    When instead the body is omitted (``text=""`` or ``body=b''``), the :meth:`HTTPException.prepare` method also
+    incorrectly overrides the ``Content-Type`` and ``Content-Length`` values. Finally, ``Content-Length`` also gets
+    recalculated when the content iterator is created from the initialization parameters. This class takes care of all
+    these edge cases to properly report content headers of HEAD requests although none is provided.
     """
     def __init__(self, code=200, headers=None, **kwargs):
         # type: (int, Optional[HeadersType], Any) -> None
