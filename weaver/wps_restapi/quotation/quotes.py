@@ -1,9 +1,5 @@
 import logging
-import random
-from datetime import timedelta
-from typing import TYPE_CHECKING
 
-from duration import to_iso8601
 from pyramid.httpexceptions import HTTPBadRequest, HTTPCreated, HTTPNotFound, HTTPOk
 
 from weaver.config import WeaverConfiguration, WeaverFeature, get_weaver_configuration
@@ -12,33 +8,16 @@ from weaver.datatype import Bill, Quote
 from weaver.exceptions import ProcessNotFound, QuoteNotFound, log_unhandled_exceptions
 from weaver.formats import OutputFormat
 from weaver.processes.types import ProcessType
+from weaver.processes.quotation import process_quote_estimator
 from weaver.processes.wps_package import get_package_workflow_steps, get_process_location
+from weaver.store.base import StoreBills, StoreProcesses, StoreQuotes
 from weaver.sort import Sort
 from weaver.store.base import StoreBills, StoreQuotes
 from weaver.utils import get_settings, get_weaver_url
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.processes.processes import submit_local_job
 
-if TYPE_CHECKING:
-    from weaver.datatype import Process
-    from weaver.typedefs import JSON
-
 LOGGER = logging.getLogger(__name__)
-
-
-def process_quote_estimator(process):   # noqa: E811
-    # type: (Process) -> JSON
-    """
-    Simulate quote parameters for the process execution.
-
-    :param process: instance of :class:`weaver.datatype.Process` for which to evaluate the quote.
-    :return: dict of {price, currency, estimatedTime} values for the process quote.
-    """
-    # TODO: replace by some fancy ml technique or something?
-    price = random.uniform(0, 10)  # nosec
-    currency = "CAD"
-    estimated_time = to_iso8601(timedelta(minutes=random.uniform(5, 60)))  # nosec
-    return {"price": price, "currency": currency, "estimatedTime": estimated_time}
 
 
 @sd.process_quotes_service.post(tags=[sd.TAG_BILL_QUOTE, sd.TAG_PROCESSES], renderer=OutputFormat.JSON,
@@ -55,11 +34,17 @@ def request_quote(request):
         raise HTTPBadRequest("Unsupported request for configuration '{}'.".format(weaver_config))
 
     process_id = request.matchdict.get("process_id")
-    process_store = get_db(request).get_store("processes")
+    process_store = get_db(request).get_store(StoreProcesses)
     try:
         process = process_store.fetch_by_id(process_id)
     except ProcessNotFound:
-        raise HTTPNotFound("Could not find process with specified 'process_id'.")
+        raise ProcessNotFound(json={
+            "title": "NoSuchProcess",
+            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/no-such-process",
+            "detail": "Process with specified reference identifier does not exist.",
+            "status": ProcessNotFound.code,
+            "cause": str(process_id)
+        })
 
     store = get_db(request).get_store(StoreQuotes)
     process_url = get_process_location(process_id, data_source=get_weaver_url(settings))
@@ -68,13 +53,21 @@ def request_quote(request):
     for param in ["inputs", "outputs", "mode", "response"]:
         if param in request.json:
             process_params[param] = request.json.pop(param)
-    process_quote_info = process_quote_estimator(process)
-    process_quote_info.update({
+
+    inputs = process_params["inputs"]
+    outputs = process_params["outputs"]
+    quote_info = {
         "process": process_id,
-        "processParameters": process_params,
+        "inputs": inputs,
+        "outputs": outputs,
         "location": process_url,
         "user": str(request.authenticated_userid)
-    })
+    }
+    quote = store.save_quote(Quote(**quote_info))
+    result = process_quote_estimator.delay(process, inputs, outputs)
+    LOGGER.debug("Celery pending task [%s] for quote [%s].", result.id, quote.id)
+
+    wait = request.headers.get("Pre")
 
     # loop workflow sub-process steps to get individual quotes
     if process_type == ProcessType.WORKFLOW and weaver_config == WeaverConfiguration.EMS:

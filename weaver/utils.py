@@ -262,6 +262,11 @@ def get_cookie_headers(header_container, cookie_header_name="Cookie"):
         return {}
 
 
+def get_prefer_header(header_container):
+    # type: (AnyHeadersContainer) -> Tuple[Ex]
+    pass
+
+
 def get_url_without_query(url):
     # type: (Union[str, ParseResult]) -> str
     """
