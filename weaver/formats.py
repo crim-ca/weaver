@@ -322,7 +322,7 @@ def get_cwl_file_format(mime_type, make_reference=False, must_exist=True, allow_
         except ConnectionError as exc:
             LOGGER.debug("Format request [%s] connection error: [%s]", _mime_type_url, exc)
         try:
-            for i in range(retries):
+            for _ in range(retries):
                 try:
                     resp = urlopen(_mime_type_url, timeout=2)  # nosec: B310 # is hardcoded HTTP(S)
                 except socket.timeout:
