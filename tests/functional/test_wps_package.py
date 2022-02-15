@@ -48,7 +48,7 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_INIT_WORKDIR,
     ProcessSchema
 )
-from weaver.processes.types import PROCESS_APPLICATION, PROCESS_BUILTIN
+from weaver.processes.types import ProcessType
 from weaver.status import Status
 from weaver.utils import get_any_value
 from weaver.wps.utils import get_wps_output_dir, map_wps_output_location
@@ -543,7 +543,7 @@ class WpsPackageAppTest(WpsConfigBase):
                     "id": self._testMethodName,
                     "title": "some title",
                     "abstract": "this is a test",
-                    "type": PROCESS_BUILTIN,
+                    "type": ProcessType.BUILTIN,
                 },
             },
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
@@ -561,9 +561,9 @@ class WpsPackageAppTest(WpsConfigBase):
             # With Weaver>4.1.x, the deserialized result from Deploy payload is employed, which drops unknown 'type'
             # Ensure that deploy now succeeds, but the obtained Process is not 'builtin' (just a regular application)
             assert resp.status_code == 201
-            assert PROCESS_BUILTIN not in resp.json["processSummary"]["keywords"]
+            assert ProcessType.BUILTIN not in resp.json["processSummary"]["keywords"]
             process = self.process_store.fetch_by_id(self._testMethodName)
-            assert process.type == PROCESS_APPLICATION
+            assert process.type == ProcessType.APPLICATION
 
     def test_deploy_block_unknown_processes(self):
         """

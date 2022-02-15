@@ -15,7 +15,7 @@ from weaver.database import get_db
 from weaver.datatype import Process
 from weaver.exceptions import PackageExecutionError, PackageNotFound, ProcessNotAccessible, ProcessNotFound
 from weaver.processes.constants import CWL_REQUIREMENT_APP_BUILTIN
-from weaver.processes.types import PROCESS_BUILTIN
+from weaver.processes.types import ProcessType
 from weaver.processes.wps_package import PACKAGE_EXTENSIONS, get_process_definition
 from weaver.store.base import StoreProcesses
 from weaver.utils import clean_json_text_body, get_registry, ows_context_href
@@ -81,7 +81,7 @@ def _replace_template(pkg, var, val):
 def _get_builtin_package(process_id, package):
     # type: (str, CWL) -> CWL
     """
-    Updates the `CWL` with requirements to allow running a :data:`PROCESS_BUILTIN` process.
+    Updates the `CWL` with requirements to allow running a :data:`ProcessType.BUILTIN` process.
 
     Following modifications are applied:
 
@@ -122,7 +122,7 @@ def register_builtin_processes(container):
             "processDescription": {
                 "process": {
                     "id": process_id,
-                    "type": PROCESS_BUILTIN,
+                    "type": ProcessType.BUILTIN,
                     "title": process_title,
                     "version": process_version,
                     "abstract": process_abstract,
@@ -134,7 +134,7 @@ def register_builtin_processes(container):
         process_payload["processDescription"]["process"].update(ows_context_href(process_url))
         builtin_processes.append(Process(
             id=process_id,
-            type=PROCESS_BUILTIN,
+            type=ProcessType.BUILTIN,
             title=process_title,
             version=process_version,
             abstract=process_abstract,
@@ -166,9 +166,9 @@ class BuiltinProcessJobBase(CommandLineJob):
             store = get_db(registry).get_store(StoreProcesses)
             process = store.fetch_by_id(self.process)  # raise if not found
         except (ProcessNotAccessible, ProcessNotFound):
-            raise PackageNotFound("Cannot find '{}' package for process '{}'".format(PROCESS_BUILTIN, self.process))
-        if process.type != PROCESS_BUILTIN:
-            raise PackageExecutionError("Invalid package is not of type '{}'".format(PROCESS_BUILTIN))
+            raise PackageNotFound("Cannot find '{}' package for process '{}'".format(ProcessType.BUILTIN, self.process))
+        if process.type != ProcessType.BUILTIN:
+            raise PackageExecutionError("Invalid package is not of type '{}'".format(ProcessType.BUILTIN))
 
     def _update_command(self):
         if len(self.command_line) and self.command_line[0] == "python":

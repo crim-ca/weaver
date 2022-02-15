@@ -20,7 +20,7 @@ from weaver.formats import ContentType
 from weaver.owsexceptions import OWSNoApplicableCode
 from weaver.processes.convert import wps2json_job_payload
 from weaver.processes.execution import submit_job_handler
-from weaver.processes.types import PROCESS_WORKFLOW
+from weaver.processes.types import ProcessType
 from weaver.processes.utils import get_job_submission_response, get_process
 from weaver.store.base import StoreProcesses
 from weaver.utils import get_header, get_registry, get_settings, get_weaver_url
@@ -233,7 +233,7 @@ class WorkerService(ServiceWPS):
         wps_process = self.processes.get(pid)
 
         # create the JSON payload from the XML content and submit job
-        is_workflow = proc.type == PROCESS_WORKFLOW
+        is_workflow = proc.type == ProcessType.WORKFLOW
         tags = req.args.get("tags", "").split(",") + ["xml", "wps-{}".format(wps_request.version)]
         data = wps2json_job_payload(wps_request, wps_process)
         body = submit_job_handler(data, self.settings, proc.processEndpointWPS1,

@@ -1,6 +1,6 @@
 from pywps import LiteralInput, LiteralOutput, Process
 
-from weaver.processes.types import PROCESS_TEST
+from weaver.processes.types import ProcessType
 
 
 class WpsTestProcess(Process):
@@ -8,7 +8,7 @@ class WpsTestProcess(Process):
     Test WPS process definition that simply returns its input string as output.
     """
 
-    type = PROCESS_TEST   # allows to map WPS class
+    type = ProcessType.TEST   # allows to map WPS class
 
     def __init__(self, **kw):
         # remove duplicates/unsupported keywords

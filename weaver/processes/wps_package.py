@@ -73,7 +73,7 @@ from weaver.processes.convert import (
     xml_wps2cwl
 )
 from weaver.processes.sources import retrieve_data_source_url
-from weaver.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
+from weaver.processes.types import ProcessType
 from weaver.processes.utils import map_progress
 from weaver.status import STATUS_PYWPS_IDS, Status, StatusCompliant, map_status
 from weaver.store.base import StoreJobs, StoreProcesses
@@ -132,6 +132,7 @@ if TYPE_CHECKING:
         CWL_ToolPathObjectType,
         CWL_WorkflowStepPackageMap,
         JSON,
+        Literal,
         Number,
         ValueType
     )
@@ -221,7 +222,7 @@ def get_package_workflow_steps(package_dict_or_url):
         package_dict_or_url = _get_process_package(package_dict_or_url)
     workflow_steps_ids = list()
     package_type = _get_package_type(package_dict_or_url)
-    if package_type == PROCESS_WORKFLOW:
+    if package_type == ProcessType.WORKFLOW:
         workflow_steps = package_dict_or_url.get("steps")
         for step in workflow_steps:
             step_package_ref = workflow_steps[step].get("run")
@@ -283,8 +284,8 @@ def _get_process_payload(process_url):
 
 
 def _get_package_type(package_dict):
-    # type: (CWL) -> Union[PROCESS_APPLICATION, PROCESS_WORKFLOW]
-    return PROCESS_WORKFLOW if package_dict.get("class").lower() == "workflow" else PROCESS_APPLICATION
+    # type: (CWL) -> Literal[ProcessType.APPLICATION, ProcessType.WORKFLOW]
+    return ProcessType.WORKFLOW if package_dict.get("class").lower() == "workflow" else ProcessType.APPLICATION
 
 
 def _get_package_requirements_as_class_list(requirements):
@@ -369,18 +370,18 @@ def _load_package_content(package_dict,                             # type: CWL
     :param package_dict: package content representation as a json dictionary.
     :param package_name: name to use to create the package file.
     :param data_source: identifier of the data source to map to specific ADES, or map to localhost if ``None``.
-    :param only_dump_file: specify if the ``CWLFactoryCallable`` should be validated and returned.
+    :param only_dump_file: specify if the :class:`CWLFactoryCallable` should be validated and returned.
     :param tmp_dir: location of the temporary directory to dump files (deleted on exit).
     :param loading_context: cwltool context used to create the cwl package (required if ``only_dump_file=False``)
     :param runtime_context: cwltool context used to execute the cwl package (required if ``only_dump_file=False``)
     :param process_offering: JSON body of the process description payload (used as I/O hint ordering)
     :returns:
-        If ``only_dump_file`` is ``True``, returns ``None``.
+        If :paramref:`only_dump_file` is ``True``, returns ``None``.
         Otherwise, tuple of:
 
-        - Instance of ``CWLFactoryCallable``
-        - Package type (``PROCESS_WORKFLOW`` or ``PROCESS_APPLICATION``)
-        - Package sub-steps definitions if package is of type ``PROCESS_WORKFLOW``. Otherwise, empty mapping.
+        - Instance of :class:`CWLFactoryCallable`
+        - Package type (:attr:`ProcessType.WORKFLOW` or :attr:`ProcessType.APPLICATION`)
+        - Package sub-steps definitions if package is of type :attr:`ProcessType.WORKFLOW`. Otherwise, empty mapping.
           Mapping of each step name contains their respective package ID and definition that must be run.
 
     .. warning::
@@ -634,8 +635,8 @@ def check_package_instance_compatible(package):
     :param package: CWL definition for the process.
     :returns: reason message if must be executed remotely or ``None`` if it *could* be executed locally.
     """
-    if _get_package_type(package) == PROCESS_WORKFLOW:
-        return "CWL package defines a [{}] process that uses remote step-processes.".format(PROCESS_WORKFLOW)
+    if _get_package_type(package) == ProcessType.WORKFLOW:
+        return "CWL package defines a [{}] process that uses remote step-processes.".format(ProcessType.WORKFLOW)
     requirement = get_application_requirement(package)
     req_class = requirement["class"]
     req_local = [CWL_REQUIREMENT_APP_BUILTIN, CWL_REQUIREMENT_APP_DOCKER]
@@ -978,7 +979,7 @@ class WpsPackage(Process):
         if self.remote_execution:
             self.logger.debug("Skipping Docker setup not needed for remote execution.")
             return None
-        if self.package_type != PROCESS_APPLICATION:
+        if self.package_type != ProcessType.APPLICATION:
             self.logger.debug("Skipping Docker setup not needed for CWL Workflow. "
                               "Sub-step must take care of it if needed.")
             return None
@@ -1244,7 +1245,7 @@ class WpsPackage(Process):
             self.package_requirement = get_application_requirement(self.package)
             try:
                 # workflows do not support stdout/stderr
-                log_stdout_stderr = self.package_type != PROCESS_WORKFLOW
+                log_stdout_stderr = self.package_type != ProcessType.WORKFLOW
                 self.setup_loggers(log_stdout_stderr)
                 self.update_status("Preparing package logs done.", PACKAGE_PROGRESS_PREP_LOG, Status.RUNNING)
             except Exception as exc:
@@ -1376,7 +1377,7 @@ class WpsPackage(Process):
         .. seealso::
             - :ref:`File Reference Types`
         """
-        if self.remote_execution or self.package_type == PROCESS_WORKFLOW:
+        if self.remote_execution or self.package_type == ProcessType.WORKFLOW:
             return False
         app_req = get_application_requirement(self.package)
         if app_req["class"] in CWL_REQUIREMENT_APP_REMOTE:
@@ -1718,8 +1719,8 @@ class WpsPackage(Process):
         requirement = get_application_requirement(step_package)
         req_class = requirement["class"]
         req_source = "requirement/hint"
-        if step_package_type == PROCESS_WORKFLOW:
-            req_class = PROCESS_WORKFLOW
+        if step_package_type == ProcessType.WORKFLOW:
+            req_class = ProcessType.WORKFLOW
             req_source = "tool class"
 
         if jobtype == "step" and not any(
@@ -1749,7 +1750,7 @@ class WpsPackage(Process):
                 update_status=_update_status_dispatch,
             )
         else:
-            # implements both `PROCESS_APPLICATION` with `CWL_REQUIREMENT_APP_DOCKER` and `PROCESS_WORKFLOW`
+            # implements both `ProcessType.APPLICATION` with `CWL_REQUIREMENT_APP_DOCKER` and `ProcessType.WORKFLOW`
             self.logger.info("WPS-3 Package resolved from %s: %s", req_source, req_class)
             from weaver.processes.wps3_process import Wps3Process
             return Wps3Process(step_payload=step_payload,

@@ -11,7 +11,7 @@ from weaver.database import get_db
 from weaver.datatype import Bill, Quote
 from weaver.exceptions import ProcessNotFound, QuoteNotFound, log_unhandled_exceptions
 from weaver.formats import OutputFormat
-from weaver.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
+from weaver.processes.types import ProcessType
 from weaver.processes.wps_package import get_package_workflow_steps, get_process_location
 from weaver.store.base import StoreBills, StoreQuotes
 from weaver.sort import Sort
@@ -77,7 +77,7 @@ def request_quote(request):
     })
 
     # loop workflow sub-process steps to get individual quotes
-    if process_type == PROCESS_WORKFLOW and weaver_config == WeaverConfiguration.EMS:
+    if process_type == ProcessType.WORKFLOW and weaver_config == WeaverConfiguration.EMS:
         workflow_quotes = list()
 
         for step in get_package_workflow_steps(process_url):
@@ -97,7 +97,7 @@ def request_quote(request):
         return HTTPCreated(json={"quote": quote.json()})
 
     # single application quotes (ADES or EMS)
-    elif process_type == PROCESS_APPLICATION:
+    elif process_type == ProcessType.APPLICATION:
         quote = store.save_quote(Quote(**process_quote_info))
         quote_json = quote.json()
         quote_json.pop("steps", None)

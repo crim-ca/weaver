@@ -38,7 +38,7 @@ from weaver.exceptions import (
     VaultFileRegistrationError
 )
 from weaver.execute import ExecuteMode
-from weaver.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW, PROCESS_WPS_LOCAL
+from weaver.processes.types import ProcessType
 from weaver.sort import Sort, SortMethods
 from weaver.status import JOB_STATUS_CATEGORIES, Status, map_status
 from weaver.store.base import StoreBills, StoreJobs, StoreProcesses, StoreQuotes, StoreServices, StoreVault
@@ -51,8 +51,9 @@ if TYPE_CHECKING:
     from typing import Any, Callable, Dict, List, Optional, Tuple, Union
     from pymongo.collection import Collection
 
+    from weaver.processes.types import AnyProcessType
     from weaver.store.base import DatetimeIntervalType, JobGroupCategory, JobSearchResult
-    from weaver.typedefs import AnyProcess, AnyProcessType, AnyUUID, AnyValueType
+    from weaver.typedefs import AnyProcess, AnyProcessClass, AnyUUID, AnyValueType
     from weaver.visibility import AnyVisibility
 
     MongodbValue = Union[AnyValueType, datetime.datetime]
@@ -367,7 +368,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
 
     @staticmethod
     def _get_process_field(process, function_dict):
-        # type: (AnyProcess, Union[Dict[AnyProcessType, Callable[[], Any]], Callable[[], Any]]) -> Any
+        # type: (AnyProcess, Union[Dict[AnyProcessClass, Callable[[], Any]], Callable[[], Any]]) -> Any
         """
         Obtain a field from a process instance after validation and using mapping of process implementation functions.
 
@@ -395,10 +396,10 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         return self._get_process_field(process, lambda: process.identifier)
 
     def _get_process_type(self, process):
-        # type: (AnyProcess) -> str
+        # type: (AnyProcess) -> AnyProcessType
         return self._get_process_field(process, {
             Process: lambda: process.type,
-            ProcessWPS: lambda: getattr(process, "type", PROCESS_WPS_LOCAL)
+            ProcessWPS: lambda: getattr(process, "type", ProcessType.WPS_LOCAL)
         }).lower()
 
     def _get_process_endpoint_wps1(self, process):
@@ -587,9 +588,9 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
             tags = ["dev"]
             tags.extend(list(filter(lambda t: bool(t), custom_tags or [])))  # remove empty tags
             if is_workflow:
-                tags.append(PROCESS_WORKFLOW)
+                tags.append(ProcessType.WORKFLOW)
             else:
-                tags.append(PROCESS_APPLICATION)
+                tags.append(ProcessType.APPLICATION)
             if execute_async:
                 tags.append(ExecuteMode.ASYNC)
             else:

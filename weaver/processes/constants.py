@@ -26,7 +26,7 @@ class OpenSearchField(Constants):
 
 
 # FIXME: convert to 'Constants' class
-# CWL package (requirements/hints) corresponding to `PROCESS_APPLICATION`
+# CWL package (requirements/hints) corresponding to `ProcessType.APPLICATION`
 CWL_REQUIREMENT_APP_BUILTIN = "BuiltinRequirement"
 CWL_REQUIREMENT_APP_DOCKER = "DockerRequirement"
 CWL_REQUIREMENT_APP_DOCKER_GPU = "DockerGpuRequirement"

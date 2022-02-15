@@ -34,15 +34,7 @@ from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteTransmissio
 from weaver.formats import AcceptLanguage, ContentType
 from weaver.processes.constants import ProcessSchema
 from weaver.processes.convert import get_field, null, ows2json, wps2json_io
-from weaver.processes.types import (
-    PROCESS_APPLICATION,
-    PROCESS_BUILTIN,
-    PROCESS_TEST,
-    PROCESS_WORKFLOW,
-    PROCESS_WPS_LOCAL,
-    PROCESS_WPS_REMOTE,
-    PROCESS_WPS_TYPES
-)
+from weaver.processes.types import ProcessType
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.utils import localize_datetime  # for backward compatibility of previously saved jobs not time-locale-aware
 from weaver.utils import (
@@ -67,6 +59,7 @@ if TYPE_CHECKING:
 
     from weaver.execute import AnyExecuteControlOption, AnyExecuteTransmissionMode
     from weaver.processes.constants import ProcessSchemaType
+    from weaver.processes.types import AnyProcessType
     from weaver.status import AnyStatusType
     from weaver.typedefs import AnyProcess, AnySettingsContainer, AnyUUID, Number, CWL, JSON
     from weaver.visibility import AnyVisibility
@@ -252,7 +245,7 @@ class Service(Base):
         """
         Service type.
         """
-        return self.get("type", PROCESS_WPS_REMOTE)
+        return self.get("type", ProcessType.WPS_REMOTE)
 
     @property
     def public(self):
@@ -410,13 +403,13 @@ class Service(Base):
         """
         try:
             # FIXME: not implemented (https://github.com/crim-ca/weaver/issues/130)
-            if self.type.lower() not in PROCESS_WPS_TYPES:
+            if not ProcessType.is_wps(self.type):
                 return None
             # basic information always available (local)
             data = {
                 "id": self.name,
                 "url": self.url,  # remote URL (bw-compat, also in links)
-                "type": PROCESS_WPS_REMOTE,
+                "type": ProcessType.WPS_REMOTE,
                 "public": self.public,
                 "links": self.links(container, fetch=fetch),
             }
@@ -460,7 +453,7 @@ class Service(Base):
             If parsing failed and was requested to be ignored, returns ``None`` to distinguish from empty process list.
         """
         # FIXME: support other providers (https://github.com/crim-ca/weaver/issues/130)
-        if self.type.lower() not in PROCESS_WPS_TYPES:
+        if not ProcessType.is_wps(self.type):
             return []
         try:
             wps = self.wps(container)
@@ -482,7 +475,7 @@ class Service(Base):
         try:
             # some WPS don't like HEAD request, so revert to normal GetCapabilities
             # otherwise use HEAD because it is faster to only 'ping' the service
-            if self.type.lower() in PROCESS_WPS_TYPES:
+            if ProcessType.is_wps(self.type):
                 meth = "GET"
                 url = "{}?service=WPS&request=GetCapabilities".format(self.url)
             else:
@@ -1827,11 +1820,11 @@ class Process(Base):
     # wps, workflow, etc.
     @property
     def type(self):
-        # type: () -> str
+        # type: () -> AnyProcessType
         """
         Type of process amongst :mod:`weaver.processes.types` definitions.
         """
-        return self.get("type", PROCESS_APPLICATION)
+        return self.get("type", ProcessType.APPLICATION)
 
     @property
     def package(self):
@@ -2127,7 +2120,7 @@ class Process(Base):
             "executeEndpoint": execute_process_url,
             "processEndpointWPS1": wps_description_url,
             "processDescriptionURL": describe_process_url,
-            "type": PROCESS_WPS_REMOTE,
+            "type": ProcessType.WPS_REMOTE,
             "package": package,
             "service": svc_name
         })
@@ -2179,15 +2172,15 @@ class Process(Base):
         from weaver.processes.wps_testing import WpsTestProcess
         process_map = {
             HelloWPS.identifier: HelloWPS,
-            PROCESS_TEST: WpsTestProcess,
-            PROCESS_APPLICATION: WpsPackage,    # single CWL package
-            PROCESS_BUILTIN: WpsPackage,        # local scripts
-            PROCESS_WPS_REMOTE: WpsPackage,     # remote WPS
-            PROCESS_WORKFLOW: WpsPackage,       # chaining of CWL packages
+            ProcessType.TEST: WpsTestProcess,
+            ProcessType.APPLICATION: WpsPackage,    # single CWL package
+            ProcessType.BUILTIN: WpsPackage,        # local scripts
+            ProcessType.WPS_REMOTE: WpsPackage,     # remote WPS
+            ProcessType.WORKFLOW: WpsPackage,       # chaining of CWL packages
         }
 
         process_key = self.type
-        if self.type == PROCESS_WPS_LOCAL:
+        if self.type == ProcessType.WPS_LOCAL:
             process_key = self.identifier
         if process_key not in process_map:
             ProcessInstanceError("Unknown process '{}' in mapping.".format(process_key))

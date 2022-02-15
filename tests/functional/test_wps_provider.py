@@ -18,7 +18,7 @@ from tests.utils import (
 from weaver.config import WeaverConfiguration
 from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import ContentType
-from weaver.processes.types import PROCESS_WPS_REMOTE
+from weaver.processes.types import ProcessType
 from weaver.processes.wps1_process import Wps1Process
 
 if TYPE_CHECKING:
@@ -117,7 +117,7 @@ class WpsProviderTest(WpsConfigBase):
         body = resp.json
         assert "id" in body and body["id"] == remote_provider_name
         assert "hummingbird" in body["title"].lower()
-        assert body["type"] == PROCESS_WPS_REMOTE
+        assert body["type"] == ProcessType.WPS_REMOTE
 
         # validate processes capabilities
         path = "/providers/{}/processes".format(remote_provider_name)
@@ -132,7 +132,7 @@ class WpsProviderTest(WpsConfigBase):
         assert processes["ncdump"]["metadata"][1]["rel"] == "user-guide"
         # keyword 'Hummingbird' in this case is from GetCapabilities ProviderName
         # keyword of the service name within Weaver is also provided, which can be different than provider
-        expect_keywords = [PROCESS_WPS_REMOTE, "Hummingbird", remote_provider_name]
+        expect_keywords = [ProcessType.WPS_REMOTE, "Hummingbird", remote_provider_name]
         assert all(key in processes["ncdump"]["keywords"] for key in expect_keywords)
         proc_desc_url = processes["ncdump"]["processDescriptionURL"]
         proc_wps1_url = processes["ncdump"]["processEndpointWPS1"]

@@ -201,7 +201,7 @@ if TYPE_CHECKING:
     HTTPValid = Union[HTTPSuccessful, HTTPRedirection]
 
     AnyProcess = Union[Process, ProcessOWS, ProcessWPS, JSON]
-    AnyProcessType = Union[Type[Process], Type[ProcessWPS]]
+    AnyProcessClass = Union[Type[Process], Type[ProcessWPS]]
 
     # update_status(message, progress, status, *args, **kwargs)
     class UpdateStatusPartialFunction(Protocol):

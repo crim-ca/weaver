@@ -18,7 +18,7 @@ from weaver.exceptions import ProcessNotFound, ServiceException, log_unhandled_e
 from weaver.formats import OutputFormat
 from weaver.processes import opensearch
 from weaver.processes.execution import submit_job
-from weaver.processes.types import PROCESS_BUILTIN
+from weaver.processes.types import ProcessType
 from weaver.processes.utils import deploy_process_from_payload, get_job_submission_response, get_process
 from weaver.store.base import StoreProcesses
 from weaver.utils import fully_qualified_name, get_any_id, repr_json
@@ -211,7 +211,7 @@ def set_process_visibility(request):
     try:
         store = get_db(request).get_store(StoreProcesses)
         process = store.fetch_by_id(process_id)
-        if process.type == PROCESS_BUILTIN:
+        if process.type == ProcessType.BUILTIN:
             raise HTTPForbidden("Cannot change the visibility of builtin process.")
         store.set_visibility(process_id, visibility)
         return HTTPOk(json={u"value": visibility})
@@ -233,7 +233,7 @@ def delete_local_process(request):
     store = get_db(request).get_store(StoreProcesses)
     process = get_process(request=request, store=store)
     process_id = process.id
-    if process.type == PROCESS_BUILTIN:
+    if process.type == ProcessType.BUILTIN:
         raise HTTPForbidden("Cannot delete a builtin process.")
     if store.delete_process(process_id, visibility=Visibility.PUBLIC):
         return HTTPOk(json={

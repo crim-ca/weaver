@@ -39,7 +39,7 @@ from weaver.exceptions import (
     ServiceNotFound,
     log_unhandled_exceptions
 )
-from weaver.processes.types import PROCESS_APPLICATION, PROCESS_BUILTIN, PROCESS_WORKFLOW
+from weaver.processes.types import ProcessType
 from weaver.store.base import StoreProcesses, StoreServices
 from weaver.utils import get_sane_name, get_settings, get_url_without_query
 from weaver.visibility import Visibility
@@ -262,7 +262,7 @@ def deploy_process_from_payload(payload, container, overwrite=False):
         package = None
         reference = content.get("href")
     elif deployment_profile_name:
-        if not any(deployment_profile_name.endswith(typ) for typ in [PROCESS_APPLICATION, PROCESS_WORKFLOW]):
+        if not any(deployment_profile_name.endswith(typ) for typ in [ProcessType.APPLICATION, ProcessType.WORKFLOW]):
             raise HTTPBadRequest("Invalid value for parameter 'deploymentProfileName'.")
         execution_units = payload.get("executionUnit")
         if not isinstance(execution_units, list):
@@ -278,10 +278,11 @@ def deploy_process_from_payload(payload, container, overwrite=False):
     else:
         raise HTTPBadRequest("Missing one of required parameters [href, owsContext, deploymentProfileName].")
 
-    if process_info.get("type", "") == PROCESS_BUILTIN:
+    if process_info.get("type", "") == ProcessType.BUILTIN:
         raise HTTPBadRequest(
             "Invalid process type resolved from package: [{0}]. Deployment of {0} process is not allowed."
-            .format(PROCESS_BUILTIN))
+            .format(ProcessType.BUILTIN)
+        )
 
     # update and validate process information using WPS process offering, CWL/WPS reference or CWL package definition
     settings = get_settings(container)

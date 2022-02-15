@@ -19,7 +19,7 @@ from weaver.owsexceptions import OWSNoApplicableCode
 from weaver.processes import wps_package
 from weaver.processes.constants import WPS_COMPLEX_DATA
 from weaver.processes.convert import ows2json_output_data
-from weaver.processes.types import PROCESS_WORKFLOW
+from weaver.processes.types import ProcessType
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.store.base import StoreJobs
 from weaver.utils import get_any_id, get_any_value, get_registry, get_settings, now, raise_on_xml_exception, wait_secs
@@ -443,7 +443,7 @@ def submit_job(request, reference, tags=None):
         service_url = reference.processEndpointWPS1
         process_id = reference.id
         visibility = reference.visibility
-        is_workflow = reference.type == PROCESS_WORKFLOW
+        is_workflow = reference.type == ProcessType.WORKFLOW
         is_local = True
         tags += "local"
         if lang and request.accept_language.best_match(AcceptLanguage.values()) is None:
