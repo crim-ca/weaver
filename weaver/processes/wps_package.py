@@ -36,7 +36,7 @@ from pywps.inout.basic import SOURCE_TYPE
 from pywps.inout.storage.file import FileStorageBuilder
 from pywps.inout.storage.s3 import S3StorageBuilder
 
-from weaver.config import WeaverConfiguration, WeaverFeatures, get_weaver_configuration
+from weaver.config import WeaverConfiguration, WeaverFeature, get_weaver_configuration
 from weaver.database import get_db
 from weaver.datatype import DockerAuthentication
 from weaver.exceptions import (
@@ -1003,7 +1003,8 @@ class WpsPackage(Process):
 
         image = None
         try:
-            client = docker.from_env()  # same as CLI
+            # load from env is the same as CLI call
+            client = docker.from_env()
             # following login does not update '~/.docker/config.json' by design, but can use it if available
             # session remains active only within the client
             # Note:
@@ -1257,7 +1258,7 @@ class WpsPackage(Process):
             #   remote execution, but cannot accomplish it due to mismatching configuration. This can occur if
             #   configuration was modified and followed by Weaver reboot with persisted WPS-remote process.
             config = get_weaver_configuration(self.settings)
-            self.remote_execution = config in WeaverFeatures.REMOTE
+            self.remote_execution = config in WeaverFeature.REMOTE
             problem_needs_remote = check_package_instance_compatible(self.package)
             if not self.remote_execution:
                 if problem_needs_remote:
@@ -1265,7 +1266,7 @@ class WpsPackage(Process):
                         PackageExecutionError,
                         message="Weaver instance is configured as [{}] but remote execution with one of {} is "
                                 "required for process [{}] because {}. Aborting execution.".format(
-                                    config, list(WeaverFeatures.REMOTE), self.package_id, problem_needs_remote
+                                    config, list(WeaverFeature.REMOTE), self.package_id, problem_needs_remote
                                 )
                     )
             # switch back to local execution if hybrid execution can handle this package by itself (eg: Docker, builtin)
@@ -1441,7 +1442,8 @@ class WpsPackage(Process):
         Otherwise, this operation could incorrectly grant unauthorized access to protected files by forging the URL.
 
         If the process requires ``OpenSearch`` references that should be preserved as is, scheme defined by
-        :py:data:`weaver.processes.constants.OpenSearchField.LOCAL_FILE_SCHEME` prefix instead of ``http(s)://`` is expected.
+        :py:data:`weaver.processes.constants.OpenSearchField.LOCAL_FILE_SCHEME` prefix instead of ``http(s)://``
+        is expected.
 
         Any other variant of file reference will be fetched as applicable by the relevant schemes.
 

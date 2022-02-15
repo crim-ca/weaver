@@ -21,7 +21,7 @@ from pyramid.settings import asbool
 
 from weaver.config import (
     WEAVER_DEFAULT_WPS_PROCESSES_CONFIG,
-    WeaverFeatures,
+    WeaverFeature,
     get_weaver_config_file,
     get_weaver_configuration
 )
@@ -202,7 +202,7 @@ def _validate_deploy_process_info(process_info, reference, package, settings, he
 
         # validate process type and package against weaver configuration
         cfg = get_weaver_configuration(settings)
-        if cfg not in WeaverConfigurationFeatures.REMOTE:
+        if cfg not in WeaverFeature.REMOTE:
             problem = check_package_instance_compatible(info["package"])
             if problem:
                 raise HTTPForbidden(json={

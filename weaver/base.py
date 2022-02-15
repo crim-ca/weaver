@@ -10,6 +10,8 @@ if TYPE_CHECKING:
 
     from weaver.typedefs import AnyKey
 
+# pylint: disable=E1120,no-value-for-parameter
+
 
 class _Const(type):
     def __setattr__(cls, key, value):
@@ -63,13 +65,13 @@ class Constants(object, metaclass=_Const):
 
 
 class _EnumMeta(enum.EnumMeta):
-    def __contains__(cls, item):
+    def __contains__(cls, member):
         """
         Allows checking if item is member of the enum by value without having to manually convert to enum member.
         """
-        if isinstance(item, cls):
-            return super(_EnumMeta, cls).__contains__(item)
-        return cls.get(item) is not None
+        if isinstance(member, cls):
+            return super(_EnumMeta, cls).__contains__(member)
+        return cls.get(member) is not None
 
     @abc.abstractmethod
     def get(cls, key):

@@ -27,7 +27,7 @@ class WeaverConfiguration(Constants):
     HYBRID = "HYBRID"
 
 
-class WeaverFeatures(Constants):
+class WeaverFeature(Constants):
     """
     Features enabled accordingly to different combinations of :class:`WeaverConfiguration` modes.
     """

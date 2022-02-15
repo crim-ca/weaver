@@ -99,9 +99,9 @@ def query_eo_images_from_wps_inputs(wps_inputs,             # type: Dict[str, De
                 collection_id = queue[0].data
                 max_occurs = min(queue[0].max_occurs, 100000)
 
-                aoi_ids = _make_specific_identifier(OpenSearchField.AOI, input_id), OpenSearchField.AOI
-                startdate_ids = (_make_specific_identifier(OpenSearchField.START_DATE, input_id), OpenSearchField.START_DATE)
-                enddate_ids = _make_specific_identifier(OpenSearchField.END_DATE, input_id), OpenSearchField.END_DATE
+                aoi_ids = make_param_id(OpenSearchField.AOI, input_id), OpenSearchField.AOI
+                startdate_ids = (make_param_id(OpenSearchField.START_DATE, input_id), OpenSearchField.START_DATE)
+                enddate_ids = make_param_id(OpenSearchField.END_DATE, input_id), OpenSearchField.END_DATE
 
                 bbox_str = get_input_data(aoi_ids)
                 validate_bbox(bbox_str)
@@ -462,12 +462,12 @@ class EOImageDescribeProcessHandler(object):
             for name in eoimage_names:
                 toi.append(
                     self.make_toi(
-                        _make_specific_identifier(OpenSearchField.START_DATE, name), start_date=True
+                        make_param_id(OpenSearchField.START_DATE, name), start_date=True
                     )
                 )
                 toi.append(
                     self.make_toi(
-                        _make_specific_identifier(OpenSearchField.END_DATE, name), start_date=False
+                        make_param_id(OpenSearchField.END_DATE, name), start_date=False
                     )
                 )
 
@@ -475,7 +475,7 @@ class EOImageDescribeProcessHandler(object):
             aoi.append(self.make_aoi(OpenSearchField.AOI))
         else:
             for name in eoimage_names:
-                aoi.append(self.make_aoi(_make_specific_identifier(OpenSearchField.AOI, name)))
+                aoi.append(self.make_aoi(make_param_id(OpenSearchField.AOI, name)))
 
         eoimage_names = modified_collection_identifiers(eoimage_names)
         for name, allowed_col in zip(eoimage_names, allowed_collections):
@@ -657,7 +657,7 @@ def replace_inputs_describe_process(inputs, payload):
     return inputs_converted
 
 
-def _make_specific_identifier(param_name, identifier):
+def make_param_id(param_name, identifier):
     # type: (str, str) -> str
     """
     Only adds an underscore between the parameters.

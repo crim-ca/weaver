@@ -1,4 +1,4 @@
-from weaver.base import Constants, ExtendedEnum
+from weaver.base import Constants
 
 
 class Sort(Constants):
@@ -14,7 +14,7 @@ class Sort(Constants):
     ID_LONG = "identifier"  # long form employed by Processes in DB representation
 
 
-class SortMethods(ExtendedEnum):
+class SortMethods(Constants):
     PROCESS = frozenset([
         Sort.ID,
         Sort.ID_LONG,  # will replace by short ID to conform with JSON representation

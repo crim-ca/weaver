@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Optional
 import cwt  # noqa  # package: esgf-compute-api
 
 from weaver.processes.wps1_process import Wps1Process
-from weaver.status import STATUS_FAILED, STATUS_RUNNING, STATUS_SUCCEEDED
+from weaver.status import Status
 from weaver.utils import fetch_file
 
 if TYPE_CHECKING:
@@ -61,7 +61,7 @@ class ESGFProcess(Wps1Process):
         Convert inputs from cwl inputs to ESGF format.
         """
         message = "Preparing execute request for remote ESGF provider."
-        self.update_status(message, Percent.PREPARING, STATUS_RUNNING)
+        self.update_status(message, Percent.PREPARING, Status.RUNNING)
 
         files = self._get_files_urls(workflow_inputs)
         varname = self._get_variable(workflow_inputs)
@@ -172,7 +172,7 @@ class ESGFProcess(Wps1Process):
         process = wps.processes(self.process)[0]
 
         message = "Sending request."
-        self.update_status(message, Percent.SENDING, STATUS_RUNNING)
+        self.update_status(message, Percent.SENDING, Status.RUNNING)
 
         wps.execute(process, inputs=inputs, domain=domain)
 
@@ -200,7 +200,7 @@ class ESGFProcess(Wps1Process):
                 status_history.add(status)
 
                 message = "ESGF status: " + status
-                self.update_status(message, status_percent, STATUS_RUNNING)
+                self.update_status(message, status_percent, Status.RUNNING)
 
         update_history()
 
@@ -219,16 +219,16 @@ class ESGFProcess(Wps1Process):
         """
         if not esgf_process.succeeded:
             message = "Process failed."
-            self.update_status(message, Percent.FINISHED, STATUS_FAILED)
+            self.update_status(message, Percent.FINISHED, Status.FAILED)
             return
 
         message = "Process successful."
-        self.update_status(message, Percent.COMPUTE_DONE, STATUS_RUNNING)
+        self.update_status(message, Percent.COMPUTE_DONE, Status.RUNNING)
         try:
             self._write_outputs(esgf_process.output.uri, output_dir, expected_outputs)
         except Exception:
             message = "Error while downloading files."
-            self.update_status(message, Percent.FINISHED, STATUS_FAILED)
+            self.update_status(message, Percent.FINISHED, Status.FAILED)
             raise
 
     def _write_outputs(self, url, output_dir, expected_outputs):
@@ -236,7 +236,7 @@ class ESGFProcess(Wps1Process):
         Write the output netcdf url to a local drive.
         """
         message = "Downloading outputs."
-        self.update_status(message, Percent.COMPUTE_DONE, STATUS_RUNNING)
+        self.update_status(message, Percent.COMPUTE_DONE, Status.RUNNING)
 
         nc_outputs = [v for v in expected_outputs.values() if v.lower().endswith(".nc")]
         if len(nc_outputs) > 1:
@@ -245,4 +245,4 @@ class ESGFProcess(Wps1Process):
         fetch_file(url, output_dir, settings=self.settings)
 
         message = "Download successful."
-        self.update_status(message, Percent.FINISHED, STATUS_SUCCEEDED)
+        self.update_status(message, Percent.FINISHED, Status.SUCCEEDED)

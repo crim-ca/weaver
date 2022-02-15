@@ -120,6 +120,10 @@ class WpsWorkflow(ProcessCWL):
 
     # pylint: disable=R1260,too-complex  # FIXME: simplify operations
 
+    # imposed by original CWL implementation
+    # pylint: disable=C0103,invalid-name
+    # pylint: disable=W0201,attribute-defined-outside-init
+
     def __init__(self, toolpath_object, loading_context, get_job_process_definition):
         # type: (Dict[Text, Any], LoadingContext, JobProcessDefinitionCallback) -> None
         super(WpsWorkflow, self).__init__(toolpath_object, loading_context)

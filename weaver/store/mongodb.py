@@ -478,7 +478,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         # replace equivalent aliases to corresponding fields in db
         if sort in [Sort.ID, Sort.PROCESS]:
             sort = Sort.ID_LONG
-        sort_allowed = list(SortMethods.PROCESS.value) + ["_id"]
+        sort_allowed = list(SortMethods.PROCESS) + ["_id"]
         sort_method = {"$sort": self._apply_sort_method(sort, Sort.ID_LONG, sort_allowed)}
 
         search_pipeline = [{"$match": search_filters}, sort_method]
@@ -745,7 +745,7 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
         pipeline = [{"$match": search_filters}]  # expected for all filters except 'duration'
         self._apply_duration_filter(pipeline, min_duration, max_duration)
 
-        sort_method = {"$sort": self._apply_sort_method(sort, Sort.CREATED, SortMethods.JOB.value)}
+        sort_method = {"$sort": self._apply_sort_method(sort, Sort.CREATED, SortMethods.JOB)}
         pipeline.append(sort_method)
 
         # results by group categories or with job list paging
@@ -1016,7 +1016,7 @@ class MongodbQuoteStore(StoreQuotes, MongodbStore):
 
         if sort is None:
             sort = Sort.ID
-        if sort not in SortMethods.QUOTE.value:
+        if sort not in SortMethods.QUOTE:
             raise QuoteNotFound("Invalid sorting method: '{!s}'".format(sort))
 
         sort_order = ASCENDING
@@ -1092,7 +1092,7 @@ class MongodbBillStore(StoreBills, MongodbStore):
 
         if sort is None:
             sort = Sort.ID
-        if sort not in SortMethods.BILL.value:
+        if sort not in SortMethods.BILL:
             raise BillNotFound("Invalid sorting method: '{}'".format(repr(sort)))
 
         sort_order = ASCENDING

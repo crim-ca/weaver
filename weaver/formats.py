@@ -196,7 +196,7 @@ class OutputFormat(Constants):
     XML = "xml"
 
     @classmethod
-    def get(cls, format_or_version, default=JSON):
+    def get(cls, format_or_version, default=JSON):  # pylint: disable=W0221,arguments-differ
         if format_or_version == "1.0.0":
             return OutputFormat.XML
         if format_or_version == "2.0.0":

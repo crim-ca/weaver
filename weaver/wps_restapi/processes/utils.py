@@ -7,7 +7,7 @@ from pyramid.httpexceptions import HTTPBadRequest
 from pyramid.request import Request
 from pyramid.settings import asbool
 
-from weaver.config import WeaverFeatures, get_weaver_configuration
+from weaver.config import WeaverFeature, get_weaver_configuration
 from weaver.database import get_db
 from weaver.formats import ContentType
 from weaver.store.base import StoreProcesses
@@ -33,7 +33,7 @@ def get_processes_filtered_by_valid_schemas(request):
     """
     settings = get_settings(request)
     with_providers = False
-    if get_weaver_configuration(settings) in WeaverFeatures.REMOTE:
+    if get_weaver_configuration(settings) in WeaverFeature.REMOTE:
         with_providers = asbool(request.params.get("providers", False))
     paging_query = sd.ProcessPagingQuery()
     paging_value = {param.name: param.default for param in paging_query.children}

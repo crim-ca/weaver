@@ -17,7 +17,7 @@ from pywps.inout.inputs import LiteralInput
 from tests.utils import setup_mongodb_processstore
 from weaver.processes import opensearch
 from weaver.processes.constants import OpenSearchField
-from weaver.processes.opensearch import _make_specific_identifier  # noqa: W0212
+from weaver.processes.opensearch import make_param_id
 from weaver.utils import get_any_id
 from weaver.wps_restapi.processes import processes
 
@@ -308,9 +308,9 @@ def inputs_unique_aoi_toi(files_id):
 
 
 def inputs_non_unique_aoi_toi(files_id):
-    end_date = _make_specific_identifier(OpenSearchField.END_DATE, files_id)
-    start_date = _make_specific_identifier(OpenSearchField.START_DATE, files_id)
-    aoi = _make_specific_identifier(OpenSearchField.AOI, files_id)
+    end_date = make_param_id(OpenSearchField.END_DATE, files_id)
+    start_date = make_param_id(OpenSearchField.START_DATE, files_id)
+    aoi = make_param_id(OpenSearchField.AOI, files_id)
     return {
         aoi: deque([LiteralInput(aoi, "Area", data_type="string")]),
         start_date: deque([LiteralInput(start_date, "Area", data_type="string")]),
@@ -324,9 +324,9 @@ def inputs_non_unique_aoi_toi(files_id):
 def query_param_names(unique_aoi_toi, identifier):
     end_date, start_date, aoi = OpenSearchField.END_DATE, OpenSearchField.START_DATE, OpenSearchField.AOI
     if not unique_aoi_toi:
-        end_date = _make_specific_identifier(end_date, identifier)
-        start_date = _make_specific_identifier(start_date, identifier)
-        aoi = _make_specific_identifier(aoi, identifier)
+        end_date = make_param_id(end_date, identifier)
+        start_date = make_param_id(start_date, identifier)
+        aoi = make_param_id(aoi, identifier)
     return end_date, start_date, aoi
 
 

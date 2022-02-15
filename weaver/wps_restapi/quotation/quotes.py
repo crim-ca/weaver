@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from duration import to_iso8601
 from pyramid.httpexceptions import HTTPBadRequest, HTTPCreated, HTTPNotFound, HTTPOk
 
-from weaver.config import WeaverConfiguration, get_weaver_configuration
+from weaver.config import WeaverConfiguration, WeaverFeature, get_weaver_configuration
 from weaver.database import get_db
 from weaver.datatype import Bill, Quote
 from weaver.exceptions import ProcessNotFound, QuoteNotFound, log_unhandled_exceptions
@@ -51,7 +51,7 @@ def request_quote(request):
     settings = get_settings(request)
     weaver_config = get_weaver_configuration(settings)
 
-    if weaver_config not in WeaverConfiguration.extensions():
+    if weaver_config not in WeaverFeature.QUOTING:
         raise HTTPBadRequest("Unsupported request for configuration '{}'.".format(weaver_config))
 
     process_id = request.matchdict.get("process_id")

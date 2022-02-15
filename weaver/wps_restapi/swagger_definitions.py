@@ -23,7 +23,7 @@ from colander import DateTime, Email, OneOf, Range, Regex, drop, null, required
 from dateutil import parser as date_parser
 
 from weaver import __meta__
-from weaver.config import WeaverFeatures
+from weaver.config import WeaverFeature
 from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import AcceptLanguage, ContentType
 from weaver.owsexceptions import OWSMissingParameterValue
@@ -74,7 +74,7 @@ if TYPE_CHECKING:
     ViewInfo = TypedDict("ViewInfo", {"name": str, "pattern": str})
 
 
-WEAVER_CONFIG_REMOTE_LIST = "[" + ", ".join(WeaverFeatures.REMOTE) + "]"
+WEAVER_CONFIG_REMOTE_LIST = "[" + ", ".join(WeaverFeature.REMOTE) + "]"
 
 API_TITLE = "Weaver REST API"
 API_INFO = {
@@ -1420,7 +1420,7 @@ class JobSortEnum(ExtendedSchemaNode):
     title = "JobSortingMethod"
     default = Sort.CREATED
     example = Sort.CREATED
-    validator = OneOf(SortMethods.JOB.value)
+    validator = OneOf(SortMethods.JOB)
 
 
 class ProcessSortEnum(ExtendedSchemaNode):
@@ -1428,7 +1428,7 @@ class ProcessSortEnum(ExtendedSchemaNode):
     title = "ProcessSortMethod"
     default = Sort.ID
     example = Sort.CREATED
-    validator = OneOf(SortMethods.PROCESS.value)
+    validator = OneOf(SortMethods.PROCESS)
 
 
 class QuoteSortEnum(ExtendedSchemaNode):
@@ -1436,7 +1436,7 @@ class QuoteSortEnum(ExtendedSchemaNode):
     title = "QuoteSortingMethod"
     default = Sort.ID
     example = Sort.PROCESS
-    validator = OneOf(SortMethods.QUOTE.value)
+    validator = OneOf(SortMethods.QUOTE)
 
 
 class LaunchJobQuerystring(ExtendedMappingSchema):
@@ -1454,7 +1454,7 @@ class JobAccess(VisibilityValue):
     pass
 
 
-class Visibility(ExtendedMappingSchema):
+class VisibilitySchema(ExtendedMappingSchema):
     value = VisibilityValue()
 
 
@@ -2280,7 +2280,7 @@ class ProcessVisibilityGetEndpoint(ProcessPath):
 
 class ProcessVisibilityPutEndpoint(ProcessPath):
     header = RequestHeaders()
-    body = Visibility()
+    body = VisibilitySchema()
 
 
 class ProviderJobEndpoint(ProviderPath, ProcessPath, JobPath):
