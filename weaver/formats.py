@@ -18,6 +18,8 @@ if TYPE_CHECKING:
 
     from weaver.typedefs import JSON
 
+LOGGER = logging.getLogger(__name__)
+
 
 class AcceptLanguage(Constants):
     """
@@ -30,9 +32,9 @@ class AcceptLanguage(Constants):
 
 class ContentType(Constants):
     """
-    Supported Content-Types
+    Supported Content-Types.
 
-    Media-type nomenclature:
+    Media-type nomenclature::
 
         <type> "/" [x- | <tree> "."] <subtype> ["+" suffix] *[";" parameter=value]
     """
@@ -62,6 +64,24 @@ class ContentType(Constants):
     TEXT_XML = "text/xml"
     ANY_XML = {APP_XML, TEXT_XML}
     ANY = "*/*"
+
+
+class OutputFormat(Constants):
+    """
+    Renderer output formats for OpenAPI generation.
+    """
+    JSON = "json"
+    XML = "xml"
+
+    @classmethod
+    def get(cls, format_or_version, default=JSON):  # pylint: disable=W0221,arguments-differ
+        if format_or_version == "1.0.0":
+            return OutputFormat.XML
+        if format_or_version == "2.0.0":
+            return OutputFormat.JSON
+        if "/" in format_or_version:  # Media-Type to output format renderer
+            format_or_version = format_or_version.split("/")[-1].split(";")[0].strip()
+        return super(OutputFormat, cls).get(format_or_version)
 
 
 # explicit mime-type to extension when not literally written in item after '/' (excluding 'x-' prefix)
@@ -186,27 +206,6 @@ EDAM_MAPPING = {
     ContentType.TEXT_PLAIN: "format_1964",
 }
 FORMAT_NAMESPACES = frozenset([IANA_NAMESPACE, EDAM_NAMESPACE])
-
-
-class OutputFormat(Constants):
-    """
-    Renderer output formats for OpenAPI generation.
-    """
-    JSON = "json"
-    XML = "xml"
-
-    @classmethod
-    def get(cls, format_or_version, default=JSON):  # pylint: disable=W0221,arguments-differ
-        if format_or_version == "1.0.0":
-            return OutputFormat.XML
-        if format_or_version == "2.0.0":
-            return OutputFormat.JSON
-        if "/" in format_or_version:  # Media-Type to output format renderer
-            format_or_version = format_or_version.split("/")[-1].split(";")[0].strip()
-        return super(OutputFormat, cls).get(format_or_version)
-
-
-LOGGER = logging.getLogger(__name__)
 
 
 def get_allowed_extensions():
