@@ -721,7 +721,7 @@ combinations.
 .. |http_scheme| replace:: ``http(s)://``
 .. |s3_scheme| replace:: ``s3://``
 .. |file_scheme| replace:: ``file://``
-.. |vault_ref| replace:: ``vault:<UUID>``
+.. |vault_ref| replace:: ``vault://<UUID>``
 .. |ADES| replace:: :term:`ADES`
 .. |EMS| replace:: :term:`EMS`
 .. |HYBRID| replace:: :term:`HYBRID`
