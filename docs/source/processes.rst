@@ -1236,7 +1236,7 @@ the ``upload`` operation, but the user must also generate the ``X-Auth-Vault`` h
 
 In order to manually upload files, the below code snippet can be employed.
 
-.. literalinclude:: ../examples/vault-upload.py
+.. literalinclude:: ../examples/vault_upload.py
     :language: python
     :caption: Sample Python request call to upload file to Vault
 
