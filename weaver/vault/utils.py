@@ -177,7 +177,7 @@ def parse_vault_token(header, unique=False):
 def get_vault_auth(request):
     # type: (Request) -> Tuple[AnyUUID, Optional[str]]
     """
-    Obtain the requested file if access is granted.
+    Obtain the requested file reference and parsed access token from the :term:`Vault` authorization header.
 
     :param request: Request containing reference file UUID and authorization headers.
     :return: Extracted file reference and authentication token.
