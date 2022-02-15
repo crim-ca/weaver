@@ -36,18 +36,14 @@ from tests.utils import (
 )
 from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import (
-    AcceptLanguage,
-    ContentType,
     EDAM_MAPPING,
     EDAM_NAMESPACE,
     IANA_NAMESPACE,
+    AcceptLanguage,
+    ContentType,
     get_cwl_file_format
 )
-from weaver.processes.constants import (
-    CWL_REQUIREMENT_APP_DOCKER,
-    CWL_REQUIREMENT_INIT_WORKDIR,
-    ProcessSchema
-)
+from weaver.processes.constants import CWL_REQUIREMENT_APP_DOCKER, CWL_REQUIREMENT_INIT_WORKDIR, ProcessSchema
 from weaver.processes.types import ProcessType
 from weaver.status import Status
 from weaver.utils import get_any_value

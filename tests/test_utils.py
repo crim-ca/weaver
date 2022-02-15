@@ -31,14 +31,7 @@ from requests.exceptions import HTTPError as RequestsHTTPError
 from tests.utils import mocked_aws_credentials, mocked_aws_s3, mocked_aws_s3_bucket_test_file, mocked_file_response
 from weaver import xml_util
 from weaver.formats import ContentType
-from weaver.status import (
-    JOB_STATUS_CATEGORIES,
-    STATUS_PYWPS_IDS,
-    STATUS_PYWPS_MAP,
-    Status,
-    StatusCompliant,
-    map_status
-)
+from weaver.status import JOB_STATUS_CATEGORIES, STATUS_PYWPS_IDS, STATUS_PYWPS_MAP, Status, StatusCompliant, map_status
 from weaver.utils import (
     NullType,
     assert_sane_name,

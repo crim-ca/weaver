@@ -10,7 +10,7 @@ from pyramid.settings import asbool
 
 from weaver import xml_util
 from weaver.formats import ContentType
-from weaver.processes.constants import OpenSearchField, WPS_LITERAL
+from weaver.processes.constants import WPS_LITERAL, OpenSearchField
 from weaver.processes.convert import normalize_ordered_io
 from weaver.processes.sources import fetch_data_sources
 from weaver.utils import get_any_id, request_extra

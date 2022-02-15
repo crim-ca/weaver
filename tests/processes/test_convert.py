@@ -15,7 +15,7 @@ from pywps.validator.mode import MODE
 
 from weaver.exceptions import PackageTypeError
 from weaver.formats import ContentType
-from weaver.processes.constants import ProcessSchema, WPS_INPUT, WPS_LITERAL, WPS_OUTPUT
+from weaver.processes.constants import WPS_INPUT, WPS_LITERAL, WPS_OUTPUT, ProcessSchema
 from weaver.processes.convert import _are_different_and_set  # noqa: W0212
 from weaver.processes.convert import (
     DEFAULT_FORMAT,

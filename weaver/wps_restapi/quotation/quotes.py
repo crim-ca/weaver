@@ -13,8 +13,8 @@ from weaver.exceptions import ProcessNotFound, QuoteNotFound, log_unhandled_exce
 from weaver.formats import OutputFormat
 from weaver.processes.types import ProcessType
 from weaver.processes.wps_package import get_package_workflow_steps, get_process_location
-from weaver.store.base import StoreBills, StoreQuotes
 from weaver.sort import Sort
+from weaver.store.base import StoreBills, StoreQuotes
 from weaver.utils import get_settings, get_weaver_url
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.processes.processes import submit_local_job

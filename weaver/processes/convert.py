@@ -31,7 +31,6 @@ from weaver.processes.constants import (
     PACKAGE_CUSTOM_TYPES,
     PACKAGE_ENUM_BASE,
     PACKAGE_LITERAL_TYPES,
-    ProcessSchema,
     WPS_BOUNDINGBOX,
     WPS_COMPLEX,
     WPS_COMPLEX_DATA,
@@ -39,7 +38,8 @@ from weaver.processes.constants import (
     WPS_LITERAL,
     WPS_LITERAL_DATA_TYPE_NAMES,
     WPS_OUTPUT,
-    WPS_REFERENCE
+    WPS_REFERENCE,
+    ProcessSchema
 )
 from weaver.utils import (
     bytes2str,
