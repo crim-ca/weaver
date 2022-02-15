@@ -40,6 +40,7 @@ from webob.headers import EnvironHeaders, ResponseHeaders
 from werkzeug.wrappers import Request as WerkzeugRequest
 from yaml.scanner import ScannerError
 
+from weaver.execute import ExecuteMode
 from weaver.formats import ContentType, get_content_type
 from weaver.status import map_status
 from weaver.warning import TimeZoneInfoAlreadySetWarning
@@ -48,6 +49,7 @@ from weaver.xml_util import XML
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, List, Iterable, NoReturn, Optional, Type, Tuple, Union
 
+    from weaver.execute import AnyExecuteMode
     from weaver.status import Status
     from weaver.typedefs import (
         AnyKey,
@@ -58,6 +60,7 @@ if TYPE_CHECKING:
         AnyValueType,
         HeadersType,
         JSON,
+        KVP,
         KVP_Item,
         Number,
         SettingsType
@@ -262,9 +265,118 @@ def get_cookie_headers(header_container, cookie_header_name="Cookie"):
         return {}
 
 
-def get_prefer_header(header_container):
-    # type: (AnyHeadersContainer) -> Tuple[Ex]
-    pass
+def parse_kvp(query,                    # type: str
+              key_value_sep="=",        # type: str
+              multi_value_sep=",",      # type: str
+              pair_sep=";",             # type: str
+              nested_pair_sep="",       # type: str
+              accumulate_keys=True,     # type: bool
+              unescape_quotes=True,     # type: bool
+              strip_spaces=True,        # type: bool
+              case_insensitive=True,    # type: bool
+              ):                        # type: (...) -> KVP
+    """
+    Parse key-value pairs using specified separators.
+
+    All values are normalized under a list, whether their have an unique or multi-value definition.
+    When a key is by itself (without separator and value), the resulting value will be an empty list.
+
+    When :paramref:`accumulate_keys` is enabled, entries such as ``{key}={val};{key}={val}`` will be joined together
+    under the same list as if they were specified using directly ``{key}={val},{val}`` (default separators employed
+    only for demonstration purpose). Both nomenclatures can also be employed simultaneously.
+
+    When :paramref:`nested_pair_sep` is provided, definitions that contain nested :paramref:`key_value_sep` character
+    within an already established :term:`KVP` will be parsed once again.
+    This will parse ``{key}={subkey1}={val1},{subkey2}={val2}`` into a nested :term:`KVP` dictionary as value under
+    the top level :term:`KVP` entry ``{key}``. Separators are passed down for nested parsing,
+    except :paramref:`pair_sep` that is replaced by :paramref:`nested_pair_sep`.
+
+    .. code-blocK:: python
+
+        >> parse_kvp("format=json&inputs=key1=value1;key2=val2,val3",
+                     nested_kvp_sep=True, nested_pair_sep=";", pair_sep="&")
+        {
+            'format': ['json'],
+            'inputs': {
+                'key1': ['value1'],
+                'key2': ['val2', 'val3']
+            }
+        }
+
+    :param query: Definition to be parsed as :term:`KVP`.
+    :param key_value_sep: Separator that delimitates the keys from their values.
+    :param multi_value_sep:
+        Separator that delimitates multiple values associated to the same key.
+        If empty (i.e.: ``""``), values will be left as a single entry in the list under the key.
+    :param pair_sep: Separator that distinguish between different ``(key, value)`` entries.
+    :param nested_pair_sep: Separator to parse values of pairs containing nested :term:`KVP` definition.
+    :param accumulate_keys: Whether replicated keys should be considered equivalent to multi-value entries.
+    :param unescape_quotes: Whether to remove single and double quotes around values.
+    :param strip_spaces: Whether to remove spaces around values after splitting them.
+    :param case_insensitive:
+        Whether to consider keys as case-insensitive.
+        If ``True``, resulting keys will be normalized to lowercase. Otherwise, original keys are employed.
+    :return:
+    """
+    if not query:
+        return {}
+    for sep in []
+
+    kvp_items = query.split(pair_sep)
+    kvp = {}
+    for item in kvp_items:
+        k_v = item.split(key_value_sep, 1)
+        if len(k_v) < 2:
+            key = k_v[0]
+            val = []
+        else:
+            key, val = k_v
+            if key_value_sep in val:
+                if not nested_pair_sep:
+                    raise ValueError(f"Cannot parse KVP entry '{item}', too many '{key_value_sep}' separators.")
+                val = parse_kvp(val, key_value_sep=key_value_sep, multi_value_sep=multi_value_sep,
+                                pair_sep=nested_pair_sep, nested_pair_sep="",
+                                accumulate_keys=accumulate_keys, unescape_quotes=unescape_quotes,
+                                strip_spaces=strip_spaces, case_insensitive=case_insensitive)
+        if case_insensitive:
+            key = key.lower()
+        if multi_value_sep:
+            if isinstance(val, str):  # in case nested KVP already processed
+                val = val.strip()
+        if strip_spaces:
+            key = key.strip()
+        kvp[key] = val
+
+
+
+def parse_prefer_header_execute_mode(header_container, supported_modes=None):
+    # type: (AnyHeadersContainer, Optional[List[ExecuteMode]]) -> Tuple[AnyExecuteMode, Optional[int]]
+    """
+    Obtain execution preference if provided in request headers.
+
+    .. seealso::
+        - `OGC API - Processes: Core, Execution mode <
+          https://docs.ogc.org/is/18-062r2/18-062r2.html#sc_execution_mode>`_
+        - :rfc:`7240#section-4.1` HTTP Prefer header ``respond-async``
+
+    :param header_container: Request headers to retrieve preference, if any available.
+    :return:
+        Tuple of resolved execution mode and, if applicable, maximum SYNC wait time until fallback to ASYNC.
+    """
+
+    prefer = get_header("prefer", header_container)
+    if not prefer:
+        # /req/core/process-execute-default-execution-mode
+        if not supported_modes:
+            return ExecuteMode.ASYNC, None
+        if len(supported_modes) == 1:
+            return supported_modes[0], None
+        return ExecuteMode.ASYNC, None  # Weaver's default
+
+    params =
+
+    # /req/core/process-execute-auto-execution-mode
+    if
 
 
 def get_url_without_query(url):
@@ -329,13 +441,17 @@ def fully_qualified_name(obj):
     """
     Obtains the full path definition of the object to allow finding and importing it.
 
-    For classes, functions and exceptions, the following format is returned::
+    For classes, functions and exceptions, the following format is returned:
+
+    .. code-block:: python
 
         module.name
 
     The ``module`` is omitted if it is a builtin object or type.
 
-    For methods, the class is also represented, resulting in the following format::
+    For methods, the class is also represented, resulting in the following format:
+
+    .. code-block:: python
 
         module.class.name
     """

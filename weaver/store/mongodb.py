@@ -692,7 +692,9 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
         """
         Finds all jobs in `MongoDB` storage matching search filters to obtain results with requested paging or grouping.
 
-        Using paging (default), result will be in the form::
+        Using paging (default), result will be in the form.
+
+        .. code-block:: python
 
             (
                 [Job(1), Job(2), Job(3), ...],
@@ -702,7 +704,9 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
         Where ``<total>`` will indicate the complete count of matched jobs with filters, but the list of jobs
         will be limited only to ``page`` index and ``limit`` specified.
 
-        Using grouping with a list of field specified with ``group_by``, results will be in the form::
+        Using grouping with a list of field specified with ``group_by``, results will be in the form.
+
+        .. code-block:: python
 
             (
                 [{category: {field1: valueA, field2: valueB, ...}, [Job(1), Job(2), ...], count: <count>},

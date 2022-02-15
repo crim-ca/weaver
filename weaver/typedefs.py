@@ -177,7 +177,8 @@ if TYPE_CHECKING:
     WPS_OutputRequested = Union[WPS_OutputAsRef, WPS_OutputAsRefMimeType]
 
     KVP_Item = Union[ValueType, Sequence[ValueType]]
-    KVP = Union[Sequence[Tuple[str, KVP_Item]], Dict[str, KVP_Item]]
+    KVP_Container = Union[Sequence[Tuple[str, KVP_Item]], Dict[str, KVP_Item]]
+    KVP = Dict[str, List[KVP_Item]]
 
     AnyContainer = Union[Configurator, Registry, PyramidRequest, WerkzeugRequest, Celery]
     SettingValue = Optional[Union[JSON, AnyValueType]]

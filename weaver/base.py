@@ -82,7 +82,7 @@ class ExtendedEnum(enum.Enum, metaclass=_EnumMeta):
     """
     Utility :class:`enum.Enum` methods.
 
-    Create an extended enum with these utilities as follows::
+    Create an extended enum with these utilities as follows.
 
     .. code-block:: python
 

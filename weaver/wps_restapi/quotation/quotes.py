@@ -10,10 +10,9 @@ from weaver.formats import OutputFormat
 from weaver.processes.types import ProcessType
 from weaver.processes.quotation import process_quote_estimator
 from weaver.processes.wps_package import get_package_workflow_steps, get_process_location
-from weaver.store.base import StoreBills, StoreProcesses, StoreQuotes
 from weaver.sort import Sort
-from weaver.store.base import StoreBills, StoreQuotes
-from weaver.utils import get_settings, get_weaver_url
+from weaver.store.base import StoreBills, StoreQuotes, StoreProcesses
+from weaver.utils import get_settings, get_weaver_url, parse_prefer_header
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.processes.processes import submit_local_job
 
@@ -67,7 +66,7 @@ def request_quote(request):
     result = process_quote_estimator.delay(process, inputs, outputs)
     LOGGER.debug("Celery pending task [%s] for quote [%s].", result.id, quote.id)
 
-    wait = request.headers.get("Pre")
+    mode, wait = parse_prefer_header(request.headers)
 
     # loop workflow sub-process steps to get individual quotes
     if process_type == ProcessType.WORKFLOW and weaver_config == WeaverConfiguration.EMS:

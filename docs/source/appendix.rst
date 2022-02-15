@@ -103,6 +103,13 @@ Glossary
     Job
         Definition of a :term:`Process` execution state with applicable operation metadata.
 
+    KVP
+        | Key-Value Pairs
+        | String representation of a set of key-value pairs, usually but not limited to, ``=`` character
+          separating keys from their values, ``,`` for multi-value (array) definitions, and another separator
+          such as ``&`` or ``;`` to distinguish between distinct pairs. Specific separators, and any applicable
+          escaping methods, depend on context, such as in URL query, HTTP header, :term:`CLI` parameter, etc.
+
     MIME-types
         | Multipurpose Internet Mail Extensions
         | Format representation of the referenced element, often represented by :term:`IANA` or :term:`EDAM` ontologies.
