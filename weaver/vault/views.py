@@ -1,6 +1,6 @@
 import logging
-import re
 import os
+import re
 from io import BufferedIOBase
 from typing import TYPE_CHECKING
 
