@@ -805,7 +805,7 @@ respected.
     - |aws_s3_bucket_names|_
     - |aws_s3_obj_key_names|_
 
-When using |vault_ref| references, the resulting file name will be either the ``filename`` specified in
+When using |vault_ref| references, the resulting file name will be obtained from the ``filename`` specified in
 the ``Content-Disposition`` within the uploaded content of the ``multipart/form-data`` request.
 
 .. seealso::
@@ -878,7 +878,7 @@ The notation (:rfc:`5234`, :rfc:`7230#section-1.2`) of the ``X-Auth-Vault`` head
 
 In summary, the access token can be provided by itself by omitting the :term:`Vault` UUID parameter only
 if a single file is referenced across all inputs within the :ref:`Execute <proc_op_execute>` request.
-Otherwise, multiple :term:`Vault` references all require to specific both their respective access token
+Otherwise, multiple :term:`Vault` references all require to specify both their respective access token
 and UUID in a comma separated list.
 
 .. _opensearch_data_source:

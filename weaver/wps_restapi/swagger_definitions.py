@@ -4319,6 +4319,16 @@ class BadRequestVaultFileUploadResponse(ExtendedMappingSchema):
     body = ErrorJsonResponseBodySchema()
 
 
+class ForbiddenVaultFileUploadResponse(ExtendedMappingSchema):
+    description = (
+        "Invalid filename refused for upload."
+        "Filename should include only alphanumeric, underscore, dash, and dot characters. "
+        "Filename should include both the base name and the desired file extension."
+    )
+    header = ResponseHeaders()
+    body = ErrorJsonResponseBodySchema()
+
+
 class XAuthVaultFileHeader(ExtendedSchemaNode):
     summary = "Authorization header with token for Vault file access."
     description = (
@@ -4695,6 +4705,7 @@ post_vault_responses = {
         }
     }),
     "400": BadRequestVaultFileUploadResponse(),
+    "403": ForbiddenVaultFileUploadResponse(),
     "500": InternalServerErrorResponseSchema(),
 }
 head_vault_file_responses = {

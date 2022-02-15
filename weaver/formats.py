@@ -7,11 +7,12 @@ from urllib.error import HTTPError
 from urllib.request import urlopen
 
 from pyramid.httpexceptions import HTTPNotFound, HTTPOk
+from pyramid_storage.extensions import resolve_extensions
 from pywps.inout.formats import FORMATS, Format
 from requests.exceptions import ConnectionError
 
 if TYPE_CHECKING:
-    from typing import Dict, Optional, Tuple, Union
+    from typing import Dict, List, Optional, Tuple, Union
 
     from weaver.typedefs import JSON
 
@@ -192,6 +193,32 @@ OUTPUT_FORMATS = {
 }
 
 LOGGER = logging.getLogger(__name__)
+
+
+def get_allowed_extensions():
+    # type: () -> List[str]
+    """
+    Obtain the complete list of extensions that are permitted for processing by the application.
+
+    .. note::
+        This is employed for security reasons. Files can still be specified with another allowed extension, but
+        it will not automatically inherit properties applicable to scripts and executables.
+        If a specific file type is refused due to its extension, a PR can be submitted to add it explicitly.
+    """
+    groups = [
+        "archives",
+        "audio",
+        "data",
+        "documents",
+        # "executables",
+        "images",
+        # "scripts",
+        "text",
+        "video",
+    ]
+    base = set(resolve_extensions("+".join(groups)))
+    extra = {ext[1:] for ext in _EXTENSION_CONTENT_TYPES_MAPPING if ext and "*" not in ext}
+    return list(base | extra)
 
 
 def get_format(mime_type, default=None):
