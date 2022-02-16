@@ -1020,6 +1020,7 @@ def request_extra(method,                       # type: str
     settings = get_settings(settings) or {}
     request_options = get_request_options(method, url, settings)
     request_options.update(request_kwargs)
+    request_kwargs = request_options  # update ref to ensure following modifications consider all parameters
     # catch kw passed to request corresponding to retries parameters
     # it is safe top pop items because 'get_request_options' creates a copy each time
     kw_retries = request_options.pop("retries", request_options.pop("retry", request_options.pop("max_retries", None)))

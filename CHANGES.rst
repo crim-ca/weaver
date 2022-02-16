@@ -36,6 +36,8 @@ Fixes:
   were generated based on the local machine timezone information. Once reloaded from database, the missing timezone
   awareness made datetime stored in ISO-8601 format to be interpreted as already localized datetime.
 - Fix invalid setup of generic CLI options headers for other operations than ``dismiss``.
+- Fix ``weaver.request-options`` handling that always ignored ``timeout`` and ``verify`` entries from the configuration
+  file by overriding them with default values.
 
 .. _changes_4.8.0:
 
