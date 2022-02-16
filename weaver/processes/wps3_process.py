@@ -48,14 +48,14 @@ LOGGER = logging.getLogger(__name__)
 
 class Wps3RemoteJobProgress(WpsRemoteJobProgress):
     PROVIDER = 1
-    # PREPARE = 2
+    PREPARE = 2
     DEPLOY = 3
     VISIBLE = 4
-    # READY = 5
+    READY = 5
     EXECUTION = 9
     MONITORING = 10
     FETCH_OUT = 90
-    # COMPLETED = 100
+    COMPLETED = 100
 
 
 class Wps3Process(WpsProcessInterface):
