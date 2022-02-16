@@ -55,7 +55,7 @@ from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, IO, List, Optional, Union
+    from typing import Any, Callable, Dict, IO, List, Optional, Union
 
     from owslib.wps import WebProcessingService
 
@@ -219,6 +219,47 @@ class Base(DictBase):
             the object to store.
         """
         raise NotImplementedError("Method 'params' must be defined for storage item representation.")
+
+
+class LocalizedDateTimeProperty(property):
+    def __init__(self,
+                 fget=None,             # type: Callable[[Any], Optional[datetime]]
+                 fset=None,             # type: Callable[[Any, Union[datetime, str]], None]
+                 fdel=None,             # type: Callable[[Any], None]
+                 doc=None,              # type: str
+                 default_now=False,     # type: bool
+                 ):                     # type: (...) -> None
+        self.default_now = default_now
+        fget = fget or self.__get__
+        fset = fset or self.__set__
+        super(LocalizedDateTimeProperty, self).__init__(fget=fget, fset=fset, fdel=fdel, doc=doc)
+
+    def __set_name__(self, owner, name):
+        # type: (Any, str) -> None
+        self.name = name
+
+    def __get__(self, instance, *_):
+        # type: (Any, Optional[Any]) -> Optional[datetime]
+        if instance is None:
+            # allow access to the descriptor as class attribute 'getattr(type(instance), property-name)'
+            return self  # noqa
+        dt = instance.get(self.name, None)
+        if not dt:
+            if self.default_now:
+                cur_dt = now()
+                self.__set__(instance, cur_dt)
+                return cur_dt
+            return None
+        return localize_datetime(dt)
+
+    def __set__(self, instance, value):
+        # type: (Any, Union[datetime, str]) -> None
+        if isinstance(str, datetime):
+            value = dt_parse(value)
+        if not isinstance(value, datetime):
+            name = fully_qualified_name(instance)
+            raise TypeError(f"Type 'datetime' is required for '{name}.{self.name}'")
+        instance[self.name] = localize_datetime(value)
 
 
 class Service(Base):
@@ -858,34 +899,6 @@ class Job(Base):
         self["is_workflow"] = is_workflow
 
     @property
-    def created(self):
-        # type: () -> datetime
-        created = self.get("created", None)
-        if not created:
-            self["created"] = now()
-        return localize_datetime(self.get("created"))
-
-    @property
-    def started(self):
-        # type: () -> Optional[datetime]
-        started = self.get("started", None)
-        if not started:
-            return None
-        return localize_datetime(started)
-
-    @started.setter
-    def started(self, started):
-        # type: (datetime) -> None
-        if not isinstance(started, datetime):
-            raise TypeError(f"Type 'datetime' is required for '{self.__name__}.started'")
-        self["started"] = started
-
-    @property
-    def finished(self):
-        # type: () -> Optional[datetime]
-        return self.get("finished", None)
-
-    @property
     def is_finished(self):
         # type: () -> bool
         return self.finished is not None
@@ -894,8 +907,7 @@ class Job(Base):
         # type: () -> None
         self["finished"] = now()
 
-    @property
-    def updated(self):
+    def _get_updated(self):
         # type: () -> datetime
         updated = self.get("updated")
         # backward compatibility when not already set
@@ -910,12 +922,10 @@ class Job(Base):
             self.updated = updated  # apply to remain static until saved
         return localize_datetime(updated)
 
-    @updated.setter
-    def updated(self, updated):
-        # type: (datetime) -> None
-        if not isinstance(updated, datetime):
-            raise TypeError(f"Type 'datetime' is required for '{self.__name__}.updated'")
-        self["updated"] = updated
+    created = LocalizedDateTimeProperty(default_now=True)
+    started = LocalizedDateTimeProperty()
+    finished = LocalizedDateTimeProperty()
+    updated = LocalizedDateTimeProperty(fget=_get_updated)
 
     @property
     def duration(self):
@@ -1172,6 +1182,7 @@ class Job(Base):
             "finished": self.finished,
             "updated": self.updated,
             "duration": self.duration_str,
+            "runningDuration": self.duration,
             "runningSeconds": self.duration.total_seconds() if self.duration is not None else None,
             # TODO: available fields not yet employed (https://github.com/crim-ca/weaver/issues/129)
             "nextPoll": None,
@@ -2218,6 +2229,13 @@ class Quote(Base):
     # pylint: disable=C0103,invalid-name
 
     def __init__(self, *args, **kwargs):
+        """
+        Initialize the quote.
+
+        .. note::
+            Although many parameters are required to render the final quote, they are not enforced
+            at creation since the partial quote definition is needed before it can be processed.
+        """
         super(Quote, self).__init__(*args, **kwargs)
         if "process" not in self:
             raise TypeError("Field 'Quote.process' is required")
@@ -2227,28 +2245,12 @@ class Quote(Base):
             raise TypeError("Field 'Quote.user' is required")
         if not isinstance(self.get("user"), str):
             raise ValueError("Field 'Quote.user' must be a string.")
-        if "price" not in self:
-            raise TypeError("Field 'Quote.price' is required")
-        if not isinstance(self.get("price"), float):
-            raise ValueError("Field 'Quote.price' must be a float number.")
-        if "currency" not in self:
-            raise TypeError("Field 'Quote.currency' is required")
-        if not isinstance(self.get("currency"), str) or len(self.get("currency")) != 3:
-            raise ValueError("Field 'Quote.currency' must be an ISO-4217 currency string code.")
         if "status" not in self:
             self["status"] = QuoteStatus.SUBMITTED
         if "created" not in self:
             self["created"] = now()
-        try:
-            self["created"] = dt_parse(str(self.get("created"))).isoformat()
-        except ValueError:
-            raise ValueError("Field 'Quote.created' must be an ISO-8601 datetime string.")
         if "expire" not in self:
             self["expire"] = now() + timedelta(days=1)
-        try:
-            self["expire"] = dt_parse(str(self.get("expire"))).isoformat()
-        except ValueError:
-            raise ValueError("Field 'Quote.expire' must be an ISO-8601 datetime string.")
         if "id" not in self:
             self["id"] = uuid.uuid4()
 
@@ -2364,35 +2366,29 @@ class Quote(Base):
         """
         return self.get("price", 0.0)
 
+    @price.setter
+    def price(self, price):
+        # type: (float) -> None
+        if not isinstance(price, float):
+            raise ValueError(f"Field '{self.__name__}.price' must be a floating point number.")
+        self["price"] = price
+
     @property
     def currency(self):
-        # type: () -> str
+        # type: () -> Optional[str]
         """
         Currency of the quote price.
         """
         return self.get("currency")
 
-    @property
-    def expire(self):
-        # type: () -> Optional[datetime]
-        """
-        Quote expiration datetime.
-        """
-        expire = self.get("expire", None)
-        if not expire:
-            return None
-        return localize_datetime(self.get("expire"))
+    @currency.setter
+    def currency(self, currency):
+        if not isinstance(currency, str) or not re.match(r"^[A-Z]{3}$", currency):
+            raise ValueError(f"Field '{self.__name__}.currency' must be an ISO-4217 currency string code.")
+        self["currency"] = currency
 
-    @property
-    def created(self):
-        # type: () -> datetime
-        """
-        Quote creation datetime.
-        """
-        created = self.get("created", None)
-        if not created:
-            self["created"] = now()
-        return localize_datetime(self.get("created"))
+    expire = LocalizedDateTimeProperty(doc="Quote expiration datetime.")
+    created = LocalizedDateTimeProperty(doc="Quote creation datetime.", default_now=True)
 
     @property
     def steps(self):
