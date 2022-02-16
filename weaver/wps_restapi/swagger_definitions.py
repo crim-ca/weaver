@@ -14,11 +14,13 @@ on `Weaver`'s `ReadTheDocs` page.
 """
 # pylint: disable=C0103,invalid-name
 
+import datetime
 import os
 from copy import copy
 from typing import TYPE_CHECKING
 
 import yaml
+import duration
 from colander import DateTime, Email, OneOf, Range, Regex, drop, null, required
 from dateutil import parser as date_parser
 
@@ -42,6 +44,7 @@ from weaver.processes.constants import (
     WPS_LITERAL_DATA_TYPE_NAMES,
     ProcessSchema
 )
+from weaver.quotation.status import QuoteStatus
 from weaver.sort import Sort, SortMethods
 from weaver.status import JOB_STATUS_CODE_API, Status
 from weaver.visibility import Visibility
@@ -2606,6 +2609,34 @@ class ProcessDeployment(ProcessSummary, ProcessContext, ProcessDeployMeta):
     _sort_after = PROCESS_DESCRIPTION_FIELD_AFTER
 
 
+class Duration(ExtendedSchemaNode):
+    # note: using String instead of Time because timedelta object cannot be directly handled (missing parts at parsing)
+    schema_type = String
+    description = "Human readable representation of the duration."
+    example = "hh:mm:ss"
+
+
+# FIXME: use ISO-8601 duration (?) - P[n]Y[n]M[n]DT[n]H[n]M[n]S
+#       https://pypi.org/project/isodate/
+#       https://en.wikipedia.org/wiki/ISO_8601#Durations
+#   See:
+#       'duration.to_iso8601' already employed for quotes, should apply for jobs as well
+class DurationISO(ExtendedSchemaNode):
+    """
+    .. seealso::
+        https://json-schema.org/draft/2019-09/json-schema-validation.html#rfc.section.7.3.1
+    """
+    schema_type = String
+    description = "ISO-8601 representation of the duration."
+    example = "P[n]Y[n]M[n]DT[n]H[n]M[n]S"
+    format = "duration"
+
+    def deserialize(self, cstruct):
+        if isinstance(cstruct, datetime.timedelta) or isinstance(cstruct, str) and not cstruct.startswith("P"):
+            return duration.to_iso8601(cstruct)
+        return cstruct
+
+
 class JobStatusInfo(ExtendedMappingSchema):
     jobID = UUID(example="a9d14bf4-84e0-449a-bac8-16e598efe807", description="ID of the job.")
     processID = ProcessIdentifier(missing=None, default=None,
@@ -2626,9 +2657,9 @@ class JobStatusInfo(ExtendedMappingSchema):
                                              "any of the other timestamps according to current execution status or "
                                              "even slightly after job finished execution according to the duration "
                                              "needed to deallocate job resources and store results.")
-    # note: using String instead of Time because timedelta object cannot be directly handled (missing parts at parsing)
-    duration = ExtendedSchemaNode(String(), missing=drop,
-                                  description="Duration since the start of the process execution.")
+    duration = Duration(missing=drop, description="Duration since the start of the process execution.")
+    runningDuration = DurationISO(missing=drop,
+                                  description="Duration in ISO-8601 format since the start of the process execution.")
     runningSeconds = NumberType(missing=drop,
                                 description="Duration in seconds since the start of the process execution.")
     expirationDate = ExtendedSchemaNode(DateTime(), missing=drop,
@@ -2709,29 +2740,6 @@ class DismissedJobSchema(ExtendedMappingSchema):
     jobID = UUID(description="ID of the job.")
     message = ExtendedSchemaNode(String(), example="Job dismissed.")
     percentCompleted = ExtendedSchemaNode(Integer(), example=0)
-
-
-class QuoteProcessParametersSchema(ExtendedMappingSchema):
-    inputs = DescribeInputTypeList(missing=drop)
-    outputs = DescribeOutputTypeList(missing=drop)
-    mode = JobExecuteModeEnum()
-    response = JobResponseOptionsEnum()
-
-
-class AlternateQuotation(ExtendedMappingSchema):
-    id = UUID(description="Quote ID.")
-    title = ExtendedSchemaNode(String(), description="Name of the quotation.", missing=drop)
-    description = ExtendedSchemaNode(String(), description="Description of the quotation.", missing=drop)
-    price = ExtendedSchemaNode(Float(), description="Process execution price.")
-    currency = ExtendedSchemaNode(String(), description="Currency code in ISO-4217 format.")
-    expire = ExtendedSchemaNode(DateTime(), description="Expiration date and time of the quote in ISO-8601 format.")
-    created = ExtendedSchemaNode(DateTime(), description="Creation date and time of the quote in ISO-8601 format.")
-    details = ExtendedSchemaNode(String(), description="Details of the quotation.", missing=drop)
-    estimatedTime = ExtendedSchemaNode(String(), description="Estimated process execution duration.", missing=drop)
-
-
-class AlternateQuotationList(ExtendedSequenceSchema):
-    step = AlternateQuotation(description="Quote of a workflow step process.")
 
 
 # same as base Format, but for process/job responses instead of process submission
@@ -2896,7 +2904,7 @@ class ExecuteInputValues(OneOfKeywordSchema):
     ]
 
 
-class Execute(ExtendedMappingSchema):
+class ExecuteInputOutputs(ExtendedMappingSchema):
     # Permit unspecified (optional) inputs for processes that could technically allow no-inputs definition (CWL).
     # This is very unusual in real world scenarios, but has some possible cases: constant endpoint fetcher, RNG output.
     #
@@ -2922,6 +2930,9 @@ class Execute(ExtendedMappingSchema):
         #        maybe this is good enough, but should have a proper test for it
         # default={}
     )
+
+
+class Execute(ExecuteInputOutputs):
     mode = JobExecuteModeEnum()
     notification_email = ExtendedSchemaNode(
         String(),
@@ -2931,36 +2942,63 @@ class Execute(ExtendedMappingSchema):
     response = JobResponseOptionsEnum()
 
 
-class Quotation(ExtendedMappingSchema):
+class QuoteStatusSchema(ExtendedSchemaNode):
+    schema_type = String
+    validator = OneOf(QuoteStatus.values())
+
+
+class PartialQuoteSchema(ExtendedMappingSchema):
     id = UUID(description="Quote ID.")
-    title = ExtendedSchemaNode(String(), description="Name of the quotation.", missing=drop)
-    description = ExtendedSchemaNode(String(), description="Description of the quotation.", missing=drop)
-    processId = UUID(description="Corresponding process ID.")
-    price = ExtendedSchemaNode(Float(), description="Process execution price.")
+    status = QuoteStatusSchema()
+    processID = ProcessIdentifier(description="Process identifier corresponding to the quote definition.")
+
+
+class Price(ExtendedSchemaNode):
+    schema_type = Float
+    # not official, but common (https://github.com/OAI/OpenAPI-Specification/issues/845#issuecomment-378139730)
+    format = "decimal"
+
+
+class StepQuotation(PartialQuoteSchema):
+    price = Price(description="Estimated price for process execution.")
     currency = ExtendedSchemaNode(String(), description="Currency code in ISO-4217 format.")
     expire = ExtendedSchemaNode(DateTime(), description="Expiration date and time of the quote in ISO-8601 format.")
     created = ExtendedSchemaNode(DateTime(), description="Creation date and time of the quote in ISO-8601 format.")
-    userId = UUID(description="User id that requested the quote.")
-    details = ExtendedSchemaNode(String(), description="Details of the quotation.", missing=drop)
-    estimatedTime = ExtendedSchemaNode(DateTime(), missing=drop,
-                                       description="Estimated duration of the process execution.")
-    processParameters = Execute(title="ProcessExecuteParameters")
-    alternativeQuotations = AlternateQuotationList(missing=drop)
+    userID = ExtendedSchemaNode(String(), description="User ID that requested the quote.")
+    estimatedTime = Duration(Integer(), missing=drop,
+                             description="Estimated duration of process execution in human readable format.")
+    estimatedSeconds = ExtendedSchemaNode(Integer(), missing=drop,
+                                          description="Estimated duration of process execution in seconds.")
+    estimatedDuration = DurationISO(missing=drop,
+                                    description="Estimated duration of process execution in ISO-8601 format.")
+    processParameters = ExecuteInputOutputs(title="ProcessExecuteParameters")
 
 
-class QuoteProcessListSchema(ExtendedSequenceSchema):
-    step = Quotation(description="Quote of a workflow step process.")
+class StepQuotationList(ExtendedSequenceSchema):
+    description = "Detailed child processes and prices part of the complete quote."
+    step = StepQuotation(description="Quote of a workflow step process.")
 
 
-class QuoteSchema(ExtendedMappingSchema):
-    id = UUID(description="Quote ID.")
-    process = AnyIdentifier(description="Corresponding process ID.")
-    steps = QuoteProcessListSchema(description="Child processes and prices.")
-    total = ExtendedSchemaNode(Float(), description="Total of the quote including step processes.")
+class Quotation(StepQuotation):
+    steps = StepQuotationList(missing=drop)
+
+
+class QuoteStepReferenceList(ExtendedSequenceSchema):
+    description = "Summary of child process quote references part of the complete quote."
+    ref = ReferenceURL()
+
+
+class QuoteSummary(PartialQuoteSchema):
+    steps = QuoteStepReferenceList()
+    total = Price(description="Total of the quote including step processes if applicable.")
+
+
+class QuoteSchema(Quotation):
+    total = Price(description="Total of the quote including step processes if applicable.")
 
 
 class QuotationList(ExtendedSequenceSchema):
-    quote = ExtendedSchemaNode(String(), description="Quote ID.")
+    quote = UUID(description="Quote ID.")
 
 
 class QuotationListSchema(ExtendedMappingSchema):
@@ -2969,17 +3007,17 @@ class QuotationListSchema(ExtendedMappingSchema):
 
 class BillSchema(ExtendedMappingSchema):
     id = UUID(description="Bill ID.")
+    quoteID = UUID(description="Original quote ID that produced this bill.", missing=drop)
     title = ExtendedSchemaNode(String(), description="Name of the bill.")
     description = ExtendedSchemaNode(String(), missing=drop)
-    price = ExtendedSchemaNode(Float(), description="Price associated to the bill.")
+    price = Price(description="Price associated to the bill.")
     currency = ExtendedSchemaNode(String(), description="Currency code in ISO-4217 format.")
     created = ExtendedSchemaNode(DateTime(), description="Creation date and time of the bill in ISO-8601 format.")
-    userId = ExtendedSchemaNode(Integer(), description="User id that requested the quote.")
-    quotationId = UUID(description="Corresponding quote ID.", missing=drop)
+    userID = ExtendedSchemaNode(Integer(), description="User id that requested the quote.")
 
 
 class BillList(ExtendedSequenceSchema):
-    bill = ExtendedSchemaNode(String(), description="Bill ID.")
+    bill = UUID(description="Bill ID.")
 
 
 class BillListSchema(ExtendedMappingSchema):
@@ -3786,6 +3824,10 @@ class PostQuote(QuotePath):
     body = NoContent()
 
 
+class QuoteProcessParametersSchema(ExecuteInputOutputs):
+    pass
+
+
 class PostProcessQuoteRequestEndpoint(ProcessPath, QuotePath):
     header = RequestHeaders()
     body = QuoteProcessParametersSchema()
@@ -4210,9 +4252,20 @@ class CreatedQuoteExecuteResponse(ExtendedMappingSchema):
     body = CreatedQuotedJobStatusSchema()
 
 
-class CreatedQuoteRequestResponse(ExtendedMappingSchema):
+class CreatedQuoteResponse(ExtendedMappingSchema):
+    description = "Quote successfully obtained for process execution definition."
     header = ResponseHeaders()
     body = QuoteSchema()
+
+
+class AcceptedQuoteResponse(ExtendedMappingSchema):
+    summary = "Quote successfully submitted."
+    description = (
+        "Quote successfully submitted for evaluating process execution definition. "
+        "Complete details will be available once evaluation has completed."
+    )
+    header = ResponseHeaders()
+    body = PartialQuoteSchema()
 
 
 class OkGetQuoteInfoResponse(ExtendedMappingSchema):
@@ -4661,7 +4714,8 @@ get_quote_responses = {
     "500": InternalServerErrorResponseSchema(),
 }
 post_quotes_responses = {
-    "201": CreatedQuoteRequestResponse(description="success"),
+    "201": CreatedQuoteResponse(),
+    "202": AcceptedQuoteResponse(),
     "500": InternalServerErrorResponseSchema(),
 }
 post_quote_responses = {

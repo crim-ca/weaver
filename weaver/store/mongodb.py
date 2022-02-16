@@ -968,21 +968,35 @@ class MongodbQuoteStore(StoreQuotes, MongodbStore):
         StoreQuotes.__init__(self)
         MongodbStore.__init__(self, *db_args, **db_kwargs)
 
-    def save_quote(self, quote):
-        # type: (Quote) -> Quote
-        """
-        Stores a quote in mongodb.
-        """
+    def _apply_quote(self, quote, override=False):
+        # type: (Quote, bool) -> Quote
         if not isinstance(quote, Quote):
             raise QuoteInstanceError("Invalid quote object: '{}'".format(repr(quote)))
         try:
-            self.collection.insert_one(quote.params())
-            quote = self.fetch_by_id(quote_id=quote.id)
+            if override:
+                self.collection.update_one({"id": quote.id}, {"$set": quote.params()})
+            else:
+                self.collection.insert_one(quote.params())
+            params = self.fetch_by_id(quote_id=quote.id)
         except Exception as ex:
             raise QuoteRegistrationError("Error occurred during quote registration: [{}]".format(repr(ex)))
-        if quote is None:
+        if params is None:
             raise QuoteRegistrationError("Failed to retrieve registered quote.")
-        return quote
+        return Quote(**params)
+
+    def save_quote(self, quote):
+        # type: (Quote) -> Quote
+        """
+        Stores a quote in `MongoDB` storage.
+        """
+        return self._apply_quote(quote, False)
+
+    def update_quote(self, quote):
+        # type: (Quote) -> Quote
+        """
+        Update quote parameters in `MongoDB` storage.
+        """
+        return self._apply_quote(quote, True)
 
     def fetch_by_id(self, quote_id):
         # type: (AnyUUID) -> Quote

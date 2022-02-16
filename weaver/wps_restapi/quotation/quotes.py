@@ -1,20 +1,24 @@
 import logging
+from typing import TYPE_CHECKING
 
-from pyramid.httpexceptions import HTTPBadRequest, HTTPCreated, HTTPNotFound, HTTPOk
+from pyramid.httpexceptions import HTTPAccepted, HTTPBadRequest, HTTPCreated, HTTPNotFound, HTTPOk
 
-from weaver.config import WeaverConfiguration, WeaverFeature, get_weaver_configuration
+from weaver.config import WeaverFeature, get_weaver_configuration
 from weaver.database import get_db
 from weaver.datatype import Bill, Quote
 from weaver.exceptions import ProcessNotFound, QuoteNotFound, log_unhandled_exceptions
+from weaver.execute import ExecuteMode
 from weaver.formats import OutputFormat
 from weaver.processes.types import ProcessType
-from weaver.processes.quotation import process_quote_estimator
-from weaver.processes.wps_package import get_package_workflow_steps, get_process_location
+from weaver.quotation.estimation import process_quote_estimator
 from weaver.sort import Sort
 from weaver.store.base import StoreBills, StoreQuotes, StoreProcesses
-from weaver.utils import get_settings, get_weaver_url, parse_prefer_header
+from weaver.utils import get_settings, parse_prefer_header_execute_mode
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.processes.processes import submit_local_job
+
+if TYPE_CHECKING:
+    from weaver.datatype import Process
 
 LOGGER = logging.getLogger(__name__)
 
@@ -30,12 +34,12 @@ def request_quote(request):
     weaver_config = get_weaver_configuration(settings)
 
     if weaver_config not in WeaverFeature.QUOTING:
-        raise HTTPBadRequest("Unsupported request for configuration '{}'.".format(weaver_config))
+        raise HTTPBadRequest("Unsupported quoting request for configuration '{}'.".format(weaver_config))
 
     process_id = request.matchdict.get("process_id")
     process_store = get_db(request).get_store(StoreProcesses)
     try:
-        process = process_store.fetch_by_id(process_id)
+        process = process_store.fetch_by_id(process_id)  # type: Process
     except ProcessNotFound:
         raise ProcessNotFound(json={
             "title": "NoSuchProcess",
@@ -45,58 +49,49 @@ def request_quote(request):
             "cause": str(process_id)
         })
 
-    store = get_db(request).get_store(StoreQuotes)
-    process_url = get_process_location(process_id, data_source=get_weaver_url(settings))
-    process_type = process.type
+    if (
+        process.type != ProcessType.APPLICATION or
+        (process.type == ProcessType.WORKFLOW and weaver_config not in WeaverFeature.REMOTE)
+    ):
+        raise HTTPBadRequest(json={
+            "title": "UnsupportedOperation",
+            "detail": f"Unsupported quoting process type '{process.type}' on '{weaver_config}' instance.",
+            "status": HTTPBadRequest.code,
+            "instance": process.href(settings)
+        })
+
+    quote_store = get_db(request).get_store(StoreQuotes)
     process_params = dict()
     for param in ["inputs", "outputs", "mode", "response"]:
         if param in request.json:
             process_params[param] = request.json.pop(param)
 
-    inputs = process_params["inputs"]
-    outputs = process_params["outputs"]
     quote_info = {
         "process": process_id,
-        "inputs": inputs,
-        "outputs": outputs,
-        "location": process_url,
+        "processParameters": process_params,
         "user": str(request.authenticated_userid)
     }
-    quote = store.save_quote(Quote(**quote_info))
-    result = process_quote_estimator.delay(process, inputs, outputs)
+    quote = quote_store.save_quote(Quote(**quote_info))
+    mode, wait, applied = parse_prefer_header_execute_mode(request.headers, process.jobControlOptions)
+
+    result = process_quote_estimator.delay(quote.id, process)
     LOGGER.debug("Celery pending task [%s] for quote [%s].", result.id, quote.id)
+    if mode == ExecuteMode.SYNC and wait:
+        LOGGER.debug("Celery task requested as sync if it completes before (wait=%ss)", wait)
+        result.wait(timeout=wait)
+        if result.ready():
+            quote = quote_store.fetch_by_id(quote.id)
+            data = quote.json()
+            data.update({"description": sd.CreatedQuoteResponse.description})
+            data.update({"links": quote.links(settings)})
+            data = sd.CreatedQuoteResponse().deserialize(data)
+            return HTTPCreated(json=data)
 
-    mode, wait = parse_prefer_header(request.headers)
-
-    # loop workflow sub-process steps to get individual quotes
-    if process_type == ProcessType.WORKFLOW and weaver_config == WeaverConfiguration.EMS:
-        workflow_quotes = list()
-
-        for step in get_package_workflow_steps(process_url):
-            # retrieve quote from provider ADES
-            # TODO: data source mapping
-            process_step_url = get_process_location(step["reference"])
-            process_quote_url = "{}/quotations".format(process_step_url)
-            subreq = request.copy()
-            subreq.path_info = process_quote_url
-            resp_json = request.invoke_subrequest(subreq).json()
-            quote_json = resp_json["quote"]
-            quote = store.save_quote(Quote(**quote_json))
-            workflow_quotes.append(quote.id)
-
-        process_quote_info.update({"steps": workflow_quotes})
-        quote = store.save_quote(Quote(**process_quote_info))
-        return HTTPCreated(json={"quote": quote.json()})
-
-    # single application quotes (ADES or EMS)
-    elif process_type == ProcessType.APPLICATION:
-        quote = store.save_quote(Quote(**process_quote_info))
-        quote_json = quote.json()
-        quote_json.pop("steps", None)
-        return HTTPCreated(json={"quote": quote_json})
-
-    # error if not handled up to this point
-    raise HTTPBadRequest("Unsupported quoting process type '{0}' on '{1}'.".format(process_type, weaver_config))
+    data = quote.partial()
+    data.update({"description": sd.AcceptedQuoteResponse.description})
+    headers = {"Location": quote.href(settings)}
+    headers.update(applied)
+    return HTTPAccepted(headers=headers, json=data)
 
 
 @sd.process_quotes_service.get(tags=[sd.TAG_BILL_QUOTE, sd.TAG_PROCESSES], renderer=OutputFormat.JSON,

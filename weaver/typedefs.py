@@ -58,6 +58,21 @@ if TYPE_CHECKING:
     _JsonItem = Union[AnyValueType, _JsonObjectItem, _JsonListItem]
     JSON = Union[Dict[str, _JsonItem], List[_JsonItem], AnyValueType]
 
+    Link = TypedDict("Link", {
+        "rel": str,
+        "title": str,
+        "href": str,
+        "hreflang": Optional[str],
+        "type": Optional[str],  # IANA Media-Type
+    }, total=False)
+    Metadata = TypedDict("Metadata", {
+        "title": str,
+        "role": str,  # URL
+        "value": str,
+        "lang": str,
+        "type": str,  # FIXME: relevant?
+    }, total=False)
+
     # CWL definition
     GlobType = TypedDict("GlobType", {"glob": Union[str, List[str]]}, total=False)
     CWL_IO_FileValue = TypedDict("CWL_IO_FileValue", {"class": str, "path": str, "format": Optional[str]}, total=True)
@@ -274,3 +289,16 @@ if TYPE_CHECKING:
 
     # reference employed as 'JobMonitorReference' by 'WPS1Process'
     JobExecution = TypedDict("JobExecution", {"execution": WPSExecution})
+
+    # quoting
+    QuoteProcessParameters = TypedDict("QuoteProcessParameters", {
+        "inputs": JobInputs,
+        "outputs": JobOutputs,
+    })
+
+    QuoteEstimationParameters = TypedDict("QuoteEstimationParameters", {
+        "price": float,
+        "currency": str,
+        "seconds": int,
+        "steps": List[str],
+    }, total=False)

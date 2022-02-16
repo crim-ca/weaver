@@ -303,6 +303,12 @@ class QuoteInstanceError(HTTPInternalServerError, OWSNoApplicableCode, QuoteExce
     """
 
 
+class QuoteEstimationError(QuoteException, ValueError):
+    """
+    Error related to a quote that occurred during its estimation.
+    """
+
+
 class BillException(WeaverException):
     """
     Base exception related to a :class:`weaver.datatype.Bill`.

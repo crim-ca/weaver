@@ -35,6 +35,7 @@ from weaver.formats import AcceptLanguage, ContentType
 from weaver.processes.constants import ProcessSchema
 from weaver.processes.convert import get_field, null, ows2json, wps2json_io
 from weaver.processes.types import ProcessType
+from weaver.quotation.status import QuoteStatus
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.utils import localize_datetime  # for backward compatibility of previously saved jobs not time-locale-aware
 from weaver.utils import (
@@ -44,6 +45,7 @@ from weaver.utils import (
     get_log_fmt,
     get_settings,
     now,
+    repr_json,
     request_extra
 )
 from weaver.visibility import Visibility
@@ -60,8 +62,19 @@ if TYPE_CHECKING:
     from weaver.execute import AnyExecuteControlOption, AnyExecuteTransmissionMode
     from weaver.processes.constants import ProcessSchemaType
     from weaver.processes.types import AnyProcessType
-    from weaver.status import AnyStatusType
-    from weaver.typedefs import AnyProcess, AnySettingsContainer, AnyUUID, Number, CWL, JSON
+    from weaver.quotation.status import AnyQuoteStatus
+    from weaver.status import AnyStatusType, StatusType
+    from weaver.typedefs import (
+        AnyProcess,
+        AnySettingsContainer,
+        AnyUUID,
+        Number,
+        CWL,
+        JSON,
+        Link,
+        Metadata,
+        QuoteProcessParameters
+    )
     from weaver.visibility import AnyVisibility
 
     AnyParams = Dict[str, Any]
@@ -173,6 +186,7 @@ class Base(DictBase):
 
     @property
     def __name__(self):
+        # type: () -> str
         return fully_qualified_name(self)
 
     @property
@@ -181,6 +195,7 @@ class Base(DictBase):
 
     @property
     def uuid(self):
+        # type: () -> uuid.UUID
         return self.id
 
     def json(self):
@@ -295,7 +310,7 @@ class Service(Base):
             raise ServiceParsingError(json={"description": msg, "cause": str(exc), "error": exc.__class__.__name__})
 
     def links(self, container, fetch=True, self_link=None):
-        # type: (AnySettingsContainer, bool, Optional[str]) -> List[JSON]
+        # type: (AnySettingsContainer, bool, Optional[str]) -> List[Link]
         """
         Obtains the links relevant to the service :term:`Provider`.
 
@@ -348,7 +363,7 @@ class Service(Base):
         return links
 
     def metadata(self, container):
-        # type: (AnySettingsContainer) -> List[JSON]
+        # type: (AnySettingsContainer) -> List[Metadata]
         """
         Obtains the metadata relevant to the service provider.
         """
@@ -734,7 +749,7 @@ class Job(Base):
 
     @status.setter
     def status(self, status):
-        # type: (str) -> None
+        # type: (StatusType) -> None
         value = Status.get(status)
         if value == Status.ACCEPTED and self.status == Status.RUNNING:
             LOGGER.debug(traceback.extract_stack())
@@ -1008,8 +1023,7 @@ class Job(Base):
         """
         vis = Visibility.get(visibility)
         if visibility not in Visibility.values():
-            name = fully_qualified_name(self)
-            raise ValueError(f"Invalid 'visibility' value '{visibility!s}' specified for '{name}.access'")
+            raise ValueError(f"Invalid 'visibility' value '{visibility!s}' specified for '{self.__name__}.access'")
         self["access"] = vis
 
     @property
@@ -1074,7 +1088,7 @@ class Job(Base):
         return "{base_job_url}{job_path}".format(base_job_url=base_url, job_path=job_path)
 
     def links(self, container=None, self_link=None):
-        # type: (Optional[AnySettingsContainer], Optional[str]) -> List[JSON]
+        # type: (Optional[AnySettingsContainer], Optional[str]) -> List[Link]
         """
         Obtains the JSON links section of the response body for a :term:`Job`.
 
@@ -1701,7 +1715,7 @@ class Process(Base):
 
     @property
     def metadata(self):
-        # type: () -> List[str]
+        # type: () -> List[Metadata]
         return self.get("metadata", [])
 
     @property
@@ -1994,18 +2008,14 @@ class Process(Base):
         return sd.Process().deserialize(self.dict())
 
     def links(self, container=None):
-        # type: (Optional[AnySettingsContainer]) -> JSON
+        # type: (Optional[AnySettingsContainer]) -> List[Link]
         """
         Obtains the JSON links section of many response body for the :term:`Process`.
 
         :param container: object that helps retrieve instance details, namely the host URL.
         """
-        settings = get_settings(container)
-        base_url = get_wps_restapi_base_url(settings)
-        if self.service:
-            base_url += sd.provider_service.path.format(provider_id=self.service)
-        proc_desc = base_url + sd.process_service.path.format(process_id=self.id)
-        proc_list = base_url + sd.processes_service.path
+        proc_desc = self.href(container)
+        proc_list = proc_desc.rsplit("/", 1)[0]
         jobs_list = proc_desc + sd.jobs_service.path
         proc_exec = proc_desc + "/execution"
         links = [
@@ -2020,11 +2030,12 @@ class Process(Base):
             {"href": proc_list, "rel": "up", "title": "List of processes registered under the service."},
         ]
         if self.service:
+            api_base_url = proc_list.rsplit("/", 1)[0]
             wps_base_url = self.processEndpointWPS1.split("?")[0]
             wps_get_caps = wps_base_url + "?service=WPS&request=GetCapabilities&version=1.0.0"
             wps_links = [
-                {"href": base_url, "rel": "service", "title": "Provider service description."},
-                {"href": base_url, "rel": "service-meta", "title": "Provider service definition."},
+                {"href": api_base_url, "rel": "service", "title": "Provider service description."},
+                {"href": api_base_url, "rel": "service-meta", "title": "Provider service definition."},
                 {"href": wps_get_caps, "rel": "service-desc", "title": "Remote service description."},
                 {"href": self.processEndpointWPS1, "rel": "http://www.opengis.net/def/rel/ogc/1.0/process-desc",
                  "title": "Remote process description."},
@@ -2035,7 +2046,19 @@ class Process(Base):
         for link in links:
             link.setdefault("type", ContentType.APP_JSON)
             link.setdefault("hreflang", AcceptLanguage.EN_CA)
-        return {"links": links}
+        return links
+
+    def href(self, container=None):
+        # type: (Optional[AnySettingsContainer]) -> str
+        """
+        Obtain the reference URL for this :term:`Process`.
+        """
+        settings = get_settings(container)
+        base_url = get_wps_restapi_base_url(settings)
+        if self.service:
+            base_url += sd.provider_service.path.format(provider_id=self.service)
+        proc_desc = base_url + sd.process_service.path.format(process_id=self.id)
+        return proc_desc
 
     def offering(self, schema=ProcessSchema.OGC):
         # type: (ProcessSchemaType) -> JSON
@@ -2052,11 +2075,11 @@ class Process(Base):
         """
         process = self.dict()
         links = self.links()
+        process.update({"links": links})
         # force selection of schema to avoid ambiguity
         if str(schema or ProcessSchema.OGC).upper() == ProcessSchema.OLD:
             # nested process fields + I/O as lists
             process.update({"process": dict(process)})
-            process.update(links)
             return sd.ProcessDescriptionOLD().deserialize(process)
         # direct process + I/O as mappings
         for io_type in ["inputs", "outputs"]:
@@ -2064,7 +2087,6 @@ class Process(Base):
                 get_field(io_def, "identifier", search_variations=True, pop_found=True): io_def
                 for io_def in process[io_type]
             }
-        process.update(links)
         return sd.ProcessDescriptionOGC().deserialize(process)
 
     def summary(self):
@@ -2213,6 +2235,8 @@ class Quote(Base):
             raise TypeError("Field 'Quote.currency' is required")
         if not isinstance(self.get("currency"), str) or len(self.get("currency")) != 3:
             raise ValueError("Field 'Quote.currency' must be an ISO-4217 currency string code.")
+        if "status" not in self:
+            self["status"] = QuoteStatus.SUBMITTED
         if "created" not in self:
             self["created"] = now()
         try:
@@ -2230,34 +2254,38 @@ class Quote(Base):
 
     @property
     def id(self):
+        # type: () -> uuid.UUID
         """
         Quote ID.
         """
         return dict.__getitem__(self, "id")
 
     @property
-    def title(self):
-        """
-        Quote title.
-        """
-        return self.get("title")
+    def status(self):
+        # type: () -> QuoteStatus
+        return QuoteStatus.get(self.get("status"), QuoteStatus.SUBMITTED)
 
-    @property
-    def description(self):
-        """
-        Quote description.
-        """
-        return self.get("description")
-
-    @property
-    def details(self):
-        """
-        Quote details.
-        """
-        return self.get("details")
+    @status.setter
+    def status(self, status):
+        # type: (AnyQuoteStatus) -> None
+        value = QuoteStatus.get(status)
+        if value not in QuoteStatus:
+            statuses = list(QuoteStatus.values())
+            name = self.__name__
+            raise ValueError(f"Status '{status}' is not valid for '{name}.status', must be one of {statuses!s}'")
+        prev = self.status
+        if (
+            (value == QuoteStatus.SUBMITTED and prev != QuoteStatus.SUBMITTED) or
+            (value == QuoteStatus.PROCESSING and prev == QuoteStatus.COMPLETED)
+        ):
+            LOGGER.error("Cannot revert back to previous quote status (%s => %s)", value, self.status)
+            LOGGER.debug(traceback.extract_stack())
+            return
+        self["status"] = value
 
     @property
     def user(self):
+        # type: () -> Optional[Union[str, int]]
         """
         User ID requesting the quote.
         """
@@ -2265,34 +2293,72 @@ class Quote(Base):
 
     @property
     def process(self):
+        # type: () -> str
         """
-        WPS Process ID.
+        Process ID.
         """
         return dict.__getitem__(self, "process")
 
     @property
-    def estimatedTime(self):  # noqa: N802
+    def seconds(self):
+        # type: () -> int
         """
-        Process estimated time.
+        Estimated time of the process execution in seconds.
         """
-        return self.get("estimatedTime")
+        return self.get("seconds")
+
+    @seconds.setter
+    def seconds(self, seconds):
+        # type: (int) -> None
+        if not isinstance(seconds, int):
+            raise TypeError(f"Invalid estimated duration type for '{self.__name__}.seconds'.")
+        if not seconds < 0:
+            raise ValueError(f"Invalid estimated duration value for '{self.__name__}.seconds'.")
+        self["seconds"] = seconds
 
     @property
-    def processParameters(self):  # noqa: N802
+    def duration(self):
+        # type: () -> Optional[timedelta]
+        if not self.seconds:
+            return None
+        return timedelta(self.seconds)
+
+    @property
+    def duration_str(self):
+        # type: () -> str
+        duration = self.duration
+        if duration is None:
+            return "00:00:00"
+        return str(duration).split(".")[0].zfill(8)  # "HH:MM:SS"
+
+    @property
+    def parameters(self):
+        # type: () -> QuoteProcessParameters
         """
         Process execution parameters for quote.
+
+        This should include minimally the inputs and expected outputs,
+        but could be extended as needed with relevant details for quoting algorithm.
         """
         return self.get("processParameters")
 
-    @property
-    def location(self):
-        """
-        WPS Process URL.
-        """
-        return self.get("location", "")
+    @parameters.setter
+    def parameters(self, data):
+        # type: (QuoteProcessParameters) -> None
+        if (
+            not isinstance(data, dict) or
+            not isinstance(data.get("inputs"), list) or
+            not all(isinstance(i, dict) for i in data.get("inputs")) or
+            not isinstance(data.get("outputs"), list) or
+            not all(isinstance(o, dict) for o in data.get("outputs"))
+        ):
+            LOGGER.error("Invalid process parameters for quote submission.\n%s", repr_json(data, indent=2))
+            raise TypeError("Invalid process parameters for quote submission.")
+        self["processParameters"] = data
 
     @property
     def price(self):
+        # type: () -> float  # FIXME: decimal?
         """
         Price of the current quote.
         """
@@ -2300,6 +2366,7 @@ class Quote(Base):
 
     @property
     def currency(self):
+        # type: () -> str
         """
         Currency of the quote price.
         """
@@ -2307,20 +2374,29 @@ class Quote(Base):
 
     @property
     def expire(self):
+        # type: () -> Optional[datetime]
         """
         Quote expiration datetime.
         """
-        return self.get("expire")
+        expire = self.get("expire", None)
+        if not expire:
+            return None
+        return localize_datetime(self.get("expire"))
 
     @property
     def created(self):
+        # type: () -> datetime
         """
         Quote creation datetime.
         """
-        return self.get("created")
+        created = self.get("created", None)
+        if not created:
+            self["created"] = now()
+        return localize_datetime(self.get("created"))
 
     @property
     def steps(self):
+        # type: () -> List[uuid.UUID]
         """
         Sub-quote IDs if applicable.
         """
@@ -2334,20 +2410,67 @@ class Quote(Base):
             "currency": self.currency,
             "user": self.user,
             "process": self.process,
-            "location": self.location,
             "steps": self.steps,
-            "title": self.title,
-            "description": self.description,
-            "details": self.details,
             "created": self.created,
             "expire": self.expire,
-            "estimatedTime": self.estimatedTime,
-            "processParameters": self.processParameters,
+            "seconds": self.seconds,
+            "parameters": self.parameters,
         }
+
+    def partial(self):
+        # type: () -> JSON
+        """
+        Submitted :term:`Quote` representation with minimal details until evaluation is completed.
+        """
+        data = {
+            "id": self.id,
+            "status": self.status,
+            "processID": self.process
+        }
+        return sd.PartialQuoteSchema().deserialize(data)
 
     def json(self):
         # type: () -> JSON
-        return sd.QuoteSchema().deserialize(self)
+        """
+        Step :term:`Quote` with :term:`JSON` representation.
+
+        .. note::
+            Does not include derived :term:`Quote` details if the associated :term:`Process` is a :term:`Workflow`.
+        """
+        data = self.dict()
+        data.update(self.partial())
+        duration = self.duration_str
+        data.update({
+            "userID": self.user,
+            "estimatedTime": duration,  # let schema convert it
+            "estimatedSeconds": self.seconds,
+            "estimatedDuration": duration,
+            "processParameters": self.parameters,
+        })
+        return sd.StepQuotation().deserialize(data)
+
+    def links(self, container=None):
+        # type: (Optional[AnySettingsContainer]) -> List[Link]
+        quote_url = self.href(container)
+        base_href = quote_url.rsplit(sd.quotes_service.path, 1)[0]
+        proc_href = base_href + sd.process_service.path.format(process_id=self.process)
+        exec_href = base_href + sd.process_quote_service.path.format(process_id=self.process, quote_id=self.id)
+        links = [
+            {"href": quote_url, "rel": "self", "title": "Quote details."},
+            {"href": proc_href, "rel": "process-meta", "title": "Process description."},
+            {"href": exec_href, "rel": "quoted-execution", "title": "Process execution using quote submission."},
+        ]
+        return links
+
+    def href(self, container=None):
+        # type: (Optional[AnySettingsContainer]) -> str
+        """
+        Obtain the reference URL for this :term:`Quote`.
+        """
+        settings = get_settings(container)
+        base_url = get_wps_restapi_base_url(settings)
+        quote_url = base_url + sd.quote_service.path.format(quote_id=self.id)
+        return quote_url
 
 
 class Bill(Base):

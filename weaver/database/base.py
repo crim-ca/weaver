@@ -9,6 +9,14 @@ if TYPE_CHECKING:
     from weaver.store.base import StoreBills, StoreJobs, StoreProcesses, StoreQuotes, StoreServices, StoreVault
     from weaver.typedefs import AnySettingsContainer, JSON, Literal, Type, Union
 
+    AnyStore = Union[
+        StoreBills,
+        StoreJobs,
+        StoreProcesses,
+        StoreQuotes,
+        StoreServices,
+        StoreVault
+    ]
     StoreTypeName = Literal[
         StoreBills.type,
         StoreJobs.type,
@@ -24,8 +32,6 @@ if TYPE_CHECKING:
     StoreServicesSelector = Union[Type[StoreServices], Literal[StoreServices.type]]
     StoreVaultSelector = Union[Type[StoreVault], Literal[StoreVault.type]]
     StoreSelector = Union[
-        Type[StoreInterface],
-        StoreInterface,
         StoreBillsSelector,
         StoreJobsSelector,
         StoreProcessesSelector,
@@ -49,7 +55,7 @@ class DatabaseInterface(metaclass=abc.ABCMeta):
 
     @staticmethod
     def _get_store_type(store_type):
-        # type: (StoreSelector) -> StoreTypeName
+        # type: (Union[StoreSelector, Type[StoreInterface], StoreInterface]) -> StoreTypeName
         if isinstance(store_type, StoreInterface):
             return store_type.type
         if isinstance(store_type, type) and issubclass(store_type, StoreInterface):
@@ -90,6 +96,7 @@ class DatabaseInterface(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def get_store(self, store_type, *store_args, **store_kwargs):
+        # type: (StoreSelector, Any, Any) -> AnyStore
         raise NotImplementedError
 
     @abc.abstractmethod

@@ -9,6 +9,7 @@ if TYPE_CHECKING:
     from pywps import Process as ProcessWPS
 
     from weaver.datatype import Bill, Job, Process, Quote, Service, VaultFile
+    from weaver.quotation.status import AnyQuoteStatus
     from weaver.typedefs import AnyUUID, DatetimeIntervalType, SettingsType, TypedDict
 
     JobGroupCategory = TypedDict("JobGroupCategory",
@@ -194,6 +195,11 @@ class StoreQuotes(StoreInterface):
     @abc.abstractmethod
     def find_quotes(self, process_id=None, page=0, limit=10, sort=None):
         # type: (Optional[str], int, int, Optional[str]) -> Tuple[List[Quote], int]
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def update_quote(self, quote):
+        # type: (Quote) -> Quote
         raise NotImplementedError
 
 
