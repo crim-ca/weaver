@@ -73,6 +73,7 @@ class MongoDatabase(DatabaseInterface):
                      self._database.name, self._database.client.server_info()["version"], pymongo.__version__)
 
     def reset_store(self, store_type):
+        # type: (AnyMongodbStoreType) -> AnyMongodbStore
         store_type = self._get_store_type(store_type)
         return self._stores.pop(store_type, None)
 

@@ -5,6 +5,7 @@ Functional tests for :mod:`weaver.cli`.
 import contextlib
 import copy
 import json
+import logging
 import os
 import shutil
 import tempfile
@@ -50,6 +51,8 @@ class TestWeaverClientBase(WpsConfigBase):
         super(TestWeaverClientBase, cls).setUpClass()
         cls.url = get_weaver_url(cls.app.app.registry)
         cls.client = WeaverClient(cls.url)
+        cli_logger = logging.getLogger("weaver.cli")
+        cli_logger.setLevel(logging.DEBUG)
 
         cls.test_process_prefix = "test-client"
 

@@ -492,7 +492,7 @@ class WeaverClient(object):
                 vault_id = res.body["file_id"]
                 token = res.body["access_token"]
                 auth_tokens[vault_id] = token
-                LOGGER.info("Converted [%s] -> [%s]", file, vault_href)
+                LOGGER.info("Converted (input: %s) [%s] -> [%s]", input_id, file, vault_href)
                 update_inputs[input_id] = {"href": vault_href, "format": {"mediaType": ctype}}
 
         auth_headers = {}
@@ -568,7 +568,7 @@ class WeaverClient(object):
             # use 'value' to have all outputs reported in body as 'value/href' rather than 'Link' headers
             data["outputs"][output_id] = {"transmissionMode": EXECUTE_TRANSMISSION_MODE_VALUE}
 
-        LOGGER.info("Executing [%s] with inputs:\n%s", process_id, _json2text(inputs))
+        LOGGER.info("Executing [%s] with inputs:\n%s", process_id, _json2text(values))
         path = f"{base}/processes/{process_id}/execution"  # use OGC-API compliant endpoint (not '/jobs')
         headers = {}
         headers.update(self._headers)
@@ -580,7 +580,6 @@ class WeaverClient(object):
         # although Weaver returns "jobID" in the body for convenience,
         # employ the "Location" header to be OGC-API compliant
         job_url = resp.headers.get("Location", "")
-        time.sleep(1)  # small delay to ensure process execution had a chance to start before monitoring
         return self.monitor(job_url, timeout=timeout, interval=interval)
 
     def upload(self, file_path, content_type=None, url=None):
@@ -700,6 +699,7 @@ class WeaverClient(object):
         # use results endpoint instead of outputs to be OGC-API compliant, should be able to target non-Weaver instance
         # with this endpoint, outputs IDs are directly at the root of the body
         result_url = f"{job_url}/results"
+        LOGGER.info("Retrieving results from [%s]", result_url)
         resp = request_extra("GET", result_url, headers=self._headers, settings=self._settings)
         res_out = self._parse_result(resp)
         outputs = res_out.body
