@@ -59,7 +59,7 @@ class OWSException(Response, Exception):
     </Exception>
 </ExceptionReport>""")
 
-    def __init__(self, detail=None, value=None, **kw):
+    def __init__(self, detail=None, value=None, json=None, **kw):  # noqa
         status = kw.pop("status", None)
         if isinstance(status, type) and issubclass(status, HTTPException):
             status = status().status
@@ -72,15 +72,20 @@ class OWSException(Response, Exception):
             status = status.status
         elif not status:
             status = HTTPOk().status
+        locator = kw.get("locator")
+        if isinstance(json, dict):
+            detail = detail or json.get("detail") or json.get("description")
+            locator = locator or json.get("locator") or json.get("name")
+            if value:
+                json.setdefault("value", value)
         self.code = str(kw.pop("code", self.code))
         desc = str(detail or kw.pop("description", self.description))
-        Response.__init__(self, status=status, **kw)
+        Response.__init__(self, status=status, json=json, **kw)
         Exception.__init__(self, detail)
         self.message = detail or self.description or getattr(self, "explanation", None)
         self.content_type = CONTENT_TYPE_APP_JSON
-        value = kw.get("locator", value)
-        if value:
-            self.locator = value
+        if locator:
+            self.locator = locator
         try:
             json_desc = self.json.get("description")
             if json_desc:

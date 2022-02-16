@@ -4319,7 +4319,7 @@ class BadRequestVaultFileUploadResponse(ExtendedMappingSchema):
     body = ErrorJsonResponseBodySchema()
 
 
-class ForbiddenVaultFileUploadResponse(ExtendedMappingSchema):
+class UnprocessableEntityVaultFileUploadResponse(ExtendedMappingSchema):
     description = (
         "Invalid filename refused for upload."
         "Filename should include only alphanumeric, underscore, dash, and dot characters. "
@@ -4705,7 +4705,7 @@ post_vault_responses = {
         }
     }),
     "400": BadRequestVaultFileUploadResponse(),
-    "403": ForbiddenVaultFileUploadResponse(),
+    "422": UnprocessableEntityVaultFileUploadResponse(),
     "500": InternalServerErrorResponseSchema(),
 }
 head_vault_file_responses = {

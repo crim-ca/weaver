@@ -4,14 +4,16 @@ import re
 from io import BufferedIOBase
 from typing import TYPE_CHECKING
 
-from pyramid.httpexceptions import HTTPBadRequest, HTTPForbidden, HTTPOk
+from pyramid.httpexceptions import HTTPOk, HTTPUnprocessableEntity
 from pyramid.response import FileIter, FileResponse
+from pyramid_storage.exceptions import FileNotAllowed
 from pyramid_storage.local import LocalFileStorage
 
 from weaver.database import get_db
 from weaver.datatype import VaultFile
 from weaver.exceptions import log_unhandled_exceptions
 from weaver.formats import get_allowed_extensions
+from weaver.owsexceptions import OWSInvalidParameterValue, OWSMissingParameterValue
 from weaver.store.base import StoreVault
 from weaver.utils import get_file_headers
 from weaver.vault.utils import get_authorized_file, get_vault_auth, get_vault_dir, get_vault_path, get_vault_url
@@ -37,19 +39,27 @@ def upload_file(request):
     """
     Upload a file to secured vault.
     """
-    req_file = request.POST.get("file")         # type: Optional[cgi_FieldStorage]
-    req_fs = getattr(req_file, "file", None)    # type: Optional[BufferedIOBase]
+    error = "File missing."
+    try:
+        req_file = request.POST.get("file")         # type: Optional[cgi_FieldStorage]
+        req_fs = getattr(req_file, "file", None)    # type: Optional[BufferedIOBase]
+    except Exception as exc:
+        error = str(exc)
+        req_file = req_fs = None
     if not isinstance(req_fs, BufferedIOBase):
-        raise HTTPBadRequest(json={
+        raise OWSMissingParameterValue(json={
             "code": "MissingParameterValue",
             "name": "file",
             "description": sd.BadRequestVaultFileUploadResponse.description,
+            "error": error,
         })
     if not re.match(FILENAME_REGEX, req_file.filename):
-        raise HTTPForbidden(json={
+        LOGGER.debug("Invalid filename refused by Vault: [%s]", req_file.filename)
+        raise OWSInvalidParameterValue(status=HTTPUnprocessableEntity, json={
             "code": "InvalidParameterValue",
             "name": "filename",
-            "description": sd.ForbiddenVaultFileUploadResponse.description,
+            "description": sd.UnprocessableEntityVaultFileUploadResponse.description,
+            "value": str(req_file.filename)
         })
 
     # save file to disk from request contents
@@ -58,7 +68,17 @@ def upload_file(request):
     vault_dir = get_vault_dir(request)
     vault_fs = LocalFileStorage(vault_dir)
     vault_fs.extensions = get_allowed_extensions()
-    vault_file.name = vault_fs.save(req_file, folder=str(vault_file.id))
+    try:
+        vault_file.name = vault_fs.save(req_file, folder=str(vault_file.id))
+    except FileNotAllowed:
+        file_ext = os.path.splitext(req_file.filename)
+        LOGGER.debug("Invalid file extension refused by Vault: [%s]", file_ext)
+        raise OWSInvalidParameterValue(status=HTTPUnprocessableEntity, json={
+            "code": "InvalidParameterValue",
+            "name": "filename",
+            "description": sd.UnprocessableEntityVaultFileUploadResponse.description,
+            "value": str(file_ext)
+        })
 
     db = get_db(request)
     vault = db.get_store(StoreVault)
