@@ -624,7 +624,10 @@ class WeaverClient(object):
                 file_headers["Content-Type"]
             )
         }
-        req_headers = {"Accept": CONTENT_TYPE_APP_JSON}  # Content-Type auto generated with multipart boundary
+        req_headers = {
+            "Accept": ContentType.APP_JSON,  # no 'Content-Type' since auto generated with multipart boundary
+            "Cache-Control": "no-cache",     # ensure the cache is not used to return a previously uploaded file
+        }
         resp = request_extra("POST", path, headers=req_headers, settings=self._settings, files=files)
         return self._parse_result(resp)
 

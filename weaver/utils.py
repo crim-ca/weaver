@@ -773,7 +773,7 @@ def invalidate_region(caching_args):
     func, region, *args = caching_args
     try:
         region_invalidate(func, region, *args)
-    except BeakerException:
+    except (BeakerException, KeyError):  # ignore if cache region not yet generated
         pass
 
 
