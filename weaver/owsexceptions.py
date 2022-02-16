@@ -7,7 +7,7 @@ be caught whether the running process is via :mod:`weaver` or through :mod:`pywp
 Furthermore, interrelation with :mod:`weaver.exceptions` classes (with base :exc:`weaver.exceptions.WeaverException`)
 also employ specific :exc:`OWSExceptions` definitions to provide specific error details.
 """
-import json
+import json as json_pkg
 import warnings
 from string import Template
 from typing import TYPE_CHECKING
@@ -59,7 +59,7 @@ class OWSException(Response, Exception):
     </Exception>
 </ExceptionReport>""")
 
-    def __init__(self, detail=None, value=None, json=None, **kw):  # noqa
+    def __init__(self, detail=None, value=None, json=None, **kw):
         status = kw.pop("status", None)
         if isinstance(status, type) and issubclass(status, HTTPException):
             status = status().status
@@ -148,7 +148,7 @@ class OWSException(Response, Exception):
                             "locator": locator or "",
                             "message": message or "",
                         }
-                        return json.dumps(data)
+                        return json_pkg.dumps(data)
 
                 page_template = JsonPageTemplate(self)
                 args = {"code": self.code, "locator": self.locator, "message": self.message}
