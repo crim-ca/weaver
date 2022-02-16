@@ -6,6 +6,6 @@ X-Auth-Vault: token <access-token-1>; id=<vault-uuid-1>,token <access-token-2>; 
 {
   "mode": "async",
   "response": "document",
-  "inputs": {"input-1": {"href": "vault:<vault-uuid-1>"}, "input-2": {"href": "vault:<vault-uuid-2>"}},
+  "inputs": {"input-1": {"href": "vault://<vault-uuid-1>"}, "input-2": {"href": "vault://<vault-uuid-2>"}},
   "outputs": {"out": {"transmissionMode": "reference"}}
 }

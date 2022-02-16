@@ -538,7 +538,7 @@ class FileUploadContent(ExtendedSchemaNode):
     schema_type = String()
     description = (
         "Contents of the file being uploaded with multipart. When prefixed with 'Content-Type: {media-type}', the "
-        "specified format will be applied to the input that will be attributed the 'vault:{UUID}' during execution. "
+        "specified format will be applied to the input that will be attributed the 'vault://{UUID}' during execution. "
         "Contents can also have 'Content-Disposition' definition to provide the desired file name."
     )
 
