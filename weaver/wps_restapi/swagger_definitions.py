@@ -4321,7 +4321,7 @@ class BadRequestVaultFileUploadResponse(ExtendedMappingSchema):
 
 class UnprocessableEntityVaultFileUploadResponse(ExtendedMappingSchema):
     description = (
-        "Invalid filename refused for upload."
+        "Invalid filename refused for upload. "
         "Filename should include only alphanumeric, underscore, dash, and dot characters. "
         "Filename should include both the base name and the desired file extension."
     )
