@@ -544,9 +544,10 @@ class WeaverClient(object):
         if isinstance(values, OperationResult):
             return values
         base = self._get_url(url)
-        values, auth_headers = self._update_files(values, url=base)
-        if isinstance(values, OperationResult):
-            return values
+        result = self._update_files(values, url=base)
+        if isinstance(result, OperationResult):
+            return result
+        values, auth_headers = result
         data = {
             # NOTE: since sync is not yet properly implemented in Weaver, simulate with monitoring after if requested
             # FIXME: support 'sync' (https://github.com/crim-ca/weaver/issues/247)

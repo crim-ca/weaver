@@ -45,6 +45,7 @@ class TestWeaverClientBase(WpsConfigBase):
     @classmethod
     def setUpClass(cls):
         cls.settings.update({
+            "weaver.vault_dir": tempfile.mkdtemp(prefix="weaver-test-"),
             "weaver.wps_output_dir": tempfile.mkdtemp(prefix="weaver-test-"),
             "weaver.wps_output_url": "http://random-file-server.com/wps-outputs"
         })
@@ -73,9 +74,10 @@ class TestWeaverClientBase(WpsConfigBase):
     @classmethod
     def tearDownClass(cls):
         super(TestWeaverClientBase, cls).tearDownClass()
-        tmp_wps_out = cls.settings.get("weaver.wps_output_dir", "")
-        if os.path.isdir(tmp_wps_out):
-            shutil.rmtree(tmp_wps_out, ignore_errors=True)
+        for tmp_dir_cfg in ["weaver.vault_dir", "weaver.wps_output_dir"]:
+            tmp_wps_out = cls.settings.get(tmp_dir_cfg, "")
+            if os.path.isdir(tmp_wps_out):
+                shutil.rmtree(tmp_wps_out, ignore_errors=True)
 
     @staticmethod
     def get_resource_file(name, process="Echo"):

@@ -1,6 +1,7 @@
 import logging
 import os
 import re
+import tempfile
 from io import BufferedIOBase
 from typing import TYPE_CHECKING
 
@@ -69,6 +70,7 @@ def upload_file(request):
     vault_fs = LocalFileStorage(vault_dir)
     vault_fs.extensions = get_allowed_extensions()
     try:
+        req_file.file = vault_file.encrypt(req_file.file)
         vault_file.name = vault_fs.save(req_file, folder=str(vault_file.id))
     except FileNotAllowed:
         file_ext = os.path.splitext(req_file.filename)
@@ -101,10 +103,17 @@ def describe_file(request):
     Get authorized vault file details without downloading it.
     """
     file_id, auth = get_vault_auth(request)
-    file = get_authorized_file(file_id, auth, request)
-    path = get_vault_path(file, request)
-    headers = get_file_headers(path, download_headers=True, content_headers=True, content_type=file.format)
-    headers["Content-Location"] = get_vault_url(file, request)
+    vault_file = get_authorized_file(file_id, auth, request)
+    path = get_vault_path(vault_file, request)
+    # content structure can sometimes help headers guess the type, allow temporary access to data
+    with tempfile.NamedTemporaryFile(suffix=os.path.splitext(path)[-1], mode="w+b") as tmp_file:
+        with open(path, "rb") as vault_fd:
+            data = vault_file.decrypt(vault_fd)
+        tmp_file.write(data.getbuffer())  # noqa
+        tmp_file.seek(0)
+        headers = get_file_headers(tmp_file.name, download_headers=True,
+                                   content_headers=True, content_type=vault_file.format)
+    headers["Content-Location"] = get_vault_url(vault_file, request)
     return HTTPHeadFileResponse(code=200, headers=headers)
 
 
@@ -129,8 +138,20 @@ def download_file(request):
             os.remove(self.file.name)
 
     request.environ["wsgi.file_wrapper"] = FileIterAndDelete
+
+    # temp file to hold decrypted contents, but don't deleted here, let the response file handler do it
     path = get_vault_path(vault_file, request)
-    resp = FileResponse(path, request=request)
-    headers = get_file_headers(path, download_headers=True, content_headers=True, content_type=vault_file.format)
+    with tempfile.NamedTemporaryFile(suffix=os.path.splitext(path)[-1], mode="w+b", delete=False) as out_file:
+        with open(path, "r+b") as vault_fd:
+            data = vault_file.decrypt(vault_fd)
+        out_file.write(data.getbuffer())  # noqa
+        out_file.flush()
+        out_file.seek(0)
+        headers = get_file_headers(path, download_headers=True,
+                                   content_headers=True, content_type=vault_file.format)
+        headers.pop("Content-Length", None)  # let FileResponse recompute with decrypted contents
+        os.remove(path)  # remove encrypted not required anymore
+
+    resp = FileResponse(out_file.name, request=request)
     resp.headers.update(headers)
     return resp

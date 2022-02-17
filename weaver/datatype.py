@@ -2,6 +2,7 @@
 Definitions of types used by tokens.
 """
 import abc
+import base64
 import copy
 import enum
 import inspect
@@ -11,6 +12,7 @@ import traceback
 import uuid
 import warnings
 from datetime import datetime, timedelta
+from io import BytesIO
 from logging import ERROR, INFO, Logger, getLevelName, getLogger
 from secrets import compare_digest, token_hex
 from typing import TYPE_CHECKING
@@ -19,6 +21,7 @@ from urllib.parse import urljoin, urlparse
 import colander
 import pyramid.httpexceptions
 import requests.exceptions
+from cryptography.fernet import Fernet
 from dateutil.parser import parse as dt_parse
 from docker.auth import decode_auth
 from owslib.util import ServiceException as OWSServiceException
@@ -75,7 +78,7 @@ from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, List, Optional, Union
+    from typing import Any, Dict, IO, List, Optional, Union
 
     from owslib.wps import WebProcessingService
 
@@ -1502,21 +1505,23 @@ class VaultFile(Authentication):
     type = AuthenticationTypes.VAULT
     bytes = 32
 
-    def __init__(self, file_name="", file_format=None, auth_token=None, **kwargs):
-        # type: (str, Optional[str], Optional[str], Any) -> None
+    def __init__(self, file_name="", file_format=None, file_secret=None, auth_token=None, **kwargs):
+        # type: (str, Optional[str], Optional[str], Optional[str], Any) -> None
         for key in ["type", "scheme", "link", "token"]:
             kwargs.pop(f"auth_{key}", None)
             kwargs.pop(key, None)
         if not file_name:
-            file_name = kwargs.pop("name", "")
-        if not file_format:
-            file_format = kwargs.pop("format", CONTENT_TYPE_TEXT_PLAIN)
+            kwargs.setdefault("name", "")
+        if file_format:
+            kwargs["format"] = file_format
+        elif not kwargs.get("format"):
+            kwargs.pop("format", None)  # avoid error setting None from reload
+        if file_secret:
+            kwargs["secret"] = file_secret
         super(VaultFile, self).__init__(
             auth_scheme="token",
             auth_link=None,  # don't care
             auth_token=auth_token or token_hex(VaultFile.bytes),
-            name=file_name,
-            format=file_format,
             **kwargs
         )
 
@@ -1531,6 +1536,53 @@ class VaultFile(Authentication):
         default = VaultFile("")
         access = file.token if file else default.token
         return compare_digest(str(access), str(token))
+
+    def encrypt(self, file):
+        # type: (IO[bytes|str]) -> BytesIO
+        """
+        Encrypt file data using a secret to avoid plain text contents during temporary :term:`Vault` storage.
+
+        .. note::
+            This is not intended to be a *strong* security countermeasure as contents can still be decrypted at any
+            time if provided with the right secret. This is only to slightly obfuscate the contents while it transits
+            between storage phases until destruction by the consuming process.
+        """
+        file.seek(0)
+        data = file.read()
+        value = data.encode("utf-8") if isinstance(data, str) else data
+        digest = Fernet(self.secret).encrypt(value)
+        return BytesIO(digest)
+
+    def decrypt(self, file):
+        # type: (IO[bytes|str]) -> BytesIO
+        """
+        Decrypt file contents using secret.
+        """
+        file.seek(0)
+        data = file.read()
+        data = data.encode("utf-8") if isinstance(data, str) else data
+        value = Fernet(self.secret).decrypt(data)
+        return BytesIO(value)
+
+    @property
+    def secret(self):
+        # type: () -> bytes
+        """
+        Secret associated to this :term:`Vault` file to hash contents back and forth.
+        """
+        secret = self.get("secret")
+        if not secret:
+            secret = self["secret"] = Fernet.generate_key()
+        return secret
+
+    @secret.setter
+    def secret(self, secret):
+        # type: (Union[bytes, str]) -> None
+        if not secret or not isinstance(secret, (bytes, str)):
+            raise ValueError(f"Invalid '{self.__name__}.secret' must be bytes or string.")
+        if isinstance(secret, str):
+            secret = base64.urlsafe_b64encode(secret.encode())
+        self["secret"] = secret
 
     @property
     def id(self):
@@ -1563,11 +1615,11 @@ class VaultFile(Authentication):
 
     @property
     def format(self):
-        # type: () -> str
+        # type: () -> Optional[str]
         """
         Format Media-Type of the file.
         """
-        return dict.__getitem__(self, "format")
+        return dict.get(self, "format", None)
 
     @format.setter
     def format(self, media_type):
@@ -1604,6 +1656,7 @@ class VaultFile(Authentication):
             "format": self.format,
             "type": self.type.value,
             "token": self.token,
+            "secret": self.secret,
             "scheme": self.scheme,
         }
 
