@@ -34,6 +34,8 @@ from weaver.utils import clean_json_text_body
 from weaver.warning import MissingParameterWarning, UnsupportedOperationWarning
 
 if TYPE_CHECKING:
+    from typing import Any, Optional
+
     from weaver.typedefs import JSON, SettingsType
 
 
@@ -60,6 +62,7 @@ class OWSException(Response, Exception):
 </ExceptionReport>""")
 
     def __init__(self, detail=None, value=None, json=None, **kw):
+        # type: (Optional[str], Optional[Any], Optional[JSON], Any) -> None
         status = kw.pop("status", None)
         if isinstance(status, type) and issubclass(status, HTTPException):
             status = status().status
@@ -80,7 +83,9 @@ class OWSException(Response, Exception):
                 json.setdefault("value", value)
         self.code = str(kw.pop("code", self.code))
         desc = str(detail or kw.pop("description", self.description))
-        Response.__init__(self, status=status, json=json, **kw)
+        if json is not None:
+            kw.update({"json": json})
+        Response.__init__(self, status=status, **kw)
         Exception.__init__(self, detail)
         self.message = detail or self.description or getattr(self, "explanation", None)
         self.content_type = CONTENT_TYPE_APP_JSON
