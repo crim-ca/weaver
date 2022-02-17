@@ -70,6 +70,7 @@ def test_parse_vault_token(header, unique, expected):
     assert result == expected
 
 
+@pytest.mark.vault
 def test_encrypt_decrypt():
     vault_file = VaultFile("")
     assert isinstance(vault_file.secret, bytes) and len(vault_file.secret)

@@ -1,7 +1,6 @@
 import logging
 import os
 import re
-import tempfile
 from io import BufferedIOBase
 from typing import TYPE_CHECKING
 
@@ -17,7 +16,14 @@ from weaver.formats import get_allowed_extensions
 from weaver.owsexceptions import OWSInvalidParameterValue, OWSMissingParameterValue
 from weaver.store.base import StoreVault
 from weaver.utils import get_file_headers
-from weaver.vault.utils import get_authorized_file, get_vault_auth, get_vault_dir, get_vault_path, get_vault_url
+from weaver.vault.utils import (
+    decrypt_from_vault,
+    get_authorized_file,
+    get_vault_auth,
+    get_vault_dir,
+    get_vault_path,
+    get_vault_url
+)
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import HTTPHeadFileResponse
 
@@ -105,15 +111,15 @@ def describe_file(request):
     file_id, auth = get_vault_auth(request)
     vault_file = get_authorized_file(file_id, auth, request)
     path = get_vault_path(vault_file, request)
-    # content structure can sometimes help headers guess the type, allow temporary access to data
-    with tempfile.NamedTemporaryFile(suffix=os.path.splitext(path)[-1], mode="w+b") as tmp_file:
-        with open(path, "rb") as vault_fd:
-            data = vault_file.decrypt(vault_fd)
-        tmp_file.write(data.getbuffer())  # noqa
-        tmp_file.seek(0)
-        headers = get_file_headers(tmp_file.name, download_headers=True,
+    tmp_file = None
+    try:
+        tmp_file = decrypt_from_vault(vault_file, path, delete_encrypted=False)
+        headers = get_file_headers(tmp_file, download_headers=True,
                                    content_headers=True, content_type=vault_file.format)
-    headers["Content-Location"] = get_vault_url(vault_file, request)
+        headers["Content-Location"] = get_vault_url(vault_file, request)
+    finally:
+        if os.path.isfile(tmp_file):
+            os.remove(tmp_file)
     return HTTPHeadFileResponse(code=200, headers=headers)
 
 
@@ -137,21 +143,10 @@ def download_file(request):
             super().close()
             os.remove(self.file.name)
 
-    request.environ["wsgi.file_wrapper"] = FileIterAndDelete
-
-    # temp file to hold decrypted contents, but don't deleted here, let the response file handler do it
     path = get_vault_path(vault_file, request)
-    with tempfile.NamedTemporaryFile(suffix=os.path.splitext(path)[-1], mode="w+b", delete=False) as out_file:
-        with open(path, "r+b") as vault_fd:
-            data = vault_file.decrypt(vault_fd)
-        out_file.write(data.getbuffer())  # noqa
-        out_file.flush()
-        out_file.seek(0)
-        headers = get_file_headers(path, download_headers=True,
-                                   content_headers=True, content_type=vault_file.format)
-        headers.pop("Content-Length", None)  # let FileResponse recompute with decrypted contents
-        os.remove(path)  # remove encrypted not required anymore
-
-    resp = FileResponse(out_file.name, request=request)
+    out_path = decrypt_from_vault(vault_file, path, delete_encrypted=True)
+    headers = get_file_headers(out_path, download_headers=True, content_headers=True, content_type=vault_file.format)
+    request.environ["wsgi.file_wrapper"] = FileIterAndDelete
+    resp = FileResponse(out_path, request=request)
     resp.headers.update(headers)
     return resp

@@ -108,7 +108,13 @@ from weaver.utils import (
     request_extra,
     setup_loggers
 )
-from weaver.vault.utils import get_vault_url, map_vault_location
+from weaver.vault.utils import (
+    decrypt_from_vault,
+    get_authorized_file,
+    get_vault_url,
+    parse_vault_token,
+    map_vault_location
+)
 from weaver.wps.utils import get_wps_output_dir, get_wps_output_url, map_wps_output_location
 from weaver.wps_restapi import swagger_definitions as sd
 
@@ -1522,11 +1528,13 @@ class WpsPackage(Process):
                 self.logger.debug("Detected and validated remotely accessible reference [%s] "
                                   "matching local Vault [%s]. Replacing URL reference for local access.",
                                   input_location, input_url)
-                # pre-fetch by move and delete file from vault (as download would)
+                # pre-fetch by move and delete file from vault and decrypt it (as download would)
                 # to save transfer time/data from local file already available
+                auth = parse_vault_token(self.auth.get(sd.XAuthVaultFileHeader.name), unique=False)
+                file = get_authorized_file(vault_id, auth.get(vault_id), self.settings)
                 input_location = map_vault_location(input_url, self.settings)
-                input_location = fetch_file(input_location, input_definition.workdir,
-                                            settings=self.settings, move=True)
+                input_location = decrypt_from_vault(file, input_location,
+                                                    out_dir=input_definition.workdir, delete_encrypted=True)
                 self.logger.debug("Moved Vault file to temporary location: [%s]. "
                                   "File not accessible from Vault endpoint anymore. "
                                   "Location will be deleted after process execution.",
