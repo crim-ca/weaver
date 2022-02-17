@@ -112,8 +112,8 @@ from weaver.vault.utils import (
     decrypt_from_vault,
     get_authorized_file,
     get_vault_url,
-    parse_vault_token,
-    map_vault_location
+    map_vault_location,
+    parse_vault_token
 )
 from weaver.wps.utils import get_wps_output_dir, get_wps_output_url, map_wps_output_location
 from weaver.wps_restapi import swagger_definitions as sd
