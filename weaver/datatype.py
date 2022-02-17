@@ -39,7 +39,7 @@ from weaver.execute import (
     EXECUTE_TRANSMISSION_MODE_OPTIONS,
     EXECUTE_TRANSMISSION_MODE_REFERENCE
 )
-from weaver.formats import ACCEPT_LANGUAGE_EN_CA, CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML, CONTENT_TYPE_TEXT_PLAIN
+from weaver.formats import ACCEPT_LANGUAGE_EN_CA, CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML
 from weaver.processes.constants import PROCESS_SCHEMA_OGC, PROCESS_SCHEMA_OLD
 from weaver.processes.convert import get_field, null, ows2json, wps2json_io
 from weaver.processes.types import (
