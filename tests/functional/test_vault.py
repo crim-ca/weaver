@@ -7,7 +7,7 @@ import pytest
 from tests.functional.test_cli import TestWeaverClientBase
 from tests.utils import mocked_sub_requests, run_command
 from weaver.cli import main as weaver_cli
-from weaver.formats import CONTENT_TYPE_APP_JSON
+from weaver.formats import ContentType
 
 
 @pytest.mark.vault
@@ -56,7 +56,7 @@ class TestVault(TestWeaverClientBase):
         vault_url = f"/vault/{vault_id}"
         resp = mocked_sub_requests(self.app, "HEAD", vault_url, headers={"X-Auth-Vault": vault_token})
         assert resp.status_code == 200
-        assert resp.headers["Content-Type"].startswith(CONTENT_TYPE_APP_JSON)
+        assert resp.headers["Content-Type"].startswith(ContentType.APP_JSON)
 
         # check download decrypted
         resp = mocked_sub_requests(self.app, "GET", vault_url, headers={"X-Auth-Vault": vault_token})
