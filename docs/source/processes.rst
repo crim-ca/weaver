@@ -414,10 +414,15 @@ that define the process references and expected inputs/outputs.
 Execution of a process (Execute)
 ---------------------------------------------------------------------
 
-Process execution (i.e.: submitting a :term:`Job`) is accomplished using the |exec-req|_ request. This section will
-first describe the basics of this request format, and after go into details for specific use cases and parametrization
-of various input/output combinations. Let's employ the following example of JSON body sent to the :term:`Job` execution
-to better illustrate the requirements.
+:term:`Process` execution (i.e.: submitting a :term:`Job`) is accomplished using the |exec-req|_ request.
+
+.. note::
+    For backward compatibility, the |exec-req-job|_ request is also supported as alias to the above
+    :term:`OGC API - Processes` compliant endpoint.
+
+This section will first describe the basics of this request format, and after go into details for specific use cases
+and parametrization of various input/output combinations. Let's employ the following example of JSON body sent to the
+:term:`Job` execution to better illustrate the requirements.
 
 .. code-block:: json
 
@@ -668,39 +673,46 @@ combinations.
 |           | - `WPS-REST`_ (remote) [#wps3]_           | |http_scheme| | Nothing (unmodified)                      |
 |           | - :ref:`process-remote-provider`          +---------------+-------------------------------------------+
 |           |                                           | |s3_scheme|   | Fetch and convert to |http_scheme| [#s3]_ |
+|           |                                           +---------------+-------------------------------------------+
+|           |                                           | |vault_ref|   | Convert to |http_scheme| [#vault2http]_   |
 |           +-------------------------------------------+---------------+-------------------------------------------+
 |           | - `WPS-REST`_ (`CWL`) [#wps3]_            | |file_scheme| | Nothing (file already local)              |
 |           |                                           +---------------+-------------------------------------------+
 |           |                                           | |http_scheme| | Fetch and convert to |file_scheme|        |
 |           |                                           +---------------+                                           |
 |           |                                           | |s3_scheme|   |                                           |
+|           |                                           +---------------+-------------------------------------------+
+|           |                                           | |vault_ref|   | Convert to |file_scheme|                  |
 +-----------+-------------------------------------------+---------------+-------------------------------------------+
 | |EMS|     | - |any| (types listed above for |ADES|)   | |file_scheme| | Convert to |http_scheme| [#file2http]_    |
 |           | - `Workflow`_ (`CWL`) [#wf]_              +---------------+-------------------------------------------+
 |           |                                           | |http_scheme| | Nothing (unmodified, step will handle it) |
 |           |                                           +---------------+                                           |
 |           |                                           | |s3_scheme|   |                                           |
+|           |                                           +---------------+                                           |
+|           |                                           | |vault_ref|   |                                           |
 +-----------+-------------------------------------------+---------------+-------------------------------------------+
 | |HYBRID|  | - `WPS-1/2`_                              | |file_scheme| | Convert to |http_scheme| [#file2http]_    |
 |           | - `ESGF-CWT`_                             +---------------+-------------------------------------------+
 |           | - `WPS-REST`_ (remote) [#wps3]_           | |http_scheme| | Nothing (unmodified)                      |
 |           | - :ref:`process-remote-provider`          +---------------+-------------------------------------------+
 |           |                                           | |s3_scheme|   | Fetch and convert to |http_scheme| [#s3]_ |
-|           | *Note*: |HYBRID| assumes |ADES| role      |               |                                           |
-|           | (remote processes)                        |               |                                           |
+|           | *Note*: |HYBRID| assumes |ADES| role      +---------------+-------------------------------------------+
+|           | (remote processes)                        | |vault_ref|   | Convert to |http_scheme| [#vault2http]_   |
 |           +-------------------------------------------+---------------+-------------------------------------------+
 |           | - `WPS-REST`_ (`CWL`) [#wps3]_            | |file_scheme| | Nothing (unmodified)                      |
 |           |                                           +---------------+-------------------------------------------+
 |           |                                           | |http_scheme| | Fetch and convert to |file_scheme|        |
-|           |                                           +---------------+                                           |
-|           | *Note*: |HYBRID| assumes |ADES| role      |               |                                           |
-|           | (local processes)                         |               |                                           |
+|           | *Note*: |HYBRID| assumes |ADES| role      +---------------+-------------------------------------------+
+|           | (local processes)                         | |vault_ref|   | Convert to |file_scheme| [#vault2file]_   |
 |           +-------------------------------------------+---------------+-------------------------------------------+
 |           | - `Workflow`_ (`CWL`) [#wf]_              | |file_scheme| | Convert to |http_scheme| [#file2http]_    |
 |           |                                           +---------------+-------------------------------------------+
 |           |                                           | |http_scheme| | Nothing (unmodified, step will handle it) |
 |           |                                           +---------------+                                           |
-|           | *Note*: |HYBRID| assumes |EMS| role       | |s3_scheme|   |                                           |
+|           |                                           | |s3_scheme|   |                                           |
+|           |                                           +---------------+                                           |
+|           | *Note*: |HYBRID| assumes |EMS| role       | |vault_ref|   |                                           |
 +-----------+-------------------------------------------+---------------+-------------------------------------------+
 
 .. |any| replace:: *<any>*
@@ -709,6 +721,7 @@ combinations.
 .. |http_scheme| replace:: ``http(s)://``
 .. |s3_scheme| replace:: ``s3://``
 .. |file_scheme| replace:: ``file://``
+.. |vault_ref| replace:: ``vault://<UUID>``
 .. |ADES| replace:: :term:`ADES`
 .. |EMS| replace:: :term:`EMS`
 .. |HYBRID| replace:: :term:`HYBRID`
@@ -720,13 +733,13 @@ combinations.
 .. rubric:: Footnotes
 
 .. [#openseach]
-    References defined by ``opensearch://`` will trigger an :term:`OpenSearch` query using the provided URL as
+    References defined by |os_scheme| will trigger an :term:`OpenSearch` query using the provided URL as
     well as other input additional parameters (see :ref:`OpenSearch Data Source`). After processing of this query,
     retrieved file references will be re-processed using the summarized logic in the table for the given use case.
 
 .. [#file2http]
-    When a ``file://`` (or empty scheme) maps to a local file that needs to be exposed externally for
-    another remote process, the conversion to ``http(s)://`` scheme employs setting ``weaver.wps_output_url`` to form
+    When a |file_scheme| (or empty scheme) maps to a local file that needs to be exposed externally for
+    another remote process, the conversion to |http_scheme| scheme employs setting ``weaver.wps_output_url`` to form
     the result URL reference. The file is placed in ``weaver.wps_output_dir`` to expose it as HTTP(S) endpoint.
     Note that the HTTP(S) servicing of the file is not handled by `Weaver` itself. It is assumed that the server
     where `Weaver` is hosted or another service takes care of this task.
@@ -740,9 +753,20 @@ combinations.
     See :ref:`CWL CommandLineTool`, :ref:`WPS-REST` and :ref:`Remote Provider` for further details.
 
 .. [#s3]
-    When an ``s3://`` file is fetched, is gets downloaded to a temporary ``file://`` location, which is **NOT**
-    necessarily exposed as ``http(s)://``. If execution is transferred to a remove process that is expected to not
+    When an |s3_scheme| file is fetched, is gets downloaded to a temporary |file_scheme| location, which is **NOT**
+    necessarily exposed as |http_scheme|. If execution is transferred to a remove process that is expected to not
     support :term:`S3` references, only then the file gets converted as in [#file2http]_.
+
+.. [#vault2file]
+    When a |vault_ref| file is specified, the local :ref:`WPS-REST` process can make use of it directly. The file is
+    therefore retrieved from the :term:`Vault` using the provided UUID and access token to be passed to the application.
+    See :ref:`file_vault_inputs` and :ref:`vault` for more details.
+
+.. [#vault2http]
+    When a |vault_ref| file is specified, the remote process needs to access it using the hosted :term:`Vault` endpoint.
+    Therefore, `Weaver` converts any vault reference to the corresponding location and inserts the access token in the
+    requests headers to authorize download from the remote server. See :ref:`file_vault_inputs` and :ref:`vault` for
+    more details.
 
 .. [#wf]
     Workflows are only available on :term:`EMS` and :term:`HYBRID` instances. Since they chain processes,
@@ -780,6 +804,82 @@ respected.
 .. seealso::
     - |aws_s3_bucket_names|_
     - |aws_s3_obj_key_names|_
+
+When using |vault_ref| references, the resulting file name will be obtained from the ``filename`` specified in
+the ``Content-Disposition`` within the uploaded content of the ``multipart/form-data`` request.
+
+.. seealso::
+    - :ref:`vault`
+
+.. _file_vault_token:
+.. _file_vault_inputs:
+
+File Vault Inputs
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. seealso::
+    Refer to :ref:`vault` section for general details about the :term:`Vault` feature.
+
+Stored files in the :term:`Vault` can be employed as input for :ref:`proc_op_execute` operation using the
+provided |vault_ref| reference from the response following upload. The :ref:`Execute <proc_op_execute>`
+request must also include the ``X-Auth-Vault`` header to obtain access to the file.
+
+.. warning::
+    Avoid using the :term:`Vault` HTTP location as ``href`` input. Prefer the |vault_ref| representation.
+
+The direct :term:`Vault` HTTP location **SHOULD NOT** be employed as input reference to a :term:`Process` to
+ensure its proper interpretation during execution. There are two main reasons for this.
+
+Firstly, using the plain HTTP endpoint will not provide any hint to `Weaver` about whether the input link
+is a generic remote file or one hosted in the :term:`Vault`. With the lack of this information, `Weaver` could attempt
+to download the file to retrieve it for its local :term:`Process` execution, creating unnecessary operations and wasting
+bandwidth since it is already available locally. Furthermore, the :term:`Vault` behaviour that deletes the file after
+its download would cause it to become unavailable upon subsequent access attempts, as it could be the case during
+handling and forwarding of references during intermediate :ref:`Workflow` step operations. This could inadvertently
+break the :ref:`Workflow` execution.
+
+Secondly, without the explicit :term:`Vault` reference, `Weaver` cannot be aware of the necessary ``X-Auth-Vault``
+authorization needed to download it. Using the |vault_ref| not only tells `Weaver` that it must forward any relevant
+access token to obtain the file, but it also ensures that those tokens are not inadvertently sent to other locations.
+Effectively, because the :term:`Vault` can be used to temporarily host sensitive data for :term:`Process` execution,
+`Weaver` can better control and avoid leaking the access token to irrelevant resource locations such that only the
+intended :term:`Job` and specific input can access it. This is even more important in situations where multiple
+:term:`Vault` references are required, to make sure each input forwards the respective access token for retrieving
+its file.
+
+When submitting the :ref:`Execute <proc_op_execute>` request, it is important to provide the ``X-Auth-Vault`` header
+with additional reference to the :term:`Vault` parameter when multiple files are involved. Each token should be
+provided using a comma to separated them, as detailed below. When only one file refers to the :term:`Vault` the
+parameters can be omitted since there is no need to map between tokens and distinct |vault_ref| entries.
+
+.. literalinclude:: ../examples/vault-execute.http
+    :language: http
+    :caption: Sample request contents to execute process with vault files
+
+The notation (:rfc:`5234`, :rfc:`7230#section-1.2`) of the ``X-Auth-Vault`` header is presented below.
+
+.. parsed-literal::
+
+    X-Auth-Vault = vault-unique / vault-multi
+
+    vault-unique = credentials [ BWS ";" OWS auth-param ]
+    vault-multi  = credentials BWS ";" OWS auth-param 1*( "," OWS credentials BWS ";" OWS auth-param )
+    credentials  = auth-scheme RWS access-token
+    auth-scheme  = "token"
+    auth-param   = "id" "=" vault-id
+    vault-id     = UUID / ( DQUOTE UUID DQUOTE )
+    access-token = base64
+    base64       = <base64, see :rfc:`4648#section-4`>
+    DQUOTE       = <DQUOTE, see :rfc:`7230#section-1.2`>
+    UUID         = <UUID, see :rfc:`4122#section-3`>
+    BWS          = <BWS, see :rfc:`7230#section-3.2.3`>
+    OWS          = <OWS, see :rfc:`7230#section-3.2.3`>
+    RWS          = <RWS, see :rfc:`7230#section-3.2.3`>
+
+In summary, the access token can be provided by itself by omitting the :term:`Vault` UUID parameter only
+if a single file is referenced across all inputs within the :ref:`Execute <proc_op_execute>` request.
+Otherwise, multiple :term:`Vault` references all require to specify both their respective access token
+and UUID in a comma separated list.
 
 .. _opensearch_data_source:
 
@@ -937,6 +1037,12 @@ Outputs Location
 By default, :term:`Job` results will be hosted under the endpoint configured by ``weaver.wps_output_url`` and
 ``weaver.wps_output_path``, and will be stored under directory defined by ``weaver.wps_output_dir`` setting.
 
+.. warning::
+    Hosting of results from the file system is **NOT** handled by `Weaver` itself. The API will only *report* the
+    expected endpoints using configured ``weaver.wps_output_url``. It is up to an alternate service or the platform
+    provider that serves the `Weaver` application to provide the external hosting and availability of files online
+    as desired.
+
 Each :term:`Job` will have its specific UUID employed for all of the outputs files, logs and status in order to
 avoid conflicts. Therefore, outputs will be available with the following location:
 
@@ -1082,6 +1188,81 @@ Note again that the more the :term:`Process` is verbose, the more tracking will 
 .. literalinclude:: ../../weaver/wps_restapi/examples/job_logs.json
     :language: json
 
+.. _vault:
+
+Uploading File to the Vault
+-----------------------------
+
+.. note::
+    The :term:`Vault` is a specific feature of `Weaver`. Other :term:`ADES`, :term:`EMS` and :term:`OGC API - Processes`
+    servers are not expected to provide this endpoint nor support the |vault_ref| reference format.
+
+The :term:`Vault` is available as secured storage for uploading files to be employed later for :term:`Process`
+execution (see also :ref:`file_vault_inputs`).
+
+When upload succeeds, the response will return a :term:`Vault` UUID and an ``access_token`` to access the file.
+Uploaded files cannot be accessed unless the proper credentials are provided. Requests toward the :term:`Vault` should
+therefore include a ``X-Auth-Vault: token {access_token]`` header in combination to the provided :term:`Vault` UUID in
+the request path to retrieve the file contents. The upload response will also include a ``file_href`` field formatted
+with a |vault_ref| reference to be used for :ref:`file_vault_inputs`, as well as a ``Content-Location`` header of the
+contextual :term:`Vault` endpoint for that file.
+
+Download of the file is accomplished using the |vault-download-req|_ request.
+In order to either obtain the file metadata without downloading it, or simply to validate its existence,
+the |vault-detail-req|_ request can be used. This HEAD request can be queried any number of times without affecting
+the file from the :term:`Vault`. For both HTTP methods, the ``X-Auth-Vault`` header is required.
+
+.. note::
+    The :term:`Vault` acts only as temporary file storage. For this reason, once the file has been downloaded, it is
+    immediately deleted. Download can only occur once. It is assumed that the resource that must employ it will have
+    created a local copy from the download and the :term:`Vault` doesn't require to preserve it anymore. This behaviour
+    intends to limit the duration for which potentially sensitive data remains available in the :term:`Vault` as well
+    as performing cleanup to limit storage space.
+
+Using the :ref:`Weaver CLI or Python client <cli>`, it is possible to upload local files automatically to the
+:term:`Vault` of a remote `Weaver` server. This can help users host their local file for remote :term:`Process`
+execution. By default, the :ref:`cli` will automatically convert any local file path provided as execution input into
+a |vault_ref| reference to make use of the :term:`Vault` self-hosting from the target `Weaver` instance. It will also
+update the provided inputs or execution body to apply any transformed |vault_ref| references transparently. This will
+allow the executed :term:`Process` to securely retrieve the files using :ref:`file_vault_inputs` behaviour. Transmission
+of any required authorization headers is also handled automatically when using this approach.
+
+It is also possible to manually provide |vault_ref| references or endpoints if those were uploaded beforehand using
+the ``upload`` operation, but the user must also generate the ``X-Auth-Vault`` header manually in such case.
+
+.. seealso::
+    Section :ref:`file_vault_inputs` provides more details about the format of ``X-Auth-Vault`` for submission
+    of multiple inputs.
+
+In order to manually upload files, the below code snippet can be employed.
+
+.. literalinclude:: ../examples/vault_upload.py
+    :language: python
+    :caption: Sample Python request call to upload file to Vault
+
+This should automatically generate a *similar* request to the result below.
+
+.. literalinclude:: ../examples/vault-upload.http
+    :language: http
+    :caption: Sample request contents to upload file to Vault
+
+.. warning::
+    When providing literal HTTP request contents as above, make sure to employ ``CRLF`` instead of plain ``LF`` for
+    separating the data using the *boundary*. Also, make sure to omit any additional ``LF`` between the data and each
+    *boundary* if this could impact parsing of the data itself (e.g.: as in the case of non-text readable base64 data)
+    to avoid modifying the file contents during upload. Some additional newlines are presented in the above example
+    only for readability purpose. It is recommended to use utilities like the Python example or
+    the :ref:`Weaver CLI <cli>` so avoid such issues during request content generation.
+    Please refer to :rfc:`7578#section-4.1` for more details regarding multipart content separators.
+
+Note that the ``Content-Type`` embedded within the multipart content in the above example (not to be confused with the
+actual ``Content-Type`` header of the request for uploading the file) can be important if the destination input of
+the :term:`Process` that will consume that :term:`Vault` file for execution must provide a specific choice of
+Media-Type if multiple are supported. This value could be employed to generate the explicit ``format`` portion of the
+input, in case it cannot be resolved automatically from the file contents, or unless it is explicitly provided once
+again for that input within the :ref:`Execute <proc_op_execute>` request body.
+
+
 .. _wps_endpoint:
 
 WPS Endpoint
@@ -1151,6 +1332,6 @@ Workflow (Chaining Step Processes)
 .. seealso::
 
     - :ref:`CWL Workflow`
-    - :ref:`Workflow Operations`
+    - :ref:`proc_workflow_ops`
     - :ref:`Workflow` process type
 

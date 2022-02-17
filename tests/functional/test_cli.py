@@ -1,12 +1,16 @@
 """
 Functional tests for :mod:`weaver.cli`.
 """
+
 import contextlib
 import copy
 import json
+import logging
 import os
 import shutil
 import tempfile
+import uuid
+from typing import TYPE_CHECKING
 
 import pytest
 import yaml
@@ -24,6 +28,10 @@ from tests.utils import (
 from weaver.cli import WeaverClient, main as weaver_cli
 from weaver.formats import CONTENT_TYPE_TEXT_PLAIN
 from weaver.status import STATUS_ACCEPTED, STATUS_FAILED, STATUS_RUNNING, STATUS_SUCCEEDED
+from weaver.wps.utils import map_wps_output_location
+
+if TYPE_CHECKING:
+    from typing import Dict
 
 
 @pytest.mark.cli
@@ -43,6 +51,8 @@ class TestWeaverClientBase(WpsConfigBase):
         super(TestWeaverClientBase, cls).setUpClass()
         cls.url = get_weaver_url(cls.app.app.registry)
         cls.client = WeaverClient(cls.url)
+        cli_logger = logging.getLogger("weaver.cli")
+        cli_logger.setLevel(logging.DEBUG)
 
         cls.test_process_prefix = "test-client"
 
@@ -53,9 +63,12 @@ class TestWeaverClientBase(WpsConfigBase):
             self.process_store.delete_process(proc.id)
 
         # make one process available for testing features
-        self.test_process = f"{self.test_process_prefix}-echo"
-        self.test_payload = self.load_resource_file("DeployProcess_Echo.yml")
-        self.deploy_process(self.test_payload, process_id=self.test_process)
+        self.test_process = {}
+        self.test_payload = {}
+        for process in ["Echo", "CatFile"]:
+            self.test_process[process] = f"{self.test_process_prefix}-{process}"
+            self.test_payload[process] = self.load_resource_file(f"DeployProcess_{process}.yml", process)
+            self.deploy_process(self.test_payload[process], process_id=self.test_process[process])
 
     @classmethod
     def tearDownClass(cls):
@@ -66,6 +79,8 @@ class TestWeaverClientBase(WpsConfigBase):
 
     @staticmethod
     def get_resource_file(name, process="Echo"):
+        if os.path.isfile(name):
+            return os.path.abspath(name)
         return os.path.join(APP_PKG_ROOT, process, name)
 
     @classmethod
@@ -75,6 +90,29 @@ class TestWeaverClientBase(WpsConfigBase):
 
 
 class TestWeaverClient(TestWeaverClientBase):
+    @classmethod
+    def setUpClass(cls):
+        super(TestWeaverClient, cls).setUpClass()
+        cls.test_tmp_dir = tempfile.mkdtemp()
+
+    @classmethod
+    def tearDownClass(cls):
+        super(TestWeaverClient, cls).tearDownClass()
+        shutil.rmtree(cls.test_tmp_dir, ignore_errors=True)
+
+    def setup_test_file(self, original_file, substitutions):
+        # type: (str, Dict[str, str]) -> str
+        path = os.path.join(self.test_tmp_dir, str(uuid.uuid4()))
+        os.makedirs(path, exist_ok=True)
+        test_file_path = os.path.join(path, os.path.split(original_file)[-1])
+        with open(original_file, "r") as real_file:
+            data = real_file.read()
+            for sub, new in substitutions.items():
+                data = data.replace(sub, new)
+        with open(test_file_path, "w") as test_file:
+            test_file.write(data)
+        return test_file_path
+
     def process_listing_op(self, operation):
         result = mocked_sub_requests(self.app, operation)
         assert result.success
@@ -86,7 +124,8 @@ class TestWeaverClient(TestWeaverClientBase):
             "jsonarray2netcdf",
             "metalink2netcdf",
             # test process
-            self.test_process,
+            self.test_process["CatFile"],
+            self.test_process["Echo"],
         }
         assert "undefined" not in result.message
 
@@ -158,16 +197,17 @@ class TestWeaverClient(TestWeaverClientBase):
 
     def test_deploy_with_undeploy(self):
         test_id = f"{self.test_process_prefix}-deploy-undeploy-flag"
-        result = mocked_sub_requests(self.app, self.client.deploy, test_id, self.test_payload)
+        deploy = self.test_payload["Echo"]
+        result = mocked_sub_requests(self.app, self.client.deploy, test_id, deploy)
         assert result.success
-        result = mocked_sub_requests(self.app, self.client.deploy, test_id, self.test_payload, undeploy=True)
+        result = mocked_sub_requests(self.app, self.client.deploy, test_id, deploy, undeploy=True)
         assert result.success
         assert "undefined" not in result.message
 
     def test_undeploy(self):
         # deploy a new process to leave the test one available
-        other_payload = copy.deepcopy(self.test_payload)
-        other_process = self.test_process + "-other"
+        other_payload = copy.deepcopy(self.test_payload["Echo"])
+        other_process = self.test_process["Echo"] + "-other"
         self.deploy_process(other_payload, process_id=other_process)
 
         result = mocked_sub_requests(self.app, self.client.undeploy, other_process)
@@ -180,10 +220,10 @@ class TestWeaverClient(TestWeaverClientBase):
         assert resp.status_code == 404
 
     def test_describe(self):
-        result = mocked_sub_requests(self.app, self.client.describe, self.test_process)
+        result = mocked_sub_requests(self.app, self.client.describe, self.test_process["Echo"])
         assert result.success
         # see deployment file for details that are expected here
-        assert result.body["id"] == self.test_process
+        assert result.body["id"] == self.test_process["Echo"]
         assert result.body["version"] == "1.0"
         assert result.body["keywords"] == ["test", "application"]  # app is added by Weaver since not CWL Workflow
         assert "message" in result.body["inputs"]
@@ -199,12 +239,13 @@ class TestWeaverClient(TestWeaverClientBase):
         assert "undefined" not in result.message, "CLI should not have confused process description as response detail."
         assert "description" not in result.body, "CLI should not have overridden the process description field."
 
-    def run_execute_inputs_schema_variant(self, inputs_param, preload=False, expect_success=True, mock_exec=True):
+    def run_execute_inputs_schema_variant(self, inputs_param, process="Echo",
+                                          preload=False, expect_success=True, mock_exec=True):
         if isinstance(inputs_param, str):
             if preload:
-                inputs_param = self.load_resource_file(inputs_param)
+                inputs_param = self.load_resource_file(inputs_param, process=process)
             else:
-                inputs_param = self.get_resource_file(inputs_param)
+                inputs_param = self.get_resource_file(inputs_param, process=process)
         with contextlib.ExitStack() as stack_exec:
             # use pass-through function because don't care about execution result here, only the parsing of I/O
             if mock_exec:
@@ -213,14 +254,14 @@ class TestWeaverClient(TestWeaverClientBase):
                 mock_exec_func = None
             for mock_exec_proc in mocked_execute_process(func_execute_process=mock_exec_func):
                 stack_exec.enter_context(mock_exec_proc)
-            result = mocked_sub_requests(self.app, self.client.execute, self.test_process, inputs=inputs_param)
+            result = mocked_sub_requests(self.app, self.client.execute, self.test_process[process], inputs=inputs_param)
         if expect_success:
-            assert result.success, result.text
+            assert result.success, result.message + " " + result.text
             assert "jobID" in result.body
             assert "processID" in result.body
             assert "status" in result.body
             assert "location" in result.body
-            assert result.body["processID"] == self.test_process
+            assert result.body["processID"] == self.test_process[process]
             assert result.body["status"] == STATUS_ACCEPTED
             assert result.body["location"] == result.headers["Location"]
             assert "undefined" not in result.message
@@ -338,10 +379,73 @@ class TestWeaverClient(TestWeaverClientBase):
         #   status was periodically pooled and returned 'running' until the final 'succeeded' resumes to download.
         raise NotImplementedError
 
+    # NOTE:
+    #   For all below '<>_auto_resolve_vault' test cases, the local file referenced in the Execute request body
+    #   should be automatically handled by uploading to the Vault and forwarding the relevant X-Auth-Vault header.
+    def run_execute_inputs_with_vault_file(self, test_input_file, process="CatFile", preload=False, embed=False):
+        test_data = "DUMMY DATA"
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt") as tmp_file:
+            tmp_file.write(test_data)
+            tmp_file.flush()
+            tmp_file.seek(0)
+            if embed:
+                test_file = [test_input_file.format(test_file=tmp_file.name)]
+            else:
+                exec_file = self.get_resource_file(test_input_file, process=process)
+                test_file = self.setup_test_file(exec_file, {"<TEST_FILE>": tmp_file.name})
+            result = self.run_execute_inputs_schema_variant(test_file, process=process,
+                                                            preload=preload, mock_exec=False)
+        job_id = result.body["jobID"]
+        result = mocked_sub_requests(self.app, self.client.results, job_id)
+        assert result.success, result.message
+        output = result.body["output"]["href"]
+        output = map_wps_output_location(output, self.settings, exists=True)
+        assert os.path.isfile(output)
+        with open(output, "r") as out_file:
+            out_data = out_file.read()
+        assert out_data == test_data
+
+    @pytest.mark.vault
+    def test_execute_inputs_cwl_file_schema_auto_resolve_vault(self):
+        self.run_execute_inputs_with_vault_file("Execute_CatFile_cwl_schema.yml", "CatFile", preload=False)
+
+    @pytest.mark.vault
+    def test_execute_inputs_ogc_mapping_file_schema_auto_resolve_vault(self):
+        self.run_execute_inputs_with_vault_file("Execute_CatFile_ogc_mapping_schema.yml", "CatFile", preload=False)
+
+    @pytest.mark.vault
+    def test_execute_inputs_old_listing_file_schema_auto_resolve_vault(self):
+        self.run_execute_inputs_with_vault_file("Execute_CatFile_old_listing_schema.yml", "CatFile", preload=False)
+
+    @pytest.mark.vault
+    def test_execute_inputs_cwl_literal_schema_auto_resolve_vault(self):
+        self.run_execute_inputs_with_vault_file("Execute_CatFile_cwl_schema.yml", "CatFile", preload=True)
+
+    @pytest.mark.vault
+    def test_execute_inputs_ogc_mapping_literal_schema_auto_resolve_vault(self):
+        self.run_execute_inputs_with_vault_file("Execute_CatFile_ogc_mapping_schema.yml", "CatFile", preload=True)
+
+    @pytest.mark.vault
+    def test_execute_inputs_old_listing_literal_schema_auto_resolve_vault(self):
+        self.run_execute_inputs_with_vault_file("Execute_CatFile_old_listing_schema.yml", "CatFile", preload=True)
+
+    @pytest.mark.vault
+    def test_execute_inputs_representation_literal_schema_auto_resolve_vault(self):
+        # 1st 'file' is the name of the process input
+        # 2nd 'File' is the type (CWL) to ensure proper detection/conversion to href URL
+        # 'test_file' will be replaced by the actual temp file instantiated with dummy data
+        for input_data in [
+            "file:File={test_file}",
+            "file:File='{test_file}'",
+            "file:File=\"{test_file}\"",
+        ]:
+            self.run_execute_inputs_with_vault_file(input_data, "CatFile", preload=False, embed=True)
+
     @mocked_dismiss_process()
     def test_dismiss(self):
         for status in [STATUS_ACCEPTED, STATUS_FAILED, STATUS_RUNNING, STATUS_SUCCEEDED]:
-            job = self.job_store.save_job(task_id="12345678-1111-2222-3333-111122223333", process=self.test_process)
+            proc = self.test_process["Echo"]
+            job = self.job_store.save_job(task_id="12345678-1111-2222-3333-111122223333", process=proc)
             job.status = status
             job = self.job_store.update_job(job)
             result = mocked_sub_requests(self.app, self.client.dismiss, str(job.id))
@@ -376,10 +480,11 @@ class TestWeaverCLI(TestWeaverClientBase):
         """
         Logging parameters should be allowed at main parser level or under any operation subparser.
         """
+        proc = self.test_process["Echo"]
         for options in [
-            ["--verbose", "describe", self.url, "-p", self.test_process],
-            ["describe", self.url, "--verbose", "-p", self.test_process],
-            ["describe", self.url, "-p", self.test_process, "--verbose"],
+            ["--verbose", "describe", "-u", self.url, "-p", proc],
+            ["describe", "-u", self.url, "--verbose", "-p", proc],
+            ["describe", "-u", self.url, "-p", proc, "--verbose"],
         ]:
             lines = mocked_sub_requests(
                 self.app, run_command,
@@ -388,7 +493,7 @@ class TestWeaverCLI(TestWeaverClientBase):
                 entrypoint=weaver_cli,
                 only_local=True,
             )
-            assert any(f"\"id\": \"{self.test_process}\"" in line for line in lines)
+            assert any(f"\"id\": \"{proc}\"" in line for line in lines)
 
     def test_deploy_no_process_id_option(self):
         payload = self.get_resource_file("DeployProcess_Echo.yml")
@@ -398,9 +503,9 @@ class TestWeaverCLI(TestWeaverClientBase):
             [
                 # weaver
                 "deploy",
+                "-u", self.url,
                 "--body", payload,  # no --process/--id, but available through --body
                 "--cwl", package,
-                self.url
             ],
             trim=False,
             entrypoint=weaver_cli,
@@ -420,9 +525,9 @@ class TestWeaverCLI(TestWeaverClientBase):
             [
                 # weaver
                 "deploy",
+                "-u", self.url,
                 "-p", test_id,
                 "-b", json.dumps(payload),  # literal JSON string accepted for CLI
-                self.url
             ],
             trim=False,
             entrypoint=weaver_cli,
@@ -447,9 +552,9 @@ class TestWeaverCLI(TestWeaverClientBase):
                 [
                     # weaver
                     "deploy",
+                    "-u", self.url,
                     "-p", test_id,
                     "-b", body_file.name,
-                    self.url
                 ],
                 trim=False,
                 entrypoint=weaver_cli,
@@ -469,10 +574,10 @@ class TestWeaverCLI(TestWeaverClientBase):
             [
                 # weaver
                 "deploy",
+                "-u", self.url,
                 "-p", test_id,
                 "--body", json.dumps(payload),  # literal JSON string accepted for CLI
                 "--cwl", json.dumps(package),   # literal JSON string accepted for CLI
-                self.url
             ],
             trim=False,
             entrypoint=weaver_cli,
@@ -492,10 +597,10 @@ class TestWeaverCLI(TestWeaverClientBase):
             [
                 # weaver
                 "deploy",
+                "-u", self.url,
                 "-p", test_id,
                 "--body", json.dumps(payload),  # literal JSON string accepted for CLI
                 "--cwl", package,
-                self.url
             ],
             trim=False,
             entrypoint=weaver_cli,
@@ -506,20 +611,21 @@ class TestWeaverCLI(TestWeaverClientBase):
 
     def test_describe(self):
         # prints formatted JSON ProcessDescription over many lines
+        proc = self.test_process["Echo"]
         lines = mocked_sub_requests(
             self.app, run_command,
             [
                 # "weaver",
                 "describe",
-                self.url,
-                "-p", self.test_process,
+                "-u", self.url,
+                "-p", proc,
             ],
             trim=False,
             entrypoint=weaver_cli,
             only_local=True,
         )
         # ignore indents of fields from formatted JSON content
-        assert any(f"\"id\": \"{self.test_process}\"" in line for line in lines)
+        assert any(f"\"id\": \"{proc}\"" in line for line in lines)
         assert any("\"inputs\": {" in line for line in lines)
         assert any("\"outputs\": {" in line for line in lines)
 
@@ -527,6 +633,7 @@ class TestWeaverCLI(TestWeaverClientBase):
         """
         Verify that specified inputs are captured for a limited number of 1 item per ``-I`` option.
         """
+        proc = self.test_process["Echo"]
         with contextlib.ExitStack() as stack_exec:
             for mock_exec_proc in mocked_execute_process():
                 stack_exec.enter_context(mock_exec_proc)
@@ -535,9 +642,9 @@ class TestWeaverCLI(TestWeaverClientBase):
                 [
                     # "weaver",
                     "execute",
-                    "-p", self.test_process,
+                    "-u", self.url,
+                    "-p", proc,
                     "-I", "message='TEST MESSAGE!'",  # if -I not capture as indented, URL after would be combined in it
-                    self.url,
                     "-M",
                     "-T", 10,
                     "-W", 1,
@@ -549,6 +656,7 @@ class TestWeaverCLI(TestWeaverClientBase):
             assert any(f"\"status\": \"{STATUS_SUCCEEDED}\"" in line for line in lines)
 
     def test_execute_manual_monitor(self):
+        proc = self.test_process["Echo"]
         with contextlib.ExitStack() as stack_exec:
             for mock_exec_proc in mocked_execute_process():
                 stack_exec.enter_context(mock_exec_proc)
@@ -558,8 +666,8 @@ class TestWeaverCLI(TestWeaverClientBase):
                 [
                     # "weaver",
                     "execute",
-                    self.url,
-                    "-p", self.test_process,
+                    "-u", self.url,
+                    "-p", proc,
                     "-I", "message='TEST MESSAGE!'"
                 ],
                 trim=False,
@@ -567,7 +675,7 @@ class TestWeaverCLI(TestWeaverClientBase):
                 only_local=True,
             )
             # ignore indents of fields from formatted JSON content
-            assert any(f"\"processID\": \"{self.test_process}\"" in line for line in lines)
+            assert any(f"\"processID\": \"{proc}\"" in line for line in lines)
             assert any("\"jobID\": \"" in line for line in lines)
             assert any("\"location\": \"" in line for line in lines)
             job_loc = [line for line in lines if "location" in line][0]
@@ -594,6 +702,7 @@ class TestWeaverCLI(TestWeaverClientBase):
             assert any("\"rel\": \"http://www.opengis.net/def/rel/ogc/1.0/results\"" in line for line in lines)
 
     def test_execute_auto_monitor(self):
+        proc = self.test_process["Echo"]
         with contextlib.ExitStack() as stack_exec:
             for mock_exec_proc in mocked_execute_process():
                 stack_exec.enter_context(mock_exec_proc)
@@ -603,8 +712,8 @@ class TestWeaverCLI(TestWeaverClientBase):
                 [
                     # "weaver",
                     "execute",
-                    self.url,
-                    "-p", self.test_process,
+                    "-u", self.url,
+                    "-p", proc,
                     "-I", "message='TEST MESSAGE!'",
                     "-M",
                     "-T", 10,
@@ -645,14 +754,15 @@ class TestWeaverCLI(TestWeaverClientBase):
         assert len([line for line in lines[start:end] if line == indent]) > 3, "Inputs should have a few paragraphs."
 
     def test_execute_invalid_format(self):
+        proc = self.test_process["Echo"]
         bad_input_value = "'this is my malformed message'"  # missing '<id>=' portion
         lines = mocked_sub_requests(
             self.app, run_command,
             [
                 # "weaver",
                 "execute",
-                self.url,
-                "-p", self.test_process,
+                "-u", self.url,
+                "-p", proc,
                 "-I", bad_input_value,
                 "-M",
                 "-T", 10,

@@ -20,7 +20,6 @@ from typing import TYPE_CHECKING
 
 import yaml
 from colander import DateTime, Email, OneOf, Range, Regex, drop, null, required
-from cornice import Service
 from dateutil import parser as date_parser
 
 from weaver import __meta__
@@ -42,6 +41,7 @@ from weaver.formats import (
     CONTENT_TYPE_ANY,
     CONTENT_TYPE_APP_JSON,
     CONTENT_TYPE_APP_XML,
+    CONTENT_TYPE_MULTI_PART_FORM,
     CONTENT_TYPE_TEXT_HTML,
     CONTENT_TYPE_TEXT_PLAIN,
     CONTENT_TYPE_TEXT_XML
@@ -85,8 +85,11 @@ from weaver.wps_restapi.colander_extras import (
     StringRange,
     XMLObject
 )
+from weaver.wps_restapi.patches import ServiceOnlyExplicitGetHead as Service  # warning: don't use 'cornice.Service'
 
 if TYPE_CHECKING:
+    from typing import Any
+
     from weaver.typedefs import DatetimeIntervalType, SettingsType, TypedDict
 
     ViewInfo = TypedDict("ViewInfo", {"name": str, "pattern": str})
@@ -204,6 +207,7 @@ TAG_DEPLOY = "Deploy"
 TAG_RESULTS = "Results"
 TAG_EXCEPTIONS = "Exceptions"
 TAG_LOGS = "Logs"
+TAG_VAULT = "Vault"
 TAG_WPS = "WPS"
 TAG_DEPRECATED = "Deprecated Endpoints"
 
@@ -268,6 +272,9 @@ job_result_service = Service(name="job_result", path=job_service.path + "/result
 process_result_service = Service(name="process_result", path=process_service.path + job_result_service.path)
 provider_result_service = Service(name="provider_result", path=provider_service.path + process_result_service.path)
 
+vault_service = Service(name="vault", path="/vault")
+vault_file_service = Service(name="vault_file", path=vault_service.path + "/{file_id}")
+
 #########################################################
 # Generic schemas
 #########################################################
@@ -297,6 +304,7 @@ class QueryBoolean(Boolean):
     description = "Boolean query parameter that allows handles common truthy/falsy values."
 
     def __init__(self, *_, **__):
+        # type: (Any, Any) -> None
         super(QueryBoolean, self).__init__(
             allow_string=True,
             false_choices=("False", "false", "0", "off", "no", "null", "Null", "none", "None", ""),
@@ -325,7 +333,7 @@ class DateTimeInterval(ExtendedSchemaNode):
 
 class S3Bucket(ExtendedSchemaNode):
     schema_type = String
-    description = "S3 bucket shorthand URL representation [s3://<bucket>/<job-uuid>/<output>.ext]"
+    description = "S3 bucket shorthand URL representation [s3://{bucket}/{job-uuid}/{output}.ext]"
     pattern = r"^s3://\S+$"
 
 
@@ -343,11 +351,19 @@ class FileURL(ExtendedSchemaNode):
     validator = SchemeURL(schemes=["http", "https"])
 
 
+class VaultReference(ExtendedSchemaNode):
+    schema_type = String
+    description = "Vault file reference."
+    example = "vault://399dc5ac-ff66-48d9-9c02-b144a975abe4"
+    pattern = r"^vault://[a-f0-9]{8}(?:-?[a-f0-9]{4}){3}-?[a-f0-9]{12}$"
+
+
 class ReferenceURL(AnyOfKeywordSchema):
     _any_of = [
         FileURL(),
         FileLocal(),
         S3Bucket(),
+        VaultReference(),
     ]
 
 
@@ -387,6 +403,32 @@ class ContentTypeHeader(ExtendedSchemaNode):
     # be that specific value but cannot have a field named with this format
     name = "Content-Type"
     schema_type = String
+
+
+class ContentLengthHeader(ExtendedSchemaNode):
+    name = "Content-Length"
+    schema_type = String
+    example = "125"
+
+
+class ContentDispositionHeader(ExtendedSchemaNode):
+    name = "Content-Disposition"
+    schema_type = String
+    example = "attachment; filename=test.json"
+
+
+class DateHeader(ExtendedSchemaNode):
+    description = "Creation date and time of the contents."
+    name = "Date"
+    schema_type = String
+    example = "Thu, 13 Jan 2022 12:37:19 GMT"
+
+
+class LastModifiedHeader(ExtendedSchemaNode):
+    description = "Modification date and time of the contents."
+    name = "Last-Modified"
+    schema_type = String
+    example = "Thu, 13 Jan 2022 12:37:19 GMT"
 
 
 class AcceptHeader(ExtendedSchemaNode):
@@ -430,12 +472,15 @@ class XmlHeader(ExtendedMappingSchema):
 
 
 class XAuthDockerHeader(ExtendedSchemaNode):
+    summary = "Authentication header for private Docker registry access."
     description = (
         "Authentication header for private registry access in order to retrieve the Docker image reference "
         "specified in an Application Package during Process deployment. When provided, this header should "
-        "contain similar details as typical Authentication or X-Auth-Token headers."
+        "contain similar details as typical Authentication or X-Auth-Token headers "
+        f"(see {DOC_URL}/package.html#dockerized-applications for more details)."
     )
     name = "X-Auth-Docker"
+    example = "Basic {base64-auth-credentials}"
     schema_type = String
     missing = drop
 
@@ -476,6 +521,38 @@ class RedirectHeaders(ResponseHeaders):
 class NoContent(ExtendedMappingSchema):
     description = "Empty response body."
     default = {}
+
+
+class FileUploadHeaders(RequestContentTypeHeader):
+    # MUST be multipart for upload
+    content_type = ContentTypeHeader(
+        example=f"{CONTENT_TYPE_MULTI_PART_FORM}; boundary=43003e2f205a180ace9cd34d98f911ff",
+        default=CONTENT_TYPE_MULTI_PART_FORM,
+        description="Desired Content-Type of the file being uploaded.", missing=required)
+    content_length = ContentLengthHeader(description="Uploaded file contents size in bytes.")
+    content_disposition = ContentDispositionHeader(example="form-data; name=\"file\"; filename=\"desired-name.ext\"",
+                                                   description="Expected ")
+
+
+class FileUploadContent(ExtendedSchemaNode):
+    schema_type = String()
+    description = (
+        "Contents of the file being uploaded with multipart. When prefixed with 'Content-Type: {media-type}', the "
+        "specified format will be applied to the input that will be attributed the 'vault://{UUID}' during execution. "
+        "Contents can also have 'Content-Disposition' definition to provide the desired file name."
+    )
+
+
+class FileResponseHeaders(NoContent):
+    content_type = ContentTypeHeader(example=CONTENT_TYPE_APP_JSON)
+    content_length = ContentLengthHeader()
+    content_disposition = ContentDispositionHeader()
+    date = DateHeader()
+    last_modified = LastModifiedHeader()
+
+
+class AccessToken(ExtendedSchemaNode):
+    schema_type = String
 
 
 class DescriptionSchema(ExtendedMappingSchema):
@@ -823,6 +900,7 @@ class ProcessDeployMeta(ExtendedMappingSchema):
 class InputOutputDescriptionMeta(ExtendedMappingSchema):
     # remove unnecessary empty lists by default if nothing is provided for inputs/outputs
     def __init__(self, *args, **kwargs):
+        # type: (Any, Any) -> None
         super(InputOutputDescriptionMeta, self).__init__(*args, **kwargs)
         for child in self.children:
             if child.name in ["keywords", "metadata"]:
@@ -1166,7 +1244,7 @@ class DescribeInputTypeMap(PermissiveMappingSchema):
     Description of all process inputs under mapping.
     """
     input_id = DescribeInputType(
-        variable="<input-id>",
+        variable="{input-id}",
         description="Input definition under mapping of process description.",
         missing=drop,  # allowed because process can have empty inputs (see schema: ProcessDescriptionOGC)
     )
@@ -1186,7 +1264,7 @@ class DeployInputTypeMap(PermissiveMappingSchema):
     Definition of all process inputs under mapping.
     """
     input_id = DeployInputType(
-        variable="<input-id>",
+        variable="{input-id}",
         description="Input definition under mapping of process deployment."
     )
 
@@ -1258,7 +1336,7 @@ class DescribeOutputTypeMap(PermissiveMappingSchema):
     Definition of all process outputs under mapping.
     """
     output_id = DescribeOutputType(
-        variable="<output-id>", title="ProcessOutputDefinition",
+        variable="{output-id}", title="ProcessOutputDefinition",
         description="Output definition under mapping of process description."
     )
 
@@ -1294,7 +1372,7 @@ class DeployOutputTypeMap(PermissiveMappingSchema):
     Definition of all process outputs under mapping.
     """
     input_id = DeployOutputType(
-        variable="<input-id>",
+        variable="{input-id}",
         description="Output definition under mapping of process deployment."
     )
 
@@ -2354,7 +2432,7 @@ class ExecuteOutputSpecList(ExtendedSequenceSchema):
 
 
 class ExecuteOutputSpecMap(ExtendedMappingSchema):
-    input_id = ExecuteOutputDefinition(variable="<input-id>", title="ExecuteOutputSpecMap",
+    input_id = ExecuteOutputDefinition(variable="{input-id}", title="ExecuteOutputSpecMap",
                                        description="Desired output reporting method.")
 
 
@@ -2619,7 +2697,7 @@ class GetPagingJobsSchema(ExtendedMappingSchema):
 
 
 class JobCategoryFilters(PermissiveMappingSchema):
-    category = ExtendedSchemaNode(String(), title="CategoryFilter", variable="<category>", default=None, missing=None,
+    category = ExtendedSchemaNode(String(), title="CategoryFilter", variable="{category}", default=None, missing=None,
                                   description="Value of the corresponding parameter forming that category group.")
 
 
@@ -2826,7 +2904,7 @@ class ExecuteInputAny(OneOfKeywordSchema):
 # 	        $ref: "inlineOrRefData.yaml"
 #
 class ExecuteInputMapValues(ExtendedMappingSchema):
-    input_id = ExecuteInputAny(variable="<input-id>", title="ExecuteInputValue",
+    input_id = ExecuteInputAny(variable="{input-id}", title="ExecuteInputValue",
                                description="Received mapping input value definition during job submission.")
 
 
@@ -3231,9 +3309,9 @@ class CWLInputType(OneOfKeywordSchema):
 
 
 class CWLInputMap(PermissiveMappingSchema):
-    input_id = CWLInputType(variable="<input-id>", title="CWLInputIdentifierType",
+    input_id = CWLInputType(variable="{input-id}", title="CWLInputIdentifierType",
                             description=IO_INFO_IDS.format(first="CWL", second="WPS", what="input") +
-                            " (Note: '<input-id>' is a variable corresponding for each identifier)")
+                            " (Note: '{input-id}' is a variable corresponding for each identifier)")
 
 
 class CWLInputItem(CWLInputObject):
@@ -3275,9 +3353,9 @@ class CWLOutputType(OneOfKeywordSchema):
 
 
 class CWLOutputMap(ExtendedMappingSchema):
-    output_id = CWLOutputType(variable="<output-id>", title="CWLOutputIdentifierType",
+    output_id = CWLOutputType(variable="{output-id}", title="CWLOutputIdentifierType",
                               description=IO_INFO_IDS.format(first="CWL", second="WPS", what="output") +
-                              " (Note: '<output-id>' is a variable corresponding for each identifier)")
+                              " (Note: '{output-id}' is a variable corresponding for each identifier)")
 
 
 class CWLOutputItem(CWLOutputObject):
@@ -3448,10 +3526,10 @@ class Result(ExtendedMappingSchema):
     """
     example_ref = "{}/master/core/examples/json/Result.json".format(OGC_API_SCHEMA_URL)
     output_id = ResultData(
-        variable="<output-id>", title="Output Identifier",
+        variable="{output-id}", title="Output Identifier",
         description=(
             "Resulting value of the output that conforms to 'OGC API - Processes' standard. "
-            "(Note: '<output-id>' is a variable corresponding for each output identifier of the process)"
+            "(Note: '{output-id}' is a variable corresponding for each output identifier of the process)"
         )
     )
 
@@ -4188,6 +4266,119 @@ class OkGetJobLogsResponse(ExtendedMappingSchema):
     body = JobLogsSchema()
 
 
+class VaultFileID(UUID):
+    description = "Vault file identifier."
+    example = "78977deb-28af-46f3-876b-cdd272742678"
+
+
+class VaultAccessToken(UUID):
+    description = "Vault file access token."
+    example = "30d889cfb7ae3a63229a8de5f91abc1ef5966bb664972f234a4db9d28f8148e0e"  # nosec
+
+
+class VaultEndpoint(ExtendedMappingSchema):
+    header = RequestHeaders()
+
+
+class VaultUploadBody(ExtendedSchemaNode):
+    schema_type = String
+    description = "Multipart file contents for upload to the vault."
+    examples = {
+        CONTENT_TYPE_MULTI_PART_FORM: {
+            "summary": "Upload JSON file to vault as multipart content.",
+            "value": EXAMPLES["vault_file_upload.txt"],
+        }
+    }
+
+
+class VaultUploadEndpoint(ExtendedMappingSchema):
+    header = FileUploadHeaders()
+    body = VaultUploadBody()
+
+
+class VaultFileUploadedBodySchema(ExtendedMappingSchema):
+    access_token = AccessToken()
+    file_id = VaultFileID()
+    file_href = VaultReference()
+
+
+class VaultFileUploadedHeaders(ResponseHeaders):
+    location = URL(name="Location", description="File download location.",
+                   example="https://localhost:4002" + vault_file_service.path.format(file_id=VaultFileID.example))
+
+
+class OkVaultFileUploadedResponse(ExtendedMappingSchema):
+    description = "File successfully uploaded to vault."
+    header = VaultFileUploadedHeaders()
+    body = VaultFileUploadedBodySchema()
+
+
+class BadRequestVaultFileUploadResponse(ExtendedMappingSchema):
+    description = "Missing or incorrectly formed file contents."
+    header = ResponseHeaders()
+    body = ErrorJsonResponseBodySchema()
+
+
+class UnprocessableEntityVaultFileUploadResponse(ExtendedMappingSchema):
+    description = (
+        "Invalid filename refused for upload. "
+        "Filename should include only alphanumeric, underscore, dash, and dot characters. "
+        "Filename should include both the base name and the desired file extension."
+    )
+    header = ResponseHeaders()
+    body = ErrorJsonResponseBodySchema()
+
+
+class XAuthVaultFileHeader(ExtendedSchemaNode):
+    summary = "Authorization header with token for Vault file access."
+    description = (
+        "For accessing a single file from the Vault, such as to obtain file metadata, requests can simply provide "
+        "the 'token {access-token}' portion in the header without additional parameters. If multiple files require "
+        "access such as during an Execute request, all applicable tokens should be provided using a comma separated "
+        "list of access tokens, each with their indented input ID and array index if applicable "
+        f"(see {DOC_URL}/processes.html#file-vault-inputs for more details)."
+    )
+    name = "X-Auth-Vault"
+    example = "token {access-token}[; id={vault-id}]"
+    schema_type = String
+
+
+class VaultFileRequestHeaders(ExtendedMappingSchema):
+    access_token = XAuthVaultFileHeader()
+
+
+class VaultFileEndpoint(VaultEndpoint):
+    header = VaultFileRequestHeaders()
+    file_id = VaultFileID()
+
+
+class OkVaultFileDetailResponse(ExtendedMappingSchema):
+    header = FileResponseHeaders()
+    body = NoContent(default="")
+
+
+class OkVaultFileDownloadResponse(OkVaultFileDetailResponse):
+    pass
+
+
+class BadRequestVaultFileAccessResponse(ExtendedMappingSchema):
+    description = "Invalid file vault reference."
+    header = ResponseHeaders()
+    body = ErrorJsonResponseBodySchema()
+
+
+class ForbiddenVaultFileDownloadResponse(ExtendedMappingSchema):
+    description = "Forbidden access to vault file. Invalid authorization from provided token."
+    header = ResponseHeaders()
+    body = ErrorJsonResponseBodySchema()
+
+
+class GoneVaultFileDownloadResponse(ExtendedMappingSchema):
+    description = "Vault File resource corresponding to specified ID is not available anymore."
+    header = ResponseHeaders()
+    body = ErrorJsonResponseBodySchema()
+
+
 get_api_frontpage_responses = {
     "200": OkGetFrontpageResponse(description="success"),
     "500": InternalServerErrorResponseSchema(),
@@ -4504,6 +4695,36 @@ get_bill_list_responses = {
 }
 get_bill_responses = {
     "200": OkGetBillDetailResponse(description="success"),
+    "500": InternalServerErrorResponseSchema(),
+}
+post_vault_responses = {
+    "200": OkVaultFileUploadedResponse(description="success", examples={
+        "VaultFileUploaded": {
+            "summary": "File successfully uploaded to vault.",
+            "value": EXAMPLES["vault_file_uploaded.json"],
+        }
+    }),
+    "400": BadRequestVaultFileUploadResponse(),
+    "422": UnprocessableEntityVaultFileUploadResponse(),
+    "500": InternalServerErrorResponseSchema(),
+}
+head_vault_file_responses = {
+    "200": OkVaultFileDetailResponse(description="success", examples={
+        "VaultFileDetails": {
+            "summary": "Obtain vault file metadata.",
+            "value": EXAMPLES["vault_file_head.json"],
+        }
+    }),
+    "400": BadRequestVaultFileAccessResponse(),
+    "403": ForbiddenVaultFileDownloadResponse(),
+    "410": GoneVaultFileDownloadResponse(),
+    "500": InternalServerErrorResponseSchema(),
+}
+get_vault_file_responses = {
+    "200": OkVaultFileDownloadResponse(description="success"),
+    "400": BadRequestVaultFileAccessResponse(),
+    "403": ForbiddenVaultFileDownloadResponse(),
+    "410": GoneVaultFileDownloadResponse(),
     "500": InternalServerErrorResponseSchema(),
 }
 wps_responses = {

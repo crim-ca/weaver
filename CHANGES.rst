@@ -12,11 +12,32 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add `Vault` endpoints providing a secured self-hosted file storage to upload local files for execution input.
+- Add ``upload`` CLI operation for uploading local files to `Vault`.
+- Add CLI automatic detection of local files during ``execute`` call to upload to `Vault` and retrieve them from it
+  on the remote `Weaver` instance.
+- Add ``-S``/``--schema`` option to CLI ``describe`` operation.
+- Add more documentation examples and references related to CLI and ``WeaverClient`` usage.
+- Improve Media-Type/Content-Type guesses based on known local definitions and extensions in ``weaver.formats``.
+- Extend ``PyWPS`` ``WPSRequest`` to support more authorization header forwarding for inputs that could need it.
 
 Fixes:
 ------
-- No change.
+- Fix rendering of CLI *required* arguments under the appropriate argument group section when those arguments can be
+  specified using prefixed ``-`` and ``--`` optional arguments format.
+- Fix CLI ``url`` parameter to be provided using ``-u`` or ``--url`` without specific argument position needed.
+- Fix CLI parsing of ``File`` inputs for ``execute`` operation when provided with quotes to capture full paths.
+- Fix rendering of OpenAPI variable names (``additionalParameters``) employed to represent for example ``{input-id}``
+  as the key within the mapping representation of inputs/outputs. The previous notation employed was incorrectly
+  interpreted as HTML tags, making them partially hidden in Swagger UI.
+- Fix reload of ``DockerAuthentication`` reference from database failing due to mismatched parameter names.
+- Fix invalid generation and interpretation of timezone-aware datetime between local objects and loaded from database.
+  Jobs created or reported without any timezone UTC offset were assumed as UTC+00:00 although corresponding datetimes
+  were generated based on the local machine timezone information. Once reloaded from database, the missing timezone
+  awareness made datetime stored in ISO-8601 format to be interpreted as already localized datetime.
+- Fix invalid setup of generic CLI options headers for other operations than ``dismiss``.
+- Fix ``weaver.request-options`` handling that always ignored ``timeout`` and ``verify`` entries from the configuration
+  file by overriding them with default values.
 
 .. _changes_4.8.0:
 
@@ -222,7 +243,7 @@ Changes:
 - Avoid ``Job.progress`` updates following ``failed`` or ``dismissed`` statuses to keep track of the last real progress
   percentage that was reached when that status was set.
 - Improve typing of database and store getter functions to infer correct types and facilitate code auto-complete.
-- Implement ``Job`` `dismiss operation <https://docs.ogc.org/DRAFTS/18-062.html#sec_cons_dismiss>`_ ensuring
+- Implement ``Job`` `dismiss operation <https://docs.ogc.org/is/18-062r2/18-062r2.html#toc53>`_ ensuring
   pending or running tasks are removed and output result artifacts are removed from disk.
 - Implement HTTP Gone (410) status from already dismissed ``Job`` when requested again or when fetching its artifacts.
 
@@ -432,12 +453,12 @@ Changes:
   Only utilities are added, not all routes provide the information yet.
 - Add validation of ``schema`` field under ``Format`` schema (as per `opengeospatial/ogcapi-processes schema format.yml
   <https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/format.yaml>`_) such that only
-  URL formatted strings are allowed, or alternatively and explicit JSON definition. Previous definitions that would
+  URL formatted strings are allowed, or alternatively an explicit JSON definition. Previous definitions that would
   indicate an empty string schema are dropped since ``schema`` is optional.
 - Block unknown and ``builtin`` process types during deployment from the API
   (fixes `#276  <https://github.com/crim-ca/weaver/issues/276>`_).
   Type ``builtin`` can only be registered by `Weaver` itself at startup. Other unknown types that have
-  no indication for mapping to an appropriate `Process` implementation are preemptively validated.
+  no indication for mapping to an appropriate ``Process`` implementation are preemptively validated.
 - Add parsing and generation of additional ``literalDataDomains`` for specification of WPS I/O data constrains and
   provide corresponding definitions in process description responses
   (fixes `#41 <https://github.com/crim-ca/weaver/issues/41>`_,

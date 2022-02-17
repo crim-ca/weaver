@@ -207,6 +207,7 @@ For convenience, following tags are also available:
 
 Following links correspond to existing servers with `Weaver` configured as *EMS*/*ADES* instances respectively.
 
+- HYBRID Server: https://service.crim.ca/
 - ADES Test server: https://ogc-ades.crim.ca/weaver/
 - EMS Test server: https://ogc-ems.crim.ca/weaver/
 - EMS Extra server: https://ogc.crim.ca/ems/

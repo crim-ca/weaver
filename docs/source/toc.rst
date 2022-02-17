@@ -14,7 +14,7 @@ Table of Contents
     package
     Examples <examples.rst>
     OpenAPI Specification <api.rst>
-    Weaver CLI <cli.rst>
+    Weaver CLI and Client <cli.rst>
     Source Code Documentation <autoapi/index.rst>
     changes
     faq

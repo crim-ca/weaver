@@ -7,11 +7,13 @@ import os
 import shutil
 import tempfile
 import uuid
+from datetime import datetime
 from typing import Type
 from urllib.parse import quote, urlparse
 
 import mock
 import pytest
+import pytz
 import responses
 from pyramid.httpexceptions import (
     HTTPConflict,
@@ -34,6 +36,7 @@ from weaver.utils import (
     assert_sane_name,
     bytes2str,
     fetch_file,
+    get_any_value,
     get_base_url,
     get_path_kvp,
     get_request_options,
@@ -41,6 +44,7 @@ from weaver.utils import (
     get_ssl_verify_option,
     get_url_without_query,
     is_valid_url,
+    localize_datetime,
     make_dirs,
     null,
     pass_http_error,
@@ -713,3 +717,37 @@ def test_fetch_file_remote_s3_bucket():
 def test_get_path_kvp():
     res = get_path_kvp("http://localhost", test1="value1", test2=["sub1", "sub2"])
     assert res == "http://localhost?test1=value1&test2=sub1,sub2"
+
+
+def test_get_any_value():
+    assert get_any_value({}) is None
+    assert get_any_value({}, default=null) is null
+    assert get_any_value({}, default=1) == 1
+    assert get_any_value({"data": 2}) == 2
+    assert get_any_value({"data": 2}, default=1) == 2
+    assert get_any_value({"data": 2}, data=False) is None
+    assert get_any_value({"data": 2}, default=1, data=False) == 1
+    assert get_any_value({"value": 2}) == 2
+    assert get_any_value({"value": 2}, default=1) == 2
+    assert get_any_value({"value": 2}, data=False) is None
+    assert get_any_value({"value": 2}, default=1, data=False) == 1
+    assert get_any_value({"href": "http://localhost/test.txt"}) == "http://localhost/test.txt"
+    assert get_any_value({"href": "http://localhost/test.txt"}, default=1) == "http://localhost/test.txt"
+    assert get_any_value({"href": "http://localhost/test.txt"}, file=False) is None
+    assert get_any_value({"href": "http://localhost/test.txt"}, file=False, default=1) == 1
+    assert get_any_value({"reference": "http://localhost/test.txt"}) == "http://localhost/test.txt"
+    assert get_any_value({"reference": "http://localhost/test.txt"}, default=1) == "http://localhost/test.txt"
+    assert get_any_value({"reference": "http://localhost/test.txt"}, file=False) is None
+    assert get_any_value({"reference": "http://localhost/test.txt"}, file=False, default=1) == 1
+    assert get_any_value({"file": "http://localhost/test.txt"}) is None
+    assert get_any_value({"data": 1, "value": 2, "href": "http://localhost/test.txt"}, file=False, data=False) is None
+
+
+def test_localize_datetime():
+    dt_utc = datetime(2000, 10, 10, 6, 12, 50, tzinfo=pytz.timezone("UTC"))
+    dt_utc_tz = localize_datetime(dt_utc)
+    dt_gmt_tz = localize_datetime(dt_utc, "GMT")  # UTC-0
+    dt_est_tz = localize_datetime(dt_utc, "EST")  # UTC-5
+    assert dt_utc_tz.timetuple()[:6] == (2000, 10, 10, 6, 12, 50)
+    assert dt_gmt_tz.timetuple()[:6] == (2000, 10, 10, 6, 12, 50)
+    assert dt_est_tz.timetuple()[:6] == (2000, 10, 10, 1, 12, 50)

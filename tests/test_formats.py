@@ -23,11 +23,49 @@ def test_get_extension_glob_any():
     assert f.get_extension(f.CONTENT_TYPE_ANY) == ".*"
 
 
+def test_get_content_type():
+    assert f.get_content_type(".json") == f.CONTENT_TYPE_APP_JSON
+    assert f.get_content_type(".tif") == f.CONTENT_TYPE_IMAGE_TIFF
+    assert f.get_content_type(".tiff") == f.CONTENT_TYPE_IMAGE_TIFF
+    assert f.get_content_type(".yml") == f.CONTENT_TYPE_APP_YAML
+    assert f.get_content_type(".yaml") == f.CONTENT_TYPE_APP_YAML
+
+
+def test_get_content_type_extra_parameters():
+    assert f.get_content_type(".unknown") is None
+    assert f.get_content_type(".unknown", default=f.CONTENT_TYPE_TEXT_PLAIN) == f.CONTENT_TYPE_TEXT_PLAIN
+    assert f.get_content_type(".txt", charset="UTF-8") == f"{f.CONTENT_TYPE_TEXT_PLAIN}; charset=UTF-8"
+    assert f.get_content_type(".tif", charset="UTF-8") == f.CONTENT_TYPE_IMAGE_TIFF  # not added by error
+
+
 def test_get_format():
     assert f.get_format(f.CONTENT_TYPE_APP_JSON) == Format(f.CONTENT_TYPE_APP_JSON)  # basic
     assert f.get_format(f.CONTENT_TYPE_APP_JSON + "; charset=UTF-8") == Format(f.CONTENT_TYPE_APP_JSON)
     assert f.get_format(f.CONTENT_TYPE_APP_GEOJSON) == Format(f.CONTENT_TYPE_APP_GEOJSON)  # pywps vendor MIME-type
     assert f.get_format(f.CONTENT_TYPE_APP_NETCDF).encoding == "base64"  # extra encoding data available
+
+
+def test_get_format_media_type_no_extension():
+    for ctype in [
+        f.CONTENT_TYPE_APP_OCTET_STREAM,
+        f.CONTENT_TYPE_APP_FORM,
+        f.CONTENT_TYPE_MULTI_PART_FORM,
+    ]:
+        fmt = f.get_format(ctype)
+        assert fmt == Format(ctype, extension=None)
+        assert fmt.extension == ""
+
+
+def test_get_format_default_no_extension():
+    for val in ["", None]:
+        for ctype in [
+            f.CONTENT_TYPE_APP_OCTET_STREAM,
+            f.CONTENT_TYPE_APP_FORM,
+            f.CONTENT_TYPE_MULTI_PART_FORM,
+        ]:
+            fmt = f.get_format(val, default=ctype)
+            assert fmt == Format(ctype, extension=None)
+            assert fmt.extension == ""
 
 
 def test_get_cwl_file_format_tuple():
@@ -37,7 +75,7 @@ def test_get_cwl_file_format_tuple():
         assert isinstance(res, tuple) and len(res) == 2
         ns, fmt = res
         assert isinstance(ns, dict) and len(ns) == 1
-        assert any(fmt in ns for fmt in f.FORMAT_NAMESPACES)
+        assert any(fmt in ns for fmt in f.FORMAT_NAMESPACES)  # pylint: disable=E1135
         assert list(ns.values())[0].startswith("http")
         ns_name = list(ns.keys())[0]
         assert fmt.startswith("{}:".format(ns_name))
@@ -193,3 +231,10 @@ def test_clean_mime_type_format_io_strip_base_and_remove_parameters():
     for expect_fmt, test_fmt in test_input_formats:
         res_type = f.clean_mime_type_format(test_fmt, suffix_subtype=True, strip_parameters=True)
         assert res_type == expect_fmt
+
+
+def test_clean_mime_type_format_default():
+    assert f.clean_mime_type_format("", suffix_subtype=False, strip_parameters=False) is None
+    assert f.clean_mime_type_format("", suffix_subtype=False, strip_parameters=True) is None
+    assert f.clean_mime_type_format("", suffix_subtype=True, strip_parameters=False) is None
+    assert f.clean_mime_type_format("", suffix_subtype=True, strip_parameters=True) is None

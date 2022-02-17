@@ -138,6 +138,13 @@ Glossary
         | Corresponds to a date/time interval employed for :term:`OpenSearch` queries in the context
           of :term:`EOImage` inputs.
 
+    Vault
+        Secured storage employed to upload files that should be temporarily stored on the `Weaver` server for
+        later retrieval using an access token.
+
+        .. seealso::
+            :ref:`vault`
+
     WKT
         Well-Known Text geometry representation.
 
@@ -146,7 +153,7 @@ Glossary
         input/output chaining between operations.
 
         .. seealso::
-            Refer to :ref:`proc_workflow`, :ref:`Workflow Operations` and :ref:`CWL Workflow` sections for more details.
+            Refer to :ref:`proc_workflow`, :ref:`proc_workflow_ops` and :ref:`CWL Workflow` sections for more details.
 
     WPS
         | Web Processing Service.

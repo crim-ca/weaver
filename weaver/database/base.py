@@ -6,7 +6,7 @@ from weaver.store.base import StoreInterface
 if TYPE_CHECKING:
     from typing import Any
 
-    from weaver.store.base import StoreBills, StoreJobs, StoreProcesses, StoreQuotes, StoreServices
+    from weaver.store.base import StoreBills, StoreJobs, StoreProcesses, StoreQuotes, StoreServices, StoreVault
     from weaver.typedefs import AnySettingsContainer, JSON, Type, Union
 
     StoreSelector = Union[Type[StoreInterface], StoreInterface, str]
@@ -57,6 +57,11 @@ class DatabaseInterface(metaclass=abc.ABCMeta):
     @overload
     def get_store(self, store_type, *store_args, **store_kwargs):
         # type: (Type[StoreServices], Any, Any) -> StoreServices
+        ...
+
+    @overload
+    def get_store(self, store_type, *store_args, **store_kwargs):
+        # type: (Type[StoreVault], Any, Any) -> StoreVault
         ...
 
     @abc.abstractmethod

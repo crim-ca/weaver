@@ -13,7 +13,7 @@ from pymongo.errors import DuplicateKeyError
 from pyramid.request import Request
 from pywps import Process as ProcessWPS
 
-from weaver.datatype import Bill, Job, Process, Quote, Service
+from weaver.datatype import Bill, Job, Process, Quote, Service, VaultFile
 from weaver.exceptions import (
     BillInstanceError,
     BillNotFound,
@@ -32,7 +32,10 @@ from weaver.exceptions import (
     QuoteRegistrationError,
     ServiceNotAccessible,
     ServiceNotFound,
-    ServiceRegistrationError
+    ServiceRegistrationError,
+    VaultFileInstanceError,
+    VaultFileNotFound,
+    VaultFileRegistrationError
 )
 from weaver.execute import EXECUTE_MODE_ASYNC, EXECUTE_MODE_SYNC
 from weaver.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW, PROCESS_WPS_LOCAL
@@ -49,7 +52,7 @@ from weaver.sort import (
     SORT_USER
 )
 from weaver.status import JOB_STATUS_CATEGORIES, STATUS_ACCEPTED, map_status
-from weaver.store.base import StoreBills, StoreJobs, StoreProcesses, StoreQuotes, StoreServices
+from weaver.store.base import StoreBills, StoreJobs, StoreProcesses, StoreQuotes, StoreServices, StoreVault
 from weaver.utils import get_base_url, get_sane_name, get_weaver_url, islambda, now, repr_json
 from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC, VISIBILITY_VALUES
 from weaver.wps.utils import get_wps_url
@@ -1099,3 +1102,56 @@ class MongodbBillStore(StoreBills, MongodbStore):
         count = found.count()
         items = [Bill(item) for item in list(found.skip(page * limit).limit(limit).sort(sort_criteria))]
         return items, count
+
+
+class MongodbVaultStore(StoreVault, MongodbStore):
+    """
+    Registry for vault files.
+
+    Uses `MongoDB` to store vault files attributes.
+    """
+
+    def __init__(self, *args, **kwargs):
+        db_args, db_kwargs = MongodbStore.get_args_kwargs(*args, **kwargs)
+        StoreVault.__init__(self)
+        MongodbStore.__init__(self, *db_args, **db_kwargs)
+
+    def get_file(self, file_id, nothrow=False):
+        # type: (AnyUUID, bool) -> Optional[VaultFile]
+        """
+        Gets vault file for given ``file_id`` from `MongoDB` storage.
+
+        :raises VaultFileNotFound: If the file does not exist and :paramref:`nothrow` was not requested.
+        :returns: Found file if it exists or ``None`` if it doesn't exist and :paramref:`nothrow` was requested.
+        """
+        if isinstance(file_id, str):
+            file_id = uuid.UUID(file_id)
+        params = self.collection.find_one({"id": file_id})
+        if not params:
+            if nothrow:
+                return None
+            raise VaultFileNotFound("Could not find vault file matching: '{}'".format(file_id))
+        return VaultFile.from_params(**params)
+
+    def save_file(self, file):
+        # type: (VaultFile) -> None
+        """
+        Stores a vault file in `MongoDB` storage.
+        """
+        if not isinstance(file, VaultFile):
+            raise VaultFileInstanceError("Invalid vault file object: '{}'".format(repr(file)))
+        try:
+            self.collection.insert_one(file.params())
+        except Exception as ex:
+            raise VaultFileRegistrationError("Error occurred during vault file registration: [{}]".format(repr(ex)))
+        return None
+
+    def delete_file(self, file):
+        # type: (Union[VaultFile, AnyUUID]) -> bool
+        """
+        Removes vault file from `MongoDB` storage.
+        """
+        file_id = file.id if isinstance(file, VaultFile) else file
+        if isinstance(file_id, str):
+            file_id = uuid.UUID(file_id)
+        return bool(self.collection.delete_one({"identifier": file_id}).deleted_count)

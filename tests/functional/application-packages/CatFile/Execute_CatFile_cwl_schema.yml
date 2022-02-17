@@ -1,0 +1,4 @@
+# YAML representation supported by WeaverClient
+file:
+  class: File
+  path: "<TEST_FILE>"  # to be replaced

@@ -30,7 +30,6 @@ if TYPE_CHECKING:
     from typing import Optional
 
     from owslib.wps import WebProcessingService
-    from pywps.app import WPSRequest
 
     from weaver.typedefs import (
         CWL_RuntimeInputsMap,
@@ -42,6 +41,7 @@ if TYPE_CHECKING:
         ProcessOWS,
         UpdateStatusPartialFunction
     )
+    from weaver.wps.service import WorkerRequest
 
 LOGGER = logging.getLogger(__name__)
 
@@ -50,7 +50,7 @@ class Wps1Process(WpsProcessInterface):
     def __init__(self,
                  provider,          # type: str
                  process,           # type: str
-                 request,           # type: WPSRequest
+                 request,           # type: WorkerRequest
                  update_status,     # type: UpdateStatusPartialFunction
                  ):
         self.provider = provider
@@ -136,7 +136,10 @@ class Wps1Process(WpsProcessInterface):
         LOGGER.debug("Execute WPS-1 provider: [%s]", self.provider)
         LOGGER.debug("Execute WPS-1 process: [%s]", self.process)
         try:
-            self.wps_provider = get_wps_client(self.provider, headers=self.cookies)
+            headers = {}
+            headers.update(self.get_auth_cookies())
+            headers.update(self.get_auth_headers())
+            self.wps_provider = get_wps_client(self.provider, headers=headers)
             raise_on_xml_exception(self.wps_provider._capabilities)  # noqa: W0212
         except Exception as ex:
             raise OWSNoApplicableCode("Failed to retrieve WPS capabilities. Error: [{}].".format(str(ex)))

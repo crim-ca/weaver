@@ -655,6 +655,10 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
         structure to parse that contained both the ``const`` sub-structure and another one with
         an arbitrary key matched against ``<var>``.
 
+    .. note::
+        In order to avoid invalid rendering of ``<>`` strings (interpreted as HTML tags by Swagger-UI),
+        it is recommended to employ ``{}`` notation for representing variable names.
+
         .. code-block:: python
 
             class ContainerAnyKeyWithName(ExtendedMappingSchema):

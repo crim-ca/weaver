@@ -701,8 +701,11 @@ docs-build: clean-docs	## generate HTML documentation with Sphinx
 	@bash -c '$(CONDA_CMD) $(MAKE) -C "$(APP_ROOT)/docs" html'
 	@-echo "Documentation available: file://$(APP_ROOT)/docs/build/html/index.html"
 
+.PHONY: docs-only
+docs-only: docs-build	  ## generate HTML documentation with Sphinx (alias)
+
 .PHONY: docs
-docs: install-doc docs-build  ## generate HTML documentation with Sphinx after dependencies installation
+docs: install-doc docs-only  ## generate HTML documentation with Sphinx after dependencies installation
 
 ## -- Versioning targets -------------------------------------------------------------------------------------------- ##
 

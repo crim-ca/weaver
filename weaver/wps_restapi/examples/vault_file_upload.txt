@@ -1,0 +1,5 @@
+--43003e2f205a180ace9cd34d98f911ff
+Content-Disposition: form-data; name="file"; filename="desired-name.json"
+Content-Type: application/json
+{"input": "data"}
+--43003e2f205a180ace9cd34d98f911ff--

@@ -16,6 +16,9 @@ feature/oas:
 feature/docker:
   - '(Docker|docker)'
 
+feature/vault:
+  - '(Vault|vault)'
+
 process/wps1:
   - 'WPS-1'
   - 'WPS1'

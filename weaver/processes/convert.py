@@ -9,13 +9,7 @@ from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
-from owslib.wps import (
-    ComplexData,
-    Input as OWS_Input_Type,
-    Metadata as OWS_Metadata,
-    Output as OWS_Output_Type,
-    is_reference
-)
+from owslib.wps import ComplexData, Metadata as OWS_Metadata, is_reference
 from pywps import Process as ProcessWPS
 from pywps.app.Common import Metadata as WPS_Metadata
 from pywps.inout import BoundingBoxInput, BoundingBoxOutput, ComplexInput, ComplexOutput, LiteralInput, LiteralOutput
@@ -63,7 +57,9 @@ from weaver.processes.constants import (
 from weaver.utils import (
     bytes2str,
     fetch_file,
+    fully_qualified_name,
     get_any_id,
+    get_any_value,
     get_sane_name,
     get_url_without_query,
     null,
@@ -77,17 +73,29 @@ if TYPE_CHECKING:
     from urllib.parse import ParseResult
 
     from pywps.app import WPSRequest
-    from owslib.wps import Process as ProcessOWS
+    from owslib.ows import BoundingBox
+    from owslib.wps import (
+        BoundingBoxDataInput,
+        ComplexDataInput,
+        Input as OWS_Input_Base,
+        Output as OWS_Output_Base,
+        Process as ProcessOWS
+    )
     from requests.models import Response
 
+    from weaver.processes.constants import ProcessSchemaType
     from weaver.typedefs import (
         AnySettingsContainer,
         AnyValueType,
         CWL,
         CWL_IO_EnumSymbols,
+        CWL_IO_FileValue,
         CWL_IO_Value,
         CWL_Input_Type,
         CWL_Output_Type,
+        ExecutionInputs,
+        ExecutionInputsList,
+        JobValueFile,
         JSON
     )
 
@@ -96,6 +104,8 @@ if TYPE_CHECKING:
     WPS_Input_Type = Union[LiteralInput, ComplexInput, BoundingBoxInput]
     WPS_Output_Type = Union[LiteralOutput, ComplexOutput, BoundingBoxOutput]
     WPS_IO_Type = Union[WPS_Input_Type, WPS_Output_Type]
+    OWS_Input_Type = Union[OWS_Input_Base, BoundingBox, BoundingBoxDataInput, ComplexDataInput]
+    OWS_Output_Type = Union[OWS_Output_Base, BoundingBox, BoundingBoxDataInput, ComplexData]
     OWS_IO_Type = Union[OWS_Input_Type, OWS_Output_Type]
     JSON_IO_Type = JSON
     JSON_IO_ListOrMap = Union[List[JSON], Dict[str, Union[JSON, str]]]
@@ -969,7 +979,7 @@ def cwl2wps_io(io_info, io_select):
 
 
 def cwl2json_input_values(data, schema=PROCESS_SCHEMA_OGC):
-    # type: (Dict[str, CWL_IO_Value], str) -> JSON
+    # type: (Dict[str, CWL_IO_Value], ProcessSchemaType) -> ExecutionInputs
     """
     Converts :term:`CWL` formatted :term:`Job` inputs to corresponding :term:`OGC API - Processes` format.
 
@@ -979,13 +989,23 @@ def cwl2json_input_values(data, schema=PROCESS_SCHEMA_OGC):
     :raises ValueError: if any input value could not be parsed with expected schema.
     :returns: converted inputs for :term:`Job` submission either in ``OGC`` or ``OLD`` format.
     """
+    def _get_file_input(input_data):
+        # type: (CWL_IO_FileValue) -> JobValueFile
+        input_file = {"href": input_data.get("path")}
+        cwl_fmt_type = input_data.get("format")
+        if isinstance(cwl_fmt_type, str):
+            fmt = get_format(cwl_fmt_type)
+            input_file["format"] = fmt.json
+        return input_file
+
     if not isinstance(data, dict):
-        raise TypeError(f"Invalid CWL input values format must be a dictionary of keys to values. Got [{type(data)}].")
+        data_type = fully_qualified_name(data)
+        raise TypeError(f"Invalid CWL input values format must be a dictionary of keys to values. Got [{data_type}].")
     inputs = {}
     for input_id, input_value in data.items():
         # single file
         if isinstance(input_value, dict) and input_value.get("class") == "File":
-            inputs[input_id] = {"href": input_value.get("path")}
+            inputs[input_id] = _get_file_input(input_value)
         # single literal value
         elif isinstance(input_value, (str, int, float, bool)):
             inputs[input_id] = {"value": input_value}
@@ -993,7 +1013,7 @@ def cwl2json_input_values(data, schema=PROCESS_SCHEMA_OGC):
         elif isinstance(input_value, list) and all(
             isinstance(val, dict) and val.get("class") == "File" for val in input_value
         ):
-            inputs[input_id] = [{"href": val.get("path")} for val in input_value]
+            inputs[input_id] = [_get_file_input(val) for val in input_value]
         # multiple literal values
         elif isinstance(input_value, list) and all(
             isinstance(val, (str, int, float, bool)) for val in input_value
@@ -1006,20 +1026,72 @@ def cwl2json_input_values(data, schema=PROCESS_SCHEMA_OGC):
         return inputs
     if schema != PROCESS_SCHEMA_OLD:
         raise NotImplementedError(f"Unknown conversion format of input values for schema: [{schema}]")
-    input_list = []
-    for input_id, input_value in inputs.items():
-        if isinstance(input_value, list):
-            input_key = list(input_value[0])[0]
-            input_list.extend([{"id": input_id, input_key: val[input_key]} for val in input_value])
-        else:
-            input_key = list(input_value)[0]
-            input_value = input_value[input_key]
-            input_list.append({"id": input_id, input_key: input_value})
-    return input_list
+    return convert_input_values_schema(inputs, PROCESS_SCHEMA_OLD)
+
+
+def convert_input_values_schema(inputs, schema):
+    # type: (ExecutionInputs, ProcessSchemaType) -> ExecutionInputs
+    """
+    Convert execution input values between equivalent formats.
+
+    :param inputs: Inputs to convert.
+    :param schema: Desired schema.
+    :return: Converted inputs.
+    """
+    if (
+        (schema == PROCESS_SCHEMA_OGC and isinstance(inputs, dict)) or
+        (schema == PROCESS_SCHEMA_OLD and isinstance(inputs, list))
+    ):
+        return inputs
+    if (
+        (schema == PROCESS_SCHEMA_OGC and not isinstance(inputs, list)) or
+        (schema == PROCESS_SCHEMA_OLD and not isinstance(inputs, dict))
+    ):
+        name = fully_qualified_name(inputs)
+        raise ValueError(f"Unknown conversion method to schema [{schema}] for inputs of type [{name}]: {inputs}")
+    if schema == PROCESS_SCHEMA_OGC:
+        input_dict = {}
+        for input_item in inputs:
+            input_id = get_any_id(input_item, pop=True)
+            input_val = get_any_value(input_item)
+            input_key = get_any_value(input_item, key=True, data=True, file=False)
+            # if the input type is data, values are grouped directly (inline values)
+            # if the input type is file, {reference + format} must both be regrouped
+            input_data = input_val if input_key else input_item
+            if input_id not in input_dict:
+                input_dict[input_id] = input_data
+            else:
+                # when repeated input ID are found, they must be regrouped as list under that ID
+                input_prev = input_dict[input_id]
+                input_dict[input_id] = [input_prev, input_data]
+        return input_dict
+    if schema == PROCESS_SCHEMA_OLD:
+        input_list = []
+        for input_id, input_value in inputs.items():
+            # list must be flattened with repeating ID
+            if isinstance(input_value, list):
+                for input_data in input_value:
+                    if isinstance(input_data, dict):
+                        # can be either nested {value: literal} or {file + format} items
+                        # either way, those are already in the desired format
+                        input_item = {"id": input_id}
+                        input_item.update(input_data)
+                    else:
+                        # otherwise only literals are accepted inline
+                        input_item = {"id": input_id, "value": input_data}
+                    input_list.append(input_item)
+            elif isinstance(input_value, dict):
+                input_key = list(input_value)[0]
+                input_value = input_value[input_key]
+                input_list.append({"id": input_id, input_key: input_value})
+            else:
+                input_list.append({"id": input_id, "value": input_value})
+        return input_list
+    raise NotImplementedError(f"Unknown conversion format of input values for schema: [{schema}]")
 
 
 def repr2json_input_values(inputs):
-    # type: (List[str]) -> List[JSON]
+    # type: (List[str]) -> ExecutionInputsList
     """
     Converts inputs in string representation to corresponding :term:`JSON` values.
 
@@ -1057,7 +1129,13 @@ def repr2json_input_values(inputs):
         arr_val = str_val.split(";")
         arr_typ = INPUT_VALUE_TYPE_MAPPING[map_typ]
         arr_val = [arr_typ(val) for val in arr_val]
-        val_key = "href" if str_typ in ["file", "File"] else "value"
+        if map_typ.capitalize() == "File":
+            val_key = "href"
+            for i, val in enumerate(list(arr_val)):
+                if (val.startswith("'") and val.endswith("'")) or (val.startswith("\"") and val.endswith("\"")):
+                    arr_val[i] = val[1:-1]
+        else:
+            val_key = "value"
         values.append({"id": str_id, val_key: arr_val if ";" in str_val else arr_val[0]})
     return values
 

@@ -8,8 +8,8 @@ if TYPE_CHECKING:
     from pyramid.request import Request
     from pywps import Process as ProcessWPS
 
-    from weaver.datatype import Bill, Job, Process, Quote, Service
-    from weaver.typedefs import AnyUUID, DatetimeIntervalType, TypedDict
+    from weaver.datatype import Bill, Job, Process, Quote, Service, VaultFile
+    from weaver.typedefs import AnyUUID, DatetimeIntervalType, SettingsType, TypedDict
 
     JobGroupCategory = TypedDict("JobGroupCategory",
                                  {"category": Dict[str, Optional[str]], "count": int, "jobs": List[Job]})
@@ -17,9 +17,12 @@ if TYPE_CHECKING:
 
 
 class StoreInterface(object, metaclass=abc.ABCMeta):
-    type = None
+    type = None      # type: str
+    settings = None  # type: SettingsType
 
-    def __init__(self):
+    def __init__(self, settings=None):
+        # type: (Optional[SettingsType]) -> None
+        self.settings = settings
         if not self.type:
             raise NotImplementedError("Store 'type' must be overridden in inheriting class.")
 
@@ -215,4 +218,23 @@ class StoreBills(StoreInterface):
     @abc.abstractmethod
     def find_bills(self, quote_id=None, page=0, limit=10, sort=None):
         # type: (Optional[str], int, int, Optional[str]) -> Tuple[List[Bill], int]
+        raise NotImplementedError
+
+
+class StoreVault(StoreInterface):
+    type = "vault"
+
+    @abc.abstractmethod
+    def get_file(self, file_id, nothrow=False):
+        # type: (AnyUUID, bool) -> VaultFile
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def save_file(self, file):
+        # type: (VaultFile) -> None
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def delete_file(self, file):
+        # type: (Union[VaultFile, AnyUUID]) -> bool
         raise NotImplementedError

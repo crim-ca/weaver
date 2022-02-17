@@ -1,0 +1,6 @@
+{
+  "description": "File successfully uploaded to vault.",
+  "access_token": "<ACCESS_TOKEN>",
+  "file_id": "e337a830-dbd6-4915-90ef-bfd46e237a3e",
+  "file_href": "vault://e337a830-dbd6-4915-90ef-bfd46e237a3e"
+}

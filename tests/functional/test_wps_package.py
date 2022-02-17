@@ -1681,7 +1681,7 @@ class WpsPackageAppTest(WpsConfigBase):
             tmp_name_target = "custom-filename-desired.txt"
             tmp_name_random = os.path.split(tmp_file.name)[-1]
             tmp_path = mocked_reference_test_file(tmp_file.name, "", "random data")
-            tmp_http = map_wps_output_location(tmp_path, self.settings, reverse=True, exists=True)
+            tmp_http = map_wps_output_location(tmp_path, self.settings, url=True, exists=True)
             assert tmp_http is None, "Failed setup of test file. Must not be available on WPS output location."
             tmp_host = "http://random-file-server.com"
             tmp_http = f"{tmp_host}/{tmp_name_random}"

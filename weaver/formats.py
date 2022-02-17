@@ -1,18 +1,21 @@
 import logging
 import os
+import re
+import socket
 from typing import TYPE_CHECKING
 from urllib.error import HTTPError
 from urllib.request import urlopen
 
 from pyramid.httpexceptions import HTTPNotFound, HTTPOk
+from pyramid_storage.extensions import resolve_extensions
 from pywps.inout.formats import FORMATS, Format
 from requests.exceptions import ConnectionError
 
-from weaver.utils import request_extra
-
 if TYPE_CHECKING:
+    from typing import Dict, List, Optional, Tuple, Union
+
     from weaver.typedefs import JSON
-    from typing import Dict, Optional, Tuple, Union
+
 
 # Languages
 ACCEPT_LANGUAGE_EN_CA = "en-CA"
@@ -33,6 +36,7 @@ CONTENT_TYPE_APP_FORM = "application/x-www-form-urlencoded"
 CONTENT_TYPE_APP_NETCDF = "application/x-netcdf"
 CONTENT_TYPE_APP_GZIP = "application/gzip"
 CONTENT_TYPE_APP_HDF5 = "application/x-hdf5"
+CONTENT_TYPE_APP_OCTET_STREAM = "application/octet-stream"
 CONTENT_TYPE_APP_TAR = "application/x-tar"          # map to existing gzip for CWL
 CONTENT_TYPE_APP_TAR_GZ = "application/tar+gzip"    # map to existing gzip for CWL
 CONTENT_TYPE_APP_YAML = "application/x-yaml"
@@ -48,27 +52,105 @@ CONTENT_TYPE_IMAGE_GEOTIFF = "image/tiff; subtype=geotiff"
 CONTENT_TYPE_IMAGE_JPEG = "image/jpeg"
 CONTENT_TYPE_IMAGE_PNG = "image/png"
 CONTENT_TYPE_IMAGE_TIFF = "image/tiff"
+CONTENT_TYPE_MULTI_PART_FORM = "multipart/form-data"
 CONTENT_TYPE_TEXT_XML = "text/xml"
 CONTENT_TYPE_ANY_XML = {CONTENT_TYPE_APP_XML, CONTENT_TYPE_TEXT_XML}
 CONTENT_TYPE_ANY = "*/*"
 
 # explicit mime-type to extension when not literally written in item after '/' (excluding 'x-' prefix)
-_CONTENT_TYPE_EXTENSION_MAPPING = {
+_CONTENT_TYPE_EXTENSION_OVERRIDES = {
     CONTENT_TYPE_APP_VDN_GEOJSON: ".geojson",  # pywps 4.4 default extension without vdn prefix
     CONTENT_TYPE_APP_NETCDF: ".nc",
     CONTENT_TYPE_APP_GZIP: ".gz",
     CONTENT_TYPE_APP_TAR_GZ: ".tar.gz",
     CONTENT_TYPE_APP_YAML: ".yml",
+    CONTENT_TYPE_IMAGE_TIFF: ".tif",  # common alternate to .tiff
     CONTENT_TYPE_ANY: ".*",   # any for glob
-}  # type: Dict[str, str]
+    CONTENT_TYPE_APP_OCTET_STREAM: "",
+    CONTENT_TYPE_APP_FORM: "",
+    CONTENT_TYPE_MULTI_PART_FORM: "",
+}
+_CONTENT_TYPE_EXCLUDE = [
+    CONTENT_TYPE_APP_OCTET_STREAM,
+    CONTENT_TYPE_APP_FORM,
+    CONTENT_TYPE_MULTI_PART_FORM,
+]
+_EXTENSION_CONTENT_TYPES_OVERRIDES = {
+    ".tiff": CONTENT_TYPE_IMAGE_TIFF,  # avoid defaulting to subtype geotiff
+    ".yaml": CONTENT_TYPE_APP_YAML,  # common alternative to .yml
+}
+
+_CONTENT_TYPE_EXTENSION_MAPPING = {}  # type: Dict[str, str]
+_CONTENT_TYPE_EXTENSION_MAPPING.update(_CONTENT_TYPE_EXTENSION_OVERRIDES)
 # extend with all known pywps formats
 _CONTENT_TYPE_FORMAT_MAPPING = {
     # content-types here are fully defined with extra parameters (e.g.: geotiff as subtype of tiff)
-    fmt.mime_type: fmt for _, fmt in FORMATS._asdict().items()  # noqa: W0212
+    fmt.mime_type: fmt
+    for _, fmt in FORMATS._asdict().items()  # noqa: W0212
+    if fmt.mime_type not in _CONTENT_TYPE_EXCLUDE
 }  # type: Dict[str, Format]
+# back-propagate changes from new formats
 _CONTENT_TYPE_EXTENSION_MAPPING.update({
-    ctype: fmt.extension for ctype, fmt in _CONTENT_TYPE_FORMAT_MAPPING.items()  # noqa: W0212
+    ctype: fmt.extension
+    for ctype, fmt in _CONTENT_TYPE_FORMAT_MAPPING.items()  # noqa: W0212
+    if ctype not in _CONTENT_TYPE_EXTENSION_MAPPING
 })
+# apply any remaining local types not explicitly or indirectly added by FORMATS
+_CONTENT_TYPE_EXT_PATTERN = re.compile(r"^[a-z]+/(x-)?(?P<ext>([a-z]+)).*$")
+_CONTENT_TYPE_LOCALS_MISSING = [
+    (ctype, _CONTENT_TYPE_EXT_PATTERN.match(ctype))
+    for name, ctype in locals().items()
+    if name.startswith("CONTENT_TYPE_")
+    and isinstance(ctype, str)
+    and ctype not in _CONTENT_TYPE_EXCLUDE
+    and ctype not in _CONTENT_TYPE_FORMAT_MAPPING
+    and ctype not in _CONTENT_TYPE_EXTENSION_MAPPING
+]
+_CONTENT_TYPE_LOCALS_MISSING = sorted(
+    [
+        (ctype, "." + re_ext["ext"])
+        for ctype, re_ext in _CONTENT_TYPE_LOCALS_MISSING if re_ext
+    ],
+    key=lambda typ: typ[0]
+)
+# update and back-propagate generated local types
+_CONTENT_TYPE_EXTENSION_MAPPING.update(_CONTENT_TYPE_LOCALS_MISSING)
+# extend additional types
+# FIXME: disabled for security reasons
+# _CONTENT_TYPE_EXTENSION_MAPPING.update({
+#     ctype: ext
+#     for ext, ctype in mimetypes.types_map.items()
+#     if ctype not in _CONTENT_TYPE_EXCLUDE
+#     and ctype not in _CONTENT_TYPE_EXTENSION_MAPPING
+# })
+_CONTENT_TYPE_FORMAT_MAPPING.update({
+    ctype: Format(ctype, extension=ext)
+    for ctype, ext in _CONTENT_TYPE_LOCALS_MISSING
+    if ctype not in _CONTENT_TYPE_EXCLUDE
+})
+_CONTENT_TYPE_FORMAT_MAPPING.update({
+    ctype: Format(ctype, extension=ext)
+    for ctype, ext in _CONTENT_TYPE_EXTENSION_MAPPING.items()
+    if ctype not in _CONTENT_TYPE_EXCLUDE
+    and ctype not in _CONTENT_TYPE_FORMAT_MAPPING
+})
+_EXTENSION_CONTENT_TYPES_MAPPING = {
+    # because the same extension can represent multiple distinct Content-Types,
+    # derive the simplest (shortest) one by default for guessing generic Content-Type
+    ext: ctype for ctype, ext in reversed(sorted(
+        _CONTENT_TYPE_EXTENSION_MAPPING.items(),
+        key=lambda typ_ext: len(typ_ext[0])
+    ))
+}
+_EXTENSION_CONTENT_TYPES_MAPPING.update(_EXTENSION_CONTENT_TYPES_OVERRIDES)
+
+# file types that can contain textual characters
+_CONTENT_TYPE_CHAR_TYPES = [
+    "application",
+    "multipart",
+    "text",
+]
+
 # redirect type resolution semantically equivalent CWL validators
 # should only be used to map CWL 'format' field if they are not already resolved through existing IANA/EDAM reference
 _CONTENT_TYPE_SYNONYM_MAPPING = {
@@ -113,18 +195,49 @@ OUTPUT_FORMATS = {
 LOGGER = logging.getLogger(__name__)
 
 
+def get_allowed_extensions():
+    # type: () -> List[str]
+    """
+    Obtain the complete list of extensions that are permitted for processing by the application.
+
+    .. note::
+        This is employed for security reasons. Files can still be specified with another allowed extension, but
+        it will not automatically inherit properties applicable to scripts and executables.
+        If a specific file type is refused due to its extension, a PR can be submitted to add it explicitly.
+    """
+    groups = [
+        "archives",
+        "audio",
+        "data",
+        "documents",
+        # "executables",
+        "images",
+        # "scripts",
+        "text",
+        "video",
+    ]
+    base = set(resolve_extensions("+".join(groups)))
+    extra = {ext[1:] for ext in _EXTENSION_CONTENT_TYPES_MAPPING if ext and "*" not in ext}
+    return list(base | extra)
+
+
 def get_format(mime_type, default=None):
-    # type: (str, Optional[str]) -> Format
+    # type: (str, Optional[str]) -> Optional[Format]
     """
     Obtains a :class:`Format` with predefined extension and encoding details from known MIME-types.
     """
-    ctype = clean_mime_type_format(mime_type, strip_parameters=True)
     fmt = _CONTENT_TYPE_FORMAT_MAPPING.get(mime_type)
     if fmt is not None:
         return fmt
     if default is not None:
         ctype = default
-    return Format(ctype, extension=get_extension(ctype))
+    else:
+        ctype = clean_mime_type_format(mime_type, strip_parameters=True)
+    if not ctype:
+        return None
+    ext = get_extension(ctype)
+    fmt = Format(ctype, extension=ext)
+    return fmt
 
 
 def get_extension(mime_type):
@@ -139,7 +252,35 @@ def get_extension(mime_type):
     if ext:
         return ext
     ctype = clean_mime_type_format(mime_type, strip_parameters=True)
+    if not ctype:
+        return ""
     return _CONTENT_TYPE_EXTENSION_MAPPING.get(ctype, ".{}".format(ctype.split("/")[-1].replace("x-", "")))
+
+
+def get_content_type(extension, charset=None, default=None):
+    # type: (str, Optional[str], Optional[str]) -> Optional[str]
+    """
+    Retrieves the Content-Type corresponding to the specified extension if it can be matched.
+
+    :param extension: Extension for which to attempt finding a known Content-Type.
+    :param charset: Charset to apply to the Content-Type as needed if extension was matched.
+    :param default: Default Content-Type to return if no extension is matched.
+    :return: Matched or default Content-Type.
+    """
+    if not extension:
+        return default
+    if not extension.startswith("."):
+        extension = f".{extension}"
+    ctype = _EXTENSION_CONTENT_TYPES_MAPPING.get(extension)
+    if not ctype:
+        return default
+    # no parameters in Media-Type, but explicit Content-Type with charset could exist as needed
+    if charset and "charset=" in ctype:
+        return re.sub(r"charset\=[A-Za-z0-9\_\-]+", f"charset={charset}", ctype)
+    # make sure to never include by mistake if the represented type cannot be characters
+    if charset and any(ctype.startswith(_type + "/") for _type in _CONTENT_TYPE_CHAR_TYPES):
+        return f"{ctype}; charset={charset}"
+    return ctype
 
 
 def get_cwl_file_format(mime_type, make_reference=False, must_exist=True, allow_synonym=True):
@@ -196,22 +337,32 @@ def get_cwl_file_format(mime_type, make_reference=False, must_exist=True, allow_
         """
         Attempts multiple request-retry variants to be as permissive as possible to sporadic/temporary failures.
         """
+        from weaver.utils import request_extra
+
         _mime_type_url = "{}{}".format(IANA_NAMESPACE_DEFINITION[IANA_NAMESPACE], _mime_type)
+        retries = 3
         try:
-            resp = request_extra("head", _mime_type_url, retries=3, timeout=0.5,
+            resp = request_extra("head", _mime_type_url, retries=retries, timeout=2,
                                  allow_redirects=True, allowed_codes=[HTTPOk.code, HTTPNotFound.code])
             if resp.status_code == HTTPOk.code:
                 return _make_if_ref(IANA_NAMESPACE_DEFINITION, IANA_NAMESPACE, _mime_type)
         except ConnectionError as exc:
             LOGGER.debug("Format request [%s] connection error: [%s]", _mime_type_url, exc)
         try:
-            resp = urlopen(_mime_type_url, timeout=1)  # nosec: B310 # is hardcoded HTTP(S)
-            if resp.code == HTTPOk.code:
-                return _make_if_ref(IANA_NAMESPACE_DEFINITION, IANA_NAMESPACE, _mime_type)
+            for _ in range(retries):
+                try:
+                    resp = urlopen(_mime_type_url, timeout=2)  # nosec: B310 # is hardcoded HTTP(S)
+                except socket.timeout:
+                    continue
+                if resp.code == HTTPOk.code:
+                    return _make_if_ref(IANA_NAMESPACE_DEFINITION, IANA_NAMESPACE, _mime_type)
+                break
         except HTTPError:
             pass
         return None
 
+    if not mime_type:
+        return None if make_reference else (None, None)
     mime_type = clean_mime_type_format(mime_type, strip_parameters=True)
     result = _request_extra_various(mime_type)
     if result is not None:
@@ -227,7 +378,7 @@ def get_cwl_file_format(mime_type, make_reference=False, must_exist=True, allow_
 
 
 def clean_mime_type_format(mime_type, suffix_subtype=False, strip_parameters=False):
-    # type: (str, bool, bool) -> str
+    # type: (str, bool, bool) -> Optional[str]
     """
     Obtains a generic media-type identifier by cleaning up any additional parameters.
 
@@ -252,6 +403,8 @@ def clean_mime_type_format(mime_type, suffix_subtype=False, strip_parameters=Fal
     .. note::
         Parameters :paramref:`suffix_subtype` and :paramref:`strip_parameters` are not necessarily exclusive.
     """
+    if not mime_type:  # avoid mismatching empty string with random type
+        return None
     # when 'format' comes from parsed CWL tool instance, the input/output record sets the value
     # using a temporary local file path after resolution against remote namespace ontology
     if mime_type.startswith("file://") and "#" in mime_type:

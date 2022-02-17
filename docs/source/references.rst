@@ -119,8 +119,10 @@
 .. _describe-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Processes%2Fpaths%2F~1processes~1%7Bprocess_id%7D~1package%2Fget
 .. |exec-req-name| replace:: Execute
 .. _exec-req-name: `exec-req`_
-.. |exec-req| replace:: ``POST {WEAVER_URL}/processes/{id}/jobs`` (Execute)
-.. _exec-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Processes%2Fpaths%2F~1processes~1{process_id}~1jobs%2Fpost
+.. |exec-req| replace:: ``POST {WEAVER_URL}/processes/{id}/execution`` (Execute)
+.. _exec-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Processes/paths/~1processes~1{process_id}~1execution/post
+.. |exec-req-job| replace:: ``POST {WEAVER_URL}/processes/{id}/jobs`` (Execute)
+.. _exec-req-job: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Processes%2Fpaths%2F~1processes~1{process_id}~1jobs%2Fpost
 .. |vis-req| replace:: ``PUT {WEAVER_URL}/processes/{id}/visibility`` (Visibility)
 .. _vis-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Processes%2Fpaths%2F~1processes~1%7Bprocess_id%7D~1visibility%2Fput
 .. |pkg-req| replace:: ``GET {WEAVER_URL}/processes/{id}/package`` (Package)
@@ -137,5 +139,11 @@
 .. _result-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Results%2Fpaths%2F~1processes~1%7Bprocess_id%7D~1jobs~1%7Bjob_id%7D~1result%2Fget
 .. |update-token-req| replace:: Update Token
 .. _update-token-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/UpdateToken/paths/~1processes~1{process_id}/put
+.. |vault-upload-req| replace:: Vault File Upload (POST)
+.. _vault-upload-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Vault/paths/~1vault/post
+.. |vault-download-req| replace:: Vault File Download (GET)
+.. _vault-download-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Vault/paths/~1vault~1{file_id}/get
+.. |vault-detail-req| replace:: Vault File Details (HEAD)
+.. _vault-detail-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Vault/paths/~1vault~1{file_id}/head
 .. |wps-req| replace:: WPS Endpoint Requests
 .. _wps-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/WPS

@@ -16,24 +16,46 @@ from weaver import __meta__
 from weaver.datatype import AutoBase
 from weaver.exceptions import PackageRegistrationError
 from weaver.execute import EXECUTE_MODE_ASYNC, EXECUTE_RESPONSE_DOCUMENT, EXECUTE_TRANSMISSION_MODE_VALUE
-from weaver.formats import CONTENT_TYPE_APP_JSON
-from weaver.processes.convert import cwl2json_input_values, repr2json_input_values
+from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_PLAIN, get_content_type, get_format
+from weaver.processes.constants import PROCESS_SCHEMA_OGC, PROCESS_SCHEMAS
+from weaver.processes.convert import (
+    convert_input_values_schema,
+    cwl2json_input_values,
+    get_field,
+    repr2json_input_values
+)
 from weaver.processes.wps_package import get_process_definition
 from weaver.status import JOB_STATUS_CATEGORIES, JOB_STATUS_CATEGORY_FINISHED, STATUS_SUCCEEDED
-from weaver.utils import fetch_file, get_any_id, get_any_value, load_file, null, repr_json, request_extra, setup_loggers
+from weaver.utils import (
+    fetch_file,
+    fully_qualified_name,
+    get_any_id,
+    get_any_value,
+    get_file_headers,
+    load_file,
+    null,
+    repr_json,
+    request_extra,
+    setup_loggers
+)
 from weaver.visibility import VISIBILITY_PUBLIC
+from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
-    from typing import Any, Optional, Tuple, Union
+    from typing import Any, Dict, Optional, Tuple, Union
 
     from requests import Response
 
     # avoid failing sphinx-argparse documentation
     # https://github.com/ashb/sphinx-argparse/issues/7
     try:
-        from weaver.typedefs import CWL, HeadersType, JSON
+        from weaver.typedefs import CWL, JSON, ExecutionInputsMap, HeadersType
     except ImportError:
-        CWL = HeadersType = JSON = Any  # avoid linter issue
+        CWL = JSON = ExecutionInputsMap = HeadersType = Any  # avoid linter issue
+    try:
+        from weaver.processes.constants import ProcessSchemaType
+    except ImportError:
+        ProcessSchemaType = str
 
 LOGGER = logging.getLogger(__name__)
 
@@ -43,6 +65,7 @@ REQUIRED_ARGS_TITLE = "Required Arguments"
 
 
 def _json2text(data):
+    # type: (Any) -> str
     return repr_json(data, indent=2, ensure_ascii=False)
 
 
@@ -123,6 +146,7 @@ class WeaverClient(object):
         }  # FIXME: load from INI, overrides as input (cumul arg '--setting weaver.x=value') ?
 
     def _get_url(self, url):
+        # type: (Optional[str]) -> str
         if not self._url and not url:
             raise ValueError("No URL available. Client was not created with an URL and operation did not receive one.")
         return self._url or self._parse_url(url)
@@ -231,7 +255,7 @@ class WeaverClient(object):
         if token or (username and password):
             if not token:
                 token = base64.b64encode(f"{username}:{password}".encode("utf-8")).decode("utf-8")
-            return {"X-Auth-Docker": f"Basic {token}"}
+            return {sd.XAuthDockerHeader.name: f"Basic {token}"}
         return {}
 
     def deploy(self,
@@ -284,7 +308,7 @@ class WeaverClient(object):
             Perform undeploy step as applicable prior to deployment to avoid conflict with exiting :term:`Process`.
         :param url:
             Instance URL if not already provided during client creation.
-        :returns: results of the operation.
+        :returns: Results of the operation.
         """
         result = self._parse_deploy_body(body, process_id)
         if not result.success:
@@ -347,8 +371,8 @@ class WeaverClient(object):
     Alias of :meth:`capabilities` for :term:`Process` listing.
     """
 
-    def describe(self, process_id, url=None):
-        # type: (str, Optional[str]) -> OperationResult
+    def describe(self, process_id, url=None, schema=PROCESS_SCHEMA_OGC):
+        # type: (str, Optional[str], Optional[ProcessSchemaType]) -> OperationResult
         """
         Describe the specified :term:`Process`.
 
@@ -357,17 +381,30 @@ class WeaverClient(object):
 
         :param process_id: Identifier of the process to describe.
         :param url: Instance URL if not already provided during client creation.
+        :param schema: Representation schema of the returned process description.
         """
         base = self._get_url(url)
         path = f"{base}/processes/{process_id}"
-        resp = request_extra("GET", path, headers=self._headers, settings=self._settings)
+        query = None
+        if isinstance(schema, str) and schema.upper() in PROCESS_SCHEMAS:
+            query = {"schema": schema.upper()}
+        resp = request_extra("GET", path, params=query, headers=self._headers, settings=self._settings)
         # API response from this request can contain 'description' matching the process description
         # rather than a generic response 'description'. Enforce the provided message to avoid confusion.
         return self._parse_result(resp, message="Process description successfully retrieved.")
 
     @staticmethod
     def _parse_inputs(inputs):
-        # type: (Optional[Union[str, JSON]]) -> Union[OperationResult, JSON]
+        # type: (Optional[Union[str, JSON]]) -> Union[OperationResult, ExecutionInputsMap]
+        """
+        Parse multiple different representation formats and input sources into standard :term:`OGC` inputs.
+
+        Schema :term:`OGC` is selected to increase compatibility coverage with potential non-`Weaver` servers
+        only conforming to standard :term:`OGC API - Processes`.
+
+        Inputs can be represented as :term:`CLI` option string arguments, file path to load contents from, or
+        directly supported list or mapping of execution inputs definitions.
+        """
         try:
             if isinstance(inputs, str):
                 # loaded inputs could be mapping or listing format (any schema: CWL, OGC, OLD)
@@ -384,7 +421,7 @@ class WeaverClient(object):
                 elif len(inputs) == 1 and inputs[0] == "":
                     inputs = []
             if isinstance(inputs, list):
-                inputs = {"inputs": inputs}  # OLD format provided directly
+                inputs = {"inputs": inputs}  # convert OLD format provided directly into OGC
             # consider possible ambiguity if literal CWL input is named 'inputs'
             # - if value of 'inputs' is an object, it can collide with 'OGC' schema,
             #   unless 'value/href' are present or their sub-dict don't have CWL 'class'
@@ -398,12 +435,74 @@ class WeaverClient(object):
                     (isinstance(values, list) and all(isinstance(v, dict) and get_any_value(v) is null for v in values))
                 )
             ):
-                values = cwl2json_input_values(inputs)
+                values = cwl2json_input_values(inputs, schema=PROCESS_SCHEMA_OGC)
             if values is null:
                 raise ValueError("Input values parsed as null. Could not properly detect employed schema.")
+            values = convert_input_values_schema(values, schema=PROCESS_SCHEMA_OGC)
         except Exception as exc:
             return OperationResult(False, f"Failed inputs parsing with error: [{exc!s}].", inputs)
         return values
+
+    def _update_files(self, inputs, url=None):
+        # type: (ExecutionInputsMap, Optional[str]) -> Tuple[ExecutionInputsMap, HeadersType]
+        """
+        Replaces local file paths by references uploaded to the :term:`Vault`.
+
+        .. seealso::
+            - Headers dictionary limitation by :mod:`requests`:
+              https://docs.python-requests.org/en/latest/user/quickstart/#response-headers
+            - Headers formatting with multiple values must be provided by comma-separated values
+              (:rfc:`7230#section-3.2.2`).
+            - Multi Vault-Token parsing accomplished by :func:`weaver.vault.utils.parse_vault_token`.
+            - More details about formats and operations related to :term:`Vault` are provided
+              in :ref:`file_vault_token` and :ref:`vault` chapters.
+
+        :param inputs: Input values for submission of :term:`Process` execution.
+        :return: Updated inputs.
+        """
+        auth_tokens = {}  # type: Dict[str, str]
+        update_inputs = dict(inputs)
+        for input_id, input_data in dict(inputs).items():
+            if not isinstance(input_data, list):  # support array of files
+                input_data = [input_data]
+            for data in input_data:
+                if not isinstance(data, dict):
+                    continue
+                file = href = get_any_value(data, default=null, data=False)
+                if not isinstance(href, str):
+                    continue
+                if href.startswith("file://"):
+                    href = href[7:]
+                if "://" not in href and not os.path.isfile(href):
+                    LOGGER.warning(
+                        "Ignoring potential local file reference since it does not exist. "
+                        "Cannot upload to vault: [%s]", file
+                    )
+                    continue
+                fmt = data.get("format", {})
+                ctype = get_field(fmt, "mime_type", search_variations=True)
+                if not ctype:
+                    ext = os.path.splitext(href)[-1]
+                    ctype = get_content_type(ext)
+                fmt = get_format(ctype, default=CONTENT_TYPE_TEXT_PLAIN)
+                res = self.upload(href, content_type=fmt.mime_type, url=url)
+                if res.code != 200:
+                    return res
+                vault_href = res.body["file_href"]
+                vault_id = res.body["file_id"]
+                token = res.body["access_token"]
+                auth_tokens[vault_id] = token
+                LOGGER.info("Converted (input: %s) [%s] -> [%s]", input_id, file, vault_href)
+                update_inputs[input_id] = {"href": vault_href, "format": {"mediaType": ctype}}
+
+        auth_headers = {}
+        if auth_tokens:
+            multi_tokens = ",".join([
+                f"token {token}; id={input_id}"
+                for input_id, token in auth_tokens.items()
+            ])
+            auth_headers = {sd.XAuthVaultFileHeader.name: multi_tokens}
+        return update_inputs, auth_headers
 
     # FIXME: support sync (https://github.com/crim-ca/weaver/issues/247)
     # :param execute_async:
@@ -437,11 +536,15 @@ class WeaverClient(object):
         :param interval:
             Monitoring interval (seconds) between job status polling requests.
         :param url: Instance URL if not already provided during client creation.
-        :returns: results of the operation.
+        :returns: Results of the operation.
         """
         if isinstance(inputs, list) and all(isinstance(item, list) for item in inputs):
             inputs = [items for sub in inputs for items in sub]  # flatten 2D->1D list
         values = self._parse_inputs(inputs)
+        if isinstance(values, OperationResult):
+            return values
+        base = self._get_url(url)
+        values, auth_headers = self._update_files(values, url=base)
         if isinstance(values, OperationResult):
             return values
         data = {
@@ -456,7 +559,6 @@ class WeaverClient(object):
             "outputs": {}
         }
         # FIXME: since (https://github.com/crim-ca/weaver/issues/375) not implemented, auto-populate all the outputs
-        base = self._get_url(url)
         result = self.describe(process_id, url=base)
         if not result.success:
             return OperationResult(False, "Could not obtain process description for execution.",
@@ -466,19 +568,72 @@ class WeaverClient(object):
             # use 'value' to have all outputs reported in body as 'value/href' rather than 'Link' headers
             data["outputs"][output_id] = {"transmissionMode": EXECUTE_TRANSMISSION_MODE_VALUE}
 
-        LOGGER.info("Executing [%s] with inputs:\n%s", process_id, _json2text(inputs))
+        LOGGER.info("Executing [%s] with inputs:\n%s", process_id, _json2text(values))
         path = f"{base}/processes/{process_id}/execution"  # use OGC-API compliant endpoint (not '/jobs')
-        resp = request_extra("POST", path, json=data, headers=self._headers, settings=self._settings)
+        headers = {}
+        headers.update(self._headers)
+        headers.update(auth_headers)
+        resp = request_extra("POST", path, json=data, headers=headers, settings=self._settings)
         result = self._parse_result(resp)
         if not monitor or not result.success:
             return result
         # although Weaver returns "jobID" in the body for convenience,
         # employ the "Location" header to be OGC-API compliant
         job_url = resp.headers.get("Location", "")
-        time.sleep(1)  # small delay to ensure process execution had a chance to start before monitoring
         return self.monitor(job_url, timeout=timeout, interval=interval)
 
+    def upload(self, file_path, content_type=None, url=None):
+        # type: (str, Optional[str], Optional[str]) -> OperationResult
+        """
+        Upload a local file to the :term:`Vault`.
+
+        .. note::
+            Feature only available for `Weaver` instances. Not available for standard :term:`OGC API - Processes`.
+
+        .. seealso::
+            More details about formats and operations related to :term:`Vault` are provided
+            in :ref:`file_vault_token` and :ref:`vault` chapters.
+
+        :param file_path: Location of the file to be uploaded.
+        :param content_type:
+            Explicit Content-Type of the file.
+            This should be an IANA Media-Type, optionally with additional parameters such as charset.
+            If not provided, attempts to guess it based on the file extension.
+        :param url: Instance URL if not already provided during client creation.
+        :returns: Results of the operation.
+        """
+        if not isinstance(file_path, str):
+            file_type = fully_qualified_name(file_path)
+            return OperationResult(False, "Local file reference is not a string.", {"file_path": file_type})
+        if file_path.startswith("file://"):
+            file_path = file_path[7:]
+        if "://" in file_path:
+            scheme = file_path.split("://", 1)[0]
+            return OperationResult(False, "Scheme not supported for local file reference.", {"file_scheme": scheme})
+        file_path = os.path.abspath(os.path.expanduser(file_path))
+        if not os.path.isfile(file_path):
+            return OperationResult(False, "Resolved local file reference does not exist.", {"file_path": file_path})
+        LOGGER.debug("Processing file for vault upload: [%s]", file_path)
+        file_headers = get_file_headers(file_path, content_headers=True, content_type=content_type)
+        base = self._get_url(url)
+        path = f"{base}/vault"
+        files = {
+            "file": (
+                os.path.basename(file_path),
+                open(file_path, "r", encoding="utf-8"),
+                file_headers["Content-Type"]
+            )
+        }
+        req_headers = {
+            "Accept": CONTENT_TYPE_APP_JSON,  # no 'Content-Type' since auto generated with multipart boundary
+            "Cache-Control": "no-cache",     # ensure the cache is not used to return a previously uploaded file
+        }
+        # allow retry to avoid some sporadic HTTP 403 errors
+        resp = request_extra("POST", path, headers=req_headers, settings=self._settings, files=files, retry=2)
+        return self._parse_result(resp)
+
     def status(self, job_reference, url=None):
+        # type: (str, Optional[str]) -> OperationResult
         """
         Obtain the status of a :term:`Job`.
 
@@ -487,7 +642,7 @@ class WeaverClient(object):
 
         :param job_reference: Either the full :term:`Job` status URL or only its UUID.
         :param url: Instance URL if not already provided during client creation.
-        :returns: retrieved status of the job.
+        :returns: Retrieved status of the job.
         """
         job_id, job_url = self._parse_job_ref(job_reference, url)
         LOGGER.info("Getting job status: [%s]", job_id)
@@ -507,7 +662,7 @@ class WeaverClient(object):
         :param interval: wait interval (seconds) between polling monitor requests.
         :param wait_for_status: monitor until the requested status is reached (default: job failed or succeeded).
         :param url: Instance URL if not already provided during client creation.
-        :return: result of the successful or failed job, or timeout of monitoring process.
+        :return: Result of the successful or failed job, or timeout of monitoring process.
         """
         job_id, job_url = self._parse_job_ref(job_reference, url)
         remain = timeout = timeout or self.monitor_timeout
@@ -548,6 +703,7 @@ class WeaverClient(object):
         # use results endpoint instead of outputs to be OGC-API compliant, should be able to target non-Weaver instance
         # with this endpoint, outputs IDs are directly at the root of the body
         result_url = f"{job_url}/results"
+        LOGGER.info("Retrieving results from [%s]", result_url)
         resp = request_extra("GET", result_url, headers=self._headers, settings=self._settings)
         res_out = self._parse_result(resp)
         outputs = res_out.body
@@ -637,8 +793,7 @@ def make_logging_options(parser):
 
 def add_url_param(parser, required=True):
     # type: (argparse.ArgumentParser, bool) -> None
-    args = ["url"] if required else ["-u", "--url"]
-    parser.add_argument(*args, metavar="URL", help="URL of the instance to run operations.")
+    parser.add_argument("-u", "--url", metavar="URL", help="URL of the instance to run operations.", required=required)
 
 
 def add_process_param(parser, description=None, required=True):
@@ -684,7 +839,9 @@ class InputsFormatter(argparse.HelpFormatter):
     # pragma: no cover  # somehow marked not covered, but functionality covered by 'test_execute_help_details'
     def _format_action(self, action):
         """
-        Override the returned help message with available options and shortcuts for email template selection.
+        Override the returned help message with available options and shortcuts for inputs.
+
+        This ensures that paragraphs defined in the "inputs" argument's help remain separated and properly formatted.
         """
         if action.dest != "inputs":
             return super(InputsFormatter, self)._format_action(action)
@@ -726,25 +883,46 @@ class SubArgumentParserFixedMutexGroups(argparse.ArgumentParser):
         container._mutually_exclusive_groups = tmp_mutex_groups
 
 
+class ArgumentParserFixedRequiredArgs(argparse.ArgumentParser):
+    """
+    Override action grouping under 'required' section to consider explicit flag even if action has option prefix.
+
+    Default behaviour places option prefixed (``-``, ``--``) arguments into optionals even if ``required`` is defined.
+    Help string correctly considers this flag and doesn't place those arguments in brackets (``[--<optional-arg>]``).
+    """
+    def _add_action(self, action):
+        if action.option_strings and not action.required:
+            self._optionals._add_action(action)
+        else:
+            self._positionals._add_action(action)
+        return action
+
+
+class WeaverArgumentParser(ArgumentParserFixedRequiredArgs, SubArgumentParserFixedMutexGroups):
+    """
+    Parser that provides fixes for proper representation of `Weaver` :term:`CLI` arguments.
+    """
+
+
 def make_parser():
     # type: () -> argparse.ArgumentParser
     """
-    Generate the CLI parser.
+    Generate the :term:`CLI` parser.
 
     .. note::
         Instead of employing :class:`argparse.ArgumentParser` instances returned
         by :meth:`argparse._SubParsersAction.add_parser`, distinct :class:`argparse.ArgumentParser` instances are
-        created for each operation an then  merged back by ourselves as subparsers under the main parser.
+        created for each operation and then merged back by ourselves as subparsers under the main parser.
         This provides more flexibility in arguments passed down and resolves, amongst other things, incorrect
         handling of exclusive argument groups and their grouping under corresponding section titles.
     """
     # generic logging parser to pass down to each operation
     # this allows providing logging options to any of them
-    log_parser = argparse.ArgumentParser(add_help=False)
+    log_parser = WeaverArgumentParser(add_help=False)
     make_logging_options(log_parser)
 
     desc = "Run {} operations.".format(__meta__.__title__)
-    parser = SubArgumentParserFixedMutexGroups(prog=__meta__.__name__, description=desc, parents=[log_parser])
+    parser = WeaverArgumentParser(prog=__meta__.__name__, description=desc, parents=[log_parser])
     set_parser_sections(parser)
     parser.add_argument(
         "--version", "-V",
@@ -757,7 +935,7 @@ def make_parser():
         description="Name of the operation to run."
     )
 
-    op_deploy = argparse.ArgumentParser(
+    op_deploy = WeaverArgumentParser(
         "deploy",
         description="Deploy a process.",
     )
@@ -806,35 +984,39 @@ def make_parser():
         help="Perform undeploy step as applicable prior to deployment to avoid conflict with exiting process."
     )
 
-    op_undeploy = argparse.ArgumentParser(
+    op_undeploy = WeaverArgumentParser(
         "undeploy",
         description="Undeploy an existing process.",
     )
-    set_parser_sections(op_deploy)
+    set_parser_sections(op_undeploy)
     add_url_param(op_undeploy)
     add_process_param(op_undeploy)
 
-    op_capabilities = argparse.ArgumentParser(
+    op_capabilities = WeaverArgumentParser(
         "capabilities",
         description="List available processes.",
     )
-    set_parser_sections(op_deploy)
+    set_parser_sections(op_capabilities)
     add_url_param(op_capabilities)
 
-    op_describe = argparse.ArgumentParser(
+    op_describe = WeaverArgumentParser(
         "describe",
         description="Obtain an existing process description.",
     )
-    set_parser_sections(op_deploy)
+    set_parser_sections(op_describe)
     add_url_param(op_describe)
     add_process_param(op_describe)
+    op_describe.add_argument(
+        "-S", "--schema", dest="schema", choices=PROCESS_SCHEMAS, default=PROCESS_SCHEMA_OGC,
+        help="Representation schema of the returned process description."
+    )
 
-    op_execute = argparse.ArgumentParser(
+    op_execute = WeaverArgumentParser(
         "execute",
         description="Submit a job execution for an existing process.",
         formatter_class=InputsFormatter,
     )
-    set_parser_sections(op_deploy)
+    set_parser_sections(op_execute)
     add_url_param(op_execute)
     add_process_param(op_execute)
     op_execute.add_argument(
@@ -849,21 +1031,24 @@ def make_parser():
             for selected format. Both mapping and listing formats are supported.
 
             To execute a process without any inputs (e.g.: using its defaults),
-            supply an explicit empty input (i.e.: -I "" or loaded from file as {}).
+            supply an explicit empty input (i.e.: ``-I ""`` or loaded from file as ``{}``).
 
-            To provide inputs using literal command-line definitions, inputs should be specified using '<id>=<value>'
-            convention, with distinct -I options for each applicable input value.
+            To provide inputs using literal command-line definitions, inputs should be specified using ``<id>=<value>``
+            convention, with distinct ``-I`` options for each applicable input value.
 
             Values that require other type than string to be converted for job submission can include the type
-            following the ID using a colon separator (i.e.: '<id>:<type>=<value>'). For example, an integer could be
-            specified as follows: 'number:int=1' while a floating point would be: 'number:float=1.23'.
+            following the ID using a colon separator (i.e.: ``<id>:<type>=<value>``). For example, an integer could be
+            specified as follows: ``number:int=1`` while a floating point number would be: ``number:float=1.23``.
 
-            File references (href) should be specified using 'File' as the type (i.e.: 'input:File=http://...').
+            File references (``href``) should be specified using ``File`` as the type (i.e.: ``input:File=http://...``).
+            Note that ``File`` in this case is expected to be an URL location where the file can be download from.
+            When a local file is supplied, Weaver will automatically convert it to a remote Vault File in order to
+            upload it and make it available for the remote process.
 
-            Array input (maxOccurs > 1) should be specified using semicolon (;) separated values.
-            The type of an item of this array can also be provided (i.e.: 'array:int=1;2;3').
+            Array input (``maxOccurs > 1``) should be specified using semicolon (;) separated values.
+            The type of an item of this array can also be provided (i.e.: ``array:int=1;2;3``).
 
-            Example: -I message='Hello Weaver' -I value:int=1234
+            Example: ``-I message='Hello Weaver' -I value:int=1234``
         """)
     )
     # FIXME: support sync (https://github.com/crim-ca/weaver/issues/247)
@@ -878,15 +1063,15 @@ def make_parser():
     )
     add_timeout_param(op_execute)
 
-    op_dismiss = argparse.ArgumentParser(
+    op_dismiss = WeaverArgumentParser(
         "dismiss",
         description="Dismiss a pending or running job, or wipe any finished job results.",
     )
-    set_parser_sections(op_deploy)
+    set_parser_sections(op_dismiss)
     add_url_param(op_dismiss, required=False)
     add_job_ref_param(op_dismiss)
 
-    op_monitor = argparse.ArgumentParser(
+    op_monitor = WeaverArgumentParser(
         "monitor",
         description="Monitor a pending or running job execution until completion or up to a maximum wait time."
     )
@@ -894,25 +1079,25 @@ def make_parser():
     add_job_ref_param(op_monitor)
     add_timeout_param(op_monitor)
 
-    op_status = argparse.ArgumentParser(
+    op_status = WeaverArgumentParser(
         "status",
         description=(
             "Obtain the status of a job using a reference UUID or URL. "
             "This is equivalent to doing a single-shot 'monitor' operation without any pooling or retries."
         ),
     )
-    set_parser_sections(op_deploy)
+    set_parser_sections(op_status)
     add_url_param(op_status, required=False)
     add_job_ref_param(op_status)
 
-    op_results = argparse.ArgumentParser(
+    op_results = WeaverArgumentParser(
         "results",
         description=(
             "Obtain the output results description of a job. "
             "This operation can also download them from the remote server if requested."
         ),
     )
-    set_parser_sections(op_deploy)
+    set_parser_sections(op_results)
     add_url_param(op_results, required=False)
     add_job_ref_param(op_results)
     op_results.add_argument(
@@ -926,6 +1111,27 @@ def make_parser():
              "(default: ${CURDIR}/{JobID}/<outputs.files>)."
     )
 
+    op_upload = WeaverArgumentParser(
+        "upload",
+        description=(
+            "Upload a local file to the remote server vault for reference in process execution inputs. "
+            "This operation is accomplished automatically for all execution inputs submitted using local files. "
+            "[note: feature only available for Weaver instances]"
+        ),
+    )
+    set_parser_sections(op_upload)
+    add_url_param(op_upload, required=True)
+    op_upload.add_argument(
+        "-c", "--content-type", dest="content_type",
+        help="Content-Type of the file to apply. "
+             "This should be an IANA Media-Type, optionally with additional parameters such as charset. "
+             "If not provided, attempts to guess it based on the file extension."
+    )
+    op_upload.add_argument(
+        "-f", "--file", dest="file_path", metavar="FILE", required=True,
+        help="Local file path to upload to the vault."
+    )
+
     operations = [
         op_deploy,
         op_undeploy,
@@ -934,8 +1140,9 @@ def make_parser():
         op_execute,
         op_monitor,
         op_dismiss,
-        op_results,
         op_status,
+        op_results,
+        op_upload,
     ]
     aliases = {
         "processes": op_capabilities
@@ -954,6 +1161,7 @@ def make_parser():
 
 
 def main(*args):
+    # type: (Any) -> int
     parser = make_parser()
     ns = parser.parse_args(args=args or None)
     setup_logger_from_options(LOGGER, ns)

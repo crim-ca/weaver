@@ -5,6 +5,8 @@ import tempfile
 from abc import abstractmethod
 from typing import TYPE_CHECKING
 
+from requests.structures import CaseInsensitiveDict
+
 from weaver.exceptions import PackageExecutionError
 from weaver.formats import CONTENT_TYPE_APP_JSON
 from weaver.processes.constants import OPENSEARCH_LOCAL_FILE_SCHEME
@@ -21,12 +23,13 @@ from weaver.utils import (
 from weaver.wps.utils import get_wps_output_dir, get_wps_output_url, map_wps_output_location
 
 if TYPE_CHECKING:
-    from typing import Any, Union
-
-    from pywps.app import WPSRequest
+    from typing import Any, Optional, Union
 
     from weaver.typedefs import (
+        AnyCookiesContainer,
+        AnyHeadersContainer,
         AnyResponseType,
+        CookiesTupleType,
         CWL_RuntimeInputsMap,
         CWL_ExpectedOutputs,
         CWL_WorkflowInputs,
@@ -36,6 +39,7 @@ if TYPE_CHECKING:
         JobMonitorReference,
         UpdateStatusPartialFunction
     )
+    from weaver.wps.service import WorkerRequest
 
 LOGGER = logging.getLogger(__name__)
 
@@ -69,12 +73,8 @@ class WpsProcessInterface(object):
     """
 
     def __init__(self, request, update_status):
-        # type: (WPSRequest, UpdateStatusPartialFunction) -> None
+        # type: (WorkerRequest, UpdateStatusPartialFunction) -> None
         self.request = request
-        if self.request.http_request:
-            self.cookies = get_cookie_headers(self.request.http_request.headers)
-        else:
-            self.cookies = {}
         self.headers = {"Accept": CONTENT_TYPE_APP_JSON, "Content-Type": CONTENT_TYPE_APP_JSON}
         self.settings = get_settings()
         self.update_status = update_status  # type: UpdateStatusPartialFunction
@@ -224,14 +224,53 @@ class WpsProcessInterface(object):
             except OSError:
                 LOGGER.warning("Ignore failure to cleanup temporary staging path: [%s]", path)
 
-    def make_request(self, method, url, retry=False, **kwargs):
-        # type: (str, str, Union[bool, int], Any) -> AnyResponseType
+    def get_auth_headers(self):
+        # type: () -> AnyHeadersContainer
+        """
+        Implementation dependent operation to retrieve applicable authorization headers.
+
+        This method is employed for every :meth:`make_request` call to avoid manually providing them each time.
+        Any overriding method should consider calling this method to retrieve authorization headers from WPS request.
+        """
+        headers = {}
+        if self.request and self.request.auth_headers:
+            headers = self.request.auth_headers.copy()
+        return CaseInsensitiveDict(headers)
+
+    def get_auth_cookies(self):
+        # type: () -> CookiesTupleType
+        """
+        Implementation dependent operation to retrieve applicable authorization cookies.
+
+        This method is employed for every :meth:`make_request` call to avoid manually providing them each time.
+        Any overriding method should consider calling this method to retrieve authorization cookies from WPS request.
+        """
+        cookies = []
+        if self.request and self.request.http_request:
+            for name in ["Cookie", "Set-Cookie"]:
+                headers = get_cookie_headers(self.request.http_request, name)
+                cookies.extend([(key, value) for key, value in headers.items()])
+        return cookies
+
+    def make_request(self,
+                     method,        # type: str
+                     url,           # type: str
+                     retry=False,   # type: Union[bool, int]
+                     cookies=None,  # type: Optional[AnyCookiesContainer]
+                     headers=None,  # type: Optional[AnyHeadersContainer]
+                     **kwargs,      # type: Any
+                     ):             # type: (...) -> AnyResponseType
         """
         Sends the request with additional parameter handling for the current process definition.
         """
         retries = int(retry) if retry is not None else 0
+        cookies = CaseInsensitiveDict(cookies or {})
+        headers = CaseInsensitiveDict(headers or {})
+        cookies.update(self.get_auth_cookies())
+        headers.update(self.headers.copy())
+        headers.update(self.get_auth_headers())
         response = request_extra(method, url=url, settings=self.settings, retries=retries,
-                                 headers=self.headers, cookies=self.cookies, **kwargs)
+                                 headers=headers, cookies=cookies, **kwargs)
         return response
 
     def host_file(self, file_path):

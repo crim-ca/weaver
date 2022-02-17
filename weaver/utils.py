@@ -28,6 +28,7 @@ from pyramid.exceptions import ConfigurationError
 from pyramid.httpexceptions import HTTPError as PyramidHTTPError, HTTPGatewayTimeout, HTTPTooManyRequests
 from pyramid.registry import Registry
 from pyramid.request import Request as PyramidRequest
+from pyramid.response import _guess_type as guess_file_contents  # noqa: W0212
 from pyramid.settings import asbool, aslist
 from pyramid.threadlocal import get_current_registry
 from pyramid_beaker import set_cache_regions_from_settings
@@ -39,6 +40,7 @@ from webob.headers import EnvironHeaders, ResponseHeaders
 from werkzeug.wrappers import Request as WerkzeugRequest
 from yaml.scanner import ScannerError
 
+from weaver.formats import CONTENT_TYPE_APP_OCTET_STREAM, get_content_type
 from weaver.status import map_status
 from weaver.warning import TimeZoneInfoAlreadySetWarning
 from weaver.xml_util import XML
@@ -66,7 +68,8 @@ SUPPORTED_FILE_SCHEMES = frozenset([
     "file",
     "http",
     "https",
-    "s3"
+    "s3",
+    "vault"
 ])
 
 # note: word characters also match unicode in this case
@@ -92,6 +95,7 @@ class NullType(metaclass=_Singleton):
 
     # pylint: disable=E1101,no-member
     def __eq__(self, other):
+        # type: (Any) -> bool
         """
         Makes any instance of :class:`NullType` compare as the same (ie: Singleton).
         """
@@ -112,6 +116,7 @@ class NullType(metaclass=_Singleton):
         return null
 
     def __repr__(self):
+        # type: () -> str
         return "<null>"
 
     @staticmethod
@@ -135,27 +140,42 @@ def get_weaver_url(container):
     return value.rstrip("/").strip()
 
 
-def get_any_id(info):
-    # type: (JSON) -> Union[str, None]
+def get_any_id(info, pop=False, key=False):
+    # type: (JSON, bool, bool) -> Union[str, None]
     """
     Retrieves a dictionary `id-like` key using multiple common variations ``[id, identifier, _id]``.
 
     :param info: dictionary that potentially contains an `id-like` key.
+    :param pop: If enabled, remove the matched key from the input mapping.
+    :param key: If enabled, return the matched key instead of the value.
     :returns: value of the matched `id-like` key or ``None`` if not found.
     """
-    return info.get("id", info.get("identifier", info.get("_id")))
+    for field in ["id", "identifier", "_id"]:
+        if field in info:
+            value = info.pop(field) if pop else info.get(field)
+            return field if key else value
+    return None
 
 
-def get_any_value(info, default=None):
-    # type: (JSON, Any) -> AnyValueType
+def get_any_value(info, default=None, file=True, data=True, pop=False, key=False):
+    # type: (JSON, Any, bool, bool, bool, bool) -> AnyValueType
     """
     Retrieves a dictionary `value-like` key using multiple common variations ``[href, value, reference, data]``.
 
-    :param info: dictionary that potentially contains a `value-like` key.
-    :param default: default value to be returned if none of the known keys were matched.
-    :returns: value of the matched `value-like` key or ``None`` if not found.
+    :param info: Dictionary that potentially contains a `value-like` key.
+    :param default: Default value to be returned if none of the known keys were matched.
+    :param file: If enabled, file-related key names will be considered.
+    :param data: If enabled, data-related key names will be considered.
+    :param pop: If enabled, remove the matched key from the input mapping.
+    :param key: If enabled, return the matched key instead of the value.
+    :returns: Value (or key if requested) of the matched `value-like` key or ``None`` if not found.
     """
-    return info.get("href", info.get("value", info.get("reference", info.get("data", default))))
+    for check, field in [(file, "href"), (data, "value"), (file, "reference"), (data, "data")]:
+        if check:
+            value = info.pop(field, null) if pop else info.get(field, null)
+            if value is not null:
+                return field if key else value
+    return default
 
 
 def get_any_message(info):
@@ -201,8 +221,8 @@ def get_settings(container=None):
     raise TypeError("Could not retrieve settings from container object of type [{}]".format(type(container)))
 
 
-def get_header(header_name, header_container):
-    # type: (str, AnyHeadersContainer) -> Union[str, None]
+def get_header(header_name, header_container, pop=False):
+    # type: (str, AnyHeadersContainer, bool) -> Union[str, None]
     """
     Searches for the specified header by case/dash/underscore-insensitive ``header_name`` inside ``header_container``.
     """
@@ -214,8 +234,13 @@ def get_header(header_name, header_container):
     if isinstance(headers, dict):
         headers = header_container.items()
     header_name = header_name.lower().replace("-", "_")
-    for h, v in headers:
+    for i, (h, v) in enumerate(list(headers)):
         if h.lower().replace("-", "_") == header_name:
+            if pop:
+                if isinstance(header_container, dict):
+                    del header_container[h]
+                else:
+                    del header_container[i]
             return v
     return None
 
@@ -316,17 +341,14 @@ def fully_qualified_name(obj):
     return ".".join([cls.__module__, cls.__name__])
 
 
-def now():
-    # type: (...) -> datetime
-    return localize_datetime(datetime.utcnow())
-
-
-def now_secs():
-    # type: (...) -> int
+def now(tz_name=None):
+    # type: (Optional[str]) -> datetime
     """
-    Return the current time in seconds since the Epoch.
+    Obtain the current time with timezone-awareness.
+
+    :param tz_name: If specified, returned current time will be localized to specified timezone.
     """
-    return int(time.time())
+    return localize_datetime(datetime.now().astimezone(), tz_name=tz_name)
 
 
 def repr_json(data, force_string=True, **kwargs):
@@ -346,31 +368,88 @@ def repr_json(data, force_string=True, **kwargs):
 
 
 def wait_secs(run_step=-1):
+    # type: (int) -> int
+    """
+    Obtain a wait time in seconds within increasing delta intervals based on iteration index.
+    """
     secs_list = (2, 2, 2, 2, 2, 5, 5, 5, 5, 5, 10, 10, 10, 10, 10, 20, 20, 20, 20, 20, 30)
     if run_step >= len(secs_list):
         run_step = -1
     return secs_list[run_step]
 
 
-def expires_at(hours=1):
-    # type: (Optional[int]) -> int
-    return now_secs() + hours * 3600
-
-
-def localize_datetime(dt, tz_name="UTC"):
+def localize_datetime(dt, tz_name=None):
     # type: (datetime, Optional[str]) -> datetime
     """
-    Provide a timezone-aware object for a given datetime and timezone name.
+    Provide a timezone-aware datetime for a given datetime and timezone name.
+
+    .. warning::
+        Any datetime provided as input that is not already timezone-aware will be assumed to be relative to the
+        current locale timezone. This is the default returned by naive :class:`datetime.datetime` instances.
+
+    If no timezone name is provided, the timezone-aware datatime will be localized with locale timezone offset.
+    Otherwise, the desired localization will be applied with the specified timezone offset.
     """
     tz_aware_dt = dt
     if dt.tzinfo is None:
-        utc = pytz.timezone("UTC")
-        aware = utc.localize(dt)
-        timezone = pytz.timezone(tz_name)
-        tz_aware_dt = aware.astimezone(timezone)
-    else:
+        tz_aware_dt = dt.astimezone()  # guess local timezone
+    if tz_name is None:
+        return tz_aware_dt
+    timezone = pytz.timezone(tz_name)
+    if tz_aware_dt.tzinfo == timezone:
         warnings.warn("tzinfo already set", TimeZoneInfoAlreadySetWarning)
+    else:
+        tz_aware_dt = tz_aware_dt.astimezone(timezone)
     return tz_aware_dt
+
+
+def get_file_header_datetime(dt):
+    # type: (datetime) -> str
+    """
+    Obtains the standard header datetime representation.
+
+    .. seealso::
+        Format of the date defined in :rfc:`5322#section-3.3`.
+    """
+    dt_gmt = localize_datetime(dt, "GMT")
+    dt_str = dt_gmt.strftime("%a, %d %b %Y %H:%M:%S GMT")
+    return dt_str
+
+
+def get_file_headers(path, download_headers=False, content_headers=False, content_type=None):
+    # type: (str, bool, bool, Optional[str]) -> HeadersType
+    """
+    Obtain headers applicable for the provided file.
+
+    :param path: File to describe.
+    :param download_headers: If enabled, add the attachment filename for downloading the file.
+    :param content_headers: If enabled, add ``Content-`` prefixed headers.
+    :param content_type: Explicit ``Content-Type`` to provide. Otherwise, use default guessed by file system.
+    :return: Headers for the file.
+    """
+    stat = os.stat(path)
+    headers = {}
+    if content_headers:
+        c_type, c_enc = guess_file_contents(path)
+        if c_type == CONTENT_TYPE_APP_OCTET_STREAM:  # default
+            f_ext = os.path.splitext(path)[-1]
+            c_type = get_content_type(f_ext, charset="UTF-8", default=CONTENT_TYPE_APP_OCTET_STREAM)
+        headers.update({
+            "Content-Type": content_type or c_type,
+            "Content-Encoding": c_enc or "",
+            "Content-Length": str(stat.st_size)
+        })
+        if download_headers:
+            headers.update({
+                "Content-Disposition": f"attachment; filename=\"{os.path.basename(path)}\"",
+            })
+    f_modified = get_file_header_datetime(datetime.fromtimestamp(stat.st_mtime))
+    f_created = get_file_header_datetime(datetime.fromtimestamp(stat.st_ctime))
+    headers.update({
+        "Date": f_created,
+        "Last-Modified": f_modified
+    })
+    return headers
 
 
 def get_base_url(url):
@@ -503,6 +582,7 @@ def get_path_kvp(path, sep=",", **params):
     """
 
     def _value(_v):
+        # type: (Any) -> str
         if isinstance(_v, (list, set, tuple)):
             return sep.join([str(_) for _ in _v])
         return str(_v)
@@ -589,6 +669,7 @@ def setup_loggers(settings=None,            # type: Optional[AnySettingsContaine
 
 
 def make_dirs(path, mode=0o755, exist_ok=False):
+    # type: (str, int, bool) -> None
     """
     Backward compatible ``make_dirs`` with reduced set of default mode flags.
 
@@ -692,7 +773,7 @@ def invalidate_region(caching_args):
     func, region, *args = caching_args
     try:
         region_invalidate(func, region, *args)
-    except BeakerException:
+    except (BeakerException, KeyError):  # ignore if cache region not yet generated
         pass
 
 
@@ -804,6 +885,7 @@ def retry_on_cache_error(func):
     """
     @functools.wraps(func)
     def wrapped(*args, **kwargs):
+        # type: (Any, Any) -> Any
         try:
             return func(*args, **kwargs)
         except BeakerException as exc:
@@ -938,6 +1020,7 @@ def request_extra(method,                       # type: str
     settings = get_settings(settings) or {}
     request_options = get_request_options(method, url, settings)
     request_options.update(request_kwargs)
+    request_kwargs = request_options  # update ref to ensure following modifications consider all parameters
     # catch kw passed to request corresponding to retries parameters
     # it is safe top pop items because 'get_request_options' creates a copy each time
     kw_retries = request_options.pop("retries", request_options.pop("retry", request_options.pop("max_retries", None)))
@@ -1080,8 +1163,8 @@ def download_file_http(file_reference, file_outdir, settings=None, **request_kwa
     return file_path
 
 
-def fetch_file(file_reference, file_outdir, settings=None, link=None, **request_kwargs):
-    # type: (str, str, Optional[AnySettingsContainer], Optional[bool], Any) -> str
+def fetch_file(file_reference, file_outdir, settings=None, link=None, move=False, **request_kwargs):
+    # type: (str, str, Optional[AnySettingsContainer], Optional[bool], bool, Any) -> str
     """
     Fetches a file from local path, AWS-S3 bucket or remote URL, and dumps it's content to the output directory.
 
@@ -1102,6 +1185,10 @@ def fetch_file(file_reference, file_outdir, settings=None, link=None, **request_
         When the source is a symbolic link itself, the destination will also be a link.
         When the source is a direct file reference, the destination will be a hard copy of the file.
         Only applicable when the file reference is local.
+    :param move:
+        Move local file to the output directory instead of copying or linking it.
+        No effect if the output directory already contains the local file.
+        No effect if download must occurs for remote file.
     :param request_kwargs: Additional keywords to forward to request call (if needed).
     :return: Path of the local copy of the fetched file.
     :raises HTTPException: applicable HTTP-based exception if any occurred during the operation.
@@ -1115,10 +1202,15 @@ def fetch_file(file_reference, file_outdir, settings=None, link=None, **request_
     LOGGER.debug("Fetching file reference: [%s]", file_href)
     if os.path.isfile(file_reference):
         LOGGER.debug("Fetch file resolved as local reference.")
+        if move and os.path.isfile(file_path):
+            LOGGER.debug("Reference [%s] cannot be moved to path [%s] (already exists)", file_href, file_path)
+            raise OSError("Cannot move file, already in output directory!")
+        if move:
+            shutil.move(os.path.realpath(file_reference), file_outdir)
         # NOTE:
         #   If file is available locally and referenced as a system link, disabling 'follow_symlinks'
         #   creates a copy of the symlink instead of an extra hard-copy of the linked file.
-        if os.path.islink(file_reference) and not os.path.isfile(file_path):
+        elif os.path.islink(file_reference) and not os.path.isfile(file_path):
             if link is True:
                 os.symlink(os.readlink(file_reference), file_path)
             else:
@@ -1249,6 +1341,7 @@ def get_sane_name(name, min_len=3, max_len=None, assert_invalid=True, replace_ch
 
 
 def assert_sane_name(name, min_len=3, max_len=None):
+    # type: (str, int, Optional[int]) -> None
     """
     Asserts that the sane name respects conditions.
 

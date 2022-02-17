@@ -8,7 +8,7 @@ from urllib.parse import urlparse
 
 from beaker.cache import cache_region
 from owslib.wps import WebProcessingService, WPSExecution
-from pyramid.httpexceptions import HTTPNotFound, HTTPUnprocessableEntity
+from pyramid.httpexceptions import HTTPNotFound, HTTPOk, HTTPUnprocessableEntity
 from pywps import configuration as pywps_config
 from webob.acceptparse import create_accept_language_header
 
@@ -29,6 +29,7 @@ from weaver.utils import (
     request_extra,
     retry_on_cache_error
 )
+from weaver.wps_restapi import swagger_definitions as sd
 
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
@@ -123,7 +124,7 @@ def get_wps_output_context(request):
     :returns: validated context or None if not specified.
     """
     headers = getattr(request, "headers", {})
-    ctx = get_header("X-WPS-Output-Context", headers)
+    ctx = get_header(sd.WpsOutputContextHeader.name, headers)
     if not ctx:
         settings = get_settings(request)
         ctx_default = settings.get("weaver.wps_output_context", None)
@@ -138,7 +139,7 @@ def get_wps_output_context(request):
         return ctx_matched
     raise HTTPUnprocessableEntity(json={
         "code": "InvalidHeaderValue",
-        "name": "X-WPS-Output-Context",
+        "name": sd.WpsOutputContextHeader.name,
         "description": "Provided value for 'X-WPS-Output-Context' request header is invalid.",
         "cause": "Value must be an alphanumeric context directory or tree hierarchy of sub-directory names.",
         "value": str(ctx)
@@ -181,30 +182,30 @@ def get_wps_local_status_location(url_status_location, container, must_exist=Tru
     return out_path
 
 
-def map_wps_output_location(reference, container, reverse=False, exists=True, file_scheme=False):
+def map_wps_output_location(reference, container, url=False, exists=True, file_scheme=False):
     # type: (str, AnySettingsContainer, bool, bool, bool) -> Optional[str]
     """
     Obtains the mapped WPS output location of a file where applicable.
 
-    :param reference: local file path (normal) or file URL (reverse) to be mapped.
-    :param container: retrieve application settings.
-    :param reverse: perform the reverse operation (local path -> URL endpoint), or process normally (URL -> local path).
-    :param exists: ensure that the mapped file exists, otherwise don't map it.
+    :param reference: Local file path or file URL to be mapped.
+    :param container: Retrieve application settings.
+    :param url: Perform URL mapping (local path -> URL endpoint), or map to local path (URL -> local path).
+    :param exists: Ensure that the mapped file exists, otherwise don't map it (otherwise ``None``).
     :param file_scheme:
         Ensure that the 'file://' scheme is applied to resulting local file location when mapped from WPS output URL.
         When in 'reverse' mode, 'file://' is always removed if present to form a potential local file path.
-    :returns: mapped reference that corresponds to the local WPS output location.
+    :returns: Mapped reference that corresponds to the local/URL WPS output location.
     """
     settings = get_settings(container)
     wps_out_dir = get_wps_output_dir(settings)
     wps_out_url = get_wps_output_url(settings)
-    if reverse and reference.startswith("file://"):
+    if url and reference.startswith("file://"):
         reference = reference[7:]
-    if reverse and reference.startswith(wps_out_dir):
+    if url and reference.startswith(wps_out_dir):
         wps_out_ref = reference.replace(wps_out_dir, wps_out_url, 1)
         if not exists or os.path.isfile(reference):
             return wps_out_ref
-    elif not reverse and reference.startswith(wps_out_url):
+    elif not url and reference.startswith(wps_out_url):
         wps_out_ref = reference.replace(wps_out_url, wps_out_dir, 1)
         if not exists or os.path.isfile(wps_out_ref):
             if file_scheme:
@@ -293,6 +294,7 @@ def check_wps_status(location=None,     # type: Optional[str]
     :returns: OWSLib.wps.WPSExecution object.
     """
     def _retry_file():
+        # type: () -> str
         LOGGER.warning("Failed retrieving WPS status-location, attempting with local file.")
         out_path = get_wps_local_status_location(location, settings)
         if not out_path:
@@ -307,15 +309,15 @@ def check_wps_status(location=None,     # type: Optional[str]
         xml_data = response
     elif location:
         xml_resp = HTTPNotFound()
+        xml_data = None
         try:
             LOGGER.debug("Attempt to retrieve WPS status-location from URL [%s]...", location)
             xml_resp = request_extra("get", location, verify=verify, settings=settings)
             xml_data = xml_resp.content
         except Exception as ex:
-            LOGGER.debug("Got exception during get status: [%r]", ex)
-            xml_data = _retry_file()
-        if xml_resp.status_code == HTTPNotFound.code:
-            LOGGER.debug("Got not-found during get status: [%r]", xml_data)
+            LOGGER.debug("Got exception during get status: [%r]. Will retry with local reference.", ex)
+        if xml_resp.status_code != HTTPOk.code:
+            LOGGER.debug("WPS XML status not found: [%r]. Retrying with local reference.", xml_data)
             xml_data = _retry_file()
     else:
         raise Exception("Missing status-location URL/file reference or response with XML object.")
@@ -447,11 +449,11 @@ def set_wps_language(wps, accept_language=None, request=None):
         https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Accept-Language
 
     .. note::
-        This function considers quality-factor weighting and parsing resolution of ``Accept-Language`` header
-        according to :rfc:`RFC 7231, section 5.3.2 <7231#section-5.3.2>`.
+        This function considers quality-factor weighting and parsing resolution
+        of ``Accept-Language`` header according to :rfc:`7231#section-5.3.2`.
 
     :param wps: service for which to apply a supported language if matched.
-    :param str accept_language: value of the Accept-Language header.
+    :param accept_language: value of the Accept-Language header.
     :param request: request from which to extract Accept-Language header if not provided directly.
     :returns: language that has been set, or ``None`` if no match could be found.
     """

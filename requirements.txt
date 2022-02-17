@@ -51,6 +51,7 @@ pyramid_celery
 pyramid_mako
 python-dateutil
 pyramid_rewrite
+pyramid_storage
 pytz
 pywps==4.5.0
 pyyaml>=5.2

@@ -222,8 +222,12 @@ class WpsRestApiJobsTest(unittest.TestCase):
         """
         Generates a list of dummy datetimes for testing.
         """
+        # tests create jobs with datetime auto-resolved relative to 'now' with local timezone-awareness
+        # must apply the same UTC offset as the local machine timezone for proper search results with datetime filters
+        local_iso_dt = datetime.datetime.now(datetime.datetime.now().astimezone().tzinfo).isoformat()
+        local_offset = local_iso_dt[-6:]  # ±00:00
         year = date.today().year + 1
-        return ["{}-0{}-02T03:32:38.487000+00:00".format(year, month) for month in range(1, 5)]
+        return ["{}-0{}-02T03:32:38.487000{}".format(year, month, local_offset) for month in range(1, 5)]
 
     @staticmethod
     def check_job_format(job):
@@ -1203,7 +1207,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         Subsequent calls to the same job dismiss operation must respond with HTTP Gone (410) status.
 
         .. seealso::
-            OGC specification of dismiss operation: https://docs.ogc.org/DRAFTS/18-062.html#sec_cons_dismiss
+            OGC specification of dismiss operation: https://docs.ogc.org/is/18-062r2/18-062r2.html#toc53
         """
         job_running = self.job_info[10]
         assert job_running.status == STATUS_RUNNING, "Job must be in running state for test"
@@ -1241,7 +1245,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         Subsequent calls to the same job dismiss operation must respond with HTTP Gone (410) status.
 
         .. seealso::
-            OGC specification of dismiss operation: https://docs.ogc.org/DRAFTS/18-062.html#sec_cons_dismiss
+            OGC specification of dismiss operation: https://docs.ogc.org/is/18-062r2/18-062r2.html#toc5
         """
         job_success = self.job_info[0]
         job_failed = self.job_info[1]

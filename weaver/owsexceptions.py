@@ -7,7 +7,7 @@ be caught whether the running process is via :mod:`weaver` or through :mod:`pywp
 Furthermore, interrelation with :mod:`weaver.exceptions` classes (with base :exc:`weaver.exceptions.WeaverException`)
 also employ specific :exc:`OWSExceptions` definitions to provide specific error details.
 """
-import json
+import json as json_pkg
 import warnings
 from string import Template
 from typing import TYPE_CHECKING
@@ -34,6 +34,8 @@ from weaver.utils import clean_json_text_body
 from weaver.warning import MissingParameterWarning, UnsupportedOperationWarning
 
 if TYPE_CHECKING:
+    from typing import Any, Optional
+
     from weaver.typedefs import JSON, SettingsType
 
 
@@ -59,7 +61,8 @@ class OWSException(Response, Exception):
     </Exception>
 </ExceptionReport>""")
 
-    def __init__(self, detail=None, value=None, **kw):
+    def __init__(self, detail=None, value=None, json=None, **kw):
+        # type: (Optional[str], Optional[Any], Optional[JSON], Any) -> None
         status = kw.pop("status", None)
         if isinstance(status, type) and issubclass(status, HTTPException):
             status = status().status
@@ -72,15 +75,22 @@ class OWSException(Response, Exception):
             status = status.status
         elif not status:
             status = HTTPOk().status
+        locator = kw.get("locator")
+        if isinstance(json, dict):
+            detail = detail or json.get("detail") or json.get("description")
+            locator = locator or json.get("locator") or json.get("name")
+            if value:
+                json.setdefault("value", value)
         self.code = str(kw.pop("code", self.code))
         desc = str(detail or kw.pop("description", self.description))
+        if json is not None:
+            kw.update({"json": json})
         Response.__init__(self, status=status, **kw)
         Exception.__init__(self, detail)
         self.message = detail or self.description or getattr(self, "explanation", None)
         self.content_type = CONTENT_TYPE_APP_JSON
-        value = kw.get("locator", value)
-        if value:
-            self.locator = value
+        if locator:
+            self.locator = locator
         try:
             json_desc = self.json.get("description")
             if json_desc:
@@ -143,7 +153,7 @@ class OWSException(Response, Exception):
                             "locator": locator or "",
                             "message": message or "",
                         }
-                        return json.dumps(data)
+                        return json_pkg.dumps(data)
 
                 page_template = JsonPageTemplate(self)
                 args = {"code": self.code, "locator": self.locator, "message": self.message}

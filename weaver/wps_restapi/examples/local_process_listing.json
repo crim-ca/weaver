@@ -1,24 +1,17 @@
 {
+  "description": "Listing of available processes successful.",
   "processes": [
-    "ColibriFlyingpigeon_SubsetBbox",
-    "OutardeFlyingpigeon_SubsetBbox",
-    "Staging_S2L1C",
-    "Staging_S2L1C-mock-docker",
-    "WaterExtent_S2-mock-docker",
-    "WorkflowWaterExtent",
-    "WorkflowWaterExtent-mock",
-    "anti-spoofing",
     "docker-demo-cat",
     "docker-python-script",
+    "Echo",
+    "file_index_selector",
     "file2string_array",
     "image-utils",
     "jsonarray2netcdf",
     "las2tif",
     "metalink2netcdf",
-    "python-script",
-    "sleep",
-    "test_blurring",
-    "test_generation",
-    "test_workflow"
-  ]
+    "sleep"
+  ],
+  "page": 0,
+  "total": 25
 }
