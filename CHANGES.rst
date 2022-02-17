@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_4.9.0:
+
+`4.9.0 <https://github.com/crim-ca/weaver/tree/4.9.0>`_ (2022-02-17)
+========================================================================
+
+Changes:
+--------
 - Add `Vault` endpoints providing a secured self-hosted file storage to upload local files for execution input.
 - Add ``upload`` CLI operation for uploading local files to `Vault`.
 - Add CLI automatic detection of local files during ``execute`` call to upload to `Vault` and retrieve them from it
