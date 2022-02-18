@@ -1,3 +1,4 @@
+import colander
 import logging
 from typing import TYPE_CHECKING
 
@@ -9,6 +10,7 @@ from weaver.datatype import Bill, Quote
 from weaver.exceptions import ProcessNotFound, QuoteNotFound, log_unhandled_exceptions
 from weaver.execute import ExecuteMode
 from weaver.formats import OutputFormat
+from weaver.owsexceptions import OWSMissingParameterValue
 from weaver.processes.types import ProcessType
 from weaver.quotation.estimation import process_quote_estimator
 from weaver.sort import Sort
@@ -60,12 +62,17 @@ def request_quote(request):
             "instance": process.href(settings)
         })
 
-    quote_store = get_db(request).get_store(StoreQuotes)
-    process_params = dict()
-    for param in ["inputs", "outputs", "mode", "response"]:
-        if param in request.json:
-            process_params[param] = request.json.pop(param)
+    try:
+        process_params = sd.QuoteProcessParametersSchema().deserialize(request.json)
+    except colander.Invalid as exc:
+        raise OWSMissingParameterValue(json={
+            "title": "MissingParameterValue",
+            "cause": "Invalid schema: [{!s}]".format(exc.msg),
+            "error": exc.__class__.__name__,
+            "value": exc.value
+        })
 
+    quote_store = get_db(request).get_store(StoreQuotes)
     quote_info = {
         "process": process_id,
         "processParameters": process_params,
@@ -74,7 +81,7 @@ def request_quote(request):
     quote = quote_store.save_quote(Quote(**quote_info))
     mode, wait, applied = parse_prefer_header_execute_mode(request.headers, process.jobControlOptions)
 
-    result = process_quote_estimator.delay(quote.id, process)
+    result = process_quote_estimator.delay(quote.id)
     LOGGER.debug("Celery pending task [%s] for quote [%s].", result.id, quote.id)
     if mode == ExecuteMode.SYNC and wait:
         LOGGER.debug("Celery task requested as sync if it completes before (wait=%ss)", wait)

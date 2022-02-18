@@ -295,10 +295,3 @@ if TYPE_CHECKING:
         "inputs": JobInputs,
         "outputs": JobOutputs,
     })
-
-    QuoteEstimationParameters = TypedDict("QuoteEstimationParameters", {
-        "price": float,
-        "currency": str,
-        "seconds": int,
-        "steps": List[str],
-    }, total=False)

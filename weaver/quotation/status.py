@@ -7,6 +7,7 @@ class QuoteStatus(Constants):
     SUBMITTED = "submitted"
     PROCESSING = "processing"
     COMPLETED = "completed"
+    FAILED = "failed"
 
 
 if TYPE_CHECKING:
@@ -16,4 +17,5 @@ if TYPE_CHECKING:
         QuoteStatus.SUBMITTED,
         QuoteStatus.PROCESSING,
         QuoteStatus.COMPLETED,
+        QuoteStatus.FAILED,
     ]

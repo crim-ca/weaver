@@ -2263,6 +2263,20 @@ class Quote(Base):
         return dict.__getitem__(self, "id")
 
     @property
+    def detail(self):
+        # type: () -> Optional[str]
+        return self.get("detail")
+
+    @detail.setter
+    def detail(self, detail):
+        # type: (str) -> None
+        if detail is None and self.detail is not None:
+            return
+        if not isinstance(detail, str):
+            raise TypeError(f"String required for '{self.__name__}.detail'.")
+        self["detail"] = detail
+
+    @property
     def status(self):
         # type: () -> QuoteStatus
         return QuoteStatus.get(self.get("status"), QuoteStatus.SUBMITTED)
@@ -2307,31 +2321,35 @@ class Quote(Base):
         """
         Estimated time of the process execution in seconds.
         """
-        return self.get("seconds")
+        return self.get("seconds") or 0
 
     @seconds.setter
     def seconds(self, seconds):
         # type: (int) -> None
         if not isinstance(seconds, int):
             raise TypeError(f"Invalid estimated duration type for '{self.__name__}.seconds'.")
-        if not seconds < 0:
+        if seconds < 0:
             raise ValueError(f"Invalid estimated duration value for '{self.__name__}.seconds'.")
         self["seconds"] = seconds
 
     @property
     def duration(self):
-        # type: () -> Optional[timedelta]
-        if not self.seconds:
-            return None
-        return timedelta(self.seconds)
+        # type: () -> timedelta
+        """
+        Duration as delta time that can be converted to ISO-8601 format (``P[n]Y[n]M[n]DT[n]H[n]M[n]S``).
+        """
+        return timedelta(seconds=self.seconds)
 
     @property
     def duration_str(self):
         # type: () -> str
+        """
+        Human-readable duration in formatted as ``hh:mm:ss``.
+        """
         duration = self.duration
         if duration is None:
             return "00:00:00"
-        return str(duration).split(".")[0].zfill(8)  # "HH:MM:SS"
+        return str(duration).split(".")[0].zfill(8)
 
     @property
     def parameters(self):
@@ -2342,7 +2360,11 @@ class Quote(Base):
         This should include minimally the inputs and expected outputs,
         but could be extended as needed with relevant details for quoting algorithm.
         """
-        return self.get("processParameters")
+        params = self.pop("processParameters", None)  # backward compatibility
+        if params and "parameters" not in self:
+            self.parameters = params
+        params = self.get("parameters", {})
+        return params
 
     @parameters.setter
     def parameters(self, data):
@@ -2356,7 +2378,7 @@ class Quote(Base):
         ):
             LOGGER.error("Invalid process parameters for quote submission.\n%s", repr_json(data, indent=2))
             raise TypeError("Invalid process parameters for quote submission.")
-        self["processParameters"] = data
+        self["parameters"] = data
 
     @property
     def price(self):
@@ -2379,7 +2401,10 @@ class Quote(Base):
         """
         Currency of the quote price.
         """
-        return self.get("currency")
+        currency = self.get("currency")
+        if not self.price:  # zero/undefined price valid to have no currency
+            return currency
+        return currency or "CAN"    # some default if not specified but price is defined
 
     @currency.setter
     def currency(self, currency):
@@ -2402,6 +2427,8 @@ class Quote(Base):
         # type: () -> AnyParams
         return {
             "id": self.id,
+            "detail": self.detail,
+            "status": self.status,
             "price": self.price,
             "currency": self.currency,
             "user": self.user,
@@ -2435,15 +2462,14 @@ class Quote(Base):
         """
         data = self.dict()
         data.update(self.partial())
-        duration = self.duration_str
         data.update({
             "userID": self.user,
-            "estimatedTime": duration,  # let schema convert it
+            "estimatedTime": self.duration_str,
             "estimatedSeconds": self.seconds,
-            "estimatedDuration": duration,
+            "estimatedDuration": self.duration,
             "processParameters": self.parameters,
         })
-        return sd.StepQuotation().deserialize(data)
+        return sd.Quotation().deserialize(data)
 
     def links(self, container=None):
         # type: (Optional[AnySettingsContainer]) -> List[Link]

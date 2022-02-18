@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING
 
 import yaml
 import duration
-from colander import DateTime, Email, OneOf, Range, Regex, drop, null, required
+from colander import DateTime, Email, Money, OneOf, Range, Regex, drop, null, required
 from dateutil import parser as date_parser
 
 from weaver import __meta__
@@ -70,7 +70,7 @@ from weaver.wps_restapi.colander_extras import (
 from weaver.wps_restapi.patches import ServiceOnlyExplicitGetHead as Service  # warning: don't use 'cornice.Service'
 
 if TYPE_CHECKING:
-    from typing import Any
+    from typing import Any, Union
 
     from weaver.typedefs import DatetimeIntervalType, SettingsType, TypedDict
 
@@ -1925,7 +1925,7 @@ class WPSProcessVersion(ExtendedSchemaNode, WPSNamespace):
 class WPSInputDescriptionType(WPSDescriptionType):
     identifier = OWSIdentifier(description="Unique identifier of the input.")
     # override below to have different examples/descriptions
-    _title = OWSTitle(description="Human readable representation of the process input.")
+    _title = OWSTitle(description="Human-readable representation of the process input.")
     abstract = OWSAbstract(missing=drop)
     metadata = OWSMetadata(missing=drop)
 
@@ -2025,7 +2025,7 @@ class WPSOutputDescriptionType(WPSDescriptionType):
     title = "OutputDescriptionType"
     identifier = OWSIdentifier(description="Unique identifier of the output.")
     # override below to have different examples/descriptions
-    _title = OWSTitle(description="Human readable representation of the process output.")
+    _title = OWSTitle(description="Human-readable representation of the process output.")
     abstract = OWSAbstract(missing=drop)
     metadata = OWSMetadata(missing=drop)
 
@@ -2613,7 +2613,7 @@ class ProcessDeployment(ProcessSummary, ProcessContext, ProcessDeployMeta):
 class Duration(ExtendedSchemaNode):
     # note: using String instead of Time because timedelta object cannot be directly handled (missing parts at parsing)
     schema_type = String
-    description = "Human readable representation of the duration."
+    description = "Human-readable representation of the duration."
     example = "hh:mm:ss"
 
 
@@ -2633,6 +2633,7 @@ class DurationISO(ExtendedSchemaNode):
     format = "duration"
 
     def deserialize(self, cstruct):
+        # type: (Union[datetime.timedelta, str]) -> str
         if isinstance(cstruct, datetime.timedelta) or isinstance(cstruct, str) and not cstruct.startswith("P"):
             return duration.to_iso8601(cstruct)
         return cstruct
@@ -2955,24 +2956,32 @@ class PartialQuoteSchema(ExtendedMappingSchema):
 
 
 class Price(ExtendedSchemaNode):
-    schema_type = Float
+    schema_type = Money
     # not official, but common (https://github.com/OAI/OpenAPI-Specification/issues/845#issuecomment-378139730)
     format = "decimal"
 
 
+class QuoteProcessParameters(PermissiveMappingSchema, ExecuteInputOutputs):
+    description = (
+        "Parameters passed for traditional process execution (inputs, outputs) "
+        "with added metadata for quote evaluation."
+    )
+
+
 class StepQuotation(PartialQuoteSchema):
+    detail = ExtendedSchemaNode(String(), description="Detail about quote processing.", missing=None)
     price = Price(description="Estimated price for process execution.")
-    currency = ExtendedSchemaNode(String(), description="Currency code in ISO-4217 format.")
+    currency = ExtendedSchemaNode(String(), description="Currency code in ISO-4217 format.", missing=None)
     expire = ExtendedSchemaNode(DateTime(), description="Expiration date and time of the quote in ISO-8601 format.")
     created = ExtendedSchemaNode(DateTime(), description="Creation date and time of the quote in ISO-8601 format.")
     userID = ExtendedSchemaNode(String(), description="User ID that requested the quote.")
-    estimatedTime = Duration(Integer(), missing=drop,
-                             description="Estimated duration of process execution in human readable format.")
+    estimatedTime = Duration(missing=drop,
+                             description="Estimated duration of process execution in human-readable format.")
     estimatedSeconds = ExtendedSchemaNode(Integer(), missing=drop,
                                           description="Estimated duration of process execution in seconds.")
     estimatedDuration = DurationISO(missing=drop,
                                     description="Estimated duration of process execution in ISO-8601 format.")
-    processParameters = ExecuteInputOutputs(title="ProcessExecuteParameters")
+    processParameters = QuoteProcessParameters(title="QuoteProcessParameters")
 
 
 class StepQuotationList(ExtendedSequenceSchema):

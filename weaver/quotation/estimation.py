@@ -11,37 +11,40 @@ from weaver.processes.types import ProcessType
 from weaver.processes.wps_package import get_package_workflow_steps, get_process_location
 from weaver.quotation.status import QuoteStatus
 from weaver.store.base import StoreProcesses, StoreQuotes
-from weaver.utils import get_settings, request_extra, wait_secs
+from weaver.utils import fully_qualified_name, get_settings, request_extra, wait_secs
 
 if TYPE_CHECKING:
-    from typing import Union
-
     from celery.task import Task
 
     from weaver.datatype import Process, Quote
-    from weaver.typedefs import QuoteEstimationParameters, QuoteProcessParameters
+    from weaver.quotation.status import AnyQuoteStatus
+    from weaver.typedefs import AnyUUID
 
 LOGGER = logging.getLogger(__name__)
 
 
 def estimate_process_quote(quote, process):
-    # type: (Quote, Process) -> QuoteEstimationParameters
+    # type: (Quote, Process) -> Quote
+    """
+    Estimate execution price and time for an atomic :term:`Process` operation.
+
+    Employs provided inputs and expected outputs and relevant metadata for the :term:`Process`.
+
+    :param quote: Quote with references to process parameters.
+    :param process: Targeted process for execution.
+    :returns: Updated quote with estimates.
+    """
 
     # TODO: replace by some fancy ml technique or something?
-    settings = get_settings()
-    price = random.uniform(0, 10)  # nosec
-    currency = "CAD"
-    seconds = int(random.uniform(5, 60) * 60 + random.uniform(5, 60))
+    quote.seconds = int(random.uniform(5, 60) * 60 + random.uniform(5, 60))
+    quote.price = float(random.uniform(0, 100) * quote.seconds)
+    quote.currency = "CAD"
 
-    params = {"price": price, "currency": currency, "seconds": seconds}
-    store = get_db(settings).get_store(StoreQuotes)
-    quote = Quote(id=quote.id, status=QuoteStatus.COMPLETED, **params)
-    store.update_quote(quote)
-    return params
+    return quote
 
 
 def estimate_workflow_quote(quote, process):
-    # type: (Quote, Process) -> QuoteEstimationParameters
+    # type: (Quote, Process) -> Quote
     """
     Loop :term:`Workflow` sub-:term:`Process` steps to get their respective :term:`Quote`.
     """
@@ -73,7 +76,7 @@ def estimate_workflow_quote(quote, process):
                 abort -= 1
                 wait = 5
             else:
-                body = resp.json()  # type: Union[QuoteEstimationParameters, QuoteProcessParameters]
+                body = resp.json()
                 if body.get("status") == QuoteStatus.COMPLETED:
                     quote_steps.append(href)
                     quote_params.append(body)
@@ -95,34 +98,50 @@ def estimate_workflow_quote(quote, process):
         params["price"] += step_params["price"]
         params["seconds"] += step_params["estimatedSeconds"]
 
-    store = get_db(settings).get_store(StoreQuotes)
-    quote = Quote(id=quote.id, status=QuoteStatus.COMPLETED, **params)
-    store.update_quote(quote)
-    return params
+    quote.update(**params)
+    return quote
 
 
 @app.task(bind=True)
-def process_quote_estimator(task, quote, process):  # noqa: E811
-    # type: (Task, str, str) -> QuoteEstimationParameters
+def process_quote_estimator(task, quote_id):  # noqa: E811
+    # type: (Task, AnyUUID) -> AnyQuoteStatus
     """
     Estimate :term:`Quote` parameters for the :term:`Process` execution.
 
     :param task: Celery Task that processes this quote.
-    :param quote: Quote identifier associated to the requested estimation for the process execution.
-    :param process: Process identifier for which to evaluate the execution quote.
+    :param quote_id: Quote identifier associated to the requested estimation for the process execution.
     :return: Estimated quote parameters.
     """
-    LOGGER.debug("Starting quote estimation [%s] for process [%s]", task.task_id, process)
+    task_id = task.request.id
+    LOGGER.debug("Starting task [%s] for quote estimation [%s]", task_id, quote_id)
 
     settings = get_settings()
     db = get_db(settings)
     p_store = db.get_store(StoreProcesses)
     q_store = db.get_store(StoreQuotes)
-    process = p_store.fetch_by_id(process)  # type: Process
-    quote = q_store.fetch_by_id(quote)  # type: Quote
+    quote = q_store.fetch_by_id(quote_id)  # type: Quote
+    process = p_store.fetch_by_id(quote.process)  # type: Process
 
-    if process.type == ProcessType.WORKFLOW:
-        params = estimate_workflow_quote(quote, process)
-    else:
-        params = estimate_process_quote(quote, process)
-    return params
+    if quote.status != QuoteStatus.SUBMITTED:
+        raise ValueError(f"Invalid quote [{quote.id}] ({quote.status}) cannot be processed.")
+
+    quote.status = QuoteStatus.PROCESSING
+    q_store.update_quote(quote)
+    try:
+        if process.type == ProcessType.WORKFLOW:
+            quote = estimate_workflow_quote(quote, process)
+        else:
+            quote = estimate_process_quote(quote, process)
+
+        quote.detail = "Quote processing complete."
+        quote.status = QuoteStatus.COMPLETED
+        LOGGER.info("Quote estimation complete [%s]. Task: [%s]", quote.id, task_id)
+    except Exception as exc:
+        LOGGER.error("Failed estimating quote [%s]. Task: [%s]", quote.id, task_id, exc_info=exc)
+        quote.detail = f"Quote estimating failed. ERROR: ({fully_qualified_name(exc)} [{exc!s}]"
+        quote.status = QuoteStatus.FAILED
+    finally:
+        q_store.update_quote(quote)
+
+    LOGGER.debug("Finished task [%s] quote estimation [%s]", task_id, quote_id)
+    return quote.status
