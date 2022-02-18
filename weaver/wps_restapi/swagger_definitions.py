@@ -354,6 +354,7 @@ class UUID(ExtendedSchemaNode):
     description = "Unique identifier."
     example = "a9d14bf4-84e0-449a-bac8-16e598efe807"
     format = "uuid"
+    pattern = "^[a-f0-9]{8}(?:-?[a-f0-9]{4}){3}-?[a-f0-9]{12}$"
     title = "UUID"
 
 
