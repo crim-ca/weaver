@@ -12,7 +12,8 @@ Changes
 
 Changes:
 --------
-- No change.
+- Refactor all constants of similar concept into classes to facilitate reuse and avoid omitting entries when iterating
+  over all members of a corresponding constant group (fixes `#33 <https://github.com/crim-ca/weaver/issues/33>`_).
 
 Fixes:
 ------
