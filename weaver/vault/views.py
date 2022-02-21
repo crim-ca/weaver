@@ -17,6 +17,7 @@ from weaver.owsexceptions import OWSInvalidParameterValue, OWSMissingParameterVa
 from weaver.store.base import StoreVault
 from weaver.utils import get_file_headers
 from weaver.vault.utils import (
+    REGEX_VAULT_FILENAME,
     decrypt_from_vault,
     get_authorized_file,
     get_vault_auth,
@@ -35,8 +36,6 @@ if TYPE_CHECKING:
     from webob.compat import cgi_FieldStorage
 
 LOGGER = logging.getLogger(__name__)
-
-FILENAME_REGEX = re.compile(r"^[a-zA-Z0-9](?:[a-zA-Z0-9._-]*[a-zA-Z0-9])?\.[a-zA-Z0-9_-]+$")
 
 
 @sd.vault_service.post(tags=[sd.TAG_VAULT], schema=sd.VaultUploadEndpoint(), response_schemas=sd.post_vault_responses)
@@ -60,7 +59,7 @@ def upload_file(request):
             "description": sd.BadRequestVaultFileUploadResponse.description,
             "error": error,
         })
-    if not re.match(FILENAME_REGEX, req_file.filename):
+    if not re.match(REGEX_VAULT_FILENAME, req_file.filename):
         LOGGER.debug("Invalid filename refused by Vault: [%s]", req_file.filename)
         raise OWSInvalidParameterValue(status=HTTPUnprocessableEntity, json={
             "code": "InvalidParameterValue",
