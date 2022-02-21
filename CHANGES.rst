@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_4.9.1:
+
+`4.9.1 <https://github.com/crim-ca/weaver/tree/4.9.1>`_ (2022-02-21)
+========================================================================
+
+Changes:
+--------
 - Add encryption of stored `Vault` file contents until retrieved for usage by the executed ``Process`` application.
 
 Fixes:
