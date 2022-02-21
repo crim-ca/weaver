@@ -12,11 +12,11 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add encryption of stored `Vault` file contents until retrieved for usage by the executed ``Process`` application.
 
 Fixes:
 ------
-- No change.
+- Fix auto-resolution of `Vault` file ``Content-Type`` when not explicitly provided.
 
 .. _changes_4.9.0:
 

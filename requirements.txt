@@ -18,6 +18,7 @@ colander
 cornice
 #cornice_swagger>=0.7.0
 git+https://github.com/fmigneault/cornice.ext.swagger.git@openapi-3#egg=cornice-swagger
+cryptography
 # FIXME: properly support GPU execution
 #   - https://github.com/crim-ca/weaver/issues/104
 #   - https://github.com/crim-ca/weaver/issues/138

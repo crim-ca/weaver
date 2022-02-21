@@ -1,8 +1,8 @@
 import logging
 import os
 import re
+import tempfile
 import uuid
-from tempfile import mkdtemp
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
@@ -29,6 +29,7 @@ LOGGER = logging.getLogger(__name__)
 
 REGEX_VAULT_TOKEN = re.compile(r"^[a-f0-9]{{{}}}$".format(VaultFile.bytes * 2))
 REGEX_VAULT_UUID = re.compile(r"^[a-f0-9]{8}(?:-?[a-f0-9]{4}){3}-?[a-f0-9]{12}$")
+REGEX_VAULT_FILENAME = re.compile(r"^[a-zA-Z0-9](?:[a-zA-Z0-9._-]*[a-zA-Z0-9_-])?\.[a-zA-Z0-9_-]+$")
 
 
 def get_vault_dir(container=None):
@@ -39,7 +40,7 @@ def get_vault_dir(container=None):
     settings = get_settings(container)
     vault_dir = settings.get("weaver.vault_dir")
     if not vault_dir:
-        vault_dir = mkdtemp(prefix="weaver_vault_")
+        vault_dir = tempfile.mkdtemp(prefix="weaver_vault_")
         LOGGER.warning("Setting 'weaver.vault_dir' undefined. Using random vault base directory: [%s]", vault_dir)
         settings["weaver.vault_dir"] = vault_dir
     os.makedirs(vault_dir, mode=0o755, exist_ok=True)
@@ -245,3 +246,27 @@ def get_authorized_file(file_id, auth_token, container=None):
             "description": sd.GoneVaultFileDownloadResponse.description,
         })
     return file
+
+
+def decrypt_from_vault(vault_file, path, out_dir=None, delete_encrypted=False):
+    # type: (VaultFile, str, Optional[str], bool) -> str
+    """
+    Decrypts a :term:`Vault` file and removes its encrypted version.
+
+    :param vault_file: Reference file in :term:`Vault`.
+    :param path: Expected location of the encrypted file.
+    :param out_dir: Desired output location, or temporary directory.
+    :param delete_encrypted: Delete original encrypted file after decryption for output.
+    :return: Output location of the decrypted file.
+    """
+    # temp file to hold decrypted contents, but don't deleted here
+    ext = os.path.splitext(path)[-1]
+    with tempfile.NamedTemporaryFile(suffix=ext, mode="w+b", delete=False, dir=out_dir) as out_file:
+        with open(path, "r+b") as vault_fd:
+            data = vault_file.decrypt(vault_fd)
+        out_file.write(data.getbuffer())  # noqa
+        out_file.flush()
+        out_file.seek(0)
+        if delete_encrypted:
+            os.remove(path)
+    return out_file.name

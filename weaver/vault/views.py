@@ -16,7 +16,15 @@ from weaver.formats import get_allowed_extensions
 from weaver.owsexceptions import OWSInvalidParameterValue, OWSMissingParameterValue
 from weaver.store.base import StoreVault
 from weaver.utils import get_file_headers
-from weaver.vault.utils import get_authorized_file, get_vault_auth, get_vault_dir, get_vault_path, get_vault_url
+from weaver.vault.utils import (
+    REGEX_VAULT_FILENAME,
+    decrypt_from_vault,
+    get_authorized_file,
+    get_vault_auth,
+    get_vault_dir,
+    get_vault_path,
+    get_vault_url
+)
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import HTTPHeadFileResponse
 
@@ -28,8 +36,6 @@ if TYPE_CHECKING:
     from webob.compat import cgi_FieldStorage
 
 LOGGER = logging.getLogger(__name__)
-
-FILENAME_REGEX = re.compile(r"^[a-zA-Z0-9](?:[a-zA-Z0-9._-]*[a-zA-Z0-9])?\.[a-zA-Z0-9_-]+$")
 
 
 @sd.vault_service.post(tags=[sd.TAG_VAULT], schema=sd.VaultUploadEndpoint(), response_schemas=sd.post_vault_responses)
@@ -53,7 +59,7 @@ def upload_file(request):
             "description": sd.BadRequestVaultFileUploadResponse.description,
             "error": error,
         })
-    if not re.match(FILENAME_REGEX, req_file.filename):
+    if not re.match(REGEX_VAULT_FILENAME, req_file.filename):
         LOGGER.debug("Invalid filename refused by Vault: [%s]", req_file.filename)
         raise OWSInvalidParameterValue(status=HTTPUnprocessableEntity, json={
             "code": "InvalidParameterValue",
@@ -69,6 +75,7 @@ def upload_file(request):
     vault_fs = LocalFileStorage(vault_dir)
     vault_fs.extensions = get_allowed_extensions()
     try:
+        req_file.file = vault_file.encrypt(req_file.file)
         vault_file.name = vault_fs.save(req_file, folder=str(vault_file.id))
     except FileNotAllowed:
         file_ext = os.path.splitext(req_file.filename)
@@ -101,10 +108,17 @@ def describe_file(request):
     Get authorized vault file details without downloading it.
     """
     file_id, auth = get_vault_auth(request)
-    file = get_authorized_file(file_id, auth, request)
-    path = get_vault_path(file, request)
-    headers = get_file_headers(path, download_headers=True, content_headers=True, content_type=file.format)
-    headers["Content-Location"] = get_vault_url(file, request)
+    vault_file = get_authorized_file(file_id, auth, request)
+    path = get_vault_path(vault_file, request)
+    tmp_file = None
+    try:
+        tmp_file = decrypt_from_vault(vault_file, path, delete_encrypted=False)
+        headers = get_file_headers(tmp_file, download_headers=True,
+                                   content_headers=True, content_type=vault_file.format)
+        headers["Content-Location"] = get_vault_url(vault_file, request)
+    finally:
+        if os.path.isfile(tmp_file):
+            os.remove(tmp_file)
     return HTTPHeadFileResponse(code=200, headers=headers)
 
 
@@ -128,9 +142,10 @@ def download_file(request):
             super().close()
             os.remove(self.file.name)
 
-    request.environ["wsgi.file_wrapper"] = FileIterAndDelete
     path = get_vault_path(vault_file, request)
-    resp = FileResponse(path, request=request)
-    headers = get_file_headers(path, download_headers=True, content_headers=True, content_type=vault_file.format)
+    out_path = decrypt_from_vault(vault_file, path, delete_encrypted=True)
+    headers = get_file_headers(out_path, download_headers=True, content_headers=True, content_type=vault_file.format)
+    request.environ["wsgi.file_wrapper"] = FileIterAndDelete
+    resp = FileResponse(out_path, request=request)
     resp.headers.update(headers)
     return resp

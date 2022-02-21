@@ -1,3 +1,4 @@
+import tempfile
 import uuid
 
 import pytest
@@ -67,3 +68,22 @@ VAULT_FAKE_UUID2 = str(uuid.uuid4())
 def test_parse_vault_token(header, unique, expected):
     result = parse_vault_token(header, unique=unique)
     assert result == expected
+
+
+@pytest.mark.vault
+def test_encrypt_decrypt():
+    vault_file = VaultFile("")
+    assert isinstance(vault_file.secret, bytes) and len(vault_file.secret)
+    data = "SOME DUMMY DATA TO ENCRYPT"
+    with tempfile.NamedTemporaryFile(suffix=".txt", mode="w+") as tmp_file:
+        tmp_file.write(data)
+        enc_file = vault_file.encrypt(tmp_file)
+    enc_file.seek(0)
+    enc_data = enc_file.read()
+    assert isinstance(enc_data, bytes) and len(enc_data)
+    assert enc_data != data
+    dec_file = vault_file.decrypt(enc_file)
+    dec_file.seek(0)
+    dec_data = dec_file.read()
+    assert isinstance(dec_data, bytes) and len(dec_data)
+    assert dec_data.decode("utf-8") == data
