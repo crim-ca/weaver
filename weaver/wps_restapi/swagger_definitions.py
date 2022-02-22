@@ -19,8 +19,8 @@ import os
 from copy import copy
 from typing import TYPE_CHECKING
 
-import yaml
 import duration
+import yaml
 from colander import DateTime, Email, Money, OneOf, Range, Regex, drop, null, required
 from dateutil import parser as date_parser
 

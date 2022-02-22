@@ -236,7 +236,7 @@ class LocalizedDateTimeProperty(property):
 
     def __set_name__(self, owner, name):
         # type: (Any, str) -> None
-        self.name = name
+        self.name = name  # pylint: disable=W0201
 
     def __get__(self, instance, *_):
         # type: (Any, Optional[Any]) -> Optional[datetime]
