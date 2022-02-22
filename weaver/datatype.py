@@ -2229,6 +2229,7 @@ class Quote(Base):
     # pylint: disable=C0103,invalid-name
 
     def __init__(self, *args, **kwargs):
+        # type: (Any, Any) -> None
         """
         Initialize the quote.
 
@@ -2237,14 +2238,7 @@ class Quote(Base):
             at creation since the partial quote definition is needed before it can be processed.
         """
         super(Quote, self).__init__(*args, **kwargs)
-        if "process" not in self:
-            raise TypeError("Field 'Quote.process' is required")
-        if not isinstance(self.get("process"), str):
-            raise ValueError("Field 'Quote.process' must be a string.")
-        if "user" not in self:
-            raise TypeError("Field 'Quote.user' is required")
-        if not isinstance(self.get("user"), str):
-            raise ValueError("Field 'Quote.user' must be a string.")
+        # set defaults
         if "status" not in self:
             self["status"] = QuoteStatus.SUBMITTED
         if "created" not in self:
@@ -2307,6 +2301,13 @@ class Quote(Base):
         """
         return dict.__getitem__(self, "user")
 
+    @user.setter
+    def user(self, user):
+        # type: (Optional[Union[str, int]]) -> None
+        if not isinstance(user, (str, int, type(None))):
+            raise ValueError(f"Field '{self.__name__}.user' must be a string, integer or None.")
+        self["user"] = user
+
     @property
     def process(self):
         # type: () -> str
@@ -2314,6 +2315,13 @@ class Quote(Base):
         Process ID.
         """
         return dict.__getitem__(self, "process")
+
+    @process.setter
+    def process(self, process):
+        # type: (str) -> None
+        if not isinstance(process, str) or not len(process):
+            raise ValueError(f"Field '{self.__name__}.process' must be a string.")
+        self["process"] = process
 
     @property
     def seconds(self):
@@ -2360,7 +2368,7 @@ class Quote(Base):
         This should include minimally the inputs and expected outputs,
         but could be extended as needed with relevant details for quoting algorithm.
         """
-        params = self.pop("processParameters", None)  # backward compatibility
+        params = dict.pop(self, "processParameters", None)  # backward compatibility
         if params and "parameters" not in self:
             self.parameters = params
         params = self.get("parameters", {})
@@ -2369,16 +2377,14 @@ class Quote(Base):
     @parameters.setter
     def parameters(self, data):
         # type: (QuoteProcessParameters) -> None
-        if (
-            not isinstance(data, dict) or
-            not isinstance(data.get("inputs"), list) or
-            not all(isinstance(i, dict) for i in data.get("inputs")) or
-            not isinstance(data.get("outputs"), list) or
-            not all(isinstance(o, dict) for o in data.get("outputs"))
-        ):
+        try:
+            sd.QuoteProcessParameters().deserialize(data)
+        except colander.Invalid:
             LOGGER.error("Invalid process parameters for quote submission.\n%s", repr_json(data, indent=2))
             raise TypeError("Invalid process parameters for quote submission.")
         self["parameters"] = data
+
+    processParameters = parameters  # noqa  # backward compatible alias
 
     @property
     def price(self):

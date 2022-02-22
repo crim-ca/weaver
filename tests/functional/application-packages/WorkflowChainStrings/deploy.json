@@ -1,0 +1,14 @@
+{
+    "processDescription": {
+        "visibility": "public",
+        "id": "WorkflowChainStrings",
+        "title": "Chain two applications that pass a string around.",
+        "version": "0.0.1"
+    },
+    "executionUnit": [
+        {
+            "test": "WorkflowChainStrings.cwl"
+        }
+    ],
+    "deploymentProfileName": "http://www.opengis.net/profiles/eoc/workflow"
+}

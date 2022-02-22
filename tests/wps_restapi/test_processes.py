@@ -19,7 +19,7 @@ from tests import resources
 from tests.utils import (
     get_links,
     get_test_weaver_app,
-    mocked_execute_process,
+    mocked_execute_celery,
     mocked_process_job_runner,
     mocked_process_package,
     mocked_remote_server_requests_wps1,
@@ -1067,7 +1067,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         execute_data["outputs"][0]["transmissionMode"] = ExecuteTransmissionMode.VALUE
         path = "/processes/{}/jobs".format(self.process_public.identifier)
         with contextlib.ExitStack() as stack_exec:
-            for mock_exec in mocked_execute_process():
+            for mock_exec in mocked_execute_celery():
                 stack_exec.enter_context(mock_exec)
             resp = self.app.post_json(path, params=execute_data, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 501

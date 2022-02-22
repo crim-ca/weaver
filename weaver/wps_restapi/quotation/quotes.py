@@ -73,12 +73,14 @@ def request_quote(request):
         })
 
     quote_store = get_db(request).get_store(StoreQuotes)
+    quote_user = request.authenticated_userid
     quote_info = {
         "process": process_id,
         "processParameters": process_params,
-        "user": str(request.authenticated_userid)
+        "user": quote_user
     }
-    quote = quote_store.save_quote(Quote(**quote_info))
+    quote = Quote(**quote_info)
+    quote = quote_store.save_quote(quote)
     mode, wait, applied = parse_prefer_header_execute_mode(request.headers, process.jobControlOptions)
 
     result = process_quote_estimator.delay(quote.id)
@@ -144,7 +146,7 @@ def get_quote_info(request):
         quote = store.fetch_by_id(quote_id)
     except QuoteNotFound:
         raise HTTPNotFound("Could not find quote with specified 'quote_id'.")
-    return HTTPOk(json={"quote": quote.json()})
+    return HTTPOk(json=quote.json())
 
 
 @sd.process_quote_service.post(tags=[sd.TAG_BILL_QUOTE, sd.TAG_EXECUTE, sd.TAG_PROCESSES], renderer=OutputFormat.JSON,

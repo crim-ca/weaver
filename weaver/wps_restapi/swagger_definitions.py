@@ -13,7 +13,6 @@ The definitions are also employed to generate the `OpenAPI` definitions reported
 on `Weaver`'s `ReadTheDocs` page.
 """
 # pylint: disable=C0103,invalid-name
-
 import datetime
 import os
 from copy import copy
@@ -2968,13 +2967,20 @@ class QuoteProcessParameters(PermissiveMappingSchema, ExecuteInputOutputs):
     )
 
 
+class UserIdSchema(OneOfKeywordSchema):
+    _one_of = [
+        ExtendedSchemaNode(String(), missing=drop),
+        ExtendedSchemaNode(Integer(), default=None),
+    ]
+
+
 class StepQuotation(PartialQuoteSchema):
     detail = ExtendedSchemaNode(String(), description="Detail about quote processing.", missing=None)
     price = Price(description="Estimated price for process execution.")
     currency = ExtendedSchemaNode(String(), description="Currency code in ISO-4217 format.", missing=None)
     expire = ExtendedSchemaNode(DateTime(), description="Expiration date and time of the quote in ISO-8601 format.")
     created = ExtendedSchemaNode(DateTime(), description="Creation date and time of the quote in ISO-8601 format.")
-    userID = ExtendedSchemaNode(String(), description="User ID that requested the quote.")
+    userID = UserIdSchema(description="User ID that requested the quote.", missing=required, default=None)
     estimatedTime = Duration(missing=drop,
                              description="Estimated duration of process execution in human-readable format.")
     estimatedSeconds = ExtendedSchemaNode(Integer(), missing=drop,

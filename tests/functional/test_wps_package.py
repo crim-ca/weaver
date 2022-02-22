@@ -28,7 +28,7 @@ from tests.utils import (
     mocked_aws_s3,
     mocked_aws_s3_bucket_test_file,
     mocked_dismiss_process,
-    mocked_execute_process,
+    mocked_execute_celery,
     mocked_file_server,
     mocked_http_file,
     mocked_reference_test_file,
@@ -546,7 +546,7 @@ class WpsPackageAppTest(WpsConfigBase):
             "executionUnit": [{"unit": cwl}],
         }
         with contextlib.ExitStack() as stack_exec:
-            for mock_exec in mocked_execute_process():
+            for mock_exec in mocked_execute_celery():
                 stack_exec.enter_context(mock_exec)
             resp = mocked_sub_requests(self.app, "post_json", "/processes", data=body, timeout=5,
                                        headers=self.json_headers, only_local=True, expect_errors=True)
@@ -594,7 +594,7 @@ class WpsPackageAppTest(WpsConfigBase):
         }
 
         with contextlib.ExitStack() as stack_exec:
-            for mock_exec in mocked_execute_process():
+            for mock_exec in mocked_execute_celery():
                 stack_exec.enter_context(mock_exec)
             resp = mocked_sub_requests(self.app, "post_json", "/processes", data=body, timeout=5,
                                        headers=self.json_headers, only_local=True, expect_errors=True)
@@ -1258,7 +1258,7 @@ class WpsPackageAppTest(WpsConfigBase):
         headers = deepcopy(self.json_headers)
 
         with contextlib.ExitStack() as stack_exec:
-            for mock_exec in mocked_execute_process():
+            for mock_exec in mocked_execute_celery():
                 stack_exec.enter_context(mock_exec)
             proc_url = "/processes/{}/jobs".format(self._testMethodName)
 
@@ -1424,7 +1424,7 @@ class WpsPackageAppTest(WpsConfigBase):
         }
 
         with contextlib.ExitStack() as stack_exec:
-            for mock_exec in mocked_execute_process():
+            for mock_exec in mocked_execute_celery():
                 stack_exec.enter_context(mock_exec)
             proc_url = "/processes/{}/jobs".format(self._testMethodName)
             resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
@@ -1527,7 +1527,7 @@ class WpsPackageAppTest(WpsConfigBase):
         assert desc["process"] is not None
 
         with contextlib.ExitStack() as stack_exec:
-            for mock_exec in mocked_execute_process():
+            for mock_exec in mocked_execute_celery():
                 stack_exec.enter_context(mock_exec)
             tmp_file = stack_exec.enter_context(tempfile.NamedTemporaryFile(mode="w", suffix=".json"))  # noqa
             tmp_file.write(json.dumps({"value": {"ref": 1, "measurement": 10.3, "uom": "m"}}))
@@ -1613,7 +1613,7 @@ class WpsPackageAppTest(WpsConfigBase):
         headers = deepcopy(self.json_headers)
 
         with contextlib.ExitStack() as stack_exec:
-            for mock_exec in mocked_execute_process():
+            for mock_exec in mocked_execute_celery():
                 stack_exec.enter_context(mock_exec)
             proc_url = "/processes/{}/jobs".format(self._testMethodName)
 
@@ -1659,7 +1659,7 @@ class WpsPackageAppTest(WpsConfigBase):
         headers = deepcopy(self.json_headers)
 
         with contextlib.ExitStack() as stack_exec:
-            for mock_exec in mocked_execute_process():
+            for mock_exec in mocked_execute_celery():
                 stack_exec.enter_context(mock_exec)
             tmp_dir = stack_exec.enter_context(tempfile.TemporaryDirectory())
             tmp_file = stack_exec.enter_context(
@@ -1734,10 +1734,10 @@ class WpsPackageAppTest(WpsConfigBase):
         }
 
         with contextlib.ExitStack() as stack_exec:
-            # Because 'mocked_execute_process' is blocking, we cannot dismiss it until it has already completed
+            # Because 'mocked_execute_celery' is blocking, we cannot dismiss it until it has already completed
             # without getting into complex multiprocess queue/wait to preserve sub-request mock context of TestApp.
             # Instead, create a full job, and simulate dismissing it midway after the fact to check result.
-            for mock_exec in mocked_execute_process():
+            for mock_exec in mocked_execute_celery():
                 stack_exec.enter_context(mock_exec)
             mock_del = stack_exec.enter_context(mocked_dismiss_process())
             path = "/processes/{}/jobs".format(self._testMethodName)
@@ -2302,7 +2302,7 @@ class WpsPackageAppWithS3BucketTest(WpsConfigBase):
             ]
         }
         with contextlib.ExitStack() as stack_exec:
-            for mock_exec in mocked_execute_process():
+            for mock_exec in mocked_execute_celery():
                 stack_exec.enter_context(mock_exec)
             proc_url = "/processes/{}/jobs".format(self._testMethodName)
             resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,

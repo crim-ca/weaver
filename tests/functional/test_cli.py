@@ -20,7 +20,7 @@ from tests.functional.utils import WpsConfigBase
 from tests.utils import (
     get_weaver_url,
     mocked_dismiss_process,
-    mocked_execute_process,
+    mocked_execute_celery,
     mocked_sub_requests,
     mocked_wps_output,
     run_command
@@ -254,7 +254,7 @@ class TestWeaverClient(TestWeaverClientBase):
                 mock_exec_func = lambda *_, **__: None  # noqa
             else:
                 mock_exec_func = None
-            for mock_exec_proc in mocked_execute_process(func_execute_process=mock_exec_func):
+            for mock_exec_proc in mocked_execute_celery(func_execute_task=mock_exec_func):
                 stack_exec.enter_context(mock_exec_proc)
             result = mocked_sub_requests(self.app, self.client.execute, self.test_process[process], inputs=inputs_param)
         if expect_success:
@@ -375,7 +375,7 @@ class TestWeaverClient(TestWeaverClientBase):
         Test case where monitoring is accomplished automatically and inline to the execution before result download.
         """
         # FIXME: Properly test execute+monitor,
-        #   Need an actual (longer) async call because 'mocked_execute_process' blocks until complete.
+        #   Need an actual (longer) async call because 'mocked_execute_celery' blocks until complete.
         #   Therefore, no pooling monitoring actually occurs (only single get status with final result).
         #   Test should wrap 'get_job' in 'get_job_status' view (or similar wrapping approach) to validate that
         #   status was periodically pooled and returned 'running' until the final 'succeeded' resumes to download.
@@ -637,7 +637,7 @@ class TestWeaverCLI(TestWeaverClientBase):
         """
         proc = self.test_process["Echo"]
         with contextlib.ExitStack() as stack_exec:
-            for mock_exec_proc in mocked_execute_process():
+            for mock_exec_proc in mocked_execute_celery():
                 stack_exec.enter_context(mock_exec_proc)
             lines = mocked_sub_requests(
                 self.app, run_command,
@@ -660,7 +660,7 @@ class TestWeaverCLI(TestWeaverClientBase):
     def test_execute_manual_monitor(self):
         proc = self.test_process["Echo"]
         with contextlib.ExitStack() as stack_exec:
-            for mock_exec_proc in mocked_execute_process():
+            for mock_exec_proc in mocked_execute_celery():
                 stack_exec.enter_context(mock_exec_proc)
 
             lines = mocked_sub_requests(
@@ -706,7 +706,7 @@ class TestWeaverCLI(TestWeaverClientBase):
     def test_execute_auto_monitor(self):
         proc = self.test_process["Echo"]
         with contextlib.ExitStack() as stack_exec:
-            for mock_exec_proc in mocked_execute_process():
+            for mock_exec_proc in mocked_execute_celery():
                 stack_exec.enter_context(mock_exec_proc)
 
             lines = mocked_sub_requests(

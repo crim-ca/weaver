@@ -76,7 +76,11 @@ class WpsConfigBase(unittest.TestCase):
         :returns: resulting tuple of ``(process-description, package)`` JSON responses.
         """
         if process_id:
-            payload["processDescription"]["process"]["id"] = process_id  # type: ignore
+            if "process" in payload["processDescription"]:
+                proc_desc = payload["processDescription"]["process"]
+            else:
+                proc_desc = payload["processDescription"]
+            proc_desc["id"] = process_id  # type: ignore
         exec_list = payload.get("executionUnit", [])
         if len(exec_list):
             # test-only feature:
