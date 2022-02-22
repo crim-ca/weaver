@@ -12,7 +12,18 @@ Changes
 
 Changes:
 --------
-- No change.
+- Updates related to |ogc-api-proc-quote|_.
+- Move estimator portion of the quoting operation into separate files and bind them with `Celery` task to allow the
+  same kind of dispatched processing as normal `Process` execution.
+- Update `Quote` data type to contain status similarly to `Job` considering dispatched ``async`` processing.
+- Define ``LocalizedDateTimeProperty`` for reuse by data types avoiding issues about handling datetime localization.
+- Update OpenAPI schemas regarding `Quote` (partial/complete) and other datetime related fields.
+- Add parsing of ``Prefer`` header allowing ``sync`` processing
+  (relates to `#247 <https://github.com/crim-ca/weaver/issues/247>`_).
+  This is not yet integrated for `Jobs` execution themselves on ``processes/{id}/execution`` endpoint.
+
+.. |ogc-api-proc-quote| replace:: `OGC API - Processes`: Quotation Extension
+.. _ogc-api-proc-quote: https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/quotation
 
 Fixes:
 ------
