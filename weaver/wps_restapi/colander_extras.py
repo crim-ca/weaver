@@ -61,9 +61,13 @@ import colander
 from cornice_swagger.converters.exceptions import ConversionError, NoSuchConverter
 from cornice_swagger.converters.schema import (
     STRING_FORMATTERS,
+    NumberTypeConverter,
     ObjectTypeConverter,
     TypeConversionDispatcher,
-    TypeConverter
+    TypeConverter,
+    ValidatorConversionDispatcher,
+    convert_range_validator,
+    convert_regex_validator
 )
 
 if TYPE_CHECKING:
@@ -1972,6 +1976,18 @@ class VariableObjectTypeConverter(ObjectTypeConverter):
         return converted
 
 
+class DecimalTypeConverter(NumberTypeConverter):
+    format = "decimal"
+
+
+class MoneyTypeConverter(DecimalTypeConverter):
+    pattern = "^[0-9]+.[0-9]{2}$"
+    convert_validator = ValidatorConversionDispatcher(
+        convert_range_validator(colander.Range(min=0)),
+        convert_regex_validator(colander.Regex(pattern, msg="Number must be formatted as currency decimal."))
+    )
+
+
 # TODO: replace directly in original cornice_swagger
 #  (see: https://github.com/Cornices/cornice.ext.swagger/issues/133)
 class OAS3TypeConversionDispatcher(TypeConversionDispatcher):
@@ -1994,7 +2010,9 @@ class OAS3TypeConversionDispatcher(TypeConversionDispatcher):
         #   when merging in original cornice_swagger, it should be the 'default' behaviour of object converter
         #   user custom converters can override everything, but they must use extended classes to use extra features
         extended_converters = {
-            colander.Mapping: VariableObjectTypeConverter
+            colander.Mapping: VariableObjectTypeConverter,
+            colander.Decimal: DecimalTypeConverter,
+            colander.Money: MoneyTypeConverter,
         }
         extended_converters.update(self.keyword_converters)
         if custom_converters:
@@ -2038,7 +2056,7 @@ class OAS3TypeConversionDispatcher(TypeConversionDispatcher):
                 elif self.default_converter:
                     converter_class = self.default_converter
                 else:
-                    raise NoSuchConverter
+                    raise NoSuchConverter(f"schema_type: {schema_type}")
 
         converter = converter_class(self)
         converted = converter(schema_node)  # noqa
