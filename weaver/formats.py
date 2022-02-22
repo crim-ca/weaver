@@ -41,27 +41,33 @@ class ContentType(Constants):
 
     APP_CWL = "application/x-cwl"
     APP_FORM = "application/x-www-form-urlencoded"
-    APP_NETCDF = "application/x-netcdf"
+    APP_GEOJSON = "application/geo+json"
     APP_GZIP = "application/gzip"
     APP_HDF5 = "application/x-hdf5"
+    APP_JSON = "application/json"
+    APP_NETCDF = "application/x-netcdf"
     APP_OCTET_STREAM = "application/octet-stream"
+    APP_PDF = "application/pdf"
     APP_TAR = "application/x-tar"          # map to existing gzip for CWL
     APP_TAR_GZ = "application/tar+gzip"    # map to existing gzip for CWL
-    APP_YAML = "application/x-yaml"
-    APP_ZIP = "application/zip"
-    TEXT_HTML = "text/html"
-    TEXT_PLAIN = "text/plain"
-    APP_PDF = "application/pdf"
-    APP_JSON = "application/json"
-    APP_GEOJSON = "application/geo+json"
     APP_VDN_GEOJSON = "application/vnd.geo+json"
     APP_XML = "application/xml"
+    APP_YAML = "application/x-yaml"
+    APP_ZIP = "application/zip"
     IMAGE_GEOTIFF = "image/tiff; subtype=geotiff"
     IMAGE_JPEG = "image/jpeg"
+    IMAGE_GIF = "image/gif"
     IMAGE_PNG = "image/png"
     IMAGE_TIFF = "image/tiff"
     MULTI_PART_FORM = "multipart/form-data"
+    TEXT_ENRICHED = "text/enriched"
+    TEXT_HTML = "text/html"
+    TEXT_PLAIN = "text/plain"
+    TEXT_RICHTEXT = "text/richtext"
     TEXT_XML = "text/xml"
+    VIDEO_MPEG = "video/mpeg"
+
+    # special handling
     ANY_XML = {APP_XML, TEXT_XML}
     ANY = "*/*"
 
@@ -193,12 +199,27 @@ _CONTENT_TYPE_SYNONYM_MAPPING = {
 #   - EDAM-classes: http://bioportal.bioontology.org/ontologies/EDAM/?p=classes (section 'Format')
 #   - EDAM-browser: https://ifb-elixirfr.github.io/edam-browser/
 IANA_NAMESPACE = "iana"
-IANA_NAMESPACE_DEFINITION = {IANA_NAMESPACE: "https://www.iana.org/assignments/media-types/"}
+IANA_NAMESPACE_URL = "https://www.iana.org/assignments/media-types/"
+IANA_NAMESPACE_DEFINITION = {IANA_NAMESPACE: IANA_NAMESPACE_URL}
+# Generic entries in IANA Media-Type namespace registry that don't have an explicit endpoint,
+# but are defined regardless. Avoid unnecessary HTTP NotFound toward those missing endpoints.
+# (see items that don't have a link in 'Template' column in lists under 'IANA_NAMESPACE_URL')
+IANA_KNOWN_MEDIA_TYPES = {
+    ContentType.IMAGE_JPEG,
+    ContentType.IMAGE_GIF,
+    ContentType.TEXT_ENRICHED,
+    ContentType.TEXT_PLAIN,
+    ContentType.TEXT_RICHTEXT,
+    ContentType.VIDEO_MPEG,
+}
 EDAM_NAMESPACE = "edam"
-EDAM_NAMESPACE_DEFINITION = {EDAM_NAMESPACE: "http://edamontology.org/"}
+EDAM_NAMESPACE_URL = "http://edamontology.org/"
+EDAM_NAMESPACE_DEFINITION = {EDAM_NAMESPACE: EDAM_NAMESPACE_URL}
 EDAM_SCHEMA = "http://edamontology.org/EDAM_1.24.owl"
 EDAM_MAPPING = {
     ContentType.APP_CWL: "format_3857",
+    ContentType.IMAGE_GIF: "format_3467",
+    ContentType.IMAGE_JPEG: "format_3579",
     ContentType.APP_HDF5: "format_3590",
     ContentType.APP_JSON: "format_3464",
     ContentType.APP_NETCDF: "format_3650",
@@ -344,15 +365,22 @@ def get_cwl_file_format(mime_type, make_reference=False, must_exist=True, allow_
     :returns: Resolved MIME-type format for `CWL` usage, accordingly to specified arguments (see description details).
     """
     def _make_if_ref(_map, _key, _fmt):
+        # type: (Dict[str, str], str, str) -> Union[Tuple[Optional[JSON], Optional[str]], Optional[str]]
         return os.path.join(_map[_key], _fmt) if make_reference else (_map, "{}:{}".format(_key, _fmt))
 
     def _request_extra_various(_mime_type):
+        # type: (str) -> Union[Tuple[Optional[JSON], Optional[str]], Optional[str]]
         """
         Attempts multiple request-retry variants to be as permissive as possible to sporadic/temporary failures.
         """
         from weaver.utils import request_extra
 
         _mime_type_url = "{}{}".format(IANA_NAMESPACE_DEFINITION[IANA_NAMESPACE], _mime_type)
+        if _mime_type in IANA_KNOWN_MEDIA_TYPES:  # avoid HTTP NotFound
+            if _mime_type in EDAM_MAPPING:  # prefer real reference if available
+                return _make_if_ref(EDAM_NAMESPACE_DEFINITION, EDAM_NAMESPACE, EDAM_MAPPING[_mime_type])
+            return _make_if_ref(IANA_NAMESPACE_DEFINITION, IANA_NAMESPACE, _mime_type)
+
         retries = 3
         try:
             resp = request_extra("head", _mime_type_url, retries=retries, timeout=2,

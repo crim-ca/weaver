@@ -12,12 +12,29 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_4.10.0:
+
+`4.10.0 <https://github.com/crim-ca/weaver/tree/4.10.0>`_ (2022-02-22)
+========================================================================
+
+Changes:
+--------
 - Refactor all constants of similar concept into classes to facilitate reuse and avoid omitting entries when iterating
   over all members of a corresponding constant group (fixes `#33 <https://github.com/crim-ca/weaver/issues/33>`_).
 
 Fixes:
 ------
-- No change.
+- Fix resolution of common IANA Media-Types (e.g.: ``text/plain``, ``image/jpeg``, etc.) that technically do not provide
+  and explicit entry when accessing the namespace (i.e.: ``{IANA_NAMESPACE_URL}/{mediaType}``), but are known in IANA
+  registry through various RFC specifications. The missing endpoints caused many recurring and unnecessary HTTP 404 that
+  needed a second validation against EDAM namespace each time. These common Media-Types, along with new definitions in
+  ``weaver.formats``, will immediately return a IANA/EDAM references without explicit validation on their registries.
 
 .. _changes_4.9.1:
 
