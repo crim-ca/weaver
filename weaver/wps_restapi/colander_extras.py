@@ -437,7 +437,7 @@ class ExtendedSchemaBase(colander.SchemaNode, metaclass=ExtendedSchemaMeta):
                 title = self.title
             else:
                 title = kwargs.get("title", schema_name)
-            # pylint: disable=no-member
+            # pylint: disable=no-member  # prefix added by XMLObject
             if self.prefix is not colander.drop:
                 title = "{}:{}".format(self.prefix or "xml", title)
             kwargs["title"] = title

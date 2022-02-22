@@ -26,8 +26,8 @@ from tests.utils import (
     run_command
 )
 from weaver.cli import WeaverClient, main as weaver_cli
-from weaver.formats import CONTENT_TYPE_TEXT_PLAIN
-from weaver.status import STATUS_ACCEPTED, STATUS_FAILED, STATUS_RUNNING, STATUS_SUCCEEDED
+from weaver.formats import ContentType
+from weaver.status import Status
 from weaver.wps.utils import map_wps_output_location
 
 if TYPE_CHECKING:
@@ -237,7 +237,7 @@ class TestWeaverClient(TestWeaverClientBase):
         assert "output" in result.body["outputs"]
         assert result.body["outputs"]["output"]["title"] == "output"
         assert result.body["outputs"]["output"]["description"] == "Output file with echo message."
-        assert result.body["outputs"]["output"]["formats"] == [{"default": True, "mediaType": CONTENT_TYPE_TEXT_PLAIN}]
+        assert result.body["outputs"]["output"]["formats"] == [{"default": True, "mediaType": ContentType.TEXT_PLAIN}]
         assert "undefined" not in result.message, "CLI should not have confused process description as response detail."
         assert "description" not in result.body, "CLI should not have overridden the process description field."
 
@@ -264,7 +264,7 @@ class TestWeaverClient(TestWeaverClientBase):
             assert "status" in result.body
             assert "location" in result.body
             assert result.body["processID"] == self.test_process[process]
-            assert result.body["status"] == STATUS_ACCEPTED
+            assert result.body["status"] == Status.ACCEPTED
             assert result.body["location"] == result.headers["Location"]
             assert "undefined" not in result.message
         else:
@@ -332,7 +332,7 @@ class TestWeaverClient(TestWeaverClientBase):
         result = mocked_sub_requests(self.app, self.client.monitor, job_id, timeout=1, interval=1)
         assert result.success, result.text
         assert "undefined" not in result.message
-        assert result.body.get("status") == STATUS_SUCCEEDED
+        assert result.body.get("status") == Status.SUCCEEDED
         links = result.body.get("links")
         assert isinstance(links, list)
         assert len(list(filter(lambda _link: _link["rel"].endswith("results"), links))) == 1
@@ -445,7 +445,7 @@ class TestWeaverClient(TestWeaverClientBase):
 
     @mocked_dismiss_process()
     def test_dismiss(self):
-        for status in [STATUS_ACCEPTED, STATUS_FAILED, STATUS_RUNNING, STATUS_SUCCEEDED]:
+        for status in [Status.ACCEPTED, Status.FAILED, Status.RUNNING, Status.SUCCEEDED]:
             proc = self.test_process["Echo"]
             job = self.job_store.save_job(task_id="12345678-1111-2222-3333-111122223333", process=proc)
             job.status = status
@@ -655,7 +655,7 @@ class TestWeaverCLI(TestWeaverClientBase):
                 entrypoint=weaver_cli,
                 only_local=True,
             )
-            assert any(f"\"status\": \"{STATUS_SUCCEEDED}\"" in line for line in lines)
+            assert any(f"\"status\": \"{Status.SUCCEEDED}\"" in line for line in lines)
 
     def test_execute_manual_monitor(self):
         proc = self.test_process["Echo"]
@@ -699,7 +699,7 @@ class TestWeaverCLI(TestWeaverClientBase):
             )
 
             assert any(f"\"jobID\": \"{job_id}\"" in line for line in lines)
-            assert any(f"\"status\": \"{STATUS_SUCCEEDED}\"" in line for line in lines)
+            assert any(f"\"status\": \"{Status.SUCCEEDED}\"" in line for line in lines)
             assert any(f"\"href\": \"{job_ref}/results\"" in line for line in lines)
             assert any("\"rel\": \"http://www.opengis.net/def/rel/ogc/1.0/results\"" in line for line in lines)
 
@@ -726,7 +726,7 @@ class TestWeaverCLI(TestWeaverClientBase):
                 only_local=True,
             )
             assert any("\"jobID\": \"" in line for line in lines)  # don't care value, self-handled
-            assert any(f"\"status\": \"{STATUS_SUCCEEDED}\"" in line for line in lines)
+            assert any(f"\"status\": \"{Status.SUCCEEDED}\"" in line for line in lines)
             assert any("\"rel\": \"http://www.opengis.net/def/rel/ogc/1.0/results\"" in line for line in lines)
 
     def test_execute_help_details(self):

@@ -15,15 +15,10 @@ from tests.utils import (
     setup_mongodb_processstore,
     setup_mongodb_servicestore
 )
-from weaver.config import WEAVER_CONFIGURATION_HYBRID
-from weaver.execute import (
-    EXECUTE_CONTROL_OPTION_ASYNC,
-    EXECUTE_MODE_ASYNC,
-    EXECUTE_RESPONSE_DOCUMENT,
-    EXECUTE_TRANSMISSION_MODE_REFERENCE
-)
-from weaver.formats import CONTENT_TYPE_APP_NETCDF, CONTENT_TYPE_TEXT_PLAIN, CONTENT_TYPE_TEXT_XML
-from weaver.processes.types import PROCESS_WPS_REMOTE
+from weaver.config import WeaverConfiguration
+from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
+from weaver.formats import ContentType
+from weaver.processes.types import ProcessType
 from weaver.processes.wps1_process import Wps1Process
 
 if TYPE_CHECKING:
@@ -37,7 +32,7 @@ if TYPE_CHECKING:
 class WpsProviderTest(WpsConfigBase):
     settings = {
         # NOTE: important otherwise cannot execute "remote" provider (default local only)
-        "weaver.configuration": WEAVER_CONFIGURATION_HYBRID,
+        "weaver.configuration": WeaverConfiguration.HYBRID,
         "weaver.wps_output_dir": "/tmp",  # nosec: B108 # don't care hardcoded for test
         "weaver.wps_output_url": resources.TEST_REMOTE_SERVER_URL + "/wps-outputs"
     }
@@ -122,7 +117,7 @@ class WpsProviderTest(WpsConfigBase):
         body = resp.json
         assert "id" in body and body["id"] == remote_provider_name
         assert "hummingbird" in body["title"].lower()
-        assert body["type"] == PROCESS_WPS_REMOTE
+        assert body["type"] == ProcessType.WPS_REMOTE
 
         # validate processes capabilities
         path = "/providers/{}/processes".format(remote_provider_name)
@@ -137,7 +132,7 @@ class WpsProviderTest(WpsConfigBase):
         assert processes["ncdump"]["metadata"][1]["rel"] == "user-guide"
         # keyword 'Hummingbird' in this case is from GetCapabilities ProviderName
         # keyword of the service name within Weaver is also provided, which can be different than provider
-        expect_keywords = [PROCESS_WPS_REMOTE, "Hummingbird", remote_provider_name]
+        expect_keywords = [ProcessType.WPS_REMOTE, "Hummingbird", remote_provider_name]
         assert all(key in processes["ncdump"]["keywords"] for key in expect_keywords)
         proc_desc_url = processes["ncdump"]["processDescriptionURL"]
         proc_wps1_url = processes["ncdump"]["processEndpointWPS1"]
@@ -159,7 +154,7 @@ class WpsProviderTest(WpsConfigBase):
         assert len(body["inputs"]["dataset"]["formats"]) == 1
         assert body["inputs"]["dataset"]["formats"][0]["default"] is True
         assert "literalDataDomains" not in body["inputs"]["dataset"]
-        assert body["inputs"]["dataset"]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_NETCDF
+        assert body["inputs"]["dataset"]["formats"][0]["mediaType"] == ContentType.APP_NETCDF
         assert body["inputs"]["dataset_opendap"]["minOccurs"] == 0
         assert body["inputs"]["dataset_opendap"]["maxOccurs"] == 100
         assert "formats" not in body["inputs"]["dataset_opendap"]
@@ -174,7 +169,7 @@ class WpsProviderTest(WpsConfigBase):
         assert "formats" in body["outputs"]["output"]
         assert len(body["outputs"]["output"]["formats"]) == 1
         assert body["outputs"]["output"]["formats"][0]["default"] is True
-        assert body["outputs"]["output"]["formats"][0]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert body["outputs"]["output"]["formats"][0]["mediaType"] == ContentType.TEXT_PLAIN
         assert "literalDataDomains" not in body["outputs"]["output"]
 
         assert body["processDescriptionURL"] == proc_desc_url
@@ -191,8 +186,8 @@ class WpsProviderTest(WpsConfigBase):
         assert "DescribeProcess" in links["process-desc"]
         assert "GetCapabilities" in links["service-desc"]
 
-        assert EXECUTE_CONTROL_OPTION_ASYNC in body["jobControlOptions"]
-        assert EXECUTE_TRANSMISSION_MODE_REFERENCE in body["outputTransmission"]
+        assert ExecuteControlOption.ASYNC in body["jobControlOptions"]
+        assert ExecuteTransmissionMode.REFERENCE in body["outputTransmission"]
 
         # validate execution submission
         # (don't actually execute because server is mocked, only validate parsing of I/O and job creation)
@@ -200,10 +195,10 @@ class WpsProviderTest(WpsConfigBase):
         # first setup all expected contents and files
         exec_file = "http://localhost.com/dont/care.nc"
         exec_body = {
-            "mode": EXECUTE_MODE_ASYNC,
-            "response": EXECUTE_RESPONSE_DOCUMENT,
+            "mode": ExecuteMode.ASYNC,
+            "response": ExecuteResponse.DOCUMENT,
             "inputs": [{"id": "dataset", "href": exec_file}],
-            "outputs": [{"id": "output", "transmissionMode": EXECUTE_TRANSMISSION_MODE_REFERENCE}]
+            "outputs": [{"id": "output", "transmissionMode": ExecuteTransmissionMode.REFERENCE}]
         }
         status_url = resources.TEST_REMOTE_SERVER_URL + "/status.xml"
         output_url = resources.TEST_REMOTE_SERVER_URL + "/output.txt"
@@ -214,17 +209,17 @@ class WpsProviderTest(WpsConfigBase):
                 OUTPUT_FILE=output_url,
             )
 
-        xml_headers = {"Content-Type": CONTENT_TYPE_TEXT_XML}
+        xml_headers = {"Content-Type": ContentType.TEXT_XML}
         ncdump_data = "Fake NetCDF Data"
         with contextlib.ExitStack() as stack_exec:
             # mock direct execution bypassing celery
             for mock_exec in mocked_execute_process():
                 stack_exec.enter_context(mock_exec)
             # mock responses expected by "remote" WPS-1 Execute request and relevant documents
-            mock_responses.add("GET", exec_file, body=ncdump_data, headers={"Content-Type": CONTENT_TYPE_APP_NETCDF})
+            mock_responses.add("GET", exec_file, body=ncdump_data, headers={"Content-Type": ContentType.APP_NETCDF})
             mock_responses.add("POST", resources.TEST_REMOTE_SERVER_URL, body=status, headers=xml_headers)
             mock_responses.add("GET", status_url, body=status, headers=xml_headers)
-            mock_responses.add("GET", output_url, body=ncdump_data, headers={"Content-Type": CONTENT_TYPE_TEXT_PLAIN})
+            mock_responses.add("GET", output_url, body=ncdump_data, headers={"Content-Type": ContentType.TEXT_PLAIN})
 
             # add reference to specific provider execute class to validate it was called
             # (whole procedure must run even though a lot of parts are mocked)
@@ -245,7 +240,7 @@ class WpsProviderTest(WpsConfigBase):
             results = self.monitor_job(status_url)
             output_url = "{}/{}/{}".format(self.settings["weaver.wps_output_url"], job_id, "output.txt")
             output_path = "{}/{}/{}".format(self.settings["weaver.wps_output_dir"], job_id, "output.txt")
-            assert results["output"]["format"]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
+            assert results["output"]["format"]["mediaType"] == ContentType.TEXT_PLAIN
             assert results["output"]["href"] == output_url
             with open(output_path) as out_file:
                 data = out_file.read()

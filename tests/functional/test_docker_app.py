@@ -8,8 +8,8 @@ from owslib.wps import ComplexDataInput, WPSExecution
 from tests.functional.utils import WpsConfigBase
 from tests.utils import mocked_execute_process, mocked_sub_requests, mocked_wps_output
 from weaver import WEAVER_ROOT_DIR, xml_util
-from weaver.execute import EXECUTE_MODE_ASYNC, EXECUTE_RESPONSE_DOCUMENT, EXECUTE_TRANSMISSION_MODE_REFERENCE
-from weaver.formats import CONTENT_TYPE_ANY_XML, CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML, CONTENT_TYPE_TEXT_PLAIN
+from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
+from weaver.formats import ContentType
 from weaver.processes.wps_package import CWL_REQUIREMENT_APP_DOCKER
 from weaver.utils import fetch_file, get_any_value, load_file, str2bytes
 from weaver.wps.utils import get_wps_url
@@ -142,13 +142,13 @@ class WpsPackageDockerAppTest(WpsConfigBase):
             tmp_file.write(test_content)
             tmp_file.seek(0)
             exec_body = {
-                "mode": EXECUTE_MODE_ASYNC,
-                "response": EXECUTE_RESPONSE_DOCUMENT,
+                "mode": ExecuteMode.ASYNC,
+                "response": ExecuteResponse.DOCUMENT,
                 "inputs": [
                     {"id": "file", "href": tmp_file.name},
                 ],
                 "outputs": [
-                    {"id": self.out_key, "transmissionMode": EXECUTE_TRANSMISSION_MODE_REFERENCE},
+                    {"id": self.out_key, "transmissionMode": ExecuteTransmissionMode.REFERENCE},
                 ]
             }
             for mock_exec in mocked_execute_process():
@@ -191,7 +191,7 @@ class WpsPackageDockerAppTest(WpsConfigBase):
 
             # execute
             if version == "1.0.0":
-                wps_inputs = ["file={}@mimeType={}".format(tmp_file.name, CONTENT_TYPE_TEXT_PLAIN)]
+                wps_inputs = ["file={}@mimeType={}".format(tmp_file.name, ContentType.TEXT_PLAIN)]
                 wps_params = {
                     "service": "WPS",
                     "request": "Execute",
@@ -202,12 +202,12 @@ class WpsPackageDockerAppTest(WpsConfigBase):
                 wps_headers = {"Accept": accept}
                 wps_data = None
             else:
-                wps_inputs = [("file", ComplexDataInput(tmp_file.name, mimeType=CONTENT_TYPE_TEXT_PLAIN))]
+                wps_inputs = [("file", ComplexDataInput(tmp_file.name, mimeType=ContentType.TEXT_PLAIN))]
                 wps_outputs = [(self.out_key, True)]  # as reference
                 wps_exec = WPSExecution(version=version, url=wps_url)
                 wps_req = wps_exec.buildRequest(self.process_id, wps_inputs, wps_outputs)
                 wps_data = xml_util.tostring(wps_req)
-                wps_headers = {"Accept": accept, "Content-Type": CONTENT_TYPE_APP_XML}
+                wps_headers = {"Accept": accept, "Content-Type": ContentType.APP_XML}
                 wps_params = None
             resp = mocked_sub_requests(self.app, wps_method, wps_url,
                                        params=wps_params, data=wps_data, headers=wps_headers, only_local=True)
@@ -216,19 +216,19 @@ class WpsPackageDockerAppTest(WpsConfigBase):
             )
 
             # parse response status
-            if accept == CONTENT_TYPE_APP_XML:
-                assert resp.content_type in CONTENT_TYPE_ANY_XML, test_content
+            if accept == ContentType.APP_XML:
+                assert resp.content_type in ContentType.ANY_XML, test_content
                 xml_body = xml_util.fromstring(str2bytes(resp.text))
                 status_url = xml_body.get("statusLocation")
                 job_id = status_url.split("/")[-1].split(".")[0]
-            elif accept == CONTENT_TYPE_APP_JSON:
-                assert resp.content_type == CONTENT_TYPE_APP_JSON, test_content
+            elif accept == ContentType.APP_JSON:
+                assert resp.content_type == ContentType.APP_JSON, test_content
                 status_url = resp.json["location"]
                 job_id = resp.json["jobID"]
             assert status_url
             assert job_id
 
-            if accept == CONTENT_TYPE_APP_XML:
+            if accept == ContentType.APP_XML:
                 wps_out_url = self.settings["weaver.wps_output_url"]
                 weaver_url = self.settings["weaver.url"]
                 assert status_url == f"{wps_out_url}/{job_id}.xml", "Status URL should be XML file for WPS-1 request"
@@ -260,7 +260,7 @@ class WpsPackageDockerAppTest(WpsConfigBase):
             - :meth:`test_execute_wps_xml_post_resp_xml`
             - :meth:`test_execute_wps_xml_post_resp_json`
         """
-        self.wps_execute("1.0.0", CONTENT_TYPE_APP_XML)
+        self.wps_execute("1.0.0", ContentType.APP_XML)
 
     def test_execute_wps_kvp_get_resp_json(self):
         """
@@ -275,7 +275,7 @@ class WpsPackageDockerAppTest(WpsConfigBase):
             - :meth:`test_execute_wps_xml_post_resp_xml`
             - :meth:`test_execute_wps_xml_post_resp_json`
         """
-        self.wps_execute("1.0.0", CONTENT_TYPE_APP_JSON)
+        self.wps_execute("1.0.0", ContentType.APP_JSON)
 
     def test_execute_wps_xml_post_resp_xml(self):
         """
@@ -289,7 +289,7 @@ class WpsPackageDockerAppTest(WpsConfigBase):
             - :meth:`test_execute_wps_kvp_get_resp_json`
             - :meth:`test_execute_wps_xml_post_resp_json`
         """
-        self.wps_execute("2.0.0", CONTENT_TYPE_APP_XML)
+        self.wps_execute("2.0.0", ContentType.APP_XML)
 
     def test_execute_wps_xml_post_resp_json(self):
         """
@@ -304,7 +304,7 @@ class WpsPackageDockerAppTest(WpsConfigBase):
             - :meth:`test_execute_wps_kvp_get_resp_json`
             - :meth:`test_execute_wps_xml_post_resp_json`
         """
-        self.wps_execute("2.0.0", CONTENT_TYPE_APP_JSON)
+        self.wps_execute("2.0.0", ContentType.APP_JSON)
 
     def test_execute_docker_embedded_python_script(self):
         test_proc = "test-docker-python-script"
@@ -328,14 +328,14 @@ class WpsPackageDockerAppTest(WpsConfigBase):
             cost = 2.45
             amount = 3
             body = {
-                "mode": EXECUTE_MODE_ASYNC,
-                "response": EXECUTE_RESPONSE_DOCUMENT,
+                "mode": ExecuteMode.ASYNC,
+                "response": ExecuteResponse.DOCUMENT,
                 "inputs": [
                     {"id": "amount", "value": amount},
                     {"id": "cost", "value": cost}
                 ],
                 "outputs": [
-                    {"id": "quote", "transmissionMode": EXECUTE_TRANSMISSION_MODE_REFERENCE},
+                    {"id": "quote", "transmissionMode": ExecuteTransmissionMode.REFERENCE},
                 ]
             }
             resp = mocked_sub_requests(self.app, "POST", path, json=body, headers=self.json_headers, only_local=True)

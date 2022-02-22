@@ -4,14 +4,14 @@ from pyramid.httpexceptions import HTTPNotFound, HTTPOk
 
 from weaver.database import get_db
 from weaver.exceptions import BillNotFound, log_unhandled_exceptions
-from weaver.formats import OUTPUT_FORMAT_JSON
+from weaver.formats import OutputFormat
 from weaver.store.base import StoreBills
 from weaver.wps_restapi import swagger_definitions as sd
 
 LOGGER = logging.getLogger(__name__)
 
 
-@sd.bills_service.get(tags=[sd.TAG_BILL_QUOTE], renderer=OUTPUT_FORMAT_JSON,
+@sd.bills_service.get(tags=[sd.TAG_BILL_QUOTE], renderer=OutputFormat.JSON,
                       schema=sd.BillsEndpoint(), response_schemas=sd.get_bill_list_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_bill_list(request):
@@ -23,7 +23,7 @@ def get_bill_list(request):
     return HTTPOk(json={"bills": [b.id for b in bills]})
 
 
-@sd.bill_service.get(tags=[sd.TAG_BILL_QUOTE], renderer=OUTPUT_FORMAT_JSON,
+@sd.bill_service.get(tags=[sd.TAG_BILL_QUOTE], renderer=OutputFormat.JSON,
                      schema=sd.BillEndpoint(), response_schemas=sd.get_bill_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_bill_info(request):

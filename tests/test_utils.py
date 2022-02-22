@@ -29,8 +29,9 @@ from requests import Response
 from requests.exceptions import HTTPError as RequestsHTTPError
 
 from tests.utils import mocked_aws_credentials, mocked_aws_s3, mocked_aws_s3_bucket_test_file, mocked_file_response
-from weaver import status, xml_util
-from weaver.formats import CONTENT_TYPE_APP_JSON
+from weaver import xml_util
+from weaver.formats import ContentType
+from weaver.status import JOB_STATUS_CATEGORIES, STATUS_PYWPS_IDS, STATUS_PYWPS_MAP, Status, StatusCompliant, map_status
 from weaver.utils import (
     NullType,
     assert_sane_name,
@@ -247,41 +248,40 @@ def get_status_variations(status_value):
 
 
 def test_map_status_ogc_compliant():
-    for sv in status.JOB_STATUS_VALUES:
+    known_statuses = set(Status.values()) - {Status.UNKNOWN}
+    for sv in known_statuses:
         for s in get_status_variations(sv):
-            assert status.map_status(s, status.STATUS_COMPLIANT_OGC) in \
-                   status.JOB_STATUS_CATEGORIES[status.STATUS_COMPLIANT_OGC]
+            assert map_status(s, StatusCompliant.OGC) in JOB_STATUS_CATEGORIES[StatusCompliant.OGC]
 
 
 def test_map_status_pywps_compliant():
-    for sv in status.JOB_STATUS_VALUES:
+    known_statuses = set(Status.values()) - {Status.UNKNOWN}
+    for sv in known_statuses:
         for s in get_status_variations(sv):
-            assert status.map_status(s, status.STATUS_COMPLIANT_PYWPS) in \
-                   status.JOB_STATUS_CATEGORIES[status.STATUS_COMPLIANT_PYWPS]
+            assert map_status(s, StatusCompliant.PYWPS) in JOB_STATUS_CATEGORIES[StatusCompliant.PYWPS]
 
 
 def test_map_status_owslib_compliant():
-    for sv in status.JOB_STATUS_VALUES:
+    known_statuses = set(Status.values()) - {Status.UNKNOWN}
+    for sv in known_statuses:
         for s in get_status_variations(sv):
-            assert status.map_status(s, status.STATUS_COMPLIANT_OWSLIB) in \
-                   status.JOB_STATUS_CATEGORIES[status.STATUS_COMPLIANT_OWSLIB]
+            assert map_status(s, StatusCompliant.OWSLIB) in JOB_STATUS_CATEGORIES[StatusCompliant.OWSLIB]
 
 
 def test_map_status_back_compatibility_and_special_cases():
-    for c in [status.STATUS_COMPLIANT_OGC, status.STATUS_COMPLIANT_PYWPS, status.STATUS_COMPLIANT_OWSLIB]:
-        assert status.map_status("successful", c) == status.STATUS_SUCCEEDED
+    for c in StatusCompliant:
+        assert map_status("successful", c) == Status.SUCCEEDED
 
 
 def test_map_status_pywps_compliant_as_int_statuses():
     for s in range(len(WPS_STATUS)):
-        if status.STATUS_PYWPS_MAP[s] != status.STATUS_UNKNOWN:
-            assert status.map_status(s, status.STATUS_COMPLIANT_PYWPS) in \
-                   status.JOB_STATUS_CATEGORIES[status.STATUS_COMPLIANT_PYWPS]
+        if STATUS_PYWPS_MAP[s] != Status.UNKNOWN:
+            assert map_status(s, StatusCompliant.PYWPS) in JOB_STATUS_CATEGORIES[StatusCompliant.PYWPS]
 
 
 def test_map_status_pywps_back_and_forth():
-    for s, i in status.STATUS_PYWPS_MAP.items():
-        assert status.STATUS_PYWPS_IDS[i] == s
+    for s, i in STATUS_PYWPS_MAP.items():
+        assert STATUS_PYWPS_IDS[i] == s
 
 
 def test_get_sane_name_replace():
@@ -635,7 +635,7 @@ def test_fetch_file_http_content_disposition_filename():
 
         def mock_response(__request, test_headers):
             test_headers.update({
-                "Content-Type": CONTENT_TYPE_APP_JSON,
+                "Content-Type": ContentType.APP_JSON,
                 "Content-Length": str(len(tmp_text))
             })
             return 200, headers, tmp_text

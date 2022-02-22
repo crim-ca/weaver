@@ -4,7 +4,7 @@ from copy import deepcopy
 import pytest
 
 from weaver.datatype import Authentication, AuthenticationTypes, DockerAuthentication, Process
-from weaver.execute import EXECUTE_CONTROL_OPTION_ASYNC, EXECUTE_CONTROL_OPTION_SYNC
+from weaver.execute import ExecuteControlOption
 
 
 def test_package_encode_decode():
@@ -52,15 +52,16 @@ def test_process_job_control_options_resolution():
         Process(id="test-{}".format(uuid.uuid4()), package={}, jobControlOptions=None),
         Process(id="test-{}".format(uuid.uuid4()), package={}, jobControlOptions=[None]),
         Process(id="test-{}".format(uuid.uuid4()), package={}, jobControlOptions=[]),
-        Process(id="test-{}".format(uuid.uuid4()), package={}, jobControlOptions=[EXECUTE_CONTROL_OPTION_ASYNC]),
+        Process(id="test-{}".format(uuid.uuid4()), package={}, jobControlOptions=[ExecuteControlOption.ASYNC]),
     ]:
-        assert test_process.jobControlOptions == [EXECUTE_CONTROL_OPTION_ASYNC]
+        assert test_process.jobControlOptions == [ExecuteControlOption.ASYNC]
     # other valid definitions should be preserved as is
-    proc = Process(id="test-{}".format(uuid.uuid4()), package={}, jobControlOptions=[EXECUTE_CONTROL_OPTION_SYNC])
-    assert proc.jobControlOptions == [EXECUTE_CONTROL_OPTION_SYNC]
-    proc = Process(id="test-{}".format(uuid.uuid4()), package={}, jobControlOptions=[EXECUTE_CONTROL_OPTION_SYNC,
-                                                                                     EXECUTE_CONTROL_OPTION_ASYNC])
-    assert proc.jobControlOptions == [EXECUTE_CONTROL_OPTION_SYNC, EXECUTE_CONTROL_OPTION_ASYNC]
+    proc = Process(id="test-{}".format(uuid.uuid4()), package={},
+                   jobControlOptions=[ExecuteControlOption.SYNC])
+    assert proc.jobControlOptions == [ExecuteControlOption.SYNC]
+    proc = Process(id="test-{}".format(uuid.uuid4()), package={},
+                   jobControlOptions=[ExecuteControlOption.SYNC, ExecuteControlOption.ASYNC])
+    assert proc.jobControlOptions == [ExecuteControlOption.SYNC, ExecuteControlOption.ASYNC]
 
 
 def test_auth_docker_image_registry_format():

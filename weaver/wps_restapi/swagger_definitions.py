@@ -23,29 +23,9 @@ from colander import DateTime, Email, OneOf, Range, Regex, drop, null, required
 from dateutil import parser as date_parser
 
 from weaver import __meta__
-from weaver.config import WEAVER_CONFIGURATIONS_REMOTE
-from weaver.execute import (
-    EXECUTE_CONTROL_OPTION_ASYNC,
-    EXECUTE_CONTROL_OPTIONS,
-    EXECUTE_MODE_ASYNC,
-    EXECUTE_MODE_OPTIONS,
-    EXECUTE_RESPONSE_DOCUMENT,
-    EXECUTE_RESPONSE_OPTIONS,
-    EXECUTE_TRANSMISSION_MODE_OPTIONS,
-    EXECUTE_TRANSMISSION_MODE_REFERENCE
-)
-from weaver.formats import (
-    ACCEPT_LANGUAGE_EN_CA,
-    ACCEPT_LANGUAGE_EN_US,
-    ACCEPT_LANGUAGES,
-    CONTENT_TYPE_ANY,
-    CONTENT_TYPE_APP_JSON,
-    CONTENT_TYPE_APP_XML,
-    CONTENT_TYPE_MULTI_PART_FORM,
-    CONTENT_TYPE_TEXT_HTML,
-    CONTENT_TYPE_TEXT_PLAIN,
-    CONTENT_TYPE_TEXT_XML
-)
+from weaver.config import WeaverFeature
+from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
+from weaver.formats import AcceptLanguage, ContentType
 from weaver.owsexceptions import OWSMissingParameterValue
 from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_BUILTIN,
@@ -59,13 +39,12 @@ from weaver.processes.constants import (
     PACKAGE_CUSTOM_TYPES,
     PACKAGE_ENUM_BASE,
     PACKAGE_TYPE_POSSIBLE_VALUES,
-    PROCESS_SCHEMA_OGC,
-    PROCESS_SCHEMAS,
-    WPS_LITERAL_DATA_TYPE_NAMES
+    WPS_LITERAL_DATA_TYPE_NAMES,
+    ProcessSchema
 )
-from weaver.sort import JOB_SORT_VALUES, PROCESS_SORT_VALUES, QUOTE_SORT_VALUES, SORT_CREATED, SORT_ID, SORT_PROCESS
-from weaver.status import JOB_STATUS_CODE_API, STATUS_ACCEPTED
-from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_VALUES
+from weaver.sort import Sort, SortMethods
+from weaver.status import JOB_STATUS_CODE_API, Status
+from weaver.visibility import Visibility
 from weaver.wps_restapi.colander_extras import (
     AllOfKeywordSchema,
     AnyOfKeywordSchema,
@@ -95,7 +74,7 @@ if TYPE_CHECKING:
     ViewInfo = TypedDict("ViewInfo", {"name": str, "pattern": str})
 
 
-WEAVER_CONFIG_REMOTE_LIST = "[" + ", ".join(WEAVER_CONFIGURATIONS_REMOTE) + "]"
+WEAVER_CONFIG_REMOTE_LIST = "[" + ", ".join(WeaverFeature.REMOTE) + "]"
 
 API_TITLE = "Weaver REST API"
 API_INFO = {
@@ -296,7 +275,7 @@ class URL(ExtendedSchemaNode):
 class MediaType(ExtendedSchemaNode):
     schema_type = String
     description = "IANA identifier of content and format."
-    example = CONTENT_TYPE_APP_JSON
+    example = ContentType.APP_JSON
     pattern = r"^\w+\/[-.\w]+(?:\+[-.\w]+)?(?:\;\s*.+)*$"
 
 
@@ -438,15 +417,15 @@ class AcceptHeader(ExtendedSchemaNode):
     schema_type = String
     # FIXME: raise HTTPNotAcceptable in not one of those?
     validator = OneOf([
-        CONTENT_TYPE_APP_JSON,
-        CONTENT_TYPE_APP_XML,
-        CONTENT_TYPE_TEXT_XML,
-        CONTENT_TYPE_TEXT_HTML,
-        CONTENT_TYPE_TEXT_PLAIN,
-        CONTENT_TYPE_ANY,
+        ContentType.APP_JSON,
+        ContentType.APP_XML,
+        ContentType.TEXT_XML,
+        ContentType.TEXT_HTML,
+        ContentType.TEXT_PLAIN,
+        ContentType.ANY,
     ])
     missing = drop
-    default = CONTENT_TYPE_APP_JSON  # defaults to JSON for easy use within browsers
+    default = ContentType.APP_JSON  # defaults to JSON for easy use within browsers
 
 
 class AcceptLanguageHeader(ExtendedSchemaNode):
@@ -455,20 +434,20 @@ class AcceptLanguageHeader(ExtendedSchemaNode):
     name = "Accept-Language"
     schema_type = String
     missing = drop
-    default = ACCEPT_LANGUAGE_EN_CA
+    default = AcceptLanguage.EN_CA
     # FIXME: oneOf validator for supported languages (?)
 
 
 class JsonHeader(ExtendedMappingSchema):
-    content_type = ContentTypeHeader(example=CONTENT_TYPE_APP_JSON, default=CONTENT_TYPE_APP_JSON)
+    content_type = ContentTypeHeader(example=ContentType.APP_JSON, default=ContentType.APP_JSON)
 
 
 class HtmlHeader(ExtendedMappingSchema):
-    content_type = ContentTypeHeader(example=CONTENT_TYPE_TEXT_HTML, default=CONTENT_TYPE_TEXT_HTML)
+    content_type = ContentTypeHeader(example=ContentType.TEXT_HTML, default=ContentType.TEXT_HTML)
 
 
 class XmlHeader(ExtendedMappingSchema):
-    content_type = ContentTypeHeader(example=CONTENT_TYPE_APP_XML, default=CONTENT_TYPE_APP_XML)
+    content_type = ContentTypeHeader(example=ContentType.APP_XML, default=ContentType.APP_XML)
 
 
 class XAuthDockerHeader(ExtendedSchemaNode):
@@ -526,8 +505,8 @@ class NoContent(ExtendedMappingSchema):
 class FileUploadHeaders(RequestContentTypeHeader):
     # MUST be multipart for upload
     content_type = ContentTypeHeader(
-        example=f"{CONTENT_TYPE_MULTI_PART_FORM}; boundary=43003e2f205a180ace9cd34d98f911ff",
-        default=CONTENT_TYPE_MULTI_PART_FORM,
+        example=f"{ContentType.MULTI_PART_FORM}; boundary=43003e2f205a180ace9cd34d98f911ff",
+        default=ContentType.MULTI_PART_FORM,
         description="Desired Content-Type of the file being uploaded.", missing=required)
     content_length = ContentLengthHeader(description="Uploaded file contents size in bytes.")
     content_disposition = ContentDispositionHeader(example="form-data; name=\"file\"; filename=\"desired-name.ext\"",
@@ -544,7 +523,7 @@ class FileUploadContent(ExtendedSchemaNode):
 
 
 class FileResponseHeaders(NoContent):
-    content_type = ContentTypeHeader(example=CONTENT_TYPE_APP_JSON)
+    content_type = ContentTypeHeader(example=ContentType.APP_JSON)
     content_length = ContentLengthHeader()
     content_disposition = ContentDispositionHeader()
     date = DateHeader()
@@ -565,8 +544,8 @@ class KeywordList(ExtendedSequenceSchema):
 
 class Language(ExtendedSchemaNode):
     schema_type = String
-    example = ACCEPT_LANGUAGE_EN_CA
-    validator = OneOf(ACCEPT_LANGUAGES)
+    example = AcceptLanguage.EN_CA
+    validator = OneOf(AcceptLanguage.values())
 
 
 class ValueLanguage(ExtendedMappingSchema):
@@ -661,7 +640,7 @@ class FormatSchema(OneOfKeywordSchema):
     # deserialization against the validator pattern of 'ReferenceURL' makes it always fail
     # this causes the whole 'Format' container (and others similar) fail and be dropped
     # to resolve this issue, preemptively detect the empty string and signal the parent OneOf to remove it
-    def deserialize(self, cstruct):
+    def deserialize(self, cstruct):  # type: ignore
         if isinstance(cstruct, str) and cstruct == "":
             return drop  # field that refers to this schema will drop the field key entirely
         return super(FormatSchema, self).deserialize(cstruct)
@@ -671,7 +650,7 @@ class FormatMimeType(ExtendedMappingSchema):
     """
     Used to respect ``mimeType`` field to work with pre-existing processes.
     """
-    mimeType = MediaType(default=CONTENT_TYPE_TEXT_PLAIN, example=CONTENT_TYPE_APP_JSON)
+    mimeType = MediaType(default=ContentType.TEXT_PLAIN, example=ContentType.APP_JSON)
     encoding = ExtendedSchemaNode(String(), missing=drop)
     schema = FormatSchema(missing=drop)
 
@@ -681,7 +660,7 @@ class Format(ExtendedMappingSchema):
     """
     Used to respect ``mediaType`` field as suggested per `OGC-API`.
     """
-    mediaType = MediaType(default=CONTENT_TYPE_TEXT_PLAIN, example=CONTENT_TYPE_APP_JSON)
+    mediaType = MediaType(default=ContentType.TEXT_PLAIN, example=ContentType.APP_JSON)
     encoding = ExtendedSchemaNode(String(), missing=drop)
     schema = FormatSchema(missing=drop)
 
@@ -695,7 +674,7 @@ class DeployFormatDefaultMimeType(FormatMimeType):
     # NOTE:
     # The default is overridden from FormatMimeType since the FormatSelection 'oneOf' always fails,
     # due to the 'default' value which is always generated and it causes the presence of both Format and FormatMimeType
-    mimeType = MediaType(example=CONTENT_TYPE_APP_JSON)
+    mimeType = MediaType(example=ContentType.APP_JSON)
 
 
 class DeployFormatDefault(Format):
@@ -707,7 +686,7 @@ class DeployFormatDefault(Format):
     # NOTE:
     # The default is overridden from Format since the FormatSelection 'oneOf' always fails,
     # due to the 'default' value which is always generated and it causes the presence of both Format and FormatMimeType
-    mediaType = MediaType(example=CONTENT_TYPE_APP_JSON)
+    mediaType = MediaType(example=ContentType.APP_JSON)
 
 
 class FormatSelection(OneOfKeywordSchema):
@@ -1390,16 +1369,16 @@ class JobExecuteModeEnum(ExtendedSchemaNode):
     # no default to enforce required input as per OGC-API schemas
     # https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/execute.yaml
     # default = EXECUTE_MODE_AUTO
-    example = EXECUTE_MODE_ASYNC
-    validator = OneOf(EXECUTE_MODE_OPTIONS)
+    example = ExecuteMode.ASYNC
+    validator = OneOf(ExecuteMode.values())
 
 
 class JobControlOptionsEnum(ExtendedSchemaNode):
     schema_type = String
     title = "JobControlOptions"
-    default = EXECUTE_CONTROL_OPTION_ASYNC
-    example = EXECUTE_CONTROL_OPTION_ASYNC
-    validator = OneOf(EXECUTE_CONTROL_OPTIONS)
+    default = ExecuteControlOption.ASYNC
+    example = ExecuteControlOption.ASYNC
+    validator = OneOf(ExecuteControlOption.values())
 
 
 class JobResponseOptionsEnum(ExtendedSchemaNode):
@@ -1407,24 +1386,24 @@ class JobResponseOptionsEnum(ExtendedSchemaNode):
     title = "JobResponseOptions"
     # no default to enforce required input as per OGC-API schemas
     # https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/execute.yaml
-    # default = EXECUTE_RESPONSE_DOCUMENT
-    example = EXECUTE_RESPONSE_DOCUMENT
-    validator = OneOf(EXECUTE_RESPONSE_OPTIONS)
+    # default = ExecuteResponse.DOCUMENT
+    example = ExecuteResponse.DOCUMENT
+    validator = OneOf(ExecuteResponse.values())
 
 
 class TransmissionModeEnum(ExtendedSchemaNode):
     schema_type = String
     title = "TransmissionMode"
-    default = EXECUTE_TRANSMISSION_MODE_REFERENCE
-    example = EXECUTE_TRANSMISSION_MODE_REFERENCE
-    validator = OneOf(EXECUTE_TRANSMISSION_MODE_OPTIONS)
+    default = ExecuteTransmissionMode.REFERENCE
+    example = ExecuteTransmissionMode.REFERENCE
+    validator = OneOf(ExecuteTransmissionMode.values())
 
 
 class JobStatusEnum(ExtendedSchemaNode):
     schema_type = String
     title = "JobStatus"
-    default = STATUS_ACCEPTED
-    example = STATUS_ACCEPTED
+    default = Status.ACCEPTED
+    example = Status.ACCEPTED
     validator = OneOf(JOB_STATUS_CODE_API)
 
 
@@ -1439,25 +1418,25 @@ class JobTypeEnum(ExtendedSchemaNode):
 class JobSortEnum(ExtendedSchemaNode):
     schema_type = String
     title = "JobSortingMethod"
-    default = SORT_CREATED
-    example = SORT_CREATED
-    validator = OneOf(JOB_SORT_VALUES)
+    default = Sort.CREATED
+    example = Sort.CREATED
+    validator = OneOf(SortMethods.JOB)
 
 
 class ProcessSortEnum(ExtendedSchemaNode):
     schema_type = String
     title = "ProcessSortMethod"
-    default = SORT_ID
-    example = SORT_CREATED
-    validator = OneOf(PROCESS_SORT_VALUES)
+    default = Sort.ID
+    example = Sort.CREATED
+    validator = OneOf(SortMethods.PROCESS)
 
 
 class QuoteSortEnum(ExtendedSchemaNode):
     schema_type = String
     title = "QuoteSortingMethod"
-    default = SORT_ID
-    example = SORT_PROCESS
-    validator = OneOf(QUOTE_SORT_VALUES)
+    default = Sort.ID
+    example = Sort.PROCESS
+    validator = OneOf(SortMethods.QUOTE)
 
 
 class LaunchJobQuerystring(ExtendedMappingSchema):
@@ -1467,15 +1446,15 @@ class LaunchJobQuerystring(ExtendedMappingSchema):
 
 class VisibilityValue(ExtendedSchemaNode):
     schema_type = String
-    validator = OneOf(VISIBILITY_VALUES)
-    example = VISIBILITY_PUBLIC
+    validator = OneOf(Visibility.values())
+    example = Visibility.PUBLIC
 
 
 class JobAccess(VisibilityValue):
     pass
 
 
-class Visibility(ExtendedMappingSchema):
+class VisibilitySchema(ExtendedMappingSchema):
     value = VisibilityValue()
 
 
@@ -1565,7 +1544,7 @@ class MimeTypeAttribute(ExtendedSchemaNode, XMLObject):
     attribute = True
     name = "mimeType"
     prefix = drop
-    example = CONTENT_TYPE_APP_JSON
+    example = ContentType.APP_JSON
 
 
 class EncodingAttribute(ExtendedSchemaNode, XMLObject):
@@ -1593,8 +1572,8 @@ class OWSLanguage(ExtendedSchemaNode, OWSNamespace):
     description = "Desired language to produce the response."
     schema_type = String
     name = "Language"
-    default = ACCEPT_LANGUAGE_EN_US
-    example = ACCEPT_LANGUAGE_EN_CA
+    default = AcceptLanguage.EN_US
+    example = AcceptLanguage.EN_CA
 
 
 class OWSLanguageAttribute(OWSLanguage):
@@ -1608,8 +1587,8 @@ class OWSService(ExtendedSchemaNode, OWSNamespace):
     schema_type = String
     name = "service"
     attribute = True
-    default = ACCEPT_LANGUAGE_EN_US
-    example = ACCEPT_LANGUAGE_EN_CA
+    default = AcceptLanguage.EN_US
+    example = AcceptLanguage.EN_CA
 
 
 class WPSServiceAttribute(ExtendedSchemaNode, XMLObject):
@@ -1632,8 +1611,8 @@ class WPSLanguageAttribute(ExtendedSchemaNode, XMLNamespace):
     schema_type = String
     name = "lang"
     attribute = True
-    default = ACCEPT_LANGUAGE_EN_US
-    example = ACCEPT_LANGUAGE_EN_CA
+    default = AcceptLanguage.EN_US
+    example = AcceptLanguage.EN_CA
 
 
 class WPSParameters(ExtendedMappingSchema):
@@ -1974,7 +1953,7 @@ class WPSBoundingBoxData(ExtendedMappingSchema, XMLObject):
 
 
 class WPSFormatDefinition(ExtendedMappingSchema, XMLObject):
-    mime_type = XMLString(name="MimeType", default=CONTENT_TYPE_TEXT_PLAIN, example=CONTENT_TYPE_TEXT_PLAIN)
+    mime_type = XMLString(name="MimeType", default=ContentType.TEXT_PLAIN, example=ContentType.TEXT_PLAIN)
     encoding = XMLString(name="Encoding", missing=drop, example="base64")
     schema = XMLString(name="Schema", missing=drop)
 
@@ -2271,8 +2250,8 @@ class ProviderEndpoint(ProviderPath):
 class ProcessDescriptionSchemaQuery(ExtendedMappingSchema):
     # see: 'ProcessDescription' schema and 'Process.offering' method
     schema = ExtendedSchemaNode(
-        String(), example=PROCESS_SCHEMA_OGC, default=PROCESS_SCHEMA_OGC,
-        validator=OneOfCaseInsensitive(PROCESS_SCHEMAS),
+        String(), example=ProcessSchema.OGC, default=ProcessSchema.OGC,
+        validator=OneOfCaseInsensitive(ProcessSchema.values()),
         description="Selects the desired schema representation of the process description."
     )
 
@@ -2301,7 +2280,7 @@ class ProcessVisibilityGetEndpoint(ProcessPath):
 
 class ProcessVisibilityPutEndpoint(ProcessPath):
     header = RequestHeaders()
-    body = Visibility()
+    body = VisibilitySchema()
 
 
 class ProviderJobEndpoint(ProviderPath, ProcessPath, JobPath):
@@ -2485,10 +2464,10 @@ class ExceptionReportType(ExtendedMappingSchema):
 
 
 class ProcessControl(ExtendedMappingSchema):
-    jobControlOptions = JobControlOptionsList(missing=[EXECUTE_CONTROL_OPTION_ASYNC],
-                                              default=[EXECUTE_CONTROL_OPTION_ASYNC])
-    outputTransmission = TransmissionModeList(missing=[EXECUTE_TRANSMISSION_MODE_REFERENCE],
-                                              default=[EXECUTE_TRANSMISSION_MODE_REFERENCE])
+    jobControlOptions = JobControlOptionsList(missing=[ExecuteControlOption.ASYNC],
+                                              default=[ExecuteControlOption.ASYNC])
+    outputTransmission = TransmissionModeList(missing=[ExecuteTransmissionMode.REFERENCE],
+                                              default=[ExecuteTransmissionMode.REFERENCE])
 
 
 class ProcessLocations(ExtendedMappingSchema):
@@ -2682,7 +2661,7 @@ class CreatedJobStatusSchema(DescriptionSchema):
     jobID = UUID(description="Unique identifier of the created job for execution.")
     processID = ProcessIdentifier(description="Identifier of the process that will be executed.")
     providerID = AnyIdentifier(description="Remote provider identifier if applicable.", missing=drop)
-    status = ExtendedSchemaNode(String(), example=STATUS_ACCEPTED)
+    status = ExtendedSchemaNode(String(), example=Status.ACCEPTED)
     location = ExtendedSchemaNode(String(), example="http://{host}/weaver/processes/{my-process-id}/jobs/{my-job-id}")
 
 
@@ -4284,7 +4263,7 @@ class VaultUploadBody(ExtendedSchemaNode):
     schema_type = String
     description = "Multipart file contents for upload to the vault."
     examples = {
-        CONTENT_TYPE_MULTI_PART_FORM: {
+        ContentType.MULTI_PART_FORM: {
             "summary": "Upload JSON file to vault as multipart content.",
             "value": EXAMPLES["vault_file_upload.txt"],
         }

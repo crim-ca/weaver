@@ -22,7 +22,7 @@ from pyramid.testing import DummyRequest
 from requests import Request as RequestsRequest
 from werkzeug.wrappers import Request as WerkzeugRequest
 
-from weaver.formats import CONTENT_TYPE_TEXT_XML
+from weaver.formats import ContentType
 from weaver.owsexceptions import (
     OWSAccessForbidden,
     OWSException,
@@ -401,11 +401,11 @@ def handle_known_exceptions(function):
             return function(*_, **__)
         except (WeaverException, OWSException, HTTPException) as exc:
             if isinstance(exc, WeaverException) and not isinstance(exc, OWSException):
-                return OWSNoApplicableCode(str(exc), locator="service", content_type=CONTENT_TYPE_TEXT_XML)
+                return OWSNoApplicableCode(str(exc), locator="service", content_type=ContentType.TEXT_XML)
             if isinstance(exc, HTTPException):
                 # override default pre-generated plain text content-type such that
                 # resulting exception generates the response content with requested accept or XML by default
-                exc.headers.setdefault("Accept", CONTENT_TYPE_TEXT_XML)
+                exc.headers.setdefault("Accept", ContentType.TEXT_XML)
                 exc.headers.pop("Content-Type", None)
                 if isinstance(exc, HTTPNotFound):
                     exc = OWSNotFound(str(exc), locator="service", status=exc)

@@ -4,7 +4,7 @@ Generic schema tests.
 import colander
 import pytest
 
-from weaver.formats import CONTENT_TYPE_APP_JSON
+from weaver.formats import ContentType
 from weaver.wps_restapi import swagger_definitions as sd
 
 
@@ -89,32 +89,32 @@ def test_url_schemes():
 
 def test_format_variations():
     format_schema = sd.DeploymentFormat()
-    schema = "https://www.iana.org/assignments/media-types/{}".format(CONTENT_TYPE_APP_JSON)
+    schema = "https://www.iana.org/assignments/media-types/{}".format(ContentType.APP_JSON)
     test_valid_fmt_deploy = [
         (
-            {"mimeType": CONTENT_TYPE_APP_JSON},
-            {"mimeType": CONTENT_TYPE_APP_JSON, "default": False}),
+            {"mimeType": ContentType.APP_JSON},
+            {"mimeType": ContentType.APP_JSON, "default": False}),
         (
-            {"mediaType": CONTENT_TYPE_APP_JSON},
-            {"mediaType": CONTENT_TYPE_APP_JSON, "default": False}),
+            {"mediaType": ContentType.APP_JSON},
+            {"mediaType": ContentType.APP_JSON, "default": False}),
         (
-            {"mediaType": CONTENT_TYPE_APP_JSON, "maximumMegabytes": 200},
-            {"mediaType": CONTENT_TYPE_APP_JSON, "maximumMegabytes": 200, "default": False}),
+            {"mediaType": ContentType.APP_JSON, "maximumMegabytes": 200},
+            {"mediaType": ContentType.APP_JSON, "maximumMegabytes": 200, "default": False}),
         (
-            {"mediaType": CONTENT_TYPE_APP_JSON, "maximumMegabytes": None},
-            {"mediaType": CONTENT_TYPE_APP_JSON, "default": False}),
+            {"mediaType": ContentType.APP_JSON, "maximumMegabytes": None},
+            {"mediaType": ContentType.APP_JSON, "default": False}),
         (
-            {"mediaType": CONTENT_TYPE_APP_JSON, "default": False},
-            {"mediaType": CONTENT_TYPE_APP_JSON, "default": False}),
+            {"mediaType": ContentType.APP_JSON, "default": False},
+            {"mediaType": ContentType.APP_JSON, "default": False}),
         (
-            {"mediaType": CONTENT_TYPE_APP_JSON, "default": True},
-            {"mediaType": CONTENT_TYPE_APP_JSON, "default": True}),
+            {"mediaType": ContentType.APP_JSON, "default": True},
+            {"mediaType": ContentType.APP_JSON, "default": True}),
         (
-            {"mediaType": CONTENT_TYPE_APP_JSON, "schema": None},
-            {"mediaType": CONTENT_TYPE_APP_JSON, "default": False}),
+            {"mediaType": ContentType.APP_JSON, "schema": None},
+            {"mediaType": ContentType.APP_JSON, "default": False}),
         (
-            {"mediaType": CONTENT_TYPE_APP_JSON, "schema": schema},
-            {"mediaType": CONTENT_TYPE_APP_JSON, "schema": schema, "default": False}),
+            {"mediaType": ContentType.APP_JSON, "schema": schema},
+            {"mediaType": ContentType.APP_JSON, "schema": schema, "default": False}),
     ]
     for fmt, res in test_valid_fmt_deploy:
         try:

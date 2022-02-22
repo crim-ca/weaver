@@ -9,11 +9,11 @@ from pyramid.settings import asbool
 
 from tests.functional.test_workflow import WorkflowProcesses, WorkflowTestRunnerBase
 from tests.utils import get_setting
-from weaver.config import WEAVER_CONFIGURATION_EMS
-from weaver.formats import CONTENT_TYPE_APP_FORM, CONTENT_TYPE_APP_JSON
+from weaver.config import WeaverConfiguration
+from weaver.formats import ContentType
 from weaver.processes.sources import fetch_data_sources
-from weaver.status import JOB_STATUS_CATEGORIES, JOB_STATUS_CATEGORY_RUNNING
-from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC
+from weaver.status import JOB_STATUS_CATEGORIES, StatusCategory
+from weaver.visibility import Visibility
 
 if TYPE_CHECKING:
     from typing import Iterable, Tuple
@@ -58,7 +58,7 @@ class WorkflowTestRunnerRemoteWithAuth(WorkflowTestRunnerBase):
             cls.request("GET", server_url, headers=cls.headers, status=HTTPOk.code)
         # verify that EMS configuration requirement is met
         resp = cls.request("GET", cls.WEAVER_RESTAPI_URL, headers=cls.headers, status=HTTPOk.code)
-        cls.assert_test(lambda: resp.json.get("configuration") == WEAVER_CONFIGURATION_EMS,
+        cls.assert_test(lambda: resp.json.get("configuration") == WeaverConfiguration.EMS,
                         message="weaver must be configured as EMS.")
 
     @classmethod
@@ -84,7 +84,7 @@ class WorkflowTestRunnerRemoteWithAuth(WorkflowTestRunnerBase):
                                ignore_errors=True, log_enabled=False)
             if resp.status_code == HTTPUnauthorized.code:
                 visibility_path = "{}/visibility".format(path)
-                visibility_body = {"value": VISIBILITY_PUBLIC}
+                visibility_body = {"value": Visibility.PUBLIC}
                 resp = cls.request("PUT", visibility_path, json=visibility_body,
                                    headers=cls.headers, cookies=cls.cookies,
                                    ignore_errors=True, log_enabled=False)
@@ -120,7 +120,7 @@ class WorkflowTestRunnerRemoteWithAuth(WorkflowTestRunnerBase):
                     "username": username,
                     "password": password
                 }
-                headers = {"Accept": CONTENT_TYPE_APP_JSON, "Content-Type": CONTENT_TYPE_APP_FORM}
+                headers = {"Accept": ContentType.APP_JSON, "Content-Type": ContentType.APP_FORM}
                 path = "{}/oauth2/token".format(cls.WEAVER_TEST_WSO2_URL)
                 resp = cls.request("POST", path, data=data, headers=headers, force_requests=True)
                 if resp.status_code == HTTPOk.code:
@@ -130,7 +130,7 @@ class WorkflowTestRunnerRemoteWithAuth(WorkflowTestRunnerBase):
                 cls.assert_response(resp, status=HTTPOk.code, message="Failed token retrieval from login!")
             else:
                 data = {"user_name": username, "password": password}
-                headers = {"Accept": CONTENT_TYPE_APP_JSON, "Content-Type": CONTENT_TYPE_APP_JSON}
+                headers = {"Accept": ContentType.APP_JSON, "Content-Type": ContentType.APP_JSON}
                 path = "{}/signin".format(cls.WEAVER_TEST_MAGPIE_URL)
                 resp = cls.request("POST", path, json=data, headers=headers, force_requests=True)
                 if resp.status_code == HTTPOk.code:
@@ -202,7 +202,7 @@ class WorkflowTestRunnerRemoteWithAuth(WorkflowTestRunnerBase):
         self.assert_test(lambda: len(test_processes) == 0, message="Test processes shouldn't be visible by bob.")
 
         # processes visibility
-        visible = {"value": VISIBILITY_PUBLIC}
+        visible = {"value": Visibility.PUBLIC}
         for process_info in self.test_processes_info.values():
             # get private visibility initially
             process_path = "/processes/{}".format(process_info.test_id)
@@ -211,7 +211,7 @@ class WorkflowTestRunnerRemoteWithAuth(WorkflowTestRunnerBase):
             execute_body = process_info.execute_payload
             resp = self.request("GET", visible_path,
                                 headers=headers_a, cookies=cookies_a, status=HTTPOk.code)
-            self.assert_test(lambda: resp.json.get("value") == VISIBILITY_PRIVATE, message="Process should be private.")
+            self.assert_test(lambda: resp.json.get("value") == Visibility.PRIVATE, message="Process should be private.")
 
             # bob cannot edit, view or execute the process
             self.request("GET", process_path,
@@ -224,7 +224,7 @@ class WorkflowTestRunnerRemoteWithAuth(WorkflowTestRunnerBase):
             # make process visible
             resp = self.request("PUT", visible_path, json=visible,
                                 headers=headers_a, cookies=cookies_a, status=HTTPOk.code)
-            self.assert_test(lambda: resp.json.get("value") == VISIBILITY_PUBLIC, message="Process should be public.")
+            self.assert_test(lambda: resp.json.get("value") == Visibility.PUBLIC, message="Process should be public.")
 
             # bob still cannot edit, but can now view and execute the process
             self.request("PUT", visible_path, json=visible,
@@ -234,7 +234,7 @@ class WorkflowTestRunnerRemoteWithAuth(WorkflowTestRunnerBase):
                              message="Response process ID should match specified test process id.")
             resp = self.request("POST", execute_path, json=execute_body,
                                 headers=headers_b, cookies=cookies_b, status=HTTPCreated.code)
-            self.assert_test(lambda: resp.json.get("status") in JOB_STATUS_CATEGORIES[JOB_STATUS_CATEGORY_RUNNING],
+            self.assert_test(lambda: resp.json.get("status") in JOB_STATUS_CATEGORIES[StatusCategory.RUNNING],
                              message="Response process execution job status should be one of running category values.")
             job_location = resp.json.get("location")
             job_id = resp.json.get("jobID")

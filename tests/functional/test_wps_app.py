@@ -23,11 +23,11 @@ from tests.utils import (
     setup_mongodb_processstore
 )
 from weaver import xml_util
-from weaver.formats import CONTENT_TYPE_ANY_XML, CONTENT_TYPE_APP_XML
+from weaver.formats import ContentType
 from weaver.processes.wps_default import HelloWPS
 from weaver.processes.wps_testing import WpsTestProcess
 from weaver.utils import str2bytes
-from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC
+from weaver.visibility import Visibility
 
 
 @pytest.mark.functional
@@ -53,12 +53,12 @@ class WpsAppTest(unittest.TestCase):
         self.process_private = WpsTestProcess(identifier="process_private")
         self.process_store.save_process(self.process_public)
         self.process_store.save_process(self.process_private)
-        self.process_store.set_visibility(self.process_public.identifier, VISIBILITY_PUBLIC)
-        self.process_store.set_visibility(self.process_private.identifier, VISIBILITY_PRIVATE)
+        self.process_store.set_visibility(self.process_public.identifier, Visibility.PUBLIC)
+        self.process_store.set_visibility(self.process_private.identifier, Visibility.PRIVATE)
 
         # add processes by pywps Process type
         self.process_store.save_process(HelloWPS())
-        self.process_store.set_visibility(HelloWPS.identifier, VISIBILITY_PUBLIC)
+        self.process_store.set_visibility(HelloWPS.identifier, Visibility.PUBLIC)
 
     def tearDown(self):
         pyramid.testing.tearDown()
@@ -69,13 +69,13 @@ class WpsAppTest(unittest.TestCase):
     def test_getcaps(self):
         resp = self.app.get(self.make_url("service=wps&request=getcapabilities"))
         assert resp.status_code == 200
-        assert resp.content_type in CONTENT_TYPE_ANY_XML
+        assert resp.content_type in ContentType.ANY_XML
         resp.mustcontain("</wps:Capabilities>")
 
     def test_getcaps_metadata(self):
         resp = self.app.get(self.make_url("service=wps&request=getcapabilities"))
         assert resp.status_code == 200
-        assert resp.content_type in CONTENT_TYPE_ANY_XML
+        assert resp.content_type in ContentType.ANY_XML
         xml_dict = xmltodict.parse(resp.text)
         assert xml_dict["wps:Capabilities"]["ows:ServiceIdentification"]["ows:Title"] == "Weaver WPS Test Server"
         assert xml_dict["wps:Capabilities"]["ows:ServiceProvider"]["ows:ProviderName"] == WpsAppTest.__name__
@@ -83,7 +83,7 @@ class WpsAppTest(unittest.TestCase):
     def test_getcaps_filtered_processes_by_visibility(self):
         resp = self.app.get(self.make_url("service=wps&request=getcapabilities"))
         assert resp.status_code == 200
-        assert resp.content_type in CONTENT_TYPE_ANY_XML
+        assert resp.content_type in ContentType.ANY_XML
         resp.mustcontain("<wps:ProcessOfferings>")
         root = xml_util.fromstring(str2bytes(resp.text))  # test response has no 'content'
         process_offerings = list(filter(lambda e: "ProcessOfferings" in e.tag, root.iter(xml_util.Element)))
@@ -98,7 +98,7 @@ class WpsAppTest(unittest.TestCase):
         params = template.format(HelloWPS.identifier)
         resp = self.app.get(self.make_url(params))
         assert resp.status_code == 200
-        assert resp.content_type in CONTENT_TYPE_ANY_XML
+        assert resp.content_type in ContentType.ANY_XML
         resp.mustcontain("</wps:ProcessDescriptions>")
 
     def test_describeprocess_filtered_processes_by_visibility(self):
@@ -107,13 +107,13 @@ class WpsAppTest(unittest.TestCase):
         url = self.make_url(param_template.format(self.process_public.identifier))
         resp = self.app.get(url)
         assert resp.status_code == 200
-        assert resp.content_type in CONTENT_TYPE_ANY_XML
+        assert resp.content_type in ContentType.ANY_XML
         resp.mustcontain("</wps:ProcessDescriptions>")
 
         url = self.make_url(param_template.format(self.process_private.identifier))
         resp = self.app.get(url, expect_errors=True)
         assert resp.status_code == 400
-        assert resp.content_type in CONTENT_TYPE_ANY_XML
+        assert resp.content_type in ContentType.ANY_XML
         resp.mustcontain("<ows:ExceptionText>Unknown process")
 
     def test_execute_allowed_demo(self):
@@ -125,13 +125,13 @@ class WpsAppTest(unittest.TestCase):
                 stack_exec.enter_context(mock_exec)
             resp = self.app.get(url)
         assert resp.status_code == 200  # FIXME: replace by 202 Accepted (?) https://github.com/crim-ca/weaver/issues/14
-        assert resp.content_type in CONTENT_TYPE_ANY_XML
+        assert resp.content_type in ContentType.ANY_XML
         resp.mustcontain("<wps:ExecuteResponse")
         resp.mustcontain("<wps:ProcessAccepted")
         resp.mustcontain("PyWPS Process {}".format(HelloWPS.identifier))
 
     def test_execute_deployed_with_visibility_allowed(self):
-        headers = {"Accept": CONTENT_TYPE_APP_XML}
+        headers = {"Accept": ContentType.APP_XML}
         params_template = "service=wps&request=execute&version=1.0.0&identifier={}&datainputs=test_input=test"
         url = self.make_url(params_template.format(self.process_public.identifier))
         with contextlib.ExitStack() as stack_exec:
@@ -139,13 +139,13 @@ class WpsAppTest(unittest.TestCase):
                 stack_exec.enter_context(mock_exec)
             resp = self.app.get(url, headers=headers)
         assert resp.status_code == 200  # FIXME: replace by 202 Accepted (?) https://github.com/crim-ca/weaver/issues/14
-        assert resp.content_type in CONTENT_TYPE_ANY_XML
+        assert resp.content_type in ContentType.ANY_XML
         resp.mustcontain("<wps:ExecuteResponse")
         resp.mustcontain("<wps:ProcessAccepted")
         resp.mustcontain("PyWPS Process {}".format(self.process_public.identifier))
 
     def test_execute_deployed_with_visibility_denied(self):
-        headers = {"Accept": CONTENT_TYPE_APP_XML}
+        headers = {"Accept": ContentType.APP_XML}
         params_template = "service=wps&request=execute&version=1.0.0&identifier={}&datainputs=test_input=test"
         url = self.make_url(params_template.format(self.process_private.identifier))
         with contextlib.ExitStack() as stack_exec:
@@ -153,7 +153,7 @@ class WpsAppTest(unittest.TestCase):
                 stack_exec.enter_context(mock_exec)
             resp = self.app.get(url, headers=headers, expect_errors=True)
         assert resp.status_code == 403
-        assert resp.content_type in CONTENT_TYPE_ANY_XML, "Error Response: {}".format(resp.text)
+        assert resp.content_type in ContentType.ANY_XML, "Error Response: {}".format(resp.text)
         resp.mustcontain("<Exception exceptionCode=\"AccessForbidden\" locator=\"service\">")
         err_desc = "Process with ID '{}' is not accessible.".format(self.process_private.identifier)
         resp.mustcontain("<ExceptionText>{}</ExceptionText>".format(err_desc))

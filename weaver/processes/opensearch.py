@@ -9,15 +9,8 @@ from pyramid.httpexceptions import HTTPOk
 from pyramid.settings import asbool
 
 from weaver import xml_util
-from weaver.formats import CONTENT_TYPE_TEXT_PLAIN
-from weaver.processes.constants import (
-    OPENSEARCH_AOI,
-    OPENSEARCH_COLLECTION,
-    OPENSEARCH_END_DATE,
-    OPENSEARCH_LOCAL_FILE_SCHEME,
-    OPENSEARCH_START_DATE,
-    WPS_LITERAL
-)
+from weaver.formats import ContentType
+from weaver.processes.constants import WPS_LITERAL, OpenSearchField
 from weaver.processes.convert import normalize_ordered_io
 from weaver.processes.sources import fetch_data_sources
 from weaver.utils import get_any_id, request_extra
@@ -87,9 +80,9 @@ def query_eo_images_from_wps_inputs(wps_inputs,             # type: Dict[str, De
         Return ``True`` if the name of this parameter is a query parameter of an ``EOImage``.
         """
         parameters = [
-            OPENSEARCH_AOI,
-            OPENSEARCH_START_DATE,
-            OPENSEARCH_END_DATE
+            OpenSearchField.AOI,
+            OpenSearchField.START_DATE,
+            OpenSearchField.END_DATE
         ]
         return any(param.startswith(p) for p in parameters)
 
@@ -106,9 +99,9 @@ def query_eo_images_from_wps_inputs(wps_inputs,             # type: Dict[str, De
                 collection_id = queue[0].data
                 max_occurs = min(queue[0].max_occurs, 100000)
 
-                aoi_ids = _make_specific_identifier(OPENSEARCH_AOI, input_id), OPENSEARCH_AOI
-                startdate_ids = (_make_specific_identifier(OPENSEARCH_START_DATE, input_id), OPENSEARCH_START_DATE)
-                enddate_ids = _make_specific_identifier(OPENSEARCH_END_DATE, input_id), OPENSEARCH_END_DATE
+                aoi_ids = make_param_id(OpenSearchField.AOI, input_id), OpenSearchField.AOI
+                startdate_ids = (make_param_id(OpenSearchField.START_DATE, input_id), OpenSearchField.START_DATE)
+                enddate_ids = make_param_id(OpenSearchField.END_DATE, input_id), OpenSearchField.END_DATE
 
                 bbox_str = get_input_data(aoi_ids)
                 validate_bbox(bbox_str)
@@ -148,7 +141,7 @@ def replace_with_opensearch_scheme(link):
     scheme = urlparse(link).scheme
     if scheme == "file":
         link_without_scheme = link[link.find(":"):]
-        return "{}{}".format(OPENSEARCH_LOCAL_FILE_SCHEME, link_without_scheme)
+        return "{}{}".format(OpenSearchField.LOCAL_FILE_SCHEME, link_without_scheme)
     else:
         return link
 
@@ -394,7 +387,7 @@ class EOImageDescribeProcessHandler(object):
             u"id": u"{}".format(identifier),
             u"title": description,
             u"abstract": description,
-            u"formats": [{u"mimeType": CONTENT_TYPE_TEXT_PLAIN, u"default": True}],
+            u"formats": [{u"mimeType": ContentType.TEXT_PLAIN, u"default": True}],
             u"minOccurs": u"1",
             u"maxOccurs": u"unbounded",
             u"literalDataDomains": [{u"dataType": {u"name": u"String"}}],
@@ -421,13 +414,13 @@ class EOImageDescribeProcessHandler(object):
         :param id_: ID of the input.
         :param start_date:  (Default value = True)
         """
-        date = OPENSEARCH_START_DATE if start_date else OPENSEARCH_END_DATE
+        date = OpenSearchField.START_DATE if start_date else OpenSearchField.END_DATE
         search_field = "{}{}".format(date[0].lower(), date[1:])
         data = {
             u"id": id_,
             u"title": u"Time of Interest",
             u"abstract": u"Time of Interest (defined as Start date - End date)",
-            u"formats": [{u"mimeType": CONTENT_TYPE_TEXT_PLAIN, u"default": True}],
+            u"formats": [{u"mimeType": ContentType.TEXT_PLAIN, u"default": True}],
             u"minOccurs": u"1",
             u"maxOccurs": u"1",
             u"literalDataDomains": [{u"dataType": {u"name": u"String"}}],
@@ -463,26 +456,26 @@ class EOImageDescribeProcessHandler(object):
         collections = []
 
         if unique_toi:
-            toi.append(self.make_toi(OPENSEARCH_START_DATE, start_date=True))
-            toi.append(self.make_toi(OPENSEARCH_END_DATE, start_date=False))
+            toi.append(self.make_toi(OpenSearchField.START_DATE, start_date=True))
+            toi.append(self.make_toi(OpenSearchField.END_DATE, start_date=False))
         else:
             for name in eoimage_names:
                 toi.append(
                     self.make_toi(
-                        _make_specific_identifier(OPENSEARCH_START_DATE, name), start_date=True
+                        make_param_id(OpenSearchField.START_DATE, name), start_date=True
                     )
                 )
                 toi.append(
                     self.make_toi(
-                        _make_specific_identifier(OPENSEARCH_END_DATE, name), start_date=False
+                        make_param_id(OpenSearchField.END_DATE, name), start_date=False
                     )
                 )
 
         if unique_aoi:
-            aoi.append(self.make_aoi(OPENSEARCH_AOI))
+            aoi.append(self.make_aoi(OpenSearchField.AOI))
         else:
             for name in eoimage_names:
-                aoi.append(self.make_aoi(_make_specific_identifier(OPENSEARCH_AOI, name)))
+                aoi.append(self.make_aoi(make_param_id(OpenSearchField.AOI, name)))
 
         eoimage_names = modified_collection_identifiers(eoimage_names)
         for name, allowed_col in zip(eoimage_names, allowed_collections):
@@ -594,7 +587,7 @@ def modified_collection_identifiers(eo_image_identifiers):
     unique_eoimage = len(eo_image_identifiers) == 1
     new_identifiers = []
     for identifier in eo_image_identifiers:
-        new = OPENSEARCH_COLLECTION if unique_eoimage else identifier + "_" + OPENSEARCH_COLLECTION
+        new = OpenSearchField.COLLECTION if unique_eoimage else identifier + "_" + OpenSearchField.COLLECTION
         new_identifiers.append(new)
     return new_identifiers
 
@@ -664,7 +657,7 @@ def replace_inputs_describe_process(inputs, payload):
     return inputs_converted
 
 
-def _make_specific_identifier(param_name, identifier):
+def make_param_id(param_name, identifier):
     # type: (str, str) -> str
     """
     Only adds an underscore between the parameters.

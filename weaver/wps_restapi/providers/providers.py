@@ -15,7 +15,7 @@ from pyramid.settings import asbool
 from weaver.database import get_db
 from weaver.datatype import Process, Service
 from weaver.exceptions import ServiceNotFound, ServiceParsingError, log_unhandled_exceptions
-from weaver.formats import OUTPUT_FORMAT_JSON
+from weaver.formats import OutputFormat
 from weaver.owsexceptions import OWSMissingParameterValue, OWSNotImplemented
 from weaver.processes.execution import submit_job
 from weaver.processes.utils import get_job_submission_response
@@ -33,7 +33,7 @@ if TYPE_CHECKING:
 LOGGER = logging.getLogger(__name__)
 
 
-@sd.providers_service.get(tags=[sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
+@sd.providers_service.get(tags=[sd.TAG_PROVIDERS], renderer=OutputFormat.JSON,
                           schema=sd.GetProviders(), response_schemas=sd.get_providers_list_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 @check_provider_requirements
@@ -54,7 +54,7 @@ def get_providers(request):
     return HTTPOk(json=sd.ProvidersBodySchema().deserialize(data))
 
 
-@sd.providers_service.post(tags=[sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
+@sd.providers_service.post(tags=[sd.TAG_PROVIDERS], renderer=OutputFormat.JSON,
                            schema=sd.PostProvider(), response_schemas=sd.post_provider_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 @check_provider_requirements
@@ -114,7 +114,7 @@ def add_provider(request):
     return HTTPCreated(json=data)
 
 
-@sd.provider_service.delete(tags=[sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
+@sd.provider_service.delete(tags=[sd.TAG_PROVIDERS], renderer=OutputFormat.JSON,
                             schema=sd.ProviderEndpoint(), response_schemas=sd.delete_provider_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 @check_provider_requirements
@@ -132,7 +132,7 @@ def remove_provider(request):
     return HTTPNoContent(json={})
 
 
-@sd.provider_service.get(tags=[sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
+@sd.provider_service.get(tags=[sd.TAG_PROVIDERS], renderer=OutputFormat.JSON,
                          schema=sd.ProviderEndpoint(), response_schemas=sd.get_provider_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 @check_provider_requirements
@@ -145,7 +145,7 @@ def get_provider(request):
 
 
 @sd.provider_processes_service.get(tags=[sd.TAG_PROVIDERS, sd.TAG_PROCESSES, sd.TAG_PROVIDERS, sd.TAG_GETCAPABILITIES],
-                                   renderer=OUTPUT_FORMAT_JSON, schema=sd.ProviderProcessesEndpoint(),
+                                   renderer=OutputFormat.JSON, schema=sd.ProviderProcessesEndpoint(),
                                    response_schemas=sd.get_provider_processes_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 @check_provider_requirements
@@ -182,7 +182,7 @@ def describe_provider_process(request):
 
 
 @sd.provider_process_service.get(tags=[sd.TAG_PROVIDERS, sd.TAG_PROCESSES, sd.TAG_PROVIDERS, sd.TAG_DESCRIBEPROCESS],
-                                 renderer=OUTPUT_FORMAT_JSON, schema=sd.ProviderProcessEndpoint(),
+                                 renderer=OutputFormat.JSON, schema=sd.ProviderProcessEndpoint(),
                                  response_schemas=sd.get_provider_process_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 @check_provider_requirements
@@ -201,10 +201,10 @@ def get_provider_process(request):
 
 
 @sd.provider_execution_service.post(tags=[sd.TAG_PROVIDERS, sd.TAG_PROVIDERS, sd.TAG_EXECUTE, sd.TAG_JOBS],
-                                    renderer=OUTPUT_FORMAT_JSON, schema=sd.PostProviderProcessJobRequest(),
+                                    renderer=OutputFormat.JSON, schema=sd.PostProviderProcessJobRequest(),
                                     response_schemas=sd.post_provider_process_job_responses)
 @sd.provider_jobs_service.post(tags=[sd.TAG_PROVIDERS, sd.TAG_PROVIDERS, sd.TAG_EXECUTE, sd.TAG_JOBS],
-                               renderer=OUTPUT_FORMAT_JSON, schema=sd.PostProviderProcessJobRequest(),
+                               renderer=OutputFormat.JSON, schema=sd.PostProviderProcessJobRequest(),
                                response_schemas=sd.post_provider_process_job_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 @check_provider_requirements

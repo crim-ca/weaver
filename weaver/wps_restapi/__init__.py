@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 
 from pyramid.settings import asbool
 
-from weaver.formats import OUTPUT_FORMAT_JSON
+from weaver.formats import OutputFormat
 from weaver.utils import get_settings
 
 if TYPE_CHECKING:
@@ -20,7 +20,7 @@ def includeme(config):
 
     config.add_route(**sd.service_api_route_info(sd.api_frontpage_service, settings))
     config.add_view(api.api_frontpage, route_name=sd.api_frontpage_service.name,
-                    request_method="GET", renderer=OUTPUT_FORMAT_JSON)
+                    request_method="GET", renderer=OutputFormat.JSON)
 
     if asbool(settings.get("weaver.wps_restapi", True)):
         LOGGER.info("Adding WPS REST API...")
@@ -38,7 +38,7 @@ def includeme(config):
         config.add_route(**sd.service_api_route_info(sd.api_versions_service, settings))
         config.add_route(**sd.service_api_route_info(sd.api_conformance_service, settings))
         config.add_view(api.openapi_json, route_name=sd.openapi_json_service.name,
-                        request_method="GET", renderer=OUTPUT_FORMAT_JSON)
+                        request_method="GET", renderer=OutputFormat.JSON)
         config.add_view(api.api_swagger_ui, route_name=sd.api_openapi_ui_service.name,
                         request_method="GET", renderer="templates/swagger_ui.mako")
         config.add_view(api.api_swagger_ui, route_name=sd.api_swagger_ui_service.name,
@@ -46,6 +46,6 @@ def includeme(config):
         config.add_view(api.api_redoc_ui, route_name=sd.api_redoc_ui_service.name,
                         request_method="GET", renderer="templates/redoc_ui.mako")
         config.add_view(api.api_versions, route_name=sd.api_versions_service.name,
-                        request_method="GET", renderer=OUTPUT_FORMAT_JSON)
+                        request_method="GET", renderer=OutputFormat.JSON)
         config.add_view(api.api_conformance, route_name=sd.api_conformance_service.name,
-                        request_method="GET", renderer=OUTPUT_FORMAT_JSON)
+                        request_method="GET", renderer=OutputFormat.JSON)

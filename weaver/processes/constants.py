@@ -1,6 +1,8 @@
 import sys
 from typing import TYPE_CHECKING
 
+from weaver.base import Constants
+
 WPS_INPUT = "input"
 WPS_OUTPUT = "output"
 WPS_COMPLEX = "complex"
@@ -13,15 +15,18 @@ WPS_LITERAL_DATA_TYPE_NAMES = frozenset([
     "int", "integer", "long", "positiveInteger", "nonNegativeInteger", "bool", "boolean", "string"
 ])
 
-# opensearch
-OPENSEARCH_START_DATE = "StartDate"
-OPENSEARCH_END_DATE = "EndDate"
-OPENSEARCH_AOI = "aoi"
-OPENSEARCH_COLLECTION = "collection"
-# data source cache
-OPENSEARCH_LOCAL_FILE_SCHEME = "opensearchfile"  # must be a valid url scheme parsable by urlparse
 
-# CWL package (requirements/hints) corresponding to `PROCESS_APPLICATION`
+class OpenSearchField(Constants):
+    START_DATE = "StartDate"
+    END_DATE = "EndDate"
+    AOI = "aoi"
+    COLLECTION = "collection"
+    # data source cache
+    LOCAL_FILE_SCHEME = "opensearchfile"  # must be a valid url scheme parsable by urlparse
+
+
+# FIXME: convert to 'Constants' class
+# CWL package (requirements/hints) corresponding to `ProcessType.APPLICATION`
 CWL_REQUIREMENT_APP_BUILTIN = "BuiltinRequirement"
 CWL_REQUIREMENT_APP_DOCKER = "DockerRequirement"
 CWL_REQUIREMENT_APP_DOCKER_GPU = "DockerGpuRequirement"
@@ -42,6 +47,7 @@ CWL_REQUIREMENT_APP_TYPES = frozenset([
 Set of :term:`CWL` requirements consisting of known :term:`Application Package` by this `Weaver` instance.
 """
 
+# FIXME: convert to 'Constants' class
 CWL_REQUIREMENT_APP_REMOTE = frozenset([
     CWL_REQUIREMENT_APP_ESGF_CWT,
     CWL_REQUIREMENT_APP_WPS1,
@@ -50,6 +56,7 @@ CWL_REQUIREMENT_APP_REMOTE = frozenset([
 Set of :term:`CWL` requirements that correspond to remote execution of an :term:`Application Package`.
 """
 
+# FIXME: convert to 'Constants' class
 CWL_REQUIREMENT_ENV_VAR = "EnvVarRequirement"
 CWL_REQUIREMENT_INIT_WORKDIR = "InitialWorkDirRequirement"
 CWL_REQUIREMENT_SCATTER = "ScatterFeatureRequirement"
@@ -94,14 +101,16 @@ PACKAGE_TYPE_POSSIBLE_VALUES = frozenset(
     list(PACKAGE_SHORTCUTS)
 )
 
-PROCESS_SCHEMA_OGC = "OGC"
-PROCESS_SCHEMA_OLD = "OLD"
-PROCESS_SCHEMAS = frozenset([
-    PROCESS_SCHEMA_OGC,
-    PROCESS_SCHEMA_OLD,
-])
+
+class ProcessSchema(Constants):
+    """
+    Schema selector to represent a :term:`Process` description.
+    """
+    OGC = "OGC"
+    OLD = "OLD"
+
 
 if TYPE_CHECKING:
     from weaver.typedefs import Literal
 
-    ProcessSchemaType = Literal[PROCESS_SCHEMA_OGC, PROCESS_SCHEMA_OGC]
+    ProcessSchemaType = Literal[ProcessSchema.OGC, ProcessSchema.OLD]

@@ -33,19 +33,11 @@ from tests.utils import (
     setup_config_with_mongodb
 )
 from weaver import WEAVER_ROOT_DIR
-from weaver.config import WEAVER_CONFIGURATION_EMS, WEAVER_CONFIGURATION_HYBRID
-from weaver.formats import CONTENT_TYPE_APP_JSON
-from weaver.status import (
-    JOB_STATUS_CATEGORIES,
-    JOB_STATUS_CATEGORY_FINISHED,
-    JOB_STATUS_CATEGORY_RUNNING,
-    JOB_STATUS_VALUES,
-    STATUS_ACCEPTED,
-    STATUS_RUNNING,
-    STATUS_SUCCEEDED
-)
+from weaver.config import WeaverConfiguration
+from weaver.formats import ContentType
+from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory
 from weaver.utils import fetch_file, get_weaver_url, make_dirs, now, request_extra
-from weaver.visibility import VISIBILITY_PUBLIC
+from weaver.visibility import Visibility
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
@@ -118,8 +110,8 @@ class WorkflowTestRunnerBase(TestCase):
     __settings__ = None
     test_processes_info = dict()    # type: Dict[WorkflowProcesses, ProcessInfo]
     headers = {
-        "Accept": CONTENT_TYPE_APP_JSON,
-        "Content-Type": CONTENT_TYPE_APP_JSON,
+        "Accept": ContentType.APP_JSON,
+        "Content-Type": ContentType.APP_JSON,
     }                               # type: HeadersType
     cookies = dict()                # type: CookiesType
     app = None                      # type: Optional[WebTestApp]
@@ -181,7 +173,7 @@ class WorkflowTestRunnerBase(TestCase):
         cls.WEAVER_TEST_JOB_GET_STATUS_INTERVAL = int(cls.get_option("WEAVER_TEST_JOB_GET_STATUS_INTERVAL", 5))
 
         # server settings
-        cls.WEAVER_TEST_CONFIGURATION = cls.get_option("WEAVER_TEST_CONFIGURATION", WEAVER_CONFIGURATION_EMS)
+        cls.WEAVER_TEST_CONFIGURATION = cls.get_option("WEAVER_TEST_CONFIGURATION", WeaverConfiguration.EMS)
         cls.WEAVER_TEST_SERVER_HOSTNAME = cls.get_option("WEAVER_TEST_SERVER_HOSTNAME", "")
         cls.WEAVER_TEST_SERVER_BASE_PATH = cls.get_option("WEAVER_TEST_SERVER_BASE_PATH", "/weaver")
         cls.WEAVER_TEST_SERVER_API_PATH = cls.get_option("WEAVER_TEST_SERVER_API_PATH", "/")
@@ -656,7 +648,7 @@ class WorkflowTestRunnerBase(TestCase):
         if cls.WEAVER_URL and url.startswith("/") or url == "" and not with_mock_req:
             url = "{}{}".format(cls.WEAVER_URL, url)
 
-        if not json_body and data_body and headers and CONTENT_TYPE_APP_JSON in headers.get("Content-Type"):
+        if not json_body and data_body and headers and ContentType.APP_JSON in headers.get("Content-Type"):
             json_body = data_body
             data_body = None
 
@@ -688,11 +680,11 @@ class WorkflowTestRunnerBase(TestCase):
 
             # add some properties similar to `webtest.TestApp`
             resp_body = getattr(resp, "body", None)  # if error is pyramid HTTPException, body is byte only
-            if CONTENT_TYPE_APP_JSON in resp.headers.get("Content-Type", []):
+            if ContentType.APP_JSON in resp.headers.get("Content-Type", []):
                 if resp_body is None:
                     setattr(resp, "body", resp.json)
                 setattr(resp, "json", resp.json())
-                setattr(resp, "content_type", CONTENT_TYPE_APP_JSON)
+                setattr(resp, "content_type", ContentType.APP_JSON)
             else:
                 if resp_body is None:
                     setattr(resp, "body", resp.text)
@@ -729,7 +721,7 @@ class WorkflowTestRunnerBase(TestCase):
             cls.assert_response(resp, status, message)
 
         if log_enabled:
-            if CONTENT_TYPE_APP_JSON in resp.headers.get("Content-Type", []):
+            if ContentType.APP_JSON in resp.headers.get("Content-Type", []):
                 payload = cls.log_json_format(resp.json, 2)  # noqa
             else:
                 payload = resp.body
@@ -784,7 +776,7 @@ class WorkflowTestRunnerBase(TestCase):
         path_deploy = "/processes"
         for process_id in test_application_ids:
             path_visible = "{}/{}/visibility".format(path_deploy, self.test_processes_info[process_id].id)
-            data_visible = {"value": VISIBILITY_PUBLIC}
+            data_visible = {"value": Visibility.PUBLIC}
             allowed_status = [HTTPCreated.code, HTTPConflict.code] if has_duplicate_apps else HTTPCreated.code
             self.request("POST", path_deploy, status=allowed_status, headers=self.headers,
                          json=self.test_processes_info[process_id].deploy_payload,
@@ -799,9 +791,9 @@ class WorkflowTestRunnerBase(TestCase):
                      message="Expect deployed workflow process.")
         process_path = "{}/{}".format(path_deploy, workflow_info.id)
         visible_path = "{}/visibility".format(process_path)
-        visible = {"value": VISIBILITY_PUBLIC}
+        visible = {"value": Visibility.PUBLIC}
         resp = self.request("PUT", visible_path, json=visible, status=HTTPOk.code, headers=self.headers)
-        self.assert_test(lambda: resp.json.get("value") == VISIBILITY_PUBLIC,
+        self.assert_test(lambda: resp.json.get("value") == Visibility.PUBLIC,
                          message="Process should be public.")
 
         with contextlib.ExitStack() as stack_exec:
@@ -824,7 +816,7 @@ class WorkflowTestRunnerBase(TestCase):
             execute_path = "{}/jobs".format(process_path)
             resp = self.request("POST", execute_path, status=HTTPCreated.code,
                                 headers=self.headers, json=execute_body)
-            self.assert_test(lambda: resp.json.get("status") in JOB_STATUS_CATEGORIES[JOB_STATUS_CATEGORY_RUNNING],
+            self.assert_test(lambda: resp.json.get("status") in JOB_STATUS_CATEGORIES[StatusCategory.RUNNING],
                              message="Response process execution job status should be one of running values.")
             job_location = resp.json.get("location")
             job_id = resp.json.get("jobID")
@@ -847,27 +839,27 @@ class WorkflowTestRunnerBase(TestCase):
                 lambda: timeout_accept > 0,
                 message="Maximum timeout reached for job execution test. " +
                         "Expected job status change from '{0}' to '{1}' within {2}s since first '{0}'."
-                        .format(STATUS_ACCEPTED, STATUS_RUNNING, self.WEAVER_TEST_JOB_ACCEPTED_MAX_TIMEOUT))
+                        .format(Status.ACCEPTED, Status.RUNNING, self.WEAVER_TEST_JOB_ACCEPTED_MAX_TIMEOUT))
             self.assert_test(
                 lambda: timeout_running > 0,
                 message="Maximum timeout reached for job execution test. " +
                         "Expected job status change from '{0}' to '{1}' within {2}s since first '{0}'."
-                        .format(STATUS_RUNNING, STATUS_SUCCEEDED, self.WEAVER_TEST_JOB_RUNNING_MAX_TIMEOUT))
+                        .format(Status.RUNNING, Status.SUCCEEDED, self.WEAVER_TEST_JOB_RUNNING_MAX_TIMEOUT))
             resp = self.request("GET", job_location_url,
                                 headers=user_headers, cookies=user_cookies, status=HTTPOk.code)
             status = resp.json.get("status")
-            self.assert_test(lambda: status in JOB_STATUS_VALUES,
+            self.assert_test(lambda: status in Status.values(),
                              message="Cannot identify a valid job status for result validation.")
-            if status in JOB_STATUS_CATEGORIES[JOB_STATUS_CATEGORY_RUNNING]:
-                if status == STATUS_ACCEPTED:
+            if status in JOB_STATUS_CATEGORIES[StatusCategory.RUNNING]:
+                if status == Status.ACCEPTED:
                     timeout_accept -= self.WEAVER_TEST_JOB_GET_STATUS_INTERVAL
                 else:
                     timeout_running -= self.WEAVER_TEST_JOB_GET_STATUS_INTERVAL
                 time.sleep(self.WEAVER_TEST_JOB_GET_STATUS_INTERVAL)
                 continue
-            if status in JOB_STATUS_CATEGORIES[JOB_STATUS_CATEGORY_FINISHED]:
+            if status in JOB_STATUS_CATEGORIES[StatusCategory.FINISHED]:
                 msg = "Job execution '{}' failed, but expected to succeed.".format(job_location_url)
-                failed = status != STATUS_SUCCEEDED
+                failed = status != Status.SUCCEEDED
                 if failed:
                     msg += "\n" + self.try_retrieve_logs(job_location_url)
                 self.assert_test(lambda: not failed, message=msg)
@@ -910,7 +902,7 @@ class WorkflowTestRunnerBase(TestCase):
 
 
 class WorkflowTestCase(WorkflowTestRunnerBase):
-    WEAVER_TEST_CONFIGURATION = WEAVER_CONFIGURATION_HYBRID
+    WEAVER_TEST_CONFIGURATION = WeaverConfiguration.HYBRID
     WEAVER_TEST_SERVER_BASE_PATH = ""
 
     WEAVER_TEST_APPLICATION_SET = {

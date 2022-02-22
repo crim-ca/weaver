@@ -6,14 +6,14 @@ from typing import TYPE_CHECKING
 from pyramid.httpexceptions import HTTPConflict, HTTPForbidden, HTTPNotFound, HTTPOk, HTTPUnauthorized
 from pyramid.settings import asbool
 
-from weaver import status
 from weaver.exceptions import PackageExecutionError
-from weaver.execute import EXECUTE_MODE_ASYNC, EXECUTE_RESPONSE_DOCUMENT, EXECUTE_TRANSMISSION_MODE_REFERENCE
-from weaver.formats import CONTENT_TYPE_APP_FORM, CONTENT_TYPE_APP_JSON
+from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
+from weaver.formats import ContentType
 from weaver.processes import opensearch
 from weaver.processes.sources import get_data_source_from_url, retrieve_data_source_url
 from weaver.processes.utils import map_progress
-from weaver.processes.wps_process_base import WpsProcessInterface
+from weaver.processes.wps_process_base import WpsProcessInterface, WpsRemoteJobProgress
+from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.utils import (
     get_any_id,
     get_any_message,
@@ -24,7 +24,7 @@ from weaver.utils import (
     repr_json,
     request_extra
 )
-from weaver.visibility import VISIBILITY_PUBLIC
+from weaver.visibility import Visibility
 from weaver.warning import MissingParameterWarning
 from weaver.wps_restapi import swagger_definitions as sd
 
@@ -45,15 +45,17 @@ if TYPE_CHECKING:
 
 LOGGER = logging.getLogger(__name__)
 
-REMOTE_JOB_PROGRESS_PROVIDER = 1
-REMOTE_JOB_PROGRESS_PREPARE = 2
-REMOTE_JOB_PROGRESS_DEPLOY = 3
-REMOTE_JOB_PROGRESS_VISIBLE = 4
-REMOTE_JOB_PROGRESS_READY = 5
-REMOTE_JOB_PROGRESS_EXECUTION = 9
-REMOTE_JOB_PROGRESS_MONITORING = 10
-REMOTE_JOB_PROGRESS_FETCH_OUT = 90
-REMOTE_JOB_PROGRESS_COMPLETED = 100
+
+class Wps3RemoteJobProgress(WpsRemoteJobProgress):
+    PROVIDER = 1
+    PREPARE = 2
+    DEPLOY = 3
+    VISIBLE = 4
+    READY = 5
+    EXECUTION = 9
+    MONITORING = 10
+    FETCH_OUT = 90
+    COMPLETED = 100
 
 
 class Wps3Process(WpsProcessInterface):
@@ -95,7 +97,7 @@ class Wps3Process(WpsProcessInterface):
 
         self.provider = data_source  # fix immediately for below `update_status` call
         self.update_status("Provider {provider} is selected {reason}.".format(provider=data_source, reason=reason),
-                           REMOTE_JOB_PROGRESS_PROVIDER, status.STATUS_RUNNING)
+                           Wps3RemoteJobProgress.PROVIDER, Status.RUNNING)
 
         return data_source, url, deploy_body
 
@@ -119,12 +121,12 @@ class Wps3Process(WpsProcessInterface):
                 "password": ades_pwd,
                 "scope": "openid",
             }
-            ades_headers = {"Content-Type": CONTENT_TYPE_APP_FORM, "Accept": CONTENT_TYPE_APP_JSON}
+            ades_headers = {"Content-Type": ContentType.APP_FORM, "Accept": ContentType.APP_JSON}
             ades_access_token_url = "{}/oauth2/token".format(ades_url)
             cred_resp = request_extra("post", ades_access_token_url,
                                       data=ades_body, headers=ades_headers, settings=self.settings)
             cred_resp.raise_for_status()
-            if CONTENT_TYPE_APP_JSON not in cred_resp.headers.get("Content-Type"):
+            if ContentType.APP_JSON not in cred_resp.headers.get("Content-Type"):
                 raise HTTPUnauthorized("Cannot retrieve valid access token using credential or ADES configurations.")
             access_token = cred_resp.json().get("access_token", None)
             if not access_token:
@@ -176,12 +178,12 @@ class Wps3Process(WpsProcessInterface):
             return False
         if response.status_code == HTTPOk.code:
             json_body = response.json()
-            return json_body.get("value") == VISIBILITY_PUBLIC
+            return json_body.get("value") == Visibility.PUBLIC
         response.raise_for_status()
 
     def set_visibility(self, visibility):
         self.update_status("Updating process visibility on remote ADES.",
-                           REMOTE_JOB_PROGRESS_VISIBLE, status.STATUS_RUNNING)
+                           Wps3RemoteJobProgress.VISIBLE, Status.RUNNING)
         path = self.url + sd.process_visibility_service.path.format(process_id=self.process)
         LOGGER.debug("Update process WPS visibility request for [%s] at [%s]", self.process, path)
         response = self.make_request(method="PUT",
@@ -207,7 +209,7 @@ class Wps3Process(WpsProcessInterface):
 
     def deploy(self):
         self.update_status("Deploying process on remote ADES.",
-                           REMOTE_JOB_PROGRESS_DEPLOY, status.STATUS_RUNNING)
+                           Wps3RemoteJobProgress.DEPLOY, Status.RUNNING)
         path = self.url + sd.processes_service.path
         LOGGER.debug("Deploy process WPS request for [%s] at [%s]", self.process, path)
         response = self.make_request(method="POST", url=path, json=self.deploy_body, retry=True)
@@ -231,7 +233,7 @@ class Wps3Process(WpsProcessInterface):
         else:
             LOGGER.info("Process [%s] enforcing to public visibility.", self.process)
             try:
-                self.set_visibility(visibility=VISIBILITY_PUBLIC)
+                self.set_visibility(visibility=Visibility.PUBLIC)
             except Exception as exc:
                 pass_http_error(exc, HTTPNotFound)
                 LOGGER.warning("Process [%s] failed setting public visibility. "
@@ -240,15 +242,15 @@ class Wps3Process(WpsProcessInterface):
     def format_outputs(self, workflow_outputs):
         # type: (JobOutputs) -> JobOutputs
         for output in workflow_outputs:
-            output.update({"transmissionMode": EXECUTE_TRANSMISSION_MODE_REFERENCE})
+            output.update({"transmissionMode": ExecuteTransmissionMode.REFERENCE})
         return workflow_outputs
 
     def dispatch(self, process_inputs, process_outputs):
         # type: (JobInputs, JobOutputs) -> Any
         LOGGER.debug("Execute process WPS request for [%s]", self.process)
         execute_body = {
-            "mode": EXECUTE_MODE_ASYNC,
-            "response": EXECUTE_RESPONSE_DOCUMENT,
+            "mode": ExecuteMode.ASYNC,
+            "response": ExecuteResponse.DOCUMENT,
             "inputs": process_inputs,
             "outputs": process_outputs
         }
@@ -266,16 +268,16 @@ class Wps3Process(WpsProcessInterface):
         # type: (str) -> bool
         job_status_uri = monitor_reference
         job_status_data = self.get_job_status(job_status_uri)
-        job_status_value = status.map_status(job_status_data["status"])
+        job_status_value = map_status(job_status_data["status"])
         job_id = job_status_data["jobID"]
 
         self.update_status("Monitoring job on remote ADES : {0}".format(job_status_uri),
-                           REMOTE_JOB_PROGRESS_MONITORING, status.STATUS_RUNNING)
+                           Wps3RemoteJobProgress.MONITORING, Status.RUNNING)
 
-        while job_status_value not in status.JOB_STATUS_CATEGORIES[status.JOB_STATUS_CATEGORY_FINISHED]:
+        while job_status_value not in JOB_STATUS_CATEGORIES[StatusCategory.FINISHED]:
             sleep(5)
             job_status_data = self.get_job_status(job_status_uri)
-            job_status_value = status.map_status(job_status_data["status"])
+            job_status_value = map_status(job_status_data["status"])
 
             LOGGER.debug(get_log_monitor_msg(job_id, job_status_value,
                                              job_status_data.get("percentCompleted", 0),
@@ -285,10 +287,10 @@ class Wps3Process(WpsProcessInterface):
                                                progress=job_status_data.get("percentCompleted", 0),
                                                duration=job_status_data.get("duration", None)),  # get if available
                                map_progress(job_status_data.get("percentCompleted", 0),
-                                            REMOTE_JOB_PROGRESS_MONITORING, REMOTE_JOB_PROGRESS_FETCH_OUT),
-                               status.STATUS_RUNNING)
+                                            Wps3RemoteJobProgress.MONITORING, Wps3RemoteJobProgress.FETCH_OUT),
+                               Status.RUNNING)
 
-        if job_status_value != status.STATUS_SUCCEEDED:
+        if job_status_value != Status.SUCCEEDED:
             LOGGER.debug(get_log_monitor_msg(job_id, job_status_value,
                                              job_status_data.get("percentCompleted", 0),
                                              get_any_message(job_status_data), job_status_data.get("statusLocation")))
@@ -306,7 +308,7 @@ class Wps3Process(WpsProcessInterface):
         job_id = job_status_uri.split("/")[-1]
         if "jobID" not in job_status:
             job_status["jobID"] = job_id  # provide if not implemented by ADES
-        job_status["status"] = status.map_status(job_status["status"])
+        job_status["status"] = map_status(job_status["status"])
         return job_status
 
     def get_results(self, monitor_reference):

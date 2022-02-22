@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 from pyramid.httpexceptions import HTTPForbidden, HTTPNotFound
 
-from weaver.config import WEAVER_CONFIGURATIONS_REMOTE, get_weaver_configuration
+from weaver.config import WeaverFeature, get_weaver_configuration
 from weaver.database import get_db
 from weaver.exceptions import ServiceNotFound
 from weaver.store.base import StoreServices
@@ -47,7 +47,7 @@ def forbid_local_only(container):
     Raises an HTTP exception forbidding to resume the operation if invalid configuration is detected.
     """
     config = get_weaver_configuration(container)
-    if config not in WEAVER_CONFIGURATIONS_REMOTE:
+    if config not in WeaverFeature.REMOTE:
         raise HTTPForbidden(json={
             "description":
                 "Invalid provider operation on [{}] instance. "

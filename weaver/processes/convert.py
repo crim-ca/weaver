@@ -20,20 +20,8 @@ from pywps.validator.mode import MODE
 
 from weaver import xml_util
 from weaver.exceptions import PackageTypeError
-from weaver.execute import (
-    EXECUTE_MODE_ASYNC,
-    EXECUTE_RESPONSE_DOCUMENT,
-    EXECUTE_TRANSMISSION_MODE_REFERENCE,
-    EXECUTE_TRANSMISSION_MODE_VALUE
-)
-from weaver.formats import (
-    CONTENT_TYPE_ANY,
-    CONTENT_TYPE_APP_JSON,
-    CONTENT_TYPE_TEXT_PLAIN,
-    get_cwl_file_format,
-    get_extension,
-    get_format
-)
+from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
+from weaver.formats import ContentType, get_cwl_file_format, get_extension, get_format
 from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_WPS1,
     PACKAGE_ARRAY_BASE,
@@ -43,8 +31,6 @@ from weaver.processes.constants import (
     PACKAGE_CUSTOM_TYPES,
     PACKAGE_ENUM_BASE,
     PACKAGE_LITERAL_TYPES,
-    PROCESS_SCHEMA_OGC,
-    PROCESS_SCHEMA_OLD,
     WPS_BOUNDINGBOX,
     WPS_COMPLEX,
     WPS_COMPLEX_DATA,
@@ -52,7 +38,8 @@ from weaver.processes.constants import (
     WPS_LITERAL,
     WPS_LITERAL_DATA_TYPE_NAMES,
     WPS_OUTPUT,
-    WPS_REFERENCE
+    WPS_REFERENCE,
+    ProcessSchema
 )
 from weaver.utils import (
     bytes2str,
@@ -160,7 +147,7 @@ WPS_COMPLEX_TYPES = [WPS_COMPLEX, WPS_COMPLEX_DATA, WPS_REFERENCE]
 WPS_ALL_TYPES = [WPS_LITERAL, WPS_BOUNDINGBOX] + WPS_COMPLEX_TYPES
 
 # default format if missing (minimal requirement of one)
-DEFAULT_FORMAT = Format(mime_type=CONTENT_TYPE_TEXT_PLAIN)
+DEFAULT_FORMAT = Format(mime_type=ContentType.TEXT_PLAIN)
 DEFAULT_FORMAT_MISSING = "__DEFAULT_FORMAT_MISSING__"
 setattr(DEFAULT_FORMAT, DEFAULT_FORMAT_MISSING, True)
 
@@ -397,7 +384,7 @@ def _get_multi_json_references(output, container):
         Array of HTTP(S) references if the specified output is effectively a JSON containing that, ``None`` otherwise.
     """
     # Check for the json datatype and mime-type
-    if output.dataType == WPS_COMPLEX_DATA and output.mimeType == CONTENT_TYPE_APP_JSON:
+    if output.dataType == WPS_COMPLEX_DATA and output.mimeType == ContentType.APP_JSON:
         try:
             # If the json data is referenced read it's content
             if output.reference:
@@ -455,7 +442,7 @@ def any2cwl_io(wps_io, io_select):
     # FIXME: BoundingBox not implemented (https://github.com/crim-ca/weaver/issues/51)
     else:
         cwl_io_fmt = None
-        cwl_io_ext = CONTENT_TYPE_ANY
+        cwl_io_ext = ContentType.ANY
         cwl_io["type"] = "File"
 
         # inputs are allowed to define multiple 'supported' formats
@@ -498,12 +485,12 @@ def any2cwl_io(wps_io, io_select):
         if cwl_io_fmt:
             cwl_io["format"] = cwl_io_fmt
         # for backward compatibility with deployed processes, consider text/plan as 'any' for glob pattern
-        cwl_io_txt = get_extension(CONTENT_TYPE_TEXT_PLAIN)
+        cwl_io_txt = get_extension(ContentType.TEXT_PLAIN)
         if cwl_io_ext == cwl_io_txt:
-            cwl_io_any = get_extension(CONTENT_TYPE_ANY)
+            cwl_io_any = get_extension(ContentType.ANY)
             LOGGER.warning("Replacing '%s' [%s] to generic '%s' [%s] glob pattern. "
                            "More explicit format could be considered for %s '%s'.",
-                           CONTENT_TYPE_TEXT_PLAIN, cwl_io_txt, CONTENT_TYPE_ANY, cwl_io_any, io_select, wps_io_id)
+                           ContentType.TEXT_PLAIN, cwl_io_txt, ContentType.ANY, cwl_io_any, io_select, wps_io_id)
             cwl_io_ext = cwl_io_any
         if io_select == WPS_OUTPUT:
             # FIXME: (?) how to specify the 'name' part of the glob (using the "id" value for now)
@@ -978,7 +965,7 @@ def cwl2wps_io(io_info, io_select):
         return io_complex(**kw)
 
 
-def cwl2json_input_values(data, schema=PROCESS_SCHEMA_OGC):
+def cwl2json_input_values(data, schema=ProcessSchema.OGC):
     # type: (Dict[str, CWL_IO_Value], ProcessSchemaType) -> ExecutionInputs
     """
     Converts :term:`CWL` formatted :term:`Job` inputs to corresponding :term:`OGC API - Processes` format.
@@ -1022,11 +1009,11 @@ def cwl2json_input_values(data, schema=PROCESS_SCHEMA_OGC):
         else:
             raise ValueError(f"Input [{input_id}] value definition could not be parsed: {input_value!s}")
     schema = schema.upper()
-    if schema == PROCESS_SCHEMA_OGC:
+    if schema == ProcessSchema.OGC:
         return inputs
-    if schema != PROCESS_SCHEMA_OLD:
+    if schema != ProcessSchema.OLD:
         raise NotImplementedError(f"Unknown conversion format of input values for schema: [{schema}]")
-    return convert_input_values_schema(inputs, PROCESS_SCHEMA_OLD)
+    return convert_input_values_schema(inputs, ProcessSchema.OLD)
 
 
 def convert_input_values_schema(inputs, schema):
@@ -1039,17 +1026,17 @@ def convert_input_values_schema(inputs, schema):
     :return: Converted inputs.
     """
     if (
-        (schema == PROCESS_SCHEMA_OGC and isinstance(inputs, dict)) or
-        (schema == PROCESS_SCHEMA_OLD and isinstance(inputs, list))
+        (schema == ProcessSchema.OGC and isinstance(inputs, dict)) or
+        (schema == ProcessSchema.OLD and isinstance(inputs, list))
     ):
         return inputs
     if (
-        (schema == PROCESS_SCHEMA_OGC and not isinstance(inputs, list)) or
-        (schema == PROCESS_SCHEMA_OLD and not isinstance(inputs, dict))
+        (schema == ProcessSchema.OGC and not isinstance(inputs, list)) or
+        (schema == ProcessSchema.OLD and not isinstance(inputs, dict))
     ):
         name = fully_qualified_name(inputs)
         raise ValueError(f"Unknown conversion method to schema [{schema}] for inputs of type [{name}]: {inputs}")
-    if schema == PROCESS_SCHEMA_OGC:
+    if schema == ProcessSchema.OGC:
         input_dict = {}
         for input_item in inputs:
             input_id = get_any_id(input_item, pop=True)
@@ -1065,7 +1052,7 @@ def convert_input_values_schema(inputs, schema):
                 input_prev = input_dict[input_id]
                 input_dict[input_id] = [input_prev, input_data]
         return input_dict
-    if schema == PROCESS_SCHEMA_OLD:
+    if schema == ProcessSchema.OLD:
         input_list = []
         for input_id, input_value in inputs.items():
             # list must be flattened with repeating ID
@@ -1586,8 +1573,8 @@ def wps2json_job_payload(wps_request, wps_process):
     data = {
         "inputs": [],
         "outputs": [],
-        "response": EXECUTE_RESPONSE_DOCUMENT,
-        "mode": EXECUTE_MODE_ASYNC,
+        "response": ExecuteResponse.DOCUMENT,
+        "mode": ExecuteMode.ASYNC,
     }
     multi_inputs = list(wps_request.inputs.values())
     for input_list in multi_inputs:
@@ -1608,9 +1595,9 @@ def wps2json_job_payload(wps_request, wps_process):
         else:
             data_output = wps_request.outputs[oid]
         if as_ref:
-            data_output["transmissionMode"] = EXECUTE_TRANSMISSION_MODE_REFERENCE
+            data_output["transmissionMode"] = ExecuteTransmissionMode.REFERENCE
         else:
-            data_output["transmissionMode"] = EXECUTE_TRANSMISSION_MODE_VALUE
+            data_output["transmissionMode"] = ExecuteTransmissionMode.VALUE
         data_output["id"] = oid
         data["outputs"].append(data_output)
     return data

@@ -29,7 +29,7 @@ from pywps.exceptions import InvalidParameterValue, MissingParameterValue, NoApp
 from webob.acceptparse import create_accept_header
 from zope.interface import implementer
 
-from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML, CONTENT_TYPE_TEXT_HTML, CONTENT_TYPE_TEXT_XML
+from weaver.formats import ContentType
 from weaver.utils import clean_json_text_body
 from weaver.warning import MissingParameterWarning, UnsupportedOperationWarning
 
@@ -88,7 +88,7 @@ class OWSException(Response, Exception):
         Response.__init__(self, status=status, **kw)
         Exception.__init__(self, detail)
         self.message = detail or self.description or getattr(self, "explanation", None)
-        self.content_type = CONTENT_TYPE_APP_JSON
+        self.content_type = ContentType.APP_JSON
         if locator:
             self.locator = locator
         try:
@@ -127,14 +127,14 @@ class OWSException(Response, Exception):
             # Attempt to match XML or JSON, if those don't match, we will fall back to defaulting to JSON
             #   since browsers add HTML automatically and it is closer to XML, we 'allow' it only to catch this
             #   explicit case and fallback to JSON manually
-            match = accept.best_match([CONTENT_TYPE_TEXT_HTML, CONTENT_TYPE_APP_JSON,
-                                       CONTENT_TYPE_TEXT_XML, CONTENT_TYPE_APP_XML],
-                                      default_match=CONTENT_TYPE_APP_JSON)
-            if match == CONTENT_TYPE_TEXT_HTML:
-                match = CONTENT_TYPE_APP_JSON
+            match = accept.best_match([ContentType.TEXT_HTML, ContentType.APP_JSON,
+                                       ContentType.TEXT_XML, ContentType.APP_XML],
+                                      default_match=ContentType.APP_JSON)
+            if match == ContentType.TEXT_HTML:
+                match = ContentType.APP_JSON
 
-            if match == CONTENT_TYPE_APP_JSON:
-                self.content_type = CONTENT_TYPE_APP_JSON
+            if match == ContentType.APP_JSON:
+                self.content_type = ContentType.APP_JSON
 
                 # json exception response should not have status 200
                 if self.status_code == HTTPOk.code:
@@ -158,7 +158,7 @@ class OWSException(Response, Exception):
                 page_template = JsonPageTemplate(self)
                 args = {"code": self.code, "locator": self.locator, "message": self.message}
             else:
-                self.content_type = CONTENT_TYPE_TEXT_XML
+                self.content_type = ContentType.TEXT_XML
                 page_template = self.page_template
                 args = {
                     "code": self.code,

@@ -16,8 +16,8 @@ from pywps.inout.inputs import LiteralInput
 
 from tests.utils import setup_mongodb_processstore
 from weaver.processes import opensearch
-from weaver.processes.constants import OPENSEARCH_AOI, OPENSEARCH_END_DATE, OPENSEARCH_START_DATE
-from weaver.processes.opensearch import _make_specific_identifier  # noqa: W0212
+from weaver.processes.constants import OpenSearchField
+from weaver.processes.opensearch import make_param_id
 from weaver.utils import get_any_id
 from weaver.wps_restapi.processes import processes
 
@@ -110,9 +110,9 @@ def test_transform_execute_parameters_wps():
 
     inputs = dict(
         [
-            make_deque(OPENSEARCH_START_DATE, "2018-01-30T00:00:00.000Z"),
-            make_deque(OPENSEARCH_END_DATE, "2018-01-31T23:59:59.999Z"),
-            make_deque(OPENSEARCH_AOI, "100.4,15.3,104.6,19.3"),
+            make_deque(OpenSearchField.START_DATE, "2018-01-30T00:00:00.000Z"),
+            make_deque(OpenSearchField.END_DATE, "2018-01-31T23:59:59.999Z"),
+            make_deque(OpenSearchField.AOI, "100.4,15.3,104.6,19.3"),
             make_deque("files", COLLECTION_IDS["sentinel2"]),
             make_deque("output_file_type", "GEOTIFF"),
             make_deque("output_name", "stack_result.tif"),
@@ -296,11 +296,11 @@ def test_get_template_probav():
 
 def inputs_unique_aoi_toi(files_id):
     return {
-        OPENSEARCH_AOI: deque([LiteralInput(OPENSEARCH_AOI, "Area", data_type="string")]),
-        OPENSEARCH_START_DATE: deque(
-            [LiteralInput(OPENSEARCH_START_DATE, "Start Date", data_type="string")]
+        OpenSearchField.AOI: deque([LiteralInput(OpenSearchField.AOI, "Area", data_type="string")]),
+        OpenSearchField.START_DATE: deque(
+            [LiteralInput(OpenSearchField.START_DATE, "Start Date", data_type="string")]
         ),
-        OPENSEARCH_END_DATE: deque([LiteralInput(OPENSEARCH_END_DATE, "End Date", data_type="string")]),
+        OpenSearchField.END_DATE: deque([LiteralInput(OpenSearchField.END_DATE, "End Date", data_type="string")]),
         files_id: deque(
             [LiteralInput(files_id, "Collection of the data.", data_type="string", max_occurs=4)]
         ),
@@ -308,9 +308,9 @@ def inputs_unique_aoi_toi(files_id):
 
 
 def inputs_non_unique_aoi_toi(files_id):
-    end_date = _make_specific_identifier(OPENSEARCH_END_DATE, files_id)
-    start_date = _make_specific_identifier(OPENSEARCH_START_DATE, files_id)
-    aoi = _make_specific_identifier(OPENSEARCH_AOI, files_id)
+    end_date = make_param_id(OpenSearchField.END_DATE, files_id)
+    start_date = make_param_id(OpenSearchField.START_DATE, files_id)
+    aoi = make_param_id(OpenSearchField.AOI, files_id)
     return {
         aoi: deque([LiteralInput(aoi, "Area", data_type="string")]),
         start_date: deque([LiteralInput(start_date, "Area", data_type="string")]),
@@ -322,11 +322,11 @@ def inputs_non_unique_aoi_toi(files_id):
 
 
 def query_param_names(unique_aoi_toi, identifier):
-    end_date, start_date, aoi = OPENSEARCH_END_DATE, OPENSEARCH_START_DATE, OPENSEARCH_AOI
+    end_date, start_date, aoi = OpenSearchField.END_DATE, OpenSearchField.START_DATE, OpenSearchField.AOI
     if not unique_aoi_toi:
-        end_date = _make_specific_identifier(end_date, identifier)
-        start_date = _make_specific_identifier(start_date, identifier)
-        aoi = _make_specific_identifier(aoi, identifier)
+        end_date = make_param_id(end_date, identifier)
+        start_date = make_param_id(start_date, identifier)
+        aoi = make_param_id(aoi, identifier)
     return end_date, start_date, aoi
 
 

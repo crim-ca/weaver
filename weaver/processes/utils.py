@@ -20,8 +20,8 @@ from pyramid.httpexceptions import (
 from pyramid.settings import asbool
 
 from weaver.config import (
-    WEAVER_CONFIGURATIONS_REMOTE,
     WEAVER_DEFAULT_WPS_PROCESSES_CONFIG,
+    WeaverFeature,
     get_weaver_config_file,
     get_weaver_configuration
 )
@@ -39,10 +39,10 @@ from weaver.exceptions import (
     ServiceNotFound,
     log_unhandled_exceptions
 )
-from weaver.processes.types import PROCESS_APPLICATION, PROCESS_BUILTIN, PROCESS_WORKFLOW
+from weaver.processes.types import ProcessType
 from weaver.store.base import StoreProcesses, StoreServices
 from weaver.utils import get_sane_name, get_settings, get_url_without_query
-from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC
+from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_client
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
@@ -84,7 +84,7 @@ def get_process(process_id=None, request=None, settings=None, store=None):
     if store is None:
         store = get_db(settings or request).get_store(StoreProcesses)
     try:
-        process = store.fetch_by_id(process_id, visibility=VISIBILITY_PUBLIC)
+        process = store.fetch_by_id(process_id, visibility=Visibility.PUBLIC)
         return process
     except (InvalidIdentifierValue, MissingIdentifierValue) as ex:
         raise HTTPBadRequest(str(ex))
@@ -202,7 +202,7 @@ def _validate_deploy_process_info(process_info, reference, package, settings, he
 
         # validate process type and package against weaver configuration
         cfg = get_weaver_configuration(settings)
-        if cfg not in WEAVER_CONFIGURATIONS_REMOTE:
+        if cfg not in WeaverFeature.REMOTE:
             problem = check_package_instance_compatible(info["package"])
             if problem:
                 raise HTTPForbidden(json={
@@ -262,7 +262,7 @@ def deploy_process_from_payload(payload, container, overwrite=False):
         package = None
         reference = content.get("href")
     elif deployment_profile_name:
-        if not any(deployment_profile_name.endswith(typ) for typ in [PROCESS_APPLICATION, PROCESS_WORKFLOW]):
+        if not any(deployment_profile_name.endswith(typ) for typ in [ProcessType.APPLICATION, ProcessType.WORKFLOW]):
             raise HTTPBadRequest("Invalid value for parameter 'deploymentProfileName'.")
         execution_units = payload.get("executionUnit")
         if not isinstance(execution_units, list):
@@ -278,10 +278,11 @@ def deploy_process_from_payload(payload, container, overwrite=False):
     else:
         raise HTTPBadRequest("Missing one of required parameters [href, owsContext, deploymentProfileName].")
 
-    if process_info.get("type", "") == PROCESS_BUILTIN:
+    if process_info.get("type", "") == ProcessType.BUILTIN:
         raise HTTPBadRequest(
             "Invalid process type resolved from package: [{0}]. Deployment of {0} process is not allowed."
-            .format(PROCESS_BUILTIN))
+            .format(ProcessType.BUILTIN)
+        )
 
     # update and validate process information using WPS process offering, CWL/WPS reference or CWL package definition
     settings = get_settings(container)
@@ -406,7 +407,7 @@ def register_wps_processes_static(service_url, service_name, service_visibility,
         proc_url = "{}?service=WPS&request=DescribeProcess&identifier={}&version={}".format(
             service_url, wps_process.identifier, wps.version
         )
-        svc_vis = VISIBILITY_PUBLIC if service_visibility else VISIBILITY_PRIVATE
+        svc_vis = Visibility.PUBLIC if service_visibility else Visibility.PRIVATE
         try:
             old_process = process_store.fetch_by_id(proc_id)
         except ProcessNotFound:

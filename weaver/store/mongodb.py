@@ -37,24 +37,13 @@ from weaver.exceptions import (
     VaultFileNotFound,
     VaultFileRegistrationError
 )
-from weaver.execute import EXECUTE_MODE_ASYNC, EXECUTE_MODE_SYNC
-from weaver.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW, PROCESS_WPS_LOCAL
-from weaver.sort import (
-    BILL_SORT_VALUES,
-    JOB_SORT_VALUES,
-    PROCESS_SORT_VALUES,
-    QUOTE_SORT_VALUES,
-    SORT_CREATED,
-    SORT_FINISHED,
-    SORT_ID,
-    SORT_ID_LONG,
-    SORT_PROCESS,
-    SORT_USER
-)
-from weaver.status import JOB_STATUS_CATEGORIES, STATUS_ACCEPTED, map_status
+from weaver.execute import ExecuteMode
+from weaver.processes.types import ProcessType
+from weaver.sort import Sort, SortMethods
+from weaver.status import JOB_STATUS_CATEGORIES, Status, map_status
 from weaver.store.base import StoreBills, StoreJobs, StoreProcesses, StoreQuotes, StoreServices, StoreVault
 from weaver.utils import get_base_url, get_sane_name, get_weaver_url, islambda, now, repr_json
-from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC, VISIBILITY_VALUES
+from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_url
 
 if TYPE_CHECKING:
@@ -62,8 +51,10 @@ if TYPE_CHECKING:
     from typing import Any, Callable, Dict, List, Optional, Tuple, Union
     from pymongo.collection import Collection
 
+    from weaver.processes.types import AnyProcessType
     from weaver.store.base import DatetimeIntervalType, JobGroupCategory, JobSearchResult
-    from weaver.typedefs import AnyProcess, AnyProcessType, AnyUUID, AnyValueType
+    from weaver.typedefs import AnyProcess, AnyProcessClass, AnyUUID, AnyValueType
+    from weaver.visibility import AnyVisibility
 
     MongodbValue = Union[AnyValueType, datetime.datetime]
     MongodbSearchFilter = Dict[str, Union[MongodbValue, List[MongodbValue], Dict[str, AnyValueType]]]
@@ -108,6 +99,7 @@ class MongodbServiceStore(StoreServices, MongodbStore):
     """
 
     def __init__(self, *args, **kwargs):
+        # type: (Any, Any) -> None
         db_args, db_kwargs = MongodbStore.get_args_kwargs(*args, **kwargs)
         StoreServices.__init__(self)
         MongodbStore.__init__(self, *db_args, **db_kwargs)
@@ -157,7 +149,7 @@ class MongodbServiceStore(StoreServices, MongodbStore):
         return my_services
 
     def fetch_by_name(self, name, visibility=None):
-        # type: (str, Optional[str]) -> Service
+        # type: (str, Optional[AnyVisibility]) -> Service
         """
         Gets service for given ``name`` from `MongoDB` storage.
         """
@@ -165,8 +157,11 @@ class MongodbServiceStore(StoreServices, MongodbStore):
         if not service:
             raise ServiceNotFound("Service '{}' could not be found.".format(name))
         service = Service(service)
-        same_visibility = (service.public and visibility == VISIBILITY_PUBLIC) or \
-                          (not service.public and visibility == VISIBILITY_PRIVATE)
+        vis = Visibility.get(visibility)
+        same_visibility = (
+            (service.public and vis == Visibility.PUBLIC) or
+            (not service.public and vis == Visibility.PRIVATE)
+        )
         if visibility is not None and not same_visibility:
             raise ServiceNotAccessible("Service '{}' cannot be accessed.".format(name))
         return service
@@ -202,7 +197,7 @@ class ListingMixin(object):
         sort = sort_field  # keep original sort field in case of error
         if sort is None:
             sort = sort_default
-        elif sort == SORT_USER:
+        elif sort == Sort.USER:
             sort = "user_id"
         if sort not in sort_allowed:
             raise ListingInvalidParameter(json={
@@ -210,7 +205,7 @@ class ListingMixin(object):
                 "cause": "sort",
                 "value": str(sort_field),
             })
-        sort_order = DESCENDING if sort in (SORT_FINISHED, SORT_CREATED) else ASCENDING
+        sort_order = DESCENDING if sort in (Sort.FINISHED, Sort.CREATED) else ASCENDING
         return {sort: sort_order}
 
     @staticmethod
@@ -281,6 +276,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
     """
 
     def __init__(self, *args, **kwargs):
+        # type: (Any, Any) -> None
         db_args, db_kwargs = MongodbStore.get_args_kwargs(*args, **kwargs)
         StoreProcesses.__init__(self)
         MongodbStore.__init__(self, *db_args, **db_kwargs)
@@ -372,7 +368,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
 
     @staticmethod
     def _get_process_field(process, function_dict):
-        # type: (AnyProcess, Union[Dict[AnyProcessType, Callable[[], Any]], Callable[[], Any]]) -> Any
+        # type: (AnyProcess, Union[Dict[AnyProcessClass, Callable[[], Any]], Callable[[], Any]]) -> Any
         """
         Obtain a field from a process instance after validation and using mapping of process implementation functions.
 
@@ -400,10 +396,10 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         return self._get_process_field(process, lambda: process.identifier)
 
     def _get_process_type(self, process):
-        # type: (AnyProcess) -> str
+        # type: (AnyProcess) -> AnyProcessType
         return self._get_process_field(process, {
             Process: lambda: process.type,
-            ProcessWPS: lambda: getattr(process, "type", PROCESS_WPS_LOCAL)
+            ProcessWPS: lambda: getattr(process, "type", ProcessType.WPS_LOCAL)
         }).lower()
 
     def _get_process_endpoint_wps1(self, process):
@@ -434,7 +430,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         return self.fetch_by_id(sane_name)
 
     def delete_process(self, process_id, visibility=None):
-        # type: (str, Optional[str]) -> bool
+        # type: (str, Optional[Visibility]) -> bool
         """
         Removes process from database, optionally filtered by visibility.
 
@@ -447,7 +443,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         return bool(self.collection.delete_one({"identifier": sane_name}).deleted_count)
 
     def list_processes(self,
-                       visibility=None,     # type: Optional[str]
+                       visibility=None,     # type: Optional[AnyVisibility, List[AnyVisibility]]
                        page=None,           # type: Optional[int]
                        limit=None,          # type: Optional[int]
                        sort=None,           # type: Optional[str]
@@ -456,7 +452,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         """
         Lists all processes in database, optionally filtered by `visibility`.
 
-        :param visibility: One value amongst `weaver.visibility`.
+        :param visibility: One or many value amongst :class:`Visibility`.
         :param page: page number to return when using result paging.
         :param limit: number of processes per page when using result paging.
         :param sort: field which is used for sorting results (default: process ID, descending).
@@ -467,23 +463,24 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         """
         search_filters = {}
         if visibility is None:
-            visibility = VISIBILITY_VALUES
-        if isinstance(visibility, str):
+            visibility = Visibility.values()
+        if not isinstance(visibility, list):
             visibility = [visibility]
         for v in visibility:
-            if v not in VISIBILITY_VALUES:
+            vis = Visibility.get(v)
+            if vis not in Visibility:
                 raise ValueError("Invalid visibility value '{0!s}' is not one of {1!s}"
-                                 .format(v, list(VISIBILITY_VALUES)))
+                                 .format(v, list(Visibility.values())))
         search_filters["visibility"] = {"$in": list(visibility)}
 
         # processes do not have 'created', but ObjectID in '_id' has the particularity of embedding creation time
-        if sort == SORT_CREATED:
+        if sort == Sort.CREATED:
             sort = "_id"
         # replace equivalent aliases to corresponding fields in db
-        if sort in [SORT_ID, SORT_PROCESS]:
-            sort = SORT_ID_LONG
-        sort_allowed = list(PROCESS_SORT_VALUES) + ["_id"]
-        sort_method = {"$sort": self._apply_sort_method(sort, SORT_ID_LONG, sort_allowed)}
+        if sort in [Sort.ID, Sort.PROCESS]:
+            sort = Sort.ID_LONG
+        sort_allowed = list(SortMethods.PROCESS) + ["_id"]
+        sort_method = {"$sort": self._apply_sort_method(sort, Sort.ID_LONG, sort_allowed)}
 
         search_pipeline = [{"$match": search_filters}, sort_method]
         paging_pipeline = []
@@ -503,7 +500,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         return [Process(item) for item in found]
 
     def fetch_by_id(self, process_id, visibility=None):
-        # type: (str, Optional[str]) -> Process
+        # type: (str, Optional[Visibility]) -> Process
         """
         Get process for given :paramref:`process_id` from storage, optionally filtered by :paramref:`visibility`.
 
@@ -523,7 +520,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         return process
 
     def get_visibility(self, process_id):
-        # type: (str) -> str
+        # type: (str) -> Visibility
         """
         Get `visibility` of a process.
 
@@ -533,14 +530,14 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         return process.visibility
 
     def set_visibility(self, process_id, visibility):
-        # type: (str, str) -> None
+        # type: (str, AnyVisibility) -> None
         """
         Set `visibility` of a process.
 
         :param visibility: One value amongst `weaver.visibility`.
         :param process_id:
         :raises TypeError: when :paramref:`visibility` is not :class:`str`.
-        :raises ValueError: when :paramref:`visibility` is not one of :py:data:`weaver.visibility.VISIBILITY_VALUES`.
+        :raises ValueError: when :paramref:`visibility` is not one of :class:`Visibility`.
         """
         process = self.fetch_by_id(process_id)
         process.visibility = visibility
@@ -563,6 +560,7 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
     """
 
     def __init__(self, *args, **kwargs):
+        # type: (Any, Any) -> None
         db_args, db_kwargs = MongodbStore.get_args_kwargs(*args, **kwargs)
         StoreJobs.__init__(self)
         MongodbStore.__init__(self, *db_args, **db_kwargs)
@@ -590,15 +588,15 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
             tags = ["dev"]
             tags.extend(list(filter(lambda t: bool(t), custom_tags or [])))  # remove empty tags
             if is_workflow:
-                tags.append(PROCESS_WORKFLOW)
+                tags.append(ProcessType.WORKFLOW)
             else:
-                tags.append(PROCESS_APPLICATION)
+                tags.append(ProcessType.APPLICATION)
             if execute_async:
-                tags.append(EXECUTE_MODE_ASYNC)
+                tags.append(ExecuteMode.ASYNC)
             else:
-                tags.append(EXECUTE_MODE_SYNC)
+                tags.append(ExecuteMode.SYNC)
             if not access:
-                access = VISIBILITY_PRIVATE
+                access = Visibility.PRIVATE
 
             new_job = Job({
                 "task_id": task_id,
@@ -606,7 +604,7 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
                 "service": service,     # provider identifier (WPS service)
                 "process": process,     # process identifier (WPS request)
                 "inputs": inputs,
-                "status": map_status(STATUS_ACCEPTED),
+                "status": map_status(Status.ACCEPTED),
                 "execute_async": execute_async,
                 "is_workflow": is_workflow,
                 "is_local": is_local,
@@ -723,7 +721,7 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
         :param service: service name to filter matching jobs.
         :param job_type: filter matching jobs for given type.
         :param tags: list of tags to filter matching jobs.
-        :param access: access visibility to filter matching jobs (default: :py:data:`VISIBILITY_PUBLIC`).
+        :param access: access visibility to filter matching jobs (default: :py:data:`Visibility.PUBLIC`).
         :param notification_email: notification email to filter matching jobs.
         :param status: status to filter matching jobs.
         :param sort: field which is used for sorting results (default: creation date, descending).
@@ -748,7 +746,7 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
         pipeline = [{"$match": search_filters}]  # expected for all filters except 'duration'
         self._apply_duration_filter(pipeline, min_duration, max_duration)
 
-        sort_method = {"$sort": self._apply_sort_method(sort, SORT_CREATED, JOB_SORT_VALUES)}
+        sort_method = {"$sort": self._apply_sort_method(sort, Sort.CREATED, SortMethods.JOB)}
         pipeline.append(sort_method)
 
         # results by group categories or with job list paging
@@ -812,7 +810,7 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
 
     @staticmethod
     def _apply_tags_filter(tags):
-        bad_tags = [v for v in VISIBILITY_VALUES if v in tags]
+        bad_tags = [vis for vis in Visibility.values() if vis in tags]
         if any(bad_tags):
             raise JobInvalidParameter(json={
                 "code": "JobInvalidParameter",
@@ -826,22 +824,24 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
 
     @staticmethod
     def _apply_access_filter(access, request):
-        # type: (str, Request) -> MongodbSearchFilter
+        # type: (AnyVisibility, Request) -> MongodbSearchFilter
         search_filters = {}
         if not request:
-            search_filters["access"] = VISIBILITY_PUBLIC
+            search_filters["access"] = Visibility.PUBLIC
         else:
             if request.authenticated_userid is not None and request.has_permission("admin"):
-                if access in VISIBILITY_VALUES:  # otherwise any
-                    search_filters["access"] = access
+                vis = Visibility.get(access)
+                if vis:
+                    search_filters["access"] = vis
             else:
                 user_id = request.authenticated_userid
                 if user_id is not None:
                     search_filters["user_id"] = user_id
-                    if access in VISIBILITY_VALUES:
-                        search_filters["access"] = access
+                    vis = Visibility.get(access)
+                    if vis:
+                        search_filters["access"] = vis
                 else:
-                    search_filters["access"] = VISIBILITY_PUBLIC
+                    search_filters["access"] = Visibility.PUBLIC
         return search_filters
 
     @staticmethod
@@ -1016,8 +1016,8 @@ class MongodbQuoteStore(StoreQuotes, MongodbStore):
             search_filters["process"] = process_id
 
         if sort is None:
-            sort = SORT_ID
-        if sort not in QUOTE_SORT_VALUES:
+            sort = Sort.ID
+        if sort not in SortMethods.QUOTE:
             raise QuoteNotFound("Invalid sorting method: '{!s}'".format(sort))
 
         sort_order = ASCENDING
@@ -1092,8 +1092,8 @@ class MongodbBillStore(StoreBills, MongodbStore):
             search_filters["quote"] = quote_id
 
         if sort is None:
-            sort = SORT_ID
-        if sort not in BILL_SORT_VALUES:
+            sort = Sort.ID
+        if sort not in SortMethods.BILL:
             raise BillNotFound("Invalid sorting method: '{}'".format(repr(sort)))
 
         sort_order = ASCENDING
@@ -1112,6 +1112,7 @@ class MongodbVaultStore(StoreVault, MongodbStore):
     """
 
     def __init__(self, *args, **kwargs):
+        # type: (Any, Any) -> None
         db_args, db_kwargs = MongodbStore.get_args_kwargs(*args, **kwargs)
         StoreVault.__init__(self)
         MongodbStore.__init__(self, *db_args, **db_kwargs)

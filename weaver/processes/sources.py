@@ -7,14 +7,14 @@ from pyramid.settings import asbool
 
 from weaver import WEAVER_ROOT_DIR
 from weaver.config import WEAVER_DEFAULT_DATA_SOURCES_CONFIG, get_weaver_config_file
-from weaver.processes.constants import OPENSEARCH_LOCAL_FILE_SCHEME
+from weaver.processes.constants import OpenSearchField
 from weaver.utils import get_settings
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
     from typing import Optional, Text
 
-    from weaver.typedefs import DataSource, DataSourceConfig
+    from weaver.typedefs import DataSourceConfig
 
 DATA_SOURCES = {}  # type: DataSourceConfig
 """Data sources configuration.
@@ -113,7 +113,7 @@ def get_data_source_from_url(data_url):
             for src, val in data_sources.items():
                 if val["netloc"] == netloc:
                     return src
-        elif scheme == OPENSEARCH_LOCAL_FILE_SCHEME:
+        elif scheme == OpenSearchField.LOCAL_FILE_SCHEME:
             # for file links, try to find if any rootdir matches in the file path
             for src, val in data_sources.items():
                 if path.startswith(val["rootdir"]):

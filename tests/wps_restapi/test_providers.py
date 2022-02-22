@@ -14,11 +14,11 @@ from tests.utils import (
     setup_mongodb_processstore,
     setup_mongodb_servicestore
 )
-from weaver.config import WEAVER_CONFIGURATION_ADES, WEAVER_CONFIGURATION_HYBRID
+from weaver.config import WeaverConfiguration
 from weaver.datatype import Service
-from weaver.execute import EXECUTE_CONTROL_OPTION_ASYNC, EXECUTE_TRANSMISSION_MODE_REFERENCE
-from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_NETCDF, CONTENT_TYPE_APP_ZIP, CONTENT_TYPE_TEXT_PLAIN
-from weaver.processes.constants import PROCESS_SCHEMA_OGC, PROCESS_SCHEMA_OLD
+from weaver.execute import ExecuteControlOption, ExecuteTransmissionMode
+from weaver.formats import ContentType
+from weaver.processes.constants import ProcessSchema
 from weaver.utils import fully_qualified_name
 
 
@@ -48,7 +48,7 @@ class WpsProviderBase(unittest.TestCase):
     def setUpClass(cls):
         cls.config = setup_config_with_mongodb(settings=cls.settings)
         cls.app = get_test_weaver_app(config=cls.config)
-        cls.json_headers = {"Accept": CONTENT_TYPE_APP_JSON, "Content-Type": CONTENT_TYPE_APP_JSON}
+        cls.json_headers = {"Accept": ContentType.APP_JSON, "Content-Type": ContentType.APP_JSON}
 
     @classmethod
     def tearDownClass(cls):
@@ -67,7 +67,7 @@ class WpsRestApiProvidersTest(WpsProviderBase):
     settings = {
         "weaver.url": "https://localhost",
         "weaver.wps_path": "/ows/wps",
-        "weaver.configuration": WEAVER_CONFIGURATION_HYBRID
+        "weaver.configuration": WeaverConfiguration.HYBRID
     }
 
     def test_empty_provider_listing(self):
@@ -82,7 +82,7 @@ class WpsRestApiProvidersTest(WpsProviderBase):
         self.service_store.clear_services()
         resp = self.app.get("/providers", headers=self.json_headers)
         assert resp.status_code == 200
-        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        assert resp.content_type == ContentType.APP_JSON
         body = resp.json
         assert "providers" in body and len(body["providers"]) == 0
 
@@ -269,7 +269,7 @@ class WpsRestApiProvidersTest(WpsProviderBase):
         path = "/providers/{}/processes".format(self.remote_provider_name)
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
-        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        assert resp.content_type == ContentType.APP_JSON
         assert "processes" in resp.json and isinstance(resp.json["processes"], list)
         assert len(resp.json["processes"]) == 2
         remote_processes = []
@@ -280,7 +280,7 @@ class WpsRestApiProvidersTest(WpsProviderBase):
             assert "keywords" in process and isinstance(process["keywords"], list)
             assert "metadata" in process and isinstance(process["metadata"], list)
             assert len(process["jobControlOptions"]) == 1
-            assert EXECUTE_CONTROL_OPTION_ASYNC in process["jobControlOptions"]
+            assert ExecuteControlOption.ASYNC in process["jobControlOptions"]
             remote_processes.append(process["id"])
         assert resources.TEST_REMOTE_PROCESS_WPS1_ID in remote_processes
 
@@ -306,14 +306,14 @@ class WpsRestApiProvidersTest(WpsProviderBase):
             - Fix in PR `geopython/OWSLib#794 <https://github.com/geopython/OWSLib/pull/794>`_
         """
         path = "/providers/{}/processes/{}".format(self.remote_provider_name, resources.TEST_REMOTE_PROCESS_WPS1_ID)
-        resp = self.app.get(path, params={"schema": PROCESS_SCHEMA_OLD}, headers=self.json_headers)
+        resp = self.app.get(path, params={"schema": ProcessSchema.OLD}, headers=self.json_headers)
         assert resp.status_code == 200
-        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        assert resp.content_type == ContentType.APP_JSON
         proc = resp.json["process"]
 
-        resp = self.app.get(path, params={"schema": PROCESS_SCHEMA_OGC}, headers=self.json_headers)
+        resp = self.app.get(path, params={"schema": ProcessSchema.OGC}, headers=self.json_headers)
         assert resp.status_code == 200
-        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        assert resp.content_type == ContentType.APP_JSON
         desc = resp.json
 
         assert "version" in proc and isinstance(proc["version"], str) and proc["version"] == "1.0.0"
@@ -327,12 +327,12 @@ class WpsRestApiProvidersTest(WpsProviderBase):
     def test_get_provider_process_description_old_schema(self):
         self.register_provider()
 
-        query = {"schema": PROCESS_SCHEMA_OLD}
+        query = {"schema": ProcessSchema.OLD}
         path = "/providers/{}/processes/{}".format(self.remote_provider_name, resources.TEST_REMOTE_PROCESS_WPS1_ID)
         resp = self.app.get(path, params=query, headers=self.json_headers)
         body = resp.json
         assert resp.status_code == 200
-        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        assert resp.content_type == ContentType.APP_JSON
         assert "process" in resp.json and isinstance(body["process"], dict)
         process = body["process"]
         assert "id" in process and isinstance(process["id"], str)
@@ -344,9 +344,9 @@ class WpsRestApiProvidersTest(WpsProviderBase):
         assert "keywords" in process and isinstance(process["keywords"], list)
         assert "metadata" in process and isinstance(process["metadata"], list)
         assert len(body["jobControlOptions"]) == 1
-        assert EXECUTE_CONTROL_OPTION_ASYNC in body["jobControlOptions"]
+        assert ExecuteControlOption.ASYNC in body["jobControlOptions"]
         assert len(body["outputTransmission"]) == 1
-        assert EXECUTE_TRANSMISSION_MODE_REFERENCE in body["outputTransmission"]
+        assert ExecuteTransmissionMode.REFERENCE in body["outputTransmission"]
         assert "inputs" in process and isinstance(process["inputs"], list)
         assert all(isinstance(p_io, dict) and "id" in p_io for p_io in process["inputs"])
         assert "outputs" in process and isinstance(process["outputs"], list)
@@ -363,7 +363,7 @@ class WpsRestApiProvidersTest(WpsProviderBase):
         path = "/providers/{}/processes/{}".format(self.remote_provider_name, resources.TEST_REMOTE_PROCESS_WPS1_ID)
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
-        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        assert resp.content_type == ContentType.APP_JSON
         assert "process" not in resp.json and isinstance(resp.json, dict)
         process = resp.json
         assert "id" in process and isinstance(process["id"], str)
@@ -375,9 +375,9 @@ class WpsRestApiProvidersTest(WpsProviderBase):
         assert "keywords" in process and isinstance(process["keywords"], list)
         assert "metadata" in process and isinstance(process["metadata"], list)
         assert len(process["jobControlOptions"]) == 1
-        assert EXECUTE_CONTROL_OPTION_ASYNC in process["jobControlOptions"]
+        assert ExecuteControlOption.ASYNC in process["jobControlOptions"]
         assert len(process["outputTransmission"]) == 1
-        assert EXECUTE_TRANSMISSION_MODE_REFERENCE in process["outputTransmission"]
+        assert ExecuteTransmissionMode.REFERENCE in process["outputTransmission"]
         assert "inputs" in process and isinstance(process["inputs"], dict)
         assert all(isinstance(p_io, str) and isinstance(process["inputs"][p_io], dict) for p_io in process["inputs"])
         assert all("id" not in process["inputs"][p_io] for p_io in process["inputs"])
@@ -397,16 +397,16 @@ class WpsRestApiProvidersTest(WpsProviderBase):
         self.register_provider()
 
         path = "/providers/{}/processes/{}".format(self.remote_provider_name, resources.WPS_NO_INPUTS_ID)
-        resp = self.app.get(path, params={"schema": PROCESS_SCHEMA_OLD}, headers=self.json_headers)
+        resp = self.app.get(path, params={"schema": ProcessSchema.OLD}, headers=self.json_headers)
         assert resp.status_code == 200
-        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        assert resp.content_type == ContentType.APP_JSON
         inputs = resp.json["process"]["inputs"]
         assert isinstance(inputs, list) and len(inputs) == 0
 
         path = "/providers/{}/processes/{}".format(self.remote_provider_name, resources.WPS_NO_INPUTS_ID)
-        resp = self.app.get(path, params={"schema": PROCESS_SCHEMA_OGC}, headers=self.json_headers)
+        resp = self.app.get(path, params={"schema": ProcessSchema.OGC}, headers=self.json_headers)
         assert resp.status_code == 200
-        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        assert resp.content_type == ContentType.APP_JSON
         inputs = resp.json["inputs"]
         assert isinstance(inputs, dict) and len(inputs) == 0
 
@@ -421,9 +421,9 @@ class WpsRestApiProvidersTest(WpsProviderBase):
         """
         self.register_provider()
         path = "/providers/{}/processes/{}".format(self.remote_provider_name, resources.WPS_LITERAL_VALUES_IO_ID)
-        resp = self.app.get(path, params={"schema": PROCESS_SCHEMA_OLD}, headers=self.json_headers)
+        resp = self.app.get(path, params={"schema": ProcessSchema.OLD}, headers=self.json_headers)
         assert resp.status_code == 200
-        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        assert resp.content_type == ContentType.APP_JSON
         inputs = resp.json["process"]["inputs"]
         outputs = resp.json["process"]["outputs"]
         assert isinstance(inputs, list) and len(inputs) == 15
@@ -544,7 +544,7 @@ class WpsRestApiProvidersTest(WpsProviderBase):
         assert "default" not in inputs[11]
         assert "literalDataDomains" not in inputs[11], "Complex input of the process should not have literal domains"
         assert "formats" in inputs[11] and len(inputs[11]["formats"]) == 1
-        assert inputs[11]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_JSON
+        assert inputs[11]["formats"][0]["mediaType"] == ContentType.APP_JSON
         assert inputs[11]["formats"][0]["default"] is True, \
             "format is specified as default one explicitly, but should be regardless since it is the only one supported"
         # see test 'test_get_provider_process_complex_maximum_megabytes'
@@ -579,17 +579,17 @@ class WpsRestApiProvidersTest(WpsProviderBase):
 
         assert outputs[0]["id"] == "output"
         assert len(outputs[0]["formats"]) == 2
-        assert outputs[0]["formats"][0]["mediaType"] == CONTENT_TYPE_APP_NETCDF
+        assert outputs[0]["formats"][0]["mediaType"] == ContentType.APP_NETCDF
         assert outputs[0]["formats"][0]["encoding"] == "base64"
         assert outputs[0]["formats"][0]["default"] is True
         assert "maximumMegabytes" not in outputs[0]["formats"][0]  # never applies, even with OWSLib update
-        assert outputs[0]["formats"][1]["mediaType"] == CONTENT_TYPE_APP_ZIP
+        assert outputs[0]["formats"][1]["mediaType"] == ContentType.APP_ZIP
         assert outputs[0]["formats"][1]["encoding"] == "base64"
         assert outputs[0]["formats"][1]["default"] is False
         assert "maximumMegabytes" not in outputs[0]["formats"][1]  # never applies, even with OWSLib update
         assert outputs[1]["id"] == "output_log"
         assert len(outputs[1]["formats"]) == 1
-        assert outputs[1]["formats"][0]["mediaType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert outputs[1]["formats"][0]["mediaType"] == ContentType.TEXT_PLAIN
         assert "encoding" not in outputs[1]["formats"][0]
         assert outputs[1]["formats"][0]["default"] is True
         assert "maximumMegabytes" not in outputs[1]["formats"][0]  # never applies, even with OWSLib update
@@ -608,9 +608,9 @@ class WpsRestApiProvidersTest(WpsProviderBase):
         """
         self.register_provider()
         path = "/providers/{}/processes/{}".format(self.remote_provider_name, resources.WPS_LITERAL_VALUES_IO_ID)
-        resp = self.app.get(path, params={"schema": PROCESS_SCHEMA_OLD}, headers=self.json_headers)
+        resp = self.app.get(path, params={"schema": ProcessSchema.OLD}, headers=self.json_headers)
         assert resp.status_code == 200
-        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        assert resp.content_type == ContentType.APP_JSON
         inputs = resp.json["process"]["inputs"]
         assert "maximumMegabytes" in inputs[11]["formats"][0]
         assert inputs[11]["formats"][0]["maximumMegabytes"] == 200
@@ -625,7 +625,7 @@ class WpsProviderLocalOnlyTest(WpsProviderBase):
     settings = {
         "weaver.url": "https://localhost",
         "weaver.wps_path": "/ows/wps",
-        "weaver.configuration": WEAVER_CONFIGURATION_ADES  # local-only
+        "weaver.configuration": WeaverConfiguration.ADES  # local-only
     }
 
     def setUp(self):

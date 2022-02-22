@@ -15,9 +15,9 @@ from yaml.scanner import ScannerError
 from weaver import __meta__
 from weaver.datatype import AutoBase
 from weaver.exceptions import PackageRegistrationError
-from weaver.execute import EXECUTE_MODE_ASYNC, EXECUTE_RESPONSE_DOCUMENT, EXECUTE_TRANSMISSION_MODE_VALUE
-from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_PLAIN, get_content_type, get_format
-from weaver.processes.constants import PROCESS_SCHEMA_OGC, PROCESS_SCHEMAS
+from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
+from weaver.formats import ContentType, get_content_type, get_format
+from weaver.processes.constants import ProcessSchema
 from weaver.processes.convert import (
     convert_input_values_schema,
     cwl2json_input_values,
@@ -25,7 +25,7 @@ from weaver.processes.convert import (
     repr2json_input_values
 )
 from weaver.processes.wps_package import get_process_definition
-from weaver.status import JOB_STATUS_CATEGORIES, JOB_STATUS_CATEGORY_FINISHED, STATUS_SUCCEEDED
+from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory
 from weaver.utils import (
     fetch_file,
     fully_qualified_name,
@@ -38,7 +38,7 @@ from weaver.utils import (
     request_extra,
     setup_loggers
 )
-from weaver.visibility import VISIBILITY_PUBLIC
+from weaver.visibility import Visibility
 from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
@@ -140,7 +140,7 @@ class WeaverClient(object):
         else:
             self._url = None
             LOGGER.warning("No URL provided. All operations must provide it directly or through another parameter!")
-        self._headers = {"Accept": CONTENT_TYPE_APP_JSON, "Content-Type": CONTENT_TYPE_APP_JSON}
+        self._headers = {"Accept": ContentType.APP_JSON, "Content-Type": ContentType.APP_JSON}
         self._settings = {
             "weaver.request_options": {}
         }  # FIXME: load from INI, overrides as input (cumul arg '--setting weaver.x=value') ?
@@ -206,7 +206,7 @@ class WeaverClient(object):
             # for convenience, always set visibility by default
             data.setdefault("processDescription", {})
             data["processDescription"].setdefault("process", {})
-            data["processDescription"]["process"]["visibility"] = VISIBILITY_PUBLIC  # type: ignore
+            data["processDescription"]["process"]["visibility"] = Visibility.PUBLIC  # type: ignore
         except (ValueError, TypeError, ScannerError) as exc:
             return OperationResult(False, f"Failed resolution of body definition: [{exc!s}]", body)
         return OperationResult(True, "", data)
@@ -371,7 +371,7 @@ class WeaverClient(object):
     Alias of :meth:`capabilities` for :term:`Process` listing.
     """
 
-    def describe(self, process_id, url=None, schema=PROCESS_SCHEMA_OGC):
+    def describe(self, process_id, url=None, schema=ProcessSchema.OGC):
         # type: (str, Optional[str], Optional[ProcessSchemaType]) -> OperationResult
         """
         Describe the specified :term:`Process`.
@@ -386,7 +386,7 @@ class WeaverClient(object):
         base = self._get_url(url)
         path = f"{base}/processes/{process_id}"
         query = None
-        if isinstance(schema, str) and schema.upper() in PROCESS_SCHEMAS:
+        if isinstance(schema, str) and schema.upper() in ProcessSchema.values():
             query = {"schema": schema.upper()}
         resp = request_extra("GET", path, params=query, headers=self._headers, settings=self._settings)
         # API response from this request can contain 'description' matching the process description
@@ -435,10 +435,10 @@ class WeaverClient(object):
                     (isinstance(values, list) and all(isinstance(v, dict) and get_any_value(v) is null for v in values))
                 )
             ):
-                values = cwl2json_input_values(inputs, schema=PROCESS_SCHEMA_OGC)
+                values = cwl2json_input_values(inputs, schema=ProcessSchema.OGC)
             if values is null:
                 raise ValueError("Input values parsed as null. Could not properly detect employed schema.")
-            values = convert_input_values_schema(values, schema=PROCESS_SCHEMA_OGC)
+            values = convert_input_values_schema(values, schema=ProcessSchema.OGC)
         except Exception as exc:
             return OperationResult(False, f"Failed inputs parsing with error: [{exc!s}].", inputs)
         return values
@@ -484,7 +484,7 @@ class WeaverClient(object):
                 if not ctype:
                     ext = os.path.splitext(href)[-1]
                     ctype = get_content_type(ext)
-                fmt = get_format(ctype, default=CONTENT_TYPE_TEXT_PLAIN)
+                fmt = get_format(ctype, default=ContentType.TEXT_PLAIN)
                 res = self.upload(href, content_type=fmt.mime_type, url=url)
                 if res.code != 200:
                     return res
@@ -551,10 +551,10 @@ class WeaverClient(object):
         data = {
             # NOTE: since sync is not yet properly implemented in Weaver, simulate with monitoring after if requested
             # FIXME: support 'sync' (https://github.com/crim-ca/weaver/issues/247)
-            "mode": EXECUTE_MODE_ASYNC,
+            "mode": ExecuteMode.ASYNC,
             "inputs": values,
             # FIXME: support 'response: raw' (https://github.com/crim-ca/weaver/issues/376)
-            "response": EXECUTE_RESPONSE_DOCUMENT,
+            "response": ExecuteResponse.DOCUMENT,
             # FIXME: allow omitting 'outputs' (https://github.com/crim-ca/weaver/issues/375)
             # FIXME: allow 'transmissionMode: value/reference' selection (https://github.com/crim-ca/weaver/issues/377)
             "outputs": {}
@@ -567,7 +567,7 @@ class WeaverClient(object):
         outputs = result.body.get("outputs")
         for output_id in outputs:
             # use 'value' to have all outputs reported in body as 'value/href' rather than 'Link' headers
-            data["outputs"][output_id] = {"transmissionMode": EXECUTE_TRANSMISSION_MODE_VALUE}
+            data["outputs"][output_id] = {"transmissionMode": ExecuteTransmissionMode.VALUE}
 
         LOGGER.info("Executing [%s] with inputs:\n%s", process_id, _json2text(values))
         path = f"{base}/processes/{process_id}/execution"  # use OGC-API compliant endpoint (not '/jobs')
@@ -626,7 +626,7 @@ class WeaverClient(object):
             )
         }
         req_headers = {
-            "Accept": CONTENT_TYPE_APP_JSON,  # no 'Content-Type' since auto generated with multipart boundary
+            "Accept": ContentType.APP_JSON,  # no 'Content-Type' since auto generated with multipart boundary
             "Cache-Control": "no-cache",     # ensure the cache is not used to return a previously uploaded file
         }
         # allow retry to avoid some sporadic HTTP 403 errors
@@ -650,7 +650,7 @@ class WeaverClient(object):
         resp = request_extra("GET", job_url, headers=self._headers, settings=self._settings)
         return self._parse_result(resp)
 
-    def monitor(self, job_reference, timeout=None, interval=None, wait_for_status=STATUS_SUCCEEDED, url=None):
+    def monitor(self, job_reference, timeout=None, interval=None, wait_for_status=Status.SUCCEEDED, url=None):
         # type: (str, Optional[int], Optional[int], str, Optional[str]) -> OperationResult
         """
         Monitor the execution of a :term:`Job` until completion.
@@ -679,7 +679,7 @@ class WeaverClient(object):
             status = body.get("status")
             if status == wait_for_status:
                 return OperationResult(True, f"Requested job status reached [{wait_for_status}].", body)
-            if status in JOB_STATUS_CATEGORIES[JOB_STATUS_CATEGORY_FINISHED]:
+            if status in JOB_STATUS_CATEGORIES[StatusCategory.FINISHED]:
                 return OperationResult(False, "Requested job status not reached, but job has finished.", body)
             time.sleep(delta)
             remain -= delta
@@ -1008,7 +1008,7 @@ def make_parser():
     add_url_param(op_describe)
     add_process_param(op_describe)
     op_describe.add_argument(
-        "-S", "--schema", dest="schema", choices=PROCESS_SCHEMAS, default=PROCESS_SCHEMA_OGC,
+        "-S", "--schema", dest="schema", choices=ProcessSchema.values(), default=ProcessSchema.OGC,
         help="Representation schema of the returned process description."
     )
 

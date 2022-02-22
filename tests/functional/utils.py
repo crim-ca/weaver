@@ -20,11 +20,11 @@ from tests.utils import (
 )
 from weaver import WEAVER_ROOT_DIR
 from weaver.database import get_db
-from weaver.formats import CONTENT_TYPE_APP_JSON
-from weaver.processes.constants import PROCESS_SCHEMA_OGC
-from weaver.status import STATUS_ACCEPTED, STATUS_RUNNING, STATUS_SUCCEEDED
+from weaver.formats import ContentType
+from weaver.processes.constants import ProcessSchema
+from weaver.status import Status
 from weaver.utils import fully_qualified_name, load_file
-from weaver.visibility import VISIBILITY_PUBLIC
+from weaver.visibility import Visibility
 
 if TYPE_CHECKING:
     from typing import Dict, Optional
@@ -33,7 +33,7 @@ if TYPE_CHECKING:
 
 @pytest.mark.functional
 class WpsConfigBase(unittest.TestCase):
-    json_headers = {"Accept": CONTENT_TYPE_APP_JSON, "Content-Type": CONTENT_TYPE_APP_JSON}
+    json_headers = {"Accept": ContentType.APP_JSON, "Content-Type": ContentType.APP_JSON}
     monitor_timeout = 30
     monitor_interval = 1
     settings = {}  # type: SettingsType
@@ -61,14 +61,14 @@ class WpsConfigBase(unittest.TestCase):
         pyramid.testing.tearDown()
 
     @classmethod
-    def describe_process(cls, process_id, describe_schema=PROCESS_SCHEMA_OGC):
+    def describe_process(cls, process_id, describe_schema=ProcessSchema.OGC):
         path = "/processes/{}?schema={}".format(process_id, describe_schema)
         resp = cls.app.get(path, headers=cls.json_headers)
         assert resp.status_code == 200
         return deepcopy(resp.json)
 
     @classmethod
-    def deploy_process(cls, payload, process_id=None, describe_schema=PROCESS_SCHEMA_OGC):
+    def deploy_process(cls, payload, process_id=None, describe_schema=ProcessSchema.OGC):
         # type: (JSON, Optional[str], str) -> JSON
         """
         Deploys a process with :paramref:`payload`.
@@ -90,7 +90,7 @@ class WpsConfigBase(unittest.TestCase):
         resp = mocked_sub_requests(cls.app, "post_json", "/processes", data=payload, headers=cls.json_headers)
         assert resp.status_code == 201, "Expected successful deployment.\nError:\n{}".format(resp.text)
         path = resp.json["processSummary"]["processDescriptionURL"]
-        body = {"value": VISIBILITY_PUBLIC}
+        body = {"value": Visibility.PUBLIC}
         resp = cls.app.put_json("{}/visibility".format(path), params=body, headers=cls.json_headers)
         assert resp.status_code == 200, "Expected successful visibility.\nError:\n{}".format(resp.text)
         info = []
@@ -114,7 +114,7 @@ class WpsConfigBase(unittest.TestCase):
                     timeout=None,                       # type: Optional[int]
                     interval=None,                      # type: Optional[int]
                     return_status=False,                # type: bool
-                    wait_for_status=STATUS_SUCCEEDED,   # type: str
+                    wait_for_status=Status.SUCCEEDED,   # type: str
                     ):                                  # type: (...) -> Dict[str, JSON]
         """
         Job polling of status URL until completion or timeout.
@@ -131,7 +131,7 @@ class WpsConfigBase(unittest.TestCase):
         def check_job_status(_resp, running=False):
             body = _resp.json
             pretty = json.dumps(body, indent=2, ensure_ascii=False)
-            statuses = [STATUS_ACCEPTED, STATUS_RUNNING, STATUS_SUCCEEDED] if running else [STATUS_SUCCEEDED]
+            statuses = [Status.ACCEPTED, Status.RUNNING, Status.SUCCEEDED] if running else [Status.SUCCEEDED]
             assert _resp.status_code == 200, "Execution failed:\n{}\n{}".format(pretty, self._try_get_logs(status_url))
             assert body["status"] in statuses, "Error job info:\n{}\n{}".format(pretty, self._try_get_logs(status_url))
             return body["status"] == wait_for_status
