@@ -125,6 +125,10 @@ if TYPE_CHECKING:
         "out": List[str],       # output to retrieve from step, for mapping with other steps
     })
     CWL_WorkflowStepID = str
+    CWL_WorkflowStepReference = TypedDict("CWL_WorkflowStepReference", {
+        "name": CWL_WorkflowStepID,
+        "reference": str,  # URL
+    })
     CWL = TypedDict("CWL", {
         "cwlVersion": str,
         "class": CWL_Class,
@@ -141,7 +145,6 @@ if TYPE_CHECKING:
         "$namespaces": Dict[str, str],
         "$schemas": Dict[str, str]
     }, total=False)
-
     CWL_WorkflowStepPackage = TypedDict("CWL_WorkflowStepPackage", {
         "id": str,          # reference ID of the package
         "package": CWL      # definition of the package as sub-step of a Workflow

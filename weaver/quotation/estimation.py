@@ -77,9 +77,13 @@ def estimate_workflow_quote(quote, process):
                 wait = 5
             else:
                 body = resp.json()
-                if body.get("status") == QuoteStatus.COMPLETED:
+                status = QuoteStatus.get(body.get("status"))
+                if status == QuoteStatus.COMPLETED:
                     quote_steps.append(href)
                     quote_params.append(body)
+                    break
+                elif status == QuoteStatus.FAILED or status is None:
+                    LOGGER.error("Quote estimation for sub-process [%s] under [%s] failed.", step["name"], process.id)
                     break
             if abort <= 0:
                 time.sleep(wait)
