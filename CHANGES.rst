@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_4.10.0:
+
+`4.10.0 <https://github.com/crim-ca/weaver/tree/4.10.0>`_ (2022-02-22)
+========================================================================
+
+Changes:
+--------
 - Refactor all constants of similar concept into classes to facilitate reuse and avoid omitting entries when iterating
   over all members of a corresponding constant group (fixes `#33 <https://github.com/crim-ca/weaver/issues/33>`_).
 

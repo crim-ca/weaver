@@ -41,13 +41,13 @@ applications and |wps| inputs and outputs. Remote execution is deferred by the `
     :alt: Requires Python 3.6+
     :target: https://www.python.org/getit
 
-.. |commits-since| image:: https://img.shields.io/github/commits-since/crim-ca/weaver/4.9.1.svg
+.. |commits-since| image:: https://img.shields.io/github/commits-since/crim-ca/weaver/4.10.0.svg
     :alt: Commits since latest release
-    :target: https://github.com/crim-ca/weaver/compare/4.9.1...master
+    :target: https://github.com/crim-ca/weaver/compare/4.10.0...master
 
-.. |version| image:: https://img.shields.io/badge/latest%20version-4.9.1-blue
+.. |version| image:: https://img.shields.io/badge/latest%20version-4.10.0-blue
     :alt: Latest Tagged Version
-    :target: https://github.com/crim-ca/weaver/tree/4.9.1
+    :target: https://github.com/crim-ca/weaver/tree/4.10.0
 
 .. |requires| image:: https://requires.io/github/crim-ca/weaver/requirements.svg?branch=master
     :alt: Requirements Status
@@ -61,9 +61,9 @@ applications and |wps| inputs and outputs. Remote execution is deferred by the `
     :alt: Github Actions CI Build Status (master branch)
     :target: https://github.com/crim-ca/weaver/actions?query=workflow%3ATests+branch%3Amaster
 
-.. |github_tagged| image:: https://img.shields.io/github/workflow/status/crim-ca/weaver/Tests/4.9.1?label=4.9.1
+.. |github_tagged| image:: https://img.shields.io/github/workflow/status/crim-ca/weaver/Tests/4.10.0?label=4.10.0
     :alt: Github Actions CI Build Status (latest tag)
-    :target: https://github.com/crim-ca/weaver/actions?query=workflow%3ATests+branch%3A4.9.1
+    :target: https://github.com/crim-ca/weaver/actions?query=workflow%3ATests+branch%3A4.10.0
 
 .. |readthedocs| image:: https://img.shields.io/readthedocs/pavics-weaver
     :alt: ReadTheDocs Build Status (master branch)
@@ -75,7 +75,7 @@ applications and |wps| inputs and outputs. Remote execution is deferred by the `
 
 .. below shield will either indicate the targeted version or 'tag not found'
 .. since docker tags are pushed following manual builds by CI, they are not automatic and no build artifact exists
-.. |docker_build_status| image:: https://img.shields.io/docker/v/pavics/weaver/4.9.1?label=tag%20status
+.. |docker_build_status| image:: https://img.shields.io/docker/v/pavics/weaver/4.10.0?label=tag%20status
     :alt: Docker Build Status (latest version)
     :target: https://hub.docker.com/r/pavics/weaver/tags
 
@@ -198,12 +198,12 @@ Docker image repositories:
 
 ::
 
-    $ docker pull pavics/weaver:4.9.1
+    $ docker pull pavics/weaver:4.10.0
 
 For convenience, following tags are also available:
 
-- ``weaver:4.9.1-manager``: `Weaver` image that will run the API for WPS process and job management.
-- ``weaver:4.9.1-worker``: `Weaver` image that will run the process job runner application.
+- ``weaver:4.10.0-manager``: `Weaver` image that will run the API for WPS process and job management.
+- ``weaver:4.10.0-worker``: `Weaver` image that will run the process job runner application.
 
 Following links correspond to existing servers with `Weaver` configured as *EMS*/*ADES* instances respectively.
 
