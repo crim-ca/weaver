@@ -17,7 +17,11 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Fix resolution of common IANA Media-Types (e.g.: ``text/plain``, ``image/jpeg``, etc.) that technically do not provide
+  and explicit entry when accessing the namespace (i.e.: ``{IANA_NAMESPACE_URL}/{mediaType}``), but are known in IANA
+  registry through various RFC specifications. The missing endpoints caused many recurring and unnecessary HTTP 404 that
+  needed a second validation against EDAM namespace each time. These common Media-Types, along with new definitions in
+  ``weaver.formats``, will immediately return a IANA/EDAM references without explicit validation on their registries.
 
 .. _changes_4.9.1:
 
