@@ -438,16 +438,20 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             assert resp.json["processSummary"]["id"] == process_name
             assert isinstance(resp.json["deploymentDone"], bool) and resp.json["deploymentDone"]
 
-    def test_deploy_process_ogc_scheme(self):
+    def test_deploy_process_ogc_schema(self):
         process_name = self.fully_qualified_test_process_name()
         process_data = self.get_process_deploy_template(process_name, schema=ProcessSchema.OGC)
+        process_desc = process_data["processDescription"]
         package_mock = mocked_process_package()
 
         with contextlib.ExitStack() as stack:
             for pkg in package_mock:
                 stack.enter_context(pkg)
+            assert "process" not in process_desc
+            assert "id" in process_desc
+            process_desc["visibility"] = Visibility.PUBLIC  # save ourself an update request
             path = "/processes"
-            resp = self.app.post_json(path, params=process_data, headers=self.json_headers, expect_errors=True)
+            resp = self.app.post_json(path, params=process_data, headers=self.json_headers)
             assert resp.status_code == 201
             assert resp.content_type == ContentType.APP_JSON
             assert resp.json["processSummary"]["id"] == process_name

@@ -248,7 +248,7 @@ def deploy_process_from_payload(payload, container, overwrite=False):
 
     # validate identifier naming for unsupported characters
     process_description = payload.get("processDescription")
-    process_info = process_description.get("process", {})
+    process_info = process_description.get("process", process_description)
     process_href = process_description.pop("href", None)
 
     # retrieve CWL package definition, either via "href" (WPS-1/2), "owsContext" or "executionUnit" (package/reference)
