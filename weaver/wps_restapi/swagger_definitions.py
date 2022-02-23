@@ -107,6 +107,7 @@ IO_INFO_IDS = (
 
 OGC_API_REPO_URL = "https://github.com/opengeospatial/ogcapi-processes"
 OGC_API_SCHEMA_URL = "https://raw.githubusercontent.com/opengeospatial/ogcapi-processes"
+OGC_API_SCHEMA_VERSION = "master"
 
 DATETIME_INTERVAL_CLOSED_SYMBOL = "/"
 DATETIME_INTERVAL_OPEN_START_SYMBOL = "../"
@@ -655,11 +656,11 @@ class FormatMimeType(ExtendedMappingSchema):
     schema = FormatSchema(missing=drop)
 
 
-# https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/format.yaml
 class Format(ExtendedMappingSchema):
     """
     Used to respect ``mediaType`` field as suggested per `OGC-API`.
     """
+    schema_ref = f"{OGC_API_SCHEMA_URL}/{OGC_API_SCHEMA_VERSION}/core/openapi/schemas/format.yaml"
     mediaType = MediaType(default=ContentType.TEXT_PLAIN, example=ContentType.APP_JSON)
     encoding = ExtendedSchemaNode(String(), missing=drop)
     schema = FormatSchema(missing=drop)
@@ -741,7 +742,7 @@ class ResultFormat(FormatDescription):
     """
     Format employed for reference results respecting 'OGC API - Processes' schemas.
     """
-    schema_ref = "{}/master/core/openapi/schemas/formatDescription.yaml".format(OGC_API_SCHEMA_URL)
+    schema_ref = f"{OGC_API_SCHEMA_URL}/{OGC_API_SCHEMA_VERSION}/core/openapi/schemas/formatDescription.yaml"
     mediaType = MediaType(String())
     encoding = ExtendedSchemaNode(String(), missing=drop)
     schema = FormatSchema(missing=drop)
@@ -1016,7 +1017,7 @@ class LiteralReference(ExtendedMappingSchema):
 
 # https://github.com/opengeospatial/ogcapi-processes/blob/e6893b/extensions/workflows/openapi/workflows.yaml#L1707-L1716
 class NameReferenceType(ExtendedMappingSchema):
-    schema_ref = "{}/master/core/openapi/schemas/nameReferenceType.yaml".format(OGC_API_SCHEMA_URL)
+    schema_ref = f"{OGC_API_SCHEMA_URL}/{OGC_API_SCHEMA_VERSION}/core/openapi/schemas/nameReferenceType.yaml"
     name = ExtendedSchemaNode(String())
     reference = ReferenceURL(missing=drop, description="Reference URL to schema definition of the named entity.")
 
@@ -1364,10 +1365,10 @@ class DeployOutputTypeAny(OneOfKeywordSchema):
 
 
 class JobExecuteModeEnum(ExtendedSchemaNode):
+    schema_ref = f"{OGC_API_SCHEMA_URL}/{OGC_API_SCHEMA_VERSION}/core/openapi/schemas/execute.yaml"
     schema_type = String
     title = "JobExecuteMode"
     # no default to enforce required input as per OGC-API schemas
-    # https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/execute.yaml
     # default = EXECUTE_MODE_AUTO
     example = ExecuteMode.ASYNC
     validator = OneOf(ExecuteMode.values())
@@ -1382,10 +1383,10 @@ class JobControlOptionsEnum(ExtendedSchemaNode):
 
 
 class JobResponseOptionsEnum(ExtendedSchemaNode):
+    schema_ref = f"{OGC_API_SCHEMA_URL}/{OGC_API_SCHEMA_VERSION}/core/openapi/schemas/execute.yaml"
     schema_type = String
     title = "JobResponseOptions"
     # no default to enforce required input as per OGC-API schemas
-    # https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/execute.yaml
     # default = ExecuteResponse.DOCUMENT
     example = ExecuteResponse.DOCUMENT
     validator = OneOf(ExecuteResponse.values())
@@ -2831,8 +2832,8 @@ class ExecuteInputInlineValue(OneOfKeywordSchema):
 #   oneOf:
 #     - $ref: "inputValueNoObject.yaml"
 #     - type: object
-#
 class ExecuteInputObjectData(OneOfKeywordSchema):
+    schema_ref = f"{OGC_API_SCHEMA_URL}/{OGC_API_SCHEMA_VERSION}/core/openapi/schemas/inputValue.yaml"
     description = "Data value of any schema "
     _one_of = [
         ExecuteInputInlineValue,
@@ -2842,6 +2843,7 @@ class ExecuteInputObjectData(OneOfKeywordSchema):
 
 # https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/qualifiedInputValue.yaml
 class ExecuteInputObject(Format):
+    schema_ref = f"{OGC_API_SCHEMA_URL}/{OGC_API_SCHEMA_VERSION}/core/openapi/schemas/qualifiedInputValue.yaml"
     value = ExecuteInputObjectData()    # can be anything, including literal value, array of them, nested object
 
 
@@ -2865,6 +2867,7 @@ class ExecuteInputInline(OneOfKeywordSchema):
 #     - $ref: "link.yaml"
 #
 class ExecuteInputAny(OneOfKeywordSchema):
+    schema_ref = f"{OGC_API_SCHEMA_URL}/{OGC_API_SCHEMA_VERSION}/core/openapi/schemas/inlineOrRefData.yaml"
     description = "Execute data definition of the input."
     _one_of = [
         ExecuteInputInline(summary="Execute input value(s) provided inline."),          # 'inputValueNoObject' + 'link'
@@ -2883,6 +2886,7 @@ class ExecuteInputAny(OneOfKeywordSchema):
 # 	        $ref: "inlineOrRefData.yaml"
 #
 class ExecuteInputMapValues(ExtendedMappingSchema):
+    schema_ref = f"{OGC_API_SCHEMA_URL}/{OGC_API_SCHEMA_VERSION}/core/openapi/schemas/execute.yaml"
     input_id = ExecuteInputAny(variable="{input-id}", title="ExecuteInputValue",
                                description="Received mapping input value definition during job submission.")
 
@@ -3486,7 +3490,7 @@ class ResultReferenceList(ExtendedSequenceSchema):
 
 
 class ResultData(OneOfKeywordSchema):
-    schema_ref = "{}/master/core/openapi/schemas/result.yaml".format(OGC_API_SCHEMA_URL)
+    schema_ref = f"{OGC_API_SCHEMA_URL}/{OGC_API_SCHEMA_VERSION}/core/openapi/schemas/result.yaml"
     _one_of = [
         # must place formatted value first since both value/format fields are simultaneously required
         # other classes require only one of the two, and therefore are more permissive during schema validation
@@ -3503,7 +3507,7 @@ class Result(ExtendedMappingSchema):
     """
     Result outputs obtained from a successful process job execution.
     """
-    example_ref = "{}/master/core/examples/json/Result.json".format(OGC_API_SCHEMA_URL)
+    example_ref = f"{OGC_API_SCHEMA_URL}/{OGC_API_SCHEMA_VERSION}/core/examples/json/Result.json"
     output_id = ResultData(
         variable="{output-id}", title="Output Identifier",
         description=(
@@ -3610,17 +3614,21 @@ class ExecutionUnitList(ExtendedSequenceSchema):
     )
 
 
-class ProcessDeploymentOffering(ExtendedMappingSchema):
-    process = ProcessDeployment()
+class DeployProcessOffering(ProcessControl):
+    process = ProcessDeployment(description="Process definition nested under process field for backward compatibility.")
     processVersion = Version(title="processVersion", missing=drop)
-    jobControlOptions = JobControlOptionsList(missing=drop)
-    outputTransmission = TransmissionModeList(missing=drop)
+
+
+class DeployProcessDescription(ProcessDeployment, ProcessControl):
+    schema_ref = f"{OGC_API_SCHEMA_URL}/{OGC_API_SCHEMA_VERSION}/core/openapi/schemas/process.yaml"
+    description = "Process description fields directly provided."
 
 
 class ProcessDescriptionChoiceType(OneOfKeywordSchema):
     _one_of = [
         Reference(),
-        ProcessDeploymentOffering()
+        DeployProcessOffering(),
+        DeployProcessDescription()
     ]
 
 
