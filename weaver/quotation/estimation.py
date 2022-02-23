@@ -60,7 +60,7 @@ def estimate_workflow_quote(quote, process):
         process_quote_url = "{}/quotations".format(process_step_url)
 
         # FIXME: how to estimate data transfer if remote process (?)
-        # FIXME: how to produce intermediate process inputs (?)
+        # FIXME: how to produce intermediate process inputs (?) - remove xfail in functional test once resolved
         # FIXME: must consider fan-out in case of parallel steps
         data = {"inputs": [], "outputs": []}
         resp = request_extra("POST", process_quote_url, json=data, headers={"Prefer": "respond-async"})

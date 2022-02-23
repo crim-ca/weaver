@@ -52,7 +52,7 @@ def request_quote(request):
         })
 
     if (
-        process.type != ProcessType.APPLICATION or
+        (process.type not in [ProcessType.APPLICATION, ProcessType.WORKFLOW]) or
         (process.type == ProcessType.WORKFLOW and weaver_config not in WeaverFeature.REMOTE)
     ):
         raise HTTPBadRequest(json={

@@ -5,17 +5,19 @@ inputs:
 outputs:
   output:
     type: string
-    outputSource: echo2/output
+    outputSource: read/output
 steps:
-  echo1:
+  # string -> file
+  echo:
     run: Echo.cwl
     in:
       message: message
     out:
       - output
-  echo2:
-    run: Echo.cwl
+  # file -> string
+  read:
+    run: ReadFile.cwl
     in:
-      input_files: echo1/output
+      file: echo/output
     out:
       - output

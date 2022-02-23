@@ -2,7 +2,7 @@
     "processDescription": {
         "visibility": "public",
         "id": "WorkflowChainStrings",
-        "title": "Chain two applications that pass a string around.",
+        "title": "Chain two applications that pass a string around with intermediate file.",
         "version": "0.0.1"
     },
     "executionUnit": [
