@@ -12,7 +12,14 @@ Changes
 
 Changes:
 --------
-- No change.
+- Support `Process` deployment using `OGC` schema (i.e.: `Process` metadata can be provided directly under
+  ``processDescription`` instead of being nested under ``processDescription.process``).
+  This aligns the deployment schema with reference `OGC API - Processes: Deploy, Replace, Undeploy` extension
+  (see |ogc-app-pkg|_ schema).
+  The previous schema for deployment with nested ``process`` field remains supported for backward compatibility.
+
+.. |ogc-app-pkg| replace:: OGC Application Package
+.. _ogc-app-pkg: https://github.com/opengeospatial/ogcapi-processes/blob/master/extensions/deploy_replace_undeploy/standard/openapi/schemas/ogcapppkg.yaml
 
 Fixes:
 ------
