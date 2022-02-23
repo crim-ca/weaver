@@ -136,8 +136,14 @@ def _check_deploy(payload):
         # Because many fields are optional during deployment to allow flexibility between compatible WPS/CWL
         # definitions, any invalid field at lower-level could make a full higher-level definition to be dropped.
         # Verify the result to ensure this was not the case for known cases to attempt early detection.
-        p_inputs = payload.get("processDescription", {}).get("process", {}).get("inputs")
-        r_inputs = results.get("processDescription", {}).get("process", {}).get("inputs")
+        p_process = payload.get("processDescription", {})
+        r_process = results.get("processDescription", {})
+        if "process" in p_process:
+            # if process is nested, both provided/result description must align
+            p_process = p_process.get("process", {})
+            r_process = r_process.get("process", {})
+        p_inputs = p_process.get("inputs")
+        r_inputs = r_process.get("inputs")
         if p_inputs and p_inputs != r_inputs:
             message = "Process deployment inputs definition is invalid."
             # try raising sub-schema to have specific reason

@@ -12,6 +12,11 @@ Changes
 
 Changes:
 --------
+- Support `Process` deployment using `OGC` schema (i.e.: `Process` metadata can be provided directly under
+  ``processDescription`` instead of being nested under ``processDescription.process``).
+  This aligns the deployment schema with reference `OGC API - Processes: Deploy, Replace, Undeploy` extension
+  (see |ogc-app-pkg|_ schema).
+  The previous schema for deployment with nested ``process`` field remains supported for backward compatibility.
 - Updates related to |ogc-api-proc-quote|_.
 - Move estimator portion of the quoting operation into separate files and bind them with `Celery` task to allow the
   same kind of dispatched processing as normal `Process` execution.
@@ -24,6 +29,8 @@ Changes:
 
 .. |ogc-api-proc-quote| replace:: `OGC API - Processes`: Quotation Extension
 .. _ogc-api-proc-quote: https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/quotation
+.. |ogc-app-pkg| replace:: OGC Application Package
+.. _ogc-app-pkg: https://github.com/opengeospatial/ogcapi-processes/blob/master/extensions/deploy_replace_undeploy/standard/openapi/schemas/ogcapppkg.yaml
 
 Fixes:
 ------
