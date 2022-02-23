@@ -107,6 +107,39 @@ class WpsPackageAppTest(WpsConfigBase):
         assert desc["title"] == title
         assert pkg["label"] == title
 
+    def test_deploy_ogc_schema(self):
+        title = "This process title comes from the CWL label"
+        cwl = {
+            "cwlVersion": "v1.0",
+            "label": title,
+            "class": "CommandLineTool",
+            "inputs": {"url": {"type": "string"}},
+            "outputs": {"values": {"type": "float"}}
+        }
+        body = {
+            "processDescription": {"id": self._testMethodName},  # not nested under 'process'
+            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication",
+            "executionUnit": [{"unit": cwl}],
+        }
+        desc, pkg = self.deploy_process(body, describe_schema=ProcessSchema.OGC)
+        assert "inputs" in pkg and isinstance(pkg["inputs"], list) and len(pkg["inputs"]) == 1
+        assert "outputs" in pkg and isinstance(pkg["outputs"], list) and len(pkg["outputs"]) == 1
+        assert pkg["inputs"][0]["id"] == "url"
+        assert pkg["outputs"][0]["id"] == "values"
+
+        assert "inputs" in desc and isinstance(desc["inputs"], dict) and len(desc["inputs"]) == 1
+        assert "outputs" in desc and isinstance(desc["outputs"], dict) and len(desc["outputs"]) == 1
+        assert "url" in desc["inputs"]
+        assert "values" in desc["outputs"]
+
+        # even if deployed as OGC schema, OLD schema can be converted back
+        desc = self.describe_process(self._testMethodName, ProcessSchema.OLD)
+        proc = desc["process"]
+        assert "inputs" in proc and isinstance(proc["inputs"], list) and len(proc["inputs"]) == 1
+        assert "outputs" in proc and isinstance(proc["outputs"], list) and len(proc["outputs"]) == 1
+        assert proc["inputs"][0]["id"] == "url"
+        assert proc["outputs"][0]["id"] == "values"
+
     def test_deploy_merge_literal_io_from_package(self):
         """
         Test validates that literal I/O definitions *only* defined in the `CWL` package as `JSON` within the deployment

@@ -720,7 +720,10 @@ class FormatDescription(ExtendedMappingSchema):
 # from 'ResultFormat' employed for result reporting, which shouldn't have a default (applied vs supported format)
 class FormatDefault(ExtendedMappingSchema):
     default = ExtendedSchemaNode(
-        Boolean(), missing=drop, default=False,
+        Boolean(), missing=drop,
+        # don't insert "default" field if omitted in deploy body to avoid causing differing "inputs"/"outputs"
+        # definitions between the submitted payload and the validated one (in 'weaver.processes.utils._check_deploy')
+        # default=False,
         description=(
             "Indicates if this format should be considered as the default one in case none of the other "
             "allowed or supported formats was matched nor provided as input during job submission."
