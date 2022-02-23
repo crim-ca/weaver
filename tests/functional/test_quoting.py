@@ -103,7 +103,7 @@ class WpsQuotationTest(WpsConfigBase):
             assert isinstance(body["price"], float) and body["price"] > 0
             assert isinstance(body["currency"], str) and body["currency"] == "CAD"
             assert isinstance(body["estimatedSeconds"], int) and body["estimatedSeconds"] > 0
-    
+
     # FIXME: pass around pseudo-inputs to intermediate steps (?)
     #        see 'weaver.quotation.estimation.estimate_workflow_quote'
     @pytest.mark.xfail(reason="missing step inputs fails sub-process quotations")
@@ -132,4 +132,3 @@ class WpsQuotationTest(WpsConfigBase):
             assert isinstance(body["price"], float) and body["price"] > 0
             assert isinstance(body["currency"], str) and body["currency"] == "CAD"
             assert isinstance(body["estimatedSeconds"], int) and body["estimatedSeconds"] > 0
-
