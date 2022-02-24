@@ -45,6 +45,7 @@ from weaver.wps_restapi import swagger_definitions as sd
 if TYPE_CHECKING:
     from typing import Optional
 
+    from weaver.processes.constants import ProcessSchemaType
     from weaver.typedefs import CWL, JSON
 
 
@@ -87,8 +88,8 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         self.process_store.set_visibility(self.process_public.identifier, Visibility.PUBLIC)
         self.process_store.set_visibility(self.process_private.identifier, Visibility.PRIVATE)
 
-    def get_process_deploy_template(self, process_id=None, cwl=None):
-        # type: (Optional[str], Optional[CWL]) -> JSON
+    def get_process_deploy_template(self, process_id=None, cwl=None, schema=ProcessSchema.OLD):
+        # type: (Optional[str], Optional[CWL], ProcessSchemaType) -> JSON
         """
         Provides deploy process bare minimum template with undefined execution unit.
 
@@ -98,15 +99,18 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         if not process_id:
             process_id = self.fully_qualified_test_process_name()
         body = {
-            "processDescription": {
-                "process": {
-                    "id": process_id,
-                    "title": "Test process '{}'.".format(process_id),
-                }
-            },
+            "processDescription": {},
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication",
             "executionUnit": []
         }
+        meta = {
+            "id": process_id,
+            "title": "Test process '{}'.".format(process_id),
+        }
+        if schema == ProcessSchema.OLD:
+            body["processDescription"]["process"] = meta
+        else:
+            body["processDescription"].update(meta)
         if cwl:
             body["executionUnit"].append({"unit": cwl})
         else:
@@ -429,6 +433,25 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                 stack.enter_context(pkg)
             path = "/processes"
             resp = self.app.post_json(path, params=process_data, headers=self.json_headers, expect_errors=True)
+            assert resp.status_code == 201
+            assert resp.content_type == ContentType.APP_JSON
+            assert resp.json["processSummary"]["id"] == process_name
+            assert isinstance(resp.json["deploymentDone"], bool) and resp.json["deploymentDone"]
+
+    def test_deploy_process_ogc_schema(self):
+        process_name = self.fully_qualified_test_process_name()
+        process_data = self.get_process_deploy_template(process_name, schema=ProcessSchema.OGC)
+        process_desc = process_data["processDescription"]
+        package_mock = mocked_process_package()
+
+        with contextlib.ExitStack() as stack:
+            for pkg in package_mock:
+                stack.enter_context(pkg)
+            assert "process" not in process_desc
+            assert "id" in process_desc
+            process_desc["visibility"] = Visibility.PUBLIC  # save ourself an update request
+            path = "/processes"
+            resp = self.app.post_json(path, params=process_data, headers=self.json_headers)
             assert resp.status_code == 201
             assert resp.content_type == ContentType.APP_JSON
             assert resp.json["processSummary"]["id"] == process_name
