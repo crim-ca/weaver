@@ -34,7 +34,9 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Fix resolution of the ``default`` field specifier under a list of supported ``formats`` during deployment.
+  For various combinations such as when ``default: True`` format is omitted, or when the default is not ordered first,
+  resolved ``default`` specifically for ``outputs`` definitions would be incorrect.
 
 .. _changes_4.10.0:
 

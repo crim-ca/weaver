@@ -1298,10 +1298,20 @@ def json2wps_field(field_info, field_category):
     if field_category == "allowed_values":
         return json2wps_allowed_values({"allowed_values": field_info})
     elif field_category == "supported_formats":
+        fmt = None
+        field_info = field_info.copy()
+        # pywps doesn't allow 'default' field in init, remove if found, but preserve it indirectly
+        default = get_field(field_info, "default", search_variations=False, pop_found=True)
         if isinstance(field_info, dict):
-            return Format(**field_info)
+            fmt = Format(**field_info)
         if isinstance(field_info, str):
-            return Format(field_info)
+            fmt = Format(field_info)
+        if fmt:
+            # consider any explicit 'default' format specification to allow resolution against many supported formats
+            # set a temporary additional attribute in PyWPS Format object that can be found later
+            if isinstance(default, bool):
+                set_field(fmt, "default", default)
+            return fmt
     elif field_category == "metadata":
         if isinstance(field_info, WPS_Metadata):
             return field_info
@@ -1420,7 +1430,7 @@ def json2wps_io(io_info, io_select):
             fmt["mime_type"] = get_field(fmt, "mime_type", search_variations=True, pop_found=True)
             fmt.pop("maximumMegabytes", None)
             # define the 'default' with 'data_format' to be used if explicitly specified from the payload
-            if fmt.pop("default", None) is True:
+            if fmt.get("default", None) is True:
                 if get_field(io_info, "data_format") != null:  # if set by previous 'fmt'
                     raise PackageTypeError("Cannot have multiple 'default' formats simultaneously.")
                 # use 'data_format' instead of 'default' to avoid overwriting a potential 'default' value
@@ -1477,7 +1487,6 @@ def json2wps_io(io_info, io_select):
         io_info.pop("min_occurs", None)
         io_info.pop("max_occurs", None)
         io_info.pop("allowed_values", None)
-        io_info.pop("data_format", None)
         io_info.pop("default", None)
         if io_type in WPS_COMPLEX_TYPES:
             io_info.pop("supported_values", None)

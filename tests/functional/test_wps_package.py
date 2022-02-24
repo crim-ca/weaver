@@ -140,6 +140,71 @@ class WpsPackageAppTest(WpsConfigBase):
         assert proc["inputs"][0]["id"] == "url"
         assert proc["outputs"][0]["id"] == "values"
 
+    def test_deploy_process_io_no_format_default(self):
+        """
+        Validate resolution of ``default`` format field during deployment.
+
+        Omitted ``default`` field in formats during deployment must only add them later on during process description.
+
+        .. versionchanged:: 4.11.0
+            Previously, ``default: False`` would be added automatically *during deployment parsing*
+            (from :mod:`colander` deserialization) when omitted in the submitted payload.
+            This caused comparison between submitted ``inputs`` and ``outputs`` against their parsed counterparts
+            to differ, failing deployment. Newer versions do not add the missing ``default`` during deployment, but
+            adds them as needed for following *process description parsing*, as they are then required in the schema.
+
+        .. seealso::
+            :func:`tests.test_schemas.test_format_variations`
+        """
+        cwl = {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "inputs": {"file": {"type": "File"}},
+            "outputs": {"file": {"type": "File"}}
+        }
+        body = {
+            "processDescription": {
+                "id": self._testMethodName,
+                "inputs": {
+                    "file": {
+                        "formats": [
+                            # no explicit defaults for any entry
+                            {"mediaType": ContentType.APP_JSON},  # first should resolve as default
+                            {"mediaType": ContentType.TEXT_PLAIN}
+                        ]
+                    }
+                },
+                "outputs": {
+                    "file": {
+                        "formats": [
+                            # explicit defaults are respected
+                            {"mediaType": ContentType.IMAGE_PNG, "default": False},
+                            {"mediaType": ContentType.IMAGE_JPEG, "default": True},  # must respect even if not first
+                            # and can be mixed with omitted that must resolve as non default
+                            {"mediaType": ContentType.IMAGE_GEOTIFF},
+                        ]
+                    }
+                }
+            },
+            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication",
+            "executionUnit": [{"unit": cwl}],
+        }
+        desc, _ = self.deploy_process(body, describe_schema=ProcessSchema.OGC)
+
+        # add fields that are generated inline by the process description
+        expect_inputs = body["processDescription"]["inputs"]  # type: JSON
+        expect_outputs = body["processDescription"]["outputs"]  # type: JSON
+        expect_inputs["file"].update({"title": "file", "minOccurs": 1, "maxOccurs": 1})
+        expect_inputs["file"]["formats"][0]["default"] = True
+        expect_inputs["file"]["formats"][1]["default"] = False
+        expect_outputs["file"].update({"title": "file"})  # no min/max occurs for outputs
+        expect_outputs["file"]["formats"][0]["default"] = False
+        expect_outputs["file"]["formats"][1]["default"] = True
+        expect_outputs["file"]["formats"][2]["default"] = False
+
+        assert desc["inputs"] == expect_inputs
+        assert desc["outputs"] == expect_outputs
+
     def test_deploy_merge_literal_io_from_package(self):
         """
         Test validates that literal I/O definitions *only* defined in the `CWL` package as `JSON` within the deployment

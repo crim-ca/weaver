@@ -88,21 +88,32 @@ def test_url_schemes():
 
 
 def test_format_variations():
+    """
+    Test format parsing for deployment payload.
+
+    .. versionchanged:: 4.11.0
+        Omitted field ``default: False`` not added automatically *during deployment* anymore.
+        It remains there if provided though, and will be added once again during process description parsing.
+
+    .. seealso::
+        Validation of above mentioned behavior is accomplished with
+        :func:`tests.functional.test_wps_package.WpsPackageAppTest.test_deploy_process_io_no_format_default`.
+    """
     format_schema = sd.DeploymentFormat()
     schema = "https://www.iana.org/assignments/media-types/{}".format(ContentType.APP_JSON)
     test_valid_fmt_deploy = [
         (
             {"mimeType": ContentType.APP_JSON},
-            {"mimeType": ContentType.APP_JSON, "default": False}),
+            {"mimeType": ContentType.APP_JSON}),
         (
             {"mediaType": ContentType.APP_JSON},
-            {"mediaType": ContentType.APP_JSON, "default": False}),
+            {"mediaType": ContentType.APP_JSON}),
         (
             {"mediaType": ContentType.APP_JSON, "maximumMegabytes": 200},
-            {"mediaType": ContentType.APP_JSON, "maximumMegabytes": 200, "default": False}),
+            {"mediaType": ContentType.APP_JSON, "maximumMegabytes": 200}),
         (
             {"mediaType": ContentType.APP_JSON, "maximumMegabytes": None},
-            {"mediaType": ContentType.APP_JSON, "default": False}),
+            {"mediaType": ContentType.APP_JSON}),
         (
             {"mediaType": ContentType.APP_JSON, "default": False},
             {"mediaType": ContentType.APP_JSON, "default": False}),
@@ -111,10 +122,10 @@ def test_format_variations():
             {"mediaType": ContentType.APP_JSON, "default": True}),
         (
             {"mediaType": ContentType.APP_JSON, "schema": None},
-            {"mediaType": ContentType.APP_JSON, "default": False}),
+            {"mediaType": ContentType.APP_JSON}),
         (
             {"mediaType": ContentType.APP_JSON, "schema": schema},
-            {"mediaType": ContentType.APP_JSON, "schema": schema, "default": False}),
+            {"mediaType": ContentType.APP_JSON, "schema": schema}),
     ]
     for fmt, res in test_valid_fmt_deploy:
         try:
