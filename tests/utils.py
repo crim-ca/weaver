@@ -848,7 +848,6 @@ def mocked_execute_celery(celery_task="weaver.processes.execution.execute_proces
         The return value is ignored, as the mocked :class:`celery.task.Task` is always returned instead.
         If not provided, the function referred by :paramref:`celery_task` is imported and called directly.
     """
-    from weaver.processes.execution import execute_process as real_execute_process
 
     class MockTask(object):
         """
