@@ -9,7 +9,6 @@ if TYPE_CHECKING:
     from pywps import Process as ProcessWPS
 
     from weaver.datatype import Bill, Job, Process, Quote, Service, VaultFile
-    from weaver.quotation.status import AnyQuoteStatus
     from weaver.typedefs import AnyUUID, DatetimeIntervalType, SettingsType, TypedDict
 
     JobGroupCategory = TypedDict("JobGroupCategory",
