@@ -51,7 +51,9 @@ def _get_settings_or_wps_config(container,                  # type: AnySettingsC
     if not found:
         if not settings.get("weaver.wps_configured"):
             load_pywps_config(container)
-        found = pywps_config.CONFIG.get(config_setting_section, config_setting_name)
+        # not yet defined on first load permitted if settings retrieved early on
+        if pywps_config.CONFIG:
+            found = pywps_config.CONFIG.get(config_setting_section, config_setting_name)
     if not isinstance(found, str):
         LOGGER.warning("%s not set in settings or WPS configuration, using default value.", message_not_found)
         found = default_not_found

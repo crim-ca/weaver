@@ -45,10 +45,10 @@ class WpsConfigBase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        config = setup_config_with_mongodb(settings=cls.settings)
+        config = get_test_weaver_config(settings=cls.settings)
+        config = setup_config_with_mongodb(config)
         config = setup_config_with_pywps(config)
         config = setup_config_with_celery(config)
-        config = get_test_weaver_config(config)
         cls.process_store = setup_mongodb_processstore(config)  # force reset
         cls.job_store = setup_mongodb_jobstore(config)
         cls.app = get_test_weaver_app(config=config, settings=cls.settings)
