@@ -2627,9 +2627,13 @@ class Duration(ExtendedSchemaNode):
 #       'duration.to_iso8601' already employed for quotes, should apply for jobs as well
 class DurationISO(ExtendedSchemaNode):
     """
+    Duration represented using ISO-8601 format.
+
     .. seealso::
-        https://json-schema.org/draft/2019-09/json-schema-validation.html#rfc.section.7.3.1
+        - https://json-schema.org/draft/2019-09/json-schema-validation.html#rfc.section.7.3.1
+        - :rfc:`3339#appendix-A`
     """
+    schema_ref = "https://json-schema.org/draft/2019-09/json-schema-validation.html#rfc.section.7.3.1"
     schema_type = String
     description = "ISO-8601 representation of the duration."
     example = "P[n]Y[n]M[n]DT[n]H[n]M[n]S"

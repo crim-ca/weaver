@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_4.11.0:
+
+`4.11.0 <https://github.com/crim-ca/weaver/tree/4.11.0>`_ (2022-02-24)
+========================================================================
+
+Changes:
+--------
 - Support `Process` deployment using `OGC` schema (i.e.: `Process` metadata can be provided directly under
   ``processDescription`` instead of being nested under ``processDescription.process``).
   This aligns the deployment schema with reference `OGC API - Processes: Deploy, Replace, Undeploy` extension
