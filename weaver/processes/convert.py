@@ -1080,7 +1080,7 @@ def convert_input_values_schema(inputs, schema):
 def repr2json_input_values(inputs):
     # type: (List[str]) -> ExecutionInputsList
     """
-    Converts inputs in string representation to corresponding :term:`JSON` values.
+    Converts inputs in string :term:`KVP` representation to corresponding :term:`JSON` values.
 
     Expected format is as follows:
 

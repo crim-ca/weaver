@@ -1,0 +1,10 @@
+{
+  "inputs": {
+    "message": "Test message"
+  },
+  "outputs": {
+    "output": {
+      "transmissionMode": "reference"
+    }
+  }
+}

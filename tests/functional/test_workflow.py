@@ -26,7 +26,7 @@ from tests.utils import (
     get_settings_from_config_ini,
     get_settings_from_testapp,
     get_test_weaver_app,
-    mocked_execute_process,
+    mocked_execute_celery,
     mocked_file_server,
     mocked_sub_requests,
     mocked_wps_output,
@@ -804,7 +804,7 @@ class WorkflowTestRunnerBase(TestCase):
                 stack_exec.enter_context(mock.patch(data_source_use, side_effect=self.mock_get_data_source_from_url))
             if self.is_webtest():
                 # mock execution when running on local Web Test app since no Celery runner is available
-                for mock_exec in mocked_execute_process():
+                for mock_exec in mocked_execute_celery():
                     stack_exec.enter_context(mock_exec)
                 # mock HTTP HEAD request to validate WPS output access (see 'setUpClass' details)
                 mock_req = stack_exec.enter_context(mocked_wps_output(self.settings, mock_head=True, mock_get=False))

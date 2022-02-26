@@ -1,0 +1,23 @@
+# YAML representation supported by WeaverClient
+processDescription:
+  id: ReadFile
+  title: Read File to obtain contents as raw string
+  version: "1.0"  # must be string, avoid interpretation as float
+  keywords:
+    - test
+  inputs:
+    - id: file
+      description: "File to read contents."
+      minOccurs: 1
+      maxOccurs: 1
+  outputs:
+    - id: output
+      description: "Contents of the file."
+jobControlOptions:
+  - async-execute
+outputTransmission:
+  - reference
+executionUnit:
+  # note: This does not work by itself! The test suite injects the file dynamically.
+  - href: "tests/functional/application-packages/CatValue/cat.cwl"
+deploymentProfileName: "http://www.opengis.net/profiles/eoc/dockerizedApplication"

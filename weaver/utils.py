@@ -25,7 +25,12 @@ from beaker.exceptions import BeakerException
 from celery.app import Celery
 from pyramid.config import Configurator
 from pyramid.exceptions import ConfigurationError
-from pyramid.httpexceptions import HTTPError as PyramidHTTPError, HTTPGatewayTimeout, HTTPTooManyRequests
+from pyramid.httpexceptions import (
+    HTTPBadRequest,
+    HTTPError as PyramidHTTPError,
+    HTTPGatewayTimeout,
+    HTTPTooManyRequests
+)
 from pyramid.registry import Registry
 from pyramid.request import Request as PyramidRequest
 from pyramid.response import _guess_type as guess_file_contents  # noqa: W0212
@@ -40,6 +45,7 @@ from webob.headers import EnvironHeaders, ResponseHeaders
 from werkzeug.wrappers import Request as WerkzeugRequest
 from yaml.scanner import ScannerError
 
+from weaver.execute import ExecuteControlOption, ExecuteMode
 from weaver.formats import ContentType, get_content_type
 from weaver.status import map_status
 from weaver.warning import TimeZoneInfoAlreadySetWarning
@@ -48,6 +54,7 @@ from weaver.xml_util import XML
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, List, Iterable, NoReturn, Optional, Type, Tuple, Union
 
+    from weaver.execute import AnyExecuteControlOption, AnyExecuteMode
     from weaver.status import Status
     from weaver.typedefs import (
         AnyKey,
@@ -58,6 +65,7 @@ if TYPE_CHECKING:
         AnyValueType,
         HeadersType,
         JSON,
+        KVP,
         KVP_Item,
         Number,
         SettingsType
@@ -262,6 +270,205 @@ def get_cookie_headers(header_container, cookie_header_name="Cookie"):
         return {}
 
 
+def parse_kvp(query,                    # type: str
+              key_value_sep="=",        # type: str
+              pair_sep=";",             # type: str
+              nested_pair_sep="",       # type: Optional[str]
+              multi_value_sep=",",      # type: Optional[str]
+              accumulate_keys=True,     # type: bool
+              unescape_quotes=True,     # type: bool
+              strip_spaces=True,        # type: bool
+              case_insensitive=True,    # type: bool
+              ):                        # type: (...) -> KVP
+    """
+    Parse key-value pairs using specified separators.
+
+    All values are normalized under a list, whether their have an unique or multi-value definition.
+    When a key is by itself (without separator and value), the resulting value will be an empty list.
+
+    When :paramref:`accumulate_keys` is enabled, entries such as ``{key}={val};{key}={val}`` will be joined together
+    under the same list as if they were specified using directly ``{key}={val},{val}`` (default separators employed
+    only for demonstration purpose). Both nomenclatures can also be employed simultaneously.
+
+    When :paramref:`nested_pair_sep` is provided, definitions that contain nested :paramref:`key_value_sep` character
+    within an already established :term:`KVP` will be parsed once again.
+    This will parse ``{key}={subkey1}={val1},{subkey2}={val2}`` into a nested :term:`KVP` dictionary as value under
+    the top level :term:`KVP` entry ``{key}``. Separators are passed down for nested parsing,
+    except :paramref:`pair_sep` that is replaced by :paramref:`nested_pair_sep`.
+
+    .. code-blocK:: python
+
+        >> parse_kvp("format=json&inputs=key1=value1;key2=val2,val3", pair_sep="&", nested_pair_sep=";")
+        {
+            'format': ['json'],
+            'inputs': {
+                'key1': ['value1'],
+                'key2': ['val2', 'val3']
+            }
+        }
+
+    :param query: Definition to be parsed as :term:`KVP`.
+    :param key_value_sep: Separator that delimitates the keys from their values.
+    :param pair_sep: Separator that distinguish between different ``(key, value)`` entries.
+    :param nested_pair_sep: Separator to parse values of pairs containing nested :term:`KVP` definition.
+    :param multi_value_sep:
+        Separator that delimitates multiple values associated to the same key.
+        If empty or ``None``, values will be left as a single entry in the list under the key.
+    :param accumulate_keys: Whether replicated keys should be considered equivalent to multi-value entries.
+    :param unescape_quotes: Whether to remove single and double quotes around values.
+    :param strip_spaces: Whether to remove spaces around values after splitting them.
+    :param case_insensitive:
+        Whether to consider keys as case-insensitive.
+        If ``True``, resulting keys will be normalized to lowercase. Otherwise, original keys are employed.
+    :return: Parsed KVP.
+    :raises HTTPBadRequest: If parsing cannot be accomplished based on parsing conditions.
+    """
+    if not query:
+        return {}
+    kvp_items = query.split(pair_sep)
+    kvp = {}
+    for item in kvp_items:
+        k_v = item.split(key_value_sep, 1)
+        if len(k_v) < 2:
+            key = k_v[0]
+            val = []
+        else:
+            key, val = k_v
+            if key_value_sep in val and nested_pair_sep:
+                val = parse_kvp(val, key_value_sep=key_value_sep, multi_value_sep=multi_value_sep,
+                                pair_sep=nested_pair_sep, nested_pair_sep=None,
+                                accumulate_keys=accumulate_keys, unescape_quotes=unescape_quotes,
+                                strip_spaces=strip_spaces, case_insensitive=case_insensitive)
+        if isinstance(val, str):  # in case nested KVP already processed
+            arr = val.split(multi_value_sep) if multi_value_sep else [val]
+            for i, val_item in enumerate(list(arr)):
+                if strip_spaces:
+                    val_item = val_item.strip()
+                if unescape_quotes and (
+                    (val_item.startswith("'") and val_item.endswith("'")) or
+                    (val_item.startswith("\"") and val_item.endswith("\""))
+                ):
+                    val_item = val_item[1:-1]
+                arr[i] = val_item
+            val = arr
+        if case_insensitive:
+            key = key.lower()
+        if strip_spaces:
+            key = key.strip()
+        if key in kvp:
+            if not accumulate_keys:
+                raise HTTPBadRequest(json={
+                    "code": "InvalidParameterValue",
+                    "description": f"Accumulation of replicated key {key} is not permitted for this query.",
+                    "value": str(query),
+                })
+            if isinstance(val, dict) or isinstance(kvp[key], dict):
+                raise HTTPBadRequest(json={
+                    "code": "InvalidParameterValue",
+                    "description": f"Accumulation of replicated key {key} is not permitted for nested definitions.",
+                    "value": str(query),
+                })
+            kvp[key].extend(val)
+        else:
+            kvp[key] = val
+    return kvp
+
+
+def parse_prefer_header_execute_mode(
+    header_container,       # type: AnyHeadersContainer
+    supported_modes=None,   # type: Optional[List[AnyExecuteControlOption]]
+    wait_max=10,            # type: int
+):                          # type: (...) -> Tuple[AnyExecuteMode, Optional[int], HeadersType]
+    """
+    Obtain execution preference if provided in request headers.
+
+    .. seealso::
+        - `OGC API - Processes: Core, Execution mode <
+          https://docs.ogc.org/is/18-062r2/18-062r2.html#sc_execution_mode>`_.
+          This defines all conditions how to handle ``Prefer`` against applicable :term:`Process` description.
+        - :rfc:`7240#section-4.1` HTTP Prefer header ``respond-async``
+
+    :param header_container: Request headers to retrieve preference, if any available.
+    :param supported_modes:
+        Execute modes that are permitted for the operation that received the ``Prefer`` header.
+        Resolved mode will respect this constrain following specification requirements of :term:`OGC API - Processes`.
+    :param wait_max:
+        Maximum wait time enforced by the server. If requested wait time is greater, 'wait' preference will not be
+        applied and will fallback to asynchronous response.
+    :return:
+        Tuple of resolved execution mode, wait time if specified, and header of applied preferences if possible.
+        Maximum wait time indicates duration until synchronous response should fallback to asynchronous response.
+    :raises HTTPBadRequest: If contents of ``Prefer`` are not valid.
+    """
+
+    prefer = get_header("prefer", header_container)
+    relevant_modes = {ExecuteControlOption.ASYNC, ExecuteControlOption.SYNC}
+    supported_modes = list(set(supported_modes or []).intersection(relevant_modes))
+
+    if not prefer:
+        # /req/core/process-execute-default-execution-mode (A & B)
+        if not supported_modes:
+            return ExecuteMode.ASYNC, None, {}  # Weaver's default
+        if len(supported_modes) == 1:
+            mode = ExecuteMode.ASYNC if supported_modes[0] == ExecuteControlOption.ASYNC else ExecuteMode.SYNC
+            wait = None if mode == ExecuteMode.ASYNC else wait_max
+            return mode, wait, {}
+        # /req/core/process-execute-default-execution-mode (C)
+        return ExecuteMode.SYNC, wait_max, {}
+
+    params = parse_kvp(prefer, pair_sep=",", multi_value_sep=None)
+    wait = wait_max
+    if "wait" in params:
+        try:
+            if not len(params["wait"]) == 1:
+                raise ValueError("Too many values.")
+            wait = params["wait"][0]
+            if not str.isnumeric(wait) or "." in wait or wait.startswith("-"):
+                raise ValueError("Invalid integer for 'wait' in seconds.")
+            wait = int(wait)
+        except (TypeError, ValueError) as exc:
+            raise HTTPBadRequest(json={
+                "code": "InvalidParameterValue",
+                "description": "HTTP Prefer header contains invalid 'wait' definition.",
+                "error": type(exc).__name__,
+                "cause": str(exc),
+                "value": str(params["wait"]),
+            })
+
+    if wait > wait_max:
+        LOGGER.info("Requested Prefer wait header too large (%ss > %ss), revert to async execution.", wait, wait_max)
+        return ExecuteMode.ASYNC, None, {}
+
+    auto = ExecuteMode.ASYNC if "respond-async" in params else ExecuteMode.SYNC
+    applied_preferences = []
+    # /req/core/process-execute-auto-execution-mode (A & B)
+    if len(supported_modes) == 1:
+        # supported mode is enforced, only indicate if it matches preferences to honour them
+        # otherwise, server is allowed to discard preference since it cannot be honoured
+        mode = ExecuteMode.ASYNC if supported_modes[0] == ExecuteControlOption.ASYNC else ExecuteMode.SYNC
+        wait = None if mode == ExecuteMode.ASYNC else wait_max
+        if auto == mode:
+            if auto == ExecuteMode.ASYNC:
+                applied_preferences.append("respond-async")
+            if wait:
+                applied_preferences.append(f"wait={wait}")
+        # /rec/core/process-execute-honor-prefer (A: async & B: wait)
+        # https://datatracker.ietf.org/doc/html/rfc7240#section-3
+        applied = {}
+        if applied_preferences:
+            applied = {"Preference-Applied": ", ".join(applied_preferences)}
+        return mode, wait, applied
+
+    # Weaver's default, at server's discretion when both mode are supported
+    # /req/core/process-execute-auto-execution-mode (C)
+    if len(supported_modes) == 2:
+        if auto == ExecuteMode.ASYNC:
+            return ExecuteMode.ASYNC, None, {"Preference-Applied": "respond-async"}
+        if wait:
+            return ExecuteMode.SYNC, wait, {"Preference-Applied": f"wait={wait}"}
+    return ExecuteMode.ASYNC, None, {}
+
+
 def get_url_without_query(url):
     # type: (Union[str, ParseResult]) -> str
     """
@@ -324,13 +531,17 @@ def fully_qualified_name(obj):
     """
     Obtains the full path definition of the object to allow finding and importing it.
 
-    For classes, functions and exceptions, the following format is returned::
+    For classes, functions and exceptions, the following format is returned:
+
+    .. code-block:: python
 
         module.name
 
     The ``module`` is omitted if it is a builtin object or type.
 
-    For methods, the class is also represented, resulting in the following format::
+    For methods, the class is also represented, resulting in the following format:
+
+    .. code-block:: python
 
         module.class.name
     """

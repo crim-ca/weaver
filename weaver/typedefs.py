@@ -58,6 +58,21 @@ if TYPE_CHECKING:
     _JsonItem = Union[AnyValueType, _JsonObjectItem, _JsonListItem]
     JSON = Union[Dict[str, _JsonItem], List[_JsonItem], AnyValueType]
 
+    Link = TypedDict("Link", {
+        "rel": str,
+        "title": str,
+        "href": str,
+        "hreflang": Optional[str],
+        "type": Optional[str],  # IANA Media-Type
+    }, total=False)
+    Metadata = TypedDict("Metadata", {
+        "title": str,
+        "role": str,  # URL
+        "value": str,
+        "lang": str,
+        "type": str,  # FIXME: relevant?
+    }, total=False)
+
     # CWL definition
     GlobType = TypedDict("GlobType", {"glob": Union[str, List[str]]}, total=False)
     CWL_IO_FileValue = TypedDict("CWL_IO_FileValue", {"class": str, "path": str, "format": Optional[str]}, total=True)
@@ -110,6 +125,10 @@ if TYPE_CHECKING:
         "out": List[str],       # output to retrieve from step, for mapping with other steps
     })
     CWL_WorkflowStepID = str
+    CWL_WorkflowStepReference = TypedDict("CWL_WorkflowStepReference", {
+        "name": CWL_WorkflowStepID,
+        "reference": str,  # URL
+    })
     CWL = TypedDict("CWL", {
         "cwlVersion": str,
         "class": CWL_Class,
@@ -126,7 +145,6 @@ if TYPE_CHECKING:
         "$namespaces": Dict[str, str],
         "$schemas": Dict[str, str]
     }, total=False)
-
     CWL_WorkflowStepPackage = TypedDict("CWL_WorkflowStepPackage", {
         "id": str,          # reference ID of the package
         "package": CWL      # definition of the package as sub-step of a Workflow
@@ -177,7 +195,8 @@ if TYPE_CHECKING:
     WPS_OutputRequested = Union[WPS_OutputAsRef, WPS_OutputAsRefMimeType]
 
     KVP_Item = Union[ValueType, Sequence[ValueType]]
-    KVP = Union[Sequence[Tuple[str, KVP_Item]], Dict[str, KVP_Item]]
+    KVP_Container = Union[Sequence[Tuple[str, KVP_Item]], Dict[str, KVP_Item]]
+    KVP = Dict[str, List[KVP_Item]]
 
     AnyContainer = Union[Configurator, Registry, PyramidRequest, WerkzeugRequest, Celery]
     SettingValue = Optional[Union[JSON, AnyValueType]]
@@ -273,3 +292,9 @@ if TYPE_CHECKING:
 
     # reference employed as 'JobMonitorReference' by 'WPS1Process'
     JobExecution = TypedDict("JobExecution", {"execution": WPSExecution})
+
+    # quoting
+    QuoteProcessParameters = TypedDict("QuoteProcessParameters", {
+        "inputs": JobInputs,
+        "outputs": JobOutputs,
+    })

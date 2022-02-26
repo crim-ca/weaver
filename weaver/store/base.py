@@ -196,6 +196,11 @@ class StoreQuotes(StoreInterface):
         # type: (Optional[str], int, int, Optional[str]) -> Tuple[List[Quote], int]
         raise NotImplementedError
 
+    @abc.abstractmethod
+    def update_quote(self, quote):
+        # type: (Quote) -> Quote
+        raise NotImplementedError
+
 
 class StoreBills(StoreInterface):
     type = "bills"

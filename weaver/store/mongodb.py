@@ -692,7 +692,9 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
         """
         Finds all jobs in `MongoDB` storage matching search filters to obtain results with requested paging or grouping.
 
-        Using paging (default), result will be in the form::
+        Using paging (default), result will be in the form.
+
+        .. code-block:: python
 
             (
                 [Job(1), Job(2), Job(3), ...],
@@ -702,7 +704,9 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
         Where ``<total>`` will indicate the complete count of matched jobs with filters, but the list of jobs
         will be limited only to ``page`` index and ``limit`` specified.
 
-        Using grouping with a list of field specified with ``group_by``, results will be in the form::
+        Using grouping with a list of field specified with ``group_by``, results will be in the form.
+
+        .. code-block:: python
 
             (
                 [{category: {field1: valueA, field2: valueB, ...}, [Job(1), Job(2), ...], count: <count>},
@@ -964,21 +968,35 @@ class MongodbQuoteStore(StoreQuotes, MongodbStore):
         StoreQuotes.__init__(self)
         MongodbStore.__init__(self, *db_args, **db_kwargs)
 
-    def save_quote(self, quote):
-        # type: (Quote) -> Quote
-        """
-        Stores a quote in mongodb.
-        """
+    def _apply_quote(self, quote, override=False):
+        # type: (Quote, bool) -> Quote
         if not isinstance(quote, Quote):
             raise QuoteInstanceError("Invalid quote object: '{}'".format(repr(quote)))
         try:
-            self.collection.insert_one(quote.params())
-            quote = self.fetch_by_id(quote_id=quote.id)
+            if override:
+                self.collection.update_one({"id": quote.id}, {"$set": quote.params()})
+            else:
+                self.collection.insert_one(quote.params())
+            params = self.fetch_by_id(quote_id=quote.id)
         except Exception as ex:
             raise QuoteRegistrationError("Error occurred during quote registration: [{}]".format(repr(ex)))
-        if quote is None:
+        if params is None:
             raise QuoteRegistrationError("Failed to retrieve registered quote.")
-        return quote
+        return Quote(**params)
+
+    def save_quote(self, quote):
+        # type: (Quote) -> Quote
+        """
+        Stores a quote in `MongoDB` storage.
+        """
+        return self._apply_quote(quote, False)
+
+    def update_quote(self, quote):
+        # type: (Quote) -> Quote
+        """
+        Update quote parameters in `MongoDB` storage.
+        """
+        return self._apply_quote(quote, True)
 
     def fetch_by_id(self, quote_id):
         # type: (AnyUUID) -> Quote

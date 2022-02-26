@@ -4,6 +4,7 @@ Utility methods for various TestCase setup operations.
 import contextlib
 import datetime
 import functools
+import importlib
 import inspect
 import io
 import json
@@ -204,13 +205,13 @@ def setup_config_with_celery(config):
     """
     Configures :mod:`celery` settings to mock process executions from under a :class:`webtest.TestApp` application.
 
-    This is also needed when using :func:`mocked_execute_process` since it will prepare underlying ``Celery``
+    This is also needed when using :func:`mocked_execute_celery` since it will prepare underlying ``Celery``
     application object, multiple of its settings and the database connection reference, although ``Celery`` worker
     still *wouldn't actually be running*. This is because :class:`celery.app.Celery` is often employed in the code
     to retrieve ``Weaver`` settings from it when the process is otherwise executed by a worker.
 
     .. seealso::
-        - :func:`mocked_execute_process`
+        - :func:`mocked_execute_celery`
     """
     settings = config.get_settings()
 
@@ -821,31 +822,32 @@ def mocked_wps_output(settings,                 # type: SettingsType
     return mocked_file_server(wps_dir, wps_url, settings, mock_get, mock_head, headers_override, requests_mock)
 
 
-def mocked_execute_process(func_execute_process=None):
-    # type: (Optional[Callable[[str, str, AnyHeadersContainer], str]]) -> Iterable[MockPatch]
+def mocked_execute_celery(celery_task="weaver.processes.execution.execute_process", func_execute_task=None):
+    # type: (str, Optional[Callable[[...], Any]]) -> Iterable[MockPatch]
     """
-    Contextual mock of a process execution to run locally instead of dispatched :mod:`celery` worker.
+    Contextual mock of a task execution to run locally instead of dispatched :mod:`celery` worker.
 
-    Provides a mock to call :func:`weaver.processes.execution.execute_process` safely within a test
-    employing :class:`webTest.TestApp` without a running ``Celery`` app.
-    This avoids connection error from ``Celery`` during a job execution request.
-    Bypasses ``execute_process.delay`` call by directly invoking the ``execute_process``.
+    By default, provides a mock to call :func:`weaver.processes.execution.execute_process` safely and directly
+    within a test employing :class:`webTest.TestApp` without a running ``Celery`` app.
+    This avoids connection error from ``Celery`` during a :term:`Job` execution request.
+    It bypasses ``execute_process.delay`` call by directly invoking the ``execute_process``
+    without involving :mod:`celery`.
 
     .. note::
-        Since ``delay`` and :mod:`celery` are bypassed, the process execution becomes blocking (not asynchronous).
-
+        Since ``delay`` and :mod:`celery` are bypassed, the task execution becomes blocking (not asynchronous).
     .. seealso::
         - :func:`mocked_process_job_runner` to completely skip process execution.
-        - :func:`setup_config_with_celery`
+        - :func:`setup_config_with_celery` should be applied on the :class:`webTest.TestApp`.
 
-    :param func_execute_process:
-        Function that should be called as substitute of the real :func:`process_execution`.
-        It is expected to receive the ``(job_id, wps_url, headers)`` parameters and return a valid member
-        of :mod:`weaver.status` as return value for proper integration with calling methods.
-        If not provided, the real :func:`process_execution` will be called, but with prior mock of any :mod:`celery`
-        related asynchronous dispatching to execute the actual process definition inline.
+    :param celery_task:
+        String function path that is bound to the application with a :class:`celery.task.Task`.
+    :param func_execute_task:
+        Function that should be called as substitute of the real function referred by :paramref:`celery_task`.
+        Input arguments should be identical to the original task function being mocked, except they
+        should omit the input argument for the :class:`celery.task.Task` that will not be automatically inserted.
+        The return value is ignored, as the mocked :class:`celery.task.Task` is always returned instead.
+        If not provided, the function referred by :paramref:`celery_task` is imported and called directly.
     """
-    from weaver.processes.execution import execute_process as real_execute_process
 
     class MockTask(object):
         """
@@ -865,21 +867,26 @@ def mocked_execute_process(func_execute_process=None):
 
     task = MockTask()
 
-    def mock_execute_process(job_id, wps_url, headers):
-        if func_execute_process is None:
-            real_execute_process(job_id, wps_url, headers)
+    def mock_execute_task(*args, **kwargs):
+        # type: (Any, Any) -> MockTask
+        if func_execute_task is None:
+            mod, func = celery_task.rsplit(".", 1)
+            module = importlib.import_module(mod)
+            task_func = getattr(module, func)
+            task_func(*args, **kwargs)
         else:
-            func_execute_process(job_id, wps_url, headers)
+            func_execute_task(*args, **kwargs)  # noqa
         return task
 
     return (
-        mock.patch("weaver.processes.execution.execute_process.delay", side_effect=mock_execute_process),
+        mock.patch(f"{celery_task}.delay", side_effect=mock_execute_task),
         mock.patch("celery.app.task.Context", return_value=task)
     )
 
 
 @contextlib.contextmanager
 def mocked_dismiss_process():
+    # type: () -> mock.MagicMock
     """
     Mock operations called to terminate :mod:`Celery` tasks.
 
@@ -903,7 +910,7 @@ def mocked_process_job_runner(job_task_id="mocked-job-id"):
     Provides a mock that will bypass execution of the process when called during job submission.
 
     .. seealso::
-        - :func:`mocked_execute_process` to still execute the process, but directly instead of within ``Celery`` worker.
+        - :func:`mocked_execute_celery` to still execute the process, but directly instead of within ``Celery`` worker.
     """
     result = mock.MagicMock()
     result.id = job_task_id

@@ -7,9 +7,39 @@ if TYPE_CHECKING:
     from typing import Any
 
     from weaver.store.base import StoreBills, StoreJobs, StoreProcesses, StoreQuotes, StoreServices, StoreVault
-    from weaver.typedefs import AnySettingsContainer, JSON, Type, Union
+    from weaver.typedefs import AnySettingsContainer, JSON, Literal, Type, Union
 
-    StoreSelector = Union[Type[StoreInterface], StoreInterface, str]
+    AnyStore = Union[
+        StoreBills,
+        StoreJobs,
+        StoreProcesses,
+        StoreQuotes,
+        StoreServices,
+        StoreVault
+    ]
+    StoreTypeName = Literal[
+        StoreBills.type,
+        StoreJobs.type,
+        StoreProcesses.type,
+        StoreQuotes.type,
+        StoreServices.type,
+        StoreVault.type
+    ]
+    StoreBillsSelector = Union[Type[StoreBills], Literal[StoreBills.type]]
+    StoreJobsSelector = Union[Type[StoreJobs], Literal[StoreJobs.type]]
+    StoreProcessesSelector = Union[Type[StoreProcesses], Literal[StoreProcesses.type]]
+    StoreQuotesSelector = Union[Type[StoreQuotes], Literal[StoreQuotes.type]]
+    StoreServicesSelector = Union[Type[StoreServices], Literal[StoreServices.type]]
+    StoreVaultSelector = Union[Type[StoreVault], Literal[StoreVault.type]]
+    StoreSelector = Union[
+        StoreBillsSelector,
+        StoreJobsSelector,
+        StoreProcessesSelector,
+        StoreQuotesSelector,
+        StoreServicesSelector,
+        StoreVaultSelector,
+        StoreTypeName
+    ]
 
 
 class DatabaseInterface(metaclass=abc.ABCMeta):
@@ -25,7 +55,7 @@ class DatabaseInterface(metaclass=abc.ABCMeta):
 
     @staticmethod
     def _get_store_type(store_type):
-        # type: (StoreSelector) -> str
+        # type: (Union[StoreSelector, Type[StoreInterface], StoreInterface]) -> StoreTypeName
         if isinstance(store_type, StoreInterface):
             return store_type.type
         if isinstance(store_type, type) and issubclass(store_type, StoreInterface):
@@ -36,36 +66,37 @@ class DatabaseInterface(metaclass=abc.ABCMeta):
 
     @overload
     def get_store(self, store_type, *store_args, **store_kwargs):
-        # type: (Type[StoreBills], Any, Any) -> StoreBills
+        # type: (StoreBillsSelector, Any, Any) -> StoreBills
         ...
 
     @overload
     def get_store(self, store_type, *store_args, **store_kwargs):
-        # type: (Type[StoreQuotes], Any, Any) -> StoreQuotes
+        # type: (StoreQuotesSelector, Any, Any) -> StoreQuotes
         ...
 
     @overload
     def get_store(self, store_type, *store_args, **store_kwargs):
-        # type: (Type[StoreJobs], Any, Any) -> StoreJobs
+        # type: (StoreJobsSelector, Any, Any) -> StoreJobs
         ...
 
     @overload
     def get_store(self, store_type, *store_args, **store_kwargs):
-        # type: (Type[StoreProcesses], Any, Any) -> StoreProcesses
+        # type: (StoreProcessesSelector, Any, Any) -> StoreProcesses
         ...
 
     @overload
     def get_store(self, store_type, *store_args, **store_kwargs):
-        # type: (Type[StoreServices], Any, Any) -> StoreServices
+        # type: (StoreServicesSelector, Any, Any) -> StoreServices
         ...
 
     @overload
     def get_store(self, store_type, *store_args, **store_kwargs):
-        # type: (Type[StoreVault], Any, Any) -> StoreVault
+        # type: (StoreVaultSelector, Any, Any) -> StoreVault
         ...
 
     @abc.abstractmethod
     def get_store(self, store_type, *store_args, **store_kwargs):
+        # type: (StoreSelector, Any, Any) -> AnyStore
         raise NotImplementedError
 
     @abc.abstractmethod

@@ -16,7 +16,7 @@ import xmltodict
 from tests.utils import (
     get_test_weaver_app,
     get_test_weaver_config,
-    mocked_execute_process,
+    mocked_execute_celery,
     setup_config_with_celery,
     setup_config_with_mongodb,
     setup_config_with_pywps,
@@ -121,7 +121,7 @@ class WpsAppTest(unittest.TestCase):
         params = template.format(HelloWPS.identifier)
         url = self.make_url(params)
         with contextlib.ExitStack() as stack_exec:
-            for mock_exec in mocked_execute_process():
+            for mock_exec in mocked_execute_celery():
                 stack_exec.enter_context(mock_exec)
             resp = self.app.get(url)
         assert resp.status_code == 200  # FIXME: replace by 202 Accepted (?) https://github.com/crim-ca/weaver/issues/14
@@ -135,7 +135,7 @@ class WpsAppTest(unittest.TestCase):
         params_template = "service=wps&request=execute&version=1.0.0&identifier={}&datainputs=test_input=test"
         url = self.make_url(params_template.format(self.process_public.identifier))
         with contextlib.ExitStack() as stack_exec:
-            for mock_exec in mocked_execute_process():
+            for mock_exec in mocked_execute_celery():
                 stack_exec.enter_context(mock_exec)
             resp = self.app.get(url, headers=headers)
         assert resp.status_code == 200  # FIXME: replace by 202 Accepted (?) https://github.com/crim-ca/weaver/issues/14
@@ -149,7 +149,7 @@ class WpsAppTest(unittest.TestCase):
         params_template = "service=wps&request=execute&version=1.0.0&identifier={}&datainputs=test_input=test"
         url = self.make_url(params_template.format(self.process_private.identifier))
         with contextlib.ExitStack() as stack_exec:
-            for mock_exec in mocked_execute_process():
+            for mock_exec in mocked_execute_celery():
                 stack_exec.enter_context(mock_exec)
             resp = self.app.get(url, headers=headers, expect_errors=True)
         assert resp.status_code == 403

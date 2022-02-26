@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from tests.functional.utils import WpsConfigBase
-from tests.utils import get_settings_from_testapp, mocked_execute_process, mocked_sub_requests
+from tests.utils import get_settings_from_testapp, mocked_execute_celery, mocked_sub_requests
 from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import ContentType
 from weaver.processes.builtin import register_builtin_processes
@@ -104,7 +104,7 @@ class BuiltinAppTest(WpsConfigBase):
                 "outputs": [{"id": "output", "transmissionMode": ExecuteTransmissionMode.REFERENCE}],
             }
 
-            for mock_exec in mocked_execute_process():
+            for mock_exec in mocked_execute_celery():
                 stack_exec.enter_context(mock_exec)
             path = "/processes/jsonarray2netcdf/jobs"
             resp = mocked_sub_requests(self.app, "post_json", path,

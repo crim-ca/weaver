@@ -6,7 +6,7 @@ import pytest
 from owslib.wps import ComplexDataInput, WPSExecution
 
 from tests.functional.utils import WpsConfigBase
-from tests.utils import mocked_execute_process, mocked_sub_requests, mocked_wps_output
+from tests.utils import mocked_execute_celery, mocked_sub_requests, mocked_wps_output
 from weaver import WEAVER_ROOT_DIR, xml_util
 from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import ContentType
@@ -151,7 +151,7 @@ class WpsPackageDockerAppTest(WpsConfigBase):
                     {"id": self.out_key, "transmissionMode": ExecuteTransmissionMode.REFERENCE},
                 ]
             }
-            for mock_exec in mocked_execute_process():
+            for mock_exec in mocked_execute_celery():
                 stack_exec.enter_context(mock_exec)
 
             # execute
@@ -186,7 +186,7 @@ class WpsPackageDockerAppTest(WpsConfigBase):
             tmp_file = stack_exec.enter_context(tempfile.NamedTemporaryFile(dir=dir_name, mode="w", suffix=".txt"))
             tmp_file.write(test_content)
             tmp_file.seek(0)
-            for mock_exec in mocked_execute_process():
+            for mock_exec in mocked_execute_celery():
                 stack_exec.enter_context(mock_exec)
 
             # execute
@@ -321,7 +321,7 @@ class WpsPackageDockerAppTest(WpsConfigBase):
         self.deploy_process(body)
 
         with contextlib.ExitStack() as stack:
-            for mock_exec in mocked_execute_process():
+            for mock_exec in mocked_execute_celery():
                 stack.enter_context(mock_exec)
 
             path = f"/processes/{test_proc}/execution"

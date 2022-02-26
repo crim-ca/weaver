@@ -35,6 +35,7 @@ from weaver.formats import AcceptLanguage, ContentType
 from weaver.processes.constants import ProcessSchema
 from weaver.processes.convert import get_field, null, ows2json, wps2json_io
 from weaver.processes.types import ProcessType
+from weaver.quotation.status import QuoteStatus
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.utils import localize_datetime  # for backward compatibility of previously saved jobs not time-locale-aware
 from weaver.utils import (
@@ -44,6 +45,7 @@ from weaver.utils import (
     get_log_fmt,
     get_settings,
     now,
+    repr_json,
     request_extra
 )
 from weaver.visibility import Visibility
@@ -53,15 +55,26 @@ from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, IO, List, Optional, Union
+    from typing import Any, Callable, Dict, IO, List, Optional, Union
 
     from owslib.wps import WebProcessingService
 
     from weaver.execute import AnyExecuteControlOption, AnyExecuteTransmissionMode
     from weaver.processes.constants import ProcessSchemaType
     from weaver.processes.types import AnyProcessType
-    from weaver.status import AnyStatusType
-    from weaver.typedefs import AnyProcess, AnySettingsContainer, AnyUUID, Number, CWL, JSON
+    from weaver.quotation.status import AnyQuoteStatus
+    from weaver.status import AnyStatusType, StatusType
+    from weaver.typedefs import (
+        AnyProcess,
+        AnySettingsContainer,
+        AnyUUID,
+        Number,
+        CWL,
+        JSON,
+        Link,
+        Metadata,
+        QuoteProcessParameters
+    )
     from weaver.visibility import AnyVisibility
 
     AnyParams = Dict[str, Any]
@@ -173,6 +186,7 @@ class Base(DictBase):
 
     @property
     def __name__(self):
+        # type: () -> str
         return fully_qualified_name(self)
 
     @property
@@ -181,6 +195,7 @@ class Base(DictBase):
 
     @property
     def uuid(self):
+        # type: () -> uuid.UUID
         return self.id
 
     def json(self):
@@ -204,6 +219,47 @@ class Base(DictBase):
             the object to store.
         """
         raise NotImplementedError("Method 'params' must be defined for storage item representation.")
+
+
+class LocalizedDateTimeProperty(property):
+    def __init__(self,
+                 fget=None,             # type: Callable[[Any], Optional[datetime]]
+                 fset=None,             # type: Callable[[Any, Union[datetime, str]], None]
+                 fdel=None,             # type: Callable[[Any], None]
+                 doc=None,              # type: str
+                 default_now=False,     # type: bool
+                 ):                     # type: (...) -> None
+        self.default_now = default_now
+        fget = fget or self.__get__
+        fset = fset or self.__set__
+        super(LocalizedDateTimeProperty, self).__init__(fget=fget, fset=fset, fdel=fdel, doc=doc)
+
+    def __set_name__(self, owner, name):
+        # type: (Any, str) -> None
+        self.name = name  # pylint: disable=W0201
+
+    def __get__(self, instance, *_):
+        # type: (Any, Optional[Any]) -> Optional[datetime]
+        if instance is None:
+            # allow access to the descriptor as class attribute 'getattr(type(instance), property-name)'
+            return self  # noqa
+        dt = instance.get(self.name, None)
+        if not dt:
+            if self.default_now:
+                cur_dt = now()
+                self.__set__(instance, cur_dt)
+                return cur_dt
+            return None
+        return localize_datetime(dt)
+
+    def __set__(self, instance, value):
+        # type: (Any, Union[datetime, str]) -> None
+        if isinstance(str, datetime):
+            value = dt_parse(value)
+        if not isinstance(value, datetime):
+            name = fully_qualified_name(instance)
+            raise TypeError(f"Type 'datetime' is required for '{name}.{self.name}'")
+        instance[self.name] = localize_datetime(value)
 
 
 class Service(Base):
@@ -295,7 +351,7 @@ class Service(Base):
             raise ServiceParsingError(json={"description": msg, "cause": str(exc), "error": exc.__class__.__name__})
 
     def links(self, container, fetch=True, self_link=None):
-        # type: (AnySettingsContainer, bool, Optional[str]) -> List[JSON]
+        # type: (AnySettingsContainer, bool, Optional[str]) -> List[Link]
         """
         Obtains the links relevant to the service :term:`Provider`.
 
@@ -348,7 +404,7 @@ class Service(Base):
         return links
 
     def metadata(self, container):
-        # type: (AnySettingsContainer) -> List[JSON]
+        # type: (AnySettingsContainer) -> List[Metadata]
         """
         Obtains the metadata relevant to the service provider.
         """
@@ -734,7 +790,7 @@ class Job(Base):
 
     @status.setter
     def status(self, status):
-        # type: (str) -> None
+        # type: (StatusType) -> None
         value = Status.get(status)
         if value == Status.ACCEPTED and self.status == Status.RUNNING:
             LOGGER.debug(traceback.extract_stack())
@@ -843,34 +899,6 @@ class Job(Base):
         self["is_workflow"] = is_workflow
 
     @property
-    def created(self):
-        # type: () -> datetime
-        created = self.get("created", None)
-        if not created:
-            self["created"] = now()
-        return localize_datetime(self.get("created"))
-
-    @property
-    def started(self):
-        # type: () -> Optional[datetime]
-        started = self.get("started", None)
-        if not started:
-            return None
-        return localize_datetime(started)
-
-    @started.setter
-    def started(self, started):
-        # type: (datetime) -> None
-        if not isinstance(started, datetime):
-            raise TypeError(f"Type 'datetime' is required for '{self.__name__}.started'")
-        self["started"] = started
-
-    @property
-    def finished(self):
-        # type: () -> Optional[datetime]
-        return self.get("finished", None)
-
-    @property
     def is_finished(self):
         # type: () -> bool
         return self.finished is not None
@@ -879,8 +907,7 @@ class Job(Base):
         # type: () -> None
         self["finished"] = now()
 
-    @property
-    def updated(self):
+    def _get_updated(self):
         # type: () -> datetime
         updated = self.get("updated")
         # backward compatibility when not already set
@@ -895,12 +922,10 @@ class Job(Base):
             self.updated = updated  # apply to remain static until saved
         return localize_datetime(updated)
 
-    @updated.setter
-    def updated(self, updated):
-        # type: (datetime) -> None
-        if not isinstance(updated, datetime):
-            raise TypeError(f"Type 'datetime' is required for '{self.__name__}.updated'")
-        self["updated"] = updated
+    created = LocalizedDateTimeProperty(default_now=True)
+    started = LocalizedDateTimeProperty()
+    finished = LocalizedDateTimeProperty()
+    updated = LocalizedDateTimeProperty(fget=_get_updated)
 
     @property
     def duration(self):
@@ -1008,8 +1033,7 @@ class Job(Base):
         """
         vis = Visibility.get(visibility)
         if visibility not in Visibility.values():
-            name = fully_qualified_name(self)
-            raise ValueError(f"Invalid 'visibility' value '{visibility!s}' specified for '{name}.access'")
+            raise ValueError(f"Invalid 'visibility' value '{visibility!s}' specified for '{self.__name__}.access'")
         self["access"] = vis
 
     @property
@@ -1074,7 +1098,7 @@ class Job(Base):
         return "{base_job_url}{job_path}".format(base_job_url=base_url, job_path=job_path)
 
     def links(self, container=None, self_link=None):
-        # type: (Optional[AnySettingsContainer], Optional[str]) -> List[JSON]
+        # type: (Optional[AnySettingsContainer], Optional[str]) -> List[Link]
         """
         Obtains the JSON links section of the response body for a :term:`Job`.
 
@@ -1158,6 +1182,7 @@ class Job(Base):
             "finished": self.finished,
             "updated": self.updated,
             "duration": self.duration_str,
+            "runningDuration": self.duration,
             "runningSeconds": self.duration.total_seconds() if self.duration is not None else None,
             # TODO: available fields not yet employed (https://github.com/crim-ca/weaver/issues/129)
             "nextPoll": None,
@@ -1701,7 +1726,7 @@ class Process(Base):
 
     @property
     def metadata(self):
-        # type: () -> List[str]
+        # type: () -> List[Metadata]
         return self.get("metadata", [])
 
     @property
@@ -1994,18 +2019,14 @@ class Process(Base):
         return sd.Process().deserialize(self.dict())
 
     def links(self, container=None):
-        # type: (Optional[AnySettingsContainer]) -> JSON
+        # type: (Optional[AnySettingsContainer]) -> List[Link]
         """
         Obtains the JSON links section of many response body for the :term:`Process`.
 
         :param container: object that helps retrieve instance details, namely the host URL.
         """
-        settings = get_settings(container)
-        base_url = get_wps_restapi_base_url(settings)
-        if self.service:
-            base_url += sd.provider_service.path.format(provider_id=self.service)
-        proc_desc = base_url + sd.process_service.path.format(process_id=self.id)
-        proc_list = base_url + sd.processes_service.path
+        proc_desc = self.href(container)
+        proc_list = proc_desc.rsplit("/", 1)[0]
         jobs_list = proc_desc + sd.jobs_service.path
         proc_exec = proc_desc + "/execution"
         links = [
@@ -2020,11 +2041,12 @@ class Process(Base):
             {"href": proc_list, "rel": "up", "title": "List of processes registered under the service."},
         ]
         if self.service:
+            api_base_url = proc_list.rsplit("/", 1)[0]
             wps_base_url = self.processEndpointWPS1.split("?")[0]
             wps_get_caps = wps_base_url + "?service=WPS&request=GetCapabilities&version=1.0.0"
             wps_links = [
-                {"href": base_url, "rel": "service", "title": "Provider service description."},
-                {"href": base_url, "rel": "service-meta", "title": "Provider service definition."},
+                {"href": api_base_url, "rel": "service", "title": "Provider service description."},
+                {"href": api_base_url, "rel": "service-meta", "title": "Provider service definition."},
                 {"href": wps_get_caps, "rel": "service-desc", "title": "Remote service description."},
                 {"href": self.processEndpointWPS1, "rel": "http://www.opengis.net/def/rel/ogc/1.0/process-desc",
                  "title": "Remote process description."},
@@ -2035,7 +2057,19 @@ class Process(Base):
         for link in links:
             link.setdefault("type", ContentType.APP_JSON)
             link.setdefault("hreflang", AcceptLanguage.EN_CA)
-        return {"links": links}
+        return links
+
+    def href(self, container=None):
+        # type: (Optional[AnySettingsContainer]) -> str
+        """
+        Obtain the reference URL for this :term:`Process`.
+        """
+        settings = get_settings(container)
+        base_url = get_wps_restapi_base_url(settings)
+        if self.service:
+            base_url += sd.provider_service.path.format(provider_id=self.service)
+        proc_desc = base_url + sd.process_service.path.format(process_id=self.id)
+        return proc_desc
 
     def offering(self, schema=ProcessSchema.OGC):
         # type: (ProcessSchemaType) -> JSON
@@ -2052,11 +2086,11 @@ class Process(Base):
         """
         process = self.dict()
         links = self.links()
+        process.update({"links": links})
         # force selection of schema to avoid ambiguity
         if str(schema or ProcessSchema.OGC).upper() == ProcessSchema.OLD:
             # nested process fields + I/O as lists
             process.update({"process": dict(process)})
-            process.update(links)
             return sd.ProcessDescriptionOLD().deserialize(process)
         # direct process + I/O as mappings
         for io_type in ["inputs", "outputs"]:
@@ -2064,7 +2098,6 @@ class Process(Base):
                 get_field(io_def, "identifier", search_variations=True, pop_found=True): io_def
                 for io_def in process[io_type]
             }
-        process.update(links)
         return sd.ProcessDescriptionOGC().deserialize(process)
 
     def summary(self):
@@ -2196,131 +2229,201 @@ class Quote(Base):
     # pylint: disable=C0103,invalid-name
 
     def __init__(self, *args, **kwargs):
+        # type: (Any, Any) -> None
+        """
+        Initialize the quote.
+
+        .. note::
+            Although many parameters are required to render the final quote, they are not enforced
+            at creation since the partial quote definition is needed before it can be processed.
+        """
         super(Quote, self).__init__(*args, **kwargs)
-        if "process" not in self:
-            raise TypeError("Field 'Quote.process' is required")
-        if not isinstance(self.get("process"), str):
-            raise ValueError("Field 'Quote.process' must be a string.")
-        if "user" not in self:
-            raise TypeError("Field 'Quote.user' is required")
-        if not isinstance(self.get("user"), str):
-            raise ValueError("Field 'Quote.user' must be a string.")
-        if "price" not in self:
-            raise TypeError("Field 'Quote.price' is required")
-        if not isinstance(self.get("price"), float):
-            raise ValueError("Field 'Quote.price' must be a float number.")
-        if "currency" not in self:
-            raise TypeError("Field 'Quote.currency' is required")
-        if not isinstance(self.get("currency"), str) or len(self.get("currency")) != 3:
-            raise ValueError("Field 'Quote.currency' must be an ISO-4217 currency string code.")
+        # set defaults
+        if "status" not in self:
+            self["status"] = QuoteStatus.SUBMITTED
         if "created" not in self:
             self["created"] = now()
-        try:
-            self["created"] = dt_parse(str(self.get("created"))).isoformat()
-        except ValueError:
-            raise ValueError("Field 'Quote.created' must be an ISO-8601 datetime string.")
         if "expire" not in self:
             self["expire"] = now() + timedelta(days=1)
-        try:
-            self["expire"] = dt_parse(str(self.get("expire"))).isoformat()
-        except ValueError:
-            raise ValueError("Field 'Quote.expire' must be an ISO-8601 datetime string.")
         if "id" not in self:
             self["id"] = uuid.uuid4()
 
     @property
     def id(self):
+        # type: () -> uuid.UUID
         """
         Quote ID.
         """
         return dict.__getitem__(self, "id")
 
     @property
-    def title(self):
-        """
-        Quote title.
-        """
-        return self.get("title")
+    def detail(self):
+        # type: () -> Optional[str]
+        return self.get("detail")
+
+    @detail.setter
+    def detail(self, detail):
+        # type: (str) -> None
+        if detail is None and self.detail is not None:
+            return
+        if not isinstance(detail, str):
+            raise TypeError(f"String required for '{self.__name__}.detail'.")
+        self["detail"] = detail
 
     @property
-    def description(self):
-        """
-        Quote description.
-        """
-        return self.get("description")
+    def status(self):
+        # type: () -> QuoteStatus
+        return QuoteStatus.get(self.get("status"), QuoteStatus.SUBMITTED)
 
-    @property
-    def details(self):
-        """
-        Quote details.
-        """
-        return self.get("details")
+    @status.setter
+    def status(self, status):
+        # type: (AnyQuoteStatus) -> None
+        value = QuoteStatus.get(status)
+        if value not in QuoteStatus:
+            statuses = list(QuoteStatus.values())
+            name = self.__name__
+            raise ValueError(f"Status '{status}' is not valid for '{name}.status', must be one of {statuses!s}'")
+        prev = self.status
+        if (
+            (value == QuoteStatus.SUBMITTED and prev != QuoteStatus.SUBMITTED) or
+            (value == QuoteStatus.PROCESSING and prev == QuoteStatus.COMPLETED)
+        ):
+            LOGGER.error("Cannot revert back to previous quote status (%s => %s)", value, self.status)
+            LOGGER.debug(traceback.extract_stack())
+            return
+        self["status"] = value
 
     @property
     def user(self):
+        # type: () -> Optional[Union[str, int]]
         """
         User ID requesting the quote.
         """
         return dict.__getitem__(self, "user")
 
+    @user.setter
+    def user(self, user):
+        # type: (Optional[Union[str, int]]) -> None
+        if not isinstance(user, (str, int, type(None))):
+            raise ValueError(f"Field '{self.__name__}.user' must be a string, integer or None.")
+        self["user"] = user
+
     @property
     def process(self):
+        # type: () -> str
         """
-        WPS Process ID.
+        Process ID.
         """
         return dict.__getitem__(self, "process")
 
-    @property
-    def estimatedTime(self):  # noqa: N802
-        """
-        Process estimated time.
-        """
-        return self.get("estimatedTime")
+    @process.setter
+    def process(self, process):
+        # type: (str) -> None
+        if not isinstance(process, str) or not len(process):
+            raise ValueError(f"Field '{self.__name__}.process' must be a string.")
+        self["process"] = process
 
     @property
-    def processParameters(self):  # noqa: N802
+    def seconds(self):
+        # type: () -> int
+        """
+        Estimated time of the process execution in seconds.
+        """
+        return self.get("seconds") or 0
+
+    @seconds.setter
+    def seconds(self, seconds):
+        # type: (int) -> None
+        if not isinstance(seconds, int):
+            raise TypeError(f"Invalid estimated duration type for '{self.__name__}.seconds'.")
+        if seconds < 0:
+            raise ValueError(f"Invalid estimated duration value for '{self.__name__}.seconds'.")
+        self["seconds"] = seconds
+
+    @property
+    def duration(self):
+        # type: () -> timedelta
+        """
+        Duration as delta time that can be converted to ISO-8601 format (``P[n]Y[n]M[n]DT[n]H[n]M[n]S``).
+        """
+        return timedelta(seconds=self.seconds)
+
+    @property
+    def duration_str(self):
+        # type: () -> str
+        """
+        Human-readable duration in formatted as ``hh:mm:ss``.
+        """
+        duration = self.duration
+        if duration is None:
+            return "00:00:00"
+        return str(duration).split(".")[0].zfill(8)
+
+    @property
+    def parameters(self):
+        # type: () -> QuoteProcessParameters
         """
         Process execution parameters for quote.
-        """
-        return self.get("processParameters")
 
-    @property
-    def location(self):
+        This should include minimally the inputs and expected outputs,
+        but could be extended as needed with relevant details for quoting algorithm.
         """
-        WPS Process URL.
-        """
-        return self.get("location", "")
+        params = dict.pop(self, "processParameters", None)  # backward compatibility
+        if params and "parameters" not in self:
+            self.parameters = params
+        params = self.get("parameters", {})
+        return params
+
+    @parameters.setter
+    def parameters(self, data):
+        # type: (QuoteProcessParameters) -> None
+        try:
+            sd.QuoteProcessParameters().deserialize(data)
+        except colander.Invalid:
+            LOGGER.error("Invalid process parameters for quote submission.\n%s", repr_json(data, indent=2))
+            raise TypeError("Invalid process parameters for quote submission.")
+        self["parameters"] = data
+
+    processParameters = parameters  # noqa  # backward compatible alias
 
     @property
     def price(self):
+        # type: () -> float  # FIXME: decimal?
         """
         Price of the current quote.
         """
         return self.get("price", 0.0)
 
+    @price.setter
+    def price(self, price):
+        # type: (float) -> None
+        if not isinstance(price, float):
+            raise ValueError(f"Field '{self.__name__}.price' must be a floating point number.")
+        self["price"] = price
+
     @property
     def currency(self):
+        # type: () -> Optional[str]
         """
         Currency of the quote price.
         """
-        return self.get("currency")
+        currency = self.get("currency")
+        if not self.price:  # zero/undefined price valid to have no currency
+            return currency
+        return currency or "CAN"    # some default if not specified but price is defined
 
-    @property
-    def expire(self):
-        """
-        Quote expiration datetime.
-        """
-        return self.get("expire")
+    @currency.setter
+    def currency(self, currency):
+        if not isinstance(currency, str) or not re.match(r"^[A-Z]{3}$", currency):
+            raise ValueError(f"Field '{self.__name__}.currency' must be an ISO-4217 currency string code.")
+        self["currency"] = currency
 
-    @property
-    def created(self):
-        """
-        Quote creation datetime.
-        """
-        return self.get("created")
+    expire = LocalizedDateTimeProperty(doc="Quote expiration datetime.")
+    created = LocalizedDateTimeProperty(doc="Quote creation datetime.", default_now=True)
 
     @property
     def steps(self):
+        # type: () -> List[uuid.UUID]
         """
         Sub-quote IDs if applicable.
         """
@@ -2330,24 +2433,72 @@ class Quote(Base):
         # type: () -> AnyParams
         return {
             "id": self.id,
+            "detail": self.detail,
+            "status": self.status,
             "price": self.price,
             "currency": self.currency,
             "user": self.user,
             "process": self.process,
-            "location": self.location,
             "steps": self.steps,
-            "title": self.title,
-            "description": self.description,
-            "details": self.details,
             "created": self.created,
             "expire": self.expire,
-            "estimatedTime": self.estimatedTime,
-            "processParameters": self.processParameters,
+            "seconds": self.seconds,
+            "parameters": self.parameters,
         }
+
+    def partial(self):
+        # type: () -> JSON
+        """
+        Submitted :term:`Quote` representation with minimal details until evaluation is completed.
+        """
+        data = {
+            "id": self.id,
+            "status": self.status,
+            "processID": self.process
+        }
+        return sd.PartialQuoteSchema().deserialize(data)
 
     def json(self):
         # type: () -> JSON
-        return sd.QuoteSchema().deserialize(self)
+        """
+        Step :term:`Quote` with :term:`JSON` representation.
+
+        .. note::
+            Does not include derived :term:`Quote` details if the associated :term:`Process` is a :term:`Workflow`.
+        """
+        data = self.dict()
+        data.update(self.partial())
+        data.update({
+            "userID": self.user,
+            "estimatedTime": self.duration_str,
+            "estimatedSeconds": self.seconds,
+            "estimatedDuration": self.duration,
+            "processParameters": self.parameters,
+        })
+        return sd.Quotation().deserialize(data)
+
+    def links(self, container=None):
+        # type: (Optional[AnySettingsContainer]) -> List[Link]
+        quote_url = self.href(container)
+        base_href = quote_url.rsplit(sd.quotes_service.path, 1)[0]
+        proc_href = base_href + sd.process_service.path.format(process_id=self.process)
+        exec_href = base_href + sd.process_quote_service.path.format(process_id=self.process, quote_id=self.id)
+        links = [
+            {"href": quote_url, "rel": "self", "title": "Quote details."},
+            {"href": proc_href, "rel": "process-meta", "title": "Process description."},
+            {"href": exec_href, "rel": "quoted-execution", "title": "Process execution using quote submission."},
+        ]
+        return links
+
+    def href(self, container=None):
+        # type: (Optional[AnySettingsContainer]) -> str
+        """
+        Obtain the reference URL for this :term:`Quote`.
+        """
+        settings = get_settings(container)
+        base_url = get_wps_restapi_base_url(settings)
+        quote_url = base_url + sd.quote_service.path.format(quote_id=self.id)
+        return quote_url
 
 
 class Bill(Base):

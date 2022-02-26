@@ -30,6 +30,7 @@ from requests.exceptions import HTTPError as RequestsHTTPError
 
 from tests.utils import mocked_aws_credentials, mocked_aws_s3, mocked_aws_s3_bucket_test_file, mocked_file_response
 from weaver import xml_util
+from weaver.execute import ExecuteControlOption, ExecuteMode
 from weaver.formats import ContentType
 from weaver.status import JOB_STATUS_CATEGORIES, STATUS_PYWPS_IDS, STATUS_PYWPS_MAP, Status, StatusCompliant, map_status
 from weaver.utils import (
@@ -48,6 +49,8 @@ from weaver.utils import (
     localize_datetime,
     make_dirs,
     null,
+    parse_kvp,
+    parse_prefer_header_execute_mode,
     pass_http_error,
     request_extra,
     str2bytes,
@@ -751,3 +754,57 @@ def test_localize_datetime():
     assert dt_utc_tz.timetuple()[:6] == (2000, 10, 10, 6, 12, 50)
     assert dt_gmt_tz.timetuple()[:6] == (2000, 10, 10, 6, 12, 50)
     assert dt_est_tz.timetuple()[:6] == (2000, 10, 10, 1, 12, 50)
+
+
+@pytest.mark.parametrize("query,params,expected", [
+    ("key1=val1;key2=val21,val22;key3=val3;key4", {},
+     {"key1": ["val1"], "key2": ["val21", "val22"], "key3": ["val3"], "key4": []}),
+    ("key1='  value 1  '  ; key2 = val2 ", {},
+     {"key1": ["  value 1  "], "key2": ["val2"]}),
+    ("key1='  value 1  '  ; key2 = val2 ", dict(unescape_quotes=False),
+     {"key1": ["'  value 1  '"], "key2": ["val2"]}),
+    ("key1='  value 1  '  ; key2 = val2 ", dict(unescape_quotes=False, strip_spaces=False),
+     {"key1": ["'  value 1  '  "], " key2 ": [" val2 "]}),
+    ("key1=val1,val2;key1=val3", {},
+     {"key1": ["val1", "val2", "val3"]}),
+    ("key1=val1,val2;KEY1=val3", {},
+     {"key1": ["val1", "val2", "val3"]}),
+    ("key1=val1,val2;KEY1=val3", dict(case_insensitive=False),
+     {"key1": ["val1", "val2"], "KEY1": ["val3"]}),
+    ("format=json&inputs=key1=value1;key2=val2,val3", dict(pair_sep="&", nested_pair_sep=";"),
+     {"format": ["json"], "inputs": {"key1": ["value1"], "key2": ["val2", "val3"]}}),
+])
+def test_parse_kvp(query, params, expected):
+    result = parse_kvp(query, **params)
+    assert result == expected
+
+
+@pytest.mark.parametrize("headers,support,expected", [
+    # both modes supported (sync attempted upto max/specified wait time, unless async requested explicitly)
+    ({}, [ExecuteControlOption.ASYNC, ExecuteControlOption.SYNC],
+     (ExecuteMode.SYNC, 10, {})),
+    ({"Prefer": ""}, [ExecuteControlOption.ASYNC, ExecuteControlOption.SYNC],
+     (ExecuteMode.SYNC, 10, {})),
+    ({"Prefer": "respond-async"}, [ExecuteControlOption.ASYNC, ExecuteControlOption.SYNC],
+     (ExecuteMode.ASYNC, None, {"Preference-Applied": "respond-async"})),
+    ({"Prefer": "respond-async, wait=4"}, [ExecuteControlOption.ASYNC, ExecuteControlOption.SYNC],
+     (ExecuteMode.ASYNC, None, {"Preference-Applied": "respond-async"})),
+    ({"Prefer": "wait=4"}, [ExecuteControlOption.ASYNC, ExecuteControlOption.SYNC],
+     (ExecuteMode.SYNC, 4, {"Preference-Applied": "wait=4"})),
+    ({"Prefer": "wait=20"}, [ExecuteControlOption.ASYNC, ExecuteControlOption.SYNC],
+     (ExecuteMode.ASYNC, None, {})),  # larger than max time
+    # only supported async (enforced) - original behaviour
+    ({}, [ExecuteControlOption.ASYNC],
+     (ExecuteMode.ASYNC, None, {})),
+    ({"Prefer": ""}, [ExecuteControlOption.ASYNC],
+     (ExecuteMode.ASYNC, None, {})),
+    ({"Prefer": "respond-async"}, [ExecuteControlOption.ASYNC],
+     (ExecuteMode.ASYNC, None, {"Preference-Applied": "respond-async"})),
+    ({"Prefer": "respond-async, wait=4"}, [ExecuteControlOption.ASYNC],
+     (ExecuteMode.ASYNC, None, {"Preference-Applied": "respond-async"})),
+    ({"Prefer": "wait=4"}, [ExecuteControlOption.ASYNC],
+     (ExecuteMode.ASYNC, None, {})),
+])
+def test_prefer_header_execute_mode(headers, support, expected):
+    result = parse_prefer_header_execute_mode(headers, support)
+    assert result == expected

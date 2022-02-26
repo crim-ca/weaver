@@ -45,10 +45,10 @@ class WpsConfigBase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        config = setup_config_with_mongodb(settings=cls.settings)
+        config = get_test_weaver_config(settings=cls.settings)
+        config = setup_config_with_mongodb(config)
         config = setup_config_with_pywps(config)
         config = setup_config_with_celery(config)
-        config = get_test_weaver_config(config)
         cls.process_store = setup_mongodb_processstore(config)  # force reset
         cls.job_store = setup_mongodb_jobstore(config)
         cls.app = get_test_weaver_app(config=config, settings=cls.settings)
@@ -76,7 +76,11 @@ class WpsConfigBase(unittest.TestCase):
         :returns: resulting tuple of ``(process-description, package)`` JSON responses.
         """
         if process_id:
-            payload["processDescription"]["process"]["id"] = process_id  # type: ignore
+            if "process" in payload["processDescription"]:
+                proc_desc = payload["processDescription"]["process"]
+            else:
+                proc_desc = payload["processDescription"]
+            proc_desc["id"] = process_id  # type: ignore
         exec_list = payload.get("executionUnit", [])
         if len(exec_list):
             # test-only feature:

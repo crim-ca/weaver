@@ -1,44 +1,28 @@
 import logging
-import random
-from datetime import timedelta
 from typing import TYPE_CHECKING
 
-from duration import to_iso8601
-from pyramid.httpexceptions import HTTPBadRequest, HTTPCreated, HTTPNotFound, HTTPOk
+import colander
+from pyramid.httpexceptions import HTTPAccepted, HTTPBadRequest, HTTPCreated, HTTPNotFound, HTTPOk
 
-from weaver.config import WeaverConfiguration, WeaverFeature, get_weaver_configuration
+from weaver.config import WeaverFeature, get_weaver_configuration
 from weaver.database import get_db
 from weaver.datatype import Bill, Quote
 from weaver.exceptions import ProcessNotFound, QuoteNotFound, log_unhandled_exceptions
+from weaver.execute import ExecuteMode
 from weaver.formats import OutputFormat
+from weaver.owsexceptions import OWSMissingParameterValue
 from weaver.processes.types import ProcessType
-from weaver.processes.wps_package import get_package_workflow_steps, get_process_location
+from weaver.quotation.estimation import process_quote_estimator
 from weaver.sort import Sort
-from weaver.store.base import StoreBills, StoreQuotes
-from weaver.utils import get_settings, get_weaver_url
+from weaver.store.base import StoreBills, StoreProcesses, StoreQuotes
+from weaver.utils import get_settings, parse_prefer_header_execute_mode
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.processes.processes import submit_local_job
 
 if TYPE_CHECKING:
     from weaver.datatype import Process
-    from weaver.typedefs import JSON
 
 LOGGER = logging.getLogger(__name__)
-
-
-def process_quote_estimator(process):   # noqa: E811
-    # type: (Process) -> JSON
-    """
-    Simulate quote parameters for the process execution.
-
-    :param process: instance of :class:`weaver.datatype.Process` for which to evaluate the quote.
-    :return: dict of {price, currency, estimatedTime} values for the process quote.
-    """
-    # TODO: replace by some fancy ml technique or something?
-    price = random.uniform(0, 10)  # nosec
-    currency = "CAD"
-    estimated_time = to_iso8601(timedelta(minutes=random.uniform(5, 60)))  # nosec
-    return {"price": price, "currency": currency, "estimatedTime": estimated_time}
 
 
 @sd.process_quotes_service.post(tags=[sd.TAG_BILL_QUOTE, sd.TAG_PROCESSES], renderer=OutputFormat.JSON,
@@ -52,59 +36,71 @@ def request_quote(request):
     weaver_config = get_weaver_configuration(settings)
 
     if weaver_config not in WeaverFeature.QUOTING:
-        raise HTTPBadRequest("Unsupported request for configuration '{}'.".format(weaver_config))
+        raise HTTPBadRequest("Unsupported quoting request for configuration '{}'.".format(weaver_config))
 
     process_id = request.matchdict.get("process_id")
-    process_store = get_db(request).get_store("processes")
+    process_store = get_db(request).get_store(StoreProcesses)
     try:
-        process = process_store.fetch_by_id(process_id)
+        process = process_store.fetch_by_id(process_id)  # type: Process
     except ProcessNotFound:
-        raise HTTPNotFound("Could not find process with specified 'process_id'.")
+        raise ProcessNotFound(json={
+            "title": "NoSuchProcess",
+            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/no-such-process",
+            "detail": "Process with specified reference identifier does not exist.",
+            "status": ProcessNotFound.code,
+            "cause": str(process_id)
+        })
 
-    store = get_db(request).get_store(StoreQuotes)
-    process_url = get_process_location(process_id, data_source=get_weaver_url(settings))
-    process_type = process.type
-    process_params = dict()
-    for param in ["inputs", "outputs", "mode", "response"]:
-        if param in request.json:
-            process_params[param] = request.json.pop(param)
-    process_quote_info = process_quote_estimator(process)
-    process_quote_info.update({
+    if (
+        (process.type not in [ProcessType.APPLICATION, ProcessType.WORKFLOW]) or
+        (process.type == ProcessType.WORKFLOW and weaver_config not in WeaverFeature.REMOTE)
+    ):
+        raise HTTPBadRequest(json={
+            "title": "UnsupportedOperation",
+            "detail": f"Unsupported quoting process type '{process.type}' on '{weaver_config}' instance.",
+            "status": HTTPBadRequest.code,
+            "instance": process.href(settings)
+        })
+
+    try:
+        process_params = sd.QuoteProcessParametersSchema().deserialize(request.json)
+    except colander.Invalid as exc:
+        raise OWSMissingParameterValue(json={
+            "title": "MissingParameterValue",
+            "cause": "Invalid schema: [{!s}]".format(exc.msg),
+            "error": exc.__class__.__name__,
+            "value": exc.value
+        })
+
+    quote_store = get_db(request).get_store(StoreQuotes)
+    quote_user = request.authenticated_userid
+    quote_info = {
         "process": process_id,
         "processParameters": process_params,
-        "location": process_url,
-        "user": str(request.authenticated_userid)
-    })
+        "user": quote_user
+    }
+    quote = Quote(**quote_info)
+    quote = quote_store.save_quote(quote)
+    mode, wait, applied = parse_prefer_header_execute_mode(request.headers, process.jobControlOptions)
 
-    # loop workflow sub-process steps to get individual quotes
-    if process_type == ProcessType.WORKFLOW and weaver_config == WeaverConfiguration.EMS:
-        workflow_quotes = list()
+    result = process_quote_estimator.delay(quote.id)
+    LOGGER.debug("Celery pending task [%s] for quote [%s].", result.id, quote.id)
+    if mode == ExecuteMode.SYNC and wait:
+        LOGGER.debug("Celery task requested as sync if it completes before (wait=%ss)", wait)
+        result.wait(timeout=wait)
+        if result.ready():
+            quote = quote_store.fetch_by_id(quote.id)
+            data = quote.json()
+            data.update({"description": sd.CreatedQuoteResponse.description})
+            data.update({"links": quote.links(settings)})
+            data = sd.CreatedQuoteResponse().deserialize(data)
+            return HTTPCreated(json=data)
 
-        for step in get_package_workflow_steps(process_url):
-            # retrieve quote from provider ADES
-            # TODO: data source mapping
-            process_step_url = get_process_location(step["reference"])
-            process_quote_url = "{}/quotations".format(process_step_url)
-            subreq = request.copy()
-            subreq.path_info = process_quote_url
-            resp_json = request.invoke_subrequest(subreq).json()
-            quote_json = resp_json["quote"]
-            quote = store.save_quote(Quote(**quote_json))
-            workflow_quotes.append(quote.id)
-
-        process_quote_info.update({"steps": workflow_quotes})
-        quote = store.save_quote(Quote(**process_quote_info))
-        return HTTPCreated(json={"quote": quote.json()})
-
-    # single application quotes (ADES or EMS)
-    elif process_type == ProcessType.APPLICATION:
-        quote = store.save_quote(Quote(**process_quote_info))
-        quote_json = quote.json()
-        quote_json.pop("steps", None)
-        return HTTPCreated(json={"quote": quote_json})
-
-    # error if not handled up to this point
-    raise HTTPBadRequest("Unsupported quoting process type '{0}' on '{1}'.".format(process_type, weaver_config))
+    data = quote.partial()
+    data.update({"description": sd.AcceptedQuoteResponse.description})
+    headers = {"Location": quote.href(settings)}
+    headers.update(applied)
+    return HTTPAccepted(headers=headers, json=data)
 
 
 @sd.process_quotes_service.get(tags=[sd.TAG_BILL_QUOTE, sd.TAG_PROCESSES], renderer=OutputFormat.JSON,
@@ -150,7 +146,7 @@ def get_quote_info(request):
         quote = store.fetch_by_id(quote_id)
     except QuoteNotFound:
         raise HTTPNotFound("Could not find quote with specified 'quote_id'.")
-    return HTTPOk(json={"quote": quote.json()})
+    return HTTPOk(json=quote.json())
 
 
 @sd.process_quote_service.post(tags=[sd.TAG_BILL_QUOTE, sd.TAG_EXECUTE, sd.TAG_PROCESSES], renderer=OutputFormat.JSON,

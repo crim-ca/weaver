@@ -8,7 +8,7 @@ import pytest
 from tests import resources
 from tests.functional.utils import WpsConfigBase
 from tests.utils import (
-    mocked_execute_process,
+    mocked_execute_celery,
     mocked_remote_server_requests_wps1,
     mocked_sub_requests,
     setup_mongodb_jobstore,
@@ -213,7 +213,7 @@ class WpsProviderTest(WpsConfigBase):
         ncdump_data = "Fake NetCDF Data"
         with contextlib.ExitStack() as stack_exec:
             # mock direct execution bypassing celery
-            for mock_exec in mocked_execute_process():
+            for mock_exec in mocked_execute_celery():
                 stack_exec.enter_context(mock_exec)
             # mock responses expected by "remote" WPS-1 Execute request and relevant documents
             mock_responses.add("GET", exec_file, body=ncdump_data, headers={"Content-Type": ContentType.APP_NETCDF})

@@ -131,6 +131,7 @@ if TYPE_CHECKING:
         CWL_Results,
         CWL_ToolPathObjectType,
         CWL_WorkflowStepPackageMap,
+        CWL_WorkflowStepReference,
         JSON,
         Literal,
         Number,
@@ -210,7 +211,7 @@ def get_process_location(process_id_or_url, data_source=None):
 
 
 def get_package_workflow_steps(package_dict_or_url):
-    # type: (Union[Dict[str, Any], str]) -> List[Dict[str, str]]
+    # type: (Union[CWL, str]) -> List[CWL_WorkflowStepReference]
     """
     Obtain references to intermediate steps of a CWL workflow.
 
@@ -219,7 +220,7 @@ def get_package_workflow_steps(package_dict_or_url):
         where `name` is the generic package step name, and `reference` is the id/url of a registered WPS package.
     """
     if isinstance(package_dict_or_url, str):
-        package_dict_or_url = _get_process_package(package_dict_or_url)
+        package_dict_or_url, _ = _get_process_package(package_dict_or_url)
     workflow_steps_ids = list()
     package_type = _get_package_type(package_dict_or_url)
     if package_type == ProcessType.WORKFLOW:
