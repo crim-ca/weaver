@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_4.12.0:
+
+`4.12.0 <https://github.com/crim-ca/weaver/tree/4.12.0>`_ (2022-02-28)
+========================================================================
+
+Changes:
+--------
 - Updates related to |ogc-api-proc-quote|_.
 - Move estimator portion of the quoting operation into separate files and bind them with `Celery` task to allow the
   same kind of dispatched processing as normal `Process` execution.
