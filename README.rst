@@ -19,7 +19,7 @@ Weaver (the nest-builder)
 
 `Weaver` is an OGC-API flavored |ems| that allows the execution of workflows chaining various
 applications and |wps| inputs and outputs. Remote execution is deferred by the `EMS` to one or many
-|ades| or remote service providers, and employs |cwl| configurations to define an |app-pkg| deployed for each process.
+|ades| or remote service providers, and employs |cwl| configurations to define an |ogc-apppkg|_ deployed for each process.
 
 
 .. start-badges
@@ -104,7 +104,7 @@ ensuring the transfer of files accordingly between instances when located across
 
 `Weaver` can also accomplish the `ADES` role in order to perform application deployment at the data source using
 the application definition provided by |cwl| configuration. It can then directly execute
-a registered process |app-pkg| with received inputs from a WPS request to expose output results for a following `ADES`
+a registered process |ogc-apppkg|_ with received inputs from a WPS request to expose output results for a following `ADES`
 in a `EMS` workflow execution chain.
 
 `Weaver` **extends** |ogc-proc-api|_ by providing additional functionalities such as more detailed job logs
@@ -261,6 +261,11 @@ interoperable geospatial data processing in the areas of Earth Observation Appli
 Videos and more functionalities were introduced in `Weaver` following |ogc-eo-apps-pilot|_.
 Corresponding developments are reported in the |ogc-eo-apps-pilot-er|_.
 
+`Weaver` has been used to participate in interoperability testing effort that lead to |ogc-best-practices-eo-apppkg|_
+technical report. This resulted, along with previous efforts, in the definition of |ogc-api-proc-ext-part2| backed by 
+validated test cases using |cwl| as the represention method for the deployment and execution of |ogc-apppkg|_ close 
+to the data.
+
 The project is furthermore developed through the *Data Analytics for Canadian Climate Services* (`DACCS`_) initiative.
 
 `Weaver` is implemented in Python with the `Pyramid`_ web framework.
@@ -268,7 +273,6 @@ It is part of `PAVICS`_ and `Birdhouse`_ ecosystems and is available within the 
 
 .. NOTE: all references in this file must remain local (instead of imported from 'references.rst')
 ..       to allow Github to directly referring to them from the repository HTML page.
-.. |app-pkg| replace:: `Application Package`
 .. |cwl| replace:: `Common Workflow Language`_ (CWL)
 .. _`Common Workflow Language`: https://www.commonwl.org/
 .. |esgf| replace:: `Earth System Grid Federation`_ (ESGF)
@@ -295,6 +299,12 @@ It is part of `PAVICS`_ and `Birdhouse`_ ecosystems and is available within the 
 .. _ogc-eo-apps-pilot: https://www.ogc.org/eoapps
 .. |ogc-eo-apps-pilot-er| replace:: OGC Earth Observation Applications Pilot: CRIM Engineering Report
 .. _ogc-eo-apps-pilot-er: http://docs.opengeospatial.org/per/20-045.html
+.. |ogc-best-practices-eo-apppkg| replace:: OGC Best Practice for Earth Observation Application Package
+.. _ogc-best-practices-eo-apppkg: https://docs.ogc.org/bp/20-089r1.html
+.. |ogc-api-proc-ext-part2| replace:: `OGC API - Processes - Part 2: Deploy, Replace, Undeploy`_ (DRU) extension
+.. _`OGC API - Processes - Part 2: Deploy, Replace, Undeploy`: https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/deploy_replace_undeploy
+.. |ogc-apppkg| replace:: `OGC Application Package`
+.. _ogc-apppkg: https://github.com/opengeospatial/ogcapi-processes/blob/master/extensions/deploy_replace_undeploy/standard/openapi/schemas/ogcapppkg.yaml
 .. _PAVICS: https://ouranosinc.github.io/pavics-sdi/index.html
 .. _Birdhouse: http://bird-house.github.io/
 .. _birdhouse-deploy: https://github.com/bird-house/birdhouse-deploy
