@@ -17,10 +17,11 @@ Changes:
   of ``format.mimeType``, ``format.mediaType`` and/or directly ``type`` field to provide the Content-Type of an
   output with ``href`` file.
   By default, both the ``format`` (i.e.: ``OLD`` schema) and the ``type`` (i.e.: ``OGC`` schema) are simultaneously
-  reported for backward and forward compatibility, and for `OGC` compliance to return a file reference IANA Media-Type
+  reported for backward and forward compatibility, and for `OGC` compliance, to return the IANA Media-Type of the
+  associated file reference (relates to `#401 <https://github.com/crim-ca/weaver/issues/401>`_).
+- Add support of ``type`` as alias to the Media-Type under the ``format`` for file references when submitted
+  for ``Job`` execution inputs, in accordance to the reported inputs/outputs endpoints, and for `OGC` compliance
   (resolves `#401 <https://github.com/crim-ca/weaver/issues/401>`_).
-- Add support of ``type`` as alias to the Media-Type of the ``format`` of file references when submitted
-  for ``Job`` execution inputs, in accordance to the reported inputs/outputs endpoints, and for `OGC` compliance.
 - Drop ``type`` field for ``metadata`` items in process description that correspond to a ``value`` with a ``role``.
 - Enforce pattern validation of ``type`` as IANA Content-Type for ``metadata`` items in process description that
   correspond to a ``Link`` with ``href``. Invalid ``type`` are now rejected to adhere to `OGC` requirement classes.
@@ -29,8 +30,9 @@ Changes:
 
 Fixes:
 ------
-- Fix ``GET /jobs/{jobID}/inputs`` endpoint failing to return submitted ``inputs`` when they were specified using the
-  mapping representation (i.e.: ``OGC`` schema).
+- Fix ``GET /jobs/{jobID}/inputs`` endpoint failing to return submitted ``inputs`` for ``Job`` execution when they
+  were specified using the mapping representation (i.e.: ``OGC`` schema) instead of the listing representation
+  (i.e.: ``OLD`` schema).
 
 .. _changes_4.12.0:
 

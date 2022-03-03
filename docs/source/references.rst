@@ -18,7 +18,7 @@
 .. |cwl-home| replace:: CWL Homepage
 .. _cwl-home: https://www.commonwl.org/
 .. |cwl-spec| replace:: CWL Specification
-.. _cwl-spec: https://www.commonwl.org/#Specification
+.. _cwl-spec: https://www.commonwl.org/specification/
 .. |cwl-guide| replace:: CWL User Guide
 .. _cwl-guide: http://www.commonwl.org/user_guide/
 .. |cwl-cmdtool| replace:: CWL CommandLineTool
