@@ -66,6 +66,7 @@ from weaver.wps_restapi.colander_extras import (
     StringRange,
     XMLObject
 )
+from weaver.wps_restapi.constants import JobOutputsSchema
 from weaver.wps_restapi.patches import ServiceOnlyExplicitGetHead as Service  # warning: don't use 'cornice.Service'
 
 if TYPE_CHECKING:
@@ -561,7 +562,6 @@ class LinkLanguage(ExtendedMappingSchema):
 
 
 class MetadataBase(ExtendedMappingSchema):
-    type = ExtendedSchemaNode(String(), missing=drop)
     title = ExtendedSchemaNode(String(), missing=drop)
 
 
@@ -589,6 +589,7 @@ class LinkRelationship(ExtendedMappingSchema):
 
 class LinkBase(LinkLanguage, MetadataBase):
     href = URL(description="Hyperlink reference.")
+    type = MediaType(description="IANA identifier of content-type located at the link.", missing=drop)
 
 
 class Link(LinkRelationship, LinkBase):
@@ -605,9 +606,13 @@ class MetadataValue(NotKeywordSchema, ValueLanguage, MetadataBase):
     value = ExtendedSchemaNode(String(), description="Plain text value of the information.")
 
 
+class MetadataLink(Link):
+    pass
+
+
 class MetadataContent(OneOfKeywordSchema):
     _one_of = [
-        Link(title="MetadataLink"),
+        MetadataLink(),
         MetadataValue(),
     ]
 
@@ -2254,23 +2259,31 @@ class ProviderEndpoint(ProviderPath):
     header = RequestHeaders()
 
 
-class ProcessDescriptionSchemaQuery(ExtendedMappingSchema):
+class ProcessDescriptionQuery(ExtendedMappingSchema):
     # see: 'ProcessDescription' schema and 'Process.offering' method
     schema = ExtendedSchemaNode(
         String(), example=ProcessSchema.OGC, default=ProcessSchema.OGC,
         validator=OneOfCaseInsensitive(ProcessSchema.values()),
-        description="Selects the desired schema representation of the process description."
+        summary="Selects the desired schema representation of the process description",
+        description=(
+            "Selects the desired schema representation of the process description. "
+            f"When '{ProcessSchema.OGC}' is used, inputs and outputs will be represented as mapping of objects. "
+            "Process metadata are also directly provided at the root of the content. "
+            f"When '{ProcessSchema.OLD}' is used, inputs and outputs will be represented as list of objects with ID. "
+            "Process metadata are also reported nested under a 'process' field. "
+            "See '#/definitions/ProcessDescription' schema for more details about each case."
+        )
     )
 
 
 class ProviderProcessEndpoint(ProviderPath, ProcessPath):
     header = RequestHeaders()
-    querystring = ProcessDescriptionSchemaQuery()
+    querystring = ProcessDescriptionQuery()
 
 
 class ProcessEndpoint(ProcessPath):
     header = RequestHeaders()
-    querystring = ProcessDescriptionSchemaQuery()
+    querystring = ProcessDescriptionQuery()
 
 
 class ProcessPackageEndpoint(ProcessPath):
@@ -2310,16 +2323,34 @@ class JobInputsEndpoint(JobPath):
     header = RequestHeaders()
 
 
+class JobOutputQuery(ExtendedMappingSchema):
+    schema = ExtendedSchemaNode(
+        String(), example=JobOutputsSchema.OGC, default=JobOutputsSchema.OLD,
+        validator=OneOfCaseInsensitive(JobOutputsSchema.values()),
+        summary="Selects the schema employed for representation of job outputs.",
+        description=(
+            "Selects the schema employed for representation of job outputs for providing file Content-Type details. "
+            f"When '{JobOutputsSchema.OLD}' is employed, 'format.mimeType' is used and 'type' is reported as well. "
+            f"When '{JobOutputsSchema.OGC}' is employed, 'format.mediaType' is used and 'type' is reported as well. "
+            "When the '+strict' value is added, only the 'format' or 'type' will be represented according to the "
+            f"reference standard ({JobOutputsSchema.OGC}, {JobOutputsSchema.OLD}) representation."
+        )
+    )
+
+
 class ProcessOutputsEndpoint(ProcessPath, JobPath):
     header = RequestHeaders()
+    querystring = JobOutputQuery()
 
 
 class ProviderOutputsEndpoint(ProviderPath, ProcessPath, JobPath):
     header = RequestHeaders()
+    querystring = JobOutputQuery()
 
 
 class JobOutputsEndpoint(JobPath):
     header = RequestHeaders()
+    querystring = JobOutputQuery()
 
 
 class ProcessResultEndpoint(ProcessOutputsEndpoint):
@@ -2332,7 +2363,7 @@ class ProviderResultEndpoint(ProviderOutputsEndpoint):
     header = RequestHeaders()
 
 
-class JobResultEndpoint(JobOutputsEndpoint):
+class JobResultEndpoint(JobPath):
     deprecated = True
     header = RequestHeaders()
 
@@ -2821,6 +2852,33 @@ class ExecuteInputListValues(ExtendedSequenceSchema):
     input_item = ExecuteInputItem(summary="Received list input value definition during job submission.")
 
 
+# same as 'ExecuteInputReference', but using 'OGC' schema with 'type' field
+# Defined as:
+#   https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/link.yaml
+# But explicitly in the context of an execution input, rather than any other link (eg: metadata)
+class ExecuteInputLink(Link):  # for other metadata (title, hreflang, etc.)
+    schema_ref = f"{OGC_API_SCHEMA_URL}/{OGC_API_SCHEMA_VERSION}/core/openapi/schemas/link.yaml"
+    href = ReferenceURL(  # no just a plain 'URL' like 'Link' has (extended with s3, vault, etc.)
+        description="Location of the file reference."
+    )
+    type = MediaType(
+        default=ContentType.TEXT_PLAIN,  # as per OGC, not required
+        description="IANA identifier of content-type located at the link."
+    )
+
+
+# same as 'ExecuteInputLink', but using 'OLD' schema with 'format' field
+class ExecuteInputReference(Reference):
+    summary = "Execute input reference link definition with parameters."
+
+
+class ExecuteInputFile(AnyOfKeywordSchema):
+    _any_of = [
+        ExecuteInputLink(),
+        ExecuteInputReference(),
+    ]
+
+
 # https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/inputValueNoObject.yaml
 # Any literal value directly provided inline in input mapping.
 #
@@ -2839,7 +2897,6 @@ class ExecuteInputInlineValue(OneOfKeywordSchema):
         ExtendedSchemaNode(Integer()),
         ExtendedSchemaNode(Boolean()),
         ExtendedSchemaNode(String()),
-        Reference(summary="Execute input reference link definition with parameters."),
     ]
 
 
@@ -2852,27 +2909,15 @@ class ExecuteInputObjectData(OneOfKeywordSchema):
     schema_ref = f"{OGC_API_SCHEMA_URL}/{OGC_API_SCHEMA_VERSION}/core/openapi/schemas/inputValue.yaml"
     description = "Data value of any schema "
     _one_of = [
-        ExecuteInputInlineValue,
-        PermissiveMappingSchema
+        ExecuteInputInlineValue(),
+        PermissiveMappingSchema(description="Data provided as any object schema."),
     ]
 
 
 # https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/qualifiedInputValue.yaml
-class ExecuteInputObject(Format):
+class ExecuteInputQualifiedValue(Format):
     schema_ref = f"{OGC_API_SCHEMA_URL}/{OGC_API_SCHEMA_VERSION}/core/openapi/schemas/qualifiedInputValue.yaml"
     value = ExecuteInputObjectData()    # can be anything, including literal value, array of them, nested object
-
-
-class ExecuteInputArrayValues(ExtendedSequenceSchema):
-    item_value = ExecuteInputInlineValue()
-
-
-# combine 'inlineOrRefData' and its 'array[inlineOrRefData]' variants to simplify 'ExecuteInputAny' definition
-class ExecuteInputInline(OneOfKeywordSchema):
-    _one_of = [
-        ExecuteInputInlineValue,
-        ExecuteInputArrayValues
-    ]
 
 
 # https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/inlineOrRefData.yaml
@@ -2882,12 +2927,26 @@ class ExecuteInputInline(OneOfKeywordSchema):
 #     - $ref: "qualifiedInputValue.yaml"
 #     - $ref: "link.yaml"
 #
-class ExecuteInputAny(OneOfKeywordSchema):
+class ExecuteInputInlineOrRefData(OneOfKeywordSchema):
     schema_ref = f"{OGC_API_SCHEMA_URL}/{OGC_API_SCHEMA_VERSION}/core/openapi/schemas/inlineOrRefData.yaml"
+    _one_of = [
+        ExecuteInputInlineValue(),     # <inline-literal>
+        ExecuteInputQualifiedValue(),  # {"value": <anything>}
+        ExecuteInputFile(),  # 'href' with either 'type' (OGC) or 'format' (OLD)
+        # FIXME: other types here, 'bbox+crs', 'collection', 'nested process', etc.
+    ]
+
+
+class ExecuteInputArrayValues(ExtendedSequenceSchema):
+    item_value = ExecuteInputInlineOrRefData()
+
+
+# combine 'inlineOrRefData' and its 'array[inlineOrRefData]' variants to simplify 'ExecuteInputAny' definition
+class ExecuteInputData(OneOfKeywordSchema):
     description = "Execute data definition of the input."
     _one_of = [
-        ExecuteInputInline(summary="Execute input value(s) provided inline."),          # 'inputValueNoObject' + 'link'
-        ExecuteInputObject(summary="Execute input value definition with parameters."),  # 'qualifiedInputValue'
+        ExecuteInputInlineOrRefData,
+        ExecuteInputArrayValues,
     ]
 
 
@@ -2903,8 +2962,8 @@ class ExecuteInputAny(OneOfKeywordSchema):
 #
 class ExecuteInputMapValues(ExtendedMappingSchema):
     schema_ref = f"{OGC_API_SCHEMA_URL}/{OGC_API_SCHEMA_VERSION}/core/openapi/schemas/execute.yaml"
-    input_id = ExecuteInputAny(variable="{input-id}", title="ExecuteInputValue",
-                               description="Received mapping input value definition during job submission.")
+    input_id = ExecuteInputData(variable="{input-id}", title="ExecuteInputValue",
+                                description="Received mapping input value definition during job submission.")
 
 
 class ExecuteInputValues(OneOfKeywordSchema):
@@ -3353,7 +3412,7 @@ class CWLInputType(OneOfKeywordSchema):
 
 
 class CWLInputMap(PermissiveMappingSchema):
-    input_id = CWLInputType(variable="{input-id}", title="CWLInputIdentifierType",
+    input_id = CWLInputType(variable="{input-id}", title="CWLInputDefinition",
                             description=IO_INFO_IDS.format(first="CWL", second="WPS", what="input") +
                             " (Note: '{input-id}' is a variable corresponding for each identifier)")
 
@@ -3397,7 +3456,7 @@ class CWLOutputType(OneOfKeywordSchema):
 
 
 class CWLOutputMap(ExtendedMappingSchema):
-    output_id = CWLOutputType(variable="{output-id}", title="CWLOutputIdentifierType",
+    output_id = CWLOutputType(variable="{output-id}", title="CWLOutputDefinition",
                               description=IO_INFO_IDS.format(first="CWL", second="WPS", what="output") +
                               " (Note: '{output-id}' is a variable corresponding for each identifier)")
 
@@ -3489,27 +3548,48 @@ class ProviderProcessesSchema(ExtendedSequenceSchema):
     provider_process = ProcessSummary()
 
 
+class JobOutputReference(ExtendedMappingSchema):
+    href = ReferenceURL(description="Output file reference.")
+    # either with 'type', 'format.mediaType' or 'format.mimeType' according requested 'schema=OGC/OLD'
+    # if 'schema=strict' as well, either 'type' or 'format' could be dropped altogether
+    type = MediaType(missing=drop, description="IANA Content-Type of the file reference.")
+    format = FormatSelection(missing=drop)
+
+
 class JobOutputValue(OneOfKeywordSchema):
     _one_of = [
-        Reference(tilte="JobOutputReference"),
+        JobOutputReference(tilte="JobOutputReference"),
         AnyLiteralDataType(title="JobOutputLiteral")
     ]
 
 
-class JobOutputFile(OutputIdentifierType):
-    format = Format(missing=drop)
-
-
 class JobOutput(AllOfKeywordSchema):
     _all_of = [
-        JobOutputFile(),
+        OutputIdentifierType(),
         JobOutputValue(),
     ]
+
+
+class JobOutputMap(ExtendedMappingSchema):
+    output_id = JobOutputValue(
+        variable="{output-id}", title="JobOutputData",
+        description=(
+            "Output data as literal value or file reference. "
+            "(Note: '{output-id}' is a variable corresponding for each identifier)"
+        )
+    )
 
 
 class JobOutputList(ExtendedSequenceSchema):
     title = "JobOutputList"
     output = JobOutput(description="Job output result with specific keyword according to represented format.")
+
+
+class JobOutputs(OneOfKeywordSchema):
+    _one_of = [
+        JobOutputMap(),
+        JobOutputList(),
+    ]
 
 
 # implement only literal parts from following schemas:
@@ -3543,6 +3623,7 @@ class ValueFormattedList(ExtendedSequenceSchema):
 
 class ResultReference(ExtendedMappingSchema):
     href = ReferenceURL(description="Result file reference.")
+    type = MediaType(description="IANA Content-Type of the file reference.")
     format = ResultFormat()
 
 
@@ -3570,7 +3651,7 @@ class Result(ExtendedMappingSchema):
     """
     example_ref = f"{OGC_API_SCHEMA_URL}/{OGC_API_SCHEMA_VERSION}/core/examples/json/Result.json"
     output_id = ResultData(
-        variable="{output-id}", title="Output Identifier",
+        variable="{output-id}", title="ResultData",
         description=(
             "Resulting value of the output that conforms to 'OGC API - Processes' standard. "
             "(Note: '{output-id}' is a variable corresponding for each output identifier of the process)"
@@ -3578,13 +3659,13 @@ class Result(ExtendedMappingSchema):
     )
 
 
-class JobInputsSchema(ExtendedMappingSchema):
-    inputs = ExecuteInputListValues()
+class JobInputsBody(ExtendedMappingSchema):
+    inputs = ExecuteInputValues()
     links = LinkList(missing=drop)
 
 
-class JobOutputsSchema(ExtendedMappingSchema):
-    outputs = JobOutputList()
+class JobOutputsBody(ExtendedMappingSchema):
+    outputs = JobOutputs()
     links = LinkList(missing=drop)
 
 
@@ -4261,12 +4342,12 @@ class GoneJobResponseSchema(ExtendedMappingSchema):
 
 class OkGetJobInputsResponse(ExtendedMappingSchema):
     header = ResponseHeaders()
-    body = JobInputsSchema()
+    body = JobInputsBody()
 
 
 class OkGetJobOutputsResponse(ExtendedMappingSchema):
     header = ResponseHeaders()
-    body = JobOutputsSchema()
+    body = JobOutputsBody()
 
 
 class RedirectResultResponse(ExtendedMappingSchema):

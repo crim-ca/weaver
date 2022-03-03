@@ -198,6 +198,7 @@ def metadata2json(meta, force=False):
     if not force and not isinstance(meta, (OWS_Metadata, WPS_Metadata)):
         return meta
     title = get_field(meta, "title", search_variations=True, default=None)
+    ctype = get_field(meta, "type") or get_field(meta, "mime_type", search_variations=True, default=None)
     href = get_field(meta, "href", search_variations=True, default=None)
     role = get_field(meta, "role", search_variations=True, default=None)
     rel = get_field(meta, "rel", search_variations=True, default=None)
@@ -207,7 +208,7 @@ def metadata2json(meta, force=False):
         href_rel = urlparse(href).hostname
         rel = str(title or role or href_rel).lower()  # fallback to first available
         rel = get_sane_name(rel, replace_character="-", assert_invalid=False)
-    return {"href": href, "title": title, "role": role, "rel": rel}
+    return {"href": href, "title": title, "role": role, "rel": rel, "type": ctype}
 
 
 def ows2json_field(ows_field):
@@ -1317,8 +1318,14 @@ def json2wps_field(field_info, field_category):
             return field_info
         if isinstance(field_info, dict):
             meta = metadata2json(field_info, force=True)
-            meta.pop("rel", None)
-            return WPS_Metadata(**meta)
+            rel = meta.pop("rel", None)
+            ctype = meta.pop("type", None)
+            meta = WPS_Metadata(**meta)
+            if isinstance(rel, str):
+                set_field(meta, "rel", rel)
+            if isinstance(ctype, str):
+                set_field(meta, "type", ctype)
+            return meta
         if isinstance(field_info, str):
             return WPS_Metadata(field_info)
     elif field_category == "keywords" and isinstance(field_info, list):
@@ -1613,7 +1620,7 @@ def wps2json_job_payload(wps_request, wps_process):
 
 
 def get_field(io_object, field, search_variations=False, only_variations=False, pop_found=False, default=null):
-    # type: (Any, str, bool, bool, bool, Any) -> Any
+    # type: (Union[JSON, object], str, bool, bool, bool, Any) -> Any
     """
     Gets a field by name from various I/O object types.
 
@@ -1655,7 +1662,7 @@ def get_field(io_object, field, search_variations=False, only_variations=False, 
 
 
 def set_field(io_object, field, value, force=False):
-    # type: (Union[ANY_IO_Type, ANY_Format_Type], str, Any, bool) -> None
+    # type: (Union[JSON, object], str, Any, bool) -> None
     """
     Sets a field by name into various I/O object types.
 
