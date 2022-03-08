@@ -18,9 +18,10 @@ from typing import TYPE_CHECKING
 
 import colander
 import pytest
+import yaml
 
 from tests import resources
-from tests.functional.utils import WpsConfigBase
+from tests.functional.utils import ResourcesUtil, WpsConfigBase
 from tests.utils import (
     MOCK_AWS_REGION,
     MOCK_HTTP_REF,
@@ -32,7 +33,8 @@ from tests.utils import (
     mocked_file_server,
     mocked_http_file,
     mocked_reference_test_file,
-    mocked_sub_requests
+    mocked_sub_requests,
+    mocked_wps_output
 )
 from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import (
@@ -77,7 +79,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 @pytest.mark.functional
-class WpsPackageAppTest(WpsConfigBase):
+class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
     @classmethod
     def setUpClass(cls):
         cls.settings = {
@@ -85,9 +87,14 @@ class WpsPackageAppTest(WpsConfigBase):
             "weaver.wps_path": "/ows/wps",
             "weaver.wps_restapi_path": "/",
             "weaver.wps_output_path": "/wpsoutputs",
+            "weaver.wps_output_url": "http://localhost/wpsoutputs",
             "weaver.wps_output_dir": "/tmp/weaver-test/wps-outputs",  # nosec: B108 # don't care hardcoded for test
         }
         super(WpsPackageAppTest, cls).setUpClass()
+
+    @classmethod
+    def request(cls, method, url, *args, **kwargs):
+        raise NotImplementedError  # not used
 
     def test_deploy_cwl_label_as_process_title(self):
         title = "This process title comes from the CWL label"
@@ -517,7 +524,7 @@ class WpsPackageAppTest(WpsConfigBase):
 
     def test_deploy_merge_mediatype_io_format_references(self):
         """
-        Test to validates ``mimeType`` is replaced by ``mediaType`` for all descriptions.
+        Test to validate ``mimeType`` is replaced by ``mediaType`` for all descriptions.
 
         Also we validate that processes that use ``mimeType`` or ``mediaType`` can be deployed successfully.
         """
@@ -610,6 +617,62 @@ class WpsPackageAppTest(WpsConfigBase):
         assert desc["inputs"]["wps_format_mediaType"]["formats"][0]["mediaType"] == ContentType.APP_JSON
         assert desc["outputs"]["wps_format_mimeType"]["formats"][0]["mediaType"] == ContentType.APP_JSON
         assert desc["outputs"]["wps_format_mediaType"]["formats"][0]["mediaType"] == ContentType.APP_JSON
+
+    def test_execute_file_type_io_format_references(self):
+        """
+        Test to validate :term:`OGC` compliant ``type`` directly provided as ``mediaType`` for execution file reference.
+        """
+        body = self.retrieve_payload("CatFile", "deploy", local=True)
+        body["processDescription"]["process"].update({
+            "id": self._testMethodName,
+            "inputs": {
+                "file": {
+                    "formats": [
+                        {"mediaType": ContentType.APP_YAML, "default": True},
+                        {"mediaType": ContentType.APP_JSON, "default": False}
+                    ]
+                }
+            }
+        })
+        self.deploy_process(body)
+        data = self.retrieve_payload("CatFile", ref_name="Execute_CatFile_ogc_mapping_schema.yml", local=True)
+        data.update({
+            "mode": ExecuteMode.ASYNC,
+            "response": ExecuteResponse.DOCUMENT,
+            "outputs": {"output": {"transmissionMode": ExecuteTransmissionMode.REFERENCE}}
+        })
+        with contextlib.ExitStack() as stack_exec:
+            for mock_exec in mocked_execute_celery():
+                stack_exec.enter_context(mock_exec)
+            stack_exec.enter_context(mocked_wps_output(self.settings))
+            out_dir = self.settings["weaver.wps_output_dir"]
+            out_url = self.settings["weaver.wps_output_url"]
+            tmp_file = stack_exec.enter_context(tempfile.NamedTemporaryFile(mode="w", dir=out_dir, suffix="test.yml"))
+            yaml.safe_dump({"test": "test"}, tmp_file)
+            tmp_file.flush()
+            tmp_file.seek(0)
+            tmp_href = tmp_file.name.replace(out_dir, out_url, 1)
+
+            # if 'type' is not properly detected, the input would assume no format is provided
+            # in such case, the default YAML format (defined in above deploy) would be used and execution would succeed
+            # if it fails, it means 'type' was properly detected as unsupported format for the input and was rejected
+            # NOTE:
+            #   execution request itself succeeds *submission*, but fails running it
+            #   since async exec is mocked, we can check failure with the status directly after
+            proc_url = "/processes/{}/jobs".format(self._testMethodName)
+            data["inputs"]["file"] = {"href": tmp_href, "type": ContentType.IMAGE_GEOTIFF}
+            resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
+                                       data=data, headers=self.json_headers, only_local=True)
+            assert resp.status_code == 201, resp.text
+            status_url = resp.json.get("location")
+            self.monitor_job(status_url, expect_failed=True)
+
+            data["inputs"]["file"]["type"] = ContentType.APP_YAML
+            resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
+                                       data=data, headers=self.json_headers, only_local=True)
+            assert resp.status_code in [200, 201], resp.text
+            status_url = resp.json.get("location")
+            self.monitor_job(status_url)  # expect successful
 
     def test_deploy_block_builtin_processes_from_api(self):
         """

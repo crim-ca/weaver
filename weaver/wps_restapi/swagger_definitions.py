@@ -2856,15 +2856,16 @@ class ExecuteInputListValues(ExtendedSequenceSchema):
 # Defined as:
 #   https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/link.yaml
 # But explicitly in the context of an execution input, rather than any other link (eg: metadata)
-class ExecuteInputLink(Link):  # for other metadata (title, hreflang, etc.)
+class ExecuteInputFileLink(Link):  # for other metadata (title, hreflang, etc.)
     schema_ref = f"{OGC_API_SCHEMA_URL}/{OGC_API_SCHEMA_VERSION}/core/openapi/schemas/link.yaml"
     href = ReferenceURL(  # no just a plain 'URL' like 'Link' has (extended with s3, vault, etc.)
         description="Location of the file reference."
     )
     type = MediaType(
-        default=ContentType.TEXT_PLAIN,  # as per OGC, not required
+        default=ContentType.TEXT_PLAIN,  # as per OGC, not mandatory (ie: 'default' supported format)
         description="IANA identifier of content-type located at the link."
     )
+    rel = LinkRelationshipType(missing=drop)  # optional opposite to normal 'Link'
 
 
 # same as 'ExecuteInputLink', but using 'OLD' schema with 'format' field
@@ -2874,8 +2875,8 @@ class ExecuteInputReference(Reference):
 
 class ExecuteInputFile(AnyOfKeywordSchema):
     _any_of = [
-        ExecuteInputLink(),
-        ExecuteInputReference(),
+        ExecuteInputFileLink(),   # 'OGC' schema with 'type: <MediaType>'
+        ExecuteInputReference(),  # 'OLD' schema with 'format: {mimeType|mediaType: <MediaType>}'
     ]
 
 
@@ -2893,10 +2894,10 @@ class ExecuteInputFile(AnyOfKeywordSchema):
 class ExecuteInputInlineValue(OneOfKeywordSchema):
     description = "Execute input value provided inline."
     _one_of = [
-        ExtendedSchemaNode(Float()),
-        ExtendedSchemaNode(Integer()),
-        ExtendedSchemaNode(Boolean()),
-        ExtendedSchemaNode(String()),
+        ExtendedSchemaNode(Float(), title="ExecuteInputValueFloat"),
+        ExtendedSchemaNode(Integer(), title="ExecuteInputValueInteger"),
+        ExtendedSchemaNode(Boolean(), title="ExecuteInputValueBoolean"),
+        ExtendedSchemaNode(String(), title="ExecuteInputValueString"),
     ]
 
 

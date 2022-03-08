@@ -18,7 +18,7 @@ from weaver.notify import encrypt_email, notify_job_complete
 from weaver.owsexceptions import OWSNoApplicableCode
 from weaver.processes import wps_package
 from weaver.processes.constants import WPS_COMPLEX_DATA
-from weaver.processes.convert import ows2json_output_data
+from weaver.processes.convert import get_field, ows2json_output_data
 from weaver.processes.types import ProcessType
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.store.base import StoreJobs
@@ -39,10 +39,11 @@ from weaver.wps_restapi.utils import get_wps_restapi_base_url
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from uuid import UUID
-    from typing import List, Optional, Tuple, Union
+    from typing import Dict, List, Optional, Tuple, Union
 
     from celery.task import Task
     from pyramid.request import Request
+    from pywps.inout.inputs import ComplexInput
 
     from weaver.datatype import Job
     from weaver.processes.convert import OWS_Input_Type, ProcessOWS
@@ -282,24 +283,30 @@ def parse_wps_inputs(wps_process, job):
     """
     Parses expected WPS process inputs against submitted job input values considering supported process definitions.
     """
-    complex_inputs = []
+    complex_inputs = {}  # type: Dict[str, ComplexInput]
     for process_input in wps_process.dataInputs:
         if WPS_COMPLEX_DATA in process_input.dataType:
-            complex_inputs.append(process_input.identifier)
+            complex_inputs[process_input.identifier] = process_input
 
     try:
         wps_inputs = list()
         # parse both dict and list type inputs
         job_inputs = job.inputs.items() if isinstance(job.inputs, dict) else job.get("inputs", [])
-        for process_input in job_inputs:
-            if isinstance(process_input, tuple):
-                input_id = process_input[0]
-                process_value = process_input[1]
+        for job_input in job_inputs:
+            if isinstance(job_input, tuple):
+                input_id = job_input[0]
+                input_val = job_input[1]
+                job_input = input_val
             else:
-                input_id = get_any_id(process_input)
-                process_value = get_any_value(process_input)
+                input_id = get_any_id(job_input)
+                input_val = get_any_value(job_input)
             # in case of array inputs, must repeat (id,value)
-            input_values = process_value if isinstance(process_value, list) else [process_value]
+            if isinstance(input_val, list):
+                input_values = input_val
+                input_details = job_input
+            else:
+                input_values = [input_val]
+                input_details = [job_input]
 
             # we need to support file:// scheme but PyWPS doesn't like them so remove the scheme file://
             input_values = [
@@ -311,13 +318,23 @@ def parse_wps_inputs(wps_process, job):
                 for val in input_values
             ]
 
-            # need to use ComplexDataInput structure for complex input
-            # need to use literal String for anything else than complex
-            # TODO: BoundingBox not supported
-            wps_inputs.extend([
-                (input_id, ComplexDataInput(input_value) if input_id in complex_inputs else str(input_value))
-                for input_value in input_values
-            ])
+            for input_value, input_detail in zip(input_values, input_details):
+                # need to use ComplexDataInput structure for complex input
+                if input_id in complex_inputs:
+                    # if provided, pass down specified data input format to allow validation against supported formats
+                    ctype = get_field(input_detail, "type", default=None)
+                    encoding = None
+                    if not ctype:
+                        media_format = get_field(input_detail, "format", default=None)
+                        if isinstance(media_format, dict):
+                            ctype = get_field(input_detail, "mime_type", search_variations=True, default=None)
+                            encoding = get_field(input_detail, "encoding", search_variations=True, default=None)
+                    wps_inputs.append((input_id, ComplexDataInput(input_value, mimeType=ctype, encoding=encoding)))
+                # need to use literal String for anything else than complex
+                # FIXME: pre-validate allowed literal values?
+                # TODO: BoundingBox not supported
+                else:
+                    wps_inputs.append((input_id, str(input_value)))
     except KeyError:
         wps_inputs = []
     return wps_inputs

@@ -4,9 +4,12 @@ import time
 import unittest
 from copy import deepcopy
 from typing import TYPE_CHECKING
+from urllib.parse import urlparse
 
 import pyramid.testing
 import pytest
+import yaml
+from pyramid.httpexceptions import HTTPOk
 
 from tests.utils import (
     get_test_weaver_app,
@@ -16,8 +19,9 @@ from tests.utils import (
     setup_config_with_mongodb,
     setup_config_with_pywps,
     setup_mongodb_jobstore,
-    setup_mongodb_processstore
+    setup_mongodb_processstore,
 )
+from tests.functional import APP_PKG_ROOT
 from weaver import WEAVER_ROOT_DIR
 from weaver.database import get_db
 from weaver.formats import ContentType
@@ -27,8 +31,120 @@ from weaver.utils import fully_qualified_name, load_file
 from weaver.visibility import Visibility
 
 if TYPE_CHECKING:
-    from typing import Dict, Optional
-    from weaver.typedefs import JSON, SettingsType
+    from typing import Any, Dict, Literal, Optional, Union
+    from weaver.typedefs import AnyResponseType, JSON, SettingsType
+
+    ReferenceType = Literal["deploy", "execute", "package"]
+
+
+class ResourcesUtil(object):
+    @classmethod
+    def request(cls, method, url, *args, **kwargs):
+        # type: (str, str, Any, Any) -> AnyResponseType
+        """
+        Request operation to retrieve remote payload definitions.
+
+        Can be left undefined (not overridden) if ``local=True`` is used.
+        """
+
+    @classmethod
+    def retrieve_payload(cls, process, ref_type=None, ref_name=None, ref_found=False, location=None, local=False):
+        # type: (str, Optional[ReferenceType], Optional[str], bool, Optional[str], bool) -> Union[Dict[str, JSON], str]
+        """
+        Retrieve content using known structures and locations.
+
+        .. seealso::
+            :meth:`retrieve_process_info`
+
+        :param process: Process identifier.
+        :param ref_type:
+            Content reference type to retrieve {deploy, execute, package}.
+            Required if no name or location provided.
+        :param ref_name:
+            Explicit name to look for. Can be just the name or with extension.
+            Can be omitted if type or location is specified instead.
+        :param ref_found: Return the first matched reference itself instead of its contents.
+        :param location: Override location (unique location with exact lookup instead of variations).
+        :param local: Consider only local application packages, but still use name variations lookup.
+        :return: First matched contents.
+        """
+        if location:
+            locations = [location]
+        else:
+            if local:
+                var_locations = [APP_PKG_ROOT]
+            else:
+                base_url = "https://raw.githubusercontent.com/"
+                var_locations = list(dict.fromkeys([  # don't use set to preserve this prioritized order
+                    APP_PKG_ROOT,
+                    os.getenv("TEST_GITHUB_SOURCE_URL"),
+                    f"{base_url}/crim-ca/testbed14/master/application-packages",
+                    f"{base_url}/crim-ca/application-packages/master/OGC/TB16/application-packages",
+                ]))
+                var_locations = [url for url in var_locations if url]
+
+            locations = []
+            if ref_name:
+                for var_loc in var_locations:
+                    if "." not in ref_name:
+                        ref_name = ref_name + ".json"  # will still retry extensions
+                    locations.extend([
+                        f"{var_loc}/{ref_name}",
+                        f"{var_loc}/{process}/{ref_name}",
+                    ])
+            else:
+                if ref_type == "deploy":
+                    ref_search = [
+                        f"DeployProcess_{process}.json",
+                        f"{process}/deploy.json",
+                        f"{process}/DeployProcess_{process}.json",
+                    ]
+                elif ref_type == "execute":
+                    ref_search = [
+                        f"Execute_{process}.json",
+                        f"{process}/execute.json",
+                        f"{process}/Execute_{process}.json",
+                    ]
+                elif ref_type == "package":
+                    ref_search = [
+                        f"{process}.cwl",
+                        f"{process}/package.cwl",
+                        f"{process}/{process}.cwl",
+                        f"{process}/{process.lower()}.cwl",
+                        f"{process}/{process.title()}.cwl",
+                    ]
+                else:
+                    raise ValueError(f"unknown reference type: {ref_type}")
+
+                for var_loc in var_locations:
+                    for var_ref in ref_search:
+                        locations.append(f"{var_loc}/{var_ref}")
+
+        tested_ref = []
+        try:
+            for path in locations:
+                extension = os.path.splitext(path)[-1]
+                retry_extensions = [".json", ".yaml", ".yml"]
+                if extension not in retry_extensions:
+                    retry_extensions = [extension]
+                # Try to find it locally, then fallback to remote
+                for ext in retry_extensions:
+                    path_ext = os.path.splitext(path)[0] + ext
+                    if os.path.isfile(path_ext):
+                        if ref_found:
+                            return path_ext
+                        with open(path_ext, "r", encoding="utf-8") as f:
+                            json_payload = yaml.safe_load(f)  # both JSON/YAML
+                            return json_payload
+                    if urlparse(path_ext).scheme != "":
+                        if ref_found:
+                            return path
+                        resp = cls.request("GET", path, force_requests=True, ignore_errors=True)
+                        if resp and resp.status_code == HTTPOk.code:
+                            return yaml.safe_load(resp.text)  # both JSON/YAML
+                    tested_ref.append(path)
+        except (IOError, ValueError):
+            pass
 
 
 @pytest.mark.functional
@@ -118,7 +234,8 @@ class WpsConfigBase(unittest.TestCase):
                     timeout=None,                       # type: Optional[int]
                     interval=None,                      # type: Optional[int]
                     return_status=False,                # type: bool
-                    wait_for_status=Status.SUCCEEDED,   # type: str
+                    wait_for_status=None,               # type: Optional[str]
+                    expect_failed=False,                # type: bool
                     ):                                  # type: (...) -> Dict[str, JSON]
         """
         Job polling of status URL until completion or timeout.
@@ -127,18 +244,29 @@ class WpsConfigBase(unittest.TestCase):
         :param timeout: timeout of monitoring until completion or abort.
         :param interval: wait interval (seconds) between polling monitor requests.
         :param return_status: return final status body instead of results once job completed.
-        :param wait_for_status: monitor until the requested status is reached (default: when job is completed)
+        :param wait_for_status:
+            Monitor until the requested status is reached (default: when job is completed).
+            If no value is specified and :paramref:`expect_failed` is enabled, completion status will be a failure.
+            Otherwise, the successful status is used instead. Explicit intermediate status can be requested instead.
+            Whichever status is specified or defaulted, failed/succeeded statuses will break-out of the monitoring loop,
+            since no more status change is possible.
+        :param expect_failed:
+            If enabled, allow failing status to during status validation.
+            If the final status is successful when failure is expected, status check will fail.
+            Enforces :paramref:`return_status` to ``True`` since no result can be obtained.
         :return: result of the successful job, or the status body if requested.
         :raises AssertionError: when job fails or took too long to complete.
         """
+        wait_for_status = wait_for_status or Status.SUCCEEDED
 
         def check_job_status(_resp, running=False):
             body = _resp.json
             pretty = json.dumps(body, indent=2, ensure_ascii=False)
-            statuses = [Status.ACCEPTED, Status.RUNNING, Status.SUCCEEDED] if running else [Status.SUCCEEDED]
+            final = Status.FAILED if expect_failed else Status.SUCCEEDED
+            statuses = [Status.ACCEPTED, Status.RUNNING, final] if running else [final]
             assert _resp.status_code == 200, "Execution failed:\n{}\n{}".format(pretty, self._try_get_logs(status_url))
             assert body["status"] in statuses, "Error job info:\n{}\n{}".format(pretty, self._try_get_logs(status_url))
-            return body["status"] == wait_for_status
+            return body["status"] in {wait_for_status, Status.SUCCEEDED, Status.FAILED}  # break condition
 
         time.sleep(1)  # small delay to ensure process execution had a chance to start before monitoring
         left = timeout or self.monitor_timeout
@@ -153,7 +281,7 @@ class WpsConfigBase(unittest.TestCase):
             once = False
             left -= delta
         check_job_status(resp)
-        if return_status:
+        if return_status or expect_failed:
             return resp.json
         resp = self.app.get("{}/results".format(status_url), headers=self.json_headers)
         assert resp.status_code == 200, "Error job info:\n{}".format(resp.json)
