@@ -33,6 +33,9 @@ Fixes:
 - Fix ``GET /jobs/{jobID}/inputs`` endpoint failing to return submitted ``inputs`` for ``Job`` execution when they
   were specified using the mapping representation (i.e.: ``OGC`` schema) instead of the listing representation
   (i.e.: ``OLD`` schema).
+- Fix Media-Type provided as ``Job`` file reference input not forwarded to underlying WPS execution for validation
+  against supported formats for corresponding inputs. Specified format handles both the ``OLD`` definition with
+  ``format`` field (and nested ``mimeType`` or ``mediaType``), and the more recent ``OGC`` format with ``type`` field.
 
 .. _changes_4.12.0:
 
