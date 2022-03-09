@@ -38,11 +38,12 @@ from weaver.exceptions import (
     VaultFileRegistrationError
 )
 from weaver.execute import ExecuteMode
+from weaver.formats import repr_json
 from weaver.processes.types import ProcessType
 from weaver.sort import Sort, SortMethods
 from weaver.status import JOB_STATUS_CATEGORIES, Status, map_status
 from weaver.store.base import StoreBills, StoreJobs, StoreProcesses, StoreQuotes, StoreServices, StoreVault
-from weaver.utils import get_base_url, get_sane_name, get_weaver_url, islambda, now, repr_json
+from weaver.utils import get_base_url, get_sane_name, get_weaver_url, islambda, now
 from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_url
 

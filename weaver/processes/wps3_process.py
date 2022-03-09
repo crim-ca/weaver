@@ -8,7 +8,7 @@ from pyramid.settings import asbool
 
 from weaver.exceptions import PackageExecutionError
 from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
-from weaver.formats import ContentType
+from weaver.formats import ContentType, repr_json
 from weaver.processes import opensearch
 from weaver.processes.sources import get_data_source_from_url, retrieve_data_source_url
 from weaver.processes.utils import map_progress
@@ -21,7 +21,6 @@ from weaver.utils import (
     get_job_log_msg,
     get_log_monitor_msg,
     pass_http_error,
-    repr_json,
     request_extra
 )
 from weaver.visibility import Visibility

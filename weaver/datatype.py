@@ -31,7 +31,7 @@ from pywps import Process as ProcessWPS
 from weaver import xml_util
 from weaver.exceptions import ProcessInstanceError, ServiceParsingError
 from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteTransmissionMode
-from weaver.formats import AcceptLanguage, ContentType
+from weaver.formats import AcceptLanguage, ContentType, repr_json
 from weaver.processes.constants import ProcessSchema
 from weaver.processes.convert import get_field, null, ows2json, wps2json_io
 from weaver.processes.types import ProcessType
@@ -45,7 +45,6 @@ from weaver.utils import (
     get_log_fmt,
     get_settings,
     now,
-    repr_json,
     request_extra
 )
 from weaver.visibility import Visibility

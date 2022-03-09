@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import re
@@ -6,17 +7,19 @@ from typing import TYPE_CHECKING
 from urllib.error import HTTPError
 from urllib.request import urlopen
 
+import yaml
+from json2xml.json2xml import Json2xml
 from pyramid.httpexceptions import HTTPNotFound, HTTPOk
 from pyramid_storage.extensions import resolve_extensions
 from pywps.inout.formats import FORMATS, Format
 from requests.exceptions import ConnectionError
 
-from weaver.base import Constants
+from weaver.base import Constants, classproperty
 
 if TYPE_CHECKING:
-    from typing import Dict, List, Optional, Tuple, Union
+    from typing import Any, Dict, List, Optional, Tuple, Union
 
-    from weaver.typedefs import JSON
+    from weaver.typedefs import JSON, Literal
 
 LOGGER = logging.getLogger(__name__)
 
@@ -74,20 +77,89 @@ class ContentType(Constants):
 
 class OutputFormat(Constants):
     """
-    Renderer output formats for OpenAPI generation.
+    Renderer output formats for :term:`CLI`, `OpenAPI` and HTTP response content generation.
     """
-    JSON = "json"
-    XML = "xml"
+    JSON = classproperty(fget=lambda self: "json", doc="""
+    Representation as :term:`JSON` (object), which can still be manipulated in code.
+    """)
+
+    JSON_STR = classproperty(fget=lambda self: "json+str", doc="""
+    Representation of :term:`JSON` content with as string with indentation and newlines. 
+    """)
+
+    JSON_RAW = classproperty(fget=lambda self: "json+raw", doc="""
+    Representation of :term:`JSON` content with raw string without any indentation or newlines. 
+    """)
+
+    YAML = classproperty(fget=lambda self: "yaml", doc="""
+    Representation as serialized :term:`YAML` string with indentation and newlines.
+    """)
+
+    YML = classproperty(fget=lambda self: "yml", doc="""
+    Alias to YAML.
+    """)
+
+    XML = classproperty(fget=lambda self: "xml", doc="""
+    Representation as serialized :term:`XML` string with indentation and newlines.
+    """)
+
+    XML_STR = classproperty(fget=lambda self: "xml+str", doc="""
+    Alias to XML.
+    """)
+
+    XML_RAW = classproperty(fget=lambda self: "xml+raw", doc="""
+    Representation as serialized :term:`XML` string without indentation or newlines.
+    """)
 
     @classmethod
     def get(cls, format_or_version, default=JSON):  # pylint: disable=W0221,arguments-differ
+        # type: (Union[str, AnyOutputFormat], AnyOutputFormat) -> AnyOutputFormat
+        """
+        Resolve the applicable output format.
+
+        :param format_or_version:
+            Either a :term:`WPS` version, a known value for a ``f``/``format`` query parameter, or an ``Accept`` header
+            that can be mapped to one of the supported output formats.
+        :param default: Default output format if none could be resolved.
+        :return: Resolved output format.
+        """
         if format_or_version == "1.0.0":
             return OutputFormat.XML
         if format_or_version == "2.0.0":
             return OutputFormat.JSON
         if "/" in format_or_version:  # Media-Type to output format renderer
-            format_or_version = format_or_version.split("/")[-1].split(";")[0].strip()
-        return super(OutputFormat, cls).get(format_or_version)
+            format_or_version = get_extension(format_or_version, dot=False)
+        return super(OutputFormat, cls).get(str(format_or_version), default=default)
+
+    @classmethod
+    def convert(cls, data, to, item_root="item"):
+        # type: (JSON, Union[str, AnyOutputFormat], str) -> Union[str, JSON]
+        """
+        Converts the input data from :term:`JSON` to another known format.
+
+        :param data: Input data to convert. Must be a literal :term:`JSON` object, not a :term:`JSON`-like string.
+        :param to:
+            Target format representation.
+            If the output format is not :term:`JSON`, it is **ALWAYS** converted to the formatted string of the
+            requested format to ensure the contents are properly represented as intended. In the case of :term:`JSON`
+            as target format or unknown format, the original object is returned directly.
+        :param item_root:
+            When using :term:`XML` representations, defines the top-most item name. Unused for other representations.
+        :return: Formatted output.
+        """
+        fmt = cls.get(to)
+        if fmt == OutputFormat.JSON:
+            return data
+        if fmt == OutputFormat.JSON_STR:
+            return repr_json(data, indent=2, ensure_ascii=False)
+        if fmt == OutputFormat.JSON_RAW:
+            return repr_json(data, ensure_ascii=False)
+        if fmt in [OutputFormat.XML, OutputFormat.XML_RAW, OutputFormat.XML_STR]:
+            pretty = fmt != OutputFormat.XML_RAW
+            return Json2xml(data, item_wrap=True, pretty=pretty, wrapper=item_root).to_xml()
+        if fmt in [OutputFormat.YML, OutputFormat.YAML]:
+            return yaml.safe_dump(data, indent=2, sort_keys=False)
+        return data
 
 
 # explicit mime-type to extension when not literally written in item after '/' (excluding 'x-' prefix)
@@ -274,21 +346,30 @@ def get_format(mime_type, default=None):
     return fmt
 
 
-def get_extension(mime_type):
-    # type: (str) -> str
+def get_extension(mime_type, dot=True):
+    # type: (str, bool) -> str
     """
     Retrieves the extension corresponding to :paramref:`mime_type` if explicitly defined, or by parsing it.
     """
+    def _handle_dot(_ext):
+        # type: (str) -> str
+        if dot and not _ext.startswith("."):
+            return f".{_ext}"
+        if not dot and _ext.startswith("."):
+            return _ext[1:]
+        return _ext
+
     fmt = _CONTENT_TYPE_FORMAT_MAPPING.get(mime_type)
     if fmt:
-        return fmt.extension
+        return _handle_dot(fmt.extension)
     ext = _CONTENT_TYPE_EXTENSION_MAPPING.get(mime_type)
     if ext:
-        return ext
+        return _handle_dot(ext)
     ctype = clean_mime_type_format(mime_type, strip_parameters=True)
     if not ctype:
         return ""
-    return _CONTENT_TYPE_EXTENSION_MAPPING.get(ctype, ".{}".format(ctype.split("/")[-1].replace("x-", "")))
+    ext = _CONTENT_TYPE_EXTENSION_MAPPING.get(ctype, ".{}".format(ctype.split("/")[-1].replace("x-", "")))
+    return _handle_dot(ext)
 
 
 def get_content_type(extension, charset=None, default=None):
@@ -472,3 +553,28 @@ def clean_mime_type_format(mime_type, suffix_subtype=False, strip_parameters=Fal
         if v.endswith(mime_type):
             mime_type = [k for k in EDAM_MAPPING if v.endswith(EDAM_MAPPING[k])][0]
     return mime_type
+
+
+def repr_json(data, force_string=True, **kwargs):
+    # type: (Any, bool, Any) -> Union[JSON, str, None]
+    """
+    Ensure that the input data can be serialized as JSON to return it formatted representation as such.
+
+    If formatting as JSON fails, returns the data as string representation or ``None`` accordingly.
+    """
+    if data is None:
+        return None
+    try:
+        data_str = json.dumps(data, **kwargs)
+        return data_str if force_string else data
+    except Exception:  # noqa: W0703 # nosec: B110
+        return str(data)
+
+
+if TYPE_CHECKING:
+    AnyOutputFormat = Literal[
+        OutputFormat.JSON,
+        OutputFormat.XML,
+        OutputFormat.YAML,
+        OutputFormat.YML,
+    ]

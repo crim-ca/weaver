@@ -3,10 +3,11 @@ Definitions of base classes employed across multiple modules to avoid circular i
 """
 import abc
 import enum
+import inspect
 from typing import TYPE_CHECKING, NewType
 
 if TYPE_CHECKING:
-    from typing import Any, List, Optional, Union
+    from typing import Any, Dict, List, Optional, Union
 
     from weaver.typedefs import AnyKey
 
@@ -36,7 +37,8 @@ class Constants(object, metaclass=_Const):
     @classmethod
     def __members__(cls):
         members = set(cls.__dict__) - set(object.__dict__)
-        return [member for member in members if isinstance(member, str) and not member.startswith("_")]
+        members = [member for member in members if not inspect.ismethod(getattr(cls, member))]
+        return [member for member in members if not isinstance(member, str) or not member.startswith("_")]
 
     @classmethod
     def get(cls, key_or_value, default=None):
@@ -46,6 +48,20 @@ class Constants(object, metaclass=_Const):
         if key_or_value in cls.values():
             return key_or_value
         return default
+
+    @classmethod
+    def docs(cls):
+        # type: () -> Dict[str, Optional[str]]
+        """
+        Retrieves the documentation string applied on the attribute.
+
+        Employ :class:`classproperty` to define the attributes.
+        """
+        return {
+            # consider only classproperty items because direct attributes will pick up base type literal docstrings
+            member: cls.__dict__[member].__doc__ if isinstance(cls.__dict__[member], classproperty) else None
+            for member in cls.__members__()
+        }
 
     @classmethod
     def names(cls):
@@ -62,6 +78,24 @@ class Constants(object, metaclass=_Const):
         Returns the literal values assigned to corresponding enum elements.
         """
         return [getattr(cls, member) for member in cls.__members__()]
+
+
+class classproperty(property):  # pylint: disable=C0103,invalid-name
+    """
+    Mimics :class:`property` decorator, but applied onto ``classmethod`` in backward compatible way.
+
+    .. note::
+        This decorator purposely only supports getter attribute to define unmodifiable class properties.
+
+    .. seealso::
+        https://stackoverflow.com/a/5191224
+    """
+    def __init__(self, fget=None, fset=None, fdel=None, doc=None):
+        super(classproperty, self).__init__(fget=fget, fset=fset, fdel=fdel, doc=doc)
+        self.__doc__ = inspect.cleandoc(doc)
+
+    def __get__(self, cls, owner):  # noqa
+        return classmethod(self.fget).__get__(None, owner)()
 
 
 class _EnumMeta(enum.EnumMeta):

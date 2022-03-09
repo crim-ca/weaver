@@ -1,3 +1,5 @@
+import re
+
 import argparse
 import base64
 import copy
@@ -16,7 +18,7 @@ from weaver import __meta__
 from weaver.datatype import AutoBase
 from weaver.exceptions import PackageRegistrationError
 from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
-from weaver.formats import ContentType, get_content_type, get_format
+from weaver.formats import ContentType, OutputFormat, get_content_type, get_format
 from weaver.processes.constants import ProcessSchema
 from weaver.processes.convert import (
     convert_input_values_schema,
@@ -34,7 +36,6 @@ from weaver.utils import (
     get_file_headers,
     load_file,
     null,
-    repr_json,
     request_extra,
     setup_loggers
 )
@@ -53,8 +54,10 @@ if TYPE_CHECKING:
     except ImportError:
         CWL = JSON = ExecutionInputsMap = HeadersType = Any  # avoid linter issue
     try:
+        from weaver.formats import AnyOutputFormat
         from weaver.processes.constants import ProcessSchemaType
     except ImportError:
+        AnyOutputFormat = str
         ProcessSchemaType = str
 
 LOGGER = logging.getLogger(__name__)
@@ -62,11 +65,6 @@ LOGGER = logging.getLogger(__name__)
 OPERATION_ARGS_TITLE = "Operation Arguments"
 OPTIONAL_ARGS_TITLE = "Optional Arguments"
 REQUIRED_ARGS_TITLE = "Required Arguments"
-
-
-def _json2text(data):
-    # type: (Any) -> str
-    return repr_json(data, indent=2, ensure_ascii=False)
 
 
 class OperationResult(AutoBase):
@@ -103,6 +101,7 @@ class OperationResult(AutoBase):
         self.code = code
 
     def __repr__(self):
+        # type: () -> str
         params = ["success", "code", "message"]
         quotes = [False, False, True]
         quoted = lambda q, v: f"\"{v}\"" if q and v is not None else v  # noqa: E731
@@ -114,7 +113,7 @@ class OperationResult(AutoBase):
         # type: () -> str
         text = dict.get(self, "text", None)
         if not text and self.body:
-            text = _json2text(self.body)
+            text = OutputFormat.convert(self.body, OutputFormat.JSON_STR)
             self["text"] = text
         return text
 
@@ -164,10 +163,10 @@ class WeaverClient(object):
         return parsed_url.rsplit("/", 1)[0] if parsed_url.endswith("/") else parsed_url
 
     @staticmethod
-    def _parse_result(response, message=None, links=True):
-        # type: (Response, Optional[str], bool) -> OperationResult
+    def _parse_result(response, message=None, success=None, links=True, output_format=None):
+        # type: (Response, Optional[str], Optional[bool], bool, Optional[AnyOutputFormat]) -> OperationResult
         hdr = dict(response.headers)
-        success = False
+        _success = False
         try:
             body = response.json()
             if not links:
@@ -177,12 +176,14 @@ class WeaverClient(object):
                 if not msg:
                     msg = body.get("error", body.get("exception", "unknown"))
             else:
-                success = True
-            text = _json2text(body)
+                _success = True
+            text = OutputFormat.convert(body, output_format or OutputFormat.JSON_STR, item_root="result")
         except Exception:  # noqa
             text = body = response.text
             msg = "Could not parse body."
-        return OperationResult(success, msg, body, hdr, text=text, code=response.status_code)
+        if success is not None:
+            _success = success
+        return OperationResult(_success, msg, body, hdr, text=text, code=response.status_code)
 
     @staticmethod
     def _parse_deploy_body(body, process_id):
@@ -276,6 +277,7 @@ class WeaverClient(object):
                undeploy=False,      # type: bool
                url=None,            # type: Optional[str]
                links=True,          # type: bool
+               output_format=None,  # type: Optional[AnyOutputFormat]
                ):                   # type: (...) -> OperationResult
         """
         Deploy a new :term:`Process` with specified metadata and reference to an :term:`Application Package`.
@@ -318,6 +320,8 @@ class WeaverClient(object):
             Instance URL if not already provided during client creation.
         :param links:
             Indicate if ``links`` section should be preserved in returned result body.
+        :param output_format:
+            Select an alternate output representation of the result body contents.
         :returns: Results of the operation.
         """
         result = self._parse_deploy_body(body, process_id)
@@ -340,25 +344,26 @@ class WeaverClient(object):
                                        body=result.body, text=result.text, code=result.code, headers=result.headers)
         path = f"{base}/processes"
         resp = request_extra("POST", path, json=data, headers=headers, settings=self._settings)
-        return self._parse_result(resp, links=links)
+        return self._parse_result(resp, links=links, output_format=output_format)
 
-    def undeploy(self, process_id, url=None, links=True):
-        # type: (str, Optional[str], bool) -> OperationResult
+    def undeploy(self, process_id, url=None, links=True, output_format=None):
+        # type: (str, Optional[str], bool, Optional[AnyOutputFormat]) -> OperationResult
         """
         Undeploy an existing :term:`Process`.
 
         :param process_id: Identifier of the process to undeploy.
         :param url: Instance URL if not already provided during client creation.
         :param links: Indicate if ``links`` section should be preserved in returned result body.
+        :param output_format: Select an alternate output representation of the result body contents.
         :returns: Results of the operation.
         """
         base = self._get_url(url)
         path = f"{base}/processes/{process_id}"
         resp = request_extra("DELETE", path, headers=self._headers, settings=self._settings)
-        return self._parse_result(resp, links=links)
+        return self._parse_result(resp, links=links, output_format=output_format)
 
-    def capabilities(self, url=None, links=True):
-        # type: (Optional[str], bool) -> OperationResult
+    def capabilities(self, url=None, links=True, output_format=None):
+        # type: (Optional[str], bool, Optional[AnyOutputFormat]) -> OperationResult
         """
         List all available :term:`Process` on the instance.
 
@@ -367,17 +372,20 @@ class WeaverClient(object):
 
         :param url: Instance URL if not already provided during client creation.
         :param links: Indicate if ``links`` section should be preserved in returned result body.
+        :param output_format: Select an alternate output representation of the result body contents.
         :returns: Results of the operation.
         """
         base = self._get_url(url)
         path = f"{base}/processes"
         query = {"detail": False}  # not supported by non-Weaver, but save the work if possible
         resp = request_extra("GET", path, params=query, headers=self._headers, settings=self._settings)
-        result = self._parse_result(resp, links=links)
-        processes = result.body.get("processes")
+        result = self._parse_result(resp, links=links, output_format=OutputFormat.JSON)
+        processes = result.body.get("processes")  # type: ignore
         if isinstance(processes, list) and all(isinstance(proc, dict) for proc in processes):
             processes = [get_any_id(proc) for proc in processes]
             result.body = processes
+        if "json" not in str(output_format).lower():
+            result.text = result.body = OutputFormat.convert(result.body, output_format, item_root="result")
         return result
 
     processes = capabilities  # alias
@@ -385,8 +393,8 @@ class WeaverClient(object):
     Alias of :meth:`capabilities` for :term:`Process` listing.
     """
 
-    def describe(self, process_id, url=None, schema=ProcessSchema.OGC, links=True):
-        # type: (str, Optional[str], Optional[ProcessSchemaType], bool) -> OperationResult
+    def describe(self, process_id, url=None, schema=ProcessSchema.OGC, links=True, output_format=None):
+        # type: (str, Optional[str], Optional[ProcessSchemaType], bool, Optional[AnyOutputFormat]) -> OperationResult
         """
         Describe the specified :term:`Process`.
 
@@ -397,6 +405,7 @@ class WeaverClient(object):
         :param url: Instance URL if not already provided during client creation.
         :param links: Indicate if ``links`` section should be preserved in returned result body.
         :param schema: Representation schema of the returned process description.
+        :param output_format: Select an alternate output representation of the result body contents.
         :returns: Results of the operation.
         """
         base = self._get_url(url)
@@ -407,7 +416,7 @@ class WeaverClient(object):
         resp = request_extra("GET", path, params=query, headers=self._headers, settings=self._settings)
         # API response from this request can contain 'description' matching the process description
         # rather than a generic response 'description'. Enforce the provided message to avoid confusion.
-        return self._parse_result(resp, message="Process description successfully retrieved.", links=links)
+        return self._parse_result(resp, message="Process description successfully retrieved.", links=links, output_format=output_format)
 
     @staticmethod
     def _parse_inputs(inputs):
@@ -524,8 +533,16 @@ class WeaverClient(object):
     # :param execute_async:
     #   Execute the process asynchronously (user must call :meth:`monitor` themselves,
     #   or synchronously where monitoring is done automatically until completion before returning.
-    def execute(self, process_id, inputs=None, monitor=False, timeout=None, interval=None, url=None, links=True):
-        # type: (str, Optional[Union[str, JSON]], bool, Optional[int], Optional[int], Optional[str], bool) -> OperationResult
+    def execute(self,
+                process_id,             # type: str
+                inputs=None,            # type: Optional[Union[str, JSON]]
+                monitor=False,          # type: bool
+                timeout=None,           # type: Optional[int]
+                interval=None,          # type: Optional[int]
+                url=None,               # type: Optional[str]
+                links=True,             # type: bool
+                output_format=None,     # type: Optional[AnyOutputFormat]
+                ):                      # type: (...) -> OperationResult
         """
         Execute a :term:`Job` for the specified :term:`Process` with provided inputs.
 
@@ -553,6 +570,7 @@ class WeaverClient(object):
             Monitoring interval (seconds) between job status polling requests.
         :param url: Instance URL if not already provided during client creation.
         :param links: Indicate if ``links`` section should be preserved in returned result body.
+        :param output_format: Select an alternate output representation of the result body contents.
         :returns: Results of the operation.
         """
         if isinstance(inputs, list) and all(isinstance(item, list) for item in inputs):
@@ -586,22 +604,22 @@ class WeaverClient(object):
             # use 'value' to have all outputs reported in body as 'value/href' rather than 'Link' headers
             data["outputs"][output_id] = {"transmissionMode": ExecuteTransmissionMode.VALUE}
 
-        LOGGER.info("Executing [%s] with inputs:\n%s", process_id, _json2text(values))
+        LOGGER.info("Executing [%s] with inputs:\n%s", process_id, OutputFormat.convert(values, OutputFormat.JSON_STR))
         path = f"{base}/processes/{process_id}/execution"  # use OGC-API compliant endpoint (not '/jobs')
         headers = {}
         headers.update(self._headers)
         headers.update(auth_headers)
         resp = request_extra("POST", path, json=data, headers=headers, settings=self._settings)
-        result = self._parse_result(resp, links=links)
+        result = self._parse_result(resp, links=links, output_format=output_format)
         if not monitor or not result.success:
             return result
         # although Weaver returns "jobID" in the body for convenience,
         # employ the "Location" header to be OGC-API compliant
         job_url = resp.headers.get("Location", "")
-        return self.monitor(job_url, timeout=timeout, interval=interval, links=links)
+        return self.monitor(job_url, timeout=timeout, interval=interval, links=links, output_format=output_format)
 
-    def upload(self, file_path, content_type=None, url=None, links=True):
-        # type: (str, Optional[str], Optional[str], bool) -> OperationResult
+    def upload(self, file_path, content_type=None, url=None, links=True, output_format=None):
+        # type: (str, Optional[str], Optional[str], bool, Optional[AnyOutputFormat]) -> OperationResult
         """
         Upload a local file to the :term:`Vault`.
 
@@ -619,6 +637,7 @@ class WeaverClient(object):
             If not provided, attempts to guess it based on the file extension.
         :param url: Instance URL if not already provided during client creation.
         :param links: Indicate if ``links`` section should be preserved in returned result body.
+        :param output_format: Select an alternate output representation of the result body contents.
         :returns: Results of the operation.
         """
         if not isinstance(file_path, str):
@@ -649,10 +668,10 @@ class WeaverClient(object):
         }
         # allow retry to avoid some sporadic HTTP 403 errors
         resp = request_extra("POST", path, headers=req_headers, settings=self._settings, files=files, retry=2)
-        return self._parse_result(resp, links=links)
+        return self._parse_result(resp, links=links, output_format=output_format)
 
-    def status(self, job_reference, url=None, links=True):
-        # type: (str, Optional[str], bool) -> OperationResult
+    def status(self, job_reference, url=None, links=True, output_format=None):
+        # type: (str, Optional[str], bool, Optional[AnyOutputFormat]) -> OperationResult
         """
         Obtain the status of a :term:`Job`.
 
@@ -662,12 +681,13 @@ class WeaverClient(object):
         :param job_reference: Either the full :term:`Job` status URL or only its UUID.
         :param url: Instance URL if not already provided during client creation.
         :param links: Indicate if ``links`` section should be preserved in returned result body.
+        :param output_format: Select an alternate output representation of the result body contents.
         :returns: Retrieved status of the job.
         """
         job_id, job_url = self._parse_job_ref(job_reference, url)
         LOGGER.info("Getting job status: [%s]", job_id)
         resp = request_extra("GET", job_url, headers=self._headers, settings=self._settings)
-        return self._parse_result(resp, links=links)
+        return self._parse_result(resp, links=links, output_format=output_format)
 
     def monitor(self,
                 job_reference,                      # type: str
@@ -676,6 +696,7 @@ class WeaverClient(object):
                 wait_for_status=Status.SUCCEEDED,   # type: str
                 url=None,                           # type: Optional[str]
                 links=True,                         # type: bool
+                output_format=None,                 # type: Optional[AnyOutputFormat]
                 ):                                  # type: (...) -> OperationResult
         """
         Monitor the execution of a :term:`Job` until completion.
@@ -689,6 +710,7 @@ class WeaverClient(object):
         :param wait_for_status: monitor until the requested status is reached (default: job failed or succeeded).
         :param url: Instance URL if not already provided during client creation.
         :param links: Indicate if ``links`` section should be preserved in returned result body.
+        :param output_format: Select an alternate output representation of the result body contents.
         :return: Result of the successful or failed job, or timeout of monitoring process.
         """
         job_id, job_url = self._parse_job_ref(job_reference, url)
@@ -696,7 +718,6 @@ class WeaverClient(object):
         delta = interval or self.monitor_interval
         LOGGER.info("Monitoring job [%s] for %ss at intervals of %ss.", job_id, timeout, delta)
         once = True
-        body = None
         while remain >= 0 or once:
             resp = request_extra("GET", job_url, headers=self._headers, settings=self._settings)
             if resp.status_code != 200:
@@ -704,16 +725,18 @@ class WeaverClient(object):
             body = resp.json()
             status = body.get("status")
             if status == wait_for_status:
-                return OperationResult(True, f"Requested job status reached [{wait_for_status}].", body)
+                msg = f"Requested job status reached [{wait_for_status}]."
+                return self._parse_result(resp, success=True, message=msg, links=links, output_format=output_format)
             if status in JOB_STATUS_CATEGORIES[StatusCategory.FINISHED]:
-                return OperationResult(False, "Requested job status not reached, but job has finished.", body)
+                msg = "Requested job status not reached, but job has finished."
+                return self._parse_result(resp, success=False, message=msg, links=links, output_format=output_format)
             time.sleep(delta)
             remain -= delta
             once = False
-        return OperationResult(False, f"Monitoring timeout reached ({timeout}s). Job did not complete in time.", body)
+        return OperationResult(False, f"Monitoring timeout reached ({timeout}s). Job did not complete in time.")
 
-    def results(self, job_reference, out_dir=None, download=False, url=None, links=True):
-        # type: (str, Optional[str], bool, Optional[str], bool) -> OperationResult
+    def results(self, job_reference, out_dir=None, download=False, url=None, links=True, output_format=None):
+        # type: (str, Optional[str], bool, Optional[str], bool, Optional[AnyOutputFormat]) -> OperationResult
         """
         Obtain the results of a successful :term:`Job` execution.
 
@@ -722,6 +745,7 @@ class WeaverClient(object):
         :param download: Download any file reference found within results (CAUTION: could transfer lots of data!).
         :param url: Instance URL if not already provided during client creation.
         :param links: Indicate if ``links`` section should be preserved in returned result body.
+        :param output_format: Select an alternate output representation of the result body contents.
         :returns: Result details and local paths if downloaded.
         """
         job_id, job_url = self._parse_job_ref(job_reference, url)
@@ -733,7 +757,7 @@ class WeaverClient(object):
         result_url = f"{job_url}/results"
         LOGGER.info("Retrieving results from [%s]", result_url)
         resp = request_extra("GET", result_url, headers=self._headers, settings=self._settings)
-        res_out = self._parse_result(resp, links=links)
+        res_out = self._parse_result(resp, links=links, output_format=output_format)
         outputs = res_out.body
         if not res_out.success or not isinstance(res_out.body, dict):
             return OperationResult(False, "Could not retrieve any output results from job.", outputs)
@@ -761,20 +785,21 @@ class WeaverClient(object):
                         outputs[output]["path"] = file_path
         return OperationResult(True, "Retrieved job results.", outputs)
 
-    def dismiss(self, job_reference, url=None, links=True):
-        # type: (str, Optional[str], bool) -> OperationResult
+    def dismiss(self, job_reference, url=None, links=True, output_format=None):
+        # type: (str, Optional[str], bool, Optional[AnyOutputFormat]) -> OperationResult
         """
         Dismiss pending or running :term:`Job`, or clear result artifacts from a completed :term:`Job`.
 
         :param job_reference: Either the full :term:`Job` status URL or only its UUID.
         :param url: Instance URL if not already provided during client creation.
         :param links: Indicate if ``links`` section should be preserved in returned result body.
+        :param output_format: Select an alternate output representation of the result body contents.
         :returns: Obtained result from the operation.
         """
         job_id, job_url = self._parse_job_ref(job_reference, url)
         LOGGER.debug("Dismissing job: [%s]", job_id)
         resp = request_extra("DELETE", job_url, headers=self._headers, settings=self._settings)
-        return self._parse_result(resp, links=links)
+        return self._parse_result(resp, links=links, output_format=output_format)
 
 
 def setup_logger_from_options(logger, args):  # pragma: no cover
@@ -826,10 +851,16 @@ def add_url_param(parser, required=True):
     parser.add_argument("-u", "--url", metavar="URL", help="URL of the instance to run operations.", required=required)
 
 
-def add_links_param(parser):
+def add_shared_options(parser):
     # type: (argparse.ArgumentParser) -> None
     parser.add_argument("-L", "--no-links", dest="links", action="store_false",
                         help="Remove \"links\" section from returned result body.")
+    fmt_docs = "\n\n".join([
+        re.sub(r"\:[a-z]+\:\`([A-Za-z0-9_\-]+)\`", r"\1", f"{getattr(OutputFormat, fmt)}: {doc}")  # remove RST
+        for fmt, doc in sorted(OutputFormat.docs().items()) if doc
+    ])
+    parser.add_argument("-F", "--format", choices=sorted(OutputFormat.values()), dest="output_format",
+                        help=f"Select an alternative output representation (default: JSON).\n\n{fmt_docs}")
 
 
 def add_process_param(parser, description=None, required=True):
@@ -871,16 +902,14 @@ def set_parser_sections(parser):
     parser._positionals.title = REQUIRED_ARGS_TITLE
 
 
-class InputsFormatter(argparse.HelpFormatter):
+class ParagraphFormatter(argparse.HelpFormatter):
     # pragma: no cover  # somehow marked not covered, but functionality covered by 'test_execute_help_details'
     def _format_action(self, action):
         """
-        Override the returned help message with available options and shortcuts for inputs.
+        Override the returned help message with available options and shortcuts for description paragraphs.
 
-        This ensures that paragraphs defined in the "inputs" argument's help remain separated and properly formatted.
+        This ensures that paragraphs defined the argument's help remain separated and properly formatted.
         """
-        if action.dest != "inputs":
-            return super(InputsFormatter, self)._format_action(action)
         indent_size = min(self._action_max_length + 2, self._max_help_position)  # see _format_action
         indent_text = indent_size * " "
         sep = "\n\n"
@@ -891,7 +920,7 @@ class InputsFormatter(argparse.HelpFormatter):
             # process each paragraph individually so it fills the available width space
             # then remove option information line to keep only formatted text and indent the line for next one
             action.help = block
-            help_block = super(InputsFormatter, self)._format_action(action)
+            help_block = super(ParagraphFormatter, self)._format_action(action)
             option_idx = help_block.find("\n") if i else 0  # leave option detail on first paragraph
             help_space = (indent_text if i != last_index else sep)  # don't indent last, next param has it already
             help_text += help_block[option_idx:] + help_space
@@ -938,6 +967,9 @@ class WeaverArgumentParser(ArgumentParserFixedRequiredArgs, SubArgumentParserFix
     """
     Parser that provides fixes for proper representation of `Weaver` :term:`CLI` arguments.
     """
+    def format_help(self):
+        # type: () -> str
+        return super(WeaverArgumentParser, self).format_help() + "\n"
 
 
 def make_parser():
@@ -974,10 +1006,11 @@ def make_parser():
     op_deploy = WeaverArgumentParser(
         "deploy",
         description="Deploy a process.",
+        formatter_class=ParagraphFormatter,
     )
     set_parser_sections(op_deploy)
     add_url_param(op_deploy)
-    add_links_param(op_deploy)
+    add_shared_options(op_deploy)
     add_process_param(op_deploy, required=False, description=(
         "Process identifier for deployment. If no ``--body`` is provided, this is required. "
         "Otherwise, provided value overrides the corresponding ID in the body."
@@ -1024,27 +1057,30 @@ def make_parser():
     op_undeploy = WeaverArgumentParser(
         "undeploy",
         description="Undeploy an existing process.",
+        formatter_class=ParagraphFormatter,
     )
     set_parser_sections(op_undeploy)
     add_url_param(op_undeploy)
-    add_links_param(op_undeploy)
+    add_shared_options(op_undeploy)
     add_process_param(op_undeploy)
 
     op_capabilities = WeaverArgumentParser(
         "capabilities",
         description="List available processes.",
+        formatter_class=ParagraphFormatter,
     )
     set_parser_sections(op_capabilities)
     add_url_param(op_capabilities)
-    add_links_param(op_capabilities)
+    add_shared_options(op_capabilities)
 
     op_describe = WeaverArgumentParser(
         "describe",
         description="Obtain an existing process description.",
+        formatter_class=ParagraphFormatter,
     )
     set_parser_sections(op_describe)
     add_url_param(op_describe)
-    add_links_param(op_describe)
+    add_shared_options(op_describe)
     add_process_param(op_describe)
     op_describe.add_argument(
         "-S", "--schema", dest="schema", choices=ProcessSchema.values(), default=ProcessSchema.OGC,
@@ -1054,16 +1090,16 @@ def make_parser():
     op_execute = WeaverArgumentParser(
         "execute",
         description="Submit a job execution for an existing process.",
-        formatter_class=InputsFormatter,
+        formatter_class=ParagraphFormatter,
     )
     set_parser_sections(op_execute)
     add_url_param(op_execute)
-    add_links_param(op_execute)
+    add_shared_options(op_execute)
     add_process_param(op_execute)
     op_execute.add_argument(
         "-I", "--inputs", dest="inputs",
         required=True, nargs=1, action="append",  # collect max 1 item per '-I', but allow many '-I'
-        # note: below is formatted using 'InputsFormatter' with detected paragraphs
+        # note: below is formatted using 'ParagraphFormatter' with detected paragraphs
         help=inspect.cleandoc("""
             Literal input definitions, or a file path or URL reference to JSON or YAML
             contents defining job inputs with OGC-API or CWL schema. This parameter is required.
@@ -1107,20 +1143,22 @@ def make_parser():
     op_dismiss = WeaverArgumentParser(
         "dismiss",
         description="Dismiss a pending or running job, or wipe any finished job results.",
+        formatter_class=ParagraphFormatter,
     )
     set_parser_sections(op_dismiss)
     add_url_param(op_dismiss, required=False)
     add_job_ref_param(op_dismiss)
-    add_links_param(op_dismiss)
+    add_shared_options(op_dismiss)
 
     op_monitor = WeaverArgumentParser(
         "monitor",
-        description="Monitor a pending or running job execution until completion or up to a maximum wait time."
+        description="Monitor a pending or running job execution until completion or up to a maximum wait time.",
+        formatter_class=ParagraphFormatter,
     )
     add_url_param(op_monitor, required=False)
     add_job_ref_param(op_monitor)
     add_timeout_param(op_monitor)
-    add_links_param(op_monitor)
+    add_shared_options(op_monitor)
 
     op_status = WeaverArgumentParser(
         "status",
@@ -1128,11 +1166,12 @@ def make_parser():
             "Obtain the status of a job using a reference UUID or URL. "
             "This is equivalent to doing a single-shot 'monitor' operation without any pooling or retries."
         ),
+        formatter_class=ParagraphFormatter,
     )
     set_parser_sections(op_status)
     add_url_param(op_status, required=False)
     add_job_ref_param(op_status)
-    add_links_param(op_status)
+    add_shared_options(op_status)
 
     op_results = WeaverArgumentParser(
         "results",
@@ -1140,11 +1179,12 @@ def make_parser():
             "Obtain the output results description of a job. "
             "This operation can also download them from the remote server if requested."
         ),
+        formatter_class=ParagraphFormatter,
     )
     set_parser_sections(op_results)
     add_url_param(op_results, required=False)
     add_job_ref_param(op_results)
-    add_links_param(op_results)
+    add_shared_options(op_results)
     op_results.add_argument(
         "-D", "--download", dest="download", action="store_true",
         help="Download all found job results file references to output location. "
@@ -1163,10 +1203,11 @@ def make_parser():
             "This operation is accomplished automatically for all execution inputs submitted using local files. "
             "[note: feature only available for Weaver instances]"
         ),
+        formatter_class=ParagraphFormatter,
     )
     set_parser_sections(op_upload)
     add_url_param(op_upload, required=True)
-    add_links_param(op_upload)
+    add_shared_options(op_upload)
     op_upload.add_argument(
         "-c", "--content-type", dest="content_type",
         help="Content-Type of the file to apply. "
