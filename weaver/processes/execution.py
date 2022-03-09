@@ -303,10 +303,10 @@ def parse_wps_inputs(wps_process, job):
             # in case of array inputs, must repeat (id,value)
             if isinstance(input_val, list):
                 input_values = input_val
-                input_details = job_input
+                input_details = input_val  # each value has its own metadata
             else:
                 input_values = [input_val]
-                input_details = [job_input]
+                input_details = [job_input]  # metadata directly in definition, not nested per array value
 
             # we need to support file:// scheme but PyWPS doesn't like them so remove the scheme file://
             input_values = [

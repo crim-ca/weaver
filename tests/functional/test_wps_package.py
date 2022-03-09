@@ -1599,7 +1599,8 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         tmp_file = "{}/{}".format(self.settings["weaver.wps_output_dir"], job_output_path)
 
         try:
-            processed_values = json.load(open(tmp_file, "r"))
+            with open(tmp_file, "r") as out_file:
+                processed_values = json.load(out_file)
         except FileNotFoundError:
             self.fail("Output file [{}] was not found where it was expected to resume test".format(tmp_file))
         except Exception as exception:
@@ -1791,7 +1792,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                 results = self.monitor_job(status_url, timeout=5)
                 wps_dir = self.settings["weaver.wps_output_dir"]
                 ctx_dir = (wps_dir + "/" + ctx) if ctx else wps_dir
-                out_url = "https://localhost" + self.settings["weaver.wps_output_path"]
+                out_url = self.settings["weaver.wps_output_url"]
                 ctx_url = (out_url + "/" + ctx) if ctx else out_url
                 res_url = ctx_url + "/" + job_id + "/stdout.log"
                 res_path = os.path.join(ctx_dir, job_id, "stdout.log")
