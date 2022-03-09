@@ -554,8 +554,14 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
         return not cls.is_local() and not cls.is_remote()
 
     @classmethod
-    def request(cls, method, url, ignore_errors=False, force_requests=False, log_enabled=True, **kw):
-        # type: (str, str, bool, bool, bool, Optional[Any]) -> AnyResponseType
+    def request(cls,                    # pylint: disable=W0221
+                method,                 # type: str
+                url,                    # type: str
+                ignore_errors=False,    # type: bool
+                force_requests=False,   # type: bool
+                log_enabled=True,       # type: bool
+                **kw                    # type: Any
+                ):                      # type: (...) -> AnyResponseType
         """
         Executes the request, but following any server prior redirects as needed.
 

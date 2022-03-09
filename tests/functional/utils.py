@@ -31,8 +31,8 @@ from weaver.utils import fully_qualified_name, load_file
 from weaver.visibility import Visibility
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Literal, Optional, Union
-    from weaver.typedefs import AnyResponseType, JSON, SettingsType
+    from typing import Any, Dict, Optional, Union
+    from weaver.typedefs import AnyResponseType, JSON, Literal, SettingsType
 
     ReferenceType = Literal["deploy", "execute", "package"]
 
