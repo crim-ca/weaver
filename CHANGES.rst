@@ -12,7 +12,8 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add `CLI` option ``-L/--no-links`` that drops the ``links`` section of any response to make the printed result more
+  concise and specific to relevant details of the called operation.
 
 Fixes:
 ------

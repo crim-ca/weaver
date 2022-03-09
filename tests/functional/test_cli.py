@@ -631,6 +631,28 @@ class TestWeaverCLI(TestWeaverClientBase):
         assert any("\"inputs\": {" in line for line in lines)
         assert any("\"outputs\": {" in line for line in lines)
 
+    def test_describe_no_links(self):
+        # prints formatted JSON ProcessDescription over many lines
+        proc = self.test_process["Echo"]
+        lines = mocked_sub_requests(
+            self.app, run_command,
+            [
+                # "weaver",
+                "describe",
+                "-u", self.url,
+                "-p", proc,
+                "-L",
+            ],
+            trim=False,
+            entrypoint=weaver_cli,
+            only_local=True,
+        )
+        # ignore indents of fields from formatted JSON content
+        assert any(f"\"id\": \"{proc}\"" in line for line in lines)
+        assert any("\"inputs\": {" in line for line in lines)
+        assert any("\"outputs\": {" in line for line in lines)
+        assert all("\"links\":" not in line for line in lines)
+
     def test_execute_inputs_capture(self):
         """
         Verify that specified inputs are captured for a limited number of 1 item per ``-I`` option.
