@@ -11,6 +11,7 @@ import pytest
 import yaml
 from pyramid.httpexceptions import HTTPOk
 
+from tests.functional import APP_PKG_ROOT
 from tests.utils import (
     get_test_weaver_app,
     get_test_weaver_config,
@@ -19,9 +20,8 @@ from tests.utils import (
     setup_config_with_mongodb,
     setup_config_with_pywps,
     setup_mongodb_jobstore,
-    setup_mongodb_processstore,
+    setup_mongodb_processstore
 )
-from tests.functional import APP_PKG_ROOT
 from weaver import WEAVER_ROOT_DIR
 from weaver.database import get_db
 from weaver.formats import ContentType

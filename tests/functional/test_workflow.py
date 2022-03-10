@@ -21,6 +21,7 @@ from pyramid.settings import asbool
 # use 'Web' prefix to avoid pytest to pick up these classes and throw warnings
 from webtest import TestApp as WebTestApp
 
+from tests.functional.utils import ResourcesUtil
 from tests.utils import (
     get_settings_from_config_ini,
     get_settings_from_testapp,
@@ -31,7 +32,6 @@ from tests.utils import (
     mocked_wps_output,
     setup_config_with_mongodb
 )
-from tests.functional.utils import ResourcesUtil
 from weaver import WEAVER_ROOT_DIR
 from weaver.config import WeaverConfiguration
 from weaver.formats import ContentType
