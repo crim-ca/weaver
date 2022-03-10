@@ -163,12 +163,18 @@ class WeaverClient(object):
         return parsed_url.rsplit("/", 1)[0] if parsed_url.endswith("/") else parsed_url
 
     @staticmethod
-    def _parse_result(response, message=None, success=None, links=True, headers=False, output_format=None):
-        # type: (Response, Optional[str], Optional[bool], bool, bool, Optional[AnyOutputFormat]) -> OperationResult
+    def _parse_result(response,             # type: Response
+                      body=None,            # type: Optional[JSON]  # override response body
+                      message=None,         # type: Optional[str]   # override message/description in contents
+                      success=None,         # type: Optional[bool]  # override resolved success
+                      links=True,           # type: bool
+                      headers=False,        # type: bool
+                      output_format=None,   # type: Optional[AnyOutputFormat]
+                      ):                    # type: (...) -> OperationResult
         hdr = dict(response.headers)
         _success = False
         try:
-            body = response.json()
+            body = body or response.json()
             if not links:
                 body.pop("links", None)
             msg = message or body.get("description", body.get("message", "undefined"))
@@ -384,14 +390,11 @@ class WeaverClient(object):
         path = f"{base}/processes"
         query = {"detail": False}  # not supported by non-Weaver, but save the work if possible
         resp = request_extra("GET", path, params=query, headers=self._headers, settings=self._settings)
-        result = self._parse_result(resp, links=links, output_format=OutputFormat.JSON)
-        processes = result.body.get("processes")  # type: ignore
+        body = resp.json()
+        processes = body.get("processes")
         if isinstance(processes, list) and all(isinstance(proc, dict) for proc in processes):
-            processes = [get_any_id(proc) for proc in processes]
-            result.body = processes
-        if "json" not in str(output_format).lower():
-            result.text = result.body = OutputFormat.convert(result.body, output_format, item_root="result")
-        return result
+            body = [get_any_id(proc) for proc in processes]
+        return self._parse_result(resp, body=body, links=links, headers=headers, output_format=output_format)
 
     processes = capabilities  # alias
     """
@@ -629,7 +632,8 @@ class WeaverClient(object):
         # although Weaver returns "jobID" in the body for convenience,
         # employ the "Location" header to be OGC-API compliant
         job_url = resp.headers.get("Location", "")
-        return self.monitor(job_url, timeout=timeout, interval=interval, links=links, headers=headers, output_format=output_format)
+        return self.monitor(job_url, timeout=timeout, interval=interval,
+                            links=links, headers=headers, output_format=output_format)
 
     def upload(self, file_path, content_type=None, url=None, links=True, headers=False, output_format=None):
         # type: (str, Optional[str], Optional[str], bool, bool, Optional[AnyOutputFormat]) -> OperationResult

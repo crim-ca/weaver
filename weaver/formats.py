@@ -84,11 +84,11 @@ class OutputFormat(Constants):
     """)
 
     JSON_STR = classproperty(fget=lambda self: "json+str", doc="""
-    Representation of :term:`JSON` content with as string with indentation and newlines. 
+    Representation of :term:`JSON` content with as string with indentation and newlines.
     """)
 
     JSON_RAW = classproperty(fget=lambda self: "json+raw", doc="""
-    Representation of :term:`JSON` content with raw string without any indentation or newlines. 
+    Representation of :term:`JSON` content with raw string without any indentation or newlines.
     """)
 
     YAML = classproperty(fget=lambda self: "yaml", doc="""
