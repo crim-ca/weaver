@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_4.13.0:
+
+`4.13.0 <https://github.com/crim-ca/weaver/tree/4.13.0>`_ (2022-03-09)
+========================================================================
+
+Changes:
+--------
 - Add ``schema`` query parameter to ``GET /jobs/{jobID}/outputs`` request allowing to select between ``OGC``, ``OLD``
   ``OGC+strict`` and ``OLD+strict`` representations (case insensitive), each with different combinations
   of ``format.mimeType``, ``format.mediaType`` and/or directly ``type`` field to provide the Content-Type of an
