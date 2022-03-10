@@ -16,6 +16,9 @@ Changes:
   concise and specific to relevant details of the called operation.
 - Add `CLI` option ``-F/--format`` that allows output of contents in an alternative format.
   Available formatters include JSON, YAML and XML representations, with either pretty indentation and newlines or not.
+  This allows `CLI` calls that can return contents in the preferred format of a such that might need to parse the
+  relevant details. Alternative until the API itself can return similar formatted responses
+  (relates to `#125 <https://github.com/crim-ca/weaver/issues/125>`_).
 - Add `CLI` option ``-H/--headers`` that allows output of response headers as well as the response contents.
   This can be useful for endpoints that can return critical information, such as ``Location`` header for the `Job`
   status endpoint of an `OGC` compliant service, or the ``Preference-Applied`` header for services that support multiple
