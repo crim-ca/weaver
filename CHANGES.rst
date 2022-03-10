@@ -28,6 +28,38 @@ Fixes:
 ------
 - No change.
 
+.. _changes_4.13.0:
+
+`4.13.0 <https://github.com/crim-ca/weaver/tree/4.13.0>`_ (2022-03-09)
+========================================================================
+
+Changes:
+--------
+- Add ``schema`` query parameter to ``GET /jobs/{jobID}/outputs`` request allowing to select between ``OGC``, ``OLD``
+  ``OGC+strict`` and ``OLD+strict`` representations (case insensitive), each with different combinations
+  of ``format.mimeType``, ``format.mediaType`` and/or directly ``type`` field to provide the Content-Type of an
+  output with ``href`` file.
+  By default, both the ``format`` (i.e.: ``OLD`` schema) and the ``type`` (i.e.: ``OGC`` schema) are simultaneously
+  reported for backward and forward compatibility, and for `OGC` compliance, to return the IANA Media-Type of the
+  associated file reference (relates to `#401 <https://github.com/crim-ca/weaver/issues/401>`_).
+- Add support of ``type`` as alias to the Media-Type under the ``format`` for file references when submitted
+  for ``Job`` execution inputs, in accordance to the reported inputs/outputs endpoints, and for `OGC` compliance
+  (resolves `#401 <https://github.com/crim-ca/weaver/issues/401>`_).
+- Drop ``type`` field for ``metadata`` items in process description that correspond to a ``value`` with a ``role``.
+- Enforce pattern validation of ``type`` as IANA Content-Type for ``metadata`` items in process description that
+  correspond to a ``Link`` with ``href``. Invalid ``type`` are now rejected to adhere to `OGC` requirement classes.
+- Clarify schema employed by `Weaver` to use naming that is as close as possible to `OGC` schemas to facilitate their
+  comprehension and external references.
+
+Fixes:
+------
+- Fix ``GET /jobs/{jobID}/inputs`` endpoint failing to return submitted ``inputs`` for ``Job`` execution when they
+  were specified using the mapping representation (i.e.: ``OGC`` schema) instead of the listing representation
+  (i.e.: ``OLD`` schema).
+- Fix Media-Type provided as ``Job`` file reference input not forwarded to underlying WPS execution for validation
+  against supported formats for corresponding inputs. Specified format handles both the ``OLD`` definition with
+  ``format`` field (and nested ``mimeType`` or ``mediaType``), and the more recent ``OGC`` format with ``type`` field.
+
 .. _changes_4.12.0:
 
 `4.12.0 <https://github.com/crim-ca/weaver/tree/4.12.0>`_ (2022-02-28)

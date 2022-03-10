@@ -1185,8 +1185,8 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         process = {
             "id": self._testMethodName,
             "metadata": [
-                {"type": "value-typed", "value": "some-value", "lang": "en-US"},
-                {"type": "link-typed", "href": "https://example.com", "hreflang": "en-US", "rel": "example"}
+                {"role": "http://example.com/value-typed", "value": "some-value", "lang": "en-US"},
+                {"type": ContentType.TEXT_PLAIN, "href": "https://example.com", "hreflang": "en-US", "rel": "example"}
             ],
             "inputs": [],
             "outputs": [],

@@ -13,10 +13,8 @@ import uuid
 from typing import TYPE_CHECKING
 
 import pytest
-import yaml
 
-from tests.functional import APP_PKG_ROOT
-from tests.functional.utils import WpsConfigBase
+from tests.functional.utils import ResourcesUtil, WpsConfigBase
 from tests.utils import (
     get_weaver_url,
     mocked_dismiss_process,
@@ -36,7 +34,7 @@ if TYPE_CHECKING:
 
 @pytest.mark.cli
 @pytest.mark.functional
-class TestWeaverClientBase(WpsConfigBase):
+class TestWeaverClientBase(WpsConfigBase, ResourcesUtil):
     def __init__(self, *args, **kwargs):
         # won't run this as a test suite, only its derived classes
         setattr(self, "__test__", self is TestWeaverClientBase)
@@ -68,7 +66,7 @@ class TestWeaverClientBase(WpsConfigBase):
         self.test_payload = {}
         for process in ["Echo", "CatFile"]:
             self.test_process[process] = f"{self.test_process_prefix}-{process}"
-            self.test_payload[process] = self.load_resource_file(f"DeployProcess_{process}.yml", process)
+            self.test_payload[process] = self.retrieve_payload(process, "deploy", local=True)
             self.deploy_process(self.test_payload[process], process_id=self.test_process[process])
 
     @classmethod
@@ -78,17 +76,6 @@ class TestWeaverClientBase(WpsConfigBase):
             tmp_wps_out = cls.settings.get(tmp_dir_cfg, "")
             if os.path.isdir(tmp_wps_out):
                 shutil.rmtree(tmp_wps_out, ignore_errors=True)
-
-    @staticmethod
-    def get_resource_file(name, process="Echo"):
-        if os.path.isfile(name):
-            return os.path.abspath(name)
-        return os.path.join(APP_PKG_ROOT, process, name)
-
-    @classmethod
-    def load_resource_file(cls, name, process="Echo"):
-        with open(TestWeaverClientBase.get_resource_file(name, process)) as res_file:
-            return yaml.safe_load(res_file)
 
 
 class TestWeaverClient(TestWeaverClientBase):
@@ -139,8 +126,8 @@ class TestWeaverClient(TestWeaverClientBase):
 
     def test_deploy_payload_body_cwl_embedded(self):
         test_id = f"{self.test_process_prefix}-deploy-body-no-cwl"
-        payload = self.load_resource_file("DeployProcess_Echo.yml")
-        package = self.load_resource_file("echo.cwl")
+        payload = self.retrieve_payload("Echo", "deploy", local=True)
+        package = self.retrieve_payload("Echo", "package", local=True)
         payload["executionUnit"][0] = {"unit": package}
 
         result = mocked_sub_requests(self.app, self.client.deploy, test_id, payload)
@@ -153,8 +140,8 @@ class TestWeaverClient(TestWeaverClientBase):
 
     def test_deploy_payload_file_cwl_embedded(self):
         test_id = f"{self.test_process_prefix}-deploy-file-no-cwl"
-        payload = self.load_resource_file("DeployProcess_Echo.yml")
-        package = self.get_resource_file("echo.cwl")
+        payload = self.retrieve_payload("Echo", "deploy", local=True)
+        package = self.retrieve_payload("Echo", "package", local=True, ref_found=True)
         payload["executionUnit"][0] = {"href": package}
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".cwl") as body_file:
@@ -171,8 +158,8 @@ class TestWeaverClient(TestWeaverClientBase):
 
     def test_deploy_payload_inject_cwl_body(self):
         test_id = f"{self.test_process_prefix}-deploy-body-with-cwl-body"
-        payload = self.load_resource_file("DeployProcess_Echo.yml")
-        package = self.load_resource_file("echo.cwl")
+        payload = self.retrieve_payload("Echo", "deploy", local=True)
+        package = self.retrieve_payload("Echo", "package", local=True)
         payload.pop("executionUnit", None)
 
         result = mocked_sub_requests(self.app, self.client.deploy, test_id, payload, package)
@@ -185,8 +172,8 @@ class TestWeaverClient(TestWeaverClientBase):
 
     def test_deploy_payload_inject_cwl_file(self):
         test_id = f"{self.test_process_prefix}-deploy-body-with-cwl-file"
-        payload = self.load_resource_file("DeployProcess_Echo.yml")
-        package = self.get_resource_file("echo.cwl")
+        payload = self.retrieve_payload("Echo", "deploy", local=True)
+        package = self.retrieve_payload("Echo", "package", local=True, ref_found=True)
         payload.pop("executionUnit", None)
 
         result = mocked_sub_requests(self.app, self.client.deploy, test_id, payload, package)
@@ -242,12 +229,13 @@ class TestWeaverClient(TestWeaverClientBase):
         assert "description" not in result.body, "CLI should not have overridden the process description field."
 
     def run_execute_inputs_schema_variant(self, inputs_param, process="Echo",
-                                          preload=False, expect_success=True, mock_exec=True):
+                                          preload=False, location=False, expect_success=True, mock_exec=True):
         if isinstance(inputs_param, str):
+            ref = {"location": inputs_param} if location else {"ref_name": inputs_param}
             if preload:
-                inputs_param = self.load_resource_file(inputs_param, process=process)
+                inputs_param = self.retrieve_payload(process=process, local=True, **ref)
             else:
-                inputs_param = self.get_resource_file(inputs_param, process=process)
+                inputs_param = self.retrieve_payload(process=process, local=True, **ref)
         with contextlib.ExitStack() as stack_exec:
             # use pass-through function because don't care about execution result here, only the parsing of I/O
             if mock_exec:
@@ -258,7 +246,7 @@ class TestWeaverClient(TestWeaverClientBase):
                 stack_exec.enter_context(mock_exec_proc)
             result = mocked_sub_requests(self.app, self.client.execute, self.test_process[process], inputs=inputs_param)
         if expect_success:
-            assert result.success, result.message + " " + result.text
+            assert result.success, result.message + (result.text if result.text else "")
             assert "jobID" in result.body
             assert "processID" in result.body
             assert "status" in result.body
@@ -393,10 +381,10 @@ class TestWeaverClient(TestWeaverClientBase):
             if embed:
                 test_file = [test_input_file.format(test_file=tmp_file.name)]
             else:
-                exec_file = self.get_resource_file(test_input_file, process=process)
+                exec_file = self.retrieve_payload(process=process, ref_name=test_input_file, local=True, ref_found=True)
                 test_file = self.setup_test_file(exec_file, {"<TEST_FILE>": tmp_file.name})
             result = self.run_execute_inputs_schema_variant(test_file, process=process,
-                                                            preload=preload, mock_exec=False)
+                                                            preload=preload, location=True, mock_exec=False)
         job_id = result.body["jobID"]
         result = mocked_sub_requests(self.app, self.client.results, job_id)
         assert result.success, result.message
@@ -498,8 +486,8 @@ class TestWeaverCLI(TestWeaverClientBase):
             assert any(f"\"id\": \"{proc}\"" in line for line in lines)
 
     def test_deploy_no_process_id_option(self):
-        payload = self.get_resource_file("DeployProcess_Echo.yml")
-        package = self.get_resource_file("echo.cwl")
+        payload = self.retrieve_payload("Echo", "deploy", local=True, ref_found=True)
+        package = self.retrieve_payload("Echo", "package", local=True, ref_found=True)
         lines = mocked_sub_requests(
             self.app, run_command,
             [
@@ -518,8 +506,8 @@ class TestWeaverCLI(TestWeaverClientBase):
 
     def test_deploy_payload_body_cwl_embedded(self):
         test_id = f"{self.test_process_prefix}-deploy-body-no-cwl"
-        payload = self.load_resource_file("DeployProcess_Echo.yml")
-        package = self.load_resource_file("echo.cwl")
+        payload = self.retrieve_payload("Echo", "deploy", local=True)
+        package = self.retrieve_payload("Echo", "package", local=True)
         payload["executionUnit"][0] = {"unit": package}
 
         lines = mocked_sub_requests(
@@ -540,8 +528,8 @@ class TestWeaverCLI(TestWeaverClientBase):
 
     def test_deploy_payload_file_cwl_embedded(self):
         test_id = f"{self.test_process_prefix}-deploy-file-no-cwl"
-        payload = self.load_resource_file("DeployProcess_Echo.yml")
-        package = self.get_resource_file("echo.cwl")
+        payload = self.retrieve_payload("Echo", "deploy", local=True)
+        package = self.retrieve_payload("Echo", "package", local=True, ref_found=True)
         payload["executionUnit"][0] = {"href": package}
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".cwl") as body_file:
@@ -567,8 +555,8 @@ class TestWeaverCLI(TestWeaverClientBase):
 
     def test_deploy_payload_inject_cwl_body(self):
         test_id = f"{self.test_process_prefix}-deploy-body-with-cwl-body"
-        payload = self.load_resource_file("DeployProcess_Echo.yml")
-        package = self.load_resource_file("echo.cwl")
+        payload = self.retrieve_payload("Echo", "deploy", local=True)
+        package = self.retrieve_payload("Echo", "package", local=True)
         payload.pop("executionUnit", None)
 
         lines = mocked_sub_requests(
@@ -590,8 +578,8 @@ class TestWeaverCLI(TestWeaverClientBase):
 
     def test_deploy_payload_inject_cwl_file(self):
         test_id = f"{self.test_process_prefix}-deploy-body-with-cwl-file"
-        payload = self.load_resource_file("DeployProcess_Echo.yml")
-        package = self.get_resource_file("echo.cwl")
+        payload = self.retrieve_payload("Echo", "deploy", local=True)
+        package = self.retrieve_payload("Echo", "package", local=True, ref_found=True)
         payload.pop("executionUnit", None)
 
         lines = mocked_sub_requests(

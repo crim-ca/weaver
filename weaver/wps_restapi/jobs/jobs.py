@@ -40,6 +40,7 @@ from weaver.utils import get_any_id, get_any_value, get_path_kvp, get_settings, 
 from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_output_dir, get_wps_output_url
 from weaver.wps_restapi import swagger_definitions as sd
+from weaver.wps_restapi.constants import JobOutputsSchema
 from weaver.wps_restapi.providers.utils import forbid_local_only
 from weaver.wps_restapi.swagger_definitions import datetime_interval_parser
 
@@ -49,6 +50,7 @@ if TYPE_CHECKING:
     from pyramid.httpexceptions import HTTPException
 
     from weaver.typedefs import AnySettingsContainer, AnyValueType, JSON
+    from weaver.wps_restapi.constants import JobOutputsSchemaType
 
 LOGGER = get_task_logger(__name__)
 
@@ -212,8 +214,8 @@ def get_job_list_links(job_total, filters, request):
     return links
 
 
-def get_results(job, container, value_key=None, ogc_api=False):
-    # type: (Job, AnySettingsContainer, Optional[str], bool) -> Union[List[JSON], JSON]
+def get_results(job, container, value_key=None, schema=JobOutputsSchema.OLD):
+    # type: (Job, AnySettingsContainer, Optional[str], JobOutputsSchemaType) -> Union[List[JSON], JSON]
     """
     Obtains the job results with extended full WPS output URL as applicable and according to configuration settings.
 
@@ -222,13 +224,17 @@ def get_results(job, container, value_key=None, ogc_api=False):
     :param value_key:
         If not specified, the returned values will have the appropriate ``data``/``href`` key according to the content.
         Otherwise, all values will have the specified key.
-    :param ogc_api:
-        If ``True``, formats the results using the :term:`OGC API - Processes` format.
+    :param schema:
+        Selects which schema to employ for representing the output results.
     :returns: list of all outputs each with minimally an ID and value under the requested key.
     """
     wps_url = get_wps_output_url(container)
     if not wps_url.endswith("/"):
         wps_url = wps_url + "/"
+    schema = JobOutputsSchema.get(str(schema).lower(), default=JobOutputsSchema.OLD)
+    strict = schema.endswith("+strict")
+    schema = schema.split("+")[0]
+    ogc_api = schema == JobOutputsSchema.OGC
     outputs = {} if ogc_api else []
     fmt_key = "mediaType" if ogc_api else "mimeType"
     for result in job.results:
@@ -250,7 +256,10 @@ def get_results(job, container, value_key=None, ogc_api=False):
         if rtype == "href":  # required for the rest to be there, other fields optional
             if "mimeType" not in result:
                 result["mimeType"] = get_format(value, default=ContentType.TEXT_PLAIN).mime_type
-            output["format"] = {fmt_key: result["mimeType"]}
+            if ogc_api or not strict:
+                output["type"] = result["mimeType"]
+            if not ogc_api or not strict:
+                output["format"] = {fmt_key: result["mimeType"]}
             for field in ["encoding", "schema"]:
                 if field in result:
                     output["format"][field] = result[field]
@@ -586,9 +595,9 @@ def get_job_inputs(request):
     Retrieve the inputs of a job.
     """
     job = get_job(request)
-    inputs = dict(inputs=[dict(id=get_any_id(_input), value=get_any_value(_input)) for _input in job.inputs])
+    inputs = {"inputs": job.inputs}
     inputs.update({"links": job.links(request, self_link="inputs")})
-    inputs = sd.JobInputsSchema().deserialize(inputs)
+    inputs = sd.JobInputsBody().deserialize(inputs)
     return HTTPOk(json=inputs)
 
 
@@ -606,9 +615,10 @@ def get_job_outputs(request):
     """
     job = get_job(request)
     raise_job_dismissed(job, request)
-    outputs = {"outputs": get_results(job, request)}
+    schema = request.params.get("schema")
+    outputs = {"outputs": get_results(job, request, schema=str(schema).replace(" ", "+"))}  # unescape query
     outputs.update({"links": job.links(request, self_link="outputs")})
-    outputs = sd.JobOutputsSchema().deserialize(outputs)
+    outputs = sd.JobOutputsBody().deserialize(outputs)
     return HTTPOk(json=outputs)
 
 
@@ -632,7 +642,7 @@ def get_job_results(request):
             "code": "ResultsNotReady",
             "description": "Job status is '{}'. Results are not yet available.".format(job_status)
         })
-    results = get_results(job, request, value_key="value", ogc_api=True)
+    results = get_results(job, request, value_key="value", schema=JobOutputsSchema.OGC)
     # note: cannot add links in this case because variable OutputID keys are directly at the root
     results = sd.Result().deserialize(results)
     return HTTPOk(json=results)
