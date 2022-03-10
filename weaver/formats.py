@@ -353,7 +353,7 @@ def get_extension(mime_type, dot=True):
     """
     def _handle_dot(_ext):
         # type: (str) -> str
-        if dot and not _ext.startswith("."):
+        if dot and not _ext.startswith(".") and _ext:  # don't add for empty extension
             return f".{_ext}"
         if not dot and _ext.startswith("."):
             return _ext[1:]
