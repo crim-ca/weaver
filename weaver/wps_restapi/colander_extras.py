@@ -112,6 +112,16 @@ class OneOfCaseInsensitive(colander.OneOf):
     """
     Validator that ensures the given value matches one of the available choices, but allowing case insensitive values.
     """
+    def __init__(self, choices, *args, **kwargs):
+        insensitive_choices = dict()  # set with kept order
+        for choice in choices:
+            insensitive_choices.setdefault(choice, None)
+            if isinstance(choice, str):
+                # add common combinations (not technically all possible ones)
+                insensitive_choices.setdefault(choice.lower(), None)
+                insensitive_choices.setdefault(choice.upper(), None)
+        insensitive_choices = list(insensitive_choices)
+        super(OneOfCaseInsensitive, self).__init__(insensitive_choices, *args, **kwargs)
 
     def __call__(self, node, value):
         if str(value).lower() not in (choice.lower() for choice in self.choices):

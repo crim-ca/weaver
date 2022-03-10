@@ -15,13 +15,13 @@ from urllib.parse import urlparse
 
 import mock
 import pytest
-import yaml
 from pyramid import testing
 from pyramid.httpexceptions import HTTPConflict, HTTPCreated, HTTPNotFound, HTTPOk
 from pyramid.settings import asbool
 # use 'Web' prefix to avoid pytest to pick up these classes and throw warnings
 from webtest import TestApp as WebTestApp
 
+from tests.functional.utils import ResourcesUtil
 from tests.utils import (
     get_settings_from_config_ini,
     get_settings_from_testapp,
@@ -103,7 +103,7 @@ class ProcessInfo(object):
 
 @pytest.mark.functional
 @pytest.mark.workflow
-class WorkflowTestRunnerBase(TestCase):
+class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
     """
     Runs an end-2-end test procedure on weaver configured as EMS located on specified `WEAVER_TEST_SERVER_HOSTNAME`.
     """
@@ -497,75 +497,6 @@ class WorkflowTestRunnerBase(TestCase):
         return ProcessInfo(process_id, test_process_id, deploy_payload, execute_payload)
 
     @classmethod
-    def retrieve_payload(cls, process, ref_type=None, location=None):
-        # type: (str, Optional[str], Optional[str]) -> Dict[str, JSON]
-        """
-        Retrieve content using known structures and locations.
-
-        .. seealso::
-            :meth:`retrieve_process_info`
-
-        :param process: process identifier
-        :param ref_type: content reference type to retrieve {deploy, execute, package}.
-        :param location: override location (unique location with exact lookup instead of variations).
-        :return: first matched contents.
-        """
-        if location:
-            locations = [location]
-        else:
-            var_locations = list(dict.fromkeys([  # don't use set to preserve this prioritized order
-                os.path.join(os.path.dirname(__file__), "application-packages"),
-                os.getenv("TEST_GITHUB_SOURCE_URL"),
-                "https://raw.githubusercontent.com/crim-ca/testbed14/master/application-packages",
-                "https://raw.githubusercontent.com/crim-ca/application-packages/master/OGC/TB16/application-packages",
-            ]))
-            var_locations = [url for url in var_locations if url]
-
-            if ref_type == "deploy":
-                flat_ref = f"DeployProcess_{process}.json"
-                pdir_ref = f"{process}/deploy.json"
-                both_ref = f"{process}/DeployProcess_{process}.json"
-            elif ref_type == "execute":
-                flat_ref = f"Execute_{process}.json"
-                pdir_ref = f"{process}/execute.json"
-                both_ref = f"{process}/Execute_{process}.json"
-            elif ref_type == "package":
-                flat_ref = f"{process}.cwl"
-                pdir_ref = f"{process}/package.cwl"
-                both_ref = f"{process}/{process}.cwl"
-            else:
-                raise ValueError(f"unknown reference type: {ref_type}")
-
-            locations = []
-            for var_loc in var_locations:
-                for var_ref in [flat_ref, pdir_ref, both_ref]:
-                    locations.append(f"{var_loc}/{var_ref}")
-
-        tested_ref = []
-        try:
-            for path in locations:
-                extension = os.path.splitext(path)[-1]
-                retry_extensions = [".json", ".yaml", ".yml"]
-                if extension not in retry_extensions:
-                    retry_extensions = [extension]
-                # Try to find it locally, then fallback to remote
-                for ext in retry_extensions:
-                    path_ext = os.path.splitext(path)[0] + ext
-                    if os.path.isfile(path_ext):
-                        with open(path_ext, "r", encoding="utf-8") as f:
-                            json_payload = yaml.safe_load(f)  # both JSON/YAML
-                            return json_payload
-                    if urlparse(path_ext).scheme != "":
-                        resp = cls.request("GET", path, force_requests=True, ignore_errors=True)
-                        if resp.status_code == HTTPOk.code:
-                            return yaml.safe_load(resp.text)  # both JSON/YAML
-                    tested_ref.append(path)
-        except (IOError, ValueError):
-            pass
-        cls.log("{}Cannot find payload from any of the following references:\n- {}"
-                .format(cls.logger_separator_calls, "\n- ".join(tested_ref)), exception=True)
-
-    @classmethod
     def assert_response(cls, response, status=None, message=""):
         # type: (AnyResponseType, Optional[Union[int, Iterable[int]]], str) -> None
         """
@@ -623,8 +554,14 @@ class WorkflowTestRunnerBase(TestCase):
         return not cls.is_local() and not cls.is_remote()
 
     @classmethod
-    def request(cls, method, url, ignore_errors=False, force_requests=False, log_enabled=True, **kw):
-        # type: (str, str, bool, bool, bool, Optional[Any]) -> AnyResponseType
+    def request(cls,                    # pylint: disable=W0221
+                method,                 # type: str
+                url,                    # type: str
+                ignore_errors=False,    # type: bool
+                force_requests=False,   # type: bool
+                log_enabled=True,       # type: bool
+                **kw                    # type: Any
+                ):                      # type: (...) -> AnyResponseType
         """
         Executes the request, but following any server prior redirects as needed.
 
