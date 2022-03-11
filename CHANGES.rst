@@ -23,6 +23,7 @@ Changes:
   This can be useful for endpoints that can return critical information, such as ``Location`` header for the `Job`
   status endpoint of an `OGC` compliant service, or the ``Preference-Applied`` header for services that support multiple
   execution modes (i.e.: ``wait`` for ``sync-execute`` or ``respond-async`` for ``async-execute`` control options).
+- Add `CLI` operation ``jobs`` to obtain listing with some options similar to the corresponding `API` endpoint queries.
 
 Fixes:
 ------

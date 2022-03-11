@@ -24,7 +24,7 @@ from tests.utils import (
     run_command
 )
 from weaver.cli import WeaverClient, main as weaver_cli
-from weaver.formats import ContentType
+from weaver.formats import ContentType, OutputFormat
 from weaver.status import Status
 from weaver.wps.utils import map_wps_output_location
 
@@ -444,6 +444,11 @@ class TestWeaverClient(TestWeaverClientBase):
 
 
 class TestWeaverCLI(TestWeaverClientBase):
+    @classmethod
+    def setUpClass(cls):
+        super(TestWeaverCLI, cls).setUpClass()
+        cls.test_job = cls.job_store.save_job(task_id="12345678-1111-2222-3333-111122223333", process="fake-process")
+
     def test_help_operations(self):
         lines = run_command(
             [
@@ -786,3 +791,166 @@ class TestWeaverCLI(TestWeaverClientBase):
             only_local=True,
         )
         assert any(bad_input_value in line for line in lines)
+
+    def test_jobs(self):
+        lines = mocked_sub_requests(
+            self.app, run_command,
+            [
+                # "weaver",
+                "jobs",
+                "-u", self.url,
+            ],
+            trim=False,
+            entrypoint=weaver_cli,
+            only_local=True,
+        )
+        assert lines
+        assert any("jobs" in line for line in lines)
+        assert any("total" in line for line in lines)
+        assert any("limit" in line for line in lines)
+
+    def test_output_format_json_pretty(self):
+        job_url = f"{self.url}/jobs/{self.test_job.id}"
+        for format_option in [[], ["-F", OutputFormat.JSON_STR]]:
+            lines = mocked_sub_requests(
+                self.app, run_command,
+                [
+                    # "weaver",
+                    "status",
+                    "-j", job_url,
+                ] + format_option,
+                trim=False,
+                entrypoint=weaver_cli,
+                only_local=True,
+            )
+            assert len(lines) > 1, "should be indented, pretty printed"
+            assert lines[0].startswith("{")
+            assert lines[-1].endswith("}")
+            assert any("jobID" in line for line in lines)
+
+    def test_output_format_json_pretty_and_headers(self):
+        job_url = f"{self.url}/jobs/{self.test_job.id}"
+        lines = mocked_sub_requests(
+            self.app, run_command,
+            [
+                # "weaver",
+                "status",
+                "-j", job_url,
+                "-F", OutputFormat.JSON_STR,
+                "-H"
+            ],
+            trim=False,
+            entrypoint=weaver_cli,
+            only_local=True,
+        )
+        assert len(lines) > 1, "should be indented, pretty printed"
+        assert lines[0] == "Headers:"
+        sep = "---"
+        sep_pos = lines.index(sep)
+        assert any("Content-Type:" in line for line in lines[1:sep_pos])
+        result = lines[sep_pos+1:]
+        assert len(result) > 1, "should be indented, pretty printed"
+        assert result[0].startswith("{")
+        assert result[-1].endswith("}")
+        assert any("jobID" in line for line in result)
+
+    def test_output_format_json_raw(self):
+        job_url = f"{self.url}/jobs/{self.test_job.id}"
+        for format_option in [["-F", OutputFormat.JSON], ["-F", OutputFormat.JSON_RAW]]:
+            lines = mocked_sub_requests(
+                self.app, run_command,
+                [
+                    # "weaver",
+                    "status",
+                    "-j", job_url,
+                ] + format_option,
+                trim=False,
+                entrypoint=weaver_cli,
+                only_local=True,
+            )
+            assert len(lines) == 1, "should NOT be indented, raw data directly in one block"
+            assert lines[0].startswith("{")
+            assert lines[0].endswith("}")
+            assert "jobID" in lines[0]
+
+    def test_output_format_yaml_pretty(self):
+        job_url = f"{self.url}/jobs/{self.test_job.id}"
+        lines = mocked_sub_requests(
+            self.app, run_command,
+            [
+                # "weaver",
+                "status",
+                "-j", job_url,
+                "-F", OutputFormat.YAML,
+            ],
+            trim=False,
+            entrypoint=weaver_cli,
+            only_local=True,
+        )
+        assert len(lines) > 1, "should be indented, pretty printed"
+        assert lines[0] == f"jobID: {self.test_job.id}"
+
+    def test_output_format_xml_pretty(self):
+        job_url = f"{self.url}/jobs/{self.test_job.id}"
+        lines = mocked_sub_requests(
+            self.app, run_command,
+            [
+                # "weaver",
+                "status",
+                "-j", job_url,
+                "-F", OutputFormat.XML_STR
+            ],
+            trim=False,
+            entrypoint=weaver_cli,
+            only_local=True,
+        )
+        assert len(lines) > 1, "should be indented, pretty printed"
+        assert lines[0].startswith("<?xml")
+        assert lines[1].startswith("<result>")
+        assert lines[-1].endswith("</result>")
+        assert any("jobID" in line for line in lines)
+
+    def test_output_format_xml_pretty_and_headers(self):
+        job_url = f"{self.url}/jobs/{self.test_job.id}"
+        lines = mocked_sub_requests(
+            self.app, run_command,
+            [
+                # "weaver",
+                "status",
+                "-j", job_url,
+                "-F", OutputFormat.XML_STR,
+                "-H"
+            ],
+            trim=False,
+            entrypoint=weaver_cli,
+            only_local=True,
+        )
+        assert len(lines) > 1, "should be indented, pretty printed"
+        assert lines[0] == "Headers:"
+        sep = "---"
+        sep_pos = lines.index(sep)
+        assert any("Content-Type:" in line for line in lines[1:sep_pos])
+        result = lines[sep_pos+1:]
+        assert len(result) > 1, "should be indented, pretty printed"
+        assert result[0].startswith("<?xml")
+        assert result[1].startswith("<result>")
+        assert result[-1].endswith("</result>")
+        assert any("jobID" in line for line in result)
+
+    def test_output_format_xml_raw(self):
+        job_url = f"{self.url}/jobs/{self.test_job.id}"
+        lines = mocked_sub_requests(
+            self.app, run_command,
+            [
+                # "weaver",
+                "status",
+                "-j", job_url,
+                "-F", OutputFormat.XML_RAW
+            ],
+            trim=False,
+            entrypoint=weaver_cli,
+            only_local=True,
+        )
+        assert len(lines) == 1, "should NOT be indented, raw data directly in one block"
+        assert lines[0].startswith("<?xml")
+        assert lines[0].endswith("</result>")

@@ -84,15 +84,15 @@ class OutputFormat(Constants):
     """)
 
     JSON_STR = classproperty(fget=lambda self: "json+str", doc="""
-    Representation of :term:`JSON` content with as string with indentation and newlines.
+    Representation as :term:`JSON` content formatted as string with indentation and newlines.
     """)
 
     JSON_RAW = classproperty(fget=lambda self: "json+raw", doc="""
-    Representation of :term:`JSON` content with raw string without any indentation or newlines.
+    Representation as :term:`JSON` content formatted as raw string without any indentation or newlines.
     """)
 
     YAML = classproperty(fget=lambda self: "yaml", doc="""
-    Representation as serialized :term:`YAML` string with indentation and newlines.
+    Representation as :term:`YAML` content formatted as string with indentation and newlines.
     """)
 
     YML = classproperty(fget=lambda self: "yml", doc="""
@@ -100,15 +100,15 @@ class OutputFormat(Constants):
     """)
 
     XML = classproperty(fget=lambda self: "xml", doc="""
-    Representation as serialized :term:`XML` string with indentation and newlines.
+    Representation as :term:`XML` content formatted as serialized string.
     """)
 
     XML_STR = classproperty(fget=lambda self: "xml+str", doc="""
-    Alias to XML.
+    Representation as :term:`XML` content formatted as string with indentation and newlines.
     """)
 
     XML_RAW = classproperty(fget=lambda self: "xml+raw", doc="""
-    Representation as serialized :term:`XML` string without indentation or newlines.
+    Representation as :term:`XML` content formatted as raw string without indentation or newlines.
     """)
 
     @classmethod
@@ -147,6 +147,8 @@ class OutputFormat(Constants):
             When using :term:`XML` representations, defines the top-most item name. Unused for other representations.
         :return: Formatted output.
         """
+        from weaver.utils import bytes2str
+
         fmt = cls.get(to)
         if fmt == OutputFormat.JSON:
             return data
@@ -155,8 +157,13 @@ class OutputFormat(Constants):
         if fmt == OutputFormat.JSON_RAW:
             return repr_json(data, ensure_ascii=False)
         if fmt in [OutputFormat.XML, OutputFormat.XML_RAW, OutputFormat.XML_STR]:
-            pretty = fmt != OutputFormat.XML_RAW
-            return Json2xml(data, item_wrap=True, pretty=pretty, wrapper=item_root).to_xml()
+            pretty = fmt == OutputFormat.XML_STR
+            xml = Json2xml(data, item_wrap=True, pretty=pretty, wrapper=item_root).to_xml()
+            if fmt == OutputFormat.XML_RAW:
+                xml = bytes2str(xml)
+            if isinstance(xml, str):
+                xml = xml.strip()
+            return xml
         if fmt in [OutputFormat.YML, OutputFormat.YAML]:
             return yaml.safe_dump(data, indent=2, sort_keys=False)
         return data
