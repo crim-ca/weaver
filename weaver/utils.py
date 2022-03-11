@@ -1,7 +1,6 @@
 import errno
 import functools
 import inspect
-import json
 import logging
 import os
 import posixpath

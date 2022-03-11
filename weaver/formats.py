@@ -19,7 +19,7 @@ from weaver.base import Constants, classproperty
 if TYPE_CHECKING:
     from typing import Any, Dict, List, Optional, Tuple, Union
 
-    from weaver.typedefs import JSON, Literal
+    from weaver.typedefs import JSON
 
 LOGGER = logging.getLogger(__name__)
 
@@ -572,6 +572,8 @@ def repr_json(data, force_string=True, **kwargs):
 
 
 if TYPE_CHECKING:
+    from weaver.typedefs import Literal
+
     AnyOutputFormat = Literal[
         OutputFormat.JSON,
         OutputFormat.XML,
