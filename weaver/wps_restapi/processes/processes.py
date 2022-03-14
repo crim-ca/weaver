@@ -20,7 +20,8 @@ from weaver.processes import opensearch
 from weaver.processes.execution import submit_job
 from weaver.processes.types import ProcessType
 from weaver.processes.utils import deploy_process_from_payload, get_job_submission_response, get_process
-from weaver.store.base import StoreProcesses
+from weaver.status import Status
+from weaver.store.base import StoreJobs, StoreProcesses
 from weaver.utils import fully_qualified_name, get_any_id
 from weaver.visibility import Visibility
 from weaver.wps_restapi import swagger_definitions as sd
@@ -211,7 +212,7 @@ def set_process_visibility(request):
     try:
         store = get_db(request).get_store(StoreProcesses)
         process = store.fetch_by_id(process_id)
-        if process.type == ProcessType.BUILTIN:
+        if not process.mutable:
             raise HTTPForbidden("Cannot change the visibility of builtin process.")
         store.set_visibility(process_id, visibility)
         return HTTPOk(json={u"value": visibility})
@@ -230,12 +231,29 @@ def delete_local_process(request):
     """
     Unregister a local process.
     """
-    store = get_db(request).get_store(StoreProcesses)
-    process = get_process(request=request, store=store)
+    db = get_db(request)
+    proc_store = db.get_store(StoreProcesses)
+    process = get_process(request=request, store=proc_store)
     process_id = process.id
-    if process.type == ProcessType.BUILTIN:
-        raise HTTPForbidden("Cannot delete a builtin process.")
-    if store.delete_process(process_id, visibility=Visibility.PUBLIC):
+    if not process.mutable:
+        raise HTTPForbidden(json={
+            "title": "Process immutable.",
+            "type": "ProcessImmutable",
+            "detail": "Cannot delete an immutable process.",
+            "status": HTTPForbidden.code,
+            "cause": {"mutable": False}
+        })
+    job_store = db.get_store(StoreJobs)
+    jobs, total = job_store.find_jobs(process=process_id, status=Status.RUNNING, page=None, limit=None)
+    if total != 0:
+        raise HTTPForbidden(json={
+            "title": "ProcessBusy",
+            "type": "ProcessBusy",
+            "detail": "Process with specified identifier is in use by a least one job and cannot be undeployed.",
+            "status": HTTPForbidden.code,
+            "cause": {"jobs": [str(job.id) for job in jobs]}
+        })
+    if proc_store.delete_process(process_id, visibility=Visibility.PUBLIC):
         return HTTPOk(json={
             "description": sd.OkDeleteProcessResponse.description,
             "identifier": process_id,

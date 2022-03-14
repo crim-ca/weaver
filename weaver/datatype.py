@@ -1851,6 +1851,14 @@ class Process(Base):
         return self.get("type", ProcessType.APPLICATION)
 
     @property
+    def mutable(self):
+        # type: () -> bool
+        """
+        Indicates if a process can be modified.
+        """
+        return self.type != ProcessType.BUILTIN
+
+    @property
     def package(self):
         # type: () -> Optional[CWL]
         """
@@ -2007,7 +2015,6 @@ class Process(Base):
     def dict(self):
         # type: () -> AnyParams
         data = super(Process, self).dict()
-        data["mutable"] = self.type != ProcessType.BUILTIN
         data.pop("auth", None)  # remote preemptively just in case any deserialize fails to drop it
         return data
 

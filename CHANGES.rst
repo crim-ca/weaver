@@ -18,6 +18,7 @@ Changes:
   `Deploy, Replace, Undeploy`.
 - Add ``mutable`` field to ``Process`` summary listing and detailed descriptions for conformance
   (resolves `#180 <https://github.com/crim-ca/weaver/issues/180>`_).
+- Improve ``Process`` undeployment to consider running ``Job`` to block its removal while in use.
 
 Fixes:
 ------

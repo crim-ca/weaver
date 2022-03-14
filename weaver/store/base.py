@@ -157,8 +157,8 @@ class StoreJobs(StoreInterface):
                   notification_email=None,  # type: Optional[str]
                   status=None,              # type: Optional[str]
                   sort=None,                # type: Optional[str]
-                  page=0,                   # type: int
-                  limit=10,                 # type: int
+                  page=0,                   # type: Optional[int]
+                  limit=10,                 # type: Optional[int]
                   min_duration=None,        # type: Optional[int]
                   max_duration=None,        # type: Optional[int]
                   datetime_interval=None,   # type: Optional[DatetimeIntervalType]
