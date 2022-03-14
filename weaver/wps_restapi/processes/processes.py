@@ -18,7 +18,6 @@ from weaver.exceptions import ProcessNotFound, ServiceException, log_unhandled_e
 from weaver.formats import OutputFormat, repr_json
 from weaver.processes import opensearch
 from weaver.processes.execution import submit_job
-from weaver.processes.types import ProcessType
 from weaver.processes.utils import deploy_process_from_payload, get_job_submission_response, get_process
 from weaver.status import Status
 from weaver.store.base import StoreJobs, StoreProcesses
