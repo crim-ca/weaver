@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_4.14.0:
+
+`4.14.0 <https://github.com/crim-ca/weaver/tree/4.14.0>`_ (2022-03-14)
+========================================================================
+
+Changes:
+--------
 - Add `CLI` option ``-L/--no-links`` that drops the ``links`` section of any response to make the printed result more
   concise and specific to relevant details of the called operation.
 - Add `CLI` option ``-F/--format`` that allows output of contents in an alternative format.
