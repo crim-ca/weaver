@@ -14,6 +14,8 @@ Changes:
 --------
 - Improve conformance for returned status codes and error messages when requesting results for an unfinished,
   failed, or dismissed ``Job``.
+- Adjust conformance item references to correspond with `OGC API - Processes: Part 2` renamed from `Transactions` to
+  `Deploy, Replace, Undeploy`.
 
 Fixes:
 ------
