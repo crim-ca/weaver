@@ -12,7 +12,8 @@ Changes
 
 Changes:
 --------
-- No change.
+- Improve conformance for returned status codes and error messages when requesting results for an unfinished,
+  failed, or dismissed ``Job``.
 
 Fixes:
 ------

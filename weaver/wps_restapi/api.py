@@ -225,7 +225,7 @@ def api_conformance(request):  # noqa: F811
         ows_wps1 + "/",
         ows_wps2 + "/",
         ows_wps2 + "/req/service/binding/rest-json/core",
-        # "http://www.opengis.net/spec/WPS/2.0/req/service/binding/rest-json/oas30",
+        ows_wps2 + "/req/service/binding/rest-json/oas30",  # /ows/wps?...&f=json
         # "http://www.opengis.net/spec/WPS/2.0/req/service/binding/rest-json/html"
         "https://github.com/opengeospatial/wps-rest-binding",  # old reference for bw-compat
         ogcapi_common + "/conf/core",
@@ -365,11 +365,8 @@ def api_conformance(request):  # noqa: F811
         ogcapi_processes + "/req/job-list/processid-response",
         ogcapi_processes + "/req/job-list/type-definition",
         ogcapi_processes + "/req/job-list/type-response",
-        # FIXME:
-        #   https://github.com/opengeospatial/ogcapi-processes/blob/master/core/requirements/core/REQ_job-results-exception-results-not-ready.adoc
-        #   type of exception SHALL be "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/result-not-ready"
-        # ogcapi_processes + "/req/core/job-results-exception/results-not-ready",
-        # ogcapi_processes + "/req/core/job-results-failed",
+        ogcapi_processes + "/req/core/job-results-exception/results-not-ready",
+        ogcapi_processes + "/req/core/job-results-failed",
         ogcapi_processes + "/req/core/job-results",
         ogcapi_processes + "/req/core/job-results-async-document",
         # ogcapi_processes + "/req/core/job-results-async-raw-mixed-multi",
