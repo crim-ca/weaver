@@ -121,6 +121,7 @@ PROCESS_DESCRIPTION_FIELD_FIRST = [
     "id",
     "title",
     "version",
+    "mutable",
     "abstract",  # backward compat for deployment
     "description",
     "keywords",
@@ -145,6 +146,7 @@ PROVIDER_DESCRIPTION_FIELD_FIRST = [
     "id",
     "title",
     "version",
+    "mutable",
     "description",
     "url",
     "type",
@@ -943,6 +945,9 @@ class DeployMinMaxOccurs(ExtendedMappingSchema):
 class ProcessDescriptionType(DescriptionBase, DescriptionExtra):
     id = ProcessIdentifier()
     version = Version(missing=drop)
+    mutable = ExtendedSchemaNode(Boolean(), default=True, description=(
+        "Indicates if the process is mutable (dynamically deployed), or immutable (builtin with this instance)."
+    ))
 
 
 class InputIdentifierType(ExtendedMappingSchema):

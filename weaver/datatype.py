@@ -2007,6 +2007,7 @@ class Process(Base):
     def dict(self):
         # type: () -> AnyParams
         data = super(Process, self).dict()
+        data["mutable"] = self.type != ProcessType.BUILTIN
         data.pop("auth", None)  # remote preemptively just in case any deserialize fails to drop it
         return data
 

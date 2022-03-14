@@ -16,6 +16,8 @@ Changes:
   failed, or dismissed ``Job``.
 - Adjust conformance item references to correspond with `OGC API - Processes: Part 2` renamed from `Transactions` to
   `Deploy, Replace, Undeploy`.
+- Add ``mutable`` field to ``Process`` summary listing and detailed descriptions for conformance
+  (resolves `#180 <https://github.com/crim-ca/weaver/issues/180>`_).
 
 Fixes:
 ------
