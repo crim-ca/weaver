@@ -48,7 +48,7 @@ from weaver.exceptions import (
     PackageTypeError,
     PayloadNotFound
 )
-from weaver.formats import ContentType, get_cwl_file_format
+from weaver.formats import ContentType, get_cwl_file_format, repr_json
 from weaver.processes import opensearch
 from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_BUILTIN,
@@ -89,7 +89,6 @@ from weaver.utils import (
     get_settings,
     is_remote_file,
     load_file,
-    repr_json,
     request_extra,
     setup_loggers
 )

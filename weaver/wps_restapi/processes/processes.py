@@ -15,13 +15,13 @@ from pyramid.settings import asbool
 
 from weaver.database import get_db
 from weaver.exceptions import ProcessNotFound, ServiceException, log_unhandled_exceptions
-from weaver.formats import OutputFormat
+from weaver.formats import OutputFormat, repr_json
 from weaver.processes import opensearch
 from weaver.processes.execution import submit_job
 from weaver.processes.types import ProcessType
 from weaver.processes.utils import deploy_process_from_payload, get_job_submission_response, get_process
 from weaver.store.base import StoreProcesses
-from weaver.utils import fully_qualified_name, get_any_id, repr_json
+from weaver.utils import fully_qualified_name, get_any_id
 from weaver.visibility import Visibility
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.processes.utils import get_process_list_links, get_processes_filtered_by_valid_schemas

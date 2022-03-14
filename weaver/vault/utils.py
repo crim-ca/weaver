@@ -11,8 +11,9 @@ from pyramid.httpexceptions import HTTPBadRequest, HTTPForbidden, HTTPGone
 
 from weaver.database import get_db
 from weaver.datatype import VaultFile
+from weaver.formats import repr_json
 from weaver.store.base import StoreVault
-from weaver.utils import get_header, get_settings, get_weaver_url, is_uuid, repr_json
+from weaver.utils import get_header, get_settings, get_weaver_url, is_uuid
 from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
