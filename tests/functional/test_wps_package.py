@@ -64,7 +64,7 @@ IANA_TAR = IANA_NAMESPACE + ":" + ContentType.APP_TAR  # noqa # pylint: disable=
 IANA_ZIP = IANA_NAMESPACE + ":" + ContentType.APP_ZIP  # noqa # pylint: disable=unused-variable
 
 KNOWN_PROCESS_DESCRIPTION_FIELDS = {
-    "id", "title", "description", "keywords", "metadata", "inputs", "outputs",
+    "id", "title", "description", "mutable", "version", "keywords", "metadata", "inputs", "outputs",
     "executeEndpoint", "processDescriptionURL", "processEndpointWPS1", "visibility"
 }
 # intersection of fields in InputType and specific sub-schema LiteralInputType
