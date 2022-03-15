@@ -238,7 +238,7 @@ class WorkerService(ServiceWPS):
         data = wps2json_job_payload(wps_request, wps_process)
         body = submit_job_handler(data, self.settings, proc.processEndpointWPS1,
                                   process_id=pid, is_local=True, is_workflow=is_workflow, visibility=Visibility.PUBLIC,
-                                  language=wps_request.language, tags=tags, auth=dict(req.headers), context=ctx)
+                                  language=wps_request.language, tags=tags, headers=dict(req.headers), context=ctx)
 
         # if Accept was JSON, provide response content as is
         # if anything else (even */*), return as XML

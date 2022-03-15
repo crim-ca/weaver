@@ -3010,7 +3010,14 @@ class ExecuteInputOutputs(ExtendedMappingSchema):
 
 
 class Execute(ExecuteInputOutputs):
-    mode = JobExecuteModeEnum()
+    mode = JobExecuteModeEnum(
+        missing=drop,
+        description=(
+            "Desired execution mode specified directly. This is intended for backward compatibility support. "
+            "To obtain more control over execution mode selection, employ the official Prefer header instead "
+            "(see for more details: https://pavics-weaver.readthedocs.io/en/latest/processes.html#execution-mode)."
+        )
+    )
     notification_email = ExtendedSchemaNode(
         String(),
         missing=drop,
@@ -4299,6 +4306,20 @@ class CreatedLaunchJobResponse(ExtendedMappingSchema):
     body = CreatedJobStatusSchema()
 
 
+class CompletedJobLocationHeader(ResponseHeaders):
+    Location = URL(description="Status location of the completed job execution.")
+
+
+class CompletedJobStatusSchema(DescriptionSchema, JobStatusInfo):
+    pass
+
+
+class CompletedJobResponse(ExtendedMappingSchema):
+    description = "Job submitted and completed execution synchronously."
+    header = CompletedJobLocationHeader()
+    body = CompletedJobStatusSchema()
+
+
 class OkDeleteProcessJobResponse(ExtendedMappingSchema):
     header = ResponseHeaders()
     body = DismissedJobSchema()
@@ -4695,11 +4716,13 @@ post_provider_responses = {
     "501": NotImplementedPostProviderResponse(),
 }
 post_provider_process_job_responses = {
+    "200": CompletedJobResponse(description="success"),
     "201": CreatedLaunchJobResponse(description="success"),
     "403": ForbiddenProviderAccessResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 post_process_jobs_responses = {
+    "200": CompletedJobResponse(description="success"),
     "201": CreatedLaunchJobResponse(description="success"),
     "403": ForbiddenProviderAccessResponseSchema(),
     "500": InternalServerErrorResponseSchema(),

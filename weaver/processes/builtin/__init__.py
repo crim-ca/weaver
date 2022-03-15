@@ -14,6 +14,7 @@ from weaver import WEAVER_ROOT_DIR
 from weaver.database import get_db
 from weaver.datatype import Process
 from weaver.exceptions import PackageExecutionError, PackageNotFound, ProcessNotAccessible, ProcessNotFound
+from weaver.execute import ExecuteControlOption
 from weaver.processes.constants import CWL_REQUIREMENT_APP_BUILTIN
 from weaver.processes.types import ProcessType
 from weaver.processes.wps_package import PACKAGE_EXTENSIONS, get_process_definition
@@ -145,6 +146,7 @@ def register_builtin_processes(container):
             processDescriptionURL=process_url,
             processEndpointWPS1=get_wps_url(container),
             executeEndpoint="/".join([process_url, "jobs"]),
+            jobControlOptions=ExecuteControlOption.values(),
             visibility=Visibility.PUBLIC,
         ))
 

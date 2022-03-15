@@ -12,6 +12,10 @@ Changes
 
 Changes:
 --------
+- Support ``Prefer`` header with ``wait`` or ``respond-async`` directives to select ``Job`` execution mode either
+  as synchronous or asynchronous task, according to supported ``jobControlOptions`` of the relevant ``Process`` being
+  executed (resolves `#247 <https://github.com/crim-ca/weaver/issues/247>`_).
+- Increase minor version of all ``builtin`` processes that will now be executable in wither (a)synchronous modes.
 - Improve conformance for returned status codes and error messages when requesting results for an unfinished,
   failed, or dismissed ``Job``.
 - Adjust conformance item references to correspond with `OGC API - Processes: Part 2` renamed from `Transactions` to

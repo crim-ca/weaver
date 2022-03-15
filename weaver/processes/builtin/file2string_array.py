@@ -17,6 +17,11 @@ LOGGER = logging.getLogger(__name__)
 LOGGER.addHandler(logging.StreamHandler(sys.stdout))
 LOGGER.setLevel(logging.INFO)
 
+# process details
+__version__ = "1.1"
+__title__ = "File to String-Array"
+__abstract__ = __doc__  # NOTE: '__doc__' is fetched directly, this is mostly to be informative
+
 OUTPUT_CWL_JSON = "cwl.output.json"
 
 

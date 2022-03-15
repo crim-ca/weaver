@@ -12,7 +12,7 @@ from pyramid_celery import celery_app as app
 
 from weaver.database import get_db
 from weaver.datatype import Process, Service
-from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
+from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import AcceptLanguage, ContentType
 from weaver.notify import encrypt_email, notify_job_complete
 from weaver.owsexceptions import OWSNoApplicableCode
@@ -21,8 +21,18 @@ from weaver.processes.constants import WPS_COMPLEX_DATA
 from weaver.processes.convert import get_field, ows2json_output_data
 from weaver.processes.types import ProcessType
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
-from weaver.store.base import StoreJobs
-from weaver.utils import get_any_id, get_any_value, get_registry, get_settings, now, raise_on_xml_exception, wait_secs
+from weaver.store.base import StoreJobs, StoreProcesses
+from weaver.utils import (
+    get_any_id,
+    get_any_value,
+    get_header,
+    get_registry,
+    get_settings,
+    now,
+    parse_prefer_header_execute_mode,
+    raise_on_xml_exception,
+    wait_secs
+)
 from weaver.visibility import Visibility
 from weaver.wps.utils import (
     check_wps_status,
@@ -483,7 +493,7 @@ def submit_job(request, reference, tags=None):
     headers = dict(request.headers)
     settings = get_settings(request)
     return submit_job_handler(json_body, settings, service_url, provider_id, process_id, is_workflow, is_local,
-                              visibility, language=lang, auth=headers, tags=tags, user=user, context=context)
+                              visibility, language=lang, headers=headers, tags=tags, user=user, context=context)
 
 
 # FIXME: this should not be necessary if schema validators correctly implement OneOf(values)
@@ -516,7 +526,7 @@ def submit_job_handler(payload,             # type: JSON
                        is_local=True,       # type: bool
                        visibility=None,     # type: Optional[AnyVisibility]
                        language=None,       # type: Optional[str]
-                       auth=None,           # type: Optional[HeaderCookiesType]
+                       headers=None,        # type: Optional[HeaderCookiesType]
                        tags=None,           # type: Optional[List[str]]
                        user=None,           # type: Optional[int]
                        context=None,        # type: Optional[str]
@@ -533,37 +543,58 @@ def submit_job_handler(payload,             # type: JSON
 
     # TODO: remove when all parameter variations are supported
     # FIXME:
-    #   - support 'sync' and 'Prefer' header variants (https://github.com/crim-ca/weaver/issues/247)
     #   - support 'response: raw' (https://github.com/crim-ca/weaver/issues/376)
     #   - allow omitting 'outputs' (https://github.com/crim-ca/weaver/issues/375)
     _validate_job_parameters(json_body)
+    db = get_db(settings)
+    headers = headers or {}
+    if is_local:
+        proc_store = db.get_store(StoreProcesses)
+        process = proc_store.fetch_by_id(process_id)
+        job_ctl_opts = process.jobControlOptions
+    else:
+        job_ctl_opts = ExecuteControlOption.values()
+    mode, wait, applied = parse_prefer_header_execute_mode(headers, job_ctl_opts)
+    get_header("prefer", headers, pop=True)
 
     is_execute_async = ExecuteMode.get(json_body["mode"]) != ExecuteMode.SYNC   # convert auto to async
     notification_email = json_body.get("notification_email")
     encrypted_email = encrypt_email(notification_email, settings) if notification_email else None
 
-    store = get_db(settings).get_store(StoreJobs)
+    store = db.get_store(StoreJobs)  # type: StoreJobs
     job = store.save_job(task_id=Status.ACCEPTED, process=process_id, service=provider_id,
                          inputs=json_body.get("inputs"), is_local=is_local, is_workflow=is_workflow,
                          access=visibility, user_id=user, execute_async=is_execute_async, custom_tags=tags,
                          notification_email=encrypted_email, accept_language=language, context=context)
     job.save_log(logger=LOGGER, message="Job task submitted for execution.", status=Status.ACCEPTED, progress=0)
     job = store.update_job(job)
-    result = execute_process.delay(job_id=job.id, wps_url=clean_ows_url(service_url), headers=auth)
-    LOGGER.debug("Celery pending task [%s] for job [%s].", result.id, job.id)
-
-    # local/provider process location
     location_base = "/providers/{provider_id}".format(provider_id=provider_id) if provider_id else ""
-    location = "{base_url}{location_base}/processes/{process_id}/jobs/{job_id}".format(
+    location_url = "{base_url}{location_base}/processes/{process_id}/jobs/{job_id}".format(
         base_url=get_wps_restapi_base_url(settings),
         location_base=location_base,
         process_id=process_id,
-        job_id=job.id)
-    body_data = {
+        job_id=job.id
+    )
+
+    result = execute_process.delay(job_id=job.id, wps_url=clean_ows_url(service_url), headers=headers)
+    LOGGER.debug("Celery pending task [%s] for job [%s].", result.id, job.id)
+    if mode == ExecuteMode.SYNC and wait:
+        LOGGER.debug("Celery task requested as sync if it completes before (wait=%ss)", wait)
+        result.wait(timeout=wait)
+        if result.ready():
+            job = store.fetch_by_id(job.id)
+            body = job.json(container=settings, self_link="status")
+            body["location"] = location_url
+            return body
+        else:
+            LOGGER.debug("Celery task requested as sync took too long to complete (wait=%ss). Continue in async.", wait)
+
+    LOGGER.debug("Celery task submitted to run async.", wait)
+    body = {
         "jobID": job.id,
         "processID": job.process,
         "providerID": provider_id,  # dropped by validator if not applicable
         "status": map_status(Status.ACCEPTED),
-        "location": location
+        "location": location_url
     }
-    return body_data
+    return body
