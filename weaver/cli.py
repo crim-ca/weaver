@@ -548,10 +548,6 @@ class WeaverClient(object):
             auth_headers = {sd.XAuthVaultFileHeader.name: multi_tokens}
         return update_inputs, auth_headers
 
-    # FIXME: support sync (https://github.com/crim-ca/weaver/issues/247)
-    # :param execute_async:
-    #   Execute the process asynchronously (user must call :meth:`monitor` themselves,
-    #   or synchronously where monitoring is done automatically until completion before returning.
     def execute(self,
                 process_id,             # type: str
                 inputs=None,            # type: Optional[Union[str, JSON]]
@@ -576,6 +572,12 @@ class WeaverClient(object):
 
         .. seealso::
             :ref:`proc_op_execute`
+
+        .. note::
+            Execution requests are always accomplished asynchronously. To obtain the final :term:`Job` status as if
+            they were executed synchronously, provide the :paramref:`monitor` argument. This offers more flexibility
+            over servers that could decide to ignore sync/async preferences, and avoids closing/timeout connection
+            errors that could occur for long running processes, since status is pooled iteratively rather than waiting.
 
         :param process_id: Identifier of the process to execute.
         :param inputs:
@@ -605,8 +607,7 @@ class WeaverClient(object):
             return result
         values, auth_headers = result
         data = {
-            # NOTE: since sync is not yet properly implemented in Weaver, simulate with monitoring after if requested
-            # FIXME: support 'sync' (https://github.com/crim-ca/weaver/issues/247)
+            # NOTE: Backward compatibility for servers that only know ``mode`` and don't handle ``Prefer`` header.
             "mode": ExecuteMode.ASYNC,
             "inputs": values,
             # FIXME: support 'response: raw' (https://github.com/crim-ca/weaver/issues/376)
@@ -627,7 +628,7 @@ class WeaverClient(object):
 
         LOGGER.info("Executing [%s] with inputs:\n%s", process_id, OutputFormat.convert(values, OutputFormat.JSON_STR))
         path = f"{base}/processes/{process_id}/execution"  # use OGC-API compliant endpoint (not '/jobs')
-        headers = {}
+        headers = {"Prefer": "respond-async"}  # for more recent servers, OGC-API compliant async request
         headers.update(self._headers)
         headers.update(auth_headers)
         resp = request_extra("POST", path, json=data, headers=headers, settings=self._settings)
@@ -1216,11 +1217,6 @@ def make_parser():
             Example: ``-I message='Hello Weaver' -I value:int=1234``
         """)
     )
-    # FIXME: support sync (https://github.com/crim-ca/weaver/issues/247)
-    # op_execute.add_argument(
-    #     "-A", "--async", dest="execute_async",
-    #     help=""
-    # )
     op_execute.add_argument(
         "-M", "--monitor", dest="monitor", action="store_true",
         help="Automatically perform the monitoring operation following job submission to retrieve final results. "
