@@ -616,7 +616,6 @@ class WeaverClient(object):
             # FIXME: allow 'transmissionMode: value/reference' selection (https://github.com/crim-ca/weaver/issues/377)
             "outputs": {}
         }
-        # FIXME: since (https://github.com/crim-ca/weaver/issues/375) not implemented, auto-populate all the outputs
         result = self.describe(process_id, url=base)
         if not result.success:
             return OperationResult(False, "Could not obtain process description for execution.",
