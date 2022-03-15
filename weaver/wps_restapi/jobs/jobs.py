@@ -32,7 +32,7 @@ from weaver.exceptions import (
     log_unhandled_exceptions
 )
 from weaver.formats import ContentType, OutputFormat, get_format, repr_json
-from weaver.owsexceptions import OWSNotFound
+from weaver.owsexceptions import OWSNoApplicableCode, OWSNotFound
 from weaver.processes.convert import any2wps_literal_datatype
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
@@ -451,10 +451,64 @@ def get_job_status(request):
     return HTTPOk(json=job_status)
 
 
+def raise_job_bad_status(job, container=None):
+    # type: (Job, Optional[AnySettingsContainer]) -> None
+    """
+    Raise the appropriate message for :term:`Job` not ready or unable to retrieve output results due to status.
+    """
+    if job.status != Status.SUCCEEDED:
+        links = job.links(container=container)
+        if job.status == Status.FAILED:
+            err_code = None
+            err_info = None
+            err_known_modules = [
+                "pywps.exceptions",
+                "owslib.wps",
+                "weaver.exceptions",
+                "weaver.owsexceptions",
+            ]
+            # try to infer the cause, fallback to generic error otherwise
+            for error in job.exceptions:
+                try:
+                    if isinstance(error, dict):
+                        err_code = error.get("Code")
+                        err_info = error.get("Text")
+                    elif isinstance(error, str) and any(error.startswith(mod) for mod in err_known_modules):
+                        err_code, err_info = error.split(":", 1)
+                        err_code = err_code.split(".")[-1].strip()
+                        err_info = err_info.strip()
+                except Exception:
+                    err_code = None
+                if err_code:
+                    break
+            if not err_code:  # default
+                err_code = OWSNoApplicableCode.code
+                err_info = "unknown"
+            # /req/core/job-results-failed
+            raise HTTPBadRequest(json={
+                "title": "JobResultsFailed",
+                "type": err_code,
+                "detail": "Job results not available because execution failed.",
+                "status": HTTPBadRequest.code,
+                "cause": err_info,
+                "links": links
+            })
+
+        # /req/core/job-results-exception/results-not-ready
+        raise HTTPBadRequest(json={
+            "title": "JobResultsNotReady",
+            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/result-not-ready",
+            "detail": "Job is not ready to obtain results.",
+            "status": HTTPBadRequest.code,
+            "cause": {"status": job.status},
+            "links": links
+        })
+
+
 def raise_job_dismissed(job, container=None):
     # type: (Job, Optional[AnySettingsContainer]) -> None
     """
-    Raise the appropriate messages for dismissed job status.
+    Raise the appropriate messages for dismissed :term:`Job` status.
     """
     if job.status == Status.DISMISSED:
         # provide the job status links since it is still available for reference
@@ -463,9 +517,12 @@ def raise_job_dismissed(job, container=None):
         job_links = [link for link in job_links if link["rel"] in ["status", "alternate", "collection", "up"]]
         raise JobGone(
             json={
-                "code": "JobDismissed",
-                "description": "Job was dismissed and artifacts have been removed.",
-                "value": job.id,
+                "title": "JobDismissed",
+                "type": "JobDismissed",
+                "status": JobGone.code,
+                "detail": "Job was dismissed and artifacts have been removed.",
+                "cause": {"status": job.status},
+                "value": str(job.id),
                 "links": job_links
             }
         )
@@ -476,9 +533,14 @@ def dismiss_job_task(job, container):
     """
     Cancels any pending or running :mod:`Celery` task and removes completed job artifacts.
 
-    :param job: job to cancel or cleanup.
-    :param container:
-    :return:
+    .. note::
+        The :term:`Job` object itself is not deleted, only its artifacts.
+        Therefore, its inputs, outputs, logs, exceptions, etc. are still available in the database,
+        but corresponding files that would be exposed by ``weaver.wps_output`` configurations are removed.
+
+    :param job: Job to cancel or cleanup.
+    :param container: Application settings.
+    :return: Updated and dismissed job.
     """
     raise_job_dismissed(job, container)
     if job.status in JOB_STATUS_CATEGORIES[StatusCategory.RUNNING]:
@@ -615,6 +677,7 @@ def get_job_outputs(request):
     """
     job = get_job(request)
     raise_job_dismissed(job, request)
+    raise_job_bad_status(job, request)
     schema = request.params.get("schema")
     outputs = {"outputs": get_results(job, request, schema=str(schema).replace(" ", "+"))}  # unescape query
     outputs.update({"links": job.links(request, self_link="outputs")})
@@ -636,6 +699,7 @@ def get_job_results(request):
     """
     job = get_job(request)
     raise_job_dismissed(job, request)
+    raise_job_bad_status(job, request)
     job_status = map_status(job.status)
     if job_status in JOB_STATUS_CATEGORIES[StatusCategory.RUNNING]:
         raise HTTPNotFound(json={

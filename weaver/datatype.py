@@ -972,13 +972,13 @@ class Job(Base):
     results = property(_get_results, _set_results)
 
     def _get_exceptions(self):
-        # type: () -> List[Optional[Dict[str, str]]]
+        # type: () -> List[Union[str, Dict[str, str]]]
         if self.get("exceptions") is None:
             self["exceptions"] = list()
         return dict.__getitem__(self, "exceptions")
 
     def _set_exceptions(self, exceptions):
-        # type: (List[Optional[Dict[str, str]]]) -> None
+        # type: (List[Union[str, Dict[str, str]]]) -> None
         if not isinstance(exceptions, list):
             raise TypeError(f"Type 'list' is required for '{self.__name__}.exceptions'")
         self["exceptions"] = exceptions
@@ -1849,6 +1849,14 @@ class Process(Base):
         Type of process amongst :mod:`weaver.processes.types` definitions.
         """
         return self.get("type", ProcessType.APPLICATION)
+
+    @property
+    def mutable(self):
+        # type: () -> bool
+        """
+        Indicates if a process can be modified.
+        """
+        return self.type != ProcessType.BUILTIN
 
     @property
     def package(self):

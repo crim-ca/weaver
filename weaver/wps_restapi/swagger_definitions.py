@@ -121,6 +121,7 @@ PROCESS_DESCRIPTION_FIELD_FIRST = [
     "id",
     "title",
     "version",
+    "mutable",
     "abstract",  # backward compat for deployment
     "description",
     "keywords",
@@ -145,6 +146,7 @@ PROVIDER_DESCRIPTION_FIELD_FIRST = [
     "id",
     "title",
     "version",
+    "mutable",
     "description",
     "url",
     "type",
@@ -943,6 +945,9 @@ class DeployMinMaxOccurs(ExtendedMappingSchema):
 class ProcessDescriptionType(DescriptionBase, DescriptionExtra):
     id = ProcessIdentifier()
     version = Version(missing=drop)
+    mutable = ExtendedSchemaNode(Boolean(), default=True, description=(
+        "Indicates if the process is mutable (dynamically deployed), or immutable (builtin with this instance)."
+    ))
 
 
 class InputIdentifierType(ExtendedMappingSchema):
@@ -3670,11 +3675,23 @@ class JobOutputsBody(ExtendedMappingSchema):
     links = LinkList(missing=drop)
 
 
-class JobException(ExtendedMappingSchema):
-    # note: test fields correspond exactly to 'owslib.wps.WPSException', they are deserialized as is
+class JobExceptionPlain(ExtendedSchemaNode):
+    schema_type = String
+    description = "Generic exception description corresponding to any error message."
+
+
+class JobExceptionDetailed(ExtendedMappingSchema):
+    description = "Fields correspond exactly to 'owslib.wps.WPSException' represented as dictionary."
     Code = ExtendedSchemaNode(String())
     Locator = ExtendedSchemaNode(String(), default=None)
     Text = ExtendedSchemaNode(String())
+
+
+class JobException(OneOfKeywordSchema):
+    _one_of = [
+        JobExceptionDetailed(),
+        JobExceptionPlain()
+    ]
 
 
 class JobExceptionsSchema(ExtendedSequenceSchema):

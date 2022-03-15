@@ -149,7 +149,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
                       user_id=self.user_editor1_id, status=Status.STARTED, progress=99, access=Visibility.PUBLIC)
 
     def make_job(self, task_id, process, service, user_id, status, progress, access,
-                 created=None, offset=None, duration=None):
+                 created=None, offset=None, duration=None, exceptions=None):
         if isinstance(created, str):
             created = date_parser.parse(created)
         job = self.job_store.save_job(task_id=task_id, process=process, service=service, is_workflow=False,
@@ -161,6 +161,8 @@ class WpsRestApiJobsTest(unittest.TestCase):
         if status in JOB_STATUS_CATEGORIES[StatusCategory.FINISHED]:
             job["finished"] = job.updated
         job.progress = progress
+        if exceptions is not None:
+            job.exceptions = exceptions
         job = self.job_store.update_job(job)
         self.job_info.append(job)
         return job
@@ -1308,3 +1310,59 @@ class WpsRestApiJobsTest(unittest.TestCase):
             resp = self.app.get(path, headers=self.json_headers)
             assert resp.status_code == 200
             assert resp.json["status"] == Status.DISMISSED, "Job status should have been updated to dismissed."
+
+    def test_job_results_errors(self):
+        """
+        Validate errors returned for a incomplete, failed or dismissed job when requesting its results.
+        """
+        job_accepted = self.make_job(
+            task_id="1111-0000-0000-0000", process=self.process_public.identifier, service=None,
+            user_id=None, status=Status.ACCEPTED, progress=0, access=Visibility.PUBLIC
+        )
+        job_running = self.make_job(
+            task_id="1111-0000-0000-1111", process=self.process_public.identifier, service=None,
+            user_id=None, status=Status.RUNNING, progress=10, access=Visibility.PUBLIC
+        )
+        job_failed_str = self.make_job(
+            task_id="1111-0000-0000-2222", process=self.process_public.identifier, service=None,
+            user_id=None, status=Status.FAILED, progress=50, access=Visibility.PUBLIC,
+            exceptions=[
+                "random",
+                "pywps.exceptions.MissingParameterValue: 400 MissingParameterValue: input",
+                "ignore"
+            ]
+        )
+        job_failed_json = self.make_job(
+            task_id="1111-0000-0000-3333", process=self.process_public.identifier, service=None,
+            user_id=None, status=Status.FAILED, progress=50, access=Visibility.PUBLIC,
+            exceptions=[
+                {},
+                {"error": "bad"},
+                {"Code": "InvalidParameterValue", "Locator": "None", "Text": "Input type invalid."}
+            ]
+        )
+        job_failed_none = self.make_job(
+            task_id="1111-0000-0000-4444", process=self.process_public.identifier, service=None,
+            user_id=None, status=Status.FAILED, progress=50, access=Visibility.PUBLIC, exceptions=[]
+        )
+        job_dismissed = self.make_job(
+            task_id="1111-0000-0000-5555", process=self.process_public.identifier, service=None,
+            user_id=None, status=Status.DISMISSED, progress=50, access=Visibility.PUBLIC
+        )
+
+        for code, job, title, error_type, cause in [
+            (400, job_accepted, "JobResultsNotReady", "result-not-ready", {"status": Status.ACCEPTED}),
+            (400, job_running, "JobResultsNotReady", "result-not-ready", {"status": Status.RUNNING}),
+            (400, job_failed_str, "JobResultsFailed", "MissingParameterValue", "400 MissingParameterValue: input"),
+            (400, job_failed_json, "JobResultsFailed", "InvalidParameterValue", "Input type invalid."),
+            (400, job_failed_none, "JobResultsFailed", "NoApplicableCode", "unknown"),
+            (410, job_dismissed, "JobDismissed", "JobDismissed", {"status": Status.DISMISSED}),
+        ]:
+            for what in ["outputs", "results"]:
+                path = f"/jobs/{job.id}/{what}"
+                resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+                assert resp.status_code == code, f"Failed using [{path}]"
+                assert resp.json["title"] == title
+                assert resp.json["cause"] == cause
+                assert resp.json["type"].endswith(error_type)  # ignore http full reference, not always there
+                assert "links" in resp.json

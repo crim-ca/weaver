@@ -189,8 +189,12 @@ class MongodbServiceStore(StoreServices, MongodbStore):
 class ListingMixin(object):
     @staticmethod
     def _apply_paging_pipeline(page, limit):
-        # type: (int, int) -> List[MongodbSearchStep]
-        return [{"$skip": page * limit}, {"$limit": limit}]
+        # type: (Optional[int], Optional[int]) -> List[MongodbSearchStep]
+        if isinstance(page, int) and isinstance(limit, int):
+            return [{"$skip": page * limit}, {"$limit": limit}]
+        if page is None and isinstance(limit, int):
+            return [{"$limit": limit}]
+        return []
 
     @staticmethod
     def _apply_sort_method(sort_field, sort_default, sort_allowed):
@@ -484,9 +488,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         sort_method = {"$sort": self._apply_sort_method(sort, Sort.ID_LONG, sort_allowed)}
 
         search_pipeline = [{"$match": search_filters}, sort_method]
-        paging_pipeline = []
-        if page is not None and limit is not None:
-            paging_pipeline = self._apply_paging_pipeline(page, limit)
+        paging_pipeline = self._apply_paging_pipeline(page, limit)
         if total:
             pipeline = self._apply_total_result(search_pipeline, paging_pipeline)
         else:
@@ -682,8 +684,8 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
                   notification_email=None,  # type: Optional[str]
                   status=None,              # type: Optional[str]
                   sort=None,                # type: Optional[str]
-                  page=0,                   # type: int
-                  limit=10,                 # type: int
+                  page=0,                   # type: Optional[int]
+                  limit=10,                 # type: Optional[int]
                   min_duration=None,        # type: Optional[int]
                   max_duration=None,        # type: Optional[int]
                   datetime_interval=None,   # type: Optional[DatetimeIntervalType]
@@ -704,6 +706,9 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
 
         Where ``<total>`` will indicate the complete count of matched jobs with filters, but the list of jobs
         will be limited only to ``page`` index and ``limit`` specified.
+
+        Limit and paging can be disabled by setting them to ``None``.
+        Paging must always be combined with limit, but limit can be employed by itself.
 
         Using grouping with a list of field specified with ``group_by``, results will be in the form.
 
@@ -731,7 +736,7 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
         :param status: status to filter matching jobs.
         :param sort: field which is used for sorting results (default: creation date, descending).
         :param page: page number to return when using result paging (only when not using ``group_by``).
-        :param limit: number of jobs per page when using result paging (only when not using ``group_by``).
+        :param limit: number of jobs (per page or total) when using result paging (only when not using ``group_by``).
         :param min_duration: minimal duration (seconds) between started time and current/finished time of jobs to find.
         :param max_duration: maximum duration (seconds) between started time and current/finished time of jobs to find.
         :param datetime_interval: field used for filtering data by creation date with a given date or interval of date.
@@ -800,7 +805,7 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
         return items, total
 
     def _find_jobs_paging(self, search_pipeline, page, limit):
-        # type: (MongodbSearchPipeline, int, int) -> Tuple[List[Job], int]
+        # type: (MongodbSearchPipeline, Optional[int], Optional[int]) -> Tuple[List[Job], int]
         """
         Retrieves jobs limited by specified paging parameters and predefined search pipeline filters.
         """
