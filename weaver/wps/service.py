@@ -236,9 +236,11 @@ class WorkerService(ServiceWPS):
         is_workflow = proc.type == ProcessType.WORKFLOW
         tags = req.args.get("tags", "").split(",") + ["xml", "wps-{}".format(wps_request.version)]
         data = wps2json_job_payload(wps_request, wps_process)
-        body = submit_job_handler(data, self.settings, proc.processEndpointWPS1,
-                                  process_id=pid, is_local=True, is_workflow=is_workflow, visibility=Visibility.PUBLIC,
-                                  language=wps_request.language, tags=tags, headers=dict(req.headers), context=ctx)
+        body, headers = submit_job_handler(
+            data, self.settings, proc.processEndpointWPS1,
+            process_id=pid, is_local=True, is_workflow=is_workflow, visibility=Visibility.PUBLIC,
+            language=wps_request.language, tags=tags, headers=dict(req.headers), context=ctx
+        )
 
         # if Accept was JSON, provide response content as is
         # if anything else (even */*), return as XML
@@ -247,7 +249,7 @@ class WorkerService(ServiceWPS):
         #   way to provide explicitly Accept header. Even our Wps1Process as Workflow step depends on this behaviour.
         accept_type = get_header("Accept", req.headers)
         if accept_type == ContentType.APP_JSON:
-            resp = get_job_submission_response(body)
+            resp = get_job_submission_response(body, headers)
             setattr(resp, "_update_status", lambda *_, **__: None)  # patch to avoid pywps server raising
             return resp
 

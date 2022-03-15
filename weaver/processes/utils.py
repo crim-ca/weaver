@@ -42,7 +42,7 @@ from weaver.exceptions import (
 from weaver.processes.types import ProcessType
 from weaver.status import JOB_STATUS_CATEGORIES, StatusCategory, map_status
 from weaver.store.base import StoreProcesses, StoreServices
-from weaver.utils import get_sane_name, get_settings, get_url_without_query
+from weaver.utils import get_header, get_sane_name, get_settings, get_url_without_query
 from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_client
 from weaver.wps_restapi import swagger_definitions as sd
@@ -103,8 +103,8 @@ def get_process(process_id=None, request=None, settings=None, store=None):
         raise HTTPBadRequest("Invalid schema:\n[{0!r}].".format(ex))
 
 
-def get_job_submission_response(body):
-    # type: (JSON) -> Union[HTTPOk, HTTPCreated]
+def get_job_submission_response(body, headers):
+    # type: (JSON, AnyHeadersContainer) -> Union[HTTPOk, HTTPCreated]
     """
     Generates the successful response from contents returned by :term:`Job` submission process.
 
@@ -118,14 +118,15 @@ def get_job_submission_response(body):
         :func:`weaver.processes.execution.submit_job_handler`
     """
     status = map_status(body.get("status"))
+    location = get_header("location", headers)
     if status in JOB_STATUS_CATEGORIES[StatusCategory.FINISHED]:
         body["description"] = sd.CompletedJobResponse.description
         body = sd.CompletedJobStatusSchema().deserialize(body)
-        return HTTPOk(location=body["location"], json=body)
+        return HTTPOk(location=location, json=body, headers=headers)
 
     body["description"] = sd.CreatedLaunchJobResponse.description
     body = sd.CreatedJobStatusSchema().deserialize(body)
-    return HTTPCreated(location=body["location"], json=body)
+    return HTTPCreated(location=location, json=body, headers=headers)
 
 
 def map_progress(progress, range_min, range_max):

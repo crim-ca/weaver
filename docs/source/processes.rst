@@ -30,6 +30,8 @@ Each one of them are accessible through the same API interface, but they have di
     and :ref:`Execute <proc_op_execute>` request payloads for diverse set of applications.
 
 
+.. _proc_builtin:
+
 Builtin
 -------
 
@@ -54,6 +56,8 @@ As of the latest release, following `builtin` processes are available:
 
 All `builtin` processes are marked with :py:data:`weaver.processes.constants.CWL_REQUIREMENT_APP_BUILTIN` in the
 :term:`CWL` ``hints`` section and are all defined in :py:mod:`weaver.processes.builtin`.
+
+.. _proc_wps_12:
 
 WPS-1/2
 -------
@@ -99,7 +103,7 @@ Please refer to :ref:`Configuration of WPS Processes` section for more details o
 .. seealso::
     - `Remote Provider`_
 
-.. _process-wps-rest:
+.. _proc_wps_rest:
 
 WPS-REST
 --------
@@ -189,7 +193,7 @@ Where the referenced file hosted at ``"https://remote-file-server.com/my-package
     "<...>": "<...>"
 
 
-.. _process-esgf-cwt:
+.. _proc_esgf_cwt:
 
 ESGF-CWT
 ----------
@@ -263,7 +267,7 @@ be indicated in the logs with the appropriate step and message where the error o
     :ref:`proc_workflow_ops` provides more details on each of the internal operations accomplished by
     individual step :term:`Process` chained in a :term:`Workflow`.
 
-.. _process-remote-provider:
+.. _proc_remote_provider:
 
 Remote Provider
 --------------------
@@ -317,7 +321,7 @@ An example body of the `register provider`_ request could be as follows:
     }
 
 
-Then, processes of this registered :ref:`process-remote-provider` will be accessible. For example, if the referenced
+Then, processes of this registered :ref:`proc_remote_provider` will be accessible. For example, if the referenced
 service by the above URL add a WPS process identified by ``my-process``, its JSON description would be obtained with
 following request (`DescribeProviderProcess`_):
 
@@ -466,8 +470,20 @@ and parametrization of various input/output combinations. Let's employ the follo
     Other parameters can be added to the request to provide further functionalities. Above fields are the minimum
     requirements to request a :term:`Job`. Please refer to the |exec-api|_ definition for all applicable features.
 
-Basic Details
-~~~~~~~~~~~~~~~~~
+.. seealso::
+    - :ref:`proc_exec_body` and :ref:`proc_exec_mode` details applicable for `Weaver` specifically.
+    - `OGC API - Processes, Process Outputs <https://docs.ogc.org/is/18-062r2/18-062r2.html#sc_process_outputs>`_
+      for more general details on ``transmissionMode`` parameter.
+    - `OGC API - Processes, Execution Mode <https://docs.ogc.org/is/18-062r2/18-062r2.html#sc_execution_mode>`_
+      for more general details on the execution negotiation (formerly with ``mode`` parameter) and more recently
+      with ``Prefer`` header.
+    - `OGC API - Processes, Response <https://docs.ogc.org/is/18-062r2/18-062r2.html#sc_execute_response>`_
+      for a complete listing of available ``response`` formats considering all other parameters.
+
+.. _proc_exec_body:
+
+Execution Body
+~~~~~~~~~~~~~~~~~~
 
 The ``inputs`` definition is the most important section of the request body. It is also the only one that is completely
 required when submitting the execution request, even for a no-input process (an empty mapping is needed in such case).
@@ -485,6 +501,20 @@ report the produced outputs from a successful :term:`Job` completion. For the ti
 stored locally and exposed externally with returned reference URL. The other mode ``value`` returns the contents
 directly in the response instead of the URL.
 
+When ``outputs`` section is omitted, it simply means that the :term:`Process` to be executed should return all
+outputs it offers in the created :ref:`Job Results <proc_op_result>`. In such case, because no representation modes
+is specified for individual outputs, `Weaver` automatically selects ``reference`` as it makes all outputs more easily
+accessible with distinct URL afterwards. If the ``outputs`` section is specified, but that one of the outputs defined
+in the :ref:`Process Description <proc_op_describe>` is not specified, that output should be omitted from the produced
+results. For the time being, because only ``reference`` representation is offered for produced output files, this
+filtering is not implemented as it offers no additional advantage for files accessed directly with their distinct URLs.
+This could be added later if ``Multipart`` raw data representation is required.
+Please |submit-issue|_ to request this feature if it is relevant for your use-cases.
+
+.. fixme::
+    Filtering not implemented (everything always available).
+    https://github.com/crim-ca/weaver/issues/380
+
 .. fixme::
     Transmission mode ``value`` not implemented. Only ``reference`` is supported.
     https://github.com/crim-ca/weaver/issues/377
@@ -496,21 +526,6 @@ directly in the response instead of the URL.
     Response representation mode ``raw`` to be implemented.
     https://github.com/crim-ca/weaver/issues/376
 
-.. fixme::
-    When ``outputs`` section is omitted, it simply means that the :term:`Process` to be executed should return all
-    outputs it offers in the created :ref:`Job Results <proc_op_result>`. Because no representation modes is specified
-    for individual outputs, `Weaver` automatically selects ``reference`` as it makes all outputs more easily accessible
-    with distinct URL afterwards. If the ``outputs`` section is specified, but that one of the outputs defined in the
-    :ref:`Process Description <proc_op_describe>` is not specified, that output should be omitted from the produced
-    results. For the time being, because only ``reference`` representation is offered for produced output files, this
-    filtering is not implemented as it offers no additional advantage that accessing files directly with their distinct
-    URLs. This could be added later if `Multipart` raw data representation is required.
-    Please |submit-issue|_ to request this feature if it is relevant for your use-cases.
-
-    Filtering not implemented (everything always available).
-    https://github.com/crim-ca/weaver/issues/380
-
-
 .. |exec-api| replace:: OpenAPI Execute
 .. _exec-api: `exec-req`_
 
@@ -520,14 +535,28 @@ directly in the response instead of the URL.
 Execution Mode
 ~~~~~~~~~~~~~~~~~~~~~
 
-.. todo:: Prefer Header details
+In order to select how to execute a :term:`Process`, either `synchronously` or `asynchronously`, the ``Prefer`` header
+should be specified. If omitted, `Weaver` defaults to `asynchronous` execution. To execute `asynchronously` explicitly,
+``Prefer: respond-async`` should be used. Otherwise, the `synchronous` execution can be requested
+with ``Prefer: wait=X`` where ``X`` is the duration in seconds to wait for a response. If no worker becomes available
+within that time, or if this value is greater than ``weaver.exec_sync_max_wait``, the :term:`Job` will resume
+`asynchronously` and the response will be returned. Furthermore, `synchronous` and `asynchronous` execution of
+a :term:`Process` can only be requested for corresponding ``jobControlOptions`` it reports as supported in
+its :ref:`Process Description <proc_op_describe>`. It is important to provide the ``jobControlOptions`` parameter with
+applicable modes when :ref:`Deploying a Process <proc_op_deploy>` to allow it to run as desired. By default, `Weaver`
+will assume that deployed processes are only `asynchronous` to handle longer operations.
+
+.. versionchanged::
+    By default, every :ref:`proc_builtin` :term:`Process` can accept both modes.
+    All previously deployed processes will only allow `asynchronous` execution, as only this one was supported.
+    This should be reported in their ``jobControlOptions``.
 
 .. warning::
     It is important to remember that the ``Prefer`` header is indeed a *preference*. If `Weaver` deems it cannot
     allocate a worker to execute the task `synchronously` within a reasonable delay, it can enforce the `asynchronous`
     execution. The `asynchronous` mode is also *prioritized* for running longer :term:`Job` submitted over the task
     queue, as this allows `Weaver` to offer better availability for all requests submitted by its users.
-    The `synchronous` mode should be reserved only for very quick and relatively low computation intensive executions.
+    The `synchronous` mode should be reserved only for very quick and relatively low computation intensive operations.
 
 The ``mode`` field displayed in the body is another method to tell whether to run the :term:`Process` in a blocking
 (``sync``) or non-blocking (``async``) manner. Note that support is limited for mode ``sync`` as this use case is often
@@ -536,14 +565,14 @@ to run the :term:`Job` (otherwise it fails immediately due to lack of processing
 for the *whole* execution to complete to obtain the result. Given that :term:`Process` could take a very long time to
 complete, it is not practical to execute them in this manner and potentially have to wait hours to retrieve outputs.
 Instead, the preferred and default approach is to request an ``async`` :term:`Job` execution. When doing so, `Weaver`
-will add this to a task queue for processing, and will immediately return a :term:`Job` identifier and location where
-the user can probe for its status, using :ref:`Monitoring <proc_op_monitor>` request. As soon as any task worker becomes
-available, it will pick any leftover queued :term:`Job` to execute it.
+will add this to a task queue for processing, and will immediately return a :term:`Job` identifier and ``Location``
+where the user can probe for its status, using :ref:`Monitoring <proc_op_monitor>` request. As soon as any task worker
+becomes available, it will pick any leftover queued :term:`Job` to execute it.
 
 .. note::
     The ``mode`` field is an older methodology that precedes the official :term:`OGC API - Processes` method using
-    the ``Prefer`` header. It is recommended to employ the ``Prefer`` header that ensures higher interoperability with
-    other services using the same standard. The ``mode`` field is deprecated and preserved only for backward
+    the ``Prefer`` header. It is recommended to employ the ``Prefer`` header that ensures higher interoperability
+    with other services using the same standard. The ``mode`` field is deprecated and preserved only for backward
     compatibility purpose.
 
 When requesting a `synchronous` execution, and provided a worker was available to pick and complete the task before
@@ -742,7 +771,7 @@ combinations.
 | |ADES|    | - `WPS-1/2`_                              | |file_scheme| | Convert to |http_scheme| [#file2http]_    |
 |           | - `ESGF-CWT`_                             +---------------+-------------------------------------------+
 |           | - `WPS-REST`_ (remote) [#wps3]_           | |http_scheme| | Nothing (unmodified)                      |
-|           | - :ref:`process-remote-provider`          +---------------+-------------------------------------------+
+|           | - :ref:`proc_remote_provider`             +---------------+-------------------------------------------+
 |           |                                           | |s3_scheme|   | Fetch and convert to |http_scheme| [#s3]_ |
 |           |                                           +---------------+-------------------------------------------+
 |           |                                           | |vault_ref|   | Convert to |http_scheme| [#vault2http]_   |
@@ -766,7 +795,7 @@ combinations.
 | |HYBRID|  | - `WPS-1/2`_                              | |file_scheme| | Convert to |http_scheme| [#file2http]_    |
 |           | - `ESGF-CWT`_                             +---------------+-------------------------------------------+
 |           | - `WPS-REST`_ (remote) [#wps3]_           | |http_scheme| | Nothing (unmodified)                      |
-|           | - :ref:`process-remote-provider`          +---------------+-------------------------------------------+
+|           | - :ref:`proc_remote_provider`             +---------------+-------------------------------------------+
 |           |                                           | |s3_scheme|   | Fetch and convert to |http_scheme| [#s3]_ |
 |           | *Note*: |HYBRID| assumes |ADES| role      +---------------+-------------------------------------------+
 |           | (remote processes)                        | |vault_ref|   | Convert to |http_scheme| [#vault2http]_   |

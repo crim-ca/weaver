@@ -215,5 +215,5 @@ def submit_provider_job(request):
     store = get_db(request).get_store(StoreServices)
     provider_id = request.matchdict.get("provider_id")
     service = store.fetch_by_name(provider_id)
-    body = submit_job(request, service, tags=["wps-rest"])
-    return get_job_submission_response(body)
+    body, headers = submit_job(request, service, tags=["wps-rest"])
+    return get_job_submission_response(body, headers)

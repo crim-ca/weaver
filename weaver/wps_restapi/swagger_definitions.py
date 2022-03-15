@@ -3000,30 +3000,41 @@ class ExecuteInputOutputs(ExtendedMappingSchema):
     inputs = ExecuteInputValues(default={}, description="Values submitted for execution.")
     outputs = ExecuteOutputSpec(
         # FIXME: add documentation reference link OGC/Weaver for further details.
-        description="Defines which outputs to be obtained from the execution (filtered or all), "
-                    "as well as the reporting method for each output according to 'transmissionMode', "
-                    "the 'response' type, and the execution 'mode' provided.",
-        # FIXME: allow omitting 'outputs' (https://github.com/crim-ca/weaver/issues/375)
-        #        maybe this is good enough, but should have a proper test for it
-        # default={}
+        description=(
+            "Defines which outputs to be obtained from the execution (filtered or all), "
+            "as well as the reporting method for each output according to 'transmissionMode', "
+            "the 'response' type, and the execution 'mode' provided "
+            "(see for more details: https://pavics-weaver.readthedocs.io/en/latest/processes.html#execution-body)."
+        ),
+        default={}
     )
 
 
 class Execute(ExecuteInputOutputs):
     mode = JobExecuteModeEnum(
         missing=drop,
+        default=ExecuteMode.AUTO,
+        deprecated=True,
         description=(
             "Desired execution mode specified directly. This is intended for backward compatibility support. "
             "To obtain more control over execution mode selection, employ the official Prefer header instead "
             "(see for more details: https://pavics-weaver.readthedocs.io/en/latest/processes.html#execution-mode)."
         )
     )
+    response = JobResponseOptionsEnum(
+        missing=drop,
+        default=ExecuteResponse.DOCUMENT,
+        description=(
+            "Indicates the desired representation format of the response. "
+            "(see for more details: https://pavics-weaver.readthedocs.io/en/latest/processes.html#execution-body)."
+        )
+    )
     notification_email = ExtendedSchemaNode(
         String(),
         missing=drop,
         validator=Email(),
-        description="Optionally send a notification email when the job is done.")
-    response = JobResponseOptionsEnum()
+        description="Optionally send a notification email when the job is done."
+    )
 
 
 class QuoteStatusSchema(ExtendedSchemaNode):
@@ -4296,8 +4307,20 @@ class NotImplementedPostProviderResponse(ExtendedMappingSchema):
     description = "Provider registration not supported using specified definition."
 
 
+class PreferenceAppliedHeader(ExtendedSchemaNode):
+    description = "Applied preferences from submitted 'Prefer' header after validation."
+    name = "Preference-Applied"
+    schema_type = String
+    example = "wait=10s, respond-async"
+
+
+class LocationHeader(URL):
+    name = "Location"
+
+
 class CreatedJobLocationHeader(ResponseHeaders):
-    Location = URL(description="Status monitoring location of the job execution.")
+    location = LocationHeader(description="Status monitoring location of the job execution.")
+    prefer_applied = PreferenceAppliedHeader(missing=drop)
 
 
 class CreatedLaunchJobResponse(ExtendedMappingSchema):
@@ -4307,7 +4330,8 @@ class CreatedLaunchJobResponse(ExtendedMappingSchema):
 
 
 class CompletedJobLocationHeader(ResponseHeaders):
-    Location = URL(description="Status location of the completed job execution.")
+    location = LocationHeader(description="Status location of the completed job execution.")
+    prefer_applied = PreferenceAppliedHeader(missing=drop)
 
 
 class CompletedJobStatusSchema(DescriptionSchema, JobStatusInfo):

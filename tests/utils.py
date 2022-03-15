@@ -20,6 +20,7 @@ from inspect import isclass
 from typing import TYPE_CHECKING
 
 # Note: do NOT import 'boto3' here otherwise 'moto' will not be able to mock it effectively
+from celery.exceptions import TimeoutError as CeleryTaskTimeoutError
 import colander
 import mock
 import moto
@@ -216,8 +217,10 @@ def setup_config_with_celery(config):
     settings = config.get_settings()
 
     # override celery loader to specify configuration directly instead of ini file
+    celery_mongodb_url = "mongodb://{}:{}/celery".format(settings.get("mongodb.host"), settings.get("mongodb.port"))
     celery_settings = {
-        "CELERY_BROKER_URL": "mongodb://{}:{}/celery".format(settings.get("mongodb.host"), settings.get("mongodb.port"))
+        "broker_url": celery_mongodb_url,
+        "result_backend": celery_mongodb_url  # for sync exec
     }
     pyramid_celery.loaders.INILoader.read_configuration = mock.MagicMock(return_value=celery_settings)
     config.include("pyramid_celery")
@@ -864,6 +867,15 @@ def mocked_execute_celery(celery_task="weaver.processes.execution.execute_proces
         @property
         def id(self):
             return self._id
+
+        # since delay is mocked and blocks to execute, assume sync is complete at this point
+        # all following methods return what would be returned normally in sync mode
+
+        def wait(*_, **__):
+            raise CeleryTaskTimeoutError
+
+        def ready(*_, **__):
+            return True
 
     task = MockTask()
 

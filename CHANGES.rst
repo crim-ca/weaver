@@ -13,9 +13,11 @@ Changes
 Changes:
 --------
 - Support ``Prefer`` header with ``wait`` or ``respond-async`` directives to select ``Job`` execution mode either
-  as synchronous or asynchronous task, according to supported ``jobControlOptions`` of the relevant ``Process`` being
-  executed (resolves `#247 <https://github.com/crim-ca/weaver/issues/247>`_).
+  as *synchronous* or *asynchronous* task, according to supported ``jobControlOptions`` of the relevant ``Process``
+  being executed (resolves `#247 <https://github.com/crim-ca/weaver/issues/247>`_).
 - Increase minor version of all ``builtin`` processes that will now be executable in wither (a)synchronous modes.
+- Add ``weaver.exec_sync_max_wait`` and ``weaver.quote_sync_max_wait`` settings allowing custom definition for the
+  maximum duration that can be specified to wait for a `synchronous` response from task workers.
 - Improve conformance for returned status codes and error messages when requesting results for an unfinished,
   failed, or dismissed ``Job``.
 - Adjust conformance item references to correspond with `OGC API - Processes: Part 2` renamed from `Transactions` to
@@ -24,9 +26,17 @@ Changes:
   (resolves `#180 <https://github.com/crim-ca/weaver/issues/180>`_).
 - Improve ``Process`` undeployment to consider running ``Job`` to block its removal while in use.
 
+Important Note
+--------------
+- In order to support *synchronous* execution, setting ``RESULT_BACKEND`` **MUST** be specified in
+  the ``weaver.ini`` configuration file.
+  See `Weaver INI Configuration Example <https://github.com/crim-ca/weaver/blob/master/config/weaver.ini.example>`_
+  in section ``[celery]`` for more details.
+
 Fixes:
 ------
-- No change.
+- Fix ``outputs`` permitted to be completely omitted from the execution request
+  (resolves `#375 <https://github.com/crim-ca/weaver/issues/375>`_).
 
 .. _changes_4.14.0:
 
@@ -327,7 +337,7 @@ Fixes:
 - Fix parsing of inputs for `OpenSearch` parameters lookup that was assuming inputs were always provided as
   listing definition, not considering possible mapping definition.
 - Fix incorrect documentation section ``Package as External Execution Unit Reference`` where content was omitted
-  and incorrectly anchored as following ``process-esgf-cwt`` section.
+  and incorrectly anchored as following ``ESGF-CWT`` section.
 
 .. _changes_4.4.0:
 

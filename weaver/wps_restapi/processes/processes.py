@@ -274,5 +274,5 @@ def submit_local_job(request):
     Execution location and method is according to deployed Application Package.
     """
     process = get_process(request=request)
-    body = submit_job(request, process, tags=["wps-rest"])
-    return get_job_submission_response(body)
+    body, headers = submit_job(request, process, tags=["wps-rest"])
+    return get_job_submission_response(body, headers)

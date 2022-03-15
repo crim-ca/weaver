@@ -11,6 +11,7 @@ from tests.utils import get_settings_from_testapp, mocked_execute_celery, mocked
 from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import ContentType
 from weaver.processes.builtin import register_builtin_processes
+from weaver.status import Status
 
 if TYPE_CHECKING:
     from weaver.typedefs import JSON
@@ -58,7 +59,7 @@ class BuiltinAppTest(WpsConfigBase):
         assert isinstance(body["process"]["outputs"][0]["formats"], list)
         assert len(body["process"]["outputs"][0]["formats"]) == 1
         assert body["process"]["outputs"][0]["formats"][0]["mediaType"] == ContentType.APP_NETCDF
-        assert body["jobControlOptions"] == [ExecuteControlOption.ASYNC]
+        assert body["jobControlOptions"] == [ExecuteControlOption.ASYNC, ExecuteControlOption.SYNC]
         assert body["outputTransmission"] == [ExecuteTransmissionMode.REFERENCE]
 
     def test_jsonarray2netcdf_describe_ogc_schema(self):
@@ -82,10 +83,10 @@ class BuiltinAppTest(WpsConfigBase):
         assert isinstance(body["outputs"]["output"]["formats"], list)
         assert len(body["outputs"]["output"]["formats"]) == 1
         assert body["outputs"]["output"]["formats"][0]["mediaType"] == ContentType.APP_NETCDF
-        assert body["jobControlOptions"] == [ExecuteControlOption.ASYNC]
+        assert body["jobControlOptions"] == [ExecuteControlOption.ASYNC, ExecuteControlOption.SYNC]
         assert body["outputTransmission"] == [ExecuteTransmissionMode.REFERENCE]
 
-    def test_jsonarray2netcdf_execute(self):
+    def test_jsonarray2netcdf_execute_async(self):
         dirname = tempfile.gettempdir()
         nc_data = "Hello NetCDF!"
         with contextlib.ExitStack() as stack_exec:
@@ -112,8 +113,76 @@ class BuiltinAppTest(WpsConfigBase):
 
         assert resp.status_code == 201, "Error: {}".format(resp.json)
         assert resp.content_type in ContentType.APP_JSON
+        # following details not available yet in async, but are in sync
+        assert "created" not in resp.json
+        assert "finished" not in resp.json
+        assert "duration" not in resp.json
+        assert "progress" not in resp.json
+
         job_url = resp.json["location"]
         results = self.monitor_job(job_url)
+
+        output_url = job_url + "/outputs"
+        resp = self.app.get(output_url, headers=self.json_headers)
+        assert resp.status_code == 200, "Error job outputs:\n{}".format(resp.json)
+        outputs = resp.json
+
+        self.validate_results(results, outputs, nc_data)
+
+    def test_jsonarray2netcdf_execute_sync(self):
+        dirname = tempfile.gettempdir()
+        nc_data = "Hello NetCDF!"
+        with contextlib.ExitStack() as stack_exec:
+            tmp_ncdf = tempfile.NamedTemporaryFile(dir=dirname, mode="w", suffix=".nc")
+            tmp_json = tempfile.NamedTemporaryFile(dir=dirname, mode="w", suffix=".json")
+            tmp_ncdf = stack_exec.enter_context(tmp_ncdf)  # noqa
+            tmp_json = stack_exec.enter_context(tmp_json)  # noqa
+            tmp_ncdf.write(nc_data)
+            tmp_ncdf.seek(0)
+            tmp_json.write(json.dumps(["file://{}".format(os.path.join(dirname, tmp_ncdf.name))]))
+            tmp_json.seek(0)
+            data = {
+                "inputs": [{"id": "input", "href": os.path.join(dirname, tmp_json.name)}],
+                "outputs": [{"id": "output", "transmissionMode": ExecuteTransmissionMode.REFERENCE}],
+            }
+            headers = {"Prefer": "wait=10"}
+            headers.update(self.json_headers)
+
+            for mock_exec in mocked_execute_celery():
+                stack_exec.enter_context(mock_exec)
+            path = "/processes/jsonarray2netcdf/jobs"
+            resp = mocked_sub_requests(self.app, "post_json", path,
+                                       data=data, headers=headers, only_local=True)
+
+        assert resp.status_code == 200, "Error: {}".format(resp.json)
+        assert resp.content_type in ContentType.APP_JSON
+
+        # since sync, all status details are already available!
+        assert resp.json["status"] == Status.SUCCEEDED
+        assert "Location" in resp.headers
+        # validate indeed sync
+        assert resp.headers["Preference-Applied"] == headers["Prefer"]
+        # following details not available yet in async, but are in sync
+        assert isinstance(resp.json["created"], str) and resp.json["created"]
+        assert isinstance(resp.json["finished"], str) and resp.json["finished"]
+        assert isinstance(resp.json["duration"], str) and resp.json["duration"]
+        assert isinstance(resp.json["progress"], int) and resp.json["progress"] == 100
+
+        job_url = resp.headers["Location"]
+        out_url = f"{job_url}/results"
+        resp = self.app.get(out_url, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.APP_JSON
+        results = resp.json
+
+        output_url = job_url + "/outputs"
+        resp = self.app.get(output_url, headers=self.json_headers)
+        assert resp.status_code == 200, "Error job outputs:\n{}".format(resp.json)
+        outputs = resp.json
+
+        self.validate_results(results, outputs, nc_data)
+
+    def validate_results(self, results, outputs, data):
 
         # first validate format of OGC-API results
         assert "output" in results, "Expected result ID 'output' in response body"
@@ -134,13 +203,9 @@ class BuiltinAppTest(WpsConfigBase):
         assert os.path.split(nc_real_path)[-1] == os.path.split(nc_path)[-1]
         assert os.path.isfile(nc_real_path)
         with open(nc_real_path, "r") as f:
-            assert f.read() == nc_data
+            assert f.read() == data
 
         # if everything was valid for results, validate equivalent but differently formatted outputs response
-        output_url = job_url + "/outputs"
-        resp = self.app.get(output_url, headers=self.json_headers)
-        assert resp.status_code == 200, "Error job outputs:\n{}".format(resp.json)
-        outputs = resp.json
         assert outputs["outputs"][0]["id"] == "output"
         nc_path = outputs["outputs"][0]["href"]
         assert isinstance(nc_path, str) and len(nc_path)
