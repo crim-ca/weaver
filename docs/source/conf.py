@@ -423,6 +423,8 @@ linkcheck_ignore = [
     # dummy values
     r"http[s]*://localhost.*/",
     r"http[s]*://example.com.*",
+    # ignore celery docs having problem (https://github.com/celery/celery/issues/7351)
+    "https://docs.celeryproject.org/",
     "https://mouflon.dkrz.de/",
     # following have sporadic downtimes
     "https://esgf-data.dkrz.de/",
