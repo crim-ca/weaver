@@ -434,6 +434,7 @@ def load_pywps_config(container, config=None):
     pywps_config.CONFIG.set("server", "sethomedir", "true")
     pywps_config.CONFIG.set("server", "outputpath", settings["weaver.wps_output_dir"])
     pywps_config.CONFIG.set("server", "outputurl", settings["weaver.wps_output_url"])
+    pywps_config.CONFIG.set("server", "url", get_wps_url(settings))
     settings["weaver.wps_configured"] = True
     return pywps_config.CONFIG
 

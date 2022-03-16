@@ -22,7 +22,8 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Fix `WPS 1/2` endpoint not reporting the appropriate instance URL
+  (fixes `#83 <https://github.com/crim-ca/weaver/issues/83>`_).
 
 .. _changes_4.14.0:
 
