@@ -13,9 +13,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt update \
     # NOTE:
     #   Only install CLI package, 'docker-ce' and 'containerd.io' not required as they should be provided by host.
-    #   Docker sibliing execution is expected. See 'docker/docker-compose.yml.example' for details.
+    #   Docker sibling execution is expected. See 'docker/docker-compose.yml.example' for details.
     && apt install --no-install-recommends docker-ce-cli \
 	&& rm -rf /var/lib/apt/lists/*
 
 # run app
-CMD celery worker -E -A pyramid_celery.celery_app --ini "${APP_CONFIG_DIR}/weaver.ini"
+CMD celery worker -B -E -A pyramid_celery.celery_app --ini "${APP_CONFIG_DIR}/weaver.ini"

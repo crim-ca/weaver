@@ -16,6 +16,11 @@ node_modules
 ## Docker
 #Dockerfile
 
+## Celery
+celeryconfig*
+celery-config*
+celerybeat-schedule.*
+
 ## Python / Extensions etc.
 *~
 *.mo

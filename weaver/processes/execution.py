@@ -60,7 +60,7 @@ if TYPE_CHECKING:
     from weaver.datatype import Job
     from weaver.processes.convert import OWS_Input_Type, ProcessOWS
     from weaver.status import StatusType
-    from weaver.typedefs import HeadersType, HeaderCookiesType, JSON, SettingsType
+    from weaver.typedefs import CeleryResult, HeadersType, HeaderCookiesType, JSON, SettingsType
     from weaver.visibility import AnyVisibility
 
 
@@ -587,7 +587,8 @@ def submit_job_handler(payload,             # type: JSON
     resp_headers = {"Location": location_url}
     resp_headers.update(applied)
 
-    result = execute_process.delay(job_id=job.id, wps_url=clean_ows_url(service_url), headers=headers)
+    wps_url = clean_ows_url(service_url)
+    result = execute_process.delay(job_id=job.id, wps_url=wps_url, headers=headers)  # type: CeleryResult
     LOGGER.debug("Celery pending task [%s] for job [%s].", result.id, job.id)
     if not is_execute_async:
         LOGGER.debug("Celery task requested as sync if it completes before (wait=%ss)", wait)

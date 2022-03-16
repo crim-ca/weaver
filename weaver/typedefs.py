@@ -24,6 +24,7 @@ if TYPE_CHECKING:
         FileSystemPathType = str
 
     from celery.app import Celery
+    from celery.result import AsyncResult, EagerResult, GroupResult, ResultSet
     from owslib.wps import BoundingBoxDataInput, ComplexDataInput, Process as ProcessOWS, WPSExecution
     from pyramid.httpexceptions import HTTPSuccessful, HTTPRedirection
     from pyramid.registry import Registry
@@ -298,3 +299,5 @@ if TYPE_CHECKING:
         "inputs": JobInputs,
         "outputs": JobOutputs,
     })
+
+    CeleryResult = Union[AsyncResult, EagerResult, GroupResult, ResultSet]

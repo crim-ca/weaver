@@ -18,6 +18,8 @@ Changes:
 - Increase minor version of all ``builtin`` processes that will now be executable in wither (a)synchronous modes.
 - Add ``weaver.exec_sync_max_wait`` and ``weaver.quote_sync_max_wait`` settings allowing custom definition for the
   maximum duration that can be specified to wait for a `synchronous` response from task workers.
+- Add ``-B`` (``celery beat``) option to Docker command of ``weaver-worker`` to run scheduled task in parallel
+  to ``celery worker`` in order to periodically cleanup task results introduced by *synchronous* execution.
 - Improve conformance for returned status codes and error messages when requesting results for an unfinished,
   failed, or dismissed ``Job``.
 - Adjust conformance item references to correspond with `OGC API - Processes: Part 2` renamed from `Transactions` to

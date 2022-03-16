@@ -18,6 +18,11 @@ env
 package-lock.json
 node_modules
 
+## Celery
+celeryconfig*
+celery-config*
+celerybeat-schedule.*
+
 ## Python / Extensions etc.
 *~
 *.mo
