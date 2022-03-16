@@ -22,7 +22,7 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Fix `CLI` ``deploy`` operation headers incorrectly passed down to the deployment request.
 
 .. _changes_4.14.0:
 
