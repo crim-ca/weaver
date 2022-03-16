@@ -1805,7 +1805,7 @@ class Process(Base):
         jco = [opt for opt in jco if opt is not None]
         if len(jco) == 0:
             jco.append(ExecuteControlOption.ASYNC)
-        self["jobControlOptions"] = jco
+        self["jobControlOptions"] = list(sorted(jco))
         return dict.__getitem__(self, "jobControlOptions")
 
     @property
@@ -1818,7 +1818,7 @@ class Process(Base):
         out = [mode for mode in out if mode is not None]
         if len(out) == 0:
             out.append(ExecuteTransmissionMode.REFERENCE)
-        self["outputTransmission"] = out
+        self["outputTransmission"] = list(sorted(out))
         return dict.__getitem__(self, "outputTransmission")
 
     @property
