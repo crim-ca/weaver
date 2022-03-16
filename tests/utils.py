@@ -871,10 +871,10 @@ def mocked_execute_celery(celery_task="weaver.processes.execution.execute_proces
         # since delay is mocked and blocks to execute, assume sync is complete at this point
         # all following methods return what would be returned normally in sync mode
 
-        def wait(*_, **__):
+        def wait(self, *_, **__):
             raise CeleryTaskTimeoutError
 
-        def ready(*_, **__):
+        def ready(self, *_, **__):
             return True
 
     task = MockTask()
