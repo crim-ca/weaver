@@ -537,7 +537,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         email = "some.test@crim.ca"
         body = {
             "inputs": [{"id": "test_input", "data": "test"}],
-            "outputs": [{"id": "test_output", "transmissionMode": ExecuteTransmissionMode.REFERENCE}],
+            "outputs": [{"id": "test_output", "transmissionMode": ExecuteTransmissionMode.VALUE}],
             "mode": ExecuteMode.ASYNC,
             "response": ExecuteResponse.DOCUMENT,
             "notification_email": email

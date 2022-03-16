@@ -1811,13 +1811,13 @@ class Process(Base):
     @property
     def outputTransmission(self):  # noqa: N802
         # type: () -> List[AnyExecuteTransmissionMode]
-        out = self.setdefault("outputTransmission", [ExecuteTransmissionMode.REFERENCE])
+        out = self.setdefault("outputTransmission", [ExecuteTransmissionMode.VALUE])
         if not isinstance(out, list):  # eg: None, bw-compat
-            out = [ExecuteTransmissionMode.REFERENCE]
+            out = [ExecuteTransmissionMode.VALUE]
         out = [ExecuteTransmissionMode.get(mode) for mode in out]
         out = [mode for mode in out if mode is not None]
         if len(out) == 0:
-            out.append(ExecuteTransmissionMode.REFERENCE)
+            out.append(ExecuteTransmissionMode.VALUE)
         self["outputTransmission"] = list(sorted(out))
         return dict.__getitem__(self, "outputTransmission")
 

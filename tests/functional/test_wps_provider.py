@@ -187,7 +187,7 @@ class WpsProviderTest(WpsConfigBase):
         assert "GetCapabilities" in links["service-desc"]
 
         assert ExecuteControlOption.ASYNC in body["jobControlOptions"]
-        assert ExecuteTransmissionMode.REFERENCE in body["outputTransmission"]
+        assert ExecuteTransmissionMode.VALUE in body["outputTransmission"]
 
         # validate execution submission
         # (don't actually execute because server is mocked, only validate parsing of I/O and job creation)
@@ -198,7 +198,7 @@ class WpsProviderTest(WpsConfigBase):
             "mode": ExecuteMode.ASYNC,
             "response": ExecuteResponse.DOCUMENT,
             "inputs": [{"id": "dataset", "href": exec_file}],
-            "outputs": [{"id": "output", "transmissionMode": ExecuteTransmissionMode.REFERENCE}]
+            "outputs": [{"id": "output", "transmissionMode": ExecuteTransmissionMode.VALUE}]
         }
         status_url = resources.TEST_REMOTE_SERVER_URL + "/status.xml"
         output_url = resources.TEST_REMOTE_SERVER_URL + "/output.txt"

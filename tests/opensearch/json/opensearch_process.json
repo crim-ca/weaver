@@ -87,7 +87,7 @@
   ],
   "keywords": [],
   "outputTransmission": [
-    "reference"
+    "value"
   ],
   "outputs": [
     {
@@ -236,7 +236,7 @@
         ],
         "keywords": [],
         "outputTransmission": [
-          "reference"
+          "value"
         ],
         "outputs": [
           {

@@ -39,7 +39,7 @@
             "async-execute"
         ],
         "outputTransmission": [
-            "reference"
+            "value"
         ]
     },
     "executionUnit": [

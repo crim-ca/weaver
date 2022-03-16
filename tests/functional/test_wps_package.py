@@ -639,7 +639,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         data.update({
             "mode": ExecuteMode.ASYNC,
             "response": ExecuteResponse.DOCUMENT,
-            "outputs": {"output": {"transmissionMode": ExecuteTransmissionMode.REFERENCE}}
+            "outputs": {"output": {"transmissionMode": ExecuteTransmissionMode.VALUE}}
         })
         with contextlib.ExitStack() as stack_exec:
             for mock_exec in mocked_execute_celery():
@@ -1414,7 +1414,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             "mode": ExecuteMode.ASYNC,
             "response": ExecuteResponse.DOCUMENT,
             "inputs": [{"id": "message", "value": "test"}],
-            "outputs": [{"id": "output", "transmissionMode": ExecuteTransmissionMode.REFERENCE}]
+            "outputs": [{"id": "output", "transmissionMode": ExecuteTransmissionMode.VALUE}]
         }
         headers = deepcopy(self.json_headers)
 
@@ -1770,7 +1770,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             "mode": ExecuteMode.ASYNC,
             "response": ExecuteResponse.DOCUMENT,
             "inputs": [{"id": "message", "value": "test"}],
-            "outputs": [{"id": "output", "transmissionMode": ExecuteTransmissionMode.REFERENCE}]
+            "outputs": [{"id": "output", "transmissionMode": ExecuteTransmissionMode.VALUE}]
         }
         headers = deepcopy(self.json_headers)
 
@@ -1846,7 +1846,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                 "mode": ExecuteMode.ASYNC,
                 "response": ExecuteResponse.DOCUMENT,
                 "inputs": [{"id": "input_file", "href": tmp_http}],
-                "outputs": [{"id": "output", "transmissionMode": ExecuteTransmissionMode.REFERENCE}]
+                "outputs": [{"id": "output", "transmissionMode": ExecuteTransmissionMode.VALUE}]
             }
             resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
                                        data=exec_body, headers=headers, only_local=True)
@@ -1892,7 +1892,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             "mode": ExecuteMode.ASYNC,
             "response": ExecuteResponse.DOCUMENT,
             "inputs": [{"id": "delay", "value": 1}],
-            "outputs": [{"id": "output", "transmissionMode": ExecuteTransmissionMode.REFERENCE}]
+            "outputs": [{"id": "output", "transmissionMode": ExecuteTransmissionMode.VALUE}]
         }
 
         with contextlib.ExitStack() as stack_exec:
@@ -2459,8 +2459,8 @@ class WpsPackageAppWithS3BucketTest(WpsConfigBase):
                 {"id": "input_with_s3", "href": test_bucket_ref},
             ],
             "outputs": [
-                {"id": "output_from_http", "transmissionMode": ExecuteTransmissionMode.REFERENCE},
-                {"id": "output_from_s3", "transmissionMode": ExecuteTransmissionMode.REFERENCE},
+                {"id": "output_from_http", "transmissionMode": ExecuteTransmissionMode.VALUE},
+                {"id": "output_from_s3", "transmissionMode": ExecuteTransmissionMode.VALUE},
             ]
         }
         with contextlib.ExitStack() as stack_exec:

@@ -1411,8 +1411,8 @@ class JobResponseOptionsEnum(ExtendedSchemaNode):
 class TransmissionModeEnum(ExtendedSchemaNode):
     schema_type = String
     title = "TransmissionMode"
-    default = ExecuteTransmissionMode.REFERENCE
-    example = ExecuteTransmissionMode.REFERENCE
+    default = ExecuteTransmissionMode.VALUE
+    example = ExecuteTransmissionMode.VALUE
     validator = OneOf(ExecuteTransmissionMode.values())
 
 
@@ -2509,8 +2509,8 @@ class ExceptionReportType(ExtendedMappingSchema):
 class ProcessControl(ExtendedMappingSchema):
     jobControlOptions = JobControlOptionsList(missing=[ExecuteControlOption.ASYNC],
                                               default=[ExecuteControlOption.ASYNC])
-    outputTransmission = TransmissionModeList(missing=[ExecuteTransmissionMode.REFERENCE],
-                                              default=[ExecuteTransmissionMode.REFERENCE])
+    outputTransmission = TransmissionModeList(missing=[ExecuteTransmissionMode.VALUE],
+                                              default=[ExecuteTransmissionMode.VALUE])
 
 
 class ProcessLocations(ExtendedMappingSchema):

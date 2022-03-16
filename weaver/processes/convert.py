@@ -1611,7 +1611,7 @@ def wps2json_job_payload(wps_request, wps_process):
         else:
             data_output = wps_request.outputs[oid]
         if as_ref:
-            data_output["transmissionMode"] = ExecuteTransmissionMode.REFERENCE
+            data_output["transmissionMode"] = ExecuteTransmissionMode.VALUE
         else:
             data_output["transmissionMode"] = ExecuteTransmissionMode.VALUE
         data_output["id"] = oid

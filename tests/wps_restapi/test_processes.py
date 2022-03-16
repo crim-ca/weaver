@@ -136,7 +136,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             ],
             "outputs": [
                 {"id": "test_output",
-                 "transmissionMode": ExecuteTransmissionMode.REFERENCE}
+                 "transmissionMode": ExecuteTransmissionMode.VALUE}
             ],
             "mode": ExecuteMode.ASYNC,
             "response": ExecuteResponse.DOCUMENT,

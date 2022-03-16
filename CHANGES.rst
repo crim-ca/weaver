@@ -39,6 +39,8 @@ Fixes:
 ------
 - Fix ``outputs`` permitted to be completely omitted from the execution request
   (resolves `#375 <https://github.com/crim-ca/weaver/issues/375>`_).
+- Fix all instances of ``outputTransmission`` reported as ``reference`` although `Weaver` behaves with the ``value``
+  method, which is to return values and file references in content body, instead of HTTP header ``Link`` references.
 
 .. _changes_4.14.0:
 

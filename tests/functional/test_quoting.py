@@ -84,7 +84,7 @@ class WpsQuotationTest(WpsConfigBase):
                 },
                 "outputs": {
                     "output": {
-                        "transmissionMode": ExecuteTransmissionMode.REFERENCE
+                        "transmissionMode": ExecuteTransmissionMode.VALUE
                     }
                 }
             }

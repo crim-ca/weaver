@@ -138,7 +138,7 @@
         "async-execute"
       ],
       "outputTransmission": [
-        "reference"
+        "value"
       ]
     }
   }
