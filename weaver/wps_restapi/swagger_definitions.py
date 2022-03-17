@@ -564,6 +564,11 @@ class LinkLanguage(ExtendedMappingSchema):
     hreflang = Language(missing=drop, description="Language of the content located at the link.")
 
 
+class LinkHeader(ExtendedSchemaNode):
+    schema_type = String
+    example = "<http://example.com>; rel=\"relation\"; type=text/plain"
+
+
 class MetadataBase(ExtendedMappingSchema):
     title = ExtendedSchemaNode(String(), missing=drop)
 
@@ -4457,6 +4462,21 @@ class OkGetJobResultsResponse(ExtendedMappingSchema):
     body = Result()
 
 
+class NoContentJobResultsHeaders(NoContent):
+    content_length = ContentLengthHeader(example="0")
+    link = LinkHeader(description=(
+        "Link to a result requested by reference output transmission. "
+        "Link relation indicates the result ID. "
+        "Additional parameters indicate expected content-type of the resource. "
+        "Literal data requested by reference are returned with contents dumped to plain text file."
+    ))
+
+
+class NoContentJobResultsResponse(ExtendedMappingSchema):
+    header = NoContentJobResultsHeaders()
+    body = NoContent(default="")
+
+
 class CreatedQuoteExecuteResponse(ExtendedMappingSchema):
     header = ResponseHeaders()
     body = CreatedQuotedJobStatusSchema()
@@ -4876,6 +4896,7 @@ get_job_results_responses = {
             "value": EXAMPLES["job_results.json"],
         }
     }),
+    "204": NoContentJobResultsResponse(description="success"),
     "400": InvalidJobResponseSchema(),
     "404": NotFoundJobResponseSchema(),
     "410": GoneJobResponseSchema(),

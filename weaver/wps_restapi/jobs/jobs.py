@@ -8,6 +8,7 @@ from celery.utils.log import get_task_logger
 from colander import Invalid
 from pyramid.httpexceptions import (
     HTTPBadRequest,
+    HTTPNoContent,
     HTTPNotFound,
     HTTPOk,
     HTTPPermanentRedirect,
@@ -805,7 +806,8 @@ def get_job_results(request):
 
     if results:  # avoid error if all by reference
         results = sd.Result().deserialize(results)
-    return HTTPOk(json=results, headers=refs)
+        HTTPOk(json=results, headers=refs)
+    return HTTPNoContent(headers=refs)
 
 
 @sd.provider_exceptions_service.get(tags=[sd.TAG_JOBS, sd.TAG_EXCEPTIONS, sd.TAG_PROVIDERS],
