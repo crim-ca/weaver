@@ -58,6 +58,7 @@ Fixes:
 - Fix all instances of ``outputTransmission`` reported as ``reference`` in ``Process`` descriptions, although `Weaver`
   behaved with the ``value`` method, which is to return values and file references in content body, instead of
   HTTP ``Link`` header references.
+- Fix `CLI` ``deploy`` operation headers incorrectly passed down to the deployment request.
 
 .. _changes_4.14.0:
 
