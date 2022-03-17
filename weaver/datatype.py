@@ -1818,7 +1818,8 @@ class Process(Base):
             Discussion about expected ordering of ``jobControlOptions``:
             https://github.com/opengeospatial/ogcapi-processes/issues/171#issuecomment-836819528
         """
-        jco_default = [ExecuteControlOption.ASYNC, ExecuteControlOption.SYNC]
+        # Weaver's default async only, must override explicitly during deploy if sync is needed
+        jco_default = [ExecuteControlOption.ASYNC]
         jco = self.setdefault("jobControlOptions", jco_default)
         if not isinstance(jco, list):  # eg: None, bw-compat
             jco = jco_default
