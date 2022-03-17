@@ -1810,14 +1810,35 @@ class Process(Base):
     @property
     def jobControlOptions(self):  # noqa: N802
         # type: () -> List[AnyExecuteControlOption]
-        jco = self.setdefault("jobControlOptions", [ExecuteControlOption.ASYNC])
+        """
+        Control options that indicate which :term:`Job` execution modes are supported by the :term:`Process`.
+
+        .. note::
+
+            There are no official mentions about the ordering of ``jobControlOptions``.
+            Nevertheless, it is often expected that the first item can be considered the default mode when none is
+            requested explicitly (at execution time). With the definition of execution mode through the ``Prefer``
+            header, `Weaver` has the option to decide if it wants to honor this header, according to available
+            resources and :term:`Job` duration.
+
+            For this reason, ``async`` is placed first by default when nothing was defined during deployment,
+            since it is the preferred mode in `Weaver`. If deployment included items though, they are preserved as is.
+            This allows to re-deploy a :term:`Process` to a remote non-`Weaver` :term:`ADES` preserving the original
+            :term:`Process` definition.
+
+        .. seealso::
+            Discussion about expected ordering of ``jobControlOptions``:
+            https://github.com/opengeospatial/ogcapi-processes/issues/171#issuecomment-836819528
+        """
+        jco_default = [ExecuteControlOption.ASYNC, ExecuteControlOption.SYNC]
+        jco = self.setdefault("jobControlOptions", jco_default)
         if not isinstance(jco, list):  # eg: None, bw-compat
-            jco = [ExecuteControlOption.ASYNC]
+            jco = jco_default
         jco = [ExecuteControlOption.get(opt) for opt in jco]
         jco = [opt for opt in jco if opt is not None]
         if len(jco) == 0:
-            jco.append(ExecuteControlOption.ASYNC)
-        self["jobControlOptions"] = list(sorted(jco))
+            jco = jco_default
+        self["jobControlOptions"] = jco  # no alpha order important!
         return dict.__getitem__(self, "jobControlOptions")
 
     @property

@@ -58,6 +58,8 @@ Fixes:
 - Fix all instances of ``outputTransmission`` reported as ``reference`` in ``Process`` descriptions, although `Weaver`
   behaved with the ``value`` method, which is to return values and file references in content body, instead of
   HTTP ``Link`` header references.
+- Fix `WPS 1/2` endpoint not reporting the appropriate instance URL
+  (fixes `#83 <https://github.com/crim-ca/weaver/issues/83>`_).
 - Fix `CLI` ``deploy`` operation headers incorrectly passed down to the deployment request.
 
 .. _changes_4.14.0:
