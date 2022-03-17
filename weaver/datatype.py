@@ -1818,13 +1818,14 @@ class Process(Base):
             Discussion about expected ordering of ``jobControlOptions``:
             https://github.com/opengeospatial/ogcapi-processes/issues/171#issuecomment-836819528
         """
-        jco = self.setdefault("jobControlOptions", [ExecuteControlOption.ASYNC, ExecuteControlOption.SYNC])
+        jco_default = [ExecuteControlOption.ASYNC, ExecuteControlOption.SYNC]
+        jco = self.setdefault("jobControlOptions", jco_default)
         if not isinstance(jco, list):  # eg: None, bw-compat
-            jco = [ExecuteControlOption.ASYNC, ExecuteControlOption.SYNC]
+            jco = jco_default
         jco = [ExecuteControlOption.get(opt) for opt in jco]
         jco = [opt for opt in jco if opt is not None]
         if len(jco) == 0:
-            jco.append(ExecuteControlOption.ASYNC)
+            jco = jco_default
         self["jobControlOptions"] = jco  # no alpha order important!
         return dict.__getitem__(self, "jobControlOptions")
 
