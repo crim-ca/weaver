@@ -53,7 +53,7 @@ def test_process_job_control_options_resolution():
         Process(id="test-{}".format(uuid.uuid4()), package={}, jobControlOptions=[None]),
         Process(id="test-{}".format(uuid.uuid4()), package={}, jobControlOptions=[]),
     ]):
-        assert test_process.jobControlOptions == [ExecuteControlOption.ASYNC, ExecuteControlOption.SYNC], f"Test {i}"
+        assert test_process.jobControlOptions == [ExecuteControlOption.ASYNC], f"Test {i}"
     # explicitly provided modes are used as is, especially if partial (allow disabling some modes)
     proc = Process(id="test-{}".format(uuid.uuid4()), package={}, jobControlOptions=[ExecuteControlOption.ASYNC])
     assert proc.jobControlOptions == [ExecuteControlOption.ASYNC]
