@@ -22,6 +22,8 @@ Changes:
 
 Fixes:
 ------
+- Fix `WPS 1/2` endpoint not reporting the appropriate instance URL
+  (fixes `#83 <https://github.com/crim-ca/weaver/issues/83>`_).
 - Fix `CLI` ``deploy`` operation headers incorrectly passed down to the deployment request.
 
 .. _changes_4.14.0:
