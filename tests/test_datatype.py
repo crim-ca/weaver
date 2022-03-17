@@ -59,6 +59,7 @@ def test_process_job_control_options_resolution():
     proc = Process(id="test-{}".format(uuid.uuid4()), package={},
                    jobControlOptions=[ExecuteControlOption.SYNC])
     assert proc.jobControlOptions == [ExecuteControlOption.SYNC]
+    # See ordering note in 'jobControlOptions' property
     proc = Process(id="test-{}".format(uuid.uuid4()), package={},
                    jobControlOptions=[ExecuteControlOption.SYNC, ExecuteControlOption.ASYNC])
     assert proc.jobControlOptions == [ExecuteControlOption.SYNC, ExecuteControlOption.ASYNC]
