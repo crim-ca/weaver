@@ -10,6 +10,16 @@ Changes
 `Unreleased <https://github.com/crim-ca/weaver/tree/master>`_ (latest)
 ========================================================================
 
+Important:
+----------
+- In order to support *synchronous* execution, setting ``RESULT_BACKEND`` **MUST** be specified in
+  the ``weaver.ini`` configuration file.
+  See `Weaver INI Configuration Example <https://github.com/crim-ca/weaver/blob/master/config/weaver.ini.example>`_
+  in section ``[celery]`` for more details.
+- With resolution and added support of ``transmissionMode`` handling according to `OGC API - Processes` specification,
+  requests that where submitted with ``reference`` outputs will produce results in a different format than previously
+  since this parameter was ignored and always returned ``value`` representation.
+
 Changes:
 --------
 - Support ``Prefer`` header with ``wait`` or ``respond-async`` directives to select ``Job`` execution mode either
@@ -20,6 +30,17 @@ Changes:
   maximum duration that can be specified to wait for a `synchronous` response from task workers.
 - Add ``-B`` (``celery beat``) option to Docker command of ``weaver-worker`` to run scheduled task in parallel
   to ``celery worker`` in order to periodically cleanup task results introduced by *synchronous* execution.
+- Add support of ``transmissionMode`` handling as ``reference`` to generate HTTP ``Link`` references for results
+  requested this way (resolves `#377 <https://github.com/crim-ca/weaver/issues/377>`_).
+- Updated every ``Process`` to report that they support ``outputTransmission`` both as ``reference`` and ``value``,
+  since handling of results is accomplished by `Weaver` itself, regardless of the application being executed.
+- Add `CLI` option ``-R/--ref/--reference`` for ``execute`` operation allowing to request corresponding ``outputs``
+  by ID to be returned using the ``transmissionMode: reference`` method, producing HTTP ``Link`` headers for those
+  entries rather than inserting values in the response content body.
+- Add requested ``outputs`` into response of ``GET /jobs/{jobId}/inputs`` to obtain submitted ``Job`` definitions.
+- Add query parameter ``schema`` for ``GET /jobs/{jobId}/inputs`` (and corresponding endpoints under ``/processes``
+  and ``/providers``) allowing to retrieve submitted input values and requested outputs with either ``OGC``/``OLD``
+  formats.
 - Improve conformance for returned status codes and error messages when requesting results for an unfinished,
   failed, or dismissed ``Job``.
 - Adjust conformance item references to correspond with `OGC API - Processes: Part 2` renamed from `Transactions` to
@@ -28,19 +49,15 @@ Changes:
   (resolves `#180 <https://github.com/crim-ca/weaver/issues/180>`_).
 - Improve ``Process`` undeployment to consider running ``Job`` to block its removal while in use.
 
-Important Note
---------------
-- In order to support *synchronous* execution, setting ``RESULT_BACKEND`` **MUST** be specified in
-  the ``weaver.ini`` configuration file.
-  See `Weaver INI Configuration Example <https://github.com/crim-ca/weaver/blob/master/config/weaver.ini.example>`_
-  in section ``[celery]`` for more details.
-
 Fixes:
 ------
 - Fix ``outputs`` permitted to be completely omitted from the execution request
   (resolves `#375 <https://github.com/crim-ca/weaver/issues/375>`_).
-- Fix all instances of ``outputTransmission`` reported as ``reference`` although `Weaver` behaves with the ``value``
-  method, which is to return values and file references in content body, instead of HTTP header ``Link`` references.
+- Fix ``outputs`` permitted as explicit empty mapping or list as equivalent to omitting them, defining by default
+  that all ``outputs`` should be returned with ``transmissionMode: value`` for ``Job`` execution.
+- Fix all instances of ``outputTransmission`` reported as ``reference`` in ``Process`` descriptions, although `Weaver`
+  behaved with the ``value`` method, which is to return values and file references in content body, instead of
+  HTTP ``Link`` header references.
 
 .. _changes_4.14.0:
 

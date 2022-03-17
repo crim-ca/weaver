@@ -50,6 +50,7 @@ from weaver.visibility import Visibility
 from weaver.wps_restapi.colander_extras import (
     AllOfKeywordSchema,
     AnyOfKeywordSchema,
+    EmptyMappingSchema,
     ExtendedBoolean as Boolean,
     ExtendedFloat as Float,
     ExtendedInteger as Integer,
@@ -66,7 +67,7 @@ from weaver.wps_restapi.colander_extras import (
     StringRange,
     XMLObject
 )
-from weaver.wps_restapi.constants import JobOutputsSchema
+from weaver.wps_restapi.constants import JobInputsOutputsSchema
 from weaver.wps_restapi.patches import ServiceOnlyExplicitGetHead as Service  # warning: don't use 'cornice.Service'
 
 if TYPE_CHECKING:
@@ -2324,21 +2325,43 @@ class ProviderInputsEndpoint(ProviderPath, ProcessPath, JobPath):
     header = RequestHeaders()
 
 
+class JobInputsOutputsQuery(ExtendedMappingSchema):
+    schema = ExtendedSchemaNode(
+        String(),
+        title="JobInputsOutputsQuerySchema",
+        example=JobInputsOutputsSchema.OGC,
+        default=JobInputsOutputsSchema.OLD,
+        validator=OneOfCaseInsensitive(JobInputsOutputsSchema.values()),
+        summary="Selects the schema employed for representation of submitted job inputs and outputs.",
+        description=(
+            "Selects the schema employed for representing job inputs and outputs that were submitted for execution. "
+            f"When '{JobInputsOutputsSchema.OLD}' is employed, listing of object with IDs is returned. "
+            f"When '{JobInputsOutputsSchema.OGC}' is employed, mapping of object definitions is returned. "
+            "If no schema is requested, the original formats from submission are employed, which could be a mix of "
+            "both representations. Providing a schema forces their corresponding conversion as applicable."
+        )
+    )
+
+
 class JobInputsEndpoint(JobPath):
     header = RequestHeaders()
+    querystring = JobInputsOutputsQuery()
 
 
 class JobOutputQuery(ExtendedMappingSchema):
     schema = ExtendedSchemaNode(
-        String(), example=JobOutputsSchema.OGC, default=JobOutputsSchema.OLD,
-        validator=OneOfCaseInsensitive(JobOutputsSchema.values()),
+        String(),
+        title="JobOutputResultsSchema",
+        example=JobInputsOutputsSchema.OGC,
+        default=JobInputsOutputsSchema.OLD,
+        validator=OneOfCaseInsensitive(JobInputsOutputsSchema.values()),
         summary="Selects the schema employed for representation of job outputs.",
         description=(
             "Selects the schema employed for representation of job outputs for providing file Content-Type details. "
-            f"When '{JobOutputsSchema.OLD}' is employed, 'format.mimeType' is used and 'type' is reported as well. "
-            f"When '{JobOutputsSchema.OGC}' is employed, 'format.mediaType' is used and 'type' is reported as well. "
+            f"When '{JobInputsOutputsSchema.OLD}' is employed, 'format.mimeType' is used and 'type' is reported as well. "
+            f"When '{JobInputsOutputsSchema.OGC}' is employed, 'format.mediaType' is used and 'type' is reported as well. "
             "When the '+strict' value is added, only the 'format' or 'type' will be represented according to the "
-            f"reference standard ({JobOutputsSchema.OGC}, {JobOutputsSchema.OLD}) representation."
+            f"reference standard ({JobInputsOutputsSchema.OGC}, {JobInputsOutputsSchema.OLD}) representation."
         )
     )
 
@@ -2453,9 +2476,16 @@ class ExecuteOutputSpecList(ExtendedSequenceSchema):
     output = ExecuteOutputItem()
 
 
-class ExecuteOutputSpecMap(ExtendedMappingSchema):
-    input_id = ExecuteOutputDefinition(variable="{input-id}", title="ExecuteOutputSpecMap",
-                                       description="Desired output reporting method.")
+class ExecuteOutputMapAdditionalProperties(ExtendedMappingSchema):
+    output_id = ExecuteOutputDefinition(variable="{output-id}", title="ExecuteOutputSpecMap",
+                                        description="Desired output reporting method.")
+
+
+class ExecuteOutputSpecMap(AnyOfKeywordSchema):
+    _any_of = [
+        ExecuteOutputMapAdditionalProperties(),  # normal {"<output-id>": {...}}
+        EmptyMappingSchema(),                    # allows explicitly provided {}
+    ]
 
 
 class ExecuteOutputSpec(OneOfKeywordSchema):
@@ -2966,10 +2996,17 @@ class ExecuteInputData(OneOfKeywordSchema):
 # 	      items:
 # 	        $ref: "inlineOrRefData.yaml"
 #
-class ExecuteInputMapValues(ExtendedMappingSchema):
+class ExecuteInputMapAdditionalProperties(ExtendedMappingSchema):
     schema_ref = f"{OGC_API_SCHEMA_URL}/{OGC_API_SCHEMA_VERSION}/core/openapi/schemas/execute.yaml"
     input_id = ExecuteInputData(variable="{input-id}", title="ExecuteInputValue",
                                 description="Received mapping input value definition during job submission.")
+
+
+class ExecuteInputMapValues(AnyOfKeywordSchema):
+    _any_of = [
+        ExecuteInputMapAdditionalProperties(),  # normal {"<input-id>": {...}}
+        EmptyMappingSchema(),                   # allows explicitly provided {}
+    ]
 
 
 class ExecuteInputValues(OneOfKeywordSchema):
@@ -2999,7 +3036,6 @@ class ExecuteInputOutputs(ExtendedMappingSchema):
     #   - 'tests.wps_restapi.test_colander_extras.test_oneof_variable_dict_or_list'
     inputs = ExecuteInputValues(default={}, description="Values submitted for execution.")
     outputs = ExecuteOutputSpec(
-        # FIXME: add documentation reference link OGC/Weaver for further details.
         description=(
             "Defines which outputs to be obtained from the execution (filtered or all), "
             "as well as the reporting method for each output according to 'transmissionMode', "
@@ -3683,8 +3719,7 @@ class Result(ExtendedMappingSchema):
     )
 
 
-class JobInputsBody(ExtendedMappingSchema):
-    inputs = ExecuteInputValues()
+class JobInputsBody(ExecuteInputOutputs):
     links = LinkList(missing=drop)
 
 

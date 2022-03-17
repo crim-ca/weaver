@@ -42,7 +42,7 @@ from weaver.visibility import Visibility
 from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Optional, Tuple, Union
+    from typing import Any, Dict, Iterable, Optional, Tuple, Union
 
     from requests import Response
 
@@ -558,6 +558,7 @@ class WeaverClient(object):
                 show_links=True,        # type: bool
                 show_headers=False,     # type: bool
                 output_format=None,     # type: Optional[AnyOutputFormat]
+                output_refs=None,       # type: Optional[Iterable[str]]
                 ):                      # type: (...) -> OperationResult
         """
         Execute a :term:`Job` for the specified :term:`Process` with provided inputs.
@@ -594,6 +595,12 @@ class WeaverClient(object):
         :param show_links: Indicate if ``links`` section should be preserved in returned result body.
         :param show_headers: Indicate if response headers should be returned in result output.
         :param output_format: Select an alternate output representation of the result body contents.
+        :param output_refs:
+            Indicates which outputs by ID to be returned as HTTP Link header reference instead of body content value.
+            With reference transmission mode, outputs that contain literal data will be linked by ``text/plain`` file
+            containing the data. outputs that refer to a file reference will simply contain that URL reference as link.
+            With value transmission mode (default behavior when outputs are not specified in this list), outputs are
+            returned as direct values (literal or href) within the response content body.
         :returns: Results of the operation.
         """
         if isinstance(inputs, list) and all(isinstance(item, list) for item in inputs):
@@ -612,8 +619,7 @@ class WeaverClient(object):
             "inputs": values,
             # FIXME: support 'response: raw' (https://github.com/crim-ca/weaver/issues/376)
             "response": ExecuteResponse.DOCUMENT,
-            # FIXME: allow omitting 'outputs' (https://github.com/crim-ca/weaver/issues/375)
-            # FIXME: allow 'transmissionMode: value/reference' selection (https://github.com/crim-ca/weaver/issues/377)
+            # FIXME: allow filtering 'outputs' (https://github.com/crim-ca/weaver/issues/380)
             "outputs": {}
         }
         result = self.describe(process_id, url=base)
@@ -621,9 +627,11 @@ class WeaverClient(object):
             return OperationResult(False, "Could not obtain process description for execution.",
                                    body=result.body, headers=result.headers, code=result.code, text=result.text)
         outputs = result.body.get("outputs")
+        output_refs = set(output_refs or [])
         for output_id in outputs:
             # use 'value' to have all outputs reported in body as 'value/href' rather than 'Link' headers
-            data["outputs"][output_id] = {"transmissionMode": ExecuteTransmissionMode.VALUE}
+            out_mode = ExecuteTransmissionMode.REFERENCE if output_id in output_refs else ExecuteTransmissionMode.VALUE
+            data["outputs"][output_id] = {"transmissionMode": out_mode}
 
         LOGGER.info("Executing [%s] with inputs:\n%s", process_id, OutputFormat.convert(values, OutputFormat.JSON_STR))
         path = f"{base}/processes/{process_id}/execution"  # use OGC-API compliant endpoint (not '/jobs')
@@ -841,6 +849,8 @@ class WeaverClient(object):
         resp = request_extra("GET", result_url, headers=self._headers, settings=self._settings)
         res_out = self._parse_result(resp, output_format=output_format,
                                      show_links=show_links, show_headers=show_headers)
+
+        # FIXME: consider results that were requested with transmissionMOde="reference" (for check+download)
         outputs = res_out.body
         if not res_out.success or not isinstance(res_out.body, dict):
             return OperationResult(False, "Could not retrieve any output results from job.", outputs)
@@ -1216,6 +1226,29 @@ def make_parser():
             Example: ``-I message='Hello Weaver' -I value:int=1234``
         """)
     )
+    # FIXME: allow filtering 'outputs' (https://github.com/crim-ca/weaver/issues/380)
+    #   Only specified ones are returned, if none specified, return all.
+    # op_execute.add_argument(
+    #    "-O", "--output",
+    op_execute.add_argument(
+        "-R", "--ref", "--reference", metavar="REFERENCE", dest="output_refs", nargs=1, action="append",
+        help=inspect.cleandoc("""
+            Indicates which outputs by ID to be returned as HTTP Link header reference instead of body content value.
+            This defines the output transmission mode when submitting the execution request.
+
+            With reference transmission mode, 
+            outputs that contain literal data will be linked by ``text/plain`` file containing the data.
+            Outputs that refer to a file reference will simply contain that URL reference as link.
+
+            With value transmission mode (default behavior when outputs are not specified in this list), outputs are 
+            returned as direct values (literal or href) within the response content body.
+            
+            When requesting any output to be returned by reference, option ``-H/--headers`` should be considered as 
+            well to return the provided ``Link`` headers for these outputs on the command line.
+            
+            Example: ``-R output-one -R output-two``
+        """)
+    )
     op_execute.add_argument(
         "-M", "--monitor", dest="monitor", action="store_true",
         help="Automatically perform the monitoring operation following job submission to retrieve final results. "
@@ -1288,7 +1321,7 @@ def make_parser():
     op_results = WeaverArgumentParser(
         "results",
         description=(
-            "Obtain the output results description of a job. "
+            "Obtain the output results from a job successfully executed. "
             "This operation can also download them from the remote server if requested."
         ),
         formatter_class=ParagraphFormatter,

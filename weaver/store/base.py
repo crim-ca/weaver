@@ -3,13 +3,20 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import datetime
-    from typing import Any, Dict, List, Optional, Tuple, Union
+    from typing import Dict, List, Optional, Tuple, Union
 
     from pyramid.request import Request
     from pywps import Process as ProcessWPS
 
     from weaver.datatype import Bill, Job, Process, Quote, Service, VaultFile
-    from weaver.typedefs import AnyUUID, DatetimeIntervalType, SettingsType, TypedDict
+    from weaver.typedefs import (
+        AnyUUID,
+        ExecutionInputs,
+        ExecutionOutputs,
+        DatetimeIntervalType,
+        SettingsType,
+        TypedDict
+    )
 
     JobGroupCategory = TypedDict("JobGroupCategory",
                                  {"category": Dict[str, Optional[str]], "count": int, "jobs": List[Job]})
@@ -113,7 +120,8 @@ class StoreJobs(StoreInterface):
                  task_id,                   # type: str
                  process,                   # type: str
                  service=None,              # type: Optional[str]
-                 inputs=None,               # type: Optional[List[Any]]
+                 inputs=None,               # type: Optional[ExecutionInputs]
+                 outputs=None,              # type: Optional[ExecutionOutputs]
                  is_workflow=False,         # type: bool
                  is_local=False,            # type: bool
                  execute_async=True,        # type: bool

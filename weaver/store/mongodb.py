@@ -54,7 +54,7 @@ if TYPE_CHECKING:
 
     from weaver.processes.types import AnyProcessType
     from weaver.store.base import DatetimeIntervalType, JobGroupCategory, JobSearchResult
-    from weaver.typedefs import AnyProcess, AnyProcessClass, AnyUUID, AnyValueType
+    from weaver.typedefs import AnyProcess, AnyProcessClass, AnyUUID, AnyValueType, ExecutionInputs, ExecutionOutputs
     from weaver.visibility import AnyVisibility
 
     MongodbValue = Union[AnyValueType, datetime.datetime]
@@ -572,7 +572,8 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
                  task_id,                   # type: AnyUUID
                  process,                   # type: str
                  service=None,              # type: Optional[str]
-                 inputs=None,               # type: Optional[List[Any]]
+                 inputs=None,               # type: Optional[ExecutionInputs]
+                 outputs=None,              # type: Optional[ExecutionOutputs]
                  is_workflow=False,         # type: bool
                  is_local=False,            # type: bool
                  execute_async=True,        # type: bool

@@ -60,7 +60,7 @@ class BuiltinAppTest(WpsConfigBase):
         assert len(body["process"]["outputs"][0]["formats"]) == 1
         assert body["process"]["outputs"][0]["formats"][0]["mediaType"] == ContentType.APP_NETCDF
         assert body["jobControlOptions"] == [ExecuteControlOption.ASYNC, ExecuteControlOption.SYNC]
-        assert body["outputTransmission"] == [ExecuteTransmissionMode.VALUE]
+        assert body["outputTransmission"] == [ExecuteTransmissionMode.REFERENCE, ExecuteTransmissionMode.VALUE]
 
     def test_jsonarray2netcdf_describe_ogc_schema(self):
         resp = self.app.get("/processes/jsonarray2netcdf", headers=self.json_headers)
@@ -84,7 +84,7 @@ class BuiltinAppTest(WpsConfigBase):
         assert len(body["outputs"]["output"]["formats"]) == 1
         assert body["outputs"]["output"]["formats"][0]["mediaType"] == ContentType.APP_NETCDF
         assert body["jobControlOptions"] == [ExecuteControlOption.ASYNC, ExecuteControlOption.SYNC]
-        assert body["outputTransmission"] == [ExecuteTransmissionMode.VALUE]
+        assert body["outputTransmission"] == [ExecuteTransmissionMode.REFERENCE, ExecuteTransmissionMode.VALUE]
 
     def test_jsonarray2netcdf_execute_async(self):
         dirname = tempfile.gettempdir()

@@ -67,6 +67,8 @@ if TYPE_CHECKING:
         AnyProcess,
         AnySettingsContainer,
         AnyUUID,
+        ExecutionInputs,
+        ExecutionOutputs,
         Number,
         CWL,
         JSON,
@@ -756,19 +758,29 @@ class Job(Base):
         return "provider"
 
     def _get_inputs(self):
-        # type: () -> List[Optional[Dict[str, JSON]]]
+        # type: () -> Optional[ExecutionInputs]
         if self.get("inputs") is None:
-            self["inputs"] = list()
+            return {}
         return dict.__getitem__(self, "inputs")
 
     def _set_inputs(self, inputs):
-        # type: (List[Optional[Dict[str, JSON]]]) -> None
-        if not isinstance(inputs, list):
-            raise TypeError(f"Type 'list' is required for '{self.__name__}.inputs'")
+        # type: (Optional[ExecutionInputs]) -> None
         self["inputs"] = inputs
 
     # allows to correctly update list by ref using 'job.inputs.extend()'
-    inputs = property(_get_inputs, _set_inputs)
+    inputs = property(_get_inputs, _set_inputs, doc="Input values and reference submitted for execution.")
+
+    def _get_outputs(self):
+        # type: () -> Optional[ExecutionOutputs]
+        if self.get("outputs") is None:
+            return {}
+        return dict.__getitem__(self, "outputs")
+
+    def _set_outputs(self, outputs):
+        # type: (Optional[ExecutionOutputs]) -> None
+        self["outputs"] = outputs
+
+    outputs = property(_get_outputs, _set_outputs, doc="Output transmission modes submitted for execution.")
 
     @property
     def user_id(self):
@@ -969,7 +981,7 @@ class Job(Base):
         self["results"] = results
 
     # allows to correctly update list by ref using 'job.results.extend()'
-    results = property(_get_results, _set_results)
+    results = property(_get_results, _set_results, doc="Output values and references that resulted from execution.")
 
     def _get_exceptions(self):
         # type: () -> List[Union[str, Dict[str, str]]]
@@ -1811,13 +1823,13 @@ class Process(Base):
     @property
     def outputTransmission(self):  # noqa: N802
         # type: () -> List[AnyExecuteTransmissionMode]
-        out = self.setdefault("outputTransmission", [ExecuteTransmissionMode.VALUE])
+        out = self.setdefault("outputTransmission", ExecuteTransmissionMode.values())
         if not isinstance(out, list):  # eg: None, bw-compat
             out = [ExecuteTransmissionMode.VALUE]
         out = [ExecuteTransmissionMode.get(mode) for mode in out]
         out = [mode for mode in out if mode is not None]
         if len(out) == 0:
-            out.append(ExecuteTransmissionMode.VALUE)
+            out.extend(ExecuteTransmissionMode.values())
         self["outputTransmission"] = list(sorted(out))
         return dict.__getitem__(self, "outputTransmission")
 

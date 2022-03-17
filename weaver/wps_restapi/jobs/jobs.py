@@ -31,16 +31,22 @@ from weaver.exceptions import (
     ServiceNotFound,
     log_unhandled_exceptions
 )
+from weaver.execute import ExecuteTransmissionMode
 from weaver.formats import ContentType, OutputFormat, get_format, repr_json
 from weaver.owsexceptions import OWSNoApplicableCode, OWSNotFound
-from weaver.processes.convert import any2wps_literal_datatype
+from weaver.processes.convert import (
+    any2wps_literal_datatype,
+    convert_input_values_schema,
+    convert_output_params_schema,
+    get_field
+)
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
 from weaver.utils import get_any_id, get_any_value, get_path_kvp, get_settings, get_weaver_url, is_uuid
 from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_output_dir, get_wps_output_url
 from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.constants import JobOutputsSchema
+from weaver.wps_restapi.constants import JobInputsOutputsSchema
 from weaver.wps_restapi.providers.utils import forbid_local_only
 from weaver.wps_restapi.swagger_definitions import datetime_interval_parser
 
@@ -49,8 +55,8 @@ if TYPE_CHECKING:
 
     from pyramid.httpexceptions import HTTPException
 
-    from weaver.typedefs import AnySettingsContainer, AnyValueType, JSON
-    from weaver.wps_restapi.constants import JobOutputsSchemaType
+    from weaver.typedefs import AnySettingsContainer, AnyUUID, AnyValueType, HeadersTupleType, JSON, SettingsType
+    from weaver.wps_restapi.constants import JobInputsOutputsSchemaType
 
 LOGGER = get_task_logger(__name__)
 
@@ -214,8 +220,66 @@ def get_job_list_links(job_total, filters, request):
     return links
 
 
-def get_results(job, container, value_key=None, schema=JobOutputsSchema.OLD):
-    # type: (Job, AnySettingsContainer, Optional[str], JobOutputsSchemaType) -> Union[List[JSON], JSON]
+def get_schema_query(schema, strict=True):
+    # type: (Optional[JobInputsOutputsSchemaType], bool) -> Optional[JobInputsOutputsSchemaType]
+    if not schema:
+        return None
+    # unescape query (eg: "OGC+strict" becomes "OGC string" from URL parsing)
+    schema_checked = str(schema).replace(" ", "+").lower()
+    if JobInputsOutputsSchema.get(schema_checked) is None:
+        raise HTTPBadRequest(json={
+            "type": "InvalidParameterValue",
+            "detail": "Query parameter 'schema' value is invalid.",
+            "status": HTTPBadRequest.code,
+            "locator": "query",
+            "value": str(schema),
+        })
+    if not strict:
+        return schema_checked.split("+")[0]
+    return schema_checked
+
+
+def make_result_link(result_id, result, job_id, settings):
+    # type: (str, Union[JSON, List[JSON]], AnyUUID, SettingsType) -> List[str]
+    """
+    Convert a result definition as ``value`` into the corresponding ``reference`` for output transmission.
+
+    .. seealso::
+        :rfc:`8288`: HTTP ``Link`` header specification.
+    """
+    values = result if isinstance(result, list) else [result]
+    suffixes = list(f".{idx}" for idx in range(len(values))) if isinstance(result, list) else [""]
+    wps_url = get_wps_output_url(settings).strip("/")
+    links = []
+    for suffix, value in zip(suffixes, values):
+        key = get_any_value(result, key=True)
+        if key != "href":
+            # literal data to be converted to link
+            # plain text file must be created containing the raw literal data
+            typ = ContentType.TEXT_PLAIN  # as per '/rec/core/process-execute-sync-document-ref'
+            enc = "UTF-8"
+            out = get_wps_output_dir(settings)
+            val = get_any_value(value, data=True, file=False)
+            loc = os.path.join(job_id, result_id + suffix + ".txt")
+            url = f"{wps_url}/{loc}"
+            path = os.path.join(out, loc)
+            with open(path, mode="w", encoding=enc) as out_file:
+                out_file.write(val)
+        else:
+            fmt = get_field(result, "format", default={"mediaType": ContentType.TEXT_PLAIN})
+            typ = get_field(fmt, "mime_type", search_variations=True, default=ContentType.TEXT_PLAIN)
+            enc = get_field(fmt, "encoding", search_variations=True, default=None)
+            url = get_any_value(value, data=False, file=True)  # should already include full path
+        links.append(f"<{url}>; rel=\"{result_id}{suffix}\"; type={typ}; charset={enc}")
+    return links
+
+
+def get_results(job,                                # type: Job
+                container,                          # type: AnySettingsContainer
+                value_key=None,                     # type: Optional[str]
+                schema=JobInputsOutputsSchema.OLD,  # type: JobInputsOutputsSchemaType
+                link_references=False,              # type: bool
+                ):                                  # type: (...) -> Tuple[Union[List[JSON], JSON], HeadersTupleType]
     """
     Obtains the job results with extended full WPS output URL as applicable and according to configuration settings.
 
@@ -225,23 +289,33 @@ def get_results(job, container, value_key=None, schema=JobOutputsSchema.OLD):
         If not specified, the returned values will have the appropriate ``data``/``href`` key according to the content.
         Otherwise, all values will have the specified key.
     :param schema:
-        Selects which schema to employ for representing the output results.
-    :returns: list of all outputs each with minimally an ID and value under the requested key.
+        Selects which schema to employ for representing the output results (listing or mapping).
+    :param link_references:
+        If enabled, an output that was requested by reference instead of value will be returned as ``Link`` reference.
+    :returns:
+        Tuple with:
+            - List or mapping of all outputs each with minimally an ID and value under the requested key.
+            - List of ``Link`` headers for reference outputs when requested. Empty otherwise.
     """
-    wps_url = get_wps_output_url(container)
+    settings = get_settings(container)
+    wps_url = get_wps_output_url(settings)
     if not wps_url.endswith("/"):
         wps_url = wps_url + "/"
-    schema = JobOutputsSchema.get(str(schema).lower(), default=JobOutputsSchema.OLD)
+    schema = JobInputsOutputsSchema.get(str(schema).lower(), default=JobInputsOutputsSchema.OLD)
     strict = schema.endswith("+strict")
     schema = schema.split("+")[0]
-    ogc_api = schema == JobOutputsSchema.OGC
+    ogc_api = schema == JobInputsOutputsSchema.OGC
     outputs = {} if ogc_api else []
     fmt_key = "mediaType" if ogc_api else "mimeType"
+    out_ref = convert_output_params_schema(job.outputs, JobInputsOutputsSchema.OGC) if link_references else {}
+    references = {}
     for result in job.results:
         rtype = "data" if any(k in result for k in ["data", "value"]) else "href"
         value = get_any_value(result)
-        out_id = get_any_id(result)
         out_key = rtype
+        out_id = get_any_id(result)
+        out_mode = out_ref.get(out_id, {}).get("transmissionMode")
+        as_ref = link_references and out_mode == ExecuteTransmissionMode.REFERENCE
         if rtype == "href":
             # fix paths relative to instance endpoint, but leave explicit links as is (eg: S3 bucket, remote HTTP, etc.)
             if value.startswith("/"):
@@ -258,11 +332,11 @@ def get_results(job, container, value_key=None, schema=JobOutputsSchema.OLD):
                 result["mimeType"] = get_format(value, default=ContentType.TEXT_PLAIN).mime_type
             if ogc_api or not strict:
                 output["type"] = result["mimeType"]
-            if not ogc_api or not strict:
+            if not ogc_api or not strict or as_ref:
                 output["format"] = {fmt_key: result["mimeType"]}
-            for field in ["encoding", "schema"]:
-                if field in result:
-                    output["format"][field] = result[field]
+                for field in ["encoding", "schema"]:
+                    if field in result:
+                        output["format"][field] = result[field]
         elif rtype != "href":
             # literal data
             # FIXME: BoundingBox not implemented (https://github.com/crim-ca/weaver/issues/51)
@@ -272,20 +346,29 @@ def get_results(job, container, value_key=None, schema=JobOutputsSchema.OLD):
             else:
                 output["dataType"] = dtype
 
-        if ogc_api:
-            if out_id in outputs:
-                output_list = outputs[out_id]
+        if ogc_api or as_ref:
+            mapping = references if as_ref else outputs
+            if out_id in mapping:
+                output_list = mapping[out_id]
                 if not isinstance(output_list, list):
                     output_list = [output_list]
                 output_list.append(output)
-                outputs[out_id] = output_list
+                mapping[out_id] = output_list
             else:
-                outputs[out_id] = output
+                mapping[out_id] = output
         else:
             # if ordered insert supported by python version, insert ID first
             output = dict([("id", out_id)] + list(output.items()))  # noqa
             outputs.append(output)
-    return outputs
+
+    # needed to collect and aggregate outputs of same ID first in case of array
+    # convert any requested link references using indices if needed
+    headers = []
+    for out_id, output in references.items():
+        res_links = make_result_link(out_id, output, job.id, settings)
+        headers.extend([("Link", link) for link in res_links])
+
+    return outputs, headers
 
 
 def validate_service_process(request):
@@ -654,13 +737,19 @@ def cancel_job_batch(request):
 def get_job_inputs(request):
     # type: (Request) -> HTTPException
     """
-    Retrieve the inputs of a job.
+    Retrieve the inputs values and outputs definitions of a job.
     """
     job = get_job(request)
-    inputs = {"inputs": job.inputs}
-    inputs.update({"links": job.links(request, self_link="inputs")})
-    inputs = sd.JobInputsBody().deserialize(inputs)
-    return HTTPOk(json=inputs)
+    schema = get_schema_query(request.params.get("schema"), strict=False)
+    job_inputs = job.inputs
+    job_outputs = job.outputs
+    if schema:
+        job_inputs = convert_input_values_schema(job_inputs, schema)
+        job_outputs = convert_output_params_schema(job_outputs, schema)
+    body = {"inputs": job_inputs, "outputs": job_outputs}
+    body.update({"links": job.links(request, self_link="inputs")})
+    body = sd.JobInputsBody().deserialize(body)
+    return HTTPOk(json=body)
 
 
 @sd.provider_outputs_service.get(tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES], renderer=OutputFormat.JSON,
@@ -673,13 +762,14 @@ def get_job_inputs(request):
 def get_job_outputs(request):
     # type: (Request) -> HTTPException
     """
-    Retrieve the outputs of a job.
+    Retrieve the output values resulting from a job execution.
     """
     job = get_job(request)
     raise_job_dismissed(job, request)
     raise_job_bad_status(job, request)
-    schema = request.params.get("schema")
-    outputs = {"outputs": get_results(job, request, schema=str(schema).replace(" ", "+"))}  # unescape query
+    schema = get_schema_query(request.params.get("schema"))
+    results, _ = get_results(job, request, schema=schema, link_references=False)
+    outputs = {"outputs": results}
     outputs.update({"links": job.links(request, self_link="outputs")})
     outputs = sd.JobOutputsBody().deserialize(outputs)
     return HTTPOk(json=outputs)
@@ -706,10 +796,16 @@ def get_job_results(request):
             "code": "ResultsNotReady",
             "description": "Job status is '{}'. Results are not yet available.".format(job_status)
         })
-    results = get_results(job, request, value_key="value", schema=JobOutputsSchema.OGC)
-    # note: cannot add links in this case because variable OutputID keys are directly at the root
-    results = sd.Result().deserialize(results)
-    return HTTPOk(json=results)
+
+    results, refs = get_results(job, request, value_key="value",
+                                schema=JobInputsOutputsSchema.OGC, link_references=True)
+    # note:
+    #   Cannot add "links" field in response body because variable Output ID keys are directly at the root
+    #   Possible conflict with an output that would be named "links".
+
+    if results:  # avoid error if all by reference
+        results = sd.Result().deserialize(results)
+    return HTTPOk(json=results, headers=refs)
 
 
 @sd.provider_exceptions_service.get(tags=[sd.TAG_JOBS, sd.TAG_EXCEPTIONS, sd.TAG_PROVIDERS],
