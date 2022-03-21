@@ -510,7 +510,7 @@ def as_int(value, default):
     """
     try:
         return int(value)
-    except Exception:
+    except Exception:  # noqa: W0703 # nosec: B110
         pass
     return default
 
