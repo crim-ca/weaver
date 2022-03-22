@@ -436,26 +436,26 @@ and parametrization of various input/output combinations. Let's employ the follo
     | .. code-block:: json                          | .. code-block:: json                          |
     |   :caption: Job Execution Payload as Listing  |   :caption: Job Execution Payload as Mapping  |
     |                                               |                                               |
-    | {                                             | {                                             |
-    |   "mode": "async",                            |   "mode": "async",                            |
-    |   "response": "document",                     |   "response": "document",                     |
-    |   "inputs": [                                 |   "inputs": {                                 |
-    |     {                                         |     "input-file": {                           |
-    |       "id": "input-file",                     |       "href": "<some-file-reference"          |
-    |       "href": "<some-file-reference"          |     },                                        |
-    |     },                                        |     "input-value": {                          |
-    |     {                                         |       "value": 1                              |
-    |       "id": "input-value",                    |     }                                         |
-    |       "data": 1,                              |   },                                          |
-    |     }                                         |   "outputs": {                                |
-    |   ],                                          |     "output": {                               |
-    |   "outputs": [                                |       "transmissionMode": "reference"         |
-    |     {                                         |     }                                         |
-    |       "id": "output",                         |   }                                           |
-    |       "transmissionMode": "reference"         | }                                             |
-    |     }                                         |                                               |
-    |   ]                                           |                                               |
-    | }                                             |                                               |
+    |   {                                           |   {                                           |
+    |     "mode": "async",                          |     "mode": "async",                          |
+    |     "response": "document",                   |     "response": "document",                   |
+    |     "inputs": [                               |     "inputs": {                               |
+    |       {                                       |       "input-file": {                         |
+    |         "id": "input-file",                   |         "href": "<some-file-reference"        |
+    |         "href": "<some-file-reference"        |       },                                      |
+    |       },                                      |       "input-value": {                        |
+    |       {                                       |         "value": 1                            |
+    |         "id": "input-value",                  |       }                                       |
+    |         "data": 1,                            |     },                                        |
+    |       }                                       |     "outputs": {                              |
+    |     ],                                        |       "output": {                             |
+    |     "outputs": [                              |         "transmissionMode": "reference"       |
+    |       {                                       |       }                                       |
+    |         "id": "output",                       |     }                                         |
+    |         "transmissionMode": "reference"       |   }                                           |
+    |       }                                       |                                               |
+    |     ]                                         |                                               |
+    |   }                                           |                                               |
     +-----------------------------------------------+-----------------------------------------------+
 
 .. note::
