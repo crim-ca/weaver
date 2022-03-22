@@ -3039,6 +3039,9 @@ class ExecuteInputOutputs(ExtendedMappingSchema):
     #   - 'tests.wps_restapi.test_providers.WpsRestApiProcessesTest.test_execute_process_no_error_not_required_params'
     #   - 'tests.wps_restapi.test_providers.WpsRestApiProcessesTest.test_get_provider_process_no_inputs'
     #   - 'tests.wps_restapi.test_colander_extras.test_oneof_variable_dict_or_list'
+    #
+    # OGC 'execute.yaml' also does not enforce any required item.
+    schema_ref = f"{OGC_API_SCHEMA_URL}/{OGC_API_SCHEMA_VERSION}/core/openapi/schemas/execute.yaml"
     inputs = ExecuteInputValues(default={}, description="Values submitted for execution.")
     outputs = ExecuteOutputSpec(
         description=(
