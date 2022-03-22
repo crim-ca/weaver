@@ -1236,16 +1236,16 @@ def make_parser():
             Indicates which outputs by ID to be returned as HTTP Link header reference instead of body content value.
             This defines the output transmission mode when submitting the execution request.
 
-            With reference transmission mode, 
+            With reference transmission mode,
             outputs that contain literal data will be linked by ``text/plain`` file containing the data.
             Outputs that refer to a file reference will simply contain that URL reference as link.
 
-            With value transmission mode (default behavior when outputs are not specified in this list), outputs are 
+            With value transmission mode (default behavior when outputs are not specified in this list), outputs are
             returned as direct values (literal or href) within the response content body.
-            
-            When requesting any output to be returned by reference, option ``-H/--headers`` should be considered as 
+
+            When requesting any output to be returned by reference, option ``-H/--headers`` should be considered as
             well to return the provided ``Link`` headers for these outputs on the command line.
-            
+
             Example: ``-R output-one -R output-two``
         """)
     )

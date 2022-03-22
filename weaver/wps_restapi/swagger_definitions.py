@@ -2363,8 +2363,10 @@ class JobOutputQuery(ExtendedMappingSchema):
         summary="Selects the schema employed for representation of job outputs.",
         description=(
             "Selects the schema employed for representation of job outputs for providing file Content-Type details. "
-            f"When '{JobInputsOutputsSchema.OLD}' is employed, 'format.mimeType' is used and 'type' is reported as well. "
-            f"When '{JobInputsOutputsSchema.OGC}' is employed, 'format.mediaType' is used and 'type' is reported as well. "
+            f"When '{JobInputsOutputsSchema.OLD}' is employed, "
+            "'format.mimeType' is used and 'type' is reported as well. "
+            f"When '{JobInputsOutputsSchema.OGC}' is employed, "
+            "'format.mediaType' is used and 'type' is reported as well. "
             "When the '+strict' value is added, only the 'format' or 'type' will be represented according to the "
             f"reference standard ({JobInputsOutputsSchema.OGC}, {JobInputsOutputsSchema.OLD}) representation."
         )
