@@ -4,8 +4,8 @@ from time import sleep
 from typing import TYPE_CHECKING
 
 import colander
-from celery.utils.log import get_task_logger
 from celery.exceptions import TimeoutError as CeleryTaskTimeoutError
+from celery.utils.log import get_task_logger
 from owslib.util import clean_ows_url
 from owslib.wps import ComplexDataInput
 from pyramid.httpexceptions import HTTPBadRequest, HTTPNotAcceptable

@@ -20,13 +20,13 @@ from inspect import isclass
 from typing import TYPE_CHECKING
 
 # Note: do NOT import 'boto3' here otherwise 'moto' will not be able to mock it effectively
-from celery.exceptions import TimeoutError as CeleryTaskTimeoutError
 import colander
 import mock
 import moto
 import pkg_resources
 import pyramid_celery
 import responses
+from celery.exceptions import TimeoutError as CeleryTaskTimeoutError
 from owslib.wps import Languages, WebProcessingService
 from pyramid import testing
 from pyramid.config import Configurator
