@@ -40,9 +40,8 @@ from weaver.exceptions import (
     log_unhandled_exceptions
 )
 from weaver.processes.types import ProcessType
-from weaver.status import JOB_STATUS_CATEGORIES, StatusCategory, map_status
 from weaver.store.base import StoreProcesses, StoreServices
-from weaver.utils import get_header, get_sane_name, get_settings, get_url_without_query
+from weaver.utils import get_sane_name, get_settings, get_url_without_query
 from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_client
 from weaver.wps_restapi import swagger_definitions as sd

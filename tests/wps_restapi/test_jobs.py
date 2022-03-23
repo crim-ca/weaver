@@ -1,4 +1,3 @@
-import colander
 import contextlib
 import datetime
 import json
@@ -12,6 +11,7 @@ from datetime import date
 from distutils.version import LooseVersion
 from typing import TYPE_CHECKING
 
+import colander
 import mock
 import pyramid.testing
 import pytest
