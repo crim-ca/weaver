@@ -242,6 +242,9 @@ class WorkerService(ServiceWPS):
             process_id=pid, is_local=True, is_workflow=is_workflow, visibility=Visibility.PUBLIC,
             language=wps_request.language, tags=tags, headers=dict(req.headers), context=ctx
         )
+        # enforced JSON results with submitted data that includes 'response=document'
+        # use 'json_body' to work with any 'response' implementation
+        body = resp.json_body
 
         # if Accept was JSON, provide response content as is
         # if anything else (even */*), return as XML
@@ -250,11 +253,11 @@ class WorkerService(ServiceWPS):
         #   way to provide explicitly Accept header. Even our Wps1Process as Workflow step depends on this behaviour.
         accept_type = get_header("Accept", req.headers)
         if accept_type == ContentType.APP_JSON:
-            resp = get_job_submission_response(resp.body, resp.headers)
+            resp = get_job_submission_response(body, resp.headers)
             setattr(resp, "_update_status", lambda *_, **__: None)  # patch to avoid pywps server raising
             return resp
 
-        return resp.body
+        return body
 
     @handle_known_exceptions
     def prepare_process_for_execution(self, identifier):
