@@ -52,6 +52,7 @@ if TYPE_CHECKING:
     from typing import Any, Callable, Dict, List, Optional, Tuple, Union
     from pymongo.collection import Collection
 
+    from weaver.execute import AnyExecuteResponse
     from weaver.processes.types import AnyProcessType
     from weaver.store.base import DatetimeIntervalType, JobGroupCategory, JobSearchResult
     from weaver.typedefs import AnyProcess, AnyProcessClass, AnyUUID, AnyValueType, ExecutionInputs, ExecutionOutputs
@@ -577,6 +578,7 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
                  is_workflow=False,         # type: bool
                  is_local=False,            # type: bool
                  execute_async=True,        # type: bool
+                 execute_response=None,     # type: Optional[AnyExecuteResponse]
                  custom_tags=None,          # type: Optional[List[str]]
                  user_id=None,              # type: Optional[int]
                  access=None,               # type: Optional[str]
@@ -610,6 +612,7 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
                 "inputs": inputs,
                 "status": map_status(Status.ACCEPTED),
                 "execute_async": execute_async,
+                "execution_response": execute_response,
                 "is_workflow": is_workflow,
                 "is_local": is_local,
                 "created": created if created else now(),

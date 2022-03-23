@@ -30,7 +30,7 @@ from pywps import Process as ProcessWPS
 
 from weaver import xml_util
 from weaver.exceptions import ProcessInstanceError, ServiceParsingError
-from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteTransmissionMode
+from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import AcceptLanguage, ContentType, repr_json
 from weaver.processes.constants import ProcessSchema
 from weaver.processes.convert import get_field, null, ows2json, wps2json_io
@@ -58,7 +58,7 @@ if TYPE_CHECKING:
 
     from owslib.wps import WebProcessingService
 
-    from weaver.execute import AnyExecuteControlOption, AnyExecuteTransmissionMode
+    from weaver.execute import AnyExecuteControlOption, AnyExecuteMode, AnyExecuteResponse, AnyExecuteTransmissionMode
     from weaver.processes.constants import ProcessSchemaType
     from weaver.processes.types import AnyProcessType
     from weaver.quotation.status import AnyQuoteStatus
@@ -837,6 +837,21 @@ class Job(Base):
             raise TypeError(f"Type 'str' is required for '{self.__name__}.status_location'")
         self["status_location"] = location_url
 
+    def status_url(self, container=None):
+        # type: (Optional[AnySettingsContainer]) -> str
+        """
+        Obtain the resolved endpoint where the :term:`Job` status information can be obtained.
+        """
+        settings = get_settings(container)
+        location_base = "/providers/{provider_id}".format(provider_id=self.service) if self.service else ""
+        location_url = "{base_url}{location_base}/processes/{process_id}/jobs/{job_id}".format(
+            base_url=get_wps_restapi_base_url(settings),
+            location_base=location_base,
+            process_id=self.process,
+            job_id=self.id
+        )
+        return location_url
+
     @property
     def notification_email(self):
         # type: () -> Optional[str]
@@ -873,17 +888,38 @@ class Job(Base):
 
     @property
     def execution_mode(self):
-        # type: () -> ExecuteMode
+        # type: () -> AnyExecuteMode
         return ExecuteMode.get(self.get("execution_mode"), ExecuteMode.ASYNC)
 
     @execution_mode.setter
     def execution_mode(self, mode):
-        # type: (Union[ExecuteMode, str]) -> None
+        # type: (Union[AnyExecuteMode, str]) -> None
         exec_mode = ExecuteMode.get(mode)
         if exec_mode not in ExecuteMode:
             modes = list(ExecuteMode.values())
             raise ValueError(f"Invalid value for '{self.__name__}.execution_mode'. Must be one of {modes}")
         self["execution_mode"] = mode
+
+    @property
+    def execution_response(self):
+        # type: () -> AnyExecuteResponse
+        out = self.setdefault("execution_response", ExecuteResponse.DOCUMENT)
+        if out not in ExecuteResponse.values():
+            out = ExecuteResponse.DOCUMENT
+        self["execution_response"] = out
+        return out
+
+    @execution_response.setter
+    def execution_response(self, response):
+        # type: (Optional[Union[AnyExecuteResponse, str]]) -> None
+        if response is None:
+            exec_resp = ExecuteResponse.DOCUMENT
+        else:
+            exec_resp = ExecuteResponse.get(response)
+        if exec_resp not in ExecuteResponse:
+            resp = list(ExecuteResponse.values())
+            raise ValueError(f"Invalid value for '{self.__name__}.execution_response'. Must be one of {resp}")
+        self["execution_response"] = exec_resp
 
     @property
     def is_local(self):
@@ -1216,10 +1252,12 @@ class Job(Base):
             "service": self.service,
             "process": self.process,
             "inputs": self.inputs,
+            "outputs": self.outputs,
             "user_id": self.user_id,
             "status": self.status,
             "status_message": self.status_message,
             "status_location": self.status_location,
+            "execution_response": self.execution_response,
             "execution_mode": self.execution_mode,
             "is_workflow": self.is_workflow,
             "created": self.created,

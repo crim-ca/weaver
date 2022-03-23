@@ -42,7 +42,6 @@ if TYPE_CHECKING:
     from webtest.response import TestResponse
     from werkzeug.wrappers import Request as WerkzeugRequest
 
-    from weaver.execute import AnyExecuteTransmissionMode
     from weaver.processes.wps_process_base import WpsProcessInterface
     from weaver.datatype import Process
     from weaver.status import AnyStatusType
@@ -302,6 +301,13 @@ if TYPE_CHECKING:
     ExecutionOutputsList = List[ExecutionOutputItem]
     ExecutionOutputsMap = Dict[str, ExecutionOutputObject]
     ExecutionOutputs = Union[ExecutionOutputsList, ExecutionOutputsMap]
+    ExecutionResultObject = TypedDict("ExecutionResultObject", {
+        "value": Optional[AnyValueType],
+        "href": Optional[str],
+        "type": Optional[str],
+    }, total=False)
+    ExecutionResultArray = List[ExecutionResultObject]
+    ExecutionResults = Dict[str, Union[ExecutionResultObject, ExecutionResultArray]]
 
     # reference employed as 'JobMonitorReference' by 'WPS1Process'
     JobExecution = TypedDict("JobExecution", {"execution": WPSExecution})

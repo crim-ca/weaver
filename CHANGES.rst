@@ -34,6 +34,10 @@ Changes:
   requested this way (resolves `#377 <https://github.com/crim-ca/weaver/issues/377>`_).
 - Updated every ``Process`` to report that they support ``outputTransmission`` both as ``reference`` and ``value``,
   since handling of results is accomplished by `Weaver` itself, regardless of the application being executed.
+- Add partial support of ``response=raw`` parameter for execution request submission in order to handle results to
+  be returned accordingly to specified ``outputTransmission`` by ``reference`` or ``value``.
+  Multipart contents for multi-output results are not yet supported
+  (relates to `#376 <https://github.com/crim-ca/weaver/issues/376>`_).
 - Add `CLI` option ``-R/--ref/--reference`` for ``execute`` operation allowing to request corresponding ``outputs``
   by ID to be returned using the ``transmissionMode: reference`` method, producing HTTP ``Link`` headers for those
   entries rather than inserting values in the response content body.

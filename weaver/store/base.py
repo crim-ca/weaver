@@ -9,6 +9,7 @@ if TYPE_CHECKING:
     from pywps import Process as ProcessWPS
 
     from weaver.datatype import Bill, Job, Process, Quote, Service, VaultFile
+    from weaver.execute import AnyExecuteResponse
     from weaver.typedefs import (
         AnyUUID,
         ExecutionInputs,
@@ -125,6 +126,7 @@ class StoreJobs(StoreInterface):
                  is_workflow=False,         # type: bool
                  is_local=False,            # type: bool
                  execute_async=True,        # type: bool
+                 execute_response=None,     # type: Optional[AnyExecuteResponse]
                  custom_tags=None,          # type: Optional[List[str]]
                  user_id=None,              # type: Optional[int]
                  access=None,               # type: Optional[str]

@@ -8,12 +8,12 @@ from celery.utils.log import get_task_logger
 from celery.exceptions import TimeoutError as CeleryTaskTimeoutError
 from owslib.util import clean_ows_url
 from owslib.wps import ComplexDataInput
-from pyramid.httpexceptions import HTTPBadRequest, HTTPNotAcceptable, HTTPNotImplemented
+from pyramid.httpexceptions import HTTPBadRequest, HTTPNotAcceptable
 from pyramid_celery import celery_app as app
 
 from weaver.database import get_db
 from weaver.datatype import Process, Service
-from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
+from weaver.execute import ExecuteControlOption, ExecuteMode
 from weaver.formats import AcceptLanguage, ContentType
 from weaver.notify import encrypt_email, notify_job_complete
 from weaver.owsexceptions import OWSNoApplicableCode
@@ -46,7 +46,7 @@ from weaver.wps.utils import (
     load_pywps_config
 )
 from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.utils import get_wps_restapi_base_url
+from weaver.wps_restapi.jobs.utils import get_job_results_response, get_job_submission_response
 
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
@@ -60,7 +60,7 @@ if TYPE_CHECKING:
     from weaver.datatype import Job
     from weaver.processes.convert import OWS_Input_Type, ProcessOWS
     from weaver.status import StatusType
-    from weaver.typedefs import CeleryResult, HeadersType, HeaderCookiesType, JSON, SettingsType
+    from weaver.typedefs import AnyResponseType, CeleryResult, HeadersType, HeaderCookiesType, JSON, SettingsType
     from weaver.visibility import AnyVisibility
 
 
@@ -442,7 +442,7 @@ def map_locations(job, settings):
 
 
 def submit_job(request, reference, tags=None):
-    # type: (Request, Union[Service, Process], Optional[List[str]]) -> Tuple[JSON, HeadersType]
+    # type: (Request, Union[Service, Process], Optional[List[str]]) -> AnyResponseType
     """
     Generates the job submission from details retrieved in the request.
 
@@ -498,28 +498,6 @@ def submit_job(request, reference, tags=None):
                               visibility, language=lang, headers=headers, tags=tags, user=user, context=context)
 
 
-def _validate_job_parameters(json_body):
-    # type: (JSON) -> None
-    """
-    Tests supported parameters not automatically validated by colander deserialize since they are optional.
-    """
-    exec_mode = json_body.get("mode")
-    if exec_mode not in [None, ExecuteMode.ASYNC, ExecuteMode.AUTO]:
-        raise HTTPNotImplemented(detail=f"Execution mode '{exec_mode}' not supported.")
-
-    resp_mode = json_body.get("response")
-    if resp_mode not in [None, ExecuteResponse.DOCUMENT]:
-        raise HTTPNotImplemented(detail=f"Execution response type '{resp_mode}' not supported.")
-
-    outputs = json_body.get("outputs", [])
-    if isinstance(outputs, dict):
-        outputs = [dict(id=out, **keys) for out, keys in outputs.items()]
-    for job_output in outputs:
-        mode = job_output["transmissionMode"]
-        if mode not in ExecuteTransmissionMode.values():
-            raise HTTPNotImplemented(detail=f"Execute transmissionMode '{mode}' not supported.")
-
-
 def submit_job_handler(payload,             # type: JSON
                        settings,            # type: SettingsType
                        service_url,         # type: str
@@ -533,7 +511,7 @@ def submit_job_handler(payload,             # type: JSON
                        tags=None,           # type: Optional[List[str]]
                        user=None,           # type: Optional[int]
                        context=None,        # type: Optional[str]
-                       ):                   # type: (...) -> Tuple[JSON, HeadersType]
+                       ):                   # type: (...) -> AnyResponseType
     """
     Submits the job to the Celery worker with provided parameters.
 
@@ -544,11 +522,6 @@ def submit_job_handler(payload,             # type: JSON
     except colander.Invalid as ex:
         raise HTTPBadRequest("Invalid schema: [{}]".format(str(ex)))
 
-    # TODO: remove when all parameter variations are supported
-    # FIXME:
-    #   - support 'response: raw' (https://github.com/crim-ca/weaver/issues/376)
-    #   - allow omitting 'outputs' (https://github.com/crim-ca/weaver/issues/375)
-    _validate_job_parameters(json_body)
     db = get_db(settings)
     headers = headers or {}
     if is_local:
@@ -566,6 +539,7 @@ def submit_job_handler(payload,             # type: JSON
         # as per https://datatracker.ietf.org/doc/html/rfc7240#section-2
         # Prefer header not resolve as valid still proces
         is_execute_async = mode != ExecuteMode.SYNC
+    exec_resp = json_body.get("response")
 
     notification_email = json_body.get("notification_email")
     encrypted_email = encrypt_email(notification_email, settings) if notification_email else None
@@ -573,17 +547,12 @@ def submit_job_handler(payload,             # type: JSON
     store = db.get_store(StoreJobs)  # type: StoreJobs
     job = store.save_job(task_id=Status.ACCEPTED, process=process_id, service=provider_id,
                          inputs=json_body.get("inputs"), is_local=is_local, is_workflow=is_workflow,
-                         access=visibility, user_id=user, execute_async=is_execute_async, custom_tags=tags,
-                         notification_email=encrypted_email, accept_language=language, context=context)
+                         access=visibility, user_id=user, context=context,
+                         execute_async=is_execute_async, execute_response=exec_resp,
+                         custom_tags=tags, notification_email=encrypted_email, accept_language=language)
     job.save_log(logger=LOGGER, message="Job task submitted for execution.", status=Status.ACCEPTED, progress=0)
     job = store.update_job(job)
-    location_base = "/providers/{provider_id}".format(provider_id=provider_id) if provider_id else ""
-    location_url = "{base_url}{location_base}/processes/{process_id}/jobs/{job_id}".format(
-        base_url=get_wps_restapi_base_url(settings),
-        location_base=location_base,
-        process_id=process_id,
-        job_id=job.id
-    )
+    location_url = job.status_url(settings)
     resp_headers = {"Location": location_url}
     resp_headers.update(applied)
 
@@ -598,9 +567,15 @@ def submit_job_handler(payload,             # type: JSON
             pass
         if result.ready():
             job = store.fetch_by_id(job.id)
+            # when sync is successful, it must return the results direct instead of status info
+            # see: https://docs.ogc.org/is/18-062r2/18-062r2.html#sc_execute_response
+            if job.status == Status.SUCCEEDED:
+                return get_job_results_response(job, settings, headers=resp_headers)
+            # otherwise return the error status
             body = job.json(container=settings, self_link="status")
             body["location"] = location_url
-            return body, resp_headers
+            resp = get_job_submission_response(body, resp_headers, error=True)
+            return resp
         else:
             LOGGER.debug("Celery task requested as sync took too long to complete (wait=%ss). Continue in async.", wait)
             # sync not respected, therefore must drop it
@@ -618,4 +593,5 @@ def submit_job_handler(payload,             # type: JSON
         "status": map_status(Status.ACCEPTED),
         "location": location_url
     }
-    return body, resp_headers
+    resp = get_job_submission_response(body, resp_headers)
+    return resp

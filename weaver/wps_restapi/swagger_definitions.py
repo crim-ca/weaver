@@ -3065,7 +3065,8 @@ class Execute(ExecuteInputOutputs):
             "Desired execution mode specified directly. This is intended for backward compatibility support. "
             "To obtain more control over execution mode selection, employ the official Prefer header instead "
             "(see for more details: https://pavics-weaver.readthedocs.io/en/latest/processes.html#execution-mode)."
-        )
+        ),
+        validator=OneOf(ExecuteMode.values())
     )
     response = JobResponseOptionsEnum(
         missing=drop,
@@ -3073,7 +3074,8 @@ class Execute(ExecuteInputOutputs):
         description=(
             "Indicates the desired representation format of the response. "
             "(see for more details: https://pavics-weaver.readthedocs.io/en/latest/processes.html#execution-body)."
-        )
+        ),
+        validator=OneOf(ExecuteResponse.values())
     )
     notification_email = ExtendedSchemaNode(
         String(),
@@ -4389,6 +4391,10 @@ class CompletedJobResponse(ExtendedMappingSchema):
     body = CompletedJobStatusSchema()
 
 
+class FailedSyncJobResponse(CompletedJobResponse):
+    description = "Job submitted and failed synchronous execution. See server logs for more details."
+
+
 class OkDeleteProcessJobResponse(ExtendedMappingSchema):
     header = ResponseHeaders()
     body = DismissedJobSchema()
@@ -4802,12 +4808,16 @@ post_provider_responses = {
 post_provider_process_job_responses = {
     "200": CompletedJobResponse(description="success"),
     "201": CreatedLaunchJobResponse(description="success"),
+    "204": NoContentJobResultsResponse(description="success"),
+    "400": FailedSyncJobResponse(),
     "403": ForbiddenProviderAccessResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 post_process_jobs_responses = {
     "200": CompletedJobResponse(description="success"),
     "201": CreatedLaunchJobResponse(description="success"),
+    "204": NoContentJobResultsResponse(description="success"),
+    "400": FailedSyncJobResponse(),
     "403": ForbiddenProviderAccessResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }

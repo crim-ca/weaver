@@ -103,32 +103,6 @@ def get_process(process_id=None, request=None, settings=None, store=None):
         raise HTTPBadRequest("Invalid schema:\n[{0!r}].".format(ex))
 
 
-def get_job_submission_response(body, headers):
-    # type: (JSON, AnyHeadersContainer) -> Union[HTTPOk, HTTPCreated]
-    """
-    Generates the successful response from contents returned by :term:`Job` submission process.
-
-    If :term:`Job` already finished processing within requested ``Prefer: wait=X`` seconds delay (and if allowed by
-    the :term:`Process` ``jobControlOptions``), return the successful status immediately instead of created status.
-
-    Otherwise, return the status monitoring location of the created :term:`Job` to be monitored asynchronously.
-
-    .. seealso::
-        :func:`weaver.processes.execution.submit_job`
-        :func:`weaver.processes.execution.submit_job_handler`
-    """
-    status = map_status(body.get("status"))
-    location = get_header("location", headers)
-    if status in JOB_STATUS_CATEGORIES[StatusCategory.FINISHED]:
-        body["description"] = sd.CompletedJobResponse.description
-        body = sd.CompletedJobStatusSchema().deserialize(body)
-        return HTTPOk(location=location, json=body, headers=headers)
-
-    body["description"] = sd.CreatedLaunchJobResponse.description
-    body = sd.CreatedJobStatusSchema().deserialize(body)
-    return HTTPCreated(location=location, json=body, headers=headers)
-
-
 def map_progress(progress, range_min, range_max):
     # type: (Number, Number, Number) -> Number
     """
