@@ -907,7 +907,7 @@ def mocked_dismiss_process():
     mock_celery_app = mock.MagicMock()
     mock_celery_app.control = mock.MagicMock()
     mock_celery_app.control.revoke = mock.MagicMock()
-    mock_celery_revoke = mock.patch("weaver.wps_restapi.jobs.jobs.celery_app", return_value=mock_celery_app)
+    mock_celery_revoke = mock.patch("weaver.wps_restapi.jobs.utils.celery_app", return_value=mock_celery_app)
 
     try:
         with mock_celery_revoke:
