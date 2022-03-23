@@ -744,6 +744,107 @@ class TestWeaverCLI(TestWeaverClientBase):
             assert any(f"\"status\": \"{Status.SUCCEEDED}\"" in line for line in lines)
             assert any("\"rel\": \"http://www.opengis.net/def/rel/ogc/1.0/results\"" in line for line in lines)
 
+    def test_execute_result_by_reference(self):
+        """
+        Validate option to obtain outputs by reference returned with ``Link`` header.
+
+        Result obtained is validated both with API outputs and extended auto-download outputs.
+        """
+        proc = self.test_process["Echo"]
+        with contextlib.ExitStack() as stack_exec:
+            out_tmp = stack_exec.enter_context(tempfile.TemporaryDirectory())
+            stack_exec.enter_context(mocked_wps_output(self.settings))
+            for mock_exec_proc in mocked_execute_celery():
+                stack_exec.enter_context(mock_exec_proc)
+
+            msg = "TEST MESSAGE!"
+            lines = mocked_sub_requests(
+                self.app, run_command,
+                [
+                    # "weaver",
+                    "execute",
+                    "-u", self.url,
+                    "-p", proc,
+                    "-I", f"message='{msg}'",
+                    "-R", "output",
+                    "-M",
+                    "-T", 10,
+                    "-W", 1,
+                    "-F", OutputFormat.YAML,
+                ],
+                trim=False,
+                entrypoint=weaver_cli,
+                only_local=True,
+            )
+            assert "jobID: " in lines[0]  # don't care value, self-handled
+            assert any(f"status: {Status.SUCCEEDED}" in line for line in lines)
+
+            job_id = lines[0].split(":")[-1].strip()
+            lines = mocked_sub_requests(
+                self.app, run_command,
+                [
+                    # "weaver",
+                    "results",
+                    "-u", self.url,
+                    "-j", job_id,
+                    "-H",   # must display header to get 'Link'
+                    "-F", OutputFormat.YAML,
+                ],
+                trim=False,
+                entrypoint=weaver_cli,
+                only_local=True,
+            )
+            sep = lines.index("---")
+            headers = lines[:sep]
+            content = lines[sep+1:-1]  # ignore final newline
+            assert len(headers) and any("Link:" in hdr for hdr in headers)
+            assert content == ["null"], "When no download involved, body should be the original no-content results."
+
+            lines = mocked_sub_requests(
+                self.app, run_command,
+                [
+                    # "weaver",
+                    "results",
+                    "-u", self.url,
+                    "-j", job_id,
+                    "-H",   # must display header to get 'Link'
+                    "-F", OutputFormat.YAML,
+                    "-D",
+                    "-O", out_tmp
+                ],
+                trim=False,
+                entrypoint=weaver_cli,
+                only_local=True,
+            )
+            sep = lines.index("---")
+            headers = lines[:sep]
+            content = lines[sep+1:]
+
+            assert len(content), "Content should have been populated from download to provide downloaded file paths."
+            link = None
+            for header in headers:
+                if "Link:" in header:
+                    link = header.split(":", 1)[-1].strip()
+                    break
+            assert link
+            link = link.split(";")[0].strip("<>")
+            path = map_wps_output_location(link, self.settings, url=False)
+            assert os.path.isfile(path), "Original file results should exist in job output dir."
+
+            # path should be in contents as well, pre-resolved within download dir (not same as job output dir)
+            assert len([line for line in content if "path:" in line]) == 1
+            path = None
+            for line in content:
+                if "path:" in line:
+                    path = line.split(":", 1)[-1].strip()
+                    break
+            assert path
+            assert path.startswith(out_tmp)
+            assert os.path.isfile(path)
+            with open(path, "r") as file:
+                data = file.read()
+            assert msg in data  # technically, output is log of echoed input message, so not exactly equal
+
     def test_execute_help_details(self):
         """
         Verify that formatting of the execute operation help provides multiple paragraphs with more details.
