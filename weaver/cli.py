@@ -216,14 +216,13 @@ class WeaverClient(object):
                             for item in nested:
                                 item.pop("links", None)
                     body.pop("links", None)
-                msg = message or body.get("description", body.get("message", "undefined"))
+                msg = body.get("description", body.get("message", "undefined"))
             if code >= 400:
                 if not msg and isinstance(body, dict):
                     msg = body.get("error", body.get("exception", "unknown"))
             else:
                 _success = True
-            if not msg:
-                msg = "undefined"
+            msg = message or getattr(response, "message", None) or msg or "undefined"
             text = OutputFormat.convert(body, output_format or OutputFormat.JSON_STR, item_root="result")
         except Exception as exc:  # noqa
             msg = "Could not parse body."
