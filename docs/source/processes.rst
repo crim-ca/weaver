@@ -594,7 +594,7 @@ Finally, the ``response`` parameter defines how to return the results produced b
 When ``response=document``, regardless of ``mode=async`` or ``mode=sync``, and regardless of requested
 outputs ``transmissionMode=value`` or ``transmissionMode=reference``, the results will be returned in
 a :term:`JSON` format containing either literal values or URL references to produced files. If ``mode=async``,
-this results *document* is obtained with |result-req|_ request, while ``mode=sync`` returns it directly.
+this results *document* is obtained with |results-req|_ request, while ``mode=sync`` returns it directly.
 When ``response=raw``, the specific contents (type and quantity), HTTP ``Link`` headers or a mix of those components
 depends both on the number of available :term:`Process` outputs, which ones were requested, and how they were
 requested (i.e.: ``transmissionMode``). It is also possible that further content negotiation gets involved
@@ -1246,7 +1246,7 @@ format is employed according to the chosen location.
 Obtaining results, outputs, logs or errors
 ---------------------------------------------------------------------
 
-In the case of successful :term:`Job` execution, the *outputs* can be retrieved with |output-req|_ request to list
+In the case of successful :term:`Job` execution, the *outputs* can be retrieved with |outputs-req|_ request to list
 each corresponding output ``id`` with the generated file reference URL. Keep in mind that the purpose of those URLs are
 only to fetch the results (not persistent storage), and could therefore be purged after some reasonable amount of time.
 The format should be similar to the following example, with minor variations according to :ref:`Configuration`
@@ -1263,7 +1263,7 @@ parameters for the base :term:`WPS` output location:
       ]
     }
 
-For the :term:`OGC` compliant endpoint, the |result-req| request can be employed instead.
+For the :term:`OGC` compliant endpoint, the |results-req| request can be employed instead.
 In the event of a :term:`Job` executed with ``response=document``, the contents will be very similar.
 On the other hand, a :term:`Job` submitted with ``response=raw`` can produce many alternative variations according
 to :term:`OGC` requirements. For this reason, the *outputs* endpoint will always provide all data and file references

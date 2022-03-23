@@ -140,11 +140,11 @@
 .. |status-req| replace:: ``GET {WEAVER_URL}/processes/{id}/jobs/{id}`` (GetStatus)
 .. _status-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Status%2Fpaths%2F~1processes~1{process_id}~1jobs~1{job_id}%2Fget
 .. |inputs-req| replace:: ``GET {WEAVER_URL}/jobs/{id}/inputs`` (Inputs)
-.. _input-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/inputs/paths/~1jobs~1{job_id}~1inputs/get
-.. |output-req| replace:: ``GET {WEAVER_URL}/jobs/{id}/outputs`` (Outputs)
-.. _output-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/outputs/paths/~1jobs~1{job_id}~1outputs/get
-.. |result-req| replace:: ``GET {WEAVER_URL}/jobs/{id}/results`` (Results)
-.. _result-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Results/paths/~1jobs~1{job_id}~1results/get
+.. _inputs-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/inputs/paths/~1jobs~1{job_id}~1inputs/get
+.. |outputs-req| replace:: ``GET {WEAVER_URL}/jobs/{id}/outputs`` (Outputs)
+.. _outputs-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/outputs/paths/~1jobs~1{job_id}~1outputs/get
+.. |results-req| replace:: ``GET {WEAVER_URL}/jobs/{id}/results`` (Results)
+.. _results-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Results/paths/~1jobs~1{job_id}~1results/get
 .. |update-token-req| replace:: Update Token
 .. _update-token-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/UpdateToken/paths/~1processes~1{process_id}/put
 .. |vault-upload-req| replace:: Vault File Upload (POST)
