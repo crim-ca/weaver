@@ -67,7 +67,8 @@ class WpsQuotationTest(WpsConfigBase):
 
     def test_quote_bad_inputs(self):
         path = sd.process_quotes_service.path.format(process_id="Echo")
-        resp = mocked_sub_requests(self.app, "POST", path, json={}, headers=self.json_headers, only_local=True)
+        data = {"inputs": [1, 2, 3]}
+        resp = mocked_sub_requests(self.app, "POST", path, json=data, headers=self.json_headers, only_local=True)
         assert resp.status_code == 400
 
     @mock.patch("weaver.quotation.estimation.estimate_process_quote", side_effect=mocked_estimate_process_quote)

@@ -610,6 +610,7 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
                 "service": service,     # provider identifier (WPS service)
                 "process": process,     # process identifier (WPS request)
                 "inputs": inputs,
+                "outputs": outputs,
                 "status": map_status(Status.ACCEPTED),
                 "execute_async": execute_async,
                 "execution_response": execute_response,

@@ -296,7 +296,7 @@ class BuiltinAppTest(WpsConfigBase):
         assert resp.status_code == 204, "Body should be empty since all outputs requested by reference (Link header)"
         assert resp.content_type is None
         assert resp.headers
-        result_links = [hdr for hdr in resp.headers if hdr[0].lower() == "link"]
+        result_links = [hdr for hdr in resp.headers if hdr[0] == "Link"]
 
         # even though results are requested by Link reference,
         # Weaver still offers them with document on outputs endpoint

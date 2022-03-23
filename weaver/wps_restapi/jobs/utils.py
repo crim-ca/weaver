@@ -283,7 +283,10 @@ def make_result_link(result_id, result, job_id, settings):
             typ = get_field(fmt, "mime_type", search_variations=True, default=ContentType.TEXT_PLAIN)
             enc = get_field(fmt, "encoding", search_variations=True, default=None)
             url = get_any_value(value, data=False, file=True)  # should already include full path
-        links.append(f"<{url}>; rel=\"{result_id}{suffix}\"; type={typ}; charset={enc}")
+            if fmt == ContentType.TEXT_PLAIN and not enc:  # only if text, otherwise binary content could differ
+                enc = "UTF-8"  # default both omit/empty
+        encoding = f"; charset={enc}" if enc else ""
+        links.append(f"<{url}>; rel=\"{result_id}{suffix}\"; type={typ}{encoding}")
     return links
 
 
@@ -416,13 +419,13 @@ def get_job_results_response(job, container, headers=None):
             "cause": {"status": job.status},
         })
 
-    # Document ignores values/references
+    # when 'response=document', ignore 'transmissionMode=value|reference', respect it when 'response=raw'
     # See:
     #   - https://docs.ogc.org/is/18-062r2/18-062r2.html#_response_7 (/req/core/job-results-async-document)
     #   - https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_process-execute-sync-document
     is_raw = job.execution_response == ExecuteResponse.RAW
     results, refs = get_results(job, container, value_key="value",
-                                schema=JobInputsOutputsSchema.OGC,
+                                schema=JobInputsOutputsSchema.OGC,  # not strict to provide more format details
                                 link_references=is_raw)  # type: Union[ExecutionResults, HeadersTupleType]
     headers = headers or {}
     if "location" not in headers:

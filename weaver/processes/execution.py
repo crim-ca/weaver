@@ -546,8 +546,8 @@ def submit_job_handler(payload,             # type: JSON
 
     store = db.get_store(StoreJobs)  # type: StoreJobs
     job = store.save_job(task_id=Status.ACCEPTED, process=process_id, service=provider_id,
-                         inputs=json_body.get("inputs"), is_local=is_local, is_workflow=is_workflow,
-                         access=visibility, user_id=user, context=context,
+                         inputs=json_body.get("inputs"), outputs=json_body.get("outputs"),
+                         is_local=is_local, is_workflow=is_workflow, access=visibility, user_id=user, context=context,
                          execute_async=is_execute_async, execute_response=exec_resp,
                          custom_tags=tags, notification_email=encrypted_email, accept_language=language)
     job.save_log(logger=LOGGER, message="Job task submitted for execution.", status=Status.ACCEPTED, progress=0)

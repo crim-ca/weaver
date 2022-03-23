@@ -1272,6 +1272,10 @@ receive additional query parameters, such as ``schema``, to return contents form
 enforcing a :term:`JSON` body as if ``response=document`` was specified during submission of the :term:`Process`
 execution.
 
+In order to better understand the parameters that where submitted during :term:`Job` creation, the |inputs-req|_
+can be employed. This will return both the data and reference inputs that were submitted, as well as
+the *requested outputs* to retrieve any relevant ``transmissionMode`` definition.
+
 In situations where the :term:`Job` resulted into ``failed`` status, the |except-req|_ can be use to retrieve
 the potential cause of failure, by capturing any raised exception. Below is an example of such exception details.
 
