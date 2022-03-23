@@ -59,7 +59,7 @@
 .. |ogc-exec-sync-responses| replace:: OGC API - Processes, Responses (sync)
 .. _ogc-exec-sync-responses: https://docs.ogc.org/is/18-062r2/18-062r2.html#sc_execute_response
 .. |ogc-exec-async-responses| replace:: OGC API - Processes, Responses (async)
-.. _ogc-exec-async-responses: https://docs.ogc.org/is/18-062r2/18-062r2.html#response_7
+.. _ogc-exec-async-responses: https://docs.ogc.org/is/18-062r2/18-062r2.html#_response_7
 .. |pywps| replace:: PyWPS
 .. _pywps: https://github.com/geopython/pywps/
 .. |pywps-status| replace:: Progress and Status Report
