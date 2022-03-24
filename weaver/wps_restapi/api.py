@@ -29,193 +29,46 @@ from weaver.utils import get_header, get_settings, get_weaver_url
 from weaver.wps.utils import get_wps_url
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.colander_extras import OAS3TypeConversionDispatcher
+from weaver.wps_restapi.constants import ConformanceCategory
 from weaver.wps_restapi.utils import get_wps_restapi_base_url, wps_restapi_base_path
 
 if TYPE_CHECKING:
-    from typing import Callable, Optional
+    from typing import Callable, List, Optional
 
-    from weaver.typedefs import JSON, SettingsType
+    from weaver.typedefs import JSON, SettingsType, TypedDict
+    from weaver.wps_restapi.constants import AnyConformanceCategory
+
+    Conformance = TypedDict("Conformance", {
+        "conformsTo": List[str]
+    }, total=True)
+
 
 LOGGER = logging.getLogger(__name__)
 
 
-@sd.api_frontpage_service.get(tags=[sd.TAG_API], renderer=OutputFormat.JSON,
-                              schema=sd.FrontpageEndpoint(), response_schemas=sd.get_api_frontpage_responses)
-def api_frontpage(request):
+def get_conformance(category):
+    # type: (Optional[AnyConformanceCategory]) -> Conformance
     """
-    Frontpage of Weaver.
-    """
-    settings = get_settings(request)
-    return api_frontpage_body(settings)
+    Obtain the conformance references.
 
+    .. seealso::
+        - https://github.com/opengeospatial/ogcapi-common/tree/master/collections
+        - https://github.com/opengeospatial/ogcapi-processes/tree/master/core
+        - https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/deploy_replace_undeploy
+        - https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/workflows
 
-@cache_region("doc", sd.api_frontpage_service.name)
-def api_frontpage_body(settings):
-    # type: (SettingsType) -> JSON
-    """
-    Generates the JSON body describing the Weaver API and documentation references.
-    """
-
-    # import here to avoid circular import errors
-    from weaver.config import get_weaver_configuration
-
-    weaver_url = get_weaver_url(settings)
-    weaver_config = get_weaver_configuration(settings)
-
-    weaver_api = asbool(settings.get("weaver.wps_restapi"))
-    weaver_api_url = get_wps_restapi_base_url(settings) if weaver_api else None
-    weaver_api_oas_ui = weaver_api_url + sd.api_openapi_ui_service.path if weaver_api else None
-    weaver_api_swagger = weaver_api_url + sd.api_swagger_ui_service.path if weaver_api else None
-    weaver_api_doc = settings.get("weaver.wps_restapi_doc", None) if weaver_api else None
-    weaver_api_ref = settings.get("weaver.wps_restapi_ref", None) if weaver_api else None
-    weaver_api_spec = weaver_api_url + sd.openapi_json_service.path if weaver_api else None
-    weaver_wps = asbool(settings.get("weaver.wps"))
-    weaver_wps_url = get_wps_url(settings) if weaver_wps else None
-    weaver_conform_url = weaver_url + sd.api_conformance_service.path
-    weaver_process_url = weaver_url + sd.processes_service.path
-    weaver_jobs_url = weaver_url + sd.jobs_service.path
-    weaver_vault = asbool(settings.get("weaver.vault"))
-    weaver_links = [
-        {"href": weaver_url, "rel": "self", "type": ContentType.APP_JSON, "title": "This landing page."},
-        {"href": weaver_conform_url, "rel": "http://www.opengis.net/def/rel/ogc/1.0/conformance",
-         "type": ContentType.APP_JSON, "title": "Conformance classes implemented by this service."},
-        {"href": __meta__.__license_url__, "rel": "license",
-         "type": ContentType.TEXT_PLAIN, "title": __meta__.__license_long__}
-    ]
-    if weaver_api:
-        weaver_links.extend([
-            {"href": weaver_api_url,
-             "rel": "service", "type": ContentType.APP_JSON,
-             "title": "WPS REST API endpoint of this service."},
-            {"href": weaver_api_spec,
-             "rel": "service-desc", "type": ContentType.APP_JSON,
-             "title": "OpenAPI specification of this service."},
-            {"href": weaver_api_oas_ui,
-             "rel": "service-doc", "type": ContentType.TEXT_HTML,
-             "title": "Human readable OpenAPI documentation of this service."},
-            {"href": weaver_api_spec,
-             "rel": "OpenAPI", "type": ContentType.APP_JSON,
-             "title": "OpenAPI specification of this service."},
-            {"href": weaver_api_swagger,
-             "rel": "swagger-ui", "type": ContentType.TEXT_HTML,
-             "title": "WPS REST API definition of this service."},
-            {"href": weaver_process_url,
-             "rel": "http://www.opengis.net/def/rel/ogc/1.0/processes", "type": ContentType.APP_JSON,
-             "title": "Processes offered by this service."},
-            {"href": sd.OGC_API_REPO_URL,
-             "rel": "ogcapi-processes-repository", "type": ContentType.TEXT_HTML,
-             "title": "OGC API - Processes schema definitions repository."},
-            {"href": weaver_jobs_url,
-             "rel": "http://www.opengis.net/def/rel/ogc/1.0/job-list", "type": ContentType.APP_JSON,
-             "title": "Job search and listing endpoint of executions registered under this service."},
-            {"href": sd.CWL_BASE_URL,
-             "rel": "cwl-home", "type": ContentType.TEXT_HTML,
-             "title": "Common Workflow Language (CWL) homepage."},
-            {"href": sd.CWL_REPO_URL,
-             "rel": "cwl-repository", "type": ContentType.TEXT_HTML,
-             "title": "Common Workflow Language (CWL) repositories."},
-            {"href": sd.CWL_SPEC_URL,
-             "rel": "cwl-specification", "type": ContentType.TEXT_HTML,
-             "title": "Common Workflow Language (CWL) specification."},
-            {"href": sd.CWL_USER_GUIDE_URL,
-             "rel": "cwl-user-guide", "type": ContentType.TEXT_HTML,
-             "title": "Common Workflow Language (CWL) user guide."},
-            {"href": sd.CWL_CMD_TOOL_URL,
-             "rel": "cwl-command-line-tool", "type": ContentType.TEXT_HTML,
-             "title": "Common Workflow Language (CWL) CommandLineTool specification."},
-            {"href": sd.CWL_WORKFLOW_URL,
-             "rel": "cwl-workflow", "type": ContentType.TEXT_HTML,
-             "title": "Common Workflow Language (CWL) Workflow specification."},
-        ])
-        if weaver_api_ref:
-            # sample:
-            #   https://app.swaggerhub.com/apis/geoprocessing/WPS/
-            weaver_links.append({"href": weaver_api_ref, "rel": "reference", "type": ContentType.APP_JSON,
-                                 "title": "API reference specification of this service."})
-        if isinstance(weaver_api_doc, str):
-            # sample:
-            #   https://raw.githubusercontent.com/opengeospatial/wps-rest-binding/develop/docs/18-062.pdf
-            if "." in weaver_api_doc:  # pylint: disable=E1135,unsupported-membership-test
-                ext_type = weaver_api_doc.split(".")[-1]
-                doc_type = "application/{}".format(ext_type)
-            else:
-                doc_type = ContentType.TEXT_PLAIN  # default most basic type
-            weaver_links.append({"href": weaver_api_doc, "rel": "documentation", "type": doc_type,
-                                 "title": "API reference documentation about this service."})
-        else:
-            weaver_links.append({"href": __meta__.__documentation_url__, "rel": "documentation",
-                                 "type": ContentType.TEXT_HTML,
-                                 "title": "API reference documentation about this service."})
-    if weaver_wps:
-        weaver_links.extend([
-            {"href": weaver_wps_url,
-             "rel": "wps", "type": ContentType.TEXT_XML,
-             "title": "WPS 1.0.0/2.0 XML endpoint of this service."},
-            {"href": "http://docs.opengeospatial.org/is/14-065/14-065.html",
-             "rel": "wps-specification", "type": ContentType.TEXT_HTML,
-             "title": "WPS 1.0.0/2.0 definition of this service."},
-            {"href": "http://schemas.opengis.net/wps/",
-             "rel": "wps-schema-repository", "type": ContentType.TEXT_HTML,
-             "title": "WPS 1.0.0/2.0 XML schemas repository."},
-            {"href": "http://schemas.opengis.net/wps/1.0.0/wpsAll.xsd",
-             "rel": "wps-schema-1", "type": ContentType.TEXT_XML,
-             "title": "WPS 1.0.0 XML validation schemas entrypoint."},
-            {"href": "http://schemas.opengis.net/wps/2.0/wps.xsd",
-             "rel": "wps-schema-2", "type": ContentType.TEXT_XML,
-             "title": "WPS 2.0 XML validation schemas entrypoint."},
-        ])
-    return {
-        "message": "Weaver Information",
-        "configuration": weaver_config,
-        "description": __meta__.__description__,
-        "parameters": [
-            {"name": "api", "enabled": weaver_api, "url": weaver_api_url, "api": weaver_api_oas_ui},
-            {"name": "vault", "enabled": weaver_vault},
-            {"name": "wps", "enabled": weaver_wps, "url": weaver_wps_url},
-        ],
-        "links": weaver_links,
-    }
-
-
-@sd.api_versions_service.get(tags=[sd.TAG_API], renderer=OutputFormat.JSON,
-                             schema=sd.VersionsEndpoint(), response_schemas=sd.get_api_versions_responses)
-def api_versions(request):  # noqa: F811
-    # type: (Request) -> HTTPException
-    """
-    Weaver versions information.
-    """
-    weaver_info = {"name": "weaver", "version": __meta__.__version__, "type": "api"}
-    return HTTPOk(json={"versions": [weaver_info]})
-
-
-@sd.api_conformance_service.get(tags=[sd.TAG_API], renderer=OutputFormat.JSON,
-                                schema=sd.ConformanceEndpoint(), response_schemas=sd.get_api_conformance_responses)
-def api_conformance(request):  # noqa: F811
-    # type: (Request) -> HTTPException
-    """
-    Weaver specification conformance information.
+    .. seealso::
+        - OGC API - Processes, Core document: https://docs.ogc.org/is/18-062r2/18-062r2.html
+        - Best-Practices document: https://docs.ogc.org/bp/20-089r1.html
     """
     # pylint: disable=C0301,line-too-long  # many long comment links cannot be split
 
-    # see references:
-    # - https://github.com/opengeospatial/ogcapi-common/tree/master/collections/requirements
-    # - https://github.com/opengeospatial/ogcapi-common/tree/master/collections/recommendations
-    # - https://github.com/opengeospatial/ogcapi-processes/tree/master/core/requirements
-    # - https://github.com/opengeospatial/ogcapi-processes/tree/master/core/recommendations
-    # - https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/transactions/standard/requirements
-    # - https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/transactions/standard/recommendations
-    # - https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/workflows/standard/requirements
-    # - https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/workflows/standard/recommendations
-    # see ogcapi-processes schemas details:
-    # - https://github.com/opengeospatial/ogcapi-processes
-    # see other references:
-    # - https://github.com/crim-ca/weaver/issues/53
-    # - https://htmlpreview.github.io/?https://github.com/opengeospatial/ogcapi-processes/blob/master/docs/18-062.html
     ows_wps1 = "http://schemas.opengis.net/wps/1.0.0"
     ows_wps2 = "http://www.opengis.net/spec/WPS/2.0"
     ogcapi_common = "http://www.opengis.net/spec/ogcapi-common-2/1.0"
     ogcapi_proc_core = "http://www.opengis.net/spec/ogcapi-processes-1/1.0"
     ogcapi_proc_part2 = "http://www.opengis.net/spec/ogcapi-processes-2/1.0"
+    ogcapi_proc_apppkg = "http://www.opengis.net/spec/eoap-bp/1.0"
     # FIXME: https://github.com/crim-ca/weaver/issues/412
     # ogcapi_proc_part3 = "http://www.opengis.net/spec/ogcapi-processes-3/1.0"
     conformance = [
@@ -227,8 +80,7 @@ def api_conformance(request):  # noqa: F811
         ows_wps2 + "/",
         ows_wps2 + "/req/service/binding/rest-json/core",
         ows_wps2 + "/req/service/binding/rest-json/oas30",  # /ows/wps?...&f=json
-        # "http://www.opengis.net/spec/WPS/2.0/req/service/binding/rest-json/html"
-        "https://github.com/opengeospatial/wps-rest-binding",  # old reference for bw-compat
+        # ows_wps2 + "/req/service/binding/rest-json/html"
         ogcapi_common + "/conf/core",
         ogcapi_common + "/per/core/additional-link-relations",
         ogcapi_common + "/per/core/additional-status-codes",
@@ -483,8 +335,227 @@ def api_conformance(request):  # noqa: F811
         # FIXME: https://github.com/crim-ca/weaver/issues/156  (billing/quotation)
         # https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/billing
         # https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/quotation
+        # FIXME: (CWL App Package) https://github.com/crim-ca/weaver/issues/294
+        ogcapi_proc_apppkg + "/conf/app",
+        ogcapi_proc_apppkg + "/req/app",
+        ogcapi_proc_apppkg + "/conf/app/cmd-line",
+        ogcapi_proc_apppkg + "/req/app/cmd-line",
+        ogcapi_proc_apppkg + "/conf/app/container",
+        ogcapi_proc_apppkg + "/req/app/container",
+        ogcapi_proc_apppkg + "/conf/app/registry",
+        ogcapi_proc_apppkg + "/req/app/registry",
+        ogcapi_proc_apppkg + "/conf/app-stage-in",
+        ogcapi_proc_apppkg + "/req/app-stage-in",
+        # FIXME: Support for STAC metadata (https://github.com/crim-ca/weaver/issues/103)
+        # ogcapi_proc_apppkg + "/conf/app/stac-input",
+        # ogcapi_proc_apppkg + "/req/app/stac-input",
+        ogcapi_proc_apppkg + "/conf/app-stage-out",
+        ogcapi_proc_apppkg + "/req/app-stage-out",
+        # ogcapi_proc_apppkg + "/req/app/stac-out",
+        # ogcapi_proc_apppkg + "/conf/app/stac-out",
+        # ogcapi_proc_apppkg + "/rec/app/stac-out-metadata",
+        # ogcapi_proc_apppkg + "/rec/conf/stac-out-metadata",
+        ogcapi_proc_apppkg + "/conf/app-pck",
+        ogcapi_proc_apppkg + "/req/app-pck",
+        # FIXME: Support embedded step definition in CWL (https://github.com/crim-ca/weaver/issues/56)
+        #   Allow definition of a '$graph' with list of Workflow + >=1 CommandLineTool all together
+        #   see: https://docs.ogc.org/bp/20-089r1.html#toc28
+        # ogcapi_proc_apppkg + "/conf/app-pck/cwl",
+        # ogcapi_proc_apppkg + "/req/app-pck/cwl",
+        ogcapi_proc_apppkg + "/req/app-pck/clt",
+        ogcapi_proc_apppkg + "/req/app-pck/wf",
+        ogcapi_proc_apppkg + "/req/app-pck/wf-inputs",
+        ogcapi_proc_apppkg + "/req/app-pck/metadata",
+        # FIXME: Support Fan-In/Fan-Out workflow (https://github.com/crim-ca/weaver/issues/105)
+        # ogcapi_proc_apppkg + "/rec/app-pck/fan-out",
+        # ogcapi_proc_apppkg + "/conf/app-pck-stage-in",
+        # ogcapi_proc_apppkg + "/req/app-pck-stage-in",
+        # FIXME: Support for STAC metadata (https://github.com/crim-ca/weaver/issues/103)
+        #   not sure about requirement: "staging of EO products SHALL be of type 'Directory'."
+        # ogcapi_proc_apppkg + "/req/app-pck-stage-in/clt-stac",
+        # ogcapi_proc_apppkg + "/req/app-pck-stage-in/wf-stac",
+        # ogcapi_proc_apppkg + "/conf/app-pck-stage-out",
+        # ogcapi_proc_apppkg + "/req/app-pck-stage-out",
+        # ogcapi_proc_apppkg + "/req/app-pck-stage-out/output-stac"
+        ogcapi_proc_apppkg + "/conf/plt",
+        ogcapi_proc_apppkg + "/req/plt",
+        ogcapi_proc_apppkg + "/req/plt/api",
+        ogcapi_proc_apppkg + "/req/plt/inputs",
+        ogcapi_proc_apppkg + "/req/plt/file",
+        # FIXME: Support for STAC metadata (https://github.com/crim-ca/weaver/issues/103)
+        # ogcapi_proc_apppkg + "/conf/plt-stage-in",
+        # ogcapi_proc_apppkg + "/req/plt-stage-in",
+        # ogcapi_proc_apppkg + "/req/plt-stage-in/input-stac",
+        # ogcapi_proc_apppkg + "/req/plt-stage-in/stac-stage",
+        # ogcapi_proc_apppkg + "/conf/plt-stage-out",
+        # ogcapi_proc_apppkg + "/req/plt-stage-out",
+        # ogcapi_proc_apppkg + "/req/plt-stage-out/stac-stage",
     ]
+    if category not in [None, ConformanceCategory.ALL]:
+        cat = f"/{category}/"
+        conformance = filter(lambda item: cat in item, conformance)
     data = {"conformsTo": list(sorted(conformance))}
+    return data
+
+
+@sd.api_frontpage_service.get(tags=[sd.TAG_API], renderer=OutputFormat.JSON,
+                              schema=sd.FrontpageEndpoint(), response_schemas=sd.get_api_frontpage_responses)
+def api_frontpage(request):
+    """
+    Frontpage of Weaver.
+    """
+    settings = get_settings(request)
+    return api_frontpage_body(settings)
+
+
+@cache_region("doc", sd.api_frontpage_service.name)
+def api_frontpage_body(settings):
+    # type: (SettingsType) -> JSON
+    """
+    Generates the JSON body describing the Weaver API and documentation references.
+    """
+
+    # import here to avoid circular import errors
+    from weaver.config import get_weaver_configuration
+
+    weaver_url = get_weaver_url(settings)
+    weaver_config = get_weaver_configuration(settings)
+
+    weaver_api = asbool(settings.get("weaver.wps_restapi"))
+    weaver_api_url = get_wps_restapi_base_url(settings) if weaver_api else None
+    weaver_api_oas_ui = weaver_api_url + sd.api_openapi_ui_service.path if weaver_api else None
+    weaver_api_swagger = weaver_api_url + sd.api_swagger_ui_service.path if weaver_api else None
+    weaver_api_doc = settings.get("weaver.wps_restapi_doc", None) if weaver_api else None
+    weaver_api_ref = settings.get("weaver.wps_restapi_ref", None) if weaver_api else None
+    weaver_api_spec = weaver_api_url + sd.openapi_json_service.path if weaver_api else None
+    weaver_wps = asbool(settings.get("weaver.wps"))
+    weaver_wps_url = get_wps_url(settings) if weaver_wps else None
+    weaver_conform_url = weaver_url + sd.api_conformance_service.path
+    weaver_process_url = weaver_url + sd.processes_service.path
+    weaver_jobs_url = weaver_url + sd.jobs_service.path
+    weaver_vault = asbool(settings.get("weaver.vault"))
+    weaver_links = [
+        {"href": weaver_url, "rel": "self", "type": ContentType.APP_JSON, "title": "This landing page."},
+        {"href": weaver_conform_url, "rel": "http://www.opengis.net/def/rel/ogc/1.0/conformance",
+         "type": ContentType.APP_JSON, "title": "Conformance classes implemented by this service."},
+        {"href": __meta__.__license_url__, "rel": "license",
+         "type": ContentType.TEXT_PLAIN, "title": __meta__.__license_long__}
+    ]
+    if weaver_api:
+        weaver_links.extend([
+            {"href": weaver_api_url,
+             "rel": "service", "type": ContentType.APP_JSON,
+             "title": "WPS REST API endpoint of this service."},
+            {"href": weaver_api_spec,
+             "rel": "service-desc", "type": ContentType.APP_JSON,
+             "title": "OpenAPI specification of this service."},
+            {"href": weaver_api_oas_ui,
+             "rel": "service-doc", "type": ContentType.TEXT_HTML,
+             "title": "Human readable OpenAPI documentation of this service."},
+            {"href": weaver_api_spec,
+             "rel": "OpenAPI", "type": ContentType.APP_JSON,
+             "title": "OpenAPI specification of this service."},
+            {"href": weaver_api_swagger,
+             "rel": "swagger-ui", "type": ContentType.TEXT_HTML,
+             "title": "WPS REST API definition of this service."},
+            {"href": weaver_process_url,
+             "rel": "http://www.opengis.net/def/rel/ogc/1.0/processes", "type": ContentType.APP_JSON,
+             "title": "Processes offered by this service."},
+            {"href": sd.OGC_API_REPO_URL,
+             "rel": "ogcapi-processes-repository", "type": ContentType.TEXT_HTML,
+             "title": "OGC API - Processes schema definitions repository."},
+            {"href": weaver_jobs_url,
+             "rel": "http://www.opengis.net/def/rel/ogc/1.0/job-list", "type": ContentType.APP_JSON,
+             "title": "Job search and listing endpoint of executions registered under this service."},
+            {"href": sd.CWL_BASE_URL,
+             "rel": "cwl-home", "type": ContentType.TEXT_HTML,
+             "title": "Common Workflow Language (CWL) homepage."},
+            {"href": sd.CWL_REPO_URL,
+             "rel": "cwl-repository", "type": ContentType.TEXT_HTML,
+             "title": "Common Workflow Language (CWL) repositories."},
+            {"href": sd.CWL_SPEC_URL,
+             "rel": "cwl-specification", "type": ContentType.TEXT_HTML,
+             "title": "Common Workflow Language (CWL) specification."},
+            {"href": sd.CWL_USER_GUIDE_URL,
+             "rel": "cwl-user-guide", "type": ContentType.TEXT_HTML,
+             "title": "Common Workflow Language (CWL) user guide."},
+            {"href": sd.CWL_CMD_TOOL_URL,
+             "rel": "cwl-command-line-tool", "type": ContentType.TEXT_HTML,
+             "title": "Common Workflow Language (CWL) CommandLineTool specification."},
+            {"href": sd.CWL_WORKFLOW_URL,
+             "rel": "cwl-workflow", "type": ContentType.TEXT_HTML,
+             "title": "Common Workflow Language (CWL) Workflow specification."},
+        ])
+        if weaver_api_ref:
+            # sample:
+            #   https://app.swaggerhub.com/apis/geoprocessing/WPS/
+            weaver_links.append({"href": weaver_api_ref, "rel": "reference", "type": ContentType.APP_JSON,
+                                 "title": "API reference specification of this service."})
+        if isinstance(weaver_api_doc, str):
+            # sample:
+            #   https://raw.githubusercontent.com/opengeospatial/wps-rest-binding/develop/docs/18-062.pdf
+            if "." in weaver_api_doc:  # pylint: disable=E1135,unsupported-membership-test
+                ext_type = weaver_api_doc.split(".")[-1]
+                doc_type = "application/{}".format(ext_type)
+            else:
+                doc_type = ContentType.TEXT_PLAIN  # default most basic type
+            weaver_links.append({"href": weaver_api_doc, "rel": "documentation", "type": doc_type,
+                                 "title": "API reference documentation about this service."})
+        else:
+            weaver_links.append({"href": __meta__.__documentation_url__, "rel": "documentation",
+                                 "type": ContentType.TEXT_HTML,
+                                 "title": "API reference documentation about this service."})
+    if weaver_wps:
+        weaver_links.extend([
+            {"href": weaver_wps_url,
+             "rel": "wps", "type": ContentType.TEXT_XML,
+             "title": "WPS 1.0.0/2.0 XML endpoint of this service."},
+            {"href": "http://docs.opengeospatial.org/is/14-065/14-065.html",
+             "rel": "wps-specification", "type": ContentType.TEXT_HTML,
+             "title": "WPS 1.0.0/2.0 definition of this service."},
+            {"href": "http://schemas.opengis.net/wps/",
+             "rel": "wps-schema-repository", "type": ContentType.TEXT_HTML,
+             "title": "WPS 1.0.0/2.0 XML schemas repository."},
+            {"href": "http://schemas.opengis.net/wps/1.0.0/wpsAll.xsd",
+             "rel": "wps-schema-1", "type": ContentType.TEXT_XML,
+             "title": "WPS 1.0.0 XML validation schemas entrypoint."},
+            {"href": "http://schemas.opengis.net/wps/2.0/wps.xsd",
+             "rel": "wps-schema-2", "type": ContentType.TEXT_XML,
+             "title": "WPS 2.0 XML validation schemas entrypoint."},
+        ])
+    return {
+        "message": "Weaver Information",
+        "configuration": weaver_config,
+        "description": __meta__.__description__,
+        "parameters": [
+            {"name": "api", "enabled": weaver_api, "url": weaver_api_url, "api": weaver_api_oas_ui},
+            {"name": "vault", "enabled": weaver_vault},
+            {"name": "wps", "enabled": weaver_wps, "url": weaver_wps_url},
+        ],
+        "links": weaver_links,
+    }
+
+
+@sd.api_versions_service.get(tags=[sd.TAG_API], renderer=OutputFormat.JSON,
+                             schema=sd.VersionsEndpoint(), response_schemas=sd.get_api_versions_responses)
+def api_versions(request):  # noqa: F811
+    # type: (Request) -> HTTPException
+    """
+    Weaver versions information.
+    """
+    weaver_info = {"name": "weaver", "version": __meta__.__version__, "type": "api"}
+    return HTTPOk(json={"versions": [weaver_info]})
+
+
+@sd.api_conformance_service.get(tags=[sd.TAG_API], renderer=OutputFormat.JSON,
+                                schema=sd.ConformanceEndpoint(), response_schemas=sd.get_api_conformance_responses)
+def api_conformance(request):  # noqa: F811
+    # type: (Request) -> HTTPException
+    """
+    Weaver specification conformance information.
+    """
+    cat = ConformanceCategory.get(request.params.get("category"), ConformanceCategory.CONFORMANCE)
+    data = get_conformance(cat)
     return HTTPOk(json=data)
 
 

@@ -52,6 +52,18 @@ Changes:
 - Add ``mutable`` field to ``Process`` summary listing and detailed descriptions for conformance
   (resolves `#180 <https://github.com/crim-ca/weaver/issues/180>`_).
 - Improve ``Process`` undeployment to consider running ``Job`` to block its removal while in use.
+- Add ``category`` query parameter to ``/conformance`` endpoint allowing to filter items
+  by ``conf`` (conformance), ``rec`` (recommendation), ``req`` (requirement), ``per`` (permission) or ``all``
+  references. By default, return the ``conf`` representation which is the expected definitions by `OGC API`
+  conformance validators.
+- Add multiple conformance items related to `CWL`
+  and `OGC Best Practice for Earth Observation Application Package <https://docs.ogc.org/bp/20-089r1.html>`_
+  definitions (relates to
+  `#56 <https://github.com/crim-ca/weaver/issues/56>`_,
+  `#103 <https://github.com/crim-ca/weaver/issues/103>`_,
+  `#105 <https://github.com/crim-ca/weaver/issues/105>`_,
+  `#294 <https://github.com/crim-ca/weaver/issues/294>`_,
+  `#399 <https://github.com/crim-ca/weaver/issues/399>`_).
 
 Fixes:
 ------
