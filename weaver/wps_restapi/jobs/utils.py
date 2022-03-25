@@ -408,16 +408,6 @@ def get_job_results_response(job, container, headers=None):
     """
     raise_job_dismissed(job, container)
     raise_job_bad_status(job, container)
-    job_status = map_status(job.status)
-    if job_status in JOB_STATUS_CATEGORIES[StatusCategory.RUNNING]:
-        raise HTTPNotFound(json={
-            "code": "ResultsNotReady",
-            "title": "JobResultsNotReady",
-            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/result-not-ready",
-            "detail": "Job is not ready to obtain results.",
-            "status": HTTPNotFound.code,
-            "cause": {"status": job.status},
-        })
 
     # when 'response=document', ignore 'transmissionMode=value|reference', respect it when 'response=raw'
     # See:
@@ -616,7 +606,9 @@ def raise_job_bad_status(job, container=None):
             })
 
         # /req/core/job-results-exception/results-not-ready
-        raise HTTPNotFound(json={
+        # must use OWS instead of HTTP class to preserve provided JSON body
+        # otherwise, pyramid considers it as not found view/path and rewrites contents in append slash handler
+        raise OWSNotFound(json={
             "title": "JobResultsNotReady",
             "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/result-not-ready",
             "detail": "Job is not ready to obtain results.",

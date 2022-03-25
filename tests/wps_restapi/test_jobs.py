@@ -1354,8 +1354,8 @@ class WpsRestApiJobsTest(unittest.TestCase):
         )
 
         for code, job, title, error_type, cause in [
-            (400, job_accepted, "JobResultsNotReady", "result-not-ready", {"status": Status.ACCEPTED}),
-            (400, job_running, "JobResultsNotReady", "result-not-ready", {"status": Status.RUNNING}),
+            (404, job_accepted, "JobResultsNotReady", "result-not-ready", {"status": Status.ACCEPTED}),
+            (404, job_running, "JobResultsNotReady", "result-not-ready", {"status": Status.RUNNING}),
             (400, job_failed_str, "JobResultsFailed", "MissingParameterValue", "400 MissingParameterValue: input"),
             (400, job_failed_json, "JobResultsFailed", "InvalidParameterValue", "Input type invalid."),
             (400, job_failed_none, "JobResultsFailed", "NoApplicableCode", "unknown"),

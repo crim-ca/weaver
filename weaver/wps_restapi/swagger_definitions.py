@@ -2553,10 +2553,10 @@ class ExceptionReportType(ExtendedMappingSchema):
 
 
 class ProcessControl(ExtendedMappingSchema):
-    jobControlOptions = JobControlOptionsList(missing=[ExecuteControlOption.ASYNC],
-                                              default=[ExecuteControlOption.ASYNC])
-    outputTransmission = TransmissionModeList(missing=[ExecuteTransmissionMode.VALUE],
-                                              default=[ExecuteTransmissionMode.VALUE])
+    jobControlOptions = JobControlOptionsList(missing=ExecuteControlOption.values(),
+                                              default=ExecuteControlOption.values())
+    outputTransmission = TransmissionModeList(missing=ExecuteTransmissionMode.values(),
+                                              default=ExecuteTransmissionMode.values())
 
 
 class ProcessLocations(ExtendedMappingSchema):

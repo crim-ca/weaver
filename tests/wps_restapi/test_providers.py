@@ -345,7 +345,7 @@ class WpsRestApiProvidersTest(WpsProviderBase):
         assert "metadata" in process and isinstance(process["metadata"], list)
         assert len(body["jobControlOptions"]) == 1
         assert ExecuteControlOption.ASYNC in body["jobControlOptions"]
-        assert len(body["outputTransmission"]) == 1
+        assert len(body["outputTransmission"]) == 2
         assert ExecuteTransmissionMode.VALUE in body["outputTransmission"]
         assert "inputs" in process and isinstance(process["inputs"], list)
         assert all(isinstance(p_io, dict) and "id" in p_io for p_io in process["inputs"])
@@ -376,7 +376,7 @@ class WpsRestApiProvidersTest(WpsProviderBase):
         assert "metadata" in process and isinstance(process["metadata"], list)
         assert len(process["jobControlOptions"]) == 1
         assert ExecuteControlOption.ASYNC in process["jobControlOptions"]
-        assert len(process["outputTransmission"]) == 1
+        assert len(process["outputTransmission"]) == 2
         assert ExecuteTransmissionMode.VALUE in process["outputTransmission"]
         assert "inputs" in process and isinstance(process["inputs"], dict)
         assert all(isinstance(p_io, str) and isinstance(process["inputs"][p_io], dict) for p_io in process["inputs"])
