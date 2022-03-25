@@ -120,19 +120,11 @@ class WorkerExecuteResponse(ExecuteResponse):
     """
     XML response generator from predefined job status URL and executed process definition.
     """
-    # pylint: disable=W0231,W0233  # FIXME: tmp until patched
 
     def __init__(self, wps_request, uuid, process, job_url, settings, *_, **__):
         # type: (WorkerRequest, str, ProcessWPS, str, SettingsType, Any, Any) -> None
 
-        # FIXME: https://github.com/geopython/pywps/pull/578
-        # temp patch, do what 'ExecuteResponse.__init__' does bypassing the problem super() call
-        WPSResponse.__init__(self, wps_request, uuid)  # pylint: disable=W0231,W0233  # tmp until patched
-        self.process = process
-        self.outputs = {o.identifier: o for o in self.process.outputs}
-        # should be following call, but causes infinite recursion until above fix is applied
-        #   super(WorkerExecuteResponse, self).__init__(wps_request, job_id, process=wps_process)
-        # --- end of patch ---
+        super(WorkerExecuteResponse, self).__init__(wps_request, uuid, process=process)
 
         # extra setup
         self.process._status_store = ReferenceStatusLocationStorage(job_url, settings)
@@ -345,12 +337,6 @@ class WorkerService(ServiceWPS):
         wps_request.set_version("2.0.0")
         request_parser = wps_request._post_request_parser(wps_request.WPS.Execute().tag)  # noqa: W0212
         request_parser(xml_request)  # parses the submitted inputs/outputs data and request parameters
-
-        # FIXME: patch erroneous WPS outputs mimeType as None handling until fixed
-        #        (see: https://github.com/geopython/pywps/pull/623)
-        for out in wps_request.outputs.values():
-            if "mimetype" in out and out["mimetype"] is None:
-                out["mimetype"] = ""
 
         # NOTE:
         #  Setting 'status = false' will disable async execution of 'pywps.app.Process.Process'
