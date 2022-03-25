@@ -1102,27 +1102,6 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                 resp = self.app.post_json(path, params=data_execute, headers=self.json_headers)
                 assert resp.status_code == 201, "Expected job submission without inputs created without error."
 
-    @pytest.mark.xfail(reason="Mode '{}' not supported for job execution.".format(ExecuteMode.SYNC))
-    def test_execute_process_mode_sync_not_supported(self):
-        execute_data = self.get_process_execute_template(fully_qualified_name(self))
-        execute_data["mode"] = ExecuteMode.SYNC
-        path = "/processes/{}/jobs".format(self.process_public.identifier)
-        resp = self.app.post_json(path, params=execute_data, headers=self.json_headers, expect_errors=True)
-        assert resp.status_code == 501
-        assert resp.content_type == ContentType.APP_JSON
-
-    @pytest.mark.xfail(reason="Mode '{}' not supported for job execution.".format(ExecuteTransmissionMode.VALUE))
-    def test_execute_process_transmission_mode_value_not_supported(self):
-        execute_data = self.get_process_execute_template(fully_qualified_name(self))
-        execute_data["outputs"][0]["transmissionMode"] = ExecuteTransmissionMode.VALUE
-        path = "/processes/{}/jobs".format(self.process_public.identifier)
-        with contextlib.ExitStack() as stack_exec:
-            for mock_exec in mocked_execute_celery():
-                stack_exec.enter_context(mock_exec)
-            resp = self.app.post_json(path, params=execute_data, headers=self.json_headers, expect_errors=True)
-        assert resp.status_code == 501
-        assert resp.content_type == ContentType.APP_JSON
-
     def test_execute_process_not_visible(self):
         path = f"/processes/{self.process_private.identifier}/jobs"
         data = self.get_process_execute_template()
