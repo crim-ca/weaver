@@ -382,7 +382,7 @@ def mocked_file_response(path, url):
     resp.status_code = 200
     resp.headers["Content-Type"] = typ
     setattr(resp, "content_type", typ)
-    with open(path, mode="rb", encoding="utf-8") as file:
+    with open(path, mode="rb") as file:
         content = file.read()
     resp._content = content  # noqa: W0212
 
