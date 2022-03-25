@@ -173,7 +173,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         For helping debugging of auto-generated job ids.
         """
         mapping = OrderedDict(sorted((str(j.task_id), str(j.id)) for j in self.job_store.list_jobs()))
-        return message + "\nMapping Task-ID/Job-ID:\n{}".format(json.dumps(mapping, indent=indent))
+        return f"{message}\nMapping Task-ID/Job-ID:\n{json.dumps(mapping, indent=indent)}"
 
     def assert_equal_with_jobs_diffs(self, jobs_result, jobs_expect,
                                      test_values=None, message="", indent=2, index=None, invert=False):
@@ -187,12 +187,12 @@ class WpsRestApiJobsTest(unittest.TestCase):
             all((job not in jobs_expect if invert else job in jobs_expect) for job in jobs_result)
         ), (
             (message if message else "Different jobs returned than expected") +
-            (" (index: {})".format(index) if index is not None else "") +
-            ("\nResponse: {}".format(json.dumps(sorted(jobs_result), indent=indent))) +
-            ("\nExpected: {}".format(json.dumps(sorted(jobs_expect), indent=indent))) +
-            ("\nMissing: {}".format(json.dumps(sorted(f"{job} ({mapping[job]})" for job in missing), indent=indent))) +
-            ("\nUnknown: {}".format(json.dumps(sorted(f"{job} ({mapping[job]})" for job in unknown), indent=indent))) +
-            ("\nTesting: {}".format(test_values) if test_values else "") +
+            (f" (index: {index})" if index is not None else "") +
+            ("\nResponse: " + json.dumps(sorted(jobs_result), indent=indent)) +
+            ("\nExpected: " + json.dumps(sorted(jobs_expect), indent=indent)) +
+            ("\nMissing: " + json.dumps(sorted(f"{job} ({mapping[job]})" for job in missing), indent=indent)) +
+            ("\nUnknown: " + json.dumps(sorted(f"{job} ({mapping[job]})" for job in unknown), indent=indent)) +
+            ("\nTesting: " + (test_values if test_values else "")) +
             (self.message_with_jobs_mapping())
         )
 
@@ -205,8 +205,8 @@ class WpsRestApiJobsTest(unittest.TestCase):
             authn_policy_class = "pyramid.security.AuthenticationAPIMixin"
             authz_policy_class = "pyramid.security.AuthorizationAPIMixin"
         return tuple([
-            mock.patch("{}.authenticated_userid".format(authn_policy_class), new_callable=lambda: user_id),
-            mock.patch("{}.has_permission".format(authz_policy_class), return_value=is_admin),
+            mock.patch(f"{authn_policy_class}.authenticated_userid", new_callable=lambda: user_id),
+            mock.patch(f"{authz_policy_class}.has_permission", return_value=is_admin),
         ])
 
     @staticmethod
@@ -220,7 +220,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         local_iso_dt = datetime.datetime.now(datetime.datetime.now().astimezone().tzinfo).isoformat()
         local_offset = local_iso_dt[-6:]  # ±00:00
         year = date.today().year + 1
-        return ["{}-0{}-02T03:32:38.487000{}".format(year, month, local_offset) for month in range(1, 5)]
+        return [f"{year}-0{month}-02T03:32:38.487000{local_offset}" for month in range(1, 5)]
 
     @staticmethod
     def check_job_format(job):
@@ -337,7 +337,8 @@ class WpsRestApiJobsTest(unittest.TestCase):
             elif categories["process"] == self.process_other.identifier:
                 expect = {self.job_info[i].id for i in [9, 10, 11, 12]}
             else:
-                pytest.fail("Unknown job grouping 'process' value: {}".format(categories["process"]))
+                cat = categories["process"]
+                pytest.fail(f"Unknown job grouping 'process' value: {cat}")
             self.assert_equal_with_jobs_diffs(grouped_jobs["jobs"], expect)  # noqa
 
     def template_get_jobs_valid_grouping_by_service_provider(self, service_or_provider):
@@ -366,7 +367,8 @@ class WpsRestApiJobsTest(unittest.TestCase):
             elif categories[service_or_provider] is None:
                 expect = {self.job_info[0].id, self.job_info[2].id}
             else:
-                pytest.fail("Unknown job grouping 'service' value: {}".format(categories[service_or_provider]))
+                cat = categories[service_or_provider]
+                pytest.fail(f"Unknown job grouping 'service' value: {cat}")
             self.assert_equal_with_jobs_diffs(grouped_jobs["jobs"], expect)  # noqa
 
     def test_get_jobs_valid_grouping_by_service(self):
@@ -395,9 +397,9 @@ class WpsRestApiJobsTest(unittest.TestCase):
         jobs_url = base_url + sd.jobs_service.path
         limit = 2  # expect 11 jobs to be visible, making 6 pages of 2 each (except last that is 1)
         last = 5   # zero-based index of last page
-        last_page = "page={}".format(last)
-        prev_last_page = "page={}".format(last - 1)
-        limit_kvp = "limit={}".format(limit)
+        last_page = f"page={last}"
+        prev_last_page = f"page={last - 1}"
+        limit_kvp = f"limit={limit}"
         path = get_path_kvp(sd.jobs_service.path, limit=limit)
         resp = self.app.get(path, headers=self.json_headers)
         links = get_links(resp.json["links"])
@@ -444,7 +446,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         p_id = self.process_public.identifier  # 5 jobs with this process, but only 3 visible
         p_j_url = base_url + sd.process_jobs_service.path.format(process_id=p_id)
         p_url = base_url + sd.process_service.path.format(process_id=p_id)
-        p_kvp = "process={}".format(p_id)
+        p_kvp = f"process={p_id}"
         path = get_path_kvp(sd.jobs_service.path, limit=1000, process=p_id)
         resp = self.app.get(path, headers=self.json_headers)
         assert len(resp.json["jobs"]) == 3, "unexpected number of visible jobs for specific process"
@@ -469,7 +471,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         resp = self.app.get(path, headers=self.json_headers)
         links = get_links(resp.json["links"])
         assert len(resp.json["jobs"]) == limit
-        assert links["alternate"].startswith(jobs_url) and "process={}".format(p_id) in links["alternate"]
+        assert links["alternate"].startswith(jobs_url) and f"process={p_id}" in links["alternate"]
         assert limit_kvp in links["alternate"] and "page=0" in links["alternate"], "alt link should also have filters"
         assert links["collection"] == p_j_url, "collection endpoint should rebase according to context process"
         assert links["search"] == jobs_url, "search endpoint should remain generic jobs even with context process used"
@@ -482,7 +484,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         assert all(p_kvp not in links[rel] for rel in ["current", "next", "prev", "first", "last"] if links[rel])
 
         limit_over_total = expect_jobs_visible * 2
-        limit_kvp = "limit={}".format(limit_over_total)
+        limit_kvp = f"limit={limit_over_total}"
         path = get_path_kvp(sd.jobs_service.path, limit=limit_over_total)
         resp = self.app.get(path, headers=self.json_headers)
         links = get_links(resp.json["links"])
@@ -546,7 +548,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         with contextlib.ExitStack() as stack:
             for runner in mocked_process_job_runner():
                 stack.enter_context(runner)
-            path = "/processes/{}/jobs".format(self.process_public.identifier)
+            path = f"/processes/{self.process_public.identifier}/jobs"
             resp = self.app.post_json(path, params=body, headers=self.json_headers)
             assert resp.status_code == 201
             assert resp.content_type == ContentType.APP_JSON
@@ -874,8 +876,8 @@ class WpsRestApiJobsTest(unittest.TestCase):
         uri = sd.openapi_json_service.path
         resp = self.app.get(uri, headers=self.json_headers)
         schema_prefix = sd.GetJobsQueries.__name__
-        assert not resp.json["parameters"]["{}.page".format(schema_prefix)]["required"]
-        assert not resp.json["parameters"]["{}.limit".format(schema_prefix)]["required"]
+        assert not resp.json["parameters"][f"{schema_prefix}.page"]["required"]
+        assert not resp.json["parameters"][f"{schema_prefix}.limit"]["required"]
 
     def test_jobs_datetime_before(self):
         """
@@ -896,7 +898,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         job_expect = [self.job_info[i].id for i in [0, 1, 2, 5, 9, 10, 11, 12]]
         self.assert_equal_with_jobs_diffs(job_result, job_expect, {"datetime": datetime_before})
         for job in resp.json["jobs"]:
-            base_uri = sd.jobs_service.path + "/{}".format(job)
+            base_uri = f"{sd.jobs_service.path}/{job}"
             path = get_path_kvp(base_uri)
             resp = self.app.get(path, headers=self.json_headers)
             assert resp.status_code == 200
@@ -919,7 +921,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         assert resp.content_type == ContentType.APP_JSON
         assert len(resp.json["jobs"]) == 2
         for job in resp.json["jobs"]:
-            base_uri = sd.jobs_service.path + "/{}".format(job)
+            base_uri = f"{sd.jobs_service.path}/{job}"
             path = get_path_kvp(base_uri)
             resp = self.app.get(path, headers=self.json_headers)
             assert resp.status_code == 200
@@ -944,7 +946,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         datetime_after, datetime_before = datetime_interval.split(DATETIME_INTERVAL_CLOSED_SYMBOL)
         assert len(resp.json["jobs"]) == 3
         for job in resp.json["jobs"]:
-            base_uri = sd.jobs_service.path + "/{}".format(job)
+            base_uri = f"{sd.jobs_service.path}/{job}"
             path = get_path_kvp(base_uri)
             resp = self.app.get(path, headers=self.json_headers)
             assert resp.status_code == 200
@@ -967,7 +969,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         assert resp.content_type == ContentType.APP_JSON
         assert len(resp.json["jobs"]) == 1
         for job in resp.json["jobs"]:
-            base_uri = sd.jobs_service.path + "/{}".format(job)
+            base_uri = f"{sd.jobs_service.path}/{job}"
             path = get_path_kvp(base_uri)
             resp = self.app.get(path, headers=self.json_headers)
             assert resp.status_code == 200
@@ -1133,7 +1135,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
 
     @pytest.mark.xfail(reason="Multiple statuses not supported")  # FIXME: support comma-separated list of statuses
     def test_get_jobs_by_status_multi(self):
-        test = {"status": "{},{}".format(Status.SUCCEEDED, Status.RUNNING)}
+        test = {"status": f"{Status.SUCCEEDED},{Status.RUNNING}"}
         path = get_path_kvp(sd.jobs_service.path, **test)
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
@@ -1149,7 +1151,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         assert resp.json["value"]["status"] == "random"
         assert "status" in resp.json["cause"]
 
-        status = "random,{}".format(Status.RUNNING)
+        status = f"random,{Status.RUNNING}"
         path = get_path_kvp(sd.jobs_service.path, status=status)
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 400
@@ -1169,7 +1171,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         with contextlib.ExitStack() as stack:
             for runner in mocked_process_job_runner():
                 stack.enter_context(runner)
-            path = "/processes/{}/jobs".format(self.process_public.identifier)
+            path = f"/processes/{self.process_public.identifier}/jobs"
             resp = self.app.post_json(path, params=body, headers=self.json_headers)
             assert resp.status_code == 201
             assert resp.content_type == ContentType.APP_JSON
@@ -1257,8 +1259,8 @@ class WpsRestApiJobsTest(unittest.TestCase):
                 tmp_out1 = stack.enter_context(tempfile.NamedTemporaryFile(mode="w", dir=job_out_dir, suffix=".yml"))
                 tmp_out2 = stack.enter_context(tempfile.NamedTemporaryFile(mode="w", dir=job_out_dir, suffix=".txt"))
                 tmp_out3 = stack.enter_context(tempfile.NamedTemporaryFile(mode="w", dir=job_out_dir, suffix=".tif"))
-                tmp_log = stack.enter_context(open(job_out_log, "w"))  # noqa
-                tmp_xml = stack.enter_context(open(job_out_xml, "w"))  # noqa
+                tmp_log = stack.enter_context(open(job_out_log, mode="w", encoding="utf-8"))  # noqa
+                tmp_xml = stack.enter_context(open(job_out_xml, mode="w", encoding="utf-8"))  # noqa
                 for tmp_file in [tmp_out1, tmp_out2, tmp_out3, tmp_log, tmp_xml]:
                     assert os.path.isfile(tmp_file.name)
 
@@ -1276,7 +1278,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
                     path = job_path + sub_path
                     func = self.app.get if sub_path else self.app.delete
                     resp = func(path, headers=self.json_headers, expect_errors=True)
-                    assert resp.status_code == 410, "Dismissed job should return 'Gone' status for: [{}]".format(path)
+                    assert resp.status_code == 410, f"Dismissed job should return 'Gone' status for: [{path}]"
         except OSError:
             pass
         finally:

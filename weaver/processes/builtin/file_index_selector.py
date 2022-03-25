@@ -37,7 +37,7 @@ def select(files, index, output_dir):
     LOGGER.debug("Process '%s' output directory: [%s].", PACKAGE_NAME, output_dir)
     try:
         if not os.path.isdir(output_dir):
-            raise ValueError("Output dir [{}] does not exist.".format(output_dir))
+            raise ValueError(f"Output dir [{output_dir}] does not exist.")
         shutil.copy(files[index], output_dir)
     except Exception as exc:
         # log only debug for tracking, re-raise and actual error wil be logged by top process monitor
@@ -46,14 +46,15 @@ def select(files, index, output_dir):
     LOGGER.info("Process '%s' execution completed.", PACKAGE_NAME)
 
 
-def main():
+def main(*args):
+    # type: (*str) -> None
     LOGGER.info("Parsing inputs of '%s' process.", PACKAGE_NAME)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("-f", "--files", type=str, nargs="+", help="Files from which to select.")
     parser.add_argument("-i", "--index", type=int, help="Index of the file to select.")
     parser.add_argument("-o", "--outdir", default=CUR_DIR, help="Output directory of the selected file.")
-    args = parser.parse_args()
-    sys.exit(select(args.files, args.index, args.outdir))
+    ns = parser.parse_args(*args)
+    sys.exit(select(ns.files, ns.index, ns.outdir))
 
 
 if __name__ == "__main__":

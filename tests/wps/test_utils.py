@@ -99,7 +99,7 @@ def test_get_wps_output_context_validation():
             except HTTPUnprocessableEntity:
                 pass
             else:
-                pytest.fail("Exception not raised when expected: (header={}, case={})".format(header, case))
+                pytest.fail(f"Exception not raised when expected: (header={header}, case={case})")
             # validate same conditions fulfilled by default context if header omitted
             try:
                 settings = {"weaver.wps_output_context": case}
@@ -109,7 +109,7 @@ def test_get_wps_output_context_validation():
             except HTTPUnprocessableEntity:
                 pass
             else:
-                pytest.fail("Exception not raised when expected: (<setting>, case={})".format(case))
+                pytest.fail(f"Exception not raised when expected: (<setting>, case={case})")
 
         for case, result in good_cases:
             # validate against provided header
@@ -118,8 +118,8 @@ def test_get_wps_output_context_validation():
                 ctx = get_wps_output_context(req)
                 assert ctx == result
             except Exception as exc:
-                pytest.fail("Exception raised when none is expected: (header={}, case={})\n"
-                            "Exception: {!s}: ${!s}".format(header, case, exc.__class__.__name__, exc))
+                pytest.fail(f"Exception raised when none is expected: (header={header}, case={case})\n"
+                            f"Exception: {exc.__class__.__name__}: ${exc!s}")
 
             # validate same conditions fulfilled by default context if header omitted
             settings = {"weaver.wps_output_context": case}
@@ -129,8 +129,8 @@ def test_get_wps_output_context_validation():
                     ctx = get_wps_output_context(req)
                     assert ctx == result
                 except Exception as exc:
-                    pytest.fail("Exception raised when none is expected: (<setting>, case={})\n"
-                                "Exception: {!s}: ${!s}".format(case, exc.__class__.__name__, exc))
+                    pytest.fail(f"Exception raised when none is expected: (header=<setting>, case={case})\n"
+                                f"Exception: {exc.__class__.__name__}: ${exc!s}")
 
 
 def test_get_wps_output_context_resolution():
@@ -158,9 +158,7 @@ def test_get_wps_output_context_resolution():
                 res = get_wps_output_context(req)
             assert res == expect_result
         except Exception as exc:
-            pytest.fail(
-                "Exception raised when none is expected [{}]: {!s}: ${!s}".format(i, exc.__class__.__name__, exc)
-            )
+            pytest.fail(f"Exception raised when none is expected [{i}]: {exc.__class__.__name__}: ${exc!s}")
 
 
 def test_map_wps_output_location_duplicate_subdir():

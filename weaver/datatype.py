@@ -985,7 +985,7 @@ class Job(Base):
         duration = self.duration
         if duration is None:
             return "00:00:00"
-        return str(duration).split(".")[0].zfill(8)  # "HH:MM:SS"
+        return str(duration).split(".", 1)[0].zfill(8)  # "HH:MM:SS"
 
     @property
     def progress(self):
@@ -2432,7 +2432,7 @@ class Quote(Base):
         duration = self.duration
         if duration is None:
             return "00:00:00"
-        return str(duration).split(".")[0].zfill(8)
+        return str(duration).split(".", 1)[0].zfill(8)
 
     @property
     def parameters(self):

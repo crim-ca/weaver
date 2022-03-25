@@ -56,7 +56,7 @@ def _get_builtin_metadata(process_id, process_path, meta_field, clean=False):
     py_file = os.path.splitext(process_path)[0] + ".py"
     if os.path.isfile(py_file):
         try:
-            mod = import_module("{}.{}".format(__name__, process_id))
+            mod = import_module(f"{__name__}.{process_id}")
             meta = getattr(mod, meta_field, None)
             if meta and isinstance(meta, str):
                 return clean_json_text_body(meta) if clean else meta
@@ -93,7 +93,7 @@ def _get_builtin_package(process_id, package):
     The ``hints`` can be directly in the package definition without triggering validation errors.
     """
     if "hints" not in package:
-        package["hints"] = dict()
+        package["hints"] = {}
     package["hints"].update({CWL_REQUIREMENT_APP_BUILTIN: {"process": process_id}})
 
     # FIXME:
@@ -168,16 +168,16 @@ class BuiltinProcessJobBase(CommandLineJob):
             store = get_db(registry).get_store(StoreProcesses)
             process = store.fetch_by_id(self.process)  # raise if not found
         except (ProcessNotAccessible, ProcessNotFound):
-            raise PackageNotFound("Cannot find '{}' package for process '{}'".format(ProcessType.BUILTIN, self.process))
+            raise PackageNotFound(f"Cannot find '{ProcessType.BUILTIN}' package for process '{self.process}'")
         if process.type != ProcessType.BUILTIN:
-            raise PackageExecutionError("Invalid package is not of type '{}'".format(ProcessType.BUILTIN))
+            raise PackageExecutionError(f"Invalid package is not of type '{ProcessType.BUILTIN}'")
 
     def _update_command(self):
         if len(self.command_line) and self.command_line[0] == "python":
             LOGGER.debug("Mapping generic builtin Python command to environment: [python] => [%s]", sys.executable)
             self.command_line[0] = sys.executable
 
-    # pylint: disable=W0221,arguments-differ    # naming using python like arguments
+    # pylint: disable=W0221,W0237  # naming using python like arguments
     def run(self, runtime_context, **kwargs):
         # type: (RuntimeContext, Any) -> None
         try:
@@ -197,7 +197,7 @@ class BuiltinProcessJobSingularity(BuiltinProcessJobBase, SingularityCommandLine
     pass
 
 
-# pylint: disable=W0221,arguments-differ    # naming using python like arguments
+# pylint: disable=W0221,W0237 # naming using python like arguments
 class BuiltinProcess(CommandLineTool):
     def make_job_runner(self, runtime_context):
         # type: (RuntimeContext) -> Type[JobBase]

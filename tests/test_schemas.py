@@ -27,7 +27,7 @@ def test_process_id_schemas():
         except colander.Invalid:
             pass
         else:
-            pytest.fail("Expected process ID to be raised as invalid: (test: {}, id: {})".format(i, _id))
+            pytest.fail(f"Expected process ID to be raised as invalid: (test: {i}, id: {_id})")
 
 
 def test_url_schemes():
@@ -70,21 +70,21 @@ def test_url_schemes():
         for url in test_href_invalid_file_valid:
             assert file_url.deserialize(url) == url
     except colander.Invalid as invalid:
-        pytest.fail("Raised invalid URL when expected to be valid for '{}' with [{}]".format(invalid.node, url))
+        pytest.fail(f"Raised invalid URL when expected to be valid for '{invalid.node}' with [{url}]")
     for url in test_href_invalid_file_valid:
         try:
             href_url.deserialize(url)
         except colander.Invalid:
             pass
         else:
-            pytest.fail("Expected URL to be raised as invalid for non-file reference: [{}]".format(url))
+            pytest.fail(f"Expected URL to be raised as invalid for non-file reference: [{url}]")
     for url in test_href_invalid_always:
         try:
             href_url.deserialize(url)
         except colander.Invalid:
             pass
         else:
-            pytest.fail("Expected URL to be raised as invalid for incorrectly formatted reference: [{}]".format(url))
+            pytest.fail(f"Expected URL to be raised as invalid for incorrectly formatted reference: [{url}]")
 
 
 def test_format_variations():
@@ -100,7 +100,7 @@ def test_format_variations():
         :func:`tests.functional.test_wps_package.WpsPackageAppTest.test_deploy_process_io_no_format_default`.
     """
     format_schema = sd.DeploymentFormat()
-    schema = "https://www.iana.org/assignments/media-types/{}".format(ContentType.APP_JSON)
+    schema = f"https://www.iana.org/assignments/media-types/{ContentType.APP_JSON}"
     test_valid_fmt_deploy = [
         (
             {"mimeType": ContentType.APP_JSON},
@@ -131,4 +131,4 @@ def test_format_variations():
         try:
             assert format_schema.deserialize(fmt) == res
         except colander.Invalid:
-            pytest.fail("Expected format to be valid: [{}]".format(fmt))
+            pytest.fail(f"Expected format to be valid: [{fmt}]")

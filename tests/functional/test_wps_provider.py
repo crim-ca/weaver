@@ -75,7 +75,7 @@ class WpsProviderTest(WpsConfigBase):
         assert resp.status_code == 201
 
         # validate service capabilities
-        path = "/providers/{}".format(remote_provider_name)
+        path = f"/providers/{remote_provider_name}"
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
 
@@ -111,7 +111,7 @@ class WpsProviderTest(WpsConfigBase):
         assert resp.status_code == 201
 
         # validate service capabilities
-        path = "/providers/{}".format(remote_provider_name)
+        path = f"/providers/{remote_provider_name}"
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
         body = resp.json
@@ -120,7 +120,7 @@ class WpsProviderTest(WpsConfigBase):
         assert body["type"] == ProcessType.WPS_REMOTE
 
         # validate processes capabilities
-        path = "/providers/{}/processes".format(remote_provider_name)
+        path = f"/providers/{remote_provider_name}/processes"
         resp = self.app.get(path, headers=self.json_headers)
         body = resp.json
         assert resp.status_code == 200
@@ -202,7 +202,7 @@ class WpsProviderTest(WpsConfigBase):
         }
         status_url = resources.TEST_REMOTE_SERVER_URL + "/status.xml"
         output_url = resources.TEST_REMOTE_SERVER_URL + "/output.txt"
-        with open(resources.TEST_HUMMINGBIRD_STATUS_WPS1_XML) as status_file:
+        with open(resources.TEST_HUMMINGBIRD_STATUS_WPS1_XML, mode="r", encoding="utf-8") as status_file:
             status = status_file.read().format(
                 TEST_SERVER_URL=resources.TEST_REMOTE_SERVER_URL,
                 LOCATION_XML=status_url,
@@ -231,17 +231,19 @@ class WpsProviderTest(WpsConfigBase):
             # launch job execution and validate
             resp = mocked_sub_requests(self.app, "post_json", proc_exec_url, timeout=5,
                                        data=exec_body, headers=self.json_headers, only_local=True)
-            assert resp.status_code in [200, 201], "Failed with: [{}]\nReason:\n{}".format(resp.status_code, resp.json)
+            assert resp.status_code in [200, 201], f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
             assert handle_wps1_process_execute.called, "WPS-1 handler should have been called by CWL runner context"
 
             status_url = resp.json["location"]
             job_id = resp.json["jobID"]
             assert status_url == proc_exec_url + "/" + job_id
             results = self.monitor_job(status_url)
-            output_url = "{}/{}/{}".format(self.settings["weaver.wps_output_url"], job_id, "output.txt")
-            output_path = "{}/{}/{}".format(self.settings["weaver.wps_output_dir"], job_id, "output.txt")
+            wps_dir = self.settings["weaver.wps_output_dir"]
+            wps_url = self.settings["weaver.wps_output_url"]
+            output_url = f"{wps_url}/{job_id}/output.txt"
+            output_path = f"{wps_dir}/{job_id}/output.txt"
             assert results["output"]["format"]["mediaType"] == ContentType.TEXT_PLAIN
             assert results["output"]["href"] == output_url
-            with open(output_path) as out_file:
+            with open(output_path, mode="r", encoding="utf-8") as out_file:
                 data = out_file.read()
             assert data == ncdump_data

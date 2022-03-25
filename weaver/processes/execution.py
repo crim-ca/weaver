@@ -300,7 +300,7 @@ def parse_wps_inputs(wps_process, job):
             complex_inputs[process_input.identifier] = process_input
 
     try:
-        wps_inputs = list()
+        wps_inputs = []
         # parse both dict and list type inputs
         job_inputs = job.inputs.items() if isinstance(job.inputs, dict) else job.get("inputs", [])
         for job_input in job_inputs:

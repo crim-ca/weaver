@@ -1565,7 +1565,7 @@ class OneOfKeywordSchema(KeywordMapper):
         """
         Test each possible case, return all corresponding errors if not exactly one of the possibilities is valid.
         """
-        invalid_one_of = dict()
+        invalid_one_of = {}
         valid_one_of = []
         valid_nodes = []
         for index, schema_class in enumerate(self._one_of):  # noqa
@@ -1680,9 +1680,9 @@ class AllOfKeywordSchema(KeywordMapper):
         """
         Test each possible case, return all corresponding errors if any of the possibilities is invalid.
         """
-        required_all_of = dict()
-        missing_all_of = dict()
-        merged_all_of = dict()
+        required_all_of = {}
+        missing_all_of = {}
+        merged_all_of = {}
         for index, schema_class in enumerate(self._all_of):  # noqa
             try:
                 schema_class = _make_node_instance(schema_class)
@@ -1787,7 +1787,7 @@ class AnyOfKeywordSchema(KeywordMapper):
         """
         Test each possible case, return if no corresponding schema was found.
         """
-        option_any_of = dict()
+        option_any_of = {}
         merged_any_of = colander.null
         invalid_any_of = colander.Invalid(node=self)
         for index, schema_class in enumerate(self._any_of):  # noqa
@@ -1801,7 +1801,7 @@ class AnyOfKeywordSchema(KeywordMapper):
                     # only possibility is all similar objects or all literals because of '_keyword_schemas_same_struct'
                     if schema_class.schema_type is colander.Mapping:
                         if merged_any_of is colander.null:
-                            merged_any_of = dict()
+                            merged_any_of = {}
                         merged_any_of.update(result)
                     else:
                         # schema nodes override one another if valid for multiple schemas
@@ -1879,7 +1879,7 @@ class NotKeywordSchema(KeywordMapper):
         """
         Raise if any sub-node schema that should NOT be present was successfully validated.
         """
-        invalid_not = dict()
+        invalid_not = {}
         for index, schema_class in enumerate(self._not):  # noqa
             try:
                 schema_class = _make_node_instance(schema_class)

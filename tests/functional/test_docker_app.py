@@ -107,7 +107,7 @@ class WpsPackageDockerAppTest(WpsConfigBase):
         assert os.path.isfile(wps_out_file)
 
         # validate content
-        with open(wps_out_file) as res_file:
+        with open(wps_out_file, mode="r", encoding="utf-8") as res_file:
             assert res_file.read() == result_file_content
 
     def test_deployed_process_schemas(self):
@@ -243,7 +243,7 @@ class WpsPackageDockerAppTest(WpsConfigBase):
             # validate XML status is updated accordingly
             wps_xml_status = os.path.join(self.settings["weaver.wps_output_dir"], job_id + ".xml")
             assert os.path.isfile(wps_xml_status)
-            with open(wps_xml_status, "r") as status_file:
+            with open(wps_xml_status, mode="r", encoding="utf-8") as status_file:
                 assert "ProcessSucceeded" in status_file.read()
 
         self.validate_outputs(job_id, results, outputs, test_content)

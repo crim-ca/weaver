@@ -62,7 +62,7 @@ class DatabaseInterface(metaclass=abc.ABCMeta):
             return store_type.type
         if isinstance(store_type, str):
             return store_type
-        raise TypeError("Unsupported store type selector: [{}] ({})".format(store_type, type(store_type)))
+        raise TypeError(f"Unsupported store type selector: [{store_type}] ({type(store_type)})")
 
     @overload
     def get_store(self, store_type, *store_args, **store_kwargs):

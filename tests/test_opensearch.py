@@ -24,7 +24,7 @@ from weaver.wps_restapi.processes import processes
 if TYPE_CHECKING:
     from typing import Dict
 
-    from weaver.typedefs import DataSourceOpenSearch
+    from weaver.typedefs import JSON, DataSourceOpenSearch
 
 OSDD_URL = "http://geo.spacebel.be/opensearch/description.xml"
 
@@ -55,7 +55,9 @@ def get_test_file(*args):
 
 
 def load_json_test_file(filename):
-    return json.load(open(get_test_file("opensearch/json", filename)))
+    # type: (str) -> JSON
+    with open(get_test_file("opensearch/json", filename), mode="r", encoding="utf-8") as file:
+        return json.load(file)
 
 
 def make_request(**kw):

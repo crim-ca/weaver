@@ -179,7 +179,7 @@ def retrieve_package_job_log(execution, job, progress_min=0, progress_max=100):
         out_dir = get_wps_output_dir(get_settings())
         # if the process is a weaver package this status xml should be available in the process output dir
         log_path = get_status_location_log_path(execution.statusLocation, out_dir=out_dir)
-        with open(log_path, "r") as log_file:
+        with open(log_path, mode="r", encoding="utf-8") as log_file:
             log_lines = log_file.readlines()
         if not log_lines:
             return
@@ -220,7 +220,7 @@ def get_package_workflow_steps(package_dict_or_url):
     """
     if isinstance(package_dict_or_url, str):
         package_dict_or_url, _ = _get_process_package(package_dict_or_url)
-    workflow_steps_ids = list()
+    workflow_steps_ids = []
     package_type = _get_package_type(package_dict_or_url)
     if package_type == ProcessType.WORKFLOW:
         workflow_steps = package_dict_or_url.get("steps")
@@ -412,7 +412,7 @@ def _load_package_content(package_dict,                             # type: CWL
     package_dict["inputs"] = normalize_ordered_io(package_dict["inputs"], order_hints=package_input_hint)
     package_dict["outputs"] = normalize_ordered_io(package_dict["outputs"], order_hints=package_output_hint)
 
-    with open(tmp_json_cwl, "w") as f:
+    with open(tmp_json_cwl, mode="w", encoding="utf-8") as f:
         json.dump(package_dict, f)
     if only_dump_file:
         return
@@ -534,7 +534,7 @@ def _generate_process_with_cwl_from_reference(reference):
     as the number of metadata that can be mapped between it and the generated `CWL` package.
     """
     cwl_package = None
-    process_info = dict()
+    process_info = {}
 
     # match against direct CWL reference
     reference_path, reference_ext = os.path.splitext(reference)
@@ -760,8 +760,8 @@ def get_process_definition(process_offering, reference=None, package=None, data_
     package_inputs, package_outputs = try_or_raise_package_error(
         lambda: _get_package_inputs_outputs(package_factory),
         reason="Definition of package/process inputs/outputs")
-    process_inputs = process_info.get("inputs", list())
-    process_outputs = process_info.get("outputs", list())
+    process_inputs = process_info.get("inputs", [])
+    process_outputs = process_info.get("outputs", [])
 
     try_or_raise_package_error(
         lambda: _update_package_metadata(process_info, package),
@@ -840,8 +840,8 @@ class WpsPackage(Process):
         inputs = opensearch.replace_inputs_describe_process(inputs=inputs, payload=self.payload)
 
         inputs = [json2wps_io(i, WPS_INPUT) for i in inputs]
-        outputs = [json2wps_io(o, WPS_OUTPUT) for o in kw.pop("outputs", list())]
-        metadata = [json2wps_field(meta_kw, "metadata") for meta_kw in kw.pop("metadata", list())]
+        outputs = [json2wps_io(o, WPS_OUTPUT) for o in kw.pop("outputs", [])]
+        metadata = [json2wps_field(meta_kw, "metadata") for meta_kw in kw.pop("metadata", [])]
 
         super(WpsPackage, self).__init__(
             self._handler,
@@ -944,20 +944,20 @@ class WpsPackage(Process):
                 return captured_log
             out_log = []
             if with_stdout_file:
-                with open(stdout_file) as app_log_fd:
+                with open(stdout_file, mode="r", encoding="utf-8") as app_log_fd:
                     out_log = app_log_fd.readlines()
                     if out_log:
                         out_log = ["----- Captured Log (stdout) -----\n"] + out_log
             err_log = []
             if with_stderr_file:
-                with open(stderr_file) as app_log_fd:
+                with open(stderr_file, mode="r", encoding="utf-8") as app_log_fd:
                     err_log = app_log_fd.readlines()
                     if err_log:
                         err_log = ["----- Captured Log (stderr) -----\n"] + err_log
             if not out_log and not err_log:
                 self.log_message(status, "Nothing captured from internal application logs.", level=logging.INFO)
                 return captured_log
-            with open(self.log_file, "r") as pkg_log_fd:
+            with open(self.log_file, mode="r", encoding="utf-8") as pkg_log_fd:
                 pkg_log = pkg_log_fd.readlines()
             cwl_end_index = -1
             cwl_end_search = f"[cwltool] [job {self.package_id}] completed"  # success/permanentFail
@@ -967,7 +967,7 @@ class WpsPackage(Process):
                     break
             captured_log = out_log + err_log + ["----- End of Logs -----\n"]
             merged_log = pkg_log[:cwl_end_index] + captured_log + pkg_log[cwl_end_index:]
-            with open(self.log_file, "w") as pkg_log_fd:
+            with open(self.log_file, mode="w", encoding="utf-8") as pkg_log_fd:
                 pkg_log_fd.writelines(merged_log)
         except Exception as exc:
             # log exception, but non-failing
@@ -1408,7 +1408,7 @@ class WpsPackage(Process):
         :param cwl_inputs_info: expected CWL input definitions for mapping
         :return: CWL input values
         """
-        cwl_inputs = dict()
+        cwl_inputs = {}
         for input_id in wps_inputs:
             # skip empty inputs (if that is even possible...)
             input_occurs = wps_inputs[input_id]

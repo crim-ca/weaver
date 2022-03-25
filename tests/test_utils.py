@@ -58,6 +58,8 @@ from weaver.utils import (
     xml_strip_ns
 )
 
+# pylint: disable=R1732,W1514  # not using with open + encoding
+
 
 def test_null_operators():
     if null:

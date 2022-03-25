@@ -88,13 +88,13 @@ PACKAGE_CUSTOM_TYPES = frozenset([PACKAGE_ENUM_BASE])  # can be anything, but su
 PACKAGE_ARRAY_BASE = "array"
 PACKAGE_ARRAY_MAX_SIZE = sys.maxsize  # pywps doesn't allow None, so use max size  # FIXME: unbounded (weaver #165)
 PACKAGE_ARRAY_ITEMS = frozenset(list(PACKAGE_SIMPLE_TYPES) + list(PACKAGE_COMPLEX_TYPES) + list(PACKAGE_CUSTOM_TYPES))
-PACKAGE_ARRAY_TYPES = frozenset(["{}[]".format(item) for item in PACKAGE_ARRAY_ITEMS])
+PACKAGE_ARRAY_TYPES = frozenset([f"{item}[]" for item in PACKAGE_ARRAY_ITEMS])
 # string values the lowest 'type' field can have by itself (as simple mapping {type: <type-string>})
 PACKAGE_TYPE_NULLABLE = frozenset(list(PACKAGE_SIMPLE_TYPES) + list(PACKAGE_CUSTOM_TYPES) + list(PACKAGE_COMPLEX_TYPES))
 # shortcut notations that can be employed to convert basic types into corresponding array or nullable variants
-PACKAGE_SHORTCUTS = frozenset(["{}?".format(typ) for typ in PACKAGE_TYPE_NULLABLE] +
+PACKAGE_SHORTCUTS = frozenset([f"{typ}?" for typ in PACKAGE_TYPE_NULLABLE] +
                               list(PACKAGE_ARRAY_TYPES) +
-                              ["{}?".format(typ) for typ in PACKAGE_ARRAY_TYPES])
+                              [f"{typ}?" for typ in PACKAGE_ARRAY_TYPES])
 PACKAGE_TYPE_POSSIBLE_VALUES = frozenset(
     list(PACKAGE_LITERAL_TYPES) +
     list(PACKAGE_COMPLEX_TYPES) +

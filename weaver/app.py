@@ -50,7 +50,7 @@ def main(global_config, **settings):
                                       generate_default_from_example=False)
     if req_file:
         LOGGER.info("Loading request options...")
-        with open(req_file, "r") as f:
+        with open(req_file, mode="r", encoding="utf-8") as f:
             settings.update({"weaver.request_options": yaml.safe_load(f)})
     else:
         LOGGER.warning("No request options found.")

@@ -89,8 +89,8 @@ class BuiltinAppTest(WpsConfigBase):
     def setup_inputs(self, stack):
         dirname = tempfile.gettempdir()
         nc_data = "Hello NetCDF!"
-        tmp_ncdf = tempfile.NamedTemporaryFile(dir=dirname, mode="w", suffix=".nc")
-        tmp_json = tempfile.NamedTemporaryFile(dir=dirname, mode="w", suffix=".json")
+        tmp_ncdf = tempfile.NamedTemporaryFile(dir=dirname, mode="w", suffix=".nc")     # pylint: disable=R1732
+        tmp_json = tempfile.NamedTemporaryFile(dir=dirname, mode="w", suffix=".json")   # pylint: disable=R1732
         tmp_ncdf = stack.enter_context(tmp_ncdf)  # noqa
         tmp_json = stack.enter_context(tmp_json)  # noqa
         tmp_ncdf.write(nc_data)
@@ -136,7 +136,7 @@ class BuiltinAppTest(WpsConfigBase):
             assert nc_href.startswith(wps_out)
             assert os.path.split(nc_real_path)[-1] == os.path.split(nc_href)[-1]
             assert os.path.isfile(nc_real_path)
-            with open(nc_real_path, "r") as f:
+            with open(nc_real_path, mode="r", encoding="utf-8") as f:
                 assert f.read() == data
 
         # if everything was valid for results, validate equivalent but differently formatted outputs response

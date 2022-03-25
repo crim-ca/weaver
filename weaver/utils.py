@@ -673,7 +673,7 @@ def get_base_url(url):
     parsed_url = urlparse(url)
     if not parsed_url.netloc or parsed_url.scheme not in ("http", "https"):
         raise ValueError("bad url")
-    service_url = "%s://%s%s" % (parsed_url.scheme, parsed_url.netloc, parsed_url.path.strip())
+    service_url = f"{parsed_url.scheme}://{parsed_url.netloc}{parsed_url.path.strip()}"
     return service_url
 
 
@@ -1367,7 +1367,7 @@ def download_file_http(file_reference, file_outdir, settings=None, **request_kwa
         raise ValueError(f"Invalid file name [{file_name!s}] resolved from URL [{file_reference}]. Aborting download.")
 
     file_path = os.path.join(file_outdir, file_name)
-    with open(file_path, "wb") as file:
+    with open(file_path, "wb") as file:  # pylint: disable=W1514
         # NOTE:
         #   Setting 'chunk_size=None' lets the request find a suitable size according to
         #   available memory. Without this, it defaults to 1 which is extremely slow.
@@ -1490,7 +1490,7 @@ def load_file(file_path, text=False):
             headers = {"Accept": ContentType.TEXT_PLAIN}
             cwl_resp = request_extra("get", file_path, headers=headers, settings=settings)
             return cwl_resp.content if text else yaml.safe_load(cwl_resp.content)
-        with open(file_path, "r") as f:
+        with open(file_path, mode="r", encoding="utf-8") as f:
             return f.read() if text else yaml.safe_load(f)
     except OSError as exc:
         LOGGER.debug("Loading error: %s", exc, exc_info=exc)

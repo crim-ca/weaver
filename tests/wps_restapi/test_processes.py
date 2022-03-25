@@ -105,7 +105,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         }
         meta = {
             "id": process_id,
-            "title": "Test process '{}'.".format(process_id),
+            "title": f"Test process '{process_id}'.",
         }
         if schema == ProcessSchema.OLD:
             body["processDescription"]["process"] = meta
@@ -119,7 +119,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             # note:
             #   hostname cannot have underscores according to [RFC-1123](https://www.ietf.org/rfc/rfc1123.txt)
             #   schema validator of Reference URL will appropriately raise such invalid string
-            body["executionUnit"].append({"href": "http://weaver.test/{}.cwl".format(process_id)})
+            body["executionUnit"].append({"href": f"http://weaver.test/{process_id}.cwl"})
         return body
 
     @staticmethod
@@ -165,14 +165,14 @@ class WpsRestApiProcessesTest(unittest.TestCase):
     def test_get_processes_with_paging(self):
         test_prefix = "test-proc-temp"
         for i in range(10):
-            p_id = "{}-{}".format(test_prefix, i)
+            p_id = f"{test_prefix}-{i}"
             proc = self.process_private = Process(id=p_id, package={}, visibility=Visibility.PUBLIC)
             self.process_store.save_process(proc)
         _, total = self.process_store.list_processes(total=True, visibility=Visibility.PUBLIC)
         assert 10 < total < 15, "cannot run process paging test with current number of processes"
         limit = 5  # some value to get 3 pages, 2 full and the last partial
         remain = total - (2 * limit)
-        limit_kvp = "limit={}".format(limit)
+        limit_kvp = f"limit={limit}"
 
         path = get_path_kvp("/processes", page=1, limit=limit)
         resp = self.app.get(path, headers=self.json_headers)
@@ -412,13 +412,13 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert process_name in resp.json.get("description")
 
     def test_describe_process_visibility_public(self):
-        path = "/processes/{}".format(self.process_public.identifier)
+        path = f"/processes/{self.process_public.identifier}"
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
         assert resp.content_type == ContentType.APP_JSON
 
     def test_describe_process_visibility_private(self):
-        path = "/processes/{}".format(self.process_private.identifier)
+        path = f"/processes/{self.process_private.identifier}"
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 403
         assert resp.content_type == ContentType.APP_JSON
@@ -498,7 +498,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         process_data_tests[5].pop("deploymentProfileName")
         process_data_tests[6].pop("executionUnit")
         process_data_tests[7]["executionUnit"] = {}
-        process_data_tests[8]["executionUnit"] = list()
+        process_data_tests[8]["executionUnit"] = []
         process_data_tests[9]["executionUnit"][0] = {"unit": "something"}  # unit as string instead of package
         process_data_tests[10]["executionUnit"][0] = {"href": {}}  # noqa  # href as package instead of URL
         process_data_tests[11]["executionUnit"][0] = {"unit": {}, "href": ""}  # can't have both unit/href together
@@ -571,9 +571,10 @@ class WpsRestApiProcessesTest(unittest.TestCase):
 
         # apply visibility to allow retrieval
         proc_id = resp.json["processSummary"]["id"]  # process id could have been cleaned up
-        proc_url = "/processes/{}".format(proc_id)
+        proc_url = f"/processes/{proc_id}"
+        vis_url = f"{proc_url}/visibility"
         body = {"value": Visibility.PUBLIC}
-        resp = self.app.put_json("{}/visibility".format(proc_url), params=body, headers=self.json_headers)
+        resp = self.app.put_json(vis_url, params=body, headers=self.json_headers)
         assert resp.status_code == 200
 
         proc_query = {"schema": ProcessSchema.OLD}
@@ -659,7 +660,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             tmp_file = os.path.join(tmp_dir, "wps1.cwl")
             tmp_href = tmp_file.replace(out_dir, out_url, 1)
             ns, fmt = get_cwl_file_format(ContentType.APP_JSON)
-            with open(tmp_file, "w") as cwl_file:
+            with open(tmp_file, mode="w", encoding="utf-8") as cwl_file:
                 json.dump({
                     "cwlVersion": "v1.0",
                     "class": "CommandLineTool",
@@ -929,9 +930,9 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         raise NotImplementedError
 
     def test_delete_process_success(self):
-        path = "/processes/{}".format(self.process_public.identifier)
+        path = f"/processes/{self.process_public.identifier}"
         resp = self.app.delete_json(path, headers=self.json_headers)
-        assert resp.status_code == 200, "Error: {}".format(resp.text)
+        assert resp.status_code == 200, f"Error: {resp.text}"
         assert resp.content_type == ContentType.APP_JSON
         assert resp.json["identifier"] == self.process_public.identifier
         assert isinstance(resp.json["undeploymentDone"], bool) and resp.json["undeploymentDone"]
@@ -939,34 +940,36 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             self.process_store.fetch_by_id(self.process_public.identifier)
 
     def test_delete_process_not_accessible(self):
-        path = "/processes/{}".format(self.process_private.identifier)
+        path = f"/processes/{self.process_private.identifier}"
         resp = self.app.delete_json(path, headers=self.json_headers, expect_errors=True)
-        assert resp.status_code == 403, "Error: {}".format(resp.text)
+        assert resp.status_code == 403, f"Error: {resp.text}"
         assert resp.content_type == ContentType.APP_JSON
 
     def test_delete_process_not_found(self):
-        path = "/processes/{}".format(self.fully_qualified_test_process_name())
+        name = self.fully_qualified_test_process_name()
+        path = f"/processes/{name}"
         resp = self.app.delete_json(path, headers=self.json_headers, expect_errors=True)
-        assert resp.status_code == 404, "Error: {}".format(resp.text)
+        assert resp.status_code == 404, f"Error: {resp.text}"
         assert resp.content_type == ContentType.APP_JSON
 
     def test_delete_process_bad_name(self):
-        path = "/processes/{}".format(self.fully_qualified_test_process_name() + "...")
+        name = self.fully_qualified_test_process_name() + "..."
+        path = f"/processes/{name}"
         resp = self.app.delete_json(path, headers=self.json_headers, expect_errors=True)
-        assert resp.status_code == 400, "Error: {}".format(resp.text)
+        assert resp.status_code == 400, f"Error: {resp.text}"
         assert resp.content_type == ContentType.APP_JSON
 
     def test_execute_process_success(self):
-        path = "/processes/{}/jobs".format(self.process_public.identifier)
+        path = f"/processes/{self.process_public.identifier}/jobs"
         data = self.get_process_execute_template()
-        task = "job-{}".format(fully_qualified_name(self))
+        task = f"job-{fully_qualified_name(self)}"
         mock_execute = mocked_process_job_runner(task)
 
         with contextlib.ExitStack() as stack:
             for exe in mock_execute:
                 stack.enter_context(exe)
             resp = self.app.post_json(path, params=data, headers=self.json_headers)
-            assert resp.status_code == 201, "Error: {}".format(resp.text)
+            assert resp.status_code == 201, f"Error: {resp.text}"
             assert resp.content_type == ContentType.APP_JSON
             assert resp.json["location"].endswith(resp.json["jobID"])
             assert resp.headers["Location"] == resp.json["location"]
@@ -978,9 +981,9 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             assert job.task_id == Status.ACCEPTED  # temporary value until processed by celery
 
     def test_execute_process_language(self):
-        path = "/processes/{}/jobs".format(self.process_public.identifier)
+        path = f"/processes/{self.process_public.identifier}/jobs"
         data = self.get_process_execute_template()
-        task = "job-{}".format(fully_qualified_name(self))
+        task = f"job-{fully_qualified_name(self)}"
         mock_execute = mocked_process_job_runner(task)
 
         with contextlib.ExitStack() as stack:
@@ -989,7 +992,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             headers = self.json_headers.copy()
             headers["Accept-Language"] = AcceptLanguage.FR_CA
             resp = self.app.post_json(path, params=data, headers=headers)
-            assert resp.status_code == 201, "Error: {}".format(resp.text)
+            assert resp.status_code == 201, f"Error: {resp.text}"
             try:
                 job = self.job_store.fetch_by_id(resp.json["jobID"])
             except JobNotFound:
@@ -998,7 +1001,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             assert job.accept_language == AcceptLanguage.FR_CA
 
     def test_execute_process_no_json_body(self):
-        path = "/processes/{}/jobs".format(self.process_public.identifier)
+        path = f"/processes/{self.process_public.identifier}/jobs"
         resp = self.app.post_json(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 400
         assert resp.content_type == ContentType.APP_JSON
@@ -1030,7 +1033,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         def no_op(*_, **__):
             return Status.SUCCEEDED
 
-        path = "/processes/{}/jobs".format(self.process_public.identifier)
+        path = f"/processes/{self.process_public.identifier}/jobs"
         with contextlib.ExitStack() as stack_exec:
             for mock_exec in mocked_execute_celery(func_execute_task=no_op):
                 stack_exec.enter_context(mock_exec)
@@ -1048,7 +1051,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                     # if required, not normal to have passed validation
                     # if optional, valid since omitting field does not raise missing field in schema
                     if is_invalid:
-                        msg = "Killed test '{}' request taking too long using:\n{}".format(i, data_json)
+                        msg = f"Killed test '{i}' request taking too long using:\n{data_json}"
                         assert timeout.state == timeout.EXECUTED, msg
 
     def test_execute_process_dont_cast_one_of(self):
@@ -1057,16 +1060,16 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         """
         # get basic mock/data templates
         name = fully_qualified_name(self)
-        execute_mock_data_tests = list()
+        execute_mock_data_tests = []
 
-        mock_execute = mocked_process_job_runner("job-{}".format(name))
+        mock_execute = mocked_process_job_runner(f"job-{name}")
         data_execute = self.get_process_execute_template("100")
         execute_mock_data_tests.append((mock_execute, data_execute))
 
         with contextlib.ExitStack() as stack:
             for exe in mock_execute:
                 stack.enter_context(exe)
-            path = "/processes/{}/jobs".format(self.process_public.identifier)
+            path = f"/processes/{self.process_public.identifier}/jobs"
             resp = self.app.post_json(path, params=data_execute, headers=self.json_headers)
             assert resp.status_code == 201, "Expected job submission without inputs created without error."
             job = self.job_store.fetch_by_id(resp.json["jobID"])
@@ -1081,10 +1084,10 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         """
         # get basic mock/data templates
         name = fully_qualified_name(self)
-        execute_mock_data_tests = list()
+        execute_mock_data_tests = []
         for i in range(2):
-            mock_execute = mocked_process_job_runner("job-{}-{}".format(name, i))
-            data_execute = self.get_process_execute_template("{}-{}".format(name, i))
+            mock_execute = mocked_process_job_runner(f"job-{name}-{i}")
+            data_execute = self.get_process_execute_template(f"{name}-{i}")
             execute_mock_data_tests.append((mock_execute, data_execute))
 
         # apply modifications for testing
@@ -1095,7 +1098,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             with contextlib.ExitStack() as stack:
                 for exe in mock_execute:
                     stack.enter_context(exe)
-                path = "/processes/{}/jobs".format(self.process_public.identifier)
+                path = f"/processes/{self.process_public.identifier}/jobs"
                 resp = self.app.post_json(path, params=data_execute, headers=self.json_headers)
                 assert resp.status_code == 201, "Expected job submission without inputs created without error."
 
@@ -1121,7 +1124,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert resp.content_type == ContentType.APP_JSON
 
     def test_execute_process_not_visible(self):
-        path = "/processes/{}/jobs".format(self.process_private.identifier)
+        path = f"/processes/{self.process_private.identifier}/jobs"
         data = self.get_process_execute_template()
         resp = self.app.post_json(path, params=data, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 403
@@ -1130,7 +1133,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
     def test_get_process_visibility_expected_response(self):
         for http_code, wps_process in [(403, self.process_private), (200, self.process_public)]:
             process = self.process_store.fetch_by_id(wps_process.identifier)
-            path = "/processes/{}/visibility".format(process.identifier)
+            path = f"/processes/{process.identifier}/visibility"
             resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
             assert resp.status_code == http_code
             assert resp.content_type == ContentType.APP_JSON
@@ -1140,7 +1143,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                 assert "value" not in resp.json
 
     def test_get_process_visibility_not_found(self):
-        path = "/processes/{}/visibility".format(self.fully_qualified_test_process_name())
+        path = f"/processes/{self.fully_qualified_test_process_name()}/visibility"
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 404
         assert resp.content_type == ContentType.APP_JSON
@@ -1148,8 +1151,8 @@ class WpsRestApiProcessesTest(unittest.TestCase):
     def test_set_process_visibility_success(self):
         test_process = self.process_private.identifier
         proc_schema = {"schema": ProcessSchema.OLD}
-        path_describe = "/processes/{}".format(test_process)
-        path_visibility = "{}/visibility".format(path_describe)
+        path_describe = f"/processes/{test_process}"
+        path_visibility = f"{path_describe}/visibility"
 
         # validate cannot be found before
         resp = self.app.get(path_describe, params=proc_schema, headers=self.json_headers, expect_errors=True)
@@ -1179,7 +1182,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert resp.status_code == 403
 
     def test_set_process_visibility_bad_formats(self):
-        path = "/processes/{}/visibility".format(self.process_private.identifier)
+        path = f"/processes/{self.process_private.identifier}/visibility"
         test_data = [
             {"visibility": Visibility.PUBLIC},
             {"visibility": True},
@@ -1232,10 +1235,10 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         for i, meta in enumerate(test_meta):
             try:
                 sd.Process().deserialize({
-                    "id": "{}_meta_{}".format(self._testMethodName, i),
+                    "id": f"{self._testMethodName}_meta_{i}",
                     "metadata": meta,
                 })
             except colander.Invalid:
                 pass
             else:
-                self.fail("Metadata is expected to be raised as invalid: (test: {}, metadata: {})".format(i, meta))
+                self.fail(f"Metadata is expected to be raised as invalid: (test: {i}, metadata: {meta})")

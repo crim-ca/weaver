@@ -112,7 +112,7 @@ class OutputFormat(Constants):
     """)
 
     @classmethod
-    def get(cls, format_or_version, default=JSON):  # pylint: disable=W0221,arguments-differ
+    def get(cls, format_or_version, default=JSON):  # pylint: disable=W0221,W0237
         # type: (Union[str, AnyOutputFormat], AnyOutputFormat) -> AnyOutputFormat
         """
         Resolve the applicable output format.
@@ -484,7 +484,7 @@ def get_cwl_file_format(mime_type, make_reference=False, must_exist=True, allow_
         try:
             for _ in range(retries):
                 try:
-                    resp = urlopen(_mime_type_url, timeout=2)  # nosec: B310 # is hardcoded HTTP(S)
+                    resp = urlopen(_mime_type_url, timeout=2)  # nosec: B310 # hardcoded HTTP(S) # pylint: disable=R1732
                 except socket.timeout:
                     continue
                 if resp.code == HTTPOk.code:

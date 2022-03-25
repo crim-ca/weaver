@@ -50,8 +50,8 @@ def forbid_local_only(container):
     if config not in WeaverFeature.REMOTE:
         raise HTTPForbidden(json={
             "description":
-                "Invalid provider operation on [{}] instance. "
-                "Processes requires unsupported remote execution.".format(config),
+                f"Invalid provider operation on [{config}] instance. "
+                "Processes requires unsupported remote execution.",
         })
 
 
@@ -77,5 +77,5 @@ def get_service(request):
     try:
         service = store.fetch_by_name(provider_id)
     except ServiceNotFound:
-        raise HTTPNotFound("Provider {0} cannot be found.".format(provider_id))
+        raise HTTPNotFound(f"Provider {provider_id} cannot be found.")
     return service, store

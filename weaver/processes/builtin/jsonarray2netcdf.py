@@ -28,7 +28,7 @@ LOGGER.addHandler(logging.StreamHandler(sys.stdout))
 LOGGER.setLevel(logging.INFO)
 
 # process details
-__version__ = "1.2"
+__version__ = "1.3"
 __title__ = "JSON array to NetCDF"
 __abstract__ = __doc__  # NOTE: '__doc__' is fetched directly, this is mostly to be informative
 
@@ -39,12 +39,12 @@ def j2n(json_reference, output_dir):
     LOGGER.debug("Process '%s' output directory: [%s].", PACKAGE_NAME, output_dir)
     try:
         if not os.path.isdir(output_dir):
-            raise ValueError("Output dir [{}] does not exist.".format(output_dir))
-        with TemporaryDirectory(prefix="wps_process_{}_".format(PACKAGE_NAME)) as tmp_dir:
+            raise ValueError(f"Output dir [{output_dir}] does not exist.")
+        with TemporaryDirectory(prefix=f"wps_process_{PACKAGE_NAME}_") as tmp_dir:
             LOGGER.debug("Fetching JSON file: [%s]", json_reference)
             json_path = fetch_file(json_reference, tmp_dir, timeout=10, retry=3)
             LOGGER.debug("Reading JSON file: [%s]", json_path)
-            with open(json_path) as json_file:
+            with open(json_path, mode="r", encoding="utf-8") as json_file:
                 json_content = json.load(json_file)
             if not isinstance(json_content, list) or any(not is_netcdf_url(f) for f in json_content):
                 LOGGER.error("Invalid JSON: [%s]", json_content)
@@ -60,15 +60,16 @@ def j2n(json_reference, output_dir):
     LOGGER.info("Process '%s' execution completed.", PACKAGE_NAME)
 
 
-def main():
+def main(*args):
+    # type: (*str) -> None
     LOGGER.info("Parsing inputs of '%s' process.", PACKAGE_NAME)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("-i", metavar="json", type=str,
                         help="JSON file to be parsed for NetCDF file names.")
     parser.add_argument("-o", metavar="outdir", default=CUR_DIR,
                         help="Output directory of the retrieved NetCDF files extracted by name from the JSON file.")
-    args = parser.parse_args()
-    sys.exit(j2n(args.i, args.o))
+    ns = parser.parse_args(*args)
+    sys.exit(j2n(ns.i, ns.o))
 
 
 if __name__ == "__main__":

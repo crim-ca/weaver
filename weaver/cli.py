@@ -734,7 +734,7 @@ class WeaverClient(object):
         files = {
             "file": (
                 os.path.basename(file_path),
-                open(file_path, "r", encoding="utf-8"),
+                open(file_path, "r", encoding="utf-8"),  # pylint: disable=R1732
                 file_headers["Content-Type"]
             )
         }

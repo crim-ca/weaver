@@ -27,7 +27,7 @@ LOGGER.addHandler(logging.StreamHandler(sys.stdout))
 LOGGER.setLevel(logging.INFO)
 
 # process details
-__version__ = "1.1"
+__version__ = "1.2"
 __title__ = "Metalink to NetCDF"
 __abstract__ = __doc__  # NOTE: '__doc__' is fetched directly, this is mostly to be informative
 
@@ -41,14 +41,14 @@ def m2n(metalink_reference, index, output_dir):
     LOGGER.debug("Process '%s' output directory: [%s].", PACKAGE_NAME, output_dir)
     try:
         if not os.path.isdir(output_dir):
-            raise ValueError("Output dir [{}] does not exist.".format(output_dir))
-        with TemporaryDirectory(prefix="wps_process_{}_".format(PACKAGE_NAME)) as tmp_dir:
+            raise ValueError(f"Output dir [{output_dir}] does not exist.")
+        with TemporaryDirectory(prefix=f"wps_process_{PACKAGE_NAME}_") as tmp_dir:
             LOGGER.debug("Fetching Metalink file: [%s]", metalink_reference)
             metalink_path = fetch_file(metalink_reference, tmp_dir, timeout=10, retry=3)
             LOGGER.debug("Reading Metalink file: [%s]", metalink_path)
             xml_data = xml_util.parse(metalink_path)
             LOGGER.debug("Parsing Metalink file references.")
-            nc_file_url = xml_data.xpath("string(//metalink/file[" + str(index) + "]/metaurl)")
+            nc_file_url = xml_data.xpath(f"string(//metalink/file[{index}]/metaurl)")
             LOGGER.debug("Fetching NetCDF reference from Metalink file: [%s]", metalink_reference)
             LOGGER.debug("NetCDF file URL : %s", nc_file_url)
             fetch_file(nc_file_url, output_dir)

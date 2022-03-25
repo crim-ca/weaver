@@ -333,6 +333,8 @@ def run_command(command, trim=True, expect_error=False, entrypoint=None):
         Python context to preserve any active mocks.
     :return: retrieved command outputs.
     """
+    # pylint: disable=R1732
+
     if isinstance(command, str):
         command = command.split(" ")
     command = [str(arg) for arg in command]
@@ -380,7 +382,8 @@ def mocked_file_response(path, url):
     resp.status_code = 200
     resp.headers["Content-Type"] = typ
     setattr(resp, "content_type", typ)
-    content = open(path, "rb").read()
+    with open(path, mode="rb", encoding="utf-8") as file:
+        content = file.read()
     resp._content = content  # noqa: W0212
 
     class StreamReader(object):
@@ -655,7 +658,7 @@ def mocked_remote_server_requests_wps1(server_configs,          # type: Union[Mo
     def get_xml(ref):
         if data:
             return ref
-        with open(ref, "r") as file:
+        with open(ref, mode="r", encoding="utf-8") as file:
             return file.read()
 
     all_request = set()
@@ -1049,7 +1052,7 @@ def mocked_reference_test_file(file_name_or_path, href_type, file_content="mock"
     else:
         tmpdir = tempfile.mkdtemp()
         path = os.path.join(tmpdir, file_name_or_path)
-    with open(path, "w") as tmp_file:
+    with open(path, mode="w", encoding="utf-8") as tmp_file:
         tmp_file.write(file_content)
         tmp_file.seek(0)
     if href_prefix:

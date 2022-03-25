@@ -248,7 +248,7 @@ def get_schema_query(schema, strict=True):
             "value": str(schema),
         })
     if not strict:
-        return schema_checked.split("+")[0]
+        return schema_checked.split("+", 1)[0]
     return schema_checked
 
 
@@ -555,13 +555,13 @@ def validate_service_process(request):
                     raise ProcessNotFound
     except (ServiceNotFound, ProcessNotFound):
         raise HTTPNotFound(json={
-            "code": "NoSuch{}".format(item_type),
-            "description": "{} of id '{}' cannot be found.".format(item_type, item_test)
+            "code": f"NoSuch{item_type}",
+            "description": f"{item_type} reference '{item_test}' cannot be found."
         })
     except (ServiceNotAccessible, ProcessNotAccessible):
         raise HTTPUnauthorized(json={
-            "code": "Unauthorized{}".format(item_type),
-            "description": "{} of id '{}' is not accessible.".format(item_type, item_test)
+            "code": f"Unauthorized{item_type}",
+            "description": f"{item_type} reference '{item_test}' is not accessible."
         })
     except InvalidIdentifierValue as ex:
         raise HTTPBadRequest(json={
@@ -693,7 +693,7 @@ def dismiss_job_task(job, container):
 
     LOGGER.debug("Job [%s] dismiss operation: Updating job status.")
     store = get_db(container).get_store(StoreJobs)
-    job.status_message = "Job {}.".format(Status.DISMISSED)
+    job.status_message = f"Job {Status.DISMISSED}."
     job.status = map_status(Status.DISMISSED)
     job = store.update_job(job)
     return job

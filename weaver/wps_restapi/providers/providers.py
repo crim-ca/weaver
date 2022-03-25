@@ -23,10 +23,12 @@ from weaver.wps.utils import get_wps_client
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.processes.utils import get_process_list_links
 from weaver.wps_restapi.providers.utils import check_provider_requirements, get_provider_services, get_service
-from weaver.wps_restapi.utils import get_schema_ref
+from weaver.wps_restapi.utils import get_schema_ref, handle_schema_validation
 
 if TYPE_CHECKING:
     from pyramid.request import Request
+
+    from weaver.typedefs import AnyResponseType
 
 LOGGER = logging.getLogger(__name__)
 
@@ -36,6 +38,7 @@ LOGGER = logging.getLogger(__name__)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 @check_provider_requirements
 def get_providers(request):
+    # type: (Request) -> AnyResponseType
     """
     Lists registered providers.
     """
@@ -57,6 +60,7 @@ def get_providers(request):
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 @check_provider_requirements
 def add_provider(request):
+    # type: (Request) -> AnyResponseType
     """
     Register a new service provider.
     """
@@ -66,7 +70,7 @@ def add_provider(request):
         body = schema.deserialize(request.json)
     except colander.Invalid as invalid:
         data = {
-            "description": "Invalid schema: [{!s}]".format(invalid),
+            "description": f"Invalid schema: [{invalid!s}]",
             "value": invalid.value
         }
         data.update(schema_ref)
@@ -79,11 +83,11 @@ def add_provider(request):
     except ServiceNotFound:
         pass
     else:
-        raise HTTPConflict("Provider [{}] already exists.".format(prov_id))
+        raise HTTPConflict(f"Provider [{prov_id}] already exists.")
     try:
         new_service = Service(url=body["url"], name=prov_id)
     except KeyError as exc:
-        raise OWSMissingParameterValue("Missing JSON parameter '{!s}'.".format(exc), value=exc)
+        raise OWSMissingParameterValue(f"Missing JSON parameter '{exc!s}'.", value=exc)
 
     if "public" in body:
         new_service["public"] = body["public"]
@@ -117,6 +121,7 @@ def add_provider(request):
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 @check_provider_requirements
 def remove_provider(request):
+    # type: (Request) -> AnyResponseType
     """
     Remove an existing service provider.
     """
@@ -135,6 +140,7 @@ def remove_provider(request):
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 @check_provider_requirements
 def get_provider(request):
+    # type: (Request) -> AnyResponseType
     """
     Get a provider definition (GetCapabilities).
     """
@@ -148,6 +154,7 @@ def get_provider(request):
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 @check_provider_requirements
 def get_provider_processes(request):
+    # type: (Request) -> AnyResponseType
     """
     Retrieve available provider processes (GetCapabilities).
     """
@@ -183,19 +190,17 @@ def describe_provider_process(request):
                                  renderer=OutputFormat.JSON, schema=sd.ProviderProcessEndpoint(),
                                  response_schemas=sd.get_provider_process_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
+@handle_schema_validation()
 @check_provider_requirements
 def get_provider_process(request):
+    # type: (Request) -> AnyResponseType
     """
     Retrieve a process description (DescribeProcess).
     """
-    try:
-        process = describe_provider_process(request)
-        schema = request.params.get("schema")
-        offering = process.offering(schema)
-        return HTTPOk(json=offering)
-    # FIXME: handle colander invalid directly in tween (https://github.com/crim-ca/weaver/issues/112)
-    except colander.Invalid as ex:
-        raise HTTPBadRequest("Invalid schema: [{!s}]".format(ex))
+    process = describe_provider_process(request)
+    schema = request.params.get("schema")
+    offering = process.offering(schema)
+    return HTTPOk(json=offering)
 
 
 @sd.provider_execution_service.post(tags=[sd.TAG_PROVIDERS, sd.TAG_PROVIDERS, sd.TAG_EXECUTE, sd.TAG_JOBS],
@@ -207,6 +212,7 @@ def get_provider_process(request):
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 @check_provider_requirements
 def submit_provider_job(request):
+    # type: (Request) -> AnyResponseType
     """
     Execute a remote provider process.
     """

@@ -67,11 +67,10 @@ def fetch_data_sources():
         if not os.path.isabs(data_source_config):
             data_source_config = os.path.normpath(os.path.join(WEAVER_ROOT_DIR, data_source_config))
         try:
-            with open(data_source_config) as f:
+            with open(data_source_config, mode="r", encoding="utf-8") as f:
                 DATA_SOURCES = yaml.safe_load(f)  # both JSON/YAML
         except Exception as exc:
-            raise ValueError("Data sources file [{0}] cannot be loaded due to error: [{1!r}]."
-                             .format(data_source_config, exc))
+            raise ValueError(f"Data sources file [{data_source_config}] cannot be loaded due to error: [{exc!r}].")
     if not DATA_SOURCES:
         raise ValueError("No data sources found in setting 'weaver.data_sources'. Data source required for EMS.")
     return DATA_SOURCES

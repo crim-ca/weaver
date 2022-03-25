@@ -35,8 +35,9 @@ from tests.utils import (
 from weaver import WEAVER_ROOT_DIR
 from weaver.config import WeaverConfiguration
 from weaver.formats import ContentType
+from weaver.processes.utils import get_process_information
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory
-from weaver.utils import fetch_file, get_weaver_url, make_dirs, now, request_extra
+from weaver.utils import fetch_file, get_any_id, get_weaver_url, make_dirs, now, request_extra
 from weaver.visibility import Visibility
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
@@ -109,12 +110,12 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
     Runs an end-2-end test procedure on weaver configured as EMS located on specified `WEAVER_TEST_SERVER_HOSTNAME`.
     """
     __settings__ = None
-    test_processes_info = dict()    # type: Dict[WorkflowProcesses, ProcessInfo]
+    test_processes_info = {}        # type: Dict[WorkflowProcesses, ProcessInfo]
     headers = {
         "Accept": ContentType.APP_JSON,
         "Content-Type": ContentType.APP_JSON,
     }                               # type: HeadersType
-    cookies = dict()                # type: CookiesType
+    cookies = {}                    # type: CookiesType
     app = None                      # type: Optional[WebTestApp]
     logger_result_dir = None        # type: Optional[str]
     logger_separator_calls = ""     # type: str
@@ -164,8 +165,8 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
         cls.logger_separator_tests = cls.get_option("WEAVER_TEST_LOGGER_SEPARATOR_TESTS", cls.logger_separator_tests)
         cls.logger_separator_cases = cls.get_option("WEAVER_TEST_LOGGER_SEPARATOR_CASES", cls.logger_separator_cases)
         cls.setup_logger()
-        cls.log("{}Start of '{}': {}\n{}"
-                .format(cls.logger_separator_cases, cls.current_case_name(), now(), cls.logger_separator_cases))
+        cls.log("%sStart of '%s': %s\n%s",
+                cls.logger_separator_cases, cls.current_case_name(), now(), cls.logger_separator_cases)
 
         # test execution configs
         cls.WEAVER_TEST_REQUEST_TIMEOUT = int(cls.get_option("WEAVER_TEST_REQUEST_TIMEOUT", 10))
@@ -201,7 +202,7 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
             if cls.WEAVER_TEST_SERVER_HOSTNAME.startswith("http"):
                 url = cls.WEAVER_TEST_SERVER_HOSTNAME
             else:
-                url = "http://{}".format(cls.WEAVER_TEST_SERVER_HOSTNAME)
+                url = f"http://{cls.WEAVER_TEST_SERVER_HOSTNAME}"
             cls.app = WebTestApp(url)
             cls.WEAVER_URL = get_weaver_url(cls.settings.fget(cls))
         cls.WEAVER_RESTAPI_URL = get_wps_restapi_base_url(cls.settings.fget(cls))
@@ -218,11 +219,10 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
         Provide basic settings that must be defined to use various weaver utility functions.
         """
         if not self.__settings__:
-            weaver_url = os.getenv("WEAVER_URL", "{}{}".format(self.WEAVER_TEST_SERVER_HOSTNAME,
-                                                               self.WEAVER_TEST_SERVER_BASE_PATH))
+            weaver_url = os.getenv("WEAVER_URL", self.WEAVER_TEST_SERVER_HOSTNAME + self.WEAVER_TEST_SERVER_BASE_PATH)
             if not weaver_url.startswith("http"):
                 if not weaver_url.startswith("/") and weaver_url != "":
-                    weaver_url = "http://{}".format(weaver_url)
+                    weaver_url = f"http://{weaver_url}"
             self.__settings__ = get_settings_from_testapp(self.app)
             self.__settings__.update(get_settings_from_config_ini(self.WEAVER_TEST_CONFIG_INI_PATH))
             self.__settings__.update({
@@ -237,15 +237,15 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
     def tearDownClass(cls):
         cls.clean_test_processes()
         testing.tearDown()
-        cls.log("{}End of '{}': {}\n{}"
-                .format(cls.logger_separator_cases, cls.current_case_name(), now(), cls.logger_separator_cases))
+        cls.log("%sEnd of '%s': %s\n%s",
+                cls.logger_separator_cases, cls.current_case_name(), now(), cls.logger_separator_cases)
 
     def setUp(self):
         # reset in case it was modified during another test
         self.__class__.log_full_trace = True
 
-        self.log("{}Start of '{}': {}\n{}"
-                 .format(self.logger_separator_tests, self.current_test_name(), now(), self.logger_separator_tests))
+        self.log("%sStart of '%s': %s\n%s",
+                 self.logger_separator_tests, self.current_test_name(), now(), self.logger_separator_tests)
 
         # cleanup old processes as required
         self.clean_test_processes_before()
@@ -253,8 +253,8 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
         self.clean_test_processes_after()
 
     def tearDown(self):
-        self.log("{}End of '{}': {}\n{}"
-                 .format(self.logger_separator_tests, self.current_test_name(), now(), self.logger_separator_tests))
+        self.log("%sEnd of '%s': %s\n%s",
+                 self.logger_separator_tests, self.current_test_name(), now(), self.logger_separator_tests)
 
     @classmethod
     def setup_test_processes_before(cls):
@@ -313,13 +313,13 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
         return val
 
     @classmethod
-    def log(cls, message, exception=False):
+    def log(cls, message, *args, exception=False):
         if cls.logger_enabled:
             if exception:
                 # also prints traceback of the exception
-                cls.logger.exception(message)
+                cls.logger.exception(message, *args)
             else:
-                cls.logger.log(cls.logger_level, message)
+                cls.logger.log(cls.logger_level, message, *args)
         if exception:
             raise RuntimeError(message)
 
@@ -341,7 +341,7 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
         """
         sub_indent = cls.get_indent(indent_level if cls.logger_json_indent else 0)
         log_payload = "\n" if cls.logger_json_indent else "" + json.dumps(payload, indent=cls.logger_json_indent)
-        log_payload.replace("\n", "\n{}".format(sub_indent))
+        log_payload.replace("\n", f"\n{sub_indent}")
         if log_payload.endswith("\n"):
             return log_payload[:-1]  # remove extra line, let logger message generation add it explicitly
         return log_payload
@@ -355,7 +355,7 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
             return None
 
         tab = "\n" + cls.get_indent(indent_level)
-        return tab + "{tab}".format(tab=tab).join(["{}: {}".format(k, dictionary[k]) for k in sorted(dictionary)])
+        return tab + tab.join([f"{k}: {dictionary[k]}" for k in sorted(dictionary)])
 
     @classmethod
     def clean_test_processes_before(cls):
@@ -387,7 +387,7 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
     def clean_test_processes(cls, allowed_codes=frozenset([HTTPOk.code, HTTPNotFound.code])):
         for process_info in cls.test_processes_info.values():
             cls.clean_test_processes_iter_before(process_info)
-            path = "/processes/{}".format(process_info.id)
+            path = f"/processes/{process_info.id}"
             resp = cls.request("DELETE", path,
                                headers=cls.headers, cookies=cls.cookies,
                                ignore_errors=True, log_enabled=False)
@@ -480,7 +480,8 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
         """
         pid = process_id.value
         deploy_payload = cls.retrieve_payload(pid, "deploy")
-        test_process_id = "{}_{}".format(cls.__name__, deploy_payload["processDescription"]["process"]["id"])
+        deploy_id = get_any_id(get_process_information(deploy_payload))
+        test_process_id = f"{cls.__name__}_{deploy_id}"
         execute_payload = cls.retrieve_payload(pid, "execute")
 
         # replace derived reference (local only, remote must used full 'href' references)
@@ -514,16 +515,17 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
             req_url = getattr(response.request, "url", "")
             req_body = getattr(response.request, "body", "")
             req_method = getattr(response.request, "method", "")
-            message = "{}, {}".format(message, content) if content else message
+            message = f"{message}, {content}" if content else message
         status = [status] if status is not None and not hasattr(status, "__iter__") else status
         if status is not None:
-            expect_msg = "Expected status in: {}".format(status)
+            expect_msg = f"Expected status in: {status}"
             expect_code = code in status
         else:
             expect_msg = "Expected status: <= 400"
             expect_code = code <= 400
-        msg = "Unexpected HTTP Status: {} {}[{}]\n{}\nFrom: [{} {} {}]".format(
-            response.status_code, reason, message, expect_msg, req_method, req_url, req_body
+        msg = (
+            f"Unexpected HTTP Status: {response.status_code} {reason}[{message}]\n{expect_msg}\n"
+            f"From: [{req_method} {req_url} {req_body}]"
         )
         cls.assert_test(lambda: expect_code, message=msg, title="Response Assertion Failed")
 
@@ -536,7 +538,7 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
         try:
             assert assert_test(), message
         except AssertionError:
-            cls.log("{}{}:\n{}\n".format(cls.logger_separator_calls, title, message), exception=True)
+            cls.log("%s%s:\n%s\n", cls.logger_separator_calls, title, message, exception=True)
 
     @classmethod
     def is_local(cls):
@@ -584,7 +586,7 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
         with_mock_req = cls.is_webtest()
 
         if cls.WEAVER_URL and url.startswith("/") or url == "" and not with_mock_req:
-            url = "{}{}".format(cls.WEAVER_URL, url)
+            url = f"{cls.WEAVER_URL}{url}"
 
         if not json_body and data_body and headers and ContentType.APP_JSON in headers.get("Content-Type"):
             json_body = data_body
@@ -595,19 +597,19 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
                 payload = cls.log_json_format(json_body, 2)
             else:
                 payload = data_body
-            trace = ("{}Request Details:\n".format(cls.logger_separator_steps) +
-                     cls.indent("Request: {method} {url}\n".format(method=method, url=url), 1) +
-                     cls.indent("Payload: {payload}".format(payload=payload), 1))
+            trace = (f"{cls.logger_separator_steps}Request Details:\n" +
+                     cls.indent(f"Request: {method} {url}\n", 1) +
+                     cls.indent(f"Payload: {payload}", 1))
             if cls.log_full_trace:
                 module_name = "requests" if with_requests else "webtest.TestApp"
                 headers = cls.log_dict_format(headers, 2)
                 cookies = cls.log_dict_format(cookies, 2)
                 trace += ("\n" +
-                          cls.indent("Headers: {headers}\n".format(headers=headers), 1) +
-                          cls.indent("Cookies: {cookies}\n".format(cookies=cookies), 1) +
-                          cls.indent("Status:  {status} (expected)\n".format(status=status), 1) +
-                          cls.indent("Message: {message} (expected)\n".format(message=message), 1) +
-                          cls.indent("Module:  {module}\n".format(module=module_name), 1))
+                          cls.indent(f"Headers: {headers}\n", 1) +
+                          cls.indent(f"Cookies: {cookies}\n", 1) +
+                          cls.indent(f"Status:  {status} (expected)\n", 1) +
+                          cls.indent(f"Message: {message} (expected)\n", 1) +
+                          cls.indent(f"Module:  {module_name}\n", 1))
             cls.log(trace)
 
         if with_requests:
@@ -637,7 +639,7 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
             if isinstance(status, int):
                 status = [status]
             kw.update({"expect_errors": (status and any(code >= 400 for code in status)) or expect_errors})
-            cookies = kw.pop("cookies", dict()) or {}
+            cookies = kw.pop("cookies", {}) or {}
             for cookie_name, cookie_value in cookies.items():
                 cls.app.set_cookie(cookie_name, cookie_value)
 
@@ -669,11 +671,11 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
                 header_filter = ["Location"]
                 headers = {k: v for k, v in resp.headers.items() if k in header_filter}
             headers = cls.log_dict_format(headers, 2)
-            cls.log("{}Response Details:\n".format(cls.logger_separator_calls) +
-                    cls.indent("Status:  {status} (received)\n".format(status=resp.status_code), 1) +
-                    cls.indent("Content: {content}\n".format(content=resp.content_type), 1) +
-                    cls.indent("Payload: {payload}\n".format(payload=payload), 1) +
-                    cls.indent("Headers: {headers}\n".format(headers=headers), 1))
+            cls.log(f"{cls.logger_separator_calls}Response Details:\n" +
+                    cls.indent(f"Status:  {resp.status_code} (received)\n", 1) +
+                    cls.indent(f"Content: {resp.content_type}\n", 1) +
+                    cls.indent(f"Payload: {payload}\n", 1) +
+                    cls.indent(f"Headers: {headers}\n", 1))
         return resp
 
     def workflow_runner(self,
@@ -713,7 +715,7 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
         has_duplicate_apps = len(set(test_application_ids)) != len(list(test_application_ids))
         path_deploy = "/processes"
         for process_id in test_application_ids:
-            path_visible = "{}/{}/visibility".format(path_deploy, self.test_processes_info[process_id].id)
+            path_visible = f"{path_deploy}/{self.test_processes_info[process_id].id}/visibility"
             data_visible = {"value": Visibility.PUBLIC}
             allowed_status = [HTTPCreated.code, HTTPConflict.code] if has_duplicate_apps else HTTPCreated.code
             self.request("POST", path_deploy, status=allowed_status, headers=self.headers,
@@ -727,8 +729,8 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
         self.request("POST", path_deploy, status=HTTPCreated.code, headers=self.headers,
                      json=workflow_info.deploy_payload,
                      message="Expect deployed workflow process.")
-        process_path = "{}/{}".format(path_deploy, workflow_info.id)
-        visible_path = "{}/visibility".format(process_path)
+        process_path = f"{path_deploy}/{workflow_info.id}"
+        visible_path = f"{process_path}/visibility"
         visible = {"value": Visibility.PUBLIC}
         resp = self.request("PUT", visible_path, json=visible, status=HTTPOk.code, headers=self.headers)
         self.assert_test(lambda: resp.json.get("value") == Visibility.PUBLIC,
@@ -751,7 +753,7 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
 
             # execute workflow
             execute_body = workflow_info.execute_payload
-            execute_path = "{}/jobs".format(process_path)
+            execute_path = f"{process_path}/jobs"
             resp = self.request("POST", execute_path, status=HTTPCreated.code,
                                 headers=self.headers, json=execute_body)
             self.assert_test(lambda: resp.json.get("status") in JOB_STATUS_CATEGORIES[StatusCategory.RUNNING],
@@ -775,14 +777,20 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
         while True:
             self.assert_test(
                 lambda: timeout_accept > 0,
-                message="Maximum timeout reached for job execution test. " +
-                        "Expected job status change from '{0}' to '{1}' within {2}s since first '{0}'."
-                        .format(Status.ACCEPTED, Status.RUNNING, self.WEAVER_TEST_JOB_ACCEPTED_MAX_TIMEOUT))
+                message=(
+                    "Maximum timeout reached for job execution test. "
+                    f"Expected job status change from '{Status.ACCEPTED}' to '{Status.RUNNING}' "
+                    f"within {self.WEAVER_TEST_JOB_ACCEPTED_MAX_TIMEOUT}s since first '{Status.ACCEPTED}'."
+                )
+            )
             self.assert_test(
                 lambda: timeout_running > 0,
-                message="Maximum timeout reached for job execution test. " +
-                        "Expected job status change from '{0}' to '{1}' within {2}s since first '{0}'."
-                        .format(Status.RUNNING, Status.SUCCEEDED, self.WEAVER_TEST_JOB_RUNNING_MAX_TIMEOUT))
+                message=(
+                    "Maximum timeout reached for job execution test. "
+                    f"Expected job status change from '{Status.RUNNING}' to '{Status.SUCCEEDED}' "
+                    f"within {self.WEAVER_TEST_JOB_RUNNING_MAX_TIMEOUT}s since first '{Status.RUNNING}'."
+                )
+            )
             resp = self.request("GET", job_location_url,
                                 headers=user_headers, cookies=user_cookies, status=HTTPOk.code)
             status = resp.json.get("status")
@@ -796,15 +804,15 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
                 time.sleep(self.WEAVER_TEST_JOB_GET_STATUS_INTERVAL)
                 continue
             if status in JOB_STATUS_CATEGORIES[StatusCategory.FINISHED]:
-                msg = "Job execution '{}' failed, but expected to succeed.".format(job_location_url)
+                msg = f"Job execution '{job_location_url}' failed, but expected to succeed."
                 failed = status != Status.SUCCEEDED
                 if failed:
                     msg += "\n" + self.try_retrieve_logs(job_location_url)
                 self.assert_test(lambda: not failed, message=msg)
                 break
-            self.assert_test(lambda: False, message="Unknown job execution status: '{}'.".format(status))
-        resp = self.request("GET", "{}/results".format(job_location_url),
-                            headers=user_headers, cookies=user_cookies, status=HTTPOk.code)
+            self.assert_test(lambda: False, message=f"Unknown job execution status: '{status}'.")
+        path = f"{job_location_url}/results"
+        resp = self.request("GET", path, headers=user_headers, cookies=user_cookies, status=HTTPOk.code)
         return resp
 
     def try_retrieve_logs(self, workflow_job_url):
@@ -823,7 +831,7 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
                 job_id = workflow_job_url.split("/")[-1]
                 tab_n = "\n" + self.indent("", 1)
                 workflow_logs = tab_n.join(logs)
-                msg += "Workflow logs [JobID: {}]".format(job_id) + tab_n + workflow_logs
+                msg += f"Workflow logs [JobID: {job_id}]" + tab_n + workflow_logs
                 log_matches = set(re.findall(r".*(https?://.+/logs).*", workflow_logs)) - {workflow_job_url}
                 log_refs = {}
                 for log_url in log_matches:
@@ -833,7 +841,7 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
                     resp = self.request("GET", log_url, ignore_errors=True)
                     if resp.status_code == 200 and isinstance(resp.json, list):
                         step_logs = tab_n.join(resp.json)
-                        msg += "\nStep process logs [JobID: {}]".format(job_id) + tab_n + step_logs
+                        msg += f"\nStep process logs [JobID: {job_id}]" + tab_n + step_logs
         except Exception:
             return "Could not retrieve job logs."
         return msg
@@ -884,10 +892,10 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
             for i in range(3):
                 nc_name = f"test-file-{i}.nc"
                 nc_refs.append(os.path.join("file://" + tmp_dir, nc_name))
-                with open(os.path.join(tmp_dir, nc_name), "w") as tmp_file:
+                with open(os.path.join(tmp_dir, nc_name), mode="w", encoding="utf-8") as tmp_file:
                     tmp_file.write(f"DUMMY NETCDF DATA #{i}")
-            with open(os.path.join(tmp_dir, "netcdf-array.json"), "w") as tmp_file:  # must match execution body
-                json.dump(nc_refs, tmp_file)
+            with open(os.path.join(tmp_dir, "netcdf-array.json"), mode="w", encoding="utf-8") as tmp_file:
+                json.dump(nc_refs, tmp_file)  # must match execution body
 
             def mock_tmp_input(requests_mock):
                 mocked_file_server(tmp_dir, tmp_host, self.settings, requests_mock=requests_mock)
@@ -906,7 +914,7 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
                              message="Workflow output file with nested directory globs should have been automatically"
                                      "mapped between steps until the final staging WPS output URL.")
             output_path = fetch_file(final_output, stage_out_tmp_dir, self.settings)
-            with open(output_path, "r") as out_file:
+            with open(output_path, mode="r", encoding="utf-8") as out_file:
                 output_data = out_file.read()
             self.assert_test(lambda: output_data == f"DUMMY NETCDF DATA #{expected_index}",
                              message="Workflow output data should have made it through the "
@@ -933,10 +941,10 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
             for i in range(3):
                 nc_name = f"test-file-{i}.nc"
                 nc_refs.append(os.path.join("file://" + tmp_dir, nc_name))
-                with open(os.path.join(tmp_dir, nc_name), "w") as tmp_file:
+                with open(os.path.join(tmp_dir, nc_name), mode="w", encoding="utf-8") as tmp_file:
                     tmp_file.write(f"DUMMY NETCDF DATA #{i}")
-            with open(os.path.join(tmp_dir, "netcdf-array.json"), "w") as tmp_file:  # must match execution body
-                json.dump(nc_refs, tmp_file)
+            with open(os.path.join(tmp_dir, "netcdf-array.json"), mode="w", encoding="utf-8") as tmp_file:
+                json.dump(nc_refs, tmp_file)  # must match execution body
 
             def mock_tmp_input(requests_mock):
                 mocked_file_server(tmp_dir, tmp_host, self.settings, requests_mock=requests_mock)
@@ -955,7 +963,7 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
                              message="Workflow output file with nested directory globs should have been automatically"
                                      "mapped between steps until the final staging WPS output URL.")
             output_path = fetch_file(final_output, stage_out_tmp_dir, self.settings)
-            with open(output_path, "r") as out_file:
+            with open(output_path, mode="r", encoding="utf-8") as out_file:
                 output_data = out_file.read()
             self.assert_test(lambda: output_data == f"DUMMY NETCDF DATA #{expected_index}",
                              message="Workflow output data should have made it through the "
@@ -982,10 +990,10 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
             for i in range(3):
                 nc_name = f"test-file-{i}.nc"
                 nc_refs.append(os.path.join(tmp_host, nc_name))
-                with open(os.path.join(tmp_dir, nc_name), "w") as tmp_file:
+                with open(os.path.join(tmp_dir, nc_name), mode="w", encoding="utf-8") as tmp_file:
                     tmp_file.write(f"DUMMY NETCDF DATA #{i}")
-            with open(os.path.join(tmp_dir, "netcdf-array.json"), "w") as tmp_file:  # must match execution body
-                json.dump(nc_refs, tmp_file)
+            with open(os.path.join(tmp_dir, "netcdf-array.json"), mode="w", encoding="utf-8") as tmp_file:
+                json.dump(nc_refs, tmp_file)  # must match execution body
 
             def mock_tmp_input(requests_mock):
                 mocked_file_server(tmp_dir, tmp_host, self.settings, requests_mock=requests_mock)
@@ -1026,8 +1034,8 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
         with contextlib.ExitStack() as stack:
             tmp_host = "https://mocked-file-server.com"  # must match in 'Execute_WorkflowCopyNestedOutDir.json'
             tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())
-            with open(os.path.join(tmp_dir, "test-file.txt"), "w") as tmp_file:  # must match execution body
-                tmp_file.write("DUMMY DATA")
+            with open(os.path.join(tmp_dir, "test-file.txt"), mode="w", encoding="utf-8") as tmp_file:
+                tmp_file.write("DUMMY DATA")  # must match execution body
 
             def mock_tmp_input(requests_mock):
                 mocked_file_server(tmp_dir, tmp_host, self.settings, requests_mock=requests_mock)
@@ -1044,7 +1052,7 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
                              message="Workflow output file with nested directory globs should have been automatically"
                                      "mapped between steps until the final staging WPS output URL.")
             output_path = fetch_file(final_output, stage_out_tmp_dir, self.settings)
-            with open(output_path, "r") as out_file:
+            with open(output_path, mode="r", encoding="utf-8") as out_file:
                 output_data = out_file.read()
             self.assert_test(lambda: output_data == "COPY:\nCOPY:\nDUMMY DATA",
                              message="Workflow output file with nested directory globs should contain "

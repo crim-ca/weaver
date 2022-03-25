@@ -133,7 +133,7 @@ class ResourcesUtil(object):
                     if os.path.isfile(path_ext):
                         if ref_found:
                             return path_ext
-                        with open(path_ext, "r", encoding="utf-8") as f:
+                        with open(path_ext, mode="r", encoding="utf-8") as f:
                             json_payload = yaml.safe_load(f)  # both JSON/YAML
                             return json_payload
                     if urlparse(path_ext).scheme != "":
@@ -178,7 +178,7 @@ class WpsConfigBase(unittest.TestCase):
 
     @classmethod
     def describe_process(cls, process_id, describe_schema=ProcessSchema.OGC):
-        path = "/processes/{}?schema={}".format(process_id, describe_schema)
+        path = f"/processes/{process_id}?schema={describe_schema}"
         resp = cls.app.get(path, headers=cls.json_headers)
         assert resp.status_code == 200
         return deepcopy(resp.json)
@@ -208,22 +208,23 @@ class WpsConfigBase(unittest.TestCase):
                 exec_list[0]["unit"] = exec_unit
                 exec_list[0].pop("href")
         resp = mocked_sub_requests(cls.app, "post_json", "/processes", data=payload, headers=cls.json_headers)
-        assert resp.status_code == 201, "Expected successful deployment.\nError:\n{}".format(resp.text)
+        assert resp.status_code == 201, f"Expected successful deployment.\nError:\n{resp.text}"
         path = resp.json["processSummary"]["processDescriptionURL"]
         body = {"value": Visibility.PUBLIC}
-        resp = cls.app.put_json("{}/visibility".format(path), params=body, headers=cls.json_headers)
-        assert resp.status_code == 200, "Expected successful visibility.\nError:\n{}".format(resp.text)
+        resp = cls.app.put_json(f"{path}/visibility", params=body, headers=cls.json_headers)
+        assert resp.status_code == 200, f"Expected successful visibility.\nError:\n{resp.text}"
         info = []
-        for info_path in ["{}?schema={}".format(path, describe_schema), "{}/package".format(path)]:
+        for info_path in [f"{path}?schema={describe_schema}", f"{path}/package"]:
             resp = cls.app.get(info_path, headers=cls.json_headers)
             assert resp.status_code == 200
             info.append(deepcopy(resp.json))
         return info
 
     def _try_get_logs(self, status_url):
-        _resp = self.app.get("{}/logs".format(status_url), headers=self.json_headers)
+        _resp = self.app.get(f"{status_url}/logs", headers=self.json_headers)
         if _resp.status_code == 200:
-            return "Error logs:\n{}".format("\n".join(_resp.json))
+            _text = "\n".join(_resp.json)
+            return f"Error logs:\n{_text}"
         return ""
 
     def fully_qualified_test_process_name(self):
@@ -260,12 +261,13 @@ class WpsConfigBase(unittest.TestCase):
         wait_for_status = wait_for_status or Status.SUCCEEDED
 
         def check_job_status(_resp, running=False):
+            # type: (AnyResponseType, bool) -> bool
             body = _resp.json
             pretty = json.dumps(body, indent=2, ensure_ascii=False)
             final = Status.FAILED if expect_failed else Status.SUCCEEDED
             statuses = [Status.ACCEPTED, Status.RUNNING, final] if running else [final]
-            assert _resp.status_code == 200, "Execution failed:\n{}\n{}".format(pretty, self._try_get_logs(status_url))
-            assert body["status"] in statuses, "Error job info:\n{}\n{}".format(pretty, self._try_get_logs(status_url))
+            assert _resp.status_code == 200, f"Execution failed:\n{pretty}\n{self._try_get_logs(status_url)}"
+            assert body["status"] in statuses, f"Error job info:\n{pretty}\n{self._try_get_logs(status_url)}"
             return body["status"] in {wait_for_status, Status.SUCCEEDED, Status.FAILED}  # break condition
 
         time.sleep(1)  # small delay to ensure process execution had a chance to start before monitoring
@@ -283,13 +285,13 @@ class WpsConfigBase(unittest.TestCase):
         check_job_status(resp)
         if return_status or expect_failed:
             return resp.json
-        resp = self.app.get("{}/results".format(status_url), headers=self.json_headers)
-        assert resp.status_code == 200, "Error job info:\n{}".format(resp.text)
+        resp = self.app.get(f"{status_url}/results", headers=self.json_headers)
+        assert resp.status_code == 200, f"Error job info:\n{resp.text}"
         return resp.json
 
     def get_outputs(self, status_url):
-        resp = self.app.get(status_url + "/outputs", headers=self.json_headers)
+        resp = self.app.get(f"{status_url}/outputs", headers=self.json_headers)
         body = resp.json
         pretty = json.dumps(body, indent=2, ensure_ascii=False)
-        assert resp.status_code == 200, "Get outputs failed:\n{}\n{}".format(pretty, self._try_get_logs(status_url))
+        assert resp.status_code == 200, f"Get outputs failed:\n{pretty}\n{self._try_get_logs(status_url)}"
         return body

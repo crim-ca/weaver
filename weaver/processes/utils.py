@@ -215,7 +215,7 @@ def _validate_deploy_process_info(process_info, reference, package, settings, he
                 proc_type = info["type"]
                 raise HTTPForbidden(json={
                     "description": (
-                        f"Invalid process deployment of type [{proc_type}] on [{cfg}] instance. " 
+                        f"Invalid process deployment of type [{proc_type}] on [{cfg}] instance. "
                         "Remote execution is required but not supported."
                     ),
                     "cause": problem
@@ -533,7 +533,7 @@ def register_wps_processes_from_config(wps_processes_file_path, container):
         return
     LOGGER.info("Using WPS-1 provider processes file: [%s]", wps_processes_file_path)
     try:
-        with open(wps_processes_file_path, "r") as f:
+        with open(wps_processes_file_path, mode="r", encoding="utf-8") as f:
             # if file is empty (not even processes/providers section), None is return instead of dict
             processes_config = yaml.safe_load(f) or {}
         if processes_config:

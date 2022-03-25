@@ -76,11 +76,11 @@ def test_wps3_process_step_io_data_or_href():
             except PackageExecutionError as exc:
                 if isinstance(exc.__cause__, TestDoneEarlyExit):
                     return  # successful test / expected handling
-                msg = "Other error was raised [{}], inputs where not correctly handled somewhere".format(exc)
+                msg = f"Other error was raised [{exc}], inputs where not correctly handled somewhere"
                 pytest.fail(msg)
             except Exception as exc:  # noqa
                 if not test_reached_parse_inputs:
-                    msg = "Prior error was raised [{}], could not evaluate intended handling of inputs".format(exc)
+                    msg = f"Prior error was raised [{exc}], could not evaluate intended handling of inputs"
                     pytest.fail(msg)
-                msg = "Other error was raised [{}], inputs where not correctly handled somewhere".format(exc)
+                msg = f"Other error was raised [{exc}], inputs where not correctly handled somewhere"
                 pytest.fail(msg)

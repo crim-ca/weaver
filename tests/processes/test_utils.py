@@ -137,9 +137,9 @@ def test_register_wps_processes_from_config_valid():
     providers = s_store.list_services()
 
     # generate equivalent of inferred named (simplified)
-    infer_name1 = WPS1_URL1.split("://")[-1].replace(".com", "_com")
-    infer_name2 = WPS1_URL2.split("://")[-1].replace(".com", "_com")
-    infer_name3 = WPS1_URL3.split("://")[-1].replace(".com", "_com")
+    infer_name1 = WPS1_URL1.rsplit("://", 1)[-1].replace(".com", "_com")
+    infer_name2 = WPS1_URL2.rsplit("://", 1)[-1].replace(".com", "_com")
+    infer_name3 = WPS1_URL3.rsplit("://", 1)[-1].replace(".com", "_com")
 
     # dynamic provider inferred names are sanitized/slug of URL
     assert len(providers) == 3, "Number of dynamic WPS-1 providers registered should match number from file."

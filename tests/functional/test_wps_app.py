@@ -64,7 +64,7 @@ class WpsAppTest(unittest.TestCase):
         pyramid.testing.tearDown()
 
     def make_url(self, params):
-        return "{}?{}".format(self.wps_path, params)
+        return f"{self.wps_path}?{params}"
 
     def test_getcaps(self):
         resp = self.app.get(self.make_url("service=wps&request=getcapabilities"))
@@ -128,7 +128,7 @@ class WpsAppTest(unittest.TestCase):
         assert resp.content_type in ContentType.ANY_XML
         resp.mustcontain("<wps:ExecuteResponse")
         resp.mustcontain("<wps:ProcessAccepted")
-        resp.mustcontain("PyWPS Process {}".format(HelloWPS.identifier))
+        resp.mustcontain(f"PyWPS Process {HelloWPS.identifier}")
 
     def test_execute_deployed_with_visibility_allowed(self):
         headers = {"Accept": ContentType.APP_XML}
@@ -142,7 +142,7 @@ class WpsAppTest(unittest.TestCase):
         assert resp.content_type in ContentType.ANY_XML
         resp.mustcontain("<wps:ExecuteResponse")
         resp.mustcontain("<wps:ProcessAccepted")
-        resp.mustcontain("PyWPS Process {}".format(self.process_public.identifier))
+        resp.mustcontain(f"PyWPS Process {self.process_public.identifier}")
 
     def test_execute_deployed_with_visibility_denied(self):
         headers = {"Accept": ContentType.APP_XML}
@@ -153,7 +153,7 @@ class WpsAppTest(unittest.TestCase):
                 stack_exec.enter_context(mock_exec)
             resp = self.app.get(url, headers=headers, expect_errors=True)
         assert resp.status_code == 403
-        assert resp.content_type in ContentType.ANY_XML, "Error Response: {}".format(resp.text)
+        assert resp.content_type in ContentType.ANY_XML, f"Error Response: {resp.text}"
         resp.mustcontain("<Exception exceptionCode=\"AccessForbidden\" locator=\"service\">")
-        err_desc = "Process with ID '{}' is not accessible.".format(self.process_private.identifier)
-        resp.mustcontain("<ExceptionText>{}</ExceptionText>".format(err_desc))
+        err_desc = f"Process with ID '{self.process_private.identifier}' is not accessible."
+        resp.mustcontain(f"<ExceptionText>{err_desc}</ExceptionText>")
