@@ -40,7 +40,7 @@ if TYPE_CHECKING:
 class ResourcesUtil(object):
     @classmethod
     def request(cls, method, url, *args, **kwargs):
-        # type: (str, str, Any, Any) -> AnyResponseType
+        # type: (str, str, *Any, **Any) -> AnyResponseType
         """
         Request operation to retrieve remote payload definitions.
 

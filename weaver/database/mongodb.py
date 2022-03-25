@@ -92,36 +92,36 @@ class MongoDatabase(DatabaseInterface):
 
     @overload
     def get_store(self, store_type, *store_args, **store_kwargs):
-        # type: (StoreBillsSelector, Any, Any) -> MongodbBillStore
+        # type: (StoreBillsSelector, *Any, **Any) -> MongodbBillStore
         ...
 
     @overload
     def get_store(self, store_type, *store_args, **store_kwargs):
-        # type: (StoreQuotesSelector, Any, Any) -> MongodbQuoteStore
+        # type: (StoreQuotesSelector, *Any, **Any) -> MongodbQuoteStore
         ...
 
     @overload
     def get_store(self, store_type, *store_args, **store_kwargs):
-        # type: (StoreJobsSelector, Any, Any) -> MongodbJobStore
+        # type: (StoreJobsSelector, *Any, **Any) -> MongodbJobStore
         ...
 
     @overload
     def get_store(self, store_type, *store_args, **store_kwargs):
-        # type: (StoreProcessesSelector, Any, Any) -> MongodbProcessStore
+        # type: (StoreProcessesSelector, *Any, **Any) -> MongodbProcessStore
         ...
 
     @overload
     def get_store(self, store_type, *store_args, **store_kwargs):
-        # type: (StoreServicesSelector, Any, Any) -> MongodbServiceStore
+        # type: (StoreServicesSelector, *Any, **Any) -> MongodbServiceStore
         ...
 
     @overload
     def get_store(self, store_type, *store_args, **store_kwargs):
-        # type: (StoreVaultSelector, Any, Any) -> MongodbVaultStore
+        # type: (StoreVaultSelector, *Any, **Any) -> MongodbVaultStore
         ...
 
     def get_store(self, store_type, *store_args, **store_kwargs):
-        # type: (StoreSelector, Any, Any) -> AnyMongodbStore
+        # type: (StoreSelector, *Any, **Any) -> AnyMongodbStore
         """
         Retrieve a store from the database.
 

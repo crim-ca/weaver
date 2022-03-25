@@ -66,37 +66,37 @@ class DatabaseInterface(metaclass=abc.ABCMeta):
 
     @overload
     def get_store(self, store_type, *store_args, **store_kwargs):
-        # type: (StoreBillsSelector, Any, Any) -> StoreBills
+        # type: (StoreBillsSelector, *Any, **Any) -> StoreBills
         ...
 
     @overload
     def get_store(self, store_type, *store_args, **store_kwargs):
-        # type: (StoreQuotesSelector, Any, Any) -> StoreQuotes
+        # type: (StoreQuotesSelector, *Any, **Any) -> StoreQuotes
         ...
 
     @overload
     def get_store(self, store_type, *store_args, **store_kwargs):
-        # type: (StoreJobsSelector, Any, Any) -> StoreJobs
+        # type: (StoreJobsSelector, *Any, **Any) -> StoreJobs
         ...
 
     @overload
     def get_store(self, store_type, *store_args, **store_kwargs):
-        # type: (StoreProcessesSelector, Any, Any) -> StoreProcesses
+        # type: (StoreProcessesSelector, *Any, **Any) -> StoreProcesses
         ...
 
     @overload
     def get_store(self, store_type, *store_args, **store_kwargs):
-        # type: (StoreServicesSelector, Any, Any) -> StoreServices
+        # type: (StoreServicesSelector, *Any, **Any) -> StoreServices
         ...
 
     @overload
     def get_store(self, store_type, *store_args, **store_kwargs):
-        # type: (StoreVaultSelector, Any, Any) -> StoreVault
+        # type: (StoreVaultSelector, *Any, **Any) -> StoreVault
         ...
 
     @abc.abstractmethod
     def get_store(self, store_type, *store_args, **store_kwargs):
-        # type: (StoreSelector, Any, Any) -> AnyStore
+        # type: (StoreSelector, *Any, **Any) -> AnyStore
         raise NotImplementedError
 
     @abc.abstractmethod

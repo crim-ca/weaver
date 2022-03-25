@@ -1097,7 +1097,7 @@ def retry_on_cache_error(func):
     """
     @functools.wraps(func)
     def wrapped(*args, **kwargs):
-        # type: (Any, Any) -> Any
+        # type: (*Any, **Any) -> Any
         try:
             return func(*args, **kwargs)
         except BeakerException as exc:
@@ -1308,7 +1308,7 @@ def request_extra(method,                       # type: str
 
 
 def download_file_http(file_reference, file_outdir, settings=None, **request_kwargs):
-    # type: (str, str, Optional[AnySettingsContainer], Any) -> str
+    # type: (str, str, Optional[AnySettingsContainer], **Any) -> str
     """
     Downloads the file referenced by an HTTP URL location.
 
@@ -1377,7 +1377,7 @@ def download_file_http(file_reference, file_outdir, settings=None, **request_kwa
 
 
 def fetch_file(file_reference, file_outdir, settings=None, link=None, move=False, **request_kwargs):
-    # type: (str, str, Optional[AnySettingsContainer], Optional[bool], bool, Any) -> str
+    # type: (str, str, Optional[AnySettingsContainer], Optional[bool], bool, **Any) -> str
     """
     Fetches a file from local path, AWS-S3 bucket or remote URL, and dumps it's content to the output directory.
 

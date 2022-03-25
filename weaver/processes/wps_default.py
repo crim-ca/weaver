@@ -1,9 +1,13 @@
 import logging
 import os
+from typing import TYPE_CHECKING
 
 from pywps import LiteralInput, LiteralOutput, Process
 
 from weaver.processes.types import ProcessType
+
+if TYPE_CHECKING:
+    from typing import Any
 
 LOGGER = logging.getLogger("PYWPS")
 
@@ -14,6 +18,7 @@ class HelloWPS(Process):
     type = ProcessType.WPS_LOCAL
 
     def __init__(self, *_, **__):
+        # type: (*Any, **Any) -> None
         inputs = [LiteralInput("name", "Your name", data_type="string")]
         outputs = [LiteralOutput("output", "Output response", data_type="string")]
 

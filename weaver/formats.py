@@ -567,7 +567,7 @@ def clean_mime_type_format(mime_type, suffix_subtype=False, strip_parameters=Fal
 
 
 def repr_json(data, force_string=True, **kwargs):
-    # type: (Any, bool, Any) -> Union[JSON, str, None]
+    # type: (Any, bool, **Any) -> Union[JSON, str, None]
     """
     Ensure that the input data can be serialized as JSON to return it formatted representation as such.
 

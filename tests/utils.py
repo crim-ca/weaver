@@ -885,7 +885,7 @@ def mocked_execute_celery(celery_task="weaver.processes.execution.execute_proces
     task = MockTask()
 
     def mock_execute_task(*args, **kwargs):
-        # type: (Any, Any) -> MockTask
+        # type: (*Any, **Any) -> MockTask
         if func_execute_task is None:
             mod, func = celery_task.rsplit(".", 1)
             module = importlib.import_module(mod)

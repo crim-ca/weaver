@@ -45,7 +45,7 @@ class HTTPHeadFileResponse(HTTPSuccessful):
     """
 
     def __init__(self, code=200, headers=None, **kwargs):
-        # type: (int, Optional[HeadersType], Any) -> None
+        # type: (int, Optional[HeadersType], **Any) -> None
         # drop any 'app_iter' content generator that would recalculate and reset the content_length
         kwargs.pop("body", None)
         kwargs.pop("json", None)

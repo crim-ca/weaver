@@ -817,7 +817,7 @@ class WpsPackage(Process):
     _job = None                     # type: Optional[Job]
 
     def __init__(self, **kw):
-        # type: (Any) -> None
+        # type: (**Any) -> None
         """
         Creates a `WPS-3 Process` instance to execute a `CWL` application package definition.
 

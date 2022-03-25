@@ -95,7 +95,7 @@ class WorkerRequest(WPSRequest):
     })
 
     def __init__(self, http_request=None, http_headers=None, **kwargs):
-        # type: (Optional[AnyRequestType], Optional[AnyHeadersContainer], Any) -> None
+        # type: (Optional[AnyRequestType], Optional[AnyHeadersContainer], **Any) -> None
         super(WorkerRequest, self).__init__(http_request, **kwargs)
         self.auth_headers = CaseInsensitiveDict()
         if http_request:
@@ -122,7 +122,7 @@ class WorkerExecuteResponse(ExecuteResponse):
     """
 
     def __init__(self, wps_request, uuid, process, job_url, settings, *_, **__):
-        # type: (WorkerRequest, str, ProcessWPS, str, SettingsType, Any, Any) -> None
+        # type: (WorkerRequest, str, ProcessWPS, str, SettingsType, *Any, **Any) -> None
 
         super(WorkerExecuteResponse, self).__init__(wps_request, uuid, process=process)
 
@@ -157,7 +157,7 @@ class WorkerService(ServiceWPS):
 
     @handle_known_exceptions
     def _get_capabilities_redirect(self, wps_request, *_, **__):
-        # type: (WPSRequest, Any, Any) -> Optional[Union[WPSResponse, HTTPValid]]
+        # type: (WPSRequest, *Any, **Any) -> Optional[Union[WPSResponse, HTTPValid]]
         """
         Redirects to WPS-REST endpoint if requested ``Content-Type`` is JSON.
         """
@@ -171,7 +171,7 @@ class WorkerService(ServiceWPS):
         return None
 
     def get_capabilities(self, wps_request, *_, **__):
-        # type: (WPSRequest, Any, Any) -> Union[WPSResponse, HTTPValid]
+        # type: (WPSRequest, *Any, **Any) -> Union[WPSResponse, HTTPValid]
         """
         Handles the ``GetCapabilities`` KVP/XML request submitted on the WPS endpoint.
 
@@ -182,7 +182,7 @@ class WorkerService(ServiceWPS):
 
     @handle_known_exceptions
     def _describe_process_redirect(self, wps_request, *_, **__):
-        # type: (WPSRequest, Any, Any) -> Optional[Union[WPSResponse, HTTPValid]]
+        # type: (WPSRequest, *Any, **Any) -> Optional[Union[WPSResponse, HTTPValid]]
         """
         Redirects to WPS-REST endpoint if requested ``Content-Type`` is JSON.
         """
@@ -202,7 +202,7 @@ class WorkerService(ServiceWPS):
         return None
 
     def describe(self, wps_request, *_, **__):
-        # type: (WPSRequest, Any, Any) -> Union[WPSResponse, HTTPValid]
+        # type: (WPSRequest, *Any, **Any) -> Union[WPSResponse, HTTPValid]
         """
         Handles the ``DescribeProcess`` KVP/XML request submitted on the WPS endpoint.
 

@@ -1,4 +1,5 @@
 from typing import TYPE_CHECKING
+
 from pywps import LiteralInput, LiteralOutput, Process
 
 from weaver.processes.types import ProcessType
@@ -16,7 +17,7 @@ class WpsTestProcess(Process):
     type = ProcessType.TEST   # allows to map WPS class
 
     def __init__(self, **kw):
-        # type: (Any) -> None
+        # type: (**Any) -> None
 
         # remove duplicates/unsupported keywords
         title = kw.pop("title", kw.get("identifier"))

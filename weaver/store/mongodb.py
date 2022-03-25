@@ -80,7 +80,7 @@ class MongodbStore(object):
 
     @classmethod
     def get_args_kwargs(cls, *args, **kwargs):
-        # type: (Any, Any) -> Tuple[Tuple, Dict]
+        # type: (*Any, **Any) -> Tuple[Tuple, Dict]
         """
         Filters :class:`MongodbStore`-specific arguments to safely pass them down its ``__init__``.
         """
@@ -101,7 +101,7 @@ class MongodbServiceStore(StoreServices, MongodbStore):
     """
 
     def __init__(self, *args, **kwargs):
-        # type: (Any, Any) -> None
+        # type: (*Any, **Any) -> None
         db_args, db_kwargs = MongodbStore.get_args_kwargs(*args, **kwargs)
         StoreServices.__init__(self)
         MongodbStore.__init__(self, *db_args, **db_kwargs)
@@ -282,7 +282,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
     """
 
     def __init__(self, *args, **kwargs):
-        # type: (Any, Any) -> None
+        # type: (*Any, **Any) -> None
         db_args, db_kwargs = MongodbStore.get_args_kwargs(*args, **kwargs)
         StoreProcesses.__init__(self)
         MongodbStore.__init__(self, *db_args, **db_kwargs)
@@ -563,7 +563,7 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
     """
 
     def __init__(self, *args, **kwargs):
-        # type: (Any, Any) -> None
+        # type: (*Any, **Any) -> None
         db_args, db_kwargs = MongodbStore.get_args_kwargs(*args, **kwargs)
         StoreJobs.__init__(self)
         MongodbStore.__init__(self, *db_args, **db_kwargs)
@@ -974,7 +974,7 @@ class MongodbQuoteStore(StoreQuotes, MongodbStore):
     """
 
     def __init__(self, *args, **kwargs):
-        # type: (Any, Any) -> None
+        # type: (*Any, **Any) -> None
         db_args, db_kwargs = MongodbStore.get_args_kwargs(*args, **kwargs)
         StoreQuotes.__init__(self)
         MongodbStore.__init__(self, *db_args, **db_kwargs)
@@ -1141,7 +1141,7 @@ class MongodbVaultStore(StoreVault, MongodbStore):
     """
 
     def __init__(self, *args, **kwargs):
-        # type: (Any, Any) -> None
+        # type: (*Any, **Any) -> None
         db_args, db_kwargs = MongodbStore.get_args_kwargs(*args, **kwargs)
         StoreVault.__init__(self)
         MongodbStore.__init__(self, *db_args, **db_kwargs)

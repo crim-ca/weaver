@@ -1487,7 +1487,7 @@ def make_parser():
 
 
 def main(*args):
-    # type: (Any) -> int
+    # type: (*str) -> int
     parser = make_parser()
     ns = parser.parse_args(args=args or None)
     setup_logger_from_options(LOGGER, ns)

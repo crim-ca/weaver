@@ -289,7 +289,7 @@ class QueryBoolean(Boolean):
     description = "Boolean query parameter that allows handles common truthy/falsy values."
 
     def __init__(self, *_, **__):
-        # type: (Any, Any) -> None
+        # type: (*Any, **Any) -> None
         super(QueryBoolean, self).__init__(
             allow_string=True,
             false_choices=("False", "false", "0", "off", "no", "null", "Null", "none", "None", ""),
@@ -897,7 +897,7 @@ class ProcessDeployMeta(ExtendedMappingSchema):
 class InputOutputDescriptionMeta(ExtendedMappingSchema):
     # remove unnecessary empty lists by default if nothing is provided for inputs/outputs
     def __init__(self, *args, **kwargs):
-        # type: (Any, Any) -> None
+        # type: (*Any, **Any) -> None
         super(InputOutputDescriptionMeta, self).__init__(*args, **kwargs)
         for child in self.children:
             if child.name in ["keywords", "metadata"]:

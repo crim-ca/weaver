@@ -19,12 +19,13 @@ if TYPE_CHECKING:
     from typing import Any
 
     from pyramid.config import Configurator
+    from pyramid.router import Router
 
     from weaver.typedefs import SettingsType
 
 
 def main(global_config, **settings):
-    # type: (SettingsType, Any) -> None
+    # type: (SettingsType, **Any) -> Router
     import weaver.app
     # add flag to disable some unnecessary operations when runner is celery (worker)
     settings["weaver.celery"] = sys.argv[0].rsplit("/", 1)[-1] == "celery"

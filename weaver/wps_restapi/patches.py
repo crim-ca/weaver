@@ -46,13 +46,13 @@ class ServiceOnlyExplicitGetHead(ServiceAutoGetHead):
     """
 
     def __init__(self, *_, **__):
-        # type: (Any, Any) -> None
+        # type: (*Any, **Any) -> None
         super(ServiceOnlyExplicitGetHead, self).__init__(*_, **__)
         self.defined_methods = NoAutoHeadList()
         self.definitions = NoAutoHeadList()
 
     def add_view(self, method, view, **kwargs):
-        # type: (Union[str, Tuple[str]], Any, Any) -> None
+        # type: (Union[str, Tuple[str]], Any, **Any) -> None
         method = method.upper()
         if method == "HEAD":  # this is a real HEAD view, add it just this time
             self.definitions.allow_once = True

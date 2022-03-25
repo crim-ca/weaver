@@ -28,7 +28,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 def main(global_config, **settings):
-    # type: (SettingsType, Any) -> Router
+    # type: (SettingsType, **Any) -> Router
     """
     Creates a Pyramid WSGI application for Weaver.
     """

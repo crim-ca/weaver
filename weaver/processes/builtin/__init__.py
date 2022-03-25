@@ -179,7 +179,7 @@ class BuiltinProcessJobBase(CommandLineJob):
 
     # pylint: disable=W0221,W0237  # naming using python like arguments
     def run(self, runtime_context, **kwargs):
-        # type: (RuntimeContext, Any) -> None
+        # type: (RuntimeContext, **Any) -> None
         try:
             self._validate_process()
             self._update_command()

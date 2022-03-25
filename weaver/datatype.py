@@ -271,7 +271,7 @@ class Service(Base):
     """
 
     def __init__(self, *args, **kwargs):
-        # type: (Any, Any) -> None
+        # type: (*Any, **Any) -> None
         super(Service, self).__init__(*args, **kwargs)
         if "name" not in self:
             raise TypeError("Service 'name' is required")
@@ -335,7 +335,7 @@ class Service(Base):
         }
 
     def wps(self, container=None, **kwargs):
-        # type: (AnySettingsContainer, Any) -> WebProcessingService
+        # type: (AnySettingsContainer, **Any) -> WebProcessingService
         """
         Obtain the remote WPS service definition and metadata.
 
@@ -566,7 +566,7 @@ class Job(Base):
     """
 
     def __init__(self, *args, **kwargs):
-        # type: (Any, Any) -> None
+        # type: (*Any, **Any) -> None
         super(Job, self).__init__(*args, **kwargs)
         if "task_id" not in self:
             raise TypeError(f"Parameter 'task_id' is required for '{self.__name__}' creation.")
@@ -1286,7 +1286,7 @@ class Authentication(Base):
     """
 
     def __init__(self, auth_scheme, auth_token, auth_link, **kwargs):
-        # type: (str, str, Optional[str], Any) -> None
+        # type: (str, str, Optional[str], **Any) -> None
         super(Authentication, self).__init__(**kwargs)
         # ensure values are provided and of valid format
         self.scheme = auth_scheme
@@ -1360,7 +1360,7 @@ class Authentication(Base):
 
     @classmethod
     def from_params(cls, **params):
-        # type: (Any) -> AnyAuthentication
+        # type: (**Any) -> AnyAuthentication
         """
         Obtains the specialized :class:`Authentication` using loaded parameters from :meth:`params`.
         """
@@ -1443,7 +1443,7 @@ class DockerAuthentication(Authentication):
     # NOTE:
     #   Specific parameter names are important for reload from database using 'Authentication.from_params'
     def __init__(self, auth_scheme, auth_token, auth_link, **kwargs):
-        # type: (str, str, str, Any) -> None
+        # type: (str, str, str, **Any) -> None
         """
         Initialize the authentication reference for pulling a Docker image from a protected registry.
 
@@ -1555,7 +1555,7 @@ class VaultFile(Authentication):
     bytes = 32
 
     def __init__(self, file_name="", file_format=None, file_secret=None, auth_token=None, **kwargs):
-        # type: (str, Optional[str], Optional[str], Optional[str], Any) -> None
+        # type: (str, Optional[str], Optional[str], Optional[str], **Any) -> None
         for key in ["type", "scheme", "link", "token"]:
             kwargs.pop(f"auth_{key}", None)
             kwargs.pop(key, None)
@@ -1720,7 +1720,7 @@ class Process(Base):
     """
 
     def __init__(self, *args, **kwargs):
-        # type: (Any, Any) -> None
+        # type: (*Any, **Any) -> None
         super(Process, self).__init__(*args, **kwargs)
         # use both 'id' and 'identifier' to support any call (WPS and recurrent 'id')
         if "id" not in self and "identifier" not in self:
@@ -2185,7 +2185,7 @@ class Process(Base):
 
     @staticmethod
     def from_wps(wps_process, **extra_params):
-        # type: (ProcessWPS, Any) -> Process
+        # type: (ProcessWPS, **Any) -> Process
         """
         Converts a :mod:`pywps` Process into a :class:`weaver.datatype.Process` using provided parameters.
         """
@@ -2200,7 +2200,7 @@ class Process(Base):
 
     @staticmethod
     def from_ows(process, service, container, **kwargs):
-        # type: (ProcessOWS, Service, AnySettingsContainer, Any) -> Process
+        # type: (ProcessOWS, Service, AnySettingsContainer, **Any) -> Process
         """
         Converts a :mod:`owslib.wps` Process to local storage :class:`weaver.datatype.Process`.
         """
@@ -2255,7 +2255,7 @@ class Process(Base):
 
     @staticmethod
     def convert(process, service=None, container=None, **kwargs):
-        # type: (AnyProcess, Optional[Service], Optional[AnySettingsContainer], Any) -> Process
+        # type: (AnyProcess, Optional[Service], Optional[AnySettingsContainer], **Any) -> Process
         """
         Converts known process equivalents definitions into the formal datatype employed by Weaver.
         """
@@ -2304,7 +2304,7 @@ class Quote(Base):
     # pylint: disable=C0103,invalid-name
 
     def __init__(self, *args, **kwargs):
-        # type: (Any, Any) -> None
+        # type: (*Any, **Any) -> None
         """
         Initialize the quote.
 

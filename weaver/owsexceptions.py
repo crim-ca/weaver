@@ -62,7 +62,7 @@ class OWSException(Response, Exception):
 </ExceptionReport>""")
 
     def __init__(self, detail=None, value=None, json=None, **kw):
-        # type: (Optional[str], Optional[Any], Optional[JSON], Any) -> None
+        # type: (Optional[str], Optional[Any], Optional[JSON], **Any) -> None
         status = kw.pop("status", None)
         if isinstance(status, type) and issubclass(status, HTTPException):
             status = status().status
