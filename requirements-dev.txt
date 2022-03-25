@@ -20,7 +20,7 @@ pydocstyle
 # FIXME: bad docstring asterisks args handling (https://github.com/PyCQA/pylint/issues/5406)
 pylint>=2.11,<2.12
 pylint_quotes
-responses>=0.20
+responses
 safety
 stopit
 # typing extension required for TypedDict
