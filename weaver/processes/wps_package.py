@@ -206,7 +206,7 @@ def get_process_location(process_id_or_url, data_source=None):
     data_source_url = retrieve_data_source_url(data_source)
     process_id = get_sane_name(process_id_or_url)
     process_url = sd.process_service.path.format(process_id=process_id)
-    return "{host}{path}".format(host=data_source_url, path=process_url)
+    return f"{data_source_url}{process_url}"
 
 
 def get_package_workflow_steps(package_dict_or_url):
@@ -242,7 +242,7 @@ def _fetch_process_info(process_info_url, fetch_error):
     :raises fetch_error: provided exception with URL message if the process information could not be retrieved.
     """
     def _info_not_found_error():
-        return fetch_error("Could not find reference: '{!s}'".format(process_info_url))
+        return fetch_error(f"Could not find reference: '{process_info_url!s}'")
 
     if not isinstance(process_info_url, str):
         raise _info_not_found_error()
@@ -263,7 +263,7 @@ def _get_process_package(process_url):
     :param process_url: process literal URL to DescribeProcess WPS-REST location.
     :return: tuple of package body as dictionary and package reference name.
     """
-    package_url = "{!s}/package".format(process_url)
+    package_url = f"{process_url}/package"
     package_body = _fetch_process_info(package_url, PackageNotFound)
     package_name = process_url.split("/")[-1]
     return package_body, package_name
@@ -278,7 +278,7 @@ def _get_process_payload(process_url):
     :return: payload body as dictionary.
     """
     process_url = get_process_location(process_url)
-    payload_url = "{!s}/payload".format(process_url)
+    payload_url = f"{process_url}/payload"
     payload_body = _fetch_process_info(payload_url, PayloadNotFound)
     return payload_body
 
@@ -319,16 +319,16 @@ def _check_package_file(cwl_file_path_or_url):
         cwl_path = cwl_file_path_or_url
         cwl_resp = request_extra("head", cwl_path, settings=get_settings())
         if cwl_resp.status_code != HTTPOk.code:
-            raise PackageRegistrationError("Cannot find CWL file at: '{}'.".format(cwl_path))
+            raise PackageRegistrationError(f"Cannot find CWL file at: '{cwl_path}'.")
     else:
         cwl_path = cwl_file_path_or_url[7:] if cwl_file_path_or_url.startswith("file://") else cwl_file_path_or_url
         cwl_path = os.path.abspath(cwl_path)
         if not os.path.isfile(cwl_path):
-            raise PackageRegistrationError("Cannot find CWL file at: '{}'.".format(cwl_file_path_or_url))
+            raise PackageRegistrationError(f"Cannot find CWL file at: '{cwl_file_path_or_url}'.")
 
     file_ext = os.path.splitext(cwl_path)[-1].replace(".", "")
     if file_ext not in PACKAGE_EXTENSIONS:
-        raise PackageRegistrationError("Not a valid CWL file type: '{}'.".format(file_ext))
+        raise PackageRegistrationError(f"Not a valid CWL file type: '{file_ext}'.")
     return cwl_path
 
 
@@ -342,7 +342,7 @@ def _load_package_file(file_path):
     try:
         return load_file(file_path)
     except ValueError as ex:
-        raise PackageRegistrationError("Package parsing generated an error: [{!s}]".format(ex))
+        raise PackageRegistrationError(f"Package parsing generated an error: [{ex!s}]")
 
 
 def _load_package_content(package_dict,                             # type: CWL
@@ -478,7 +478,7 @@ def _get_package_io(package_factory, io_select, as_json):
     elif io_select == WPS_INPUT:
         io_attrib = "inputs_record_schema"
     else:
-        raise PackageTypeError("Unknown I/O selection: '{}'.".format(io_select))
+        raise PackageTypeError(f"Unknown I/O selection: '{io_select}'.")
     cwl_package_io = getattr(package_factory.t, io_attrib)
     wps_package_io = [cwl2wps_io(io_item, io_select) for io_item in cwl_package_io["fields"]]
     if as_json:
@@ -548,8 +548,10 @@ def _generate_process_with_cwl_from_reference(reference):
         settings = get_settings()
         response = request_extra("GET", reference, retries=3, settings=settings)
         if response.status_code != HTTPOk.code:
-            raise HTTPServiceUnavailable("Couldn't obtain a valid response from [{}]. Service response: [{} {}]"
-                                         .format(reference, response.status_code, response.reason))
+            raise HTTPServiceUnavailable(
+                f"Couldn't obtain a valid response from [{reference}]. "
+                f"Service response: [{response.status_code} {response.reason}]"
+            )
         content_type = get_header("Content-Type", response.headers)
 
         # try to detect incorrectly reported media-type using common structures
@@ -608,13 +610,15 @@ def get_application_requirement(package):
     all_hints = _get_package_requirements_as_class_list(reqs) + _get_package_requirements_as_class_list(hints)
     app_hints = list(filter(lambda h: any(h["class"].endswith(t) for t in CWL_REQUIREMENT_APP_TYPES), all_hints))
     if len(app_hints) > 1:
-        raise ValueError("Package 'requirements' and/or 'hints' define too many conflicting values: {}, "
-                         "only one permitted amongst {}.".format(list(app_hints), list(CWL_REQUIREMENT_APP_TYPES)))
+        raise ValueError(
+            f"Package 'requirements' and/or 'hints' define too many conflicting values: {list(app_hints)}, "
+            f"only one permitted amongst {list(CWL_REQUIREMENT_APP_TYPES)}."
+        )
     requirement = app_hints[0] if app_hints else {"class": ""}
 
     cwl_supported_reqs = list(CWL_REQUIREMENTS_SUPPORTED)
     if not all(item.get("class") in cwl_supported_reqs for item in all_hints):
-        raise PackageTypeError("Invalid requirement, the requirements supported are {0}".format(cwl_supported_reqs))
+        raise PackageTypeError(f"Invalid requirement, the requirements supported are {cwl_supported_reqs}")
 
     return requirement
 
@@ -636,7 +640,7 @@ def check_package_instance_compatible(package):
     :returns: reason message if must be executed remotely or ``None`` if it *could* be executed locally.
     """
     if _get_package_type(package) == ProcessType.WORKFLOW:
-        return "CWL package defines a [{}] process that uses remote step-processes.".format(ProcessType.WORKFLOW)
+        return f"CWL package defines a [{ProcessType.WORKFLOW}] process that uses remote step-processes."
     requirement = get_application_requirement(package)
     req_class = requirement["class"]
     req_local = [CWL_REQUIREMENT_APP_BUILTIN, CWL_REQUIREMENT_APP_DOCKER]
@@ -644,11 +648,11 @@ def check_package_instance_compatible(package):
     if req_class in req_local:
         return None
     if req_class in req_remote:
-        return "CWL package hint/requirement [{}] requires a remote provider.".format(req_class)
+        return f"CWL package hint/requirement [{req_class}] requires a remote provider."
     # other undefined hint/requirement for remote execution (aka: ADES dispatched WPS-3/REST/OGC-API)
     remote = all(req in req_class for req in ["provider", "process"])
     if remote:
-        return "CWL package hint/requirement [{}] defines a remote provider entry.".format(req_class)
+        return f"CWL package hint/requirement [{req_class}] defines a remote provider entry."
     return None
 
 
@@ -685,9 +689,12 @@ def get_auth_requirements(requirement, headers):
             }
             if auth_scheme not in auth_supported:
                 if auth_scheme.capitalize() not in auth_supported:
+                    supported_schemes = ", ".join([
+                        f"{scheme} ({rfc_spec})" for scheme, rfc_spec in auth_supported.items()
+                    ])
                     raise ValueError(
-                        "Invalid authentication header scheme is not supported. Supported schemes are: {}.".format(
-                            ", ".join([f"{scheme} ({rfc_spec})" for scheme, rfc_spec in auth_supported.items()]))
+                        "Invalid authentication header scheme is not supported. "
+                        f"Supported schemes are: {supported_schemes}."
                     )
                 auth_scheme = auth_scheme.capitalize()
             auth = DockerAuthentication(auth_scheme, auth_token, link_ref_docker)
@@ -727,7 +734,7 @@ def get_process_definition(process_offering, reference=None, package=None, data_
             exc_type = type(exc) if isinstance(exc, package_errors) else PackageRegistrationError
             exc_msg = str(exc)
             LOGGER.exception(exc_msg)
-            raise exc_type("Invalid package/reference definition. {0} generated error: [{1!r}].".format(reason, exc))
+            raise exc_type(f"Invalid package/reference definition. {reason} generated error: [{exc!s}].")
 
     if not (isinstance(package, dict) or isinstance(reference, str)):
         raise PackageRegistrationError("Invalid parameters amongst one of [package, reference].")
@@ -866,12 +873,12 @@ class WpsPackage(Process):
         log_file_handler.setFormatter(log_file_formatter)
 
         # prepare package logger
-        self.logger = logging.getLogger("{}|{}".format(LOGGER.name, self.package_id))
+        self.logger = logging.getLogger(f"{LOGGER.name}|{self.package_id}")
         self.logger.addHandler(log_file_handler)
         self.logger.setLevel(self.log_level)
 
         # add CWL job and CWL runner logging to current package logger
-        job_logger = logging.getLogger("job {}".format(PACKAGE_DEFAULT_FILE_NAME))
+        job_logger = logging.getLogger(f"job {PACKAGE_DEFAULT_FILE_NAME}")
         job_logger.addHandler(log_file_handler)
         job_logger.setLevel(self.log_level)
         cwl_logger = logging.getLogger("cwltool")
@@ -953,7 +960,7 @@ class WpsPackage(Process):
             with open(self.log_file, "r") as pkg_log_fd:
                 pkg_log = pkg_log_fd.readlines()
             cwl_end_index = -1
-            cwl_end_search = "[cwltool] [job {}] completed".format(self.package_id)  # success/permanentFail
+            cwl_end_search = f"[cwltool] [job {self.package_id}] completed"  # success/permanentFail
             for i in reversed(range(len(pkg_log))):
                 if cwl_end_search in pkg_log[i]:
                     cwl_end_index = i
@@ -1112,7 +1119,9 @@ class WpsPackage(Process):
                 req_items.setdefault(CWL_REQUIREMENT_ENV_VAR, {"envDef": {}})
                 req_env = req_items.get(CWL_REQUIREMENT_ENV_VAR)
             active_python_path = os.path.join(sys.exec_prefix, "bin")
-            env_path = "{}:{}".format(active_python_path, os.getenv("PATH"))
+            env_path = os.getenv("PATH") or ""
+            env_path = ":" + env_path if env_path else ""
+            env_path = f"{active_python_path}{env_path}"
             req_env["envDef"].update({"PATH": env_path})
             if self.package.get("baseCommand") == "python":
                 self.package["baseCommand"] = os.path.join(active_python_path, "python")
@@ -1168,7 +1177,7 @@ class WpsPackage(Process):
                            target_host, status):
         # type: (str, Number, Number, Number, str, AnyValueType, str) -> None
         self.update_status(
-            message="[provider: {0}, step: {1}] - {2}".format(target_host, step_name, str(message).strip()),
+            message=f"[provider: {target_host}, step: {step_name}] - {str(message).strip()}",
             progress=map_progress(progress, start_step_progress, end_step_progress),
             status=status,
         )
@@ -1187,10 +1196,9 @@ class WpsPackage(Process):
 
         :returns: formatted exception with message to be raised by calling function.
         """
-        exception_msg = " [{}]".format(repr(exception)) if isinstance(exception, Exception) else ""
-        self.log_message(status=status, level=level,
-                         message="{0}: {1}{2}".format(exception_type.__name__, message, exception_msg))
-        return exception_type("{0}{1}".format(message, exception_msg))
+        exception_msg = f" [{exception!r}]" if isinstance(exception, Exception) else ""
+        self.log_message(status=status, level=level, message=f"{exception_type.__name__}: {message}{exception_msg}")
+        return exception_type(f"{message}{exception_msg}")
 
     @property
     def job(self):
@@ -1265,10 +1273,11 @@ class WpsPackage(Process):
                 if problem_needs_remote:
                     raise self.exception_message(
                         PackageExecutionError,
-                        message="Weaver instance is configured as [{}] but remote execution with one of {} is "
-                                "required for process [{}] because {}. Aborting execution.".format(
-                                    config, list(WeaverFeature.REMOTE), self.package_id, problem_needs_remote
-                                )
+                        message=(
+                            f"Weaver instance is configured as [{config}] but remote execution with one "
+                            f"of {list(WeaverFeature.REMOTE)} is required for process [{self.package_id}] "
+                            f"because {problem_needs_remote}. Aborting execution."
+                        )
                     )
             # switch back to local execution if hybrid execution can handle this package by itself (eg: Docker, builtin)
             elif config == WeaverConfiguration.HYBRID:
@@ -1297,7 +1306,7 @@ class WpsPackage(Process):
                                                                             loading_context=loading_context,
                                                                             runtime_context=runtime_context)
             except Exception as ex:
-                raise PackageRegistrationError("Exception occurred on package instantiation: '{!r}'".format(ex))
+                raise PackageRegistrationError(f"Exception occurred on package instantiation: '{ex!r}'")
             self.update_status("Loading package content done.", PACKAGE_PROGRESS_LOADING, Status.RUNNING)
 
             try:
@@ -1356,10 +1365,8 @@ class WpsPackage(Process):
                 raise self.exception_message(PackageExecutionError, exc, "Failed to save package outputs.")
         except Exception:
             # return log file location by status message since outputs are not obtained by WPS failed process
-            log_url = "{}/{}.log".format(get_wps_output_url(self.settings), self.uuid)
-            error_msg = "Package completed with errors. Server logs: [{}], Available at [{}]:".format(
-                self.log_file, log_url
-            )
+            log_url = f"{get_wps_output_url(self.settings)}/{self.uuid}.log"
+            error_msg = f"Package completed with errors. Server logs: [{self.log_file}], Available at: [{log_url}]"
             self.update_status(error_msg, self.percent, Status.FAILED)
             raise
         else:
@@ -1429,7 +1436,7 @@ class WpsPackage(Process):
                     input_data = input_i.url if input_i.as_reference else input_i.data
                 cwl_inputs[input_id] = input_data
             else:
-                raise PackageTypeError("Undefined package input for execution: {}.".format(type(input_i)))
+                raise PackageTypeError(f"Undefined package input for execution: {type(input_i)}.")
         return cwl_inputs
 
     def make_location_input(self, input_type, input_definition):
@@ -1574,14 +1581,16 @@ class WpsPackage(Process):
                 # provide more details than poorly descriptive IndexError
                 if not len(cwl_result[output_id]):
                     raise PackageExecutionError(
-                        "Process output '{}' expects at least one value but none was found. "
-                        "Possible incorrect glob pattern definition in CWL Application Package.".format(output_id)
+                        f"Process output '{output_id}' expects at least one value but none was found. "
+                        "Possible incorrect glob pattern definition in CWL Application Package."
                     )
                 cwl_result[output_id] = cwl_result[output_id][0]  # expect only one output
 
             if "location" not in cwl_result[output_id] and os.path.isfile(str(cwl_result[output_id])):
-                raise PackageTypeError("Process output '{}' defines CWL type other than 'File'. ".format(output_id) +
-                                       "Application output results must use 'File' type to return file references.")
+                raise PackageTypeError(
+                    f"Process output '{output_id}' defines CWL type other than 'File'. "
+                    "Application output results must use 'File' type to return file references."
+                )
             if "location" in cwl_result[output_id]:
                 self.make_location_output(cwl_result, output_id)
                 continue
@@ -1699,8 +1708,7 @@ class WpsPackage(Process):
         end_step_progress = self.map_step_progress(len(self.step_launched) + 1, max(1, len(self.step_packages)))
 
         self.step_launched.append(jobname)
-        self.update_status("Preparing to launch {type} {name}.".format(type=jobtype, name=jobname),
-                           start_step_progress, Status.RUNNING)
+        self.update_status(f"Preparing to launch {jobtype} {jobname}.", start_step_progress, Status.RUNNING)
 
         def _update_status_dispatch(_message, _progress, _status, _provider):
             self.step_update_status(
@@ -1712,7 +1720,8 @@ class WpsPackage(Process):
             required_params = ["provider", "process"]
             for _param in required_params:
                 if _param not in _requirement:
-                    raise ValueError("Missing requirement detail [{}]: {}".format(_requirement["class"], _param))
+                    _req = _requirement["class"]
+                    raise ValueError(f"Missing requirement detail [{_req}]: {_param}")
                 _wps_params[_param] = _requirement[_param]
             return _wps_params
 

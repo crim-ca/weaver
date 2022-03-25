@@ -63,7 +63,8 @@ def get_processes(request):
         if invalid_processes:
             raise HTTPServiceUnavailable(
                 "Previously deployed processes are causing invalid schema integrity errors. "
-                "Manual cleanup of following processes is required: {}".format(invalid_processes))
+                f"Manual cleanup of following processes is required: {invalid_processes}"
+            )
 
         body = {"processes": processes if detail else [get_any_id(p) for p in processes]}  # type: JSON
         if not with_providers:
@@ -128,7 +129,7 @@ def get_processes(request):
         raise
     # FIXME: handle colander invalid directly in tween (https://github.com/crim-ca/weaver/issues/112)
     except colander.Invalid as ex:
-        raise HTTPBadRequest("Invalid schema: [{!s}]".format(ex))
+        raise HTTPBadRequest(f"Invalid schema: [{ex!s}]")
 
 
 @sd.processes_service.post(tags=[sd.TAG_PROCESSES, sd.TAG_DEPLOY], renderer=OutputFormat.JSON,
@@ -156,7 +157,7 @@ def get_local_process(request):
         return HTTPOk(json=offering)
     # FIXME: handle colander invalid directly in tween (https://github.com/crim-ca/weaver/issues/112)
     except colander.Invalid as ex:
-        raise HTTPBadRequest("Invalid schema: [{!s}]\nValue: [{!s}]".format(ex, ex.value))
+        raise HTTPBadRequest(f"Invalid schema: [{ex!s}]\nValue: [{ex.value!s}]")
 
 
 @sd.process_package_service.get(tags=[sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS], renderer=OutputFormat.JSON,
@@ -206,7 +207,7 @@ def set_process_visibility(request):
     if not isinstance(process_id, str):
         raise HTTPUnprocessableEntity("Invalid process identifier.")
     if visibility not in Visibility:
-        raise HTTPBadRequest("Invalid visibility value specified: {!s}".format(visibility))
+        raise HTTPBadRequest(f"Invalid visibility value specified: {visibility!s}")
 
     try:
         store = get_db(request).get_store(StoreProcesses)
@@ -218,7 +219,7 @@ def set_process_visibility(request):
     except TypeError:
         raise HTTPBadRequest("Value of visibility must be a string.")
     except ValueError:
-        raise HTTPUnprocessableEntity("Value of visibility must be one of : {!s}".format(Visibility.values()))
+        raise HTTPUnprocessableEntity(f"Value of visibility must be one of : {Visibility.values()!s}")
     except ProcessNotFound as ex:
         raise HTTPNotFound(str(ex))
 

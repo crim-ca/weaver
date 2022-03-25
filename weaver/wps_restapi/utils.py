@@ -42,6 +42,7 @@ class HTTPHeadFileResponse(HTTPSuccessful):
     recalculated when the content iterator is created from the initialization parameters. This class takes care of all
     these edge cases to properly report content headers of HEAD requests although none is provided.
     """
+
     def __init__(self, code=200, headers=None, **kwargs):
         # type: (int, Optional[HeadersType], Any) -> None
         # drop any 'app_iter' content generator that would recalculate and reset the content_length

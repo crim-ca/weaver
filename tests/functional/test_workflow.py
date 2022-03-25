@@ -92,6 +92,7 @@ class ProcessInfo(object):
     """
     Container to preserve details loaded from 'application-packages' definitions.
     """
+
     def __init__(self, process_id, test_id=None, deploy_payload=None, execute_payload=None):
         # type: (Union[str, WorkflowProcesses], Optional[str], Optional[JSON], Optional[JSON]) -> None
         self.pid = WorkflowProcesses(process_id)

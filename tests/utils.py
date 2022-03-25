@@ -217,7 +217,9 @@ def setup_config_with_celery(config):
     settings = config.get_settings()
 
     # override celery loader to specify configuration directly instead of ini file
-    celery_mongodb_url = "mongodb://{}:{}/celery".format(settings.get("mongodb.host"), settings.get("mongodb.port"))
+    celery_mongodb_host = settings.get("mongodb.host")
+    celery_mongodb_port = settings.get("mongodb.port")
+    celery_mongodb_url = f"mongodb://{celery_mongodb_host}:{celery_mongodb_port}/celery-test"
     celery_settings = {
         "broker_url": celery_mongodb_url,
         "result_backend": celery_mongodb_url  # for sync exec
@@ -348,9 +350,9 @@ def run_command(command, trim=True, expect_error=False, entrypoint=None):
             err = entrypoint(*tuple(command))
         out = stdout.getvalue()
     if expect_error:
-        assert err, "process returned successfully when error was expected: {}".format(err)
+        assert err, f"process returned successfully when error was expected: {err!s}"
     else:
-        assert not err, "process returned with error code: {}".format(err)
+        assert not err, f"process returned with error code: {err!s}"
         # when no output is present, it is either because CLI was not installed correctly, or caused by some other error
         assert out != "", "process did not execute as expected, no output available"
     out_lines = [line for line in out.splitlines() if not trim or (line and not line.startswith(" "))]
@@ -369,12 +371,12 @@ def mocked_file_response(path, url):
     :return: generated response
     """
     if not os.path.isfile(path):
-        raise HTTPNotFound("Could not find mock file: [{}]".format(url))
+        raise HTTPNotFound(f"Could not find mock file: [{url}]")
     resp = Response()
     ext = os.path.splitext(path)[-1]
     typ = ContentType.APP_JSON if ext == ".json" else ContentType.TEXT_XML if ext == ".xml" else None
     if not typ:
-        return HTTPUnprocessableEntity("Unknown Content-Type for mock file: [{}]".format(url))
+        return HTTPUnprocessableEntity(f"Unknown Content-Type for mock file: [{url}]")
     resp.status_code = 200
     resp.headers["Content-Type"] = typ
     setattr(resp, "content_type", typ)
@@ -669,14 +671,14 @@ def mocked_remote_server_requests_wps1(server_configs,          # type: Union[Mo
 
         get_cap_xml = get_xml(resource_xml_getcap)
         version_query = "&version=1.0.0"
-        get_cap_url = "{}?service=WPS&request=GetCapabilities".format(test_server_wps)
+        get_cap_url = f"{test_server_wps}?service=WPS&request=GetCapabilities"
         all_request.add((responses.GET, get_cap_url, get_cap_xml))
         all_request.add((responses.GET, get_cap_url + version_query, get_cap_xml))
         for proc_desc_xml in resource_xml_describe:
             describe_xml = get_xml(proc_desc_xml)
             # assume process ID is always the first identifier (ignore input/output IDs after)
             proc_desc_id = re.findall("<ows:Identifier>(.*)</ows:Identifier>", describe_xml)[0]
-            proc_desc_url = "{}?service=WPS&request=DescribeProcess&identifier={}".format(test_server_wps, proc_desc_id)
+            proc_desc_url = f"{test_server_wps}?service=WPS&request=DescribeProcess&identifier={proc_desc_id}"
             all_request.add((responses.GET, proc_desc_url, describe_xml))
             all_request.add((responses.GET, proc_desc_url + version_query, describe_xml))
             # special case where 'identifier' gets added to 'GetCapabilities', but is simply ignored
@@ -758,7 +760,7 @@ def mocked_file_server(directory,               # type: str
         Operation called when the file-server URL is matched against incoming requests that have been mocked.
         """
         if (mock_head and request.method == "HEAD") or (mock_get and request.method == "GET"):
-            file_url = "file://{}".format(request.url.replace(url, directory, 1))
+            file_url = "file://" + request.url.replace(url, directory, 1)
             resp = request_extra(request.method, file_url, settings=settings)
             if resp.status_code == 200:
                 headers = resp.headers
@@ -786,7 +788,7 @@ def mocked_file_server(directory,               # type: str
         return 404, {}, ""
 
     mock_req = requests_mock or responses.RequestsMock(assert_all_requests_are_fired=False)
-    any_file_url = re.compile(r"{}/[\w\-_/.]+".format(url))  # match any sub-directory/file structure
+    any_file_url = re.compile(fr"{url}/[\w\-_/.]+")  # match any sub-directory/file structure
     if mock_get:
         mock_req.add_callback(responses.GET, any_file_url, callback=request_callback)
     if mock_head:
@@ -1002,7 +1004,7 @@ def mocked_aws_s3_bucket_test_file(bucket_name, file_name, file_content="mock"):
         tmp_file.write(file_content)
         tmp_file.flush()
         s3.upload_file(Bucket=bucket_name, Filename=tmp_file.name, Key=file_name)
-    return "s3://{}/{}".format(bucket_name, file_name)
+    return f"s3://{bucket_name}/{file_name}"
 
 
 def mocked_http_file(test_func):
@@ -1051,6 +1053,6 @@ def mocked_reference_test_file(file_name_or_path, href_type, file_content="mock"
         tmp_file.write(file_content)
         tmp_file.seek(0)
     if href_prefix:
-        path = "{}{}".format(href_prefix, path)
+        path = f"{href_prefix}{path}"
         href_type = None if "://" in path else href_type
-    return "{}://{}".format(href_type, path) if href_type else path
+    return f"{href_type}://{path}" if href_type else path

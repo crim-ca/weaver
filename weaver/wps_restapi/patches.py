@@ -44,6 +44,7 @@ class ServiceOnlyExplicitGetHead(ServiceAutoGetHead):
         - HEAD method removed from ignored methods in :func:`weaver.wps_restapi.api.get_openapi_json`.
         - HEAD method auto-insertion disabled for :mod:`pyramid` in :func:`patch_pyramid_view_no_auto_head_get_method`.
     """
+
     def __init__(self, *_, **__):
         # type: (Any, Any) -> None
         super(ServiceOnlyExplicitGetHead, self).__init__(*_, **__)

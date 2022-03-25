@@ -95,7 +95,7 @@ class BuiltinAppTest(WpsConfigBase):
         tmp_json = stack.enter_context(tmp_json)  # noqa
         tmp_ncdf.write(nc_data)
         tmp_ncdf.seek(0)
-        tmp_json.write(json.dumps(["file://{}".format(os.path.join(dirname, tmp_ncdf.name))]))
+        tmp_json.write(json.dumps([f"file://{os.path.join(dirname, tmp_ncdf.name)}"]))
         tmp_json.seek(0)
         body = {"inputs": [{"id": "input", "href": os.path.join(dirname, tmp_json.name)}]}
         return body, nc_data
@@ -128,7 +128,7 @@ class BuiltinAppTest(WpsConfigBase):
         settings = get_settings_from_testapp(self.app)
         wps_path = settings.get("weaver.wps_output_path")
         wps_dir = settings.get("weaver.wps_output_dir")
-        wps_out = "{}{}".format(settings.get("weaver.url"), wps_path)
+        wps_out = settings.get("weaver.url") + wps_path
 
         # validate results if applicable
         if nc_href is not None:
@@ -161,7 +161,7 @@ class BuiltinAppTest(WpsConfigBase):
             resp = mocked_sub_requests(self.app, "post_json", path,
                                        data=body, headers=self.json_headers, only_local=True)
 
-        assert resp.status_code == 201, "Error: {}".format(resp.json)
+        assert resp.status_code == 201, f"Error: {resp.json}"
         assert resp.content_type in ContentType.APP_JSON
         # following details not available yet in async, but are in sync
         assert "created" not in resp.json
@@ -174,7 +174,7 @@ class BuiltinAppTest(WpsConfigBase):
 
         output_url = job_url + "/outputs"
         resp = self.app.get(output_url, headers=self.json_headers)
-        assert resp.status_code == 200, "Error job outputs:\n{}".format(resp.json)
+        assert resp.status_code == 200, f"Error job outputs:\n{resp.json}"
         outputs = resp.json
 
         self.validate_results(results, outputs, nc_data, None)
@@ -200,13 +200,13 @@ class BuiltinAppTest(WpsConfigBase):
             resp = mocked_sub_requests(self.app, "post_json", path,
                                        data=body, headers=self.json_headers, only_local=True)
 
-        assert resp.status_code == 201, "Error: {}".format(resp.json)
         assert resp.content_type in ContentType.APP_JSON
+        assert resp.status_code == 201, f"Error: {resp.json}"
         job_url = resp.json["location"]
         self.monitor_job(job_url, return_status=True)  # don't fetch results automatically
 
-        resp = self.app.get("{}/results".format(job_url), headers=self.json_headers)
-        assert resp.status_code == 200, "Error: {}".format(resp.text)
+        resp = self.app.get(f"{job_url}/results", headers=self.json_headers)
+        assert resp.status_code == 200, f"Error: {resp.text}"
         assert resp.content_type == ContentType.APP_JSON
         result_links = [hdr for hdr in resp.headers if hdr[0].lower() == "link"]
         assert len(result_links) == 0
@@ -216,7 +216,7 @@ class BuiltinAppTest(WpsConfigBase):
         # Weaver still offers them with document on outputs endpoint
         output_url = job_url + "/outputs"
         resp = self.app.get(output_url, headers=self.json_headers)
-        assert resp.status_code == 200, "Error job outputs:\n{}".format(resp.text)
+        assert resp.status_code == 200, f"Error job outputs:\n{resp.text}"
         outputs = resp.json
 
         self.validate_results(results, outputs, nc_data, result_links)
@@ -242,13 +242,13 @@ class BuiltinAppTest(WpsConfigBase):
             resp = mocked_sub_requests(self.app, "post_json", path,
                                        data=body, headers=self.json_headers, only_local=True)
 
-        assert resp.status_code == 201, "Error: {}".format(resp.text)
         assert resp.content_type in ContentType.APP_JSON
+        assert resp.status_code == 201, f"Error: {resp.json}"
         job_url = resp.json["location"]
         self.monitor_job(job_url, return_status=True)  # don't fetch results automatically
 
-        resp = self.app.get("{}/results".format(job_url), headers=self.json_headers)
-        assert resp.status_code < 400, "Error: {}".format(resp.text)
+        resp = self.app.get(f"{job_url}/results", headers=self.json_headers)
+        assert resp.status_code < 400, f"Error: {resp.text}"
         assert resp.status_code == 200, "Body should contain literal raw data dump"
         assert resp.content_type in ContentType.APP_NETCDF, "raw result by value should be directly the content-type"
         assert resp.text == nc_data, "raw result by value should be directly the data content"
@@ -260,7 +260,7 @@ class BuiltinAppTest(WpsConfigBase):
         # Weaver still offers them with document on outputs endpoint
         output_url = job_url + "/outputs"
         resp = self.app.get(output_url, headers=self.json_headers)
-        assert resp.status_code == 200, "Error job outputs:\n{}".format(resp.text)
+        assert resp.status_code == 200, f"Error job outputs:\n{resp.text}"
         outputs = resp.json
 
         self.validate_results(None, outputs, nc_data, result_links)
@@ -286,13 +286,13 @@ class BuiltinAppTest(WpsConfigBase):
             resp = mocked_sub_requests(self.app, "post_json", path,
                                        data=body, headers=self.json_headers, only_local=True)
 
-        assert resp.status_code == 201, "Error: {}".format(resp.json)
         assert resp.content_type in ContentType.APP_JSON
+        assert resp.status_code == 201, f"Error: {resp.json}"
         job_url = resp.json["location"]
         self.monitor_job(job_url, return_status=True)  # don't fetch results automatically
 
-        resp = self.app.get("{}/results".format(job_url), headers=self.json_headers)
-        assert resp.status_code < 400, "Error: {}".format(resp.json)
+        resp = self.app.get(f"{job_url}/results", headers=self.json_headers)
+        assert resp.status_code < 400, f"Error: {resp.text}"
         assert resp.status_code == 204, "Body should be empty since all outputs requested by reference (Link header)"
         assert resp.content_type is None
         assert resp.headers
@@ -300,9 +300,8 @@ class BuiltinAppTest(WpsConfigBase):
 
         # even though results are requested by Link reference,
         # Weaver still offers them with document on outputs endpoint
-        output_url = job_url + "/outputs"
-        resp = self.app.get(output_url, headers=self.json_headers)
-        assert resp.status_code == 200, "Error job outputs:\n{}".format(resp.json)
+        resp = self.app.get(f"{job_url}/outputs", headers=self.json_headers)
+        assert resp.status_code == 200, f"Error job outputs:\n{resp.json}"
         outputs = resp.json
 
         self.validate_results(None, outputs, nc_data, result_links)
@@ -328,7 +327,7 @@ class BuiltinAppTest(WpsConfigBase):
             resp = mocked_sub_requests(self.app, "post_json", path,
                                        data=body, headers=headers, only_local=True)
 
-        assert resp.status_code == 200, "Error: {}".format(resp.json)
+        assert resp.status_code == 200, f"Error: {resp.text}"
         assert resp.content_type in ContentType.APP_JSON
 
         # since sync, results are directly available instead of job status
@@ -359,7 +358,7 @@ class BuiltinAppTest(WpsConfigBase):
 
         output_url = job_url + "/outputs"
         resp = self.app.get(output_url, headers=self.json_headers)
-        assert resp.status_code == 200, "Error job outputs:\n{}".format(resp.json)
+        assert resp.status_code == 200, f"Error job outputs:\n{resp.json}"
         outputs = resp.json
 
         self.validate_results(results, outputs, nc_data, None)

@@ -18,6 +18,8 @@ sys.path.insert(0, os.path.join(CUR_DIR, os.path.split(CUR_DIR)[-1]))
 # pylint: disable=C0413,wrong-import-order
 from weaver import __meta__  # isort:skip # noqa: E402
 
+# pylint: disable=C0209,consider-using-f-string
+
 LOGGER = logging.getLogger("{}.setup".format(__meta__.__name__))
 if logging.StreamHandler not in LOGGER.handlers:
     LOGGER.addHandler(logging.StreamHandler(sys.stdout))  # type: ignore # noqa

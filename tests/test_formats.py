@@ -78,7 +78,7 @@ def test_get_cwl_file_format_tuple():
         assert any(fmt in ns for fmt in f.FORMAT_NAMESPACES)  # pylint: disable=E1135
         assert list(ns.values())[0].startswith("http")
         ns_name = list(ns.keys())[0]
-        assert fmt.startswith("{}:".format(ns_name))
+        assert fmt.startswith(f"{ns_name}:")
         tested.remove(ns_name)
     assert len(tested) == 0, "test did not evaluate every namespace variation"
 
@@ -107,7 +107,7 @@ def test_get_cwl_file_format_unknown():
 def test_get_cwl_file_format_default():
     fmt = "application/unknown"
     iana_url = f.IANA_NAMESPACE_DEFINITION[f.IANA_NAMESPACE]
-    iana_fmt = "{}:{}".format(f.IANA_NAMESPACE, fmt)
+    iana_fmt = f"{f.IANA_NAMESPACE}:{fmt}"
     res = f.get_cwl_file_format("application/unknown", make_reference=False, must_exist=False)
     assert isinstance(res, tuple)
     assert res[0] == {f.IANA_NAMESPACE: iana_url}
@@ -130,7 +130,7 @@ def test_get_cwl_file_format_retry_attempts():
     with mock.patch("weaver.utils.get_settings", return_value={"cache.request.enabled": "false"}):
         with mock.patch("requests.Session.request", side_effect=mock_request_extra) as mocked_request:
             _, fmt = f.get_cwl_file_format(f.ContentType.APP_JSON)
-            assert fmt == "{}:{}".format(f.IANA_NAMESPACE, f.ContentType.APP_JSON)
+            assert fmt == f"{f.IANA_NAMESPACE}:{f.ContentType.APP_JSON}"
             assert mocked_request.call_count == 2
 
 
@@ -148,7 +148,7 @@ def test_get_cwl_file_format_retry_fallback_urlopen():
         with mock.patch("requests.Session.request", side_effect=mock_connect_error) as mocked_request:
             with mock.patch("weaver.formats.urlopen", side_effect=mock_urlopen) as mocked_urlopen:
                 _, fmt = f.get_cwl_file_format(f.ContentType.APP_JSON)
-                assert fmt == "{}:{}".format(f.IANA_NAMESPACE, f.ContentType.APP_JSON)
+                assert fmt == f"{f.IANA_NAMESPACE}:{f.ContentType.APP_JSON}"
                 assert mocked_request.call_count == 4, "Expected internally attempted 4 times (1 attempt + 3 retries)"
                 assert mocked_urlopen.call_count == 1, "Expected internal fallback request calls"
 
@@ -174,7 +174,7 @@ def test_get_cwl_file_format_synonym():
 
 
 def test_clean_mime_type_format_iana():
-    iana_fmt = "{}:{}".format(f.IANA_NAMESPACE, f.ContentType.APP_JSON)  # "iana:mime_type"
+    iana_fmt = f"{f.IANA_NAMESPACE}:{f.ContentType.APP_JSON}"  # "iana:mime_type"
     res_type = f.clean_mime_type_format(iana_fmt)
     assert res_type == f.ContentType.APP_JSON
     iana_url = list(f.IANA_NAMESPACE_DEFINITION.values())[0]
@@ -185,7 +185,7 @@ def test_clean_mime_type_format_iana():
 
 def test_clean_mime_type_format_edam():
     mime_type, fmt = list(f.EDAM_MAPPING.items())[0]
-    edam_fmt = "{}:{}".format(f.EDAM_NAMESPACE, fmt)  # "edam:format_####"
+    edam_fmt = f"{f.EDAM_NAMESPACE}:{fmt}"  # "edam:format_####"
     res_type = f.clean_mime_type_format(edam_fmt)
     assert res_type == mime_type
     edam_fmt = os.path.join(list(f.EDAM_NAMESPACE_DEFINITION.values())[0], fmt)  # "edam-url/format_####"

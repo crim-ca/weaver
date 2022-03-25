@@ -3,7 +3,8 @@ Conversion functions between corresponding data structures.
 """
 import json
 import logging
-from collections import Hashable, OrderedDict  # pylint: disable=E0611,no-name-in-module   # moved to .abc in Python 3
+from collections import OrderedDict
+from collections.abc import Hashable
 from copy import deepcopy
 from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING
@@ -230,7 +231,7 @@ def ows2json_io(ows_io):
     """
     Converts I/O definition from :mod:`owslib.wps` to JSON.
     """
-    json_io = dict()
+    json_io = {}
     for field in WPS_FIELD_MAPPING:
         value = get_field(ows_io, field, search_variations=True)
         # preserve numeric values (ex: "minOccurs"=0) as actual parameters
@@ -393,7 +394,7 @@ def _get_multi_json_references(output, container):
             if output.reference:
                 with TemporaryDirectory() as tmp_dir:
                     file_path = fetch_file(output.reference, tmp_dir, settings=container)
-                    with open(file_path, "r") as tmp_file:
+                    with open(file_path, "r", encoding=output.encoding) as tmp_file:
                         json_data_str = tmp_file.read()
             # Else get the data directly
             else:
@@ -433,7 +434,7 @@ def any2cwl_io(wps_io, io_select):
 
     wps_io_type = get_field(wps_io, "type", search_variations=True)
     wps_io_id = get_field(wps_io, "identifier", search_variations=True)
-    cwl_ns = dict()
+    cwl_ns = {}
     cwl_io = {"id": wps_io_id}  # type: CWL_IO_Type  # noqa
     if wps_io_type not in WPS_COMPLEX_TYPES:
         cwl_io_type = any2cwl_literal_datatype(wps_io_type)
@@ -498,7 +499,7 @@ def any2cwl_io(wps_io, io_select):
         if io_select == WPS_OUTPUT:
             # FIXME: (?) how to specify the 'name' part of the glob (using the "id" value for now)
             cwl_io["outputBinding"] = {
-                "glob": "{}{}".format(wps_io_id, cwl_io_ext)
+                "glob": f"{wps_io_id}{cwl_io_ext}"
             }
 
     # FIXME: multi-outputs (https://github.com/crim-ca/weaver/issues/25)
@@ -585,14 +586,14 @@ def ows2json(wps_process, wps_service_name, wps_service_url, wps_provider_name=N
     # generate CWL for WPS-1 using parsed WPS-3
     cwl_package = wps2cwl_requirement(wps_service_url, wps_process.identifier)
     for io_select in [WPS_INPUT, WPS_OUTPUT]:
-        io_section = "{}s".format(io_select)
-        cwl_package[io_section] = list()
+        io_section = f"{io_select}s"
+        cwl_package[io_section] = []
         for wps_io in process_info[io_section]:
             cwl_io, cwl_ns = any2cwl_io(wps_io, io_select)
             cwl_package[io_section].append(cwl_io)
             if cwl_ns:
                 if "$namespaces" not in cwl_package:
-                    cwl_package["$namespaces"] = dict()
+                    cwl_package["$namespaces"] = {}
                 cwl_package["$namespaces"].update(cwl_ns)
     return cwl_package, process_info
 
@@ -654,7 +655,7 @@ def is_cwl_file_type(io_info):
     """
     io_type = io_info.get("type")
     if not io_type:
-        raise ValueError("Missing CWL 'type' definition: [{!s}]".format(io_info))
+        raise ValueError(f"Missing CWL 'type' definition: [{io_info!s}]")
     if isinstance(io_type, str):
         return io_type == "File"
     if isinstance(io_type, dict):
@@ -663,8 +664,7 @@ def is_cwl_file_type(io_info):
         return io_type["type"] == "File"
     if isinstance(io_type, list):
         return any(typ == "File" or is_cwl_file_type({"type": typ}) for typ in io_type)
-    msg = "Unknown parsing of CWL 'type' format ({!s}) [{!s}] in [{}]".format(type(io_type), io_type, io_info)
-    raise ValueError(msg)
+    raise ValueError(f"Unknown parsing of CWL 'type' format ({type(io_type)!s}) [{io_type!s}] in [{io_info}]")
 
 
 def is_cwl_array_type(io_info):
@@ -720,13 +720,13 @@ def is_cwl_array_type(io_info):
     ):
         io_type = dict(io_return["type"])  # make hashable to allow comparison
         if io_type["type"] != PACKAGE_ARRAY_BASE:
-            raise PackageTypeError("Unsupported I/O 'array' definition: '{}'.".format(repr(io_info)))
+            raise PackageTypeError(f"Unsupported I/O 'array' definition: '{io_info!r}'.")
         # parse enum in case we got an array of allowed symbols
         is_enum = _update_if_sub_enum(io_type["items"])
         if not is_enum:
             io_return["type"] = io_type["items"]
         if io_return["type"] not in PACKAGE_ARRAY_ITEMS:
-            raise PackageTypeError("Unsupported I/O 'array' definition: '{}'.".format(repr(io_info)))
+            raise PackageTypeError(f"Unsupported I/O 'array' definition: '{io_info!r}'.")
         LOGGER.debug("I/O [%s] parsed as 'array' with nested dict notation", io_info["name"])
         io_return["array"] = True
     # array type conversion when defined as string '<type>[]'
@@ -738,7 +738,7 @@ def is_cwl_array_type(io_info):
             io_item["type"] = io_return["type"]  # override corrected type without '[]'
             _update_if_sub_enum(io_item)
         if io_return["type"] not in PACKAGE_ARRAY_ITEMS:
-            raise PackageTypeError("Unsupported I/O 'array' definition: '{}'.".format(repr(io_info)))
+            raise PackageTypeError(f"Unsupported I/O 'array' definition: '{io_info!r}'.")
         LOGGER.debug("I/O [%s] parsed as 'array' with shorthand '[]' notation", io_info["name"])
         io_return["array"] = True
     return io_return["array"], io_return["type"], io_return["mode"], io_return["allow"]
@@ -762,16 +762,16 @@ def is_cwl_enum_type(io_info):
         return False, io_type, MODE.NONE, None
 
     if "symbols" not in io_type:
-        raise PackageTypeError("Unsupported I/O 'enum' definition: '{!r}'.".format(io_info))
+        raise PackageTypeError(f"Unsupported I/O 'enum' definition: '{io_info!r}'.")
     io_allow = io_type["symbols"]
     if not isinstance(io_allow, list) or len(io_allow) < 1:
-        raise PackageTypeError("Invalid I/O 'enum.symbols' definition: '{!r}'.".format(io_info))
+        raise PackageTypeError(f"Invalid I/O 'enum.symbols' definition: '{io_info!r}'.")
 
     # validate matching types in allowed symbols and convert to supported CWL type
     first_allow = io_allow[0]
     for io_i in io_allow:
         if type(io_i) is not type(first_allow):
-            raise PackageTypeError("Ambiguous types in I/O 'enum.symbols' definition: '{!r}'.".format(io_info))
+            raise PackageTypeError(f"Ambiguous types in I/O 'enum.symbols' definition: '{io_info!r}'.")
     if isinstance(first_allow, str):
         io_type = "string"
     elif isinstance(first_allow, float):
@@ -779,8 +779,9 @@ def is_cwl_enum_type(io_info):
     elif isinstance(first_allow, int):
         io_type = "int"
     else:
-        raise PackageTypeError("Unsupported I/O 'enum' base type: `{!s}`, from definition: `{!r}`."
-                               .format(type(first_allow), io_info))
+        raise PackageTypeError(
+            f"Unsupported I/O 'enum' base type: `{type(first_allow)!s}`, from definition: `{io_info!r}`."
+        )
 
     # allowed value validator mode must be set for input
     return True, io_type, MODE.SIMPLE, io_allow
@@ -809,10 +810,10 @@ def get_cwl_io_type(io_info):
     is_null = False
     if isinstance(io_type, list):
         if not len(io_type) > 1:
-            raise PackageTypeError("Unsupported I/O type as list cannot have only one base type: '{}'".format(io_info))
+            raise PackageTypeError(f"Unsupported I/O type as list cannot have only one base type: '{io_info}'")
         if "null" in io_type:
             if len(io_type) == 1:
-                raise PackageTypeError("Unsupported I/O cannot be only 'null' type: '{}'".format(io_info))
+                raise PackageTypeError(f"Unsupported I/O cannot be only 'null' type: '{io_info}'")
             LOGGER.debug("I/O parsed for 'default'")
             is_null = True  # I/O can be omitted since default value exists
             io_type = [typ for typ in io_type if typ != "null"]
@@ -824,7 +825,8 @@ def get_cwl_io_type(io_info):
             io_type_many = set()
             io_base_type = None
             for i, typ in enumerate(io_type):
-                sub_type = {"type": typ, "name": "{}[{}]".format(io_info["name"], i)}
+                io_name = io_info["name"]
+                sub_type = {"type": typ, "name": f"{io_name}[{i}]"}
                 is_array, array_elem, _, _ = is_cwl_array_type(sub_type)
                 is_enum, enum_type, _, _ = is_cwl_enum_type(sub_type)
                 # array base type more important than enum because later array conversion also handles allowed values
@@ -838,7 +840,7 @@ def get_cwl_io_type(io_info):
                     io_base_type = io_base_type if io_base_type is not None else typ  # less priority
                     io_type_many.add(typ)  # literal base type by itself (not array/enum)
             if len(io_type_many) != 1:
-                raise PackageTypeError("Unsupported I/O with many distinct base types for info: '{!s}'".format(io_info))
+                raise PackageTypeError(f"Unsupported I/O with many distinct base types for info: '{io_info!s}'")
             io_type = io_base_type
 
         LOGGER.debug("I/O parsed for multiple base types")
@@ -868,7 +870,7 @@ def cwl2wps_io(io_info, io_select):
         io_complex = ComplexOutput      # type: Union[Type[ComplexInput], Type[ComplexOutput]]
         # io_bbox = BoundingBoxOutput     # type: Union[Type[BoundingBoxInput], Type[BoundingBoxOutput]]
     else:
-        raise PackageTypeError("Unsupported I/O info definition: '{!r}' with '{}'.".format(io_info, io_select))
+        raise PackageTypeError(f"Unsupported I/O info definition: '{io_info!r}' with '{io_select}'.")
 
     # obtain base type considering possible CWL type representations
     io_type, is_null = get_cwl_io_type(io_info)
@@ -902,7 +904,7 @@ def cwl2wps_io(io_info, io_select):
         LOGGER.debug("io_info:       [%s]", repr(io_info))
         LOGGER.debug("io_type:       [%s]", repr(io_type))
         LOGGER.debug("type(io_type): [%s]", type(io_type))
-        raise TypeError("I/O type has not been properly decoded. Should be a string, got: '{!r}'".format(io_type))
+        raise TypeError(f"I/O type has not been properly decoded. Should be a string, got: '{io_type!r}'")
 
     # literal types
     if is_enum or io_type in PACKAGE_LITERAL_TYPES:
@@ -1415,7 +1417,7 @@ def json2wps_allowed_values(io_info):
                 # literalDataDomains could be 'anyValue', which is to be ignored here
             return allowed_values
         LOGGER.debug("Cannot parse literal I/O AllowedValues: %s", allowed)
-        raise ValueError("Unknown parsing of 'AllowedValues' for value: {!s}".format(allowed))
+        raise ValueError(f"Unknown parsing of 'AllowedValues' for value: {allowed!s}")
     if domains:
         for domain in domains:
             values = domain.get("valueDefinition")
@@ -1555,7 +1557,7 @@ def json2wps_io(io_info, io_select):
                 io_info.pop("allowed_values", None)
             io_info.pop("literalDataDomains", None)
             return LiteralOutput(**io_info)
-    raise PackageTypeError("Unknown conversion from dict to WPS type (type={0}, mode={1}).".format(io_type, io_select))
+    raise PackageTypeError(f"Unknown conversion from dict to WPS type (type={io_type}, mode={io_select}).")
 
 
 def wps2json_io(io_wps):
@@ -1565,7 +1567,7 @@ def wps2json_io(io_wps):
     """
 
     if not isinstance(io_wps, BasicIO):
-        raise PackageTypeError("Invalid type, expected 'BasicIO', got: [{0!r}] '{1!r}'".format(type(io_wps), io_wps))
+        raise PackageTypeError(f"Invalid type, expected 'BasicIO', got: [{type(io_wps)!r}] '{io_wps!r}'")
     if not hasattr(io_wps, "json"):
         raise PackageTypeError("Invalid type definition expected to have a 'json' property.")
 
@@ -1883,13 +1885,13 @@ def merge_package_io(wps_io_list, cwl_io_list, io_select):
     if not isinstance(cwl_io_list, list):
         raise PackageTypeError("CWL I/O definitions must be provided, empty list if none required.")
     if not wps_io_list:
-        wps_io_list = list()
+        wps_io_list = []
     wps_io_dict = OrderedDict((get_field(wps_io, "identifier", search_variations=True), deepcopy(wps_io))
                               for wps_io in wps_io_list)
     cwl_io_dict = OrderedDict((get_field(cwl_io, "identifier", search_variations=True), deepcopy(cwl_io))
                               for cwl_io in cwl_io_list)
     missing_io_list = [cwl_io for cwl_io in cwl_io_dict if cwl_io not in wps_io_dict]  # preserve ordering
-    updated_io_list = list()
+    updated_io_list = []
 
     # WPS I/O by id not matching any converted CWL->WPS I/O are discarded
     # otherwise, evaluate provided WPS I/O definitions and find potential new information to be merged

@@ -26,6 +26,7 @@ from weaver.processes.convert import (
     get_field,
     repr2json_input_values
 )
+from weaver.processes.utils import get_process_information
 from weaver.processes.wps_package import get_process_definition
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory
 from weaver.utils import (
@@ -275,7 +276,8 @@ class WeaverClient(object):
     def _parse_deploy_package(body, cwl, wps, process_id, headers):
         # type: (JSON, Optional[CWL], Optional[str], Optional[str], HeadersType) -> OperationResult
         try:
-            p_id = body.get("processDescription", {}).get("process", {}).get("id", process_id)
+            p_desc = get_process_information(body)
+            p_id = get_any_id(p_desc, default=process_id)
             info = {"id": p_id}  # minimum requirement for process offering validation
             if (isinstance(cwl, str) and not cwl.startswith("{")) or isinstance(wps, str):
                 LOGGER.debug("Override loaded CWL into provided/loaded body for process: [%s]", p_id)
@@ -1121,6 +1123,7 @@ class SubArgumentParserFixedMutexGroups(argparse.ArgumentParser):
         - https://bugs.python.org/issue43259
         - https://bugs.python.org/issue16807
     """
+
     def _add_container_actions(self, container):
         # pylint: disable=W0212
         groups = container._mutually_exclusive_groups
@@ -1141,6 +1144,7 @@ class ArgumentParserFixedRequiredArgs(argparse.ArgumentParser):
     Default behaviour places option prefixed (``-``, ``--``) arguments into optionals even if ``required`` is defined.
     Help string correctly considers this flag and doesn't place those arguments in brackets (``[--<optional-arg>]``).
     """
+
     def _add_action(self, action):
         if action.option_strings and not action.required:
             self._optionals._add_action(action)
@@ -1153,6 +1157,7 @@ class WeaverArgumentParser(ArgumentParserFixedRequiredArgs, SubArgumentParserFix
     """
     Parser that provides fixes for proper representation of `Weaver` :term:`CLI` arguments.
     """
+
     def format_help(self):
         # type: () -> str
         return super(WeaverArgumentParser, self).format_help() + "\n"
@@ -1175,13 +1180,13 @@ def make_parser():
     log_parser = WeaverArgumentParser(add_help=False)
     make_logging_options(log_parser)
 
-    desc = "Run {} operations.".format(__meta__.__title__)
+    desc = f"Run {__meta__.__title__} operations."
     parser = WeaverArgumentParser(prog=__meta__.__name__, description=desc, parents=[log_parser])
     set_parser_sections(parser)
     parser.add_argument(
         "--version", "-V",
         action="version",
-        version="%(prog)s {}".format(__meta__.__version__),
+        version=f"%(prog)s {__meta__.__version__}",
         help="Display the version of the package."
     )
     ops_parsers = parser.add_subparsers(

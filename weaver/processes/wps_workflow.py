@@ -30,6 +30,7 @@ from cwltool.workflow import Workflow
 from schema_salad import validate
 from schema_salad.sourceline import SourceLine
 
+from weaver.formats import repr_json
 from weaver.processes.builtin import BuiltinProcess
 from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_BUILTIN,
@@ -246,8 +247,7 @@ class WpsWorkflow(ProcessCWL):
                 adjustFileObjs(ret, builder.mutation_manager.set_generation)
             return ret if ret is not None else {}
         except validate.ValidationException as exc:
-            raise WorkflowException("Error validating output record: {!s}\nIn:\n{}"
-                                    .format(exc, json.dumps(ret, indent=4)))
+            raise WorkflowException(f"Error validating output record: {exc!s}\nIn:\n{repr_json(ret, indent=2)}")
         finally:
             if builder.mutation_manager and readers:
                 for reader in readers.values():
@@ -375,7 +375,7 @@ class WpsWorkflow(ProcessCWL):
             if single:
                 if not result and not optional:
                     with SourceLine(binding, "glob", WorkflowException, debug):
-                        raise WorkflowException("Did not find output file with glob pattern: '{}'".format(globpatterns))
+                        raise WorkflowException(f"Did not find output file with glob pattern: '{globpatterns}'")
                 elif not result and optional:
                     pass
                 elif isinstance(result, list):

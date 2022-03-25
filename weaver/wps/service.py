@@ -173,7 +173,7 @@ class WorkerService(ServiceWPS):
         accept_type = get_header("Accept", req.headers)
         if accept_type == ContentType.APP_JSON:
             url = get_weaver_url(self.settings)
-            resp = HTTPSeeOther(location="{}{}".format(url, sd.processes_service.path))  # redirect
+            resp = HTTPSeeOther(location=f"{url}{sd.processes_service.path}")  # redirect
             setattr(resp, "_update_status", lambda *_, **__: None)  # patch to avoid pywps server raising
             return resp
         return None
@@ -204,7 +204,7 @@ class WorkerService(ServiceWPS):
             if len(proc) > 1:
                 raise HTTPBadRequest("Unsupported multi-process ID for description. Only provide one.")
             path = sd.process_service.path.format(process_id=proc[0])
-            resp = HTTPSeeOther(location="{}{}".format(url, path))  # redirect
+            resp = HTTPSeeOther(location=f"{url}{path}")  # redirect
             setattr(resp, "_update_status", lambda *_, **__: None)  # patch to avoid pywps server raising
             return resp
         return None
@@ -235,7 +235,7 @@ class WorkerService(ServiceWPS):
 
         # create the JSON payload from the XML content and submit job
         is_workflow = proc.type == ProcessType.WORKFLOW
-        tags = req.args.get("tags", "").split(",") + ["xml", "wps-{}".format(wps_request.version)]
+        tags = req.args.get("tags", "").split(",") + ["xml", f"wps-{wps_request.version}"]
         data = wps2json_job_payload(wps_request, wps_process)
         resp = submit_job_handler(
             data, self.settings, proc.processEndpointWPS1,
@@ -323,7 +323,7 @@ class WorkerService(ServiceWPS):
             return WorkerExecuteResponse(wps_request, job_id, wps_process, job_url, settings=self.settings)
         except Exception as ex:  # noqa
             LOGGER.exception("Error building XML response by PyWPS Service during WPS Execute result from worker.")
-            message = "Failed building XML response from WPS Execute result. Error [{!r}]".format(ex)
+            message = f"Failed building XML response from WPS Execute result. Error [{ex!r}]"
             raise OWSNoApplicableCode(message, locator=job_id)
 
     def execute_job(self,
@@ -365,7 +365,7 @@ class WorkerService(ServiceWPS):
         if not remote_process:
             worker_process_id = process_id
         else:
-            worker_process_id = "wps_package-{}-{}".format(process_id, job.uuid)
+            worker_process_id = f"wps_package-{process_id}-{job.uuid}"
             self.dispatched_processes[worker_process_id] = remote_process
 
         wps_response = super(WorkerService, self).execute(worker_process_id, wps_request, job.uuid)
@@ -397,5 +397,5 @@ def get_pywps_service(environ=None, is_worker=False):
         service = WorkerService(processes_wps, is_worker=is_worker, settings=settings)
     except Exception as ex:
         LOGGER.exception("Error occurred during PyWPS Service and/or Processes setup.")
-        raise OWSNoApplicableCode("Failed setup of PyWPS Service and/or Processes. Error [{!r}]".format(ex))
+        raise OWSNoApplicableCode(f"Failed setup of PyWPS Service and/or Processes. Error [{ex!r}]")
     return service

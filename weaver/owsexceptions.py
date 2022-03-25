@@ -106,7 +106,7 @@ class OWSException(Response, Exception):
 
     def __repr__(self):
         if self.message:
-            return "{}{}".format(type(self), self.message)
+            return f"{type(self)}{self.message}"
         return str(type(self))
 
     @staticmethod

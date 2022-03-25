@@ -142,11 +142,11 @@ class Wps1Process(WpsProcessInterface):
             self.wps_provider = get_wps_client(self.provider, headers=headers)
             raise_on_xml_exception(self.wps_provider._capabilities)  # noqa: W0212
         except Exception as ex:
-            raise OWSNoApplicableCode("Failed to retrieve WPS capabilities. Error: [{}].".format(str(ex)))
+            raise OWSNoApplicableCode(f"Failed to retrieve WPS capabilities. Error: [{ex!s}].")
         try:
             self.wps_process = self.wps_provider.describeprocess(self.process)
         except Exception as ex:
-            raise OWSNoApplicableCode("Failed to retrieve WPS process description. Error: [{}].".format(str(ex)))
+            raise OWSNoApplicableCode(f"Failed to retrieve WPS process description. Error: [{ex!s}].")
 
     def dispatch(self, process_inputs, process_outputs):
         # type: (JobInputs, JobOutputs) -> JobExecution
@@ -171,7 +171,7 @@ class Wps1Process(WpsProcessInterface):
         job_id = "<undefined>"
         while execution.isNotComplete() or run_step == 0:
             if num_retries >= max_retries:
-                raise Exception("Could not read status document after {} retries. Giving up.".format(max_retries))
+                raise Exception(f"Could not read status document after {max_retries} retries. Giving up.")
             try:
                 execution = check_wps_status(location=execution.statusLocation,
                                              sleep_secs=wait_secs(run_step), settings=self.settings)

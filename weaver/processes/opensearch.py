@@ -13,6 +13,7 @@ from weaver.formats import ContentType
 from weaver.processes.constants import WPS_LITERAL, OpenSearchField
 from weaver.processes.convert import normalize_ordered_io
 from weaver.processes.sources import fetch_data_sources
+from weaver.processes.utils import get_process_information
 from weaver.utils import get_any_id, request_extra
 
 if TYPE_CHECKING:
@@ -25,24 +26,29 @@ LOGGER = logging.getLogger("PACKAGE")
 
 
 def alter_payload_after_query(payload):
+    # type: (JSON) -> JSON
     """
     When redeploying the package on :term:`ADES`, strip out any :term:`EOImage` parameter.
     """
     new_payload = deepcopy(payload)
-
-    for input_ in new_payload["processDescription"]["process"]["inputs"]:
+    proc_desc = get_process_information(new_payload)
+    inputs = proc_desc["inputs"]
+    for input_ in inputs:
         if EOImageDescribeProcessHandler.is_eoimage_input(input_):
             del input_["additionalParameters"]
     return new_payload
 
 
 def validate_bbox(bbox):
-    # u"100.0, 15.0, 104.0, 19.0"
+    # type: (str) -> None
+    """
+    Validate bounding box formatted as ``x1, y1, x2, y2`` string composed of floating point numbers.
+    """
     try:
         if not len(list(map(float, bbox.split(",")))) == 4:
             raise ValueError
     except ValueError:
-        raise ValueError("Could not parse bbox as a list of 4 floats: {}".format(bbox))
+        raise ValueError(f"Could not parse bbox as a list of 4 floats: {bbox}")
 
 
 def query_eo_images_from_wps_inputs(wps_inputs,             # type: Dict[str, Deque]
@@ -72,7 +78,8 @@ def query_eo_images_from_wps_inputs(wps_inputs,             # type: Dict[str, De
                 return wps_inputs[id_][0].data
             except KeyError:
                 pass
-        raise ValueError("Missing input identifier: {}".format(" or ".join(ids_to_get)))
+        ids_choices = " or ".join(ids_to_get)
+        raise ValueError(f"Missing input identifier: {ids_choices}")
 
     def is_eoimage_parameter(param):
         # type: (str) -> bool
@@ -125,9 +132,11 @@ def query_eo_images_from_wps_inputs(wps_inputs,             # type: Dict[str, De
                     if len(eoimages_queue) >= max_occurs:
                         break
                 if len(eoimages_queue) < queue[0].min_occurs:
-                    message = "Could not find enough images [{}/{}] matching accepted mimetype [{}]"
-                    message = message.format(len(eoimages_queue), queue[0].min_occurs, ", ".join(mime_types))
-                    raise ValueError(message)
+                    allowed_mime_types = ", ".join(mime_types)
+                    raise ValueError(
+                        f"Could not find enough images [{len(eoimages_queue)}/{queue[0].min_occurs}] "
+                        f"matching accepted mimetype [{allowed_mime_types}]"
+                    )
                 new_inputs[input_id] = eoimages_queue
 
     return new_inputs
@@ -141,9 +150,8 @@ def replace_with_opensearch_scheme(link):
     scheme = urlparse(link).scheme
     if scheme == "file":
         link_without_scheme = link[link.find(":"):]
-        return "{}{}".format(OpenSearchField.LOCAL_FILE_SCHEME, link_without_scheme)
-    else:
-        return link
+        return OpenSearchField.LOCAL_FILE_SCHEME + link_without_scheme
+    return link
 
 
 # FIXME: move appropriately when adding BoundingBox support (https://github.com/crim-ca/weaver/issues/51)
@@ -163,7 +171,7 @@ class OpenSearchQuery(object):
         osdd_url,                                   # type: str
         catalog_search_field="parentIdentifier",    # type: str
         settings=None,                              # type: Optional[AnySettingsContainer]
-    ):
+    ):                                              # type: (...) -> None
         """
         Container to handle `OpenSearch` queries.
 
@@ -181,11 +189,10 @@ class OpenSearchQuery(object):
         }
         # validate inputs
         if any(c in "/?" for c in collection_identifier):
-            raise ValueError(
-                "Invalid collection identifier: {}".format(collection_identifier)
-            )
+            raise ValueError(f"Invalid collection identifier: {collection_identifier}")
 
     def get_template_url(self):
+        # type: () -> str
         resp = request_extra("get", self.osdd_url, params=self.params, settings=self.settings)
         resp.raise_for_status()
 
@@ -216,9 +223,7 @@ class OpenSearchQuery(object):
 
         for key, value in params.items():
             if key not in allowed_names:
-                raise ValueError(
-                    "{key} is not an allowed query parameter".format(key=key)
-                )
+                raise ValueError(f"Key '{key}' is not an allowed query parameter.")
             query_params[key] = value
 
         if "maximumRecords" not in query_params:
@@ -309,11 +314,10 @@ class OpenSearchQuery(object):
                     yield good_links[0]
                     break
             else:
-                message = "Could not match any accepted mimetype [{}] to received mimetype [{}] using params {}"
-                message = message.format(", ".join(accept_mime_types), ", ".join(data_links_mime_types), params)
                 # Do not raise an error right now, just loop until we reach the number of inputs we want
                 # Raise only if that number isn't reach
-                LOGGER.warning(message)
+                LOGGER.warning("Could not match any accepted mimetype [%s] to received mimetype [%s] using params %s",
+                               ", ".join(accept_mime_types), ", ".join(data_links_mime_types), params)
 
 
 def get_additional_parameters(input_data):
@@ -384,7 +388,7 @@ class EOImageDescribeProcessHandler(object):
         # type: (str, List[str]) -> JSON
         description = u"Collection of the data."
         data = {
-            u"id": u"{}".format(identifier),
+            u"id": str(identifier),
             u"title": description,
             u"abstract": description,
             u"formats": [{u"mimeType": ContentType.TEXT_PLAIN, u"default": True}],
@@ -415,7 +419,7 @@ class EOImageDescribeProcessHandler(object):
         :param start_date:  (Default value = True)
         """
         date = OpenSearchField.START_DATE if start_date else OpenSearchField.END_DATE
-        search_field = "{}{}".format(date[0].lower(), date[1:])
+        search_field = f"{date[0].lower()}{date[1:]}"
         data = {
             u"id": id_,
             u"title": u"Time of Interest",
@@ -526,7 +530,7 @@ def get_original_collection_id(payload, wps_inputs):
     )
     for execute_id, deploy_id in correspondence.items():
         if execute_id not in new_inputs:
-            raise ValueError("Missing required input parameter: {}".format(execute_id))
+            raise ValueError(f"Missing required input parameter: {execute_id}")
         new_inputs[deploy_id] = new_inputs.pop(execute_id)
     return new_inputs
 
@@ -584,10 +588,11 @@ def insert_max_occurs(payload, wps_inputs):
 
 
 def modified_collection_identifiers(eo_image_identifiers):
+    # type: (List[str]) -> List[str]
     unique_eoimage = len(eo_image_identifiers) == 1
     new_identifiers = []
     for identifier in eo_image_identifiers:
-        new = OpenSearchField.COLLECTION if unique_eoimage else identifier + "_" + OpenSearchField.COLLECTION
+        new = OpenSearchField.COLLECTION if unique_eoimage else make_param_id(identifier, OpenSearchField.COLLECTION)
         new_identifiers.append(new)
     return new_identifiers
 
@@ -612,7 +617,7 @@ def get_data_source(collection_id):
     try:
         return data_sources["opensearchdefault"]
     except KeyError:
-        raise ValueError("No OSDD URL found in data sources for collection ID '{}'".format(collection_id))
+        raise ValueError(f"No OSDD URL found in data sources for collection ID '{collection_id}'")
 
 
 def get_eo_images_ids_from_payload(payload):
@@ -662,4 +667,4 @@ def make_param_id(param_name, identifier):
     """
     Only adds an underscore between the parameters.
     """
-    return "{}_{}".format(param_name, identifier)
+    return f"{param_name}_{identifier}"

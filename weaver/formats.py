@@ -378,7 +378,8 @@ def get_extension(mime_type, dot=True):
     ctype = clean_mime_type_format(mime_type, strip_parameters=True)
     if not ctype:
         return ""
-    ext = _CONTENT_TYPE_EXTENSION_MAPPING.get(ctype, ".{}".format(ctype.split("/")[-1].replace("x-", "")))
+    ext_default = "." + ctype.split("/")[-1].replace("x-", "")
+    ext = _CONTENT_TYPE_EXTENSION_MAPPING.get(ctype, ext_default)
     return _handle_dot(ext)
 
 
@@ -457,7 +458,7 @@ def get_cwl_file_format(mime_type, make_reference=False, must_exist=True, allow_
     """
     def _make_if_ref(_map, _key, _fmt):
         # type: (Dict[str, str], str, str) -> Union[Tuple[Optional[JSON], Optional[str]], Optional[str]]
-        return os.path.join(_map[_key], _fmt) if make_reference else (_map, "{}:{}".format(_key, _fmt))
+        return os.path.join(_map[_key], _fmt) if make_reference else (_map, f"{_key}:{_fmt}")
 
     def _request_extra_various(_mime_type):
         # type: (str) -> Union[Tuple[Optional[JSON], Optional[str]], Optional[str]]
@@ -466,7 +467,7 @@ def get_cwl_file_format(mime_type, make_reference=False, must_exist=True, allow_
         """
         from weaver.utils import request_extra
 
-        _mime_type_url = "{}{}".format(IANA_NAMESPACE_DEFINITION[IANA_NAMESPACE], _mime_type)
+        _mime_type_url = f"{IANA_NAMESPACE_DEFINITION[IANA_NAMESPACE]}{_mime_type}"
         if _mime_type in IANA_KNOWN_MEDIA_TYPES:  # avoid HTTP NotFound
             if _mime_type in EDAM_MAPPING:  # prefer real reference if available
                 return _make_if_ref(EDAM_NAMESPACE_DEFINITION, EDAM_NAMESPACE, EDAM_MAPPING[_mime_type])
@@ -549,10 +550,10 @@ def clean_mime_type_format(mime_type, suffix_subtype=False, strip_parameters=Fal
         if len(parts) < 2:
             parts.append("")
         else:
-            parts[1] = ";{}".format(parts[1])
+            parts[1] = f";{parts[1]}"
         typ, sub = parts[0].split("/")
         sub = sub.split("+")[-1]
-        mime_type = "{}/{}{}".format(typ, sub, parts[1])
+        mime_type = f"{typ}/{sub}{parts[1]}"
     for v in list(IANA_NAMESPACE_DEFINITION.values()) + list(EDAM_NAMESPACE_DEFINITION.values()):
         if v in mime_type:
             mime_type = mime_type.replace(v, "")

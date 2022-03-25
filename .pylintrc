@@ -76,6 +76,7 @@ confidence=
 # no Warning level messages displayed, use "--disable=all --enable=classes
 # --disable=W".
 disable=C0111,missing-docstring,
+        C0206,consider-using-dict-items,
         C0302,too-many-lines,
         C0412,ungrouped-imports,
         C0415,import-outside-toplevel,

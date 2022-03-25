@@ -43,7 +43,7 @@ from weaver.processes.types import ProcessType
 from weaver.sort import Sort, SortMethods
 from weaver.status import JOB_STATUS_CATEGORIES, Status, map_status
 from weaver.store.base import StoreBills, StoreJobs, StoreProcesses, StoreQuotes, StoreServices, StoreVault
-from weaver.utils import get_base_url, get_sane_name, get_weaver_url, islambda, now
+from weaver.utils import fully_qualified_name, get_base_url, get_sane_name, get_weaver_url, islambda, now
 from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_url
 
@@ -157,7 +157,7 @@ class MongodbServiceStore(StoreServices, MongodbStore):
         """
         service = self.collection.find_one({"name": name})
         if not service:
-            raise ServiceNotFound("Service '{}' could not be found.".format(name))
+            raise ServiceNotFound(f"Service '{name}' could not be found.")
         service = Service(service)
         vis = Visibility.get(visibility)
         same_visibility = (
@@ -165,7 +165,7 @@ class MongodbServiceStore(StoreServices, MongodbStore):
             (not service.public and vis == Visibility.PRIVATE)
         )
         if visibility is not None and not same_visibility:
-            raise ServiceNotAccessible("Service '{}' cannot be accessed.".format(name))
+            raise ServiceNotAccessible(f"Service '{name}' cannot be accessed.")
         return service
 
     def fetch_by_url(self, url):
@@ -346,7 +346,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         """
         new_process = Process.convert(process, processEndpointWPS1=self.default_wps_endpoint)
         if not isinstance(new_process, Process):
-            raise ProcessInstanceError("Unsupported process type '{}'".format(type(process)))
+            raise ProcessInstanceError(f"Unsupported process type '{fully_qualified_name(process)}'")
 
         # apply defaults if not specified
         new_process["type"] = self._get_process_type(new_process)
@@ -395,7 +395,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
                 return function_dict()
             return function_dict[ProcessWPS]()
         else:
-            raise ProcessInstanceError("Unsupported process type '{}'".format(type(process)))
+            raise ProcessInstanceError(f"Unsupported process type '{fully_qualified_name(process)}'")
 
     def _get_process_id(self, process):
         # type: (AnyProcess) -> str
@@ -430,7 +430,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
             if overwrite:
                 self.collection.delete_one({"identifier": sane_name})
             else:
-                raise ProcessRegistrationError("Process '{}' already registered.".format(sane_name))
+                raise ProcessRegistrationError(f"Process '{sane_name}' already registered.")
         process.identifier = sane_name  # must use property getter/setter to match both 'Process' types
         self._add_process(process)
         return self.fetch_by_id(sane_name)
@@ -445,7 +445,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         sane_name = get_sane_name(process_id, **self.sane_name_config)
         process = self.fetch_by_id(sane_name, visibility=visibility)
         if not process:
-            raise ProcessNotFound("Process '{}' could not be found.".format(sane_name))
+            raise ProcessNotFound(f"Process '{sane_name}' could not be found.")
         return bool(self.collection.delete_one({"identifier": sane_name}).deleted_count)
 
     def list_processes(self,
@@ -475,8 +475,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         for v in visibility:
             vis = Visibility.get(v)
             if vis not in Visibility:
-                raise ValueError("Invalid visibility value '{0!s}' is not one of {1!s}"
-                                 .format(v, list(Visibility.values())))
+                raise ValueError(f"Invalid visibility value '{v!s}' is not one of {list(Visibility.values())!s}")
         search_filters["visibility"] = {"$in": list(visibility)}
 
         # processes do not have 'created', but ObjectID in '_id' has the particularity of embedding creation time
@@ -517,10 +516,10 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         sane_name = get_sane_name(process_id, **self.sane_name_config)
         process = self.collection.find_one({"identifier": sane_name})
         if not process:
-            raise ProcessNotFound("Process '{}' could not be found.".format(sane_name))
+            raise ProcessNotFound(f"Process '{sane_name}' could not be found.")
         process = Process(process)
         if visibility is not None and process.visibility != visibility:
-            raise ProcessNotAccessible("Process '{}' cannot be accessed.".format(sane_name))
+            raise ProcessNotAccessible(f"Process '{sane_name}' cannot be accessed.")
         return process
 
     def get_visibility(self, process_id):
@@ -627,7 +626,7 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
             self.collection.insert_one(new_job.params())
             job = self.fetch_by_id(job_id=new_job.id)
         except Exception as ex:
-            raise JobRegistrationError("Error occurred during job registration: [{}]".format(repr(ex)))
+            raise JobRegistrationError(f"Error occurred during job registration: [{ex!r}]")
         if job is None:
             raise JobRegistrationError("Failed to retrieve registered job.")
         return job
@@ -645,8 +644,8 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
             if result.acknowledged and result.matched_count == 1:
                 return self.fetch_by_id(job.id)
         except Exception as ex:
-            raise JobUpdateError("Error occurred during job update: [{}]".format(repr(ex)))
-        raise JobUpdateError("Failed to update specified job: '{}'".format(str(job)))
+            raise JobUpdateError(f"Error occurred during job update: [{ex!r}]")
+        raise JobUpdateError(f"Failed to update specified job: '{job!s}'")
 
     def delete_job(self, job_id):
         # type: (str) -> bool
@@ -665,7 +664,7 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
             job_id = uuid.UUID(job_id)
         job = self.collection.find_one({"id": job_id})
         if not job:
-            raise JobNotFound("Could not find job matching: '{}'".format(job_id))
+            raise JobNotFound(f"Could not find job matching: '{job_id}'")
         return Job(job)
 
     def list_jobs(self):
@@ -830,7 +829,7 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
             raise JobInvalidParameter(json={
                 "code": "JobInvalidParameter",
                 "description": "Visibility values not acceptable in 'tags', use 'access' instead.",
-                "cause": "Invalid value{} in 'tag': {}".format("s" if len(bad_tags) > 1 else "", ",".join(bad_tags)),
+                "cause": f"Invalid value{'s'[:len(bad_tags)^1]} in 'tags': {','.join(bad_tags)}",
                 "locator": "tags",
             })
         if tags:
@@ -975,6 +974,7 @@ class MongodbQuoteStore(StoreQuotes, MongodbStore):
     """
 
     def __init__(self, *args, **kwargs):
+        # type: (Any, Any) -> None
         db_args, db_kwargs = MongodbStore.get_args_kwargs(*args, **kwargs)
         StoreQuotes.__init__(self)
         MongodbStore.__init__(self, *db_args, **db_kwargs)
@@ -982,7 +982,7 @@ class MongodbQuoteStore(StoreQuotes, MongodbStore):
     def _apply_quote(self, quote, override=False):
         # type: (Quote, bool) -> Quote
         if not isinstance(quote, Quote):
-            raise QuoteInstanceError("Invalid quote object: '{}'".format(repr(quote)))
+            raise QuoteInstanceError(f"Invalid quote object: '{quote!r}'")
         try:
             if override:
                 self.collection.update_one({"id": quote.id}, {"$set": quote.params()})
@@ -990,7 +990,7 @@ class MongodbQuoteStore(StoreQuotes, MongodbStore):
                 self.collection.insert_one(quote.params())
             params = self.fetch_by_id(quote_id=quote.id)
         except Exception as ex:
-            raise QuoteRegistrationError("Error occurred during quote registration: [{}]".format(repr(ex)))
+            raise QuoteRegistrationError(f"Error occurred during quote registration: [{ex!r}]")
         if params is None:
             raise QuoteRegistrationError("Failed to retrieve registered quote.")
         return Quote(**params)
@@ -1018,7 +1018,7 @@ class MongodbQuoteStore(StoreQuotes, MongodbStore):
             quote_id = uuid.UUID(quote_id)
         quote = self.collection.find_one({"id": quote_id})
         if not quote:
-            raise QuoteNotFound("Could not find quote matching: '{}'".format(quote_id))
+            raise QuoteNotFound(f"Could not find quote matching: '{quote_id}'")
         return Quote(quote)
 
     def list_quotes(self):
@@ -1047,7 +1047,7 @@ class MongodbQuoteStore(StoreQuotes, MongodbStore):
         if sort is None:
             sort = Sort.ID
         if sort not in SortMethods.QUOTE:
-            raise QuoteNotFound("Invalid sorting method: '{!s}'".format(sort))
+            raise QuoteNotFound(f"Invalid sorting method: '{sort!s}'")
 
         sort_order = ASCENDING
         sort_criteria = [(sort, sort_order)]
@@ -1075,12 +1075,12 @@ class MongodbBillStore(StoreBills, MongodbStore):
         Stores a bill in mongodb.
         """
         if not isinstance(bill, Bill):
-            raise BillInstanceError("Invalid bill object: '{}'".format(repr(bill)))
+            raise BillInstanceError(f"Invalid bill object: '{bill!r}'")
         try:
             self.collection.insert_one(bill.params())
             bill = self.fetch_by_id(bill_id=bill.id)
         except Exception as ex:
-            raise BillRegistrationError("Error occurred during bill registration: [{}]".format(repr(ex)))
+            raise BillRegistrationError(f"Error occurred during bill registration: [{ex!r}]")
         if bill is None:
             raise BillRegistrationError("Failed to retrieve registered bill.")
         return Bill(bill)
@@ -1094,7 +1094,7 @@ class MongodbBillStore(StoreBills, MongodbStore):
             bill_id = uuid.UUID(bill_id)
         bill = self.collection.find_one({"id": bill_id})
         if not bill:
-            raise BillNotFound("Could not find bill matching: '{}'".format(bill_id))
+            raise BillNotFound(f"Could not find bill matching: '{bill_id}'")
         return Bill(bill)
 
     def list_bills(self):
@@ -1123,7 +1123,7 @@ class MongodbBillStore(StoreBills, MongodbStore):
         if sort is None:
             sort = Sort.ID
         if sort not in SortMethods.BILL:
-            raise BillNotFound("Invalid sorting method: '{}'".format(repr(sort)))
+            raise BillNotFound(f"Invalid sorting method: '{sort!r}'")
 
         sort_order = ASCENDING
         sort_criteria = [(sort, sort_order)]
@@ -1160,7 +1160,7 @@ class MongodbVaultStore(StoreVault, MongodbStore):
         if not params:
             if nothrow:
                 return None
-            raise VaultFileNotFound("Could not find vault file matching: '{}'".format(file_id))
+            raise VaultFileNotFound(f"Could not find vault file matching: '{file_id}'")
         return VaultFile.from_params(**params)
 
     def save_file(self, file):
@@ -1169,11 +1169,11 @@ class MongodbVaultStore(StoreVault, MongodbStore):
         Stores a vault file in `MongoDB` storage.
         """
         if not isinstance(file, VaultFile):
-            raise VaultFileInstanceError("Invalid vault file object: '{}'".format(repr(file)))
+            raise VaultFileInstanceError(f"Invalid vault file object: '{file!r}'")
         try:
             self.collection.insert_one(file.params())
         except Exception as ex:
-            raise VaultFileRegistrationError("Error occurred during vault file registration: [{}]".format(repr(ex)))
+            raise VaultFileRegistrationError(f"Error occurred during vault file registration: [{ex!r}]")
         return None
 
     def delete_file(self, file):

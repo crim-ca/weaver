@@ -73,6 +73,8 @@ from cornice_swagger.converters.schema import (
 if TYPE_CHECKING:
     from typing import Any, Dict, Iterable, Optional, Sequence, Type, Union
 
+# pylint: disable=C0209,consider-using-f-string
+
 
 LITERAL_SCHEMA_TYPES = frozenset([
     colander.Boolean,
@@ -112,8 +114,9 @@ class OneOfCaseInsensitive(colander.OneOf):
     """
     Validator that ensures the given value matches one of the available choices, but allowing case insensitive values.
     """
+
     def __init__(self, choices, *args, **kwargs):
-        insensitive_choices = dict()  # set with kept order
+        insensitive_choices = {}  # set with kept order
         for choice in choices:
             insensitive_choices.setdefault(choice, None)
             if isinstance(choice, str):
@@ -298,6 +301,7 @@ class ExtendedFloat(ExtendedNumber, colander.Float):
     This is to distinguish it from explicit definitions of ``float``-like numbers or strings.
     By default, values such as ``"1"``, ``1.0``, ``True`` will not be automatically converted to equivalent ``1.0``.
     """
+
     def __init__(self, *_, allow_string=False, strict=True, **__):
         colander.Float.__init__(self)
         ExtendedNumber.__init__(self, *_, strict=strict, allow_string=allow_string, **__)
@@ -314,8 +318,8 @@ class ExtendedFloat(ExtendedNumber, colander.Float):
             raise ValueError("Value is not a Floating point number (Boolean, Integer and String not allowed).")
         return num
 
-    def serialize(self, node, cstruct):  # pylint: disable=W0221
-        result = super(ExtendedFloat, self).serialize(node, cstruct)
+    def serialize(self, node, appstruct):
+        result = super(ExtendedFloat, self).serialize(node, appstruct)
         if result is not colander.null:
             result = float(result)
         return result
@@ -328,6 +332,7 @@ class ExtendedInteger(ExtendedNumber, colander.Integer):
     This is to distinguish it from explicit definitions of ``integer``-like numbers or strings.
     By default, values such as ``"1"``, ``1.0``, ``True`` will not be automatically converted to equivalent ``1``.
     """
+
     def __init__(self, *_, allow_string=False, strict=True, **__):
         colander.Integer.__init__(self)
         ExtendedNumber.__init__(self, *_, strict=strict, allow_string=allow_string, **__)
@@ -348,8 +353,8 @@ class ExtendedInteger(ExtendedNumber, colander.Integer):
             raise ValueError("Value is not a Integer number (Boolean, Float and String not allowed).")
         return num
 
-    def serialize(self, node, cstruct):  # pylint: disable=W0221
-        result = super(ExtendedInteger, self).serialize(node, cstruct)
+    def serialize(self, node, appstruct):
+        result = super(ExtendedInteger, self).serialize(node, appstruct)
         if result is not colander.null:
             result = int(result)
         return result
@@ -364,6 +369,7 @@ class ExtendedString(colander.String):
     For ``format="date"`` and ``format="date-time"``, consider instead using :class:`colander.Date`
     and :class:`colander.DateTime` respectively since more advanced support and features are provided with them.
     """
+
     def deserialize(self, node, cstruct):
         try:
             if str(getattr(node, "format", "")).lower() == "uuid":
@@ -1166,6 +1172,7 @@ class StrictMappingSchema(ExtendedMappingSchema):
     .. seealso::
         :class:`PermissiveMappingSchema`
     """
+
     def __init__(self, *args, **kwargs):
         kwargs["unknown"] = "raise"
         super(StrictMappingSchema, self).__init__(*args, **kwargs)
@@ -1179,6 +1186,7 @@ class EmptyMappingSchema(StrictMappingSchema):
 
     Any children added to this schema are removed automatically.
     """
+
     def __init__(self, *args, **kwargs):
         super(EmptyMappingSchema, self).__init__(*args, **kwargs)
         self.children = []

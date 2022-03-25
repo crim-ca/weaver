@@ -20,13 +20,15 @@ from weaver.wps_restapi.patches import patch_pyramid_view_no_auto_head_get_metho
 if TYPE_CHECKING:
     from typing import Any
 
+    from pyramid.router import Router
+
     from weaver.typedefs import SettingsType
 
 LOGGER = logging.getLogger(__name__)
 
 
 def main(global_config, **settings):
-    # type: (SettingsType, Any) -> None
+    # type: (SettingsType, Any) -> Router
     """
     Creates a Pyramid WSGI application for Weaver.
     """

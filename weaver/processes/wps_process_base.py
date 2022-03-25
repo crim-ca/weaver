@@ -125,7 +125,7 @@ class WpsProcessInterface(object):
             if not job_success:
                 raise PackageExecutionError("Failed dispatch and monitoring of remote process execution.")
         except Exception as exc:
-            err_msg = "{0}: {1!s}".format(fully_qualified_name(exc), exc)
+            err_msg = f"{fully_qualified_name(exc)}: {exc!s}"
             err_ctx = "Dispatch and monitoring of remote process caused an unhandled error."
             LOGGER.exception("%s [%s]", err_ctx, err_msg, exc_info=exc)
             self.update_status("Running final cleanup operations following failed execution.",
@@ -364,8 +364,9 @@ class WpsProcessInterface(object):
         for exec_input in execute_body_inputs:
             if "href" in exec_input and isinstance(exec_input["href"], str):
                 LOGGER.debug("Original input location [%s] : [%s]", exec_input["id"], exec_input["href"])
-                if exec_input["href"].startswith("{0}://".format(OpenSearchField.LOCAL_FILE_SCHEME)):
-                    exec_input["href"] = "file{0}".format(exec_input["href"][len(OpenSearchField.LOCAL_FILE_SCHEME):])
+                if exec_input["href"].startswith(f"{OpenSearchField.LOCAL_FILE_SCHEME}://"):
+                    exec_href = exec_input["href"][len(OpenSearchField.LOCAL_FILE_SCHEME):]
+                    exec_input["href"] = f"file{exec_href}"
                     LOGGER.debug("OpenSearch intermediate input [%s] : [%s]", exec_input["id"], exec_input["href"])
                 elif exec_input["href"].startswith("file://"):
                     exec_input["href"] = self.host_file(exec_input["href"])
