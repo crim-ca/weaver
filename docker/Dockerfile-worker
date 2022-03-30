@@ -18,4 +18,5 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 	&& rm -rf /var/lib/apt/lists/*
 
 # run app
-CMD celery worker -B -E -A pyramid_celery.celery_app --ini "${APP_CONFIG_DIR}/weaver.ini"
+# see CHANGES (4.15.0), celery>=5.2 needs '-A' before 'worker'
+CMD celery -A pyramid_celery.celery_app worker -B -E --ini "${APP_CONFIG_DIR}/weaver.ini"
