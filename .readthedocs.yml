@@ -14,7 +14,7 @@ python:
     - method: pip
       path: .
       extra_requirements:
-        - setuptools>=57,<58
+        - "setuptools>=57,<58"
     # - requirements: requirements-sys.txt
     - requirements: requirements-doc.txt
   system_packages: false
