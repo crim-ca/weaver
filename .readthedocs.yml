@@ -8,13 +8,13 @@ formats:
 python:
   version: "3.7"
   install:
-    # ReadTheDocs enforces setuptools<58.3.0, but 58 breaks with other packages.
-    # pin version to avoid issue related to `use_2to3` called within `rdflib-jsonld` (via cwltool -> schema_salad)
-    # (see https://github.com/pypa/setuptools/blob/7685e2393c9f44bcff13d62361f2355595d856ba/CHANGES.rst#v5803)
-    # - requirements: requirements-sys.txt
+    - requirements: requirements-sys.txt
     - requirements: requirements-doc.txt
-    - method: pip
-      path: .
-      extra_requirements:
-        - setuptools>=57,!=58.*
+# ReadTheDocs enforces setuptools<58.3.0, but 58 breaks with other packages.
+# pin version to avoid issue related to `use_2to3` called within `rdflib-jsonld` (via cwltool -> schema_salad)
+# (see https://github.com/pypa/setuptools/blob/7685e2393c9f44bcff13d62361f2355595d856ba/CHANGES.rst#v5803)
+#    - method: pip
+#      path: .
+#      extra_requirements:
+#        - setuptools>=57,!=58.*
   system_packages: false
