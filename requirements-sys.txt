@@ -1,2 +1,5 @@
 pip>=22.0.4
-setuptools>=59
+# ReadTheDocs enforces setuptools<58.3.0, but 58 breaks with other packages.
+# pin version to avoid issue related to `use_2to3` called within `rdflib-jsonld` (via cwltool -> schema_salad)
+# (see https://github.com/pypa/setuptools/blob/7685e2393c9f44bcff13d62361f2355595d856ba/CHANGES.rst#v5803)
+setuptools>=57,<58
