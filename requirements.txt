@@ -13,8 +13,8 @@ billiard>3.2,<3.4; sys_platform == "win32"
 #   https://github.com/celery/celery/blob/master/docs/whatsnew-5.2.rst#upgrading-from-celery-4x
 celery[mongodb]<4; sys_platform == "win32"  # pyup: ignore
 celery[mongodb]>=5.2.3; sys_platform != "win32" and python_version >= "3.7"  # pyup: ignore
-# more recent versions not avilable for end-of-life python
-# FIXME: drop support?
+# technically, >=5.2 preferred to resolve security issue, but dependency resolver cannot find it
+# FIXME: drop support? more recent versions not avilable for end-of-life python
 celery[mongodb]>=5.1; sys_platform != "win32" and python_version <= "3.6"  # pyup: ignore
 cffi
 colander
