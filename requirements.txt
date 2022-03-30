@@ -12,7 +12,7 @@ billiard>3.2,<3.4; sys_platform == "win32"
 #   celery's CLI interface changed
 #   https://github.com/celery/celery/blob/master/docs/whatsnew-5.2.rst#upgrading-from-celery-4x
 celery[mongodb]<4; sys_platform == "win32"  # pyup: ignore
-celery[mongodb]>=5.2; sys_platform != "win32"  # pyup: ignore
+celery[mongodb]>=5.2.3; sys_platform != "win32"  # pyup: ignore
 cffi
 colander
 cornice
