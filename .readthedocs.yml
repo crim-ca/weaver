@@ -8,7 +8,6 @@ formats:
 python:
   version: "3.7"
   install:
-    - requirements: requirements-rtd.txt
-    # - requirements: requirements-sys.txt
+    - requirements: requirements-sys.txt
     - requirements: requirements-doc.txt
   system_packages: false
