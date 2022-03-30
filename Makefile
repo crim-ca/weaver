@@ -217,10 +217,10 @@ conda-env-export:		## export the conda environment
 install: install-all    ## alias for 'install-all' target
 
 .PHONY: install-run
-install-run: install-sys install-pkg install-raw 	## install requirements and application to run it locally
+install-run: conda-env install-sys install-pkg install-raw 	## install requirements and application to run it locally
 
 .PHONY: install-all
-install-all: install-sys install-pkg install-pip install-dev  ## install application with all its dependencies
+install-all: conda-env install-sys install-pkg install-pip install-dev  ## install application with all its dependencies
 
 .PHONY: install-doc
 install-doc: install-pip	## install documentation dependencies
@@ -242,7 +242,7 @@ install-pkg: install-pip	## install application package dependencies
 
 # don't use 'PIP_XARGS' in this case since extra features could not yet be supported by pip being installed/updated
 .PHONY: install-sys
-install-sys: conda-env	## install system dependencies and required installers/runners
+install-sys:	## install system dependencies and required installers/runners
 	@echo "Installing system dependencies..."
 	@bash -c '$(CONDA_CMD) pip install --upgrade -r "$(APP_ROOT)/requirements-sys.txt"'
 
