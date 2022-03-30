@@ -11,8 +11,11 @@ billiard>3.2,<3.4; sys_platform == "win32"
 #   celery >=4.4.3 breaks on 'future.utils' import
 #   celery's CLI interface changed
 #   https://github.com/celery/celery/blob/master/docs/whatsnew-5.2.rst#upgrading-from-celery-4x
-celery[mongodb]==4.4.2; sys_platform != "win32"  # pyup: ignore
 celery[mongodb]<4; sys_platform == "win32"  # pyup: ignore
+celery[mongodb]>=5.2.3; sys_platform != "win32" and python_version >= "3.7"  # pyup: ignore
+# more recent versions not avilable for end-of-life python
+# FIXME: drop support?
+celery[mongodb]>=5.1; sys_platform != "win32" and python_version <= "3.6"  # pyup: ignore
 cffi
 colander
 cornice
