@@ -64,6 +64,7 @@ Changes:
   `#105 <https://github.com/crim-ca/weaver/issues/105>`_,
   `#294 <https://github.com/crim-ca/weaver/issues/294>`_,
   `#399 <https://github.com/crim-ca/weaver/issues/399>`_).
+- Drop ``Python 3.6`` support to better resolve package dependencies.
 
 Fixes:
 ------
