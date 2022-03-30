@@ -28,7 +28,9 @@ cryptography
 # FIXME: remove extra CWL code and let it handle it for use
 #   - changes since cause error with invalid get_listing import location
 #   - https://github.com/crim-ca/weaver/issues/154
-cwltool>=2,<=3.0.20200324120055
+# https://github.com/common-workflow-language/cwltool/commit/5bdb3d3dd47d8d1b3a1685220b4b6ce0f94c055e
+# (update rdflib that supports 'rdflib-jsonld>0.5.0'), minimal verison 3.0.20210124104916
+cwltool==3.1.20210816212154
 docker
 duration
 git+https://github.com/ESGF/esgf-compute-api.git@v2.3.7#egg=esgf-compute-api
@@ -58,7 +60,10 @@ pytz
 pywps==4.5.1
 pyyaml>=5.2
 # required by: cwltool => schema_salad, make requirement stricter because it has longer wheel build time
-rdflib-jsonld==0.5.0
+# otherwise 'setuptools>58.3.0' breaks with other packages
+# due to deprecated `use_2to3` called within `rdflib-jsonld` (via cwltool -> schema_salad)
+# (see https://github.com/pypa/setuptools/blob/7685e2393c9f44bcff13d62361f2355595d856ba/CHANGES.rst#v5803)
+rdflib-jsonld>0.5.0,<0.6.2
 requests
 requests_file
 # let cwltool define ruamel.yaml version (<=0.16.5)

@@ -76,6 +76,7 @@ if TYPE_CHECKING:
         AnySettingsContainer,
         AnyValueType,
         CWL,
+        CWL_IO_DataType,
         CWL_IO_EnumSymbols,
         CWL_IO_FileValue,
         CWL_IO_Value,
@@ -724,7 +725,7 @@ def is_cwl_array_type(io_info):
         # parse enum in case we got an array of allowed symbols
         is_enum = _update_if_sub_enum(io_type["items"])
         if not is_enum:
-            io_return["type"] = io_type["items"]
+            io_return["type"] = escape_cwl_io_type(io_type["items"])
         if io_return["type"] not in PACKAGE_ARRAY_ITEMS:
             raise PackageTypeError(f"Unsupported I/O 'array' definition: '{io_info!r}'.")
         LOGGER.debug("I/O [%s] parsed as 'array' with nested dict notation", io_info["name"])
@@ -759,6 +760,7 @@ def is_cwl_enum_type(io_info):
     """
     io_type = io_info["type"]
     if not isinstance(io_type, dict) or "type" not in io_type or io_type["type"] not in PACKAGE_CUSTOM_TYPES:
+        io_type = escape_cwl_io_type(io_type)
         return False, io_type, MODE.NONE, None
 
     if "symbols" not in io_type:
@@ -783,8 +785,15 @@ def is_cwl_enum_type(io_info):
             f"Unsupported I/O 'enum' base type: `{type(first_allow)!s}`, from definition: `{io_info!r}`."
         )
 
-    # allowed value validator mode must be set for input
-    return True, io_type, MODE.SIMPLE, io_allow
+    io_type = escape_cwl_io_type(io_type)
+    return True, io_type, MODE.SIMPLE, io_allow  # allowed value validator mode must be set for input
+
+
+def escape_cwl_io_type(io_type):
+    # type: (Union[str, CWL_IO_DataType]) -> Union[str, CWL_IO_DataType]
+    if not isinstance(io_type, str):
+        return io_type
+    return str(io_type.replace("org.w3id.cwl.cwl.", "", 1))  # remove double quoted string class + namespace
 
 
 def get_cwl_io_type(io_info):
@@ -844,6 +853,8 @@ def get_cwl_io_type(io_info):
             io_type = io_base_type
 
         LOGGER.debug("I/O parsed for multiple base types")
+    if isinstance(io_type, str):
+        io_type = str(io_type.replace("org.w3id.cwl.cwl.", "", 1))  # remove double quoted string class + namespace
     return io_type, is_null
 
 
