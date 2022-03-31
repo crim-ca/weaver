@@ -228,7 +228,6 @@ if TYPE_CHECKING:
         def __call__(self, message: str, progress: Number, status: AnyStatusType, *args: Any, **kwargs: Any) -> None:
             pass
 
-    # others
     DatetimeIntervalType = TypedDict("DatetimeIntervalType", {
         "before": datetime,
         "after": datetime,

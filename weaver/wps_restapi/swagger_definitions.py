@@ -67,7 +67,7 @@ from weaver.wps_restapi.colander_extras import (
     StringRange,
     XMLObject
 )
-from weaver.wps_restapi.constants import JobInputsOutputsSchema
+from weaver.wps_restapi.constants import ConformanceCategory, JobInputsOutputsSchema
 from weaver.wps_restapi.patches import ServiceOnlyExplicitGetHead as Service  # warning: don't use 'cornice.Service'
 
 if TYPE_CHECKING:
@@ -1524,8 +1524,19 @@ class VersionsEndpoint(ExtendedMappingSchema):
     header = RequestHeaders()
 
 
+class ConformanceQueries(ExtendedMappingSchema):
+    category = ExtendedSchemaNode(
+        String(),
+        missing=drop,
+        default=ConformanceCategory.CONFORMANCE,
+        validator=OneOf(ConformanceCategory.values()),
+        description="Select the desired conformance item references to be returned."
+    )
+
+
 class ConformanceEndpoint(ExtendedMappingSchema):
     header = RequestHeaders()
+    querystring = ConformanceQueries()
 
 
 class OpenAPIEndpoint(ExtendedMappingSchema):
