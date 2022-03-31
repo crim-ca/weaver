@@ -82,9 +82,11 @@ if TYPE_CHECKING:
         CWL_Output_Type,
         ExecutionInputs,
         ExecutionInputsList,
+        ExecutionOutputs,
         JobValueFile,
         JSON
     )
+    from weaver.wps_restapi.constants import JobInputsOutputsSchemaType
 
     # typing shortcuts
     # pylint: disable=C0103,invalid-name
@@ -1018,7 +1020,7 @@ def cwl2json_input_values(data, schema=ProcessSchema.OGC):
 
 
 def convert_input_values_schema(inputs, schema):
-    # type: (ExecutionInputs, ProcessSchemaType) -> ExecutionInputs
+    # type: (ExecutionInputs, JobInputsOutputsSchemaType) -> ExecutionInputs
     """
     Convert execution input values between equivalent formats.
 
@@ -1026,6 +1028,8 @@ def convert_input_values_schema(inputs, schema):
     :param schema: Desired schema.
     :return: Converted inputs.
     """
+    if isinstance(schema, str):
+        schema = schema.upper()
     if (
         (schema == ProcessSchema.OGC and isinstance(inputs, dict)) or
         (schema == ProcessSchema.OLD and isinstance(inputs, list))
@@ -1076,6 +1080,46 @@ def convert_input_values_schema(inputs, schema):
                 input_list.append({"id": input_id, "value": input_value})
         return input_list
     raise NotImplementedError(f"Unknown conversion format of input values for schema: [{schema}]")
+
+
+def convert_output_params_schema(outputs, schema):
+    # type: (ExecutionOutputs, JobInputsOutputsSchemaType) -> ExecutionOutputs
+    """
+    Convert execution output parameters between equivalent formats.
+
+    .. warning::
+        These outputs are not *values* (i.e.: *results*), but *submitted* :term:`Job` outputs for return definitions.
+        Contents are transferred as-is without any consideration of ``value`` or ``href`` fields.
+
+    :param outputs: Outputs to convert.
+    :param schema: Desired schema.
+    :return: Converted outputs.
+    """
+    if isinstance(schema, str):
+        schema = schema.upper()
+    if (
+        (schema == ProcessSchema.OGC and isinstance(outputs, dict)) or
+        (schema == ProcessSchema.OLD and isinstance(outputs, list))
+    ):
+        return outputs
+    if (
+        (schema == ProcessSchema.OGC and not isinstance(outputs, list)) or
+        (schema == ProcessSchema.OLD and not isinstance(outputs, dict))
+    ):
+        name = fully_qualified_name(outputs)
+        raise ValueError(f"Unknown conversion method to schema [{schema}] for outputs of type [{name}]: {outputs}")
+    if schema == ProcessSchema.OGC:
+        out_dict = {}
+        for out in outputs:
+            out_id = get_any_id(out, pop=True)
+            out_dict[out_id] = out
+        return out_dict
+    if schema == ProcessSchema.OLD:
+        out_list = [{"id": out} for out in outputs]
+        for out in out_list:
+            out.update(outputs[out["id"]])
+        return out_list
+    raise NotImplementedError(f"Unknown conversion format of outputs definitions for schema: [{schema}]")
 
 
 def repr2json_input_values(inputs):
@@ -1611,7 +1655,7 @@ def wps2json_job_payload(wps_request, wps_process):
         else:
             data_output = wps_request.outputs[oid]
         if as_ref:
-            data_output["transmissionMode"] = ExecuteTransmissionMode.REFERENCE
+            data_output["transmissionMode"] = ExecuteTransmissionMode.VALUE
         else:
             data_output["transmissionMode"] = ExecuteTransmissionMode.VALUE
         data_output["id"] = oid

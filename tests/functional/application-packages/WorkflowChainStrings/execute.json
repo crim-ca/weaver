@@ -4,7 +4,7 @@
   },
   "outputs": {
     "output": {
-      "transmissionMode": "reference"
+      "transmissionMode": "value"
     }
   }
 }

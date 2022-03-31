@@ -10,7 +10,7 @@
     "outputs": [
         {
             "id": "output_files",
-            "transmissionMode": "reference"
+            "transmissionMode": "value"
         }
     ]
 }

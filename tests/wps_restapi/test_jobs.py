@@ -11,6 +11,7 @@ from datetime import date
 from distutils.version import LooseVersion
 from typing import TYPE_CHECKING
 
+import colander
 import mock
 import pyramid.testing
 import pytest
@@ -537,7 +538,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         email = "some.test@crim.ca"
         body = {
             "inputs": [{"id": "test_input", "data": "test"}],
-            "outputs": [{"id": "test_output", "transmissionMode": ExecuteTransmissionMode.REFERENCE}],
+            "outputs": [{"id": "test_output", "transmissionMode": ExecuteTransmissionMode.VALUE}],
             "mode": ExecuteMode.ASYNC,
             "response": ExecuteResponse.DOCUMENT,
             "notification_email": email
@@ -1366,3 +1367,88 @@ class WpsRestApiJobsTest(unittest.TestCase):
                 assert resp.json["cause"] == cause
                 assert resp.json["type"].endswith(error_type)  # ignore http full reference, not always there
                 assert "links" in resp.json
+
+    def test_jobs_inputs_outputs_validations(self):
+        """
+        Ensure that inputs/outputs submitted or returned can be represented and validated across various formats.
+        """
+        default_trans_mode = {"transmissionMode": ExecuteTransmissionMode.VALUE}
+
+        job_none = sd.Execute().deserialize({})
+        assert job_none == {
+            "inputs": {},
+            "outputs": {},
+            "mode": ExecuteMode.AUTO,
+            "response": ExecuteResponse.DOCUMENT
+        }
+
+        job_in_none = sd.Execute().deserialize({"outputs": {"random": default_trans_mode}})
+        assert job_in_none == {
+            "inputs": {},
+            "outputs": {"random": default_trans_mode},
+            "mode": ExecuteMode.AUTO,
+            "response": ExecuteResponse.DOCUMENT
+        }
+
+        job_in_empty_dict = sd.Execute().deserialize({"inputs": {}, "outputs": {"random": default_trans_mode}})
+        assert job_in_empty_dict == {
+            "inputs": {},
+            "outputs": {"random": default_trans_mode},
+            "mode": ExecuteMode.AUTO,
+            "response": ExecuteResponse.DOCUMENT
+        }
+
+        job_in_empty_list = sd.Execute().deserialize({"inputs": [], "outputs": {"random": default_trans_mode}})
+        assert job_in_empty_list == {
+            "inputs": [],
+            "outputs": {"random": default_trans_mode},
+            "mode": ExecuteMode.AUTO,
+            "response": ExecuteResponse.DOCUMENT
+        }
+
+        job_out_none = sd.Execute().deserialize({"inputs": {"random": "ok"}})
+        assert job_out_none == {
+            "inputs": {"random": "ok"},
+            "outputs": {},
+            "mode": ExecuteMode.AUTO,
+            "response": ExecuteResponse.DOCUMENT
+        }
+
+        job_out_empty_dict = sd.Execute().deserialize({"inputs": {"random": "ok"}, "outputs": {}})
+        assert job_out_empty_dict == {
+            "inputs": {"random": "ok"},
+            "outputs": {},
+            "mode": ExecuteMode.AUTO,
+            "response": ExecuteResponse.DOCUMENT
+        }
+
+        job_out_empty_list = sd.Execute().deserialize({"inputs": {"random": "ok"}, "outputs": []})
+        assert job_out_empty_list == {
+            "inputs": {"random": "ok"},
+            "outputs": [],
+            "mode": ExecuteMode.AUTO,
+            "response": ExecuteResponse.DOCUMENT
+        }
+
+        job_out_defined = sd.Execute().deserialize({
+            "inputs": {"random": "ok"},
+            "outputs": {"random": {"transmissionMode": ExecuteTransmissionMode.REFERENCE}}
+        })
+        assert job_out_defined == {
+            "inputs": {"random": "ok"},
+            "outputs": {"random": {"transmissionMode": ExecuteTransmissionMode.REFERENCE}},
+            "mode": ExecuteMode.AUTO,
+            "response": ExecuteResponse.DOCUMENT
+        }
+
+        with self.assertRaises(colander.Invalid):
+            sd.Execute().deserialize({"inputs": "value"})
+
+        with self.assertRaises(colander.Invalid):
+            sd.Execute().deserialize({"outputs": "value"})
+
+        with self.assertRaises(colander.Invalid):
+            sd.Execute().deserialize({"outputs": {"random": "value"}})
+
+        with self.assertRaises(colander.Invalid):
+            sd.Execute().deserialize({"outputs": {"random": {"transmissionMode": "bad"}}})

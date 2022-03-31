@@ -30,7 +30,7 @@ from pywps import Process as ProcessWPS
 
 from weaver import xml_util
 from weaver.exceptions import ProcessInstanceError, ServiceParsingError
-from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteTransmissionMode
+from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import AcceptLanguage, ContentType, repr_json
 from weaver.processes.constants import ProcessSchema
 from weaver.processes.convert import get_field, null, ows2json, wps2json_io
@@ -58,7 +58,7 @@ if TYPE_CHECKING:
 
     from owslib.wps import WebProcessingService
 
-    from weaver.execute import AnyExecuteControlOption, AnyExecuteTransmissionMode
+    from weaver.execute import AnyExecuteControlOption, AnyExecuteMode, AnyExecuteResponse, AnyExecuteTransmissionMode
     from weaver.processes.constants import ProcessSchemaType
     from weaver.processes.types import AnyProcessType
     from weaver.quotation.status import AnyQuoteStatus
@@ -67,6 +67,8 @@ if TYPE_CHECKING:
         AnyProcess,
         AnySettingsContainer,
         AnyUUID,
+        ExecutionInputs,
+        ExecutionOutputs,
         Number,
         CWL,
         JSON,
@@ -756,19 +758,29 @@ class Job(Base):
         return "provider"
 
     def _get_inputs(self):
-        # type: () -> List[Optional[Dict[str, JSON]]]
+        # type: () -> Optional[ExecutionInputs]
         if self.get("inputs") is None:
-            self["inputs"] = list()
+            return {}
         return dict.__getitem__(self, "inputs")
 
     def _set_inputs(self, inputs):
-        # type: (List[Optional[Dict[str, JSON]]]) -> None
-        if not isinstance(inputs, list):
-            raise TypeError(f"Type 'list' is required for '{self.__name__}.inputs'")
+        # type: (Optional[ExecutionInputs]) -> None
         self["inputs"] = inputs
 
     # allows to correctly update list by ref using 'job.inputs.extend()'
-    inputs = property(_get_inputs, _set_inputs)
+    inputs = property(_get_inputs, _set_inputs, doc="Input values and reference submitted for execution.")
+
+    def _get_outputs(self):
+        # type: () -> Optional[ExecutionOutputs]
+        if self.get("outputs") is None:
+            return {}
+        return dict.__getitem__(self, "outputs")
+
+    def _set_outputs(self, outputs):
+        # type: (Optional[ExecutionOutputs]) -> None
+        self["outputs"] = outputs
+
+    outputs = property(_get_outputs, _set_outputs, doc="Output transmission modes submitted for execution.")
 
     @property
     def user_id(self):
@@ -825,6 +837,21 @@ class Job(Base):
             raise TypeError(f"Type 'str' is required for '{self.__name__}.status_location'")
         self["status_location"] = location_url
 
+    def status_url(self, container=None):
+        # type: (Optional[AnySettingsContainer]) -> str
+        """
+        Obtain the resolved endpoint where the :term:`Job` status information can be obtained.
+        """
+        settings = get_settings(container)
+        location_base = "/providers/{provider_id}".format(provider_id=self.service) if self.service else ""
+        location_url = "{base_url}{location_base}/processes/{process_id}/jobs/{job_id}".format(
+            base_url=get_wps_restapi_base_url(settings),
+            location_base=location_base,
+            process_id=self.process,
+            job_id=self.id
+        )
+        return location_url
+
     @property
     def notification_email(self):
         # type: () -> Optional[str]
@@ -861,17 +888,38 @@ class Job(Base):
 
     @property
     def execution_mode(self):
-        # type: () -> ExecuteMode
+        # type: () -> AnyExecuteMode
         return ExecuteMode.get(self.get("execution_mode"), ExecuteMode.ASYNC)
 
     @execution_mode.setter
     def execution_mode(self, mode):
-        # type: (Union[ExecuteMode, str]) -> None
+        # type: (Union[AnyExecuteMode, str]) -> None
         exec_mode = ExecuteMode.get(mode)
         if exec_mode not in ExecuteMode:
             modes = list(ExecuteMode.values())
             raise ValueError(f"Invalid value for '{self.__name__}.execution_mode'. Must be one of {modes}")
         self["execution_mode"] = mode
+
+    @property
+    def execution_response(self):
+        # type: () -> AnyExecuteResponse
+        out = self.setdefault("execution_response", ExecuteResponse.DOCUMENT)
+        if out not in ExecuteResponse.values():
+            out = ExecuteResponse.DOCUMENT
+        self["execution_response"] = out
+        return out
+
+    @execution_response.setter
+    def execution_response(self, response):
+        # type: (Optional[Union[AnyExecuteResponse, str]]) -> None
+        if response is None:
+            exec_resp = ExecuteResponse.DOCUMENT
+        else:
+            exec_resp = ExecuteResponse.get(response)
+        if exec_resp not in ExecuteResponse:
+            resp = list(ExecuteResponse.values())
+            raise ValueError(f"Invalid value for '{self.__name__}.execution_response'. Must be one of {resp}")
+        self["execution_response"] = exec_resp
 
     @property
     def is_local(self):
@@ -969,7 +1017,7 @@ class Job(Base):
         self["results"] = results
 
     # allows to correctly update list by ref using 'job.results.extend()'
-    results = property(_get_results, _set_results)
+    results = property(_get_results, _set_results, doc="Output values and references that resulted from execution.")
 
     def _get_exceptions(self):
         # type: () -> List[Union[str, Dict[str, str]]]
@@ -1204,10 +1252,12 @@ class Job(Base):
             "service": self.service,
             "process": self.process,
             "inputs": self.inputs,
+            "outputs": self.outputs,
             "user_id": self.user_id,
             "status": self.status,
             "status_message": self.status_message,
             "status_location": self.status_location,
+            "execution_response": self.execution_response,
             "execution_mode": self.execution_mode,
             "is_workflow": self.is_workflow,
             "created": self.created,
@@ -1798,27 +1848,49 @@ class Process(Base):
     @property
     def jobControlOptions(self):  # noqa: N802
         # type: () -> List[AnyExecuteControlOption]
-        jco = self.setdefault("jobControlOptions", [ExecuteControlOption.ASYNC])
+        """
+        Control options that indicate which :term:`Job` execution modes are supported by the :term:`Process`.
+
+        .. note::
+
+            There are no official mentions about the ordering of ``jobControlOptions``.
+            Nevertheless, it is often expected that the first item can be considered the default mode when none is
+            requested explicitly (at execution time). With the definition of execution mode through the ``Prefer``
+            header, `Weaver` has the option to decide if it wants to honor this header, according to available
+            resources and :term:`Job` duration.
+
+            For this reason, ``async`` is placed first by default when nothing was defined during deployment,
+            since it is the preferred mode in `Weaver`. If deployment included items though, they are preserved as is.
+            This allows to re-deploy a :term:`Process` to a remote non-`Weaver` :term:`ADES` preserving the original
+            :term:`Process` definition.
+
+        .. seealso::
+            Discussion about expected ordering of ``jobControlOptions``:
+            https://github.com/opengeospatial/ogcapi-processes/issues/171#issuecomment-836819528
+        """
+        # Weaver's default async only, must override explicitly during deploy if sync is needed
+        jco_default = [ExecuteControlOption.ASYNC]
+        jco = self.setdefault("jobControlOptions", jco_default)
         if not isinstance(jco, list):  # eg: None, bw-compat
-            jco = [ExecuteControlOption.ASYNC]
+            jco = jco_default
         jco = [ExecuteControlOption.get(opt) for opt in jco]
         jco = [opt for opt in jco if opt is not None]
         if len(jco) == 0:
-            jco.append(ExecuteControlOption.ASYNC)
-        self["jobControlOptions"] = jco
+            jco = jco_default
+        self["jobControlOptions"] = jco  # no alpha order important!
         return dict.__getitem__(self, "jobControlOptions")
 
     @property
     def outputTransmission(self):  # noqa: N802
         # type: () -> List[AnyExecuteTransmissionMode]
-        out = self.setdefault("outputTransmission", [ExecuteTransmissionMode.REFERENCE])
+        out = self.setdefault("outputTransmission", ExecuteTransmissionMode.values())
         if not isinstance(out, list):  # eg: None, bw-compat
-            out = [ExecuteTransmissionMode.REFERENCE]
+            out = [ExecuteTransmissionMode.VALUE]
         out = [ExecuteTransmissionMode.get(mode) for mode in out]
         out = [mode for mode in out if mode is not None]
         if len(out) == 0:
-            out.append(ExecuteTransmissionMode.REFERENCE)
-        self["outputTransmission"] = out
+            out.extend(ExecuteTransmissionMode.values())
+        self["outputTransmission"] = list(sorted(out))
         return dict.__getitem__(self, "outputTransmission")
 
     @property

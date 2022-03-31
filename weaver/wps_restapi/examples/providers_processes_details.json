@@ -11,7 +11,7 @@
         "async-execute"
       ],
       "outputTransmission": [
-        "reference"
+        "value"
       ],
       "processDescriptionURL": "http://localhost:4002/processes/ColibriFlyingpigeon_SubsetBbox",
       "processEndpointWPS1": "http://localhost:4002/ows/wps",
@@ -28,7 +28,7 @@
         "async-execute"
       ],
       "outputTransmission": [
-        "reference"
+        "value"
       ],
       "processDescriptionURL": "http://localhost:4002/processes/OutardeFlyingpigeon_SubsetBbox",
       "processEndpointWPS1": "http://localhost:4002/ows/wps",
@@ -47,7 +47,7 @@
         "async-execute"
       ],
       "outputTransmission": [
-        "reference"
+        "value"
       ],
       "processDescriptionURL": "http://localhost:4002/processes/Staging_S2L1C",
       "processEndpointWPS1": "http://localhost:4002/ows/wps",
@@ -66,7 +66,7 @@
         "async-execute"
       ],
       "outputTransmission": [
-        "reference"
+        "value"
       ],
       "processDescriptionURL": "http://localhost:4002/processes/Staging_S2L1C-mock-docker",
       "processEndpointWPS1": "http://localhost:4002/ows/wps",
@@ -85,7 +85,7 @@
         "async-execute"
       ],
       "outputTransmission": [
-        "reference"
+        "value"
       ],
       "processDescriptionURL": "http://localhost:4002/processes/WaterExtent_S2-mock-docker",
       "processEndpointWPS1": "http://localhost:4002/ows/wps",
@@ -104,7 +104,7 @@
         "async-execute"
       ],
       "outputTransmission": [
-        "reference"
+        "value"
       ],
       "processDescriptionURL": "http://localhost:4002/processes/WorkflowWaterExtent",
       "processEndpointWPS1": "http://localhost:4002/ows/wps",
@@ -123,7 +123,7 @@
         "async-execute"
       ],
       "outputTransmission": [
-        "reference"
+        "value"
       ],
       "processDescriptionURL": "http://localhost:4002/processes/WorkflowWaterExtent-mock",
       "processEndpointWPS1": "http://localhost:4002/ows/wps",
@@ -159,7 +159,7 @@
         "async-execute"
       ],
       "outputTransmission": [
-        "reference"
+        "value"
       ],
       "processDescriptionURL": "http://localhost:4002/processes/anti-spoofing",
       "processEndpointWPS1": "http://localhost:4002/ows/wps",
@@ -178,7 +178,7 @@
         "async-execute"
       ],
       "outputTransmission": [
-        "reference"
+        "value"
       ],
       "processDescriptionURL": "http://localhost:4002/processes/docker-demo-cat",
       "processEndpointWPS1": "http://localhost:4002/ows/wps",
@@ -195,7 +195,7 @@
         "async-execute"
       ],
       "outputTransmission": [
-        "reference"
+        "value"
       ],
       "processDescriptionURL": "http://localhost:4002/processes/docker-python-script",
       "processEndpointWPS1": "http://localhost:4002/ows/wps",
@@ -212,7 +212,7 @@
         "async-execute"
       ],
       "outputTransmission": [
-        "reference"
+        "value"
       ],
       "processDescriptionURL": "http://localhost:4002/processes/file2string_array",
       "processEndpointWPS1": "http://localhost:4002/ows/wps",
@@ -239,7 +239,7 @@
         "async-execute"
       ],
       "outputTransmission": [
-        "reference"
+        "value"
       ],
       "processDescriptionURL": "http://localhost:4002/processes/image-utils",
       "processEndpointWPS1": "http://localhost:4002/ows/wps",
@@ -258,7 +258,7 @@
         "async-execute"
       ],
       "outputTransmission": [
-        "reference"
+        "value"
       ],
       "processDescriptionURL": "http://localhost:4002/processes/jsonarray2netcdf",
       "processEndpointWPS1": "http://localhost:4002/ows/wps",
@@ -313,7 +313,7 @@
         "async-execute"
       ],
       "outputTransmission": [
-        "reference"
+        "value"
       ],
       "processDescriptionURL": "http://localhost:4002/processes/las2tif",
       "processEndpointWPS1": "http://localhost:4002/ows/wps",
@@ -332,7 +332,7 @@
         "async-execute"
       ],
       "outputTransmission": [
-        "reference"
+        "value"
       ],
       "processDescriptionURL": "http://localhost:4002/processes/metalink2netcdf",
       "processEndpointWPS1": "http://localhost:4002/ows/wps",
@@ -352,7 +352,7 @@
         "async-execute"
       ],
       "outputTransmission": [
-        "reference"
+        "value"
       ],
       "processDescriptionURL": "http://localhost:4002/processes/python-script",
       "processEndpointWPS1": "http://localhost:4002/ows/wps",
@@ -370,7 +370,7 @@
         "async-execute"
       ],
       "outputTransmission": [
-        "reference"
+        "value"
       ],
       "processDescriptionURL": "http://localhost:4002/processes/sleep",
       "processEndpointWPS1": "http://localhost:4002/ows/wps",
@@ -397,7 +397,7 @@
         "async-execute"
       ],
       "outputTransmission": [
-        "reference"
+        "value"
       ],
       "processDescriptionURL": "http://localhost:4002/processes/test_blurring",
       "processEndpointWPS1": "http://localhost:4002/ows/wps",
@@ -424,7 +424,7 @@
         "async-execute"
       ],
       "outputTransmission": [
-        "reference"
+        "value"
       ],
       "processDescriptionURL": "http://localhost:4002/processes/test_generation",
       "processEndpointWPS1": "http://localhost:4002/ows/wps",
@@ -443,7 +443,7 @@
         "async-execute"
       ],
       "outputTransmission": [
-        "reference"
+        "value"
       ],
       "processDescriptionURL": "http://localhost:4002/processes/test_workflow",
       "processEndpointWPS1": "http://localhost:4002/ows/wps",

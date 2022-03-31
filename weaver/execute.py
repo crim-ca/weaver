@@ -2,6 +2,9 @@ from typing import TYPE_CHECKING
 
 from weaver.base import Constants
 
+if TYPE_CHECKING:
+    from typing import List
+
 
 class ExecuteMode(Constants):
     AUTO = "auto"
@@ -12,6 +15,14 @@ class ExecuteMode(Constants):
 class ExecuteControlOption(Constants):
     ASYNC = "async-execute"
     SYNC = "sync-execute"
+
+    @classmethod
+    def values(cls):
+        # type: () -> List[AnyExecuteControlOption]
+        """
+        Return default control options in specific order according to preferred modes for execution by `Weaver`.
+        """
+        return [ExecuteControlOption.ASYNC, ExecuteControlOption.SYNC]
 
 
 class ExecuteResponse(Constants):

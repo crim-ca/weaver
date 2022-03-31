@@ -10,8 +10,41 @@ Changes
 `Unreleased <https://github.com/crim-ca/weaver/tree/master>`_ (latest)
 ========================================================================
 
+Important:
+----------
+- In order to support *synchronous* execution, setting ``RESULT_BACKEND`` **MUST** be specified in
+  the ``weaver.ini`` configuration file.
+  See `Weaver INI Configuration Example <https://github.com/crim-ca/weaver/blob/master/config/weaver.ini.example>`_
+  in section ``[celery]`` for more details.
+- With resolution and added support of ``transmissionMode`` handling according to `OGC API - Processes` specification,
+  requests that where submitted with ``reference`` outputs will produce results in a different format than previously
+  since this parameter was ignored and always returned ``value`` representation.
+
 Changes:
 --------
+- Support ``Prefer`` header with ``wait`` or ``respond-async`` directives to select ``Job`` execution mode either
+  as *synchronous* or *asynchronous* task, according to supported ``jobControlOptions`` of the relevant ``Process``
+  being executed (resolves `#247 <https://github.com/crim-ca/weaver/issues/247>`_).
+- Increase minor version of all ``builtin`` processes that will now be executable in wither (a)synchronous modes.
+- Add ``weaver.exec_sync_max_wait`` and ``weaver.quote_sync_max_wait`` settings allowing custom definition for the
+  maximum duration that can be specified to wait for a `synchronous` response from task workers.
+- Add ``-B`` (``celery beat``) option to Docker command of ``weaver-worker`` to run scheduled task in parallel
+  to ``celery worker`` in order to periodically cleanup task results introduced by *synchronous* execution.
+- Add support of ``transmissionMode`` handling as ``reference`` to generate HTTP ``Link`` references for results
+  requested this way (resolves `#377 <https://github.com/crim-ca/weaver/issues/377>`_).
+- Updated every ``Process`` to report that they support ``outputTransmission`` both as ``reference`` and ``value``,
+  since handling of results is accomplished by `Weaver` itself, regardless of the application being executed.
+- Add partial support of ``response=raw`` parameter for execution request submission in order to handle results to
+  be returned accordingly to specified ``outputTransmission`` by ``reference`` or ``value``.
+  Multipart contents for multi-output results are not yet supported
+  (relates to `#376 <https://github.com/crim-ca/weaver/issues/376>`_).
+- Add `CLI` option ``-R/--ref/--reference`` for ``execute`` operation allowing to request corresponding ``outputs``
+  by ID to be returned using the ``transmissionMode: reference`` method, producing HTTP ``Link`` headers for those
+  entries rather than inserting values in the response content body.
+- Add requested ``outputs`` into response of ``GET /jobs/{jobId}/inputs`` to obtain submitted ``Job`` definitions.
+- Add query parameter ``schema`` for ``GET /jobs/{jobId}/inputs`` (and corresponding endpoints under ``/processes``
+  and ``/providers``) allowing to retrieve submitted input values and requested outputs with either ``OGC``/``OLD``
+  formats.
 - Improve conformance for returned status codes and error messages when requesting results for an unfinished,
   failed, or dismissed ``Job``.
 - Adjust conformance item references to correspond with `OGC API - Processes: Part 2` renamed from `Transactions` to
@@ -22,6 +55,13 @@ Changes:
 
 Fixes:
 ------
+- Fix ``outputs`` permitted to be completely omitted from the execution request
+  (resolves `#375 <https://github.com/crim-ca/weaver/issues/375>`_).
+- Fix ``outputs`` permitted as explicit empty mapping or list as equivalent to omitting them, defining by default
+  that all ``outputs`` should be returned with ``transmissionMode: value`` for ``Job`` execution.
+- Fix all instances of ``outputTransmission`` reported as ``reference`` in ``Process`` descriptions, although `Weaver`
+  behaved with the ``value`` method, which is to return values and file references in content body, instead of
+  HTTP ``Link`` header references.
 - Fix `WPS 1/2` endpoint not reporting the appropriate instance URL
   (fixes `#83 <https://github.com/crim-ca/weaver/issues/83>`_).
 - Fix `CLI` ``deploy`` operation headers incorrectly passed down to the deployment request.
@@ -325,7 +365,7 @@ Fixes:
 - Fix parsing of inputs for `OpenSearch` parameters lookup that was assuming inputs were always provided as
   listing definition, not considering possible mapping definition.
 - Fix incorrect documentation section ``Package as External Execution Unit Reference`` where content was omitted
-  and incorrectly anchored as following ``process-esgf-cwt`` section.
+  and incorrectly anchored as following ``ESGF-CWT`` section.
 
 .. _changes_4.4.0:
 

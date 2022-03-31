@@ -102,19 +102,6 @@ def get_process(process_id=None, request=None, settings=None, store=None):
         raise HTTPBadRequest("Invalid schema:\n[{0!r}].".format(ex))
 
 
-def get_job_submission_response(body):
-    # type: (JSON) -> HTTPCreated
-    """
-    Generates the successful response from contents returned by job submission process.
-
-    .. seealso::
-        :func:`weaver.processes.execution.submit_job`
-    """
-    body["description"] = sd.CreatedLaunchJobResponse.description
-    body = sd.CreatedJobStatusSchema().deserialize(body)
-    return HTTPCreated(location=body["location"], json=body)
-
-
 def map_progress(progress, range_min, range_max):
     # type: (Number, Number, Number) -> Number
     """

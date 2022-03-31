@@ -31,7 +31,7 @@
         "executeEndpoint": "https://remote-server.com/processes/test-remote-process-wps3/jobs"
     },
     "outputTransmission": [
-        "reference"
+        "value"
     ],
     "jobControlOptions": [
         "async-execute"

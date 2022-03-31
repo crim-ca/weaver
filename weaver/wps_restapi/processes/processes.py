@@ -18,7 +18,7 @@ from weaver.exceptions import ProcessNotFound, ServiceException, log_unhandled_e
 from weaver.formats import OutputFormat, repr_json
 from weaver.processes import opensearch
 from weaver.processes.execution import submit_job
-from weaver.processes.utils import deploy_process_from_payload, get_job_submission_response, get_process
+from weaver.processes.utils import deploy_process_from_payload, get_process
 from weaver.status import Status
 from weaver.store.base import StoreJobs, StoreProcesses
 from weaver.utils import fully_qualified_name, get_any_id
@@ -274,5 +274,4 @@ def submit_local_job(request):
     Execution location and method is according to deployed Application Package.
     """
     process = get_process(request=request)
-    body = submit_job(request, process, tags=["wps-rest"])
-    return get_job_submission_response(body)
+    return submit_job(request, process, tags=["wps-rest"])

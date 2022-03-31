@@ -2,6 +2,7 @@ import logging
 from typing import TYPE_CHECKING
 
 import colander
+from celery.exceptions import TimeoutError as CeleryTaskTimeoutError
 from pyramid.httpexceptions import HTTPAccepted, HTTPBadRequest, HTTPCreated, HTTPNotFound, HTTPOk
 
 from weaver.config import WeaverFeature, get_weaver_configuration
@@ -15,12 +16,14 @@ from weaver.processes.types import ProcessType
 from weaver.quotation.estimation import process_quote_estimator
 from weaver.sort import Sort
 from weaver.store.base import StoreBills, StoreProcesses, StoreQuotes
-from weaver.utils import get_settings, parse_prefer_header_execute_mode
+from weaver.utils import as_int, get_header, get_settings, parse_prefer_header_execute_mode
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.processes.processes import submit_local_job
 
 if TYPE_CHECKING:
     from weaver.datatype import Process
+
+    from weaver.typedefs import AnyResponseType, PyramidRequest
 
 LOGGER = logging.getLogger(__name__)
 
@@ -29,6 +32,7 @@ LOGGER = logging.getLogger(__name__)
                                 schema=sd.PostProcessQuoteRequestEndpoint(), response_schemas=sd.post_quotes_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def request_quote(request):
+    # type: (PyramidRequest) -> AnyResponseType
     """
     Request a quotation for a process.
     """
@@ -81,13 +85,17 @@ def request_quote(request):
     }
     quote = Quote(**quote_info)
     quote = quote_store.save_quote(quote)
-    mode, wait, applied = parse_prefer_header_execute_mode(request.headers, process.jobControlOptions)
+    max_wait = as_int(settings.get("weaver.quote_sync_max_wait"), default=20)
+    mode, wait, applied = parse_prefer_header_execute_mode(request.headers, process.jobControlOptions, max_wait)
 
     result = process_quote_estimator.delay(quote.id)
     LOGGER.debug("Celery pending task [%s] for quote [%s].", result.id, quote.id)
     if mode == ExecuteMode.SYNC and wait:
         LOGGER.debug("Celery task requested as sync if it completes before (wait=%ss)", wait)
-        result.wait(timeout=wait)
+        try:
+            result.wait(timeout=wait)
+        except CeleryTaskTimeoutError:
+            pass
         if result.ready():
             quote = quote_store.fetch_by_id(quote.id)
             data = quote.json()
@@ -95,6 +103,13 @@ def request_quote(request):
             data.update({"links": quote.links(settings)})
             data = sd.CreatedQuoteResponse().deserialize(data)
             return HTTPCreated(json=data)
+        else:
+            LOGGER.debug("Celery task requested as sync took too long to complete (wait=%ss). Continue in async.", wait)
+            # sync not respected, therefore must drop it
+            # since both could be provided as alternative preferences, drop only async with limited subset
+            prefer = get_header("Preference-Applied", applied, pop=True)
+            _, _, async_applied = parse_prefer_header_execute_mode({"Prefer": prefer}, [ExecuteMode.ASYNC])
+            applied = async_applied
 
     data = quote.partial()
     data.update({"description": sd.AcceptedQuoteResponse.description})
@@ -109,6 +124,7 @@ def request_quote(request):
                        schema=sd.QuotesEndpoint(), response_schemas=sd.get_quote_list_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_quote_list(request):
+    # type: (PyramidRequest) -> AnyResponseType
     """
     Get list of quotes IDs.
     """
@@ -137,6 +153,7 @@ def get_quote_list(request):
                       schema=sd.QuoteEndpoint(), response_schemas=sd.get_quote_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_quote_info(request):
+    # type: (PyramidRequest) -> AnyResponseType
     """
     Get quote information.
     """
@@ -155,6 +172,7 @@ def get_quote_info(request):
                        schema=sd.PostQuote(), response_schemas=sd.post_quote_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def execute_quote(request):
+    # type: (PyramidRequest) -> AnyResponseType
     """
     Execute a quoted process.
     """

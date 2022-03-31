@@ -213,13 +213,35 @@ they are optional and which default value or operation is applied in each situat
     completion if an email was provided in the :ref:`Execute <proc_op_execute>` request body
     (see also: :ref:`Email Notification`).
 
+.. versionadded:: 4.15.0
+
+- | ``weaver.exec_sync_max_wait``
+  | (default: ``20``, :class:`int`, seconds)
+  |
+  | Defines the maximum duration allowed for running a :term:`Job` execution in `synchronous` mode.
+  |
+  | See :ref:`proc_exec_mode` for more details on the feature and how to employ it.
+  | Ensure `Celery`_ worker is configured as specified below.
+
+.. versionadded:: 4.15.0
+
+- | ``weaver.quote_sync_max_wait``
+  | (default: ``20``, :class:`int`, seconds)
+  |
+  | Defines the maximum duration allowed for running a :term:`Quote` estimation in `synchronous` mode.
+  |
+  | See :ref:`proc_exec_mode` for more details on the feature and how to employ it.
+  | Ensure `Celery`_ worker is configured as specified below.
 
 .. note::
 
     Since `Weaver` employs `Celery`_ as task queue manager and `MongoDB`_ as backend, relevant settings for the
-    |celery-config|_ and the |celery-mongo|_ should be referred to. Processing of task jobs and results reporting
+    |celery-config|_ and the |celery-mongo|_ should be employed. Processing of task jobs and results reporting
     is accomplished according to the specific implementation of these services. Therefore, all applicable settings
     and extensions should be available for custom server configuration and scaling as needed.
+
+.. warning::
+    In order to support `synchronous` execution, the ``RESULT_BACKEND`` setting **MUST** be defined.
 
 .. |celery-config| replace:: configuration of Celery
 .. _celery-config: https://docs.celeryproject.org/en/latest/userguide/configuration.html#configuration
@@ -344,16 +366,42 @@ simply set setting ``weaver.wps_processes_file`` as *undefined* (i.e.: nothing a
 Configuration of Request Options
 =======================================
 
-.. todo:: complete docs
-
-:term:`Request Options`
-
-``weaver.ssl_verify``
-
-
 .. versionadded:: 1.8.0
 
-`request_options.yml.example`_
+It is possible to define :term:`Request Options` that consist of additional arguments that will be passed down to
+:func:`weaver.utils.request_extra`, which essentially call a traditional request using :mod:`requests` module, but
+with extended handling capabilities such as caching, retrying, and file reference support. The specific parameters
+that are passed down for individual requests depend whether a match based on URL (optionally with regex rules) and
+method definitions can be found in the :term:`Request Options` file. This file should be provided using
+the ``weaver.request_options`` configuration setting. Using this definition, it is possible to provide specific
+requests handling options, such as extended timeout, authentication arguments, SSL certification verification setting,
+etc. on a per-request basis, leave other requests unaffected and generally more secure.
+
+.. seealso::
+    File `request_options.yml.example`_ provides more details and sample :term:`YAML` format of the expected contents
+    for :term:`Request Options` feature.
+
+.. seealso::
+    Please refer to :func:`weaver.utils.request_extra` documentation directly for supported parameters and capabilities.
+
+
+- | ``weaver.request_options = <file-path>``
+  | (default: ``None``)
+  |
+  | Path of the :term:`Request Options` definitions to employ.
+
+
+- | ``weaver.ssl_verify = true|false``
+  | (default: ``true``)
+  |
+  | Toggle the SSL certificate verification across all requests.
+
+.. warning::
+    It is **NOT** recommended to disable SSL verification across all requests for security reasons
+    (avoid man-in-the-middle attacks). This is crucial for requests that involve any form of authentication, secured
+    access or personal user data references. This should be employed only for quickly resolving issues during
+    development. Consider fixing SSL certificates on problematic servers, or disable the verification on a per-request
+    basis using :term:`Request Options` for acceptable cases.
 
 
 Starting the Application

@@ -387,12 +387,17 @@ def parse_prefer_header_execute_mode(
           This defines all conditions how to handle ``Prefer`` against applicable :term:`Process` description.
         - :rfc:`7240#section-4.1` HTTP Prefer header ``respond-async``
 
+    .. seealso::
+        If ``Prefer`` format is valid, but server decides it cannot be respected, it can be transparently ignored
+        (:rfc:`7240#section-2`). The server must respond with ``Preference-Applied`` indicating preserved preferences
+        it decided to respect.
+
     :param header_container: Request headers to retrieve preference, if any available.
     :param supported_modes:
         Execute modes that are permitted for the operation that received the ``Prefer`` header.
         Resolved mode will respect this constrain following specification requirements of :term:`OGC API - Processes`.
     :param wait_max:
-        Maximum wait time enforced by the server. If requested wait time is greater, 'wait' preference will not be
+        Maximum wait time enforced by the server. If requested wait time is greater, ``wait`` preference will not be
         applied and will fallback to asynchronous response.
     :return:
         Tuple of resolved execution mode, wait time if specified, and header of applied preferences if possible.
@@ -496,6 +501,18 @@ def is_uuid(maybe_uuid):
     if not isinstance(maybe_uuid, str):
         return False
     return re.match(UUID_PATTERN, str(maybe_uuid)) is not None
+
+
+def as_int(value, default):
+    # type: (Any, int) -> int
+    """
+    Ensures a value is converted to :class:`int`.
+    """
+    try:
+        return int(value)
+    except Exception:  # noqa: W0703 # nosec: B110
+        pass
+    return default
 
 
 def parse_extra_options(option_str, sep=","):

@@ -1152,17 +1152,53 @@ class ExtendedMappingSchema(
             ExtendedSchemaBase._validate(node)
 
 
+class StrictMappingSchema(ExtendedMappingSchema):
+    """
+    Object schema that will ``raise`` any unknown field not represented by children schema.
+
+    This is equivalent to `OpenAPI` object mapping with ``additionalProperties: false``.
+    This type is useful for defining a dictionary that matches *exactly* a specific set of values and children schema.
+
+    ..note::
+        When doing schema deserialization to validate it, unknown keys would normally be removed without this class
+        (default behaviour is to ``ignore`` them). With this schema, content under an unknown key is fails validation.
+
+    .. seealso::
+        :class:`PermissiveMappingSchema`
+    """
+    def __init__(self, *args, **kwargs):
+        kwargs["unknown"] = "raise"
+        super(StrictMappingSchema, self).__init__(*args, **kwargs)
+        # sub-type mapping itself must also have 'raise' such that its own 'deserialize' copies the fields over
+        self.typ.unknown = "raise"
+
+
+class EmptyMappingSchema(StrictMappingSchema):
+    """
+    Mapping that guarantees it is completely empty for validation during deserialization.
+
+    Any children added to this schema are removed automatically.
+    """
+    def __init__(self, *args, **kwargs):
+        super(EmptyMappingSchema, self).__init__(*args, **kwargs)
+        self.children = []
+
+
 class PermissiveMappingSchema(ExtendedMappingSchema):
     """
-    Object schema that will allow *any unknown* field to remain present in the resulting deserialization.
+    Object schema that will ``preserve`` any unknown field to remain present in the resulting deserialization.
 
     This type is useful for defining a dictionary where some field names are not known in advance, or
     when more optional keys that don't need to all be exhaustively provided in the schema are acceptable.
 
-    When doing schema deserialization to validate it, unknown keys would normally be removed without this class
-    (default behaviour is to ``ignore`` them). With this schema, content under an unknown key is ``preserved``
-    as it was received without any validation. Other fields that are explicitly specified with sub-schema nodes
-    will still be validated as per usual behaviour.
+    ..note::
+        When doing schema deserialization to validate it, unknown keys would normally be removed without this class
+        (default behaviour is to ``ignore`` them). With this schema, content under an unknown key using ``preserve``
+        are passed down without any validation. Other fields that are explicitly specified with sub-schema nodes
+        will still be validated as per usual behaviour.
+
+    .. seealso::
+        :class:`StrictMappingSchema`
 
     Example::
 
@@ -1784,9 +1820,6 @@ class NotKeywordSchema(KeywordMapper):
     Allows specifying specific schema conditions that fails underlying schema definition validation if present.
 
     Corresponds to the ``not`` specifier of `OpenAPI` specification.
-
-    This is equivalent to `OpenAPI` object mapping with ``additionalProperties: false``, but is more explicit in
-    the definition of invalid or conflicting field names with explicit definitions during deserialization.
 
     Example::
 

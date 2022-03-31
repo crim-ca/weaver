@@ -30,7 +30,7 @@
   "outputs": [
     {
       "id": "output",
-      "transmissionMode": "reference"
+      "transmissionMode": "value"
     }
   ]
 }

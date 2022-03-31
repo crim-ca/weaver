@@ -50,6 +50,7 @@ from weaver.visibility import Visibility
 from weaver.wps_restapi.colander_extras import (
     AllOfKeywordSchema,
     AnyOfKeywordSchema,
+    EmptyMappingSchema,
     ExtendedBoolean as Boolean,
     ExtendedFloat as Float,
     ExtendedInteger as Integer,
@@ -66,7 +67,7 @@ from weaver.wps_restapi.colander_extras import (
     StringRange,
     XMLObject
 )
-from weaver.wps_restapi.constants import JobOutputsSchema
+from weaver.wps_restapi.constants import JobInputsOutputsSchema
 from weaver.wps_restapi.patches import ServiceOnlyExplicitGetHead as Service  # warning: don't use 'cornice.Service'
 
 if TYPE_CHECKING:
@@ -561,6 +562,11 @@ class ValueLanguage(ExtendedMappingSchema):
 
 class LinkLanguage(ExtendedMappingSchema):
     hreflang = Language(missing=drop, description="Language of the content located at the link.")
+
+
+class LinkHeader(ExtendedSchemaNode):
+    schema_type = String
+    example = "<http://example.com>; rel=\"relation\"; type=text/plain"
 
 
 class MetadataBase(ExtendedMappingSchema):
@@ -1411,8 +1417,8 @@ class JobResponseOptionsEnum(ExtendedSchemaNode):
 class TransmissionModeEnum(ExtendedSchemaNode):
     schema_type = String
     title = "TransmissionMode"
-    default = ExecuteTransmissionMode.REFERENCE
-    example = ExecuteTransmissionMode.REFERENCE
+    default = ExecuteTransmissionMode.VALUE
+    example = ExecuteTransmissionMode.VALUE
     validator = OneOf(ExecuteTransmissionMode.values())
 
 
@@ -2324,21 +2330,45 @@ class ProviderInputsEndpoint(ProviderPath, ProcessPath, JobPath):
     header = RequestHeaders()
 
 
+class JobInputsOutputsQuery(ExtendedMappingSchema):
+    schema = ExtendedSchemaNode(
+        String(),
+        title="JobInputsOutputsQuerySchema",
+        example=JobInputsOutputsSchema.OGC,
+        default=JobInputsOutputsSchema.OLD,
+        validator=OneOfCaseInsensitive(JobInputsOutputsSchema.values()),
+        summary="Selects the schema employed for representation of submitted job inputs and outputs.",
+        description=(
+            "Selects the schema employed for representing job inputs and outputs that were submitted for execution. "
+            f"When '{JobInputsOutputsSchema.OLD}' is employed, listing of object with IDs is returned. "
+            f"When '{JobInputsOutputsSchema.OGC}' is employed, mapping of object definitions is returned. "
+            "If no schema is requested, the original formats from submission are employed, which could be a mix of "
+            "both representations. Providing a schema forces their corresponding conversion as applicable."
+        )
+    )
+
+
 class JobInputsEndpoint(JobPath):
     header = RequestHeaders()
+    querystring = JobInputsOutputsQuery()
 
 
 class JobOutputQuery(ExtendedMappingSchema):
     schema = ExtendedSchemaNode(
-        String(), example=JobOutputsSchema.OGC, default=JobOutputsSchema.OLD,
-        validator=OneOfCaseInsensitive(JobOutputsSchema.values()),
+        String(),
+        title="JobOutputResultsSchema",
+        example=JobInputsOutputsSchema.OGC,
+        default=JobInputsOutputsSchema.OLD,
+        validator=OneOfCaseInsensitive(JobInputsOutputsSchema.values()),
         summary="Selects the schema employed for representation of job outputs.",
         description=(
             "Selects the schema employed for representation of job outputs for providing file Content-Type details. "
-            f"When '{JobOutputsSchema.OLD}' is employed, 'format.mimeType' is used and 'type' is reported as well. "
-            f"When '{JobOutputsSchema.OGC}' is employed, 'format.mediaType' is used and 'type' is reported as well. "
+            f"When '{JobInputsOutputsSchema.OLD}' is employed, "
+            "'format.mimeType' is used and 'type' is reported as well. "
+            f"When '{JobInputsOutputsSchema.OGC}' is employed, "
+            "'format.mediaType' is used and 'type' is reported as well. "
             "When the '+strict' value is added, only the 'format' or 'type' will be represented according to the "
-            f"reference standard ({JobOutputsSchema.OGC}, {JobOutputsSchema.OLD}) representation."
+            f"reference standard ({JobInputsOutputsSchema.OGC}, {JobInputsOutputsSchema.OLD}) representation."
         )
     )
 
@@ -2453,9 +2483,16 @@ class ExecuteOutputSpecList(ExtendedSequenceSchema):
     output = ExecuteOutputItem()
 
 
-class ExecuteOutputSpecMap(ExtendedMappingSchema):
-    input_id = ExecuteOutputDefinition(variable="{input-id}", title="ExecuteOutputSpecMap",
-                                       description="Desired output reporting method.")
+class ExecuteOutputMapAdditionalProperties(ExtendedMappingSchema):
+    output_id = ExecuteOutputDefinition(variable="{output-id}", title="ExecuteOutputSpecMap",
+                                        description="Desired output reporting method.")
+
+
+class ExecuteOutputSpecMap(AnyOfKeywordSchema):
+    _any_of = [
+        ExecuteOutputMapAdditionalProperties(),  # normal {"<output-id>": {...}}
+        EmptyMappingSchema(),                    # allows explicitly provided {}
+    ]
 
 
 class ExecuteOutputSpec(OneOfKeywordSchema):
@@ -2509,8 +2546,8 @@ class ExceptionReportType(ExtendedMappingSchema):
 class ProcessControl(ExtendedMappingSchema):
     jobControlOptions = JobControlOptionsList(missing=[ExecuteControlOption.ASYNC],
                                               default=[ExecuteControlOption.ASYNC])
-    outputTransmission = TransmissionModeList(missing=[ExecuteTransmissionMode.REFERENCE],
-                                              default=[ExecuteTransmissionMode.REFERENCE])
+    outputTransmission = TransmissionModeList(missing=[ExecuteTransmissionMode.VALUE],
+                                              default=[ExecuteTransmissionMode.VALUE])
 
 
 class ProcessLocations(ExtendedMappingSchema):
@@ -2966,10 +3003,17 @@ class ExecuteInputData(OneOfKeywordSchema):
 # 	      items:
 # 	        $ref: "inlineOrRefData.yaml"
 #
-class ExecuteInputMapValues(ExtendedMappingSchema):
+class ExecuteInputMapAdditionalProperties(ExtendedMappingSchema):
     schema_ref = f"{OGC_API_SCHEMA_URL}/{OGC_API_SCHEMA_VERSION}/core/openapi/schemas/execute.yaml"
     input_id = ExecuteInputData(variable="{input-id}", title="ExecuteInputValue",
                                 description="Received mapping input value definition during job submission.")
+
+
+class ExecuteInputMapValues(AnyOfKeywordSchema):
+    _any_of = [
+        ExecuteInputMapAdditionalProperties(),  # normal {"<input-id>": {...}}
+        EmptyMappingSchema(),                   # allows explicitly provided {}
+    ]
 
 
 class ExecuteInputValues(OneOfKeywordSchema):
@@ -2997,26 +3041,48 @@ class ExecuteInputOutputs(ExtendedMappingSchema):
     #   - 'tests.wps_restapi.test_providers.WpsRestApiProcessesTest.test_execute_process_no_error_not_required_params'
     #   - 'tests.wps_restapi.test_providers.WpsRestApiProcessesTest.test_get_provider_process_no_inputs'
     #   - 'tests.wps_restapi.test_colander_extras.test_oneof_variable_dict_or_list'
+    #
+    # OGC 'execute.yaml' also does not enforce any required item.
+    schema_ref = f"{OGC_API_SCHEMA_URL}/{OGC_API_SCHEMA_VERSION}/core/openapi/schemas/execute.yaml"
     inputs = ExecuteInputValues(default={}, description="Values submitted for execution.")
     outputs = ExecuteOutputSpec(
-        # FIXME: add documentation reference link OGC/Weaver for further details.
-        description="Defines which outputs to be obtained from the execution (filtered or all), "
-                    "as well as the reporting method for each output according to 'transmissionMode', "
-                    "the 'response' type, and the execution 'mode' provided.",
-        # FIXME: allow omitting 'outputs' (https://github.com/crim-ca/weaver/issues/375)
-        #        maybe this is good enough, but should have a proper test for it
-        # default={}
+        description=(
+            "Defines which outputs to be obtained from the execution (filtered or all), "
+            "as well as the reporting method for each output according to 'transmissionMode', "
+            "the 'response' type, and the execution 'mode' provided "
+            "(see for more details: https://pavics-weaver.readthedocs.io/en/latest/processes.html#execution-body)."
+        ),
+        default={}
     )
 
 
 class Execute(ExecuteInputOutputs):
-    mode = JobExecuteModeEnum()
+    mode = JobExecuteModeEnum(
+        missing=drop,
+        default=ExecuteMode.AUTO,
+        deprecated=True,
+        description=(
+            "Desired execution mode specified directly. This is intended for backward compatibility support. "
+            "To obtain more control over execution mode selection, employ the official Prefer header instead "
+            "(see for more details: https://pavics-weaver.readthedocs.io/en/latest/processes.html#execution-mode)."
+        ),
+        validator=OneOf(ExecuteMode.values())
+    )
+    response = JobResponseOptionsEnum(
+        missing=drop,
+        default=ExecuteResponse.DOCUMENT,
+        description=(
+            "Indicates the desired representation format of the response. "
+            "(see for more details: https://pavics-weaver.readthedocs.io/en/latest/processes.html#execution-body)."
+        ),
+        validator=OneOf(ExecuteResponse.values())
+    )
     notification_email = ExtendedSchemaNode(
         String(),
         missing=drop,
         validator=Email(),
-        description="Optionally send a notification email when the job is done.")
-    response = JobResponseOptionsEnum()
+        description="Optionally send a notification email when the job is done."
+    )
 
 
 class QuoteStatusSchema(ExtendedSchemaNode):
@@ -3665,8 +3731,7 @@ class Result(ExtendedMappingSchema):
     )
 
 
-class JobInputsBody(ExtendedMappingSchema):
-    inputs = ExecuteInputValues()
+class JobInputsBody(ExecuteInputOutputs):
     links = LinkList(missing=drop)
 
 
@@ -4289,14 +4354,45 @@ class NotImplementedPostProviderResponse(ExtendedMappingSchema):
     description = "Provider registration not supported using specified definition."
 
 
+class PreferenceAppliedHeader(ExtendedSchemaNode):
+    description = "Applied preferences from submitted 'Prefer' header after validation."
+    name = "Preference-Applied"
+    schema_type = String
+    example = "wait=10s, respond-async"
+
+
+class LocationHeader(URL):
+    name = "Location"
+
+
 class CreatedJobLocationHeader(ResponseHeaders):
-    Location = URL(description="Status monitoring location of the job execution.")
+    location = LocationHeader(description="Status monitoring location of the job execution.")
+    prefer_applied = PreferenceAppliedHeader(missing=drop)
 
 
 class CreatedLaunchJobResponse(ExtendedMappingSchema):
     description = "Job successfully submitted to processing queue. Execution should begin when resources are available."
     header = CreatedJobLocationHeader()
     body = CreatedJobStatusSchema()
+
+
+class CompletedJobLocationHeader(ResponseHeaders):
+    location = LocationHeader(description="Status location of the completed job execution.")
+    prefer_applied = PreferenceAppliedHeader(missing=drop)
+
+
+class CompletedJobStatusSchema(DescriptionSchema, JobStatusInfo):
+    pass
+
+
+class CompletedJobResponse(ExtendedMappingSchema):
+    description = "Job submitted and completed execution synchronously."
+    header = CompletedJobLocationHeader()
+    body = CompletedJobStatusSchema()
+
+
+class FailedSyncJobResponse(CompletedJobResponse):
+    description = "Job submitted and failed synchronous execution. See server logs for more details."
 
 
 class OkDeleteProcessJobResponse(ExtendedMappingSchema):
@@ -4375,6 +4471,21 @@ class RedirectResultResponse(ExtendedMappingSchema):
 class OkGetJobResultsResponse(ExtendedMappingSchema):
     header = ResponseHeaders()
     body = Result()
+
+
+class NoContentJobResultsHeaders(NoContent):
+    content_length = ContentLengthHeader(example="0")
+    link = LinkHeader(description=(
+        "Link to a result requested by reference output transmission. "
+        "Link relation indicates the result ID. "
+        "Additional parameters indicate expected content-type of the resource. "
+        "Literal data requested by reference are returned with contents dumped to plain text file."
+    ))
+
+
+class NoContentJobResultsResponse(ExtendedMappingSchema):
+    header = NoContentJobResultsHeaders()
+    body = NoContent(default="")
 
 
 class CreatedQuoteExecuteResponse(ExtendedMappingSchema):
@@ -4695,12 +4806,18 @@ post_provider_responses = {
     "501": NotImplementedPostProviderResponse(),
 }
 post_provider_process_job_responses = {
+    "200": CompletedJobResponse(description="success"),
     "201": CreatedLaunchJobResponse(description="success"),
+    "204": NoContentJobResultsResponse(description="success"),
+    "400": FailedSyncJobResponse(),
     "403": ForbiddenProviderAccessResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 post_process_jobs_responses = {
+    "200": CompletedJobResponse(description="success"),
     "201": CreatedLaunchJobResponse(description="success"),
+    "204": NoContentJobResultsResponse(description="success"),
+    "400": FailedSyncJobResponse(),
     "403": ForbiddenProviderAccessResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
@@ -4794,6 +4911,7 @@ get_job_results_responses = {
             "value": EXAMPLES["job_results.json"],
         }
     }),
+    "204": NoContentJobResultsResponse(description="success"),
     "400": InvalidJobResponseSchema(),
     "404": NotFoundJobResponseSchema(),
     "410": GoneJobResponseSchema(),

@@ -165,7 +165,10 @@ class OutputFormat(Constants):
                 xml = xml.strip()
             return xml
         if fmt in [OutputFormat.YML, OutputFormat.YAML]:
-            return yaml.safe_dump(data, indent=2, sort_keys=False)
+            yml = yaml.safe_dump(data, indent=2, sort_keys=False, width=float("inf"))
+            if yml.endswith("\n...\n"):  # added when data is single literal or None instead of list/object
+                yml = yml[:-4]
+            return yml
         return data
 
 

@@ -4,15 +4,16 @@ from time import sleep
 from typing import TYPE_CHECKING
 
 import colander
+from celery.exceptions import TimeoutError as CeleryTaskTimeoutError
 from celery.utils.log import get_task_logger
 from owslib.util import clean_ows_url
 from owslib.wps import ComplexDataInput
-from pyramid.httpexceptions import HTTPBadRequest, HTTPNotAcceptable, HTTPNotImplemented
+from pyramid.httpexceptions import HTTPBadRequest, HTTPNotAcceptable
 from pyramid_celery import celery_app as app
 
 from weaver.database import get_db
 from weaver.datatype import Process, Service
-from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
+from weaver.execute import ExecuteControlOption, ExecuteMode
 from weaver.formats import AcceptLanguage, ContentType
 from weaver.notify import encrypt_email, notify_job_complete
 from weaver.owsexceptions import OWSNoApplicableCode
@@ -21,8 +22,19 @@ from weaver.processes.constants import WPS_COMPLEX_DATA
 from weaver.processes.convert import get_field, ows2json_output_data
 from weaver.processes.types import ProcessType
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
-from weaver.store.base import StoreJobs
-from weaver.utils import get_any_id, get_any_value, get_registry, get_settings, now, raise_on_xml_exception, wait_secs
+from weaver.store.base import StoreJobs, StoreProcesses
+from weaver.utils import (
+    as_int,
+    get_any_id,
+    get_any_value,
+    get_header,
+    get_registry,
+    get_settings,
+    now,
+    parse_prefer_header_execute_mode,
+    raise_on_xml_exception,
+    wait_secs
+)
 from weaver.visibility import Visibility
 from weaver.wps.utils import (
     check_wps_status,
@@ -34,7 +46,7 @@ from weaver.wps.utils import (
     load_pywps_config
 )
 from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.utils import get_wps_restapi_base_url
+from weaver.wps_restapi.jobs.utils import get_job_results_response, get_job_submission_response
 
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
@@ -48,7 +60,7 @@ if TYPE_CHECKING:
     from weaver.datatype import Job
     from weaver.processes.convert import OWS_Input_Type, ProcessOWS
     from weaver.status import StatusType
-    from weaver.typedefs import HeadersType, HeaderCookiesType, JSON, SettingsType
+    from weaver.typedefs import AnyResponseType, CeleryResult, HeadersType, HeaderCookiesType, JSON, SettingsType
     from weaver.visibility import AnyVisibility
 
 
@@ -430,7 +442,7 @@ def map_locations(job, settings):
 
 
 def submit_job(request, reference, tags=None):
-    # type: (Request, Union[Service, Process], Optional[List[str]]) -> JSON
+    # type: (Request, Union[Service, Process], Optional[List[str]]) -> AnyResponseType
     """
     Generates the job submission from details retrieved in the request.
 
@@ -483,28 +495,7 @@ def submit_job(request, reference, tags=None):
     headers = dict(request.headers)
     settings = get_settings(request)
     return submit_job_handler(json_body, settings, service_url, provider_id, process_id, is_workflow, is_local,
-                              visibility, language=lang, auth=headers, tags=tags, user=user, context=context)
-
-
-# FIXME: this should not be necessary if schema validators correctly implement OneOf(values)
-def _validate_job_parameters(json_body):
-    # type: (JSON) -> None
-    """
-    Tests supported parameters not automatically validated by colander deserialize.
-    """
-    if json_body["mode"] not in [ExecuteMode.ASYNC, ExecuteMode.AUTO]:
-        raise HTTPNotImplemented(detail="Execution mode '{}' not supported.".format(json_body["mode"]))
-
-    if json_body["response"] != ExecuteResponse.DOCUMENT:
-        raise HTTPNotImplemented(detail="Execution response type '{}' not supported.".format(json_body["response"]))
-
-    outputs = json_body.get("outputs", [])
-    if isinstance(outputs, dict):
-        outputs = [dict(id=out, **keys) for out, keys in outputs.items()]
-    for job_output in outputs:
-        mode = job_output["transmissionMode"]
-        if mode not in ExecuteTransmissionMode.values():
-            raise HTTPNotImplemented(detail="Execute transmissionMode '{}' not supported.".format(mode))
+                              visibility, language=lang, headers=headers, tags=tags, user=user, context=context)
 
 
 def submit_job_handler(payload,             # type: JSON
@@ -516,11 +507,11 @@ def submit_job_handler(payload,             # type: JSON
                        is_local=True,       # type: bool
                        visibility=None,     # type: Optional[AnyVisibility]
                        language=None,       # type: Optional[str]
-                       auth=None,           # type: Optional[HeaderCookiesType]
+                       headers=None,        # type: Optional[HeaderCookiesType]
                        tags=None,           # type: Optional[List[str]]
                        user=None,           # type: Optional[int]
                        context=None,        # type: Optional[str]
-                       ):                   # type: (...) -> JSON
+                       ):                   # type: (...) -> AnyResponseType
     """
     Submits the job to the Celery worker with provided parameters.
 
@@ -531,39 +522,76 @@ def submit_job_handler(payload,             # type: JSON
     except colander.Invalid as ex:
         raise HTTPBadRequest("Invalid schema: [{}]".format(str(ex)))
 
-    # TODO: remove when all parameter variations are supported
-    # FIXME:
-    #   - support 'sync' and 'Prefer' header variants (https://github.com/crim-ca/weaver/issues/247)
-    #   - support 'response: raw' (https://github.com/crim-ca/weaver/issues/376)
-    #   - allow omitting 'outputs' (https://github.com/crim-ca/weaver/issues/375)
-    _validate_job_parameters(json_body)
+    db = get_db(settings)
+    headers = headers or {}
+    if is_local:
+        proc_store = db.get_store(StoreProcesses)
+        process = proc_store.fetch_by_id(process_id)
+        job_ctl_opts = process.jobControlOptions
+    else:
+        job_ctl_opts = ExecuteControlOption.values()
+    max_wait = as_int(settings.get("weaver.exec_sync_max_wait"), default=20)
+    mode, wait, applied = parse_prefer_header_execute_mode(headers, job_ctl_opts, max_wait)
+    get_header("prefer", headers, pop=True)
+    if not applied:  # whatever returned is a default, consider 'mode' in body as alternative
+        is_execute_async = ExecuteMode.get(json_body.get("mode")) != ExecuteMode.SYNC   # convert auto to async
+    else:
+        # as per https://datatracker.ietf.org/doc/html/rfc7240#section-2
+        # Prefer header not resolve as valid still proces
+        is_execute_async = mode != ExecuteMode.SYNC
+    exec_resp = json_body.get("response")
 
-    is_execute_async = ExecuteMode.get(json_body["mode"]) != ExecuteMode.SYNC   # convert auto to async
     notification_email = json_body.get("notification_email")
     encrypted_email = encrypt_email(notification_email, settings) if notification_email else None
 
-    store = get_db(settings).get_store(StoreJobs)
+    store = db.get_store(StoreJobs)  # type: StoreJobs
     job = store.save_job(task_id=Status.ACCEPTED, process=process_id, service=provider_id,
-                         inputs=json_body.get("inputs"), is_local=is_local, is_workflow=is_workflow,
-                         access=visibility, user_id=user, execute_async=is_execute_async, custom_tags=tags,
-                         notification_email=encrypted_email, accept_language=language, context=context)
+                         inputs=json_body.get("inputs"), outputs=json_body.get("outputs"),
+                         is_local=is_local, is_workflow=is_workflow, access=visibility, user_id=user, context=context,
+                         execute_async=is_execute_async, execute_response=exec_resp,
+                         custom_tags=tags, notification_email=encrypted_email, accept_language=language)
     job.save_log(logger=LOGGER, message="Job task submitted for execution.", status=Status.ACCEPTED, progress=0)
     job = store.update_job(job)
-    result = execute_process.delay(job_id=job.id, wps_url=clean_ows_url(service_url), headers=auth)
-    LOGGER.debug("Celery pending task [%s] for job [%s].", result.id, job.id)
+    location_url = job.status_url(settings)
+    resp_headers = {"Location": location_url}
+    resp_headers.update(applied)
 
-    # local/provider process location
-    location_base = "/providers/{provider_id}".format(provider_id=provider_id) if provider_id else ""
-    location = "{base_url}{location_base}/processes/{process_id}/jobs/{job_id}".format(
-        base_url=get_wps_restapi_base_url(settings),
-        location_base=location_base,
-        process_id=process_id,
-        job_id=job.id)
-    body_data = {
+    wps_url = clean_ows_url(service_url)
+    result = execute_process.delay(job_id=job.id, wps_url=wps_url, headers=headers)  # type: CeleryResult
+    LOGGER.debug("Celery pending task [%s] for job [%s].", result.id, job.id)
+    if not is_execute_async:
+        LOGGER.debug("Celery task requested as sync if it completes before (wait=%ss)", wait)
+        try:
+            result.wait(timeout=wait)
+        except CeleryTaskTimeoutError:
+            pass
+        if result.ready():
+            job = store.fetch_by_id(job.id)
+            # when sync is successful, it must return the results direct instead of status info
+            # see: https://docs.ogc.org/is/18-062r2/18-062r2.html#sc_execute_response
+            if job.status == Status.SUCCEEDED:
+                return get_job_results_response(job, settings, headers=resp_headers)
+            # otherwise return the error status
+            body = job.json(container=settings, self_link="status")
+            body["location"] = location_url
+            resp = get_job_submission_response(body, resp_headers, error=True)
+            return resp
+        else:
+            LOGGER.debug("Celery task requested as sync took too long to complete (wait=%ss). Continue in async.", wait)
+            # sync not respected, therefore must drop it
+            # since both could be provided as alternative preferences, drop only async with limited subset
+            prefer = get_header("Preference-Applied", headers, pop=True)
+            _, _, async_applied = parse_prefer_header_execute_mode({"Prefer": prefer}, [ExecuteMode.ASYNC])
+            if async_applied:
+                resp_headers.update(async_applied)
+
+    LOGGER.debug("Celery task submitted to run async.")
+    body = {
         "jobID": job.id,
         "processID": job.process,
         "providerID": provider_id,  # dropped by validator if not applicable
         "status": map_status(Status.ACCEPTED),
-        "location": location
+        "location": location_url
     }
-    return body_data
+    resp = get_job_submission_response(body, resp_headers)
+    return resp

@@ -56,6 +56,10 @@
 .. _ogc-home: `ogc`_
 .. |ogc-proc-api| replace:: OGC API - Processes
 .. _ogc-proc-api: https://github.com/opengeospatial/ogcapi-processes
+.. |ogc-exec-sync-responses| replace:: OGC API - Processes, Responses (sync)
+.. _ogc-exec-sync-responses: https://docs.ogc.org/is/18-062r2/18-062r2.html#sc_execute_response
+.. |ogc-exec-async-responses| replace:: OGC API - Processes, Responses (async)
+.. _ogc-exec-async-responses: https://docs.ogc.org/is/18-062r2/18-062r2.html#_response_7
 .. |pywps| replace:: PyWPS
 .. _pywps: https://github.com/geopython/pywps/
 .. |pywps-status| replace:: Progress and Status Report
@@ -135,8 +139,12 @@
 .. _status-req-name: `status-req`_
 .. |status-req| replace:: ``GET {WEAVER_URL}/processes/{id}/jobs/{id}`` (GetStatus)
 .. _status-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Status%2Fpaths%2F~1processes~1{process_id}~1jobs~1{job_id}%2Fget
-.. |result-req| replace:: ``GET {WEAVER_URL}/processes/{id}/jobs/{id}/result`` (GetResult)
-.. _result-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Results%2Fpaths%2F~1processes~1%7Bprocess_id%7D~1jobs~1%7Bjob_id%7D~1result%2Fget
+.. |inputs-req| replace:: ``GET {WEAVER_URL}/jobs/{id}/inputs`` (Inputs)
+.. _inputs-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/inputs/paths/~1jobs~1{job_id}~1inputs/get
+.. |outputs-req| replace:: ``GET {WEAVER_URL}/jobs/{id}/outputs`` (Outputs)
+.. _outputs-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/outputs/paths/~1jobs~1{job_id}~1outputs/get
+.. |results-req| replace:: ``GET {WEAVER_URL}/jobs/{id}/results`` (Results)
+.. _results-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Results/paths/~1jobs~1{job_id}~1results/get
 .. |update-token-req| replace:: Update Token
 .. _update-token-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/UpdateToken/paths/~1processes~1{process_id}/put
 .. |vault-upload-req| replace:: Vault File Upload (POST)

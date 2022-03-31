@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 import yaml
+from webob.headers import ResponseHeaders
 from yaml.scanner import ScannerError
 
 from weaver import __meta__
@@ -35,6 +36,7 @@ from weaver.utils import (
     get_file_headers,
     load_file,
     null,
+    parse_kvp,
     request_extra,
     setup_loggers
 )
@@ -42,16 +44,17 @@ from weaver.visibility import Visibility
 from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Optional, Tuple, Union
+    from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
     from requests import Response
 
     # avoid failing sphinx-argparse documentation
     # https://github.com/ashb/sphinx-argparse/issues/7
     try:
-        from weaver.typedefs import CWL, JSON, ExecutionInputsMap, HeadersType
+        from weaver.typedefs import AnyHeadersContainer, CWL, JSON, ExecutionInputsMap, ExecutionResults, HeadersType
     except ImportError:
-        CWL = JSON = ExecutionInputsMap = HeadersType = Any  # avoid linter issue
+        # avoid linter issue
+        AnyHeadersContainer = CWL = JSON = ExecutionInputsMap = ExecutionResults = HeadersType = Any
     try:
         from weaver.formats import AnyOutputFormat
         from weaver.processes.constants import ProcessSchemaType
@@ -80,7 +83,7 @@ class OperationResult(AutoBase):
     """
     success = False     # type: Optional[bool]
     message = ""        # type: Optional[str]
-    headers = {}        # type: Optional[HeadersType]
+    headers = {}        # type: Optional[AnyHeadersContainer]
     body = {}           # type: Optional[Union[JSON, str]]
     code = None         # type: Optional[int]
 
@@ -88,7 +91,7 @@ class OperationResult(AutoBase):
                  success=None,  # type: Optional[bool]
                  message=None,  # type: Optional[str]
                  body=None,     # type: Optional[Union[str, JSON]]
-                 headers=None,  # type: Optional[HeadersType]
+                 headers=None,  # type: Optional[AnyHeadersContainer]
                  text=None,     # type: Optional[str]
                  code=None,     # type: Optional[int]
                  **kwargs,      # type: Any
@@ -96,7 +99,7 @@ class OperationResult(AutoBase):
         super(OperationResult, self).__init__(**kwargs)
         self.success = success
         self.message = message
-        self.headers = headers
+        self.headers = ResponseHeaders(headers) if headers is not None else None
         self.body = body
         self.text = text
         self.code = code
@@ -122,6 +125,28 @@ class OperationResult(AutoBase):
     def text(self, text):
         # type: (str) -> None
         self["text"] = text
+
+    def links(self, header_names=None):
+        # type: (Optional[List[str]]) -> ResponseHeaders
+        """
+        Obtain HTTP headers sorted in the result that corresponds to any link reference.
+
+        :param header_names:
+            Limit link names to be considered.
+            By default, considered headers are ``Link``, ``Content-Location`` and ``Location``.
+        """
+        if not self.headers:
+            return ResponseHeaders([])
+        if not isinstance(self.headers, ResponseHeaders):
+            self.headers = ResponseHeaders(self.headers)
+        if not header_names:
+            header_names = ["Link", "Content-Location", "Location"]
+        header_names = [hdr.lower() for hdr in header_names]
+        link_headers = ResponseHeaders()
+        for hdr_n, hdr_v in self.headers.items():
+            if hdr_n.lower() in header_names:
+                link_headers.add(hdr_n, hdr_v)
+        return link_headers
 
 
 class WeaverClient(object):
@@ -164,7 +189,7 @@ class WeaverClient(object):
         return parsed_url.rsplit("/", 1)[0] if parsed_url.endswith("/") else parsed_url
 
     @staticmethod
-    def _parse_result(response,             # type: Response
+    def _parse_result(response,             # type: Union[Response, OperationResult]
                       body=None,            # type: Optional[JSON]  # override response body
                       message=None,         # type: Optional[str]   # override message/description in contents
                       success=None,         # type: Optional[bool]  # override resolved success
@@ -173,33 +198,44 @@ class WeaverClient(object):
                       nested_links=None,    # type: Optional[str]
                       output_format=None,   # type: Optional[AnyOutputFormat]
                       ):                    # type: (...) -> OperationResult
-        hdr = dict(response.headers)
+        # multi-header of same name, for example to support many Link
+        headers = ResponseHeaders(response.headers)
+        code = getattr(response, "status_code", None) or getattr(response, "code", None)
         _success = False
         try:
-            body = body or response.json()
-            if not show_links:
-                if nested_links:
-                    nested = body.get(nested_links, [])
-                    if isinstance(nested, list):
-                        for item in nested:
-                            item.pop("links", None)
-                body.pop("links", None)
-            msg = message or body.get("description", body.get("message", "undefined"))
-            if response.status_code >= 400:
-                if not msg:
+            msg = None
+            ctype = headers.get("Content-Type")
+            content = getattr(response, "content", None) or getattr(response, "body", None)
+            if not body and content and ctype and ContentType.APP_JSON in ctype and hasattr(response, "json"):
+                body = response.json()
+            if isinstance(body, dict):
+                if not show_links:
+                    if nested_links:
+                        nested = body.get(nested_links, [])
+                        if isinstance(nested, list):
+                            for item in nested:
+                                item.pop("links", None)
+                    body.pop("links", None)
+                msg = body.get("description", body.get("message", "undefined"))
+            if code >= 400:
+                if not msg and isinstance(body, dict):
                     msg = body.get("error", body.get("exception", "unknown"))
             else:
                 _success = True
+            msg = message or getattr(response, "message", None) or msg or "undefined"
             text = OutputFormat.convert(body, output_format or OutputFormat.JSON_STR, item_root="result")
-        except Exception:  # noqa
-            text = body = response.text
+        except Exception as exc:  # noqa
             msg = "Could not parse body."
+            text = body = response.text
+            LOGGER.warning(msg, exc_info=exc)
         if show_headers:
-            s_hdr = OutputFormat.convert({"Headers": hdr}, OutputFormat.YAML)
-            text = f"{s_hdr}---\n{text}"
+            # convert potential multi-equal-key headers into a JSON/YAML serializable format
+            hdr_l = [{hdr_name: hdr_val} for hdr_name, hdr_val in sorted(headers.items())]
+            hdr_s = OutputFormat.convert({"Headers": hdr_l}, OutputFormat.YAML)
+            text = f"{hdr_s}---\n{text}"
         if success is not None:
             _success = success
-        return OperationResult(_success, msg, body, hdr, text=text, code=response.status_code)
+        return OperationResult(_success, msg, body, headers, text=text, code=code)
 
     @staticmethod
     def _parse_deploy_body(body, process_id):
@@ -548,10 +584,6 @@ class WeaverClient(object):
             auth_headers = {sd.XAuthVaultFileHeader.name: multi_tokens}
         return update_inputs, auth_headers
 
-    # FIXME: support sync (https://github.com/crim-ca/weaver/issues/247)
-    # :param execute_async:
-    #   Execute the process asynchronously (user must call :meth:`monitor` themselves,
-    #   or synchronously where monitoring is done automatically until completion before returning.
     def execute(self,
                 process_id,             # type: str
                 inputs=None,            # type: Optional[Union[str, JSON]]
@@ -562,6 +594,7 @@ class WeaverClient(object):
                 show_links=True,        # type: bool
                 show_headers=False,     # type: bool
                 output_format=None,     # type: Optional[AnyOutputFormat]
+                output_refs=None,       # type: Optional[Iterable[str]]
                 ):                      # type: (...) -> OperationResult
         """
         Execute a :term:`Job` for the specified :term:`Process` with provided inputs.
@@ -576,6 +609,12 @@ class WeaverClient(object):
 
         .. seealso::
             :ref:`proc_op_execute`
+
+        .. note::
+            Execution requests are always accomplished asynchronously. To obtain the final :term:`Job` status as if
+            they were executed synchronously, provide the :paramref:`monitor` argument. This offers more flexibility
+            over servers that could decide to ignore sync/async preferences, and avoids closing/timeout connection
+            errors that could occur for long running processes, since status is pooled iteratively rather than waiting.
 
         :param process_id: Identifier of the process to execute.
         :param inputs:
@@ -592,6 +631,12 @@ class WeaverClient(object):
         :param show_links: Indicate if ``links`` section should be preserved in returned result body.
         :param show_headers: Indicate if response headers should be returned in result output.
         :param output_format: Select an alternate output representation of the result body contents.
+        :param output_refs:
+            Indicates which outputs by ID to be returned as HTTP Link header reference instead of body content value.
+            With reference transmission mode, outputs that contain literal data will be linked by ``text/plain`` file
+            containing the data. outputs that refer to a file reference will simply contain that URL reference as link.
+            With value transmission mode (default behavior when outputs are not specified in this list), outputs are
+            returned as direct values (literal or href) within the response content body.
         :returns: Results of the operation.
         """
         if isinstance(inputs, list) and all(isinstance(item, list) for item in inputs):
@@ -605,29 +650,35 @@ class WeaverClient(object):
             return result
         values, auth_headers = result
         data = {
-            # NOTE: since sync is not yet properly implemented in Weaver, simulate with monitoring after if requested
-            # FIXME: support 'sync' (https://github.com/crim-ca/weaver/issues/247)
+            # NOTE: Backward compatibility for servers that only know ``mode`` and don't handle ``Prefer`` header.
             "mode": ExecuteMode.ASYNC,
             "inputs": values,
-            # FIXME: support 'response: raw' (https://github.com/crim-ca/weaver/issues/376)
             "response": ExecuteResponse.DOCUMENT,
-            # FIXME: allow omitting 'outputs' (https://github.com/crim-ca/weaver/issues/375)
-            # FIXME: allow 'transmissionMode: value/reference' selection (https://github.com/crim-ca/weaver/issues/377)
+            # FIXME: allow filtering 'outputs' (https://github.com/crim-ca/weaver/issues/380)
             "outputs": {}
         }
-        # FIXME: since (https://github.com/crim-ca/weaver/issues/375) not implemented, auto-populate all the outputs
         result = self.describe(process_id, url=base)
         if not result.success:
             return OperationResult(False, "Could not obtain process description for execution.",
                                    body=result.body, headers=result.headers, code=result.code, text=result.text)
         outputs = result.body.get("outputs")
+        output_refs = set(output_refs or [])
         for output_id in outputs:
-            # use 'value' to have all outputs reported in body as 'value/href' rather than 'Link' headers
-            data["outputs"][output_id] = {"transmissionMode": ExecuteTransmissionMode.VALUE}
+            if output_id in output_refs:
+                # If any 'reference' is requested explicitly, must switch to 'response=raw'
+                # since 'response=document' ignores 'transmissionMode' definitions.
+                data["response"] = ExecuteResponse.RAW
+                # Use 'value' to have all outputs reported in body as 'value/href' rather than 'Link' headers.
+                out_mode = ExecuteTransmissionMode.REFERENCE
+            else:
+                # make sure to set value to outputs not requested as reference in case another one needs reference
+                # mode doesn't matter if no output by reference requested since 'response=document' would be used
+                out_mode = ExecuteTransmissionMode.VALUE
+            data["outputs"][output_id] = {"transmissionMode": out_mode}
 
         LOGGER.info("Executing [%s] with inputs:\n%s", process_id, OutputFormat.convert(values, OutputFormat.JSON_STR))
         path = f"{base}/processes/{process_id}/execution"  # use OGC-API compliant endpoint (not '/jobs')
-        headers = {}
+        headers = {"Prefer": "respond-async"}  # for more recent servers, OGC-API compliant async request
         headers.update(self._headers)
         headers.update(auth_headers)
         resp = request_extra("POST", path, json=data, headers=headers, settings=self._settings)
@@ -809,6 +860,65 @@ class WeaverClient(object):
             once = False
         return OperationResult(False, f"Monitoring timeout reached ({timeout}s). Job did not complete in time.")
 
+    def _download_references(self, outputs, out_links, out_dir, job_id):
+        # type: (ExecutionResults, AnyHeadersContainer, str, str) -> ExecutionResults
+        """
+        Download file references from results response contents and link headers.
+
+        Downloaded files extend the results contents with ``path`` and ``source`` fields to indicate where the
+        retrieved files have been saved and where they came from. When files are found by HTTP header links, they
+        are added to the output contents to generate a combined representation in the operation result.
+        """
+        if not isinstance(outputs, dict):
+            # default if links-only needed later (insert as content for printed output)
+            outputs = {}  # type: ExecutionResults
+
+        # download file results
+        if not (any("href" in value for value in outputs.values()) or len(out_links)):
+            return OperationResult(False, "Outputs were found but none are downloadable (only raw values?).", outputs)
+        if not out_dir:
+            out_dir = os.path.join(os.path.realpath(os.path.curdir), job_id)
+        os.makedirs(out_dir, exist_ok=True)
+        LOGGER.info("Will store job [%s] output results in [%s]", job_id, out_dir)
+
+        # download outputs from body content
+        LOGGER.debug("%s outputs in results content.", "Processing" if len(outputs) else "No")
+        for output, value in outputs.items():
+            is_list = True
+            if not isinstance(value, list):
+                value = [value]
+                is_list = False
+            for i, item in enumerate(value):
+                if "href" in item:
+                    file_path = fetch_file(item["href"], out_dir, link=False)
+                    if is_list:
+                        outputs[output][i]["path"] = file_path
+                        outputs[output][i]["source"] = "body"
+                    else:
+                        outputs[output]["path"] = file_path
+                        outputs[output]["source"] = "body"
+
+        # download links from headers
+        LOGGER.debug("%s outputs in results link headers.", "Processing" if len(out_links) else "No")
+        for _, link_header in ResponseHeaders(out_links).items():
+            link, params = link_header.split(";", 1)
+            href = link.strip("<>")
+            params = parse_kvp(params, multi_value_sep=None, accumulate_keys=False)
+            ctype = (params.get("type") or [None])[0]
+            rel = params["rel"][0].split(".")
+            output = rel[0]
+            is_array = len(rel) > 1 and str.isnumeric(rel[1])
+            file_path = fetch_file(href, out_dir, link=False)
+            value = {"href": href, "type": ctype, "path": file_path, "source": "link"}
+            if output in outputs:
+                if isinstance(outputs[output], dict):  # in case 'rel="<output>.<index"' was not employed
+                    outputs[output] = [outputs[output], value]
+                else:
+                    outputs[output].append(value)
+            else:
+                outputs[output] = [value] if is_array else value
+        return outputs
+
     def results(self,
                 job_reference,          # type: str
                 out_dir=None,           # type: Optional[str]
@@ -841,32 +951,20 @@ class WeaverClient(object):
         resp = request_extra("GET", result_url, headers=self._headers, settings=self._settings)
         res_out = self._parse_result(resp, output_format=output_format,
                                      show_links=show_links, show_headers=show_headers)
-        outputs = res_out.body
-        if not res_out.success or not isinstance(res_out.body, dict):
-            return OperationResult(False, "Could not retrieve any output results from job.", outputs)
-        if not download:
-            return OperationResult(True, "Listing job results.", outputs)
 
-        # download file results
-        if not any("href" in value for value in outputs.values()):
-            return OperationResult(False, "Outputs were found but none are downloadable (only raw values?).", outputs)
-        if not out_dir:
-            out_dir = os.path.join(os.path.realpath(os.path.curdir), job_id)
-        os.makedirs(out_dir, exist_ok=True)
-        LOGGER.info("Will store job [%s] output results in [%s]", job_id, out_dir)
-        for output, value in outputs.items():
-            is_list = True
-            if not isinstance(value, list):
-                value = [value]
-                is_list = False
-            for i, item in enumerate(value):
-                if "href" in item:
-                    file_path = fetch_file(item["href"], out_dir, link=False)
-                    if is_list:
-                        outputs[output][i]["path"] = file_path
-                    else:
-                        outputs[output]["path"] = file_path
-        return OperationResult(True, "Retrieved job results.", outputs)
+        outputs = res_out.body
+        headers = res_out.headers
+        out_links = res_out.links(["Link"])
+        if not res_out.success or not (isinstance(res_out.body, dict) or len(out_links)):
+            return OperationResult(False, "Could not retrieve any output results from job.", outputs, headers)
+        if not download:
+            res_out.message = "Listing job results."
+            return res_out
+        outputs = self._download_references(outputs, out_links, out_dir, job_id)
+        # rebuild result with modified outputs that contains downloaded paths
+        result = OperationResult(True, "Retrieved job results.", outputs, headers, code=200)
+        return self._parse_result(result, body=outputs, output_format=output_format,
+                                  show_links=show_links, show_headers=show_headers)
 
     def dismiss(self, job_reference, url=None, show_links=True, show_headers=False, output_format=None):
         # type: (str, Optional[str], bool, bool, Optional[AnyOutputFormat]) -> OperationResult
@@ -1216,11 +1314,29 @@ def make_parser():
             Example: ``-I message='Hello Weaver' -I value:int=1234``
         """)
     )
-    # FIXME: support sync (https://github.com/crim-ca/weaver/issues/247)
+    # FIXME: allow filtering 'outputs' (https://github.com/crim-ca/weaver/issues/380)
+    #   Only specified ones are returned, if none specified, return all.
     # op_execute.add_argument(
-    #     "-A", "--async", dest="execute_async",
-    #     help=""
-    # )
+    #    "-O", "--output",
+    op_execute.add_argument(
+        "-R", "--ref", "--reference", metavar="REFERENCE", dest="output_refs", action="append",
+        help=inspect.cleandoc("""
+            Indicates which outputs by ID to be returned as HTTP Link header reference instead of body content value.
+            This defines the output transmission mode when submitting the execution request.
+
+            With reference transmission mode,
+            outputs that contain literal data will be linked by ``text/plain`` file containing the data.
+            Outputs that refer to a file reference will simply contain that URL reference as link.
+
+            With value transmission mode (default behavior when outputs are not specified in this list), outputs are
+            returned as direct values (literal or href) within the response content body.
+
+            When requesting any output to be returned by reference, option ``-H/--headers`` should be considered as
+            well to return the provided ``Link`` headers for these outputs on the command line.
+
+            Example: ``-R output-one -R output-two``
+        """)
+    )
     op_execute.add_argument(
         "-M", "--monitor", dest="monitor", action="store_true",
         help="Automatically perform the monitoring operation following job submission to retrieve final results. "
@@ -1293,7 +1409,7 @@ def make_parser():
     op_results = WeaverArgumentParser(
         "results",
         description=(
-            "Obtain the output results description of a job. "
+            "Obtain the output results from a job successfully executed. "
             "This operation can also download them from the remote server if requested."
         ),
         formatter_class=ParagraphFormatter,

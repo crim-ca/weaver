@@ -24,6 +24,7 @@ if TYPE_CHECKING:
         FileSystemPathType = str
 
     from celery.app import Celery
+    from celery.result import AsyncResult, EagerResult, GroupResult, ResultSet
     from owslib.wps import BoundingBoxDataInput, ComplexDataInput, Process as ProcessOWS, WPSExecution
     from pyramid.httpexceptions import HTTPSuccessful, HTTPRedirection
     from pyramid.registry import Registry
@@ -290,6 +291,24 @@ if TYPE_CHECKING:
     ExecutionInputsList = List[JobValueItem]        # when schema='weaver.processes.constants.ProcessSchema.OLD'
     ExecutionInputs = Union[ExecutionInputsList, ExecutionInputsMap]
 
+    ExecutionOutputObject = TypedDict("ExecutionOutputObject", {
+        "transmissionMode": str
+    }, total=False)
+    ExecutionOutputItem = TypedDict("ExecutionOutputItem", {
+        "id": str,
+        "transmissionMode": str
+    }, total=False)
+    ExecutionOutputsList = List[ExecutionOutputItem]
+    ExecutionOutputsMap = Dict[str, ExecutionOutputObject]
+    ExecutionOutputs = Union[ExecutionOutputsList, ExecutionOutputsMap]
+    ExecutionResultObject = TypedDict("ExecutionResultObject", {
+        "value": Optional[AnyValueType],
+        "href": Optional[str],
+        "type": Optional[str],
+    }, total=False)
+    ExecutionResultArray = List[ExecutionResultObject]
+    ExecutionResults = Dict[str, Union[ExecutionResultObject, ExecutionResultArray]]
+
     # reference employed as 'JobMonitorReference' by 'WPS1Process'
     JobExecution = TypedDict("JobExecution", {"execution": WPSExecution})
 
@@ -298,3 +317,5 @@ if TYPE_CHECKING:
         "inputs": JobInputs,
         "outputs": JobOutputs,
     })
+
+    CeleryResult = Union[AsyncResult, EagerResult, GroupResult, ResultSet]

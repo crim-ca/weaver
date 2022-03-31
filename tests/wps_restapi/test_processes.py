@@ -136,7 +136,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             ],
             "outputs": [
                 {"id": "test_output",
-                 "transmissionMode": ExecuteTransmissionMode.REFERENCE}
+                 "transmissionMode": ExecuteTransmissionMode.VALUE}
             ],
             "mode": ExecuteMode.ASYNC,
             "response": ExecuteResponse.DOCUMENT,
@@ -1004,28 +1004,52 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert resp.content_type == ContentType.APP_JSON
 
     def test_execute_process_missing_required_params(self):
+        """
+        Validate execution against missing parameters.
+
+        .. versionchanged:: 4.15.0
+            Multiple parameters are not **required** anymore because the alternative with ``Prefer`` header
+            for :term:`OGC API - Processes` compliance is permitted. When the values are specified through,
+            they should still be validated to provide relevant error details to the user.
+        """
         execute_data = self.get_process_execute_template(fully_qualified_name(self))
 
         # remove components for testing different cases
-        execute_data_tests = [deepcopy(execute_data) for _ in range(7)]
-        execute_data_tests[0].pop("outputs")
-        execute_data_tests[1].pop("mode")
-        execute_data_tests[2].pop("response")
-        execute_data_tests[3]["mode"] = "random"
-        execute_data_tests[4]["response"] = "random"
-        execute_data_tests[5]["inputs"] = [{"test_input": "test_value"}]  # noqa  # bad format on purpose
-        execute_data_tests[6]["outputs"] = [{"id": "test_output", "transmissionMode": "random"}]
+        execute_data_tests = [[True, deepcopy(execute_data)] for _ in range(7)]
+        execute_data_tests[0][0] = False
+        execute_data_tests[0][1].pop("outputs")
+        execute_data_tests[1][0] = False
+        execute_data_tests[1][1].pop("mode")
+        execute_data_tests[2][0] = False
+        execute_data_tests[2][1].pop("response")
+        execute_data_tests[3][1]["mode"] = "random"
+        execute_data_tests[4][1]["response"] = "random"
+        execute_data_tests[5][1]["inputs"] = [{"test_input": "test_value"}]  # noqa  # bad format on purpose
+        execute_data_tests[6][1]["outputs"] = [{"id": "test_output", "transmissionMode": "random"}]
+
+        def no_op(*_, **__):
+            return Status.SUCCEEDED
 
         path = "/processes/{}/jobs".format(self.process_public.identifier)
-        for i, exec_data in enumerate(execute_data_tests):
-            data_json = json.dumps(exec_data, indent=2)
-            with stopit.ThreadingTimeout(3) as timeout:  # timeout to kill execution if schema validation did not raise
-                resp = self.app.post_json(path, params=exec_data, headers=self.json_headers, expect_errors=True)
-                msg = "Failed with test variation '{}' with status '{}' using:\n{}"
-                assert resp.status_code in [400, 422], msg.format(i, resp.status_code, data_json)
-                assert resp.content_type == ContentType.APP_JSON, msg.format(i, resp.content_type)
-            msg = "Killed test '{}' request taking too long using:\n{}".format(i, data_json)
-            assert timeout.state == timeout.EXECUTED, msg
+        with contextlib.ExitStack() as stack_exec:
+            for mock_exec in mocked_execute_celery(func_execute_task=no_op):
+                stack_exec.enter_context(mock_exec)
+            for i, (is_invalid, exec_data) in enumerate(execute_data_tests):
+                data_json = json.dumps(exec_data, indent=2)
+                try:
+                    # timeout to kill execution if schema validation did not raise
+                    with stopit.ThreadingTimeout(3) as timeout:
+                        resp = self.app.post_json(path, params=exec_data, headers=self.json_headers, expect_errors=True)
+                        msg = "Failed with test variation '{}' with status '{}' using:\n{}"
+                        code = [400, 422] if is_invalid else [201]
+                        assert resp.status_code in code, msg.format(i, resp.status_code, data_json)
+                        assert resp.content_type == ContentType.APP_JSON, msg.format(i, resp.content_type)
+                except stopit.TimeoutException:
+                    # if required, not normal to have passed validation
+                    # if optional, valid since omitting field does not raise missing field in schema
+                    if is_invalid:
+                        msg = "Killed test '{}' request taking too long using:\n{}".format(i, data_json)
+                        assert timeout.state == timeout.EXECUTED, msg
 
     def test_execute_process_dont_cast_one_of(self):
         """

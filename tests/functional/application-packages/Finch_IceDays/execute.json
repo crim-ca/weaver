@@ -14,7 +14,7 @@
   "outputs": [
     {
       "id": "output_netcdf",
-      "transmissionMode": "reference"
+      "transmissionMode": "value"
     }
   ]
 }

@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 from weaver.base import Constants
 
 
-class JobOutputsSchema(Constants):
+class JobInputsOutputsSchema(Constants):
     """
     Schema selector to represent a :term:`Job` output results.
     """
@@ -16,9 +16,9 @@ class JobOutputsSchema(Constants):
 if TYPE_CHECKING:
     from weaver.typedefs import Literal
 
-    JobOutputsSchemaType = Literal[
-        JobOutputsSchema.OGC_STRICT,
-        JobOutputsSchema.OLD_STRICT,
-        JobOutputsSchema.OGC,
-        JobOutputsSchema.OLD
+    JobInputsOutputsSchemaType = Literal[
+        JobInputsOutputsSchema.OGC_STRICT,
+        JobInputsOutputsSchema.OLD_STRICT,
+        JobInputsOutputsSchema.OGC,
+        JobInputsOutputsSchema.OLD
     ]

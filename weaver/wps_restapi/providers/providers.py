@@ -17,8 +17,6 @@ from weaver.datatype import Process, Service
 from weaver.exceptions import ServiceNotFound, ServiceParsingError, log_unhandled_exceptions
 from weaver.formats import OutputFormat
 from weaver.owsexceptions import OWSMissingParameterValue, OWSNotImplemented
-from weaver.processes.execution import submit_job
-from weaver.processes.utils import get_job_submission_response
 from weaver.store.base import StoreServices
 from weaver.utils import get_any_id, get_settings
 from weaver.wps.utils import get_wps_client
@@ -212,8 +210,9 @@ def submit_provider_job(request):
     """
     Execute a remote provider process.
     """
+    from weaver.processes.execution import submit_job  # isort:skip # noqa: E402 # pylint: disable=C0413
+
     store = get_db(request).get_store(StoreServices)
     provider_id = request.matchdict.get("provider_id")
     service = store.fetch_by_name(provider_id)
-    body = submit_job(request, service, tags=["wps-rest"])
-    return get_job_submission_response(body)
+    return submit_job(request, service, tags=["wps-rest"])

@@ -241,7 +241,7 @@ class Wps3Process(WpsProcessInterface):
     def format_outputs(self, workflow_outputs):
         # type: (JobOutputs) -> JobOutputs
         for output in workflow_outputs:
-            output.update({"transmissionMode": ExecuteTransmissionMode.REFERENCE})
+            output.update({"transmissionMode": ExecuteTransmissionMode.VALUE})
         return workflow_outputs
 
     def dispatch(self, process_inputs, process_outputs):

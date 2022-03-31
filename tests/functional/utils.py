@@ -284,7 +284,7 @@ class WpsConfigBase(unittest.TestCase):
         if return_status or expect_failed:
             return resp.json
         resp = self.app.get("{}/results".format(status_url), headers=self.json_headers)
-        assert resp.status_code == 200, "Error job info:\n{}".format(resp.json)
+        assert resp.status_code == 200, "Error job info:\n{}".format(resp.text)
         return resp.json
 
     def get_outputs(self, status_url):

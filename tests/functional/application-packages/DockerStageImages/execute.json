@@ -10,7 +10,7 @@
     "outputs": [
         {
             "id": "staging_output",
-            "transmissionMode": "reference"
+            "transmissionMode": "value"
         }
     ]
 }

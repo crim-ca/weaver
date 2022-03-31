@@ -47,18 +47,21 @@ def test_package_encode_decode():
 
 
 def test_process_job_control_options_resolution():
-    # invalid or matching default mode should be corrected to default async list
-    for test_process in [
+    # invalid or matching default mode should be corrected to default modes list
+    for i, test_process in enumerate([
         Process(id="test-{}".format(uuid.uuid4()), package={}, jobControlOptions=None),
         Process(id="test-{}".format(uuid.uuid4()), package={}, jobControlOptions=[None]),
         Process(id="test-{}".format(uuid.uuid4()), package={}, jobControlOptions=[]),
-        Process(id="test-{}".format(uuid.uuid4()), package={}, jobControlOptions=[ExecuteControlOption.ASYNC]),
-    ]:
-        assert test_process.jobControlOptions == [ExecuteControlOption.ASYNC]
+    ]):
+        assert test_process.jobControlOptions == [ExecuteControlOption.ASYNC], f"Test {i}"
+    # explicitly provided modes are used as is, especially if partial (allow disabling some modes)
+    proc = Process(id="test-{}".format(uuid.uuid4()), package={}, jobControlOptions=[ExecuteControlOption.ASYNC])
+    assert proc.jobControlOptions == [ExecuteControlOption.ASYNC]
     # other valid definitions should be preserved as is
     proc = Process(id="test-{}".format(uuid.uuid4()), package={},
                    jobControlOptions=[ExecuteControlOption.SYNC])
     assert proc.jobControlOptions == [ExecuteControlOption.SYNC]
+    # See ordering note in 'jobControlOptions' property
     proc = Process(id="test-{}".format(uuid.uuid4()), package={},
                    jobControlOptions=[ExecuteControlOption.SYNC, ExecuteControlOption.ASYNC])
     assert proc.jobControlOptions == [ExecuteControlOption.SYNC, ExecuteControlOption.ASYNC]

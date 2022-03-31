@@ -67,6 +67,13 @@ weaver.ssl_verify = true
 # see 'requests_options.yml.example'
 weaver.request_options =
 
+# --- Weaver Execution settings ---
+
+# maximum wait time allowed for Prefer header to run Job/Quote synchronously
+# over this limit, they will automatically fallback to asynchronous execution/estimation
+weaver.exec_sync_max_wait = 20
+weaver.quote_sync_max_wait = 20
+
 # --- Weaver CWL settings ---
 # NOTE: [experimental]
 # enforce provided effective user/group identifiers for Application Package execution
@@ -147,6 +154,15 @@ weaver.vault_dir = /tmp/vault
 [celery]
 #USE_CELERYCONFIG = True
 BROKER_URL = mongodb://mongodb:27017/celery
+# Result backend is required for SYNC execution.
+#   Using only the backend type matching the broker URL will automatically resolve to use it database location.
+#   For an alternative result location, provide the full backend directly rather than using "mongodb_backend_settings".
+#   This setting is not correctly parsed (dict) by "pyramid_celery", and separate [celery:mongodb_backend_settings] is
+#   also not found. If more configuration are required, consider using a "celeryconfig" (and "USE_CELERYCONFIG = True").
+#   That configuration should be placed at the root of weaver since "pyramid_celery" doesn't support custom locations.
+#       https://github.com/sontek/pyramid_celery/pull/89
+RESULT_BACKEND = mongodb
+# RESULT_BACKEND = mongodb://mongodb:27017/celery
 
 ###
 # wsgi server configuration
