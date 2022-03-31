@@ -41,7 +41,7 @@ from weaver.exceptions import (
 )
 from weaver.processes.types import ProcessType
 from weaver.store.base import StoreProcesses, StoreServices
-from weaver.utils import get_sane_name, get_settings, get_url_without_query
+from weaver.utils import fully_qualified_name, get_sane_name, get_settings, get_url_without_query
 from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_client
 from weaver.wps_restapi import swagger_definitions as sd
@@ -89,7 +89,7 @@ def get_process(process_id=None, request=None, settings=None, store=None):
     except (InvalidIdentifierValue, MissingIdentifierValue) as ex:
         raise HTTPBadRequest(str(ex))
     except ProcessNotAccessible:
-        raise HTTPForbidden("Process with ID '{!s}' is not accessible.".format(process_id))
+        raise HTTPForbidden(f"Process with ID '{process_id!s}' is not accessible.")
     except ProcessNotFound:
         raise ProcessNotFound(json={
             "title": "NoSuchProcess",
@@ -99,7 +99,7 @@ def get_process(process_id=None, request=None, settings=None, store=None):
             "cause": str(process_id)
         })
     except colander.Invalid as ex:
-        raise HTTPBadRequest("Invalid schema:\n[{0!r}].".format(ex))
+        raise HTTPBadRequest(f"Invalid schema:\n[{ex!r}].")
 
 
 def map_progress(progress, range_min, range_max):
@@ -108,6 +108,19 @@ def map_progress(progress, range_min, range_max):
     Calculates the relative progression of the percentage process within min/max values.
     """
     return max(range_min, min(range_max, range_min + (progress * (range_max - range_min)) / 100))
+
+
+def get_process_information(process_description):
+    # type: (JSON) -> JSON
+    """
+    Obtain the details for the process within its description considering various supported formats.
+    """
+    proc_desc = process_description.get("processDescription", {})
+    if "process" in proc_desc:
+        process = proc_desc.get("process", {})
+        if isinstance(process, dict):  # some instance use 'process' to represent the full-URI identifier
+            return process
+    return proc_desc
 
 
 @log_unhandled_exceptions(logger=LOGGER, message="Unhandled error occurred during parsing of deploy payload.",
@@ -127,6 +140,7 @@ def _check_deploy(payload):
         r_process = results.get("processDescription", {})
         if "process" in p_process:
             # if process is nested, both provided/result description must align
+            # don't use "get_process_information" to make sure everything is retrieved under same location
             p_process = p_process.get("process", {})
             r_process = r_process.get("process", {})
         p_inputs = p_process.get("inputs")
@@ -172,7 +186,7 @@ def _check_deploy(payload):
         LOGGER.debug("Failed deploy body schema validation:\n%s", exc)
         raise HTTPBadRequest(json={
             "description": message,
-            "cause": "Invalid schema: [{!s}]".format(exc.msg),
+            "cause": f"Invalid schema: [{exc.msg!s}]",
             "error": exc.__class__.__name__,
             "value": exc.value
         })
@@ -198,9 +212,12 @@ def _validate_deploy_process_info(process_info, reference, package, settings, he
         if cfg not in WeaverFeature.REMOTE:
             problem = check_package_instance_compatible(info["package"])
             if problem:
+                proc_type = info["type"]
                 raise HTTPForbidden(json={
-                    "description": "Invalid process deployment of type [{}] on [{}] instance. "
-                                   "Remote execution is required but not supported.".format(info["type"], cfg),
+                    "description": (
+                        f"Invalid process deployment of type [{proc_type}] on [{cfg}] instance. "
+                        "Remote execution is required but not supported."
+                    ),
                     "cause": problem
                 })
         return info
@@ -210,7 +227,7 @@ def _validate_deploy_process_info(process_info, reference, package, settings, he
     except InvalidIdentifierValue as ex:
         raise HTTPBadRequest(str(ex))
     except (PackageRegistrationError, PackageTypeError) as ex:
-        msg = "Invalid package/reference definition. Loading generated error: [{!s}]".format(ex)
+        msg = f"Invalid package/reference definition. Loading generated error: [{ex!s}]"
         LOGGER.exception(msg)
         raise HTTPUnprocessableEntity(detail=msg)
 
@@ -273,8 +290,8 @@ def deploy_process_from_payload(payload, container, overwrite=False):
 
     if process_info.get("type", "") == ProcessType.BUILTIN:
         raise HTTPBadRequest(
-            "Invalid process type resolved from package: [{0}]. Deployment of {0} process is not allowed."
-            .format(ProcessType.BUILTIN)
+            f"Invalid process type resolved from package: [{ProcessType.BUILTIN}]. "
+            f"Deployment of {ProcessType.BUILTIN} process is not allowed."
         )
 
     # update and validate process information using WPS process offering, CWL/WPS reference or CWL package definition
@@ -342,7 +359,7 @@ def parse_wps_process_config(config_entry):
         svc_proc = []
         svc_vis = False
     else:
-        raise ValueError("Invalid service value: [{!s}].".format(config_entry))
+        raise ValueError(f"Invalid service value: [{config_entry!s}].")
     url_p = urlparse(svc_url)
     qs_p = parse_qs(url_p.query)
     svc_url = get_url_without_query(url_p)
@@ -352,9 +369,9 @@ def parse_wps_process_config(config_entry):
     svc_proc = svc_proc or qs_p.get("identifier", [])  # noqa  # 'identifier=a,b,c' techically allowed
     svc_proc = [proc.strip() for proc in svc_proc if proc.strip()]  # remote empty
     if not isinstance(svc_name, str):
-        raise ValueError("Invalid service value: [{!s}].".format(svc_name))
+        raise ValueError(f"Invalid service value: [{svc_name!s}].")
     if not isinstance(svc_proc, list):
-        raise ValueError("Invalid process value: [{!s}].".format(svc_proc))
+        raise ValueError(f"Invalid process value: [{svc_proc!s}].")
     return svc_name, svc_url, svc_proc, svc_vis
 
 
@@ -396,10 +413,9 @@ def register_wps_processes_static(service_url, service_name, service_visibility,
         return
     wps_processes = [wps.describeprocess(p) for p in service_processes] or wps.processes
     for wps_process in wps_processes:
-        proc_id = "{}_{}".format(service_name, get_sane_name(wps_process.identifier))
-        proc_url = "{}?service=WPS&request=DescribeProcess&identifier={}&version={}".format(
-            service_url, wps_process.identifier, wps.version
-        )
+        proc_id = f"{service_name}_{get_sane_name(wps_process.identifier)}"
+        wps_pid = wps_process.identifier
+        proc_url = f"{service_url}?service=WPS&request=DescribeProcess&identifier={wps_pid}&version={wps.version}"
         svc_vis = Visibility.PUBLIC if service_visibility else Visibility.PRIVATE
         try:
             old_process = process_store.fetch_by_id(proc_id)
@@ -424,7 +440,7 @@ def register_wps_processes_static(service_url, service_name, service_visibility,
             if resp.status_code == HTTPOk.code:
                 LOGGER.info("Process registered: [%s]", proc_id)
             else:
-                raise RuntimeError("Process registration failed: [{}]".format(proc_id))
+                raise RuntimeError(f"Process registration failed: [{proc_id}]")
         except Exception as ex:
             LOGGER.exception("Exception during process registration: [%r]. Skipping...", ex)
             continue
@@ -517,7 +533,7 @@ def register_wps_processes_from_config(wps_processes_file_path, container):
         return
     LOGGER.info("Using WPS-1 provider processes file: [%s]", wps_processes_file_path)
     try:
-        with open(wps_processes_file_path, "r") as f:
+        with open(wps_processes_file_path, mode="r", encoding="utf-8") as f:
             # if file is empty (not even processes/providers section), None is return instead of dict
             processes_config = yaml.safe_load(f) or {}
         if processes_config:
@@ -542,6 +558,6 @@ def register_wps_processes_from_config(wps_processes_file_path, container):
 
         LOGGER.info("Finished processing configuration file [%s].", wps_processes_file_path)
     except Exception as exc:
-        msg = "Invalid WPS-1 providers configuration file caused: [{!s}]({!s}).".format(type(exc).__name__, exc)
+        msg = f"Invalid WPS-1 providers configuration file caused: [{fully_qualified_name(exc)}]({exc!s})."
         LOGGER.exception(msg)
         raise RuntimeError(msg)

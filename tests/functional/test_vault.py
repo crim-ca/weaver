@@ -45,7 +45,7 @@ class TestVault(TestWeaverClientBase):
         vault_dir = self.settings.get("weaver.vault_dir")
         vault_id = result["file_id"]
         vault_path = os.path.join(vault_dir, vault_id, tmp_name)
-        with open(vault_path, "r") as vault_fd:
+        with open(vault_path, mode="r", encoding="utf-8") as vault_fd:
             vault_data = vault_fd.read()
         assert vault_data != data
         assert "{" not in vault_data

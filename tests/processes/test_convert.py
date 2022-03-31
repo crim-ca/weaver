@@ -114,7 +114,7 @@ def test_json2wps_datatype():
 
     for expect, test_io in test_cases:
         copy_io = deepcopy(test_io)  # can get modified by function
-        assert json2wps_datatype(test_io) == expect, "Failed for [{}]".format(copy_io)
+        assert json2wps_datatype(test_io) == expect, f"Failed for [{copy_io}]"
 
 
 def test_json2wps_allowed_values():
@@ -138,7 +138,7 @@ def test_json2wps_allowed_values():
          [AllowedValue(minval=0, maxval=6, spacing=2, range_closure="open-closed")]),
     ]):
         result = json2wps_allowed_values(values)
-        assert result == expect, "Failed test {}".format(i)
+        assert result == expect, f"Failed test {i}"
 
 
 def test_cwl2wps_io_null_or_array_of_enums():
@@ -180,7 +180,7 @@ def test_cwl2wps_io_raise_mixed_types():
         {"type": "array", "items": "int"}
     ]
     for i, test_type in enumerate([io_type1, io_type2, io_type3, io_type4]):
-        io_info = {"name": "test-{}".format(i), "type": test_type}
+        io_info = {"name": f"test-{i}", "type": test_type}
         with pytest.raises(PackageTypeError):
             cwl2wps_io(io_info, WPS_INPUT)
 
@@ -501,8 +501,8 @@ def test_is_cwl_file_type_not_files():
         ["null", {"type": "array", "items": "string"}],
     ]
     for i, io_type in enumerate(test_types):
-        io_info = {"name": "test-{}".format(i), "type": io_type}
-        assert not is_cwl_file_type(io_info), "Test [{}]: {}".format(i, io_info)
+        io_info = {"name": f"test-{i}", "type": io_type}
+        assert not is_cwl_file_type(io_info), f"Test [{i}]: {io_info}"
 
 
 def assert_formats_equal_any_order(format_result, format_expect):
@@ -512,7 +512,7 @@ def assert_formats_equal_any_order(format_result, format_expect):
             if r_fmt.json == e_fmt.json:
                 format_expect.remove(e_fmt)
                 break
-    assert not format_expect, "Not all expected formats matched {}".format([fmt.json for fmt in format_expect])
+    assert not format_expect, f"Not all expected formats matched {[fmt.json for fmt in format_expect]}"
 
 
 def test_merge_io_formats_no_wps():
@@ -615,7 +615,8 @@ def test_normalize_ordered_io_with_builtin_dict_and_hints():
                 assert res == expect
                 validated = True
         if not validated:
-            raise AssertionError("expected '{}' was not validated against any result value".format(expect["id"]))
+            expect_id = expect["id"]
+            raise AssertionError(f"expected '{expect_id}' was not validated against any result value")
 
 
 def test_normalize_ordered_io_with_ordered_dict():

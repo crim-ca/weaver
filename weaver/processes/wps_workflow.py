@@ -30,6 +30,7 @@ from cwltool.workflow import Workflow
 from schema_salad import validate
 from schema_salad.sourceline import SourceLine
 
+from weaver.formats import repr_json
 from weaver.processes.builtin import BuiltinProcess
 from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_BUILTIN,
@@ -75,7 +76,7 @@ def default_make_tool(toolpath_object,              # type: CWL_ToolPathObjectTy
                       get_job_process_definition,   # type: JobProcessDefinitionCallback
                       ):                            # type: (...) -> ProcessCWL
     if not isinstance(toolpath_object, collections.abc.MutableMapping):
-        raise WorkflowException(u"Not a dict: '%s'" % toolpath_object)
+        raise WorkflowException(f"Not a dict: '{toolpath_object}'")
     if "class" in toolpath_object:
         if toolpath_object["class"] == "CommandLineTool":
             builtin_process_hints = [h.get("process") for h in toolpath_object.get("hints")
@@ -88,9 +89,10 @@ def default_make_tool(toolpath_object,              # type: CWL_ToolPathObjectTy
         if toolpath_object["class"] == "Workflow":
             return Workflow(toolpath_object, loading_context)
 
+    tool = toolpath_object["id"]
     raise WorkflowException(
-        u"Missing or invalid 'class' field in %s, expecting one of: CommandLineTool, ExpressionTool, Workflow" %
-        toolpath_object["id"])
+        f"Missing or invalid 'class' field in {tool}, expecting one of: CommandLineTool, ExpressionTool, Workflow"
+    )
 
 
 class CallbackJob(object):
@@ -134,7 +136,7 @@ class WpsWorkflow(ProcessCWL):
         self.requirements = list(filter(lambda req: req["class"] != CWL_REQUIREMENT_APP_DOCKER, self.requirements))
         self.hints = list(filter(lambda req: req["class"] != CWL_REQUIREMENT_APP_DOCKER, self.hints))
 
-    # pylint: disable=W0221,arguments-differ    # naming using python like arguments
+    # pylint: disable=W0221,W0237 # naming using python like arguments
     def job(self,
             joborder,           # type: Dict[Text, AnyValueType]
             output_callbacks,   # type: Callable[[Any, Any], Any]
@@ -186,7 +188,7 @@ class WpsWorkflow(ProcessCWL):
             with SourceLine(timelimit, "timelimit", validate.ValidationException):
                 wps_workflow_job.timelimit = builder.do_eval(timelimit["timelimit"])
                 if not isinstance(wps_workflow_job.timelimit, int) or wps_workflow_job.timelimit < 0:
-                    raise Exception("timelimit must be an integer >= 0, got: %s" % wps_workflow_job.timelimit)
+                    raise Exception(f"timelimit must be an integer >= 0, got: {wps_workflow_job.timelimit}")
 
         wps_workflow_job.collect_outputs = partial(
             self.collect_output_ports, self.tool["outputs"], builder,
@@ -218,9 +220,8 @@ class WpsWorkflow(ProcessCWL):
             else:
                 for i, port in enumerate(ports):
                     def make_workflow_exception(msg):
-                        return WorkflowException(
-                            u"Error collecting output for parameter '%s':\n%s"
-                            % (shortname(port["id"]), msg))
+                        name = shortname(port["id"])
+                        return WorkflowException(f"Error collecting output for parameter '{name}':\n{msg}")
                     with SourceLine(ports, i, make_workflow_exception, debug):
                         fragment = shortname(port["id"])
                         ret[fragment] = self.collect_output(port, builder, outdir, fs_access,
@@ -246,8 +247,7 @@ class WpsWorkflow(ProcessCWL):
                 adjustFileObjs(ret, builder.mutation_manager.set_generation)
             return ret if ret is not None else {}
         except validate.ValidationException as exc:
-            raise WorkflowException("Error validating output record: {!s}\nIn:\n{}"
-                                    .format(exc, json.dumps(ret, indent=4)))
+            raise WorkflowException(f"Error validating output record: {exc!s}\nIn:\n{repr_json(ret, indent=2)}")
         finally:
             if builder.mutation_manager and readers:
                 for reader in readers.values():
@@ -353,7 +353,7 @@ class WpsWorkflow(ProcessCWL):
                                 while contents != b"":
                                     checksum.update(contents)
                                     contents = f.read(1024 * 1024)
-                                files["checksum"] = "sha1$%s" % checksum.hexdigest()
+                                files["checksum"] = f"sha1${checksum.hexdigest()}"
                             f.seek(0, 2)
                             file_size = f.tell()
                         files["size"] = file_size
@@ -375,7 +375,7 @@ class WpsWorkflow(ProcessCWL):
             if single:
                 if not result and not optional:
                     with SourceLine(binding, "glob", WorkflowException, debug):
-                        raise WorkflowException("Did not find output file with glob pattern: '{}'".format(globpatterns))
+                        raise WorkflowException(f"Did not find output file with glob pattern: '{globpatterns}'")
                 elif not result and optional:
                     pass
                 elif isinstance(result, list):

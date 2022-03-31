@@ -94,11 +94,11 @@ class TestWeaverClient(TestWeaverClientBase):
         path = os.path.join(self.test_tmp_dir, str(uuid.uuid4()))
         os.makedirs(path, exist_ok=True)
         test_file_path = os.path.join(path, os.path.split(original_file)[-1])
-        with open(original_file, "r") as real_file:
+        with open(original_file, mode="r", encoding="utf-8") as real_file:
             data = real_file.read()
             for sub, new in substitutions.items():
                 data = data.replace(sub, new)
-        with open(test_file_path, "w") as test_file:
+        with open(test_file_path, mode="w", encoding="utf-8") as test_file:
             test_file.write(data)
         return test_file_path
 
@@ -391,7 +391,7 @@ class TestWeaverClient(TestWeaverClientBase):
         output = result.body["output"]["href"]
         output = map_wps_output_location(output, self.settings, exists=True)
         assert os.path.isfile(output)
-        with open(output, "r") as out_file:
+        with open(output, mode="r", encoding="utf-8") as out_file:
             out_data = out_file.read()
         assert out_data == test_data
 
@@ -841,7 +841,7 @@ class TestWeaverCLI(TestWeaverClientBase):
             assert path
             assert path.startswith(out_tmp)
             assert os.path.isfile(path)
-            with open(path, "r") as file:
+            with open(path, mode="r", encoding="utf-8") as file:
                 data = file.read()
             assert msg in data  # technically, output is log of echoed input message, so not exactly equal
 

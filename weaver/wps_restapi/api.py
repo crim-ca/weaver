@@ -496,7 +496,7 @@ def api_frontpage_body(settings):
             #   https://raw.githubusercontent.com/opengeospatial/wps-rest-binding/develop/docs/18-062.pdf
             if "." in weaver_api_doc:  # pylint: disable=E1135,unsupported-membership-test
                 ext_type = weaver_api_doc.split(".")[-1]
-                doc_type = "application/{}".format(ext_type)
+                doc_type = f"application/{ext_type}"
             else:
                 doc_type = ContentType.TEXT_PLAIN  # default most basic type
             weaver_links.append({"href": weaver_api_doc, "rel": "documentation", "type": doc_type,
@@ -595,18 +595,18 @@ def get_openapi_json(http_scheme="http", http_host="localhost", base_url=None,
         "description": __meta__.__description__,
         "licence": {
             "name": __meta__.__license_type__,
-            "url": "{}/blob/master/LICENSE.txt".format(__meta__.__source_repository__),
+            "url": f"{__meta__.__source_repository__}/blob/master/LICENSE.txt",
         }
     }
     if settings:
         for key in ["name", "email", "url"]:
-            val = settings.get("weaver.wps_metadata_contact_{}".format(key))
+            val = settings.get(f"weaver.wps_metadata_contact_{key}")
             if val:
                 swagger_info.setdefault("contact", {})
                 swagger_info["contact"][key] = val
         abstract = settings.get("weaver.wps_metadata_identification_abstract")
         if abstract:
-            swagger_info["description"] = "{}\n\n{}".format(abstract, __meta__.__description__)
+            swagger_info["description"] = f"{abstract}\n\n{__meta__.__description__}"
         terms = settings.get("weaver.wps_metadata_identification_accessconstraints")
         if terms and "http" in terms:
             if "," in terms:

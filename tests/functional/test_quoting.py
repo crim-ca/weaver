@@ -57,10 +57,10 @@ class WpsQuotationTest(WpsConfigBase):
             ("WorkflowChainStrings", "deploy.json", "package.cwl"),
         ]:
             path = os.path.join(APP_PKG_ROOT, name, deploy)
-            with open(path, "r") as deploy_file:
+            with open(path, mode="r", encoding="utf-8") as deploy_file:
                 body = yaml.safe_load(deploy_file)
             path = os.path.join(APP_PKG_ROOT, name, app_pkg)
-            with open(path, "r") as pkg_file:
+            with open(path, mode="r", encoding="utf-8") as pkg_file:
                 pkg = yaml.safe_load(pkg_file)
             body["executionUnit"][0] = {"unit": pkg}
             cls.deploy_process(body, process_id=name)
@@ -116,7 +116,8 @@ class WpsQuotationTest(WpsConfigBase):
             ):
                 stack_quote.enter_context(mock_quote)
 
-            with open(os.path.join(APP_PKG_ROOT, "WorkflowChainStrings", "execute.json"), "r") as exec_file:
+            path = os.path.join(APP_PKG_ROOT, "WorkflowChainStrings", "execute.json")
+            with open(path, mode="r", encoding="utf-8") as exec_file:
                 data = yaml.safe_load(exec_file)
             path = sd.process_quotes_service.path.format(process_id="WorkflowChainStrings")
             resp = mocked_sub_requests(self.app, "POST", path, json=data, headers=self.json_headers, only_local=True)

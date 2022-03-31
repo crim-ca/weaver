@@ -28,7 +28,7 @@ def error_repr(http_err):
     """
     err_type = type(http_err).__name__
     if not isinstance(http_err, (HTTPException, OWSException)):
-        return "({}) {!s}".format(err_type, http_err)
+        return f"({err_type}) {http_err!s}"
     err_code = getattr(http_err, "code", getattr(http_err, "status_code", 500))
     err_repr = str(http_err)
     try:
@@ -40,7 +40,7 @@ def error_repr(http_err):
             err_repr = err_repr.replace(". 'Errors for each case:", ".\n Errors for each case:")
     except Exception:  # noqa: W0703 # nosec: B110
         pass
-    return "({}) <{}> {!s}".format(err_type, err_code, err_repr)
+    return f"({err_type}) <{err_code}> {err_repr!s}"
 
 
 def ows_response_tween(request, handler):
@@ -85,12 +85,12 @@ def ows_response_tween(request, handler):
     # FIXME:
     #   https://github.com/crim-ca/weaver/issues/215
     #   convivial generation of this repr format should be directly in common exception class
-    err_msg = "\n  Cause: [{} {}]".format(request.method, request.url)
+    err_msg = f"\n  Cause: [{request.method} {request.url}]"
     raised_error_repr = error_repr(raised_error)
     if raised_error != return_error:
-        err_msg += "\n  Error: [{}]\n  Return: [{}]".format(raised_error_repr, error_repr(return_error))
+        err_msg += f"\n  Error: [{raised_error_repr}]\n  Return: [{error_repr(return_error)}]"
     else:
-        err_msg += "\n  Error: [{}]".format(raised_error_repr)
+        err_msg += f"\n  Error: [{raised_error_repr}]"
     LOGGER.log(exc_log_lvl, "Handled request exception:%s", err_msg, exc_info=exc_info_err)
     LOGGER.debug("Handled request details:\n%s\n%s", raised_error_repr, getattr(raised_error, "text", ""))
     return return_error

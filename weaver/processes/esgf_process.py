@@ -102,8 +102,8 @@ class ESGFProcess(Wps1Process):
 
         # fix unintuitive latitude that must be given 'reversed' (start is larger than end)
         if InputNames.LAT in grouped_inputs:
-            values = grouped_inputs[InputNames.LAT][InputArguments.START], \
-                     grouped_inputs[InputNames.LAT][InputArguments.END]
+            values = (grouped_inputs[InputNames.LAT][InputArguments.START],
+                      grouped_inputs[InputNames.LAT][InputArguments.END])
             grouped_inputs[InputNames.LAT][InputArguments.START] = max(values)
             grouped_inputs[InputNames.LAT][InputArguments.END] = min(values)
 
@@ -111,11 +111,12 @@ class ESGFProcess(Wps1Process):
         for param_name, values in grouped_inputs.items():
             for start_end in [InputArguments.START, InputArguments.END]:
                 if start_end not in values:
-                    raise ValueError("Missing required parameter: {}_{}".format(param_name, start_end))
+                    raise ValueError(f"Missing required parameter: {param_name}_{start_end}")
             crs = cwt.VALUES
             if InputArguments.CRS in values:
                 if values[InputArguments.CRS] not in allowed_crs:
-                    raise ValueError("CRS must be in {}".format(", ".join(map(str, allowed_crs))))
+                    allowed_crs_str = ", ".join(map(str, allowed_crs))
+                    raise ValueError(f"CRS must be in [{allowed_crs_str}]")
                 crs = allowed_crs[values[InputArguments.CRS]]
 
             dimension = cwt.Dimension(param_name, values[InputArguments.START], values[InputArguments.END], crs=crs)
@@ -130,7 +131,7 @@ class ESGFProcess(Wps1Process):
     def _check_required_inputs(self, workflow_inputs):
         for required_input in self.required_inputs:
             if required_input not in workflow_inputs:
-                raise ValueError("Missing required input: {}".format(required_input))
+                raise ValueError(f"Missing required input: {required_input}")
 
     @staticmethod
     def _get_files_urls(workflow_inputs):
@@ -146,7 +147,7 @@ class ESGFProcess(Wps1Process):
 
         for cwl_file in files:
             if not cwl_file["class"] == "File":
-                raise ValueError("'{}' inputs must have a class named 'File'".format(InputNames.FILES))
+                raise ValueError(f"Input named '{InputNames.FILES}' must have a class named 'File'")
             location = cwl_file["location"]
             if not location.startswith("http"):
                 raise ValueError("ESGF processes only support urls for files inputs.")

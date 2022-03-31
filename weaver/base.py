@@ -90,6 +90,7 @@ class classproperty(property):  # pylint: disable=C0103,invalid-name
     .. seealso::
         https://stackoverflow.com/a/5191224
     """
+
     def __init__(self, fget=None, fset=None, fdel=None, doc=None):
         super(classproperty, self).__init__(fget=fget, fset=fset, fdel=fdel, doc=doc)
         self.__doc__ = inspect.cleandoc(doc)

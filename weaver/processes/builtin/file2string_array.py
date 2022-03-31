@@ -18,31 +18,35 @@ LOGGER.addHandler(logging.StreamHandler(sys.stdout))
 LOGGER.setLevel(logging.INFO)
 
 # process details
-__version__ = "1.1"
+__version__ = "1.2"
 __title__ = "File to String-Array"
 __abstract__ = __doc__  # NOTE: '__doc__' is fetched directly, this is mostly to be informative
 
 OUTPUT_CWL_JSON = "cwl.output.json"
 
 
-def main(input_file, output_dir):
+def process(input_file, output_dir):
     # type: (argparse.FileType, str) -> None
-    LOGGER.info(
-        "Got arguments: input_file=%s output_dir=%s", input_file, output_dir
-    )
+    LOGGER.info("Got arguments: input_file=%s output_dir=%s", input_file, output_dir)
     output_data = {"output": [input_file]}
-    json.dump(output_data, open(os.path.join(output_dir, OUTPUT_CWL_JSON), "w"))
+    with open(os.path.join(output_dir, OUTPUT_CWL_JSON), mode="w", encoding="utf-8") as file:
+        return json.dump(output_data, file)
 
 
-if __name__ == "__main__":
+def main(*args):
+    # type: (*str) -> None
     LOGGER.info("Parsing inputs of '%s' process.", PACKAGE_NAME)
-    PARSER = argparse.ArgumentParser(description=__doc__)
-    PARSER.add_argument("-i", help="CWL File")
-    PARSER.add_argument(
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("-i", help="CWL File")
+    parser.add_argument(
         "-o",
         metavar="outdir",
         required=True,
         help="Output directory of the retrieved NetCDF files extracted by name from the JSON file.",
     )
-    ARGS = PARSER.parse_args()
-    sys.exit(main(ARGS.i, ARGS.o))
+    ns = parser.parse_args(*args)
+    sys.exit(process(ns.i, ns.o))
+
+
+if __name__ == "__main__":
+    main()

@@ -265,19 +265,16 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         assert "format" not in proc["outputs"][0]
         expect = KNOWN_PROCESS_DESCRIPTION_FIELDS
         fields = set(proc.keys()) - expect
-        assert len(fields) == 0, \
-            "Unexpected fields found:\n  Unknown: {}\n  Expected: {}".format(list(fields), list(expect))
+        assert len(fields) == 0, f"Unexpected fields found:\n  Unknown: {fields}\n  Expected: {expect}"
         # make sure that deserialization of literal fields did not produce over-verbose metadata
         for p_input in proc["inputs"]:
             expect = KNOWN_PROCESS_DESCRIPTION_INPUT_DATA_FIELDS
             fields = set(p_input) - expect
-            assert len(fields) == 0, \
-                "Unexpected fields found:\n  Unknown: {}\n  Expected: {}".format(list(fields), list(expect))
+            assert len(fields) == 0, f"Unexpected fields found:\n  Unknown: {fields}\n  Expected: {expect}"
         for p_output in proc["outputs"]:
             expect = KNOWN_PROCESS_DESCRIPTION_OUTPUT_DATA_FIELDS
             fields = set(p_output) - expect
-            assert len(fields) == 0, \
-                "Unexpected fields found:\n  Unknown: {}\n  Expected: {}".format(list(fields), list(expect))
+            assert len(fields) == 0, f"Unexpected fields found:\n  Unknown: {fields}\n  Expected: {expect}"
 
     def test_deploy_merge_literal_io_from_package_and_offering(self):
         """
@@ -659,7 +656,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             # NOTE:
             #   execution request itself succeeds *submission*, but fails running it
             #   since async exec is mocked, we can check failure with the status directly after
-            proc_url = "/processes/{}/jobs".format(self._testMethodName)
+            proc_url = f"/processes/{self._testMethodName}/jobs"
             data["inputs"]["file"] = {"href": tmp_href, "type": ContentType.IMAGE_GEOTIFF}
             resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
                                        data=data, headers=self.json_headers, only_local=True)
@@ -1336,9 +1333,10 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                 proc_in_exp = (
                     int(process_input[field]) if str(process_input[field]).isnumeric() else process_input[field]
                 )
-                assert proc_in_res == proc_in_exp, \
-                    "Field '{}' of input '{}'({}) is expected to be '{}' but was '{}'" \
-                    .format(field, process_input, i, proc_in_exp, proc_in_res)
+                assert proc_in_res == proc_in_exp, (
+                    f"Field '{field}' of input '{process_input}'({i}) "
+                    f"is expected to be '{proc_in_exp}' but was '{proc_in_res}'"
+                )
 
     def test_deploy_merge_wps_io_as_mappings(self):
         """
@@ -1421,7 +1419,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         with contextlib.ExitStack() as stack_exec:
             for mock_exec in mocked_execute_celery():
                 stack_exec.enter_context(mock_exec)
-            proc_url = "/processes/{}/jobs".format(self._testMethodName)
+            proc_url = f"/processes/{self._testMethodName}/jobs"
 
             valid_languages = [(lang, True) for lang in AcceptLanguage.values()]
             wrong_languages = [(lang, False) for lang in ["ru", "fr-CH"]]
@@ -1431,7 +1429,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                                            data=exec_body, headers=headers, only_local=True)
                 code = resp.status_code
                 if accept:  # must execute until completion with success
-                    assert code in [200, 201], "Failed with: [{}]\nReason:\n{}".format(code, resp.json)
+                    assert code in [200, 201], f"Failed with: [{code}]\nReason:\n{resp.json}"
                     status_url = resp.json.get("location")
                     self.monitor_job(status_url, timeout=5, return_status=True)  # wait until success
                     job_id = resp.json.get("jobID")
@@ -1493,7 +1491,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                                             def tmp(value):
                                                 path_ = value.get('path')
                                                 if path_ and os.path.exists(path_):
-                                                    with open (path_, 'r') as file_:
+                                                    with open (path_, mode="r", encoding="utf-8") as file_:
                                                         file_data = file_.read()
                                                 return file_data.upper()
                                             value = map(tmp, value)
@@ -1501,7 +1499,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                                     elif isinstance(value, dict):
                                         path_ = value.get('path')
                                         if path_ and os.path.exists(path_):
-                                            with open (path_, 'r') as file_:
+                                            with open (path_, mode="r", encoding="utf-8") as file_:
                                                 file_data = file_.read()
                                             input[key] = file_data.upper()
                                     elif isinstance(value, str):
@@ -1587,24 +1585,25 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         with contextlib.ExitStack() as stack_exec:
             for mock_exec in mocked_execute_celery():
                 stack_exec.enter_context(mock_exec)
-            proc_url = "/processes/{}/jobs".format(self._testMethodName)
+            proc_url = f"/processes/{self._testMethodName}/jobs"
             resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
                                        data=exec_body, headers=self.json_headers, only_local=True)
-            assert resp.status_code in [200, 201], "Failed with: [{}]\nReason:\n{}".format(resp.status_code, resp.json)
+            assert resp.status_code in [200, 201], f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
             status_url = resp.json.get("location")
 
         results = self.monitor_job(status_url)
 
         job_output_path = results.get("output_test")["href"].split(self.settings["weaver.wps_output_path"])[-1]
-        tmp_file = "{}/{}".format(self.settings["weaver.wps_output_dir"], job_output_path)
+        wps_out = self.settings["weaver.wps_output_dir"]
+        tmp_file = f"{wps_out}/{job_output_path}"
 
         try:
-            with open(tmp_file, "r") as out_file:
+            with open(tmp_file, mode="r", encoding="utf-8") as out_file:
                 processed_values = json.load(out_file)
         except FileNotFoundError:
-            self.fail("Output file [{}] was not found where it was expected to resume test".format(tmp_file))
+            self.fail(f"Output file [{tmp_file}] was not found where it was expected to resume test")
         except Exception as exception:
-            self.fail("An error occurred during the reading of the file: {}".format(exception))
+            self.fail(f"An error occurred during the reading of the file: {exception}")
         assert processed_values["test_int_array"] == "11;21;31;41;51"
         assert processed_values["test_float_array"] == "10.53;20.53;30.53;40.53;50.53"
         assert processed_values["test_string_array"] == "THIS;IS;A;TEST"
@@ -1656,7 +1655,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                                         if isinstance(value, dict):
                                             path_ = value.get("path")
                                             if path_ and os.path.exists(path_):
-                                                with open (path_, "r") as file_:
+                                                with open (path_, mode="r", encoding="utf-8") as file_:
                                                     file_data = file_.read()
                                                 input[key] = ast.literal_eval(file_data.upper())
                                     json.dump(input, open("./tmp.txt", "w"))
@@ -1715,7 +1714,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                         "value": 10.2
                     },
                     "measureFileInput": {
-                        "href": "file://{}".format(tmp_file.name)
+                        "href": f"file://{tmp_file.name}"
                     }
                 },
                 "outputs": [
@@ -1723,24 +1722,25 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                 ]
             }
 
-            proc_url = "/processes/{}/jobs".format(self._testMethodName)
+            proc_url = f"/processes/{self._testMethodName}/jobs"
             resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
                                        data=exec_body, headers=self.json_headers, only_local=True)
-            assert resp.status_code in [200, 201], "Failed with: [{}]\nReason:\n{}".format(resp.status_code, resp.json)
+            assert resp.status_code in [200, 201], f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
             status_url = resp.json.get("location")
 
         results = self.monitor_job(status_url)
 
         job_output_path = results.get("output_test")["href"].split(self.settings["weaver.wps_output_path"])[-1]
-        tmp_file = "{}/{}".format(self.settings["weaver.wps_output_dir"], job_output_path)
+        wps_out = self.settings["weaver.wps_output_dir"]
+        tmp_file = f"{wps_out}/{job_output_path}"
 
         try:
-            with open(tmp_file, "r") as f:
+            with open(tmp_file, mode="r", encoding="utf-8") as f:
                 processed_values = json.load(f)
         except FileNotFoundError:
-            self.fail("Output file [{}] was not found where it was expected to resume test".format(tmp_file))
+            self.fail(f"Output file [{tmp_file}] was not found where it was expected to resume test")
         except Exception as exception:
-            self.fail("An error occurred during the reading of the file: {}".format(exception))
+            self.fail(f"An error occurred during the reading of the file: {exception}")
         assert processed_values["stringInput"] == "string_test"
         assert processed_values["integerInput"] == 10
         assert processed_values["doubleInput"] == 3.14159
@@ -1777,7 +1777,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         with contextlib.ExitStack() as stack_exec:
             for mock_exec in mocked_execute_celery():
                 stack_exec.enter_context(mock_exec)
-            proc_url = "/processes/{}/jobs".format(self._testMethodName)
+            proc_url = f"/processes/{self._testMethodName}/jobs"
 
             wps_context_dirs = [None, "", "test", "sub/test"]
             for ctx in wps_context_dirs:
@@ -1786,7 +1786,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                 resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
                                            data=exec_body, headers=headers, only_local=True)
                 code = resp.status_code
-                assert code in [200, 201], "Failed with: [{}]\nReason:\n{}".format(code, resp.json)
+                assert code in [200, 201], f"Failed with: [{code}]\nReason:\n{resp.json}"
                 status_url = resp.json.get("location")
                 job_id = resp.json["jobID"]
                 results = self.monitor_job(status_url, timeout=5)
@@ -1796,8 +1796,8 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                 ctx_url = (out_url + "/" + ctx) if ctx else out_url
                 res_url = ctx_url + "/" + job_id + "/stdout.log"
                 res_path = os.path.join(ctx_dir, job_id, "stdout.log")
-                assert results["output"]["href"] == res_url, "Invalid output URL with context: {}".format(ctx)
-                assert os.path.isfile(res_path), "Invalid output path with context: {}".format(ctx)
+                assert results["output"]["href"] == res_url, f"Invalid output URL with context: {ctx}"
+                assert os.path.isfile(res_path), f"Invalid output path with context: {ctx}"
 
     def test_execute_job_with_custom_file_name(self):
         """
@@ -1841,7 +1841,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             headers.update({"Content-Disposition": f"filename=\"{tmp_name_target}\""})
             stack_exec.enter_context(mocked_file_server(tmp_dir, tmp_host, self.settings, headers_override=headers))
 
-            proc_url = "/processes/{}/jobs".format(self._testMethodName)
+            proc_url = f"/processes/{self._testMethodName}/jobs"
             exec_body = {
                 "mode": ExecuteMode.ASYNC,
                 "response": ExecuteResponse.DOCUMENT,
@@ -1851,7 +1851,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
                                        data=exec_body, headers=headers, only_local=True)
             code = resp.status_code
-            assert code in [200, 201], "Failed with: [{}]\nReason:\n{}".format(code, resp.json)
+            assert code in [200, 201], f"Failed with: [{code}]\nReason:\n{resp.json}"
             status_url = resp.json.get("location")
             job_id = resp.json["jobID"]
             self.monitor_job(status_url, timeout=5)
@@ -1859,7 +1859,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             job_dir = os.path.join(wps_dir, job_id)
             job_out = os.path.join(job_dir, "stdout.log")
             assert os.path.isfile(job_out), f"Invalid output file not found: [{job_out}]"
-            with open(job_out, "r") as out_fd:
+            with open(job_out, mode="r", encoding="utf-8") as out_fd:
                 out_data = out_fd.read()
             assert tmp_name_target in out_data and tmp_name_random not in out_data, (
                 "Expected input file fetched and staged with Content-Disposition preferred filename "
@@ -1902,10 +1902,10 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             for mock_exec in mocked_execute_celery():
                 stack_exec.enter_context(mock_exec)
             mock_del = stack_exec.enter_context(mocked_dismiss_process())
-            path = "/processes/{}/jobs".format(self._testMethodName)
+            path = f"/processes/{self._testMethodName}/jobs"
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_body, headers=self.json_headers, only_local=True)
-            assert resp.status_code in [200, 201], "Failed with: [{}]\nReason:\n{}".format(resp.status_code, resp.json)
+            assert resp.status_code in [200, 201], f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
             status_url = resp.json.get("location")
             status = self.monitor_job(status_url, return_status=True)
             job_id = status["jobID"]
@@ -1918,7 +1918,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             self.job_store.update_job(job)
 
             # validate that API reports dismiss instead of failed
-            path = "/jobs/{}".format(job_id)
+            path = f"/jobs/{job_id}"
             resp = self.app.delete(path, headers=self.json_headers)
             assert resp.status_code == 200
             assert resp.json["status"] == Status.DISMISSED
@@ -1926,7 +1926,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             assert mock_del.control.revoke.call_count == 1
 
             # subsequent calls to dismiss should be refused
-            path = "/jobs/{}".format(job_id)
+            path = f"/jobs/{job_id}"
             resp = self.app.delete(path, headers=self.json_headers, expect_errors=True)
             assert resp.status_code == 410
             assert mock_del.control.revoke.call_count == 1  # not called again
@@ -2034,8 +2034,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         assert proc["outputs"][0]["formats"][0]["default"] is True
         expect = KNOWN_PROCESS_DESCRIPTION_FIELDS
         fields = set(proc.keys()) - expect
-        assert len(fields) == 0, \
-            "Unexpected fields found:\n  Unknown: {}\n  Expected: {}".format(list(fields), list(expect))
+        assert len(fields) == 0, f"Unexpected fields found:\n  Unknown: {fields}\n  Expected: {expect}"
 
     def test_deploy_merge_complex_io_from_package_and_offering(self):
         """
@@ -2172,7 +2171,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
     def test_deploy_literal_and_complex_io_from_wps_xml_reference(self):
         body = {
             "processDescription": {"process": {"id": self._testMethodName}},
-            "executionUnit": [{"href": "mock://{}".format(resources.WPS_LITERAL_COMPLEX_IO_XML)}],
+            "executionUnit": [{"href": f"mock://{resources.WPS_LITERAL_COMPLEX_IO_XML}"}],
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication"
         }
         desc, pkg = self.deploy_process(body, describe_schema=ProcessSchema.OLD)
@@ -2259,7 +2258,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
     def test_deploy_enum_array_and_multi_format_inputs_from_wps_xml_reference(self):
         body = {
             "processDescription": {"process": {"id": self._testMethodName}},
-            "executionUnit": [{"href": "mock://{}".format(resources.WPS_ENUM_ARRAY_IO_XML)}],
+            "executionUnit": [{"href": f"mock://{resources.WPS_ENUM_ARRAY_IO_XML}"}],
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication"
         }
         desc, pkg = self.deploy_process(body, describe_schema=ProcessSchema.OLD)
@@ -2449,7 +2448,7 @@ class WpsPackageAppWithS3BucketTest(WpsConfigBase):
 
         input_file_s3 = "input-s3.txt"
         input_file_http = "media-types.txt"  # use some random HTTP location that actually exists (will be fetched)
-        test_http_ref = "https://www.iana.org/assignments/media-types/{}".format(input_file_http)
+        test_http_ref = f"https://www.iana.org/assignments/media-types/{input_file_http}"
         test_bucket_ref = mocked_aws_s3_bucket_test_file("wps-process-test-bucket", input_file_s3)
         exec_body = {
             "mode": ExecuteMode.ASYNC,
@@ -2466,10 +2465,10 @@ class WpsPackageAppWithS3BucketTest(WpsConfigBase):
         with contextlib.ExitStack() as stack_exec:
             for mock_exec in mocked_execute_celery():
                 stack_exec.enter_context(mock_exec)
-            proc_url = "/processes/{}/jobs".format(self._testMethodName)
+            proc_url = f"/processes/{self._testMethodName}/jobs"
             resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
                                        data=exec_body, headers=self.json_headers, only_local=True)
-            assert resp.status_code in [200, 201], "Failed with: [{}]\nReason:\n{}".format(resp.status_code, resp.json)
+            assert resp.status_code in [200, 201], f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
             status_url = resp.json["location"]
             job_id = resp.json["jobID"]
 
@@ -2484,9 +2483,9 @@ class WpsPackageAppWithS3BucketTest(WpsConfigBase):
         output_bucket = self.settings["weaver.wps_output_s3_bucket"]
         wps_uuid = str(self.job_store.fetch_by_id(job_id).wps_id)
         for out_key, out_file in [("output_from_s3", input_file_s3), ("output_from_http", input_file_http)]:
-            output_ref = "{}/{}/{}".format(output_bucket, wps_uuid, out_file)
-            output_ref_abbrev = "s3://{}".format(output_ref)
-            output_ref_full = "https://s3.{}.amazonaws.com/{}".format(MOCK_AWS_REGION, output_ref)
+            output_ref = f"{output_bucket}/{wps_uuid}/{out_file}"
+            output_ref_abbrev = f"s3://{output_ref}"
+            output_ref_full = f"https://s3.{MOCK_AWS_REGION}.amazonaws.com/{output_ref}"
             output_ref_any = [output_ref_abbrev, output_ref_full]  # allow any variant weaver can parse
             # validation on outputs path
             assert output_values[out_key] in output_ref_any
@@ -2502,7 +2501,7 @@ class WpsPackageAppWithS3BucketTest(WpsConfigBase):
         resp_json = mocked_s3.list_objects_v2(Bucket=output_bucket)
         bucket_file_keys = [obj["Key"] for obj in resp_json["Contents"]]
         for out_file in [input_file_s3, input_file_http]:
-            out_key = "{}/{}".format(job_id, out_file)
+            out_key = f"{job_id}/{out_file}"
             assert out_key in bucket_file_keys
 
         # check that outputs are NOT copied locally, but that XML status does exist
@@ -2512,4 +2511,4 @@ class WpsPackageAppWithS3BucketTest(WpsConfigBase):
             assert not os.path.exists(os.path.join(wps_outdir, out_file))
             assert not os.path.exists(os.path.join(wps_outdir, job_id, out_file))
             assert not os.path.exists(os.path.join(wps_outdir, wps_uuid, out_file))
-        assert os.path.isfile(os.path.join(wps_outdir, "{}.xml".format(job_id)))
+        assert os.path.isfile(os.path.join(wps_outdir, f"{job_id}.xml"))

@@ -81,7 +81,7 @@ class MongoDatabase(DatabaseInterface):
         super(MongoDatabase, self).__init__(container)
         self._database = get_mongodb_engine(container)
         self._settings = get_settings(container)
-        self._stores = dict()
+        self._stores = {}
         LOGGER.debug("Database [%s] using versions: {MongoDB: %s, pymongo: %s}",
                      self._database.name, self._database.client.server_info()["version"], pymongo.__version__)
 
@@ -92,36 +92,36 @@ class MongoDatabase(DatabaseInterface):
 
     @overload
     def get_store(self, store_type, *store_args, **store_kwargs):
-        # type: (StoreBillsSelector, Any, Any) -> MongodbBillStore
+        # type: (StoreBillsSelector, *Any, **Any) -> MongodbBillStore
         ...
 
     @overload
     def get_store(self, store_type, *store_args, **store_kwargs):
-        # type: (StoreQuotesSelector, Any, Any) -> MongodbQuoteStore
+        # type: (StoreQuotesSelector, *Any, **Any) -> MongodbQuoteStore
         ...
 
     @overload
     def get_store(self, store_type, *store_args, **store_kwargs):
-        # type: (StoreJobsSelector, Any, Any) -> MongodbJobStore
+        # type: (StoreJobsSelector, *Any, **Any) -> MongodbJobStore
         ...
 
     @overload
     def get_store(self, store_type, *store_args, **store_kwargs):
-        # type: (StoreProcessesSelector, Any, Any) -> MongodbProcessStore
+        # type: (StoreProcessesSelector, *Any, **Any) -> MongodbProcessStore
         ...
 
     @overload
     def get_store(self, store_type, *store_args, **store_kwargs):
-        # type: (StoreServicesSelector, Any, Any) -> MongodbServiceStore
+        # type: (StoreServicesSelector, *Any, **Any) -> MongodbServiceStore
         ...
 
     @overload
     def get_store(self, store_type, *store_args, **store_kwargs):
-        # type: (StoreVaultSelector, Any, Any) -> MongodbVaultStore
+        # type: (StoreVaultSelector, *Any, **Any) -> MongodbVaultStore
         ...
 
     def get_store(self, store_type, *store_args, **store_kwargs):
-        # type: (StoreSelector, Any, Any) -> AnyMongodbStore
+        # type: (StoreSelector, *Any, **Any) -> AnyMongodbStore
         """
         Retrieve a store from the database.
 
@@ -141,7 +141,7 @@ class MongoDatabase(DatabaseInterface):
                         *store_args, **store_kwargs
                     )
                 return self._stores[store_type]
-        raise NotImplementedError("Database '{}' cannot find matching store '{}'.".format(self.type, store_type))
+        raise NotImplementedError(f"Database '{self.type}' cannot find matching store '{store_type}'.")
 
     def get_session(self):
         # type: (...) -> Any
@@ -207,7 +207,7 @@ def get_mongodb_connection(container):
     settings_default = [("mongodb.host", "localhost"), ("mongodb.port", 27017), ("mongodb.db_name", "weaver")]
     for setting, default in settings_default:
         if settings.get(setting, None) is None:
-            warnings.warn("Setting '{}' not defined in registry, using default [{}].".format(setting, default))
+            warnings.warn(f"Setting '{setting}' not defined in registry, using default [{default}].")
             settings[setting] = default
     client = pymongo.MongoClient(settings["mongodb.host"], int(settings["mongodb.port"]), connect=False,
                                  # Must specify representation since PyMongo 4.0 and also to avoid Python 3.6 error

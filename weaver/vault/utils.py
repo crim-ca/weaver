@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 
 LOGGER = logging.getLogger(__name__)
 
-REGEX_VAULT_TOKEN = re.compile(r"^[a-f0-9]{{{}}}$".format(VaultFile.bytes * 2))
+REGEX_VAULT_TOKEN = re.compile(fr"^[a-f0-9]{{{VaultFile.bytes * 2}}}$")
 REGEX_VAULT_UUID = re.compile(r"^[a-f0-9]{8}(?:-?[a-f0-9]{4}){3}-?[a-f0-9]{12}$")
 REGEX_VAULT_FILENAME = re.compile(r"^[a-zA-Z0-9](?:[a-zA-Z0-9._-]*[a-zA-Z0-9_-])?\.[a-zA-Z0-9_-]+$")
 

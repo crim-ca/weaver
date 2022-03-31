@@ -29,7 +29,7 @@ class GenericApiRoutesTestCase(unittest.TestCase):
             sd.FrontpageSchema().deserialize(body)
         except colander.Invalid as ex:
             body = json.dumps(body, indent=2, ensure_ascii=False)
-            self.fail("expected valid response format as defined in schema [{!s}] in\n{}".format(ex, body))
+            self.fail(f"expected valid response format as defined in schema [{ex!s}] in\n{body}")
         refs = [link["rel"] for link in body["links"]]
         assert len(body["links"]) == len(set(refs)), "Link relationships must all be unique"
         for link in body["links"]:
@@ -45,10 +45,10 @@ class GenericApiRoutesTestCase(unittest.TestCase):
             else:
                 resp = request_extra("GET", path, retries=3, retry_after=True, ssl_verify=False, allow_redirects=True)
             code = resp.status_code
-            test = "({}) [{}]".format(rel, path)
-            assert code in [200, 400], "Reference link expected to be found, got [{}] for {}".format(code, test)
+            test = f"({rel}) [{path}]"
+            assert code in [200, 400], f"Reference link expected to be found, got [{code}] for {test}"
             ctype = resp.headers.get("Content-Type", "").split(";")[0].strip()
-            assert ctype in rtype, "Reference link content does not match [{}]!=[{}] for {}".format(ctype, rtype, test)
+            assert ctype in rtype, f"Reference link content does not match [{ctype}]!=[{rtype}] for {test}"
 
     def test_version_format(self):
         resp = self.testapp.get(sd.api_versions_service.path, headers=self.json_headers)
@@ -56,7 +56,7 @@ class GenericApiRoutesTestCase(unittest.TestCase):
         try:
             sd.VersionsSchema().deserialize(resp.json)
         except colander.Invalid as ex:
-            self.fail("expected valid response format as defined in schema [{!s}]".format(ex))
+            self.fail(f"expected valid response format as defined in schema [{ex!s}]")
 
     def test_conformance_format(self):
         resp = self.testapp.get(sd.api_conformance_service.path, headers=self.json_headers)
@@ -64,12 +64,12 @@ class GenericApiRoutesTestCase(unittest.TestCase):
         try:
             sd.ConformanceSchema().deserialize(resp.json)
         except colander.Invalid as ex:
-            self.fail("expected valid response format as defined in schema [{!s}]".format(ex))
+            self.fail(f"expected valid response format as defined in schema [{ex!s}]")
 
     def test_swagger_api_format(self):
         resp = self.testapp.get(sd.api_swagger_ui_service.path)
         assert resp.status_code == 200
-        assert "<title>{}</title>".format(sd.API_TITLE) in resp.text
+        assert f"<title>{sd.API_TITLE}</title>" in resp.text
 
         resp = self.testapp.get(sd.openapi_json_service.path, headers=self.json_headers)
         assert resp.status_code == 200
@@ -163,7 +163,7 @@ class RebasedApiRoutesTestCase(unittest.TestCase):
         resp.test_app = test_app  # replace object to let follow redirect correctly
         resp = resp.follow()
         assert resp.status_code == 200
-        assert "<title>{}</title>".format(sd.API_TITLE) in resp.text
+        assert f"<title>{sd.API_TITLE}</title>" in resp.text
 
     def test_swagger_api_request_base_path_original(self):
         """
@@ -177,9 +177,9 @@ class RebasedApiRoutesTestCase(unittest.TestCase):
 
         resp = testapp.get(sd.openapi_json_service.path, headers=self.json_headers)
         assert resp.status_code == 200, "API definition should be accessed directly"
-        assert resp.json["host"] in [self.app_host, "{}:80".format(self.app_host)]
+        assert resp.json["host"] in [self.app_host, f"{self.app_host}:80"]
         assert resp.json["basePath"] == sd.api_frontpage_service.path
 
         resp = testapp.get(sd.api_swagger_ui_service.path)
         assert resp.status_code == 200, "API definition should be accessed directly"
-        assert "<title>{}</title>".format(sd.API_TITLE) in resp.text
+        assert f"<title>{sd.API_TITLE}</title>" in resp.text

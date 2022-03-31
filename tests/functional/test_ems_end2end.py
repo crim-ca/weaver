@@ -74,7 +74,7 @@ class WorkflowTestRunnerRemoteWithAuth(WorkflowTestRunnerBase):
 
     @classmethod
     def clean_test_processes_iter_before(cls, process_info):
-        path = "/processes/{}".format(process_info.test_id)
+        path = f"/processes/{process_info.test_id}"
 
         # unauthorized when using Weaver directly means visibility is not public, but process definitively exists
         # update it to allow following delete
@@ -83,7 +83,7 @@ class WorkflowTestRunnerRemoteWithAuth(WorkflowTestRunnerBase):
                                headers=cls.headers, cookies=cls.cookies,
                                ignore_errors=True, log_enabled=False)
             if resp.status_code == HTTPUnauthorized.code:
-                visibility_path = "{}/visibility".format(path)
+                visibility_path = f"{path}/visibility"
                 visibility_body = {"value": Visibility.PUBLIC}
                 resp = cls.request("PUT", visibility_path, json=visibility_body,
                                    headers=cls.headers, cookies=cls.cookies,
@@ -121,17 +121,17 @@ class WorkflowTestRunnerRemoteWithAuth(WorkflowTestRunnerBase):
                     "password": password
                 }
                 headers = {"Accept": ContentType.APP_JSON, "Content-Type": ContentType.APP_FORM}
-                path = "{}/oauth2/token".format(cls.WEAVER_TEST_WSO2_URL)
+                path = f"{cls.WEAVER_TEST_WSO2_URL}/oauth2/token"
                 resp = cls.request("POST", path, data=data, headers=headers, force_requests=True)
                 if resp.status_code == HTTPOk.code:
                     access_token = resp.json().get("access_token")
                     cls.assert_test(lambda: access_token is not None, message="Failed login!")
-                    return {"Authorization": "Bearer {}".format(access_token)}, {}
+                    return {"Authorization": f"Bearer {access_token}"}, {}
                 cls.assert_response(resp, status=HTTPOk.code, message="Failed token retrieval from login!")
             else:
                 data = {"user_name": username, "password": password}
                 headers = {"Accept": ContentType.APP_JSON, "Content-Type": ContentType.APP_JSON}
-                path = "{}/signin".format(cls.WEAVER_TEST_MAGPIE_URL)
+                path = f"{cls.WEAVER_TEST_MAGPIE_URL}/signin"
                 resp = cls.request("POST", path, json=data, headers=headers, force_requests=True)
                 if resp.status_code == HTTPOk.code:
                     return {}, dict(resp.cookies)
@@ -205,9 +205,9 @@ class WorkflowTestRunnerRemoteWithAuth(WorkflowTestRunnerBase):
         visible = {"value": Visibility.PUBLIC}
         for process_info in self.test_processes_info.values():
             # get private visibility initially
-            process_path = "/processes/{}".format(process_info.test_id)
-            visible_path = "{}/visibility".format(process_path)
-            execute_path = "{}/jobs".format(process_path)
+            process_path = f"/processes/{process_info.test_id}"
+            visible_path = f"{process_path}/visibility"
+            execute_path = f"{process_path}/jobs"
             execute_body = process_info.execute_payload
             resp = self.request("GET", visible_path,
                                 headers=headers_a, cookies=cookies_a, status=HTTPOk.code)

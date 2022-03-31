@@ -48,8 +48,8 @@ def get_processes_filtered_by_valid_schemas(request):
 
     store = get_db(request).get_store(StoreProcesses)
     processes, total_local_processes = store.list_processes(visibility=Visibility.PUBLIC, total=True, **paging_param)
-    valid_processes = list()
-    invalid_processes_ids = list()
+    valid_processes = []
+    invalid_processes_ids = []
     for process in processes:
         try:
             valid_processes.append(process.summary())

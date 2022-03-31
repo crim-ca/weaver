@@ -120,9 +120,9 @@ class DictBase(dict):
 
     def __repr__(self):
         # type: () -> str
-        cls = type(self)
-        repr_ = dict.__repr__(self)
-        return "{0}.{1} ({2})".format(cls.__module__, cls.__name__, repr_)
+        _type = fully_qualified_name(self)
+        _repr = dict.__repr__(self)
+        return f"{_type} ({_repr})"
 
     def dict(self):
         # type: () -> AnyParams
@@ -271,7 +271,7 @@ class Service(Base):
     """
 
     def __init__(self, *args, **kwargs):
-        # type: (Any, Any) -> None
+        # type: (*Any, **Any) -> None
         super(Service, self).__init__(*args, **kwargs)
         if "name" not in self:
             raise TypeError("Service 'name' is required")
@@ -335,7 +335,7 @@ class Service(Base):
         }
 
     def wps(self, container=None, **kwargs):
-        # type: (AnySettingsContainer, Any) -> WebProcessingService
+        # type: (AnySettingsContainer, **Any) -> WebProcessingService
         """
         Obtain the remote WPS service definition and metadata.
 
@@ -348,7 +348,7 @@ class Service(Base):
                 self["_wps"] = _wps = get_wps_client(self.url, container=container, **kwargs)
             return _wps
         except (OWSServiceException, xml_util.ParseError) as exc:
-            msg = "Invalid XML returned by WPS [{}] at [{}] cannot be parsed.".format(self.name, self.url)
+            msg = f"Invalid XML returned by WPS [{self.name}] at [{self.url}] cannot be parsed."
             raise ServiceParsingError(json={"description": msg, "cause": str(exc), "error": exc.__class__.__name__})
 
     def links(self, container, fetch=True, self_link=None):
@@ -369,9 +369,10 @@ class Service(Base):
             wps_lang = AcceptLanguage.EN_CA  # assume, cannot validate
 
         wps_url = urljoin(wps_url, urlparse(wps_url).path)
-        wps_url = "{}?service=WPS&request=GetCapabilities".format(wps_url)
-        svc_url = "{}/providers/{}".format(get_wps_restapi_base_url(container), self.name)
-        proc_url = "{}/processes".format(svc_url)
+        wps_url = f"{wps_url}?service=WPS&request=GetCapabilities"
+        api_url = get_wps_restapi_base_url(container)
+        svc_url = f"{api_url}/providers/{self.name}"
+        proc_url = f"{svc_url}/processes"
         links = [
             {
                 "rel": "service-desc",
@@ -484,8 +485,8 @@ class Service(Base):
             LOGGER.error("Failed schema validation on otherwise valid parsing of provider definition.", exc_info=exc)
             raise  # invalid schema on our side, don't ignore it
         except Exception as exc:
-            msg = "Exception occurred while fetching or parsing WPS [{}] at [{}]".format(self.name, self.url)
-            err_msg = "{}: {!r}".format(msg, exc)
+            msg = f"Exception occurred while fetching or parsing WPS [{self.name}] at [{self.url}]"
+            err_msg = f"{msg}: {exc!r}"
             LOGGER.debug(err_msg, exc_info=exc)
             if ignore:
                 warnings.warn(err_msg, NonBreakingExceptionWarning)
@@ -534,7 +535,7 @@ class Service(Base):
             # otherwise use HEAD because it is faster to only 'ping' the service
             if ProcessType.is_wps(self.type):
                 meth = "GET"
-                url = "{}?service=WPS&request=GetCapabilities".format(self.url)
+                url = f"{self.url}?service=WPS&request=GetCapabilities"
             else:
                 meth = "HEAD"
                 url = self.url
@@ -546,8 +547,8 @@ class Service(Base):
             resp = request_extra(meth, url, timeout=2, settings=settings, allowed_codes=allowed_codes)
             return resp.status_code in allowed_codes
         except (requests.exceptions.RequestException, pyramid.httpexceptions.HTTPException) as exc:
-            msg = "Exception occurred while checking service [{}] accessibility at [{}]".format(self.name, self.url)
-            warnings.warn("{}: {!r}".format(msg, exc), NonBreakingExceptionWarning)
+            msg = f"Exception occurred while checking service [{self.name}] accessibility at [{self.url}]"
+            warnings.warn(f"{msg}: {exc!r}", NonBreakingExceptionWarning)
             if not ignore:
                 raise ServiceParsingError(json={
                     "description": msg,
@@ -565,7 +566,7 @@ class Job(Base):
     """
 
     def __init__(self, *args, **kwargs):
-        # type: (Any, Any) -> None
+        # type: (*Any, **Any) -> None
         super(Job, self).__init__(*args, **kwargs)
         if "task_id" not in self:
             raise TypeError(f"Parameter 'task_id' is required for '{self.__name__}' creation.")
@@ -583,7 +584,7 @@ class Job(Base):
     @staticmethod
     def _get_err_msg(error):
         # type: (WPSException) -> str
-        return "{0.text} - code={0.code} - locator={0.locator}".format(error)
+        return f"{error.text} - code={error.code} - locator={error.locator}"
 
     def save_log(self,
                  errors=None,       # type: Optional[Union[str, Exception, WPSException, List[WPSException]]]
@@ -843,13 +844,9 @@ class Job(Base):
         Obtain the resolved endpoint where the :term:`Job` status information can be obtained.
         """
         settings = get_settings(container)
-        location_base = "/providers/{provider_id}".format(provider_id=self.service) if self.service else ""
-        location_url = "{base_url}{location_base}/processes/{process_id}/jobs/{job_id}".format(
-            base_url=get_wps_restapi_base_url(settings),
-            location_base=location_base,
-            process_id=self.process,
-            job_id=self.id
-        )
+        location_base = f"/providers/{self.service}" if self.service else ""
+        api_base_url = get_wps_restapi_base_url(settings)
+        location_url = f"{api_base_url}{location_base}/processes/{self.process}/jobs/{self.id}"
         return location_url
 
     @property
@@ -988,7 +985,7 @@ class Job(Base):
         duration = self.duration
         if duration is None:
             return "00:00:00"
-        return str(duration).split(".")[0].zfill(8)  # "HH:MM:SS"
+        return str(duration).split(".", 1)[0].zfill(8)  # "HH:MM:SS"
 
     @property
     def progress(self):
@@ -1007,7 +1004,7 @@ class Job(Base):
     def _get_results(self):
         # type: () -> List[Optional[Dict[str, JSON]]]
         if self.get("results") is None:
-            self["results"] = list()
+            self["results"] = []
         return dict.__getitem__(self, "results")
 
     def _set_results(self, results):
@@ -1022,7 +1019,7 @@ class Job(Base):
     def _get_exceptions(self):
         # type: () -> List[Union[str, Dict[str, str]]]
         if self.get("exceptions") is None:
-            self["exceptions"] = list()
+            self["exceptions"] = []
         return dict.__getitem__(self, "exceptions")
 
     def _set_exceptions(self, exceptions):
@@ -1037,7 +1034,7 @@ class Job(Base):
     def _get_logs(self):
         # type: () -> List[Dict[str, str]]
         if self.get("logs") is None:
-            self["logs"] = list()
+            self["logs"] = []
         return dict.__getitem__(self, "logs")
 
     def _set_logs(self, logs):
@@ -1052,7 +1049,7 @@ class Job(Base):
     def _get_tags(self):
         # type: () -> List[Optional[str]]
         if self.get("tags") is None:
-            self["tags"] = list()
+            self["tags"] = []
         return dict.__getitem__(self, "tags")
 
     def _set_tags(self, tags):
@@ -1142,7 +1139,7 @@ class Job(Base):
         if self.service is not None:
             base_url += sd.provider_service.path.format(provider_id=self.service)
         job_path = sd.process_job_service.path.format(process_id=self.process, job_id=self.id)
-        return "{base_job_url}{job_path}".format(base_job_url=base_url, job_path=job_path)
+        return base_url + job_path
 
     def links(self, container=None, self_link=None):
         # type: (Optional[AnySettingsContainer], Optional[str]) -> List[Link]
@@ -1158,9 +1155,9 @@ class Job(Base):
         settings = get_settings(container)
         base_url = get_wps_restapi_base_url(settings)
         job_url = self._job_url(base_url)  # full URL
-        job_path = "{}{}".format(base_url, sd.job_service.path.format(job_id=self.id))
+        job_path = base_url + sd.job_service.path.format(job_id=self.id)
         job_exec = job_url.rsplit("/", 1)[0] + "/execution"
-        job_list = "{}{}".format(base_url, sd.jobs_service.path)
+        job_list = base_url + sd.jobs_service.path
         job_links = [
             {"href": job_url, "rel": "status", "title": "Job status."},  # OGC
             {"href": job_url, "rel": "monitor", "title": "Job monitoring location."},  # IANA
@@ -1289,7 +1286,7 @@ class Authentication(Base):
     """
 
     def __init__(self, auth_scheme, auth_token, auth_link, **kwargs):
-        # type: (str, str, Optional[str], Any) -> None
+        # type: (str, str, Optional[str], **Any) -> None
         super(Authentication, self).__init__(**kwargs)
         # ensure values are provided and of valid format
         self.scheme = auth_scheme
@@ -1363,7 +1360,7 @@ class Authentication(Base):
 
     @classmethod
     def from_params(cls, **params):
-        # type: (Any) -> AnyAuthentication
+        # type: (**Any) -> AnyAuthentication
         """
         Obtains the specialized :class:`Authentication` using loaded parameters from :meth:`params`.
         """
@@ -1446,7 +1443,7 @@ class DockerAuthentication(Authentication):
     # NOTE:
     #   Specific parameter names are important for reload from database using 'Authentication.from_params'
     def __init__(self, auth_scheme, auth_token, auth_link, **kwargs):
-        # type: (str, str, str, Any) -> None
+        # type: (str, str, str, **Any) -> None
         """
         Initialize the authentication reference for pulling a Docker image from a protected registry.
 
@@ -1558,7 +1555,7 @@ class VaultFile(Authentication):
     bytes = 32
 
     def __init__(self, file_name="", file_format=None, file_secret=None, auth_token=None, **kwargs):
-        # type: (str, Optional[str], Optional[str], Optional[str], Any) -> None
+        # type: (str, Optional[str], Optional[str], Optional[str], **Any) -> None
         for key in ["type", "scheme", "link", "token"]:
             kwargs.pop(f"auth_{key}", None)
             kwargs.pop(key, None)
@@ -1723,7 +1720,7 @@ class Process(Base):
     """
 
     def __init__(self, *args, **kwargs):
-        # type: (Any, Any) -> None
+        # type: (*Any, **Any) -> None
         super(Process, self).__init__(*args, **kwargs)
         # use both 'id' and 'identifier' to support any call (WPS and recurrent 'id')
         if "id" not in self and "identifier" not in self:
@@ -1950,13 +1947,13 @@ class Process(Base):
         """
         Deployment specification as JSON body.
         """
-        body = self.get("payload", dict())
+        body = self.get("payload", {})
         return self._decode(body) if isinstance(body, dict) else body
 
     @payload.setter
     def payload(self, body):
         # type: (JSON) -> None
-        self["payload"] = self._decode(body) if isinstance(body, dict) else dict()
+        self["payload"] = self._decode(body) if isinstance(body, dict) else {}
 
     # encode(->)/decode(<-) characters that cannot be in a key during save to db
     _character_codes = [("$", "\uFF04"), (".", "\uFF0E")]
@@ -2188,7 +2185,7 @@ class Process(Base):
 
     @staticmethod
     def from_wps(wps_process, **extra_params):
-        # type: (ProcessWPS, Any) -> Process
+        # type: (ProcessWPS, **Any) -> Process
         """
         Converts a :mod:`pywps` Process into a :class:`weaver.datatype.Process` using provided parameters.
         """
@@ -2203,7 +2200,7 @@ class Process(Base):
 
     @staticmethod
     def from_ows(process, service, container, **kwargs):
-        # type: (ProcessOWS, Service, AnySettingsContainer, Any) -> Process
+        # type: (ProcessOWS, Service, AnySettingsContainer, **Any) -> Process
         """
         Converts a :mod:`owslib.wps` Process to local storage :class:`weaver.datatype.Process`.
         """
@@ -2219,14 +2216,13 @@ class Process(Base):
         else:
             svc_name = service.get("name")  # can be a custom ID or identical to provider name
             remote_service_url = service.url
-            local_provider_url = "{}/providers/{}".format(wps_api_url, svc_name)
+            local_provider_url = f"{wps_api_url}/providers/{svc_name}"
             svc_provider_name = service.wps().provider.name
-        describe_process_url = "{}/processes/{}".format(local_provider_url, process.identifier)
-        execute_process_url = "{}/jobs".format(describe_process_url)
+        describe_process_url = f"{local_provider_url}/processes/{process.identifier}"
+        execute_process_url = f"{describe_process_url}/jobs"
         package, info = ows2json(process, svc_name, remote_service_url, svc_provider_name)
-        wps_description_url = "{}?service=WPS&request=DescribeProcess&version=1.0.0&identifier={}".format(
-            remote_service_url, process.identifier
-        )
+        wps_query = f"service=WPS&request=DescribeProcess&version=1.0.0&identifier={process.identifier}"
+        wps_description_url = f"{remote_service_url}?{wps_query}"
         kwargs.update({  # parameters that must be enforced to find service
             "url": describe_process_url,
             "executeEndpoint": execute_process_url,
@@ -2259,7 +2255,7 @@ class Process(Base):
 
     @staticmethod
     def convert(process, service=None, container=None, **kwargs):
-        # type: (AnyProcess, Optional[Service], Optional[AnySettingsContainer], Any) -> Process
+        # type: (AnyProcess, Optional[Service], Optional[AnySettingsContainer], **Any) -> Process
         """
         Converts known process equivalents definitions into the formal datatype employed by Weaver.
         """
@@ -2271,7 +2267,7 @@ class Process(Base):
             return Process(process, **kwargs)
         if isinstance(process, Process):
             return process
-        raise TypeError("Unknown process type to convert: [{}]".format(type(process)))
+        raise TypeError(f"Unknown process type to convert: [{fully_qualified_name(process)}]")
 
     def wps(self):
         # type: () -> ProcessWPS
@@ -2295,7 +2291,7 @@ class Process(Base):
         if self.type == ProcessType.WPS_LOCAL:
             process_key = self.identifier
         if process_key not in process_map:
-            ProcessInstanceError("Unknown process '{}' in mapping.".format(process_key))
+            ProcessInstanceError(f"Unknown process '{process_key}' in mapping.")
         return process_map[process_key](**self.params_wps)
 
 
@@ -2308,7 +2304,7 @@ class Quote(Base):
     # pylint: disable=C0103,invalid-name
 
     def __init__(self, *args, **kwargs):
-        # type: (Any, Any) -> None
+        # type: (*Any, **Any) -> None
         """
         Initialize the quote.
 
@@ -2436,7 +2432,7 @@ class Quote(Base):
         duration = self.duration
         if duration is None:
             return "00:00:00"
-        return str(duration).split(".")[0].zfill(8)
+        return str(duration).split(".", 1)[0].zfill(8)
 
     @property
     def parameters(self):

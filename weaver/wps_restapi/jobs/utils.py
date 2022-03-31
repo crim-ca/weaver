@@ -248,7 +248,7 @@ def get_schema_query(schema, strict=True):
             "value": str(schema),
         })
     if not strict:
-        return schema_checked.split("+")[0]
+        return schema_checked.split("+", 1)[0]
     return schema_checked
 
 
@@ -408,16 +408,6 @@ def get_job_results_response(job, container, headers=None):
     """
     raise_job_dismissed(job, container)
     raise_job_bad_status(job, container)
-    job_status = map_status(job.status)
-    if job_status in JOB_STATUS_CATEGORIES[StatusCategory.RUNNING]:
-        raise HTTPNotFound(json={
-            "code": "ResultsNotReady",
-            "title": "JobResultsNotReady",
-            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/result-not-ready",
-            "detail": "Job is not ready to obtain results.",
-            "status": HTTPNotFound.code,
-            "cause": {"status": job.status},
-        })
 
     # when 'response=document', ignore 'transmissionMode=value|reference', respect it when 'response=raw'
     # See:
@@ -555,13 +545,13 @@ def validate_service_process(request):
                     raise ProcessNotFound
     except (ServiceNotFound, ProcessNotFound):
         raise HTTPNotFound(json={
-            "code": "NoSuch{}".format(item_type),
-            "description": "{} of id '{}' cannot be found.".format(item_type, item_test)
+            "code": f"NoSuch{item_type}",
+            "description": f"{item_type} reference '{item_test}' cannot be found."
         })
     except (ServiceNotAccessible, ProcessNotAccessible):
         raise HTTPUnauthorized(json={
-            "code": "Unauthorized{}".format(item_type),
-            "description": "{} of id '{}' is not accessible.".format(item_type, item_test)
+            "code": f"Unauthorized{item_type}",
+            "description": f"{item_type} reference '{item_test}' is not accessible."
         })
     except InvalidIdentifierValue as ex:
         raise HTTPBadRequest(json={
@@ -616,7 +606,9 @@ def raise_job_bad_status(job, container=None):
             })
 
         # /req/core/job-results-exception/results-not-ready
-        raise HTTPNotFound(json={
+        # must use OWS instead of HTTP class to preserve provided JSON body
+        # otherwise, pyramid considers it as not found view/path and rewrites contents in append slash handler
+        raise OWSNotFound(json={
             "title": "JobResultsNotReady",
             "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/result-not-ready",
             "detail": "Job is not ready to obtain results.",
@@ -693,7 +685,7 @@ def dismiss_job_task(job, container):
 
     LOGGER.debug("Job [%s] dismiss operation: Updating job status.")
     store = get_db(container).get_store(StoreJobs)
-    job.status_message = "Job {}.".format(Status.DISMISSED)
+    job.status_message = f"Job {Status.DISMISSED}."
     job.status = map_status(Status.DISMISSED)
     job = store.update_job(job)
     return job

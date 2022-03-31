@@ -68,7 +68,7 @@ def get_weaver_configuration(container):
         weaver_config = WeaverConfiguration.DEFAULT
     weaver_config_up = weaver_config.upper()
     if weaver_config_up not in WeaverConfiguration:
-        raise ConfigurationError("Unknown setting 'weaver.configuration' specified: '{}'".format(weaver_config))
+        raise ConfigurationError(f"Unknown setting 'weaver.configuration' specified: '{weaver_config}'")
     return weaver_config_up
 
 
@@ -91,8 +91,8 @@ def get_weaver_config_file(file_path, default_config_file, generate_default_from
     :returns: absolute path of the resolved file.
     """
     if default_config_file not in WEAVER_DEFAULT_CONFIGS:
-        raise ValueError("Invalid default configuration file [{}] is not one of {}"
-                         .format(default_config_file, list(WEAVER_DEFAULT_CONFIGS)))
+        raise ValueError(f"Invalid default configuration file [{default_config_file}] "
+                         f"is not one of {list(WEAVER_DEFAULT_CONFIGS)}.")
     default_path = os.path.abspath(os.path.join(WEAVER_CONFIG_DIR, default_config_file))
     if file_path in [None, "", default_config_file, os.path.join(os.curdir, default_config_file)]:
         file_path = default_path
@@ -113,7 +113,7 @@ def get_weaver_config_file(file_path, default_config_file, generate_default_from
         return ""
     LOGGER.warning("Using generated file copied from: [%s]", example_file)
     if not os.path.isfile(example_path):
-        raise RuntimeError("Could not find expected example configuration file: [{}]".format(example_path))
+        raise RuntimeError(f"Could not find expected example configuration file: [{example_path}]")
     shutil.copyfile(example_path, default_path)
     return default_path
 

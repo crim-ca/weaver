@@ -80,7 +80,7 @@ def notify_job_complete(job, to_email_recipient, container):
         template = Template(text=__DEFAULT_TEMPLATE__)  # nosec: B702
     else:
         default_name = settings.get("weaver.wps_email_notify_template_default", "default.mako")
-        process_name = "{!s}.mako".format(job.process)
+        process_name = f"{job.process!s}.mako"
         default_template = os.path.join(template_dir, default_name)
         process_template = os.path.join(template_dir, process_name)
         if os.path.isfile(process_template):
@@ -88,12 +88,11 @@ def notify_job_complete(job, to_email_recipient, container):
         elif os.path.isfile(default_template):
             template = Template(filename=default_template)  # nosec: B702
         else:
-            raise IOError("Template file doesn't exist: OneOf[{!s}, {!s}]".
-                          format(process_name, default_name))
+            raise IOError(f"Template file doesn't exist: OneOf[{process_name!s}, {default_name!s}]")
 
     job_json = job.json(settings)
     contents = template.render(to=to_email_recipient, job=job, settings=settings, **job_json)
-    message = u"{}".format(contents).strip(u"\n")
+    message = f"{contents}".strip(u"\n")
 
     if ssl:
         server = smtplib.SMTP_SSL(smtp_host, port)
@@ -115,12 +114,12 @@ def notify_job_complete(job, to_email_recipient, container):
 
     if result:
         code, error_message = result[to_email_recipient]
-        raise IOError("Code: {}, Message: {}".format(code, error_message))
+        raise IOError(f"Code: {code}, Message: {error_message}")
 
 
 def encrypt_email(email, settings):
     if not email or not isinstance(email, str):
-        raise TypeError("Invalid email: {!s}".format(email))
+        raise TypeError(f"Invalid email: {email!s}")
     LOGGER.debug("Job email setup.")
     try:
         salt = str2bytes(settings.get("weaver.wps_email_encrypt_salt"))

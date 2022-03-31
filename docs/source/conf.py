@@ -14,7 +14,8 @@
 # note:
 #   ignore invalid-name convention flagged by codacy/pylint
 #   as they refer to valid setting names defined by sphinx
-# pylint: disable=C0103
+# pylint: disable=C0103,invalid-name
+# pylint: disable=C0209,consider-using-f-string
 
 import json
 import logging

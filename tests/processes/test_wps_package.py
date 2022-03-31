@@ -37,7 +37,7 @@ def test_check_package_file_with_url():
 def test_check_package_file_with_file_scheme():
     with mock.patch("requests.Session.request", return_value=MockResponseOk()) as mock_request:
         with tempfile.NamedTemporaryFile(mode="r", suffix="test-package.cwl") as tmp_file:
-            package_file = "file://{}".format(tmp_file.name)
+            package_file = f"file://{tmp_file.name}"
             res_path = _check_package_file(package_file)
             mock_request.assert_not_called()
             assert res_path == tmp_file.name
@@ -154,7 +154,7 @@ def test_stdout_stderr_logging_for_commandline_tool_success():
 
         # log assertions
         expect_log = os.path.splitext(wps_package_instance.mock_status_location)[0] + ".log"
-        with open(expect_log, "r") as file:
+        with open(expect_log, mode="r", encoding="utf-8") as file:
             log_data = file.read()
             # FIXME: add more specific asserts... validate CWL command called and sub-operations logged
             assert "Dummy message" in log_data

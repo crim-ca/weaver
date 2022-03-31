@@ -1,16 +1,17 @@
+import functools
 import inspect
 import logging
 from copy import deepcopy
 from typing import TYPE_CHECKING
 
-from colander import SchemaNode
-from pyramid.httpexceptions import HTTPSuccessful, status_map
+import colander
+from pyramid.httpexceptions import HTTPBadRequest, HTTPSuccessful, status_map
 
 from weaver.utils import get_header, get_settings, get_weaver_url
 from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Optional
+    from typing import Any, Callable, Dict, Optional
 
     from weaver.typedefs import AnySettingsContainer, HeadersType
 
@@ -42,8 +43,9 @@ class HTTPHeadFileResponse(HTTPSuccessful):
     recalculated when the content iterator is created from the initialization parameters. This class takes care of all
     these edge cases to properly report content headers of HEAD requests although none is provided.
     """
+
     def __init__(self, code=200, headers=None, **kwargs):
-        # type: (int, Optional[HeadersType], Any) -> None
+        # type: (int, Optional[HeadersType], **Any) -> None
         # drop any 'app_iter' content generator that would recalculate and reset the content_length
         kwargs.pop("body", None)
         kwargs.pop("json", None)
@@ -90,8 +92,8 @@ def get_wps_restapi_base_url(container):
     return weaver_rest_url.rstrip("/").strip()
 
 
-def get_schema_ref(schema, container, ref_type="$schema", ref_name=True):
-    # type: (SchemaNode, AnySettingsContainer, str, True) -> Dict[str, str]
+def get_schema_ref(schema, container=None, ref_type="$schema", ref_name=True):
+    # type: (colander.SchemaNode, Optional[AnySettingsContainer], str, True) -> Dict[str, str]
     """
     Generates the JSON OpenAPI schema reference relative to the current `Weaver` instance.
 
@@ -108,8 +110,8 @@ def get_schema_ref(schema, container, ref_type="$schema", ref_name=True):
     :param ref_name: indicate if the plain name should also be included under field ``"schema"``.
     :return: OpenAPI schema reference
     """
-    is_instance = isinstance(schema, SchemaNode)
-    assert is_instance or (inspect.isclass(schema) and issubclass(schema, SchemaNode))
+    is_instance = isinstance(schema, colander.SchemaNode)
+    assert is_instance or (inspect.isclass(schema) and issubclass(schema, colander.SchemaNode))
     if is_instance:
         schema = type(schema)
     schema_name = schema.__name__
@@ -117,9 +119,39 @@ def get_schema_ref(schema, container, ref_type="$schema", ref_name=True):
     weaver_schema_url = settings.get("weaver.schema_url")
     if not weaver_schema_url:
         restapi_path = get_wps_restapi_base_url(container)
-        weaver_schema_url = "{}{}#/definitions".format(restapi_path, sd.openapi_json_service.path)
+        weaver_schema_url = f"{restapi_path}{sd.openapi_json_service.path}#/definitions"
     weaver_schema_url = weaver_schema_url.rstrip("/").strip()
-    schema_ref = {ref_type: "{}/{}".format(weaver_schema_url, schema_name)}
+    schema_ref = {ref_type: f"{weaver_schema_url}/{schema_name}"}
     if ref_name:
         schema_ref.update({"schema": schema_name})
     return schema_ref
+
+
+def handle_schema_validation(schema=None):
+    # type: (Optional[colander.SchemaNode]) -> Callable
+    """
+    Convert a schema validation error into an HTTP error with error details about the failure.
+
+    :param schema: If provided, document this schema as the reference of the failed schema validation.
+    :raises HTTPBadRequest: If any schema validation error occurs when handling the decorated function.
+    """
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapped(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except colander.Invalid as ex:
+                data = {
+                    "type": "InvalidSchema",
+                    "detail": "Invalid value failed schema validation.",
+                    "error": colander.Invalid.__name__,
+                    "cause": ex.asdict(),
+                    "value": ex.value,
+                }
+                if schema:
+                    data.update({
+                        "schema": get_schema_ref(schema)
+                    })
+                raise HTTPBadRequest(json=data)
+        return wrapped
+    return decorator

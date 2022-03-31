@@ -25,6 +25,7 @@ from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_sta
 from weaver.store.base import StoreJobs, StoreProcesses
 from weaver.utils import (
     as_int,
+    fully_qualified_name,
     get_any_id,
     get_any_value,
     get_header,
@@ -100,7 +101,7 @@ def execute_process(self, job_id, wps_url, headers=None):
     job = store.fetch_by_id(job_id)
     job.started = now()
     job.status = Status.STARTED  # will be mapped to 'RUNNING'
-    job.status_message = "Job {}.".format(Status.STARTED)  # will preserve detail of STARTED vs RUNNING
+    job.status_message = f"Job {Status.STARTED}."  # will preserve detail of STARTED vs RUNNING
     job.save_log(message=job.status_message)
 
     task_logger = get_task_logger(__name__)
@@ -120,8 +121,8 @@ def execute_process(self, job_id, wps_url, headers=None):
 
     try:
         job.progress = JobProgress.DESCRIBE
-        job.save_log(logger=task_logger, message="Employed WPS URL: [{!s}]".format(wps_url), level=logging.DEBUG)
-        job.save_log(logger=task_logger, message="Execute WPS request for process [{!s}]".format(job.process))
+        job.save_log(logger=task_logger, message=f"Employed WPS URL: [{wps_url!s}]", level=logging.DEBUG)
+        job.save_log(logger=task_logger, message=f"Execute WPS request for process [{job.process!s}]")
         wps_process = fetch_wps_process(job, wps_url, headers, settings)
 
         # prepare inputs
@@ -160,10 +161,10 @@ def execute_process(self, job_id, wps_url, headers=None):
         if not wps_status_path.startswith("http") and not os.path.isfile(wps_status_path):
             LOGGER.warning("WPS status location not resolved to local path: [%s]", wps_status_path)
         job.save_log(logger=task_logger, level=logging.DEBUG,
-                     message="Updated job status location: [{}].".format(wps_status_path))
+                     message=f"Updated job status location: [{wps_status_path}].")
 
         job.status = Status.RUNNING
-        job.status_message = execution.statusMessage or "{} initiation done.".format(str(job))
+        job.status_message = execution.statusMessage or f"{job!s} initiation done."
         job.status_location = wps_status_path
         job.request = execution.request
         job.response = execution.response
@@ -178,7 +179,7 @@ def execute_process(self, job_id, wps_url, headers=None):
             if num_retries >= max_retries:
                 job.save_log(errors=execution.errors, logger=task_logger)
                 job = store.update_job(job)
-                raise Exception("Could not read status document after {} retries. Giving up.".format(max_retries))
+                raise Exception(f"Could not read status document after {max_retries} retries. Giving up.")
             try:
                 # NOTE:
                 #   Don't actually log anything here until process is completed (success or fail) so that underlying
@@ -192,17 +193,16 @@ def execute_process(self, job_id, wps_url, headers=None):
                 job_msg = (execution.statusMessage or "").strip()
                 job.response = execution.response
                 job.status = map_status(execution.getStatus())
-                job.status_message = (
-                    "Job execution monitoring (progress: {}%, status: {})."
-                    .format(execution.percentCompleted, job_msg or "n/a")
-                )
+                job_status_msg = job_msg or "n/a"
+                job_percent = execution.percentCompleted
+                job.status_message = f"Job execution monitoring (progress: {job_percent}%, status: {job_status_msg})."
 
                 if execution.isComplete():
-                    msg_progress = " (status: {})".format(job_msg) if job_msg else ""
+                    msg_progress = f" (status: {job_msg})" if job_msg else ""
                     if execution.isSucceded():
                         wps_package.retrieve_package_job_log(execution, job, progress_min, progress_max)
                         job.status = map_status(Status.SUCCEEDED)
-                        job.status_message = "Job succeeded{}.".format(msg_progress)
+                        job.status_message = f"Job succeeded{msg_progress}."
                         job.progress = progress_max
                         job.save_log(logger=task_logger)
                         job_results = [ows2json_output_data(output, process, settings)
@@ -211,7 +211,7 @@ def execute_process(self, job_id, wps_url, headers=None):
                     else:
                         task_logger.debug("Job failed.")
                         wps_package.retrieve_package_job_log(execution, job, progress_min, progress_max)
-                        job.status_message = "Job failed{}.".format(msg_progress)
+                        job.status_message = f"Job failed{msg_progress}."
                         job.progress = progress_max
                         job.save_log(errors=execution.errors, logger=task_logger)
                     task_logger.debug("Mapping Job references with generated WPS locations.")
@@ -221,7 +221,7 @@ def execute_process(self, job_id, wps_url, headers=None):
             except Exception as exc:
                 num_retries += 1
                 task_logger.debug("Exception raised: %s", repr(exc))
-                job.status_message = "Could not read status XML document for {!s}. Trying again...".format(job)
+                job.status_message = f"Could not read status XML document for {job!s}. Trying again..."
                 job.save_log(errors=execution.errors, logger=task_logger)
                 job = store.update_job(job)
                 sleep(1)
@@ -240,9 +240,8 @@ def execute_process(self, job_id, wps_url, headers=None):
         LOGGER.debug("Failed job [%s] raised an exception.", job, exc_info=exc)
         # note: don't update the progress here to preserve last one that was set
         job.status = map_status(Status.FAILED)
-        job.status_message = "Failed to run {!s}.".format(job)
-        exception_class = "{}.{}".format(type(exc).__module__, type(exc).__name__)
-        errors = "{0}: {1!s}".format(exception_class, exc)
+        job.status_message = f"Failed to run {job!s}."
+        errors = f"{fully_qualified_name(exc)}: {exc!s}"
         job.save_log(errors=errors, logger=task_logger)
         job = store.update_job(job)
     finally:
@@ -253,7 +252,7 @@ def execute_process(self, job_id, wps_url, headers=None):
         task_success = map_status(job.status) not in JOB_STATUS_CATEGORIES[StatusCategory.FAILED]
         if task_success:
             job.progress = JobProgress.EXECUTE_MONITOR_END
-        job.status_message = "Job {}.".format(job.status)
+        job.status_message = f"Job {job.status}."
         job.save_log(logger=task_logger)
 
         if task_success:
@@ -262,7 +261,7 @@ def execute_process(self, job_id, wps_url, headers=None):
 
         if job.status not in JOB_STATUS_CATEGORIES[StatusCategory.FINISHED]:
             job.status = Status.SUCCEEDED
-        job.status_message = "Job {}.".format(job.status)
+        job.status_message = f"Job {job.status}."
         job.mark_finished()
         if task_success:
             job.progress = JobProgress.DONE
@@ -281,12 +280,12 @@ def fetch_wps_process(job, wps_url, headers, settings):
         wps = get_wps_client(wps_url, settings, headers=headers, language=job.accept_language)
         raise_on_xml_exception(wps._capabilities)  # noqa
     except Exception as ex:
-        job.save_log(errors=ex, message="Failed WPS client creation for process [{!s}]".format(job.process))
-        raise OWSNoApplicableCode("Failed to retrieve WPS capabilities. Error: [{}].".format(str(ex)))
+        job.save_log(errors=ex, message=f"Failed WPS client creation for process [{job.process!s}]")
+        raise OWSNoApplicableCode(f"Failed to retrieve WPS capabilities. Error: [{ex!s}].")
     try:
         wps_process = wps.describeprocess(job.process)
     except Exception as ex:
-        raise OWSNoApplicableCode("Failed to retrieve WPS process description. Error: [{}].".format(str(ex)))
+        raise OWSNoApplicableCode(f"Failed to retrieve WPS process description. Error: [{ex!s}].")
     return wps_process
 
 
@@ -301,7 +300,7 @@ def parse_wps_inputs(wps_process, job):
             complex_inputs[process_input.identifier] = process_input
 
     try:
-        wps_inputs = list()
+        wps_inputs = []
         # parse both dict and list type inputs
         job_inputs = job.inputs.items() if isinstance(job.inputs, dict) else job.get("inputs", [])
         for job_input in job_inputs:
@@ -363,9 +362,8 @@ def send_job_complete_notification_email(job, task_logger, settings):
             message = "Notification email sent successfully."
             job.save_log(logger=task_logger, message=message)
         except Exception as exc:
-            exception_class = "{}.{}".format(type(exc).__module__, type(exc).__name__)
-            exception = "{0}: {1!s}".format(exception_class, exc)
-            message = "Couldn't send notification email ({})".format(exception)
+            exception = f"{fully_qualified_name(exc)}: {exc!s}"
+            message = f"Couldn't send notification email ({exception})"
             job.save_log(errors=message, logger=task_logger, message=message)
 
 
@@ -454,13 +452,13 @@ def submit_job(request, reference, tags=None):
         raise HTTPBadRequest(json={
             "code": "InvalidHeaderValue",
             "name": "Content-Type",
-            "description": "Request 'Content-Type' header other than '{}' not supported.".format(ContentType.APP_JSON),
+            "description": f"Request 'Content-Type' header other than '{ContentType.APP_JSON}' not supported.",
             "value": str(request.content_type)
         })
     try:
         json_body = request.json_body
     except Exception as ex:
-        raise HTTPBadRequest("Invalid JSON body cannot be decoded for job submission. [{}]".format(ex))
+        raise HTTPBadRequest(f"Invalid JSON body cannot be decoded for job submission. [{ex}]")
     # validate context if needed later on by the job for early failure
     context = get_wps_output_context(request)
 
@@ -475,10 +473,9 @@ def submit_job(request, reference, tags=None):
         is_workflow = reference.type == ProcessType.WORKFLOW
         is_local = True
         tags += "local"
-        if lang and request.accept_language.best_match(AcceptLanguage.values()) is None:
-            raise HTTPNotAcceptable("Requested language [{}] is not in supported languages [{}].".format(
-                lang, ", ".join(AcceptLanguage.values())
-            ))
+        support_lang = AcceptLanguage.values()
+        if lang and request.accept_language.best_match(support_lang) is None:
+            raise HTTPNotAcceptable(f"Requested language [{lang}] not in supported languages [{sorted(support_lang)}].")
     elif isinstance(reference, Service):
         service_url = reference.url
         provider_id = reference.id
@@ -520,7 +517,7 @@ def submit_job_handler(payload,             # type: JSON
     try:
         json_body = sd.Execute().deserialize(payload)
     except colander.Invalid as ex:
-        raise HTTPBadRequest("Invalid schema: [{}]".format(str(ex)))
+        raise HTTPBadRequest(f"Invalid schema: [{ex!s}]")
 
     db = get_db(settings)
     headers = headers or {}

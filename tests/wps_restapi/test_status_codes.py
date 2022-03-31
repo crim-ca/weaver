@@ -52,16 +52,16 @@ class StatusCodeTestCase(unittest.TestCase):
     def test_200(self):
         for uri in TEST_PUBLIC_ROUTES:
             resp = self.testapp.get(uri, expect_errors=True, headers=self.headers)
-            self.assertEqual(200, resp.status_code, "route {} did not return 200".format(uri))
+            self.assertEqual(200, resp.status_code, f"route {uri} did not return 200")
 
     @pytest.mark.xfail(reason="Not working if not behind proxy. Protected implementation to be done.")
     @unittest.expectedFailure
     def test_401(self):
         for uri in TEST_FORBIDDEN_ROUTES:
             resp = self.testapp.get(uri, expect_errors=True, headers=self.headers)
-            self.assertEqual(401, resp.status_code, "route {} did not return 401".format(uri))
+            self.assertEqual(401, resp.status_code, f"route {uri} did not return 401")
 
     def test_404(self):
         for uri in TEST_NOTFOUND_ROUTES:
             resp = self.testapp.get(uri, expect_errors=True, headers=self.headers)
-            self.assertEqual(404, resp.status_code, "route {} did not return 404".format(uri))
+            self.assertEqual(404, resp.status_code, f"route {uri} did not return 404")

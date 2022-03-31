@@ -77,7 +77,7 @@ class WpsPackageDockerAppTest(WpsConfigBase):
         # get generic details
         wps_uuid = str(self.job_store.fetch_by_id(job_id).wps_id)
         wps_out_url = self.settings["weaver.wps_output_url"]
-        wps_output = "{}/{}/{}".format(wps_out_url, wps_uuid, self.out_file)
+        wps_output = f"{wps_out_url}/{wps_uuid}/{self.out_file}"
 
         # --- validate /results path format ---
         assert len(result_payload) == 1
@@ -99,15 +99,15 @@ class WpsPackageDockerAppTest(WpsConfigBase):
         assert not os.path.exists(os.path.join(wps_outdir, self.out_file)), \
             "File is expected to be created in sub-directory of Job ID, not directly in WPS output directory."
         # job log, XML status and output directory can be retrieved with both Job UUID and underlying WPS UUID reference
-        assert os.path.isfile(os.path.join(wps_outdir, "{}.log".format(wps_uuid)))
-        assert os.path.isfile(os.path.join(wps_outdir, "{}.xml".format(wps_uuid)))
+        assert os.path.isfile(os.path.join(wps_outdir, f"{wps_uuid}.log"))
+        assert os.path.isfile(os.path.join(wps_outdir, f"{wps_uuid}.xml"))
         assert os.path.isfile(os.path.join(wps_outdir, wps_uuid, self.out_file))
-        assert os.path.isfile(os.path.join(wps_outdir, "{}.log".format(job_id)))
-        assert os.path.isfile(os.path.join(wps_outdir, "{}.xml".format(job_id)))
+        assert os.path.isfile(os.path.join(wps_outdir, f"{job_id}.log"))
+        assert os.path.isfile(os.path.join(wps_outdir, f"{job_id}.xml"))
         assert os.path.isfile(wps_out_file)
 
         # validate content
-        with open(wps_out_file) as res_file:
+        with open(wps_out_file, mode="r", encoding="utf-8") as res_file:
             assert res_file.read() == result_file_content
 
     def test_deployed_process_schemas(self):
@@ -155,10 +155,10 @@ class WpsPackageDockerAppTest(WpsConfigBase):
                 stack_exec.enter_context(mock_exec)
 
             # execute
-            proc_url = "/processes/{}/jobs".format(self.process_id)
+            proc_url = f"/processes/{self.process_id}/jobs"
             resp = mocked_sub_requests(self.app, "post_json", proc_url,
                                        data=exec_body, headers=self.json_headers, only_local=True)
-            assert resp.status_code in [200, 201], "Failed with: [{}]\nReason:\n{}".format(resp.status_code, resp.json)
+            assert resp.status_code in [200, 201], f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
             status_url = resp.json["location"]
             job_id = resp.json["jobID"]
 
@@ -177,8 +177,9 @@ class WpsPackageDockerAppTest(WpsConfigBase):
             test_content = "Test file in Docker - WPS XML"
             wps_method = "POST"
         else:
-            raise ValueError("Invalid WPS version: {}".format(version))
-        test_content += " {} request - Accept {}".format(wps_method, accept.split("/")[-1].upper())
+            raise ValueError(f"Invalid WPS version: {version}")
+        accept_type = accept.split("/")[-1].upper()
+        test_content += f" {wps_method} request - Accept {accept_type}"
 
         with contextlib.ExitStack() as stack_exec:
             # setup
@@ -191,7 +192,7 @@ class WpsPackageDockerAppTest(WpsConfigBase):
 
             # execute
             if version == "1.0.0":
-                wps_inputs = ["file={}@mimeType={}".format(tmp_file.name, ContentType.TEXT_PLAIN)]
+                wps_inputs = [f"file={tmp_file.name}@mimeType={ContentType.TEXT_PLAIN}"]
                 wps_params = {
                     "service": "WPS",
                     "request": "Execute",
@@ -212,7 +213,7 @@ class WpsPackageDockerAppTest(WpsConfigBase):
             resp = mocked_sub_requests(self.app, wps_method, wps_url,
                                        params=wps_params, data=wps_data, headers=wps_headers, only_local=True)
             assert resp.status_code in [200, 201], (
-                "Failed with: [{}]\nTest: [{}]\nReason:\n{}".format(resp.status_code, test_content, resp.text)
+                f"Failed with: [{resp.status_code}]\nTest: [{test_content}]\nReason:\n{resp.text}"
             )
 
             # parse response status
@@ -242,7 +243,7 @@ class WpsPackageDockerAppTest(WpsConfigBase):
             # validate XML status is updated accordingly
             wps_xml_status = os.path.join(self.settings["weaver.wps_output_dir"], job_id + ".xml")
             assert os.path.isfile(wps_xml_status)
-            with open(wps_xml_status, "r") as status_file:
+            with open(wps_xml_status, mode="r", encoding="utf-8") as status_file:
                 assert "ProcessSucceeded" in status_file.read()
 
         self.validate_outputs(job_id, results, outputs, test_content)

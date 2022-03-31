@@ -62,7 +62,7 @@ class OWSException(Response, Exception):
 </ExceptionReport>""")
 
     def __init__(self, detail=None, value=None, json=None, **kw):
-        # type: (Optional[str], Optional[Any], Optional[JSON], Any) -> None
+        # type: (Optional[str], Optional[Any], Optional[JSON], **Any) -> None
         status = kw.pop("status", None)
         if isinstance(status, type) and issubclass(status, HTTPException):
             status = status().status
@@ -106,7 +106,7 @@ class OWSException(Response, Exception):
 
     def __repr__(self):
         if self.message:
-            return "{}{}".format(type(self), self.message)
+            return f"{type(self)}{self.message}"
         return str(type(self))
 
     @staticmethod

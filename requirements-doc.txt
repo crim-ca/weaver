@@ -3,7 +3,8 @@
 # (see 'docs/source/conf.py')
 -r requirements.txt
 cloud_sptheme
-sphinx>=3.5,<4
+jinja2<3.1  # fix sphinx failing, see: https://github.com/sphinx-doc/sphinx/issues/10291
+sphinx>=3.5,<5
 sphinx-argparse
 sphinx-autoapi>=1.7.0
 sphinx-paramlinks>=0.4.1

@@ -84,7 +84,7 @@ class Wps3Process(WpsProcessInterface):
                 if isinstance(value, list):
                     value = value[0]  # Use the first value to determine the data source
                 data_url = value["location"]
-                reason = "(ADES based on {0})".format(data_url)
+                reason = f"(ADES based on {data_url})"
             else:
                 reason = "(No EOImage -> Default ADES)"
             data_source = get_data_source_from_url(data_url)
@@ -92,10 +92,10 @@ class Wps3Process(WpsProcessInterface):
             url = retrieve_data_source_url(data_source)
         except (IndexError, KeyError) as exc:
             LOGGER.error("Error during WPS-3 process data source resolution: [%s]", exc, exc_info=exc)
-            raise PackageExecutionError("Failed resolution of WPS-3 process data source: [{!r}]".format(exc))
+            raise PackageExecutionError(f"Failed resolution of WPS-3 process data source: [{exc!r}]")
 
         self.provider = data_source  # fix immediately for below `update_status` call
-        self.update_status("Provider {provider} is selected {reason}.".format(provider=data_source, reason=reason),
+        self.update_status(f"Provider {data_source} is selected {reason}.",
                            Wps3RemoteJobProgress.PROVIDER, Status.RUNNING)
 
         return data_source, url, deploy_body
@@ -121,7 +121,7 @@ class Wps3Process(WpsProcessInterface):
                 "scope": "openid",
             }
             ades_headers = {"Content-Type": ContentType.APP_FORM, "Accept": ContentType.APP_JSON}
-            ades_access_token_url = "{}/oauth2/token".format(ades_url)
+            ades_access_token_url = f"{ades_url}/oauth2/token"
             cred_resp = request_extra("post", ades_access_token_url,
                                       data=ades_body, headers=ades_headers, settings=self.settings)
             cred_resp.raise_for_status()
@@ -141,7 +141,7 @@ class Wps3Process(WpsProcessInterface):
                 "[ades.username, ades.password, ades.wso2_hostname, ades.wso2_client_id, ades.wso2_client_secret]",
                 MissingParameterWarning
             )
-        return {"Authorization": "Bearer {}".format(access_token)} if access_token else {}
+        return {"Authorization": f"Bearer {access_token}"} if access_token else {}
 
     def get_auth_headers(self):
         # type: () -> AnyHeadersContainer
@@ -258,7 +258,7 @@ class Wps3Process(WpsProcessInterface):
         response = self.make_request(method="POST", url=request_url, json=execute_body, retry=True)
         if response.status_code != 201:
             LOGGER.error("Request [POST %s] failed with: [%s]", request_url, response.status_code)
-            raise Exception("Was expecting a 201 status code from the execute request : {0}".format(request_url))
+            raise Exception(f"Was expecting a 201 status code from the execute request : {request_url}")
 
         job_status_uri = response.headers["Location"]
         return job_status_uri
@@ -270,7 +270,7 @@ class Wps3Process(WpsProcessInterface):
         job_status_value = map_status(job_status_data["status"])
         job_id = job_status_data["jobID"]
 
-        self.update_status("Monitoring job on remote ADES : {0}".format(job_status_uri),
+        self.update_status(f"Monitoring job on remote ADES : {job_status_uri}",
                            Wps3RemoteJobProgress.MONITORING, Status.RUNNING)
 
         while job_status_value not in JOB_STATUS_CATEGORIES[StatusCategory.FINISHED]:

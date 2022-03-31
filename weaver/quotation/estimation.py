@@ -57,7 +57,7 @@ def estimate_workflow_quote(quote, process):
         # retrieve quote from provider ADES
         # TODO: data source mapping
         process_step_url = get_process_location(step["reference"])
-        process_quote_url = "{}/quotations".format(process_step_url)
+        process_quote_url = f"{process_step_url}/quotations"
 
         # FIXME: how to estimate data transfer if remote process (?)
         # FIXME: how to produce intermediate process inputs (?) - remove xfail in functional test once resolved

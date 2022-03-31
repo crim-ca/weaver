@@ -40,7 +40,7 @@ def request_quote(request):
     weaver_config = get_weaver_configuration(settings)
 
     if weaver_config not in WeaverFeature.QUOTING:
-        raise HTTPBadRequest("Unsupported quoting request for configuration '{}'.".format(weaver_config))
+        raise HTTPBadRequest(f"Unsupported quoting request for configuration '{weaver_config}'.")
 
     process_id = request.matchdict.get("process_id")
     process_store = get_db(request).get_store(StoreProcesses)
@@ -71,7 +71,7 @@ def request_quote(request):
     except colander.Invalid as exc:
         raise OWSMissingParameterValue(json={
             "title": "MissingParameterValue",
-            "cause": "Invalid schema: [{!s}]".format(exc.msg),
+            "cause": f"Invalid schema: [{exc.msg!s}]",
             "error": exc.__class__.__name__,
             "value": exc.value
         })

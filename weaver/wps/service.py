@@ -95,7 +95,7 @@ class WorkerRequest(WPSRequest):
     })
 
     def __init__(self, http_request=None, http_headers=None, **kwargs):
-        # type: (Optional[AnyRequestType], Optional[AnyHeadersContainer], Any) -> None
+        # type: (Optional[AnyRequestType], Optional[AnyHeadersContainer], **Any) -> None
         super(WorkerRequest, self).__init__(http_request, **kwargs)
         self.auth_headers = CaseInsensitiveDict()
         if http_request:
@@ -120,19 +120,11 @@ class WorkerExecuteResponse(ExecuteResponse):
     """
     XML response generator from predefined job status URL and executed process definition.
     """
-    # pylint: disable=W0231,W0233  # FIXME: tmp until patched
 
     def __init__(self, wps_request, uuid, process, job_url, settings, *_, **__):
-        # type: (WorkerRequest, str, ProcessWPS, str, SettingsType, Any, Any) -> None
+        # type: (WorkerRequest, str, ProcessWPS, str, SettingsType, *Any, **Any) -> None
 
-        # FIXME: https://github.com/geopython/pywps/pull/578
-        # temp patch, do what 'ExecuteResponse.__init__' does bypassing the problem super() call
-        WPSResponse.__init__(self, wps_request, uuid)  # pylint: disable=W0231,W0233  # tmp until patched
-        self.process = process
-        self.outputs = {o.identifier: o for o in self.process.outputs}
-        # should be following call, but causes infinite recursion until above fix is applied
-        #   super(WorkerExecuteResponse, self).__init__(wps_request, job_id, process=wps_process)
-        # --- end of patch ---
+        super(WorkerExecuteResponse, self).__init__(wps_request, uuid, process=process)
 
         # extra setup
         self.process._status_store = ReferenceStatusLocationStorage(job_url, settings)
@@ -165,7 +157,7 @@ class WorkerService(ServiceWPS):
 
     @handle_known_exceptions
     def _get_capabilities_redirect(self, wps_request, *_, **__):
-        # type: (WPSRequest, Any, Any) -> Optional[Union[WPSResponse, HTTPValid]]
+        # type: (WPSRequest, *Any, **Any) -> Optional[Union[WPSResponse, HTTPValid]]
         """
         Redirects to WPS-REST endpoint if requested ``Content-Type`` is JSON.
         """
@@ -173,13 +165,13 @@ class WorkerService(ServiceWPS):
         accept_type = get_header("Accept", req.headers)
         if accept_type == ContentType.APP_JSON:
             url = get_weaver_url(self.settings)
-            resp = HTTPSeeOther(location="{}{}".format(url, sd.processes_service.path))  # redirect
+            resp = HTTPSeeOther(location=f"{url}{sd.processes_service.path}")  # redirect
             setattr(resp, "_update_status", lambda *_, **__: None)  # patch to avoid pywps server raising
             return resp
         return None
 
     def get_capabilities(self, wps_request, *_, **__):
-        # type: (WPSRequest, Any, Any) -> Union[WPSResponse, HTTPValid]
+        # type: (WPSRequest, *Any, **Any) -> Union[WPSResponse, HTTPValid]
         """
         Handles the ``GetCapabilities`` KVP/XML request submitted on the WPS endpoint.
 
@@ -190,7 +182,7 @@ class WorkerService(ServiceWPS):
 
     @handle_known_exceptions
     def _describe_process_redirect(self, wps_request, *_, **__):
-        # type: (WPSRequest, Any, Any) -> Optional[Union[WPSResponse, HTTPValid]]
+        # type: (WPSRequest, *Any, **Any) -> Optional[Union[WPSResponse, HTTPValid]]
         """
         Redirects to WPS-REST endpoint if requested ``Content-Type`` is JSON.
         """
@@ -204,13 +196,13 @@ class WorkerService(ServiceWPS):
             if len(proc) > 1:
                 raise HTTPBadRequest("Unsupported multi-process ID for description. Only provide one.")
             path = sd.process_service.path.format(process_id=proc[0])
-            resp = HTTPSeeOther(location="{}{}".format(url, path))  # redirect
+            resp = HTTPSeeOther(location=f"{url}{path}")  # redirect
             setattr(resp, "_update_status", lambda *_, **__: None)  # patch to avoid pywps server raising
             return resp
         return None
 
     def describe(self, wps_request, *_, **__):
-        # type: (WPSRequest, Any, Any) -> Union[WPSResponse, HTTPValid]
+        # type: (WPSRequest, *Any, **Any) -> Union[WPSResponse, HTTPValid]
         """
         Handles the ``DescribeProcess`` KVP/XML request submitted on the WPS endpoint.
 
@@ -235,7 +227,7 @@ class WorkerService(ServiceWPS):
 
         # create the JSON payload from the XML content and submit job
         is_workflow = proc.type == ProcessType.WORKFLOW
-        tags = req.args.get("tags", "").split(",") + ["xml", "wps-{}".format(wps_request.version)]
+        tags = req.args.get("tags", "").split(",") + ["xml", f"wps-{wps_request.version}"]
         data = wps2json_job_payload(wps_request, wps_process)
         resp = submit_job_handler(
             data, self.settings, proc.processEndpointWPS1,
@@ -323,7 +315,7 @@ class WorkerService(ServiceWPS):
             return WorkerExecuteResponse(wps_request, job_id, wps_process, job_url, settings=self.settings)
         except Exception as ex:  # noqa
             LOGGER.exception("Error building XML response by PyWPS Service during WPS Execute result from worker.")
-            message = "Failed building XML response from WPS Execute result. Error [{!r}]".format(ex)
+            message = f"Failed building XML response from WPS Execute result. Error [{ex!r}]"
             raise OWSNoApplicableCode(message, locator=job_id)
 
     def execute_job(self,
@@ -346,12 +338,6 @@ class WorkerService(ServiceWPS):
         request_parser = wps_request._post_request_parser(wps_request.WPS.Execute().tag)  # noqa: W0212
         request_parser(xml_request)  # parses the submitted inputs/outputs data and request parameters
 
-        # FIXME: patch erroneous WPS outputs mimeType as None handling until fixed
-        #        (see: https://github.com/geopython/pywps/pull/623)
-        for out in wps_request.outputs.values():
-            if "mimetype" in out and out["mimetype"] is None:
-                out["mimetype"] = ""
-
         # NOTE:
         #  Setting 'status = false' will disable async execution of 'pywps.app.Process.Process'
         #  but this is needed since this job is running within Celery worker already async
@@ -365,7 +351,7 @@ class WorkerService(ServiceWPS):
         if not remote_process:
             worker_process_id = process_id
         else:
-            worker_process_id = "wps_package-{}-{}".format(process_id, job.uuid)
+            worker_process_id = f"wps_package-{process_id}-{job.uuid}"
             self.dispatched_processes[worker_process_id] = remote_process
 
         wps_response = super(WorkerService, self).execute(worker_process_id, wps_request, job.uuid)
@@ -397,5 +383,5 @@ def get_pywps_service(environ=None, is_worker=False):
         service = WorkerService(processes_wps, is_worker=is_worker, settings=settings)
     except Exception as ex:
         LOGGER.exception("Error occurred during PyWPS Service and/or Processes setup.")
-        raise OWSNoApplicableCode("Failed setup of PyWPS Service and/or Processes. Error [{!r}]".format(ex))
+        raise OWSNoApplicableCode(f"Failed setup of PyWPS Service and/or Processes. Error [{ex!r}]")
     return service

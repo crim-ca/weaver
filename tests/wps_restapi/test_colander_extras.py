@@ -41,19 +41,15 @@ def evaluate_test_cases(test_cases):
         try:
             result = test_schema.deserialize(test_value)
             if test_expect is colander.Invalid:
-                pytest.fail("Test [{}]: Expected invalid format from [{}] with: {}, but received: {}".format(
-                    i, test_schema_name, test_value, result)
-                )
-            assert result == test_expect, "Test [{}]: Bad result from [{}] with: {}".format(
-                i, test_schema_name, test_value
-            )
+                pytest.fail(f"Test [{i}]: Expected invalid format from [{test_schema_name}] "
+                            f"with: {test_value}, but received: {result}")
+            assert result == test_expect, f"Test [{i}]: Bad result from [{test_schema_name}] with: {test_value}"
         except colander.Invalid:
             if test_expect is colander.Invalid:
                 pass
             else:
-                pytest.fail("Test [{}]: Expected valid format from [{}] with: {}, but invalid instead of: {}".format(
-                    i, test_schema_name, test_value, test_expect)
-                )
+                pytest.fail(f"Test [{i}]: Expected valid format from [{test_schema_name}] "
+                            f"with: {test_value}, but invalid instead of: {test_expect}")
 
 
 def test_oneof_io_formats_deserialize_as_mapping():
@@ -191,23 +187,24 @@ def test_oneof_nested_dict_list():
         try:
             assert test_schema().deserialize(test_value) == test_value
         except colander.Invalid:
-            pytest.fail("Should not fail deserialize of '{!s}' with {!s}"
-                        .format(ce._get_node_name(test_schema), test_value))
+            node_name = ce._get_node_name(test_schema)
+            pytest.fail(f"Should not fail deserialize of '{node_name!s}' with {test_value!s}")
     for test_schema, test_value in [
         (ObjOneOf, {"key": None}),
         (ObjOneOf, {"items": None}),
         (ObjOneOf, {"items": ["value"], "key": "value"}),  # cannot have both (oneOf)
     ]:
+        node_name = ce._get_node_name(test_schema)
         try:
             result = ObjOneOf().deserialize(test_value)
         except colander.Invalid:
             pass
         except Exception:
-            raise AssertionError("Incorrect exception raised from deserialize of '{!s}' with {!s}"
-                                 .format(ce._get_node_name(test_schema), test_value))
+            raise AssertionError("Incorrect exception raised from deserialize "
+                                 f"of '{node_name!s}' with {test_value!s}")
         else:
-            raise AssertionError("Should have raised invalid schema from deserialize of '{!s}' with {!s}, but got {!s}"
-                                 .format(ce._get_node_name(test_schema), test_value, result))
+            raise AssertionError("Should have raised invalid schema from deserialize "
+                                 f"of '{node_name!s}' with {test_value!s}, but got {result!s}")
 
 
 def test_oneof_dropable():
@@ -366,16 +363,17 @@ def test_not_keyword_extra_fields_handling():
         _not = [MappingWithType()]
 
     value = {"type": "invalid", "item": "valid"}
+    node_name = ce._get_node_name(MappingWithoutType)
     try:
         result = MappingWithoutType().deserialize(value)
     except colander.Invalid:
         pass
     except Exception:
-        raise AssertionError("Incorrect exception raised from deserialize of '{!s}' with {!s}"
-                             .format(ce._get_node_name(MappingWithoutType), value))
+        raise AssertionError("Incorrect exception raised from deserialize "
+                             f"of '{node_name!s}' with {value!s}")
     else:
-        raise AssertionError("Should have raised invalid schema from deserialize of '{!s}' with {!s}, but got {!s}"
-                             .format(ce._get_node_name(MappingWithoutType), value, result))
+        raise AssertionError("Should have raised invalid schema from deserialize "
+                             f"of '{node_name!s}' with {value!s}, but got {result!s}")
 
     test_cases = [
         (MappingWithoutType, {"item": "valid", "value": "ignore"}, {"item": "valid"}),
@@ -828,7 +826,7 @@ def test_schema_default_missing_validator_openapi():
     ]
     for schema in test_schemas:
         converted = converter.convert_type(schema())
-        assert converted == schema.schema_expected, "Schema for [{}] not as expected".format(schema.__name__)
+        assert converted == schema.schema_expected, f"Schema for [{schema.__name__}] not as expected"
 
 
 def test_dropable_variable_mapping():
@@ -947,4 +945,4 @@ def test_media_type_pattern():
         except colander.Invalid:
             pass
         else:
-            pytest.fail("Expected valid format from [{}] with: '{}'".format(test_schema.__name__, test_value))
+            pytest.fail(f"Expected valid format from [{test_schema.__name__}] with: '{test_value}'")

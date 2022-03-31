@@ -20,13 +20,15 @@ from weaver.wps_restapi.patches import patch_pyramid_view_no_auto_head_get_metho
 if TYPE_CHECKING:
     from typing import Any
 
+    from pyramid.router import Router
+
     from weaver.typedefs import SettingsType
 
 LOGGER = logging.getLogger(__name__)
 
 
 def main(global_config, **settings):
-    # type: (SettingsType, Any) -> None
+    # type: (SettingsType, **Any) -> Router
     """
     Creates a Pyramid WSGI application for Weaver.
     """
@@ -48,7 +50,7 @@ def main(global_config, **settings):
                                       generate_default_from_example=False)
     if req_file:
         LOGGER.info("Loading request options...")
-        with open(req_file, "r") as f:
+        with open(req_file, mode="r", encoding="utf-8") as f:
             settings.update({"weaver.request_options": yaml.safe_load(f)})
     else:
         LOGGER.warning("No request options found.")

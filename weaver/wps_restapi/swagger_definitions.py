@@ -86,22 +86,21 @@ API_INFO = {
     "contact": {"name": __meta__.__authors__, "email": __meta__.__emails__, "url": __meta__.__source_repository__}
 }
 API_DOCS = {
-    "description": "{} documentation".format(__meta__.__title__),
+    "description": f"{__meta__.__title__} documentation",
     "url": __meta__.__documentation_url__
 }
-DOC_URL = "{}/en/latest".format(__meta__.__documentation_url__)
+DOC_URL = f"{__meta__.__documentation_url__}/en/latest"
 
 CWL_VERSION = "v1.1"
 CWL_REPO_URL = "https://github.com/common-workflow-language"
 CWL_BASE_URL = "https://www.commonwl.org"
-CWL_SPEC_URL = "{}/#Specification".format(CWL_BASE_URL)
-CWL_USER_GUIDE_URL = "{}/user_guide".format(CWL_BASE_URL)
-CWL_CMD_TOOL_URL = "{}/{}/CommandLineTool.html".format(CWL_BASE_URL, CWL_VERSION)
-CWL_WORKFLOW_URL = "{}/{}/Workflow.html".format(CWL_BASE_URL, CWL_VERSION)
+CWL_SPEC_URL = f"{CWL_BASE_URL}/#Specification"
+CWL_USER_GUIDE_URL = f"{CWL_BASE_URL}/user_guide"
+CWL_CMD_TOOL_URL = f"{CWL_BASE_URL}/{CWL_VERSION}/CommandLineTool.html"
+CWL_WORKFLOW_URL = f"{CWL_BASE_URL}/{CWL_VERSION}/Workflow.html"
 CWL_DOC_MESSAGE = (
     "Note that multiple formats are supported and not all specification variants or parameters "
-    "are presented here. Please refer to official CWL documentation for more details "
-    "({}).".format(CWL_BASE_URL)
+    f"are presented here. Please refer to official CWL documentation for more details ({CWL_BASE_URL})."
 )
 
 IO_INFO_IDS = (
@@ -290,7 +289,7 @@ class QueryBoolean(Boolean):
     description = "Boolean query parameter that allows handles common truthy/falsy values."
 
     def __init__(self, *_, **__):
-        # type: (Any, Any) -> None
+        # type: (*Any, **Any) -> None
         super(QueryBoolean, self).__init__(
             allow_string=True,
             false_choices=("False", "false", "0", "off", "no", "null", "Null", "none", "None", ""),
@@ -309,12 +308,11 @@ class DateTimeInterval(ExtendedSchemaNode):
     )
     example = "2022-03-02T03:32:38.487000+00:00/.."
     regex_datetime = r"(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d+)?(([+-]\d\d:\d\d)|Z)?)"
-    regex_interval_closed = r"{i}\/{i}".format(i=regex_datetime)
-    regex_interval_open_start = r"\.\.\/{}".format(regex_datetime)
-    regex_interval_open_end = r"{}\/\.\.".format(regex_datetime)
+    regex_interval_closed = fr"{regex_datetime}\/{regex_datetime}"
+    regex_interval_open_start = fr"\.\.\/{regex_datetime}"
+    regex_interval_open_end = fr"{regex_datetime}\/\.\."
 
-    pattern = "^{}|{}|{}|{}$".format(regex_datetime, regex_interval_closed,
-                                     regex_interval_open_start, regex_interval_open_end)
+    pattern = fr"^{regex_datetime}|{regex_interval_closed}|{regex_interval_open_start}|{regex_interval_open_end}$"
 
 
 class S3Bucket(ExtendedSchemaNode):
@@ -899,7 +897,7 @@ class ProcessDeployMeta(ExtendedMappingSchema):
 class InputOutputDescriptionMeta(ExtendedMappingSchema):
     # remove unnecessary empty lists by default if nothing is provided for inputs/outputs
     def __init__(self, *args, **kwargs):
-        # type: (Any, Any) -> None
+        # type: (*Any, **Any) -> None
         super(InputOutputDescriptionMeta, self).__init__(*args, **kwargs)
         for child in self.children:
             if child.name in ["keywords", "metadata"]:
@@ -2555,10 +2553,10 @@ class ExceptionReportType(ExtendedMappingSchema):
 
 
 class ProcessControl(ExtendedMappingSchema):
-    jobControlOptions = JobControlOptionsList(missing=[ExecuteControlOption.ASYNC],
-                                              default=[ExecuteControlOption.ASYNC])
-    outputTransmission = TransmissionModeList(missing=[ExecuteTransmissionMode.VALUE],
-                                              default=[ExecuteTransmissionMode.VALUE])
+    jobControlOptions = JobControlOptionsList(missing=ExecuteControlOption.values(),
+                                              default=ExecuteControlOption.values())
+    outputTransmission = TransmissionModeList(missing=ExecuteTransmissionMode.values(),
+                                              default=ExecuteTransmissionMode.values())
 
 
 class ProcessLocations(ExtendedMappingSchema):
@@ -2685,12 +2683,12 @@ class ProcessDeployment(ProcessSummary, ProcessContext, ProcessDeployMeta):
         missing=drop, title="DeploymentInputs",
         description="Additional definitions for process inputs to extend generated details by the referred package. "
                     "These are optional as they can mostly be inferred from the 'executionUnit', but allow specific "
-                    "overrides (see '{}/package.html#correspondence-between-cwl-and-wps-fields')".format(DOC_URL))
+                    f"overrides (see '{DOC_URL}/package.html#correspondence-between-cwl-and-wps-fields')")
     outputs = DeployOutputTypeAny(
         missing=drop, title="DeploymentOutputs",
         description="Additional definitions for process outputs to extend generated details by the referred package. "
                     "These are optional as they can mostly be inferred from the 'executionUnit', but allow specific "
-                    "overrides (see '{}/package.html#correspondence-between-cwl-and-wps-fields')".format(DOC_URL))
+                    f"overrides (see '{DOC_URL}/package.html#correspondence-between-cwl-and-wps-fields')")
     visibility = VisibilityValue(missing=drop)
 
     _sort_first = PROCESS_DESCRIPTION_FIELD_FIRST
@@ -4164,8 +4162,8 @@ class ForbiddenProviderAccessResponseSchema(ExtendedMappingSchema):
 class ForbiddenProviderLocalResponseSchema(ExtendedMappingSchema):
     description = (
         "Provider operation is not allowed on local-only Weaver instance. "
-        "Applies only when application configuration is not within: {}"
-    ).format(WEAVER_CONFIG_REMOTE_LIST)
+        f"Applies only when application configuration is not within: {WEAVER_CONFIG_REMOTE_LIST}"
+    )
     header = ResponseHeaders()
     body = ErrorJsonResponseBodySchema()
 
@@ -4236,7 +4234,7 @@ class GetProcessesQuery(ProcessPagingQuery, ProcessDetailQuery):
         description="List local processes as well as all sub-processes of all registered providers. "
                     "Paging and sorting query parameters are unavailable when providers are requested since lists are "
                     "populated dynamically and cannot ensure consistent process lists per page across providers. "
-                    "Applicable only for Weaver configurations {}, ignored otherwise.".format(WEAVER_CONFIG_REMOTE_LIST)
+                    f"Applicable only for Weaver configurations {WEAVER_CONFIG_REMOTE_LIST}, ignored otherwise."
     )
     ignore = ExtendedSchemaNode(
         QueryBoolean(), example=True, default=True, missing=drop,
@@ -5061,7 +5059,7 @@ def service_api_route_info(service_api, settings):
     from weaver.wps_restapi.utils import wps_restapi_base_path  # import here to avoid circular import errors
 
     api_base = wps_restapi_base_path(settings)
-    return {"name": service_api.name, "pattern": "{base}{path}".format(base=api_base, path=service_api.path)}
+    return {"name": service_api.name, "pattern": f"{api_base}{service_api.path}"}
 
 
 def datetime_interval_parser(datetime_interval):

@@ -58,6 +58,8 @@ from weaver.utils import (
     xml_strip_ns
 )
 
+# pylint: disable=R1732,W1514  # not using with open + encoding
+
 
 def test_null_operators():
     if null:
@@ -94,7 +96,7 @@ def test_is_url_valid():
 
 def test_get_url_without_query():
     url_h = "http://some-host.com/wps"
-    url_q = "{}?service=WPS".format(url_h)
+    url_q = f"{url_h}?service=WPS"
     url_p = urlparse(url_q)
     assert get_url_without_query(url_q) == url_h
     assert get_url_without_query(url_p) == url_h
@@ -390,7 +392,7 @@ def test_get_ssl_verify_option():
         ("POST", "service=WPS&request=Execute&version=2.0.0&identifier=test"),
     ]
     for method, queries in tests:
-        url = "{}?{}".format(any_wps_url, queries)
+        url = f"{any_wps_url}?{queries}"
         assert get_ssl_verify_option(method, url, any_wps_conf)
 
 
@@ -537,8 +539,9 @@ def test_fetch_file_local_links():
                 if os.path.exists(dst_path):
                     os.remove(dst_path)
                 fetch_file(src_path, dst_dir, link=as_link)
-                assert os.path.isfile(dst_path), "File [{}] should be accessible under [{}]. Failed with: {}".format(
-                    tmp_file, dst_path, (src_path, as_link, result_link)
+                assert os.path.isfile(dst_path), (
+                    f"File [{tmp_file}] should be accessible under [{dst_path}]. "
+                    f"Failed with: {(src_path, as_link, result_link)}"
                 )
                 if result_link:
                     assert os.path.islink(dst_path), "Result is not a link when it is expected to be one."
@@ -546,7 +549,7 @@ def test_fetch_file_local_links():
                     assert not os.path.islink(dst_path), "Result is a link when it is expected not to be one."
                 assert json.load(open(dst_path)) == tmp_data, "File should be properly copied/referenced from original"
     except OSError as exc:
-        pytest.fail("Unexpected error raised during test: [{}]".format(exc))
+        pytest.fail(f"Unexpected error raised during test: [{exc!s}]")
     finally:
         shutil.rmtree(src_dir, ignore_errors=True)
         shutil.rmtree(dst_dir, ignore_errors=True)
@@ -569,7 +572,7 @@ def test_fetch_file_local_with_protocol():
             for protocol in ["", "file://"]:
                 tmp_path = protocol + tmp_json.name
                 fetch_file(tmp_path, res_dir)
-                assert os.path.isfile(res_path), "File [{}] should be accessible under [{}]".format(tmp_path, res_path)
+                assert os.path.isfile(res_path), f"File [{tmp_path}] should be accessible under [{res_path}]"
                 assert json.load(open(res_path)) == tmp_data, "File should be properly copied/referenced from original"
         except Exception:
             raise
@@ -612,7 +615,7 @@ def test_fetch_file_remote_with_request():
         try:
             make_dirs(res_dir, exist_ok=True)
             fetch_file(tmp_http, res_dir, retry=tmp_retry + 1)
-            assert os.path.isfile(res_path), "File [{}] should be accessible under [{}]".format(tmp_http, res_path)
+            assert os.path.isfile(res_path), f"File [{tmp_http}] should be accessible under [{res_path}]"
             assert m_request.call_count == 2, "Request method should have been called twice because of retries"
             assert json.load(open(res_path)) == tmp_data, "File should be properly generated from HTTP reference"
         except Exception:
@@ -634,7 +637,7 @@ def test_fetch_file_http_content_disposition_filename():
         tmp_normal = "spécial.json"
         tmp_escape = quote(tmp_normal)  # % characters
         tmp_name = os.path.split(tmp_json.name)[-1]
-        tmp_http = "http://weaver.mock/{}".format(tmp_random)  # pseudo endpoint where file name is not directly visible
+        tmp_http = f"http://weaver.mock/{tmp_random}"  # pseudo endpoint where file name is not directly visible
 
         def mock_response(__request, test_headers):
             test_headers.update({

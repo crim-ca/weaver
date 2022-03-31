@@ -77,6 +77,11 @@ Fixes:
 - Fix `WPS 1/2` endpoint not reporting the appropriate instance URL
   (fixes `#83 <https://github.com/crim-ca/weaver/issues/83>`_).
 - Fix `CLI` ``deploy`` operation headers incorrectly passed down to the deployment request.
+- Fix many linting issues with latest ``pylint`` definitions.
+- Fix temporary ``pywps`` patches that have been integrated
+  (relates to `#352 <https://github.com/crim-ca/weaver/issues/352>`_
+  addressing issues `geopython/pywps#578 <https://github.com/geopython/pywps/pull/578>`_
+  and `geopython/pywps#623 <https://github.com/geopython/pywps/pull/623>`_).
 
 .. _changes_4.14.0:
 

@@ -170,7 +170,7 @@ def get_wps_local_status_location(url_status_location, container, must_exist=Tru
     if not found and "/jobs/" in url_status_location:
         job_uuid = url_status_location.rsplit("/jobs/", 1)[-1].split("/", 1)[0]
         if is_uuid(job_uuid):
-            out_path_join = os.path.join(dir_path, "{}.xml".format(job_uuid))
+            out_path_join = os.path.join(dir_path, f"{job_uuid}.xml")
             found = os.path.isfile(out_path_join)
             if found or not must_exist:
                 out_path = out_path_join
@@ -301,9 +301,9 @@ def check_wps_status(location=None,     # type: Optional[str]
         LOGGER.warning("Failed retrieving WPS status-location, attempting with local file.")
         out_path = get_wps_local_status_location(location, settings)
         if not out_path:
-            raise HTTPNotFound("Could not find file resource from [{}].".format(location))
+            raise HTTPNotFound(f"Could not find file resource from [{location}].")
         LOGGER.info("Resolved WPS status-location using local file reference.")
-        with open(out_path, "r") as f:
+        with open(out_path, mode="r", encoding="utf-8") as f:
             return f.read()
 
     execution = WPSExecution()

@@ -148,12 +148,13 @@ def get_weaver_url(container):
     return value.rstrip("/").strip()
 
 
-def get_any_id(info, pop=False, key=False):
-    # type: (JSON, bool, bool) -> Union[str, None]
+def get_any_id(info, default=None, pop=False, key=False):
+    # type: (JSON, Optional[str], bool, bool) -> Optional[str]
     """
     Retrieves a dictionary `id-like` key using multiple common variations ``[id, identifier, _id]``.
 
     :param info: dictionary that potentially contains an `id-like` key.
+    :param default: Default identifier to be returned if none of the known keys were matched.
     :param pop: If enabled, remove the matched key from the input mapping.
     :param key: If enabled, return the matched key instead of the value.
     :returns: value of the matched `id-like` key or ``None`` if not found.
@@ -162,7 +163,7 @@ def get_any_id(info, pop=False, key=False):
         if field in info:
             value = info.pop(field) if pop else info.get(field)
             return field if key else value
-    return None
+    return default
 
 
 def get_any_value(info, default=None, file=True, data=True, pop=False, key=False):
@@ -212,7 +213,7 @@ def get_registry(container=None, nothrow=False):
         return get_current_registry()
     if nothrow:
         return None
-    raise TypeError("Could not retrieve registry from container object of type [{}].".format(type(container)))
+    raise TypeError(f"Could not retrieve registry from container object of type [{fully_qualified_name(container)}].")
 
 
 def get_settings(container=None):
@@ -226,7 +227,7 @@ def get_settings(container=None):
         return container.settings
     if isinstance(container, dict):
         return container
-    raise TypeError("Could not retrieve settings from container object of type [{}]".format(type(container)))
+    raise TypeError(f"Could not retrieve settings from container object of type [{fully_qualified_name(container)}]")
 
 
 def get_header(header_name, header_container, pop=False):
@@ -535,7 +536,7 @@ def parse_extra_options(option_str, sep=","):
             extra_options = [opt.split("=", 1) for opt in option_str.split(sep)]
             extra_options = {opt[0].strip(): (opt[1].strip() if len(opt) > 1 else None) for opt in extra_options}
         except Exception as exc:
-            msg = "Can not parse extra-options: [{}]. Caused by: [{}]".format(option_str, exc)
+            msg = f"Can not parse extra-options: [{option_str}]. Caused by: [{exc}]"
             raise ConfigurationError(msg)
     else:
         extra_options = {}
@@ -672,7 +673,7 @@ def get_base_url(url):
     parsed_url = urlparse(url)
     if not parsed_url.netloc or parsed_url.scheme not in ("http", "https"):
         raise ValueError("bad url")
-    service_url = "%s://%s%s" % (parsed_url.scheme, parsed_url.netloc, parsed_url.path.strip())
+    service_url = f"{parsed_url.scheme}://{parsed_url.netloc}{parsed_url.path.strip()}"
     return service_url
 
 
@@ -755,7 +756,7 @@ def str2bytes(string):
     Obtains the bytes representation of the string.
     """
     if not isinstance(string, (str, bytes)):
-        raise TypeError("Cannot convert item to bytes: {!r}".format(type(string)))
+        raise TypeError(f"Cannot convert item to bytes: {type(string)!r}")
     if isinstance(string, bytes):
         return string
     return string.encode()
@@ -767,7 +768,7 @@ def bytes2str(string):
     Obtains the unicode representation of the string.
     """
     if not isinstance(string, (str, bytes)):
-        raise TypeError("Cannot convert item to unicode: {!r}".format(type(string)))
+        raise TypeError(f"Cannot convert item to unicode: {type(string)!r}")
     if not isinstance(string, bytes):
         return string
     return string.decode()
@@ -799,7 +800,7 @@ def get_path_kvp(path, sep=",", **params):
             return sep.join([str(_) for _ in _v])
         return str(_v)
 
-    kvp = ["{}={}".format(k, _value(v)) for k, v in params.items()]
+    kvp = [f"{k}={_value(v)}" for k, v in params.items()]
     return path + "?" + "&".join(kvp)
 
 
@@ -821,14 +822,13 @@ def get_log_date_fmt():
 
 def get_log_monitor_msg(job_id, status, percent, message, location):
     # type: (str, str, Number, str, str) -> str
-    return "Monitoring job {jobID} : [{status}] {percent} - {message} [{location}]".format(
-        jobID=job_id, status=status, percent=percent, message=message, location=location
-    )
+    return f"Monitoring job {job_id} : [{status}] {percent} - {message} [{location}]"
 
 
 def get_job_log_msg(status, message, progress=0, duration=None):
     # type: (Union[Status, str], str, Optional[Number], Optional[str]) -> str
-    return "{d} {p:3d}% {s:10} {m}".format(d=duration or "", p=int(progress or 0), s=map_status(status), m=message)
+    duration = f"{duration} " if duration is not None else ""
+    return f"{duration}{int(progress or 0):3d}% {map_status(status):10} {message}"
 
 
 def setup_loggers(settings=None,            # type: Optional[AnySettingsContainer]
@@ -1097,7 +1097,7 @@ def retry_on_cache_error(func):
     """
     @functools.wraps(func)
     def wrapped(*args, **kwargs):
-        # type: (Any, Any) -> Any
+        # type: (*Any, **Any) -> Any
         try:
             return func(*args, **kwargs)
         except BeakerException as exc:
@@ -1121,7 +1121,7 @@ def _request_call(method, url, kwargs):
     """
     with requests.Session() as request_session:
         if urlparse(url).scheme in ["", "file"]:
-            url = "file://{}".format(os.path.abspath(url)) if not url.startswith("file://") else url
+            url = f"file://{os.path.abspath(url)}" if not url.startswith("file://") else url
             request_session.mount("file://", FileAdapter())
         resp = request_session.request(method, url, **kwargs)
     return resp
@@ -1286,8 +1286,9 @@ def request_extra(method,                       # type: str
                 invalidate_region(caching_args)
                 return resp
             invalidate_region(caching_args)
-            failures.append("{} ({})".format(getattr(resp, "reason", type(resp).__name__),
-                                             getattr(resp, "status_code", getattr(resp, "code", 500))))
+            reason = getattr(resp, "reason", type(resp).__name__)
+            err_code = getattr(resp, "status_code", getattr(resp, "code", 500))
+            failures.append(f"{reason} ({err_code})")
         # function called without retries raises original error as if calling requests module directly
         except (requests.ConnectionError, requests.Timeout) as exc:
             if no_retries:
@@ -1297,7 +1298,7 @@ def request_extra(method,                       # type: str
     # also pass-through here if no retries
     if no_retries and resp:
         return resp
-    detail = "Request ran out of retries. Attempts generated following errors: {}".format(failures)
+    detail = f"Request ran out of retries. Attempts generated following errors: {failures}"
     err = HTTPGatewayTimeout(detail=detail)
     # make 'raise_for_status' method available for convenience
     setattr(err, "url", url)
@@ -1307,7 +1308,7 @@ def request_extra(method,                       # type: str
 
 
 def download_file_http(file_reference, file_outdir, settings=None, **request_kwargs):
-    # type: (str, str, Optional[AnySettingsContainer], Any) -> str
+    # type: (str, str, Optional[AnySettingsContainer], **Any) -> str
     """
     Downloads the file referenced by an HTTP URL location.
 
@@ -1366,7 +1367,7 @@ def download_file_http(file_reference, file_outdir, settings=None, **request_kwa
         raise ValueError(f"Invalid file name [{file_name!s}] resolved from URL [{file_reference}]. Aborting download.")
 
     file_path = os.path.join(file_outdir, file_name)
-    with open(file_path, "wb") as file:
+    with open(file_path, "wb") as file:  # pylint: disable=W1514
         # NOTE:
         #   Setting 'chunk_size=None' lets the request find a suitable size according to
         #   available memory. Without this, it defaults to 1 which is extremely slow.
@@ -1376,7 +1377,7 @@ def download_file_http(file_reference, file_outdir, settings=None, **request_kwa
 
 
 def fetch_file(file_reference, file_outdir, settings=None, link=None, move=False, **request_kwargs):
-    # type: (str, str, Optional[AnySettingsContainer], Optional[bool], bool, Any) -> str
+    # type: (str, str, Optional[AnySettingsContainer], Optional[bool], bool, **Any) -> str
     """
     Fetches a file from local path, AWS-S3 bucket or remote URL, and dumps it's content to the output directory.
 
@@ -1451,7 +1452,8 @@ def fetch_file(file_reference, file_outdir, settings=None, link=None, move=False
                 LOGGER.warning("Detected HTTP file reference to AWS S3 bucket that mismatches server configuration. "
                                "Will consider it as plain HTTP with read access.")
             else:
-                file_ref_updated = "s3://{}".format(file_reference.replace(s3.meta.endpoint_url, ""))
+                file_reference_s3 = file_reference.replace(s3.meta.endpoint_url, "")
+                file_ref_updated = f"s3://{file_reference_s3}"
                 LOGGER.debug("Adjusting file reference to S3 shorthand for further parsing:\n"
                              "  Initial: [%s]\n"
                              "  Updated: [%s]", file_reference, file_ref_updated)
@@ -1460,8 +1462,10 @@ def fetch_file(file_reference, file_outdir, settings=None, link=None, move=False
     else:
         scheme = file_reference.split("://")
         scheme = "<none>" if len(scheme) < 2 else scheme[0]
-        raise ValueError("Unresolved location and/or fetch file scheme: '{!s}', supported: {}, reference: [{!s}]"
-                         .format(scheme, list(SUPPORTED_FILE_SCHEMES), file_reference))
+        raise ValueError(
+            f"Unresolved location and/or fetch file scheme: '{scheme!s}', "
+            f"supported: {list(SUPPORTED_FILE_SCHEMES)}, reference: [{file_reference!s}]"
+        )
     LOGGER.debug("Fetch file resolved:\n"
                  "  Reference: [%s]\n"
                  "  File Path: [%s]", file_href, file_path)
@@ -1486,7 +1490,7 @@ def load_file(file_path, text=False):
             headers = {"Accept": ContentType.TEXT_PLAIN}
             cwl_resp = request_extra("get", file_path, headers=headers, settings=settings)
             return cwl_resp.content if text else yaml.safe_load(cwl_resp.content)
-        with open(file_path, "r") as f:
+        with open(file_path, mode="r", encoding="utf-8") as f:
             return f.read() if text else yaml.safe_load(f)
     except OSError as exc:
         LOGGER.debug("Loading error: %s", exc, exc_info=exc)
@@ -1503,7 +1507,7 @@ def is_remote_file(file_location):
     """
     cwl_file_path_or_url = file_location.replace("file://", "")
     scheme = urlparse(cwl_file_path_or_url).scheme
-    return scheme != "" and not posixpath.ismount("{}:".format(scheme))  # windows partition
+    return scheme != "" and not posixpath.ismount(f"{scheme}:")  # windows partition
 
 
 REGEX_SEARCH_INVALID_CHARACTERS = re.compile(r"[^a-zA-Z0-9_\-]")
@@ -1537,7 +1541,7 @@ def get_sane_name(name, min_len=3, max_len=None, assert_invalid=True, replace_ch
         Single character to use for replacement of invalid ones if :paramref:`assert_invalid` is ``False``.
     """
     if not isinstance(replace_character, str) or not len(replace_character) == 1:
-        raise ValueError("Single replace character is expected, got invalid [{!s}]".format(replace_character))
+        raise ValueError(f"Single replace character is expected, got invalid [{replace_character!s}]")
     max_len = max_len or len(name)
     if assert_invalid:
         assert_sane_name(name, min_len, max_len)
@@ -1561,15 +1565,17 @@ def assert_sane_name(name, min_len=3, max_len=None):
     from weaver.exceptions import InvalidIdentifierValue, MissingIdentifierValue
 
     if name is None or len(name) == 0:
-        raise MissingIdentifierValue("Invalid name : {0}".format(name))
+        raise MissingIdentifierValue(f"Invalid name : {name}")
     name = name.strip()
-    if "--" in name \
-       or name.startswith("-") \
-       or name.endswith("-") \
-       or len(name) < min_len \
-       or (max_len is not None and len(name) > max_len) \
-       or not re.match(REGEX_ASSERT_INVALID_CHARACTERS, name):
-        raise InvalidIdentifierValue("Invalid name : {0}".format(name))
+    if (
+        "--" in name
+        or name.startswith("-")
+        or name.endswith("-")
+        or len(name) < min_len
+        or (max_len is not None and len(name) > max_len)
+        or not re.match(REGEX_ASSERT_INVALID_CHARACTERS, name)
+    ):
+        raise InvalidIdentifierValue(f"Invalid name : {name}")
 
 
 def clean_json_text_body(body, remove_newlines=True, remove_indents=True):
