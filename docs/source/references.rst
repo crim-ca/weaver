@@ -87,7 +87,7 @@
 .. _ogc-testbeds-apps: https://github.com/crim-ca/application-packages
 
 .. External references
-.. _Celery: https://docs.celeryproject.org/en/latest/
+.. _Celery: https://docs.celeryq.dev/en/latest/
 .. _Gunicorn: https://gunicorn.org/
 .. _Miniconda: https://docs.conda.io/en/latest/miniconda.html
 .. _MongoDB: https://www.mongodb.com/
