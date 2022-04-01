@@ -86,6 +86,7 @@ setup(
         "Natural Language :: English",
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.6",    # FIXME: drop 3.6
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
@@ -107,7 +108,7 @@ setup(
     package_data={"": ["*.mako"]},
     zip_safe=False,
     test_suite="tests",
-    python_requires=">=3.7, <4",
+    python_requires=">=3.6, <4",  # FIXME: >=3.7
     install_requires=REQUIREMENTS,
     dependency_links=LINKS,
     extras_require={

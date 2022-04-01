@@ -46,6 +46,15 @@ jobs:
         allow-failure: [false]
         test-case: [test-unit-only, test-func-only]
         include:
+          # end-of-life python
+          - os: ubuntu-latest
+            python-version: 3.6
+            allow-failure: false
+            test-case: test-unit-only
+          - os: ubuntu-latest
+            python-version: 3.6
+            allow-failure: false
+            test-case: test-func-only
           # linter tests
           - os: ubuntu-latest
             python-version: 3.7
