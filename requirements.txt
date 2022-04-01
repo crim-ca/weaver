@@ -5,7 +5,7 @@ boto3
 # windows fixes until
 # https://github.com/celery/billiard/issues/260
 # https://github.com/celery/billiard/issues/313
-billiard>=3; sys_platform != "win32"  # avoid issue with use_2to3
+billiard>=3.6.*,<4.0; sys_platform != "win32"  # avoid issue with use_2to3
 billiard>3.2,<3.4; sys_platform == "win32"
 # FIXME: pymongo>=4 breaks with kombu corresponding to pinned Celery (https://github.com/crim-ca/weaver/issues/386)
 #   celery >=4.4.3 breaks on 'future.utils' import
