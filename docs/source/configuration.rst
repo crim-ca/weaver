@@ -244,9 +244,9 @@ they are optional and which default value or operation is applied in each situat
     In order to support `synchronous` execution, the ``RESULT_BACKEND`` setting **MUST** be defined.
 
 .. |celery-config| replace:: configuration of Celery
-.. _celery-config: https://docs.celeryproject.org/en/latest/userguide/configuration.html#configuration
+.. _celery-config: https://docs.celeryq.dev/en/latest/userguide/configuration.html#configuration
 .. |celery-mongo| replace:: configuration of MongoDB Backend
-.. _celery-mongo: https://docs.celeryproject.org/en/latest/userguide/configuration.html#mongodb-backend-settings
+.. _celery-mongo: https://docs.celeryq.dev/en/latest/userguide/configuration.html#mongodb-backend-settings
 
 .. _conf_s3_buckets:
 
