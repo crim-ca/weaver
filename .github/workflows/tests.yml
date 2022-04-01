@@ -42,7 +42,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        python-version: ["3.7", "3.8", "3.9", "3.10"]
+        python-version: ["3.7", "3.8", "3.9"]
         allow-failure: [false]
         test-case: [test-unit-only, test-func-only]
         include:
@@ -53,6 +53,15 @@ jobs:
             test-case: test-unit-only
           - os: ubuntu-latest
             python-version: 3.6
+            allow-failure: true
+            test-case: test-func-only
+          # experimental python
+          - os: ubuntu-latest
+            python-version: "3.10"
+            allow-failure: true
+            test-case: test-unit-only
+          - os: ubuntu-latest
+            python-version: "3.10"
             allow-failure: true
             test-case: test-func-only
           # linter tests
