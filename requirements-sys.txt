@@ -1,4 +1,5 @@
-pip>=22.0.4
+pip>=20.2.2; python_version <= "3.6"
+pip>=22.0.4; python_version >= "3.7"
 # let setuptools open to best match since celery enforces some specific versions
 setuptools>=57,!=58.*; python_version <= "3.6"
 setuptools>=59,<59.7; python_version >= "3.7"

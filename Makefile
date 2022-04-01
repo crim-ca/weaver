@@ -556,7 +556,6 @@ check-docf-only: mkdir-reports	## run PEP8 code documentation format checks
 # FIXME: no configuration file support
 define FLYNT_FLAGS
 --line-length 120 \
---exclude $(APP_ROOT)/setup.py \
 --verbose
 endef
 ifeq ($(shell test $(PYTHON_VERSION_MAJOR) -eq 3 && test $(PYTHON_VERSION_MINOR) -ge 8; echo $$?),0)
@@ -692,7 +691,7 @@ fix-fstring-only: mkdir-reports
 	@echo "Fixing code string formats substitutions to f-string definitions..."
 	@-rm -f "$(REPORTS_DIR)/fixed-fstring.txt"
 	@bash -c '$(CONDA_CMD) \
- 		flynt $(FLYNT_FLAGS) "$(APP_ROOT)" \
+		flynt $(FLYNT_FLAGS) "$(APP_ROOT)" \
 		1> >(tee "$(REPORTS_DIR)/fixed-fstring.txt")'
 
 .PHONY: fix-css-only
