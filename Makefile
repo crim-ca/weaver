@@ -243,10 +243,15 @@ install-pkg: install-pip	## install application package dependencies
 	@bash -c "$(CONDA_CMD) pip install $(PIP_XARGS) -r "$(APP_ROOT)/requirements.txt" --no-cache-dir"
 	@echo "Install with pip complete."
 
+# FIXME:
+# 	pre-install 'rdflib-jsonld' to match setuptools, which will then be replaced by more recent when installing celery
+# 	required by: cwltool -> schema_salad
 # don't use 'PIP_XARGS' in this case since extra features could not yet be supported by pip being installed/updated
 .PHONY: install-sys
 install-sys:	## install system dependencies and required installers/runners
 	@echo "Installing system dependencies..."
+	@bash -c '$(CONDA_CMD) pip install "setuptools>=57,<58"'
+	@bash -c '$(CONDA_CMD) pip install "rdflib-jsonld==0.5.0"'
 	@bash -c '$(CONDA_CMD) pip install --upgrade -r "$(APP_ROOT)/requirements-sys.txt"'
 
 .PHONY: install-pip
