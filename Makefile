@@ -556,7 +556,7 @@ check-docf-only: mkdir-reports	## run PEP8 code documentation format checks
 # FIXME: no configuration file support
 define FLYNT_FLAGS
 --line-length 120 \
---exclude $(APP_ROOT)/setup.py
+--exclude $(APP_ROOT)/setup.py \
 --verbose
 endef
 ifeq ($(shell test $(PYTHON_VERSION_MAJOR) -eq 3 && test $(PYTHON_VERSION_MINOR) -ge 8; echo $$?),0)
