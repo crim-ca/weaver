@@ -1,5 +1,7 @@
 pip>=20.2.2; python_version <= "3.6"
 pip>=22.0.4; python_version >= "3.7"
-# let setuptools open to best match since celery enforces some specific versions
+# celery enforces some specific versions of setuptools (<60)
 setuptools>=57,!=58.*; python_version <= "3.6"
-setuptools>=59,<59.7; python_version >= "3.7"
+# FIXME: when cwltool and rdflib-jsonld versions are updated to avoid failing setuptools install, update more recent
+# setuptools>=59,<59.7; python_version >= "3.7"
+setuptools>=57,!=58.*,<58
