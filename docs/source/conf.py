@@ -424,7 +424,7 @@ linkcheck_ignore = [
     # dummy values
     r"http[s]*://localhost.*/",
     r"http[s]*://example.com.*",
-    # ignore celery docs having problem (https://github.com/celery/celery/issues/7351)
+    # ignore celery docs having problem (https://github.com/celery/celery/issues/7351), use 'docs.celeryq.dev' instead
     "https://docs.celeryproject.org/",
     "https://mouflon.dkrz.de/",
     # following have sporadic downtimes
