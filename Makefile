@@ -200,7 +200,7 @@ conda-config: conda-base	## setup configuration of the conda environment
 .PHONY: conda-install
 conda-install: conda-env
 	@echo "Updating conda packages..."
-	@bash -c '$(CONDA_CMD) conda install -c conda-forge proj'
+	@bash -c '$(CONDA_CMD) conda install -y -c conda-forge proj'
 
 .PHONY: conda-env
 conda-env: conda-base conda-config	## create the conda environment
