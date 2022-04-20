@@ -10,6 +10,19 @@ Changes
 `Unreleased <https://github.com/crim-ca/weaver/tree/master>`_ (latest)
 ========================================================================
 
+Changes:
+--------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_4.15.0:
+
+`4.15.0 <https://github.com/crim-ca/weaver/tree/4.15.0>`_ (2022-04-20)
+========================================================================
+
 Important:
 ----------
 - In order to support *synchronous* execution, setting ``RESULT_BACKEND`` **MUST** be specified in
