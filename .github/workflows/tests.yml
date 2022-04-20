@@ -103,8 +103,7 @@ jobs:
         name: Parse Python Version
         id: python-semver
         with:
-          input_string: ${{ matrix.python-version }}
-          version_extractor_regex: '^(.*)$'
+          input_string: '${{ matrix.python-version }}'
       - uses: actions/cache@v3
         name: Check Proj Lib Pre-Built in Cache
         id: cache-proj
