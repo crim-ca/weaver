@@ -105,7 +105,7 @@ jobs:
         with:
           # note: '22' is v8, '21' is v7
           path: /usr/local/lib/x86_64-linux-gnu/libproj.so.22.2.1
-          key: ${{ runner.os }}-${{ hashFiles('/usr/local/lib/x86_64-linux-gnu/libproj.so.22.2.1') }}
+          key: ${{ runner.os }}-libproj
       - name: Install Proj Lib Prerequisite
         if: ${{ matrix.python-version >= '3.10' && steps.cache-proj.outputs.cache-hit != 'true' }}
         run: |
