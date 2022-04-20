@@ -112,7 +112,7 @@ jobs:
           path: /tmp/proj-8.2.1/install
           key: ${{ runner.os }}-python${{ matrix.python-version }}-proj
       - name: Install Proj Lib Prerequisite
-        if: >
+        if: |
           ${{ 
             steps.python-semver.outputs.major == '3' &&
             steps.python-semver.outputs.minor >= '10' &&
