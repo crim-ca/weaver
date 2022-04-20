@@ -82,7 +82,7 @@ def doc_redirect_include(file_path):
 doc_redirect_map = {}
 for _dir in [DOC_SRC_ROOT, DOC_PRJ_ROOT]:
     doc_redirect_map.update({
-        "docs/source/{}".format(file_name): file_name
+        f"docs/source/{file_name}": file_name
         for file_name in os.listdir(_dir)
         if doc_redirect_include(file_name)
     })
@@ -144,7 +144,7 @@ source_suffix = ".rst"
 
 # The master toctree document.
 master_doc = "index"
-master_title = "{} Documentation".format(__meta__.__title__)
+master_title = f"{__meta__.__title__} Documentation"
 
 # General information about the project.
 project = __meta__.__title__
@@ -336,7 +336,7 @@ latex_elements = {
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title,
 #  author, document class [howto, manual, or own class]).
-latex_file = "{}.tex".format(__meta__.__name__)
+latex_file = f"{__meta__.__name__}.tex"
 latex_documents = [
     (master_doc, latex_file, master_title, __meta__.__author__, "manual"),
 ]
@@ -406,7 +406,7 @@ texinfo_documents = [
 # intersphinx_mapping = {'https://docs.python.org/': None}
 intersphinx_mapping = {
     "python": ("http://docs.python.org/", None),
-    __meta__.__name__: ("{}/en/latest".format(__meta__.__documentation_url__), None),
+    __meta__.__name__: (f"{__meta__.__documentation_url__}/en/latest", None),
 }
 
 # linkcheck options

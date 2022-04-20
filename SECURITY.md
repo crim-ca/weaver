@@ -11,6 +11,6 @@ Security and vulnerability reports should be submitted as an issue of type [Secu
 Patches for security vulnerabilities will be released for the following versions:
 
 | Version | Supported          |
-| ------- | ------------------ |
+|---------|--------------------|
 | 4.x     | :white_check_mark: |
 | < 4.x   | :x:                |

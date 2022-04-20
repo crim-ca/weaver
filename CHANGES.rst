@@ -19,6 +19,13 @@ Important:
 - With resolution and added support of ``transmissionMode`` handling according to `OGC API - Processes` specification,
   requests that where submitted with ``reference`` outputs will produce results in a different format than previously
   since this parameter was ignored and always returned ``value`` representation.
+- Due to ``celery>=5.2`` migration, any call to ``celery`` `CLI` must be updated accordingly by moving the global
+  options before the *mode*, namely ``worker``, ``inspect`` and so on. Specifically for `Weaver`, this means
+  the ``weaver-worker`` command line option `-A` must be moved *before* ``worker`` as follows:
+
+  .. code-block:: shell
+
+    celery -A pyramid_celery.celery_app worker -B -E --ini weaver.ini [...]
 
 Changes:
 --------
@@ -64,6 +71,8 @@ Changes:
   `#105 <https://github.com/crim-ca/weaver/issues/105>`_,
   `#294 <https://github.com/crim-ca/weaver/issues/294>`_,
   `#399 <https://github.com/crim-ca/weaver/issues/399>`_).
+- Phase out ``Python 3.6`` support to better resolve package dependencies
+  (could still work, but not explicitly supported nor officially guaranteed to work).
 
 Fixes:
 ------
@@ -82,6 +91,8 @@ Fixes:
   (relates to `#352 <https://github.com/crim-ca/weaver/issues/352>`_
   addressing issues `geopython/pywps#578 <https://github.com/geopython/pywps/pull/578>`_
   and `geopython/pywps#623 <https://github.com/geopython/pywps/pull/623>`_).
+- Fix ``celery`` security vulnerability with update to latest recommended version
+  (resolves `#386 <https://github.com/crim-ca/weaver/issues/386>`_).
 
 .. _changes_4.14.0:
 

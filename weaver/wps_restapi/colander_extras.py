@@ -167,7 +167,7 @@ class SchemeURL(colander.Regex):
         if not schemes:
             schemes = [""]
         if not msg:
-            msg = colander._("Must be a URL matching one of schemes {}".format(schemes))  # noqa
+            msg = colander._(f"Must be a URL matching one of schemes {schemes}")  # noqa
         regex_schemes = r"(?:" + "|".join(schemes) + r")"
         regex = colander.URL_REGEX.replace(r"(?:http|ftp)s?", regex_schemes)
         super(SchemeURL, self).__init__(regex, msg=msg, flags=flags)
@@ -459,7 +459,7 @@ class ExtendedSchemaBase(colander.SchemaNode, metaclass=ExtendedSchemaMeta):
                 title = kwargs.get("title", schema_name)
             # pylint: disable=no-member  # prefix added by XMLObject
             if self.prefix is not colander.drop:
-                title = "{}:{}".format(self.prefix or "xml", title)
+                title = f"{self.prefix or 'xml'}:{title}"
             kwargs["title"] = title
         elif isinstance(schema_type, (colander.Mapping, colander.Sequence)):
             if self.title in ["", colander.required]:
@@ -487,7 +487,7 @@ class ExtendedSchemaBase(colander.SchemaNode, metaclass=ExtendedSchemaMeta):
             super(ExtendedSchemaBase, self).__init__(*args, **kwargs)
             ExtendedSchemaBase._validate(self)
         except Exception as exc:
-            raise SchemaNodeTypeError("Invalid schema definition for [{}]".format(schema_name)) from exc
+            raise SchemaNodeTypeError(f"Invalid schema definition for [{schema_name}]") from exc
 
     @staticmethod
     def _validate(node):
@@ -810,7 +810,7 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
             return False
         # value must be a dictionary map object to allow variable key
         if not isinstance(cstruct, dict):
-            msg = "Variable key not allowed for non-mapping data: {}".format(type(cstruct).__name__)
+            msg = f"Variable key not allowed for non-mapping data: {type(cstruct).__name__}"
             raise colander.Invalid(node=node, msg=msg)
         return True
 
@@ -837,11 +837,11 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
                 for var_mapped in mapped:
                     result[var_mapped["name"]] = var_mapped["cstruct"]
         except colander.Invalid as invalid:
-            invalid_var.msg = "Tried matching variable '{}' sub-schemas but no match found.".format(var_name)
+            invalid_var.msg = f"Tried matching variable '{var_name}' sub-schemas but no match found."
             invalid_var.add(invalid)
             raise invalid_var
         except KeyError:
-            invalid_var.msg = "Tried matching variable '{}' sub-schemas but mapping failed.".format(var_name)
+            invalid_var.msg = f"Tried matching variable '{var_name}' sub-schemas but mapping failed."
             raise invalid_var
         if not isinstance(result, dict):
             raise TypeError("Variable result must be of mapping schema type. Got [{}] value {}".format(
@@ -859,7 +859,7 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
         for var_child in var_children:
             var = getattr(var_child, self._variable, None)
             var_map[var] = []
-            var_msg = "Requirement not met under variable: {}.".format(var)
+            var_msg = f"Requirement not met under variable: {var}."
             var_invalid = colander.Invalid(node=self, msg=var_msg, value=cstruct)
             # attempt to find any sub-node matching the sub-schema under variable
             for child_key, child_cstruct in cstruct.items():
@@ -1255,7 +1255,7 @@ class KeywordMapper(ExtendedMappingSchema):
                     self._keyword = self._keyword_inv.get(maybe_kwargs[0], maybe_kwargs[0])
                     setattr(self, self._keyword, kwargs.get(maybe_kwargs[0]))
             if not self._keyword:
-                raise SchemaNodeTypeError("Type '{}' must define a keyword element.".format(self))
+                raise SchemaNodeTypeError(f"Type '{self}' must define a keyword element.")
         self._validate_keyword_unique()
         self._validate_keyword_schemas()
 
@@ -1278,13 +1278,9 @@ class KeywordMapper(ExtendedMappingSchema):
             if hasattr(self, kw):
                 total += 1
             if total > 1:
-                raise SchemaNodeTypeError("Multiple keywords '{}' not permitted for '{!s}'".format(
-                    list(self._keywords), self
-                ))
+                raise SchemaNodeTypeError(f"Multiple keywords '{list(self._keywords)}' not permitted for '{self!s}'")
         if not total == 1:
-            raise SchemaNodeTypeError("Missing one of keywords '{}' for '{!s}'".format(
-                list(self._keywords), self
-            ))
+            raise SchemaNodeTypeError(f"Missing one of keywords '{list(self._keywords)}' for '{self!s}'")
 
     def _validate_keyword_schemas(self):
         """
@@ -1509,7 +1505,7 @@ class OneOfKeywordSchema(KeywordMapper):
 
         Must be overridden in the schema definition using it.
         """
-        raise SchemaNodeTypeError("Missing '{}' keyword for schema '{}'.".format(cls._keyword, cls))
+        raise SchemaNodeTypeError(f"Missing '{cls._keyword}' keyword for schema '{cls}'.")
 
     def __init__(self, *args, **kwargs):
         discriminator = getattr(self, self._discriminator, None)
@@ -1579,8 +1575,7 @@ class OneOfKeywordSchema(KeywordMapper):
             except colander.Invalid as invalid:
                 invalid_one_of.update({_get_node_name(invalid.node, schema_name=True): invalid.asdict()})
         message = (
-            "Incorrect type must be one of: {}. Errors for each case: {}"
-            .format(list(invalid_one_of), invalid_one_of)
+            f"Incorrect type must be one of: {list(invalid_one_of)}. Errors for each case: {invalid_one_of}"
         )
         if valid_one_of:
             # if found only one, return it, otherwise try to discriminate
@@ -1674,7 +1669,7 @@ class AllOfKeywordSchema(KeywordMapper):
 
         Must be overridden in the schema definition using it.
         """
-        raise SchemaNodeTypeError("Missing '{}' keyword for schema '{}'.".format(cls._keyword, cls))
+        raise SchemaNodeTypeError(f"Missing '{cls._keyword}' keyword for schema '{cls}'.")
 
     def _deserialize_keyword(self, cstruct):
         """
@@ -1781,7 +1776,7 @@ class AnyOfKeywordSchema(KeywordMapper):
 
         Must be overridden in the schema definition using it.
         """
-        raise SchemaNodeTypeError("Missing '{}' keyword for schema '{}'.".format(cls._keyword, cls))
+        raise SchemaNodeTypeError(f"Missing '{cls._keyword}' keyword for schema '{cls}'.")
 
     def _deserialize_keyword(self, cstruct):
         """
@@ -1816,8 +1811,7 @@ class AnyOfKeywordSchema(KeywordMapper):
         # nothing succeeded, the whole definition is invalid in this case
         if merged_any_of is colander.null:
             invalid_any_of.msg = (
-                "Incorrect type must represent any of: {}. "
-                "All missing from: {}".format(list(option_any_of), cstruct)
+                f"Incorrect type must represent any of: {list(option_any_of)}. All missing from: {cstruct}"
             )
             raise invalid_any_of
         return merged_any_of
@@ -1873,7 +1867,7 @@ class NotKeywordSchema(KeywordMapper):
 
         Must be overridden in the schema definition using it.
         """
-        raise SchemaNodeTypeError("Missing '{}' keyword for schema '{}'.".format(cls._keyword, cls))
+        raise SchemaNodeTypeError(f"Missing '{cls._keyword}' keyword for schema '{cls}'.")
 
     def _deserialize_keyword(self, cstruct):
         """
@@ -1891,7 +1885,7 @@ class NotKeywordSchema(KeywordMapper):
             except colander.Invalid:
                 pass  # error raised as intended when missing field is not present
         if invalid_not:
-            message = "Value contains not allowed fields from schema conditions: {}".format(invalid_not)
+            message = f"Value contains not allowed fields from schema conditions: {invalid_not}"
             raise colander.Invalid(node=self, msg=message, value=cstruct)
         # If schema was a plain NotKeywordSchema, the result will be empty as it serves only to validate
         # that the subnodes are not present. Otherwise, if it derives from other mapping classes, apply them.
@@ -1942,7 +1936,7 @@ class OneOfKeywordTypeConverter(KeywordTypeConverter):
             if len(getattr(schema_node, "children", [])):
                 if not isinstance(schema_node, colander.MappingSchema):
                     raise ConversionTypeError(
-                        "Unknown base type to convert oneOf schema item is no a mapping: {}".format(type(schema_node))
+                        f"Unknown base type to convert oneOf schema item is no a mapping: {type(schema_node)}"
                     )
                 # specific oneOf sub-item, will be processed by itself during dispatch of sub-item of allOf
                 # rewrite the title of that new sub-item schema from the original title to avoid conflict
@@ -2155,7 +2149,7 @@ def _make_node_instance(schema_node_or_class):
         schema_node_or_class = schema_node_or_class()
     if not isinstance(schema_node_or_class, colander.SchemaNode):  # refer to original class to support non-extended
         raise ConversionTypeError(
-            "Invalid item should be a SchemaNode, got: {!s}".format(type(schema_node_or_class)))
+            f"Invalid item should be a SchemaNode, got: {type(schema_node_or_class)!s}")
     return schema_node_or_class
 
 
@@ -2179,7 +2173,7 @@ def _get_schema_type(schema_node, check=False):
     if not isinstance(schema_type, colander.SchemaType):
         if check:
             return None
-        raise ConversionTypeError("Invalid schema type could not be detected: {!s}".format(type(schema_type)))
+        raise ConversionTypeError(f"Invalid schema type could not be detected: {type(schema_type)!s}")
     return schema_type
 
 

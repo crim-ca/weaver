@@ -783,8 +783,7 @@ def is_cwl_enum_type(io_info):
             f"Unsupported I/O 'enum' base type: `{type(first_allow)!s}`, from definition: `{io_info!r}`."
         )
 
-    # allowed value validator mode must be set for input
-    return True, io_type, MODE.SIMPLE, io_allow
+    return True, io_type, MODE.SIMPLE, io_allow  # allowed value validator mode must be set for input
 
 
 def get_cwl_io_type(io_info):

@@ -63,6 +63,9 @@ else
 endif
 DOWNLOAD_CACHE ?= $(APP_ROOT)/downloads
 PYTHON_VERSION ?= `python -c 'import platform; print(platform.python_version())'`
+PYTHON_VERSION_MAJOR := $(shell echo $(PYTHON_VERSION) | cut -f 1 -d '.')
+PYTHON_VERSION_MINOR := $(shell echo $(PYTHON_VERSION) | cut -f 2 -d '.')
+PYTHON_VERSION_PATCH := $(shell echo $(PYTHON_VERSION) | cut -f 3 -d '.' | cut -f 1 -d ' ')
 PIP_USE_FEATURE := `python -c '\
 	import pip; \
 	from distutils.version import LooseVersion; \
@@ -194,6 +197,11 @@ conda-config: conda-base	## setup configuration of the conda environment
 	@ "$(CONDA_BIN)" config --add channels defaults
 	@ "$(CONDA_BIN)" config --append channels conda-forge
 
+.PHONY: conda-install
+conda-install: conda-env
+	@echo "Updating conda packages..."
+	@bash -c '$(CONDA_CMD) conda install -y -c conda-forge proj'
+
 .PHONY: conda-env
 conda-env: conda-base conda-config	## create the conda environment
 	@test -d "$(CONDA_ENV_PATH)" || \
@@ -217,10 +225,10 @@ conda-env-export:		## export the conda environment
 install: install-all    ## alias for 'install-all' target
 
 .PHONY: install-run
-install-run: install-sys install-pkg install-raw 	## install requirements and application to run it locally
+install-run: conda-install install-sys install-pkg install-raw 	## install requirements and application to run locally
 
 .PHONY: install-all
-install-all: install-sys install-pkg install-pip install-dev  ## install application with all its dependencies
+install-all: conda-install install-sys install-pkg install-pip install-dev  ## install application with all dependencies
 
 .PHONY: install-doc
 install-doc: install-pip	## install documentation dependencies
@@ -242,7 +250,7 @@ install-pkg: install-pip	## install application package dependencies
 
 # don't use 'PIP_XARGS' in this case since extra features could not yet be supported by pip being installed/updated
 .PHONY: install-sys
-install-sys: conda-env	## install system dependencies and required installers/runners
+install-sys:	## install system dependencies and required installers/runners
 	@echo "Installing system dependencies..."
 	@bash -c '$(CONDA_CMD) pip install --upgrade -r "$(APP_ROOT)/requirements-sys.txt"'
 
@@ -446,7 +454,7 @@ coverage: test-coverage  ## alias to run test with coverage analysis
 ## -- [variants '<target>-only' without '-only' suffix are also available with pre-install setup]
 
 # autogen check variants with pre-install of dependencies using the '-only' target references
-CHECKS := pep8 lint security security-code security-deps doc8 docf docstring links imports
+CHECKS := pep8 lint security security-code security-deps doc8 docf fstring docstring links imports
 CHECKS := $(addprefix check-, $(CHECKS))
 
 # items that should not install python dev packages should be added here instead
@@ -550,6 +558,23 @@ check-docf-only: mkdir-reports	## run PEP8 code documentation format checks
 			"$(APP_ROOT)" \
 		1>&2 2> >(tee "$(REPORTS_DIR)/check-docf.txt")'
 
+# FIXME: no configuration file support
+define FLYNT_FLAGS
+--line-length 120 \
+--verbose
+endef
+ifeq ($(shell test $(PYTHON_VERSION_MAJOR) -eq 3 && test $(PYTHON_VERSION_MINOR) -ge 8; echo $$?),0)
+  FLYNT_FLAGS := $(FLYNT_FLAGS) --transform-concats
+endif
+
+.PHONY: check-fstring-only
+check-fstring-only: mkdir-reports	## check f-string format definitions
+	@echo "Running code f-string formats substitutions..."
+	@-rm -f "$(REPORTS_DIR)/check-fstring.txt"
+	@bash -c '$(CONDA_CMD) \
+		flynt --dry-run --fail-on-change $(FLYNT_FLAGS) "$(APP_ROOT)" \
+		1> >(tee "$(REPORTS_DIR)/check-fstring.txt")'
+
 .PHONY: check-docstring-only
 check-docstring-only: mkdir-reports  ## check code docstring style and linting
 	@echo "Running docstring checks..."
@@ -599,7 +624,7 @@ check-md-only: mkdir-reports 	## check Markdown linting
 check-md: install-npm-remarklint check-md-only	## check Markdown linting after dependency installation
 
 # autogen fix variants with pre-install of dependencies using the '-only' target references
-FIXES := imports lint docf
+FIXES := imports lint docf fstring
 FIXES := $(addprefix fix-, $(FIXES))
 # items that should not install python dev packages should be added here instead
 # they must provide their own target/only + with dependency install variants
@@ -665,6 +690,14 @@ fix-docf-only: mkdir-reports  ## fix some PEP8 code documentation style problems
 			--recursive \
 			$(APP_ROOT) \
 		1> >(tee "$(REPORTS_DIR)/fixed-docf.txt")'
+
+.PHONY: fix-fstring-only
+fix-fstring-only: mkdir-reports
+	@echo "Fixing code string formats substitutions to f-string definitions..."
+	@-rm -f "$(REPORTS_DIR)/fixed-fstring.txt"
+	@bash -c '$(CONDA_CMD) \
+		flynt $(FLYNT_FLAGS) "$(APP_ROOT)" \
+		1> >(tee "$(REPORTS_DIR)/fixed-fstring.txt")'
 
 .PHONY: fix-css-only
 fix-css-only: mkdir-reports 	## fix CSS linting problems automatically

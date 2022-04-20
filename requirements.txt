@@ -5,14 +5,20 @@ boto3
 # windows fixes until
 # https://github.com/celery/billiard/issues/260
 # https://github.com/celery/billiard/issues/313
-billiard; sys_platform != "win32"
+billiard>2; sys_platform != "win32"  # avoid issue with use_2to3
 billiard>3.2,<3.4; sys_platform == "win32"
 # FIXME: pymongo>=4 breaks with kombu corresponding to pinned Celery (https://github.com/crim-ca/weaver/issues/386)
 #   celery >=4.4.3 breaks on 'future.utils' import
 #   celery's CLI interface changed
 #   https://github.com/celery/celery/blob/master/docs/whatsnew-5.2.rst#upgrading-from-celery-4x
-celery[mongodb]==4.4.2; sys_platform != "win32"  # pyup: ignore
 celery[mongodb]<4; sys_platform == "win32"  # pyup: ignore
+# FIXME: use celery 5.2 specifically to resolve security issue
+#   best match for now since cannot use setuptools>=59 until cwltool/rdflib-jsonld are updated
+celery[mongodb]==5.2.2; sys_platform != "win32" and python_version >= "3.7"  # pyup: ignore
+# celery[mongodb]>=5.2.3; sys_platform != "win32" and python_version >= "3.7"  # pyup: ignore
+# technically, >=5.2 preferred to resolve security issue, but dependency resolver cannot find it
+# FIXME: drop support? more recent versions not avilable for end-of-life python
+celery[mongodb]>=5.1; sys_platform != "win32" and python_version <= "3.6"  # pyup: ignore
 cffi
 colander
 cornice
@@ -28,7 +34,7 @@ cryptography
 # FIXME: remove extra CWL code and let it handle it for use
 #   - changes since cause error with invalid get_listing import location
 #   - https://github.com/crim-ca/weaver/issues/154
-cwltool>=2,<=3.0.20200324120055
+cwltool==3.0.20200324120055
 docker
 duration
 git+https://github.com/ESGF/esgf-compute-api.git@v2.3.7#egg=esgf-compute-api
@@ -49,7 +55,7 @@ pymongo>=3.12.0,<4
 pyproj>=3
 pyramid>=1.7.3
 pyramid_beaker>=0.8
-pyramid_celery
+pyramid_celery>=4.0.0   # required for celery>=5
 pyramid_mako
 python-dateutil
 pyramid_rewrite
@@ -57,8 +63,6 @@ pyramid_storage
 pytz
 pywps==4.5.1
 pyyaml>=5.2
-# required by: cwltool => schema_salad, make requirement stricter because it has longer wheel build time
-rdflib-jsonld==0.5.0
 requests
 requests_file
 # let cwltool define ruamel.yaml version (<=0.16.5)

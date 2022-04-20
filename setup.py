@@ -20,7 +20,7 @@ from weaver import __meta__  # isort:skip # noqa: E402
 
 # pylint: disable=C0209,consider-using-f-string
 
-LOGGER = logging.getLogger("{}.setup".format(__meta__.__name__))
+LOGGER = logging.getLogger(f"{__meta__.__name__}.setup")
 if logging.StreamHandler not in LOGGER.handlers:
     LOGGER.addHandler(logging.StreamHandler(sys.stdout))  # type: ignore # noqa
 LOGGER.setLevel(logging.INFO)
@@ -89,6 +89,8 @@ setup(
         "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
         "Framework :: Pyramid",
         "Topic :: Internet :: WWW/HTTP",
         "Topic :: Internet :: WWW/HTTP :: WSGI :: Application",
@@ -116,7 +118,7 @@ setup(
     },
     entry_points={
         "paste.app_factory": [
-            "main = {}:main".format(__meta__.__name__)
+            f"main = {__meta__.__name__}:main"
         ],
         "console_scripts": [
             "{0} = {0}.cli:main".format(__meta__.__name__)

@@ -10,8 +10,4 @@ python:
   install:
     - requirements: requirements-sys.txt
     - requirements: requirements-doc.txt
-#    - method: pip
-#      path: .
-#      extra_requirements:
-#        - docs
   system_packages: false
