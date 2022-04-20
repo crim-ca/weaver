@@ -13,8 +13,8 @@ about: Create a pull request to resolve issues or add new features.
 
 ## Features and Fixes
 
-- Fixes \#<issue number>
-- Relates to \#<issue number>
+- Fixes #\<issue number>
+- Relates to #\<issue number>
 
 ## Checklist
 
