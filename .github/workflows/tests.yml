@@ -109,25 +109,32 @@ jobs:
         id: cache-proj
         with:
           # note: '22' is v8, '21' is v7
-          path: /usr/local/lib/x86_64-linux-gnu/libproj.so.22.2.1
-          key: ${{ runner.os }}-proj
+          path: /tmp/proj-8.2.1/install
+          key: ${{ runner.os }}-python${{ matrix.python-version }}-proj
       - name: Install Proj Lib Prerequisite
         if: >
           ${{ 
             steps.python-semver.outputs.major == '3' &&
             steps.python-semver.outputs.minor >= '10' &&
-            steps.cache-proj.outputs.cache-hit != 'true' 
+            steps.cache-proj.outputs.cache-hit != 'true'
           }}
+        env:
+          PROJ_CACHE_HIT: ${{ steps.cache-proj.outputs.cache-hit }}
+        # copy install instead of direct install to avoid cache permission denied
         run: |
+          if [[ "${PROJ_CACHE_HIT}" != 'true' ]]; then
+            sudo apt-get install -y cmake libcurl4-openssl-dev libsqlite3-dev
+            cd /tmp/
+            wget https://download.osgeo.org/proj/proj-8.2.1.tar.gz
+            tar -xzf proj-8.2.1.tar.gz
+            mkdir proj-8.2.1/install
+            mkdir proj-8.2.1/build
+            cd proj-8.2.1/build
+            cmake -DCMAKE_INSTALL_PREFIX=/tmp/proj-8.2.1/install -DBUILD_TESTING=OFF ..
+            make install -j $(nproc)
+          fi
           echo "PROJ_DIR=/usr/local" >> $GITHUB_ENV
-          wget https://download.osgeo.org/proj/proj-8.2.1.tar.gz
-          tar -xzf proj-8.2.1.tar.gz
-          mkdir proj-8.2.1/build
-          cd proj-8.2.1/build
-          sudo apt-get install -y cmake libcurl4-openssl-dev libsqlite3-dev
-          cmake -DCMAKE_INSTALL_PREFIX=/usr/local -DBUILD_TESTING=OFF ..
-          sudo make install -j $(nproc)
-          rm -fr proj-8.2.1/
+          sudo cp --verbose --force --recursive /tmp/proj-8.2.1/install/* /usr/local/
       - name: Install Dependencies
         # skip python setup if running with docker
         if: ${{ matrix.test-case != 'test-docker' }}
