@@ -99,8 +99,15 @@ jobs:
         uses: actions/setup-python@v2
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Install Prerequisites
-        if: ${{ matrix.python-version >= '3.10' }}
+      - uses: actions/cache@v3
+        name: Check Proj Lib Pre-Built in Cache
+        id: cache-proj
+        with:
+          # note: '22' is v8, '21' is v7
+          path: /usr/local/lib/x86_64-linux-gnu/libproj.so.22.2.1
+          key: ${{ runner.os }}-${{ hashFiles('/usr/local/lib/x86_64-linux-gnu/libproj.so.22.2.1') }}
+      - name: Install Proj Lib Prerequisite
+        if: ${{ matrix.python-version >= '3.10' && steps.cache-proj.outputs.cache-hit != 'true' }}
         run: |
           echo "PROJ_DIR=/usr/local" >> $GITHUB_ENV
           wget https://download.osgeo.org/proj/proj-8.2.1.tar.gz
@@ -110,6 +117,7 @@ jobs:
           sudo apt-get install -y cmake libcurl4-openssl-dev libsqlite3-dev
           cmake -DCMAKE_INSTALL_PREFIX=/usr/local ..
           sudo make install -j $(nproc)
+          rm -fr proj-8.2.1/
       - name: Install Dependencies
         # skip python setup if running with docker
         if: ${{ matrix.test-case != 'test-docker' }}
