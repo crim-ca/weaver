@@ -116,7 +116,7 @@ jobs:
           ${{ 
             steps.python-semver.outputs.major == '3' &&
             steps.python-semver.outputs.minor >= '10' &&
-            && steps.cache-proj.outputs.cache-hit != 'true' 
+            steps.cache-proj.outputs.cache-hit != 'true' 
           }}
         run: |
           echo "PROJ_DIR=/usr/local" >> $GITHUB_ENV
