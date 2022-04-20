@@ -99,11 +99,11 @@ jobs:
         uses: actions/setup-python@v2
         with:
           python-version: ${{ matrix.python-version }}
-      - uses: booxmedialtd/ws-action-parse-semver@v1
-        name: Parse Python Version
+      - name: Parse Python Version
         id: python-semver
-        with:
-          input_string: '${{ matrix.python-version }}'
+        run: |
+          echo "::set-output name=major:$(echo ${{ matrix.python-version }} | cut -d '.' -f 1)"
+          echo "::set-output name=minor:$(echo ${{ matrix.python-version }} | cut -d '.' -f 2)"
       - uses: actions/cache@v3
         name: Check Proj Lib Pre-Built in Cache
         id: cache-proj
