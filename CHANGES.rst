@@ -24,6 +24,7 @@ Important:
   the ``weaver-worker`` command line option `-A` must be moved *before* ``worker`` as follows:
 
   .. code-block:: shell
+
     celery -A pyramid_celery.celery_app worker -B -E --ini weaver.ini [...]
 
 Changes:
