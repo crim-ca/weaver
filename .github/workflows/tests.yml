@@ -113,11 +113,9 @@ jobs:
           key: ${{ runner.os }}-python${{ matrix.python-version }}-proj
       - name: Install Proj Lib Prerequisite
         if: |
-          ${{ 
-            steps.python-semver.outputs.major == '3' &&
-            steps.python-semver.outputs.minor >= '10' &&
-            steps.cache-proj.outputs.cache-hit != 'true'
-          }}
+          steps.python-semver.outputs.major == 3 &&
+          steps.python-semver.outputs.minor >= 10 &&
+          steps.cache-proj.outputs.cache-hit != 'true'
         env:
           PROJ_CACHE_HIT: ${{ steps.cache-proj.outputs.cache-hit }}
         # copy install instead of direct install to avoid cache permission denied
