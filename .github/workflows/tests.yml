@@ -105,7 +105,7 @@ jobs:
         with:
           # note: '22' is v8, '21' is v7
           path: /usr/local/lib/x86_64-linux-gnu/libproj.so.22.2.1
-          key: ${{ runner.os }}-libproj
+          key: ${{ runner.os }}-proj
       - name: Install Proj Lib Prerequisite
         if: ${{ matrix.python-version >= '3.10' && steps.cache-proj.outputs.cache-hit != 'true' }}
         run: |
@@ -115,7 +115,7 @@ jobs:
           mkdir proj-8.2.1/build
           cd proj-8.2.1/build
           sudo apt-get install -y cmake libcurl4-openssl-dev libsqlite3-dev
-          cmake -DCMAKE_INSTALL_PREFIX=/usr/local ..
+          cmake -DCMAKE_INSTALL_PREFIX=/usr/local -DBUILD_TESTING=OFF ..
           sudo make install -j $(nproc)
           rm -fr proj-8.2.1/
       - name: Install Dependencies
