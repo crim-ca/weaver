@@ -1501,7 +1501,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         assert isinstance(resp.text, str)
         assert not resp.text.startswith("[\"[")  # JSON list '[' followed by each string item with [<datetime>]
         with pytest.raises(AttributeError):
-            resp.json  # noqa
+            resp.json  # noqa  # pylint: disable=pointless-statement
         lines = resp.text.split("\n")
         assert len(lines) == 3
         assert "Start" in lines[0]
@@ -1514,7 +1514,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         assert isinstance(resp.text, str)
         assert not resp.text.startswith("[\"[")  # JSON list '[' followed by each string item with [<datetime>]
         with pytest.raises(AttributeError):
-            resp.json  # noqa
+            resp.json  # noqa  # pylint: disable=pointless-statement
         lines = resp.text.split("\n")
         assert len(lines) == 3
         assert "Start" in lines[0]
@@ -1528,7 +1528,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         assert resp.text.startswith("<?xml")
         assert "<logs>" in resp.text
         with pytest.raises(AttributeError):
-            resp.json  # noqa
+            resp.json  # noqa  # pylint: disable=pointless-statement
         lines = resp.text.split("<logs>")[-1].split("</logs>")[0].split("<item")[1:]
         assert len(lines) == 3
         assert "Start" in lines[0]
@@ -1540,7 +1540,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         assert ContentType.APP_YAML in resp.content_type
         assert isinstance(resp.text, str)
         with pytest.raises(AttributeError):
-            resp.json  # noqa
+            resp.json  # noqa  # pylint: disable=pointless-statement
         lines = resp.text.split("\n")
         lines = [line for line in lines if line]
         assert len(lines) == 3
