@@ -11,14 +11,13 @@ billiard>3.2,<3.4; sys_platform == "win32"
 #   celery >=4.4.3 breaks on 'future.utils' import
 #   celery's CLI interface changed
 #   https://github.com/celery/celery/blob/master/docs/whatsnew-5.2.rst#upgrading-from-celery-4x
-celery[mongodb]<4; sys_platform == "win32"  # pyup: ignore
+celery[mongodb]<4; sys_platform == "win32"  # rq.filter: <4  # pyup: ignore
 # FIXME: use celery 5.2 specifically to resolve security issue
 #   best match for now since cannot use setuptools>=59 until cwltool/rdflib-jsonld are updated
-celery[mongodb]==5.2.2; sys_platform != "win32" and python_version >= "3.7"  # pyup: ignore
-# celery[mongodb]>=5.2.3; sys_platform != "win32" and python_version >= "3.7"  # pyup: ignore
+celery[mongodb]>=5.2.2,<6; sys_platform != "win32" and python_version >= "3.7"
 # technically, >=5.2 preferred to resolve security issue, but dependency resolver cannot find it
 # FIXME: drop support? more recent versions not avilable for end-of-life python
-celery[mongodb]>=5.1; sys_platform != "win32" and python_version <= "3.6"  # pyup: ignore
+celery[mongodb]>=5.1,<5.2; sys_platform != "win32" and python_version <= "3.6"  # rq.filter: >=5.1,<5.2 # pyup: ignore
 cffi
 colander
 cornice
