@@ -74,6 +74,12 @@ if TYPE_CHECKING:
         "type": str,  # FIXME: relevant?
     }, total=False)
 
+    LogLevelStr = Literal[
+        "CRITICAL", "FATAL", "ERROR", "WARN", "WARNING", "INFO", "DEBUG",
+        "critical", "fatal", "error", "warn", "warning", "info", "debug"
+    ]
+    AnyLogLevel = Union[LogLevelStr, int]
+
     # CWL definition
     GlobType = TypedDict("GlobType", {"glob": Union[str, List[str]]}, total=False)
     CWL_IO_FileValue = TypedDict("CWL_IO_FileValue", {"class": str, "path": str, "format": Optional[str]}, total=True)

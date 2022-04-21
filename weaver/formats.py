@@ -19,7 +19,7 @@ from weaver.base import Constants, classproperty
 if TYPE_CHECKING:
     from typing import Any, Dict, List, Optional, Tuple, Union
 
-    from weaver.typedefs import JSON
+    from weaver.typedefs import JSON, AnyRequestType
 
 LOGGER = logging.getLogger(__name__)
 
@@ -111,9 +111,17 @@ class OutputFormat(Constants):
     Representation as :term:`XML` content formatted as raw string without indentation or newlines.
     """)
 
+    TXT = classproperty(fget=lambda self: "txt", doc="""
+    Representation as plain text content without any specific reformatting or validation.
+    """)
+
+    TEXT = classproperty(fget=lambda self: "text", doc="""
+    Representation as plain text content without any specific reformatting or validation.
+    """)
+
     @classmethod
-    def get(cls, format_or_version, default=JSON):  # pylint: disable=W0221,W0237
-        # type: (Union[str, AnyOutputFormat], AnyOutputFormat) -> AnyOutputFormat
+    def get(cls, format_or_version, default=JSON, allow_version=True):  # pylint: disable=W0221,W0237
+        # type: (Union[str, AnyOutputFormat], AnyOutputFormat, bool) -> AnyOutputFormat
         """
         Resolve the applicable output format.
 
@@ -121,11 +129,12 @@ class OutputFormat(Constants):
             Either a :term:`WPS` version, a known value for a ``f``/``format`` query parameter, or an ``Accept`` header
             that can be mapped to one of the supported output formats.
         :param default: Default output format if none could be resolved.
+        :param allow_version: Enable :term:`WPS` version specifiers to infer the corresponding output representation.
         :return: Resolved output format.
         """
-        if format_or_version == "1.0.0":
+        if allow_version and format_or_version == "1.0.0":
             return OutputFormat.XML
-        if format_or_version == "2.0.0":
+        if allow_version and format_or_version == "2.0.0":
             return OutputFormat.JSON
         if "/" in format_or_version:  # Media-Type to output format renderer
             format_or_version = get_extension(format_or_version, dot=False)
@@ -191,6 +200,7 @@ _CONTENT_TYPE_EXCLUDE = [
     ContentType.MULTI_PART_FORM,
 ]
 _EXTENSION_CONTENT_TYPES_OVERRIDES = {
+    ".text": ContentType.TEXT_PLAIN,  # common alias to .txt, especially when using format query
     ".tiff": ContentType.IMAGE_TIFF,  # avoid defaulting to subtype geotiff
     ".yaml": ContentType.APP_YAML,  # common alternative to .yml
 }
@@ -400,13 +410,25 @@ def get_content_type(extension, charset=None, default=None):
     ctype = _EXTENSION_CONTENT_TYPES_MAPPING.get(extension)
     if not ctype:
         return default
+    return add_content_type_charset(ctype, charset)
+
+
+def add_content_type_charset(content_type, charset):
+    # type: (str, Optional[str]) -> str
+    """
+    Apply the specific charset to the content-type with some validation in case of conflicting definitions.
+
+    :param content_type: Desired Content-Type.
+    :param charset: Desired charset parameter.
+    :return: updated content-type with charset.
+    """
     # no parameters in Media-Type, but explicit Content-Type with charset could exist as needed
-    if charset and "charset=" in ctype:
-        return re.sub(r"charset\=[A-Za-z0-9\_\-]+", f"charset={charset}", ctype)
+    if charset and "charset=" in content_type:
+        return re.sub(r"charset\=[A-Za-z0-9\_\-]+", f"charset={charset}", content_type)
     # make sure to never include by mistake if the represented type cannot be characters
-    if charset and any(ctype.startswith(_type + "/") for _type in _CONTENT_TYPE_CHAR_TYPES):
-        return f"{ctype}; charset={charset}"
-    return ctype
+    if charset and any(content_type.startswith(_type + "/") for _type in _CONTENT_TYPE_CHAR_TYPES):
+        return f"{content_type}; charset={charset}"
+    return content_type
 
 
 def get_cwl_file_format(mime_type, make_reference=False, must_exist=True, allow_synonym=True):
@@ -564,6 +586,37 @@ def clean_mime_type_format(mime_type, suffix_subtype=False, strip_parameters=Fal
         if v.endswith(mime_type):
             mime_type = [k for k in EDAM_MAPPING if v.endswith(EDAM_MAPPING[k])][0]
     return mime_type
+
+
+def guess_target_format(request, default=ContentType.APP_JSON):
+    # type: (AnyRequestType, str) -> str
+    """
+    Guess the best applicable response ``Content-Type`` header according to request ``Accept`` header and ``format``
+    query, or defaulting to :py:data:`ContentType.APP_JSON`.
+
+    :returns: matched MIME-type or default.
+    """
+    from weaver.utils import get_header
+
+    format_query = request.params.get("format") or request.params.get("f")
+    content_type = None
+    if format_query:
+        content_type = OutputFormat.get(format_query, default=None, allow_version=False)
+        if content_type:
+            content_type = get_content_type(content_type)
+    if not content_type:
+        content_type = get_header("accept", request.headers, default=default)
+        for ctype in content_type.split(","):
+            ctype = clean_mime_type_format(ctype, suffix_subtype=True, strip_parameters=True)
+            if ctype != default:
+                # because most browsers enforce some 'visual' list of accept header, revert to JSON if detected
+                # explicit request set by client (e.g.: using 'requests') will have full control over desired content
+                user_agent = get_header("user-agent", request.headers)
+                if user_agent and any(browser in user_agent for browser in ["Mozilla", "Chrome", "Safari"]):
+                    content_type = ContentType.APP_JSON
+    if not content_type or content_type == ContentType.ANY:
+        content_type = default
+    return content_type
 
 
 def repr_json(data, force_string=True, **kwargs):

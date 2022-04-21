@@ -1,5 +1,6 @@
 import contextlib
 import datetime
+import logging
 import json
 import os
 import shutil
@@ -45,7 +46,11 @@ from weaver.wps_restapi.swagger_definitions import (
 )
 
 if TYPE_CHECKING:
-    from typing import Iterable, List, Tuple, Union
+    from typing import Iterable, List, Optional, Tuple, Union
+
+    from weaver.status import AnyStatusType
+    from weaver.typedefs import JSON, AnyLogLevel, Number
+    from weaver.visibility import AnyVisibility
 
 
 class WpsRestApiJobsTest(unittest.TestCase):
@@ -104,7 +109,12 @@ class WpsRestApiJobsTest(unittest.TestCase):
         self.job_info = []  # type: List[Job]
         self.make_job(task_id="0000-0000-0000-0000",
                       process=self.process_public.identifier, service=None,
-                      user_id=self.user_editor1_id, status=Status.SUCCEEDED, progress=100, access=Visibility.PUBLIC)
+                      user_id=self.user_editor1_id, status=Status.SUCCEEDED, progress=100, access=Visibility.PUBLIC,
+                      logs=[
+                          ("Start", logging.INFO, Status.ACCEPTED, 1),
+                          ("Process", logging.INFO, Status.RUNNING, 10),
+                          ("Complete", logging.INFO, Status.SUCCEEDED, 100)
+                      ])
         self.make_job(task_id="0000-0000-0000-1111",
                       process=self.process_unknown, service=self.service_public.name,
                       user_id=self.user_editor1_id, status=Status.FAILED, progress=99, access=Visibility.PUBLIC)
@@ -149,8 +159,20 @@ class WpsRestApiJobsTest(unittest.TestCase):
                       process=self.process_other.identifier, service=self.service_two.name,
                       user_id=self.user_editor1_id, status=Status.STARTED, progress=99, access=Visibility.PUBLIC)
 
-    def make_job(self, task_id, process, service, user_id, status, progress, access,
-                 created=None, offset=None, duration=None, exceptions=None):
+    def make_job(self,
+                 task_id,           # type: str
+                 process,           # type: str
+                 service,           # type: Optional[str]
+                 user_id,           # type: Optional[int]
+                 status,            # type: AnyStatusType
+                 progress,          # type: int
+                 access,            # type: AnyVisibility
+                 created=None,      # type: Optional[Union[datetime.datetime, str]]
+                 offset=None,       # type: Optional[int]
+                 duration=None,     # type: Optional[int]
+                 exceptions=None,   # type: Optional[List[JSON]]
+                 logs=None,         # type: Optional[List[Union[str, Tuple[str, AnyLogLevel, AnyStatusType, Number]]]]
+                 ):
         if isinstance(created, str):
             created = date_parser.parse(created)
         job = self.job_store.save_job(task_id=task_id, process=process, service=service, is_workflow=False,
@@ -162,6 +184,12 @@ class WpsRestApiJobsTest(unittest.TestCase):
         if status in JOB_STATUS_CATEGORIES[StatusCategory.FINISHED]:
             job["finished"] = job.updated
         job.progress = progress
+        if logs is not None:
+            for log_item in logs:
+                if isinstance(log_item, tuple):
+                    job.save_log(message=log_item[0], level=log_item[1], status=log_item[2], progress=log_item[3])
+                else:
+                    job.save_log(message=log_item)
         if exceptions is not None:
             job.exceptions = exceptions
         job = self.job_store.update_job(job)
@@ -1454,3 +1482,69 @@ class WpsRestApiJobsTest(unittest.TestCase):
 
         with self.assertRaises(colander.Invalid):
             sd.Execute().deserialize({"outputs": {"random": {"transmissionMode": "bad"}}})
+
+    def test_job_logs_formats(self):
+        path = f"/jobs/{self.job_info[0].id}/logs"
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert ContentType.APP_JSON in resp.content_type
+        assert isinstance(resp.json, list)
+        lines = resp.json
+        assert len(lines) == 3
+        assert "Start" in lines[0]
+        assert "Process" in lines[1]
+        assert "Complete" in lines[2]
+
+        resp = self.app.get(path, headers={"Accept": ContentType.TEXT_PLAIN})
+        assert resp.status_code == 200
+        assert ContentType.TEXT_PLAIN in resp.content_type
+        assert isinstance(resp.text, str)
+        assert not resp.text.startswith("[\"[")  # JSON list '[' followed by each string item with [<datetime>]
+        with pytest.raises(AttributeError):
+            resp.json  # noqa
+        lines = resp.text.split("\n")
+        assert len(lines) == 3
+        assert "Start" in lines[0]
+        assert "Process" in lines[1]
+        assert "Complete" in lines[2]
+
+        resp = self.app.get(path, params={"f": "text"})
+        assert resp.status_code == 200
+        assert ContentType.TEXT_PLAIN in resp.content_type
+        assert isinstance(resp.text, str)
+        assert not resp.text.startswith("[\"[")  # JSON list '[' followed by each string item with [<datetime>]
+        with pytest.raises(AttributeError):
+            resp.json  # noqa
+        lines = resp.text.split("\n")
+        assert len(lines) == 3
+        assert "Start" in lines[0]
+        assert "Process" in lines[1]
+        assert "Complete" in lines[2]
+
+        resp = self.app.get(path, params={"f": "xml"})
+        assert resp.status_code == 200
+        assert ContentType.APP_XML in resp.content_type
+        assert isinstance(resp.text, str)
+        assert resp.text.startswith("<?xml")
+        assert "<logs>" in resp.text
+        with pytest.raises(AttributeError):
+            resp.json  # noqa
+        lines = resp.text.split("<logs>")[-1].split("</logs>")[0].split("<item")[1:]
+        assert len(lines) == 3
+        assert "Start" in lines[0]
+        assert "Process" in lines[1]
+        assert "Complete" in lines[2]
+
+        resp = self.app.get(path, params={"f": "yaml"})
+        assert resp.status_code == 200
+        assert ContentType.APP_YAML in resp.content_type
+        assert isinstance(resp.text, str)
+        with pytest.raises(AttributeError):
+            resp.json  # noqa
+        lines = resp.text.split("\n")
+        lines = [line for line in lines if line]
+        assert len(lines) == 3
+        assert all(line.startswith("- ") for line in lines)
+        assert "Start" in lines[0]
+        assert "Process" in lines[1]
+        assert "Complete" in lines[2]
