@@ -1482,18 +1482,18 @@ def json2oas_io(io_info):
         io_schema = {
             "type": "array",
             "items": item_schema,
-            "minOccurs": min_occurs,
+            "minItems": min_occurs,
         }
         if isinstance(max_occurs, int):
-            io_schema["maxOccurs"] = max_occurs
+            io_schema["maxItems"] = max_occurs
     elif max_occurs == 1 or max_occurs is null:  # assume unspecified is default=1
         io_schema = item_schema
     else:
         array_schema = {"type": "array", "items": item_schema}
         if isinstance(min_occurs, int):
-            array_schema["minOccurs"] = min_occurs
+            array_schema["minItems"] = min_occurs
         if isinstance(max_occurs, int):
-            array_schema["maxOccurs"] = max_occurs
+            array_schema["maxItems"] = max_occurs
         # if item schema was itself 'oneOf', combine them to make it easier to read
         if len(item_schema) == 1 and "oneOf" in item_schema:
             io_schema = deepcopy(item_schema)  # avoid recursion by dict references
