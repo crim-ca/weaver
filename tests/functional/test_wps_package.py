@@ -70,7 +70,7 @@ KNOWN_PROCESS_DESCRIPTION_FIELDS = {
 # intersection of fields in InputType and specific sub-schema LiteralInputType
 KNOWN_PROCESS_DESCRIPTION_INPUT_DATA_FIELDS = {
     "id", "title", "description", "keywords", "metadata", "links", "literalDataDomains", "additionalParameters",
-    "minOccurs", "maxOccurs"
+    "minOccurs", "maxOccurs", "schema"
 }
 # corresponding schemas of input, but min/max occurs not expected
 KNOWN_PROCESS_DESCRIPTION_OUTPUT_DATA_FIELDS = KNOWN_PROCESS_DESCRIPTION_INPUT_DATA_FIELDS - {"minOccurs", "maxOccurs"}
@@ -204,10 +204,29 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         expect_inputs["file"].update({"title": "file", "minOccurs": 1, "maxOccurs": 1})
         expect_inputs["file"]["formats"][0]["default"] = True
         expect_inputs["file"]["formats"][1]["default"] = False
+        expect_inputs["file"]["schema"] = {
+            "oneOf": [
+                {"type": "string", "format": "uri"},
+                {"type": "string", "contentMediaType": ContentType.APP_JSON},
+                {"type": "string", "contentMediaType": ContentType.TEXT_PLAIN},
+                {"type": "object", "additionalProperties": True},  # auto added from JSON detection
+            ]
+        }
         expect_outputs["file"].update({"title": "file"})  # no min/max occurs for outputs
         expect_outputs["file"]["formats"][0]["default"] = False
         expect_outputs["file"]["formats"][1]["default"] = True
         expect_outputs["file"]["formats"][2]["default"] = False
+        expect_outputs["file"]["schema"] = {
+            "oneOf": [
+                {"type": "string", "format": "uri"},
+                {"type": "string", "format": "binary",
+                 "contentMediaType": ContentType.IMAGE_PNG, "contentEncoding": "base64"},
+                {"type": "string", "format": "binary",
+                 "contentMediaType": ContentType.IMAGE_JPEG, "contentEncoding": "base64"},
+                {"type": "string", "format": "binary",
+                 "contentMediaType": ContentType.IMAGE_GEOTIFF, "contentEncoding": "base64"},
+            ]
+        }
 
         assert desc["inputs"] == expect_inputs
         assert desc["outputs"] == expect_outputs

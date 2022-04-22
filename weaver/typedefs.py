@@ -5,7 +5,7 @@ if TYPE_CHECKING:
     import typing
     import uuid
     from datetime import datetime
-    from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Type, Union
+    from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Type, TypeAlias, Union
     if hasattr(typing, "TypedDict"):
         from typing import TypedDict  # pylint: disable=E0611,no-name-in-module  # Python >= 3.8
     else:
@@ -54,8 +54,11 @@ if TYPE_CHECKING:
     AnyUUID = Union[str, uuid.UUID]
     # add more levels of explicit definitions than necessary to simulate JSON recursive structure better than 'Any'
     # amount of repeated equivalent definition makes typing analysis 'work well enough' for most use cases
-    _JsonObjectItem = Dict[str, Union["JSON", "_JsonListItem"]]
-    _JsonListItem = List[Union[AnyValueType, _JsonObjectItem, "_JsonListItem", "JSON"]]
+    _JSON: TypeAlias = "JSON"
+    _JsonObjectItemAlias: TypeAlias = "_JsonObjectItem"
+    _JsonListItemAlias: TypeAlias = "_JsonListItem"
+    _JsonObjectItem = Dict[str, Union[_JSON, _JsonListItemAlias]]
+    _JsonListItem = List[Union[AnyValueType, _JsonObjectItem, _JsonListItemAlias, _JSON]]
     _JsonItem = Union[AnyValueType, _JsonObjectItem, _JsonListItem]
     JSON = Union[Dict[str, _JsonItem], List[_JsonItem], AnyValueType]
 
@@ -321,6 +324,8 @@ if TYPE_CHECKING:
 
     # simple/partial definitions of OpenAPI schema
     OpenAPISchemaTypes = Literal["object", "array", "boolean", "integer", "number", "string"]
+    _OpenAPISchema: TypeAlias = "OpenAPISchema"
+    _OpenAPISchemaProperties: TypeAlias = "OpenAPISchemaProperties"
     OpenAPISchemaProperties = TypedDict("OpenAPISchemaProperties", {
         "type": OpenAPISchemaTypes,
         "format": str,
@@ -329,7 +334,7 @@ if TYPE_CHECKING:
         "title": str,
         "description": str,
         "enum": List[Union[str, Number]],
-        "items": List[str, "OpenAPISchema"],
+        "items": List[str, _OpenAPISchema],
         "required": List[str],
         "nullable": bool,
         "deprecated": bool,
@@ -351,14 +356,19 @@ if TYPE_CHECKING:
         "contentMediaType": str,
         "contentEncoding": str,
         "contentSchema": str,
-        "not": Union[str, "OpenAPISchema"],
-        "allOf": List[Union[str, "OpenAPISchema"]],
-        "anyOf": List[Union[str, "OpenAPISchema"]],
-        "oneOf": List[Union[str, "OpenAPISchema"]],
-        "properties": Union["OpenAPISchemaProperties", Dict[str, Any]],
-        "additionalProperties": Union[bool, Dict[str, Union[str, "OpenAPISchema"]]],
-    }, total=True)
-    OpenAPISchema = TypedDict("OpenAPISchema", {
+        "not": Union[str, _OpenAPISchema],
+        "allOf": List[Union[str, _OpenAPISchema]],
+        "anyOf": List[Union[str, _OpenAPISchema]],
+        "oneOf": List[Union[str, _OpenAPISchema]],
+        "properties": Dict[str, _OpenAPISchemaProperties],
+        "additionalProperties": Union[bool, Dict[str, Union[str, _OpenAPISchema]]],
+    }, total=False)
+    OpenAPISchemaObject = TypedDict("OpenAPISchemaObject", {
         "type": Literal["object"],
         "properties": OpenAPISchemaProperties
-    }, total=True)
+    }, total=False)
+    OpenAPISchemaList = TypedDict("OpenAPISchemaList", {
+        "type": Literal["array"],
+        "items": _OpenAPISchema
+    }, total=False)
+    OpenAPISchema = Union[OpenAPISchemaObject, OpenAPISchemaList, OpenAPISchemaProperties]

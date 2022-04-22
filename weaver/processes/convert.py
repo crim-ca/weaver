@@ -1472,6 +1472,11 @@ def json2oas_io(io_info):
 
     min_occurs = get_field(io_info, "min_occurs", search_variations=True)
     max_occurs = get_field(io_info, "max_occurs", search_variations=True)
+    # backward support of values as strings
+    if isinstance(min_occurs, str) and str.isnumeric(min_occurs):
+        min_occurs = int(min_occurs)
+    if isinstance(max_occurs, str) and str.isnumeric(max_occurs):
+        max_occurs = int(max_occurs)
     if isinstance(min_occurs, int) and min_occurs > 1:
         io_schema = {
             "type": "array",
@@ -1480,7 +1485,7 @@ def json2oas_io(io_info):
         }
         if isinstance(max_occurs, int):
             io_schema["maxOccurs"] = max_occurs
-    elif max_occurs == 1:
+    elif max_occurs == 1 or max_occurs is null:  # assume unspecified is default=1
         io_schema = item_schema
     else:
         array_schema = {"type": "array", "items": item_schema}
