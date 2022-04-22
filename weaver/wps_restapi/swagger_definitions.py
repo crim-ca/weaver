@@ -50,6 +50,7 @@ from weaver.visibility import Visibility
 from weaver.wps_restapi.colander_extras import (
     AllOfKeywordSchema,
     AnyOfKeywordSchema,
+    BoundedRange,
     EmptyMappingSchema,
     ExtendedBoolean as Boolean,
     ExtendedFloat as Float,
@@ -62,6 +63,7 @@ from weaver.wps_restapi.colander_extras import (
     OneOfCaseInsensitive,
     OneOfKeywordSchema,
     PermissiveMappingSchema,
+    PermissiveSequenceSchema,
     SchemeURL,
     SemanticVersion,
     StringRange,
@@ -343,6 +345,14 @@ class VaultReference(ExtendedSchemaNode):
 
 
 class ReferenceURL(AnyOfKeywordSchema):
+    _any_of = [
+        FileURL(),
+        FileLocal(),
+        S3Bucket(),
+    ]
+
+
+class ExecuteReferenceURL(AnyOfKeywordSchema):
     _any_of = [
         FileURL(),
         FileLocal(),
@@ -904,6 +914,154 @@ class InputOutputDescriptionMeta(ExtendedMappingSchema):
                 child.missing = drop
 
 
+class ReferenceOAS(ExtendedMappingSchema):
+    schema_ref = f"{OGC_API_SCHEMA_URL}/{OGC_API_SCHEMA_VERSION}/core/openapi/schemas/reference.yaml"
+    _ref = ReferenceURL(name="$ref", description="External OpenAPI schema reference.")
+
+
+class TypeOAS(ExtendedSchemaNode):
+    name = "type"
+    schema_type = String
+    validator = OneOf([
+        "array",
+        "boolean",
+        "integer",
+        "number",
+        "object",
+        "string",
+    ])
+
+
+class EnumItemOAS(OneOfKeywordSchema):
+    _one_of = [
+        ExtendedSchemaNode(Float()),
+        ExtendedSchemaNode(Integer()),
+        ExtendedSchemaNode(String()),
+    ]
+
+
+class EnumOAS(ExtendedSequenceSchema):
+    enum = EnumItemOAS()
+
+
+class RequiredOAS(ExtendedSequenceSchema):
+    required_field = ExtendedSchemaNode(String(), description="Name of the field that is required under the object.")
+
+
+class MultipleOfOAS(OneOfKeywordSchema):
+    _one_of = [
+        ExtendedSchemaNode(Float()),
+        ExtendedSchemaNode(Integer()),
+    ]
+
+
+# cannot make recursive declarative schemas
+# simulate it and assume it is sufficient for validation purposes
+class PseudoObjectOAS(OneOfKeywordSchema):
+    _one_of = [
+        ReferenceOAS(),
+        PermissiveMappingSchema(),
+    ]
+
+
+class KeywordObjectOAS(ExtendedSequenceSchema):
+    item = PseudoObjectOAS()
+
+
+class AdditionalPropertiesOAS(OneOfKeywordSchema):
+    _one_of = [
+        ReferenceOAS(),
+        PermissiveMappingSchema(),
+        ExtendedSchemaNode(Boolean())
+    ]
+
+
+class AnyValueOAS(AnyOfKeywordSchema):
+    _any_of = [
+        PermissiveMappingSchema(),
+        PermissiveSequenceSchema(),
+        ExtendedSchemaNode(Float()),
+        ExtendedSchemaNode(Integer()),
+        ExtendedSchemaNode(Boolean()),
+        ExtendedSchemaNode(String()),
+    ]
+
+
+# reference:
+#   https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/master/core/openapi/schemas/schema.yaml
+# note:
+#   although reference definition provides multiple 'default: 0|false' entries, we omit them since the behaviour
+#   of colander with extended schema nodes is to set this value by default in deserialize result if they were missing,
+#   but reference 'default' correspond more to the default *interpretation* value if none was provided.
+#   It is preferable in our case to omit (i.e.: drop) these defaults to keep obtained/resolved definitions succinct,
+#   since those defaults can be defined (by default...) if needed. No reason to add them explicitly.
+class PropertyItemOAS(PermissiveMappingSchema):
+    _type = TypeOAS(name="type", missing=drop)  # not present if top-most schema is {allOf,anyOf,oneOf,not}
+    _format = ExtendedSchemaNode(String(), name="format", missing=drop)
+    default = AnyValueOAS(unknown="preserve", missing=drop)
+    example = AnyValueOAS(unknown="preserve", missing=drop)
+    title = ExtendedSchemaNode(String(), missing=drop)
+    description = ExtendedSchemaNode(String(), missing=drop)
+    enum = EnumOAS(missing=drop)
+    items = PseudoObjectOAS(name="oneOf", missing=drop)
+    required = RequiredOAS(missing=drop)
+    nullable = ExtendedSchemaNode(Boolean(), missing=drop)
+    deprecated = ExtendedSchemaNode(Boolean(), missing=drop)
+    read_only = ExtendedSchemaNode(Boolean(), name="readOnly", missing=drop)
+    write_only = ExtendedSchemaNode(Boolean(), name="writeOnly", missing=drop)
+    multiple_of = MultipleOfOAS(name="multipleOf", missing=drop, validator=BoundedRange(min=0, exclusive_min=True))
+    minimum = ExtendedSchemaNode(Integer(), name="minLength", missing=drop, validator=Range(min=0))  # default=0
+    maximum = ExtendedSchemaNode(Integer(), name="maxLength", missing=drop, validator=Range(min=0))
+    exclusive_min = ExtendedSchemaNode(Boolean(), name="exclusiveMinimum", missing=drop)  # default=False
+    exclusive_max = ExtendedSchemaNode(Boolean(), name="exclusiveMaximum", missing=drop)  # default=False
+    min_length = ExtendedSchemaNode(Integer(), name="minLength", missing=drop, validator=Range(min=0))  # default=0
+    max_length = ExtendedSchemaNode(Integer(), name="maxLength", missing=drop, validator=Range(min=0))
+    pattern = ExtendedSchemaNode(Integer(), missing=drop)
+    min_items = ExtendedSchemaNode(Integer(), name="minItems", missing=drop, validator=Range(min=0))  #  default=0
+    max_items = ExtendedSchemaNode(Integer(), name="maxItems", missing=drop, validator=Range(min=0))
+    unique_items = ExtendedSchemaNode(Boolean(), name="uniqueItems", missing=drop)  # default=False
+    min_prop = ExtendedSchemaNode(Integer(), name="minProperties", missing=drop, default=0, validator=Range(min=0))
+    max_prop = ExtendedSchemaNode(Integer(), name="maxProperties", missing=drop, validator=Range(min=0))
+    content_type = ExtendedSchemaNode(String(), name="contentMediaType", missing=drop)
+    content_encode = ExtendedSchemaNode(String(), name="contentEncoding", missing=drop)
+    content_schema = ExtendedSchemaNode(String(), name="contentSchema", missing=drop)
+    _not = PseudoObjectOAS(name="not", title="not", missing=drop)
+    _all_of = KeywordObjectOAS(name="allOf", title="allOf", missing=drop)
+    _any_of = KeywordObjectOAS(name="anyOf", title="anyOf", missing=drop)
+    _one_of = KeywordObjectOAS(name="oneOf", title="oneOf", missing=drop)
+    x_props = AdditionalPropertiesOAS(name="additionalProperties", missing=drop)
+    properties = PermissiveMappingSchema(missing=drop)  # cannot do real recursive definitions, simply check mapping
+
+
+class PropertiesOAS(ExtendedMappingSchema):
+    property_name = PropertyItemOAS(
+        variable="{property-name}",
+        description="Named of the property being defined under the OpenAPI object.",
+    )
+
+
+class ObjectOAS(ExtendedMappingSchema):
+    _type = TypeOAS(name="type", missing=drop, validator=OneOf(["object"]))
+    properties = PropertiesOAS()
+
+
+class OAS(OneOfKeywordSchema):
+    description = "OpenAPI schema definition."
+    schema_ref = f"{OGC_API_SCHEMA_URL}/{OGC_API_SCHEMA_VERSION}/core/openapi/schemas/schema.yaml"
+    _one_of = [
+        ReferenceOAS(),
+        ObjectOAS(),
+        PropertyItemOAS(),  # for top-level keyword schemas {allOf,anyOf,oneOf,not}
+    ]
+
+
+class InputOutputDescriptionSchema(ExtendedMappingSchema):
+    # empty dict means 'anything' in OpenAPI, in case it failed resolution
+    # add it to avoid failing the full input deserialization in case our OpenAPI schemas definitions
+    # are faulty/insufficiently defined (eg: recursive objects/properties) or missing OAS parameters
+    schema = OAS(missing={}, default={})
+
+
 class MinOccursDefinition(OneOfKeywordSchema):
     description = "Minimum amount of values required for this input."
     title = "MinOccurs"
@@ -1198,6 +1356,7 @@ class DescribeInputType(AllOfKeywordSchema):
     _all_of = [
         DescriptionType(),
         InputOutputDescriptionMeta(),
+        InputOutputDescriptionSchema(),
         DescribeInputTypeDefinition(),
         DescribeMinMaxOccurs(),
         DescriptionExtra(),
@@ -1312,6 +1471,7 @@ class DescribeOutputType(AllOfKeywordSchema):
     _all_of = [
         DescriptionType(),
         InputOutputDescriptionMeta(),
+        InputOutputDescriptionSchema(),
         DescribeOutputTypeDefinition(),
     ]
 
@@ -2841,7 +3001,7 @@ class DataEncodingAttributes(FormatSelection):
 
 class Reference(ExtendedMappingSchema):
     title = "Reference"
-    href = ReferenceURL(description="Endpoint of the reference.")
+    href = ExecuteReferenceURL(description="Endpoint of the reference.")
     format = DataEncodingAttributes(missing=drop)
     body = ExtendedSchemaNode(String(), missing=drop)
     bodyReference = ReferenceURL(missing=drop)
@@ -2909,7 +3069,7 @@ class ExecuteInputListValues(ExtendedSequenceSchema):
 # But explicitly in the context of an execution input, rather than any other link (eg: metadata)
 class ExecuteInputFileLink(Link):  # for other metadata (title, hreflang, etc.)
     schema_ref = f"{OGC_API_SCHEMA_URL}/{OGC_API_SCHEMA_VERSION}/core/openapi/schemas/link.yaml"
-    href = ReferenceURL(  # no just a plain 'URL' like 'Link' has (extended with s3, vault, etc.)
+    href = ExecuteReferenceURL(  # no just a plain 'URL' like 'Link' has (extended with s3, vault, etc.)
         description="Location of the file reference."
     )
     type = MediaType(

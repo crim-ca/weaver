@@ -12,11 +12,13 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add reporting of OpenAPI ``schema`` field for I/O definitions within `Process` description responses as required
+  by `OGC API - Processes` specification (resolves `#245 <https://github.com/crim-ca/weaver/issues/245>`_).
 
 Fixes:
 ------
-- No change.
+- Remove ``VaultReference`` from ``ReferenceURL`` schema employed to reference external resources that are not intended
+  to be used with temporary `Vault` definitions. Only inputs for `Process` execution will allow `Vault` references.
 
 .. _changes_4.15.0:
 

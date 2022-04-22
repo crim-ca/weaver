@@ -33,7 +33,7 @@ from weaver.exceptions import ProcessInstanceError, ServiceParsingError
 from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import AcceptLanguage, ContentType, repr_json
 from weaver.processes.constants import ProcessSchema
-from weaver.processes.convert import get_field, null, ows2json, wps2json_io
+from weaver.processes.convert import get_field, null, json2oas_io, ows2json, wps2json_io
 from weaver.processes.types import ProcessType
 from weaver.quotation.status import QuoteStatus
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
@@ -2174,6 +2174,12 @@ class Process(Base):
                 get_field(io_def, "identifier", search_variations=True, pop_found=True): io_def
                 for io_def in process[io_type]
             }
+            # when OpenAPI schema is not predefined, generate them dynamically
+            # (for preexisting processes in database, newer deployment will have generated them already to save time)
+            for io_id, io_def in process[io_type].items():
+                io_schema = get_field(io_def, "schema", search_variations=False)
+                if not isinstance(io_schema, dict):
+                    io_def["schema"] = json2oas_io(io_def)
         return sd.ProcessDescriptionOGC().deserialize(process)
 
     def summary(self):

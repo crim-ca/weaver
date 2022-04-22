@@ -87,6 +87,71 @@ LITERAL_SCHEMA_TYPES = frozenset([
 ])
 
 
+def _make_node_instance(schema_node_or_class):
+    # type: (Union[colander.SchemaNode, Type[colander.SchemaNode]]) -> colander.SchemaNode
+    """
+    Obtains a schema node instance in case it was specified only by type reference.
+
+    This helps being more permissive of provided definitions while handling situations
+    like presented in the example below:
+
+    .. code-block:: python
+
+        class Map(OneOfMappingSchema):
+            # uses types instead of instances like 'SubMap1([...])' and 'SubMap2([...])'
+            _one_of = (SubMap1, SubMap2)
+    """
+    if isinstance(schema_node_or_class, colander._SchemaMeta):  # noqa: W0212
+        schema_node_or_class = schema_node_or_class()
+    if not isinstance(schema_node_or_class, colander.SchemaNode):  # refer to original class to support non-extended
+        raise ConversionTypeError(
+            f"Invalid item should be a SchemaNode, got: {type(schema_node_or_class)!s}")
+    return schema_node_or_class
+
+
+def _get_schema_type(schema_node, check=False):
+    # type: (Union[colander.SchemaNode, Type[colander.SchemaNode]], bool) -> Optional[colander.SchemaType]
+    """
+    Obtains the schema-type from the provided node, supporting various initialization methods.
+
+    - ``typ`` is set by an instantiated node from specific schema (e.g.: ``colander.SchemaNode(colander.String())``)
+    - ``schema_type`` can also be provided, either by type or instance if using class definition with property
+
+    :param schema_node: item to analyse
+    :param check: only attempt to retrieve the schema type, and if failing return ``None``
+    :returns: found schema type
+    :raises ConversionTypeError: if no ``check`` requested and schema type cannot be found (invalid schema node)
+    """
+    schema_node = _make_node_instance(schema_node)
+    schema_type = getattr(schema_node, "typ", getattr(schema_node, "schema_type"))
+    if isinstance(schema_type, type):
+        schema_type = schema_type()  # only type instead of object, instantiate with default since no parameters anyway
+    if not isinstance(schema_type, colander.SchemaType):
+        if check:
+            return None
+        raise ConversionTypeError(f"Invalid schema type could not be detected: {type(schema_type)!s}")
+    return schema_type
+
+
+def _get_node_name(schema_node, schema_name=False):
+    # type: (colander.SchemaNode, bool) -> str
+    """
+    Obtains the name of the node with best available value.
+
+    :param schema_node: node for which to retrieve the name.
+    :param schema_name:
+        - If ``True``, prefer the schema definition (class) name over the instance or field name.
+        - Otherwise, return the field name, the title or as last result the class name.
+    :returns: node name
+    """
+    title = getattr(schema_node, "title", None)
+    if title in ["", colander.required]:
+        title = None
+    if schema_name:
+        return title or type(schema_node).__name__
+    return getattr(schema_node, "name", None) or title or type(schema_node).__name__
+
+
 class SchemaNodeTypeError(TypeError):
     """
     Generic error indicating that the definition of a SchemaNode is invalid.
@@ -131,27 +196,57 @@ class OneOfCaseInsensitive(colander.OneOf):
             return super(OneOfCaseInsensitive, self).__call__(node, value)
 
 
-class StringRange(colander.Range):
+class BoundedRange(colander.Range):
+    """
+    Validator of value within range with added ``exclusive`` bounds support.
+    """
+    def __init__(self, min=None, max=None, exclusive_min=False, exclusive_max=False, **kwargs):
+        # type: (Optional[Union[float, int]], Optional[Union[float, int]], bool, bool, Any) -> None
+        self.min_excl = exclusive_min
+        self.max_excl = exclusive_max
+        super(BoundedRange, self).__init__(min=min, max=max, **kwargs)
+
+    def __call__(self, node, value):
+        super(BoundedRange, self).__call__(node, value)
+        if self.min_excl and self.min is not None:
+            if value <= self.min:
+                min_err = colander._(
+                    self.min_err, mapping={"val": value, "min": self.min, "exclusive": True}
+                )
+                raise colander.Invalid(node, min_err)
+
+        if self.max_excl and self.max is not None:
+            if value >= self.max:
+                max_err = colander._(
+                    self.max_err, mapping={"val": value, "max": self.max, "exclusive": True}
+                )
+                raise colander.Invalid(node, max_err)
+
+
+class StringRange(BoundedRange):
     """
     Validator that provides the same functionalities as :class:`colander.Range` for a numerical string value.
     """
 
-    def __init__(self, min=None, max=None, **kwargs):
+    def __init__(self, min=None, max=None, exclusive_min=False, exclusive_max=False, **kwargs):
+        # type: (Optional[Union[float, int, str]], Optional[Union[float, int, str]], bool, bool, Any) -> None
         try:
             if isinstance(min, str):
-                min = int(min)
+                min = float(min) if "." in min else int(min)
             if isinstance(max, str):
-                max = int(max)
-        except ValueError:
+                max = float(max) if "." in max else int(max)
+        except (TypeError, ValueError):
             raise SchemaNodeTypeError("StringRange validator created with invalid min/max non-numeric string.")
-        super(StringRange, self).__init__(min=min, max=max, **kwargs)
+        super(StringRange, self).__init__(
+            min=min, max=max, exclusive_min=exclusive_min, exclusive_max=exclusive_max, **kwargs
+        )
 
     def __call__(self, node, value):
         if not isinstance(value, str):
             raise colander.Invalid(node=node, value=value, msg="Value is not a string.")
         if not str.isnumeric(value):
             raise colander.Invalid(node=node, value=value, msg="Value is not a numeric string.")
-        return super(StringRange, self).__call__(node, int(value))
+        return super(StringRange, self).__call__(node, float(value) if "." in value else int(value))
 
 
 class SchemeURL(colander.Regex):
@@ -1229,6 +1324,10 @@ class PermissiveMappingSchema(ExtendedMappingSchema):
         self.typ.unknown = "preserve"
 
 
+class PermissiveSequenceSchema(ExtendedMappingSchema):
+    item = PermissiveMappingSchema()
+
+
 class KeywordMapper(ExtendedMappingSchema):
     """
     Generic keyword mapper for any sub-implementers.
@@ -2129,68 +2228,3 @@ class OAS3TypeConversionDispatcher(TypeConversionDispatcher):
             converted["xml"] = xml
 
         return converted
-
-
-def _make_node_instance(schema_node_or_class):
-    # type: (Union[colander.SchemaNode, Type[colander.SchemaNode]]) -> colander.SchemaNode
-    """
-    Obtains a schema node instance in case it was specified only by type reference.
-
-    This helps being more permissive of provided definitions while handling situations
-    like presented in the example below:
-
-    .. code-block:: python
-
-        class Map(OneOfMappingSchema):
-            # uses types instead of instances like 'SubMap1([...])' and 'SubMap2([...])'
-            _one_of = (SubMap1, SubMap2)
-    """
-    if isinstance(schema_node_or_class, colander._SchemaMeta):  # noqa: W0212
-        schema_node_or_class = schema_node_or_class()
-    if not isinstance(schema_node_or_class, colander.SchemaNode):  # refer to original class to support non-extended
-        raise ConversionTypeError(
-            f"Invalid item should be a SchemaNode, got: {type(schema_node_or_class)!s}")
-    return schema_node_or_class
-
-
-def _get_schema_type(schema_node, check=False):
-    # type: (Union[colander.SchemaNode, Type[colander.SchemaNode]], bool) -> Optional[colander.SchemaType]
-    """
-    Obtains the schema-type from the provided node, supporting various initialization methods.
-
-    - ``typ`` is set by an instantiated node from specific schema (e.g.: ``colander.SchemaNode(colander.String())``)
-    - ``schema_type`` can also be provided, either by type or instance if using class definition with property
-
-    :param schema_node: item to analyse
-    :param check: only attempt to retrieve the schema type, and if failing return ``None``
-    :returns: found schema type
-    :raises ConversionTypeError: if no ``check`` requested and schema type cannot be found (invalid schema node)
-    """
-    schema_node = _make_node_instance(schema_node)
-    schema_type = getattr(schema_node, "typ", getattr(schema_node, "schema_type"))
-    if isinstance(schema_type, type):
-        schema_type = schema_type()  # only type instead of object, instantiate with default since no parameters anyway
-    if not isinstance(schema_type, colander.SchemaType):
-        if check:
-            return None
-        raise ConversionTypeError(f"Invalid schema type could not be detected: {type(schema_type)!s}")
-    return schema_type
-
-
-def _get_node_name(schema_node, schema_name=False):
-    # type: (colander.SchemaNode, bool) -> str
-    """
-    Obtains the name of the node with best available value.
-
-    :param schema_node: node for which to retrieve the name.
-    :param schema_name:
-        - If ``True``, prefer the schema definition (class) name over the instance or field name.
-        - Otherwise, return the field name, the title or as last result the class name.
-    :returns: node name
-    """
-    title = getattr(schema_node, "title", None)
-    if title in ["", colander.required]:
-        title = None
-    if schema_name:
-        return title or type(schema_node).__name__
-    return getattr(schema_node, "name", None) or title or type(schema_node).__name__

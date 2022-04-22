@@ -85,7 +85,8 @@ if TYPE_CHECKING:
         ExecutionInputsList,
         ExecutionOutputs,
         JobValueFile,
-        JSON
+        JSON,
+        OpenAPISchema
     )
     from weaver.wps_restapi.constants import JobInputsOutputsSchemaType
 
@@ -129,12 +130,13 @@ WPS_FIELD_MAPPING = {
     "max_occurs": ["maxOccurs", "MaxOccurs", "Max_Occurs", "maxoccurs"],
     "max_megabytes": ["maximumMegabytes", "max_size"],
     "mime_type": ["mimeType", "MimeType", "mime-type", "Mime-Type", "mimetype",
-                  "mediaType", "MediaType", "media-type", "Media-Type", "mediatype"],
+                  "mediaType", "MediaType", "media-type", "Media-Type", "mediatype",
+                  "content_type", "contentMediaType"],
     "range_minimum": ["minval", "minimum", "minimumValue"],
     "range_maximum": ["maxval", "maximum", "maximumValue"],
     "range_spacing": ["spacing"],
     "range_closure": ["closure", "rangeClosure"],
-    "encoding": ["Encoding"],
+    "encoding": ["Encoding", "content_encoding", "contentEncoding"],
     "href": ["url", "link", "reference"],
 }
 # WPS fields that contain a structure corresponding to `Format` object
@@ -1300,6 +1302,206 @@ def any2json_literal_data_domains(io_info):
             wps_value_definition = wps_allowed_values
     domain["valueDefinition"] = wps_value_definition
     return [domain]
+
+
+def json2oas_io_complex(io_info):
+    # type: (JSON_IO_Type) -> OpenAPISchema
+    """
+    Convert a single-dimension complex :term:`JSON` I/O definition into corresponding :term:`OpenAPI` schema.
+    """
+    item_types = [
+        {"type": "string", "format": "uri"},  # 'uri' not a 'standard' OpenAPI (since open field), but very common
+    ]
+    item_formats = get_field(io_info, "supported_formats", search_variations=True)
+    if isinstance(item_formats, list):
+        # FIXME: support Complex execute input provided as raw data, to dump to file for CWL execution
+        any_json = False
+        for fmt in item_formats:
+            fmt_media = get_field(fmt, "mime_type", search_variations=True)
+            fmt_encode = get_field(fmt, "encoding", search_variations=True)
+            # heuristic to guess more specific encoding
+            fmt_type_as_text = ["multipart/", "application/"]  # others always binary (eg: image)
+            fmt_subtype_as_text = ["+xml", "/json", "yaml"]
+            if not fmt_encode:
+                if fmt_media.startswith("text/") or (
+                    any(fmt_media.startswith(fmt_sub) for fmt_sub in fmt_type_as_text) and
+                    any(fmt_enc in fmt_media for fmt_enc in fmt_subtype_as_text)
+                ):
+                    fmt_encode = None
+                else:
+                    fmt_encode = "base64"
+            if fmt_encode:
+                # format/contentEncoding somewhat redundant,
+                # but providing both allows using "preferred" approach by either OpenAPI 3.0/3.1
+                item_types.append({
+                    "type": "string",
+                    "format": "binary",
+                    "contentMediaType": fmt_media,
+                    "contentEncoding": fmt_encode,
+                })
+            else:
+                item_types.append({
+                    "type": "string",
+                    "contentMediaType": fmt_media,
+                })
+            any_json |= ContentType.APP_JSON in fmt_media
+        # FIXME: support Complex execute input provided as raw JSON, to dump to file for CWL execution
+        if any_json:
+            # best we can do is 'any JSON' since cannot guess applicable schema not provided by user on deploy
+            item_types.append({"type": "object", "additionalProperties": True})
+    else:
+        item_types.append({"type": "string", "format": "binary"})
+    item_schema = {
+        "oneOf": item_types  # complex by reference or encoded data
+    }
+    return item_schema
+
+
+def json2oas_io_bbox(io_info):
+    # type: (JSON_IO_Type) -> OpenAPISchema
+    """
+    Convert a single-dimension bounding box :term:`JSON` I/O definition into corresponding :term:`OpenAPI` schema.
+    """
+    # FIXME: validate bbox definition, reference:
+    # https://github.com/opengeospatial/ogcapi-processes/blob/d5257/core/examples/json/ProcessDescription.json#L137-L150
+    # https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/d5257/core/openapi/schemas/bbox.yaml
+    item_schema = {
+        "type": "object",
+        "format": "ogc-bbox",
+        "required": ["bbox"],
+        "properties": {
+            # don't add the 'enum' of CRS as defined in the reference schema since this is auto-generated
+            # and could mismatch the intended CRS by the user if schema was not provided explicitly
+            "crs": {"type": "string", "format": "uri", "default": "http://www.opengis.net/def/crs/OGC/1.3/CRS84"},
+            "bbox": {
+                "type": "array",
+                "items": "number",
+                "oneOf": [
+                    {"minItems": 4, "maxItems": 4},
+                    {"minItems": 6, "maxItems": 6},
+                ]
+            },
+        }
+    }
+    return item_schema
+
+
+def json2oas_io_literal(io_info):
+    # type: (JSON_IO_Type) -> OpenAPISchema
+    """
+    Convert a single-dimension literal value :term:`JSON` I/O definition into corresponding :term:`OpenAPI` schema.
+    """
+    item_variation = []
+    domains = get_field(io_info, "literal_data_domains", search_variations=True, default=[])
+    for data_info in domains:
+        data_type = get_field(data_info, "type", search_variations=True)
+        if isinstance(data_type, dict) and "name" in data_type:
+            data_type = data_type["name"]
+            data_href = get_field(data_type, "href", search_variations=True)
+        else:
+            data_type = None
+            data_href = None
+        if not data_type:
+            continue
+        data_var = {}
+        if data_href:
+            data_var["contentSchema"] = data_href
+        data_def = get_field(data_info, "valueDefinition")
+        if isinstance(data_def, dict):
+            # anyValue
+            # nothing to do since regardless of true/false, nothing can be applied as OpenAPI schema definition
+            pass
+        elif isinstance(data_def, list) and all(isinstance(val_def, (int, float, str)) for val_def in data_def):
+            # allowed values
+            # need to split the different types if a mix is used (e.g.: 1, 2, "A", "B")
+            data_val_types = {
+                "string": [val for val in data_def if isinstance(val, str)],
+                "number": [val for val in data_def if isinstance(val, (float, int))],
+            }
+            for _typ, vals in data_val_types.items():
+                if vals:
+                    data_enum = {"type": _typ, "enum": vals}
+                    data_enum.update(data_var)
+                    item_variation.append(data_enum)
+            continue  # next immediately since many enum variations are already handled
+        elif isinstance(data_def, list) and all(isinstance(val_def, dict) for val_def in data_def):
+            # allowed ranges
+            for val in data_def:
+                min_val = get_field(val, "range_minimum", search_variations=True, default=None)
+                max_val = get_field(val, "range_maximum", search_variations=True, default=None)
+                spacing = get_field(val, "range_spacing", search_variations=True, default=None)
+                closure = get_field(val, "range_closure", search_variations=True, default=RANGECLOSURETYPE.CLOSED)
+                data_range = {}
+                if min_val is not None:
+                    data_range["minimum"] = min_val
+                if max_val is not None:
+                    data_range["maximum"] = max_val
+                if spacing is not None:
+                    data_range["multipleOf"] = spacing
+                if closure == RANGECLOSURETYPE.OPEN:            # ]min, max[
+                    data_range.update({"exclusiveMinimum": True, "exclusiveMaximum": True})
+                elif closure == RANGECLOSURETYPE.OPENCLOSED:    # ]min, max]
+                    data_range.update({"exclusiveMinimum": True})
+                elif closure == RANGECLOSURETYPE.CLOSEDOPEN:    # [min, max[
+                    data_range.update({"exclusiveMaximum": True})
+                item_variation.append(data_var)
+            continue  # next immediately since many range variations are already handled
+        # basic definition if no special enum/range handling was applied
+        data_var["type"] = data_type
+        item_variation.append(data_var)
+
+    if not domains:
+        return {"type": "string"}
+    item_schema = {"oneOf": item_variation}
+    return item_schema
+
+
+def json2oas_io(io_info):
+    # type: (JSON_IO_Type) -> OpenAPISchema
+    """
+    Converts definitions from a :term:`JSON` :term:`Process` I/O definition into corresponding :term:`OpenAPI` schema.
+    """
+
+    io_type = get_field(io_info, "type")
+    if io_type == WPS_COMPLEX:
+        item_schema = json2oas_io_complex(io_info)
+    elif io_type == WPS_BOUNDINGBOX:
+        item_schema = json2oas_io_bbox(io_info)
+    else:
+        item_schema = json2oas_io_literal(io_info)
+
+    min_occurs = get_field(io_info, "min_occurs", search_variations=True)
+    max_occurs = get_field(io_info, "max_occurs", search_variations=True)
+    if isinstance(min_occurs, int) and min_occurs > 1:
+        io_schema = {
+            "type": "array",
+            "items": item_schema,
+            "minOccurs": min_occurs,
+        }
+        if isinstance(max_occurs, int):
+            io_schema["maxOccurs"] = max_occurs
+    elif max_occurs == 1:
+        io_schema = item_schema
+    else:
+        array_schema = {"type": "array", "items": item_schema}
+        if isinstance(min_occurs, int):
+            array_schema["minOccurs"] = min_occurs
+        if isinstance(max_occurs, int):
+            array_schema["maxOccurs"] = max_occurs
+        # if item schema was itself 'oneOf', combine them to make it easier to read
+        if len(item_schema) == 1 and "oneOf" in item_schema:
+            io_schema = deepcopy(item_schema)  # avoid recursion by dict references
+            io_schema["oneOf"].append(array_schema)
+        # otherwise simply stack (still valid, just slightly more confusing to read)
+        else:
+            io_schema = {
+                "oneOf": [
+                    item_schema,
+                    array_schema,
+                ]
+            }
+
+    return io_schema
 
 
 def json2wps_datatype(io_info):

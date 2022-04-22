@@ -318,3 +318,47 @@ if TYPE_CHECKING:
     })
 
     CeleryResult = Union[AsyncResult, EagerResult, GroupResult, ResultSet]
+
+    # simple/partial definitions of OpenAPI schema
+    OpenAPISchemaTypes = Literal["object", "array", "boolean", "integer", "number", "string"]
+    OpenAPISchemaProperties = TypedDict("OpenAPISchemaProperties", {
+        "type": OpenAPISchemaTypes,
+        "format": str,
+        "default": Any,
+        "example": Any,
+        "title": str,
+        "description": str,
+        "enum": List[Union[str, Number]],
+        "items": List[str, "OpenAPISchema"],
+        "required": List[str],
+        "nullable": bool,
+        "deprecated": bool,
+        "readOnly": bool,
+        "writeOnly": bool,
+        "multipleOf": Number,
+        "minimum": Number,
+        "maximum": Number,
+        "exclusiveMinimum": bool,
+        "exclusiveMaximum": bool,
+        "minLength": Number,
+        "maxLength": Number,
+        "pattern": str,
+        "minItems": Number,
+        "maxItems": Number,
+        "uniqueItems": bool,
+        "minProperties": Number,
+        "maxProperties": Number,
+        "contentMediaType": str,
+        "contentEncoding": str,
+        "contentSchema": str,
+        "not": Union[str, "OpenAPISchema"],
+        "allOf": List[Union[str, "OpenAPISchema"]],
+        "anyOf": List[Union[str, "OpenAPISchema"]],
+        "oneOf": List[Union[str, "OpenAPISchema"]],
+        "properties": Union["OpenAPISchemaProperties", Dict[str, Any]],
+        "additionalProperties": Union[bool, Dict[str, Union[str, "OpenAPISchema"]]],
+    }, total=True)
+    OpenAPISchema = TypedDict("OpenAPISchema", {
+        "type": Literal["object"],
+        "properties": OpenAPISchemaProperties
+    }, total=True)
