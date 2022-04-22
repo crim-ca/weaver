@@ -14,6 +14,8 @@ Changes:
 --------
 - Add reporting of OpenAPI ``schema`` field for I/O definitions within `Process` description responses as required
   by `OGC API - Processes` specification (resolves `#245 <https://github.com/crim-ca/weaver/issues/245>`_).
+- Add support of ``Accept`` header, ``f`` and ``format`` request queries for ``GET /jobs/{jobID}/logs`` retrieval
+  using ``text``, ``json``, ``yaml`` and ``xml`` (and their corresponding Media-Type definitions) to list `Job` logs.
 
 Fixes:
 ------
