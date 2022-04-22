@@ -8,7 +8,7 @@ from notify import encrypt_email
 from weaver.database import get_db
 from weaver.datatype import Job
 from weaver.exceptions import JobNotFound, log_unhandled_exceptions
-from weaver.formats import OutputFormat, repr_json
+from weaver.formats import ContentType, OutputFormat, add_content_type_charset, guess_target_format, repr_json
 from weaver.processes.convert import convert_input_values_schema, convert_output_params_schema
 from weaver.store.base import StoreJobs
 from weaver.utils import get_settings
@@ -307,6 +307,14 @@ def get_job_logs(request):
     job = get_job(request)
     raise_job_dismissed(job, request)
     logs = sd.JobLogsSchema().deserialize(job.logs)
+    ctype = guess_target_format(request)
+    if ctype == ContentType.TEXT_PLAIN:
+        ctype = add_content_type_charset(ctype, charset="UTF-8")
+        return HTTPOk(body="\n".join(logs), content_type=ctype)
+    if ctype in set(ContentType.ANY_XML) | {ContentType.APP_YAML}:
+        data = OutputFormat.convert(logs, ctype, item_root="logs")
+        ctype = add_content_type_charset(ctype, charset="UTF-8")
+        return HTTPOk(body=data, content_type=ctype)
     return HTTPOk(json=logs)
 
 

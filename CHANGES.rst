@@ -12,7 +12,8 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add support of ``Accept`` header, ``f`` and ``format`` request queries for ``GET /jobs/{jobID}/logs`` retrieval
+  using ``text``, ``json``, ``yaml`` and ``xml`` (and their corresponding Media-Type definitions) to list `Job` logs.
 
 Fixes:
 ------
