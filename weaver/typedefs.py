@@ -5,7 +5,7 @@ if TYPE_CHECKING:
     import typing
     import uuid
     from datetime import datetime
-    from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Type, TypeAlias, Union
+    from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Type, Union
     if hasattr(typing, "TypedDict"):
         from typing import TypedDict  # pylint: disable=E0611,no-name-in-module  # Python >= 3.8
     else:
@@ -18,6 +18,10 @@ if TYPE_CHECKING:
         from typing import Protocol  # pylint: disable=E0611,no-name-in-module  # Python >= 3.8
     else:
         from typing_extensions import Protocol
+    if hasattr(typing, "TypeAlias"):
+        from typing import TypeAlias  # pylint: disable=E0611,no-name-in-module  # Python >= 3.10
+    else:
+        from typing_extensions import TypeAlias
     if hasattr(os, "PathLike"):
         FileSystemPathType = Union[os.PathLike, str]
     else:
