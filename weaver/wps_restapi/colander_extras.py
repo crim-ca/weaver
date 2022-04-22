@@ -181,6 +181,7 @@ class OneOfCaseInsensitive(colander.OneOf):
     """
 
     def __init__(self, choices, *args, **kwargs):
+        # type: (Iterable[str], Any, Any) -> None
         insensitive_choices = {}  # set with kept order
         for choice in choices:
             insensitive_choices.setdefault(choice, None)
@@ -192,6 +193,7 @@ class OneOfCaseInsensitive(colander.OneOf):
         super(OneOfCaseInsensitive, self).__init__(insensitive_choices, *args, **kwargs)
 
     def __call__(self, node, value):
+        # type: (colander.SchemaNode, Any) -> None
         if str(value).lower() not in (choice.lower() for choice in self.choices):
             return super(OneOfCaseInsensitive, self).__call__(node, value)
 
@@ -259,6 +261,7 @@ class SchemeURL(colander.Regex):
     """
 
     def __init__(self, schemes=None, msg=None, flags=re.IGNORECASE):
+        # type: (Optional[Iterable[str]], Optional[str], Optional[re.RegexFlag]) -> None
         if not schemes:
             schemes = [""]
         if not msg:
@@ -277,6 +280,7 @@ class SemanticVersion(colander.Regex):
     """
 
     def __init__(self, *args, v_prefix=False, rc_suffix=True, **kwargs):
+        # type: (Any, bool, bool, Any) -> None
         if "regex" in kwargs:
             self.pattern = kwargs.pop("regex")
         else:
@@ -297,6 +301,7 @@ class SemanticVersion(colander.Regex):
 class ExtendedBoolean(colander.Boolean):
 
     def __init__(self, *args, true_choices=None, false_choices=None, allow_string=False, **kwargs):
+        # type: (Any, Optional[Iterable[str]], Optional[Iterable[str]], bool, Any) -> None
         """
         Initializes the extended boolean schema node.
 
@@ -398,6 +403,7 @@ class ExtendedFloat(ExtendedNumber, colander.Float):
     """
 
     def __init__(self, *_, allow_string=False, strict=True, **__):
+        # type: (Any, bool, bool, Any) -> None
         colander.Float.__init__(self)
         ExtendedNumber.__init__(self, *_, strict=strict, allow_string=allow_string, **__)
 
@@ -429,6 +435,7 @@ class ExtendedInteger(ExtendedNumber, colander.Integer):
     """
 
     def __init__(self, *_, allow_string=False, strict=True, **__):
+        # type: (Any, bool, bool, Any) -> None
         colander.Integer.__init__(self)
         ExtendedNumber.__init__(self, *_, strict=strict, allow_string=allow_string, **__)
 
@@ -466,6 +473,7 @@ class ExtendedString(colander.String):
     """
 
     def deserialize(self, node, cstruct):
+        # type: (colander.SchemaNode, Any) -> str
         try:
             if str(getattr(node, "format", "")).lower() == "uuid":
                 if isinstance(cstruct, str):
@@ -1283,6 +1291,7 @@ class EmptyMappingSchema(StrictMappingSchema):
     """
 
     def __init__(self, *args, **kwargs):
+        # type: (Any, Any) -> None
         super(EmptyMappingSchema, self).__init__(*args, **kwargs)
         self.children = []
 
@@ -1318,6 +1327,7 @@ class PermissiveMappingSchema(ExtendedMappingSchema):
     """
 
     def __init__(self, *args, **kwargs):
+        # type: (Any, Any) -> None
         kwargs["unknown"] = "preserve"
         super(PermissiveMappingSchema, self).__init__(*args, **kwargs)
         # sub-type mapping itself must also have 'preserve' such that its own 'deserialize' copies the fields over

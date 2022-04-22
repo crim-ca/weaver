@@ -2176,7 +2176,7 @@ class Process(Base):
             }
             # when OpenAPI schema is not predefined, generate them dynamically
             # (for preexisting processes in database, newer deployment will have generated them already to save time)
-            for io_id, io_def in process[io_type].items():
+            for io_def in process[io_type].values():
                 io_schema = get_field(io_def, "schema", search_variations=False)
                 if not isinstance(io_schema, dict):
                     io_def["schema"] = json2oas_io(io_def)

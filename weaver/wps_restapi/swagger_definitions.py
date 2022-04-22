@@ -1017,10 +1017,10 @@ class PropertyItemOAS(PermissiveMappingSchema):
     min_length = ExtendedSchemaNode(Integer(), name="minLength", missing=drop, validator=Range(min=0))  # default=0
     max_length = ExtendedSchemaNode(Integer(), name="maxLength", missing=drop, validator=Range(min=0))
     pattern = ExtendedSchemaNode(Integer(), missing=drop)
-    min_items = ExtendedSchemaNode(Integer(), name="minItems", missing=drop, validator=Range(min=0))  #  default=0
+    min_items = ExtendedSchemaNode(Integer(), name="minItems", missing=drop, validator=Range(min=0))  # default=0
     max_items = ExtendedSchemaNode(Integer(), name="maxItems", missing=drop, validator=Range(min=0))
     unique_items = ExtendedSchemaNode(Boolean(), name="uniqueItems", missing=drop)  # default=False
-    min_prop = ExtendedSchemaNode(Integer(), name="minProperties", missing=drop, default=0, validator=Range(min=0))
+    min_prop = ExtendedSchemaNode(Integer(), name="minProperties", missing=drop, validator=Range(min=0))  # default=0
     max_prop = ExtendedSchemaNode(Integer(), name="maxProperties", missing=drop, validator=Range(min=0))
     content_type = ExtendedSchemaNode(String(), name="contentMediaType", missing=drop)
     content_encode = ExtendedSchemaNode(String(), name="contentEncoding", missing=drop)
