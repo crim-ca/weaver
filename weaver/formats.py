@@ -591,10 +591,22 @@ def clean_mime_type_format(mime_type, suffix_subtype=False, strip_parameters=Fal
 def guess_target_format(request, default=ContentType.APP_JSON):
     # type: (AnyRequestType, str) -> str
     """
-    Guess the best applicable response ``Content-Type`` header according to request ``Accept`` header and ``format``
-    query, or defaulting to :py:data:`ContentType.APP_JSON`.
+    Guess the best applicable response ``Content-Type`` header from the request.
 
-    :returns: matched MIME-type or default.
+    Considers the request ``Accept`` header, ``format`` query and alternatively ``f`` query to parse possible formats.
+    Full Media-Type are expected in the header. Query parameters can use both the full type, or only the sub-type
+    (i.e.: :term:`JSON`, :term:`XML`, etc.), with case-insensitive names.
+    Defaults to :py:data:`ContentType.APP_JSON` if none was specified.
+
+    Applies some specific logic to handle automatically added ``Accept`` headers by many browsers such that sending
+    requests to the API using them will not automatically default back to :term:`XML` or similar `HTML` representations.
+    If browsers are used to send requests, but that ``format``/``f`` queries are used directly in the URL, those will
+    be applied since this is a very intuitive (and easier) approach to request different formats when using browsers.
+
+    When user-agent clients are identified as another source, such as sending requests from a server or from code, both
+    headers and query parameters are applied directly without question.
+
+    :returns: Matched MIME-type or default.
     """
     from weaver.utils import get_header
 
