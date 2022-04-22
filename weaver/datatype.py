@@ -33,7 +33,7 @@ from weaver.exceptions import ProcessInstanceError, ServiceParsingError
 from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import AcceptLanguage, ContentType, repr_json
 from weaver.processes.constants import ProcessSchema
-from weaver.processes.convert import get_field, null, json2oas_io, ows2json, wps2json_io
+from weaver.processes.convert import get_field, json2oas_io, null, ows2json, wps2json_io
 from weaver.processes.types import ProcessType
 from weaver.quotation.status import QuoteStatus
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
