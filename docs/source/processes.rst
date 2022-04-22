@@ -514,7 +514,8 @@ filtering is not implemented as it offers no additional advantage for files acce
 This could be added later if ``Multipart`` raw data representation is required.
 Please |submit-issue|_ to request this feature if it is relevant for your use-cases.
 
-.. fixme::
+.. fixme:
+.. todo::
     Filtering of ``outputs`` not implemented (everything always available).
     https://github.com/crim-ca/weaver/issues/380
 
@@ -1465,4 +1466,3 @@ Workflow (Chaining Step Processes)
     - :ref:`CWL Workflow`
     - :ref:`proc_workflow_ops`
     - :ref:`Workflow` process type
-
