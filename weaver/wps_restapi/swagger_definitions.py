@@ -35,6 +35,8 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_ESGF_CWT,
     CWL_REQUIREMENT_APP_WPS1,
     CWL_REQUIREMENT_INIT_WORKDIR,
+    OAS_DATA_TYPES,
+    OAS_COMPLEX_TYPES,
     PACKAGE_ARRAY_BASE,
     PACKAGE_ARRAY_ITEMS,
     PACKAGE_CUSTOM_TYPES,
@@ -922,14 +924,7 @@ class ReferenceOAS(ExtendedMappingSchema):
 class TypeOAS(ExtendedSchemaNode):
     name = "type"
     schema_type = String
-    validator = OneOf([
-        "array",
-        "boolean",
-        "integer",
-        "number",
-        "object",
-        "string",
-    ])
+    validator = OneOf(OAS_DATA_TYPES)
 
 
 class EnumItemOAS(OneOfKeywordSchema):
@@ -1041,7 +1036,7 @@ class PropertiesOAS(ExtendedMappingSchema):
 
 
 class ObjectOAS(ExtendedMappingSchema):
-    _type = TypeOAS(name="type", missing=drop, validator=OneOf(["object"]))
+    _type = TypeOAS(name="type", missing=drop, validator=OneOf(OAS_COMPLEX_TYPES))
     properties = PropertiesOAS()
 
 
@@ -1376,6 +1371,7 @@ class DeployInputType(AllOfKeywordSchema):
     _all_of = [
         DeploymentType(),
         InputOutputDescriptionMeta(),
+        InputOutputDescriptionSchema(),
         DeployInputTypeDefinition(),
         DeployMinMaxOccurs(),
         DescriptionExtra(),

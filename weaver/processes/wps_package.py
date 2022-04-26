@@ -449,10 +449,8 @@ def _merge_package_inputs_outputs(wps_inputs_defs,      # type: Union[List[ANY_I
     :returns:
         Tuple of (inputs, outputs) consisting of lists of I/O with merged contents between :term:`CWL` and :term:`WPS`.
     """
-    if isinstance(wps_inputs_defs, dict):
-        wps_inputs_defs = normalize_ordered_io(wps_inputs_defs)
-    if isinstance(wps_outputs_defs, dict):
-        wps_outputs_defs = normalize_ordered_io(wps_outputs_defs)
+    wps_inputs_defs = normalize_ordered_io(wps_inputs_defs)
+    wps_outputs_defs = normalize_ordered_io(wps_outputs_defs)
     wps_inputs_merged = merge_package_io(wps_inputs_defs, cwl_inputs_list, WPS_INPUT)
     wps_outputs_merged = merge_package_io(wps_outputs_defs, cwl_outputs_list, WPS_OUTPUT)
     return [wps2json_io(i) for i in wps_inputs_merged], [wps2json_io(o) for o in wps_outputs_merged]

@@ -126,6 +126,7 @@ def get_process_information(process_description):
 @log_unhandled_exceptions(logger=LOGGER, message="Unhandled error occurred during parsing of deploy payload.",
                           is_request=False)
 def _check_deploy(payload):
+    # type: (JSON) -> JSON
     """
     Validate minimum deploy payload field requirements with exception handling.
     """
@@ -163,6 +164,10 @@ def _check_deploy(payload):
                     "error": "Invalid",
                     "value": d_inputs
                 })
+            LOGGER.warning(
+                "Detected difference between original/parsed deploy inputs, but no invalid schema:\n%s",
+                generate_diff(p_inputs, r_inputs, val_name="original payload", ref_name="parsed result")
+            )
         # Execution Unit is optional since process reference (e.g.: WPS-1 href) can be provided in processDescription
         # Cannot validate as CWL yet, since execution unit can also be an href that is not yet fetched (it will later)
         p_exec_unit = payload.get("executionUnit", [{}])
@@ -182,7 +187,7 @@ def _check_deploy(payload):
                     "value": d_exec_unit
                 })
             LOGGER.warning(
-                "Detected difference between original/parsed deploy payload, but no invalid schema:\n%s",
+                "Detected difference between original/parsed deploy execution unit, but no invalid schema:\n%s",
                 generate_diff(p_exec_unit, r_exec_unit, val_name="original payload", ref_name="parsed result")
             )
         return results

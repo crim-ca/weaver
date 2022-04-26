@@ -25,6 +25,16 @@ from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import ContentType, get_cwl_file_format, get_extension, get_format
 from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_WPS1,
+    OAS_ARRAY_TYPES,
+    OAS_COMPLEX_TYPES,
+    OAS_KEYWORD_TYPES,
+    OAS_LITERAL_BINARY_FORMATS,
+    OAS_LITERAL_NUMERIC,
+    OAS_LITERAL_NUMERIC_FORMATS,
+    OAS_LITERAL_FLOAT_FORMATS,
+    OAS_LITERAL_INTEGER_FORMATS,
+    OAS_LITERAL_STRING_FORMATS,
+    OAS_LITERAL_TYPES,
     PACKAGE_ARRAY_BASE,
     PACKAGE_ARRAY_ITEMS,
     PACKAGE_ARRAY_MAX_SIZE,
@@ -35,8 +45,14 @@ from weaver.processes.constants import (
     WPS_BOUNDINGBOX,
     WPS_COMPLEX,
     WPS_COMPLEX_DATA,
+    WPS_COMPLEX_TYPES,
+    WPS_DATA_TYPES,
     WPS_INPUT,
     WPS_LITERAL,
+    WPS_LITERAL_DATA_BOOLEAN,
+    WPS_LITERAL_DATA_FLOAT,
+    WPS_LITERAL_DATA_INTEGER,
+    WPS_LITERAL_DATA_STRING,
     WPS_LITERAL_DATA_TYPE_NAMES,
     WPS_OUTPUT,
     WPS_REFERENCE,
@@ -71,7 +87,7 @@ if TYPE_CHECKING:
     )
     from requests.models import Response
 
-    from weaver.processes.constants import ProcessSchemaType
+    from weaver.processes.constants import ProcessSchemaType, WPS_DataType
     from weaver.typedefs import (
         AnySettingsContainer,
         AnyValueType,
@@ -86,7 +102,8 @@ if TYPE_CHECKING:
         ExecutionOutputs,
         JobValueFile,
         JSON,
-        OpenAPISchema
+        OpenAPISchema,
+        TypedDict
     )
     from weaver.wps_restapi.constants import JobInputsOutputsSchemaType
 
@@ -99,6 +116,10 @@ if TYPE_CHECKING:
     OWS_Output_Type = Union[OWS_Output_Base, BoundingBox, BoundingBoxDataInput, ComplexData]
     OWS_IO_Type = Union[OWS_Input_Type, OWS_Output_Type]
     JSON_IO_Type = JSON
+    JSON_IO_TypedInfo = TypedDict("JSON_IO_TypedInfo", {
+        "type": WPS_DataType,
+        "data_type": Optional[str],
+    }, total=False)
     JSON_IO_ListOrMap = Union[List[JSON], Dict[str, Union[JSON, str]]]
     CWL_IO_Type = Union[CWL_Input_Type, CWL_Output_Type]
     PKG_IO_Type = Union[JSON_IO_Type, WPS_IO_Type]
@@ -123,6 +144,7 @@ WPS_FIELD_MAPPING = {
     "default": ["default_value", "defaultValue", "DefaultValue", "Default", "data_format", "data"],
     "supported_values": ["SupportedValues", "supportedValues", "supportedvalues", "Supported_Values"],
     "supported_formats": ["SupportedFormats", "supportedFormats", "supportedformats", "Supported_Formats", "formats"],
+    "supported_crs": ["SupportedCRS", "supportedCRS", "crs", "CRS"],
     "additional_parameters": ["AdditionalParameters", "additionalParameters", "additionalparameters",
                               "Additional_Parameters"],
     "type": ["Type", "data_type", "dataType", "DataType", "Data_Type"],
@@ -143,13 +165,6 @@ WPS_FIELD_MAPPING = {
 #   - keys must match `WPS_FIELD_MAPPING` keys
 #   - fields are placed in order of relevance (prefer explicit format, then supported, and defaults as last resort)
 WPS_FIELD_FORMAT = ["formats", "supported_formats", "supported_values", "default"]
-
-# WPS 'type' string variations employed to indicate a Complex (file) I/O by different libraries
-# for literal types, see 'any2cwl_literal_datatype' and 'any2wps_literal_datatype' functions
-WPS_COMPLEX_TYPES = [WPS_COMPLEX, WPS_COMPLEX_DATA, WPS_REFERENCE]
-
-# WPS 'type' string of all combinations (type of data / library implementation)
-WPS_ALL_TYPES = [WPS_LITERAL, WPS_BOUNDINGBOX] + WPS_COMPLEX_TYPES
 
 # default format if missing (minimal requirement of one)
 DEFAULT_FORMAT = Format(mime_type=ContentType.TEXT_PLAIN)
@@ -1180,13 +1195,13 @@ def any2cwl_literal_datatype(io_type):
     """
     Solves common literal data-type names to supported ones for `CWL`.
     """
-    if io_type in ["string", "date", "time", "dateTime", "anyURI"]:
+    if io_type in WPS_LITERAL_DATA_STRING | OAS_LITERAL_STRING_FORMATS:
         return "string"
-    if io_type in ["scale", "angle", "float", "double"]:
+    if io_type in WPS_LITERAL_DATA_FLOAT | OAS_LITERAL_FLOAT_FORMATS:
         return "float"
-    if io_type in ["integer", "long", "positiveInteger", "nonNegativeInteger"]:
+    if io_type in WPS_LITERAL_DATA_INTEGER | OAS_LITERAL_INTEGER_FORMATS:
         return "int"
-    if io_type in ["bool", "boolean"]:
+    if io_type in WPS_LITERAL_DATA_BOOLEAN:
         return "boolean"
     LOGGER.warning("Could not identify a CWL literal data type with [%s].", io_type)
     return null
@@ -1201,13 +1216,13 @@ def any2wps_literal_datatype(io_type, is_value):
     """
     if isinstance(io_type, str):
         if not is_value:
-            if io_type in ["string", "date", "time", "dateTime", "anyURI"]:
+            if io_type in WPS_LITERAL_DATA_STRING | OAS_LITERAL_STRING_FORMATS:
                 return "string"
-            if io_type in ["scale", "angle", "float", "double"]:
+            if io_type in WPS_LITERAL_DATA_FLOAT | OAS_LITERAL_FLOAT_FORMATS:
                 return "float"
-            if io_type in ["int", "integer", "long", "positiveInteger", "nonNegativeInteger"]:
+            if io_type in WPS_LITERAL_DATA_INTEGER | OAS_LITERAL_INTEGER_FORMATS:
                 return "integer"
-            if io_type in ["bool", "boolean"]:
+            if io_type in WPS_LITERAL_DATA_BOOLEAN:
                 return "boolean"
         LOGGER.warning("Unknown named literal data type: '%s', using default 'string'. Should be one of: %s",
                        io_type, list(WPS_LITERAL_DATA_TYPE_NAMES))
@@ -1365,14 +1380,19 @@ def json2oas_io_bbox(io_info):
     # FIXME: validate bbox definition, reference:
     # https://github.com/opengeospatial/ogcapi-processes/blob/d5257/core/examples/json/ProcessDescription.json#L137-L150
     # https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/d5257/core/openapi/schemas/bbox.yaml
+
+    # don't add the 'enum' of CRS as defined in the reference schema since this is auto-generated
+    # and could mismatch the intended CRS by the user, unless available explicitly
+    crs_schema = {"type": "string", "format": "uri", "default": "http://www.opengis.net/def/crs/OGC/1.3/CRS84"}
+    supported_crs = get_field(io_info, "supported_crs", search_variations=True)
+    if isinstance(supported_crs, list) and all(isinstance(crs, str) for crs in supported_crs):
+        crs_schema["enum"] = supported_crs
     item_schema = {
         "type": "object",
         "format": "ogc-bbox",
         "required": ["bbox"],
         "properties": {
-            # don't add the 'enum' of CRS as defined in the reference schema since this is auto-generated
-            # and could mismatch the intended CRS by the user if schema was not provided explicitly
-            "crs": {"type": "string", "format": "uri", "default": "http://www.opengis.net/def/crs/OGC/1.3/CRS84"},
+            "crs": crs_schema,
             "bbox": {
                 "type": "array",
                 "items": "number",
@@ -1396,15 +1416,15 @@ def json2oas_io_literal_data_type(io_type):
         - https://swagger.io/specification/#data-types
     """
     data_info = {"type": "string"}
-    if io_type in ["float", "double"]:
+    if io_type in OAS_LITERAL_FLOAT_FORMATS:
         data_info["type"] = "number"
         data_info["format"] = io_type
-    if io_type in ["int32", "int64"]:
+    if io_type in OAS_LITERAL_INTEGER_FORMATS:
         data_info["type"] = "integer"
         data_info["format"] = io_type
     if io_type in ["bool", "boolean"]:
         data_info["type"] = "boolean"
-    if io_type in ["date", "datetime", "date-time", "full-date", "time", "password"]:
+    if io_type in OAS_LITERAL_STRING_FORMATS:
         data_info["type"] = "string"
         if "time" in io_type:
             data_info["format"] = "date-time"
@@ -1412,7 +1432,7 @@ def json2oas_io_literal_data_type(io_type):
             data_info["format"] = "date"
         else:
             data_info["format"] = io_type
-    if io_type in ["base64", "binary", "byte"]:
+    if io_type in OAS_LITERAL_BINARY_FORMATS:
         data_info["type"] = "string"
         data_info["format"] = "binary"
     return data_info
@@ -1490,7 +1510,7 @@ def json2oas_io_literal(io_info):
     if not domains:
         return {"type": "string"}
     item_schema = {"oneOf": item_variation}
-    return item_schema
+    return item_schema  # noqa
 
 
 def json2oas_io(io_info):
@@ -1498,7 +1518,6 @@ def json2oas_io(io_info):
     """
     Converts definitions from a :term:`JSON` :term:`Process` I/O definition into corresponding :term:`OpenAPI` schema.
     """
-
     io_type = get_field(io_info, "type")
     if io_type == WPS_COMPLEX:
         item_schema = json2oas_io_complex(io_info)
@@ -1534,7 +1553,7 @@ def json2oas_io(io_info):
         # if item schema was itself 'oneOf', combine them to make it easier to read
         if len(item_schema) == 1 and "oneOf" in item_schema:
             io_schema = deepcopy(item_schema)  # avoid recursion by dict references
-            io_schema["oneOf"].append(array_schema)
+            io_schema["oneOf"].append(array_schema)  # noqa
         # otherwise simply stack (still valid, just slightly more confusing to read)
         else:
             io_schema = {
@@ -1545,6 +1564,71 @@ def json2oas_io(io_info):
             }
 
     return io_schema
+
+
+def oas2json_io(io_info):
+    # type: (OpenAPISchema) -> JSON_IO_TypedInfo
+    """
+
+    :param io_info:
+    :return:
+    """
+    io_type = get_field(io_info, "type", search_variations=False)
+    io_default = get_field(io_info, "default", search_variations=False)
+    kw_key_val = list(filter(lambda key, val: key in OAS_KEYWORD_TYPES, io_info.values()))
+    io_fmt = get_field(io_info, "format", search_variations=False)
+    io_json = {"type": WPS_COMPLEX}  # if cannot be resolved, must be too ambiguous, so assume complex data dump
+    if io_type in OAS_LITERAL_TYPES:
+        if io_type in OAS_LITERAL_NUMERIC:
+            if io_fmt in OAS_LITERAL_FLOAT_FORMATS:
+                io_type = "double"
+            if io_fmt in OAS_LITERAL_INTEGER_FORMATS:
+                io_type = "integer"
+        elif io_fmt in OAS_LITERAL_STRING_FORMATS:
+            io_type = io_fmt
+        data_type = any2wps_literal_datatype(io_type, False)
+        io_json = {"type": WPS_LITERAL, "data_type": data_type, "max_occurs": 1}  # min unknown from literal schema
+    elif io_type in OAS_COMPLEX_TYPES:
+        io_props = get_field(io_info, "properties", search_variations=False) or {}
+        if ("bbox" in io_props and "crs" in io_props) or io_fmt == "ogc-bbox":
+            io_json = {"type": WPS_BOUNDINGBOX}
+        else:
+            io_json = {"type": WPS_COMPLEX}
+
+    elif io_type in OAS_ARRAY_TYPES:
+        io_items = get_field(io_info, "items", search_variations=False)
+        io_json = oas2json_io(io_items)
+    elif len(kw_key_val) == 1:
+        keyword_schemas = kw_key_val[0][-1]
+        keyword_objects = [oas2json_io(schema) for schema in keyword_schemas]
+        keyword_objects = [types for sub in keyword_objects for types in sub]  # flatten 2D->1D in case of nested kw
+        keyword_types = [get_field(obj, "type", search_variations=False) for obj in keyword_objects]
+        keyword_types = set(filter(lambda obj: isinstance(obj, str), keyword_types))
+        keyword_dtypes = [get_field(obj, "data_type", search_variations=False) for obj in keyword_objects]
+        keyword_dtypes = set(filter(lambda obj: isinstance(obj, str), keyword_dtypes))
+        if keyword_types:
+            # literals are all or nothing, but can allow different 'data format'
+            # any mixed type with literal must be elevated to complex since there is no way to handle both as literals
+            if all(typ == WPS_LITERAL for typ in keyword_types):
+                io_json = {"type": WPS_LITERAL}
+                if keyword_dtypes and len(keyword_dtypes) == 1:
+                    io_json["data_type"] = list(keyword_dtypes)[0]
+                elif all(dtype in OAS_LITERAL_FLOAT_FORMATS for dtype in keyword_dtypes):
+                    io_json["data_type"] = "double"
+                elif all(dtype in OAS_LITERAL_INTEGER_FORMATS for dtype in keyword_dtypes):
+                    io_json["data_type"] = "integer"
+                # acceptable to use 'numeric' for either integers or floats
+                elif all(dtype in OAS_LITERAL_NUMERIC | OAS_LITERAL_NUMERIC_FORMATS for dtype in keyword_dtypes):
+                    io_json["data_type"] = "numeric"
+                else:
+                    io_json["data_type"] = "string"
+            # since some variations can be an external reference or a partial definition,
+            # anything matching a bbox marks the whole definition as one, falling back to complex otherwise
+            elif any(typ == WPS_BOUNDINGBOX for typ in keyword_types):
+                io_json = {"type": WPS_BOUNDINGBOX}
+    if io_default is not null:
+        io_json["default"] = io_default  # can help resolve as last resort if type can be inferred from literal value
+    return io_json
 
 
 def json2wps_datatype(io_info):
@@ -1750,7 +1834,7 @@ def json2wps_io(io_info, io_select):
     # remove additional arguments according to each case
     io_type = io_info.pop("type", WPS_COMPLEX)  # only ComplexData doesn't have "type"
     # attempt to identify defined data-type directly in 'type' field instead of 'data_type'
-    if io_type not in WPS_ALL_TYPES:
+    if io_type not in WPS_DATA_TYPES:
         io_type_guess = any2wps_literal_datatype(io_type, is_value=False)
         if io_type_guess is not null:
             io_type = WPS_LITERAL
@@ -2154,6 +2238,9 @@ def merge_package_io(wps_io_list, cwl_io_list, io_select):
             "identifier": cwl_identifier,
             "title": cwl_title if cwl_title is not null else cwl_identifier
         })
+        wps_io_schema = get_field(wps_io_json, "schema")
+        if wps_io_schema:
+            wps_io_json.update(oas2json_io(wps_io_schema))
         # apply type if WPS deploy definition was partial but can be retrieved from CWL
         wps_io_json.setdefault("type", get_field(cwl_io_json, "type", search_variations=True))
 

@@ -10,10 +10,25 @@ WPS_BOUNDINGBOX = "bbox"
 WPS_LITERAL = "literal"
 WPS_REFERENCE = "reference"
 WPS_COMPLEX_DATA = "ComplexData"
-WPS_LITERAL_DATA_TYPE_NAMES = frozenset([
-    "date", "time", "dateTime", "anyURI", "scale", "angle", "float", "double",
-    "int", "integer", "long", "positiveInteger", "nonNegativeInteger", "bool", "boolean", "string"
-])
+WPS_LITERAL_DATA_BOOLEAN = frozenset(["bool", "boolean"])
+WPS_LITERAL_DATA_DATETIME = frozenset(["date", "time", "dateTime"])
+WPS_LITERAL_DATA_FLOAT = frozenset(["scale", "angle", "float", "double"])
+WPS_LITERAL_DATA_INTEGER = frozenset(["int", "integer", "long", "positiveInteger", "nonNegativeInteger"])
+WPS_LITERAL_DATA_STRING = frozenset({"anyURI", "string"} | WPS_LITERAL_DATA_DATETIME)
+WPS_LITERAL_DATA_TYPE_NAMES = frozenset(
+    WPS_LITERAL_DATA_BOOLEAN |
+    WPS_LITERAL_DATA_DATETIME |
+    WPS_LITERAL_DATA_FLOAT |
+    WPS_LITERAL_DATA_INTEGER |
+    WPS_LITERAL_DATA_STRING
+)
+
+# WPS 'type' string variations employed to indicate a Complex (file) I/O by different libraries
+# for literal types, see 'any2cwl_literal_datatype' and 'any2wps_literal_datatype' functions
+WPS_COMPLEX_TYPES = frozenset([WPS_COMPLEX, WPS_COMPLEX_DATA, WPS_REFERENCE])
+
+# WPS 'type' string of all combinations (type of data / library implementation)
+WPS_DATA_TYPES = frozenset({WPS_LITERAL, WPS_BOUNDINGBOX} | WPS_COMPLEX_TYPES)
 
 
 class OpenSearchField(Constants):
@@ -72,8 +87,8 @@ an :term:`Application Package` by themselves.
 """
 
 CWL_REQUIREMENTS_SUPPORTED = frozenset(
-    list(CWL_REQUIREMENT_APP_TYPES) +
-    list(CWL_REQUIREMENT_FEATURES)
+    CWL_REQUIREMENT_APP_TYPES |
+    CWL_REQUIREMENT_FEATURES
 )
 """
 Set of all :term:`CWL` requirements or hints that are supported for deployment of valid :term:`Application Package`.
@@ -81,25 +96,44 @@ Set of all :term:`CWL` requirements or hints that are supported for deployment o
 
 # CWL package types and extensions
 PACKAGE_SIMPLE_TYPES = frozenset(["string", "boolean", "float", "int", "integer", "long", "double"])
-PACKAGE_LITERAL_TYPES = frozenset(list(PACKAGE_SIMPLE_TYPES) + ["null", "Any"])
+PACKAGE_LITERAL_TYPES = frozenset(PACKAGE_SIMPLE_TYPES | {"null", "Any"})
 PACKAGE_COMPLEX_TYPES = frozenset(["File"])  # FIXME: type "Directory" not supported
 PACKAGE_ENUM_BASE = "enum"
 PACKAGE_CUSTOM_TYPES = frozenset([PACKAGE_ENUM_BASE])  # can be anything, but support "enum" which is more common
 PACKAGE_ARRAY_BASE = "array"
 PACKAGE_ARRAY_MAX_SIZE = sys.maxsize  # pywps doesn't allow None, so use max size  # FIXME: unbounded (weaver #165)
-PACKAGE_ARRAY_ITEMS = frozenset(list(PACKAGE_SIMPLE_TYPES) + list(PACKAGE_COMPLEX_TYPES) + list(PACKAGE_CUSTOM_TYPES))
+PACKAGE_ARRAY_ITEMS = frozenset(PACKAGE_SIMPLE_TYPES | PACKAGE_COMPLEX_TYPES | PACKAGE_CUSTOM_TYPES)
 PACKAGE_ARRAY_TYPES = frozenset([f"{item}[]" for item in PACKAGE_ARRAY_ITEMS])
 # string values the lowest 'type' field can have by itself (as simple mapping {type: <type-string>})
-PACKAGE_TYPE_NULLABLE = frozenset(list(PACKAGE_SIMPLE_TYPES) + list(PACKAGE_CUSTOM_TYPES) + list(PACKAGE_COMPLEX_TYPES))
+PACKAGE_TYPE_NULLABLE = frozenset(PACKAGE_SIMPLE_TYPES | PACKAGE_CUSTOM_TYPES | PACKAGE_COMPLEX_TYPES)
 # shortcut notations that can be employed to convert basic types into corresponding array or nullable variants
-PACKAGE_SHORTCUTS = frozenset([f"{typ}?" for typ in PACKAGE_TYPE_NULLABLE] +
-                              list(PACKAGE_ARRAY_TYPES) +
-                              [f"{typ}?" for typ in PACKAGE_ARRAY_TYPES])
-PACKAGE_TYPE_POSSIBLE_VALUES = frozenset(
-    list(PACKAGE_LITERAL_TYPES) +
-    list(PACKAGE_COMPLEX_TYPES) +
-    list(PACKAGE_SHORTCUTS)
+PACKAGE_SHORTCUTS = frozenset(
+    {f"{typ}?" for typ in PACKAGE_TYPE_NULLABLE} |
+    PACKAGE_ARRAY_TYPES |
+    {f"{typ}?" for typ in PACKAGE_ARRAY_TYPES}
 )
+PACKAGE_TYPE_POSSIBLE_VALUES = frozenset(
+    PACKAGE_LITERAL_TYPES |
+    PACKAGE_COMPLEX_TYPES |
+    PACKAGE_SHORTCUTS
+)
+
+# OpenAPI definitions
+OAS_COMPLEX_TYPES = frozenset(["object"])
+OAS_ARRAY_TYPES = frozenset(["array"])
+OAS_LITERAL_TYPES = frozenset(["boolean", "integer", "number", "string"])
+OAS_LITERAL_NUMERIC = frozenset(["integer", "number"])
+OAS_LITERAL_FLOAT_FORMATS = frozenset(["float", "double"])
+OAS_LITERAL_INTEGER_FORMATS = frozenset(["int32", "int64"])
+OAS_LITERAL_NUMERIC_FORMATS = frozenset(OAS_LITERAL_FLOAT_FORMATS | OAS_LITERAL_INTEGER_FORMATS)
+OAS_LITERAL_STRING_FORMATS = frozenset(["date", "datetime", "date-time", "full-date", "time", "password"])
+OAS_LITERAL_BINARY_FORMATS = frozenset(["base64", "binary", "byte"])
+OAS_KEYWORD_TYPES = frozenset(["allOf", "anyOf", "oneOf", "not"])
+OAS_DATA_TYPES = frozenset([
+    OAS_COMPLEX_TYPES |
+    OAS_ARRAY_TYPES |
+    OAS_LITERAL_TYPES
+])
 
 
 class ProcessSchema(Constants):
@@ -114,3 +148,4 @@ if TYPE_CHECKING:
     from weaver.typedefs import Literal
 
     ProcessSchemaType = Literal[ProcessSchema.OGC, ProcessSchema.OLD]
+    WPS_DataType = Literal[WPS_LITERAL, WPS_BOUNDINGBOX, WPS_COMPLEX, WPS_COMPLEX_DATA, WPS_REFERENCE]
