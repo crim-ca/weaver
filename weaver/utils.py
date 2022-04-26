@@ -232,28 +232,43 @@ def get_settings(container=None):
     raise TypeError(f"Could not retrieve settings from container object of type [{fully_qualified_name(container)}]")
 
 
-def get_header(header_name, header_container, pop=False):
-    # type: (str, AnyHeadersContainer, bool) -> Union[str, None]
+def get_header(header_name,         # type: str
+               header_container,    # type: AnyHeadersContainer
+               default=None,        # type: Optional[str], Optional[Union[str, List[str]]], bool
+               pop=False,           # type: bool
+               ):                   # type: (...) -> Optional[Union[str, List[str]]]
     """
-    Searches for the specified header by case/dash/underscore-insensitive ``header_name`` inside ``header_container``.
+    Find the specified header within a header container.
+
+    Retrieves :paramref:`header_name` by fuzzy match (independently of upper/lower-case and underscore/dash) from
+    various framework implementations of *Headers*.
+
+    :param header_name: header to find.
+    :param header_container: where to look for :paramref:`header_name`.
+    :param default: returned value if :paramref:`header_container` is invalid or :paramref:`header_name` is not found.
+    :param pop: remove the matched header(s) by name from the input container.
     """
+    def fuzzy_name(_name):
+        # type: (str) -> str
+        return _name.lower().replace("-", "_")
+
     if header_container is None:
-        return None
+        return default
     headers = header_container
     if isinstance(headers, (ResponseHeaders, EnvironHeaders, CaseInsensitiveDict)):
         headers = dict(headers)
     if isinstance(headers, dict):
         headers = header_container.items()
-    header_name = header_name.lower().replace("-", "_")
+    header_name = fuzzy_name(header_name)
     for i, (h, v) in enumerate(list(headers)):
-        if h.lower().replace("-", "_") == header_name:
+        if fuzzy_name(h) == header_name:
             if pop:
                 if isinstance(header_container, dict):
                     del header_container[h]
                 else:
                     del header_container[i]
             return v
-    return None
+    return default
 
 
 def get_cookie_headers(header_container, cookie_header_name="Cookie"):

@@ -64,6 +64,7 @@ if TYPE_CHECKING:
     from weaver.quotation.status import AnyQuoteStatus
     from weaver.status import AnyStatusType, StatusType
     from weaver.typedefs import (
+        AnyLogLevel,
         AnyProcess,
         AnySettingsContainer,
         AnyUUID,
@@ -590,7 +591,7 @@ class Job(Base):
                  errors=None,       # type: Optional[Union[str, Exception, WPSException, List[WPSException]]]
                  logger=None,       # type: Optional[Logger]
                  message=None,      # type: Optional[str]
-                 level=INFO,        # type: int
+                 level=INFO,        # type: AnyLogLevel
                  status=None,       # type: Optional[AnyStatusType]
                  progress=None,     # type: Optional[Number]
                  ):                 # type: (...) -> None
