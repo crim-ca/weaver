@@ -34,7 +34,7 @@ if TYPE_CHECKING:
     from typing import Any, Dict, Optional, Union
     from weaver.typedefs import AnyResponseType, JSON, Literal, SettingsType
 
-    ReferenceType = Literal["deploy", "execute", "package"]
+    ReferenceType = Literal["deploy", "describe", "execute", "package"]
 
 
 class ResourcesUtil(object):
@@ -98,6 +98,12 @@ class ResourcesUtil(object):
                         f"DeployProcess_{process}.json",
                         f"{process}/deploy.json",
                         f"{process}/DeployProcess_{process}.json",
+                    ]
+                elif ref_type == "describe":
+                    ref_search = [
+                        f"Describe_{process}.json",
+                        f"{process}/describe.json",
+                        f"{process}/Describe_{process}.json",
                     ]
                 elif ref_type == "execute":
                     ref_search = [

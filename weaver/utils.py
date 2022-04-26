@@ -1,6 +1,8 @@
+import difflib
 import errno
 import functools
 import inspect
+import json
 import logging
 import os
 import posixpath
@@ -1688,3 +1690,30 @@ def transform_json(json_data,               # type: Dict[str, JSON]
                         if k in nested_item:
                             nested_item[k] = func(nested_item[k])
     return json_data
+
+
+def generate_diff(val, ref, val_name="Test", ref_name="Reference"):
+    # type: (Any, Any, str, str) -> str
+    """
+    Generates a line-by-line diff result of the test value against the reference value.
+
+    Attempts to parse the contents as JSON to provide better diff of matched/sorted lines, and falls back to plain
+    line-based string representations otherwise.
+
+    :param val: Test input value.
+    :param ref: Reference input value.
+    :param val_name: Name to apply in diff for test input value.
+    :param ref_name: Name to apply in diff for reference input value.
+    :returns: Formatted multiline diff,
+    """
+    try:
+        val = json.dumps(val, sort_keys=True, indent=2, ensure_ascii=False)
+    except Exception:  # noqa
+        val = str(val)
+    try:
+        ref = json.dumps(ref, sort_keys=True, indent=2, ensure_ascii=False)
+    except Exception:  # noqa
+        ref = str(ref)
+    val = val.splitlines()
+    ref = ref.splitlines()
+    return "\n".join(difflib.context_diff(val, ref, fromfile=val_name, tofile=ref_name))

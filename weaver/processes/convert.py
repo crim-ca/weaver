@@ -1386,6 +1386,38 @@ def json2oas_io_bbox(io_info):
     return item_schema
 
 
+def json2oas_io_literal_data_type(io_type):
+    # type: (str) -> JSON
+    """
+    Converts various literal data types into corresponding :term:`OpenAPI` fields.
+
+    .. seealso::
+        - https://spec.openapis.org/oas/v3.1.0#data-types
+        - https://swagger.io/specification/#data-types
+    """
+    data_info = {"type": "string"}
+    if io_type in ["float", "double"]:
+        data_info["type"] = "number"
+        data_info["format"] = io_type
+    if io_type in ["int32", "int64"]:
+        data_info["type"] = "integer"
+        data_info["format"] = io_type
+    if io_type in ["bool", "boolean"]:
+        data_info["type"] = "boolean"
+    if io_type in ["date", "datetime", "date-time", "full-date", "time", "password"]:
+        data_info["type"] = "string"
+        if "time" in io_type:
+            data_info["format"] = "date-time"
+        elif "date" in io_type:
+            data_info["format"] = "date"
+        else:
+            data_info["format"] = io_type
+    if io_type in ["base64", "binary", "byte"]:
+        data_info["type"] = "string"
+        data_info["format"] = "binary"
+    return data_info
+
+
 def json2oas_io_literal(io_info):
     # type: (JSON_IO_Type) -> OpenAPISchema
     """
@@ -1422,6 +1454,10 @@ def json2oas_io_literal(io_info):
                 if vals:
                     data_enum = {"type": _typ, "enum": vals}
                     data_enum.update(data_var)
+                    if _typ == "number" and all(val for val in data_def if isinstance(val, float)):
+                        data_enum.update(json2oas_io_literal_data_type("double"))
+                    if _typ == "number" and all(val for val in data_def if isinstance(val, int)):
+                        data_enum.update(json2oas_io_literal_data_type("integer"))
                     item_variation.append(data_enum)
             continue  # next immediately since many enum variations are already handled
         elif isinstance(data_def, list) and all(isinstance(val_def, dict) for val_def in data_def):
@@ -1446,8 +1482,9 @@ def json2oas_io_literal(io_info):
                     data_range.update({"exclusiveMaximum": True})
                 item_variation.append(data_var)
             continue  # next immediately since many range variations are already handled
+
         # basic definition if no special enum/range handling was applied
-        data_var["type"] = data_type
+        data_var.update(json2oas_io_literal_data_type(data_type))
         item_variation.append(data_var)
 
     if not domains:

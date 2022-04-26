@@ -147,6 +147,54 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         assert proc["inputs"][0]["id"] == "url"
         assert proc["outputs"][0]["id"] == "values"
 
+    def test_deploy_ogc_with_io_schema_definitions(self):
+        """
+        Validate deployment when :term:`Process` definition includes I/O with OpenAPI ``schema`` fields.
+
+        When provided during deployment, I/O ``schema`` definitions should be kept as-is because they *should*
+        be more precise for the intended usage by the application then what `Weaver` can resolve by itself.
+
+        Using provided I/O ``schema`` definitions, `Weaver` should backport all corresponding information that
+        can be used to form other similar fields (for ``OLD`` representation and other backward compatibility).
+
+        .. seealso::
+            Files for ``EchoProcess`` use reference :term:`OGC` definitions. See links in contents.
+        """
+        ref = self.retrieve_payload("EchoProcess", "describe", local=True)
+        cwl = self.retrieve_payload("EchoProcess", "package", local=True)
+        body = {
+            "processDescription": ref,
+            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication",
+            "executionUnit": [{"unit": cwl}],
+        }
+
+        desc, _ = self.deploy_process(body, process_id=self._testMethodName, describe_schema=ProcessSchema.OGC)
+        assert "inputs" in desc and isinstance(desc["inputs"], dict) and len(desc["inputs"]) == len(ref["inputs"])
+        assert "outputs" in desc and isinstance(desc["outputs"], dict) and len(desc["outputs"]) == len(ref["output"])
+        assert all(isinstance(val, dict) and isinstance(val.get(["schema"]), dict) for val in desc["inputs"].values())
+        assert all(isinstance(val, dict) and isinstance(val.get(["schema"]), dict) for val in desc["outputs"].values())
+
+        # expect unchanged schema definitions
+        assert all(ref["inputs"][key]["schema"] == val["schema"] for key, val in desc["inputs"].items())
+        assert all(ref["outputs"][key]["schema"] == val["schema"] for key, val in desc["outputs"].items())
+
+        # array min/max items => min/max occurs
+        assert "minOccurs" in desc["inputs"]["arrayInput"]
+        assert isinstance(desc["inputs"]["arrayInput"]["schema"]["minItems"], int)
+        assert desc["inputs"]["arrayInput"]["minOccurs"] == desc["inputs"]["arrayInput"]["schema"]["minItems"]
+        assert "maxOccurs" in desc["inputs"]["arrayInput"]
+        assert isinstance(desc["inputs"]["arrayInput"]["schema"]["maxItems"], int)
+        assert desc["inputs"]["arrayInput"]["maxOccurs"] == desc["inputs"]["arrayInput"]["schema"]["maxItems"]
+        # although conversion is possible, min/max occurs not allowed in outputs, so omitted regardless
+        assert "minOccurs" not in desc["outputs"]["arrayOutput"]
+        assert "maxOccurs" not in desc["outputs"]["arrayOutput"]
+        assert "minItems" in desc["outputs"]["arrayInput"]["schema"]
+        assert isinstance(desc["outputs"]["arrayInput"]["schema"]["minItems"], int)
+        assert "maxItems" in desc["outputs"]["arrayInput"]["schema"]
+        assert isinstance(desc["outputs"]["arrayInput"]["schema"]["maxItems"], int)
+
+
+
     def test_deploy_process_io_no_format_default(self):
         """
         Validate resolution of ``default`` format field during deployment.

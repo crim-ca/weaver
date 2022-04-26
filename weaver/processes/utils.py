@@ -41,7 +41,7 @@ from weaver.exceptions import (
 )
 from weaver.processes.types import ProcessType
 from weaver.store.base import StoreProcesses, StoreServices
-from weaver.utils import fully_qualified_name, get_sane_name, get_settings, get_url_without_query
+from weaver.utils import fully_qualified_name, get_sane_name, get_settings, get_url_without_query, generate_diff
 from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_client
 from weaver.wps_restapi import swagger_definitions as sd
@@ -169,7 +169,7 @@ def _check_deploy(payload):
         r_exec_unit = results.get("executionUnit", [{}])
         if p_exec_unit and p_exec_unit != r_exec_unit:
             message = "Process deployment execution unit is invalid."
-            d_exec_unit = sd.ExecutionUnit().deserialize(p_exec_unit)  # raises directly if caused by invalid schema
+            d_exec_unit = sd.ExecutionUnitList().deserialize(p_exec_unit)  # raises directly if caused by invalid schema
             if r_exec_unit != d_exec_unit:  # otherwise raise a generic error, don't allow differing definitions
                 message = (
                     "Process deployment execution unit resolved as valid definition but differs from submitted "
@@ -181,6 +181,10 @@ def _check_deploy(payload):
                     "error": PackageRegistrationError.__name__,
                     "value": d_exec_unit
                 })
+            LOGGER.warning(
+                "Detected difference between original/parsed deploy payload, but no invalid schema:\n%s",
+                generate_diff(p_exec_unit, r_exec_unit, val_name="original payload", ref_name="parsed result")
+            )
         return results
     except colander.Invalid as exc:
         LOGGER.debug("Failed deploy body schema validation:\n%s", exc)
