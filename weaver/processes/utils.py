@@ -144,30 +144,33 @@ def _check_deploy(payload):
             # don't use "get_process_information" to make sure everything is retrieved under same location
             p_process = p_process.get("process", {})
             r_process = r_process.get("process", {})
-        p_inputs = p_process.get("inputs")
-        r_inputs = r_process.get("inputs")
-        if p_inputs and p_inputs != r_inputs:
-            message = "Process deployment inputs definition is invalid."
-            # try raising sub-schema to have specific reason
-            d_inputs = sd.DeployInputTypeAny().deserialize(p_inputs)
-            # Raise directly if we where not able to detect the cause, but there is something incorrectly dropped.
-            # Only raise if indirect vs direct inputs deserialize differ such that auto-resolved defaults omitted from
-            # submitted process inputs or unknowns fields that were correctly ignored don't cause false-positive diffs.
-            if r_inputs != d_inputs:
-                message = (
-                    "Process deployment inputs definition resolved as valid schema but differ from submitted values. "
-                    "Validate provided inputs against resolved inputs with schemas to avoid mismatching definitions."
+        for io_type, io_schema in [("inputs", sd.DeployInputTypeAny), ("outputs", sd.DeployOutputTypeAny)]:
+            p_io = p_process.get(io_type)
+            r_io = r_process.get(io_type)
+            if p_io and p_io != r_io:
+                message = f"Process deployment {io_type} definition is invalid."
+                # try raising sub-schema to have specific reason
+                d_io = io_schema(name=io_type).deserialize(p_io)
+                # Raise directly if we where not able to detect the cause, but there is something incorrectly dropped.
+                # Only raise if indirect vs direct deserialize differ such that auto-resolved defaults omitted from
+                # submitted process I/O or unknowns fields that were correctly ignored don't cause false-positive diffs.
+                if r_io != d_io:
+                    message = (
+                        f"Process deployment {p_io} definition resolved as valid schema "
+                        f"but differ from submitted values. "
+                        f"Validate provided {p_io} against resolved {p_io} with schemas "
+                        f"to avoid mismatching definitions."
+                    )
+                    raise HTTPBadRequest(json={
+                        "description": message,
+                        "cause": "unknown",
+                        "error": "Invalid",
+                        "value": d_io
+                    })
+                LOGGER.warning(
+                    "Detected difference between original/parsed deploy %s, but no invalid schema error:\n%s",
+                    io_type, generate_diff(p_io, r_io, val_name="original payload", ref_name="parsed result")
                 )
-                raise HTTPBadRequest(json={
-                    "description": message,
-                    "cause": "unknown",
-                    "error": "Invalid",
-                    "value": d_inputs
-                })
-            LOGGER.warning(
-                "Detected difference between original/parsed deploy inputs, but no invalid schema:\n%s",
-                generate_diff(p_inputs, r_inputs, val_name="original payload", ref_name="parsed result")
-            )
         # Execution Unit is optional since process reference (e.g.: WPS-1 href) can be provided in processDescription
         # Cannot validate as CWL yet, since execution unit can also be an href that is not yet fetched (it will later)
         p_exec_unit = payload.get("executionUnit", [{}])
@@ -187,7 +190,7 @@ def _check_deploy(payload):
                     "value": d_exec_unit
                 })
             LOGGER.warning(
-                "Detected difference between original/parsed deploy execution unit, but no invalid schema:\n%s",
+                "Detected difference between original/parsed deploy execution unit, but no invalid schema error:\n%s",
                 generate_diff(p_exec_unit, r_exec_unit, val_name="original payload", ref_name="parsed result")
             )
         return results

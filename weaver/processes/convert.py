@@ -22,7 +22,7 @@ from pywps.validator.mode import MODE
 from weaver import xml_util
 from weaver.exceptions import PackageTypeError
 from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
-from weaver.formats import ContentType, get_cwl_file_format, get_extension, get_format
+from weaver.formats import ContentType, get_cwl_file_format, get_extension, get_format, repr_json
 from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_WPS1,
     OAS_ARRAY_TYPES,
@@ -103,6 +103,7 @@ if TYPE_CHECKING:
         JobValueFile,
         JSON,
         OpenAPISchema,
+        OpenAPISchemaKeyword,
         TypedDict
     )
     from weaver.wps_restapi.constants import JobInputsOutputsSchemaType
@@ -117,7 +118,7 @@ if TYPE_CHECKING:
     OWS_IO_Type = Union[OWS_Input_Type, OWS_Output_Type]
     JSON_IO_Type = JSON
     JSON_IO_TypedInfo = TypedDict("JSON_IO_TypedInfo", {
-        "type": WPS_DataType,
+        "type": WPS_DataType,  # noqa
         "data_type": Optional[str],
     }, total=False)
     JSON_IO_ListOrMap = Union[List[JSON], Dict[str, Union[JSON, str]]]
@@ -1566,19 +1567,17 @@ def json2oas_io(io_info):
     return io_schema
 
 
-def oas2json_io(io_info):
-    # type: (OpenAPISchema) -> JSON_IO_TypedInfo
+def oas2json_io_literal(io_info):
+    # type: (OpenAPISchema) -> Union[JSON_IO_TypedInfo, Type[null]]
     """
+    Converts a literal value I/O definition by :term:`OpenAPI` schema into the equivalent :term:`JSON` representation.
 
-    :param io_info:
-    :return:
+    :param io_info: :term:`OpenAPI` schema of the I/O.
+    :return: Converted :term:`JSON` I/O definition, or :data:`null` if definition could not be resolved.
     """
     io_type = get_field(io_info, "type", search_variations=False)
-    io_default = get_field(io_info, "default", search_variations=False)
-    kw_key_val = list(filter(lambda key, val: key in OAS_KEYWORD_TYPES, io_info.values()))
     io_fmt = get_field(io_info, "format", search_variations=False)
-    io_json = {"type": WPS_COMPLEX}  # if cannot be resolved, must be too ambiguous, so assume complex data dump
-    if io_type in OAS_LITERAL_TYPES:
+    if io_fmt is not null:
         if io_type in OAS_LITERAL_NUMERIC:
             if io_fmt in OAS_LITERAL_FLOAT_FORMATS:
                 io_type = "double"
@@ -1586,48 +1585,125 @@ def oas2json_io(io_info):
                 io_type = "integer"
         elif io_fmt in OAS_LITERAL_STRING_FORMATS:
             io_type = io_fmt
-        data_type = any2wps_literal_datatype(io_type, False)
-        io_json = {"type": WPS_LITERAL, "data_type": data_type, "max_occurs": 1}  # min unknown from literal schema
-    elif io_type in OAS_COMPLEX_TYPES:
-        io_props = get_field(io_info, "properties", search_variations=False) or {}
-        if ("bbox" in io_props and "crs" in io_props) or io_fmt == "ogc-bbox":
-            io_json = {"type": WPS_BOUNDINGBOX}
-        else:
-            io_json = {"type": WPS_COMPLEX}
+    data_type = any2wps_literal_datatype(io_type, False)
+    io_json = {"type": WPS_LITERAL, "data_type": data_type}
+    return io_json
 
-    elif io_type in OAS_ARRAY_TYPES:
-        io_items = get_field(io_info, "items", search_variations=False)
-        io_json = oas2json_io(io_items)
-    elif len(kw_key_val) == 1:
-        keyword_schemas = kw_key_val[0][-1]
+
+def oas2json_io_array(io_info):
+    # type: (OpenAPISchema) -> Union[JSON_IO_TypedInfo, Type[null]]
+    """
+    Converts an array I/O definition by :term:`OpenAPI` schema into the equivalent :term:`JSON` representation.
+
+    :param io_info: :term:`OpenAPI` schema of the I/O.
+    :return: Converted :term:`JSON` I/O definition, or :data:`null` if definition could not be resolved.
+    """
+    io_items = get_field(io_info, "items", search_variations=False)
+    io_json = oas2json_io(io_items)
+    min_items = get_field(io_info, "minItems")
+    max_items = get_field(io_info, "maxItems")
+    if isinstance(min_items, int):
+        io_json["minOccurs"] = min_items
+    if isinstance(max_items, int):
+        io_json["maxOccurs"] = max_items
+    return io_json
+
+
+def oas2json_io_object(io_info):
+    # type: (OpenAPISchema) -> Union[JSON_IO_TypedInfo, Type[null]]
+    """
+    Converts an object I/O definition by :term:`OpenAPI` schema into the equivalent :term:`JSON` representation.
+
+    An explicit :term:`OpenAPI` schema with ``object`` type can represent any of the following I/O:
+
+      - Bounding Box as GeoJSON feature
+      - Complex JSON structure
+
+    :param io_info: :term:`OpenAPI` schema of the I/O.
+    :return: Converted :term:`JSON` I/O definition, or :data:`null` if definition could not be resolved.
+    """
+    io_fmt = get_field(io_info, "format", search_variations=False)
+    io_props = get_field(io_info, "properties", search_variations=False) or {}
+    if ("bbox" in io_props and "crs" in io_props) or io_fmt == "ogc-bbox":
+        io_json = {"type": WPS_BOUNDINGBOX}
+    else:
+        io_json = {"type": WPS_COMPLEX}
+    return io_json
+
+
+def oas2json_io_keyword(io_info):
+    # type: (OpenAPISchemaKeyword) -> Union[JSON_IO_TypedInfo, Type[null]]
+    """
+    Converts a keyword I/O definition by :term:`OpenAPI` schema into the equivalent :term:`JSON` representation.
+
+    Keywords are defined as a list of combinations of :term:`OpenAPI` schema representing how to combine them
+    according to the keyword value, being one of :data:`OAS_KEYWORD_TYPES`.
+
+    :param io_info: :term:`OpenAPI` schema of the I/O.
+    :return: Converted :term:`JSON` I/O definition, or :data:`null` if definition could not be resolved.
+    """
+    io_json = {"type": WPS_COMPLEX}  # if cannot be resolved, must be too ambiguous, so assume complex data dump
+    kw_key_val = {key: val for key, val in io_info.items() if key in OAS_KEYWORD_TYPES}
+    if len(kw_key_val) != 1:
+        return null
+    keyword = list(kw_key_val)[0]
+    keyword_schemas = io_info[keyword]
+    if keyword == "not":
+        keyword_objects = oas2json_io(keyword_schemas)  # noqa
+    else:
         keyword_objects = [oas2json_io(schema) for schema in keyword_schemas]
-        keyword_objects = [types for sub in keyword_objects for types in sub]  # flatten 2D->1D in case of nested kw
-        keyword_types = [get_field(obj, "type", search_variations=False) for obj in keyword_objects]
-        keyword_types = set(filter(lambda obj: isinstance(obj, str), keyword_types))
-        keyword_dtypes = [get_field(obj, "data_type", search_variations=False) for obj in keyword_objects]
-        keyword_dtypes = set(filter(lambda obj: isinstance(obj, str), keyword_dtypes))
-        if keyword_types:
-            # literals are all or nothing, but can allow different 'data format'
-            # any mixed type with literal must be elevated to complex since there is no way to handle both as literals
-            if all(typ == WPS_LITERAL for typ in keyword_types):
-                io_json = {"type": WPS_LITERAL}
-                if keyword_dtypes and len(keyword_dtypes) == 1:
-                    io_json["data_type"] = list(keyword_dtypes)[0]
-                elif all(dtype in OAS_LITERAL_FLOAT_FORMATS for dtype in keyword_dtypes):
-                    io_json["data_type"] = "double"
-                elif all(dtype in OAS_LITERAL_INTEGER_FORMATS for dtype in keyword_dtypes):
-                    io_json["data_type"] = "integer"
-                # acceptable to use 'numeric' for either integers or floats
-                elif all(dtype in OAS_LITERAL_NUMERIC | OAS_LITERAL_NUMERIC_FORMATS for dtype in keyword_dtypes):
-                    io_json["data_type"] = "numeric"
-                else:
-                    io_json["data_type"] = "string"
-            # since some variations can be an external reference or a partial definition,
-            # anything matching a bbox marks the whole definition as one, falling back to complex otherwise
-            elif any(typ == WPS_BOUNDINGBOX for typ in keyword_types):
-                io_json = {"type": WPS_BOUNDINGBOX}
+    keyword_objects = [types for sub in keyword_objects for types in sub]  # flatten 2D->1D in case of nested kw
+    keyword_types = [get_field(obj, "type", search_variations=False) for obj in keyword_objects]
+    keyword_types = set(filter(lambda obj: isinstance(obj, str), keyword_types))
+    keyword_dtypes = [get_field(obj, "data_type", search_variations=False) for obj in keyword_objects]
+    keyword_dtypes = set(filter(lambda obj: isinstance(obj, str), keyword_dtypes))
+    if keyword_types:
+        # literals are all or nothing, but can allow different 'data format'
+        # any mixed type with literal must be elevated to complex since there is no way to handle both as literals
+        if all(typ == WPS_LITERAL for typ in keyword_types):
+            io_json = {"type": WPS_LITERAL}
+            if keyword_dtypes and len(keyword_dtypes) == 1:
+                io_json["data_type"] = list(keyword_dtypes)[0]
+            elif all(dtype in OAS_LITERAL_FLOAT_FORMATS for dtype in keyword_dtypes):
+                io_json["data_type"] = "double"
+            elif all(dtype in OAS_LITERAL_INTEGER_FORMATS for dtype in keyword_dtypes):
+                io_json["data_type"] = "integer"
+            # acceptable to use 'numeric' for either integers or floats
+            elif all(dtype in OAS_LITERAL_NUMERIC | OAS_LITERAL_NUMERIC_FORMATS for dtype in keyword_dtypes):
+                io_json["data_type"] = "numeric"
+            else:
+                io_json["data_type"] = "string"
+        # since some variations can be an external reference or a partial definition,
+        # anything matching a bbox marks the whole definition as one, falling back to complex otherwise
+        elif any(typ == WPS_BOUNDINGBOX for typ in keyword_types):
+            io_json = {"type": WPS_BOUNDINGBOX}
+    return io_json
+
+
+def oas2json_io(io_info):
+    # type: (OpenAPISchema) -> Union[JSON_IO_TypedInfo, Type[null]]
+    """
+    Converts an I/O definition by :term:`OpenAPI` schema into the equivalent :term:`JSON` representation.
+
+    :param io_info: :term:`OpenAPI` schema of the I/O.
+    :return: Converted :term:`JSON` I/O definition, or :data:`null` if definition could not be resolved.
+    """
+    io_type = get_field(io_info, "type", search_variations=False)
+    if io_type in OAS_LITERAL_TYPES:
+        io_json = oas2json_io_literal(io_info)
+    elif io_type in OAS_COMPLEX_TYPES:
+        io_json = oas2json_io_object(io_info)
+    elif io_type in OAS_ARRAY_TYPES:
+        io_json = oas2json_io_array(io_info)
+    elif any(key in OAS_KEYWORD_TYPES for key in io_info):
+        io_json = oas2json_io_keyword(io_info)
+    else:
+        LOGGER.debug("Unknown OpenAPI to JSON I/O resolution for schema: %s", repr_json(io_info))
+        return null
+    # default literal value can help resolve as last resort if specific type cannot be inferred
+    io_default = get_field(io_info, "default", search_variations=False)
     if io_default is not null:
-        io_json["default"] = io_default  # can help resolve as last resort if type can be inferred from literal value
+        io_json["default"] = io_default
     return io_json
 
 
@@ -2240,7 +2316,9 @@ def merge_package_io(wps_io_list, cwl_io_list, io_select):
         })
         wps_io_schema = get_field(wps_io_json, "schema")
         if wps_io_schema:
-            wps_io_json.update(oas2json_io(wps_io_schema))
+            json_io_schema = oas2json_io(wps_io_schema)
+            if json_io_schema and isinstance(json_io_schema, dict):
+                wps_io_json.update(json_io_schema)
         # apply type if WPS deploy definition was partial but can be retrieved from CWL
         wps_io_json.setdefault("type", get_field(cwl_io_json, "type", search_variations=True))
 

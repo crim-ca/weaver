@@ -631,8 +631,8 @@ def guess_target_format(request, default=ContentType.APP_JSON):
     return content_type
 
 
-def repr_json(data, force_string=True, **kwargs):
-    # type: (Any, bool, **Any) -> Union[JSON, str, None]
+def repr_json(data, force_string=True, ensure_ascii=False, indent=2, **kwargs):
+    # type: (Any, bool, bool, int, **Any) -> Union[JSON, str, None]
     """
     Ensure that the input data can be serialized as JSON to return it formatted representation as such.
 
@@ -641,7 +641,7 @@ def repr_json(data, force_string=True, **kwargs):
     if data is None:
         return None
     try:
-        data_str = json.dumps(data, **kwargs)
+        data_str = json.dumps(data, indent=indent, ensure_ascii=ensure_ascii, **kwargs)
         return data_str if force_string else data
     except Exception:  # noqa: W0703 # nosec: B110
         return str(data)

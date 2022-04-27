@@ -335,8 +335,8 @@ if TYPE_CHECKING:
     # simple/partial definitions of OpenAPI schema
     OpenAPISchemaTypes = Literal["object", "array", "boolean", "integer", "number", "string"]
     _OpenAPISchema: TypeAlias = "OpenAPISchema"
-    _OpenAPISchemaProperties: TypeAlias = "OpenAPISchemaProperties"
-    OpenAPISchemaProperties = TypedDict("OpenAPISchemaProperties", {
+    _OpenAPISchemaProperty: TypeAlias = "OpenAPISchemaProperty"
+    OpenAPISchemaProperty = TypedDict("OpenAPISchemaProperty", {
         "type": OpenAPISchemaTypes,
         "format": str,
         "default": Any,
@@ -366,19 +366,42 @@ if TYPE_CHECKING:
         "contentMediaType": str,
         "contentEncoding": str,
         "contentSchema": str,
-        "not": Union[_OpenAPISchema, str],
-        "allOf": List[Union[_OpenAPISchema, str]],
-        "anyOf": List[Union[_OpenAPISchema, str]],
-        "oneOf": List[Union[_OpenAPISchema, str]],
-        "properties": Dict[str, _OpenAPISchemaProperties],
+        "properties": Dict[str, _OpenAPISchemaProperty],
         "additionalProperties": Union[bool, Dict[str, Union[str, _OpenAPISchema]]],
     }, total=False)
     OpenAPISchemaObject = TypedDict("OpenAPISchemaObject", {
         "type": Literal["object"],
-        "properties": OpenAPISchemaProperties
+        "properties": Dict[str, OpenAPISchemaProperty],
     }, total=False)
     OpenAPISchemaList = TypedDict("OpenAPISchemaList", {
         "type": Literal["array"],
-        "items": _OpenAPISchema
+        "items": _OpenAPISchema,
     }, total=False)
-    OpenAPISchema = Union[OpenAPISchemaObject, OpenAPISchemaList, OpenAPISchemaProperties]
+    OpenAPISchemaReference = TypedDict("OpenAPISchemaReference", {
+        "$ref": _OpenAPISchema
+    }, total=True)
+    OpenAPISchemaAllOf = TypedDict("OpenAPISchemaAllOf", {
+        "allOf": List[Union[_OpenAPISchema, OpenAPISchemaReference]],
+    }, total=False)
+    OpenAPISchemaAnyOf = TypedDict("OpenAPISchemaAnyOf", {
+        "anyOf": List[Union[_OpenAPISchema, OpenAPISchemaReference]],
+    }, total=False)
+    OpenAPISchemaOneOf = TypedDict("OpenAPISchemaOneOf", {
+        "oneOf": List[Union[_OpenAPISchema, OpenAPISchemaReference]],
+    }, total=False)
+    OpenAPISchemaNot = TypedDict("OpenAPISchemaNot", {
+        "not": Union[_OpenAPISchema, OpenAPISchemaReference],
+    }, total=False)
+    OpenAPISchemaKeyword = Union[
+        OpenAPISchemaAllOf,
+        OpenAPISchemaAnyOf,
+        OpenAPISchemaOneOf,
+        OpenAPISchemaNot,
+    ]
+    OpenAPISchema = Union[
+        OpenAPISchemaObject,
+        OpenAPISchemaList,
+        OpenAPISchemaKeyword,
+        OpenAPISchemaProperty,
+        OpenAPISchemaReference,
+    ]

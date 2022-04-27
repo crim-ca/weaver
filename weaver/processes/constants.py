@@ -129,11 +129,11 @@ OAS_LITERAL_NUMERIC_FORMATS = frozenset(OAS_LITERAL_FLOAT_FORMATS | OAS_LITERAL_
 OAS_LITERAL_STRING_FORMATS = frozenset(["date", "datetime", "date-time", "full-date", "time", "password"])
 OAS_LITERAL_BINARY_FORMATS = frozenset(["base64", "binary", "byte"])
 OAS_KEYWORD_TYPES = frozenset(["allOf", "anyOf", "oneOf", "not"])
-OAS_DATA_TYPES = frozenset([
+OAS_DATA_TYPES = frozenset(
     OAS_COMPLEX_TYPES |
     OAS_ARRAY_TYPES |
     OAS_LITERAL_TYPES
-])
+)
 
 
 class ProcessSchema(Constants):
@@ -145,7 +145,10 @@ class ProcessSchema(Constants):
 
 
 if TYPE_CHECKING:
+    from typing import Union
+
     from weaver.typedefs import Literal
 
     ProcessSchemaType = Literal[ProcessSchema.OGC, ProcessSchema.OLD]
-    WPS_DataType = Literal[WPS_LITERAL, WPS_BOUNDINGBOX, WPS_COMPLEX, WPS_COMPLEX_DATA, WPS_REFERENCE]
+    WPS_ComplexType = Literal[WPS_COMPLEX, WPS_COMPLEX_DATA, WPS_REFERENCE]
+    WPS_DataType = Union[Literal[WPS_LITERAL, WPS_BOUNDINGBOX], WPS_ComplexType]

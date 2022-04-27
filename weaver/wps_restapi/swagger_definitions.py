@@ -990,7 +990,7 @@ class AnyValueOAS(AnyOfKeywordSchema):
 #   but reference 'default' correspond more to the default *interpretation* value if none was provided.
 #   It is preferable in our case to omit (i.e.: drop) these defaults to keep obtained/resolved definitions succinct,
 #   since those defaults can be defined (by default...) if needed. No reason to add them explicitly.
-class PropertyItemOAS(PermissiveMappingSchema):
+class PropertyOAS(PermissiveMappingSchema):
     _type = TypeOAS(name="type", missing=drop)  # not present if top-most schema is {allOf,anyOf,oneOf,not}
     _format = ExtendedSchemaNode(String(), name="format", missing=drop)
     default = AnyValueOAS(unknown="preserve", missing=drop)
@@ -998,7 +998,7 @@ class PropertyItemOAS(PermissiveMappingSchema):
     title = ExtendedSchemaNode(String(), missing=drop)
     description = ExtendedSchemaNode(String(), missing=drop)
     enum = EnumOAS(missing=drop)
-    items = PseudoObjectOAS(name="oneOf", missing=drop)
+    items = PseudoObjectOAS(name="items", missing=drop)
     required = RequiredOAS(missing=drop)
     nullable = ExtendedSchemaNode(Boolean(), missing=drop)
     deprecated = ExtendedSchemaNode(Boolean(), missing=drop)
@@ -1028,8 +1028,8 @@ class PropertyItemOAS(PermissiveMappingSchema):
     properties = PermissiveMappingSchema(missing=drop)  # cannot do real recursive definitions, simply check mapping
 
 
-class PropertiesOAS(ExtendedMappingSchema):
-    property_name = PropertyItemOAS(
+class ObjectPropertiesOAS(ExtendedMappingSchema):
+    property_name = PropertyOAS(
         variable="{property-name}",
         description="Named of the property being defined under the OpenAPI object.",
     )
@@ -1037,7 +1037,7 @@ class PropertiesOAS(ExtendedMappingSchema):
 
 class ObjectOAS(ExtendedMappingSchema):
     _type = TypeOAS(name="type", missing=drop, validator=OneOf(OAS_COMPLEX_TYPES))
-    properties = PropertiesOAS()
+    properties = ObjectPropertiesOAS()
 
 
 class OAS(OneOfKeywordSchema):
@@ -1046,7 +1046,7 @@ class OAS(OneOfKeywordSchema):
     _one_of = [
         ReferenceOAS(),
         ObjectOAS(),
-        PropertyItemOAS(),  # for top-level keyword schemas {allOf,anyOf,oneOf,not}
+        PropertyOAS(),  # for top-level keyword schemas {allOf,anyOf,oneOf,not}
     ]
 
 
