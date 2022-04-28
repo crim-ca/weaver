@@ -111,6 +111,7 @@ inputs:
           contentMediaType: image/jp2
           type: string
     title: Inline Images Value Input
+  # FIXME: Support Literal with Unit of Measure (https://github.com/crim-ca/weaver/issues/430)
   measureInput:
     description: This is an example of a NUMERIC literal with an associated unit of measure.
     schema:
@@ -210,6 +211,7 @@ outputs:
       - contentEncoding: binary
         contentMediaType: image/jp2
         type: string
+  # FIXME: Support Literal with Unit of Measure (https://github.com/crim-ca/weaver/issues/430)
   measureOutput:
     schema:
       properties:
