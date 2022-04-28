@@ -213,7 +213,8 @@ class WpsConfigBase(unittest.TestCase):
                 exec_unit = load_file(os.path.join(WEAVER_ROOT_DIR, exec_href))
                 exec_list[0]["unit"] = exec_unit
                 exec_list[0].pop("href")
-        resp = mocked_sub_requests(cls.app, "post_json", "/processes", data=payload, headers=cls.json_headers)
+        resp = mocked_sub_requests(cls.app, "post_json", "/processes",
+                                   data=payload, headers=cls.json_headers, only_local=True)
         assert resp.status_code == 201, f"Expected successful deployment.\nError:\n{resp.text}"
         path = resp.json["processSummary"]["processDescriptionURL"]
         body = {"value": Visibility.PUBLIC}

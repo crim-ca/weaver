@@ -9,6 +9,7 @@ import posixpath
 import re
 import shutil
 import sys
+import tempfile
 import time
 import warnings
 from copy import deepcopy
@@ -24,6 +25,7 @@ import yaml
 from beaker.cache import cache_region, region_invalidate
 from beaker.exceptions import BeakerException
 from celery.app import Celery
+from jsonschema.validators import RefResolver as JsonSchemaRefResolver
 from pyramid.config import Configurator
 from pyramid.exceptions import ConfigurationError
 from pyramid.httpexceptions import (
@@ -68,6 +70,7 @@ if TYPE_CHECKING:
         JSON,
         KVP,
         KVP_Item,
+        OpenAPISchema,
         Number,
         SettingsType
     )
@@ -139,6 +142,26 @@ class NullType(metaclass=_Singleton):
 
 # pylint: disable=C0103,invalid-name
 null = NullType()
+
+
+class SchemaRefResolver(JsonSchemaRefResolver):
+    """
+    Reference resolver that supports both :term:`JSON` and :term:`YAML` files from a remote location.
+    """
+    # only need to override the remote resolution to add YAML support
+    def resolve_remote(self, uri):
+        # type: (str) -> OpenAPISchema
+        try:
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                schema_file = fetch_file(uri, tmp_dir, headers={"Accept": ContentType.APP_JSON})
+                with open(schema_file, mode="r", encoding="utf-8") as io_f:
+                    result = yaml.safe_load(io_f)
+        except Exception as exc:
+            raise ValueError(f"External OpenAPI schema reference [{uri}] could not be loaded.") from exc
+
+        if self.cache_remote:
+            self.store[uri] = result
+        return result
 
 
 def get_weaver_url(container):

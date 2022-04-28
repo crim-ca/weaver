@@ -1,6 +1,8 @@
 """
 Conversion functions between corresponding data structures.
 """
+import tempfile
+
 import json
 import logging
 from collections import OrderedDict
@@ -59,6 +61,7 @@ from weaver.processes.constants import (
     ProcessSchema
 )
 from weaver.utils import (
+    SchemaRefResolver,
     bytes2str,
     fetch_file,
     fully_qualified_name,
@@ -103,6 +106,9 @@ if TYPE_CHECKING:
         JobValueFile,
         JSON,
         OpenAPISchema,
+        OpenAPISchemaArray,
+        OpenAPISchemaObject,
+        OpenAPISchemaProperty,
         OpenAPISchemaKeyword,
         TypedDict
     )
@@ -1266,6 +1272,7 @@ def any2json_literal_allowed_value(io_allow):
             range_fields = ["minimumValue", "maximumValue", "spacing"]
             if allowed_type == "value" or not any(field in io_allow for field in range_fields):
                 return allowed_value
+        io_allow = wps_range
         if not io_allow:  # empty container
             return null
     return io_allow
@@ -1291,7 +1298,7 @@ def any2json_literal_data_domains(io_info):
           - url-string
           - {anyValue: bool}
           - [float, int, bool, str]
-          - [{minimum, maximum, spacing, closure}]
+          - [{minimum: number/none, maximum: number/none, spacing: number/none, closure: str open/close variations}]
     """
     io_type = get_field(io_info, "type", search_variations=False)
     if io_type in [WPS_BOUNDINGBOX, WPS_COMPLEX]:
@@ -1568,7 +1575,7 @@ def json2oas_io(io_info):
 
 
 def oas2json_io_literal(io_info):
-    # type: (OpenAPISchema) -> Union[JSON_IO_TypedInfo, Type[null]]
+    # type: (OpenAPISchemaProperty) -> Union[JSON_IO_TypedInfo, Type[null]]
     """
     Converts a literal value I/O definition by :term:`OpenAPI` schema into the equivalent :term:`JSON` representation.
 
@@ -1581,17 +1588,48 @@ def oas2json_io_literal(io_info):
         if io_type in OAS_LITERAL_NUMERIC:
             if io_fmt in OAS_LITERAL_FLOAT_FORMATS:
                 io_type = "double"
-            if io_fmt in OAS_LITERAL_INTEGER_FORMATS:
+            elif io_fmt in OAS_LITERAL_INTEGER_FORMATS:
                 io_type = "integer"
         elif io_fmt in OAS_LITERAL_STRING_FORMATS:
             io_type = io_fmt
     data_type = any2wps_literal_datatype(io_type, False)
     io_json = {"type": WPS_LITERAL, "data_type": data_type}
+    io_enum = get_field(io_info, "enum", search_variations=False)
+    min_val = get_field(io_info, "minimum", search_variations=False)
+    max_val = get_field(io_info, "maximum", search_variations=False)
+    min_exc = get_field(io_info, "exclusiveMinimum", search_variations=False, default=False)
+    max_exc = get_field(io_info, "exclusiveMaximum", search_variations=False, default=False)
+    mult_of = get_field(io_info, "multipleOf", search_variations=False, default=None)
+    io_allow = null
+    if io_enum is not null:
+        io_allow = {"allowed_values": io_enum}
+    elif min_val is not null or max_val is not null:
+        if min_exc and max_exc:
+            closure = RANGECLOSURETYPE.OPEN
+        elif min_exc:
+            closure = RANGECLOSURETYPE.OPENCLOSED
+        elif max_exc:
+            closure = RANGECLOSURETYPE.CLOSEDOPEN
+        else:
+            closure = RANGECLOSURETYPE.CLOSED
+        io_allow = {
+            "allowed_values": [{
+                "minimum": min_val,
+                "maximum": max_val,
+                "spacing": mult_of,
+                "closure": closure
+            }]
+        }
+    if io_allow is not null:
+        io_allow.update(io_info)
+        io_allow["data_type"] = data_type
+        domains = any2json_literal_data_domains(io_allow)
+        io_json["literalDataDomains"] = domains
     return io_json
 
 
 def oas2json_io_array(io_info):
-    # type: (OpenAPISchema) -> Union[JSON_IO_TypedInfo, Type[null]]
+    # type: (OpenAPISchemaArray) -> Union[JSON_IO_TypedInfo, Type[null]]
     """
     Converts an array I/O definition by :term:`OpenAPI` schema into the equivalent :term:`JSON` representation.
 
@@ -1610,7 +1648,7 @@ def oas2json_io_array(io_info):
 
 
 def oas2json_io_object(io_info):
-    # type: (OpenAPISchema) -> Union[JSON_IO_TypedInfo, Type[null]]
+    # type: (OpenAPISchemaObject) -> Union[JSON_IO_TypedInfo, Type[null]]
     """
     Converts an object I/O definition by :term:`OpenAPI` schema into the equivalent :term:`JSON` representation.
 
@@ -1619,6 +1657,9 @@ def oas2json_io_object(io_info):
       - Bounding Box as GeoJSON feature
       - Complex JSON structure
 
+    .. seealso::
+        :func:`oas2json_io_file` is used for file reference to be parsed as other Complex I/O.
+
     :param io_info: :term:`OpenAPI` schema of the I/O.
     :return: Converted :term:`JSON` I/O definition, or :data:`null` if definition could not be resolved.
     """
@@ -1626,8 +1667,40 @@ def oas2json_io_object(io_info):
     io_props = get_field(io_info, "properties", search_variations=False) or {}
     if ("bbox" in io_props and "crs" in io_props) or io_fmt == "ogc-bbox":
         io_json = {"type": WPS_BOUNDINGBOX}
+        io_crs = get_field(io_props, "crs", search_variations=False)
+        if isinstance(io_crs, dict):
+            io_crs_allow = get_field(io_crs, "enum", search_variations=False)
+            if isinstance(io_crs_allow, list) and all(isinstance(crs, str) for crs in io_crs_allow):
+                io_json["supported_crs"] = io_crs_allow
     else:
-        io_json = {"type": WPS_COMPLEX}
+        # note:
+        #  In this case we are dealing only with literal OAS objects, therefore JSON content.
+        #  Complex I/O provided by file reference are done by other methods.
+        io_json = {"type": WPS_COMPLEX, "supported_formats": [{"media_type": ContentType.APP_JSON}]}
+    return io_json
+
+
+def oas2json_io_file(io_info):
+    # type: (OpenAPISchemaObject) -> Union[JSON_IO_TypedInfo, Type[null]]
+    """
+    Converts a file reference I/O definition by :term:`OpenAPI` schema into the equivalent :term:`JSON` representation.
+
+    :param io_info: :term:`OpenAPI` schema of the I/O.
+    :return: Converted :term:`JSON` I/O definition, or :data:`null` if definition could not be resolved.
+    """
+    io_json = {"type": WPS_COMPLEX}
+    io_ctype = get_field(io_info, "contentMediaType", search_variations=False)
+    io_encode = get_field(io_info, "contentEncoding", search_variations=False)
+    io_schema = get_field(io_info, "contentSchema", search_variations=False)
+    io_format = {}
+    if isinstance(io_encode, str):
+        io_format["encoding"] = io_encode
+    if isinstance(io_schema, str):
+        io_format["schema"] = io_schema
+    if isinstance(io_ctype, str):
+        io_format["mime_type"] = io_ctype
+        # other fields don't matter if required media-type is omitted
+        io_json["supported_formats"] = [io_format]
     return io_json
 
 
@@ -1642,17 +1715,22 @@ def oas2json_io_keyword(io_info):
     :param io_info: :term:`OpenAPI` schema of the I/O.
     :return: Converted :term:`JSON` I/O definition, or :data:`null` if definition could not be resolved.
     """
-    io_json = {"type": WPS_COMPLEX}  # if cannot be resolved, must be too ambiguous, so assume complex data dump
+    # if cannot be resolved, must be too ambiguous, so assume complex data dump
+    io_json = {"type": WPS_COMPLEX, "supported_formats": [{"mime_type": ContentType.APP_JSON}]}
     kw_key_val = {key: val for key, val in io_info.items() if key in OAS_KEYWORD_TYPES}
     if len(kw_key_val) != 1:
         return null
     keyword = list(kw_key_val)[0]
     keyword_schemas = io_info[keyword]
     if keyword == "not":
-        keyword_objects = oas2json_io(keyword_schemas)  # noqa
+        keyword_objects = [oas2json_io(keyword_schemas)]  # noqa
+    elif keyword == "allOf":
+        merged_schema = {}  # type: OpenAPISchema
+        for schema in keyword_schemas:
+            merged_schema.update(schema)
+        keyword_objects = [oas2json_io(merged_schema)]
     else:
         keyword_objects = [oas2json_io(schema) for schema in keyword_schemas]
-    keyword_objects = [types for sub in keyword_objects for types in sub]  # flatten 2D->1D in case of nested kw
     keyword_types = [get_field(obj, "type", search_variations=False) for obj in keyword_objects]
     keyword_types = set(filter(lambda obj: isinstance(obj, str), keyword_types))
     keyword_dtypes = [get_field(obj, "data_type", search_variations=False) for obj in keyword_objects]
@@ -1688,23 +1766,94 @@ def oas2json_io(io_info):
     :param io_info: :term:`OpenAPI` schema of the I/O.
     :return: Converted :term:`JSON` I/O definition, or :data:`null` if definition could not be resolved.
     """
+    io_info = oas2json_resolve_remote(io_info)
     io_type = get_field(io_info, "type", search_variations=False)
-    if io_type in OAS_LITERAL_TYPES:
-        io_json = oas2json_io_literal(io_info)
-    elif io_type in OAS_COMPLEX_TYPES:
-        io_json = oas2json_io_object(io_info)
-    elif io_type in OAS_ARRAY_TYPES:
-        io_json = oas2json_io_array(io_info)
+    io_json = null
+
+    # File I/O references are defined with string type, but are usually associated with content information to
+    # help distinguish them from plain string value. Try to detect this to avoid literal data interpretation.
+    if io_type == "string":
+        io_ctype = get_field(io_info, "contentMediaType", search_variations=False)
+        io_encode = get_field(io_info, "contentEncoding", search_variations=False)
+        io_schema = get_field(io_info, "contentSchema", search_variations=False)
+        io_format = get_field(io_info, "format", search_variations=False)
+        if any(io_field is not null for io_field in [io_ctype, io_encode, io_schema]) or io_format == "uri":
+            io_type = WPS_COMPLEX  # set value to avoid null return below, but no parsing after since not OAS type
+            io_json = oas2json_io_file(io_info)
+
+    if io_type is not null:
+        if io_type in OAS_LITERAL_TYPES:
+            io_json = oas2json_io_literal(io_info)
+        elif io_type in OAS_COMPLEX_TYPES:
+            io_json = oas2json_io_object(io_info)
+        elif io_type in OAS_ARRAY_TYPES:
+            io_json = oas2json_io_array(io_info)
     elif any(key in OAS_KEYWORD_TYPES for key in io_info):
         io_json = oas2json_io_keyword(io_info)
-    else:
+        io_type = "keyword"
+    if io_type is null or io_json is null:
         LOGGER.debug("Unknown OpenAPI to JSON I/O resolution for schema: %s", repr_json(io_info))
         return null
+
     # default literal value can help resolve as last resort if specific type cannot be inferred
     io_default = get_field(io_info, "default", search_variations=False)
     if io_default is not null:
         io_json["default"] = io_default
     return io_json
+
+
+def oas2json_resolve_remote(io_info):
+    # type: (OpenAPISchema) -> OpenAPISchema
+    """
+    Perform remote :term:`OpenAPI` schema ``$ref`` resolution.
+
+    Resolution is performed only sufficiently to provide enough context for following :term:`JSON` I/O conversion.
+    Remote references are not resolved further than required to speedup loading time and avoid recursive error on
+    self-referring schema. Passed sufficient levels of schema definitions, the specific contents is not important
+    nor needs to be resolved as there is they cannot be mapped to anything else than :data:`WPS_COMPLEX` I/O type.
+
+    :param io_info: I/O :term:`OpenAPI` schema to attempt resolution as applicable.
+    :return: Resolved I/O schema or directly the provided schema returned unmodified if no references need resolution.
+    """
+    # retrieve external schema reference (possibly nested)
+    io_href = get_field(io_info, "$ref", search_variations=False, pop_found=True)
+    if isinstance(io_href, str):
+        # first encountered reference should be full-uri to allow us knowing where to look for
+        if not any(io_href.startswith(scheme + "://") for scheme in ["http", "https", "s3"]):
+            raise ValueError(f"External OpenAPI schema reference [{io_href}] must be absolue.")
+        if not any(io_href.endswith(extension) for extension in [".yaml", ".yml", ".json"]):
+            raise ValueError(f"External OpenAPI schema reference [{io_href}] must be formatted as JSON or YAML.")
+        try:
+            # use resolver which will handle all intricacies of loading remote schema into a local dict definition
+            # this way, no need to handle other external, relative, absolute, etc. nested '$ref' locations
+            # note: '$ref' are still loaded on the first level only to avoid recursive schemas breaking on load
+            io_base = io_href.rsplit("/", 1)[0] + "/"
+            resolver = SchemaRefResolver(base_uri=io_base, referrer=io_info)
+            io_resolved = resolver.resolve_from_url(io_href)
+            # In case the input schema was the result of a 'allOf' merge,
+            # update with other fields that forms a whole object
+            # This way, there is more chance we can detect a combined form that matches a known conversion type.
+            io_info.update(io_resolved)
+            # If the remote $ref schema itself was a combination of $ref schemas (e.g.: it contained 'oneOf').
+            # Then update the first level of references that we can potentially work with to resolve conversion type.
+            # No need to resolve more since this is guaranteed to be 'complex' type.
+            # We must use the resolver right away in case the remote $ref are relative to the same root $ref.
+            for keyword in OAS_KEYWORD_TYPES:
+                if keyword in io_info:
+                    if isinstance(io_info[keyword], list):  # all keywords except 'not'
+                        for i, schema in enumerate(list(io_info[keyword])):
+                            if "$ref" in schema:
+                                ref_id, schema = resolver.resolve(schema["$ref"])  # type: Tuple[str, OpenAPISchema]
+                                schema["$id"] = ref_id
+                                io_info[keyword][i] = schema
+                    elif "$ref" in io_info[keyword]:  # only 'not' keyword
+                        ref_schema = io_info[keyword]["$ref"]
+                        ref_id, schema = resolver.resolve(ref_schema)  # type: Tuple[str, OpenAPISchema]
+                        schema["$id"] = ref_id
+                        io_info[keyword] = schema
+        except Exception as exc:
+            raise ValueError(f"External OpenAPI schema reference [{io_href}] could not be loaded.") from exc
+    return io_info
 
 
 def json2wps_datatype(io_info):

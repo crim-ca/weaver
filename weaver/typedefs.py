@@ -333,9 +333,12 @@ if TYPE_CHECKING:
     CeleryResult = Union[AsyncResult, EagerResult, GroupResult, ResultSet]
 
     # simple/partial definitions of OpenAPI schema
-    OpenAPISchemaTypes = Literal["object", "array", "boolean", "integer", "number", "string"]
     _OpenAPISchema: TypeAlias = "OpenAPISchema"
     _OpenAPISchemaProperty: TypeAlias = "OpenAPISchemaProperty"
+    OpenAPISchemaTypes = Literal["object", "array", "boolean", "integer", "number", "string"]
+    OpenAPISchemaReference = TypedDict("OpenAPISchemaReference", {
+        "$ref": _OpenAPISchema
+    }, total=True)
     OpenAPISchemaProperty = TypedDict("OpenAPISchemaProperty", {
         "type": OpenAPISchemaTypes,
         "format": str,
@@ -344,7 +347,7 @@ if TYPE_CHECKING:
         "title": str,
         "description": str,
         "enum": List[Union[str, Number]],
-        "items": List[str, _OpenAPISchema],
+        "items": List[_OpenAPISchema, OpenAPISchemaReference],
         "required": List[str],
         "nullable": bool,
         "deprecated": bool,
@@ -367,19 +370,16 @@ if TYPE_CHECKING:
         "contentEncoding": str,
         "contentSchema": str,
         "properties": Dict[str, _OpenAPISchemaProperty],
-        "additionalProperties": Union[bool, Dict[str, Union[str, _OpenAPISchema]]],
+        "additionalProperties": Union[bool, Dict[str, Union[_OpenAPISchema, OpenAPISchemaReference]]],
     }, total=False)
     OpenAPISchemaObject = TypedDict("OpenAPISchemaObject", {
         "type": Literal["object"],
         "properties": Dict[str, OpenAPISchemaProperty],
     }, total=False)
-    OpenAPISchemaList = TypedDict("OpenAPISchemaList", {
+    OpenAPISchemaArray = TypedDict("OpenAPISchemaArray", {
         "type": Literal["array"],
         "items": _OpenAPISchema,
     }, total=False)
-    OpenAPISchemaReference = TypedDict("OpenAPISchemaReference", {
-        "$ref": _OpenAPISchema
-    }, total=True)
     OpenAPISchemaAllOf = TypedDict("OpenAPISchemaAllOf", {
         "allOf": List[Union[_OpenAPISchema, OpenAPISchemaReference]],
     }, total=False)
@@ -400,7 +400,7 @@ if TYPE_CHECKING:
     ]
     OpenAPISchema = Union[
         OpenAPISchemaObject,
-        OpenAPISchemaList,
+        OpenAPISchemaArray,
         OpenAPISchemaKeyword,
         OpenAPISchemaProperty,
         OpenAPISchemaReference,
