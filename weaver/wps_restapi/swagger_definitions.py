@@ -1503,6 +1503,7 @@ class DeployOutputType(AllOfKeywordSchema):
     _all_of = [
         DeploymentType(),
         InputOutputDescriptionMeta(),
+        InputOutputDescriptionSchema(),
         DeployOutputTypeDefinition(),
     ]
 
@@ -3566,9 +3567,6 @@ class CWLArguments(ExtendedSequenceSchema):
 
 class CWLTypeString(ExtendedSchemaNode):
     schema_type = String
-    # in this case it is ok to use 'name' because target fields receiving it will
-    # cause issues against builtin 'type' of Python reserved keyword
-    title = "Type"
     description = "Field type definition."
     example = "float"
     validator = OneOf(PACKAGE_TYPE_POSSIBLE_VALUES)

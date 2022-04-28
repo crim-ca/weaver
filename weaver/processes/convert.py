@@ -1,8 +1,6 @@
 """
 Conversion functions between corresponding data structures.
 """
-import tempfile
-
 import json
 import logging
 from collections import OrderedDict
@@ -786,7 +784,7 @@ def is_cwl_enum_type(io_info):
         return False, io_type, MODE.NONE, None
 
     if "symbols" not in io_type:
-        raise PackageTypeError(f"Unsupported I/O 'enum' definition: '{io_info!r}'.")
+        raise PackageTypeError(f"Unsupported I/O 'enum' definition misisng 'symbols': '{io_info!r}'.")
     io_allow = io_type["symbols"]
     if not isinstance(io_allow, list) or len(io_allow) < 1:
         raise PackageTypeError(f"Invalid I/O 'enum.symbols' definition: '{io_info!r}'.")
@@ -1621,7 +1619,7 @@ def oas2json_io_literal(io_info):
             }]
         }
     if io_allow is not null:
-        io_allow.update(io_info)
+        io_allow.update(io_info)  # noqa
         io_allow["data_type"] = data_type
         domains = any2json_literal_data_domains(io_allow)
         io_json["literalDataDomains"] = domains
@@ -1843,12 +1841,12 @@ def oas2json_resolve_remote(io_info):
                     if isinstance(io_info[keyword], list):  # all keywords except 'not'
                         for i, schema in enumerate(list(io_info[keyword])):
                             if "$ref" in schema:
-                                ref_id, schema = resolver.resolve(schema["$ref"])  # type: Tuple[str, OpenAPISchema]
+                                ref_id, schema = resolver.resolve(schema["$ref"])
                                 schema["$id"] = ref_id
-                                io_info[keyword][i] = schema
+                                io_info[keyword][i] = schema  # noqa
                     elif "$ref" in io_info[keyword]:  # only 'not' keyword
                         ref_schema = io_info[keyword]["$ref"]
-                        ref_id, schema = resolver.resolve(ref_schema)  # type: Tuple[str, OpenAPISchema]
+                        ref_id, schema = resolver.resolve(ref_schema)
                         schema["$id"] = ref_id
                         io_info[keyword] = schema
         except Exception as exc:
@@ -2103,11 +2101,13 @@ def json2wps_io(io_info, io_select):
         if io_type == WPS_LITERAL:
             io_info.pop("supported_formats", None)
             io_info["data_type"] = json2wps_datatype(io_info)
-            allowed_values = json2wps_allowed_values(io_info)
-            if allowed_values:
-                io_info["allowed_values"] = allowed_values
-            else:
-                io_info.pop("allowed_values", None)
+            # FIXME: cannot pass allowed values (or "expected" ones) for output
+            io_info.pop("allowed_values", None)
+            # allowed_values = json2wps_allowed_values(io_info)
+            # if allowed_values:
+            #     io_info["allowed_values"] = allowed_values
+            # else:
+            #    io_info.pop("allowed_values", None)
             io_info.pop("literalDataDomains", None)
             return LiteralOutput(**io_info)
     raise PackageTypeError(f"Unknown conversion from dict to WPS type (type={io_type}, mode={io_select}).")

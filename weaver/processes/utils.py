@@ -168,7 +168,7 @@ def _check_deploy(payload):
                         "value": d_io
                     })
                 LOGGER.warning(
-                    "Detected difference between original/parsed deploy %s, but no invalid schema error:\n%s",
+                    "Detected difference between original/parsed deploy %s, but no invalid schema:\n%s",
                     io_type, generate_diff(p_io, r_io, val_name="original payload", ref_name="parsed result")
                 )
         # Execution Unit is optional since process reference (e.g.: WPS-1 href) can be provided in processDescription
@@ -190,7 +190,7 @@ def _check_deploy(payload):
                     "value": d_exec_unit
                 })
             LOGGER.warning(
-                "Detected difference between original/parsed deploy execution unit, but no invalid schema error:\n%s",
+                "Detected difference between original/parsed deploy execution unit, but no invalid schema:\n%s",
                 generate_diff(p_exec_unit, r_exec_unit, val_name="original payload", ref_name="parsed result")
             )
         return results

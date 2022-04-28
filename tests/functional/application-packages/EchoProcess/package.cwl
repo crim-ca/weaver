@@ -40,7 +40,8 @@ inputs:
   imagesInput:
     type:
       # array from minOccurs=1/maxOccurs=150
-      - type: File
+      # note: '{type: File}' not allowed
+      - "File"
       - type: array
         items: File
     # Multiple formats (GeoTIFF, JP2)
@@ -49,11 +50,12 @@ inputs:
     # no way to provide unit of measure...?
     type: double
   stringInput:
-    type: enum
-    symbols:
-      - Value1
-      - Value2
-      - Value3
+    type:
+      type: enum
+      symbols:
+        - Value1
+        - Value2
+        - Value3
 
 outputs:
   arrayOutput:
@@ -88,7 +90,8 @@ outputs:
   imagesOutput:
     type:
       # array from minOccurs=1/maxOccurs=150
-      - type: File
+      # note: '{type: File}' not allowed
+      - "File"
       - type: array
         items: File
     # Multiple formats (GeoTIFF, JP2)
@@ -97,8 +100,9 @@ outputs:
     # no way to provide unit of measure...?
     type: double
   stringOutput:
-    type: enum
-    symbols:
-      - Value1
-      - Value2
-      - Value3
+    type:
+      type: enum
+      symbols:
+        - Value1
+        - Value2
+        - Value3

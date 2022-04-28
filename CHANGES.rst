@@ -12,8 +12,14 @@ Changes
 
 Changes:
 --------
-- Add reporting of OpenAPI ``schema`` field for I/O definitions within `Process` description responses as required
+- Add support of OpenAPI ``schema`` field for I/O definitions within `Process` description responses as required
   by `OGC API - Processes` specification (resolves `#245 <https://github.com/crim-ca/weaver/issues/245>`_).
+  Existing and deployed processes using legacy I/O definitions will be parsed for corresponding fields employed in
+  OpenAPI to generate the missing ``schema`` field. Inversely, processes directly deployed with ``schema`` definitions
+  are ported back to legacy I/O representation by padding them with corresponding fields. Conversion between the
+  two representations is unidirectional according to whether ``schema`` is specified or not. Nevertheless, the final
+  I/O definitions can try to make use of both representations simultaneously and in combination with I/O definitions
+  extracted from the `CWL Application Package` to resolve additional details during I/O merging strategy.
 - Add support of ``Accept`` header, ``f`` and ``format`` request queries for ``GET /jobs/{jobID}/logs`` retrieval
   using ``text``, ``json``, ``yaml`` and ``xml`` (and their corresponding Media-Type definitions) to list `Job` logs.
 
@@ -21,6 +27,7 @@ Fixes:
 ------
 - Remove ``VaultReference`` from ``ReferenceURL`` schema employed to reference external resources that are not intended
   to be used with temporary `Vault` definitions. Only inputs for `Process` execution will allow `Vault` references.
+- Fix ``LiteralOutput`` creation not removing ``allowed_values`` not available with `PyWPS` class.
 
 .. _changes_4.15.0:
 
