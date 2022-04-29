@@ -17,6 +17,9 @@ inputs:
       minItems: 2
       type: array
     title: Array Input Example
+  # FIXME: Support BoundingBox I/O (https://github.com/crim-ca/weaver/issues/51)
+  #        parsing will work and will be detected/converted to a JSON file (for eventual CWL call),
+  #        but currently the transition to WPS I/O and from WPS->CWL I/O is not implemented.
   boundingBoxInput:
     description: This is an example of a BBOX literal input.
     schema:
@@ -145,6 +148,9 @@ outputs:
       maxItems: 10
       minItems: 2
       type: array
+  # FIXME: Support BoundingBox I/O (https://github.com/crim-ca/weaver/issues/51)
+  #        parsing will work and will be detected/converted to a JSON file (for eventual CWL call),
+  #        but currently the transition to WPS I/O and from WPS->CWL I/O is not implemented.
   boundingBoxOutput:
     schema:
       allOf:
