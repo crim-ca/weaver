@@ -950,12 +950,18 @@ class MultipleOfOAS(OneOfKeywordSchema):
     ]
 
 
+class PermissiveDefinitionOAS(NotKeywordSchema, PermissiveMappingSchema):
+    _not = [
+        ReferenceOAS
+    ]
+
+
 # cannot make recursive declarative schemas
 # simulate it and assume it is sufficient for validation purposes
 class PseudoObjectOAS(OneOfKeywordSchema):
     _one_of = [
         ReferenceOAS(),
-        PermissiveMappingSchema(),
+        PermissiveDefinitionOAS(),
     ]
 
 
@@ -966,7 +972,7 @@ class KeywordObjectOAS(ExtendedSequenceSchema):
 class AdditionalPropertiesOAS(OneOfKeywordSchema):
     _one_of = [
         ReferenceOAS(),
-        PermissiveMappingSchema(),
+        PermissiveDefinitionOAS(),
         ExtendedSchemaNode(Boolean())
     ]
 
@@ -1021,9 +1027,9 @@ class PropertyOAS(PermissiveMappingSchema):
     content_encode = ExtendedSchemaNode(String(), name="contentEncoding", missing=drop)
     content_schema = ExtendedSchemaNode(String(), name="contentSchema", missing=drop)
     _not = PseudoObjectOAS(name="not", title="not", missing=drop)
-    _all_of = KeywordObjectOAS(name="allOf", title="allOf", missing=drop)
-    _any_of = KeywordObjectOAS(name="anyOf", title="anyOf", missing=drop)
-    _one_of = KeywordObjectOAS(name="oneOf", title="oneOf", missing=drop)
+    _all_of = KeywordObjectOAS(name="allOf", missing=drop)
+    _any_of = KeywordObjectOAS(name="anyOf", missing=drop)
+    _one_of = KeywordObjectOAS(name="oneOf", missing=drop)
     x_props = AdditionalPropertiesOAS(name="additionalProperties", missing=drop)
     properties = PermissiveMappingSchema(missing=drop)  # cannot do real recursive definitions, simply check mapping
 
@@ -1045,8 +1051,8 @@ class ObjectOAS(ExtendedMappingSchema):
 # since we redefine 'properties', do not cause validation error for 'oneOf'
 class DefinitionOAS(AnyOfKeywordSchema):
     _any_of = [
-        PropertyOAS(),  # for top-level keyword schemas {allOf,anyOf,oneOf,not}
         ObjectOAS(),
+        PropertyOAS(),  # for top-level keyword schemas {allOf,anyOf,oneOf,not}
     ]
 
 
