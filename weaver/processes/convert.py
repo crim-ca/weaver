@@ -1674,7 +1674,7 @@ def oas2json_io_object(io_info):
         # note:
         #  In this case we are dealing only with literal OAS objects, therefore JSON content.
         #  Complex I/O provided by file reference are done by other methods.
-        io_json = {"type": WPS_COMPLEX, "supported_formats": [{"media_type": ContentType.APP_JSON}]}
+        io_json = {"type": WPS_COMPLEX, "supported_formats": [{"mime_type": ContentType.APP_JSON}]}
     return io_json
 
 

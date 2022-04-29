@@ -1035,9 +1035,19 @@ class ObjectPropertiesOAS(ExtendedMappingSchema):
     )
 
 
+# would not need this if we could do explicit recursive definitions but at the very least, validate that when a
+# object type is specified, its properties are as well and are slightly more specific than permissive mapping
 class ObjectOAS(ExtendedMappingSchema):
     _type = TypeOAS(name="type", missing=drop, validator=OneOf(OAS_COMPLEX_TYPES))
-    properties = ObjectPropertiesOAS()
+    properties = ObjectPropertiesOAS()  # required and more specific contrary to 'properties' in 'PropertyOAS'
+
+
+# since we redefine 'properties', do not cause validation error for 'oneOf'
+class DefinitionOAS(AnyOfKeywordSchema):
+    _any_of = [
+        PropertyOAS(),  # for top-level keyword schemas {allOf,anyOf,oneOf,not}
+        ObjectOAS(),
+    ]
 
 
 class OAS(OneOfKeywordSchema):
@@ -1045,8 +1055,7 @@ class OAS(OneOfKeywordSchema):
     schema_ref = f"{OGC_API_SCHEMA_URL}/{OGC_API_SCHEMA_VERSION}/core/openapi/schemas/schema.yaml"
     _one_of = [
         ReferenceOAS(),
-        ObjectOAS(),
-        PropertyOAS(),  # for top-level keyword schemas {allOf,anyOf,oneOf,not}
+        DefinitionOAS(),
     ]
 
 
