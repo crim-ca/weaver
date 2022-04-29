@@ -331,6 +331,11 @@ def deploy_process_from_payload(payload, container, overwrite=False):
     # bw-compat abstract/description (see: ProcessDeployment schema)
     if "description" not in process_info or not process_info["description"]:
         process_info["description"] = process_info.get("abstract", "")
+    # if user provided additional links that have valid schema,
+    # process them separately since links are generated dynamically from API settings per process
+    # don't leave them there as they would be seen as if the 'Process' class generated the field
+    if "links" in process_info:
+        process_info["additional_links"] = process_info.pop("links")
 
     # FIXME: handle colander invalid directly in tween (https://github.com/crim-ca/weaver/issues/112)
     try:
@@ -339,12 +344,19 @@ def deploy_process_from_payload(payload, container, overwrite=False):
         sd.ProcessSummary().deserialize(process)  # make if fail before save if invalid
         store.save_process(process, overwrite=overwrite)
         process_summary = process.summary()
-    except ProcessRegistrationError as ex:
-        raise HTTPConflict(detail=str(ex))
-    except (ValueError, colander.Invalid) as ex:
-        # raised on invalid process name
-        raise HTTPBadRequest(detail=str(ex))
-
+    except ProcessRegistrationError as exc:
+        raise HTTPConflict(detail=str(exc))
+    except ValueError as exc:
+        LOGGER.error("Failed schema validation of deployed process summary:\n%s", exc)
+        raise HTTPBadRequest(detail=str(exc))
+    except colander.Invalid as exc:
+        LOGGER.error("Failed schema validation of deployed process summary:\n%s", exc)
+        raise HTTPBadRequest(json={
+            "description": "Failed schema validation of deployed process summary.",
+            "cause": f"Invalid schema: [{exc.msg or exc!s}]",
+            "error": exc.__class__.__name__,
+            "value": exc.value
+        })
     return HTTPCreated(json={
         "description": sd.OkPostProcessesResponse.description,
         "processSummary": process_summary,

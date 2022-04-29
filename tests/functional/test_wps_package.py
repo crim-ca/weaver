@@ -194,7 +194,6 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         assert isinstance(desc["outputs"]["arrayInput"]["schema"]["maxItems"], int)
 
 
-
     def test_deploy_process_io_no_format_default(self):
         """
         Validate resolution of ``default`` format field during deployment.

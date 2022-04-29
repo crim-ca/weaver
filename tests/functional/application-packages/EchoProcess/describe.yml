@@ -127,7 +127,7 @@ inputs:
         uom:
           type: string
       required:
-        - value
+        - measurement
         - uom
       type: object
     title: Numerical Value with UOM Example
@@ -229,7 +229,7 @@ outputs:
         uom:
           type: string
       required:
-        - value
+        - measurement
         - uom
       type: object
   stringOutput:

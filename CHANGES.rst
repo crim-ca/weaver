@@ -22,12 +22,18 @@ Changes:
   extracted from the `CWL Application Package` to resolve additional details during I/O merging strategy.
 - Add support of ``Accept`` header, ``f`` and ``format`` request queries for ``GET /jobs/{jobID}/logs`` retrieval
   using ``text``, ``json``, ``yaml`` and ``xml`` (and their corresponding Media-Type definitions) to list `Job` logs.
+- Add partial support of literals with unit of measure (``UoM``) specified during `Process` deployment using the
+  I/O ``schema`` field (relates to `#430 <https://github.com/crim-ca/weaver/issues/430>`_).
+- Add partial support of bounding box parsing specified during `Process` deployment using the
+  I/O ``schema`` field (relates to `#51 <https://github.com/crim-ca/weaver/issues/51>`_).
 
 Fixes:
 ------
 - Remove ``VaultReference`` from ``ReferenceURL`` schema employed to reference external resources that are not intended
   to be used with temporary `Vault` definitions. Only inputs for `Process` execution will allow `Vault` references.
 - Fix ``LiteralOutput`` creation not removing ``allowed_values`` not available with `PyWPS` class.
+- Fix failing `Process` deployment caused by ``links`` if explicitly specified in the payload by the user.
+  Additional links that don't conflict with dynamically generated ones are added to the deployed `Process` definition.
 
 .. _changes_4.15.0:
 

@@ -632,7 +632,7 @@ def guess_target_format(request, default=ContentType.APP_JSON):
 
 
 def repr_json(data, force_string=True, ensure_ascii=False, indent=2, **kwargs):
-    # type: (Any, bool, bool, int, **Any) -> Union[JSON, str, None]
+    # type: (Any, bool, bool, Optional[int], **Any) -> Union[JSON, str, None]
     """
     Ensure that the input data can be serialized as JSON to return it formatted representation as such.
 

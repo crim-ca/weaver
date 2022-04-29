@@ -2134,6 +2134,11 @@ class Process(Base):
         for link in links:
             link.setdefault("type", ContentType.APP_JSON)
             link.setdefault("hreflang", AcceptLanguage.EN_CA)
+        # add user-provided additional links, no type/hreflang added since we cannot guess them
+        known_links = {link.get("rel") for link in links}
+        extra_links = self.get("additional_links", [])
+        extra_links = [link for link in extra_links if link.get("rel") not in known_links]
+        links.extend(extra_links)
         return links
 
     def href(self, container=None):
