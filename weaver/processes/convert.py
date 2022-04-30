@@ -1350,16 +1350,15 @@ def json2oas_io_complex(io_info):
     """
     Convert a single-dimension complex :term:`JSON` I/O definition into corresponding :term:`OpenAPI` schema.
     """
-    item_types = [
-        {"type": "string", "format": "uri"},  # 'uri' not a 'standard' OpenAPI (since open field), but very common
-    ]
+    item_types = []
     item_formats = get_field(io_info, "supported_formats", search_variations=True)
-    if isinstance(item_formats, list):
-        # FIXME: support Complex execute input provided as raw data, to dump to file for CWL execution
-        any_json = False
+    if isinstance(item_formats, list) and item_formats:
+        json_schema_refs = set()
+        json_schema_any = None
         for fmt in item_formats:
             fmt_media = get_field(fmt, "mime_type", search_variations=True)
             fmt_encode = get_field(fmt, "encoding", search_variations=True)
+            fmt_schema = get_field(fmt, "schema", search_variations=False)
             # heuristic to guess more specific encoding
             fmt_type_as_text = ["multipart/", "application/"]  # others always binary (eg: image)
             fmt_subtype_as_text = ["+xml", "/json", "yaml"]
@@ -1385,16 +1384,26 @@ def json2oas_io_complex(io_info):
                     "type": "string",
                     "contentMediaType": fmt_media,
                 })
-            any_json |= ContentType.APP_JSON in fmt_media
-        # FIXME: support Complex execute input provided as raw JSON, to dump to file for CWL execution
-        if any_json:
+            if fmt_schema:  # could be non-JSON, just a reference
+                item_types[-1]["contentSchema"] = fmt_schema
+            if ContentType.APP_JSON in fmt_media:
+                json_schema_any = True
+                if fmt_schema:  # got an explicit JSON
+                    json_schema_any = False
+                    item_types[-1]["contentSchema"] = fmt_schema
+                    json_schema_refs.add(fmt_schema)
+        if json_schema_any:
             # best we can do is 'any JSON' since cannot guess applicable schema not provided by user on deploy
             item_types.append({"type": "object", "additionalProperties": True})
+        elif json_schema_refs:
+            item_types = [{"$ref": ref} for ref in json_schema_refs]
     else:
-        item_types.append({"type": "string", "format": "binary"})
-    item_schema = {
-        "oneOf": item_types  # complex by reference or encoded data
-    }
+        # complex by reference or encoded data
+        item_types = [
+            {"type": "string", "format": "uri"},  # 'uri' not a 'standard' OpenAPI (since open field), but very common
+            {"type": "string", "format": "binary"},
+        ]
+    item_schema = {"oneOf": item_types} if len(item_types) > 1 else item_types[0]
     return item_schema
 
 
