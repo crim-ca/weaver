@@ -170,9 +170,9 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
 
         desc, _ = self.deploy_process(body, process_id=self._testMethodName, describe_schema=ProcessSchema.OGC)
         assert "inputs" in desc and isinstance(desc["inputs"], dict) and len(desc["inputs"]) == len(ref["inputs"])
-        assert "outputs" in desc and isinstance(desc["outputs"], dict) and len(desc["outputs"]) == len(ref["output"])
-        assert all(isinstance(val, dict) and isinstance(val.get(["schema"]), dict) for val in desc["inputs"].values())
-        assert all(isinstance(val, dict) and isinstance(val.get(["schema"]), dict) for val in desc["outputs"].values())
+        assert "outputs" in desc and isinstance(desc["outputs"], dict) and len(desc["outputs"]) == len(ref["outputs"])
+        assert all(isinstance(val, dict) and isinstance(val.get("schema"), dict) for val in desc["inputs"].values())
+        assert all(isinstance(val, dict) and isinstance(val.get("schema"), dict) for val in desc["outputs"].values())
 
         # expect unchanged schema definitions
         assert all(ref["inputs"][key]["schema"] == val["schema"] for key, val in desc["inputs"].items())
@@ -192,7 +192,6 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         assert isinstance(desc["outputs"]["arrayInput"]["schema"]["minItems"], int)
         assert "maxItems" in desc["outputs"]["arrayInput"]["schema"]
         assert isinstance(desc["outputs"]["arrayInput"]["schema"]["maxItems"], int)
-
 
     def test_deploy_process_io_no_format_default(self):
         """

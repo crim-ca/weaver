@@ -181,6 +181,10 @@ class OutputFormat(Constants):
         return data
 
 
+class SchemaRole(Constants):
+    JSON_SCHEMA = "https://www.w3.org/2019/wot/json-schema"
+
+
 # explicit mime-type to extension when not literally written in item after '/' (excluding 'x-' prefix)
 _CONTENT_TYPE_EXTENSION_OVERRIDES = {
     ContentType.APP_VDN_GEOJSON: ".geojson",  # pywps 4.4 default extension without vdn prefix

@@ -3,6 +3,7 @@ Conversion functions between corresponding data structures.
 """
 import json
 import logging
+import os
 from collections import OrderedDict
 from collections.abc import Hashable
 from copy import deepcopy
@@ -14,7 +15,7 @@ from owslib.wps import ComplexData, Metadata as OWS_Metadata, is_reference
 from pywps import Process as ProcessWPS
 from pywps.app.Common import Metadata as WPS_Metadata
 from pywps.inout import BoundingBoxInput, BoundingBoxOutput, ComplexInput, ComplexOutput, LiteralInput, LiteralOutput
-from pywps.inout.basic import BasicIO
+from pywps.inout.basic import BasicBoundingBox, BasicComplex, BasicIO
 from pywps.inout.formats import Format
 from pywps.inout.literaltypes import ALLOWEDVALUETYPE, RANGECLOSURETYPE, AllowedValue, AnyValue
 from pywps.validator.mode import MODE
@@ -22,7 +23,15 @@ from pywps.validator.mode import MODE
 from weaver import xml_util
 from weaver.exceptions import PackageTypeError
 from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
-from weaver.formats import ContentType, get_cwl_file_format, get_extension, get_format, repr_json
+from weaver.formats import (
+    ContentType,
+    SchemaRole,
+    get_content_type,
+    get_cwl_file_format,
+    get_extension,
+    get_format,
+    repr_json
+)
 from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_WPS1,
     OAS_ARRAY_TYPES,
@@ -965,10 +974,18 @@ def cwl2wps_io(io_info, io_select):
             "title": io_info.get("label", io_name),
             "abstract": io_info.get("doc", ""),
         }
+        # format can represent either a Media-Type or a schema reference
+        # - format as Media-Type is useful for WPS Complex
+        # - format as schema is useful for WPS BoundingBox JSON/YAML structure
         if "format" in io_info:
             io_fmt = io_info["format"]
-            io_formats = [io_fmt] if isinstance(io_fmt, str) else io_fmt
-            kw["supported_formats"] = [get_format(fmt) for fmt in io_formats]
+            io_format = get_format(io_fmt)
+            # namespaced format not resolved, full path to schema should have lots of '/' (including protocol separator)
+            if io_format and len(io_format.mime_type.split("/")) > 2:
+                io_ext = os.path.splitext(io_format.mime_type)[-1]
+                io_typ = get_content_type(io_ext)
+                io_format = Format(io_typ, extension=io_ext, schema=io_format.mime_type)
+            kw["supported_formats"] = [io_format]
             kw["mode"] = MODE.SIMPLE  # only validate the extension (not file contents)
         else:
             # we need to minimally add 1 format, otherwise empty list is evaluated as None by pywps
@@ -1648,8 +1665,8 @@ def oas2json_io_array(io_info):
     return io_json
 
 
-def oas2json_io_object(io_info):
-    # type: (OpenAPISchemaObject) -> Union[JSON_IO_TypedInfo, Type[null]]
+def oas2json_io_object(io_info, io_href=null):
+    # type: (OpenAPISchemaObject, str) -> Union[JSON_IO_TypedInfo, Type[null]]
     """
     Converts an object I/O definition by :term:`OpenAPI` schema into the equivalent :term:`JSON` representation.
 
@@ -1662,6 +1679,7 @@ def oas2json_io_object(io_info):
         :func:`oas2json_io_file` is used for file reference to be parsed as other Complex I/O.
 
     :param io_info: :term:`OpenAPI` schema of the I/O.
+    :param io_href: Alternate schema reference for the type.
     :return: Converted :term:`JSON` I/O definition, or :data:`null` if definition could not be resolved.
     """
     io_fmt = get_field(io_info, "format", search_variations=False)
@@ -1673,11 +1691,21 @@ def oas2json_io_object(io_info):
             io_crs_allow = get_field(io_crs, "enum", search_variations=False)
             if isinstance(io_crs_allow, list) and all(isinstance(crs, str) for crs in io_crs_allow):
                 io_json["supported_crs"] = io_crs_allow
+        if io_href is not null:
+            io_meta = {"href": io_href, "role": SchemaRole.JSON_SCHEMA, "title": "Schema"}
+            io_ext = os.path.splitext(io_href)[-1]
+            io_ctype = io_ext and get_content_type(io_ext)
+            if io_ctype:
+                io_meta["type"] = io_ctype
+            io_json["metadata"] = [io_meta]
     else:
         # note:
         #  In this case we are dealing only with literal OAS objects, therefore JSON content.
         #  Complex I/O provided by file reference are done by other methods.
-        io_json = {"type": WPS_COMPLEX, "supported_formats": [{"mime_type": ContentType.APP_JSON}]}
+        obj_fmt = {"mime_type": ContentType.APP_JSON}
+        if io_href is not null:
+            obj_fmt["schema"] = io_href
+        io_json = {"type": WPS_COMPLEX, "supported_formats": [obj_fmt]}
     return io_json
 
 
@@ -1731,22 +1759,34 @@ def oas2json_io_keyword(io_info):
         # since some variations can be an external reference or a partial definition,
         # anything matching a bbox marks the whole definition as one, falling back to complex otherwise
         elif any(typ == WPS_BOUNDINGBOX for typ in keyword_types):
-            io_json = {"type": WPS_BOUNDINGBOX}
+            for obj_json in keyword_objects:
+                io_type = get_field(obj_json, "type")
+                if io_type == WPS_BOUNDINGBOX:
+                    io_json = obj_json
+                    break
+        elif all(typ == WPS_COMPLEX for typ in keyword_types):
+            # improve definition of complex type of multiple distinct supported formats
+            formats = []
+            for obj_json in keyword_objects:
+                obj_fmt = get_field(obj_json, "supported_formats", default=[])
+                formats.extend([fmt for fmt in obj_fmt if fmt not in formats])
+            io_json = {"type": WPS_COMPLEX, "supported_formats": formats}
     return io_json
 
 
-def oas2json_io_file(io_info):
-    # type: (OpenAPISchemaObject) -> JSON_IO_TypedInfo
+def oas2json_io_file(io_info, io_href=null):
+    # type: (OpenAPISchemaObject, str) -> JSON_IO_TypedInfo
     """
     Converts a file reference I/O definition by :term:`OpenAPI` schema into the equivalent :term:`JSON` representation.
 
     :param io_info: :term:`OpenAPI` schema of the I/O.
+    :param io_href: Alternate schema reference for the type.
     :return: Converted :term:`JSON` I/O definition, or :data:`null` if definition could not be resolved.
     """
     io_json = {"type": WPS_COMPLEX}
     io_ctype = get_field(io_info, "contentMediaType", search_variations=False)
     io_encode = get_field(io_info, "contentEncoding", search_variations=False)
-    io_schema = get_field(io_info, "contentSchema", search_variations=False)
+    io_schema = get_field(io_info, "contentSchema", search_variations=False, default=io_href)
     io_format = {}
     if isinstance(io_encode, str):
         io_format["encoding"] = io_encode
@@ -1797,6 +1837,7 @@ def oas2json_io(io_info):
     :param io_info: :term:`OpenAPI` schema of the I/O.
     :return: Converted :term:`JSON` I/O definition, or :data:`null` if definition could not be resolved.
     """
+    io_href = get_field(io_info, "$ref")
     io_info = oas2json_resolve_remote(io_info)
     io_type = get_field(io_info, "type", search_variations=False)
     io_json = null
@@ -1810,7 +1851,7 @@ def oas2json_io(io_info):
         io_format = get_field(io_info, "format", search_variations=False)
         if any(io_field is not null for io_field in [io_ctype, io_encode, io_schema]) or io_format == "uri":
             io_type = WPS_COMPLEX  # set value to avoid null return below, but no parsing after since not OAS type
-            io_json = oas2json_io_file(io_info)
+            io_json = oas2json_io_file(io_info, io_href)
 
     else:
         # known special case of extended OAS object representing a literal (unit of measure)
@@ -1822,7 +1863,7 @@ def oas2json_io(io_info):
         if io_type in OAS_LITERAL_TYPES:
             io_json = oas2json_io_literal(io_info)
         elif io_type in OAS_COMPLEX_TYPES:
-            io_json = oas2json_io_object(io_info)
+            io_json = oas2json_io_object(io_info, io_href)
         elif io_type in OAS_ARRAY_TYPES:
             io_json = oas2json_io_array(io_info)
     elif any(key in OAS_KEYWORD_TYPES for key in io_info):
@@ -2173,6 +2214,7 @@ def wps2json_io(io_wps):
     replace_func = {
         "maxOccurs": str,
         "minOccurs": str,
+        "metadata": lambda metadata: [metadata2json(meta) for meta in metadata]
     }
 
     transform_json(io_wps_json, rename=rename, replace_values=replace_values, replace_func=replace_func)
@@ -2428,13 +2470,14 @@ def merge_io_formats(wps_formats, cwl_formats):
     """
     Merges I/O format definitions by matching ``mime-type`` field.
 
-    In case of conflict, preserve the WPS version which can be more detailed (for example, by specifying ``encoding``).
+    In case of conflict, preserve the :term:`WPS` version which can be more detailed
+    (for example, by specifying ``encoding``).
 
-    Verifies if ``DEFAULT_FORMAT_MISSING`` was written to a single `CWL` format caused by a lack of any value
-    provided as input. In this case, *only* `WPS` formats are kept.
+    Verifies if :data:`DEFAULT_FORMAT_MISSING` was written to a single :term:`CWL` format caused by a lack of any value
+    provided as input. In this case, *only* :term:`WPS` formats are kept.
 
-    In the event that ``DEFAULT_FORMAT_MISSING`` was written to the `CWL` formats and that no `WPS` format was
-    specified, the :py:data:`DEFAULT_FORMAT` is returned.
+    In the event that :data:`DEFAULT_FORMAT_MISSING` was written to the :term:`CWL` formats and that no :term:`WPS`
+    format was specified, the :py:data:`DEFAULT_FORMAT` is returned.
 
     :raises PackageTypeError: if inputs are invalid format lists
     """
@@ -2462,14 +2505,17 @@ def merge_io_formats(wps_formats, cwl_formats):
 def merge_package_io(wps_io_list, cwl_io_list, io_select):
     # type: (List[ANY_IO_Type], List[WPS_IO_Type], str) -> List[WPS_IO_Type]
     """
-    Merges corresponding parameters of different I/O definitions from CWL/WPS sources.
+    Merges corresponding parameters of different I/O definition sources (:term:`CWL`, :term:`OpenAPI` and :term:`WPS`).
 
-    Update I/O definitions to use for process creation and returned by GetCapabilities, DescribeProcess.
-    If WPS I/O definitions where provided during deployment, update `CWL-to-WPS` converted I/O with the WPS I/O
-    complementary details. Otherwise, provide minimum field requirements that can be retrieved from CWL definitions.
+    Update I/O definitions to use for :term:`Process` creation and returned by ``GetCapabilities``/``DescribeProcess``.
+    If :term:`WPS` I/O definitions where provided during deployment, update `CWL-to-WPS` converted I/O with the
+    :term:`WPS` I/O complementary details. If an :term:`OpenAPI` ``schema`` definition was provided to define the I/O,
+    infer the corresponding :term:`WPS` I/O details. Then, considering those resolved definitions and any missing
+    information that could be inferred, extend field requirements that can be retrieved from :term:`CWL` definitions.
 
-    Removes any deployment WPS I/O definitions that don't match any CWL I/O by ID.
-    Adds missing deployment WPS I/O definitions using expected CWL I/O IDs.
+    Removes any deployment :term:`WPS` I/O definitions that don't match any :term:`CWL` I/O by ID, since they will be
+    of no use for the underlying :term:`Application Package`. Adds missing deployment :term:`WPS` I/O definitions using
+    expected :term:`CWL` I/O IDs.
 
     :param wps_io_list: list of WPS I/O (as json) passed during process deployment.
     :param cwl_io_list: list of CWL I/O converted to WPS-like I/O for counter-validation.
@@ -2491,9 +2537,9 @@ def merge_package_io(wps_io_list, cwl_io_list, io_select):
     # otherwise, evaluate provided WPS I/O definitions and find potential new information to be merged
     for cwl_id in cwl_io_dict:
         cwl_io = cwl_io_dict[cwl_id]
-        updated_io_list.append(cwl_io)
         if cwl_id in missing_io_list:
-            continue  # missing WPS I/O are inferred only using CWL->WPS definitions
+            updated_io_list.append(cwl_io)
+            continue  # missing WPS I/O can only be inferred using CWL->WPS definitions
 
         # enforce expected CWL->WPS I/O required parameters
         cwl_io_json = cwl_io.json
@@ -2504,6 +2550,7 @@ def merge_package_io(wps_io_list, cwl_io_list, io_select):
             "identifier": cwl_identifier,
             "title": cwl_title if cwl_title is not null else cwl_identifier
         })
+        # attempt to infer additional typing or constraints from OpenAPI schema if available
         wps_io_schema = get_field(wps_io_json, "schema")
         if wps_io_schema:
             json_io_schema = oas2json_io(wps_io_schema)
@@ -2524,42 +2571,83 @@ def merge_package_io(wps_io_list, cwl_io_list, io_select):
         if wps_max_occurs == null and cwl_max_occurs != null:
             wps_io_json["max_occurs"] = cwl_max_occurs
         wps_io = json2wps_io(wps_io_json, io_select)
+        check_io_compatible(wps_io, cwl_io, cwl_id)
+        # use WPS variant since WPS<->CWL mapping found, WPS is more precise for process definition
+        # (e.g.: bbox type that is not available in CWL)
+        updated_io_list.append(wps_io)
 
-        # validate types to ensure they match categories, otherwise merging will cause more confusion
-        # for Literal/Complex coming from WPS side, they should be matched exactly with Literal/Complex on CWL side
-        # WARNING: when BoundingBox for WPS, it should be mapped to ComplexInput on CWL side (since no equivalent)
-        cwl_io_type = type(cwl_io)
-        wps_io_type = type(wps_io)
-        if not (
-            (wps_io_type in [LiteralInput, LiteralOutput] and cwl_io_type in [LiteralInput, LiteralOutput]) or
-            (wps_io_type in [BoundingBoxInput, BoundingBoxOutput] and cwl_io_type in [ComplexInput, ComplexOutput]) or
-            (wps_io_type in [ComplexInput, ComplexOutput] and cwl_io_type in [ComplexInput, ComplexOutput])
-        ):
-            msg_err = f"Mismatching CWL/WPS types for merge of I/O ID: [{cwl_id}] "
-            msg_typ = f" (CWL: {fully_qualified_name(cwl_io_type)}, WPS: {fully_qualified_name(wps_io_type)})."
-            LOGGER.error("%s.\n  CWL: %s\n  WPS: %s", msg_err, cwl_io_type, wps_io_type)
-            raise PackageTypeError(msg_err + msg_typ)
-
-        # Retrieve any complementing fields (metadata, keywords, etc.) passed as WPS input.
+        # Retrieve any complementing fields (metadata, keywords, etc.) passed in CWL/WPS inputs
         # Enforce some additional fields to keep value specified by WPS if applicable.
         # These are only added here rather that 'WPS_FIELD_MAPPING' to avoid erroneous detection by other functions.
         #   - Literal: 'default' value defined by 'data'
         #   - Complex: 'default' format defined by 'data_format'
         # (see function 'json2wps_io' for detail)
-        for field_type in list(WPS_FIELD_MAPPING) + ["data", "data_format"]:
+        # Important to have 'data_format' after, as it depends on 'supported_formats' processed an interation before.
+        # Important to have 'metadata' before 'supported_formats' that interact together during mixed typed exchanges.
+        wps_field_list = list(set(WPS_FIELD_MAPPING) - {"metadata"})
+        for field_type in ["metadata"] + wps_field_list + ["data", "data_format"]:
             cwl_field = get_field(cwl_io, field_type)
             wps_field = get_field(wps_io, field_type)
-            # override provided formats if different (keep WPS), or if CWL->WPS was missing but is provided by WPS
-            if _are_different_and_set(wps_field, cwl_field) or (wps_field is not null and cwl_field is null):
-                # list of formats are updated by comparing format items since information can be partially complementary
-                if field_type in ["supported_formats"] and cwl_field is not null:
+            # employ provided formats if different (keep WPS), or if CWL offers more that were missing in WPS
+            # because 'updated_io_list' contains the WPS I/O already, only need to push differences found in CWL
+            if _are_different_and_set(wps_field, cwl_field) or (wps_field is null and cwl_field is not null):
+                # because WPS Bbox is mapped against CWL Complex, adjust format to metadata in that case
+                # WPS expected to have no formats, since not a complex
+                # CWL expected to have only 1 because 'format' field is unique (see also 'cwl2wps_io' schema handling)
+                if (
+                    field_type in ["supported_formats", "data_format"] and
+                    isinstance(wps_io, BasicBoundingBox) and isinstance(cwl_io, BasicComplex)
+                ):
+                    cwl_field = cwl_field[0] if isinstance(cwl_field, (list, tuple)) else cwl_field
+                    wps_field = get_field(wps_io, "metadata", default=[])
+                    if not any(meta.href == cwl_field.schema for meta in wps_field):
+                        wps_field.append(WPS_Metadata(
+                            title="Schema",
+                            href=cwl_field.schema,
+                            role=SchemaRole.JSON_SCHEMA,
+                            type_=cwl_field.mime_type
+                        ))
+                        set_field(updated_io_list[-1], "metadata", wps_field)
+                    continue
+                elif field_type == "supported_formats" and cwl_field is not null:
                     wps_field = merge_io_formats(wps_field, cwl_field)
                 # default 'data_format' must be one of the 'supported_formats'
                 # avoid setting something invalid in this case, or it will cause problem after
                 # note: 'supported_formats' must have been processed before
-                if field_type == "data_format":
+                elif field_type == "data_format":
                     wps_fmts = get_field(updated_io_list[-1], "supported_formats", search_variations=False, default=[])
                     if wps_field not in wps_fmts:
                         continue
                 set_field(updated_io_list[-1], field_type, wps_field)
     return updated_io_list
+
+
+def check_io_compatible(wps_io, cwl_io, io_id):
+    # type: (WPS_IO_Type, WPS_IO_Type, str) -> None
+    """
+    Validate types to ensure they match categories, otherwise merging will cause more confusion
+
+    For Literal/Complex I/O coming from :term:`WPS` side, they should be matched exactly with Literal/Complex I/O
+    on the :term:`CWL` side.
+
+    .. note::
+        The :term`CWL` I/O in this case is expected to be a :mod:`pywps` converted I/O from the :term`CWL` definition,
+        and not a direct :term`CWL` I/O definition.
+
+    .. warning::
+        When BoundingBox for :term:`WPS`, it should be mapped to ComplexInput on :term:`CWL` side (since no equivalent).
+
+    :raises PackageTypeError: If I/O are not compatible.
+    :returns: Nothing if compatible.
+    """
+    cwl_io_type = type(cwl_io)
+    wps_io_type = type(wps_io)
+    if not (
+        (wps_io_type in [LiteralInput, LiteralOutput] and cwl_io_type in [LiteralInput, LiteralOutput]) or
+        (wps_io_type in [BoundingBoxInput, BoundingBoxOutput] and cwl_io_type in [ComplexInput, ComplexOutput]) or
+        (wps_io_type in [ComplexInput, ComplexOutput] and cwl_io_type in [ComplexInput, ComplexOutput])
+    ):
+        msg_err = f"Mismatching CWL/WPS types for merge of I/O ID: [{io_id}] "
+        msg_typ = f" (CWL: {fully_qualified_name(cwl_io_type)}, WPS: {fully_qualified_name(wps_io_type)})."
+        LOGGER.error("%s.\n  CWL: %s\n  WPS: %s", msg_err, cwl_io_type, wps_io_type)
+        raise PackageTypeError(msg_err + msg_typ)
