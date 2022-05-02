@@ -339,6 +339,11 @@ if TYPE_CHECKING:
     OpenAPISchemaReference = TypedDict("OpenAPISchemaReference", {
         "$ref": _OpenAPISchema
     }, total=True)
+    OpenAPISchemaMetadata = TypedDict("OpenAPISchemaMetadata", {
+        "$id": str,         # reference to external '$ref' after local resolution for tracking
+        "$schema": str,     # how to parse schema (usually: 'https://json-schema.org/draft/2020-12/schema')
+        "@context": str,    # extra details or JSON-LD references
+    }, total=False)
     OpenAPISchemaProperty = TypedDict("OpenAPISchemaProperty", {
         "type": OpenAPISchemaTypes,
         "format": str,
@@ -404,4 +409,5 @@ if TYPE_CHECKING:
         OpenAPISchemaKeyword,
         OpenAPISchemaProperty,
         OpenAPISchemaReference,
+        OpenAPISchemaMetadata,
     ]

@@ -15,7 +15,7 @@ WPS_LITERAL_DATA_DATETIME = frozenset(["date", "time", "dateTime"])
 WPS_LITERAL_DATA_FLOAT = frozenset(["scale", "angle", "float", "double"])
 WPS_LITERAL_DATA_INTEGER = frozenset(["int", "integer", "long", "positiveInteger", "nonNegativeInteger"])
 WPS_LITERAL_DATA_STRING = frozenset({"anyURI", "string"} | WPS_LITERAL_DATA_DATETIME)
-WPS_LITERAL_DATA_TYPE_NAMES = frozenset(
+WPS_LITERAL_DATA_TYPES = frozenset(
     WPS_LITERAL_DATA_BOOLEAN |
     WPS_LITERAL_DATA_DATETIME |
     WPS_LITERAL_DATA_FLOAT |
@@ -126,7 +126,11 @@ OAS_LITERAL_NUMERIC = frozenset(["integer", "number"])
 OAS_LITERAL_FLOAT_FORMATS = frozenset(["float", "double"])
 OAS_LITERAL_INTEGER_FORMATS = frozenset(["int32", "int64"])
 OAS_LITERAL_NUMERIC_FORMATS = frozenset(OAS_LITERAL_FLOAT_FORMATS | OAS_LITERAL_INTEGER_FORMATS)
-OAS_LITERAL_STRING_FORMATS = frozenset(["date", "datetime", "date-time", "full-date", "time", "password"])
+OAS_LITERAL_DATETIME_FORMATS = frozenset(["date", "datetime", "date-time", "full-date", "time"])
+OAS_LITERAL_STRING_FORMATS = frozenset(
+    OAS_LITERAL_DATETIME_FORMATS |
+    {"password"}
+)
 OAS_LITERAL_BINARY_FORMATS = frozenset(["base64", "binary", "byte"])
 OAS_KEYWORD_TYPES = frozenset(["allOf", "anyOf", "oneOf", "not"])
 OAS_DATA_TYPES = frozenset(

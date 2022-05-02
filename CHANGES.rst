@@ -26,6 +26,8 @@ Changes:
   I/O ``schema`` field (relates to `#430 <https://github.com/crim-ca/weaver/issues/430>`_).
 - Add partial support of bounding box parsing specified during `Process` deployment using the
   I/O ``schema`` field (relates to `#51 <https://github.com/crim-ca/weaver/issues/51>`_).
+- Add encoding/decoding of JSON I/O definitions for saving to database in order to support OpenAPI ``schema`` that can
+  contain conflicting key names with MongoDB functionalities (e.g.: ``$ref``).
 
 Fixes:
 ------

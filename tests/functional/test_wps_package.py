@@ -174,11 +174,132 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         assert all(isinstance(val, dict) and isinstance(val.get("schema"), dict) for val in desc["inputs"].values())
         assert all(isinstance(val, dict) and isinstance(val.get("schema"), dict) for val in desc["outputs"].values())
 
-        # expect unchanged schema definitions
-        assert all(ref["inputs"][key]["schema"] == val["schema"] for key, val in desc["inputs"].items())
-        assert all(ref["outputs"][key]["schema"] == val["schema"] for key, val in desc["outputs"].items())
+        # NOTE:
+        #   Schema definitions are slightly modified when compatible information is detected from other CWL/WPS sources
+        #   to improve their validation. For example, min/max occurs can help define singe/multi-value/array type.
+        # check obtained/extended schemas case by case based on expected merging of definitions
+        assert desc["inputs"]["arrayInput"]["schema"] == ref["inputs"]["arrayInput"]["schema"]  # no change
+        assert desc["inputs"]["boundingBoxInput"]["schema"] == {
+            # what is referenced by $ref, converted to $id after retrieval
+            "type": "object",
+            "properties": {
+                "crs": {
+                    "type": "string",
+                    "format": "uri",
+                    "default": "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+                    "enum": [
+                        "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+                        "http://www.opengis.net/def/crs/OGC/0/CRS84h",
+                    ]
+                },
+                "bbox": {
+                    "type": "array",
+                    "items": "number",
+                    "oneOf": [
+                        {"minItems": 4, "maxItems": 4},
+                        {"minItems": 6, "maxItems": 6},
+                    ]
+                }
+            },
+            "required": ["bbox"],
+            # merged:
+            "format": "ogc-bbox",
+            # added:
+            "$id": "https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/d52579/core/openapi/schemas/bbox.yaml"
+        }
+        assert desc["inputs"]["complexObjectInput"]["schema"] == {
+            "oneOf": [
+                # extended raw-data
+                {"type": "string", "contentMediaType": "application/json"},
+                # original definition
+                ref["inputs"]["complexObjectInput"]["schema"]
+            ]
+        }
+        assert desc["inputs"]["dateInput"]["schema"] == ref["inputs"]["dateInput"]["schema"]  # no change
+        assert desc["inputs"]["doubleInput"]["schema"] == ref["inputs"]["doubleInput"]["schema"]  # no change
+        assert desc["inputs"]["featureCollectionInput"]["schema"]["oneOf"][:2] == [
+            # same as reference
+            {
+                "type": "string",
+                "contentMediaType": "application/gml+xml; version=3.2"
+            },
+            {
+                "type": "string",
+                "contentMediaType": "application/vnd.google-earth.kml+xml",
+                "contentSchema": "https://schemas.opengis.net/kml/2.3/ogckml23.xsd"
+            },
+        ]
+        # extended contentMediaType using the provided JSON object $ref
+        assert desc["inputs"]["featureCollectionInput"]["schema"]["oneOf"][2] == {
+            "type": "string",
+            "contentMediaType": "application/json",
+            "contentSchema": "https://geojson.org/schema/FeatureCollection.json",
+        }
+        # extended and simplified from allOf/$ref
+        # FIXME: format "geojson-feature-collection" dropped, but unnecessary for validation
+        # assert desc["inputs"]["featureCollectionInput"]["schema"]["oneOf"][2]["format"] == (
+        #   "geojson-feature-collection"
+        # )
+        assert desc["inputs"]["featureCollectionInput"]["schema"]["oneOf"][3]["$ref"] == (
+            "https://geojson.org/schema/FeatureCollection.json"
+        )
+        # check that actual full definition of $ref is not included (big JSON)
+        assert all(
+            field not in desc["inputs"]["featureCollectionInput"]["schema"]["oneOf"][3]
+            for field in ["type", "properties"]
+        )
+        # min/max occurs detected => schema converted to array-only since minOccurs=2
+        assert desc["inputs"]["geometryInput"]["schema"] == {
+            "type": "array",
+            "items": {"oneOf": [
+                ref["inputs"]["geometryInput"]["schema"]["oneOf"][0],
+                # extended from allOf/$ref
+                {
+                    "type": "string",
+                    "format": "geojson-geometry",
+                    "contentMediaType": "application/json",
+                    "contentSchema": (
+                        "http://schemas.opengis.net/ogcapi/features/part1/1.0/openapi/schemas/geometryGeoJSON.yaml"
+                    )
+                },
+                # same as original allOf/$ref
+                ref["inputs"]["geometryInput"]["schema"]["oneOf"][1],
+            ]},
+            "minItems": ref["inputs"]["geometryInput"]["minOccurs"],
+            "maxItems": ref["inputs"]["geometryInput"]["maxOccurs"],
+        }
+        assert desc["inputs"]["imageInput"]["schema"] == {
+            "oneOf": [
+                # same as original (except added 'format' for consistency)
+                {
+                    "type": "string", "format": "binary",
+                    "contentEncoding": "binary", "contentMediaType": "image/tiff; application=geotiff"},
+                {
+                    "type": "string", "format": "binary",
+                    "contentEncoding": "binary", "contentMediaType": "image/jp2"
+                },
+                # extended from minOccurs/maxOccurs detection
+                {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 150,
+                    "items": [
+                        {
+                            "type": "string", "format": "binary",
+                            "contentEncoding": "binary", "contentMediaType": "image/tiff; application=geotiff"
+                        },
+                        {
+                            "type": "string", "format": "binary",
+                            "contentEncoding": "binary", "contentMediaType": "image/jp2"
+                        },
+                    ]
+                }
+            ]
+        }
+        assert desc["inputs"]["measureInput"]["schema"] == ref["inputs"]["measureInput"]["schema"]  # no change
+        assert desc["inputs"]["stringInput"]["schema"] == ref["inputs"]["stringInput"]["schema"]  # no change
 
-        # array min/max items => min/max occurs
+        # check detection of array min/max items => min/max occurs
         assert "minOccurs" in desc["inputs"]["arrayInput"]
         assert isinstance(desc["inputs"]["arrayInput"]["schema"]["minItems"], int)
         assert desc["inputs"]["arrayInput"]["minOccurs"] == desc["inputs"]["arrayInput"]["schema"]["minItems"]
@@ -192,6 +313,18 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         assert isinstance(desc["outputs"]["arrayInput"]["schema"]["minItems"], int)
         assert "maxItems" in desc["outputs"]["arrayInput"]["schema"]
         assert isinstance(desc["outputs"]["arrayInput"]["schema"]["maxItems"], int)
+
+        # contentMediaType => supported formats
+        assert desc["inputs"]["complexObjectInput"]["formats"] == [
+            {"default": True, "mediaType": "application/json"},  # represents the generic JSON complex properties
+        ]
+        assert desc["inputs"]["featureCollectionInput"]["formats"] == [
+            {"default": True, "mediaType": "application/gml+xml; version=3.2"},
+            {"default": False, "mediaType": "application/vnd.google-earth.kml+xml",
+             "schema": "https://schemas.opengis.net/kml/2.3/ogckml23.xsd"},
+            {"default": False, "mediaType": "application/json",
+             "schema": "https://geojson.org/schema/FeatureCollection.json"}  # $ref in allOf => schema
+        ]
 
     def test_deploy_process_io_no_format_default(self):
         """

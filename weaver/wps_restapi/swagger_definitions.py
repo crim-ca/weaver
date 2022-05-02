@@ -42,7 +42,7 @@ from weaver.processes.constants import (
     PACKAGE_CUSTOM_TYPES,
     PACKAGE_ENUM_BASE,
     PACKAGE_TYPE_POSSIBLE_VALUES,
-    WPS_LITERAL_DATA_TYPE_NAMES,
+    WPS_LITERAL_DATA_TYPES,
     ProcessSchema
 )
 from weaver.quotation.status import QuoteStatus
@@ -996,7 +996,8 @@ class AnyValueOAS(AnyOfKeywordSchema):
 #   but reference 'default' correspond more to the default *interpretation* value if none was provided.
 #   It is preferable in our case to omit (i.e.: drop) these defaults to keep obtained/resolved definitions succinct,
 #   since those defaults can be defined (by default...) if needed. No reason to add them explicitly.
-class PropertyOAS(PermissiveMappingSchema):
+class PropertyOAS(NotKeywordSchema, PermissiveMappingSchema):
+    _not = [ReferenceOAS()]
     _type = TypeOAS(name="type", missing=drop)  # not present if top-most schema is {allOf,anyOf,oneOf,not}
     _format = ExtendedSchemaNode(String(), name="format", missing=drop)
     default = AnyValueOAS(unknown="preserve", missing=drop)
@@ -1026,7 +1027,7 @@ class PropertyOAS(PermissiveMappingSchema):
     content_type = ExtendedSchemaNode(String(), name="contentMediaType", missing=drop)
     content_encode = ExtendedSchemaNode(String(), name="contentEncoding", missing=drop)
     content_schema = ExtendedSchemaNode(String(), name="contentSchema", missing=drop)
-    _not = PseudoObjectOAS(name="not", title="not", missing=drop)
+    _not_key = PseudoObjectOAS(name="not", title="not", missing=drop)
     _all_of = KeywordObjectOAS(name="allOf", missing=drop)
     _any_of = KeywordObjectOAS(name="anyOf", missing=drop)
     _one_of = KeywordObjectOAS(name="oneOf", missing=drop)
@@ -1043,7 +1044,8 @@ class ObjectPropertiesOAS(ExtendedMappingSchema):
 
 # would not need this if we could do explicit recursive definitions but at the very least, validate that when a
 # object type is specified, its properties are as well and are slightly more specific than permissive mapping
-class ObjectOAS(ExtendedMappingSchema):
+class ObjectOAS(NotKeywordSchema, ExtendedMappingSchema):
+    _not = [ReferenceOAS]
     _type = TypeOAS(name="type", missing=drop, validator=OneOf(OAS_COMPLEX_TYPES))
     properties = ObjectPropertiesOAS()  # required and more specific contrary to 'properties' in 'PropertyOAS'
 
@@ -1214,7 +1216,7 @@ class DataTypeSchema(NameReferenceType):
     description = "Type of the literal data representation."
     title = "DataType"
     # any named type that can be converted by: 'weaver.processes.convert.any2wps_literal_datatype'
-    name = ExtendedSchemaNode(String(), validator=OneOf(list(WPS_LITERAL_DATA_TYPE_NAMES)))
+    name = ExtendedSchemaNode(String(), validator=OneOf(list(WPS_LITERAL_DATA_TYPES)))
 
 
 class UomSchema(NameReferenceType):

@@ -1539,7 +1539,6 @@ class OneOfKeywordSchema(KeywordMapper):
     .. warning::
         When ``oneOf/allOf`` automatic expansion occurs during schema generation
 
-
     .. warning::
         When calling :meth:`deserialize`, because the validation process requires **exactly one**
         of the variants to succeed to consider the whole object to evaluate as valid, it is
@@ -1604,6 +1603,7 @@ class OneOfKeywordSchema(KeywordMapper):
     _keyword_schemas_only_object = False
     _keyword = "_one_of"
     _discriminator = "discriminator"
+    discriminator = None
 
     @classmethod
     @abstractmethod

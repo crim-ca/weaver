@@ -453,7 +453,7 @@ def _merge_package_inputs_outputs(wps_inputs_defs,      # type: Union[List[ANY_I
     wps_outputs_defs = normalize_ordered_io(wps_outputs_defs)
     wps_inputs_merged = merge_package_io(wps_inputs_defs, cwl_inputs_list, WPS_INPUT)
     wps_outputs_merged = merge_package_io(wps_outputs_defs, cwl_outputs_list, WPS_OUTPUT)
-    return [wps2json_io(i) for i in wps_inputs_merged], [wps2json_io(o) for o in wps_outputs_merged]
+    return wps_inputs_merged, wps_outputs_merged
 
 
 def _get_package_io(package_factory, io_select, as_json):
