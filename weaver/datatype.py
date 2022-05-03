@@ -2189,9 +2189,11 @@ class Process(Base):
                 get_field(io_def, "identifier", search_variations=True): io_def
                 for io_def in process[io_type]
             }
-            # when OpenAPI schema is not predefined from deployed definition, generate them dynamically
-            # mostly for preexisting processes in database
-            # newer deployment should have generated them already to save time or for more precise definitions
+            # When OpenAPI schema is not predefined explicitly in deployed I/O definitions, generate them dynamically.
+            # This call allow to fill missing details for preexisting (already deployed) processes in database.
+            # Another possible case is a deployment providing only CWL definitions, and WPS are inferred from them.
+            # In this situation, the lack of WPS I/O altogether requires to generate OAS from I/O merge/conversion.
+            # Deployment with OAS should have generated this field already to save time or for more precise definitions.
             for io_def in process[io_type].values():
                 io_schema = get_field(io_def, "schema", search_variations=False)
                 if not isinstance(io_schema, dict):

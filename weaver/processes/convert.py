@@ -2750,8 +2750,15 @@ def merge_package_io(wps_io_list, cwl_io_list, io_select):
             json_io_schema = oas2json_io(wps_io_schema)
             if json_io_schema and isinstance(json_io_schema, dict):
                 wps_io_json.update(json_io_schema)
-        # apply type if WPS deploy definition was partial but can be retrieved from CWL
-        wps_io_json.setdefault("type", get_field(cwl_io_json, "type", search_variations=True))
+
+        # check if WPS I/O resolves to default literal string due to missing detection of details for explicit type
+        # this is permitted if the corresponding CWL I/O can provide the remaining details of the partial WPS I/O
+        if "type" not in wps_io_json and "data_type" not in wps_io_json:
+            cwl_io_type = get_field(cwl_io_json, "type", search_variations=False)
+            wps_io_json["type"] = cwl_io_type
+            # preemptively transfer the specific data-type as well, otherwise we might need to deal with different ones
+            if cwl_io_type == WPS_LITERAL:
+                wps_io_json["data_type"] = get_field(cwl_io_json, "data_type", search_variations=False)
 
         # fill missing WPS min/max occurs in 'provided' json to avoid overwriting resolved CWL values by WPS default '1'
         #   with 'default' field, this default '1' causes erroneous result when 'min_occurs' should be "0"
