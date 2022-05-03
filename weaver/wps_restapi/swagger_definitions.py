@@ -996,8 +996,9 @@ class AnyValueOAS(AnyOfKeywordSchema):
 #   but reference 'default' correspond more to the default *interpretation* value if none was provided.
 #   It is preferable in our case to omit (i.e.: drop) these defaults to keep obtained/resolved definitions succinct,
 #   since those defaults can be defined (by default...) if needed. No reason to add them explicitly.
-class PropertyOAS(NotKeywordSchema, PermissiveMappingSchema):
-    _not = [ReferenceOAS()]
+# WARNING:
+#   cannot use any KeywordMapper derived instance here, otherwise conflicts with same OpenAPI keywords as children nodes
+class PropertyOAS(PermissiveMappingSchema):
     _type = TypeOAS(name="type", missing=drop)  # not present if top-most schema is {allOf,anyOf,oneOf,not}
     _format = ExtendedSchemaNode(String(), name="format", missing=drop)
     default = AnyValueOAS(unknown="preserve", missing=drop)
@@ -1035,8 +1036,16 @@ class PropertyOAS(NotKeywordSchema, PermissiveMappingSchema):
     properties = PermissiveMappingSchema(missing=drop)  # cannot do real recursive definitions, simply check mapping
 
 
+# this class is only to avoid conflicting names with keyword mappers
+class AnyPropertyOAS(OneOfKeywordSchema):
+    _one_of = [
+        ReferenceOAS(),
+        PropertyOAS(),
+    ]
+
+
 class ObjectPropertiesOAS(ExtendedMappingSchema):
-    property_name = PropertyOAS(
+    property_name = AnyPropertyOAS(
         variable="{property-name}",
         description="Named of the property being defined under the OpenAPI object.",
     )
