@@ -153,6 +153,7 @@ if TYPE_CHECKING:
 
     from weaver.typedefs import Literal
 
+    # pylint: disable=invalid-name
     ProcessSchemaType = Literal[ProcessSchema.OGC, ProcessSchema.OLD]
     WPS_ComplexType = Literal[WPS_COMPLEX, WPS_COMPLEX_DATA, WPS_REFERENCE]
     WPS_DataType = Union[Literal[WPS_LITERAL, WPS_BOUNDINGBOX], WPS_ComplexType]

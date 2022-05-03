@@ -41,7 +41,7 @@ from weaver.exceptions import (
 )
 from weaver.processes.types import ProcessType
 from weaver.store.base import StoreProcesses, StoreServices
-from weaver.utils import fully_qualified_name, get_sane_name, get_settings, get_url_without_query, generate_diff
+from weaver.utils import fully_qualified_name, generate_diff, get_sane_name, get_settings, get_url_without_query
 from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_client
 from weaver.wps_restapi import swagger_definitions as sd

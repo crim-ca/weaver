@@ -1502,6 +1502,64 @@ def json2oas_io_literal_data_type(io_type):
     return data_info
 
 
+def json2oas_io_allowed_values(io_base, io_allowed):
+    # type: (JSON, JSON) -> List[JSON]
+    """
+    Converts literal data allowed values :term:`JSON` definitions ino :term:`OpenAPI` equivalent variations.
+
+    :param io_base: Base value definitions that can be shared across variations (e.g.: default values).
+    :param io_allowed: Allowed values definitions (enum, ranges) extracted from :term:`JSON` literal data domains.
+    :return: List of converted :term:`OpenAPI` definitions applicable to represent the allowed values.
+    """
+
+    item_variation = []
+    if isinstance(io_allowed, dict):
+        # anyValue
+        # nothing to do since regardless of true/false, nothing can be applied as OpenAPI schema definition
+        return [io_base]
+    if isinstance(io_allowed, list) and all(isinstance(val_def, (int, float, str)) for val_def in io_allowed):
+        # allowed values
+        # need to split the different types if a mix is used (e.g.: 1, 2, "A", "B")
+        data_val_types = {
+            "string": [val for val in io_allowed if isinstance(val, str)],
+            "number": [val for val in io_allowed if isinstance(val, (float, int))],
+        }
+        for _typ, vals in data_val_types.items():
+            if vals:
+                data_enum = {"type": _typ, "enum": vals}
+                data_enum.update(io_base)
+                if _typ == "number" and all(val for val in io_allowed if isinstance(val, float)):
+                    data_enum.update(json2oas_io_literal_data_type("double"))
+                if _typ == "number" and all(val for val in io_allowed if isinstance(val, int)):
+                    data_enum.update(json2oas_io_literal_data_type("integer"))
+                item_variation.append(data_enum)
+        return item_variation
+    if isinstance(io_allowed, list) and all(isinstance(val_def, dict) for val_def in io_allowed):
+        # allowed ranges
+        for val in io_allowed:
+            min_val = get_field(val, "range_minimum", search_variations=True, default=None)
+            max_val = get_field(val, "range_maximum", search_variations=True, default=None)
+            spacing = get_field(val, "range_spacing", search_variations=True, default=None)
+            closure = get_field(val, "range_closure", search_variations=True, default=RANGECLOSURETYPE.CLOSED)
+            data_range = {}
+            data_range.update(io_base)
+            if min_val is not None:
+                data_range["minimum"] = min_val
+            if max_val is not None:
+                data_range["maximum"] = max_val
+            if spacing is not None:
+                data_range["multipleOf"] = spacing
+            if closure == RANGECLOSURETYPE.OPEN:  # ]min, max[
+                data_range.update({"exclusiveMinimum": True, "exclusiveMaximum": True})
+            elif closure == RANGECLOSURETYPE.OPENCLOSED:  # ]min, max]
+                data_range.update({"exclusiveMinimum": True})
+            elif closure == RANGECLOSURETYPE.CLOSEDOPEN:  # [min, max[
+                data_range.update({"exclusiveMaximum": True})
+            item_variation.append(data_range)
+        return item_variation
+    return [io_base]
+
+
 def json2oas_io_literal(io_info, io_hint=null):
     # type: (JSON_IO_Type, Union[OpenAPISchema, Type[null]]) -> OpenAPISchema
     """
@@ -1535,53 +1593,10 @@ def json2oas_io_literal(io_info, io_hint=null):
         if data_default is not null:
             data_var["default"] = data_default
         data_def = get_field(data_info, "valueDefinition")
-        if isinstance(data_def, dict):
-            # anyValue
-            # nothing to do since regardless of true/false, nothing can be applied as OpenAPI schema definition
-            pass
-        elif isinstance(data_def, list) and all(isinstance(val_def, (int, float, str)) for val_def in data_def):
-            # allowed values
-            # need to split the different types if a mix is used (e.g.: 1, 2, "A", "B")
-            data_val_types = {
-                "string": [val for val in data_def if isinstance(val, str)],
-                "number": [val for val in data_def if isinstance(val, (float, int))],
-            }
-            for _typ, vals in data_val_types.items():
-                if vals:
-                    data_enum = {"type": _typ, "enum": vals}
-                    data_enum.update(data_var)
-                    if _typ == "number" and all(val for val in data_def if isinstance(val, float)):
-                        data_enum.update(json2oas_io_literal_data_type("double"))
-                    if _typ == "number" and all(val for val in data_def if isinstance(val, int)):
-                        data_enum.update(json2oas_io_literal_data_type("integer"))
-                    item_variation.append(data_enum)
-            continue  # next immediately since many enum variations are already handled
-        elif isinstance(data_def, list) and all(isinstance(val_def, dict) for val_def in data_def):
-            # allowed ranges
-            for val in data_def:
-                min_val = get_field(val, "range_minimum", search_variations=True, default=None)
-                max_val = get_field(val, "range_maximum", search_variations=True, default=None)
-                spacing = get_field(val, "range_spacing", search_variations=True, default=None)
-                closure = get_field(val, "range_closure", search_variations=True, default=RANGECLOSURETYPE.CLOSED)
-                data_range = {}
-                data_range.update(data_var)
-                if min_val is not None:
-                    data_range["minimum"] = min_val
-                if max_val is not None:
-                    data_range["maximum"] = max_val
-                if spacing is not None:
-                    data_range["multipleOf"] = spacing
-                if closure == RANGECLOSURETYPE.OPEN:            # ]min, max[
-                    data_range.update({"exclusiveMinimum": True, "exclusiveMaximum": True})
-                elif closure == RANGECLOSURETYPE.OPENCLOSED:    # ]min, max]
-                    data_range.update({"exclusiveMinimum": True})
-                elif closure == RANGECLOSURETYPE.CLOSEDOPEN:    # [min, max[
-                    data_range.update({"exclusiveMaximum": True})
-                item_variation.append(data_range)
-            continue  # next immediately since many range variations are already handled
-
+        # extend definition with relevant value definitions
         # basic definition if no special enum/range handling was applied
-        item_variation.append(data_var)
+        data_var = json2oas_io_allowed_values(data_var, data_def)
+        item_variation.extend(data_var)
 
     if not domains:
         return {"type": "string"}
@@ -2130,7 +2145,7 @@ def json2wps_allowed_values(io_info):
     return null
 
 
-def json2wps_io(io_info, io_select):
+def json2wps_io(io_info, io_select):  # pylint: disable=R1260
     # type: (JSON_IO_Type, str) -> WPS_IO_Type
     """
     Converts an I/O from a JSON dict to PyWPS types.
@@ -2297,7 +2312,6 @@ def wps2json_io(io_wps, forced_fields=False):
                 io_field = get_field(io_wps, field, search_variations=True)
                 if io_field is not null:
                     io_wps_json[field] = io_field
-        io_type = get_field(io_wps_json, "type", search_variations=False)
 
     rename = {
         "identifier": "id",
@@ -2660,7 +2674,7 @@ def merge_io_fields(wps_io, cwl_io):
                     ))
                     set_field(wps_io, "metadata", wps_field)
                 continue
-            elif field_type == "supported_formats" and cwl_field is not null:
+            if field_type == "supported_formats" and cwl_field is not null:
                 wps_field = merge_io_formats(wps_field, cwl_field)
             # default 'data_format' must be one of the 'supported_formats'
             # avoid setting something invalid in this case, or it will cause problem after
@@ -2766,7 +2780,7 @@ def merge_package_io(wps_io_list, cwl_io_list, io_select):
 def check_io_compatible(wps_io, cwl_io, io_id):
     # type: (WPS_IO_Type, WPS_IO_Type, str) -> None
     """
-    Validate types to ensure they match categories, otherwise merging will cause more confusion
+    Validate types to ensure they match categories, otherwise merging will cause more confusion.
 
     For Literal/Complex I/O coming from :term:`WPS` side, they should be matched exactly with Literal/Complex I/O
     on the :term:`CWL` side.
@@ -2779,7 +2793,6 @@ def check_io_compatible(wps_io, cwl_io, io_id):
         When BoundingBox for :term:`WPS`, it should be mapped to ComplexInput on :term:`CWL` side (since no equivalent).
 
     :raises PackageTypeError: If I/O are not compatible.
-    :returns: Nothing if compatible.
     """
     cwl_io_type = type(cwl_io)
     wps_io_type = type(wps_io)
