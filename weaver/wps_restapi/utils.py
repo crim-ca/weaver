@@ -29,8 +29,6 @@ class HTTPHeadFileResponse(HTTPSuccessful):
     .. seealso::
         :rfc:`2616#section-9.4`
 
-
-    from pyramid.httpexceptions import HTTPException
     .. note::
         Even though no content is provided for HEAD response, ``204`` **SHOULD NOT** be used
         since it must emulate the GET response that would contain the content.

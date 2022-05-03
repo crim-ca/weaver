@@ -182,6 +182,9 @@ class AutoBase(DictBase):
 
 
 class Base(DictBase):
+    """
+    Base interface for all data-types.
+    """
     def __str__(self):
         # type: () -> str
         return f"{type(self).__name__} <{self.id}>"
@@ -224,6 +227,9 @@ class Base(DictBase):
 
 
 class LocalizedDateTimeProperty(property):
+    """
+    Property that ensures date-time localization is applied on the stored/retrieved value as required.
+    """
     def __init__(self,
                  fget=None,             # type: Callable[[Any], Optional[datetime]]
                  fset=None,             # type: Callable[[Any, Union[datetime, str]], None]

@@ -1475,7 +1475,7 @@ def json2oas_io_literal_data_type(io_type):
     Converts various literal data types into corresponding :term:`OpenAPI` fields.
 
     .. seealso::
-        - https://spec.openapis.org/oas/v3.1.0#x4-4-data-types
+        - https://spec.openapis.org/oas/v3.1.0#data-types
         - https://swagger.io/specification/#data-types
     """
     data_info = {"type": "string"}

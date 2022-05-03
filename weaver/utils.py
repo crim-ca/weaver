@@ -423,7 +423,7 @@ def parse_prefer_header_execute_mode(
     Obtain execution preference if provided in request headers.
 
     .. seealso::
-        - `OGC API - Processes: Core, Execution mode <
+        - :term:`OGC API - Processes`: Core, Execution mode <
           https://docs.ogc.org/is/18-062r2/18-062r2.html#sc_execution_mode>`_.
           This defines all conditions how to handle ``Prefer`` against applicable :term:`Process` description.
         - :rfc:`7240#section-4.1` HTTP Prefer header ``respond-async``

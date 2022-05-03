@@ -120,6 +120,13 @@ Glossary
     OGC API - Processes
         The new API that defines JSON REST-binding representation of :term:`WPS` :term:`Process` collection.
 
+    OpenAPI
+        OpenAPI Specification (`OAS`) defines a standard, programming language-agnostic interface description for
+        HTTP APIs.
+
+        .. seealso::
+            https://spec.openapis.org/oas/v3.1.0
+
     OpenSearch
         Protocol of lookup and retrieval of remotely stored files.
         Please refer to :ref:`OpenSearch Data Source` for details.

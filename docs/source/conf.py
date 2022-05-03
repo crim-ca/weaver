@@ -430,6 +430,8 @@ linkcheck_ignore = [
     # following have sporadic downtimes
     "https://esgf-data.dkrz.de/",
     "https://indico.egi.eu/",
+    # ignore anchors not found although valid
+    "https://spec.openapis.org/oas/v3.1.0/*#*",
     ".*docker-registry.crim.ca.*",  # protected
     # might not exist yet (we are generating it!)
     "https://pavics-weaver.readthedocs.io/en/latest/api.html",
