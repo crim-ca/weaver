@@ -164,7 +164,7 @@ class OutputFormat(Constants):
         if fmt == OutputFormat.JSON_STR:
             return repr_json(data, indent=2, ensure_ascii=False)
         if fmt == OutputFormat.JSON_RAW:
-            return repr_json(data, ensure_ascii=False)
+            return repr_json(data, indent=None, ensure_ascii=False)
         if fmt in [OutputFormat.XML, OutputFormat.XML_RAW, OutputFormat.XML_STR]:
             pretty = fmt == OutputFormat.XML_STR
             xml = Json2xml(data, item_wrap=True, pretty=pretty, wrapper=item_root).to_xml()

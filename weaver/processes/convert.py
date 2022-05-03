@@ -2227,10 +2227,12 @@ def json2wps_io(io_info, io_select):  # pylint: disable=R1260
             io_type = WPS_LITERAL
             io_info["data_type"] = io_type_guess
     if io_type == WPS_LITERAL:
-        data_type = get_field(io_info, "data_type")
-        # pywps literals subset is more restrictive that all possible standard WPS
+        data_type = json2wps_datatype(io_info)
+        # pywps literals subset is more restrictive than all possible standard WPS
+        # make use of some non-pywps compatible types since other valid WPS types are easier to match with OAS
         if data_type in WPS_LITERAL_DATA_TYPES and data_type not in LITERAL_DATA_TYPES:
-            io_info["data_type"] = any2wps_literal_datatype(data_type, is_value=False, pywps=True)
+            data_type = any2wps_literal_datatype(data_type, is_value=False, pywps=True)
+        io_info["data_type"] = data_type
     if io_select == WPS_INPUT:
         if ("max_occurs", "unbounded") in io_info.items():
             io_info["max_occurs"] = PACKAGE_ARRAY_MAX_SIZE
@@ -2248,7 +2250,6 @@ def json2wps_io(io_info, io_select):  # pylint: disable=R1260
         if io_type == WPS_LITERAL:
             io_info.pop("data_format", None)
             io_info.pop("supported_formats", None)
-            io_info["data_type"] = json2wps_datatype(io_info)
             allowed_values = json2wps_allowed_values(io_info)
             if allowed_values:
                 io_info["allowed_values"] = allowed_values
@@ -2273,7 +2274,6 @@ def json2wps_io(io_info, io_select):  # pylint: disable=R1260
             io_wps = BoundingBoxOutput(**io_info)
         elif io_type == WPS_LITERAL:
             io_info.pop("supported_formats", None)
-            io_info["data_type"] = json2wps_datatype(io_info)
             io_info.pop("literalDataDomains", None)
             io_wps = LiteralOutput(**io_info)
             set_field(io_wps, "allowed_values", io_allow)

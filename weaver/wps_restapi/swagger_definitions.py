@@ -1077,10 +1077,11 @@ class OAS(OneOfKeywordSchema):
 
 
 class InputOutputDescriptionSchema(ExtendedMappingSchema):
-    # empty dict means 'anything' in OpenAPI, in case it failed resolution
-    # add it to avoid failing the full input deserialization in case our OpenAPI schemas definitions
-    # are faulty/insufficiently defined (eg: recursive objects/properties) or missing OAS parameters
-    schema = OAS(missing={}, default={})
+    # Validation is accomplished only for the first few levels of the OpenAPI definition.
+    # This is sufficient to know if the I/O type is literal/bbox/complex. If 'schema' is explicitly provided, it
+    # should minimally succeed those top-level validation for proper I/O interpretation. Pseudo-recursive schema
+    # are defined for any more deeply nested definition to keep everything intact (eg: explicit object structure).
+    schema = OAS(missing=drop)
 
 
 class MinOccursDefinition(OneOfKeywordSchema):

@@ -147,7 +147,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         assert proc["inputs"][0]["id"] == "url"
         assert proc["outputs"][0]["id"] == "values"
 
-    def test_deploy_ogc_with_io_schema_definitions(self):
+    def test_deploy_ogc_with_io_oas_definitions(self):
         """
         Validate deployment when :term:`Process` definition includes I/O with OpenAPI ``schema`` fields.
 
@@ -2823,3 +2823,8 @@ class WpsPackageAppWithS3BucketTest(WpsConfigBase):
             assert not os.path.exists(os.path.join(wps_outdir, job_id, out_file))
             assert not os.path.exists(os.path.join(wps_outdir, wps_uuid, out_file))
         assert os.path.isfile(os.path.join(wps_outdir, f"{job_id}.xml"))
+
+    def test_execute_job_with_oas_validation(self):
+        """
+        Process with :term:`OpenAPI` I/O definitions validates the schema of the submitted :term:`JSON` data.
+        """
