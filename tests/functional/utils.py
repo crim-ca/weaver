@@ -190,8 +190,8 @@ class WpsConfigBase(unittest.TestCase):
         return deepcopy(resp.json)
 
     @classmethod
-    def deploy_process(cls, payload, process_id=None, describe_schema=ProcessSchema.OGC):
-        # type: (JSON, Optional[str], str) -> JSON
+    def deploy_process(cls, payload, process_id=None, describe_schema=ProcessSchema.OGC, mock_requests_only_local=True):
+        # type: (JSON, Optional[str], str, bool) -> JSON
         """
         Deploys a process with :paramref:`payload`.
 
@@ -214,7 +214,7 @@ class WpsConfigBase(unittest.TestCase):
                 exec_list[0]["unit"] = exec_unit
                 exec_list[0].pop("href")
         resp = mocked_sub_requests(cls.app, "post_json", "/processes",
-                                   data=payload, headers=cls.json_headers, only_local=True)
+                                   data=payload, headers=cls.json_headers, only_local=mock_requests_only_local)
         assert resp.status_code == 201, f"Expected successful deployment.\nError:\n{resp.text}"
         path = resp.json["processSummary"]["processDescriptionURL"]
         body = {"value": Visibility.PUBLIC}

@@ -2169,6 +2169,7 @@ def json2wps_io(io_info, io_select):  # pylint: disable=R1260
         "maxOccurs": "max_occurs",
         "dataType": "data_type",
         "defaultValue": "default",
+        "crs": "default",
         "supportedValues": "supported_values",
     }
     remove = [
@@ -2184,6 +2185,9 @@ def json2wps_io(io_info, io_select):  # pylint: disable=R1260
         "schema",
         "asreference",
         "additionalParameters",
+        "ll",
+        "ur",
+        "bbox",
     ]
     replace_values = {"unbounded": PACKAGE_ARRAY_MAX_SIZE}
 
@@ -2358,10 +2362,15 @@ def wps2json_io(io_wps, forced_fields=False):
         io_default = get_field(io_wps_json, "default", search_variations=True)
         for io_format in io_wps_json["formats"]:
             io_format["default"] = (io_default != null and is_equal_formats(io_format, io_default))
-        if io_default and len(io_wps_json["formats"]) == 1 and not io_wps_json["formats"][0]["default"]:
-            io_default_mime_type = get_field(io_default, "mime_type", search_variations=True)
+        if len(io_wps_json["formats"]) == 1 and not io_wps_json["formats"][0]["default"]:
             io_single_fmt_mime_type = get_field(io_wps_json["formats"][0], "mime_type", search_variations=True)
-            io_wps_json["formats"][0]["default"] = (io_default_mime_type == io_single_fmt_mime_type)
+            if io_default:
+                io_default_mime_type = get_field(io_default, "mime_type", search_variations=True)
+                io_wps_json["formats"][0]["default"] = (io_default_mime_type == io_single_fmt_mime_type)
+            elif DEFAULT_FORMAT.mime_type == io_single_fmt_mime_type:
+                io_supported = get_field(io_wps, "supported_formats", default=[DEFAULT_FORMAT])
+                io_missing = get_field(io_supported[0], DEFAULT_FORMAT_MISSING, default=False)
+                io_wps_json["formats"][0]["default"] = io_missing
 
     elif io_wps_json["type"] == WPS_BOUNDINGBOX:
         pass  # FIXME: BoundingBox not implemented (https://github.com/crim-ca/weaver/issues/51)

@@ -2483,7 +2483,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             "executionUnit": [{"href": f"mock://{resources.WPS_LITERAL_COMPLEX_IO_XML}"}],
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication"
         }
-        desc, pkg = self.deploy_process(body, describe_schema=ProcessSchema.OLD)
+        desc, pkg = self.deploy_process(body, describe_schema=ProcessSchema.OLD, mock_requests_only_local=False)
 
         # basic contents validation
         assert "cwlVersion" in pkg
@@ -2570,7 +2570,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             "executionUnit": [{"href": f"mock://{resources.WPS_ENUM_ARRAY_IO_XML}"}],
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication"
         }
-        desc, pkg = self.deploy_process(body, describe_schema=ProcessSchema.OLD)
+        desc, pkg = self.deploy_process(body, describe_schema=ProcessSchema.OLD, mock_requests_only_local=False)
 
         # basic contents validation
         assert "cwlVersion" in pkg
