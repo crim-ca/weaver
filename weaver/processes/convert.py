@@ -1639,7 +1639,8 @@ def json2oas_io(io_info, io_hint=null):
     if isinstance(max_occurs, str) and str.isnumeric(max_occurs):
         max_occurs = int(max_occurs)
     # resolve a single/multi/both value cardinality
-    if isinstance(min_occurs, int) and min_occurs > 1:
+    # because specified single-value/objects *MUST* be provided, optional can be represented only by zero-length array
+    if isinstance(min_occurs, int) and (min_occurs == 0 or min_occurs > 1):
         io_schema = {
             "type": "array",
             "items": item_schema,

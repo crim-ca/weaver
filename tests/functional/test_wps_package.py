@@ -498,7 +498,6 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         expect_inputs["file"]["formats"][1]["default"] = False
         expect_inputs["file"]["schema"] = {
             "oneOf": [
-                {"type": "string", "format": "uri"},
                 {"type": "string", "contentMediaType": ContentType.APP_JSON},
                 {"type": "string", "contentMediaType": ContentType.TEXT_PLAIN},
                 {"type": "object", "additionalProperties": True},  # auto added from JSON detection
@@ -510,7 +509,6 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         expect_outputs["file"]["formats"][2]["default"] = False
         expect_outputs["file"]["schema"] = {
             "oneOf": [
-                {"type": "string", "format": "uri"},
                 {"type": "string", "format": "binary",
                  "contentMediaType": ContentType.IMAGE_PNG, "contentEncoding": "base64"},
                 {"type": "string", "format": "binary",

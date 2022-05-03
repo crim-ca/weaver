@@ -285,11 +285,13 @@ Inputs/Outputs ID
 Inputs and outputs (:term:`I/O`) ``id`` from the :term:`CWL` context will be respectively matched against corresponding
 ``id`` or ``identifier`` field from I/O of :term:`WPS` context. In the :term:`CWL` definition, all of the allowed I/O
 structures are supported, whether they are specified using an array list with explicit definitions, using "shortcut"
-variant, or using key-value pairs (see |cwl-io-map|_ for more details). Regardless of array or mapping format,
-:term:`CWL` requires that all I/O have unique ``id``. On the :term:`WPS` side, a list of I/O is *always* expected.
-This is because :term:`WPS` I/O with multiple values (array in :term:`CWL`) are specified by repeating the ``id`` with
-each value instead of defining the value as a list of those values during :ref:`Execute <proc_op_execute>` request
-(see also :ref:`Multiple Inputs`).
+variant (i.e.: ``<type>[]``), or using key-value pairs (see |cwl-io-map|_ for more details). Regardless of array or
+mapping format, :term:`CWL` requires that all I/O have unique ``id``.
+On the :term:`WPS` side, either a mapping or list of I/O are also expected with unique ``id``.
+
+.. versionchanged:: 4.0
+    Previous versions only supported :term:`WPS` I/O using the listing format. Both can be used interchangeably in
+    both :term:`CWL` and :term:`WPS` contexts as of this version.
 
 To summarize, the following :term:`CWL` and :term:`WPS` I/O definitions are all equivalent and will result into the
 same process definition after deployment. For simplification purpose, below examples omit all but mandatory fields
@@ -342,9 +344,9 @@ the :ref:`Deploy <proc_op_deploy>` request body with any of the following variat
 
 .. warning::
     `Weaver` assumes that its main purpose is to eventually execute an :term:`Application Package` and will therefore
-    prioritize specification in :term:`CWL` over :term:`WPS`. Because of this, any unmatched ``id`` from the :term:`WPS`
-    context against provided :term:`CWL` ``id``\s of the same I/O section **will be dropped**, as they ultimately would
-    have no purpose during :term:`CWL` execution.
+    prioritize specification in :term:`CWL` over :term:`WPS` to infer types. Because of this, any unmatched ``id`` from
+    the :term:`WPS` context against provided :term:`CWL` ``id``\s of the same I/O section **will be dropped**, as they
+    ultimately would have no purpose during :term:`CWL` execution.
 
     This does not apply in the case of referenced :ref:`WPS-1/2` processes since no :term:`CWL` is available in the
     first place.
@@ -353,7 +355,7 @@ the :ref:`Deploy <proc_op_deploy>` request body with any of the following variat
 Inputs/Outputs Type
 -----------------------
 
-In the :term:`CWL` context, the ``type`` field indicates the type of I/O. Available types are presented in the
+In the :term:`CWL` context, the ``type`` field indicates the type of :term:`I/O`. Available types are presented in the
 |cwl-io-type|_ portion of the specification.
 
 .. warning::
@@ -367,13 +369,23 @@ In the :term:`CWL` context, the ``type`` field indicates the type of I/O. Availa
 
 In the :term:`WPS` context, three data types exist, namely ``Literal``, ``BoundingBox`` and ``Complex`` data.
 
+.. _bbox-note:
+.. note::
+    As of the current version of `Weaver`, :term:`WPS` data type ``BoundingBox`` is not completely supported.
+    The schema definition exists in :term:`WPS` context but is not handled by any :term:`CWL` type conversion yet.
+    This feature is reflected by issue `#51 <https://github.com/crim-ca/weaver/issues/51>`_.
+    It is possible to use a ``Literal`` data of type ``string`` corresponding to :term:`WKT` [#]_, [#]_ in the meantime.
+
+.. [#] |wkt-example|_
+.. [#] |wkt-format|_
+
 As presented in the example of the previous section, :term:`I/O` in the :term:`WPS` context does not require an explicit
 indication of the type from one of ``Literal``, ``BoundingBox`` and ``Complex`` data. Instead, :term:`WPS` type is
-inferred using the matched API schema of the I/O. For instance, ``Complex`` I/O (i.e.: file reference) requires the
+inferred using the matched API schema of the I/O. For instance, ``Complex`` I/O (e.g.: file reference) requires the
 ``formats`` field to distinguish it from a plain ``string``. Therefore, specifying either ``format`` in :term:`CWL`
 or ``formats`` in :term:`WPS` immediately provides all needed information for `Weaver` to understand that this I/O is
-expected to be a file reference. A ``crs`` field would otherwise indicate a ``BoundingBox`` I/O
-(see :ref:`note <bbox-note>`). If none of the two previous schemas are matched, the I/O type resolution falls back
+expected to be a file reference. A combination of ``bbox`` and ``crs`` fields would otherwise indicate a ``BoundingBox``
+I/O (see :ref:`note <bbox-note>`). If none of the two previous schemas are matched, the I/O type resolution falls back
 to ``Literal`` data of ``string`` type. To employ another primitive data type such as ``Integer``, an explicit
 indication needs to be provided as follows.
 
@@ -394,15 +406,11 @@ details through the :term:`CWL` definition and have the corresponding :term:`WPS
 the generated process. If desired, ``literalDataDomains`` can still be explicitly provided as above to ensure that
 it gets parsed as intended type.
 
-.. _bbox-note:
-.. note::
-    As of the current version of `Weaver`, :term:`WPS` data type ``BoundingBox`` is not supported. The schema definition
-    exists in :term:`WPS` context but is not handled by any :term:`CWL` type conversion yet. This feature is reflected
-    by issue `#51 <https://github.com/crim-ca/weaver/issues/51>`_. It is possible to use a ``Literal`` data of
-    type ``string`` corresponding to :term:`WKT` [#]_, [#]_ in the meantime.
-
-.. [#] |wkt-example|_
-.. [#] |wkt-format|_
+With more recent versions of `Weaver`, it is also possible to employ :term:`OpenAPI` schema definitions provided in
+the :term:`WPS` I/O to specify the explicit structure that applies to ``Literal``, ``BoundingBox`` and ``Complex``
+data types. When :term:`OpenAPI` schema are detected, they are also considered in the merging strategy along with
+other specifications provided in :term:`CWL` and :term:`WPS` contexts. More details about :term:`OAS` context is
+provided in :ref:`OpenAPI Schema` section.
 
 File Format
 -----------------------
@@ -411,7 +419,13 @@ An input or output resolved as :term:`CWL` ``File`` type, equivalent to a :term:
 ``format`` specification. Every ``mimeType`` field nested under ``formats`` entries of the :term:`WPS` definition
 will be mapped against corresponding *namespaced* ``format`` of :term:`CWL`.
 
-For example, the following input definitions are equivalent in both contexts.
+.. note::
+    For :term:`OGC API - Processes` conformance and backward compatible support, both ``mimeType`` and ``mediaType``
+    can be used interchangeably for :ref:`Process Deployment <proc_op_deploy>`.
+    For :ref:`Process Description <proc_op_describe>`, the employed name depends on the requested ``schema`` as query
+    parameter, defaulting to :term:`OGC API - Processes` ``mediaType`` representation if unspecified.
+
+Follow is an example where input definitions are equivalent in both :term:`CWL` and :term:`WPS` contexts.
 
 .. table::
     :class: code-table
@@ -442,7 +456,7 @@ For example, the following input definitions are equivalent in both contexts.
 
 
 As demonstrated, both contexts accept multiple formats for inputs. These effectively represent *supported formats* by
-the underlying application. The two :term:`MIME-types` selected for this example are chosen specifically to demonstrate
+the underlying application. The two :term:`Media-Types` selected for this example are chosen specifically to demonstrate
 how :term:`CWL` formats must be specified. More precisely, :term:`CWL` requires a real schema definition referencing to
 an existing ontology to validate formats, specified through the ``$namespaces`` section. Each format entry is then
 defined as a mapping of the appropriate namespace to the identifier of the ontology. Alternatively, you can also provide
@@ -453,9 +467,9 @@ Like many other fields, this information can become quite rapidly redundant and 
 and :term:`WPS` is provided. In other words, an application developer could only specify the :term:`I/O`'s ``formats``
 in the :term:`WPS` portion during process deployment, and `Weaver` will take care to update the matching :term:`CWL`
 definition without any user intervention. This makes it also easier for the user to specify supported formats since it
-is generally easier to remember names of :term:`MIME-types` than full ontology references. `Weaver` has a large set of
-commonly employed :term:`MIME-types` that it knows how to convert to corresponding ontologies. Also, `Weaver` will look
-for new :term:`MIME-types` it doesn't explicitly know about onto either the :term:`IANA` or the :term:`EDAM` ontologies
+is generally easier to remember names of :term:`Media-types` than full ontology references. `Weaver` has a large set of
+commonly employed :term:`Media-Types` that it knows how to convert to corresponding ontologies. Also, `Weaver` will look
+for new :term:`Media-Types` it doesn't explicitly know about onto either the :term:`IANA` or the :term:`EDAM` ontologies
 in order to attempt automatically resolving them.
 
 When formats are resolved between the two contexts, `Weaver` applies information in a complimentary fashion. This means
@@ -463,10 +477,16 @@ for example that if the user provided ``application/x-netcdf`` on the :term:`WPS
 the :term:`CWL` side, both resulting contexts will have both of those formats combined. `Weaver` will not favour one
 location over the other, but will rather merge them if they can be resolved into different and valid entities.
 
-Since ``format`` is a required field for :term:`WPS` ``ComplexData`` definitions (see :ref:`Inputs/Outputs Type`) and
-that :term:`MIME-types` are easier to provide in this context, it is *recommended* to provide all of them in the
-:term:`WPS` definition.
+Since ``formats`` is a required field for :term:`WPS` ``ComplexData`` definitions (see :ref:`Inputs/Outputs Type`) and
+that :term:`Media-Types` are easier to provide in this context, it is *recommended* to provide all of them in the
+:term:`WPS` definition. Alternatively, the :ref:`Inputs/Outputs Schema` representation also located within the
+:term:`WPS` I/O definitions can be used to provide ``contentMediaType``.
 
+Above examples present the minimal content of ``formats`` :term:`JSON` objects
+(i.e.: ``mimeType`` or ``mediaType`` value), but other fields, such as ``encoding`` and ``schema``
+can be provided as well to further refine the specific format supported by the corresponding :term:`I/O` definition.
+These fields are directly mapped, merged and combined against complementary details provided with ``contentMediaType``,
+and ``contentEncoding`` and ``contentSchema`` within an :term:`OAS` schema (see :ref:`Inputs/Outputs Schema`).
 
 Output File Format
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -499,7 +519,7 @@ each case.
 Allowed Values
 -----------------------
 
-Allowed values in the context of :term:`WPS` ``LiteralData`` provides a mean for the application developer to restrict
+Allowed values in the context of :term:`WPS` ``Literal`` data provides a mean for the application developer to restrict
 inputs to a specific set of values. In :term:`CWL`, the same can be achieved using an ``enum`` definition. Therefore,
 the following two variants are equivalent and completely interchangeable.
 
@@ -536,21 +556,26 @@ Multiple and Optional Values
 
 Inputs that take *multiple* values or references can be specified using ``minOccurs`` and ``maxOccurs`` in :term:`WPS`
 context, while they are specified using the ``array`` type in `CWL`. While the same ``minOccurs`` parameter with a
-value of zero (``0``) can be employed to indicate an *optional* input, :term:`CWL` requires the type to specify ``null``
-or to use the shortcut ``?`` character suffixed to the base type to indicate optional input. Resolution between
-:term:`WPS` and :term:`CWL` for the merging strategy implies all corresponding parameter combinations and checks in
-this case.
+value of zero (``0``) can be employed to indicate an *optional* input, :term:`CWL` requires the type to specify
+``"null"`` or to use the shortcut ``?`` character suffixed to the base type to indicate optional input.
+Resolution between :term:`WPS` and :term:`CWL` for the merging strategy implies all corresponding parameter
+combinations and checks in this case.
+
+.. warning::
+    Ensure to specify ``"null"`` with quotes when working with :term:`JSON`, :term:`YAML` and :term:`CWL` file formats
+    and/or contents submitted to :term:`API` requests or with the :term:`CLI`. Using an unquoted ``null`` will result
+    into a parsed ``None`` value which will not be detected as *nullable* :term:`CWL` type.
 
 Because :term:`CWL` does not take an explicit amount of maximum occurrences, information in this case are not
 necessarily completely interchangeable. In fact, :term:`WPS` is slightly more verbose and easier to define in this case
 than :term:`CWL` because all details are contained within the same two parameters. Because of this, it is often
 preferable to provide the ``minOccurs`` and ``maxOccurs`` in the :term:`WPS` context, and let `Weaver` infer the
-``array`` and/or ``null`` type requirements automatically. Also, because of all implied parameters in this situation to
-specify the similar details, it is important to avoid providing contradicting specifications as `Weaver` will have
+``array`` and/or ``"null"`` type requirements automatically. Also, because of all implied parameters in this situation
+to specify the similar details, it is important to avoid providing contradicting specifications as `Weaver` will have
 trouble guessing the intended result when merging specifications. If unambiguous guess can be made, :term:`CWL` will be
 employed as deciding definition to resolve erroneous mismatches (as for any other corresponding fields).
 
-.. todo:: update warning according to Weaver issue #25
+.. todo:: update warning according to Weaver issue `#25 <https://github.com/crim-ca/weaver/issues/25>`_
 
 .. warning::
     Parameters ``minOccurs`` and ``maxOccurs`` are not permitted for outputs in the :term:`WPS` context. Native
@@ -588,11 +613,6 @@ of *multiple* and *optional* information.
     +---------------------------------------------------+-----------------------------------------------------------+
 
 
-.. todo:: minOccurs/maxOccurs + array + WPS repeats IDs vs CWL as list
-
-
-.. todo:: example multi-value + enum
-
 It can be noted from the examples that ``minOccurs`` and ``maxOccurs`` can be either an ``integer`` or a ``string``
 representing one. This is to support backward compatibility of older :term:`WPS` specification that always employed
 strings although representing numbers. `Weaver` understands and handles both cases. Also, ``maxOccurs`` can have the
@@ -601,10 +621,158 @@ entries (although often capped by another implicit machine-level limitation such
 :term:`CWL`, an ``array`` is always considered as *unbounded*, therefore :term:`WPS` is the only context that can limit
 this amount.
 
+Inputs/Outputs Schema
+-----------------------
+
+.. versionadded:: 4.16
+
+Alternatively to parameters presented in previous sections, and employed for representing
+:ref:`Multiple and Optional Values`, :ref:`Allowed Values` specifications, supported :ref:`File Format` definitions
+and/or :ref:`Inputs/Outputs Type` identification, the :term:`OpenAPI` specification can be employed to entirely
+define the :term:`I/O` schema. More specifically, this is accomplished by providing an :term:`OAS`-compliant structure
+under the ``schema`` field of each corresponding :term:`I/O`.
+
+For example, the bellow representations are equivalent between :term:`WPS`, :term:`OAS` and :term:`CWL` definitions.
+Obviously, corresponding definitions can become more or less complicated with multiple combinations of corresponding
+parameters presented later in this section. Some definitions are also not completely portable between contexts.
+
+.. table::
+    :class: code-table
+    :align: center
+    :widths: 33,34,33
+
+    +-------------------------------+------------------------------+-----------------------------+
+    | .. code-block:: json          | .. code-block:: json         | .. code-block:: json        |
+    |    :caption: WPS Input        |    :caption: OAS Input       |    :caption: CWL Input      |
+    |    :linenos:                  |    :linenos:                 |    :linenos:                |
+    |                               |                              |                             |
+    |    {                          |    {                         |    {                        |
+    |      "id": "input",           |      "id": "input",          |      "id": "input",         |
+    |      "literalDataDomains": [  |      "schema": {             |      "type": {              |
+    |        {                      |        "type": "array",      |        "type": "array",     |
+    |           "allowedValues": [  |        "items": {            |        "items": {           |
+    |             "value-1",        |          "type": "string",   |          "type": "enum",    |
+    |             "value-2"         |          "enum": [           |          "symbols": [       |
+    |           ]                   |            "value-1",        |            "value-1",       |
+    |        }                      |            "value-2"         |            "value-2"        |
+    |      ],                       |          ]                   |          ]                  |
+    |      "minOccurs": 2,          |        },                    |        }                    |
+    |      "maxOccurs": 4           |        "minItems": 2,        |      }                      |
+    |    }                          |        "maxItems": 4         |    }                        |
+    |                               |      }                       |                             |
+    |                               |    }                         |                             |
+    +-------------------------------+------------------------------+-----------------------------+
+
+.. seealso::
+    An example with extensive variations of supported :term:`I/O` definitions with :term:`OAS` is
+    available in |test-oas|_. This is also the corresponding example provided by :term:`OGC API - Processes`
+    standard to ensure `Weaver` complies to its specification.
+
+.. |test-oas| replace:: tests/functional/application-packages/EchoProcess/describe.yml
+.. _test-oas: https://github.com/crim-ca/weaver/tree/master/tests/functional/application-packages/EchoProcess/describe.yml
+
+As per all previous parameters in :term:`CWL` and :term:`WPS` contexts, details provided in :term:`OAS` schema are
+complementary and `Weaver` will attempt to infer, combine and convert between the various representations as best
+as possible according to the level of details provided.
+
+Furthermore, `Weaver` will *extend* (as needed) any provided ``schema`` during
+:ref:`Process Deployment <proc_op_deploy>` if it can identify that the specific :term:`OAS` definition is inconsistent
+with other parameters. For example, if ``minOccurs``/``maxOccurs`` are provided by indicating that the :term:`I/O` must
+have exactly between [2-4] elements, but only a single :term:`OAS` object is defined under ``schema``, it will be
+converted to the corresponding array, as single values are not permitted in this case. Similarly, if the range of
+items was instead [1-4], the :term:`OAS` definition would be adjusted with ``oneOf`` keyword, allowing both single
+value and array representation of those values when submitted for :ref:`Process Execution <proc_op_execute>`.
+
+Below is a summary of fields that are equivalent or considered to identify similar specifications
+(corresponding fields are aligned in the table).
+Note that all :term:`OAS` elements are always nested under the ``schema`` field, where appropriate as
+per :term:`OpenAPI` specification. Other :term:`OAS` fields are still valid, but not explicitly handled
+to search fo corresponding definitions in :term:`WPS` and :term:`CWL` contexts.
+
++-------------------------------------+---------------------------------------+-------------------------------------+
+| Parameters in :term:`WPS` Context   | Parameters in :term:`OAS` Context     | Parameters in :term:`CWL` Context   |
++=====================================+=======================================+=====================================+
+| ``minOccurs``/``maxOccurs`` |br|    | ``type``/``oneOf`` combination |br|   | ``type`` modifiers: |br|            |
+|                                     |                                       |                                     |
+| - ``minOccurs=0``                   | - single type unless ``minItems=0``   | - ``?``/``"null"`` if ``min*=0``    |
+| - ``maxOccurs>1`` or ``unbounded``  | - ``minItems``/``maxItems`` (array)   | - ``[]``/``array`` if ``max*>1``    |
++-------------------------------------+---------------------------------------+-------------------------------------+
+| ``formats`` |br|                    | ``oneOf`` (for each format) |br|      | ``format`` |br|                     |
+|                                     |                                       |                                     |
+| - ``mimeType``/``mediaType``        | - ``contentMediaType``                | - *namespaced* ``mediaType``        |
+| - ``encoding``                      | - ``contentEncoding``                 | - |na|                              |
+| - ``schema``                        | - ``contentSchema``                   | - full-URI ``format``/``$schema``   |
++-------------------------------------+---------------------------------------+-------------------------------------+
+| ``literalDataDomains``              | |br|                                  | |br|                                |
+|                                     |                                       |                                     |
+| - ``allowedValues`` (int/float/str) | - ``enum`` array of values            | - ``enum`` type with ``symbols``    |
+|                                     |   |br| |br| |br|                      |   |br| |br| |br|                    |
+| - ``allowedValues`` (range) |br|    |                                       |                                     |
+|     - ``minimumValue``              | - ``minimum`` value                   | - |na| |br|                         |
+|     - ``maximumValue``              | - ``maximum`` value                   | - |na| |br|                         |
+|     - ``spacing``                   | - ``multipleOf`` value                | - |na| |br|                         |
+|     - ``rangeClosure`` |br|         | - ``exclusiveMinimum``/               | - |na| |br|                         |
+|       (combination of open, closed, |   ``exclusiveMaximum`` |br| (set      |   |br| |br|                         |
+|       open-closed, closed-open)     |   ``true`` for corresponding "open")  |   |br| |br|                         |
+|                                     |   |br| |br| |br|                      |                                     |
+| - ``valueDefinition`` (name)        | - ``type``/``format`` combination     | - ``type`` (simplified as needed)   |
+| - ``default``                       | - ``default``                         | - ``default`` and ``?``/``"null"``  |
++-------------------------------------+---------------------------------------+-------------------------------------+
+
+Along those combinations, :term:`OAS` also accomplishes the auto-detection of common :term:`JSON` structures to convert
+between raw-data, :term:`JSON` object, and ``application/json`` file references toward the corresponding ``Complex``
+:term:`WPS` input or output. When a :term:`JSON` definition is detected, the corresponding equivalent representations
+will be added using ``oneOf`` if they were not already provided in ``schema``. When analyzing and combining those
+definitions, any :term:`OAS` ``$ref`` or ``contentSchema`` specifications will be used to resolve the corresponding
+``type: object`` with the most explicit ``schema`` definition available. External URIs pointing to an :term:`OAS`
+schema formatted either as :term:`JSON` or :term:`YAML` are resolved and fetched inline as needed during :term:`I/O`
+merging strategy to interpret specified references.
+
+Finally, special handling of well-known :term:`OAS` ``type: object`` structures is performed to convert them to more
+specific and appropriate :term:`WPS` types intended for their purpose. For instance, a *measurement* value provided
+along with an `Unit of Measure` (:term:`UoM`) is converted to a :term:`WPS` ``Literal``. An object containing ``bbox``
+and ``crs`` fields with the correct schema are converted to :term:`WPS` ``BoundingBox`` type. Except for these special
+cases, all other :term:`OAS` ``type: object`` are otherwise converted to :term:`WPS` ``Complex`` type, which in turn is
+communicated to the :term:`CWL` application using a ``File`` :term:`I/O`. Other non-:term:`JSON` definitions are also
+converted using the same :term:`WPS` ``Complex``/:term:`CWL` ``File``, but their values cannot be submitted with literal
+:term:`JSON` structures during :ref:`Process Execution <proc_op_execute>`, only using raw-data or a file reference.
 
 Metadata
 -----------------------
 
-.. todo:: (s:)keywords field, doc/label vs abstract/title per-I/O and overall process, etc?
+Metadata fields are transferred between :term:`WPS` (from :term:`Process` description) and :term:`CWL`
+(from :term:`Application Package`) when match is possible. Per :term:`I/O` definition that support certain
+metadata fields (notably descriptions), are also transferred.
 
-Example: `cwl-metadata`_
+.. note::
+    Because the ``schema`` (:term:`OAS`) definitions are embedded within :term:`WPS` I/O definitions, corresponding
+    metadata fields **ARE NOT** transferred. This choice is made in order to keep ``schema`` succinct such that they
+    only describe the structure of the expected data type and format, and to avoid too much metadata duplication for
+    each :term:`I/O` in the resulting :term:`Process` description.
+
+Below is a list of compatible elements.
+
++-----------------------------------------+----------------------------------------------------------+
+| Parameters in :term:`WPS` Context       | Parameters in :term:`CWL` Context                        |
++=========================================+==========================================================+
+| ``keywords``                            | ``s:keywords`` (expecting ``s`` in ``$namespace``        |
+|                                         | referring to http://schema.org [#schemaorg]_)            |
++-----------------------------------------+----------------------------------------------------------+
+| ``metadata``                            | ``$schemas``/``$namespace``                              |
+| (using ``title`` and ``href`` fields)   | (using namespace name and HTTP references)               |
++-----------------------------------------+----------------------------------------------------------+
+| ``title``                               | ``label``                                                |
++-----------------------------------------+----------------------------------------------------------+
+| ``abstract``/``description``            | ``doc``                                                  |
++-----------------------------------------+----------------------------------------------------------+
+
+.. rubric:: Footnotes
+
+.. [#schemaorg]
+    See example: https://www.commonwl.org/user_guide/17-metadata/index.html
+
+.. |br| raw:: html
+
+    <br>
+
+.. |na| replace:: *n/a*

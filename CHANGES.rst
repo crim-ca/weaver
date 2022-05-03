@@ -673,7 +673,7 @@ Changes:
   The principal change introduced in this case is that process description contents will be directly at the root
   of the object returned by ``/processes/{id}`` response instead of being nested under ``"process"`` field.
   Furthermore, ``inputs`` and ``outputs`` definitions are reported as mapping of ``{"<id>": {<parameters>}}`` as
-  specified by OGP-API instead of old listing format ``[{"id": "<id-value>", <key:val parameters>}]``. The old
+  specified by `OGC-API` instead of old listing format ``[{"id": "<id-value>", <key:val parameters>}]``. The old
   nested and listing format can still be obtained using request query parameter ``schema=OLD``, and will otherwise use
   `OGC-API` by default or when ``schema=OGC``. Note that some duplicated metadata fields are dropped regardless of
   selected format in favor of `OGC-API` names. Some examples are ``abstract`` that becomes ``description``,

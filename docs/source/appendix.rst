@@ -110,22 +110,27 @@ Glossary
           such as ``&`` or ``;`` to distinguish between distinct pairs. Specific separators, and any applicable
           escaping methods, depend on context, such as in URL query, HTTP header, :term:`CLI` parameter, etc.
 
+    Media-Types
     MIME-types
         | Multipurpose Internet Mail Extensions
         | Format representation of the referenced element, often represented by :term:`IANA` or :term:`EDAM` ontologies.
+          More recent `Media-Type` naming is employed for the general use of ``Content-Type`` data representation in
+          multiple situations and contexts.
+
+    OAS
+    OpenAPI
+        OpenAPI Specification (`OAS`) defines a standard, programming language-agnostic interface description for
+        HTTP APIs. It is used in `Weaver` and :term:`OGC API - Processes` to represent API definitions for requests
+        and responses, as well as :term:`I/O` definitions for :term:`Process` description.
+
+        .. seealso::
+            https://spec.openapis.org/oas/v3.1.0
 
     OGC
         |ogc|_
 
     OGC API - Processes
         The new API that defines JSON REST-binding representation of :term:`WPS` :term:`Process` collection.
-
-    OpenAPI
-        OpenAPI Specification (`OAS`) defines a standard, programming language-agnostic interface description for
-        HTTP APIs.
-
-        .. seealso::
-            https://spec.openapis.org/oas/v3.1.0
 
     OpenSearch
         Protocol of lookup and retrieval of remotely stored files.
@@ -148,9 +153,16 @@ Glossary
         Simple Storage Service (:term:`AWS` S3), bucket file storage.
 
     TOI
-        | Time of Interest.
+        | Time of Interest
         | Corresponds to a date/time interval employed for :term:`OpenSearch` queries in the context
           of :term:`EOImage` inputs.
+
+    UoM
+        | Unit of Measure
+        | Represents a measurement defined as literal value associated with a specific unit that could take advantage
+          of known conversion methods with other compatible units to obtain the equivalent value. These values are
+          transferred to the :term:`Process` as specified, and it is up to the underlying :term:`Application Package`
+          definition to interpret it as deemed fit.
 
     Vault
         Secured storage employed to upload files that should be temporarily stored on the `Weaver` server for
