@@ -2822,7 +2822,10 @@ class WpsPackageAppWithS3BucketTest(WpsConfigBase):
             assert not os.path.exists(os.path.join(wps_outdir, wps_uuid, out_file))
         assert os.path.isfile(os.path.join(wps_outdir, f"{job_id}.xml"))
 
+    # FIXME: implement
+    @pytest.mark.skip(reason="OAS execute parse/validate values not implemented")
     def test_execute_job_with_oas_validation(self):
         """
         Process with :term:`OpenAPI` I/O definitions validates the schema of the submitted :term:`JSON` data.
         """
+        raise NotImplementedError
