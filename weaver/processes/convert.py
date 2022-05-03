@@ -1400,26 +1400,27 @@ def json2oas_io_complex(io_info, io_hint=null):
                     json_schema_any = False
                     item_types[-1]["contentSchema"] = fmt_schema
                     json_schema_refs.add(fmt_schema)
+        json_objects = []
         if json_schema_any:
-            # if no hint, best we can do is 'any JSON' since cannot guess applicable schema not provided by user
+            # if no ref schema, best we can do is 'any JSON' since cannot guess applicable schema not provided by user
             json_objects = [{"type": "object", "additionalProperties": True}]
-            # if we have a hint of the raw-data schema originally submitted during deploy, use it
-            if isinstance(io_hint, dict):
-                # consider that submitted schema could already have contained by-reference 'content[...]' items
-                # remove them in this case since they should have already been processed during first conversion/merge
-                io_hint = oas_resolve_remote(io_hint)
-                json_objects = []
-                if "oneOf" in io_hint or "anyOf" in io_hint:
-                    for item in io_hint.get("oneOf", io_hint.get("anyOf", [])):
-                        if item.get("type") == "object":
-                            json_objects.append(item)
-                elif "allOf" in io_hint:
-                    json_objects = [io_hint]
-                elif io_hint.get("type") == "object":
-                    json_objects = [io_hint]
-            item_types.extend(json_objects)
         elif json_schema_refs:
-            item_types.extend([{"$ref": ref} for ref in json_schema_refs])
+            json_objects = [{"$ref": ref} for ref in json_schema_refs]
+        # if we have a hint of the raw-data schema originally submitted during deploy, use it instead
+        if isinstance(io_hint, dict):
+            # consider that submitted schema could already have contained 'content[...]' definitions
+            # remove them in this case since they should have already been processed during first conversion/merge
+            io_hint = oas_resolve_remote(io_hint)
+            json_objects = []
+            if "oneOf" in io_hint or "anyOf" in io_hint:
+                for item in io_hint.get("oneOf", io_hint.get("anyOf", [])):
+                    if item.get("type") == "object" or "allOf" in item:
+                        json_objects.append(item)
+            elif "allOf" in io_hint:
+                json_objects = [io_hint]
+            elif io_hint.get("type") == "object":
+                json_objects = [io_hint]
+        item_types.extend(json_objects)
     else:
         # complex by reference or encoded data
         item_types = [{"type": "string", "format": "binary"}]
@@ -1493,7 +1494,7 @@ def json2oas_io_literal_data_type(io_type):
             data_info["format"] = "date-time"
         elif "date" in io_type.lower():
             data_info["format"] = "date"
-        else:
+        elif io_type != "string":
             data_info["format"] = io_type
     if io_type in OAS_LITERAL_BINARY_FORMATS:
         data_info["type"] = "string"
@@ -1927,7 +1928,15 @@ def oas2json_io(io_info):
             io_json = oas2json_io_array(io_info)
     elif any(key in OAS_KEYWORD_TYPES for key in io_info):
         io_json = oas2json_io_keyword(io_info)
-        io_type = "keyword"
+        # in case this keyword was a large combination of multiple complex JSON variants with a reference schema
+        # forward the reference in the supported type since this is a special case that we extend with contentSchema
+        io_type = get_field(io_json, "type", default="keyword")  # ensure not null value to skip return null
+        if io_type == WPS_COMPLEX:
+            io_formats = get_field(io_json, "supported_formats", default=[])
+            if "$id" in io_info and len(io_formats) == 1:
+                io_ctype = get_field(io_formats[0], "mime_type", search_variations=True)
+                if io_ctype and ContentType.APP_JSON in io_ctype:
+                    io_formats[0]["schema"] = io_info["$id"]
     if io_type is null or io_json is null:
         LOGGER.debug("Unknown OpenAPI to JSON I/O resolution for schema: %s", repr_json(io_info))
         return null
@@ -2233,29 +2242,44 @@ def json2wps_io(io_info, io_select):
             io_info.pop("literalDataDomains", None)
             return LiteralInput(**io_info)
     elif io_select == WPS_OUTPUT:
-        io_info.pop("min_occurs", None)
-        io_info.pop("max_occurs", None)
-        io_info.pop("allowed_values", None)
-        io_info.pop("default", None)
+        # following not allowed for PyWPS instance creation
+        # but they are useful for other steps, so forward them afterward
+        io_min = io_info.pop("min_occurs", null)
+        io_max = io_info.pop("max_occurs", null)
+        io_allow = io_info.pop("allowed_values", null)
+        io_default = io_info.pop("default", null)
+        io_wps = null
         if io_type in WPS_COMPLEX_TYPES:
             io_info.pop("supported_values", None)
-            return ComplexOutput(**io_info)
-        if io_type == WPS_BOUNDINGBOX:
+            io_wps = ComplexOutput(**io_info)
+        elif io_type == WPS_BOUNDINGBOX:
             io_info.pop("supported_formats", None)
             io_info["crss"] = get_field(io_info, "supported_crs", search_variations=True, pop_found=True, default=None)
-            return BoundingBoxOutput(**io_info)
-        if io_type == WPS_LITERAL:
+            io_wps = BoundingBoxOutput(**io_info)
+        elif io_type == WPS_LITERAL:
             io_info.pop("supported_formats", None)
             io_info["data_type"] = json2wps_datatype(io_info)
             io_info.pop("literalDataDomains", None)
-            return LiteralOutput(**io_info)
+            io_wps = LiteralOutput(**io_info)
+            set_field(io_wps, "allowed_values", io_allow)
+        if io_wps:
+            set_field(io_wps, "min_occurs", io_min)
+            set_field(io_wps, "max_occurs", io_max)
+            set_field(io_wps, "default", io_default)
+            return io_wps
     raise PackageTypeError(f"Unknown conversion from dict to WPS type (type={io_type}, mode={io_select}).")
 
 
-def wps2json_io(io_wps):
-    # type: (WPS_IO_Type) -> JSON_IO_Type
+def wps2json_io(io_wps, forced_fields=False):
+    # type: (WPS_IO_Type, bool) -> JSON_IO_Type
     """
-    Converts a PyWPS I/O into a dictionary based version with keys corresponding to standard names (WPS 2.0).
+    Converts a :mod:`pywps` I/O into a :term:`JSON` dictionary with corresponding standard keys names (:term:`WPS` 2.0).
+
+    :param io_wps: Any :mod:`pywps` I/O definition to be converted to :term:`JSON` representation.
+    :param forced_fields:
+        Request transfer of additional fields normally undefined for outputs if they are available by being forcefully
+        inserted in the objects after their creation (i.e.: using :func:`set_field`). These fields can be useful for
+        obtaining mandatory details for further processing operations (e.g.: :term:`OpenAPI` schema conversion).
     """
 
     if not isinstance(io_wps, BasicIO):
@@ -2263,7 +2287,17 @@ def wps2json_io(io_wps):
     if not hasattr(io_wps, "json"):
         raise PackageTypeError("Invalid type definition expected to have a 'json' property.")
 
-    io_wps_json = io_wps.json   # noqa
+    io_wps_json = io_wps.json
+
+    # transfer additional fields normally undefined for outputs if available in original object (forcefully added)
+    # when they are requested for further processing operations (eg: later OAS conversion)
+    if forced_fields:
+        for field in ["min_occurs", "max_occurs"]:
+            if field not in io_wps_json:
+                io_field = get_field(io_wps, field, search_variations=True)
+                if io_field is not null:
+                    io_wps_json[field] = io_field
+        io_type = get_field(io_wps_json, "type", search_variations=False)
 
     rename = {
         "identifier": "id",
@@ -2314,9 +2348,16 @@ def wps2json_io(io_wps):
 
     else:  # literal
         # retrieve the default definition with original value type (default 'data' is string encoded with it)
-        io_wps_default = get_field(io_wps, "_default")
+        io_wps_default = get_field(io_wps, "default", search_variations=True)
         if io_wps_default not in [null, None]:
             io_wps_json["default"] = io_wps_default
+        if "allowed_values" not in io_wps_json:
+            io_field = get_field(io_wps, "allowed_values", search_variations=False)
+            if io_field is not null:
+                io_wps_json["allowed_values"] = [
+                    io_allow.json if not isinstance(io_allow, dict) else io_allow
+                    for io_allow in io_field
+                ]
         domains = any2json_literal_data_domains(io_wps_json)
         if domains:
             io_wps_json["literalDataDomains"] = domains
@@ -2714,7 +2755,7 @@ def merge_package_io(wps_io_list, cwl_io_list, io_select):
         #   receive it during execution either as raw data or file reference. This provides a more precise schema
         #   to what would actually be accepted/produced as input/output for the process.
         # Otherwise, generate one that best represents available details using only available WPS/CWL fields.
-        json_io = wps2json_io(wps_io)
+        json_io = wps2json_io(wps_io, forced_fields=True)
         oas_io = json2oas_io(json_io, wps_io_schema)
         json_io["schema"] = oas_io
         updated_io_list.append(json_io)

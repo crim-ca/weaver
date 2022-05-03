@@ -202,7 +202,7 @@ outputs:
   geometryOutput:
     schema:
       oneOf:
-        - contentMediaType: application/gml+xml
+        - contentMediaType: application/gml+xml; version=3.2
           contentSchema: http://schemas.opengis.net/gml/3.2.1/geometryBasic2d.xsd
           type: string
         - allOf:

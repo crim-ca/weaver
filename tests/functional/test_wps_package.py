@@ -167,6 +167,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication",
             "executionUnit": [{"unit": cwl}],
         }
+        ogc_api_ref = "https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/d52579"
 
         desc, _ = self.deploy_process(body, process_id=self._testMethodName, describe_schema=ProcessSchema.OGC)
         assert "inputs" in desc and isinstance(desc["inputs"], dict) and len(desc["inputs"]) == len(ref["inputs"])
@@ -205,7 +206,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             # merged:
             "format": "ogc-bbox",
             # added:
-            "$id": "https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/d52579/core/openapi/schemas/bbox.yaml"
+            "$id": f"{ogc_api_ref}/core/openapi/schemas/bbox.yaml"
         }
         assert desc["inputs"]["complexObjectInput"]["schema"] == {
             "oneOf": [
@@ -236,11 +237,10 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             "contentSchema": "https://geojson.org/schema/FeatureCollection.json",
         }
         # extended and simplified from allOf/$ref
-        # FIXME: format "geojson-feature-collection" dropped, but unnecessary for validation
-        # assert desc["inputs"]["featureCollectionInput"]["schema"]["oneOf"][2]["format"] == (
-        #   "geojson-feature-collection"
-        # )
-        assert desc["inputs"]["featureCollectionInput"]["schema"]["oneOf"][3]["$ref"] == (
+        assert desc["inputs"]["featureCollectionInput"]["schema"]["oneOf"][3]["allOf"][0]["format"] == (
+            "geojson-feature-collection"
+        )
+        assert desc["inputs"]["featureCollectionInput"]["schema"]["oneOf"][3]["allOf"][1]["$ref"] == (
             "https://geojson.org/schema/FeatureCollection.json"
         )
         # check that actual full definition of $ref is not included (big JSON)
@@ -256,7 +256,8 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                 # extended from allOf/$ref
                 {
                     "type": "string",
-                    "format": "geojson-geometry",
+                    # FIXME: format not forwarded, but not really needed since specific contentSchema is provided
+                    # "format": "geojson-geometry",
                     "contentMediaType": "application/json",
                     "contentSchema": (
                         "http://schemas.opengis.net/ogcapi/features/part1/1.0/openapi/schemas/geometryGeoJSON.yaml"
@@ -268,7 +269,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             "minItems": ref["inputs"]["geometryInput"]["minOccurs"],
             "maxItems": ref["inputs"]["geometryInput"]["maxOccurs"],
         }
-        assert desc["inputs"]["imageInput"]["schema"] == {
+        assert desc["inputs"]["imagesInput"]["schema"] == {
             "oneOf": [
                 # same as original (except added 'format' for consistency)
                 {
@@ -283,21 +284,140 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                     "type": "array",
                     "minItems": 1,
                     "maxItems": 150,
-                    "items": [
-                        {
-                            "type": "string", "format": "binary",
-                            "contentEncoding": "binary", "contentMediaType": "image/tiff; application=geotiff"
-                        },
-                        {
-                            "type": "string", "format": "binary",
-                            "contentEncoding": "binary", "contentMediaType": "image/jp2"
-                        },
-                    ]
+                    "items": {
+                        # equivalent to above single-value oneOf
+                        "oneOf": [
+                            {
+                                "type": "string", "format": "binary",
+                                "contentEncoding": "binary", "contentMediaType": "image/tiff; application=geotiff"
+                            },
+                            {
+                                "type": "string", "format": "binary",
+                                "contentEncoding": "binary", "contentMediaType": "image/jp2"
+                            },
+                        ]
+                    }
                 }
             ]
         }
-        assert desc["inputs"]["measureInput"]["schema"] == ref["inputs"]["measureInput"]["schema"]  # no change
+        # FIXME: support measure I/O (https://github.com/crim-ca/weaver/issues/430)
+        #        parsing works to detect numeric type, but reverse operation WPS->OAS not obvious
+        #        since no real indication/distinction between a literal data and one with uom
+        # assert desc["inputs"]["measureInput"]["schema"] == ref["inputs"]["measureInput"]["schema"]  # no change
         assert desc["inputs"]["stringInput"]["schema"] == ref["inputs"]["stringInput"]["schema"]  # no change
+
+        # NOTE:
+        #   although conversion is possible, min/max occurs not allowed in outputs WPS representation
+        #   because of this, they will also be omitted in the OpenAPI schema definition following merge
+        #   *everything else* should be identical to inputs
+        assert desc["outputs"]["arrayOutput"]["schema"] == ref["outputs"]["arrayOutput"]["schema"]  # no change
+        assert desc["outputs"]["boundingBoxOutput"]["schema"] == {
+            # what is referenced by $ref, converted to $id after retrieval
+            "type": "object",
+            "properties": {
+                "crs": {
+                    "type": "string",
+                    "format": "uri",
+                    "default": "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+                    "enum": [
+                        "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+                        "http://www.opengis.net/def/crs/OGC/0/CRS84h",
+                    ]
+                },
+                "bbox": {
+                    "type": "array",
+                    "items": "number",
+                    "oneOf": [
+                        {"minItems": 4, "maxItems": 4},
+                        {"minItems": 6, "maxItems": 6},
+                    ]
+                }
+            },
+            "required": ["bbox"],
+            # merged:
+            "format": "ogc-bbox",
+            # added:
+            "$id": f"{ogc_api_ref}/core/openapi/schemas/bbox.yaml"
+        }
+        assert desc["outputs"]["complexObjectOutput"]["schema"] == {
+            "oneOf": [
+                # extended raw-data
+                {"type": "string", "contentMediaType": "application/json"},
+                # original definition
+                ref["outputs"]["complexObjectOutput"]["schema"]
+            ]
+        }
+        assert desc["outputs"]["dateOutput"]["schema"] == ref["outputs"]["dateOutput"]["schema"]  # no change
+        assert desc["outputs"]["doubleOutput"]["schema"] == ref["outputs"]["doubleOutput"]["schema"]  # no change
+        assert desc["outputs"]["featureCollectionOutput"]["schema"]["oneOf"][:2] == [
+            # same as reference
+            {
+                "type": "string",
+                "contentMediaType": "application/gml+xml; version=3.2"
+            },
+            {
+                "type": "string",
+                "contentMediaType": "application/vnd.google-earth.kml+xml",
+                "contentSchema": "https://schemas.opengis.net/kml/2.3/ogckml23.xsd"
+            },
+        ]
+        # extended contentMediaType using the provided JSON object $ref
+        assert desc["outputs"]["featureCollectionOutput"]["schema"]["oneOf"][2] == {
+            "type": "string",
+            "contentMediaType": "application/json",
+            "contentSchema": "https://geojson.org/schema/FeatureCollection.json",
+        }
+        # extended and simplified from allOf/$ref
+        assert desc["outputs"]["featureCollectionOutput"]["schema"]["oneOf"][3]["allOf"][0]["format"] == (
+            "geojson-feature-collection"
+        )
+        assert desc["outputs"]["featureCollectionOutput"]["schema"]["oneOf"][3]["allOf"][1]["$ref"] == (
+            "https://geojson.org/schema/FeatureCollection.json"
+        )
+        # check that actual full definition of $ref is not included (big JSON)
+        assert all(
+            field not in desc["outputs"]["featureCollectionOutput"]["schema"]["oneOf"][3]
+            for field in ["type", "properties"]
+        )
+        # contrary to 'geometryInput', there is no min/max occurs since not available for outputs
+        # because they are missing, there is no auto-expansion of 'oneOf' into *only* array items
+        assert desc["outputs"]["geometryOutput"]["schema"] == {
+            "oneOf": [
+                ref["outputs"]["geometryOutput"]["schema"]["oneOf"][0],
+                # extended from allOf/$ref
+                {
+                    "type": "string",
+                    # FIXME: format not forwarded, but not really needed since specific contentSchema is provided
+                    # "format": "geojson-geometry",
+                    "contentMediaType": "application/json",
+                    "contentSchema": (
+                        "http://schemas.opengis.net/ogcapi/features/part1/1.0/openapi/schemas/geometryGeoJSON.yaml"
+                    )
+                },
+                # same as original allOf/$ref
+                ref["outputs"]["geometryOutput"]["schema"]["oneOf"][1],
+            ],
+        }
+        # contrary to 'imagesInput', there is no min/max occurs since not available for outputs
+        # because they are missing, there is no auto-expansion of 'oneOf' into single + array items combinations
+        # only single dimension are preserved
+        assert desc["outputs"]["imagesOutput"]["schema"] == {
+            "oneOf": [
+                # same as original (except added 'format' for consistency)
+                {
+                    "type": "string", "format": "binary",
+                    "contentEncoding": "binary", "contentMediaType": "image/tiff; application=geotiff"},
+                {
+                    "type": "string", "format": "binary",
+                    "contentEncoding": "binary", "contentMediaType": "image/jp2"
+                }
+            ]
+        }
+        # FIXME: support measure I/O (https://github.com/crim-ca/weaver/issues/430)
+        #        parsing works to detect numeric type, but reverse operation WPS->OAS not obvious
+        #        since no real indication/distinction between a literal data and one with uom
+        # assert desc["outputs"]["measureOutput"]["schema"] == ref["outputs"]["measureOutput"]["schema"]  # no change
+        assert desc["outputs"]["stringOutput"]["schema"] == ref["outputs"]["stringOutput"]["schema"]  # no change
 
         # check detection of array min/max items => min/max occurs
         assert "minOccurs" in desc["inputs"]["arrayInput"]
@@ -306,13 +426,6 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         assert "maxOccurs" in desc["inputs"]["arrayInput"]
         assert isinstance(desc["inputs"]["arrayInput"]["schema"]["maxItems"], int)
         assert desc["inputs"]["arrayInput"]["maxOccurs"] == desc["inputs"]["arrayInput"]["schema"]["maxItems"]
-        # although conversion is possible, min/max occurs not allowed in outputs, so omitted regardless
-        assert "minOccurs" not in desc["outputs"]["arrayOutput"]
-        assert "maxOccurs" not in desc["outputs"]["arrayOutput"]
-        assert "minItems" in desc["outputs"]["arrayInput"]["schema"]
-        assert isinstance(desc["outputs"]["arrayInput"]["schema"]["minItems"], int)
-        assert "maxItems" in desc["outputs"]["arrayInput"]["schema"]
-        assert isinstance(desc["outputs"]["arrayInput"]["schema"]["maxItems"], int)
 
         # contentMediaType => supported formats
         assert desc["inputs"]["complexObjectInput"]["formats"] == [
