@@ -981,13 +981,18 @@ def cwl2wps_io(io_info, io_select):
         # - format as schema is useful for WPS BoundingBox JSON/YAML structure
         if "format" in io_info:
             io_fmt = io_info["format"]
-            io_format = get_format(io_fmt)
-            # namespaced format not resolved, full path to schema should have lots of '/' (including protocol separator)
-            if io_format and len(io_format.mime_type.split("/")) > 2:
-                io_ext = os.path.splitext(io_format.mime_type)[-1]
-                io_typ = get_content_type(io_ext)
-                io_format = Format(io_typ, extension=io_ext, schema=io_format.mime_type)
-            kw["supported_formats"] = [io_format]
+            io_formats = [io_fmt] if isinstance(io_fmt, str) else io_fmt
+            io_formats = [get_format(fmt) for fmt in io_formats]
+            for i, io_format in enumerate(list(io_formats)):
+                # when CWL namespaced format are not resolved, full path URI to schema is expected
+                # because of full URI, should have lots of '/' (including protocol separator),
+                # use this to detect content schema reference vs content media-type reference
+                if io_format and len(io_format.mime_type.split("/")) > 2:
+                    io_ext = os.path.splitext(io_format.mime_type)[-1]
+                    io_typ = get_content_type(io_ext)
+                    io_format = Format(io_typ, extension=io_ext, schema=io_format.mime_type)
+                    io_formats[i] = io_format
+            kw["supported_formats"] = io_formats
             kw["mode"] = MODE.SIMPLE  # only validate the extension (not file contents)
         else:
             # we need to minimally add 1 format, otherwise empty list is evaluated as None by pywps
