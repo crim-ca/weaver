@@ -154,7 +154,7 @@ jobs:
       - name: Run Tests
         run: make stop ${{ matrix.test-case }}
       - name: Upload coverage report
-        uses: codecov/codecov-action@v1
+        uses: codecov/codecov-action@v2
         if: ${{ success() && matrix.test-case == 'test-coverage-only' }}
         with:
           files: ./reports/coverage.xml
