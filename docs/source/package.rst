@@ -621,18 +621,28 @@ entries (although often capped by another implicit machine-level limitation such
 :term:`CWL`, an ``array`` is always considered as *unbounded*, therefore :term:`WPS` is the only context that can limit
 this amount.
 
+.. _oas_io_schema:
+
 Inputs/Outputs Schema
 -----------------------
 
 .. versionadded:: 4.16
 
+.. _oas_basic_definitions:
+
+Basic Definitions
+~~~~~~~~~~~~~~~~~~~~~~
+
 Alternatively to parameters presented in previous sections, and employed for representing
 :ref:`Multiple and Optional Values`, :ref:`Allowed Values` specifications, supported :ref:`File Format` definitions
 and/or :ref:`Inputs/Outputs Type` identification, the :term:`OpenAPI` specification can be employed to entirely
 define the :term:`I/O` schema. More specifically, this is accomplished by providing an :term:`OAS`-compliant structure
-under the ``schema`` field of each corresponding :term:`I/O`.
+under the ``schema`` field of each corresponding :term:`I/O`. This capability allows each :term:`Process` to be
+compliant with :term:`OGC API - Processes` specification that requires this detail in
+the :ref:`Process Description <proc_op_describe>`. The same kind of ``schema`` definitions can be used
+for the :ref:`Deploy <proc_op_deploy>` operation.
 
-For example, the bellow representations are equivalent between :term:`WPS`, :term:`OAS` and :term:`CWL` definitions.
+For example, the below representations are equivalent between :term:`WPS`, :term:`OAS` and :term:`CWL` definitions.
 Obviously, corresponding definitions can become more or less complicated with multiple combinations of corresponding
 parameters presented later in this section. Some definitions are also not completely portable between contexts.
 
@@ -677,17 +687,17 @@ as possible according to the level of details provided.
 
 Furthermore, `Weaver` will *extend* (as needed) any provided ``schema`` during
 :ref:`Process Deployment <proc_op_deploy>` if it can identify that the specific :term:`OAS` definition is inconsistent
-with other parameters. For example, if ``minOccurs``/``maxOccurs`` are provided by indicating that the :term:`I/O` must
-have exactly between [2-4] elements, but only a single :term:`OAS` object is defined under ``schema``, it will be
-converted to the corresponding array, as single values are not permitted in this case. Similarly, if the range of
-items was instead [1-4], the :term:`OAS` definition would be adjusted with ``oneOf`` keyword, allowing both single
-value and array representation of those values when submitted for :ref:`Process Execution <proc_op_execute>`.
+with other parameters. For example, if ``minOccurs``/``maxOccurs`` were provided by indicating that the :term:`I/O` must
+have exactly between [2-4] elements, but only a single :term:`OAS` object was defined under ``schema``, that :term:`OAS`
+definition would be converted to the corresponding array, as single values are not permitted in this case. Similarly, if
+the range of items was instead [1-4], the :term:`OAS` definition would be adjusted with ``oneOf`` keyword, allowing both
+single value and array representation of those values, when submitted for :ref:`Process Execution <proc_op_execute>`.
 
 Below is a summary of fields that are equivalent or considered to identify similar specifications
 (corresponding fields are aligned in the table).
-Note that all :term:`OAS` elements are always nested under the ``schema`` field, where appropriate as
-per :term:`OpenAPI` specification. Other :term:`OAS` fields are still valid, but not explicitly handled
-to search fo corresponding definitions in :term:`WPS` and :term:`CWL` contexts.
+Note that all :term:`OAS` elements are always nested under the ``schema`` field of an :term:`I/O`, with parameters
+located where appropriate as per :term:`OpenAPI` specification. Other :term:`OAS` fields are still permitted, but
+are not explicitly handled to search for corresponding definitions in :term:`WPS` and :term:`CWL` contexts.
 
 +-------------------------------------+---------------------------------------+-------------------------------------+
 | Parameters in :term:`WPS` Context   | Parameters in :term:`OAS` Context     | Parameters in :term:`CWL` Context   |
@@ -719,23 +729,132 @@ to search fo corresponding definitions in :term:`WPS` and :term:`CWL` contexts.
 | - ``default``                       | - ``default``                         | - ``default`` and ``?``/``"null"``  |
 +-------------------------------------+---------------------------------------+-------------------------------------+
 
-Along those combinations, :term:`OAS` also accomplishes the auto-detection of common :term:`JSON` structures to convert
-between raw-data, :term:`JSON` object, and ``application/json`` file references toward the corresponding ``Complex``
-:term:`WPS` input or output. When a :term:`JSON` definition is detected, the corresponding equivalent representations
-will be added using ``oneOf`` if they were not already provided in ``schema``. When analyzing and combining those
-definitions, any :term:`OAS` ``$ref`` or ``contentSchema`` specifications will be used to resolve the corresponding
-``type: object`` with the most explicit ``schema`` definition available. External URIs pointing to an :term:`OAS`
-schema formatted either as :term:`JSON` or :term:`YAML` are resolved and fetched inline as needed during :term:`I/O`
-merging strategy to interpret specified references.
+In order to be :term:`OGC`-compliant, any previously deployed :term:`Process` will automatically generate any missing
+``schema`` specification for all :term:`I/O` it employs when calling its :ref:`Process Description <proc_op_describe>`.
+Similarly, a deployed :term:`Process` that did not make use of the ``schema`` representation method to define its
+:term:`I/O` will also generate the corresponding :term:`OAS` definitions from other :term:`WPS` and :term:`CWL`
+contexts, provided those definitions offered sufficiently descriptive and valid :term:`I/O` parameters for deployment.
 
-Finally, special handling of well-known :term:`OAS` ``type: object`` structures is performed to convert them to more
+.. _oas_json_types:
+
+JSON Types
+~~~~~~~~~~~~~~~~~~~
+
+Along above parameter combinations, :term:`OAS` context also accomplishes the auto-detection of common :term:`JSON`
+structures to convert between raw-data string formatted as :term:`JSON`, literal :term:`JSON` object embedded in the
+body, and ``application/json`` file references toward the corresponding ``Complex`` :term:`WPS` input or output.
+When any of those three :term:`JSON` definition is detected, other equivalent representations will be added using
+a ``oneOf`` keyword if they were not already explicitly provided in ``schema``. When analyzing and combining those
+definitions, any :term:`OAS` ``$ref`` or ``contentSchema`` specifications will be used to resolve the corresponding
+``type: object`` with the most explicit ``schema`` definition available. If this cannot be achieved, a generic
+``object`` allowing any ``additionalProperties`` (i.e.: no :term:`JSON` schema variation) will be used instead.
+External URIs pointing to an :term:`OAS` schema formatted either as :term:`JSON` or :term:`YAML` are resolved and
+fetched inline as needed during :term:`I/O` merging strategy to interpret specified references.
+
+Following is a sample representation of equivalent variants :term:`JSON` definitions, which would be
+automatically expended using the ``oneOf`` structure with other missing components if applicable.
+
+.. table::
+    :class: code-table
+    :align: center
+    :widths: 50,50
+
+    +-----------------------------------------------------------+---------------------------------------------------+
+    | .. code-block:: json                                      | .. code-block:: json                              |
+    |   :caption: JSON Complex Input with schema reference      |   :caption: Generic JSON Complex Input            |
+    |                                                           |                                                   |
+    |    {                                                      |    {                                              |
+    |      "id:" "input",                                       |      "id:" "input",                               |
+    |      "schema": {                                          |      "schema": {                                  |
+    |        "oneOf": [                                         |        "oneOf": [                                 |
+    |          {                                                |          {                                        |
+    |            "type": "string",                              |            "type": "string",                      |
+    |            "contentMediaType": "application/json"         |            "contentMediaType": "application/json" |
+    |            "contentSchema": "http://host.com/schema.json" |          },                                       |
+    |          },                                               |          {                                        |
+    |          {                                                |            "type": "object",                      |
+    |            "$ref": "http://host.com/schema.json"          |            "additionalProperties": true           |
+    |          }                                                |          }                                        |
+    |        ]                                                  |        ]                                          |
+    |      }                                                    |      }                                            |
+    |    }                                                      |    }                                              |
+    +-----------------------------------------------------------+---------------------------------------------------+
+
+
+Special handling of well-known :term:`OAS` ``type: object`` structures is also performed to convert them to more
 specific and appropriate :term:`WPS` types intended for their purpose. For instance, a *measurement* value provided
 along with an `Unit of Measure` (:term:`UoM`) is converted to a :term:`WPS` ``Literal``. An object containing ``bbox``
 and ``crs`` fields with the correct schema are converted to :term:`WPS` ``BoundingBox`` type. Except for these special
 cases, all other :term:`OAS` ``type: object`` are otherwise converted to :term:`WPS` ``Complex`` type, which in turn is
 communicated to the :term:`CWL` application using a ``File`` :term:`I/O`. Other non-:term:`JSON` definitions are also
 converted using the same :term:`WPS` ``Complex``/:term:`CWL` ``File``, but their values cannot be submitted with literal
-:term:`JSON` structures during :ref:`Process Execution <proc_op_execute>`, only using raw-data or a file reference.
+:term:`JSON` structures during :ref:`Process Execution <proc_op_execute>`, only using raw-data (i.e: encoding string)
+or a file reference.
+
+.. seealso::
+    File |test-oas|_ provides example :term:`I/O` definitions for mentioned special :term:`OAS` interpretations
+    and more advanced :term:`JSON` schemas with nested :term:`OAS` keywords.
+
+.. _oas_file_references:
+
+File References
+~~~~~~~~~~~~~~~~~~~
+
+It is important to consider that all :term:`OAS` ``schema`` that can be provided during a :ref:`Deploy <proc_op_deploy>`
+request or retrieved from a :ref:`Process Description <proc_op_describe>` only define the *expected value*
+representations of the :term:`I/O` data to be submitted for :ref:`Execution <proc_op_execute>` request.
+In other words, an :term:`I/O` typed as ``Complex`` that can be submitted using any of the supported
+:ref:`file_reference_types` to be forwarded to :term:`CWL` **SHOULD NOT** add any URI-related definition in ``schema``.
+It is implicit for every :term:`Process` that an :term:`I/O` of given supported :term:`Media-Types` can be submitted by
+reference using a link pointing to contents of such types. This implicit file reference interpretation serves multiple
+purposes.
+
+1. Using only *expected value* definition and leaving out the by-reference equivalent greatly simplifies the ``schema``
+   definitions since every single ``Complex`` :term:`I/O` does not need to provide a very verbose ``schema``
+   containing a ``oneOf(file-ref,raw-data)`` representation to indicate that data can be submitted both by value or
+   by reference.
+
+2. Using a generic ``{"type": "string", "format": "uri"}`` :term:`OAS` schema does not convey the :term:`Media-Types`
+   requirements as well as inferring them "link-to" ``{"type": "string", "contentMediaType: <format>}``. It is therefore
+   better to omit them entirely as they do not add any :term:`I/O` descriptive value.
+
+3. Because the above string-formatted ``uri`` are left out from definitions, it can instead be used explicitly in an
+   :term:`I/O` specification to indicate to `Weaver` that the :term:`Process` uses a ``Literal`` URI string, that must
+   not be fetched by `Weaver`, and must be passed down as plain string URI directly without modification or
+   interpretation to the underlying :term:`CWL` :term:`Application Package`.
+
+To summarize, strings with ``format: uri`` will **NOT** be considered as ``Complex`` :temr:`I/O` by `Weaver`. They will
+be seen as any other string ``Literal``, but this allows a :term:`Process` describing its :term:`I/O` as an external URI
+reference. This can be useful for an application that handles itself the retrieval of the resource referred to by this
+URI. To represent supported formats of ``Complex`` file references, the ``schema`` should be represented using the
+following structures. If the ``contentMediaType`` happens to be :term:`JSON`, then the explicit :term:`OAS` ``object``
+schema can be added as well, as presented in :ref:`oas_json_types` section.
+
+.. table::
+    :class: code-table
+    :align: center
+    :widths: 50,50
+
+    +-------------------------------------------+-------------------------------------------------------+
+    | .. code-block:: json                      | .. code-block:: json                                  |
+    |    :caption: Single Format Complex Input  |    :caption: Multiple Supported Format Complex Input  |
+    |                                           |                                                       |
+    |    {                                      |    {                                                  |
+    |      "id:" "input",                       |      "id:" "input",                                   |
+    |      "schema": {                          |      "schema": {                                      |
+    |        "type": "string",                  |        "oneOf": [                                     |
+    |        "contentMediaType": "image/png",   |          {                                            |
+    |        "contentEncoding": "base64"        |            "type": "string",                          |
+    |      }                                    |            "contentMediaType": "application/gml+xml"  |
+    |    }                                      |          },                                           |
+    |                                           |          {                                            |
+    |                                           |            "type": "string",                          |
+    |                                           |            "contentMediaType": "application/kml+xml"  |
+    |                                           |          }                                            |
+    |                                           |        ]                                              |
+    |                                           |      }                                                |
+    |                                           |    }                                                  |
+    +-------------------------------------------+-------------------------------------------------------+
 
 Metadata
 -----------------------
