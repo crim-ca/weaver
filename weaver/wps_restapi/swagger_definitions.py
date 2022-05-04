@@ -3007,10 +3007,10 @@ class ExecuteInputData(OneOfKeywordSchema):
 #   inputs:
 #     additionalProperties:           # this is the below 'variable=<input-id>'
 #       oneOf:
-# 	    - $ref: "inlineOrRefData.yaml"
-# 	    - type: array
-# 	      items:
-# 	        $ref: "inlineOrRefData.yaml"
+#       - $ref: "inlineOrRefData.yaml"
+#       - type: array
+#         items:
+#           $ref: "inlineOrRefData.yaml"
 #
 class ExecuteInputMapAdditionalProperties(ExtendedMappingSchema):
     schema_ref = f"{OGC_API_SCHEMA_URL}/{OGC_API_SCHEMA_VERSION}/core/openapi/schemas/execute.yaml"

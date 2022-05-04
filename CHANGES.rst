@@ -14,6 +14,8 @@ Changes:
 --------
 - Add support of ``Accept`` header, ``f`` and ``format`` request queries for ``GET /jobs/{jobID}/logs`` retrieval
   using ``text``, ``json``, ``yaml`` and ``xml`` (and their corresponding Media-Type definitions) to list `Job` logs.
+- Add parsing of `CLI` inputs with ``@parameter=value`` additional properties to be passed for the `Process`
+  execution. This can be used for specifying the ``mediaType`` and ``encoding`` of a ``File`` reference input.
 
 Fixes:
 ------
