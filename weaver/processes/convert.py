@@ -8,7 +8,7 @@ from collections.abc import Hashable
 from copy import deepcopy
 from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING
-from urllib.parse import urlparse, unquote
+from urllib.parse import unquote, urlparse
 
 from owslib.wps import ComplexData, Metadata as OWS_Metadata, is_reference
 from pywps import Process as ProcessWPS
