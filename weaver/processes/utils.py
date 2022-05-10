@@ -263,7 +263,7 @@ def deploy_process_from_payload(payload, container, overwrite=False):
     found = False
     if process_href:
         reference = process_href  # reference type handled downstream
-        found = isinstance(reference, str) and "://" in reference
+        found = isinstance(reference, str)
     elif isinstance(ows_context, dict):
         offering = ows_context.get("offering")
         if not isinstance(offering, dict):
@@ -273,7 +273,7 @@ def deploy_process_from_payload(payload, container, overwrite=False):
             raise HTTPUnprocessableEntity("Invalid parameter 'processDescription.process.owsContext.offering.content'.")
         package = None
         reference = content.get("href")
-        found = isinstance(reference, str) and "://" in reference
+        found = isinstance(reference, str)
     else:
         if deployment_profile_name:  # optional hint
             allowed_profile_suffix = [ProcessType.APPLICATION, ProcessType.WORKFLOW]
@@ -291,7 +291,7 @@ def deploy_process_from_payload(payload, container, overwrite=False):
             if package:
                 found = isinstance(package, dict) and package
             elif reference:
-                found = isinstance(reference, str) and "://" in reference
+                found = isinstance(reference, str)
             if found:
                 break
     if not found:
