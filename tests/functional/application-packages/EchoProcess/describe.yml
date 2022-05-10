@@ -4,7 +4,7 @@
 id: EchoProcess
 title: Echo Process
 version: 1.0.0
-description: This process accepts and number of input and simple echoes each input as an output.
+description: This process accepts inputs of different types and simply echoes each input as its corresponding output.
 inputs:
   arrayInput:
     description: |

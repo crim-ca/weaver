@@ -425,7 +425,7 @@ will be mapped against corresponding *namespaced* ``format`` of :term:`CWL`.
     For :ref:`Process Description <proc_op_describe>`, the employed name depends on the requested ``schema`` as query
     parameter, defaulting to :term:`OGC API - Processes` ``mediaType`` representation if unspecified.
 
-Follow is an example where input definitions are equivalent in both :term:`CWL` and :term:`WPS` contexts.
+Following is an example where input definitions are equivalent in both :term:`CWL` and :term:`WPS` contexts.
 
 .. table::
     :class: code-table
