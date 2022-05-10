@@ -17,7 +17,8 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Fix missing ``deploymentProfile`` property in `Process` description
+  (resolves `#319 <https://github.com/crim-ca/weaver/issues/319>`_).
 
 .. _changes_4.15.0:
 
