@@ -7,19 +7,22 @@ from collections import OrderedDict
 from copy import deepcopy
 
 import pytest
+from owslib.wps import ComplexData, Input as OWSInput
 from pywps.inout.formats import Format
-from pywps.inout.inputs import LiteralInput
+from pywps.inout.inputs import ComplexInput, LiteralInput
 from pywps.inout.literaltypes import AllowedValue, AnyValue
 from pywps.inout.outputs import ComplexOutput
 from pywps.validator.mode import MODE
 
 from weaver.exceptions import PackageTypeError
-from weaver.formats import ContentType
+from weaver.formats import EDAM_MAPPING, EDAM_NAMESPACE_DEFINITION, ContentType
 from weaver.processes.constants import WPS_INPUT, WPS_LITERAL, WPS_OUTPUT, ProcessSchema
 from weaver.processes.convert import _are_different_and_set  # noqa: W0212
 from weaver.processes.convert import (
     DEFAULT_FORMAT,
     PACKAGE_ARRAY_MAX_SIZE,
+    any2cwl_io,
+    complex2json,
     convert_input_values_schema,
     cwl2json_input_values,
     cwl2wps_io,
@@ -30,7 +33,9 @@ from weaver.processes.convert import (
     json2wps_datatype,
     merge_io_formats,
     normalize_ordered_io,
-    repr2json_input_values
+    repr2json_input_values,
+    set_field,
+    wps2json_io
 )
 from weaver.utils import null
 
@@ -86,6 +91,154 @@ def test_are_different_and_set_single_null():
     item = ObjectWithEqProperty()
     assert _are_different_and_set(item, null) is False
     assert _are_different_and_set(null, item) is False
+
+
+def test_any2cwl_io_from_wps():
+    fmt = Format(ContentType.APP_NETCDF)
+    wps_io = ComplexInput("test", "", supported_formats=[fmt], data_format=fmt)
+    # use 'json' to obtain 'type' field, but otherwise fields are named the same as if using the object
+    wps_as_json = wps_io.json
+    cwl_io, cwl_ns = any2cwl_io(wps_as_json, "input")
+    assert cwl_io == {
+        "id": "test",
+        "type": "File",
+        "format": f"edam:{EDAM_MAPPING[ContentType.APP_NETCDF]}"
+    }
+    assert cwl_ns == EDAM_NAMESPACE_DEFINITION
+
+    # retry by manually injecting the type to validate that
+    # pre-resolved type can also be converted directly from object
+    # since the object is used rather than its JSON representation,
+    # potentially more field definitions are available to extract CWL equivalents
+    setattr(wps_io, "type", "complex")
+    cwl_io, cwl_ns = any2cwl_io(wps_io, "input")
+    assert cwl_io == {
+        "id": "test",
+        "type": "File",
+        "format": f"edam:{EDAM_MAPPING[ContentType.APP_NETCDF]}",
+        "default": None,
+    }
+    assert cwl_ns == EDAM_NAMESPACE_DEFINITION
+
+    wps_io.min_occurs = 10
+    wps_io.max_occurs = 20
+    # use 'json' to obtain 'type' field, but otherwise fields are named the same as if using the object
+    cwl_io, cwl_ns = any2cwl_io(wps_io, "input")
+    assert cwl_io == {
+        "id": "test",
+        "type": {"type": "array", "items": "File"},
+        "format": f"edam:{EDAM_MAPPING[ContentType.APP_NETCDF]}",
+        "default": None,
+    }
+    assert cwl_ns == EDAM_NAMESPACE_DEFINITION
+
+
+class MockElementXML(dict):
+    value = {}
+
+    def __init__(self, value):  # noqa
+        self.value = value
+
+    def __call__(self, *_, **__):
+        return MockElementXML([])
+
+    def __getattr__(self, _):
+        return MockElementXML({})
+
+    def find(self, key):
+        if isinstance(self.value, dict):
+            return self.value.get(key)
+        return None
+
+
+def test_any2cwl_io_from_ows():
+    ows_io = OWSInput(MockElementXML({}))  # skip parsing from XML, inject corresponding results directly
+    ows_io.identifier = "test"
+    ows_io.supportedValues = [ComplexData(mimeType=ContentType.APP_NETCDF)]
+    setattr(ows_io, "type", "complex")
+    # use 'json' to obtain 'type' field, but otherwise fields are named the same as if using the object
+    cwl_io, cwl_ns = any2cwl_io(ows_io, "input")
+    assert cwl_io == {
+        "id": "test",
+        "type": "File",
+        "format": f"edam:{EDAM_MAPPING[ContentType.APP_NETCDF]}",
+        "default": None,
+    }
+    assert cwl_ns == EDAM_NAMESPACE_DEFINITION
+
+    ows_io = OWSInput(MockElementXML({}))  # skip parsing from XML, inject corresponding results directly
+    ows_io.identifier = "test"
+    ows_io.supportedValues = [ComplexData(mimeType=ContentType.APP_NETCDF)]
+    ows_io.minOccurs = 10
+    ows_io.maxOccurs = 20
+    setattr(ows_io, "type", "complex")
+    # use 'json' to obtain 'type' field, but otherwise fields are named the same as if using the object
+    cwl_io, cwl_ns = any2cwl_io(ows_io, "input")
+    assert cwl_io == {
+        "id": "test",
+        "type": {"type": "array", "items": "File"},
+        "format": f"edam:{EDAM_MAPPING[ContentType.APP_NETCDF]}",
+        "default": None,
+    }
+    assert cwl_ns == EDAM_NAMESPACE_DEFINITION
+
+
+def test_any2cwl_io_from_json():
+    # different than WPS as JSON representation, here we employ directly the OGC-API JSON representation
+    json_io = {
+        "id": "test",
+        "formats": [{"mediaType": ContentType.APP_NETCDF, "default": True}]
+    }
+    # need to inject the following, would be provided by other merging/resolution steps prior to 'any2cwl_io' call
+    json_io["type"] = "complex"
+    # use 'json' to obtain 'type' field, but otherwise fields are named the same as if using the object
+    cwl_io, cwl_ns = any2cwl_io(json_io, "input")
+    assert cwl_io == {
+        "id": "test",
+        "type": "File",
+        "format": f"edam:{EDAM_MAPPING[ContentType.APP_NETCDF]}"
+    }
+    assert cwl_ns == EDAM_NAMESPACE_DEFINITION
+
+    json_io["minOccurs"] = 10
+    json_io["maxOccurs"] = 20
+    # use 'json' to obtain 'type' field, but otherwise fields are named the same as if using the object
+    cwl_io, cwl_ns = any2cwl_io(json_io, "input")
+    assert cwl_io == {
+        "id": "test",
+        "type": {"type": "array", "items": "File"},
+        "format": f"edam:{EDAM_MAPPING[ContentType.APP_NETCDF]}",
+    }
+    assert cwl_ns == EDAM_NAMESPACE_DEFINITION
+
+
+def test_any2cwl_io_from_oas():
+    # different than WPS as JSON representation, here we employ directly the OGC-API JSON representation
+    json_io = {
+        "id": "test",
+        "formats": [{"mediaType": ContentType.APP_NETCDF, "default": True}]
+    }
+    # need to inject the following, would be provided by other merging/resolution steps prior to 'any2cwl_io' call
+    json_io["type"] = "complex"
+    # use 'json' to obtain 'type' field, but otherwise fields are named the same as if using the object
+    cwl_io, cwl_ns = any2cwl_io(json_io, "input")
+    assert cwl_io == {
+        "id": "test",
+        "type": "File",
+        "format": f"edam:{EDAM_MAPPING[ContentType.APP_NETCDF]}"
+    }
+    assert cwl_ns == EDAM_NAMESPACE_DEFINITION
+
+    json_io["minOccurs"] = 10
+    json_io["maxOccurs"] = 20
+    # use 'json' to obtain 'type' field, but otherwise fields are named the same as if using the object
+    cwl_io, cwl_ns = any2cwl_io(json_io, "input")
+    assert cwl_io == {
+        "id": "test",
+        "type": {"type": "array", "items": "File"},
+        "format": f"edam:{EDAM_MAPPING[ContentType.APP_NETCDF]}",
+    }
+    assert cwl_ns == EDAM_NAMESPACE_DEFINITION
 
 
 def test_json2wps_datatype():
@@ -515,6 +668,38 @@ def assert_formats_equal_any_order(format_result, format_expect):
     assert not format_expect, f"Not all expected formats matched {[fmt.json for fmt in format_expect]}"
 
 
+def test_wps2json_io_default_format():
+    # must create object with matching data/supported formats or error otherwise
+    wps_io = ComplexInput("test", "", supported_formats=[DEFAULT_FORMAT], data_format=DEFAULT_FORMAT)
+    # then simulate that a merging/resolution replaced the supported formats
+    wps_io.supported_formats = []
+    # conversion should employ the default format since none specified
+    json_io = wps2json_io(wps_io)
+    default = {
+        "default": True,
+        "mediaType": DEFAULT_FORMAT.mime_type,
+        "extension": DEFAULT_FORMAT.extension,
+        "encoding": DEFAULT_FORMAT.encoding,
+        "schema": DEFAULT_FORMAT.schema,
+    }
+    assert json_io["formats"] == [default]
+
+    # do the same thing again, but 'default' should be False because default plain/text
+    # format is not defined as 'data_format' (used as default specifier)
+    json_fmt = Format(ContentType.APP_JSON)
+    wps_io = ComplexInput("test", "", supported_formats=[json_fmt], data_format=json_fmt)
+    wps_io.supported_formats = []
+    json_io = wps2json_io(wps_io)
+    default = {
+        "default": False,   # <-- this is what must be different
+        "mediaType": DEFAULT_FORMAT.mime_type,
+        "extension": DEFAULT_FORMAT.extension,
+        "encoding": DEFAULT_FORMAT.encoding,
+        "schema": DEFAULT_FORMAT.schema,
+    }
+    assert json_io["formats"] == [default]
+
+
 def test_merge_io_formats_no_wps():
     wps_fmt = []
     cwl_fmt = [DEFAULT_FORMAT]
@@ -672,6 +857,30 @@ def test_normalize_ordered_io_when_direct_type_string():
     assert all(["type" in res_i and res_i["type"] == inputs_as_strings[res_i["id"]] for res_i in result])
 
 
+def test_complex2json():
+    data = ComplexData(ContentType.IMAGE_GEOTIFF, encoding="base64", schema="")
+    set_field(data, "maximumMegabytes", "100")  # possibly injected from parsed XML
+    json_data = complex2json(data)
+    assert json_data == {
+        "mimeType": ContentType.IMAGE_GEOTIFF,
+        "encoding": "base64",
+        "schema": "",
+        "maximumMegabytes": 100,
+        "default": False,
+    }
+
+    data = ComplexData(ContentType.APP_JSON, encoding=None, schema="https://geojson.org/schema/FeatureCollection.json")
+    set_field(data, "maximumMegabytes", "15")  # possibly injected from parsed XML
+    json_data = complex2json(data)
+    assert json_data == {
+        "mimeType": ContentType.APP_JSON,
+        "encoding": None,
+        "schema": "https://geojson.org/schema/FeatureCollection.json",
+        "maximumMegabytes": 15,
+        "default": False,
+    }
+
+
 def test_cwl2json_input_values_ogc_format():
     values = {
         "test1": "value",
@@ -827,3 +1036,36 @@ def test_repr2json_input_values():
     ]
     result = repr2json_input_values(values)
     assert result == expect
+
+
+def test_set_field():
+    data = {"x": 1}
+    set_field(data, "y", 2)
+    assert data == {"x": 1, "y": 2}
+
+    set_field(data, "z", null)
+    assert data == {"x": 1, "y": 2}
+
+    set_field(data, "z", null, force=True)
+    assert data == {"x": 1, "y": 2, "z": null}
+
+    set_field(data, "z", None)
+    assert data == {"x": 1, "y": 2, "z": None}
+
+    class Data(object):
+        pass
+
+    data = Data()
+    set_field(data, "y", 2)
+    assert getattr(data, "y", 2)
+
+    set_field(data, "z", null)
+    assert not hasattr(data, "z")
+
+    set_field(data, "z", null, force=True)
+    assert getattr(data, "y", 2)
+    assert getattr(data, "z", None) == null
+
+    set_field(data, "z", None)
+    assert getattr(data, "y", 2)
+    assert getattr(data, "z", null) is None

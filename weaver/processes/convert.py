@@ -250,18 +250,6 @@ def metadata2json(meta, force=False):
     return {"href": href, "title": title, "role": role, "rel": rel, "type": ctype}
 
 
-def ows2json_field(ows_field):
-    # type: (Union[ComplexData, OWS_Metadata, AnyValueType]) -> Union[JSON, AnyValueType]
-    """
-    Obtains the JSON or raw value from an :mod:`owslib.wps` I/O field.
-    """
-    if isinstance(ows_field, ComplexData):
-        return complex2json(ows_field)
-    if isinstance(ows_field, OWS_Metadata):
-        return metadata2json(ows_field)
-    return ows_field
-
-
 def ows2json_io(ows_io):
     # type: (OWS_IO_Type) -> JSON_IO_Type
     """
@@ -453,9 +441,10 @@ def _get_multi_json_references(output, container):
 def any2cwl_io(wps_io, io_select):
     # type: (Union[JSON_IO_Type, WPS_IO_Type, OWS_IO_Type], str) -> Tuple[CWL_IO_Type, Dict[str, str]]
     """
-    Converts a `WPS`-like I/O to `CWL` corresponding I/O.
+    Converts a :term:`WPS`-like I/O from various :term:`WPS` library representations to :term:`CWL` corresponding I/O.
 
-    Because of `CWL` I/O of type `File` with `format` field, the applicable namespace is also returned.
+    Conversion can be accomplished for :mod:`pywps` and :mod:`owslib` objects, as well as their :term:`JSON` equivalent.
+    Because :term:`CWL` I/O of type ``File`` with ``format`` field are namespaced, this is also returned if needed.
 
     :returns: converted I/O and namespace dictionary with corresponding format references as required
     """
@@ -494,7 +483,7 @@ def any2cwl_io(wps_io, io_select):
                 if cwl_io_ref and cwl_io_fmt:
                     cwl_ns.update(cwl_io_ref)
                 break
-            if isinstance(fmt, list):
+            if isinstance(fmt, (list, tuple)):
                 if len(fmt) == 1:
                     cwl_io_ref, cwl_io_fmt, cwl_io_ext = _get_cwl_fmt_details(fmt[0])
                     if cwl_io_ref and cwl_io_fmt:
