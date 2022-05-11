@@ -1939,6 +1939,19 @@ class Process(Base):
         return self.type != ProcessType.BUILTIN
 
     @property
+    def deployment_profile(self):
+        # type: () -> str
+        base = "http://www.opengis.net/profiles/eoc/"
+        _typ = self.type
+        if _typ == ProcessType.APPLICATION:
+            profile = base + "dockerizedApplication"
+        elif "wps" in _typ:
+            profile = base + "wpsApplication"
+        else:
+            profile = base + _typ
+        return profile
+
+    @property
     def package(self):
         # type: () -> Optional[CWL]
         """
@@ -2179,7 +2192,10 @@ class Process(Base):
         """
         process = self.dict()
         links = self.links()
-        process.update({"links": links})
+        process.update({
+            "deploymentProfile": self.deployment_profile,
+            "links": links
+        })
 
         # adjust I/O definitions with missing information for both representations
         io_hints = {}

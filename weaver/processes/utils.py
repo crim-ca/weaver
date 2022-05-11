@@ -268,12 +268,14 @@ def deploy_process_from_payload(payload, container, overwrite=False):
     process_href = process_description.pop("href", None)
 
     # retrieve CWL package definition, either via "href" (WPS-1/2), "owsContext" or "executionUnit" (package/reference)
-    deployment_profile_name = payload.get("deploymentProfileName", "").lower()
+    deployment_profile_name = payload.get("deploymentProfileName", "")
     ows_context = process_info.pop("owsContext", None)
     reference = None
     package = None
+    found = False
     if process_href:
         reference = process_href  # reference type handled downstream
+        found = isinstance(reference, str)
     elif isinstance(ows_context, dict):
         offering = ows_context.get("offering")
         if not isinstance(offering, dict):
@@ -283,9 +285,12 @@ def deploy_process_from_payload(payload, container, overwrite=False):
             raise HTTPUnprocessableEntity("Invalid parameter 'processDescription.process.owsContext.offering.content'.")
         package = None
         reference = content.get("href")
-    elif deployment_profile_name:
-        if not any(deployment_profile_name.endswith(typ) for typ in [ProcessType.APPLICATION, ProcessType.WORKFLOW]):
-            raise HTTPBadRequest("Invalid value for parameter 'deploymentProfileName'.")
+        found = isinstance(reference, str)
+    else:
+        if deployment_profile_name:  # optional hint
+            allowed_profile_suffix = [ProcessType.APPLICATION, ProcessType.WORKFLOW]
+            if not any(deployment_profile_name.lower().endswith(typ) for typ in allowed_profile_suffix):
+                raise HTTPBadRequest("Invalid value for parameter 'deploymentProfileName'.")
         execution_units = payload.get("executionUnit")
         if not isinstance(execution_units, list):
             raise HTTPUnprocessableEntity("Invalid parameter 'executionUnit'.")
@@ -295,10 +300,21 @@ def deploy_process_from_payload(payload, container, overwrite=False):
             package = execution_unit.get("unit")
             reference = execution_unit.get("href")
             # stop on first package/reference found, simultaneous usage will raise during package retrieval
-            if package or reference:
+            if package:
+                found = isinstance(package, dict) and package
+            elif reference:
+                found = isinstance(reference, str)
+            if found:
                 break
-    else:
-        raise HTTPBadRequest("Missing one of required parameters [href, owsContext, deploymentProfileName].")
+    if not found:
+        params = [
+            "ProcessDescription.href",
+            "ProcessDescription.owsContext.content.href",
+            "executionUnit[*].(unit|href)",
+        ]
+        raise HTTPBadRequest(
+            f"Missing one of required parameters {params} to obtain package/process definition or reference."
+        )
 
     if process_info.get("type", "") == ProcessType.BUILTIN:
         raise HTTPBadRequest(
@@ -357,11 +373,14 @@ def deploy_process_from_payload(payload, container, overwrite=False):
             "error": exc.__class__.__name__,
             "value": exc.value
         })
-    return HTTPCreated(json={
+    data = {
         "description": sd.OkPostProcessesResponse.description,
         "processSummary": process_summary,
         "deploymentDone": True
-    })
+    }
+    if deployment_profile_name:
+        data["deploymentProfileName"] = deployment_profile_name
+    return HTTPCreated(json=data)
 
 
 def parse_wps_process_config(config_entry):

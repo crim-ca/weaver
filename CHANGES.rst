@@ -28,6 +28,10 @@ Changes:
   I/O ``schema`` field (relates to `#51 <https://github.com/crim-ca/weaver/issues/51>`_).
 - Add encoding/decoding of JSON I/O definitions for saving to database in order to support OpenAPI ``schema`` that can
   contain conflicting key names with MongoDB functionalities (e.g.: ``$ref``).
+- Remove ``deploymentProfileName`` requirement during `Process` deployment. The corresponding ``deploymentProfile``
+  property is instead automatically generated from resolved `CWL` package/reference or remote `WPS` reference. This
+  further simplifies deployment using the `CLI` to its bare minimum components as only the `CWL` or `WPS` reference
+  needs to be provided along the desired `Process` ID without any further details.
 
 Fixes:
 ------
@@ -36,6 +40,8 @@ Fixes:
 - Fix ``LiteralOutput`` creation not removing ``allowed_values`` not available with `PyWPS` class.
 - Fix failing `Process` deployment caused by ``links`` if explicitly specified in the payload by the user.
   Additional links that don't conflict with dynamically generated ones are added to the deployed `Process` definition.
+- Fix missing ``deploymentProfile`` property in `Process` description
+  (resolves `#319 <https://github.com/crim-ca/weaver/issues/319>`_).
 
 .. _changes_4.15.0:
 
