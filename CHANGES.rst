@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_4.16.0:
+
+`4.16.0 <https://github.com/crim-ca/weaver/tree/4.16.0>`_ (2022-05-11)
+========================================================================
+
+Changes:
+--------
 - Add support of OpenAPI ``schema`` field for I/O definitions within `Process` description responses as required
   by `OGC API - Processes` specification (resolves `#245 <https://github.com/crim-ca/weaver/issues/245>`_).
   Existing and deployed processes using legacy I/O definitions will be parsed for corresponding fields employed in
