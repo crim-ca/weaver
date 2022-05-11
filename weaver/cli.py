@@ -1323,7 +1323,7 @@ def make_parser():
             things, to provide a file's ``mediaType`` or ``encoding`` details. When using array values, each value in
             the array can take ``@`` parameters independently.
 
-            Any value that contains a special separator character (:;@) must URL-encoded (%XX) to avoid invalid parsing.
+            Any value that contains special separator characters (:;@) must URL-encoded (%%XX) to avoid invalid parsing.
 
             Example: ``-I message='Hello Weaver' -I value:int=1234 -I file:File=data.xml@mediaType=text/xml``
         """)
