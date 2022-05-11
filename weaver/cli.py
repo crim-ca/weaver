@@ -390,6 +390,7 @@ class WeaverClient(object):
             if result.code not in [200, 404]:
                 return OperationResult(False, "Failed requested undeployment prior deployment.",
                                        body=result.body, text=result.text, code=result.code, headers=result.headers)
+        LOGGER.debug("Deployment Body:\n%s", OutputFormat.convert(data, OutputFormat.JSON_STR))
         path = f"{base}/processes"
         resp = request_extra("POST", path, json=data, headers=req_headers, settings=self._settings)
         return self._parse_result(resp, show_links=show_links, show_headers=show_headers, output_format=output_format)

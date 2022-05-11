@@ -495,7 +495,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         process_data_tests[2]["processDescription"]["process"].pop("id")  # noqa
         process_data_tests[3]["processDescription"]["jobControlOptions"] = ExecuteControlOption.ASYNC
         process_data_tests[4]["processDescription"]["jobControlOptions"] = [ExecuteMode.ASYNC]  # noqa
-        process_data_tests[5].pop("deploymentProfileName")
+        process_data_tests[5]["deploymentProfileName"] = "random"  # can be omitted, but if provided, must be valid
         process_data_tests[6].pop("executionUnit")
         process_data_tests[7]["executionUnit"] = {}
         process_data_tests[8]["executionUnit"] = []

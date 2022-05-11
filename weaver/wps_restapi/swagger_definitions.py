@@ -133,6 +133,7 @@ PROCESS_DESCRIPTION_FIELD_AFTER = [
     "processDescriptionURL",
     "processEndpointWPS1",
     "executeEndpoint",
+    "deploymentProfile",
     "links"
 ]
 # fields ordering for nested process definition of OLD schema format of ProcessDescription
@@ -2617,6 +2618,10 @@ class ProcessVisibility(ExtendedMappingSchema):
     visibility = VisibilityValue(missing=drop)
 
 
+class ProcessDeploymentProfile(ExtendedMappingSchema):
+    deploymentProfile = URL(missing=drop)
+
+
 class Process(
     # following are like 'ProcessSummary',
     # except without 'ProcessControl' and 'DescriptionLinks' that are outside of nested 'process'
@@ -2635,7 +2640,7 @@ class Process(
     _sort_after = PROCESS_DESCRIPTION_FIELD_AFTER
 
 
-class ProcessDescriptionOLD(ProcessControl, DescriptionLinks):
+class ProcessDescriptionOLD(ProcessControl, ProcessDeploymentProfile, DescriptionLinks):
     """
     Old schema for process description.
     """
@@ -2646,7 +2651,14 @@ class ProcessDescriptionOLD(ProcessControl, DescriptionLinks):
     _sort_after = PROCESS_DESCRIPTION_FIELD_AFTER_OLD_SCHEMA
 
 
-class ProcessDescriptionOGC(ProcessSummary, ProcessContext, ProcessVisibility, ProcessLocations, DescriptionLinks):
+class ProcessDescriptionOGC(
+    ProcessSummary,
+    ProcessContext,
+    ProcessVisibility,
+    ProcessLocations,
+    ProcessDeploymentProfile,
+    DescriptionLinks
+):
     """
     OGC-API schema for process description.
     """
