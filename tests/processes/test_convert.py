@@ -812,18 +812,36 @@ def test_repr2json_input_values():
         "test8:file=/tmp/other.txt",
         "test9:str=short",
         "test10:string=long",
+        # verify that '@parameters' handle some special logic to convert known format fields (not just passed directly)
+        f"test11:File=/tmp/file.json@mediaType={ContentType.APP_JSON}@schema=http://schema.org/random.json",
+        f"test12:File=/tmp/other.xml@mimeType={ContentType.TEXT_XML}@contentSchema=http://schema.org/random.xml",
+        # different representations can be used simultaneously, each parameter is attached to the specific array item
+        f"test13:File=/tmp/one.json@mimeType={ContentType.APP_JSON};/tmp/two.xml@mediaType={ContentType.TEXT_XML}",
     ]
     expect = [
         {"id": "test1", "value": "value"},
         {"id": "test2", "value": 1},
         {"id": "test3", "value": 1.23},
         {"id": "test4", "href": "/tmp/random.txt"},
-        {"id": "test5", "value": ["val1", "val2"]},
-        {"id": "test6", "value": [1, 2]},
-        {"id": "test7", "value": [1.23, 4.56]},
+        # array values are extended to OLD listing format
+        # CLI would then convert them to OGC using 'convert_input_values_schema'
+        {"id": "test5", "value": "val1"},
+        {"id": "test5", "value": "val2"},
+        {"id": "test6", "value": 1},
+        {"id": "test6", "value": 2},
+        {"id": "test7", "value": 1.23},
+        {"id": "test7", "value": 4.56},
         {"id": "test8", "href": "/tmp/other.txt"},
         {"id": "test9", "value": "short"},
-        {"id": "test10", "value": "long"}
+        {"id": "test10", "value": "long"},
+        {"id": "test11", "href": "/tmp/file.json", "format": {
+            "mediaType": ContentType.APP_JSON, "schema": "http://schema.org/random.json"
+        }},
+        {"id": "test12", "href": "/tmp/other.xml", "format": {
+            "mediaType": ContentType.TEXT_XML, "schema": "http://schema.org/random.xml"
+        }},
+        {"id": "test13", "href": "/tmp/one.json", "format": {"mediaType": ContentType.APP_JSON}},
+        {"id": "test13", "href": "/tmp/two.xml", "format": {"mediaType": ContentType.TEXT_XML}},
     ]
     result = repr2json_input_values(values)
     assert result == expect

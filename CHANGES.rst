@@ -14,6 +14,8 @@ Changes:
 --------
 - Add support of ``Accept`` header, ``f`` and ``format`` request queries for ``GET /jobs/{jobID}/logs`` retrieval
   using ``text``, ``json``, ``yaml`` and ``xml`` (and their corresponding Media-Type definitions) to list `Job` logs.
+- Add parsing of `CLI` inputs with ``@parameter=value`` additional properties to be passed for the `Process`
+  execution. This can be used for specifying the ``mediaType`` and ``encoding`` of a ``File`` reference input.
 - Remove ``deploymentProfileName`` requirement during `Process` deployment. The corresponding ``deploymentProfile``
   property is instead automatically generated from resolved `CWL` package/reference or remote `WPS` reference. This
   further simplifies deployment using the `CLI` to its bare minimum components as only the `CWL` or `WPS` reference

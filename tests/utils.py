@@ -70,6 +70,8 @@ if TYPE_CHECKING:
     MockConfigWPS1 = Sequence[str, str, Optional[Sequence[str]], Optional[Sequence[str]]]
     MockReturnType = TypeVar("MockReturnType")
 
+    CommandType = Callable[[Union[str, Tuple[str]]], int]
+
 MOCK_AWS_REGION = "us-central-1"
 MOCK_HTTP_REF = "http://localhost.mock"
 
@@ -320,7 +322,7 @@ def get_links(resp_links):
 
 
 def run_command(command, trim=True, expect_error=False, entrypoint=None):
-    # type: (Union[str, Iterable[str]], bool, bool, Optional[Callable[[Tuple[Any]], int]]) -> List[str]
+    # type: (Union[str, Iterable[str]], bool, bool, Optional[CommandType]) -> List[str]
     """
     Run a CLI operation and retrieve the produced output.
 

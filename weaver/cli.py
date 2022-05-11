@@ -509,7 +509,7 @@ class WeaverClient(object):
             # - if value of 'inputs' is an object, it can collide with 'OGC' schema,
             #   unless 'value/href' are present or their sub-dict don't have CWL 'class'
             # - if value of 'inputs' is an array, it can collide with 'OLD' schema,
-            #   unless 'value/href' (and 'id' technically) are present
+            #   unless 'value/href' (and also 'id' technically) are present
             values = inputs.get("inputs", null)
             if (
                 values is null or
@@ -527,7 +527,7 @@ class WeaverClient(object):
         return values
 
     def _update_files(self, inputs, url=None):
-        # type: (ExecutionInputsMap, Optional[str]) -> Tuple[ExecutionInputsMap, HeadersType]
+        # type: (ExecutionInputsMap, Optional[str]) -> Union[Tuple[ExecutionInputsMap, HeadersType], OperationResult]
         """
         Replaces local file paths by references uploaded to the :term:`Vault`.
 
@@ -541,7 +541,7 @@ class WeaverClient(object):
               in :ref:`file_vault_token` and :ref:`vault` chapters.
 
         :param inputs: Input values for submission of :term:`Process` execution.
-        :return: Updated inputs.
+        :return: Updated inputs or the result of a failing intermediate request.
         """
         auth_tokens = {}  # type: Dict[str, str]
         update_inputs = dict(inputs)
@@ -642,12 +642,12 @@ class WeaverClient(object):
             returned as direct values (literal or href) within the response content body.
         :returns: Results of the operation.
         """
+        base = self._get_url(url)  # raise before inputs parsing if not available
         if isinstance(inputs, list) and all(isinstance(item, list) for item in inputs):
             inputs = [items for sub in inputs for items in sub]  # flatten 2D->1D list
         values = self._parse_inputs(inputs)
         if isinstance(values, OperationResult):
             return values
-        base = self._get_url(url)
         result = self._update_files(values, url=base)
         if isinstance(result, OperationResult):
             return result
@@ -1300,24 +1300,33 @@ def make_parser():
             for selected format. Both mapping and listing formats are supported.
 
             To execute a process without any inputs (e.g.: using its defaults),
-            supply an explicit empty input (i.e.: ``-I ""`` or loaded from file as ``{}``).
+            supply an explicit empty input (i.e.: ``-I ""`` or loaded from JSON/YAML file as ``{}``).
 
             To provide inputs using literal command-line definitions, inputs should be specified using ``<id>=<value>``
             convention, with distinct ``-I`` options for each applicable input value.
 
-            Values that require other type than string to be converted for job submission can include the type
+            Values that require other type than string to be converted for job submission can include the data type
             following the ID using a colon separator (i.e.: ``<id>:<type>=<value>``). For example, an integer could be
             specified as follows: ``number:int=1`` while a floating point number would be: ``number:float=1.23``.
 
             File references (``href``) should be specified using ``File`` as the type (i.e.: ``input:File=http://...``).
             Note that ``File`` in this case is expected to be an URL location where the file can be download from.
             When a local file is supplied, Weaver will automatically convert it to a remote Vault File in order to
-            upload it and make it available for the remote process.
+            upload it at the specified URL location and make it available for the remote process.
 
-            Array input (``maxOccurs > 1``) should be specified using semicolon (;) separated values.
-            The type of an item of this array can also be provided (i.e.: ``array:int=1;2;3``).
+            Array input (``maxOccurs > 1``) can be specified using semicolon (;) separated values after the input ID.
+            The type of an element-wise item of this array can also be provided (i.e.: ``arrayInput:int=1;2;3``).
+            Alternatively, the same input ID can be repeated over many ``-I`` options each providing an element of the
+            multi-value array to be formed.
 
-            Example: ``-I message='Hello Weaver' -I value:int=1234``
+            Additional parameters can be specified following any ``<value>`` using any amount of ``@<param>=<info>``
+            specifiers. Those will be added to the inputs body submitted for execution. This can be used, amongst other
+            things, to provide a file's ``mediaType`` or ``encoding`` details. When using array values, each value in
+            the array can take ``@`` parameters independently.
+
+            Any value that contains special separator characters (:;@) must URL-encoded (%%XX) to avoid invalid parsing.
+
+            Example: ``-I message='Hello Weaver' -I value:int=1234 -I file:File=data.xml@mediaType=text/xml``
         """)
     )
     # FIXME: allow filtering 'outputs' (https://github.com/crim-ca/weaver/issues/380)
