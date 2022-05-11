@@ -136,7 +136,7 @@ def test_any2cwl_io_from_wps():
 class MockElementXML(dict):
     value = {}
 
-    def __init__(self, value):  # noqa
+    def __init__(self, value):  # noqa  # pylint: disable=W0231
         self.value = value
 
     def __call__(self, *_, **__):
