@@ -70,7 +70,7 @@ KNOWN_PROCESS_DESCRIPTION_FIELDS = {
 # intersection of fields in InputType and specific sub-schema LiteralInputType
 KNOWN_PROCESS_DESCRIPTION_INPUT_DATA_FIELDS = {
     "id", "title", "description", "keywords", "metadata", "links", "literalDataDomains", "additionalParameters",
-    "minOccurs", "maxOccurs"
+    "minOccurs", "maxOccurs", "schema"
 }
 # corresponding schemas of input, but min/max occurs not expected
 KNOWN_PROCESS_DESCRIPTION_OUTPUT_DATA_FIELDS = KNOWN_PROCESS_DESCRIPTION_INPUT_DATA_FIELDS - {"minOccurs", "maxOccurs"}
@@ -147,6 +147,298 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         assert proc["inputs"][0]["id"] == "url"
         assert proc["outputs"][0]["id"] == "values"
 
+    def test_deploy_ogc_with_io_oas_definitions(self):
+        """
+        Validate deployment when :term:`Process` definition includes I/O with OpenAPI ``schema`` fields.
+
+        When provided during deployment, I/O ``schema`` definitions should be kept as-is because they *should*
+        be more precise for the intended usage by the application then what `Weaver` can resolve by itself.
+
+        Using provided I/O ``schema`` definitions, `Weaver` should backport all corresponding information that
+        can be used to form other similar fields (for ``OLD`` representation and other backward compatibility).
+
+        .. seealso::
+            Files for ``EchoProcess`` use reference :term:`OGC` definitions. See links in contents.
+        """
+        ref = self.retrieve_payload("EchoProcess", "describe", local=True)
+        cwl = self.retrieve_payload("EchoProcess", "package", local=True)
+        body = {
+            "processDescription": ref,
+            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication",
+            "executionUnit": [{"unit": cwl}],
+        }
+        ogc_api_ref = "https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/d52579"
+
+        desc, _ = self.deploy_process(body, process_id=self._testMethodName, describe_schema=ProcessSchema.OGC)
+        assert "inputs" in desc and isinstance(desc["inputs"], dict) and len(desc["inputs"]) == len(ref["inputs"])
+        assert "outputs" in desc and isinstance(desc["outputs"], dict) and len(desc["outputs"]) == len(ref["outputs"])
+        assert all(isinstance(val, dict) and isinstance(val.get("schema"), dict) for val in desc["inputs"].values())
+        assert all(isinstance(val, dict) and isinstance(val.get("schema"), dict) for val in desc["outputs"].values())
+
+        # NOTE:
+        #   Schema definitions are slightly modified when compatible information is detected from other CWL/WPS sources
+        #   to improve their validation. For example, min/max occurs can help define singe/multi-value/array type.
+        # check obtained/extended schemas case by case based on expected merging of definitions
+        assert desc["inputs"]["arrayInput"]["schema"] == ref["inputs"]["arrayInput"]["schema"]  # no change
+        assert desc["inputs"]["boundingBoxInput"]["schema"] == {
+            # what is referenced by $ref, converted to $id after retrieval
+            "type": "object",
+            "properties": {
+                "crs": {
+                    "type": "string",
+                    "format": "uri",
+                    "default": "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+                    "enum": [
+                        "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+                        "http://www.opengis.net/def/crs/OGC/0/CRS84h",
+                    ]
+                },
+                "bbox": {
+                    "type": "array",
+                    "items": "number",
+                    "oneOf": [
+                        {"minItems": 4, "maxItems": 4},
+                        {"minItems": 6, "maxItems": 6},
+                    ]
+                }
+            },
+            "required": ["bbox"],
+            # merged:
+            "format": "ogc-bbox",
+            # added:
+            "$id": f"{ogc_api_ref}/core/openapi/schemas/bbox.yaml"
+        }
+        assert desc["inputs"]["complexObjectInput"]["schema"] == {
+            "oneOf": [
+                # extended raw-data
+                {"type": "string", "contentMediaType": "application/json"},
+                # original definition
+                ref["inputs"]["complexObjectInput"]["schema"]
+            ]
+        }
+        assert desc["inputs"]["dateInput"]["schema"] == ref["inputs"]["dateInput"]["schema"]  # no change
+        assert desc["inputs"]["doubleInput"]["schema"] == ref["inputs"]["doubleInput"]["schema"]  # no change
+        assert desc["inputs"]["featureCollectionInput"]["schema"]["oneOf"][:2] == [
+            # same as reference
+            {
+                "type": "string",
+                "contentMediaType": "application/gml+xml; version=3.2"
+            },
+            {
+                "type": "string",
+                "contentMediaType": "application/vnd.google-earth.kml+xml",
+                "contentSchema": "https://schemas.opengis.net/kml/2.3/ogckml23.xsd"
+            },
+        ]
+        # extended contentMediaType using the provided JSON object $ref
+        assert desc["inputs"]["featureCollectionInput"]["schema"]["oneOf"][2] == {
+            "type": "string",
+            "contentMediaType": "application/json",
+            "contentSchema": "https://geojson.org/schema/FeatureCollection.json",
+        }
+        # extended and simplified from allOf/$ref
+        assert desc["inputs"]["featureCollectionInput"]["schema"]["oneOf"][3]["allOf"][0]["format"] == (
+            "geojson-feature-collection"
+        )
+        assert desc["inputs"]["featureCollectionInput"]["schema"]["oneOf"][3]["allOf"][1]["$ref"] == (
+            "https://geojson.org/schema/FeatureCollection.json"
+        )
+        # check that actual full definition of $ref is not included (big JSON)
+        assert all(
+            field not in desc["inputs"]["featureCollectionInput"]["schema"]["oneOf"][3]
+            for field in ["type", "properties"]
+        )
+        # min/max occurs detected => schema converted to array-only since minOccurs=2
+        assert desc["inputs"]["geometryInput"]["schema"] == {
+            "type": "array",
+            "items": {"oneOf": [
+                ref["inputs"]["geometryInput"]["schema"]["oneOf"][0],
+                # extended from allOf/$ref
+                {
+                    "type": "string",
+                    # FIXME: format not forwarded, but not really needed since specific contentSchema is provided
+                    # "format": "geojson-geometry",
+                    "contentMediaType": "application/json",
+                    "contentSchema": (
+                        "http://schemas.opengis.net/ogcapi/features/part1/1.0/openapi/schemas/geometryGeoJSON.yaml"
+                    )
+                },
+                # same as original allOf/$ref
+                ref["inputs"]["geometryInput"]["schema"]["oneOf"][1],
+            ]},
+            "minItems": ref["inputs"]["geometryInput"]["minOccurs"],
+            "maxItems": ref["inputs"]["geometryInput"]["maxOccurs"],
+        }
+        assert desc["inputs"]["imagesInput"]["schema"] == {
+            "oneOf": [
+                # same as original (except added 'format' for consistency)
+                {
+                    "type": "string", "format": "binary",
+                    "contentEncoding": "binary", "contentMediaType": "image/tiff; application=geotiff"},
+                {
+                    "type": "string", "format": "binary",
+                    "contentEncoding": "binary", "contentMediaType": "image/jp2"
+                },
+                # extended from minOccurs/maxOccurs detection
+                {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 150,
+                    "items": {
+                        # equivalent to above single-value oneOf
+                        "oneOf": [
+                            {
+                                "type": "string", "format": "binary",
+                                "contentEncoding": "binary", "contentMediaType": "image/tiff; application=geotiff"
+                            },
+                            {
+                                "type": "string", "format": "binary",
+                                "contentEncoding": "binary", "contentMediaType": "image/jp2"
+                            },
+                        ]
+                    }
+                }
+            ]
+        }
+        # FIXME: support measure I/O (https://github.com/crim-ca/weaver/issues/430)
+        #        parsing works to detect numeric type, but reverse operation WPS->OAS not obvious
+        #        since no real indication/distinction between a literal data and one with uom
+        # assert desc["inputs"]["measureInput"]["schema"] == ref["inputs"]["measureInput"]["schema"]  # no change
+        assert desc["inputs"]["stringInput"]["schema"] == ref["inputs"]["stringInput"]["schema"]  # no change
+
+        # NOTE:
+        #   although conversion is possible, min/max occurs not allowed in outputs WPS representation
+        #   because of this, they will also be omitted in the OpenAPI schema definition following merge
+        #   *everything else* should be identical to inputs
+        assert desc["outputs"]["arrayOutput"]["schema"] == ref["outputs"]["arrayOutput"]["schema"]  # no change
+        assert desc["outputs"]["boundingBoxOutput"]["schema"] == {
+            # what is referenced by $ref, converted to $id after retrieval
+            "type": "object",
+            "properties": {
+                "crs": {
+                    "type": "string",
+                    "format": "uri",
+                    "default": "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+                    "enum": [
+                        "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+                        "http://www.opengis.net/def/crs/OGC/0/CRS84h",
+                    ]
+                },
+                "bbox": {
+                    "type": "array",
+                    "items": "number",
+                    "oneOf": [
+                        {"minItems": 4, "maxItems": 4},
+                        {"minItems": 6, "maxItems": 6},
+                    ]
+                }
+            },
+            "required": ["bbox"],
+            # merged:
+            "format": "ogc-bbox",
+            # added:
+            "$id": f"{ogc_api_ref}/core/openapi/schemas/bbox.yaml"
+        }
+        assert desc["outputs"]["complexObjectOutput"]["schema"] == {
+            "oneOf": [
+                # extended raw-data
+                {"type": "string", "contentMediaType": "application/json"},
+                # original definition
+                ref["outputs"]["complexObjectOutput"]["schema"]
+            ]
+        }
+        assert desc["outputs"]["dateOutput"]["schema"] == ref["outputs"]["dateOutput"]["schema"]  # no change
+        assert desc["outputs"]["doubleOutput"]["schema"] == ref["outputs"]["doubleOutput"]["schema"]  # no change
+        assert desc["outputs"]["featureCollectionOutput"]["schema"]["oneOf"][:2] == [
+            # same as reference
+            {
+                "type": "string",
+                "contentMediaType": "application/gml+xml; version=3.2"
+            },
+            {
+                "type": "string",
+                "contentMediaType": "application/vnd.google-earth.kml+xml",
+                "contentSchema": "https://schemas.opengis.net/kml/2.3/ogckml23.xsd"
+            },
+        ]
+        # extended contentMediaType using the provided JSON object $ref
+        assert desc["outputs"]["featureCollectionOutput"]["schema"]["oneOf"][2] == {
+            "type": "string",
+            "contentMediaType": "application/json",
+            "contentSchema": "https://geojson.org/schema/FeatureCollection.json",
+        }
+        # extended and simplified from allOf/$ref
+        assert desc["outputs"]["featureCollectionOutput"]["schema"]["oneOf"][3]["allOf"][0]["format"] == (
+            "geojson-feature-collection"
+        )
+        assert desc["outputs"]["featureCollectionOutput"]["schema"]["oneOf"][3]["allOf"][1]["$ref"] == (
+            "https://geojson.org/schema/FeatureCollection.json"
+        )
+        # check that actual full definition of $ref is not included (big JSON)
+        assert all(
+            field not in desc["outputs"]["featureCollectionOutput"]["schema"]["oneOf"][3]
+            for field in ["type", "properties"]
+        )
+        # contrary to 'geometryInput', there is no min/max occurs since not available for outputs
+        # because they are missing, there is no auto-expansion of 'oneOf' into *only* array items
+        assert desc["outputs"]["geometryOutput"]["schema"] == {
+            "oneOf": [
+                ref["outputs"]["geometryOutput"]["schema"]["oneOf"][0],
+                # extended from allOf/$ref
+                {
+                    "type": "string",
+                    # FIXME: format not forwarded, but not really needed since specific contentSchema is provided
+                    # "format": "geojson-geometry",
+                    "contentMediaType": "application/json",
+                    "contentSchema": (
+                        "http://schemas.opengis.net/ogcapi/features/part1/1.0/openapi/schemas/geometryGeoJSON.yaml"
+                    )
+                },
+                # same as original allOf/$ref
+                ref["outputs"]["geometryOutput"]["schema"]["oneOf"][1],
+            ],
+        }
+        # contrary to 'imagesInput', there is no min/max occurs since not available for outputs
+        # because they are missing, there is no auto-expansion of 'oneOf' into single + array items combinations
+        # only single dimension are preserved
+        assert desc["outputs"]["imagesOutput"]["schema"] == {
+            "oneOf": [
+                # same as original (except added 'format' for consistency)
+                {
+                    "type": "string", "format": "binary",
+                    "contentEncoding": "binary", "contentMediaType": "image/tiff; application=geotiff"},
+                {
+                    "type": "string", "format": "binary",
+                    "contentEncoding": "binary", "contentMediaType": "image/jp2"
+                }
+            ]
+        }
+        # FIXME: support measure I/O (https://github.com/crim-ca/weaver/issues/430)
+        #        parsing works to detect numeric type, but reverse operation WPS->OAS not obvious
+        #        since no real indication/distinction between a literal data and one with uom
+        # assert desc["outputs"]["measureOutput"]["schema"] == ref["outputs"]["measureOutput"]["schema"]  # no change
+        assert desc["outputs"]["stringOutput"]["schema"] == ref["outputs"]["stringOutput"]["schema"]  # no change
+
+        # check detection of array min/max items => min/max occurs
+        assert "minOccurs" in desc["inputs"]["arrayInput"]
+        assert isinstance(desc["inputs"]["arrayInput"]["schema"]["minItems"], int)
+        assert desc["inputs"]["arrayInput"]["minOccurs"] == desc["inputs"]["arrayInput"]["schema"]["minItems"]
+        assert "maxOccurs" in desc["inputs"]["arrayInput"]
+        assert isinstance(desc["inputs"]["arrayInput"]["schema"]["maxItems"], int)
+        assert desc["inputs"]["arrayInput"]["maxOccurs"] == desc["inputs"]["arrayInput"]["schema"]["maxItems"]
+
+        # contentMediaType => supported formats
+        assert desc["inputs"]["complexObjectInput"]["formats"] == [
+            {"default": True, "mediaType": "application/json"},  # represents the generic JSON complex properties
+        ]
+        assert desc["inputs"]["featureCollectionInput"]["formats"] == [
+            {"default": True, "mediaType": "application/gml+xml; version=3.2"},
+            {"default": False, "mediaType": "application/vnd.google-earth.kml+xml",
+             "schema": "https://schemas.opengis.net/kml/2.3/ogckml23.xsd"},
+            {"default": False, "mediaType": "application/json",
+             "schema": "https://geojson.org/schema/FeatureCollection.json"}  # $ref in allOf => schema
+        ]
+
     def test_deploy_process_io_no_format_default(self):
         """
         Validate resolution of ``default`` format field during deployment.
@@ -204,10 +496,27 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         expect_inputs["file"].update({"title": "file", "minOccurs": 1, "maxOccurs": 1})
         expect_inputs["file"]["formats"][0]["default"] = True
         expect_inputs["file"]["formats"][1]["default"] = False
+        expect_inputs["file"]["schema"] = {
+            "oneOf": [
+                {"type": "string", "contentMediaType": ContentType.APP_JSON},
+                {"type": "string", "contentMediaType": ContentType.TEXT_PLAIN},
+                {"type": "object", "additionalProperties": True},  # auto added from JSON detection
+            ]
+        }
         expect_outputs["file"].update({"title": "file"})  # no min/max occurs for outputs
         expect_outputs["file"]["formats"][0]["default"] = False
         expect_outputs["file"]["formats"][1]["default"] = True
         expect_outputs["file"]["formats"][2]["default"] = False
+        expect_outputs["file"]["schema"] = {
+            "oneOf": [
+                {"type": "string", "format": "binary",
+                 "contentMediaType": ContentType.IMAGE_PNG, "contentEncoding": "base64"},
+                {"type": "string", "format": "binary",
+                 "contentMediaType": ContentType.IMAGE_JPEG, "contentEncoding": "base64"},
+                {"type": "string", "format": "binary",
+                 "contentMediaType": ContentType.IMAGE_GEOTIFF, "contentEncoding": "base64"},
+            ]
+        }
 
         assert desc["inputs"] == expect_inputs
         assert desc["outputs"] == expect_outputs
@@ -2174,7 +2483,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             "executionUnit": [{"href": f"mock://{resources.WPS_LITERAL_COMPLEX_IO_XML}"}],
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication"
         }
-        desc, pkg = self.deploy_process(body, describe_schema=ProcessSchema.OLD)
+        desc, pkg = self.deploy_process(body, describe_schema=ProcessSchema.OLD, mock_requests_only_local=False)
 
         # basic contents validation
         assert "cwlVersion" in pkg
@@ -2261,7 +2570,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             "executionUnit": [{"href": f"mock://{resources.WPS_ENUM_ARRAY_IO_XML}"}],
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication"
         }
-        desc, pkg = self.deploy_process(body, describe_schema=ProcessSchema.OLD)
+        desc, pkg = self.deploy_process(body, describe_schema=ProcessSchema.OLD, mock_requests_only_local=False)
 
         # basic contents validation
         assert "cwlVersion" in pkg
@@ -2512,3 +2821,11 @@ class WpsPackageAppWithS3BucketTest(WpsConfigBase):
             assert not os.path.exists(os.path.join(wps_outdir, job_id, out_file))
             assert not os.path.exists(os.path.join(wps_outdir, wps_uuid, out_file))
         assert os.path.isfile(os.path.join(wps_outdir, f"{job_id}.xml"))
+
+    # FIXME: implement
+    @pytest.mark.skip(reason="OAS execute parse/validate values not implemented")
+    def test_execute_job_with_oas_validation(self):
+        """
+        Process with :term:`OpenAPI` I/O definitions validates the schema of the submitted :term:`JSON` data.
+        """
+        raise NotImplementedError

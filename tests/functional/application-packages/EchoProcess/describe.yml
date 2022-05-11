@@ -1,0 +1,251 @@
+# Reference (converted to YAML for comments):
+#   https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/d52579/core/examples/json/ProcessDescription.json
+# Modifications applied where noted, mostly for unsupported or incomplete definitions.
+id: EchoProcess
+title: Echo Process
+version: 1.0.0
+description: This process accepts inputs of different types and simply echoes each input as its corresponding output.
+inputs:
+  arrayInput:
+    description: |
+      This is an example of a single process input that is an array of values. 
+      In this case, the input array would be interpreted as a single value and not as individual inputs.
+    schema:
+      items:
+        type: integer
+      maxItems: 10
+      minItems: 2
+      type: array
+    title: Array Input Example
+  # FIXME: Support BoundingBox I/O (https://github.com/crim-ca/weaver/issues/51)
+  #        parsing will work and will be detected/converted to a JSON file (for eventual CWL call),
+  #        but currently the transition to WPS I/O and from WPS->CWL I/O is not implemented.
+  boundingBoxInput:
+    description: This is an example of a BBOX literal input.
+    schema:
+      allOf:
+        - format: ogc-bbox
+        # - $ref: ../../openapi/schemas/bbox.yaml
+        - $ref: https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/d52579/core/openapi/schemas/bbox.yaml
+    title: Bounding Box Input Example
+  complexObjectInput:
+    description: This is an example of a complex object input.
+    schema:
+      properties:
+        property1:
+          type: string
+        property2:
+          format: uri
+          type: string
+        property3:
+          type: number
+        property4:
+          format: date-time
+          type: string
+        property5:
+          type: boolean
+      required:
+        - property1
+        - property5
+      type: object
+    title: Complex Object Input Example
+  dateInput:
+    description: This is an example of a DATE literal input.
+    schema:
+      format: date-time
+      type: string
+    title: Date Literal Input Example
+  doubleInput:
+    description: |
+      This is an example of a DOUBLE literal input that is bounded between
+      a value greater than 0 and 10.  The default value is 5.
+    schema:
+      default: 5
+      exclusiveMinimum: true
+      format: double
+      maximum: 10
+      minimum: 0
+      type: number
+    title: Bounded Double Literal Input Example
+  featureCollectionInput:
+    description: |
+      This is an example of an input that is a feature collection that can be encoded in one of three ways: as a 
+      GeoJSON feature collection, as a GML feature collection retrieved from a WFS or as a KML document.
+    schema:
+      oneOf:
+        - contentMediaType: application/gml+xml; version=3.2
+          type: string
+        - contentMediaType: application/vnd.google-earth.kml+xml
+          contentSchema: https://schemas.opengis.net/kml/2.3/ogckml23.xsd
+          type: string
+        - allOf:
+            - format: geojson-feature-collection
+            - $ref: https://geojson.org/schema/FeatureCollection.json
+    title: Feature Collection Input Example.
+  geometryInput:
+    description: |
+      This is an example of a geometry input.  In this case the geometry can be expressed as a GML of GeoJSON geometry.
+    maxOccurs: 5
+    minOccurs: 2
+    schema:
+      oneOf:
+        - contentMediaType: application/gml+xml; version=3.2
+          contentSchema: http://schemas.opengis.net/gml/3.2.1/geometryBasic2d.xsd
+          type: string
+        - allOf:
+            - format: geojson-geometry
+            - $ref: http://schemas.opengis.net/ogcapi/features/part1/1.0/openapi/schemas/geometryGeoJSON.yaml
+    title: Geometry input
+  imagesInput:
+    description: |
+      This is an example of an image input. In this case, the input is an array of up to 150 images that might, 
+      for example, be a set of tiles.  The oneOf[] conditional is used to indicate the acceptable image content types;
+      GeoTIFF and JPEG 2000 in this case.  Each input image in the input array can be included inline in the execute 
+      request as a base64-encoded string or referenced using the link.yaml schema.  The use of a base64-encoded string 
+      is implied by the specification and does not need to be specified in the definition of the input.
+    maxOccurs: 150
+    minOccurs: 1
+    schema:
+      oneOf:
+        - contentEncoding: binary
+          contentMediaType: image/tiff; application=geotiff
+          type: string
+        - contentEncoding: binary
+          contentMediaType: image/jp2
+          type: string
+    title: Inline Images Value Input
+  # FIXME: Support Literal with Unit of Measure (https://github.com/crim-ca/weaver/issues/430)
+  measureInput:
+    description: This is an example of a NUMERIC literal with an associated unit of measure.
+    schema:
+      properties:
+        measurement:
+          type: number
+        reference:
+          format: uri
+          type: string
+        uom:
+          type: string
+      required:
+        - measurement
+        - uom
+      type: object
+    title: Numerical Value with UOM Example
+  stringInput:
+    description: This is an example of a STRING literal input.
+    schema:
+      enum:
+        - Value1
+        - Value2
+        - Value3
+      type: string
+    title: String Literal Input Example
+outputs:
+  arrayOutput:
+    schema:
+      items:
+        type: integer
+      maxItems: 10
+      minItems: 2
+      type: array
+  # FIXME: Support BoundingBox I/O (https://github.com/crim-ca/weaver/issues/51)
+  #        parsing will work and will be detected/converted to a JSON file (for eventual CWL call),
+  #        but currently the transition to WPS I/O and from WPS->CWL I/O is not implemented.
+  boundingBoxOutput:
+    schema:
+      allOf:
+        - format: ogc-bbox
+          # - $ref: ../../openapi/schemas/bbox.yaml
+        - $ref: https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/d52579/core/openapi/schemas/bbox.yaml
+  complexObjectOutput:
+    schema:
+      properties:
+        property1:
+          type: string
+        property2:
+          format: uri
+          type: string
+        property3:
+          type: number
+        property4:
+          format: date-time
+          type: string
+        property5:
+          type: boolean
+      required:
+        - property1
+        - property5
+      type: object
+  dateOutput:
+    schema:
+      format: date-time
+      type: string
+  doubleOutput:
+    schema:
+      default: 5
+      exclusiveMinimum: true
+      format: double
+      maximum: 10
+      minimum: 0
+      type: number
+  featureCollectionOutput:
+    schema:
+      oneOf:
+        - contentMediaType: application/gml+xml; version=3.2
+          type: string
+        - contentMediaType: application/vnd.google-earth.kml+xml
+          contentSchema: https://schemas.opengis.net/kml/2.3/ogckml23.xsd
+          type: string
+        - allOf:
+            - format: geojson-feature-collection
+            - $ref: https://geojson.org/schema/FeatureCollection.json
+  geometryOutput:
+    schema:
+      oneOf:
+        - contentMediaType: application/gml+xml; version=3.2
+          contentSchema: http://schemas.opengis.net/gml/3.2.1/geometryBasic2d.xsd
+          type: string
+        - allOf:
+            - format: geojson-geometry
+            - $ref: http://schemas.opengis.net/ogcapi/features/part1/1.0/openapi/schemas/geometryGeoJSON.yaml
+  imagesOutput:
+    schema:
+      oneOf:
+      - contentEncoding: binary
+        contentMediaType: image/tiff; application=geotiff
+        type: string
+      - contentEncoding: binary
+        contentMediaType: image/jp2
+        type: string
+  # FIXME: Support Literal with Unit of Measure (https://github.com/crim-ca/weaver/issues/430)
+  measureOutput:
+    schema:
+      properties:
+        measurement:
+          type: number
+        reference:
+          format: uri
+          type: string
+        uom:
+          type: string
+      required:
+        - measurement
+        - uom
+      type: object
+  stringOutput:
+    schema:
+      enum:
+        - Value1
+        - Value2
+        - Value3
+      type: string
+jobControlOptions:
+  - async-execute
+  - sync-execute
+links:
+  - href: https://processing.example.org/oapi-p/processes/EchoProcess/execution
+    rel: http://www.opengis.net/def/rel/ogc/1.0/execute
+    title: Execute endpoint
+outputTransmission:
+  - value
+  - reference

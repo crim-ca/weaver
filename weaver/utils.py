@@ -1,12 +1,15 @@
+import difflib
 import errno
 import functools
 import inspect
+import json
 import logging
 import os
 import posixpath
 import re
 import shutil
 import sys
+import tempfile
 import time
 import warnings
 from copy import deepcopy
@@ -22,6 +25,7 @@ import yaml
 from beaker.cache import cache_region, region_invalidate
 from beaker.exceptions import BeakerException
 from celery.app import Celery
+from jsonschema.validators import RefResolver as JsonSchemaRefResolver
 from pyramid.config import Configurator
 from pyramid.exceptions import ConfigurationError
 from pyramid.httpexceptions import (
@@ -66,6 +70,7 @@ if TYPE_CHECKING:
         JSON,
         KVP,
         KVP_Item,
+        OpenAPISchema,
         Number,
         SettingsType
     )
@@ -137,6 +142,26 @@ class NullType(metaclass=_Singleton):
 
 # pylint: disable=C0103,invalid-name
 null = NullType()
+
+
+class SchemaRefResolver(JsonSchemaRefResolver):
+    """
+    Reference resolver that supports both :term:`JSON` and :term:`YAML` files from a remote location.
+    """
+    # only need to override the remote resolution to add YAML support
+    def resolve_remote(self, uri):
+        # type: (str) -> OpenAPISchema
+        try:
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                schema_file = fetch_file(uri, tmp_dir, headers={"Accept": ContentType.APP_JSON})
+                with open(schema_file, mode="r", encoding="utf-8") as io_f:
+                    result = yaml.safe_load(io_f)
+        except Exception as exc:
+            raise ValueError(f"External OpenAPI schema reference [{uri}] could not be loaded.") from exc
+
+        if self.cache_remote:
+            self.store[uri] = result
+        return result
 
 
 def get_weaver_url(container):
@@ -398,7 +423,7 @@ def parse_prefer_header_execute_mode(
     Obtain execution preference if provided in request headers.
 
     .. seealso::
-        - `OGC API - Processes: Core, Execution mode <
+        - :term:`OGC API - Processes`: Core, Execution mode <
           https://docs.ogc.org/is/18-062r2/18-062r2.html#sc_execution_mode>`_.
           This defines all conditions how to handle ``Prefer`` against applicable :term:`Process` description.
         - :rfc:`7240#section-4.1` HTTP Prefer header ``respond-async``
@@ -1703,3 +1728,30 @@ def transform_json(json_data,               # type: Dict[str, JSON]
                         if k in nested_item:
                             nested_item[k] = func(nested_item[k])
     return json_data
+
+
+def generate_diff(val, ref, val_name="Test", ref_name="Reference"):
+    # type: (Any, Any, str, str) -> str
+    """
+    Generates a line-by-line diff result of the test value against the reference value.
+
+    Attempts to parse the contents as JSON to provide better diff of matched/sorted lines, and falls back to plain
+    line-based string representations otherwise.
+
+    :param val: Test input value.
+    :param ref: Reference input value.
+    :param val_name: Name to apply in diff for test input value.
+    :param ref_name: Name to apply in diff for reference input value.
+    :returns: Formatted multiline diff,
+    """
+    try:
+        val = json.dumps(val, sort_keys=True, indent=2, ensure_ascii=False)
+    except Exception:  # noqa
+        val = str(val)
+    try:
+        ref = json.dumps(ref, sort_keys=True, indent=2, ensure_ascii=False)
+    except Exception:  # noqa
+        ref = str(ref)
+    val = val.splitlines()
+    ref = ref.splitlines()
+    return "\n".join(difflib.context_diff(val, ref, fromfile=val_name, tofile=ref_name))

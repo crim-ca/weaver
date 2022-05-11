@@ -164,7 +164,7 @@ class OutputFormat(Constants):
         if fmt == OutputFormat.JSON_STR:
             return repr_json(data, indent=2, ensure_ascii=False)
         if fmt == OutputFormat.JSON_RAW:
-            return repr_json(data, ensure_ascii=False)
+            return repr_json(data, indent=None, ensure_ascii=False)
         if fmt in [OutputFormat.XML, OutputFormat.XML_RAW, OutputFormat.XML_STR]:
             pretty = fmt == OutputFormat.XML_STR
             xml = Json2xml(data, item_wrap=True, pretty=pretty, wrapper=item_root).to_xml()
@@ -179,6 +179,10 @@ class OutputFormat(Constants):
                 yml = yml[:-4]
             return yml
         return data
+
+
+class SchemaRole(Constants):
+    JSON_SCHEMA = "https://www.w3.org/2019/wot/json-schema"
 
 
 # explicit mime-type to extension when not literally written in item after '/' (excluding 'x-' prefix)
@@ -631,8 +635,8 @@ def guess_target_format(request, default=ContentType.APP_JSON):
     return content_type
 
 
-def repr_json(data, force_string=True, **kwargs):
-    # type: (Any, bool, **Any) -> Union[JSON, str, None]
+def repr_json(data, force_string=True, ensure_ascii=False, indent=2, **kwargs):
+    # type: (Any, bool, bool, Optional[int], **Any) -> Union[JSON, str, None]
     """
     Ensure that the input data can be serialized as JSON to return it formatted representation as such.
 
@@ -641,7 +645,7 @@ def repr_json(data, force_string=True, **kwargs):
     if data is None:
         return None
     try:
-        data_str = json.dumps(data, **kwargs)
+        data_str = json.dumps(data, indent=indent, ensure_ascii=ensure_ascii, **kwargs)
         return data_str if force_string else data
     except Exception:  # noqa: W0703 # nosec: B110
         return str(data)

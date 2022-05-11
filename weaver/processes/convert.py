@@ -3,6 +3,7 @@ Conversion functions between corresponding data structures.
 """
 import json
 import logging
+import os
 from collections import OrderedDict
 from collections.abc import Hashable
 from copy import deepcopy
@@ -14,17 +15,36 @@ from owslib.wps import ComplexData, Metadata as OWS_Metadata, is_reference
 from pywps import Process as ProcessWPS
 from pywps.app.Common import Metadata as WPS_Metadata
 from pywps.inout import BoundingBoxInput, BoundingBoxOutput, ComplexInput, ComplexOutput, LiteralInput, LiteralOutput
-from pywps.inout.basic import BasicIO
+from pywps.inout.basic import BasicBoundingBox, BasicComplex, BasicIO
 from pywps.inout.formats import Format
-from pywps.inout.literaltypes import ALLOWEDVALUETYPE, RANGECLOSURETYPE, AllowedValue, AnyValue
+from pywps.inout.literaltypes import ALLOWEDVALUETYPE, LITERAL_DATA_TYPES, RANGECLOSURETYPE, AllowedValue, AnyValue
 from pywps.validator.mode import MODE
 
 from weaver import xml_util
 from weaver.exceptions import PackageTypeError
 from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
-from weaver.formats import ContentType, get_cwl_file_format, get_extension, get_format
+from weaver.formats import (
+    ContentType,
+    SchemaRole,
+    get_content_type,
+    get_cwl_file_format,
+    get_extension,
+    get_format,
+    repr_json
+)
 from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_WPS1,
+    OAS_ARRAY_TYPES,
+    OAS_COMPLEX_TYPES,
+    OAS_KEYWORD_TYPES,
+    OAS_LITERAL_BINARY_FORMATS,
+    OAS_LITERAL_DATETIME_FORMATS,
+    OAS_LITERAL_FLOAT_FORMATS,
+    OAS_LITERAL_INTEGER_FORMATS,
+    OAS_LITERAL_NUMERIC,
+    OAS_LITERAL_NUMERIC_FORMATS,
+    OAS_LITERAL_STRING_FORMATS,
+    OAS_LITERAL_TYPES,
     PACKAGE_ARRAY_BASE,
     PACKAGE_ARRAY_ITEMS,
     PACKAGE_ARRAY_MAX_SIZE,
@@ -35,14 +55,22 @@ from weaver.processes.constants import (
     WPS_BOUNDINGBOX,
     WPS_COMPLEX,
     WPS_COMPLEX_DATA,
+    WPS_COMPLEX_TYPES,
+    WPS_DATA_TYPES,
     WPS_INPUT,
     WPS_LITERAL,
-    WPS_LITERAL_DATA_TYPE_NAMES,
+    WPS_LITERAL_DATA_BOOLEAN,
+    WPS_LITERAL_DATA_DATETIME,
+    WPS_LITERAL_DATA_FLOAT,
+    WPS_LITERAL_DATA_INTEGER,
+    WPS_LITERAL_DATA_STRING,
+    WPS_LITERAL_DATA_TYPES,
     WPS_OUTPUT,
     WPS_REFERENCE,
     ProcessSchema
 )
 from weaver.utils import (
+    SchemaRefResolver,
     bytes2str,
     fetch_file,
     fully_qualified_name,
@@ -71,7 +99,7 @@ if TYPE_CHECKING:
     )
     from requests.models import Response
 
-    from weaver.processes.constants import ProcessSchemaType
+    from weaver.processes.constants import ProcessSchemaType, WPS_DataType
     from weaver.typedefs import (
         AnySettingsContainer,
         AnyValueType,
@@ -86,6 +114,11 @@ if TYPE_CHECKING:
         ExecutionOutputs,
         JobValueFile,
         JSON,
+        OpenAPISchema,
+        OpenAPISchemaArray,
+        OpenAPISchemaObject,
+        OpenAPISchemaProperty,
+        OpenAPISchemaKeyword,
         TypedDict
     )
     from weaver.wps_restapi.constants import JobInputsOutputsSchemaType
@@ -99,6 +132,11 @@ if TYPE_CHECKING:
     OWS_Output_Type = Union[OWS_Output_Base, BoundingBox, BoundingBoxDataInput, ComplexData]
     OWS_IO_Type = Union[OWS_Input_Type, OWS_Output_Type]
     JSON_IO_Type = JSON
+    JSON_IO_TypedInfo = TypedDict("JSON_IO_TypedInfo", {
+        "type": WPS_DataType,  # noqa
+        "data_type": Optional[str],
+        "data_uom": Optional[bool],
+    }, total=False)
     JSON_IO_ListOrMap = Union[List[JSON], Dict[str, Union[JSON, str]]]
     CWL_IO_Type = Union[CWL_Input_Type, CWL_Output_Type]
     PKG_IO_Type = Union[JSON_IO_Type, WPS_IO_Type]
@@ -124,9 +162,10 @@ WPS_FIELD_MAPPING = {
                             "Allowedcollections"],
     "any_value": ["anyvalue", "anyValue", "AnyValue"],
     "literal_data_domains": ["literalDataDomains"],
-    "default": ["default_value", "defaultValue", "DefaultValue", "Default", "data_format", "data"],
+    "default": ["default_value", "defaultValue", "DefaultValue", "Default", "_default", "data_format", "data"],
     "supported_values": ["SupportedValues", "supportedValues", "supportedvalues", "Supported_Values"],
     "supported_formats": ["SupportedFormats", "supportedFormats", "supportedformats", "Supported_Formats", "formats"],
+    "supported_crs": ["SupportedCRS", "supportedCRS", "crss", "crs", "CRS"],
     "additional_parameters": ["AdditionalParameters", "additionalParameters", "additionalparameters",
                               "Additional_Parameters"],
     "type": ["Type", "data_type", "dataType", "DataType", "Data_Type"],
@@ -134,7 +173,8 @@ WPS_FIELD_MAPPING = {
     "max_occurs": ["maxOccurs", "MaxOccurs", "Max_Occurs", "maxoccurs"],
     "max_megabytes": ["maximumMegabytes", "max_size"],
     "mime_type": ["mimeType", "MimeType", "mime-type", "Mime-Type", "mimetype",
-                  "mediaType", "MediaType", "media-type", "Media-Type", "mediatype"],
+                  "mediaType", "MediaType", "media-type", "Media-Type", "mediatype",
+                  "content_type", "contentMediaType"],
     "range_minimum": ["minval", "minimum", "minimumValue"],
     "range_maximum": ["maxval", "maximum", "maximumValue"],
     "range_spacing": ["spacing"],
@@ -142,18 +182,13 @@ WPS_FIELD_MAPPING = {
     "encoding": ["Encoding", "content_encoding", "contentEncoding"],
     "schema": ["Schema", "contentSchema"],
     "href": ["url", "link", "reference"],
+    "uom": ["UoM", "unit"],
+    "measure": ["value", "measurement"],
 }
 # WPS fields that contain a structure corresponding to `Format` object
 #   - keys must match `WPS_FIELD_MAPPING` keys
 #   - fields are placed in order of relevance (prefer explicit format, then supported, and defaults as last resort)
 WPS_FIELD_FORMAT = ["formats", "supported_formats", "supported_values", "default"]
-
-# WPS 'type' string variations employed to indicate a Complex (file) I/O by different libraries
-# for literal types, see 'any2cwl_literal_datatype' and 'any2wps_literal_datatype' functions
-WPS_COMPLEX_TYPES = [WPS_COMPLEX, WPS_COMPLEX_DATA, WPS_REFERENCE]
-
-# WPS 'type' string of all combinations (type of data / library implementation)
-WPS_ALL_TYPES = [WPS_LITERAL, WPS_BOUNDINGBOX] + WPS_COMPLEX_TYPES
 
 # default format if missing (minimal requirement of one)
 DEFAULT_FORMAT = Format(mime_type=ContentType.TEXT_PLAIN)
@@ -218,18 +253,6 @@ def metadata2json(meta, force=False):
         rel = str(title or role or href_rel).lower()  # fallback to first available
         rel = get_sane_name(rel, replace_character="-", assert_invalid=False)
     return {"href": href, "title": title, "role": role, "rel": rel, "type": ctype}
-
-
-def ows2json_field(ows_field):
-    # type: (Union[ComplexData, OWS_Metadata, AnyValueType]) -> Union[JSON, AnyValueType]
-    """
-    Obtains the JSON or raw value from an :mod:`owslib.wps` I/O field.
-    """
-    if isinstance(ows_field, ComplexData):
-        return complex2json(ows_field)
-    if isinstance(ows_field, OWS_Metadata):
-        return metadata2json(ows_field)
-    return ows_field
 
 
 def ows2json_io(ows_io):
@@ -305,7 +328,7 @@ def ows2json_io(ows_io):
         return json_io
 
     # add value constraints in specifications
-    elif io_type in WPS_LITERAL_DATA_TYPE_NAMES:
+    elif io_type in WPS_LITERAL_DATA_TYPES:
         domains = any2json_literal_data_domains(ows_io)
         if domains:
             json_io["literalDataDomains"] = domains
@@ -423,9 +446,10 @@ def _get_multi_json_references(output, container):
 def any2cwl_io(wps_io, io_select):
     # type: (Union[JSON_IO_Type, WPS_IO_Type, OWS_IO_Type], str) -> Tuple[CWL_IO_Type, Dict[str, str]]
     """
-    Converts a `WPS`-like I/O to `CWL` corresponding I/O.
+    Converts a :term:`WPS`-like I/O from various :term:`WPS` library representations to :term:`CWL` corresponding I/O.
 
-    Because of `CWL` I/O of type `File` with `format` field, the applicable namespace is also returned.
+    Conversion can be accomplished for :mod:`pywps` and :mod:`owslib` objects, as well as their :term:`JSON` equivalent.
+    Because :term:`CWL` I/O of type ``File`` with ``format`` field are namespaced, this is also returned if needed.
 
     :returns: converted I/O and namespace dictionary with corresponding format references as required
     """
@@ -464,7 +488,7 @@ def any2cwl_io(wps_io, io_select):
                 if cwl_io_ref and cwl_io_fmt:
                     cwl_ns.update(cwl_io_ref)
                 break
-            if isinstance(fmt, list):
+            if isinstance(fmt, (list, tuple)):
                 if len(fmt) == 1:
                     cwl_io_ref, cwl_io_fmt, cwl_io_ext = _get_cwl_fmt_details(fmt[0])
                     if cwl_io_ref and cwl_io_fmt:
@@ -768,7 +792,7 @@ def is_cwl_enum_type(io_info):
         return False, io_type, MODE.NONE, None
 
     if "symbols" not in io_type:
-        raise PackageTypeError(f"Unsupported I/O 'enum' definition: '{io_info!r}'.")
+        raise PackageTypeError(f"Unsupported I/O 'enum' definition missing 'symbols': '{io_info!r}'.")
     io_allow = io_type["symbols"]
     if not isinstance(io_allow, list) or len(io_allow) < 1:
         raise PackageTypeError(f"Invalid I/O 'enum.symbols' definition: '{io_info!r}'.")
@@ -946,10 +970,23 @@ def cwl2wps_io(io_info, io_select):
             "title": io_info.get("label", io_name),
             "abstract": io_info.get("doc", ""),
         }
+        # format can represent either a Media-Type or a schema reference
+        # - format as Media-Type is useful for WPS Complex
+        # - format as schema is useful for WPS BoundingBox JSON/YAML structure
         if "format" in io_info:
             io_fmt = io_info["format"]
             io_formats = [io_fmt] if isinstance(io_fmt, str) else io_fmt
-            kw["supported_formats"] = [get_format(fmt) for fmt in io_formats]
+            io_formats = [get_format(fmt) for fmt in io_formats]
+            for i, io_format in enumerate(list(io_formats)):
+                # when CWL namespaced format are not resolved, full path URI to schema is expected
+                # because of full URI, should have lots of '/' (including protocol separator),
+                # use this to detect content schema reference vs content media-type reference
+                if io_format and len(io_format.mime_type.split("/")) > 2:
+                    io_ext = os.path.splitext(io_format.mime_type)[-1]
+                    io_typ = get_content_type(io_ext)
+                    io_format = Format(io_typ, extension=io_ext, schema=io_format.mime_type)
+                    io_formats[i] = io_format
+            kw["supported_formats"] = io_formats
             kw["mode"] = MODE.SIMPLE  # only validate the extension (not file contents)
         else:
             # we need to minimally add 1 format, otherwise empty list is evaluated as None by pywps
@@ -1237,37 +1274,43 @@ def any2cwl_literal_datatype(io_type):
     """
     Solves common literal data-type names to supported ones for `CWL`.
     """
-    if io_type in ["string", "date", "time", "dateTime", "anyURI"]:
+    if io_type in WPS_LITERAL_DATA_STRING | OAS_LITERAL_STRING_FORMATS:
         return "string"
-    if io_type in ["scale", "angle", "float", "double"]:
-        return "float"
-    if io_type in ["integer", "long", "positiveInteger", "nonNegativeInteger"]:
+    if io_type in WPS_LITERAL_DATA_INTEGER | OAS_LITERAL_INTEGER_FORMATS:
         return "int"
-    if io_type in ["bool", "boolean"]:
+    if io_type in WPS_LITERAL_DATA_FLOAT | OAS_LITERAL_FLOAT_FORMATS | OAS_LITERAL_NUMERIC:
+        return "float"
+    if io_type in WPS_LITERAL_DATA_BOOLEAN:
         return "boolean"
     LOGGER.warning("Could not identify a CWL literal data type with [%s].", io_type)
     return null
 
 
-def any2wps_literal_datatype(io_type, is_value):
-    # type: (AnyValueType, bool) -> Union[str, Type[null]]
+def any2wps_literal_datatype(io_type, is_value=False, pywps=False):
+    # type: (AnyValueType, bool, bool) -> Union[str, Type[null]]
     """
     Solves common literal data-type names to supported ones for `WPS`.
 
     Verification is accomplished by name when ``is_value=False``, otherwise with python ``type`` when ``is_value=True``.
+
+    :param io_type: Type to convert to :term:`WPS` supported literal data type.
+    :param is_value: If enabled, consider :paramref:`io_type` literal data itself to attempt detection of the type.
+    :param pywps: If enabled, restrict only to types supported by :mod:`pywps` (subset of full :term:`WPS`).
     """
     if isinstance(io_type, str):
         if not is_value:
-            if io_type in ["string", "date", "time", "dateTime", "anyURI"]:
+            if io_type in WPS_LITERAL_DATA_STRING | OAS_LITERAL_STRING_FORMATS:
+                if io_type in WPS_LITERAL_DATA_DATETIME | OAS_LITERAL_DATETIME_FORMATS:
+                    return io_type if io_type in WPS_LITERAL_DATA_DATETIME else "dateTime"
                 return "string"
-            if io_type in ["scale", "angle", "float", "double"]:
-                return "float"
-            if io_type in ["int", "integer", "long", "positiveInteger", "nonNegativeInteger"]:
+            if io_type in WPS_LITERAL_DATA_INTEGER | OAS_LITERAL_INTEGER_FORMATS:
                 return "integer"
-            if io_type in ["bool", "boolean"]:
+            if io_type in WPS_LITERAL_DATA_FLOAT | OAS_LITERAL_FLOAT_FORMATS | OAS_LITERAL_NUMERIC:
+                return "float" if pywps or io_type not in WPS_LITERAL_DATA_FLOAT else io_type
+            if io_type in WPS_LITERAL_DATA_BOOLEAN:
                 return "boolean"
         LOGGER.warning("Unknown named literal data type: '%s', using default 'string'. Should be one of: %s",
-                       io_type, list(WPS_LITERAL_DATA_TYPE_NAMES))
+                       io_type, list(WPS_LITERAL_DATA_TYPES))
         return "string"
     if is_value and isinstance(io_type, bool):
         return "boolean"
@@ -1307,6 +1350,7 @@ def any2json_literal_allowed_value(io_allow):
             range_fields = ["minimumValue", "maximumValue", "spacing"]
             if allowed_type == "value" or not any(field in io_allow for field in range_fields):
                 return allowed_value
+        io_allow = wps_range
         if not io_allow:  # empty container
             return null
     return io_allow
@@ -1332,7 +1376,7 @@ def any2json_literal_data_domains(io_info):
           - url-string
           - {anyValue: bool}
           - [float, int, bool, str]
-          - [{minimum, maximum, spacing, closure}]
+          - [{minimum: number/none, maximum: number/none, spacing: number/none, closure: str open/close variations}]
     """
     io_type = get_field(io_info, "type", search_variations=False)
     if io_type in [WPS_BOUNDINGBOX, WPS_COMPLEX]:
@@ -1359,6 +1403,672 @@ def any2json_literal_data_domains(io_info):
             wps_value_definition = wps_allowed_values
     domain["valueDefinition"] = wps_value_definition
     return [domain]
+
+
+def json2oas_io_complex(io_info, io_hint=null):
+    # type: (JSON_IO_Type, Union[OpenAPISchema, Type[null]]) -> OpenAPISchema
+    """
+    Convert a single-dimension complex :term:`JSON` I/O definition into corresponding :term:`OpenAPI` schema.
+    """
+    item_types = []
+    item_formats = get_field(io_info, "supported_formats", search_variations=True)
+    if isinstance(item_formats, list) and item_formats:
+        json_schema_refs = set()
+        json_schema_any = None
+        for fmt in item_formats:
+            fmt_media = get_field(fmt, "mime_type", search_variations=True)
+            fmt_encode = get_field(fmt, "encoding", search_variations=True)
+            fmt_schema = get_field(fmt, "schema", search_variations=False)
+            # heuristic to guess more specific encoding
+            fmt_type_as_text = ["multipart/", "application/"]  # others always binary (eg: image)
+            fmt_subtype_as_text = ["+xml", "/json", "yaml"]
+            if not fmt_encode:
+                if fmt_media.startswith("text/") or (
+                    any(fmt_media.startswith(fmt_sub) for fmt_sub in fmt_type_as_text) and
+                    any(fmt_enc in fmt_media for fmt_enc in fmt_subtype_as_text)
+                ):
+                    fmt_encode = None
+                else:
+                    fmt_encode = "base64"
+            if fmt_encode:
+                # format/contentEncoding somewhat redundant,
+                # but providing both allows using "preferred" approach by either OpenAPI 3.0/3.1
+                item_types.append({
+                    "type": "string",
+                    "format": "binary",
+                    "contentMediaType": fmt_media,
+                    "contentEncoding": fmt_encode,
+                })
+            else:
+                item_types.append({
+                    "type": "string",
+                    "contentMediaType": fmt_media,
+                })
+            if fmt_schema:  # could be non-JSON, just a reference
+                item_types[-1]["contentSchema"] = fmt_schema
+            if ContentType.APP_JSON in fmt_media:
+                json_schema_any = True
+                if fmt_schema:  # got an explicit JSON
+                    json_schema_any = False
+                    item_types[-1]["contentSchema"] = fmt_schema
+                    json_schema_refs.add(fmt_schema)
+        json_objects = []
+        if json_schema_any:
+            # if no ref schema, best we can do is 'any JSON' since cannot guess applicable schema not provided by user
+            json_objects = [{"type": "object", "additionalProperties": True}]
+        elif json_schema_refs:
+            json_objects = [{"$ref": ref} for ref in json_schema_refs]
+        # if we have a hint of the raw-data schema originally submitted during deploy, use it instead
+        if isinstance(io_hint, dict):
+            # consider that submitted schema could already have contained 'content[...]' definitions
+            # remove them in this case since they should have already been processed during first conversion/merge
+            io_hint = oas_resolve_remote(io_hint)
+            json_objects = []
+            if "oneOf" in io_hint or "anyOf" in io_hint:
+                for item in io_hint.get("oneOf", io_hint.get("anyOf", [])):
+                    if item.get("type") == "object" or "allOf" in item:
+                        json_objects.append(item)
+            elif "allOf" in io_hint:
+                json_objects = [io_hint]
+            elif io_hint.get("type") == "object":
+                json_objects = [io_hint]
+        item_types.extend(json_objects)
+    else:
+        # complex by reference or encoded data
+        item_types = [{"type": "string", "format": "binary"}]
+    item_schema = {"oneOf": item_types} if len(item_types) > 1 else item_types[0]
+    return item_schema
+
+
+def json2oas_io_bbox(io_info, io_hint=null):
+    # type: (JSON_IO_Type, Union[OpenAPISchema, Type[null]]) -> OpenAPISchema
+    """
+    Convert a single-dimension bounding box :term:`JSON` I/O definition into corresponding :term:`OpenAPI` schema.
+
+    .. seealso::
+        https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/d5257/core/openapi/schemas/bbox.yaml
+    """
+    # don't add the 'enum' of CRS as defined in the reference schema since this is auto-generated
+    # and could mismatch the intended CRS by the user, unless available explicitly
+    crs_schema = {"type": "string", "format": "uri", "default": "http://www.opengis.net/def/crs/OGC/1.3/CRS84"}
+    supported_crs = get_field(io_info, "supported_crs", search_variations=True)
+    if isinstance(supported_crs, list) and all(isinstance(crs, str) for crs in supported_crs):
+        crs_schema["enum"] = supported_crs
+    item_schema = {
+        "type": "object",
+        "format": "ogc-bbox",
+        "required": ["bbox"],
+        "properties": {
+            "crs": crs_schema,
+            "bbox": {
+                "type": "array",
+                "items": "number",
+                "oneOf": [
+                    {"minItems": 4, "maxItems": 4},
+                    {"minItems": 6, "maxItems": 6},
+                ]
+            },
+        }
+    }
+    if isinstance(io_hint, dict):
+        if "$ref" in io_hint:
+            item_schema["$id"] = io_hint["$ref"]
+        elif "allOf" in io_hint:
+            for item in io_hint["allOf"]:
+                if "$ref" in item:
+                    item_schema["$id"] = item["$ref"]
+                    break
+    return item_schema
+
+
+def json2oas_io_literal_data_type(io_type):
+    # type: (str) -> JSON
+    """
+    Converts various literal data types into corresponding :term:`OpenAPI` fields.
+
+    .. seealso::
+        - https://spec.openapis.org/oas/v3.1.0#data-types
+        - https://swagger.io/specification/#data-types
+    """
+    data_info = {"type": "string"}
+    if io_type in OAS_LITERAL_FLOAT_FORMATS | WPS_LITERAL_DATA_FLOAT:
+        data_info["type"] = "number"
+        data_info["format"] = io_type
+    if io_type in OAS_LITERAL_INTEGER_FORMATS | WPS_LITERAL_DATA_INTEGER:
+        data_info["type"] = "integer"
+        if io_type != "integer":
+            data_info["format"] = io_type
+    if io_type in WPS_LITERAL_DATA_BOOLEAN:
+        data_info["type"] = "boolean"
+    if io_type in OAS_LITERAL_STRING_FORMATS | WPS_LITERAL_DATA_STRING:
+        data_info["type"] = "string"
+        if "time" in io_type.lower():
+            data_info["format"] = "date-time"
+        elif "date" in io_type.lower():
+            data_info["format"] = "date"
+        elif io_type != "string":
+            data_info["format"] = io_type
+    if io_type in OAS_LITERAL_BINARY_FORMATS:
+        data_info["type"] = "string"
+        data_info["format"] = "binary"
+    return data_info
+
+
+def json2oas_io_allowed_values(io_base, io_allowed):
+    # type: (JSON, JSON) -> List[JSON]
+    """
+    Converts literal data allowed values :term:`JSON` definitions ino :term:`OpenAPI` equivalent variations.
+
+    :param io_base: Base value definitions that can be shared across variations (e.g.: default values).
+    :param io_allowed: Allowed values definitions (enum, ranges) extracted from :term:`JSON` literal data domains.
+    :return: List of converted :term:`OpenAPI` definitions applicable to represent the allowed values.
+    """
+
+    item_variation = []
+    if isinstance(io_allowed, dict):
+        # anyValue
+        # nothing to do since regardless of true/false, nothing can be applied as OpenAPI schema definition
+        return [io_base]
+    if isinstance(io_allowed, list) and all(isinstance(val_def, (int, float, str)) for val_def in io_allowed):
+        # allowed values
+        # need to split the different types if a mix is used (e.g.: 1, 2, "A", "B")
+        data_val_types = {
+            "string": [val for val in io_allowed if isinstance(val, str)],
+            "number": [val for val in io_allowed if isinstance(val, (float, int))],
+        }
+        for _typ, vals in data_val_types.items():
+            if vals:
+                data_enum = {"type": _typ, "enum": vals}
+                data_enum.update(io_base)
+                if _typ == "number" and all(val for val in io_allowed if isinstance(val, float)):
+                    data_enum.update(json2oas_io_literal_data_type("double"))
+                if _typ == "number" and all(val for val in io_allowed if isinstance(val, int)):
+                    data_enum.update(json2oas_io_literal_data_type("integer"))
+                item_variation.append(data_enum)
+        return item_variation
+    if isinstance(io_allowed, list) and all(isinstance(val_def, dict) for val_def in io_allowed):
+        # allowed ranges
+        for val in io_allowed:
+            min_val = get_field(val, "range_minimum", search_variations=True, default=None)
+            max_val = get_field(val, "range_maximum", search_variations=True, default=None)
+            spacing = get_field(val, "range_spacing", search_variations=True, default=None)
+            closure = get_field(val, "range_closure", search_variations=True, default=RANGECLOSURETYPE.CLOSED)
+            data_range = {}
+            data_range.update(io_base)
+            if min_val is not None:
+                data_range["minimum"] = min_val
+            if max_val is not None:
+                data_range["maximum"] = max_val
+            if spacing is not None:
+                data_range["multipleOf"] = spacing
+            if closure == RANGECLOSURETYPE.OPEN:  # ]min, max[
+                data_range.update({"exclusiveMinimum": True, "exclusiveMaximum": True})
+            elif closure == RANGECLOSURETYPE.OPENCLOSED:  # ]min, max]
+                data_range.update({"exclusiveMinimum": True})
+            elif closure == RANGECLOSURETYPE.CLOSEDOPEN:  # [min, max[
+                data_range.update({"exclusiveMaximum": True})
+            item_variation.append(data_range)
+        return item_variation
+    return [io_base]
+
+
+def json2oas_io_literal(io_info, io_hint=null):
+    # type: (JSON_IO_Type, Union[OpenAPISchema, Type[null]]) -> OpenAPISchema
+    """
+    Convert a single-dimension literal value :term:`JSON` I/O definition into corresponding :term:`OpenAPI` schema.
+    """
+    item_variation = []
+    domains = get_field(io_info, "literal_data_domains", search_variations=True, default=[])
+    for data_info in domains:
+        data_type = get_field(data_info, "type", search_variations=True)
+        if isinstance(data_type, dict) and "name" in data_type:
+            data_type = data_type["name"]
+            data_href = get_field(data_type, "href", search_variations=True)
+        else:
+            data_type = None
+            data_href = None
+        if io_hint:
+            # if original data type is available in hint OAS I/O definition, use it since it should be more specific
+            # because of conversions between type/format of different scopes, some types could be less precise
+            # (eg: 'double' transformed to 'float')
+            data_hint = oas2json_io(io_hint)
+            data_hint = (data_hint or {}).get("data_type")
+            # ignore 'string' type which is the fallback type to avoid undoing proper detection
+            data_hint = null if data_hint == "string" and data_type is not null else data_hint
+            data_type = data_hint or data_type
+        if not data_type:
+            continue
+        data_var = json2oas_io_literal_data_type(data_type)
+        if data_href:
+            data_var["contentSchema"] = data_href
+        data_default = get_field(io_info, "default", search_variations=True)
+        if data_default is not null:
+            data_var["default"] = data_default
+        data_def = get_field(data_info, "valueDefinition")
+        # extend definition with relevant value definitions
+        # basic definition if no special enum/range handling was applied
+        data_var = json2oas_io_allowed_values(data_var, data_def)
+        item_variation.extend(data_var)
+
+    if not domains:
+        return {"type": "string"}
+    if len(item_variation) > 1:
+        item_schema = {"oneOf": item_variation}
+    else:
+        item_schema = item_variation[0]
+    if isinstance(io_hint, dict):
+        if "$ref" in io_hint:
+            item_schema["$id"] = io_hint["$ref"]
+    return item_schema
+
+
+def json2oas_io(io_info, io_hint=null):
+    # type: (JSON_IO_Type, Union[OpenAPISchema, Type[null]]) -> OpenAPISchema
+    """
+    Converts definitions from a :term:`JSON` :term:`Process` I/O definition into corresponding :term:`OpenAPI` schema.
+
+    :param io_info: :term:`WPS` I/O definition to generate a corresponding :term:`OpenAPI` schema.
+    :param io_hint: Reference :term:`OpenAPI` definition that can improve more explicit object definitions.
+    """
+    io_type = get_field(io_info, "type")
+    if io_type == WPS_COMPLEX:
+        item_schema = json2oas_io_complex(io_info, io_hint)
+    elif io_type == WPS_BOUNDINGBOX:
+        item_schema = json2oas_io_bbox(io_info, io_hint)
+    else:
+        item_schema = json2oas_io_literal(io_info, io_hint)
+
+    min_occurs = get_field(io_info, "min_occurs", search_variations=True)
+    max_occurs = get_field(io_info, "max_occurs", search_variations=True)
+    # backward support of values as strings
+    if isinstance(min_occurs, str) and str.isnumeric(min_occurs):
+        min_occurs = int(min_occurs)
+    if isinstance(max_occurs, str) and str.isnumeric(max_occurs):
+        max_occurs = int(max_occurs)
+    # resolve a single/multi/both value cardinality
+    # because specified single-value/objects *MUST* be provided, optional can be represented only by zero-length array
+    if isinstance(min_occurs, int) and (min_occurs == 0 or min_occurs > 1):
+        io_schema = {
+            "type": "array",
+            "items": item_schema,
+            "minItems": min_occurs,
+        }
+        if isinstance(max_occurs, int):
+            io_schema["maxItems"] = max_occurs
+    elif max_occurs == 1 or max_occurs is null:  # assume unspecified is default=1
+        io_schema = item_schema
+    else:
+        array_schema = {"type": "array", "items": item_schema}
+        if isinstance(min_occurs, int):
+            array_schema["minItems"] = min_occurs
+        if isinstance(max_occurs, int):
+            array_schema["maxItems"] = max_occurs
+        # if item schema was itself 'oneOf', combine them to make it easier to read
+        if len(item_schema) == 1 and "oneOf" in item_schema:
+            io_schema = deepcopy(item_schema)  # avoid recursion by dict references
+            io_schema["oneOf"].append(array_schema)  # noqa
+        # otherwise simply stack (still valid, just slightly more confusing to read)
+        else:
+            io_schema = {
+                "oneOf": [
+                    item_schema,
+                    array_schema,
+                ]
+            }
+    return io_schema
+
+
+def oas2json_io_literal(io_info):
+    # type: (OpenAPISchemaProperty) -> Union[JSON_IO_TypedInfo, Type[null]]
+    """
+    Converts a literal value I/O definition by :term:`OpenAPI` schema into the equivalent :term:`JSON` representation.
+
+    :param io_info: :term:`OpenAPI` schema of the I/O.
+    :return: Converted :term:`JSON` I/O definition, or :data:`null` if definition could not be resolved.
+    """
+    io_type = get_field(io_info, "type", search_variations=False)
+    io_fmt = get_field(io_info, "format", search_variations=False)
+    if io_fmt is not null:
+        if io_type in OAS_LITERAL_NUMERIC:
+            if io_fmt in OAS_LITERAL_FLOAT_FORMATS:
+                io_type = "double"
+            elif io_fmt in OAS_LITERAL_INTEGER_FORMATS:
+                io_type = "integer"
+        elif io_fmt in OAS_LITERAL_STRING_FORMATS:
+            io_type = io_fmt
+    data_type = any2wps_literal_datatype(io_type, False)
+    io_json = {"type": WPS_LITERAL, "data_type": data_type}
+    io_enum = get_field(io_info, "enum", search_variations=False)
+    min_val = get_field(io_info, "minimum", search_variations=False)
+    max_val = get_field(io_info, "maximum", search_variations=False)
+    min_exc = get_field(io_info, "exclusiveMinimum", search_variations=False, default=False)
+    max_exc = get_field(io_info, "exclusiveMaximum", search_variations=False, default=False)
+    mult_of = get_field(io_info, "multipleOf", search_variations=False, default=None)
+    io_allow = null
+    if io_enum is not null:
+        io_allow = {"allowed_values": io_enum}
+    elif min_val is not null or max_val is not null:
+        if min_exc and max_exc:
+            closure = RANGECLOSURETYPE.OPEN
+        elif min_exc:
+            closure = RANGECLOSURETYPE.OPENCLOSED
+        elif max_exc:
+            closure = RANGECLOSURETYPE.CLOSEDOPEN
+        else:
+            closure = RANGECLOSURETYPE.CLOSED
+        io_allow = {
+            "allowed_values": [{
+                "minimum": min_val,
+                "maximum": max_val,
+                "spacing": mult_of,
+                "closure": closure
+            }]
+        }
+    if io_allow is not null:
+        io_allow.update(io_info)  # noqa
+        io_allow["data_type"] = data_type
+        domains = any2json_literal_data_domains(io_allow)
+        io_json["literalDataDomains"] = domains
+    return io_json
+
+
+def oas2json_io_array(io_info):
+    # type: (OpenAPISchemaArray) -> Union[JSON_IO_TypedInfo, Type[null]]
+    """
+    Converts an array I/O definition by :term:`OpenAPI` schema into the equivalent :term:`JSON` representation.
+
+    :param io_info: :term:`OpenAPI` schema of the I/O.
+    :return: Converted :term:`JSON` I/O definition, or :data:`null` if definition could not be resolved.
+    """
+    io_items = get_field(io_info, "items", search_variations=False)
+    io_json = oas2json_io(io_items)
+    min_items = get_field(io_info, "minItems")
+    max_items = get_field(io_info, "maxItems")
+    if isinstance(min_items, int):
+        io_json["minOccurs"] = min_items
+    if isinstance(max_items, int):
+        io_json["maxOccurs"] = max_items
+    return io_json
+
+
+def oas2json_io_object(io_info, io_href=null):
+    # type: (OpenAPISchemaObject, str) -> Union[JSON_IO_TypedInfo, Type[null]]
+    """
+    Converts an object I/O definition by :term:`OpenAPI` schema into the equivalent :term:`JSON` representation.
+
+    An explicit :term:`OpenAPI` schema with ``object`` type can represent any of the following I/O:
+
+      - Bounding Box as GeoJSON feature
+      - Complex JSON structure
+
+    .. seealso::
+        :func:`oas2json_io_file` is used for file reference to be parsed as other Complex I/O.
+
+    :param io_info: :term:`OpenAPI` schema of the I/O.
+    :param io_href: Alternate schema reference for the type.
+    :return: Converted :term:`JSON` I/O definition, or :data:`null` if definition could not be resolved.
+    """
+    io_fmt = get_field(io_info, "format", search_variations=False)
+    io_props = get_field(io_info, "properties", search_variations=False) or {}
+    if ("bbox" in io_props and "crs" in io_props) or io_fmt == "ogc-bbox":
+        io_json = {"type": WPS_BOUNDINGBOX}
+        io_crs = get_field(io_props, "crs", search_variations=False)
+        if isinstance(io_crs, dict):
+            io_crs_allow = get_field(io_crs, "enum", search_variations=False)
+            if isinstance(io_crs_allow, list) and all(isinstance(crs, str) for crs in io_crs_allow):
+                io_json["supported_crs"] = io_crs_allow
+        if io_href is not null:
+            io_meta = {"href": io_href, "role": SchemaRole.JSON_SCHEMA, "title": "Schema"}
+            io_ext = os.path.splitext(io_href)[-1]
+            io_ctype = io_ext and get_content_type(io_ext)
+            if io_ctype:
+                io_meta["type"] = io_ctype
+            io_json["metadata"] = [io_meta]
+    else:
+        # note:
+        #  In this case we are dealing only with literal OAS objects, therefore JSON content.
+        #  Complex I/O provided by file reference are done by other methods.
+        obj_fmt = {"mime_type": ContentType.APP_JSON}
+        if io_href is not null:
+            obj_fmt["schema"] = io_href
+        io_json = {"type": WPS_COMPLEX, "supported_formats": [obj_fmt]}
+    return io_json
+
+
+def oas2json_io_keyword(io_info):
+    # type: (OpenAPISchemaKeyword) -> Union[JSON_IO_TypedInfo, Type[null]]
+    """
+    Converts a keyword I/O definition by :term:`OpenAPI` schema into the equivalent :term:`JSON` representation.
+
+    Keywords are defined as a list of combinations of :term:`OpenAPI` schema representing how to combine them
+    according to the keyword value, being one of :data:`OAS_KEYWORD_TYPES`.
+
+    :param io_info: :term:`OpenAPI` schema of the I/O.
+    :return: Converted :term:`JSON` I/O definition, or :data:`null` if definition could not be resolved.
+    """
+    # if cannot be resolved, must be too ambiguous, so assume complex data dump
+    io_json = {"type": WPS_COMPLEX, "supported_formats": [{"mime_type": ContentType.APP_JSON}]}
+    kw_key_val = {key: val for key, val in io_info.items() if key in OAS_KEYWORD_TYPES}
+    if len(kw_key_val) != 1:
+        return null
+    keyword = list(kw_key_val)[0]
+    keyword_schemas = io_info[keyword]
+    if keyword == "not":
+        keyword_objects = [oas2json_io(keyword_schemas)]  # noqa
+    elif keyword == "allOf":
+        merged_schema = {}  # type: OpenAPISchema
+        for schema in keyword_schemas:
+            merged_schema.update(schema)
+        keyword_objects = [oas2json_io(merged_schema)]
+    else:
+        keyword_objects = [oas2json_io(schema) for schema in keyword_schemas]
+    keyword_types = [get_field(obj, "type", search_variations=False) for obj in keyword_objects]
+    keyword_types = set(filter(lambda obj: isinstance(obj, str), keyword_types))
+    keyword_dtypes = [get_field(obj, "data_type", search_variations=False) for obj in keyword_objects]
+    keyword_dtypes = set(filter(lambda obj: isinstance(obj, str), keyword_dtypes))
+    if keyword_types:
+        # literals are all or nothing, but can allow different 'data format'
+        # any mixed type with literal must be elevated to complex since there is no way to handle both as literals
+        if all(typ == WPS_LITERAL for typ in keyword_types):
+            io_json = {"type": WPS_LITERAL}
+            if keyword_dtypes and len(keyword_dtypes) == 1:
+                io_json["data_type"] = list(keyword_dtypes)[0]
+            elif all(dtype in OAS_LITERAL_FLOAT_FORMATS for dtype in keyword_dtypes):
+                io_json["data_type"] = "double"
+            elif all(dtype in OAS_LITERAL_INTEGER_FORMATS for dtype in keyword_dtypes):
+                io_json["data_type"] = "integer"
+            # acceptable to use 'numeric' for either integers or floats
+            elif all(dtype in OAS_LITERAL_NUMERIC | OAS_LITERAL_NUMERIC_FORMATS for dtype in keyword_dtypes):
+                io_json["data_type"] = "numeric"
+            else:
+                io_json["data_type"] = "string"
+        # since some variations can be an external reference or a partial definition,
+        # anything matching a bbox marks the whole definition as one, falling back to complex otherwise
+        elif any(typ == WPS_BOUNDINGBOX for typ in keyword_types):
+            for obj_json in keyword_objects:
+                io_type = get_field(obj_json, "type")
+                if io_type == WPS_BOUNDINGBOX:
+                    io_json = obj_json
+                    break
+        elif all(typ == WPS_COMPLEX for typ in keyword_types):
+            # improve definition of complex type of multiple distinct supported formats
+            formats = []
+            for obj_json in keyword_objects:
+                obj_fmt = get_field(obj_json, "supported_formats", default=[])
+                formats.extend([fmt for fmt in obj_fmt if fmt not in formats])
+            io_json = {"type": WPS_COMPLEX, "supported_formats": formats}
+    return io_json
+
+
+def oas2json_io_file(io_info, io_href=null):
+    # type: (OpenAPISchemaObject, str) -> JSON_IO_TypedInfo
+    """
+    Converts a file reference I/O definition by :term:`OpenAPI` schema into the equivalent :term:`JSON` representation.
+
+    :param io_info: :term:`OpenAPI` schema of the I/O.
+    :param io_href: Alternate schema reference for the type.
+    :return: Converted :term:`JSON` I/O definition, or :data:`null` if definition could not be resolved.
+    """
+    io_json = {"type": WPS_COMPLEX}
+    io_ctype = get_field(io_info, "contentMediaType", search_variations=False)
+    io_encode = get_field(io_info, "contentEncoding", search_variations=False)
+    io_schema = get_field(io_info, "contentSchema", search_variations=False, default=io_href)
+    io_format = {}
+    if isinstance(io_encode, str):
+        io_format["encoding"] = io_encode
+    if isinstance(io_schema, str):
+        io_format["schema"] = io_schema
+    if isinstance(io_ctype, str):
+        io_format["mime_type"] = io_ctype
+        # other fields don't matter if required media-type is omitted
+        io_json["supported_formats"] = [io_format]
+    return io_json
+
+
+def oas2json_io_measure(io_info):
+    # type: (OpenAPISchemaObject) -> Union[JSON_IO_TypedInfo, Type[null]]
+    """
+    Convert an unit of measure (``UoM``) I/O definition by :term:`OpenAPI` schema into :term:`JSON` representation.
+
+    This conversion projects an object (normally complex type) into a literal type, considering that other provided
+    parameters are all metadata information.
+
+    :param io_info: Potential :term:`OpenAPI` schema of an UoM I/O.
+    :return: Converted I/O if it matched the UoM format, or null otherwise.
+    """
+    io_type = get_field(io_info, "type", search_variations=False)
+    if io_type == "object":
+        io_prop = get_field(io_info, "properties", search_variations=False)
+        if isinstance(io_prop, dict):
+            io_uom = get_field(io_prop, "uom", search_variations=True)
+            io_val = get_field(io_prop, "measure", search_variations=True)
+            if isinstance(io_uom, dict) and isinstance(io_val, dict):
+                io_key = get_field(io_prop, "measure", search_variations=True, key=True)
+                io_req = get_field(io_info, "required", search_variations=False)
+                if not isinstance(io_req, list) or io_key not in io_req:
+                    io_err = repr_json(io_info, force_string=True, indent=None)
+                    raise ValueError(
+                        f"Detected UoM I/O schema but missing 'required' field entry for the measure value: {io_err}"
+                    )
+                # detect if any number, int/float explicit, or any min/max constraints
+                return oas2json_io_literal(io_val)
+    return null
+
+
+def oas2json_io(io_info):
+    # type: (OpenAPISchema) -> Union[JSON_IO_TypedInfo, Type[null]]
+    """
+    Converts an I/O definition by :term:`OpenAPI` schema into the equivalent :term:`JSON` representation.
+
+    :param io_info: :term:`OpenAPI` schema of the I/O.
+    :return: Converted :term:`JSON` I/O definition, or :data:`null` if definition could not be resolved.
+    """
+    io_href = get_field(io_info, "$ref")
+    io_info = oas_resolve_remote(io_info)
+    io_type = get_field(io_info, "type", search_variations=False)
+    io_json = null
+
+    # File I/O can be defined with raw-data string type, but must be associated with content information to
+    # help distinguish them from plain string value. Try to detect this to avoid literal data interpretation.
+    # NOTE:
+    #   Don't include "{type: string, format: uri}" as complex type.
+    #   Leave this as the method to indicate that a process uses a plain URL reference that must not be fetched.
+    if io_type == "string":
+        io_ctype = get_field(io_info, "contentMediaType", search_variations=False)
+        io_encode = get_field(io_info, "contentEncoding", search_variations=False)
+        # io_schema = get_field(io_info, "contentSchema", search_variations=False)  # ignore since possible in literal
+        if any(io_field is not null for io_field in [io_ctype, io_encode]):
+            io_type = WPS_COMPLEX  # set value to avoid null return below, but no parsing after since not OAS type
+            io_json = oas2json_io_file(io_info, io_href)
+
+    else:
+        # known special case of extended OAS object representing a literal (unit of measure)
+        io_json = oas2json_io_measure(io_info)
+        if io_json:
+            io_type = WPS_LITERAL  # set value to avoid null return below, but no parsing after since not OAS type
+
+    if io_type is not null:
+        if io_type in OAS_LITERAL_TYPES:
+            io_json = oas2json_io_literal(io_info)
+        elif io_type in OAS_COMPLEX_TYPES:
+            io_json = oas2json_io_object(io_info, io_href)
+        elif io_type in OAS_ARRAY_TYPES:
+            io_json = oas2json_io_array(io_info)
+    elif any(key in OAS_KEYWORD_TYPES for key in io_info):
+        io_json = oas2json_io_keyword(io_info)
+        # in case this keyword was a large combination of multiple complex JSON variants with a reference schema
+        # forward the reference in the supported type since this is a special case that we extend with contentSchema
+        io_type = get_field(io_json, "type", default="keyword")  # ensure not null value to skip return null
+        if io_type == WPS_COMPLEX:
+            io_formats = get_field(io_json, "supported_formats", default=[])
+            if "$id" in io_info and len(io_formats) == 1:
+                io_ctype = get_field(io_formats[0], "mime_type", search_variations=True)
+                if io_ctype and ContentType.APP_JSON in io_ctype:
+                    io_formats[0]["schema"] = io_info["$id"]
+    if io_type is null or io_json is null:
+        LOGGER.debug("Unknown OpenAPI to JSON I/O resolution for schema: %s", repr_json(io_info))
+        return null
+
+    # default literal value can help resolve as last resort if specific type cannot be inferred
+    io_default = get_field(io_info, "default", search_variations=False)
+    if io_default is not null:
+        io_json["default"] = io_default
+    return io_json
+
+
+def oas_resolve_remote(io_info):
+    # type: (OpenAPISchema) -> OpenAPISchema
+    """
+    Perform remote :term:`OpenAPI` schema ``$ref`` resolution.
+
+    Resolution is performed only sufficiently to provide enough context for following :term:`JSON` I/O conversion.
+    Remote references are not resolved further than required to speedup loading time and avoid recursive error on
+    self-referring schema. Passed sufficient levels of schema definitions, the specific contents is not important
+    nor needs to be resolved as there is they cannot be mapped to anything else than :data:`WPS_COMPLEX` I/O type.
+
+    :param io_info: I/O :term:`OpenAPI` schema to attempt resolution as applicable.
+    :return: Resolved I/O schema or directly the provided schema returned unmodified if no references need resolution.
+    """
+    # retrieve external schema reference (possibly nested)
+    io_href = get_field(io_info, "$ref", search_variations=False, pop_found=True)
+    if isinstance(io_href, str):
+        # first encountered reference should be full-uri to allow us knowing where to look for
+        if not any(io_href.startswith(scheme + "://") for scheme in ["http", "https", "s3"]):
+            raise ValueError(f"External OpenAPI schema reference [{io_href}] must be absolue.")
+        if not any(io_href.endswith(extension) for extension in [".yaml", ".yml", ".json"]):
+            raise ValueError(f"External OpenAPI schema reference [{io_href}] must be formatted as JSON or YAML.")
+        try:
+            # use resolver which will handle all intricacies of loading remote schema into a local dict definition
+            # this way, no need to handle other external, relative, absolute, etc. nested '$ref' locations
+            # note: '$ref' are still loaded on the first level only to avoid recursive schemas breaking on load
+            io_base = io_href.rsplit("/", 1)[0] + "/"
+            resolver = SchemaRefResolver(base_uri=io_base, referrer=io_info)
+            io_resolved = resolver.resolve_from_url(io_href)
+            # In case the input schema was the result of a 'allOf' merge,
+            # update with other fields that forms a whole object
+            # This way, there is more chance we can detect a combined form that matches a known conversion type.
+            io_info.update(io_resolved)
+            io_info["$id"] = io_href
+            # If the remote $ref schema itself was a combination of $ref schemas (e.g.: it contained 'oneOf').
+            # Then update the first level of references that we can potentially work with to resolve conversion type.
+            # No need to resolve more since this is guaranteed to be 'complex' type.
+            # We must use the resolver right away in case the remote $ref are relative to the same root $ref.
+            for keyword in OAS_KEYWORD_TYPES:
+                if keyword in io_info:
+                    if isinstance(io_info[keyword], list):  # all keywords except 'not'
+                        for i, schema in enumerate(list(io_info[keyword])):
+                            if "$ref" in schema:
+                                ref_id, schema = resolver.resolve(schema["$ref"])
+                                schema["$id"] = ref_id
+                                io_info[keyword][i] = schema  # noqa
+                    elif "$ref" in io_info[keyword]:  # only 'not' keyword
+                        ref_schema = io_info[keyword]["$ref"]
+                        ref_id, schema = resolver.resolve(ref_schema)
+                        schema["$id"] = ref_id
+                        io_info[keyword] = schema
+        except Exception as exc:
+            raise ValueError(f"External OpenAPI schema reference [{io_href}] could not be loaded.") from exc
+    return io_info
 
 
 def json2wps_datatype(io_info):
@@ -1488,7 +2198,7 @@ def json2wps_allowed_values(io_info):
     return null
 
 
-def json2wps_io(io_info, io_select):
+def json2wps_io(io_info, io_select):  # pylint: disable=R1260
     # type: (JSON_IO_Type, str) -> WPS_IO_Type
     """
     Converts an I/O from a JSON dict to PyWPS types.
@@ -1506,6 +2216,7 @@ def json2wps_io(io_info, io_select):
         "maxOccurs": "max_occurs",
         "dataType": "data_type",
         "defaultValue": "default",
+        "crs": "default",
         "supportedValues": "supported_values",
     }
     remove = [
@@ -1521,6 +2232,9 @@ def json2wps_io(io_info, io_select):
         "schema",
         "asreference",
         "additionalParameters",
+        "ll",
+        "ur",
+        "bbox",
     ]
     replace_values = {"unbounded": PACKAGE_ARRAY_MAX_SIZE}
 
@@ -1564,11 +2278,18 @@ def json2wps_io(io_info, io_select):
     # remove additional arguments according to each case
     io_type = io_info.pop("type", WPS_COMPLEX)  # only ComplexData doesn't have "type"
     # attempt to identify defined data-type directly in 'type' field instead of 'data_type'
-    if io_type not in WPS_ALL_TYPES:
+    if io_type not in WPS_DATA_TYPES:
         io_type_guess = any2wps_literal_datatype(io_type, is_value=False)
         if io_type_guess is not null:
             io_type = WPS_LITERAL
             io_info["data_type"] = io_type_guess
+    if io_type == WPS_LITERAL:
+        data_type = json2wps_datatype(io_info)
+        # pywps literals subset is more restrictive than all possible standard WPS
+        # make use of some non-pywps compatible types since other valid WPS types are easier to match with OAS
+        if data_type in WPS_LITERAL_DATA_TYPES and data_type not in LITERAL_DATA_TYPES:
+            data_type = any2wps_literal_datatype(data_type, is_value=False, pywps=True)
+        io_info["data_type"] = data_type
     if io_select == WPS_INPUT:
         if ("max_occurs", "unbounded") in io_info.items():
             io_info["max_occurs"] = PACKAGE_ARRAY_MAX_SIZE
@@ -1581,12 +2302,11 @@ def json2wps_io(io_info, io_select):
             return ComplexInput(**io_info)
         if io_type == WPS_BOUNDINGBOX:
             io_info.pop("supported_formats", None)
-            io_info.pop("supportedCRS", None)
+            io_info["crss"] = get_field(io_info, "supported_crs", search_variations=True, pop_found=True, default=None)
             return BoundingBoxInput(**io_info)
         if io_type == WPS_LITERAL:
             io_info.pop("data_format", None)
             io_info.pop("supported_formats", None)
-            io_info["data_type"] = json2wps_datatype(io_info)
             allowed_values = json2wps_allowed_values(io_info)
             if allowed_values:
                 io_info["allowed_values"] = allowed_values
@@ -1595,33 +2315,43 @@ def json2wps_io(io_info, io_select):
             io_info.pop("literalDataDomains", None)
             return LiteralInput(**io_info)
     elif io_select == WPS_OUTPUT:
-        io_info.pop("min_occurs", None)
-        io_info.pop("max_occurs", None)
-        io_info.pop("allowed_values", None)
-        io_info.pop("default", None)
+        # following not allowed for PyWPS instance creation
+        # but they are useful for other steps, so forward them afterward
+        io_min = io_info.pop("min_occurs", null)
+        io_max = io_info.pop("max_occurs", null)
+        io_allow = io_info.pop("allowed_values", null)
+        io_default = io_info.pop("default", null)
+        io_wps = null
         if io_type in WPS_COMPLEX_TYPES:
             io_info.pop("supported_values", None)
-            return ComplexOutput(**io_info)
-        if io_type == WPS_BOUNDINGBOX:
+            io_wps = ComplexOutput(**io_info)
+        elif io_type == WPS_BOUNDINGBOX:
             io_info.pop("supported_formats", None)
-            return BoundingBoxOutput(**io_info)
-        if io_type == WPS_LITERAL:
+            io_info["crss"] = get_field(io_info, "supported_crs", search_variations=True, pop_found=True, default=None)
+            io_wps = BoundingBoxOutput(**io_info)
+        elif io_type == WPS_LITERAL:
             io_info.pop("supported_formats", None)
-            io_info["data_type"] = json2wps_datatype(io_info)
-            allowed_values = json2wps_allowed_values(io_info)
-            if allowed_values:
-                io_info["allowed_values"] = allowed_values
-            else:
-                io_info.pop("allowed_values", None)
             io_info.pop("literalDataDomains", None)
-            return LiteralOutput(**io_info)
+            io_wps = LiteralOutput(**io_info)
+            set_field(io_wps, "allowed_values", io_allow)
+        if io_wps:
+            set_field(io_wps, "min_occurs", io_min)
+            set_field(io_wps, "max_occurs", io_max)
+            set_field(io_wps, "default", io_default)
+            return io_wps
     raise PackageTypeError(f"Unknown conversion from dict to WPS type (type={io_type}, mode={io_select}).")
 
 
-def wps2json_io(io_wps):
-    # type: (WPS_IO_Type) -> JSON_IO_Type
+def wps2json_io(io_wps, forced_fields=False):
+    # type: (WPS_IO_Type, bool) -> JSON_IO_Type
     """
-    Converts a PyWPS I/O into a dictionary based version with keys corresponding to standard names (WPS 2.0).
+    Converts a :mod:`pywps` I/O into a :term:`JSON` dictionary with corresponding standard keys names (:term:`WPS` 2.0).
+
+    :param io_wps: Any :mod:`pywps` I/O definition to be converted to :term:`JSON` representation.
+    :param forced_fields:
+        Request transfer of additional fields normally undefined for outputs if they are available by being forcefully
+        inserted in the objects after their creation (i.e.: using :func:`set_field`). These fields can be useful for
+        obtaining mandatory details for further processing operations (e.g.: :term:`OpenAPI` schema conversion).
     """
 
     if not isinstance(io_wps, BasicIO):
@@ -1629,7 +2359,16 @@ def wps2json_io(io_wps):
     if not hasattr(io_wps, "json"):
         raise PackageTypeError("Invalid type definition expected to have a 'json' property.")
 
-    io_wps_json = io_wps.json   # noqa
+    io_wps_json = io_wps.json
+
+    # transfer additional fields normally undefined for outputs if available in original object (forcefully added)
+    # when they are requested for further processing operations (eg: later OAS conversion)
+    if forced_fields:
+        for field in ["min_occurs", "max_occurs"]:
+            if field not in io_wps_json:
+                io_field = get_field(io_wps, field, search_variations=True)
+                if io_field is not null:
+                    io_wps_json[field] = io_field
 
     rename = {
         "identifier": "id",
@@ -1645,9 +2384,13 @@ def wps2json_io(io_wps):
     replace_func = {
         "maxOccurs": str,
         "minOccurs": str,
+        "metadata": lambda metadata: [metadata2json(meta) for meta in metadata]
     }
+    remove = [
+        "data"  # string encoded value can cause confusion with default
+    ]
 
-    transform_json(io_wps_json, rename=rename, replace_values=replace_values, replace_func=replace_func)
+    transform_json(io_wps_json, rename=rename, remove=remove, replace_values=replace_values, replace_func=replace_func)
 
     # in some cases (Complex I/O), 'as_reference=True' causes "type" to be overwritten, revert it back
     if "type" in io_wps_json and io_wps_json["type"] == WPS_REFERENCE:
@@ -1666,15 +2409,31 @@ def wps2json_io(io_wps):
         io_default = get_field(io_wps_json, "default", search_variations=True)
         for io_format in io_wps_json["formats"]:
             io_format["default"] = (io_default != null and is_equal_formats(io_format, io_default))
-        if io_default and len(io_wps_json["formats"]) == 1 and not io_wps_json["formats"][0]["default"]:
-            io_default_mime_type = get_field(io_default, "mime_type", search_variations=True)
+        if len(io_wps_json["formats"]) == 1 and not io_wps_json["formats"][0]["default"]:
             io_single_fmt_mime_type = get_field(io_wps_json["formats"][0], "mime_type", search_variations=True)
-            io_wps_json["formats"][0]["default"] = (io_default_mime_type == io_single_fmt_mime_type)
+            if io_default:
+                io_default_mime_type = get_field(io_default, "mime_type", search_variations=True)
+                io_wps_json["formats"][0]["default"] = (io_default_mime_type == io_single_fmt_mime_type)
+            elif DEFAULT_FORMAT.mime_type == io_single_fmt_mime_type:
+                io_supported = get_field(io_wps, "supported_formats", default=[DEFAULT_FORMAT])
+                io_missing = get_field(io_supported[0], DEFAULT_FORMAT_MISSING, default=False)
+                io_wps_json["formats"][0]["default"] = io_missing
 
     elif io_wps_json["type"] == WPS_BOUNDINGBOX:
         pass  # FIXME: BoundingBox not implemented (https://github.com/crim-ca/weaver/issues/51)
 
     else:  # literal
+        # retrieve the default definition with original value type (default 'data' is string encoded with it)
+        io_wps_default = get_field(io_wps, "default", search_variations=True)
+        if io_wps_default not in [null, None]:
+            io_wps_json["default"] = io_wps_default
+        if "allowed_values" not in io_wps_json:
+            io_field = get_field(io_wps, "allowed_values", search_variations=False)
+            if io_field is not null:
+                io_wps_json["allowed_values"] = [
+                    io_allow.json if not isinstance(io_allow, dict) else io_allow
+                    for io_allow in io_field
+                ]
         domains = any2json_literal_data_domains(io_wps_json)
         if domains:
             io_wps_json["literalDataDomains"] = domains
@@ -1723,8 +2482,15 @@ def wps2json_job_payload(wps_request, wps_process):
     return data
 
 
-def get_field(io_object, field, search_variations=False, only_variations=False, pop_found=False, default=null):
-    # type: (Union[JSON, object], str, bool, bool, bool, Any) -> Any
+def get_field(io_object,
+              field,
+              search_variations=False,
+              only_variations=False,
+              pop_found=False,
+              key=False,
+              default=null,
+              ):
+    # type: (Union[JSON, object], str, bool, bool, bool, bool, Any) -> Any
     """
     Gets a field by name from various I/O object types.
 
@@ -1743,6 +2509,7 @@ def get_field(io_object, field, search_variations=False, only_variations=False, 
     :param search_variations: If enabled, search for all variations to the field name to attempt search until matched.
     :param only_variations: If enabled, skip the first 'basic' field and start search directly with field variations.
     :param pop_found: If enabled, whenever a match is found by field or variations, remove that entry from the object.
+    :param key: If enabled, whenever a match is found by field or variations, return matched key instead of the value.
     :param default: Alternative default value to return if no match could be found.
     :returns: Matched value (including search variations if enabled), or ``default``.
     """
@@ -1752,16 +2519,16 @@ def get_field(io_object, field, search_variations=False, only_variations=False, 
             if value is not null:
                 if pop_found:
                     io_object.pop(field)
-                return value
+                return field if key else value
         else:
             value = getattr(io_object, field, null)
             if value is not null:
-                return value
+                return field if key else value
     if search_variations and field in WPS_FIELD_MAPPING:
         for var in WPS_FIELD_MAPPING[field]:
             value = get_field(io_object, var, search_variations=False, only_variations=False, pop_found=pop_found)
             if value is not null:
-                return value
+                return var if key else value
     return default
 
 
@@ -1892,13 +2659,14 @@ def merge_io_formats(wps_formats, cwl_formats):
     """
     Merges I/O format definitions by matching ``mime-type`` field.
 
-    In case of conflict, preserve the WPS version which can be more detailed (for example, by specifying ``encoding``).
+    In case of conflict, preserve the :term:`WPS` version which can be more detailed
+    (for example, by specifying ``encoding``).
 
-    Verifies if ``DEFAULT_FORMAT_MISSING`` was written to a single `CWL` format caused by a lack of any value
-    provided as input. In this case, *only* `WPS` formats are kept.
+    Verifies if :data:`DEFAULT_FORMAT_MISSING` was written to a single :term:`CWL` format caused by a lack of any value
+    provided as input. In this case, *only* :term:`WPS` formats are kept.
 
-    In the event that ``DEFAULT_FORMAT_MISSING`` was written to the `CWL` formats and that no `WPS` format was
-    specified, the :py:data:`DEFAULT_FORMAT` is returned.
+    In the event that :data:`DEFAULT_FORMAT_MISSING` was written to the :term:`CWL` formats and that no :term:`WPS`
+    format was specified, the :py:data:`DEFAULT_FORMAT` is returned.
 
     :raises PackageTypeError: if inputs are invalid format lists
     """
@@ -1923,22 +2691,86 @@ def merge_io_formats(wps_formats, cwl_formats):
     return formats
 
 
-def merge_package_io(wps_io_list, cwl_io_list, io_select):
-    # type: (List[ANY_IO_Type], List[WPS_IO_Type], str) -> List[WPS_IO_Type]
+def merge_io_fields(wps_io, cwl_io):
+    # type: (WPS_IO_Type, WPS_IO_Type) -> WPS_IO_Type
     """
-    Merges corresponding parameters of different I/O definitions from CWL/WPS sources.
+    Combines corresponding I/O fields from :term:`WPS` and :term:`CWL` definitions.
 
-    Update I/O definitions to use for process creation and returned by GetCapabilities, DescribeProcess.
-    If WPS I/O definitions where provided during deployment, update `CWL-to-WPS` converted I/O with the WPS I/O
-    complementary details. Otherwise, provide minimum field requirements that can be retrieved from CWL definitions.
+    .. seealso::
+        :func:`cwl2wps_io` for conversion of :term:`CWL` to :term:`WPS` representation.
 
-    Removes any deployment WPS I/O definitions that don't match any CWL I/O by ID.
-    Adds missing deployment WPS I/O definitions using expected CWL I/O IDs.
+    :param wps_io: Original :term:`WPS` I/O provided in the process definition during deployment.
+    :param cwl_io: Converted :term:`CWL` I/O into :term:`WPS` representation for matching similar details.
+    :return: Merged I/O definition.
+    """
+    # Retrieve any complementing fields (metadata, keywords, etc.) passed in CWL/WPS inputs
+    # Enforce some additional fields to keep value specified by WPS if applicable.
+    # These are only added here rather that 'WPS_FIELD_MAPPING' to avoid erroneous detection by other functions.
+    #   - Literal: 'default' value defined by 'data' (forced converted to string) or '_default' with original value
+    #   - Complex: 'default' format defined by 'data_format'
+    # (see function 'json2wps_io' for detail)
+    # Important to have 'data_format' after, as it depends on 'supported_formats' processed an interation before.
+    # Important to have 'metadata' before 'supported_formats' that interact together during mixed typed exchanges.
+    wps_field_list = ["metadata"] + list(set(WPS_FIELD_MAPPING) - {"metadata"}) + ["_default", "data_format"]
+    for field_type in wps_field_list:
+        cwl_field = get_field(cwl_io, field_type)
+        wps_field = get_field(wps_io, field_type)
+        # employ provided formats if different (keep WPS), or if CWL offers more that were missing in WPS
+        # because 'updated_io_list' contains the WPS I/O already, only need to push differences found in CWL
+        if _are_different_and_set(wps_field, cwl_field) or (wps_field is null and cwl_field is not null):
+            # because WPS Bbox is mapped against CWL Complex, adjust format to metadata in that case
+            # WPS expected to have no formats, since not a complex
+            # CWL expected to have only 1 because 'format' field is unique (see also 'cwl2wps_io' schema handling)
+            if (
+                field_type in ["supported_formats", "data_format"] and
+                isinstance(wps_io, BasicBoundingBox) and isinstance(cwl_io, BasicComplex)
+            ):
+                cwl_field = cwl_field[0] if isinstance(cwl_field, (list, tuple)) else cwl_field
+                wps_field = get_field(wps_io, "metadata", default=[])
+                if not any(meta.href == cwl_field.schema for meta in wps_field):
+                    wps_field.append(WPS_Metadata(
+                        title="Schema",
+                        href=cwl_field.schema,
+                        role=SchemaRole.JSON_SCHEMA,
+                        type_=cwl_field.mime_type
+                    ))
+                    set_field(wps_io, "metadata", wps_field)
+                continue
+            if field_type == "supported_formats" and cwl_field is not null:
+                wps_field = merge_io_formats(wps_field, cwl_field)
+            # default 'data_format' must be one of the 'supported_formats'
+            # avoid setting something invalid in this case, or it will cause problem after
+            # note: 'supported_formats' must have been processed before
+            elif field_type == "data_format":
+                wps_fmts = get_field(wps_io, "supported_formats", search_variations=False, default=[])
+                if wps_field not in wps_fmts:
+                    continue
+            set_field(wps_io, field_type, wps_field)
+    return wps_io
 
-    :param wps_io_list: list of WPS I/O (as json) passed during process deployment.
-    :param cwl_io_list: list of CWL I/O converted to WPS-like I/O for counter-validation.
+
+def merge_package_io(wps_io_list, cwl_io_list, io_select):
+    # type: (List[ANY_IO_Type], List[WPS_IO_Type], str) -> List[JSON_IO_Type]
+    """
+    Merges corresponding parameters of different I/O definition sources (:term:`CWL`, :term:`OpenAPI` and :term:`WPS`).
+
+    Update I/O definitions to use for :term:`Process` creation and returned by ``GetCapabilities``/``DescribeProcess``.
+    If :term:`WPS` I/O definitions where provided during deployment, update `CWL-to-WPS` converted I/O with the
+    :term:`WPS` I/O complementary details. If an :term:`OpenAPI` ``schema`` definition was provided to define the I/O,
+    infer the corresponding :term:`WPS` I/O details. Then, considering those resolved definitions and any missing
+    information that could be inferred, extend field requirements that can be retrieved from :term:`CWL` definitions.
+
+    Removes any deployment :term:`WPS` I/O definitions that don't match any :term:`CWL` I/O by ID, since they will be
+    of no use for the underlying :term:`Application Package`. Adds missing deployment :term:`WPS` I/O definitions using
+    expected :term:`CWL` I/O IDs.
+
+    .. seealso::
+        :func:`cwl2wps_io` for conversion of :term:`CWL` to :term:`WPS` representation.
+
+    :param wps_io_list: list of :term:`WPS` I/O (as json) passed during process deployment.
+    :param cwl_io_list: list of :term:`CWL` I/O converted to :term:`WPS`-like I/O for counter-validation.
     :param io_select: :py:data:`WPS_INPUT` or :py:data:`WPS_OUTPUT` to specify desired WPS type conversion.
-    :returns: list of validated/updated WPS I/O for the process matching CWL I/O requirements.
+    :returns: list of updated :term:`JSON` I/O combing :term:`CWL`, :term:`WPS` and :term:`OpenAPI` specifications.
     """
     if not isinstance(cwl_io_list, list):
         raise PackageTypeError("CWL I/O definitions must be provided, empty list if none required.")
@@ -1955,9 +2787,10 @@ def merge_package_io(wps_io_list, cwl_io_list, io_select):
     # otherwise, evaluate provided WPS I/O definitions and find potential new information to be merged
     for cwl_id in cwl_io_dict:
         cwl_io = cwl_io_dict[cwl_id]
-        updated_io_list.append(cwl_io)
         if cwl_id in missing_io_list:
-            continue  # missing WPS I/O are inferred only using CWL->WPS definitions
+            json_io = wps2json_io(cwl_io)
+            updated_io_list.append(json_io)
+            continue  # missing WPS I/O can only be inferred using CWL->WPS definitions
 
         # enforce expected CWL->WPS I/O required parameters
         cwl_io_json = cwl_io.json
@@ -1968,8 +2801,21 @@ def merge_package_io(wps_io_list, cwl_io_list, io_select):
             "identifier": cwl_identifier,
             "title": cwl_title if cwl_title is not null else cwl_identifier
         })
-        # apply type if WPS deploy definition was partial but can be retrieved from CWL
-        wps_io_json.setdefault("type", get_field(cwl_io_json, "type", search_variations=True))
+        # attempt to infer additional typing or constraints from OpenAPI schema if available
+        wps_io_schema = get_field(wps_io_json, "schema")
+        if wps_io_schema:
+            json_io_schema = oas2json_io(wps_io_schema)
+            if json_io_schema and isinstance(json_io_schema, dict):
+                wps_io_json.update(json_io_schema)
+
+        # check if WPS I/O resolves to default literal string due to missing detection of details for explicit type
+        # this is permitted if the corresponding CWL I/O can provide the remaining details of the partial WPS I/O
+        if "type" not in wps_io_json and "data_type" not in wps_io_json:
+            cwl_io_type = get_field(cwl_io_json, "type", search_variations=False)
+            wps_io_json["type"] = cwl_io_type
+            # preemptively transfer the specific data-type as well, otherwise we might need to deal with different ones
+            if cwl_io_type == WPS_LITERAL:
+                wps_io_json["data_type"] = get_field(cwl_io_json, "data_type", search_variations=False)
 
         # fill missing WPS min/max occurs in 'provided' json to avoid overwriting resolved CWL values by WPS default '1'
         #   with 'default' field, this default '1' causes erroneous result when 'min_occurs' should be "0"
@@ -1982,28 +2828,49 @@ def merge_package_io(wps_io_list, cwl_io_list, io_select):
             wps_io_json["min_occurs"] = cwl_min_occurs
         if wps_max_occurs == null and cwl_max_occurs != null:
             wps_io_json["max_occurs"] = cwl_max_occurs
-        wps_io = json2wps_io(wps_io_json, io_select)
 
-        # Retrieve any complementing fields (metadata, keywords, etc.) passed as WPS input.
-        # Enforce some additional fields to keep value specified by WPS if applicable.
-        # These are only added here rather that 'WPS_FIELD_MAPPING' to avoid erroneous detection by other functions.
-        #   - Literal: 'default' value defined by 'data'
-        #   - Complex: 'default' format defined by 'data_format'
-        # (see function 'json2wps_io' for detail)
-        for field_type in list(WPS_FIELD_MAPPING) + ["data", "data_format"]:
-            cwl_field = get_field(cwl_io, field_type)
-            wps_field = get_field(wps_io, field_type)
-            # override provided formats if different (keep WPS), or if CWL->WPS was missing but is provided by WPS
-            if _are_different_and_set(wps_field, cwl_field) or (wps_field is not null and cwl_field is null):
-                # list of formats are updated by comparing format items since information can be partially complementary
-                if field_type in ["supported_formats"]:
-                    wps_field = merge_io_formats(wps_field, cwl_field)
-                # default 'data_format' must be one of the 'supported_formats'
-                # avoid setting something invalid in this case, or it will cause problem after
-                # note: 'supported_formats' must have been processed before
-                if field_type == "data_format":
-                    wps_fmts = get_field(updated_io_list[-1], "supported_formats", search_variations=False, default=[])
-                    if wps_field not in wps_fmts:
-                        continue
-                set_field(updated_io_list[-1], field_type, wps_field)
+        wps_io = json2wps_io(wps_io_json, io_select)
+        check_io_compatible(wps_io, cwl_io, cwl_id)
+        wps_io = merge_io_fields(wps_io, cwl_io)
+
+        # Given OpenAPI schema provided during WPS deployment, generate its extended I/O definition.
+        #   This extension allows the user to provide only 'raw' or '$ref' complex object schema, while Weaver can
+        #   receive it during execution either as raw data or file reference. This provides a more precise schema
+        #   to what would actually be accepted/produced as input/output for the process.
+        # Otherwise, generate one that best represents available details using only available WPS/CWL fields.
+        json_io = wps2json_io(wps_io, forced_fields=True)
+        oas_io = json2oas_io(json_io, wps_io_schema)
+        json_io["schema"] = oas_io
+        updated_io_list.append(json_io)
+
     return updated_io_list
+
+
+def check_io_compatible(wps_io, cwl_io, io_id):
+    # type: (WPS_IO_Type, WPS_IO_Type, str) -> None
+    """
+    Validate types to ensure they match categories, otherwise merging will cause more confusion.
+
+    For Literal/Complex I/O coming from :term:`WPS` side, they should be matched exactly with Literal/Complex I/O
+    on the :term:`CWL` side.
+
+    .. note::
+        The :term`CWL` I/O in this case is expected to be a :mod:`pywps` converted I/O from the :term`CWL` definition,
+        and not a direct :term`CWL` I/O definition.
+
+    .. warning::
+        When BoundingBox for :term:`WPS`, it should be mapped to ComplexInput on :term:`CWL` side (since no equivalent).
+
+    :raises PackageTypeError: If I/O are not compatible.
+    """
+    cwl_io_type = type(cwl_io)
+    wps_io_type = type(wps_io)
+    if not (
+        (wps_io_type in [LiteralInput, LiteralOutput] and cwl_io_type in [LiteralInput, LiteralOutput]) or
+        (wps_io_type in [BoundingBoxInput, BoundingBoxOutput] and cwl_io_type in [ComplexInput, ComplexOutput]) or
+        (wps_io_type in [ComplexInput, ComplexOutput] and cwl_io_type in [ComplexInput, ComplexOutput])
+    ):
+        msg_err = f"Mismatching CWL/WPS types for merge of I/O ID: [{io_id}] "
+        msg_typ = f" (CWL: {fully_qualified_name(cwl_io_type)}, WPS: {fully_qualified_name(wps_io_type)})."
+        LOGGER.error("%s.\n  CWL: %s\n  WPS: %s", msg_err, cwl_io_type, wps_io_type)
+        raise PackageTypeError(msg_err + msg_typ)

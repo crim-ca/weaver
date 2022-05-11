@@ -12,8 +12,22 @@ Changes
 
 Changes:
 --------
+- Add support of OpenAPI ``schema`` field for I/O definitions within `Process` description responses as required
+  by `OGC API - Processes` specification (resolves `#245 <https://github.com/crim-ca/weaver/issues/245>`_).
+  Existing and deployed processes using legacy I/O definitions will be parsed for corresponding fields employed in
+  OpenAPI to generate the missing ``schema`` field. Inversely, processes directly deployed with ``schema`` definitions
+  are ported back to legacy I/O representation by padding them with corresponding fields. Conversion between the
+  two representations is unidirectional according to whether ``schema`` is specified or not. Nevertheless, the final
+  I/O definitions can try to make use of both representations simultaneously and in combination with I/O definitions
+  extracted from the `CWL Application Package` to resolve additional details during I/O merging strategy.
 - Add support of ``Accept`` header, ``f`` and ``format`` request queries for ``GET /jobs/{jobID}/logs`` retrieval
   using ``text``, ``json``, ``yaml`` and ``xml`` (and their corresponding Media-Type definitions) to list `Job` logs.
+- Add partial support of literals with unit of measure (``UoM``) specified during `Process` deployment using the
+  I/O ``schema`` field (relates to `#430 <https://github.com/crim-ca/weaver/issues/430>`_).
+- Add partial support of bounding box parsing specified during `Process` deployment using the
+  I/O ``schema`` field (relates to `#51 <https://github.com/crim-ca/weaver/issues/51>`_).
+- Add encoding/decoding of JSON I/O definitions for saving to database in order to support OpenAPI ``schema`` that can
+  contain conflicting key names with MongoDB functionalities (e.g.: ``$ref``).
 - Add parsing of `CLI` inputs with ``@parameter=value`` additional properties to be passed for the `Process`
   execution. This can be used for specifying the ``mediaType`` and ``encoding`` of a ``File`` reference input.
 - Remove ``deploymentProfileName`` requirement during `Process` deployment. The corresponding ``deploymentProfile``
@@ -23,6 +37,11 @@ Changes:
 
 Fixes:
 ------
+- Remove ``VaultReference`` from ``ReferenceURL`` schema employed to reference external resources that are not intended
+  to be used with temporary `Vault` definitions. Only inputs for `Process` execution will allow `Vault` references.
+- Fix ``LiteralOutput`` creation not removing ``allowed_values`` not available with `PyWPS` class.
+- Fix failing `Process` deployment caused by ``links`` if explicitly specified in the payload by the user.
+  Additional links that don't conflict with dynamically generated ones are added to the deployed `Process` definition.
 - Fix missing ``deploymentProfile`` property in `Process` description
   (resolves `#319 <https://github.com/crim-ca/weaver/issues/319>`_).
 
@@ -662,7 +681,7 @@ Changes:
   The principal change introduced in this case is that process description contents will be directly at the root
   of the object returned by ``/processes/{id}`` response instead of being nested under ``"process"`` field.
   Furthermore, ``inputs`` and ``outputs`` definitions are reported as mapping of ``{"<id>": {<parameters>}}`` as
-  specified by OGP-API instead of old listing format ``[{"id": "<id-value>", <key:val parameters>}]``. The old
+  specified by `OGC-API` instead of old listing format ``[{"id": "<id-value>", <key:val parameters>}]``. The old
   nested and listing format can still be obtained using request query parameter ``schema=OLD``, and will otherwise use
   `OGC-API` by default or when ``schema=OGC``. Note that some duplicated metadata fields are dropped regardless of
   selected format in favor of `OGC-API` names. Some examples are ``abstract`` that becomes ``description``,

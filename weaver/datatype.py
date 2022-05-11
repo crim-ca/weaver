@@ -33,7 +33,7 @@ from weaver.exceptions import ProcessInstanceError, ServiceParsingError
 from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import AcceptLanguage, ContentType, repr_json
 from weaver.processes.constants import ProcessSchema
-from weaver.processes.convert import get_field, null, ows2json, wps2json_io
+from weaver.processes.convert import get_field, json2oas_io, normalize_ordered_io, null, ows2json, wps2json_io
 from weaver.processes.types import ProcessType
 from weaver.quotation.status import QuoteStatus
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
@@ -182,6 +182,9 @@ class AutoBase(DictBase):
 
 
 class Base(DictBase):
+    """
+    Base interface for all data-types.
+    """
     def __str__(self):
         # type: () -> str
         return f"{type(self).__name__} <{self.id}>"
@@ -224,6 +227,9 @@ class Base(DictBase):
 
 
 class LocalizedDateTimeProperty(property):
+    """
+    Property that ensures date-time localization is applied on the stored/retrieved value as required.
+    """
     def __init__(self,
                  fget=None,             # type: Callable[[Any], Optional[datetime]]
                  fset=None,             # type: Callable[[Any, Union[datetime, str]], None]
@@ -1798,22 +1804,24 @@ class Process(Base):
             Because of pre-registered/deployed/retrieved remote processes, inputs are formatted in-line
             to respect valid OGC-API schema representation and apply any required correction transparently.
         """
-
         inputs = self.get("inputs")
         if inputs is not None:
-            for input_ in inputs:
-                input_formats = get_field(input_, "formats", search_variations=False, default=[])
+            for _input in inputs:
+                input_formats = get_field(_input, "formats", search_variations=False, default=[])
                 for fmt in input_formats:
                     mime_type = get_field(fmt, "mime_type", search_variations=True, pop_found=True)
                     if mime_type is not null:
                         fmt["mediaType"] = mime_type
-                input_min = get_field(input_, "min_occurs", search_variations=True, pop_found=True, default=1)
-                input_max = get_field(input_, "max_occurs", search_variations=True, pop_found=True, default=1)
-                input_["minOccurs"] = int(input_min)
-                input_["maxOccurs"] = int(input_max) if input_max != "unbounded" else input_max
-                input_desc = get_field(input_, "abstract", search_variations=True, pop_found=True)
+                input_min = get_field(_input, "min_occurs", search_variations=True, pop_found=True, default=1)
+                input_max = get_field(_input, "max_occurs", search_variations=True, pop_found=True, default=1)
+                _input["minOccurs"] = int(input_min)
+                _input["maxOccurs"] = int(input_max) if input_max != "unbounded" else input_max
+                input_desc = get_field(_input, "abstract", search_variations=True, pop_found=True)
                 if input_desc:
-                    input_["description"] = input_desc
+                    _input["description"] = input_desc
+                input_schema = get_field(_input, "schema", search_variations=False)
+                if input_schema:
+                    _input["schema"] = self._decode(input_schema)
         return inputs
 
     @property
@@ -1829,18 +1837,20 @@ class Process(Base):
             Because of pre-registered/deployed/retrieved remote processes, inputs are formatted in-line
             to respect valid OGC-API schema representation and apply any required correction transparently.
         """
-
         outputs = self.get("outputs", [])
-        for output_ in outputs:
-            output_formats = get_field(output_, "formats", search_variations=False, default=[])
+        for _output in outputs:
+            output_formats = get_field(_output, "formats", search_variations=False, default=[])
             for fmt in output_formats:
                 mime_type = get_field(fmt, "mime_type", pop_found=True, search_variations=True)
                 if mime_type is not null:
                     fmt["mediaType"] = mime_type
 
-            output_desc = get_field(output_, "abstract", search_variations=True, pop_found=True)
+            output_desc = get_field(_output, "abstract", search_variations=True, pop_found=True)
             if output_desc:
-                output_["description"] = output_desc
+                _output["description"] = output_desc
+            output_schema = get_field(_output, "schema", search_variations=False)
+            if output_schema:
+                _output["schema"] = self._decode(output_schema)
         return outputs
 
     @property
@@ -2061,8 +2071,9 @@ class Process(Base):
             "keywords": self.keywords,
             "metadata": self.metadata,
             "version": self.version,
-            "inputs": self.inputs,
-            "outputs": self.outputs,
+            # escape potential OpenAPI JSON $ref in 'schema' also used by Mongo BSON
+            "inputs": [self._encode(_input) for _input in self.inputs or []],
+            "outputs": [self._encode(_output) for _output in self.outputs or []],
             "jobControlOptions": self.jobControlOptions,
             "outputTransmission": self.outputTransmission,
             "processEndpointWPS1": self.processEndpointWPS1,
@@ -2147,6 +2158,11 @@ class Process(Base):
         for link in links:
             link.setdefault("type", ContentType.APP_JSON)
             link.setdefault("hreflang", AcceptLanguage.EN_CA)
+        # add user-provided additional links, no type/hreflang added since we cannot guess them
+        known_links = {link.get("rel") for link in links}
+        extra_links = self.get("additional_links", [])
+        extra_links = [link for link in extra_links if link.get("rel") not in known_links]
+        links.extend(extra_links)
         return links
 
     def href(self, container=None):
@@ -2180,17 +2196,33 @@ class Process(Base):
             "deploymentProfile": self.deployment_profile,
             "links": links
         })
-        # force selection of schema to avoid ambiguity
-        if str(schema or ProcessSchema.OGC).upper() == ProcessSchema.OLD:
-            # nested process fields + I/O as lists
-            process.update({"process": dict(process)})
-            return sd.ProcessDescriptionOLD().deserialize(process)
-        # direct process + I/O as mappings
+
+        # adjust I/O definitions with missing information for both representations
+        io_hints = {}
         for io_type in ["inputs", "outputs"]:
+            io_hints[io_type] = process[io_type]
             process[io_type] = {
-                get_field(io_def, "identifier", search_variations=True, pop_found=True): io_def
+                get_field(io_def, "identifier", search_variations=True): io_def
                 for io_def in process[io_type]
             }
+            # When OpenAPI schema is not predefined explicitly in deployed I/O definitions, generate them dynamically.
+            # This call allow to fill missing details for preexisting (already deployed) processes in database.
+            # Another possible case is a deployment providing only CWL definitions, and WPS are inferred from them.
+            # In this situation, the lack of WPS I/O altogether requires to generate OAS from I/O merge/conversion.
+            # Deployment with OAS should have generated this field already to save time or for more precise definitions.
+            for io_def in process[io_type].values():
+                io_schema = get_field(io_def, "schema", search_variations=False)
+                if not isinstance(io_schema, dict):
+                    io_def["schema"] = json2oas_io(io_def)
+
+        # force selection of schema to avoid ambiguity
+        if str(schema or ProcessSchema.OGC).upper() == ProcessSchema.OLD:
+            # fields nested under 'process' + I/O as lists
+            for io_type in ["inputs", "outputs"]:
+                process[io_type] = normalize_ordered_io(process[io_type], io_hints[io_type])
+            process.update({"process": dict(process)})
+            return sd.ProcessDescriptionOLD().deserialize(process)
+        # process fields directly at root + I/O as mappings
         return sd.ProcessDescriptionOGC().deserialize(process)
 
     def summary(self):

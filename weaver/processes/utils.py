@@ -41,7 +41,7 @@ from weaver.exceptions import (
 )
 from weaver.processes.types import ProcessType
 from weaver.store.base import StoreProcesses, StoreServices
-from weaver.utils import fully_qualified_name, get_sane_name, get_settings, get_url_without_query
+from weaver.utils import fully_qualified_name, generate_diff, get_sane_name, get_settings, get_url_without_query
 from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_client
 from weaver.wps_restapi import swagger_definitions as sd
@@ -126,6 +126,7 @@ def get_process_information(process_description):
 @log_unhandled_exceptions(logger=LOGGER, message="Unhandled error occurred during parsing of deploy payload.",
                           is_request=False)
 def _check_deploy(payload):
+    # type: (JSON) -> JSON
     """
     Validate minimum deploy payload field requirements with exception handling.
     """
@@ -143,33 +144,40 @@ def _check_deploy(payload):
             # don't use "get_process_information" to make sure everything is retrieved under same location
             p_process = p_process.get("process", {})
             r_process = r_process.get("process", {})
-        p_inputs = p_process.get("inputs")
-        r_inputs = r_process.get("inputs")
-        if p_inputs and p_inputs != r_inputs:
-            message = "Process deployment inputs definition is invalid."
-            # try raising sub-schema to have specific reason
-            d_inputs = sd.DeployInputTypeAny().deserialize(p_inputs)
-            # Raise directly if we where not able to detect the cause, but there is something incorrectly dropped.
-            # Only raise if indirect vs direct inputs deserialize differ such that auto-resolved defaults omitted from
-            # submitted process inputs or unknowns fields that were correctly ignored don't cause false-positive diffs.
-            if r_inputs != d_inputs:
-                message = (
-                    "Process deployment inputs definition resolved as valid schema but differ from submitted values. "
-                    "Validate provided inputs against resolved inputs with schemas to avoid mismatching definitions."
+        for io_type, io_schema in [("inputs", sd.DeployInputTypeAny), ("outputs", sd.DeployOutputTypeAny)]:
+            p_io = p_process.get(io_type)
+            r_io = r_process.get(io_type)
+            if p_io and p_io != r_io:
+                message = f"Process deployment {io_type} definition is invalid."
+                # try raising sub-schema to have specific reason
+                d_io = io_schema(name=io_type).deserialize(p_io)
+                # Raise directly if we where not able to detect the cause, but there is something incorrectly dropped.
+                # Only raise if indirect vs direct deserialize differ such that auto-resolved defaults omitted from
+                # submitted process I/O or unknowns fields that were correctly ignored don't cause false-positive diffs.
+                if r_io != d_io:
+                    message = (
+                        f"Process deployment {p_io} definition resolved as valid schema "
+                        f"but differ from submitted values. "
+                        f"Validate provided {p_io} against resolved {p_io} with schemas "
+                        f"to avoid mismatching definitions."
+                    )
+                    raise HTTPBadRequest(json={
+                        "description": message,
+                        "cause": "unknown",
+                        "error": "Invalid",
+                        "value": d_io
+                    })
+                LOGGER.warning(
+                    "Detected difference between original/parsed deploy %s, but no invalid schema:\n%s",
+                    io_type, generate_diff(p_io, r_io, val_name="original payload", ref_name="parsed result")
                 )
-                raise HTTPBadRequest(json={
-                    "description": message,
-                    "cause": "unknown",
-                    "error": "Invalid",
-                    "value": d_inputs
-                })
         # Execution Unit is optional since process reference (e.g.: WPS-1 href) can be provided in processDescription
         # Cannot validate as CWL yet, since execution unit can also be an href that is not yet fetched (it will later)
         p_exec_unit = payload.get("executionUnit", [{}])
         r_exec_unit = results.get("executionUnit", [{}])
         if p_exec_unit and p_exec_unit != r_exec_unit:
             message = "Process deployment execution unit is invalid."
-            d_exec_unit = sd.ExecutionUnit().deserialize(p_exec_unit)  # raises directly if caused by invalid schema
+            d_exec_unit = sd.ExecutionUnitList().deserialize(p_exec_unit)  # raises directly if caused by invalid schema
             if r_exec_unit != d_exec_unit:  # otherwise raise a generic error, don't allow differing definitions
                 message = (
                     "Process deployment execution unit resolved as valid definition but differs from submitted "
@@ -181,6 +189,10 @@ def _check_deploy(payload):
                     "error": PackageRegistrationError.__name__,
                     "value": d_exec_unit
                 })
+            LOGGER.warning(
+                "Detected difference between original/parsed deploy execution unit, but no invalid schema:\n%s",
+                generate_diff(p_exec_unit, r_exec_unit, val_name="original payload", ref_name="parsed result")
+            )
         return results
     except colander.Invalid as exc:
         LOGGER.debug("Failed deploy body schema validation:\n%s", exc)
@@ -335,6 +347,11 @@ def deploy_process_from_payload(payload, container, overwrite=False):
     # bw-compat abstract/description (see: ProcessDeployment schema)
     if "description" not in process_info or not process_info["description"]:
         process_info["description"] = process_info.get("abstract", "")
+    # if user provided additional links that have valid schema,
+    # process them separately since links are generated dynamically from API settings per process
+    # don't leave them there as they would be seen as if the 'Process' class generated the field
+    if "links" in process_info:
+        process_info["additional_links"] = process_info.pop("links")
 
     # FIXME: handle colander invalid directly in tween (https://github.com/crim-ca/weaver/issues/112)
     try:
@@ -343,12 +360,19 @@ def deploy_process_from_payload(payload, container, overwrite=False):
         sd.ProcessSummary().deserialize(process)  # make if fail before save if invalid
         store.save_process(process, overwrite=overwrite)
         process_summary = process.summary()
-    except ProcessRegistrationError as ex:
-        raise HTTPConflict(detail=str(ex))
-    except (ValueError, colander.Invalid) as ex:
-        # raised on invalid process name
-        raise HTTPBadRequest(detail=str(ex))
-
+    except ProcessRegistrationError as exc:
+        raise HTTPConflict(detail=str(exc))
+    except ValueError as exc:
+        LOGGER.error("Failed schema validation of deployed process summary:\n%s", exc)
+        raise HTTPBadRequest(detail=str(exc))
+    except colander.Invalid as exc:
+        LOGGER.error("Failed schema validation of deployed process summary:\n%s", exc)
+        raise HTTPBadRequest(json={
+            "description": "Failed schema validation of deployed process summary.",
+            "cause": f"Invalid schema: [{exc.msg or exc!s}]",
+            "error": exc.__class__.__name__,
+            "value": exc.value
+        })
     data = {
         "description": sd.OkPostProcessesResponse.description,
         "processSummary": process_summary,

@@ -34,7 +34,7 @@ if TYPE_CHECKING:
     from typing import Any, Dict, Optional, Union
     from weaver.typedefs import AnyResponseType, JSON, Literal, SettingsType
 
-    ReferenceType = Literal["deploy", "execute", "package"]
+    ReferenceType = Literal["deploy", "describe", "execute", "package"]
 
 
 class ResourcesUtil(object):
@@ -98,6 +98,12 @@ class ResourcesUtil(object):
                         f"DeployProcess_{process}.json",
                         f"{process}/deploy.json",
                         f"{process}/DeployProcess_{process}.json",
+                    ]
+                elif ref_type == "describe":
+                    ref_search = [
+                        f"Describe_{process}.json",
+                        f"{process}/describe.json",
+                        f"{process}/Describe_{process}.json",
                     ]
                 elif ref_type == "execute":
                     ref_search = [
@@ -184,8 +190,8 @@ class WpsConfigBase(unittest.TestCase):
         return deepcopy(resp.json)
 
     @classmethod
-    def deploy_process(cls, payload, process_id=None, describe_schema=ProcessSchema.OGC):
-        # type: (JSON, Optional[str], str) -> JSON
+    def deploy_process(cls, payload, process_id=None, describe_schema=ProcessSchema.OGC, mock_requests_only_local=True):
+        # type: (JSON, Optional[str], str, bool) -> JSON
         """
         Deploys a process with :paramref:`payload`.
 
@@ -207,7 +213,8 @@ class WpsConfigBase(unittest.TestCase):
                 exec_unit = load_file(os.path.join(WEAVER_ROOT_DIR, exec_href))
                 exec_list[0]["unit"] = exec_unit
                 exec_list[0].pop("href")
-        resp = mocked_sub_requests(cls.app, "post_json", "/processes", data=payload, headers=cls.json_headers)
+        resp = mocked_sub_requests(cls.app, "post_json", "/processes",
+                                   data=payload, headers=cls.json_headers, only_local=mock_requests_only_local)
         assert resp.status_code == 201, f"Expected successful deployment.\nError:\n{resp.text}"
         path = resp.json["processSummary"]["processDescriptionURL"]
         body = {"value": Visibility.PUBLIC}

@@ -449,13 +449,11 @@ def _merge_package_inputs_outputs(wps_inputs_defs,      # type: Union[List[ANY_I
     :returns:
         Tuple of (inputs, outputs) consisting of lists of I/O with merged contents between :term:`CWL` and :term:`WPS`.
     """
-    if isinstance(wps_inputs_defs, dict):
-        wps_inputs_defs = normalize_ordered_io(wps_inputs_defs)
-    if isinstance(wps_outputs_defs, dict):
-        wps_outputs_defs = normalize_ordered_io(wps_outputs_defs)
+    wps_inputs_defs = normalize_ordered_io(wps_inputs_defs)
+    wps_outputs_defs = normalize_ordered_io(wps_outputs_defs)
     wps_inputs_merged = merge_package_io(wps_inputs_defs, cwl_inputs_list, WPS_INPUT)
     wps_outputs_merged = merge_package_io(wps_outputs_defs, cwl_outputs_list, WPS_OUTPUT)
-    return [wps2json_io(i) for i in wps_inputs_merged], [wps2json_io(o) for o in wps_outputs_merged]
+    return wps_inputs_merged, wps_outputs_merged
 
 
 def _get_package_io(package_factory, io_select, as_json):
@@ -466,12 +464,12 @@ def _get_package_io(package_factory, io_select, as_json):
     .. seealso::
         Factory can be obtained with validation using :func:`_load_package_content`.
 
-    :param package_factory: `CWL` factory that contains I/O references to the package definition.
+    :param package_factory: :term:`CWL` factory that contains I/O references to the package definition.
     :param io_select: either :data:`WPS_INPUT` or :data:`WPS_OUTPUT` according to what needs to be processed.
-    :param as_json: toggle to specific the desired output type.
-    :returns: I/O format depends on value :paramref:`as_json`.
-        If ``True``, converts the I/O definitions into `JSON` representation.
-        If ``False``, converts the I/O definitions into `WPS` objects.
+    :param as_json: toggle to the desired output type.
+        If ``True``, converts the I/O definitions into :term:`JSON` representation.
+        If ``False``, converts the I/O definitions into :term:`WPS` objects.
+    :returns: I/O format depending on value :paramref:`as_json`.
     """
     if io_select == WPS_OUTPUT:
         io_attrib = "outputs_record_schema"
@@ -490,7 +488,7 @@ def _get_package_inputs_outputs(package_factory,    # type: CWLFactoryCallable
                                 as_json=False,      # type: bool
                                 ):                  # type: (...) -> Tuple[List[PKG_IO_Type], List[PKG_IO_Type]]
     """
-    Generates `WPS-like` ``(inputs, outputs)`` tuple using parsed CWL package definitions.
+    Generates :term:`WPS`-like ``(inputs, outputs)`` tuple using parsed CWL package definitions.
     """
     return (_get_package_io(package_factory, io_select=WPS_INPUT, as_json=as_json),
             _get_package_io(package_factory, io_select=WPS_OUTPUT, as_json=as_json))
@@ -499,7 +497,7 @@ def _get_package_inputs_outputs(package_factory,    # type: CWLFactoryCallable
 def _update_package_metadata(wps_package_metadata, cwl_package_package):
     # type: (JSON, CWL) -> None
     """
-    Updates the package `WPS` metadata dictionary from extractable `CWL` package definition.
+    Updates the package :term:`WPS` metadata dictionary from extractable `CWL` package definition.
     """
     wps_package_metadata["title"] = wps_package_metadata.get("title", cwl_package_package.get("label", ""))
     wps_package_metadata["abstract"] = wps_package_metadata.get("abstract", cwl_package_package.get("doc", ""))
@@ -767,7 +765,7 @@ def get_process_definition(process_offering, reference=None, package=None, data_
         lambda: _update_package_metadata(process_info, package),
         reason="Metadata update")
 
-    package_inputs, package_outputs = try_or_raise_package_error(
+    process_inputs, process_outputs = try_or_raise_package_error(
         lambda: _merge_package_inputs_outputs(process_inputs, package_inputs, process_outputs, package_outputs),
         reason="Merging of inputs/outputs")
 
@@ -789,8 +787,8 @@ def get_process_definition(process_offering, reference=None, package=None, data_
         "identifier": process_id,
         "package": package,
         "type": process_type,
-        "inputs": package_inputs,
-        "outputs": package_outputs,
+        "inputs": process_inputs,
+        "outputs": process_outputs,
         "auth": auth_requirements
     })
     return process_offering

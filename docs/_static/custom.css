@@ -35,6 +35,14 @@ div[class^="highlight"] {
     white-space: normal;
 }
 
+.wy-table-responsive table > tbody > tr > td > ul > li > dl {
+    line-height: 18px;
+}
+
+.wy-table-responsive table > tbody > tr > td > ul > li > dl > dt {
+    font-weight: normal;
+}
+
 .wy-table-responsive {
     margin-bottom: 24px;
     max-width: 100%;
