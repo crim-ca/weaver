@@ -62,7 +62,7 @@ def test_parse_inputs_from_file():
             result = WeaverClient().execute("fake_process", input_json.name, url="http://fake.domain.com")
     assert result is mock_result
     assert len(inputs) == 1
-    assert inputs[0] == {"input1": {"value": "data"}}
+    assert inputs[0] == {"input1": "data"}
 
 
 @pytest.mark.cli
