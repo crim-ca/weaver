@@ -9,7 +9,7 @@ from collections.abc import Hashable
 from copy import deepcopy
 from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 from owslib.wps import ComplexData, Metadata as OWS_Metadata, is_reference
 from pywps import Process as ProcessWPS
@@ -85,7 +85,7 @@ from weaver.utils import (
 from weaver.wps.utils import get_wps_client
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, List, Optional, Tuple, Type, Union
+    from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
     from urllib.parse import ParseResult
 
     from pywps.app import WPSRequest
@@ -143,6 +143,10 @@ if TYPE_CHECKING:
     ANY_IO_Type = Union[CWL_IO_Type, JSON_IO_Type, WPS_IO_Type, OWS_IO_Type]
     ANY_Format_Type = Union[Dict[str, Optional[str]], Format]
     ANY_Metadata_Type = Union[OWS_Metadata, WPS_Metadata, Dict[str, str]]
+    DataInputType = TypedDict("DataInputType", {
+        "data": Union[float, int, bool, str],
+        # ** any other params
+    }, total=False)
 
 
 # WPS object attribute -> all possible *other* naming variations (no need to repeat key name)
@@ -176,6 +180,7 @@ WPS_FIELD_MAPPING = {
     "range_spacing": ["spacing"],
     "range_closure": ["closure", "rangeClosure"],
     "encoding": ["Encoding", "content_encoding", "contentEncoding"],
+    "schema": ["Schema", "contentSchema"],
     "href": ["url", "link", "reference"],
     "uom": ["UoM", "unit"],
     "measure": ["value", "measurement"],
@@ -193,13 +198,13 @@ setattr(DEFAULT_FORMAT, DEFAULT_FORMAT_MISSING, True)
 INPUT_VALUE_TYPE_MAPPING = {
     "bool": bool,
     "boolean": bool,
-    "file": str,
-    "File": str,
+    "file": unquote,
+    "File": unquote,
     "float": float,
     "int": int,
     "integer": int,
-    "str": str,
-    "string": str,
+    "str": unquote,
+    "string": unquote,
 }
 
 LOGGER = logging.getLogger(__name__)
@@ -1161,16 +1166,43 @@ def convert_output_params_schema(outputs, schema):
     raise NotImplementedError(f"Unknown conversion format of outputs definitions for schema: [{schema}]")
 
 
+def repr2json_input_params(value, converter=None):
+    # type: (str, Optional[Callable[[str], Any]]) -> DataInputType
+    """
+    Extracts and converts the value and its associated parameters from a :term:`KVP` string representation.
+
+    This function only interprets a pre-extracted single-value definition (i.e.: without the input ID) from a parent
+    :term:`KVP` string.
+
+    .. seealso::
+        Use :func:`repr2json_input_values` For parsing multi-value arrays and the full :term:`KVP` including the ID.
+
+    :param value: String representation of the value to be interpreted.
+    :param converter: Conversion function of the value after parsing.
+    :return: Converted value and additional parameters if applicable.
+    """
+    params = value.split("@")
+    value = params[0]
+    if converter is not None:
+        value = converter(value)
+    params = params[1:]
+    parameters = {}
+    for param in params:
+        param_key, param_val = param.split("=", 1)
+        parameters[param_key] = unquote(param_val)
+    return {"data": value, **parameters}
+
+
 def repr2json_input_values(inputs):
     # type: (List[str]) -> ExecutionInputsList
     """
     Converts inputs in string :term:`KVP` representation to corresponding :term:`JSON` values.
 
-    Expected format is as follows:
+    Expected format of the input is as follows:
 
     .. code-block:: text
 
-        input_id[:input_type]=input_value[;input_array]
+        input_id[:input_type]=input_value[@input_parameter][;input_array[@input_parameter]][;...]
 
     Where:
         - ``input_id`` represents the target identifier of the input
@@ -1178,13 +1210,31 @@ def repr2json_input_values(inputs):
           (includes ``File`` for ``href`` instead of ``value`` key in resulting object)
         - ``input_value`` represents the desired value subject to conversion by ``input_type``
         - ``input_array`` represents any additional values for array-like inputs (``maxOccurs > 1``)
+        - ``input_parameter`` represents additional :term:`KVP` details associated to each
+          ``input_value``/``input_array`` part (i.e.: per array element if applicable)
+
+    The separator character for representing array-like values is ``;`` because the full :term:`KVP`
+    (already split into a list as argument to this function), could be formed of multiple comma (``,``) or
+    ampersand (``&``) separated input definitions, depending on where the definition came from (e.g.: URI).
+
+    The ``input_parameter`` portion can combine multiple parameters each separated by ``@`` and themselves formed with
+    :term:`KVP` representation of the corresponding parameter names and values. Parameter names do not need to be
+    consistent between distinct array elements. For example, a multi-parameters input could be formatted as follows:
+
+    .. code-block:: text
+
+        input_id=item_value1@param1=value1@param2=value2;item_value2@other1=value1
+
+    .. note::
+        - Any character that matches one of the separators that should be interpreted literally should be URL-encoded.
+        - Single (``'``) and double (``"``) quotes are removed if they delimit a ``File`` reference.
 
     :param inputs: list of string inputs to parse.
     :return: parsed inputs if successful.
     """
     values = []
     for str_input in inputs:
-        str_id, str_val = str_input.split("=")
+        str_id, str_val = str_input.split("=", 1)
         str_id_typ = str_id.split(":")
         if len(str_id_typ) == 2:
             str_id, str_typ = str_id_typ
@@ -1195,19 +1245,27 @@ def repr2json_input_values(inputs):
         val_typ = any2cwl_literal_datatype(str_typ)
         if not str_id or (val_typ is null and str_typ not in INPUT_VALUE_TYPE_MAPPING):
             raise ValueError(f"Invalid input value ID representation. "
-                             f"Missing or unknown 'ID[:type]' parts after resolution as '{str_id!s}:{str_typ!s}'.")
+                             f"Missing or unknown 'ID[:TYPE]' parts after resolution as '{str_id!s}:{str_typ!s}'.")
         map_typ = val_typ if val_typ is not null else str_typ
         arr_val = str_val.split(";")
-        arr_typ = INPUT_VALUE_TYPE_MAPPING[map_typ]
-        arr_val = [arr_typ(val) for val in arr_val]
+        convert = INPUT_VALUE_TYPE_MAPPING[map_typ]
+        arr_val = [repr2json_input_params(val, convert) for val in arr_val]
         if map_typ.capitalize() == "File":
             val_key = "href"
-            for i, val in enumerate(list(arr_val)):
-                if (val.startswith("'") and val.endswith("'")) or (val.startswith("\"") and val.endswith("\"")):
-                    arr_val[i] = val[1:-1]
+            for val in arr_val:
+                ref = val["data"]
+                if (ref.startswith("'") and ref.endswith("'")) or (ref.startswith("\"") and ref.endswith("\"")):
+                    val["data"] = ref[1:-1]
+                fmt = {}  # transfer parameters matching format fields that must be nested in value definition
+                for field, target in [("mime_type", "mediaType"), ("encoding", "encoding"), ("schema", "schema")]:
+                    val_field = get_field(val, field, search_variations=True, pop_found=True)
+                    if val_field is not null:
+                        fmt[target] = val_field
+                if fmt:
+                    val["format"] = fmt
         else:
             val_key = "value"
-        values.append({"id": str_id, val_key: arr_val if ";" in str_val else arr_val[0]})
+        values.extend([{"id": str_id, val_key: val.pop("data"), **val} for val in arr_val])
     return values
 
 

@@ -28,6 +28,8 @@ Changes:
   I/O ``schema`` field (relates to `#51 <https://github.com/crim-ca/weaver/issues/51>`_).
 - Add encoding/decoding of JSON I/O definitions for saving to database in order to support OpenAPI ``schema`` that can
   contain conflicting key names with MongoDB functionalities (e.g.: ``$ref``).
+- Add parsing of `CLI` inputs with ``@parameter=value`` additional properties to be passed for the `Process`
+  execution. This can be used for specifying the ``mediaType`` and ``encoding`` of a ``File`` reference input.
 - Remove ``deploymentProfileName`` requirement during `Process` deployment. The corresponding ``deploymentProfile``
   property is instead automatically generated from resolved `CWL` package/reference or remote `WPS` reference. This
   further simplifies deployment using the `CLI` to its bare minimum components as only the `CWL` or `WPS` reference
