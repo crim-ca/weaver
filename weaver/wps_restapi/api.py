@@ -305,9 +305,7 @@ def get_conformance(category):
         ogcapi_proc_part2 + "/req/ogcapppkg",
         ogcapi_proc_part2 + "/req/ogcapppkg/execution-unit-docker",
         ogcapi_proc_part2 + "/req/ogcapppkg/process-description",
-        # FIXME: 'deploymentProfile = http://www.opengis.net/profiles/eoc/dockerizedApplication'
-        #   https://github.com/crim-ca/weaver/issues/319
-        # ogcapi_proc_part2 + "/req/ogcapppkg/profile-docker",
+        ogcapi_proc_part2 + "/req/ogcapppkg/profile-docker",
         ogcapi_proc_part2 + "/req/ogcapppkg/schema",
         ogcapi_proc_part2 + "/req/deploy-replace-undeploy",
         ogcapi_proc_part2 + "/req/deploy-replace-undeploy/deploy/body",

@@ -14,10 +14,15 @@ Changes:
 --------
 - Add support of ``Accept`` header, ``f`` and ``format`` request queries for ``GET /jobs/{jobID}/logs`` retrieval
   using ``text``, ``json``, ``yaml`` and ``xml`` (and their corresponding Media-Type definitions) to list `Job` logs.
+- Remove ``deploymentProfileName`` requirement during `Process` deployment. The corresponding ``deploymentProfile``
+  property is instead automatically generated from resolved `CWL` package/reference or remote `WPS` reference. This
+  further simplifies deployment using the `CLI` to its bare minimum components as only the `CWL` or `WPS` reference
+  needs to be provided along the desired `Process` ID without any further details.
 
 Fixes:
 ------
-- No change.
+- Fix missing ``deploymentProfile`` property in `Process` description
+  (resolves `#319 <https://github.com/crim-ca/weaver/issues/319>`_).
 
 .. _changes_4.15.0:
 
