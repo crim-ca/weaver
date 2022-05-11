@@ -234,9 +234,9 @@ class StringRange(BoundedRange):
         # type: (Optional[Union[float, int, str]], Optional[Union[float, int, str]], bool, bool, Any) -> None
         try:
             if isinstance(min, str):
-                min = float(min) if "." in min else int(min)
+                min = float(min) if "." in min or "e" in min else int(min)
             if isinstance(max, str):
-                max = float(max) if "." in max else int(max)
+                max = float(max) if "." in max or "e" in max else int(max)
         except (TypeError, ValueError):
             raise SchemaNodeTypeError("StringRange validator created with invalid min/max non-numeric string.")
         super(StringRange, self).__init__(
@@ -244,11 +244,12 @@ class StringRange(BoundedRange):
         )
 
     def __call__(self, node, value):
+        # type: (colander.SchemaNode, str) -> Union[float, int]
         if not isinstance(value, str):
             raise colander.Invalid(node=node, value=value, msg="Value is not a string.")
         if not str.isnumeric(value):
             raise colander.Invalid(node=node, value=value, msg="Value is not a numeric string.")
-        return super(StringRange, self).__call__(node, float(value) if "." in value else int(value))
+        return super(StringRange, self).__call__(node, float(value) if "." in value or "e" in value else int(value))
 
 
 class SchemeURL(colander.Regex):
@@ -333,6 +334,7 @@ class ExtendedBoolean(colander.Boolean):
             )
 
     def deserialize(self, node, cstruct):
+        # type: (colander.SchemaNode, Any) -> Union[Type[colander.null, bool]]
         if cstruct is colander.null:
             return cstruct
 
@@ -804,6 +806,7 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
 
     @classmethod
     def is_variable(cls, node):
+        # type: (colander.SchemaNode) -> bool
         """
         If current node is the variable field definition.
         """
@@ -2148,6 +2151,7 @@ class OAS3TypeConversionDispatcher(TypeConversionDispatcher):
     openapi_spec = 3
 
     def __init__(self, custom_converters=None, default_converter=None):
+        # type: (Optional[Dict[colander.SchemaType, TypeConverter]], Optional[TypeConverter]) -> None
         self.keyword_converters = {
             OneOfKeywordSchema: OneOfKeywordTypeConverter,
             AllOfKeywordSchema: AllOfKeywordTypeConverter,
@@ -2174,6 +2178,7 @@ class OAS3TypeConversionDispatcher(TypeConversionDispatcher):
         super(OAS3TypeConversionDispatcher, self).__init__(extended_converters, default_converter)
 
     def __call__(self, schema_node):
+        # type: (colander.SchemaNode) -> Dict[str, Any]
         schema_type = schema_node.typ
         schema_type = type(schema_type)
 
