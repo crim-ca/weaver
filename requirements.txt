@@ -7,17 +7,20 @@ boto3
 # https://github.com/celery/billiard/issues/313
 billiard>2; sys_platform != "win32"  # avoid issue with use_2to3
 billiard>3.2,<3.4; sys_platform == "win32"
+# NOTE:
+#   for each following celery requirement, ignore insecure package marked by 'requires.io' using 'rq.filter'
+#   last definition is the principal and maintained one, other are only tentative for backward compatibility
 # FIXME: pymongo>=4 breaks with kombu corresponding to pinned Celery (https://github.com/crim-ca/weaver/issues/386)
 #   celery >=4.4.3 breaks on 'future.utils' import
 #   celery's CLI interface changed
 #   https://github.com/celery/celery/blob/master/docs/whatsnew-5.2.rst#upgrading-from-celery-4x
-celery[mongodb]<4; sys_platform == "win32"  # rq.filter: <4  # pyup: ignore
-# FIXME: use celery 5.2 specifically to resolve security issue
-#   best match for now since cannot use setuptools>=59 until cwltool/rdflib-jsonld are updated
-celery[mongodb]>=5.2.2,<6; sys_platform != "win32" and python_version >= "3.7"
+celery[mongodb]<4; sys_platform == "win32"  # rq.filter: >=5.2.2,<6 # pyup: ignore  # pyup: ignore
 # technically, >=5.2 preferred to resolve security issue, but dependency resolver cannot find it
 # FIXME: drop support? more recent versions not avilable for end-of-life python
-celery[mongodb]>=5.1,<5.2; sys_platform != "win32" and python_version <= "3.6"  # rq.filter: >=5.1,<5.2 # pyup: ignore
+celery[mongodb]>=5.1,<5.2; sys_platform != "win32" and python_version <= "3.6"  # rq.filter: >=5.2.2,<6 # pyup: ignore
+# FIXME: use celery 5.2 specifically to resolve security issue
+#   best match for now since cannot use setuptools>=59 until cwltool/rdflib-jsonld are updated
+celery[mongodb]>=5.2.2,<6; sys_platform != "win32" and python_version >= "3.7"  # this is the real requirement
 cffi
 colander
 cornice
