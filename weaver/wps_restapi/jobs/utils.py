@@ -487,7 +487,6 @@ def get_job_submission_response(body, headers, error=False):
         :func:`weaver.processes.execution.submit_job_handler`
     """
     status = map_status(body.get("status"))
-    location = get_header("location", headers)
     if status in JOB_STATUS_CATEGORIES[StatusCategory.FINISHED]:
         if error:
             http_class = HTTPBadRequest
@@ -498,11 +497,11 @@ def get_job_submission_response(body, headers, error=False):
             body = sd.CompletedJobStatusSchema().deserialize(body)
 
         body["description"] = http_desc
-        return http_class(location=location, json=body, headers=headers)
+        return http_class(json=body, headers=headers)
 
     body["description"] = sd.CreatedLaunchJobResponse.description
     body = sd.CreatedJobStatusSchema().deserialize(body)
-    return HTTPCreated(location=location, json=body, headers=headers)
+    return HTTPCreated(json=body, headers=headers)
 
 
 def validate_service_process(request):
