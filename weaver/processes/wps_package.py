@@ -58,6 +58,7 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_TYPES,
     CWL_REQUIREMENT_APP_WPS1,
     CWL_REQUIREMENT_ENV_VAR,
+    CWL_REQUIREMENT_RESOURCE,
     CWL_REQUIREMENTS_SUPPORTED,
     WPS_INPUT,
     WPS_OUTPUT
@@ -125,7 +126,9 @@ if TYPE_CHECKING:
         AnyValueType,
         CWL,
         CWL_AnyRequirements,
+        CWL_Requirement,
         CWL_RequirementsDict,
+        CWL_RequirementNames,
         CWL_RequirementsList,
         CWL_Results,
         CWL_ToolPathObjectType,
@@ -590,14 +593,24 @@ def _generate_process_with_cwl_from_reference(reference):
     return cwl_package, process_info
 
 
-def get_application_requirement(package):
-    # type: (CWL) -> Dict[str, Any]
+def get_application_requirement(package, search=None, default=None, validate=True):
+    # type: (CWL, Optional[CWL_RequirementNames], Optional[Any], bool) -> Union[CWL_Requirement, Any]
     """
-    Retrieve the principal requirement that allows mapping to the appropriate process implementation.
+    Retrieves a requirement or hint from the :term:`CWL` package definition.
 
-    Obtains the first item in `CWL` package ``requirements`` or ``hints`` that corresponds to a `Weaver`-specific
-    application type as defined in :py:data:`CWL_REQUIREMENT_APP_TYPES`.
+    If no filter is specified (default), retrieve the *principal* requirement that allows mapping to the appropriate
+    :term:`Process` implementation. Obtains the first item in :term:`CWL` package ``requirements`` or ``hints``
+    that corresponds to a `Weaver`-specific application type as defined in :py:data:`CWL_REQUIREMENT_APP_TYPES`.
+    If a filter is provided, this specific requirement or hint is looked for instead.
+    Regardless of the applied filter, only a unique item can be matched across requirements/hints containers, and
+    within a same container in case of listing representation to avoid ambiguity. When requirements/hints validation
+    is enabled, all requirements must also be defined amongst :data:`CWL_REQUIREMENTS_SUPPORTED` for the :term:`CWL`
+    package to be considered valid.
 
+    :param package: CWL definition to parse.
+    :param search: Specific requirement/hint name to search and retrieve the definition if available.
+    :param default: Default value to return if no match was found. If ``None``, returns an empty ``{"class": ""}``.
+    :param validate: Validate supported requirements/hints definition while extracting requested one.
     :returns: dictionary that minimally has ``class`` field, and optionally other parameters from that requirement.
     """
     # package can define requirements and/or hints,
@@ -606,17 +619,22 @@ def get_application_requirement(package):
     reqs = package.get("requirements", {})
     hints = package.get("hints", {})
     all_hints = _get_package_requirements_as_class_list(reqs) + _get_package_requirements_as_class_list(hints)
-    app_hints = list(filter(lambda h: any(h["class"].endswith(t) for t in CWL_REQUIREMENT_APP_TYPES), all_hints))
+    if search:
+        app_hints = list(filter(lambda h: h == search, all_hints))
+    else:
+        app_hints = list(filter(lambda h: any(h["class"].endswith(t) for t in CWL_REQUIREMENT_APP_TYPES), all_hints))
     if len(app_hints) > 1:
         raise ValueError(
             f"Package 'requirements' and/or 'hints' define too many conflicting values: {list(app_hints)}, "
             f"only one permitted amongst {list(CWL_REQUIREMENT_APP_TYPES)}."
         )
-    requirement = app_hints[0] if app_hints else {"class": ""}
+    req_default = default if default is not None else {"class": ""}
+    requirement = app_hints[0] if app_hints else req_default
 
-    cwl_supported_reqs = list(CWL_REQUIREMENTS_SUPPORTED)
-    if not all(item.get("class") in cwl_supported_reqs for item in all_hints):
-        raise PackageTypeError(f"Invalid requirement, the requirements supported are {cwl_supported_reqs}")
+    if validate:
+        cwl_supported_reqs = list(CWL_REQUIREMENTS_SUPPORTED)
+        if not all(item.get("class") in cwl_supported_reqs for item in all_hints):
+            raise PackageTypeError(f"Invalid requirement, the requirements supported are {cwl_supported_reqs}")
 
     return requirement
 
@@ -1053,6 +1071,7 @@ class WpsPackage(Process):
         # cwltool will add additional unique characters after prefix paths
         cwl_workdir = os.path.join(wps_workdir, "cwltool_tmp_")
         cwl_outdir = os.path.join(wps_workdir, "cwltool_out_")
+        res_req = get_application_requirement(self.package, CWL_REQUIREMENT_RESOURCE, default={}, validate=False)
         runtime_params = {
             # force explicit staging if write needed (InitialWorkDirRequirement in CWL package)
             # protect input paths that can be re-used to avoid potential in-place modifications
@@ -1065,7 +1084,13 @@ class WpsPackage(Process):
             "tmp_outdir_prefix": cwl_outdir,
             # ask CWL to move tmp outdir results to the WPS process workdir (otherwise we loose them on cleanup)
             "outdir": self.workdir,
-            "debug": self.logger.isEnabledFor(logging.DEBUG)
+            "debug": self.logger.isEnabledFor(logging.DEBUG),
+            # when process is a docker image, memory monitoring information is obtained with CID file
+            # this file is only generated when the below command is explicitly None (not even when '')
+            "user_space_docker_cmd": None,
+            # if 'ResourceRequirement' is specified to limit RAM usage, below must be added to ensure it is applied
+            # but don't enable it otherwise, since some defaults are applied which could break existing processes
+            "strict_memory_limit": bool(res_req),
         }
         return runtime_params
 

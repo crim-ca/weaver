@@ -841,6 +841,7 @@ class WeaverClient(object):
         remain = timeout = timeout or self.monitor_timeout
         delta = interval or self.monitor_interval
         LOGGER.info("Monitoring job [%s] for %ss at intervals of %ss.", job_id, timeout, delta)
+        LOGGER.debug("Job URL: [%s]", job_url)
         once = True
         while remain >= 0 or once:
             resp = request_extra("GET", job_url, headers=self._headers, settings=self._settings)

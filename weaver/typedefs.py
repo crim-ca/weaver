@@ -46,6 +46,7 @@ if TYPE_CHECKING:
     from webtest.response import TestResponse
     from werkzeug.wrappers import Request as WerkzeugRequest
 
+    from weaver.processes.constants import CWL_RequirementNames
     from weaver.processes.wps_process_base import WpsProcessInterface
     from weaver.datatype import Process
     from weaver.status import AnyStatusType
@@ -123,8 +124,10 @@ if TYPE_CHECKING:
     }, total=False)
     CWL_Inputs = Union[List[CWL_Input_Type], Dict[str, CWL_Input_Type]]
     CWL_Outputs = Union[List[CWL_Output_Type], Dict[str, CWL_Output_Type]]
-    CWL_Requirement = TypedDict("CWL_Requirement", {"class": str}, total=False)  # includes 'hints'
-    CWL_RequirementsDict = Dict[str, Dict[str, str]]   # {'<req>': {<param>: <val>}}
+
+    # 'requirements' includes 'hints'
+    CWL_Requirement = TypedDict("CWL_Requirement", {"class": CWL_RequirementNames}, total=False)  # type: ignore
+    CWL_RequirementsDict = Dict[CWL_RequirementNames, Dict[str, str]]   # {'<req>': {<param>: <val>}}
     CWL_RequirementsList = List[CWL_Requirement]       # [{'class': <req>, <param>: <val>}]
     CWL_AnyRequirements = Union[CWL_RequirementsDict, CWL_RequirementsList]
     # results from CWL execution

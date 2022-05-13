@@ -175,7 +175,7 @@ they are optional and which default value or operation is applied in each situat
 - | ``weaver.wps_workdir = <directory-path>``
   | (default: uses automatically generated temporary directory if none specified)
   |
-  | Prefix where process job worker should execute the process from.
+  | Prefix where process :term:`Job` worker should execute the :term:`Process` from.
 
 - | ``weaver.wps_restapi = true|false``
   | (default: ``true``)
@@ -413,4 +413,3 @@ Starting the Application
 
 - need to start ``gunicorn/pserve`` (example `Dockerfile-manager`_)
 - need to start ``celery`` worker (example `Dockerfile-worker`_)
-
