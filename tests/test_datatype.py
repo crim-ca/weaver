@@ -3,6 +3,7 @@ from copy import deepcopy
 
 import pytest
 
+from tests import resources
 from weaver.datatype import Authentication, AuthenticationTypes, DockerAuthentication, Process
 from weaver.execute import ExecuteControlOption
 
@@ -155,3 +156,16 @@ def test_auth_docker_image_from_parent_params():
     assert dict(auth_docker) == dict(auth_docker)
     for field in ["auth_link", "auth_token", "auth_type", "auth_image"]:
         assert field not in auth
+
+
+def test_process_io_schema_ignore_uri():
+    """
+    Process with ``schema`` field under I/O definition that is not an :term:`OAS` object must not fail I/O resolution.
+    """
+    wps_data = resources.load_resource("wps_colibri_flyingpigeon_subset_storage.json")
+    assert any(isinstance(out.get("schema"), str) for out in wps_data["outputs"])
+    proc_obj = Process(wps_data)
+    # following convert JSON items to pywps definitions, but also generate OAS inline
+    # if 'default format' "schema" exists, it must not cause an error when parsing the object
+    wps_proc = proc_obj.wps()
+    assert any(isinstance(out.json.get("schema"), str) for out in wps_proc.outputs)

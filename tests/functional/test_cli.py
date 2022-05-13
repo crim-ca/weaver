@@ -24,7 +24,8 @@ from tests.utils import (
     run_command
 )
 from weaver.cli import WeaverClient, main as weaver_cli
-from weaver.formats import ContentType, OutputFormat
+from weaver.formats import ContentType, OutputFormat, get_cwl_file_format
+from weaver.processes.constants import ProcessSchema
 from weaver.status import Status
 from weaver.wps.utils import map_wps_output_location
 
@@ -603,6 +604,82 @@ class TestWeaverCLI(TestWeaverClientBase):
         )
         assert any(f"\"id\": \"{test_id}\"" in line for line in lines)
         assert any("\"deploymentDone\": true" in line for line in lines)
+
+    def test_deploy_payload_process_info_merged(self):
+        """
+        Validate that both process information formats are detected and merged accordingly.
+
+        Because OLD/OGC formats allow either ``processDescription.{info}`` or ``processDescription.process.{info}``,
+        both structures must be considered if provided by the user. Failing to do so, the :term:`CLI` could inject the
+        desired :term:`Process` ID (via ``-p``) in the wrong place, which would discard the rest of the user-provided
+        information when performing the ``OneOf()`` schema validation of the body.
+        """
+        in_oas = {"type": "string", "format": "uri"}
+        out_oas = {"type": "object", "properties": {"data": {"type": "object", "additionalProperties": True}}}
+        io_fmt = ContentType.IMAGE_GEOTIFF
+        cwl_ns, cwl_fmt = get_cwl_file_format(io_fmt)
+        process = {
+            "inputs": {"message": {"schema": in_oas}},
+            "outputs": {"output": {"schema": out_oas}}
+        }
+        payload_direct = {"processDescription": process}
+        payload_nested = {"processDescription": {"process": process}}
+
+        # use both combination of process description to validate resolution
+        for i, payload in enumerate([payload_direct, payload_nested]):
+            test_id = f"{self.test_process_prefix}-deploy-body-with-process-info-{i}"
+            package = self.retrieve_payload("Echo", "package", local=True)
+            package["outputs"]["output"]["format"] = cwl_fmt
+            package["$namespaces"] = cwl_ns
+
+            lines = mocked_sub_requests(
+                self.app, run_command,
+                [
+                    # weaver
+                    "deploy",
+                    "-u", self.url,
+                    "-p", test_id,
+                    "--body", json.dumps(payload),
+                    "--cwl", json.dumps(package),
+                ],
+                trim=False,
+                entrypoint=weaver_cli,
+                only_local=True,
+            )
+            assert any(f"\"id\": \"{test_id}\"" in line for line in lines)
+            assert any("\"deploymentDone\": true" in line for line in lines)
+
+            # validate result
+            lines = mocked_sub_requests(
+                self.app, run_command,
+                [
+                    # weaver
+                    "describe",
+                    "-u", self.url,
+                    "-p", test_id,
+                    "-F", OutputFormat.JSON_RAW,  # single line JSON literal
+                    "-S", ProcessSchema.OGC,
+                ],
+                trim=False,
+                entrypoint=weaver_cli,
+                only_local=True,
+            )
+            data = json.loads(lines[0])
+            in_schema = data["inputs"]["message"]["schema"]
+            out_schema = data["outputs"]["output"]["schema"]
+            out_formats = data["outputs"]["output"]["formats"]
+            out_cwl_type = {"contentMediaType": io_fmt, "contentEncoding": "base64",
+                            "type": "string", "format": "binary"}
+            out_json_type = {"contentMediaType": ContentType.APP_JSON, "type": "string"}
+            out_oas_oneof = {"oneOf": [out_cwl_type, out_json_type, out_oas]}
+            out_cwl_fmt = {"default": False, "mediaType": io_fmt}
+            out_oas_fmt = {"default": True, "mediaType": ContentType.APP_JSON}
+            out_any_fmt = [out_cwl_fmt, out_oas_fmt]
+            # if any of the below definitions don't include user-provided information,
+            # CLI did not combine it as intended prior to sending deployment request
+            assert in_schema == in_oas  # injected by user provided process description
+            assert out_schema == out_oas_oneof  # combined from user and auto-resolved definitions
+            assert out_formats == out_any_fmt  # auto-resolved from CWL
 
     def test_describe(self):
         # prints formatted JSON ProcessDescription over many lines

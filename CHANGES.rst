@@ -12,11 +12,18 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add `OpenGIS <http://www.opengis.net/def/glossary>`_ as a potential namespace resolver for common geospatial
+  Media-Types such as ``image/tiff; subtype=geotiff`` that must be distinguished from generic IANA formats.
 
 Fixes:
 ------
-- No change.
+- Fix invalid interpretation of stored `Process` I/O with ``schema`` with Media-Type reference not representing a
+  pre-resolved OpenAPI schema object, but rather an expected URI ``contentSchema`` reference for *default* format.
+- Fix `CLI` combination of user-provided `Process` description and inserted `Process` ID by option argument considering
+  alternative ``OGC``/``OLD`` representations.
+- Fix `OAS` ``format`` field dropped for literal type when resolving ``schema`` provided during `Process` deployment.
+- Fix Media-Type resolution dropping important sub-type parameters to distinguish between specific
+  type context (e.g. ``image/tiff`` vs ``image/tiff; subtype=geotiff``).
 
 .. _changes_4.16.0:
 

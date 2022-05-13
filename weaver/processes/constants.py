@@ -129,7 +129,7 @@ OAS_LITERAL_NUMERIC_FORMATS = frozenset(OAS_LITERAL_FLOAT_FORMATS | OAS_LITERAL_
 OAS_LITERAL_DATETIME_FORMATS = frozenset(["date", "datetime", "date-time", "full-date", "time"])
 OAS_LITERAL_STRING_FORMATS = frozenset(
     OAS_LITERAL_DATETIME_FORMATS |
-    {"password"}
+    {"password", "uri", "url"}
 )
 OAS_LITERAL_BINARY_FORMATS = frozenset(["base64", "binary", "byte"])
 OAS_KEYWORD_TYPES = frozenset(["allOf", "anyOf", "oneOf", "not"])
