@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_4.16.1:
+
+`4.16.1 <https://github.com/crim-ca/weaver/tree/4.16.1>`_ (2022-05-12)
+========================================================================
+
+Changes:
+--------
 - Add `OpenGIS <http://www.opengis.net/def/glossary>`_ as a potential namespace resolver for common geospatial
   Media-Types such as ``image/tiff; subtype=geotiff`` that must be distinguished from generic IANA formats.
 
