@@ -1620,6 +1620,7 @@ def json2oas_io_literal(io_info, io_hint=null):
     item_variation = []
     domains = get_field(io_info, "literal_data_domains", search_variations=True, default=[])
     for data_info in domains:
+        data_fmt = {}
         data_type = get_field(data_info, "type", search_variations=True)
         if isinstance(data_type, dict) and "name" in data_type:
             data_type = data_type["name"]
@@ -1636,9 +1637,12 @@ def json2oas_io_literal(io_info, io_hint=null):
             # ignore 'string' type which is the fallback type to avoid undoing proper detection
             data_hint = null if data_hint == "string" and data_type is not null else data_hint
             data_type = data_hint or data_type
+            data_fmt = get_field(io_hint, "format", search_variations=False)
+            data_fmt = {"format": data_fmt} if data_fmt is not null else {}
         if not data_type:
             continue
         data_var = json2oas_io_literal_data_type(data_type)
+        data_var.update(data_fmt)
         if data_href:
             data_var["contentSchema"] = data_href
         data_default = get_field(io_info, "default", search_variations=True)

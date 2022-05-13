@@ -288,12 +288,16 @@ _CONTENT_TYPE_SYNONYM_MAPPING = {
 }
 
 # Mappings for "CWL->File->Format"
-# IANA contains most standard MIME-types, but might not include special (application/x-hdf5, application/x-netcdf, etc.)
-# EDAM contains many field-specific schemas, but don't have an implicit URL definition (uses 'format_<id>' instead)
+# - IANA contains most standard MIME-types, but some special/vendor-specific types are missing
+#   (application/x-hdf5, application/x-netcdf, etc.).
+# - EDAM contains many field-specific schemas, but don't have an implicit URL definition (uses 'format_<id>' instead).
+# - OpenGIS contains many OGC/Geospatial Media-Types and glossary of related terms, but since it includes many items
+#   that are not necessarily Media-Types, URI resolutions are not attempted at random to avoid invalid references.
 # search:
 #   - IANA: https://www.iana.org/assignments/media-types/media-types.xhtml
 #   - EDAM-classes: http://bioportal.bioontology.org/ontologies/EDAM/?p=classes (section 'Format')
 #   - EDAM-browser: https://ifb-elixirfr.github.io/edam-browser/
+#   - OpenGIS vocabulary: http://www.opengis.net/def/glossary
 IANA_NAMESPACE = "iana"
 IANA_NAMESPACE_URL = "https://www.iana.org/assignments/media-types/"
 IANA_NAMESPACE_DEFINITION = {IANA_NAMESPACE: IANA_NAMESPACE_URL}
@@ -307,6 +311,12 @@ IANA_KNOWN_MEDIA_TYPES = {
     ContentType.TEXT_PLAIN,
     ContentType.TEXT_RICHTEXT,
     ContentType.VIDEO_MPEG,
+}
+# types to enforce to IANA in case another equivalent is known in other following mappings
+# duplicates in other mappings are left defined in case they are employed by a user to ensure their detection
+# but prefer the IANA resolution with is the primary reference for Media-Types
+IANA_MAPPING = {
+    ContentType.APP_JSON: ContentType.APP_JSON,
 }
 EDAM_NAMESPACE = "edam"
 EDAM_NAMESPACE_URL = "http://edamontology.org/"
@@ -322,7 +332,18 @@ EDAM_MAPPING = {
     ContentType.APP_YAML: "format_3750",
     ContentType.TEXT_PLAIN: "format_1964",
 }
-FORMAT_NAMESPACES = frozenset([IANA_NAMESPACE, EDAM_NAMESPACE])
+OPENGIS_NAMESPACE = "opengis"
+OPENGIS_NAMESPACE_URL = "http://www.opengis.net/"
+OPENGIS_NAMESPACE_DEFINITION = {OPENGIS_NAMESPACE: OPENGIS_NAMESPACE_URL}
+OPENGIS_MAPPING = {
+    ContentType.IMAGE_GEOTIFF: "def/glossary/term/Geotiff"
+}
+FORMAT_NAMESPACE_DEFINITIONS = {
+    **IANA_NAMESPACE_DEFINITION,
+    **EDAM_NAMESPACE_DEFINITION,
+    **OPENGIS_NAMESPACE_DEFINITION
+}
+FORMAT_NAMESPACES = frozenset(FORMAT_NAMESPACE_DEFINITIONS)
 
 
 def get_allowed_extensions():
@@ -486,6 +507,16 @@ def get_cwl_file_format(mime_type, make_reference=False, must_exist=True, allow_
         # type: (Dict[str, str], str, str) -> Union[Tuple[Optional[JSON], Optional[str]], Optional[str]]
         return os.path.join(_map[_key], _fmt) if make_reference else (_map, f"{_key}:{_fmt}")
 
+    def _search_explicit_mappings(_mime_type):
+        # type: (str) -> Union[Tuple[Optional[JSON], Optional[str]], Optional[str]]
+        if _mime_type in IANA_MAPPING:
+            return _make_if_ref(IANA_NAMESPACE_DEFINITION, IANA_NAMESPACE, IANA_MAPPING[_mime_type])
+        if _mime_type in EDAM_MAPPING:  # prefer real reference if available
+            return _make_if_ref(EDAM_NAMESPACE_DEFINITION, EDAM_NAMESPACE, EDAM_MAPPING[_mime_type])
+        if _mime_type in OPENGIS_MAPPING:  # prefer real reference if available
+            return _make_if_ref(OPENGIS_NAMESPACE_DEFINITION, OPENGIS_NAMESPACE, OPENGIS_MAPPING[_mime_type])
+        return None
+
     def _request_extra_various(_mime_type):
         # type: (str) -> Union[Tuple[Optional[JSON], Optional[str]], Optional[str]]
         """
@@ -495,8 +526,10 @@ def get_cwl_file_format(mime_type, make_reference=False, must_exist=True, allow_
 
         _mime_type_url = f"{IANA_NAMESPACE_DEFINITION[IANA_NAMESPACE]}{_mime_type}"
         if _mime_type in IANA_KNOWN_MEDIA_TYPES:  # avoid HTTP NotFound
-            if _mime_type in EDAM_MAPPING:  # prefer real reference if available
-                return _make_if_ref(EDAM_NAMESPACE_DEFINITION, EDAM_NAMESPACE, EDAM_MAPPING[_mime_type])
+            # prefer real reference if available
+            _found = _search_explicit_mappings(_mime_type)
+            if _found is not None:
+                return _found
             return _make_if_ref(IANA_NAMESPACE_DEFINITION, IANA_NAMESPACE, _mime_type)
 
         retries = 3
@@ -522,12 +555,17 @@ def get_cwl_file_format(mime_type, make_reference=False, must_exist=True, allow_
 
     if not mime_type:
         return None if make_reference else (None, None)
+    # attempt search without cleanup in case of explicit definition that needs the extra parameters
+    found = _search_explicit_mappings(mime_type)
+    if found:
+        return found
     mime_type = clean_mime_type_format(mime_type, strip_parameters=True)
     result = _request_extra_various(mime_type)
     if result is not None:
         return result
-    if mime_type in EDAM_MAPPING:
-        return _make_if_ref(EDAM_NAMESPACE_DEFINITION, EDAM_NAMESPACE, EDAM_MAPPING[mime_type])
+    found = _search_explicit_mappings(mime_type)
+    if found:
+        return found
     if not must_exist:
         return _make_if_ref(IANA_NAMESPACE_DEFINITION, IANA_NAMESPACE, mime_type)
     if result is None and allow_synonym and mime_type in _CONTENT_TYPE_SYNONYM_MAPPING:
@@ -580,15 +618,23 @@ def clean_mime_type_format(mime_type, suffix_subtype=False, strip_parameters=Fal
         typ, sub = parts[0].split("/")
         sub = sub.split("+")[-1]
         mime_type = f"{typ}/{sub}{parts[1]}"
-    for v in list(IANA_NAMESPACE_DEFINITION.values()) + list(EDAM_NAMESPACE_DEFINITION.values()):
+    for v in FORMAT_NAMESPACE_DEFINITIONS.values():
         if v in mime_type:
             mime_type = mime_type.replace(v, "")
-    for v in list(IANA_NAMESPACE_DEFINITION.keys()) + list(EDAM_NAMESPACE_DEFINITION.keys()):
+            break
+    for v in FORMAT_NAMESPACE_DEFINITIONS:
         if mime_type.startswith(v + ":"):
             mime_type = mime_type.replace(v + ":", "")
-    for v in EDAM_MAPPING.values():
-        if v.endswith(mime_type):
-            mime_type = [k for k in EDAM_MAPPING if v.endswith(EDAM_MAPPING[k])][0]
+            break
+    search = True
+    for _map in [EDAM_MAPPING, OPENGIS_MAPPING]:
+        if not search:
+            break
+        for v in _map.values():
+            if v.endswith(mime_type):
+                mime_type = [k for k in _map if v.endswith(_map[k])][0]
+                search = False
+                break
     return mime_type
 
 

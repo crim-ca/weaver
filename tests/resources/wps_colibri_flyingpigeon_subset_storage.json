@@ -1,0 +1,327 @@
+{
+    "identifier": "ColibriFlyingpigeon_SubsetBbox",
+    "title": "ColibriFlyingpigeon_SubsetBbox",
+    "abstract": "",
+    "keywords": [],
+    "metadata": [],
+    "version": null,
+    "inputs": [
+        {
+            "title": "NetCDF resource",
+            "abstract": "NetCDF file or OPEnDAP url pointing to netCDF file.",
+            "keywords": [],
+            "metadata": [],
+            "type": "complex",
+            "data_format": {
+                "mime_type": "application/x-netcdf",
+                "encoding": "base64",
+                "schema": "",
+                "extension": ""
+            },
+            "asreference": false,
+            "workdir": null,
+            "mode": 0,
+            "translations": null,
+            "mimetype": "application/x-netcdf",
+            "encoding": "base64",
+            "id": "resource",
+            "formats": [
+                {
+                    "encoding": "base64",
+                    "schema": "",
+                    "extension": "",
+                    "mimeType": "application/x-netcdf",
+                    "default": true
+                },
+                {
+                    "encoding": "",
+                    "schema": "",
+                    "extension": "",
+                    "mimeType": "application/x-ogc-dods",
+                    "default": false
+                }
+            ],
+            "minOccurs": 1,
+            "maxOccurs": 1000
+        },
+        {
+            "title": "Minimum longitude",
+            "abstract": "Minimum longitude.",
+            "keywords": [],
+            "metadata": [],
+            "type": "literal",
+            "data_type": "float",
+            "workdir": null,
+            "allowed_values": [],
+            "any_value": false,
+            "mode": 0,
+            "translations": null,
+            "id": "lon0",
+            "minOccurs": 1,
+            "maxOccurs": 1
+        },
+        {
+            "title": "Maximum longitude",
+            "abstract": "Maximum longitude.",
+            "keywords": [],
+            "metadata": [],
+            "type": "literal",
+            "data_type": "float",
+            "workdir": null,
+            "allowed_values": [],
+            "any_value": false,
+            "mode": 0,
+            "translations": null,
+            "id": "lon1",
+            "minOccurs": 1,
+            "maxOccurs": 1
+        },
+        {
+            "title": "Minimum latitude",
+            "abstract": "Minimum latitude.",
+            "keywords": [],
+            "metadata": [],
+            "type": "literal",
+            "data_type": "float",
+            "workdir": null,
+            "allowed_values": [],
+            "any_value": false,
+            "mode": 0,
+            "translations": null,
+            "id": "lat0",
+            "minOccurs": 1,
+            "maxOccurs": 1
+        },
+        {
+            "title": "Maximum latitude",
+            "abstract": "Maximum latitude.",
+            "keywords": [],
+            "metadata": [],
+            "type": "literal",
+            "data_type": "float",
+            "workdir": null,
+            "allowed_values": [],
+            "any_value": false,
+            "mode": 0,
+            "translations": null,
+            "id": "lat1",
+            "minOccurs": 1,
+            "maxOccurs": 1
+        },
+        {
+            "title": "Initial datetime",
+            "abstract": "Initial datetime for temporal subsetting.",
+            "keywords": [],
+            "metadata": [],
+            "type": "literal",
+            "data_type": "string",
+            "workdir": null,
+            "allowed_values": [],
+            "any_value": false,
+            "mode": 0,
+            "translations": null,
+            "data": "null",
+            "id": "start",
+            "minOccurs": 0,
+            "maxOccurs": 1
+        },
+        {
+            "title": "None",
+            "abstract": "Final datetime for temporal subsetting.",
+            "keywords": [],
+            "metadata": [],
+            "type": "literal",
+            "data_type": "string",
+            "workdir": null,
+            "allowed_values": [],
+            "any_value": false,
+            "mode": 0,
+            "translations": null,
+            "data": "null",
+            "id": "end",
+            "minOccurs": 0,
+            "maxOccurs": 1
+        },
+        {
+            "title": "Variable",
+            "abstract": "Name of the variable in the NetCDF file.Will be guessed if not provided.",
+            "keywords": [],
+            "metadata": [],
+            "type": "literal",
+            "data_type": "string",
+            "workdir": null,
+            "allowed_values": [],
+            "any_value": false,
+            "mode": 0,
+            "translations": null,
+            "data": "null",
+            "id": "variable",
+            "minOccurs": 0,
+            "maxOccurs": 1
+        }
+    ],
+    "outputs": [
+        {
+            "title": "NetCDF output for first resource file.",
+            "abstract": "",
+            "keywords": [],
+            "type": "complex",
+            "asreference": true,
+            "data_format": {
+                "mime_type": "application/x-netcdf",
+                "encoding": "base64",
+                "schema": "",
+                "extension": ""
+            },
+            "file": null,
+            "workdir": null,
+            "mode": 1,
+            "translations": null,
+            "mimetype": "application/x-netcdf",
+            "encoding": "base64",
+            "id": "output",
+            "formats": [
+                {
+                    "encoding": "base64",
+                    "schema": "",
+                    "extension": "",
+                    "mimeType": "application/x-netcdf",
+                    "default": true
+                }
+            ],
+            "minOccurs": "1",
+            "maxOccurs": "1"
+        },
+        {
+            "title": "Metalink file with links to all NetCDF outputs.",
+            "abstract": "",
+            "keywords": [],
+            "type": "complex",
+            "asreference": true,
+            "data_format": {
+                "mime_type": "application/metalink+xml; version=4.0",
+                "encoding": "",
+                "schema": "metalink/4.0/metalink4.xsd",
+                "extension": ""
+            },
+            "file": null,
+            "workdir": null,
+            "mode": 0,
+            "translations": null,
+            "mimetype": "application/metalink+xml; version=4.0",
+            "schema": "metalink/4.0/metalink4.xsd",
+            "id": "metalink",
+            "formats": [
+                {
+                    "encoding": "",
+                    "schema": "metalink/4.0/metalink4.xsd",
+                    "extension": "",
+                    "mimeType": "application/metalink+xml; version=4.0",
+                    "default": true
+                }
+            ],
+            "minOccurs": "1",
+            "maxOccurs": "1"
+        }
+    ],
+    "jobControlOptions": ["async-execute"],
+    "outputTransmission": [],
+    "processEndpointWPS1": "http://localhost:4002/ows/wps",
+    "processDescriptionURL": "http://localhost:4002/processes/ColibriFlyingpigeon_SubsetBbox",
+    "executeEndpoint": "http://localhost:4002/processes/ColibriFlyingpigeon_SubsetBbox/jobs",
+    "owsContext": {
+        "offering": {
+            "content": {
+                "href": "https://colibri.crim.ca/twitcher/ows/proxy/flyingpigeon/wps?service=WPS&request=describeprocess&version=1.0.0&identifier=subset_bbox"
+            }
+        }
+    },
+    "type": "application",
+    "package": {
+        "cwlVersion": "v1.0",
+        "class": "CommandLineTool",
+        "hints": {
+            "WPS1Requirement": {
+                "provider": "https://colibri.crim.ca/twitcher/ows/proxy/flyingpigeon/wps",
+                "process": "subset_bbox"
+            }
+        },
+        "inputs": [
+            {
+                "id": "resource",
+                "type": [
+                    "File",
+                    {
+                        "type": "array",
+                        "items": "File"
+                    }
+                ]
+            },
+            {
+                "id": "lon0",
+                "type": "float"
+            },
+            {
+                "id": "lon1",
+                "type": "float"
+            },
+            {
+                "id": "lat0",
+                "type": "float"
+            },
+            {
+                "id": "lat1",
+                "type": "float"
+            },
+            {
+                "id": "start",
+                "type": ["null", "string"],
+                "default": "null"
+            },
+            {
+                "id": "end",
+                "type": ["null", "string"],
+                "default": "null"
+            },
+            {
+                "id": "variable",
+                "type": ["null", "string"],
+                "default": "null"
+            }
+        ],
+        "outputs": [
+            {
+                "id": "output",
+                "type": "File",
+                "format": "edam:format_3650",
+                "outputBinding": {
+                    "glob": "output.nc"
+                }
+            },
+            {
+                "id": "metalink",
+                "type": "File",
+                "outputBinding": {
+                    "glob": "metalink.meta4"
+                }
+            }
+        ],
+        "＄namespaces": {
+            "edam": "http://edamontology.org/"
+        }
+    },
+    "payload": {
+        "processDescription": {
+            "process": {
+                "id": "ColibriFlyingpigeon_SubsetBbox"
+            }
+        },
+        "executionUnit": [
+            {
+                "href": "https://colibri.crim.ca/twitcher/ows/proxy/flyingpigeon/wps?service=WPS&request=describeprocess&version=1.0.0&identifier=subset_bbox"
+            }
+        ],
+        "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication"
+    },
+    "visibility": "public"
+}

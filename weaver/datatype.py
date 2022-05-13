@@ -1820,7 +1820,7 @@ class Process(Base):
                 if input_desc:
                     _input["description"] = input_desc
                 input_schema = get_field(_input, "schema", search_variations=False)
-                if input_schema:
+                if isinstance(input_schema, dict):
                     _input["schema"] = self._decode(input_schema)
         return inputs
 
@@ -1849,7 +1849,7 @@ class Process(Base):
             if output_desc:
                 _output["description"] = output_desc
             output_schema = get_field(_output, "schema", search_variations=False)
-            if output_schema:
+            if isinstance(output_schema, dict):
                 _output["schema"] = self._decode(output_schema)
         return outputs
 

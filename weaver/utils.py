@@ -1515,7 +1515,7 @@ def fetch_file(file_reference, file_outdir, settings=None, link=None, move=False
 def load_file(file_path, text=False):
     # type: (str, bool) -> Union[JSON, str]
     """
-    Load JSON or YAML file contents from local path or remote URL.
+    Load :term:`JSON` or :term:`YAML` file contents from local path or remote URL.
 
     If URL, get the content and validate it by loading, otherwise load file directly.
 

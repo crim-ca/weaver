@@ -259,15 +259,13 @@ class WeaverClient(object):
                         "process": {"id": process_id}
                     }
                 }
-            if body and process_id:
+            desc = data.get("processDescription", {})
+            if data and process_id:
                 LOGGER.debug("Override provided process ID [%s] into provided/loaded body.", process_id)
-                data.setdefault("processDescription", {})
-                data["processDescription"].setdefault("process", {})
-                data["processDescription"]["process"]["id"] = process_id  # type: ignore
-            # for convenience, always set visibility by default
-            data.setdefault("processDescription", {})
-            data["processDescription"].setdefault("process", {})
-            data["processDescription"]["process"]["visibility"] = Visibility.PUBLIC  # type: ignore
+                desc = data.get("processDescription", {}).get("process", {}) or data.get("processDescription", {})
+                desc["id"] = process_id
+            data.setdefault("processDescription", desc)  # already applied if description was found/updated at any level
+            desc["visibility"] = Visibility.PUBLIC
         except (ValueError, TypeError, ScannerError) as exc:
             return OperationResult(False, f"Failed resolution of body definition: [{exc!s}]", body)
         return OperationResult(True, "", data)

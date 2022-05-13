@@ -70,7 +70,7 @@ def test_get_format_default_no_extension():
 
 def test_get_cwl_file_format_tuple():
     tested = set(f.FORMAT_NAMESPACES)
-    for mime_type in [f.ContentType.APP_JSON, f.ContentType.APP_NETCDF]:
+    for mime_type in [f.ContentType.APP_JSON, f.ContentType.APP_NETCDF, f.ContentType.IMAGE_GEOTIFF]:
         res = f.get_cwl_file_format(mime_type, make_reference=False)
         assert isinstance(res, tuple) and len(res) == 2
         ns, fmt = res
@@ -85,8 +85,11 @@ def test_get_cwl_file_format_tuple():
 
 def test_get_cwl_file_format_reference():
     tested = set(f.FORMAT_NAMESPACES)
-    tests = [(f.IANA_NAMESPACE_DEFINITION, f.ContentType.APP_JSON),
-             (f.EDAM_NAMESPACE_DEFINITION, f.ContentType.APP_NETCDF)]
+    tests = [
+        (f.IANA_NAMESPACE_DEFINITION, f.ContentType.APP_JSON),
+        (f.EDAM_NAMESPACE_DEFINITION, f.ContentType.APP_NETCDF),
+        (f.OPENGIS_NAMESPACE_DEFINITION, f.ContentType.IMAGE_GEOTIFF),
+    ]
     for ns, mime_type in tests:
         res = f.get_cwl_file_format(mime_type, make_reference=True)
         ns_name, ns_url = list(ns.items())[0]
@@ -129,8 +132,8 @@ def test_get_cwl_file_format_retry_attempts():
 
     with mock.patch("weaver.utils.get_settings", return_value={"cache.request.enabled": "false"}):
         with mock.patch("requests.Session.request", side_effect=mock_request_extra) as mocked_request:
-            _, fmt = f.get_cwl_file_format(f.ContentType.APP_JSON)
-            assert fmt == f"{f.IANA_NAMESPACE}:{f.ContentType.APP_JSON}"
+            _, fmt = f.get_cwl_file_format(f.ContentType.IMAGE_PNG)
+            assert fmt == f"{f.IANA_NAMESPACE}:{f.ContentType.IMAGE_PNG}"
             assert mocked_request.call_count == 2
 
 
@@ -147,8 +150,8 @@ def test_get_cwl_file_format_retry_fallback_urlopen():
     with mock.patch("weaver.utils.get_settings", return_value={"cache.request.enabled": "false"}):
         with mock.patch("requests.Session.request", side_effect=mock_connect_error) as mocked_request:
             with mock.patch("weaver.formats.urlopen", side_effect=mock_urlopen) as mocked_urlopen:
-                _, fmt = f.get_cwl_file_format(f.ContentType.APP_JSON)
-                assert fmt == f"{f.IANA_NAMESPACE}:{f.ContentType.APP_JSON}"
+                _, fmt = f.get_cwl_file_format(f.ContentType.IMAGE_PNG)
+                assert fmt == f"{f.IANA_NAMESPACE}:{f.ContentType.IMAGE_PNG}"
                 assert mocked_request.call_count == 4, "Expected internally attempted 4 times (1 attempt + 3 retries)"
                 assert mocked_urlopen.call_count == 1, "Expected internal fallback request calls"
 
@@ -190,6 +193,16 @@ def test_clean_mime_type_format_edam():
     assert res_type == mime_type
     edam_fmt = os.path.join(list(f.EDAM_NAMESPACE_DEFINITION.values())[0], fmt)  # "edam-url/format_####"
     res_type = f.clean_mime_type_format(edam_fmt)
+    assert res_type == mime_type  # application/x-type
+
+
+def test_clean_mime_type_format_opengis():
+    mime_type, fmt = list(f.OPENGIS_MAPPING.items())[0]
+    gis_fmt = f"{f.OPENGIS_NAMESPACE}:{fmt}"  # "edam:format_####"
+    res_type = f.clean_mime_type_format(gis_fmt)
+    assert res_type == mime_type
+    gis_fmt = os.path.join(list(f.OPENGIS_NAMESPACE_DEFINITION.values())[0], fmt)  # "edam-url/format_####"
+    res_type = f.clean_mime_type_format(gis_fmt)
     assert res_type == mime_type  # application/x-type
 
 
