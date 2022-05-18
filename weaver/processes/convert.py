@@ -468,6 +468,8 @@ def any2cwl_io(wps_io, io_select):
     cwl_io = {"id": wps_io_id}  # type: CWL_IO_Type  # noqa
     if wps_io_type not in WPS_COMPLEX_TYPES:
         cwl_io_type = any2cwl_literal_datatype(wps_io_type)
+        if cwl_io_type is null:
+            LOGGER.warning("Could not identify a CWL literal data type with [%s].", wps_io_type)
         wps_allow = get_field(wps_io, "allowed_values", search_variations=True)
         if isinstance(wps_allow, list) and len(wps_allow) > 0:
             cwl_io["type"] = {"type": PACKAGE_ENUM_BASE, "symbols": wps_allow}
@@ -1244,6 +1246,8 @@ def repr2json_input_values(inputs):
             str_typ = "string"
         val_typ = any2cwl_literal_datatype(str_typ)
         if not str_id or (val_typ is null and str_typ not in INPUT_VALUE_TYPE_MAPPING):
+            if str_id and val_typ is null:
+                LOGGER.warning("Could not identify a CWL literal data type with [%s].", str_id)
             raise ValueError(f"Invalid input value ID representation. "
                              f"Missing or unknown 'ID[:TYPE]' parts after resolution as '{str_id!s}:{str_typ!s}'.")
         map_typ = val_typ if val_typ is not null else str_typ
@@ -1282,7 +1286,6 @@ def any2cwl_literal_datatype(io_type):
         return "float"
     if io_type in WPS_LITERAL_DATA_BOOLEAN:
         return "boolean"
-    LOGGER.warning("Could not identify a CWL literal data type with [%s].", io_type)
     return null
 
 
