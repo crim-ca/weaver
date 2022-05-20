@@ -18,7 +18,7 @@ Fixes:
 ------
 - Fix `Job` ``Location`` header injected twice in ``get_job_submission_response`` causing header to have comma-separated
   list of URI values failing retrieval by `CLI` when attempting to perform auto-monitoring of the submitted `Job`.
-- Fix `CWL` runtime context setup to return
+- Fix `CWL` runtime context setup to return monitored maximum RAM used by application under the `Process` if possible.
 
 .. _changes_4.16.1:
 
