@@ -1,6 +1,8 @@
 """
 Definitions of types used by tokens.
 """
+import os
+
 import abc
 import base64
 import copy
@@ -1008,6 +1010,21 @@ class Job(Base):
             raise ValueError(f"Value must be in range [0,100] for '{self.__name__}.progress'")
         self["progress"] = progress
 
+    @property
+    def statistics(self):
+        # type: () -> Optional[JSON]
+        """
+        Collected statistics about used memory and processing units if available.
+        """
+        return self.get("statistics")
+
+    @statistics.setter
+    def statistics(self, stats):
+        # type: (JSON) -> None
+        if not isinstance(stats, dict):
+            raise TypeError(f"Type 'dict' is required for '{self.__name__}.statistics'")
+        self["statistics"] = stats
+
     def _get_results(self):
         # type: () -> List[Optional[Dict[str, JSON]]]
         if self.get("results") is None:
@@ -1039,13 +1056,13 @@ class Job(Base):
     exceptions = property(_get_exceptions, _set_exceptions)
 
     def _get_logs(self):
-        # type: () -> List[Dict[str, str]]
+        # type: () -> List[str]
         if self.get("logs") is None:
             self["logs"] = []
         return dict.__getitem__(self, "logs")
 
     def _set_logs(self, logs):
-        # type: (List[Dict[str, str]]) -> None
+        # type: (List[str]) -> None
         if not isinstance(logs, list):
             raise TypeError(f"Type 'list' is required for '{self.__name__}.logs'")
         self["logs"] = logs
@@ -1270,6 +1287,7 @@ class Job(Base):
             "updated": self.updated,
             "progress": self.progress,
             "results": self.results,
+            "statistics": self.statistics,
             "exceptions": self.exceptions,
             "logs": self.logs,
             "tags": self.tags,

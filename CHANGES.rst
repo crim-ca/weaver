@@ -12,7 +12,8 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add statistics collection at the end of `Job` execution to obtain used memory from ``celery`` process and spaced
+  used by produced results.
 
 Fixes:
 ------

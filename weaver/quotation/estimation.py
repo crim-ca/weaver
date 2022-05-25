@@ -14,7 +14,7 @@ from weaver.store.base import StoreProcesses, StoreQuotes
 from weaver.utils import fully_qualified_name, get_settings, request_extra, wait_secs
 
 if TYPE_CHECKING:
-    from celery.task import Task
+    from celery.app.task import Task
 
     from weaver.datatype import Process, Quote
     from weaver.quotation.status import AnyQuoteStatus

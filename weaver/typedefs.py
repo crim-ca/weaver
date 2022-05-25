@@ -2,10 +2,14 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import os
+    import sys
     import typing
     import uuid
     from datetime import datetime
     from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Type, Union
+
+    import psutil
+
     if hasattr(typing, "TypedDict"):
         from typing import TypedDict  # pylint: disable=E0611,no-name-in-module  # Python >= 3.8
     else:
@@ -26,6 +30,28 @@ if TYPE_CHECKING:
         FileSystemPathType = Union[os.PathLike, str]
     else:
         FileSystemPathType = str
+
+    MemoryInfo = Any
+    if sys.platform == "win32":
+        try:
+            MemoryInfo = psutil._psutil_windows._pfullmem  # noqa: W0212
+        except (AttributeError, ImportError, NameError):
+            pass
+    if MemoryInfo is Any:
+        try:
+            MemoryInfo = psutil._pslinux.pfullmem  # noqa: W0212
+        except (AttributeError, ImportError, NameError):
+            pass
+    if MemoryInfo is Any:
+        if TypedDict is Dict:
+            MemoryInfo = Dict
+        else:
+            MemoryInfo = TypedDict("MemoryInfo", {
+                "rss": int,
+                "uss": int,
+                "vms": int,
+            }, total=False)
+    TimesCPU = psutil._common.pcputimes  # noqa: W0212
 
     from celery.app import Celery
     from celery.result import AsyncResult, EagerResult, GroupResult, ResultSet
