@@ -7,7 +7,7 @@ import pytest
 from tests.functional.test_cli import TestWeaverClientBase
 from tests.utils import mocked_sub_requests, run_command
 from weaver.cli import main as weaver_cli
-from weaver.formats import ContentType
+from weaver.formats import ContentType, add_content_type_charset
 
 
 @pytest.mark.vault
@@ -62,3 +62,25 @@ class TestVault(TestWeaverClientBase):
         resp = mocked_sub_requests(self.app, "GET", vault_url, headers={"X-Auth-Vault": vault_token})
         assert resp.status_code == 200
         assert resp.text == text
+
+    def test_vault_fast_requests(self):
+        """
+        Validate that Vault can handle multiple subsequent requests in short intervals for similar documents.
+        """
+        test_data = json.dumps({"data": "test"}, ensure_ascii=False).encode("UTF-8")
+        headers = {"Accept": ContentType.APP_JSON}  # multi-part content-type added automatically with boundary
+        for i in range(30):
+            file = [("file", "test-file.json", test_data, add_content_type_charset(ContentType.APP_JSON, "UTF-8"))]
+            resp = self.app.post("/vault", headers=headers, upload_files=file)
+            body = resp.json
+            token = body["access_token"]
+            file_id = body["file_id"]
+            # make sure access was not by chance
+            resp = self.app.get(url=f"/vault/{file_id}", expect_errors=True)
+            assert resp.status_code == 403
+            resp = self.app.get(url=f"/vault/{file_id}", headers={"X-Auth-Vault": token})
+            assert resp.status_code == 200
+            assert resp.body == test_data
+            # validate flushed as expected after first fetch
+            resp = self.app.get(url=f"/vault/{file_id}", headers={"X-Auth-Vault": token}, expect_errors=True)
+            assert resp.status_code == 410  # Gone
