@@ -96,6 +96,7 @@ class CaseInsensitive(str):
     def __init__(self, _str):
         # type: (str) -> None
         self.__str = _str
+        super(CaseInsensitive, self).__init__()
 
     def __hash__(self):
         return hash(self.__str)
