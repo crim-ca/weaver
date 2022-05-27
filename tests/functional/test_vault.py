@@ -69,7 +69,7 @@ class TestVault(TestWeaverClientBase):
         """
         test_data = json.dumps({"data": "test"}, ensure_ascii=False).encode("UTF-8")
         headers = {"Accept": ContentType.APP_JSON}  # multi-part content-type added automatically with boundary
-        for i in range(30):
+        for _ in range(30):
             file = [("file", "test-file.json", test_data, add_content_type_charset(ContentType.APP_JSON, "UTF-8"))]
             resp = self.app.post("/vault", headers=headers, upload_files=file)
             body = resp.json
