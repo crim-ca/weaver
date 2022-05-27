@@ -88,9 +88,9 @@ if TYPE_CHECKING:
     _JSON: TypeAlias = "JSON"
     _JsonObjectItemAlias: TypeAlias = "_JsonObjectItem"
     _JsonListItemAlias: TypeAlias = "_JsonListItem"
-    _JsonObjectItem = Dict[str, Union[_JSON, _JsonListItemAlias]]
-    _JsonListItem = List[Union[AnyValueType, _JsonObjectItem, _JsonListItemAlias, _JSON]]
-    _JsonItem = Union[AnyValueType, _JsonObjectItem, _JsonListItem]
+    _JsonObjectItem = Dict[str, Union[_JSON, _JsonObjectItemAlias, _JsonListItemAlias]]
+    _JsonListItem = List[Union[AnyValueType, _JsonObjectItem, _JsonListItemAlias]]
+    _JsonItem = Union[AnyValueType, _JsonObjectItem, _JsonListItem, _JSON]
     JSON = Union[Dict[str, _JsonItem], List[_JsonItem], AnyValueType]
 
     Link = TypedDict("Link", {
@@ -358,6 +358,36 @@ if TYPE_CHECKING:
         "inputs": JobInputs,
         "outputs": JobOutputs,
     })
+
+    # job execution statistics
+    ApplicationStatistics = TypedDict("ApplicationStatistics", {
+        "usedMemory": str,
+        "usedMemoryBytes": int,
+    }, total=True)
+    ProcessStatistics = TypedDict("ProcessStatistics", {
+        "rss": str,
+        "rssBytes": int,
+        "uss": str,
+        "ussBytes": int,
+        "vms": str,
+        "vmsBytes": int,
+        "usedThreads": int,
+        "usedCPU": int,
+        "usedHandles": int,
+        "usedMemory": str,
+        "usedMemoryBytes": int,
+        "totalSize": str,
+        "totalSizeBytes": int,
+    }, total=False)
+    OutputStatistics = TypedDict("OutputStatistics", {
+        "size": str,
+        "sizeBytes": int,
+    }, total=True)
+    Statistics = TypedDict("Statistics", {
+        "application": Optional[ApplicationStatistics],
+        "process": Optional[ProcessStatistics],
+        "outputs": Dict[str, OutputStatistics],
+    }, total=False)
 
     CeleryResult = Union[AsyncResult, EagerResult, GroupResult, ResultSet]
 

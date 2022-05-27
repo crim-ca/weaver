@@ -14,6 +14,8 @@ Changes:
 --------
 - Add statistics collection at the end of `Job` execution to obtain used memory from ``celery`` process and spaced
   used by produced results.
+- Add ``/jobs/{jobID}/statistics`` endpoint (and corresponding locations for ``/providers`` and ``/processes``) to
+  report any collected statistics following a `Job` execution.
 
 Fixes:
 ------

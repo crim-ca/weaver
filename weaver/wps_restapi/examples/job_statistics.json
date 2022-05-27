@@ -1,0 +1,27 @@
+{
+  "application": {
+    "usedMemory": "3.000 MiB",
+    "usedMemoryBytes": 3145728
+  },
+  "process": {
+    "rss": "139.531 MiB",
+    "rssBytes": 146309120,
+    "uss": "84.535 MiB",
+    "ussBytes": 88641536,
+    "vms": "1.388 GiB",
+    "vmsBytes": 1490432000,
+    "usedThreads": 11,
+    "usedCPU": 5,
+    "usedHandles": 0,
+    "usedMemory": "13.734 MiB",
+    "usedMemoryBytes": 14401536,
+    "totalSize": "3.000 B",
+    "totalSizeBytes": 3
+  },
+  "outputs": {
+    "output": {
+      "size": "3.000 B",
+      "sizeBytes": 3
+    }
+  }
+}

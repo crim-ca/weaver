@@ -859,6 +859,9 @@ def test_apply_number_with_unit(number, binary, unit, expect):
     ("1GiB", True, 1_073_741_824),   # forced but matches
     ("1GiB", None, 1_073_741_824),   # normal
     ("1GiB", False, 1_000_000_000),  # forced unmatched 'B'
+    # rounding expected for binary (ie: 1 x 2^30 + 400 x 2^20 for accurate result)
+    # if not rounded, converting causes floating remainder (1.4 x 2^30 = 1503238553.6)
+    ("1.4GiB", True, 1_503_238_554),
 ])
 def test_parse_number_with_unit(number, binary, expect):
     result = parse_number_with_unit(number, binary=binary)

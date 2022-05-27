@@ -197,6 +197,7 @@ TAG_DEPLOY = "Deploy"
 TAG_RESULTS = "Results"
 TAG_EXCEPTIONS = "Exceptions"
 TAG_LOGS = "Logs"
+TAG_STATISTICS = "Statistics"
 TAG_VAULT = "Vault"
 TAG_WPS = "WPS"
 TAG_DEPRECATED = "Deprecated Endpoints"
@@ -226,6 +227,7 @@ job_exceptions_service = Service(name="job_exceptions", path=job_service.path + 
 job_outputs_service = Service(name="job_outputs", path=job_service.path + "/outputs")
 job_inputs_service = Service(name="job_inputs", path=job_service.path + "/inputs")
 job_logs_service = Service(name="job_logs", path=job_service.path + "/logs")
+job_stats_service = Service(name="job_stats", path=job_service.path + "/statistics")
 
 processes_service = Service(name="processes", path="/processes")
 process_service = Service(name="process", path=processes_service.path + "/{process_id}")
@@ -241,6 +243,7 @@ process_inputs_service = Service(name="process_inputs", path=process_service.pat
 process_outputs_service = Service(name="process_outputs", path=process_service.path + job_outputs_service.path)
 process_exceptions_service = Service(name="process_exceptions", path=process_service.path + job_exceptions_service.path)
 process_logs_service = Service(name="process_logs", path=process_service.path + job_logs_service.path)
+process_stats_service = Service(name="process_stats", path=process_service.path + job_stats_service.path)
 process_execution_service = Service(name="process_execution", path=process_service.path + "/execution")
 
 providers_service = Service(name="providers", path="/providers")
@@ -253,6 +256,7 @@ provider_results_service = Service(name="provider_results", path=provider_servic
 provider_inputs_service = Service(name="provider_inputs", path=provider_service.path + process_inputs_service.path)
 provider_outputs_service = Service(name="provider_outputs", path=provider_service.path + process_outputs_service.path)
 provider_logs_service = Service(name="provider_logs", path=provider_service.path + process_logs_service.path)
+provider_stats_service = Service(name="provider_stats", path=provider_service.path + process_stats_service.path)
 provider_exceptions_service = Service(name="provider_exceptions",
                                       path=provider_service.path + process_exceptions_service.path)
 provider_execution_service = Service(name="provider_execution", path=provider_service.path + "/execution")
@@ -2633,6 +2637,18 @@ class ProcessLogsEndpoint(ProcessPath, JobPath):
     header = RequestHeaders()
 
 
+class JobStatisticsEndpoint(JobPath):
+    header = RequestHeaders()
+
+
+class ProcessJobStatisticsEndpoint(ProcessPath, JobPath):
+    header = RequestHeaders()
+
+
+class ProviderJobStatisticsEndpoint(ProviderPath, ProcessPath, JobPath):
+    header = RequestHeaders()
+
+
 ##################################################################
 # These classes define schemas for requests that feature a body
 ##################################################################
@@ -3969,6 +3985,46 @@ class JobLogsSchema(ExtendedSequenceSchema):
     log = ExtendedSchemaNode(String())
 
 
+class ApplicationStatisticsSchema(ExtendedMappingSchema):
+    mem = ExtendedSchemaNode(String(), name="usedMemory", example="10 MiB")
+    mem_bytes = ExtendedSchemaNode(Integer(), name="usedMemoryBytes", example=10485760)
+
+
+class ProcessStatisticsSchema(ExtendedMappingSchema):
+    rss = ExtendedSchemaNode(String(), name="rss", example="140 MiB")
+    rss_bytes = ExtendedSchemaNode(Integer(), name="rssBytes", example=146800640)
+    uss = ExtendedSchemaNode(String(), name="uss", example="80 MiB")
+    uss_bytes = ExtendedSchemaNode(Integer(), name="ussBytes", example=83886080)
+    vms = ExtendedSchemaNode(String(), name="vms", example="1.4 GiB")
+    vms_bytes = ExtendedSchemaNode(Integer(), name="vmsBytes", example=1503238554)
+    used_threads = ExtendedSchemaNode(Integer(), name="usedThreads", example=10)
+    used_cpu = ExtendedSchemaNode(Integer(), name="usedCPU", example=2)
+    used_handles = ExtendedSchemaNode(Integer(), name="usedHandles", example=0)
+    mem = ExtendedSchemaNode(String(), name="usedMemory", example="10 MiB",
+                             description="RSS memory employed by the job execution omitting worker memory.")
+    mem_bytes = ExtendedSchemaNode(Integer(), name="usedMemoryBytes", example=10485760,
+                                   description="RSS memory employed by the job execution omitting worker memory.")
+    total_size = ExtendedSchemaNode(String(), name="totalSize", example="10 MiB",
+                                    description="Total size to store job output files.")
+    total_size_bytes = ExtendedSchemaNode(Integer(), name="totalSizeBytes", example=10485760,
+                                          description="Total size to store job output files.")
+
+
+class OutputStatisticsSchema(ExtendedMappingSchema):
+    size = ExtendedSchemaNode(String(), name="size", example="5 MiB")
+    size_bytes = ExtendedSchemaNode(Integer(), name="sizeBytes", example=5242880)
+
+
+class OutputStatisticsMap(ExtendedMappingSchema):
+    output = OutputStatisticsSchema(variable="{output-id}", description="Spaced used by this output file.")
+
+
+class JobStatisticsSchema(ExtendedMappingSchema):
+    application = ApplicationStatisticsSchema(missing=drop)
+    process = ProcessStatisticsSchema(missing=drop)
+    outputs = OutputStatisticsMap(missing=drop)
+
+
 class FrontpageParameterSchema(ExtendedMappingSchema):
     name = ExtendedSchemaNode(String(), example="api")
     enabled = ExtendedSchemaNode(Boolean(), example=True)
@@ -4741,6 +4797,11 @@ class OkGetJobLogsResponse(ExtendedMappingSchema):
     body = JobLogsSchema()
 
 
+class OkGetJobStatsResponse(ExtendedMappingSchema):
+    header = ResponseHeaders()
+    body = JobStatisticsSchema()
+
+
 class VaultFileID(UUID):
     description = "Vault file identifier."
     example = "78977deb-28af-46f3-876b-cdd272742678"
@@ -5153,6 +5214,22 @@ get_logs_responses = {
 }
 get_prov_logs_responses = copy(get_logs_responses)
 get_prov_logs_responses.update({
+    "403": ForbiddenProviderLocalResponseSchema(),
+})
+get_stats_responses = {
+    "200": OkGetJobStatsResponse(description="success", examples={
+        "JobStatistics": {
+            "summary": "Job statistics collected following process execution.",
+            "value": EXAMPLES["job_statistics.json"],
+        }
+    }),
+    "400": InvalidJobResponseSchema(),
+    "404": NotFoundJobResponseSchema(),
+    "410": GoneJobResponseSchema(),
+    "500": InternalServerErrorResponseSchema(),
+}
+get_prov_stats_responses = copy(get_stats_responses)
+get_prov_stats_responses.update({
     "403": ForbiddenProviderLocalResponseSchema(),
 })
 get_quote_list_responses = {

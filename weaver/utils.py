@@ -1846,6 +1846,7 @@ def parse_number_with_unit(number, binary=None):
         f_val = float(num["number"])
         unit = grp["unit"]
         multiplier = 1
+        as_bin = False
         if unit:
             as_bin = binary is None and unit[-1] == "B"
             is_bin = unit[:2] in UNIT_BIN_POWER
@@ -1861,8 +1862,11 @@ def parse_number_with_unit(number, binary=None):
             else:
                 multiplier = 10 ** (factor * 3)
         f_val = f_val * multiplier
-        i_val = int(f_val)
-        val = i_val if i_val == f_val else f_val
+        if binary or as_bin:
+            val = int(f_val + 0.5)  # round up
+        else:
+            i_val = int(f_val)
+            val = i_val if i_val == f_val else f_val
     except (AttributeError, KeyError, ValueError, TypeError):
         raise ValueError(f"Invalid number with optional unit string could not be parsed: [{number!s}]")
     return val

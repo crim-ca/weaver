@@ -1,8 +1,6 @@
 """
 Definitions of types used by tokens.
 """
-import os
-
 import abc
 import base64
 import copy
@@ -77,7 +75,8 @@ if TYPE_CHECKING:
         JSON,
         Link,
         Metadata,
-        QuoteProcessParameters
+        QuoteProcessParameters,
+        Statistics
     )
     from weaver.visibility import AnyVisibility
 
@@ -1012,7 +1011,7 @@ class Job(Base):
 
     @property
     def statistics(self):
-        # type: () -> Optional[JSON]
+        # type: () -> Optional[Statistics]
         """
         Collected statistics about used memory and processing units if available.
         """
@@ -1020,7 +1019,7 @@ class Job(Base):
 
     @statistics.setter
     def statistics(self, stats):
-        # type: (JSON) -> None
+        # type: (Statistics) -> None
         if not isinstance(stats, dict):
             raise TypeError(f"Type 'dict' is required for '{self.__name__}.statistics'")
         self["statistics"] = stats
@@ -1202,6 +1201,8 @@ class Job(Base):
                      "title": "Job outputs of successful process execution (extended outputs with metadata)."},
                     {"href": job_url + "/results", "rel": "http://www.opengis.net/def/rel/ogc/1.0/results",
                      "title": "Job results of successful process execution (direct output values mapping)."},
+                    {"href": job_url + "/statistics", "rel": "statistics",  # unofficial
+                     "title": "Job statistics collected following process execution."},
                 ])
             else:
                 job_links.append({

@@ -39,7 +39,6 @@ from weaver.utils import (
     get_any_id,
     get_any_value,
     get_file_headers,
-    get_header,
     get_path_kvp,
     get_settings,
     get_weaver_url,
