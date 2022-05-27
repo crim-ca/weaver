@@ -465,11 +465,16 @@ class Service(Base):
         :param fetch: indicates whether metadata should be fetched from remote.
         :param ignore: indicates if failing metadata retrieval/parsing should be silently discarded or raised.
         :return: generated summary information.
+        :raises ServiceParsingError:
+            If the target service provider is not reachable, content is not parsable or any other error related to
+            validating the service that needs to be understood for summary creation.
+        :raises colander.Invalid: If the generated response format is not valid according to schema definition.
         """
         try:
             # FIXME: not implemented (https://github.com/crim-ca/weaver/issues/130)
             if not ProcessType.is_wps(self.type):
                 return None
+            self.check_accessible(container, ignore=ignore)
             # basic information always available (local)
             data = {
                 "id": self.name,
@@ -491,6 +496,8 @@ class Service(Base):
         except colander.Invalid as exc:
             LOGGER.error("Failed schema validation on otherwise valid parsing of provider definition.", exc_info=exc)
             raise  # invalid schema on our side, don't ignore it
+        except ServiceParsingError:
+            raise
         except Exception as exc:
             msg = f"Exception occurred while fetching or parsing WPS [{self.name}] at [{self.url}]"
             err_msg = f"{msg}: {exc!r}"
@@ -498,8 +505,6 @@ class Service(Base):
             if ignore:
                 warnings.warn(err_msg, NonBreakingExceptionWarning)
                 return None
-            if isinstance(exc, ServiceParsingError):
-                raise
             raise ServiceParsingError(json={"description": msg, "cause": str(exc), "error": fully_qualified_name(exc)})
 
     def processes(self, container, ignore=False):
@@ -552,7 +557,15 @@ class Service(Base):
             # - enforce quick timeout (but don't allow 408 code) to avoid long pending connexions that never resolve
             allowed_codes = [200, 400, 405, 500]
             resp = request_extra(meth, url, timeout=2, settings=settings, allowed_codes=allowed_codes)
-            return resp.status_code in allowed_codes
+            code = resp.status_code
+            accessible = code in allowed_codes
+            if not accessible and not ignore:
+                msg = f"Service [{self.name}] at [{self.url}] response status code [{code}] is not acceptable."
+                raise ServiceParsingError(json={
+                    "description": msg,
+                    "cause": "Cannot validate or parse service metadata since it is not accessible.",
+                })
+            return accessible
         except (requests.exceptions.RequestException, pyramid.httpexceptions.HTTPException) as exc:
             msg = f"Exception occurred while checking service [{self.name}] accessibility at [{self.url}]"
             warnings.warn(f"{msg}: {exc!r}", NonBreakingExceptionWarning)

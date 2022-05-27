@@ -16,7 +16,8 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Fix failing `Service` provider summary response in case of unresponsive (not accessible or parsable) URL endpoint
+  contents due to different errors raised by distinct versions of ``requests`` package.
 
 .. _changes_4.16.1:
 
