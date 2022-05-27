@@ -2,12 +2,12 @@ from typing import TYPE_CHECKING
 
 from celery.utils.log import get_task_logger
 from colander import Invalid
-from pyramid.httpexceptions import HTTPBadRequest, HTTPNotFound, HTTPOk, HTTPPermanentRedirect, HTTPUnprocessableEntity
+from pyramid.httpexceptions import HTTPBadRequest, HTTPOk, HTTPPermanentRedirect, HTTPUnprocessableEntity
 
 from notify import encrypt_email
 from weaver.database import get_db
 from weaver.datatype import Job
-from weaver.exceptions import JobNotFound, log_unhandled_exceptions
+from weaver.exceptions import JobNotFound, JobStatisticsNotFound, log_unhandled_exceptions
 from weaver.formats import ContentType, OutputFormat, add_content_type_charset, guess_target_format, repr_json
 from weaver.processes.convert import convert_input_values_schema, convert_output_params_schema
 from weaver.store.base import StoreJobs
@@ -334,20 +334,20 @@ def get_job_stats(request):
     job = get_job(request)
     raise_job_dismissed(job, request)
     if job.status not in JOB_STATUS_CATEGORIES[StatusCategory.FINISHED] or job.status != Status.SUCCEEDED:
-        raise HTTPNotFound(json={
+        raise JobStatisticsNotFound(json={
             "title": "NoJobStatistics",
             "type": "no-job-statistics",  # unofficial
             "detail": "Job statistics are only available for completed and successful jobs.",
-            "status": HTTPNotFound.code,
+            "status": JobStatisticsNotFound.code,
             "cause": {"status": job.status},
         })
     stats = job.statistics
     if not stats:  # backward compatibility for existing jobs before feature was added
-        raise HTTPNotFound(json={
+        raise JobStatisticsNotFound(json={
             "title": "NoJobStatistics",
             "type": "no-job-statistics",  # unofficial
             "detail": "Job statistics were not collected for this execution.",
-            "status": HTTPNotFound.code,
+            "status": JobStatisticsNotFound.code,
             "cause": "Empty statistics."
         })
     body = sd.JobStatisticsSchema().deserialize(stats)

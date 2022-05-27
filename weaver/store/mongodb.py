@@ -648,12 +648,14 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
         raise JobUpdateError(f"Failed to update specified job: '{job!s}'")
 
     def delete_job(self, job_id):
-        # type: (str) -> bool
+        # type: (AnyUUID) -> bool
         """
         Removes job from `MongoDB` storage.
         """
-        self.collection.delete_one({"id": job_id})
-        return True
+        if isinstance(job_id, str):
+            job_id = uuid.UUID(job_id)
+        result = self.collection.delete_one({"id": job_id})
+        return result.deleted_count == 1
 
     def fetch_by_id(self, job_id):
         # type: (AnyUUID) -> Job

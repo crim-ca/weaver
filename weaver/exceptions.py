@@ -190,6 +190,15 @@ class JobInvalidParameter(HTTPBadRequest, OWSInvalidParameterValue, JobException
     """
 
 
+class JobStatisticsNotFound(JobNotFound):
+    """
+    Error related to statistics not available for a Job.
+
+    Statistics could be unavailable due to incomplete execution, failed status,
+    or simply because it is an older result generated before this feature was introduced.
+    """
+
+
 class JobRegistrationError(HTTPInternalServerError, OWSNoApplicableCode, JobException):
     """
     Error related to a registration issue for a job.
