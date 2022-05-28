@@ -41,7 +41,8 @@ git+https://github.com/ESGF/esgf-compute-api.git@v2.3.7#egg=esgf-compute-api
 # it is also only available for Python >=3.5
 # use pserve to continue supporting config.ini with paste settings
 gunicorn>=20.0.4
-json2xml
+json2xml<3.19.0; python_version <= "3.6"
+json2xml; python_version >= "3.7"
 jsonschema>=3.0.1
 lxml
 mako
