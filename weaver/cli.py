@@ -531,7 +531,7 @@ class WeaverClient(object):
 
         .. seealso::
             - Headers dictionary limitation by :mod:`requests`:
-              https://docs.python-requests.org/en/latest/user/quickstart/#response-headers
+              https://requests.readthedocs.io/en/master/user/quickstart/#response-content
             - Headers formatting with multiple values must be provided by comma-separated values
               (:rfc:`7230#section-3.2.2`).
             - Multi Vault-Token parsing accomplished by :func:`weaver.vault.utils.parse_vault_token`.
