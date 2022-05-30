@@ -10,9 +10,9 @@ from weaver.datatype import Job
 from weaver.exceptions import JobNotFound, JobStatisticsNotFound, log_unhandled_exceptions
 from weaver.formats import ContentType, OutputFormat, add_content_type_charset, guess_target_format, repr_json
 from weaver.processes.convert import convert_input_values_schema, convert_output_params_schema
+from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory
 from weaver.store.base import StoreJobs
 from weaver.utils import get_settings
-from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.jobs.utils import (
     dismiss_job_task,

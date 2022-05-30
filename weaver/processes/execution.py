@@ -5,8 +5,8 @@ from typing import TYPE_CHECKING
 
 import colander
 import psutil
-from celery.utils.debug import ps as get_celery_process
 from celery.exceptions import TimeoutError as CeleryTaskTimeoutError
+from celery.utils.debug import ps as get_celery_process
 from celery.utils.log import get_task_logger
 from owslib.util import clean_ows_url
 from owslib.wps import ComplexDataInput
