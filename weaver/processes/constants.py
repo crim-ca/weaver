@@ -74,11 +74,13 @@ Set of :term:`CWL` requirements that correspond to remote execution of an :term:
 # FIXME: convert to 'Constants' class
 CWL_REQUIREMENT_ENV_VAR = "EnvVarRequirement"
 CWL_REQUIREMENT_INIT_WORKDIR = "InitialWorkDirRequirement"
+CWL_REQUIREMENT_RESOURCE = "ResourceRequirement"
 CWL_REQUIREMENT_SCATTER = "ScatterFeatureRequirement"
 
 CWL_REQUIREMENT_FEATURES = frozenset([
     CWL_REQUIREMENT_ENV_VAR,
     CWL_REQUIREMENT_INIT_WORKDIR,
+    CWL_REQUIREMENT_RESOURCE,   # FIXME: perform pre-check on job submit? (https://github.com/crim-ca/weaver/issues/138)
     # CWL_REQUIREMENT_SCATTER,  # FIXME: see workflow test + fix https://github.com/crim-ca/weaver/issues/105
 ])
 """
@@ -154,6 +156,17 @@ if TYPE_CHECKING:
     from weaver.typedefs import Literal
 
     # pylint: disable=invalid-name
+    CWL_RequirementNames = Literal[
+        CWL_REQUIREMENT_APP_BUILTIN,
+        CWL_REQUIREMENT_APP_DOCKER,
+        CWL_REQUIREMENT_APP_DOCKER_GPU,
+        CWL_REQUIREMENT_APP_ESGF_CWT,
+        CWL_REQUIREMENT_APP_WPS1,
+        CWL_REQUIREMENT_ENV_VAR,
+        CWL_REQUIREMENT_INIT_WORKDIR,
+        CWL_REQUIREMENT_RESOURCE,
+        CWL_REQUIREMENT_SCATTER,
+    ]
     ProcessSchemaType = Literal[ProcessSchema.OGC, ProcessSchema.OLD]
     WPS_ComplexType = Literal[WPS_COMPLEX, WPS_COMPLEX_DATA, WPS_REFERENCE]
     WPS_DataType = Union[Literal[WPS_LITERAL, WPS_BOUNDINGBOX], WPS_ComplexType]

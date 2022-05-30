@@ -35,6 +35,7 @@ from weaver.formats import ContentType
 from weaver.status import JOB_STATUS_CATEGORIES, STATUS_PYWPS_IDS, STATUS_PYWPS_MAP, Status, StatusCompliant, map_status
 from weaver.utils import (
     NullType,
+    apply_number_with_unit,
     assert_sane_name,
     bytes2str,
     fetch_file,
@@ -50,6 +51,7 @@ from weaver.utils import (
     make_dirs,
     null,
     parse_kvp,
+    parse_number_with_unit,
     parse_prefer_header_execute_mode,
     pass_http_error,
     request_extra,
@@ -811,3 +813,61 @@ def test_parse_kvp(query, params, expected):
 def test_prefer_header_execute_mode(headers, support, expected):
     result = parse_prefer_header_execute_mode(headers, support)
     assert result == expected
+
+
+@pytest.mark.parametrize("number,binary,unit,expect", [
+    (1.234, False, "B", "1.234 B"),
+    (10_000_000, False, "B", "10.000 MB"),
+    (10_000_000, True, "B", "9.537 MiB"),
+    (10_000_000_000, False, "B", "10.000 GB"),
+    (10_737_418_240, True, "B", "10.000 GiB"),
+    (10_000_000_000, True, "B", "9.313 GiB"),
+    (10**25, False, "", "10.000 Y"),
+    (10**25, True, "B", "8.272 YiB"),
+    (10**28, False, "", "10000.000 Y"),  # last unit goes over bound
+    (10**-28, False, "s", "0.000 ys"),   # out of bound, cannot represent smaller
+    (-10 * 10**3, False, "s", "-10.000 ks"),  # negative & positive power
+    (-0.001234, False, "s", "-1.234 ms"),  # negative & reducing power
+    (0, False, "", "0.000"),
+    (0.000, True, "", "0.000 B"),
+])
+def test_apply_number_with_unit(number, binary, unit, expect):
+    result = apply_number_with_unit(number, unit=unit, binary=binary)
+    assert result == expect
+
+
+@pytest.mark.parametrize("number,binary,expect", [
+    ("1 B", None, 1),
+    # note: 'k' lower
+    ("1k", False, 1_000),            # normal
+    ("1kB", False, 1_000),           # forced unmatched 'B'
+    ("1kB", None, 1_024),            # auto from 'B'
+    ("1kB", True, 1_024),            # forced but matches
+    # note: 'K' upper
+    ("1K", False, 1_000),            # normal
+    ("1KB", False, 1_000),           # forced unmatched 'B'
+    ("1KB", None, 1_024),            # auto from 'B'
+    ("1KB", True, 1_024),            # forced but matches
+    # normal
+    ("1KiB", True, 1_024),           # forced but matches
+    ("1KiB", None, 1_024),           # normal
+    ("1KiB", False, 1_000),          # forced unmatched 'B'
+    ("1G", False, 1_000_000_000),    # normal
+    ("1GB", False, 1_000_000_000),   # forced unmatched 'B'
+    ("1GB", None, 1_073_741_824),    # auto from 'B'
+    ("1GB", True, 1_073_741_824),    # forced but matches
+    ("1GiB", True, 1_073_741_824),   # forced but matches
+    ("1GiB", None, 1_073_741_824),   # normal
+    ("1GiB", False, 1_000_000_000),  # forced unmatched 'B'
+    # rounding expected for binary (ie: 1 x 2^30 + 400 x 2^20 for accurate result)
+    # if not rounded, converting causes floating remainder (1.4 x 2^30 = 1503238553.6)
+    ("1.4GiB", True, 1_503_238_554),
+])
+def test_parse_number_with_unit(number, binary, expect):
+    result = parse_number_with_unit(number, binary=binary)
+    assert result == expect
+
+
+def test_parse_number_with_unit_error():
+    with pytest.raises(ValueError):
+        parse_number_with_unit(123)  # noqa

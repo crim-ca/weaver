@@ -4,7 +4,9 @@ from time import sleep
 from typing import TYPE_CHECKING
 
 import colander
+import psutil
 from celery.exceptions import TimeoutError as CeleryTaskTimeoutError
+from celery.utils.debug import ps as get_celery_process
 from celery.utils.log import get_task_logger
 from owslib.util import clean_ows_url
 from owslib.wps import ComplexDataInput
@@ -24,6 +26,7 @@ from weaver.processes.types import ProcessType
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.store.base import StoreJobs, StoreProcesses
 from weaver.utils import (
+    apply_number_with_unit,
     as_int,
     fully_qualified_name,
     get_any_id,
@@ -32,6 +35,7 @@ from weaver.utils import (
     get_registry,
     get_settings,
     now,
+    parse_number_with_unit,
     parse_prefer_header_execute_mode,
     raise_on_xml_exception,
     wait_secs
@@ -42,6 +46,7 @@ from weaver.wps.utils import (
     get_wps_client,
     get_wps_local_status_location,
     get_wps_output_context,
+    get_wps_output_dir,
     get_wps_output_path,
     get_wps_output_url,
     load_pywps_config
@@ -54,14 +59,22 @@ if TYPE_CHECKING:
     from uuid import UUID
     from typing import Dict, List, Optional, Tuple, Union
 
-    from celery.task import Task
+    from celery.app.task import Task
     from pyramid.request import Request
     from pywps.inout.inputs import ComplexInput
 
     from weaver.datatype import Job
     from weaver.processes.convert import OWS_Input_Type, ProcessOWS
     from weaver.status import StatusType
-    from weaver.typedefs import AnyResponseType, CeleryResult, HeadersType, HeaderCookiesType, JSON, SettingsType
+    from weaver.typedefs import (
+        JSON,
+        AnyResponseType,
+        CeleryResult,
+        HeadersType,
+        HeaderCookiesType,
+        SettingsType,
+        Statistics
+    )
     from weaver.visibility import AnyVisibility
 
 
@@ -84,7 +97,7 @@ class JobProgress(object):
 
 
 @app.task(bind=True)
-def execute_process(self, job_id, wps_url, headers=None):
+def execute_process(task, job_id, wps_url, headers=None):
     # type: (Task, UUID, str, Optional[HeadersType]) -> StatusType
     """
     Celery task that executes the WPS process job monitoring as status updates (local and remote).
@@ -93,10 +106,11 @@ def execute_process(self, job_id, wps_url, headers=None):
 
     LOGGER.debug("Job execute process called.")
 
-    # reset the connection because we are in a forked celery process
+    task_process = get_celery_process()
+    rss_start = task_process.memory_info().rss
     registry = get_registry(None)  # local thread, whether locally or dispatched celery
     settings = get_settings(registry)
-    db = get_db(registry, reset_connection=True)
+    db = get_db(registry, reset_connection=True)  # reset the connection because we are in a forked celery process
     store = db.get_store(StoreJobs)
     job = store.fetch_by_id(job_id)
     job.started = now()
@@ -108,7 +122,7 @@ def execute_process(self, job_id, wps_url, headers=None):
     job.save_log(logger=task_logger, message="Job task setup initiated.")
     load_pywps_config(settings)
     job.progress = JobProgress.SETUP
-    job.task_id = self.request.id
+    job.task_id = task.request.id
     job.save_log(logger=task_logger, message="Job task setup completed.")
     job = store.update_job(job)
 
@@ -250,6 +264,7 @@ def execute_process(self, job_id, wps_url, headers=None):
         if task_terminated and map_status(job.status) == Status.FAILED:
             job.status = Status.DISMISSED
         task_success = map_status(job.status) not in JOB_STATUS_CATEGORIES[StatusCategory.FAILED]
+        collect_statistics(task_process, settings, job, rss_start)
         if task_success:
             job.progress = JobProgress.EXECUTE_MONITOR_END
         job.status_message = f"Job {job.status}."
@@ -269,6 +284,82 @@ def execute_process(self, job_id, wps_url, headers=None):
         job = store.update_job(job)
 
     return job.status
+
+
+def collect_statistics(process, settings=None, job=None, rss_start=None):
+    # type: (Optional[psutil.Process], Optional[SettingsType], Optional[Job], Optional[int]) -> Optional[Statistics]
+    """
+    Collect any available execution statistics and store them in the :term:`Job` if provided.
+    """
+    try:
+        mem_used = None
+        if job:
+            mem_info = list(filter(lambda line: "cwltool" in line and "memory used" in line, job.logs))
+            mem_used = None
+            if mem_info:
+                mem_info = mem_info[0].split(":")[-1].strip()
+                mem_used = parse_number_with_unit(mem_info, binary=True)
+
+        stats = {}  # type: JSON
+        if mem_used:
+            stats["application"] = {
+                # see: 'cwltool.job.JobBase.process_monitor', reported memory in logs uses 'rss'
+                "usedMemory": apply_number_with_unit(mem_used, binary=True),
+                "usedMemoryBytes": mem_used,
+            }
+
+        rss = None
+        if process:
+            proc_info = process.memory_full_info()
+            rss = getattr(proc_info, "rss", 0)
+            uss = getattr(proc_info, "uss", 0)
+            vms = getattr(proc_info, "vms", 0)
+            stats["process"] = {
+                "rss": apply_number_with_unit(rss, binary=True),
+                "rssBytes": rss,
+                "uss": apply_number_with_unit(uss, binary=True),
+                "ussBytes": uss,
+                "vms": apply_number_with_unit(vms, binary=True),
+                "vmsBytes": vms,
+            }
+            fields = [("usedThreads", "num_threads"), ("usedCPU", "cpu_num"), ("usedHandles", "num_handles")]
+            for field, method in fields:
+                func = getattr(process, method, None)
+                stats["process"][field] = func() if func is not None else 0
+
+        if rss_start and rss:
+            # diff of RSS between start/end to consider only execution of the job steps
+            # this more accurately reports used memory by the execution itself, omitting celery worker's base memory
+            rss_diff = rss - rss_start
+            stats["process"]["usedMemory"] = apply_number_with_unit(rss_diff, binary=True)
+            stats["process"]["usedMemoryBytes"] = rss_diff
+
+        total_size = 0
+        if job:
+            stats["outputs"] = {}
+            for result in job.results:
+                res_ref = get_any_value(result, file=True)
+                if res_ref and isinstance(res_ref, str):
+                    if res_ref.startswith(f"/{job.id}"):  # pseudo-relative reference
+                        out_dir = get_wps_output_dir(settings)
+                        res_ref = os.path.join(out_dir, res_ref[1:])
+                    if os.path.isfile(res_ref):
+                        res_stat = os.stat(res_ref)
+                        res_id = get_any_id(result)
+                        res_size = res_stat.st_size
+                        stats["outputs"][res_id] = {
+                            "size": apply_number_with_unit(res_size, binary=True),
+                            "sizeBytes": res_size,
+                        }
+                        total_size += res_size
+            stats["process"]["totalSize"] = apply_number_with_unit(total_size, binary=True)
+            stats["process"]["totalSizeBytes"] = total_size
+
+        if stats and job:
+            job.statistics = stats
+        return stats or None
+    except Exception as exc:
+        LOGGER.warning("Ignoring error that occurred during statistics collection [%s]", str(exc), exc_info=exc)
 
 
 def fetch_wps_process(job, wps_url, headers, settings):

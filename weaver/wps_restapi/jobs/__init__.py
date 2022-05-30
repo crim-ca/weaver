@@ -17,6 +17,7 @@ def includeme(config):
     config.add_route(**sd.service_api_route_info(sd.job_inputs_service, settings))
     config.add_route(**sd.service_api_route_info(sd.job_exceptions_service, settings))
     config.add_route(**sd.service_api_route_info(sd.job_logs_service, settings))
+    config.add_route(**sd.service_api_route_info(sd.job_stats_service, settings))
     config.add_route(**sd.service_api_route_info(sd.provider_job_service, settings))
     config.add_route(**sd.service_api_route_info(sd.provider_jobs_service, settings))
     config.add_route(**sd.service_api_route_info(sd.provider_results_service, settings))
@@ -24,6 +25,7 @@ def includeme(config):
     config.add_route(**sd.service_api_route_info(sd.provider_inputs_service, settings))
     config.add_route(**sd.service_api_route_info(sd.provider_exceptions_service, settings))
     config.add_route(**sd.service_api_route_info(sd.provider_logs_service, settings))
+    config.add_route(**sd.service_api_route_info(sd.provider_stats_service, settings))
     config.add_route(**sd.service_api_route_info(sd.process_jobs_service, settings))
     config.add_route(**sd.service_api_route_info(sd.process_job_service, settings))
     config.add_route(**sd.service_api_route_info(sd.process_results_service, settings))
@@ -31,6 +33,7 @@ def includeme(config):
     config.add_route(**sd.service_api_route_info(sd.process_inputs_service, settings))
     config.add_route(**sd.service_api_route_info(sd.process_exceptions_service, settings))
     config.add_route(**sd.service_api_route_info(sd.process_logs_service, settings))
+    config.add_route(**sd.service_api_route_info(sd.process_stats_service, settings))
 
     # backward compatibility routes (deprecated)
     config.add_route(**sd.service_api_route_info(sd.job_result_service, settings))
@@ -90,6 +93,12 @@ def includeme(config):
     config.add_view(j.get_job_logs, route_name=sd.provider_logs_service.name,
                     request_method="GET", renderer=OutputFormat.JSON)
     config.add_view(j.get_job_logs, route_name=sd.process_logs_service.name,
+                    request_method="GET", renderer=OutputFormat.JSON)
+    config.add_view(j.get_job_stats, route_name=sd.job_stats_service.name,
+                    request_method="GET", renderer=OutputFormat.JSON)
+    config.add_view(j.get_job_stats, route_name=sd.provider_stats_service.name,
+                    request_method="GET", renderer=OutputFormat.JSON)
+    config.add_view(j.get_job_stats, route_name=sd.process_stats_service.name,
                     request_method="GET", renderer=OutputFormat.JSON)
     config.add_view(j.redirect_job_result, route_name=sd.job_result_service.name,
                     request_method="GET", renderer=OutputFormat.JSON)

@@ -144,7 +144,7 @@ class StoreJobs(StoreInterface):
 
     @abc.abstractmethod
     def delete_job(self, job_id):
-        # type: (str) -> bool
+        # type: (AnyUUID) -> bool
         raise NotImplementedError
 
     @abc.abstractmethod

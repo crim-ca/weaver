@@ -49,6 +49,7 @@ mako
 # esgf-compute-api (cwt) needs oauthlib but doesn't add it in their requirements
 oauthlib
 owslib==0.25.0
+psutil
 # FIXME: pymongo>=4 breaks with kombu corresponding to pinned Celery (https://github.com/crim-ca/weaver/issues/386)
 pymongo>=3.12.0,<4
 # pyproj>=2 employed by OWSLib, but make requirements stricter

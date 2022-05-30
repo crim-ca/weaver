@@ -75,7 +75,8 @@ if TYPE_CHECKING:
         JSON,
         Link,
         Metadata,
-        QuoteProcessParameters
+        QuoteProcessParameters,
+        Statistics
     )
     from weaver.visibility import AnyVisibility
 
@@ -1021,6 +1022,21 @@ class Job(Base):
             raise ValueError(f"Value must be in range [0,100] for '{self.__name__}.progress'")
         self["progress"] = progress
 
+    @property
+    def statistics(self):
+        # type: () -> Optional[Statistics]
+        """
+        Collected statistics about used memory and processing units if available.
+        """
+        return self.get("statistics")
+
+    @statistics.setter
+    def statistics(self, stats):
+        # type: (Statistics) -> None
+        if not isinstance(stats, dict):
+            raise TypeError(f"Type 'dict' is required for '{self.__name__}.statistics'")
+        self["statistics"] = stats
+
     def _get_results(self):
         # type: () -> List[Optional[Dict[str, JSON]]]
         if self.get("results") is None:
@@ -1052,13 +1068,13 @@ class Job(Base):
     exceptions = property(_get_exceptions, _set_exceptions)
 
     def _get_logs(self):
-        # type: () -> List[Dict[str, str]]
+        # type: () -> List[str]
         if self.get("logs") is None:
             self["logs"] = []
         return dict.__getitem__(self, "logs")
 
     def _set_logs(self, logs):
-        # type: (List[Dict[str, str]]) -> None
+        # type: (List[str]) -> None
         if not isinstance(logs, list):
             raise TypeError(f"Type 'list' is required for '{self.__name__}.logs'")
         self["logs"] = logs
@@ -1198,6 +1214,8 @@ class Job(Base):
                      "title": "Job outputs of successful process execution (extended outputs with metadata)."},
                     {"href": job_url + "/results", "rel": "http://www.opengis.net/def/rel/ogc/1.0/results",
                      "title": "Job results of successful process execution (direct output values mapping)."},
+                    {"href": job_url + "/statistics", "rel": "statistics",  # unofficial
+                     "title": "Job statistics collected following process execution."},
                 ])
             else:
                 job_links.append({
@@ -1283,6 +1301,7 @@ class Job(Base):
             "updated": self.updated,
             "progress": self.progress,
             "results": self.results,
+            "statistics": self.statistics,
             "exceptions": self.exceptions,
             "logs": self.logs,
             "tags": self.tags,

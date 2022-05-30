@@ -1,8 +1,10 @@
 import os
 
+from weaver import WEAVER_MODULE_DIR
 from weaver.utils import load_file
 
 RESOURCES_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), ""))
+EXAMPLES_PATH = os.path.join(WEAVER_MODULE_DIR, "wps_restapi/examples")
 
 GET_CAPABILITIES_TEMPLATE_URL = "{}?service=WPS&request=GetCapabilities&version=1.0.0"
 DESCRIBE_PROCESS_TEMPLATE_URL = "{}?service=WPS&request=DescribeProcess&identifier={}&version=1.0.0"
@@ -36,6 +38,11 @@ WPS_NO_INPUTS_XML = os.path.join(RESOURCES_PATH, "wps_no_inputs.xml")
 WPS_NO_INPUTS_URL = DESCRIBE_PROCESS_TEMPLATE_URL.format(
     TEST_REMOTE_SERVER_URL, WPS_NO_INPUTS_ID
 )
+
+
+def load_example(file_name):
+    file_path = os.path.join(EXAMPLES_PATH, file_name)
+    return load_file(file_path)
 
 
 def load_resource(file_name):

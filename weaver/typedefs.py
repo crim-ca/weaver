@@ -2,10 +2,14 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import os
+    import sys
     import typing
     import uuid
     from datetime import datetime
     from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Type, Union
+
+    import psutil
+
     if hasattr(typing, "TypedDict"):
         from typing import TypedDict  # pylint: disable=E0611,no-name-in-module  # Python >= 3.8
     else:
@@ -27,6 +31,28 @@ if TYPE_CHECKING:
     else:
         FileSystemPathType = str
 
+    MemoryInfo = Any
+    if sys.platform == "win32":
+        try:
+            MemoryInfo = psutil._psutil_windows._pfullmem  # noqa: W0212
+        except (AttributeError, ImportError, NameError):
+            pass
+    if MemoryInfo is Any:
+        try:
+            MemoryInfo = psutil._pslinux.pfullmem  # noqa: W0212
+        except (AttributeError, ImportError, NameError):
+            pass
+    if MemoryInfo is Any:
+        if TypedDict is Dict:
+            MemoryInfo = Dict
+        else:
+            MemoryInfo = TypedDict("MemoryInfo", {
+                "rss": int,
+                "uss": int,
+                "vms": int,
+            }, total=False)
+    TimesCPU = psutil._common.pcputimes  # noqa: W0212
+
     from celery.app import Celery
     from celery.result import AsyncResult, EagerResult, GroupResult, ResultSet
     from owslib.wps import BoundingBoxDataInput, ComplexDataInput, Process as ProcessOWS, WPSExecution
@@ -46,6 +72,7 @@ if TYPE_CHECKING:
     from webtest.response import TestResponse
     from werkzeug.wrappers import Request as WerkzeugRequest
 
+    from weaver.processes.constants import CWL_RequirementNames
     from weaver.processes.wps_process_base import WpsProcessInterface
     from weaver.datatype import Process
     from weaver.status import AnyStatusType
@@ -61,9 +88,9 @@ if TYPE_CHECKING:
     _JSON: TypeAlias = "JSON"
     _JsonObjectItemAlias: TypeAlias = "_JsonObjectItem"
     _JsonListItemAlias: TypeAlias = "_JsonListItem"
-    _JsonObjectItem = Dict[str, Union[_JSON, _JsonListItemAlias]]
-    _JsonListItem = List[Union[AnyValueType, _JsonObjectItem, _JsonListItemAlias, _JSON]]
-    _JsonItem = Union[AnyValueType, _JsonObjectItem, _JsonListItem]
+    _JsonObjectItem = Dict[str, Union[_JSON, _JsonObjectItemAlias, _JsonListItemAlias]]
+    _JsonListItem = List[Union[AnyValueType, _JsonObjectItem, _JsonListItemAlias]]
+    _JsonItem = Union[AnyValueType, _JsonObjectItem, _JsonListItem, _JSON]
     JSON = Union[Dict[str, _JsonItem], List[_JsonItem], AnyValueType]
 
     Link = TypedDict("Link", {
@@ -123,8 +150,10 @@ if TYPE_CHECKING:
     }, total=False)
     CWL_Inputs = Union[List[CWL_Input_Type], Dict[str, CWL_Input_Type]]
     CWL_Outputs = Union[List[CWL_Output_Type], Dict[str, CWL_Output_Type]]
-    CWL_Requirement = TypedDict("CWL_Requirement", {"class": str}, total=False)  # includes 'hints'
-    CWL_RequirementsDict = Dict[str, Dict[str, str]]   # {'<req>': {<param>: <val>}}
+
+    # 'requirements' includes 'hints'
+    CWL_Requirement = TypedDict("CWL_Requirement", {"class": CWL_RequirementNames}, total=False)  # type: ignore
+    CWL_RequirementsDict = Dict[CWL_RequirementNames, Dict[str, str]]   # {'<req>': {<param>: <val>}}
     CWL_RequirementsList = List[CWL_Requirement]       # [{'class': <req>, <param>: <val>}]
     CWL_AnyRequirements = Union[CWL_RequirementsDict, CWL_RequirementsList]
     # results from CWL execution
@@ -329,6 +358,36 @@ if TYPE_CHECKING:
         "inputs": JobInputs,
         "outputs": JobOutputs,
     })
+
+    # job execution statistics
+    ApplicationStatistics = TypedDict("ApplicationStatistics", {
+        "usedMemory": str,
+        "usedMemoryBytes": int,
+    }, total=True)
+    ProcessStatistics = TypedDict("ProcessStatistics", {
+        "rss": str,
+        "rssBytes": int,
+        "uss": str,
+        "ussBytes": int,
+        "vms": str,
+        "vmsBytes": int,
+        "usedThreads": int,
+        "usedCPU": int,
+        "usedHandles": int,
+        "usedMemory": str,
+        "usedMemoryBytes": int,
+        "totalSize": str,
+        "totalSizeBytes": int,
+    }, total=False)
+    OutputStatistics = TypedDict("OutputStatistics", {
+        "size": str,
+        "sizeBytes": int,
+    }, total=True)
+    Statistics = TypedDict("Statistics", {
+        "application": Optional[ApplicationStatistics],
+        "process": Optional[ProcessStatistics],
+        "outputs": Dict[str, OutputStatistics],
+    }, total=False)
 
     CeleryResult = Union[AsyncResult, EagerResult, GroupResult, ResultSet]
 

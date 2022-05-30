@@ -12,6 +12,7 @@ import mimetypes
 import os
 import re
 import subprocess
+import sys
 import tempfile
 import uuid
 import warnings
@@ -342,6 +343,8 @@ def run_command(command, trim=True, expect_error=False, entrypoint=None):
     command = [str(arg) for arg in command]
     if entrypoint is None:
         out, _ = subprocess.Popen(["which", "python"], universal_newlines=True, stdout=subprocess.PIPE).communicate()
+        if not out:
+            out = sys.executable  # fallback for some systems that fail above call
         python_path = os.path.split(out)[0]
         debug_path = os.path.expandvars(os.environ["PATH"])
         env = {"PATH": f"{python_path}:{debug_path}"}

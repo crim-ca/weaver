@@ -12,10 +12,16 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add statistics collection at the end of `Job` execution to obtain used memory from ``celery`` process and spaced
+  used by produced results.
+- Add ``/jobs/{jobID}/statistics`` endpoint (and corresponding locations for ``/providers`` and ``/processes``) to
+  report any collected statistics following a `Job` execution.
 
 Fixes:
 ------
+- Fix `Job` ``Location`` header injected twice in ``get_job_submission_response`` causing header to have comma-separated
+  list of URI values failing retrieval by `CLI` when attempting to perform auto-monitoring of the submitted `Job`.
+- Fix `CWL` runtime context setup to return monitored maximum RAM used by application under the `Process` if possible.
 - Fix failing `Service` provider summary response in case of unresponsive (not accessible or parsable) URL endpoint
   contents due to different errors raised by distinct versions of ``requests`` package.
 

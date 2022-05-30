@@ -89,6 +89,34 @@ SUPPORTED_FILE_SCHEMES = frozenset([
 FILE_NAME_QUOTE_PATTERN = re.compile(r"^\"?([\w\-.]+\.\w+)\"?$")  # extension required, permissive extra quotes
 FILE_NAME_LOOSE_PATTERN = re.compile(r"^[\w\-.]+$")  # no extension required
 
+
+class CaseInsensitive(str):
+    __str = None
+
+    def __init__(self, _str):
+        # type: (str) -> None
+        self.__str = _str
+        super(CaseInsensitive, self).__init__()
+
+    def __hash__(self):
+        return hash(self.__str)
+
+    def __str__(self):
+        return self.__str
+
+    def __repr__(self):
+        return f"CaseInsensitive({self.__str})"
+
+    def __eq__(self, other):
+        # type: (Any) -> bool
+        return self.__str.casefold() == str(other).casefold()
+
+
+NUMBER_PATTERN = re.compile(r"^(?P<number>[+-]?[0-9]+[.]?[0-9]*([e][+-]?[0-9]+)?)\s*(?P<unit>.*)$")
+UNIT_SI_POWER_UP = [CaseInsensitive("k"), "M", "G", "T", "P", "E", "Z", "Y"]  # allow upper 'K' often used
+UNIT_SI_POWER_DOWN = ["m", "µ", "n", "p", "f", "a", "z", "y"]
+UNIT_BIN_POWER = ["Ki", "Mi", "Gi", "Ti", "Pi", "Ei", "Zi", "Yi"]
+
 UUID_PATTERN = re.compile(colander.UUID_REGEX, re.IGNORECASE)
 
 
@@ -1755,3 +1783,91 @@ def generate_diff(val, ref, val_name="Test", ref_name="Reference"):
     val = val.splitlines()
     ref = ref.splitlines()
     return "\n".join(difflib.context_diff(val, ref, fromfile=val_name, tofile=ref_name))
+
+
+def apply_number_with_unit(number, unit="", binary=False, decimals=3):
+    # type: (Number, str, bool, int) -> str
+    """
+    Apply the relevant unit and prefix factor to the specified number to create a human-readable value.
+
+    :param number: Numeric value with no unit.
+    :param unit: Unit to be applied. Auto-resolved to 'B' if binary requested. Factor applied accordingly to number.
+    :param binary: Use binary multiplier (powers of 2) instead of SI decimal multipliers (powers of 10).
+    :param decimals: Number of decimals to preserve after unit is applied.
+    :return: String of the numeric value with appropriate unit.
+    """
+    multiplier = 1024. if binary else 1000.
+    unit = "B" if binary else unit
+    factor = ""
+    ratio = 1.0
+    negative = number < 0
+    number = -1. * number if negative else number
+    if number == 0:
+        pass
+    elif number > multiplier:
+        for exp, factor in enumerate(UNIT_SI_POWER_UP, start=1):
+            if not (number / float(multiplier ** exp)) >= (multiplier - 1.):
+                ratio = float(multiplier ** -exp)
+                break
+        else:
+            ratio = float(multiplier ** -len(UNIT_SI_POWER_UP))
+    elif number < multiplier:
+        for exp, factor in enumerate([""] + UNIT_SI_POWER_DOWN, start=0):
+            if (number * float(multiplier ** exp)) >= 1.:
+                ratio = float(multiplier ** exp)
+                break
+        else:
+            ratio = float(multiplier ** len(UNIT_SI_POWER_DOWN))
+    factor = f"{factor}i" if factor and binary else factor
+    factor = f" {factor}" if factor or unit else ""
+    value = (-1. if negative else 1.) * number * ratio
+    return f"{value:.{decimals}f}{factor}{unit}"
+
+
+def parse_number_with_unit(number, binary=None):
+    # type: (str, Optional[bool]) -> Number
+    """
+    Parses a numeric value accompanied with a unit to generate the unit-less value without prefix factor.
+
+    :param number:
+        Numerical value and unit. Unit is dissociated from value with first non-numerical match.
+        Unit is assumed to be present (not only the multiplier by itself).
+        This is important to avoid confusion (e.g.: ``m`` used for meters vs ``m`` prefix for "milli").
+    :param binary:
+        Force use (``True``) or non-use (``False``) of binary multiplier (powers of 2) instead of
+        SI decimal multipliers (powers of 10) for converting value (with applicable unit multiplier if available).
+        If unspecified (``None``), auto-detect from unit (e.g.: powers of 2 for ``MiB``, powers of 10 for ``MB``).
+        When unspecified, the ``B`` character is used to auto-detect if binary should apply, SI multipliers are
+        otherwise assumed.
+    :return: Literal value.
+    """
+    try:
+        num = re.match(NUMBER_PATTERN, number)
+        grp = num.groupdict()
+        f_val = float(num["number"])
+        unit = grp["unit"]
+        multiplier = 1
+        as_bin = False
+        if unit:
+            as_bin = binary is None and unit[-1] == "B"
+            is_bin = unit[:2] in UNIT_BIN_POWER
+            is_num = unit[0] in UNIT_SI_POWER_UP
+            if is_bin:
+                factor = UNIT_BIN_POWER.index(unit[:2]) + 1
+            elif is_num:
+                factor = UNIT_SI_POWER_UP.index(unit[:1]) + 1
+            else:
+                factor = 0
+            if binary or as_bin:
+                multiplier = 2 ** (factor * 10)
+            else:
+                multiplier = 10 ** (factor * 3)
+        f_val = f_val * multiplier
+        if binary or as_bin:
+            val = int(f_val + 0.5)  # round up
+        else:
+            i_val = int(f_val)
+            val = i_val if i_val == f_val else f_val
+    except (AttributeError, KeyError, ValueError, TypeError):
+        raise ValueError(f"Invalid number with optional unit string could not be parsed: [{number!s}]")
+    return val

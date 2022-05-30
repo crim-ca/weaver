@@ -18,6 +18,7 @@ import pyramid.testing
 import pytest
 from dateutil import parser as date_parser
 
+from tests.resources import load_example
 from tests.utils import (
     get_links,
     get_module_version,
@@ -49,7 +50,7 @@ if TYPE_CHECKING:
     from typing import Iterable, List, Optional, Tuple, Union
 
     from weaver.status import AnyStatusType
-    from weaver.typedefs import JSON, AnyLogLevel, Number
+    from weaver.typedefs import JSON, AnyLogLevel, Number, Statistics
     from weaver.visibility import AnyVisibility
 
 
@@ -172,7 +173,9 @@ class WpsRestApiJobsTest(unittest.TestCase):
                  duration=None,     # type: Optional[int]
                  exceptions=None,   # type: Optional[List[JSON]]
                  logs=None,         # type: Optional[List[Union[str, Tuple[str, AnyLogLevel, AnyStatusType, Number]]]]
-                 ):
+                 statistics=None,   # type: Optional[Statistics]
+                 add_info=True,     # type: bool
+                 ):                 # type: (...) -> Job
         if isinstance(created, str):
             created = date_parser.parse(created)
         job = self.job_store.save_job(task_id=task_id, process=process, service=service, is_workflow=False,
@@ -192,8 +195,11 @@ class WpsRestApiJobsTest(unittest.TestCase):
                     job.save_log(message=log_item)
         if exceptions is not None:
             job.exceptions = exceptions
+        if statistics is not None:
+            job.statistics = statistics
         job = self.job_store.update_job(job)
-        self.job_info.append(job)
+        if add_info:
+            self.job_info.append(job)
         return job
 
     def message_with_jobs_mapping(self, message="", indent=2):
@@ -1391,11 +1397,15 @@ class WpsRestApiJobsTest(unittest.TestCase):
         ]:
             for what in ["outputs", "results"]:
                 path = f"/jobs/{job.id}/{what}"
+                case = (
+                    f"Failed using (Path: {path}, Status: {job.status}, Code: {code}, Job: {job}, "
+                    f"Title: {title}, Error: {error_type}, Cause: {cause})"
+                )
                 resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
-                assert resp.status_code == code, f"Failed using [{path}]"
-                assert resp.json["title"] == title
-                assert resp.json["cause"] == cause
-                assert resp.json["type"].endswith(error_type)  # ignore http full reference, not always there
+                assert resp.status_code == code, case
+                assert resp.json["title"] == title, case
+                assert resp.json["cause"] == cause, case
+                assert resp.json["type"].endswith(error_type), case   # ignore http full reference, not always there
                 assert "links" in resp.json
 
     def test_jobs_inputs_outputs_validations(self):
@@ -1548,3 +1558,27 @@ class WpsRestApiJobsTest(unittest.TestCase):
         assert "Start" in lines[0]
         assert "Process" in lines[1]
         assert "Complete" in lines[2]
+
+    def test_job_statistics_missing(self):
+        job = self.job_info[0]
+        assert job.status == Status.SUCCEEDED, "invalid job status to run test"
+        path = f"/jobs/{job.id}/statistics"
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 404, "even if job is successful, expects not found if no statistics are available"
+
+    def test_job_statistics_response(self):
+        stats = load_example("job_statistics.json")
+        job = self.make_job(
+            add_info=False,
+            task_id="2222-0000-0000-0000", process=self.process_public.identifier, service=None,
+            user_id=self.user_admin_id, status=Status.SUCCEEDED, progress=100, access=Visibility.PUBLIC,
+            statistics=stats
+        )
+        try:
+            path = f"/jobs/{job.id}/statistics"
+            resp = self.app.get(path, headers=self.json_headers)
+            assert resp.status_code == 200
+            assert resp.json == stats
+        finally:
+            if job:
+                self.job_store.delete_job(job.id)

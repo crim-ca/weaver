@@ -10,7 +10,7 @@ from webtest import TestApp as WebTestApp
 
 from tests.utils import get_test_weaver_app, get_test_weaver_config
 from weaver.formats import ContentType
-from weaver.utils import request_extra
+from weaver.utils import get_header, request_extra
 from weaver.wps_restapi import swagger_definitions as sd
 
 
@@ -44,6 +44,11 @@ class GenericApiRoutesTestCase(unittest.TestCase):
                 resp = self.testapp.get(urlparse(path).path, expect_errors=True)  # allow error for wps without queries
             else:
                 resp = request_extra("GET", path, retries=3, retry_after=True, ssl_verify=False, allow_redirects=True)
+            user_agent = get_header("user-agent", resp.request.headers)
+            if resp.status_code == 403 and "python" in user_agent:
+                # some sites will explicitly block bots, retry with mocked user-agent simulating human user access
+                resp = request_extra("GET", path, headers={"User-Agent": "Mozilla"},
+                                     retries=3, retry_after=True, ssl_verify=False, allow_redirects=True)
             code = resp.status_code
             test = f"({rel}) [{path}]"
             assert code in [200, 400], f"Reference link expected to be found, got [{code}] for {test}"

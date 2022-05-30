@@ -7,9 +7,10 @@ from pyramid.httpexceptions import HTTPBadRequest, HTTPOk, HTTPPermanentRedirect
 from notify import encrypt_email
 from weaver.database import get_db
 from weaver.datatype import Job
-from weaver.exceptions import JobNotFound, log_unhandled_exceptions
+from weaver.exceptions import JobNotFound, JobStatisticsNotFound, log_unhandled_exceptions
 from weaver.formats import ContentType, OutputFormat, add_content_type_charset, guess_target_format, repr_json
 from weaver.processes.convert import convert_input_values_schema, convert_output_params_schema
+from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory
 from weaver.store.base import StoreJobs
 from weaver.utils import get_settings
 from weaver.wps_restapi import swagger_definitions as sd
@@ -276,10 +277,10 @@ def get_job_results(request):
 @sd.provider_exceptions_service.get(tags=[sd.TAG_JOBS, sd.TAG_EXCEPTIONS, sd.TAG_PROVIDERS],
                                     renderer=OutputFormat.JSON, schema=sd.ProviderExceptionsEndpoint(),
                                     response_schemas=sd.get_prov_exceptions_responses)
-@sd.job_exceptions_service.get(tags=[sd.TAG_JOBS, sd.TAG_EXCEPTIONS], renderer=OutputFormat.JSON,
-                               schema=sd.JobExceptionsEndpoint(), response_schemas=sd.get_exceptions_responses)
 @sd.process_exceptions_service.get(tags=[sd.TAG_JOBS, sd.TAG_EXCEPTIONS, sd.TAG_PROCESSES], renderer=OutputFormat.JSON,
                                    schema=sd.ProcessExceptionsEndpoint(), response_schemas=sd.get_exceptions_responses)
+@sd.job_exceptions_service.get(tags=[sd.TAG_JOBS, sd.TAG_EXCEPTIONS], renderer=OutputFormat.JSON,
+                               schema=sd.JobExceptionsEndpoint(), response_schemas=sd.get_exceptions_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_job_exceptions(request):
     # type: (PyramidRequest) -> AnyResponseType
@@ -294,10 +295,10 @@ def get_job_exceptions(request):
 
 @sd.provider_logs_service.get(tags=[sd.TAG_JOBS, sd.TAG_LOGS, sd.TAG_PROVIDERS], renderer=OutputFormat.JSON,
                               schema=sd.ProviderLogsEndpoint(), response_schemas=sd.get_prov_logs_responses)
-@sd.job_logs_service.get(tags=[sd.TAG_JOBS, sd.TAG_LOGS], renderer=OutputFormat.JSON,
-                         schema=sd.JobLogsEndpoint(), response_schemas=sd.get_logs_responses)
 @sd.process_logs_service.get(tags=[sd.TAG_JOBS, sd.TAG_LOGS, sd.TAG_PROCESSES], renderer=OutputFormat.JSON,
                              schema=sd.ProcessLogsEndpoint(), response_schemas=sd.get_logs_responses)
+@sd.job_logs_service.get(tags=[sd.TAG_JOBS, sd.TAG_LOGS], renderer=OutputFormat.JSON,
+                         schema=sd.JobLogsEndpoint(), response_schemas=sd.get_logs_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_job_logs(request):
     # type: (PyramidRequest) -> AnyResponseType
@@ -316,6 +317,41 @@ def get_job_logs(request):
         ctype = add_content_type_charset(ctype, charset="UTF-8")
         return HTTPOk(body=data, content_type=ctype)
     return HTTPOk(json=logs)
+
+
+@sd.provider_stats_service.get(tags=[sd.TAG_JOBS, sd.TAG_STATISTICS, sd.TAG_PROVIDERS], renderer=OutputFormat.JSON,
+                               schema=sd.ProviderJobStatisticsEndpoint(), response_schemas=sd.get_prov_stats_responses)
+@sd.process_stats_service.get(tags=[sd.TAG_JOBS, sd.TAG_STATISTICS, sd.TAG_PROCESSES], renderer=OutputFormat.JSON,
+                              schema=sd.ProcessJobStatisticsEndpoint(), response_schemas=sd.get_stats_responses)
+@sd.job_stats_service.get(tags=[sd.TAG_JOBS, sd.TAG_STATISTICS], renderer=OutputFormat.JSON,
+                          schema=sd.JobStatisticsEndpoint(), response_schemas=sd.get_stats_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
+def get_job_stats(request):
+    # type: (PyramidRequest) -> AnyResponseType
+    """
+    Retrieve the statistics of a job.
+    """
+    job = get_job(request)
+    raise_job_dismissed(job, request)
+    if job.status not in JOB_STATUS_CATEGORIES[StatusCategory.FINISHED] or job.status != Status.SUCCEEDED:
+        raise JobStatisticsNotFound(json={
+            "title": "NoJobStatistics",
+            "type": "no-job-statistics",  # unofficial
+            "detail": "Job statistics are only available for completed and successful jobs.",
+            "status": JobStatisticsNotFound.code,
+            "cause": {"status": job.status},
+        })
+    stats = job.statistics
+    if not stats:  # backward compatibility for existing jobs before feature was added
+        raise JobStatisticsNotFound(json={
+            "title": "NoJobStatistics",
+            "type": "no-job-statistics",  # unofficial
+            "detail": "Job statistics were not collected for this execution.",
+            "status": JobStatisticsNotFound.code,
+            "cause": "Empty statistics."
+        })
+    body = sd.JobStatisticsSchema().deserialize(stats)
+    return HTTPOk(json=body)
 
 
 @sd.provider_result_service.get(tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROVIDERS, sd.TAG_DEPRECATED],
