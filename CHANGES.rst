@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_4.17.0:
+
+`4.17.0 <https://github.com/crim-ca/weaver/tree/4.17.0>`_ (2022-05-30)
+========================================================================
+
+Changes:
+--------
 - Add statistics collection at the end of `Job` execution to obtain used memory from ``celery`` process and spaced
   used by produced results.
 - Add ``/jobs/{jobID}/statistics`` endpoint (and corresponding locations for ``/providers`` and ``/processes``) to
