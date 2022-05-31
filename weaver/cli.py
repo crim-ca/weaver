@@ -1,3 +1,4 @@
+import abc
 import argparse
 import base64
 import copy
@@ -11,6 +12,7 @@ from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 import yaml
+from requests.auth import AuthBase, HTTPBasicAuth
 from webob.headers import ResponseHeaders
 from yaml.scanner import ScannerError
 
@@ -35,6 +37,7 @@ from weaver.utils import (
     get_any_id,
     get_any_value,
     get_file_headers,
+    import_target,
     load_file,
     null,
     parse_kvp,
@@ -52,10 +55,20 @@ if TYPE_CHECKING:
     # avoid failing sphinx-argparse documentation
     # https://github.com/ashb/sphinx-argparse/issues/7
     try:
-        from weaver.typedefs import AnyHeadersContainer, CWL, JSON, ExecutionInputsMap, ExecutionResults, HeadersType
+        from weaver.typedefs import (
+            AnyHeadersContainer,
+            AnyRequestType,
+            AnyResponseType,
+            CWL,
+            JSON,
+            ExecutionInputsMap,
+            ExecutionResults,
+            HeadersType
+        )
     except ImportError:
         # avoid linter issue
-        AnyHeadersContainer = CWL = JSON = ExecutionInputsMap = ExecutionResults = HeadersType = Any
+        AnyHeadersContainer = AnyRequestType = AnyResponseType = Any
+        CWL = JSON = ExecutionInputsMap = ExecutionResults = HeadersType = Any
     try:
         from weaver.formats import AnyOutputFormat
         from weaver.processes.constants import ProcessSchemaType
@@ -150,6 +163,39 @@ class OperationResult(AutoBase):
         return link_headers
 
 
+class AuthHandler(AuthBase):
+    url = None       # type: Optional[str]
+    identity = None  # type: Optional[str]
+    password = None  # type: Optional[str]  # nosec
+
+    def __init__(self, url=None, identity=None, password=None):
+        # type: (Optional[str], Optional[str], Optional[str]) -> None
+        if url is not None:
+            self.url = url
+        if identity is not None:
+            self.identity = identity
+        if password is not None:
+            self.password = password
+
+    @abc.abstractmethod
+    def __call__(self, request):
+        # type: (AnyRequestType) -> AnyRequestType
+        raise NotImplementedError
+
+
+class BasicAuthHandler(AuthHandler, HTTPBasicAuth):
+    """
+    Adds the ``Authorization`` header formed from basic authentication encoding of username and password to the request.
+    """
+    @property
+    def username(self):
+        return self.identity
+
+    def __call__(self, request):
+        # type: (AnyRequestType) -> AnyRequestType
+        return HTTPBasicAuth.__call__(self, request)
+
+
 class WeaverClient(object):
     """
     Client that handles common HTTP requests with a `Weaver` or similar :term:`OGC API - Processes` instance.
@@ -157,13 +203,18 @@ class WeaverClient(object):
     # default configuration parameters, overridable by corresponding method parameters
     monitor_timeout = 60    # maximum delay to wait for job completion
     monitor_interval = 5    # interval between monitor pooling job status requests
+    auth = None  # type: AuthHandler
 
-    def __init__(self, url=None):
-        # type: (Optional[str]) -> None
+    def __init__(self, url=None, auth=None):
+        # type: (Optional[str], Optional[AuthHandler]) -> None
         """
         Initialize the client with predefined parameters.
 
         :param url: Instance URL to employ for each method call. Must be provided each time if not defined here.
+        :param auth:
+            Instance authentication handler that will be applied for every request.
+            For specific authentication method on per-request basis, parameter should be provided to respective methods.
+            Should perform required adjustments to request to allow access control of protected contents.
         """
         if url:
             self._url = self._parse_url(url)
@@ -171,10 +222,17 @@ class WeaverClient(object):
         else:
             self._url = None
             LOGGER.warning("No URL provided. All operations must provide it directly or through another parameter!")
+        self.auth = auth
         self._headers = {"Accept": ContentType.APP_JSON, "Content-Type": ContentType.APP_JSON}
         self._settings = {
             "weaver.request_options": {}
         }  # FIXME: load from INI, overrides as input (cumul arg '--setting weaver.x=value') ?
+
+    def _request(self, method, url, *args, **kwargs):
+        # type: (str, str,  Any, Any) -> AnyResponseType
+        if self.auth is not None and kwargs.get("auth") is None:
+            kwargs["auth"] = self.auth
+        return request_extra(method, url, *args, **kwargs)
 
     def _get_url(self, url):
         # type: (Optional[str]) -> str
@@ -198,6 +256,7 @@ class WeaverClient(object):
                       show_links=True,      # type: bool
                       nested_links=None,    # type: Optional[str]
                       output_format=None,   # type: Optional[AnyOutputFormat]
+                      content_type=None,    # type: Optional[ContentType]
                       ):                    # type: (...) -> OperationResult
         # multi-header of same name, for example to support many Link
         headers = ResponseHeaders(response.headers)
@@ -205,10 +264,17 @@ class WeaverClient(object):
         _success = False
         try:
             msg = None
-            ctype = headers.get("Content-Type")
+            ctype = headers.get("Content-Type", content_type)
             content = getattr(response, "content", None) or getattr(response, "body", None)
+            text = None
             if not body and content and ctype and ContentType.APP_JSON in ctype and hasattr(response, "json"):
                 body = response.json()
+            elif isinstance(response, OperationResult):
+                body = response.body
+            # Don't set text if no-content, since used by jobs header-only response. Explicit null will replace it.
+            elif response.text:
+                msg = "Could not parse body."
+                text = response.text
             if isinstance(body, dict):
                 if not show_links:
                     if nested_links:
@@ -224,7 +290,7 @@ class WeaverClient(object):
             else:
                 _success = True
             msg = message or getattr(response, "message", None) or msg or "undefined"
-            text = OutputFormat.convert(body, output_format or OutputFormat.JSON_STR, item_root="result")
+            text = text or OutputFormat.convert(body, output_format or OutputFormat.JSON_STR, item_root="result")
         except Exception as exc:  # noqa
             msg = "Could not parse body."
             text = body = response.text
@@ -328,6 +394,7 @@ class WeaverClient(object):
                password=None,       # type: Optional[str]
                undeploy=False,      # type: bool
                url=None,            # type: Optional[str]
+               auth=None,           # type: Optional[AuthHandler]
                show_links=True,     # type: bool
                show_headers=False,  # type: bool
                output_format=None,  # type: Optional[AnyOutputFormat]
@@ -365,6 +432,9 @@ class WeaverClient(object):
         :param password: Password to form the authentication token to a private Docker registry.
         :param undeploy: Perform undeploy as necessary before deployment to avoid conflict with exiting :term:`Process`.
         :param url: Instance URL if not already provided during client creation.
+        :param auth:
+            Instance authentication handler if not already created during client creation.
+            Should perform required adjustments to request to allow access control of protected contents.
         :param show_links: Indicate if ``links`` section should be preserved in returned result body.
         :param show_headers: Indicate if response headers should be returned in result output.
         :param output_format: Select an alternate output representation of the result body contents.
@@ -390,16 +460,19 @@ class WeaverClient(object):
                                        body=result.body, text=result.text, code=result.code, headers=result.headers)
         LOGGER.debug("Deployment Body:\n%s", OutputFormat.convert(data, OutputFormat.JSON_STR))
         path = f"{base}/processes"
-        resp = request_extra("POST", path, json=data, headers=req_headers, settings=self._settings)
+        resp = self._request("POST", path, json=data, headers=req_headers, settings=self._settings, auth=auth)
         return self._parse_result(resp, show_links=show_links, show_headers=show_headers, output_format=output_format)
 
-    def undeploy(self, process_id, url=None, show_links=True, show_headers=False, output_format=None):
-        # type: (str, Optional[str], bool, bool, Optional[AnyOutputFormat]) -> OperationResult
+    def undeploy(self, process_id, url=None, auth=None, show_links=True, show_headers=False, output_format=None):
+        # type: (str, Optional[str], Optional[AuthHandler], bool, bool, Optional[AnyOutputFormat]) -> OperationResult
         """
         Undeploy an existing :term:`Process`.
 
         :param process_id: Identifier of the process to undeploy.
         :param url: Instance URL if not already provided during client creation.
+        :param auth:
+            Instance authentication handler if not already created during client creation.
+            Should perform required adjustments to request to allow access control of protected contents.
         :param show_links: Indicate if ``links`` section should be preserved in returned result body.
         :param show_headers: Indicate if response headers should be returned in result output.
         :param output_format: Select an alternate output representation of the result body contents.
@@ -407,11 +480,11 @@ class WeaverClient(object):
         """
         base = self._get_url(url)
         path = f"{base}/processes/{process_id}"
-        resp = request_extra("DELETE", path, headers=self._headers, settings=self._settings)
+        resp = self._request("DELETE", path, headers=self._headers, settings=self._settings, auth=auth)
         return self._parse_result(resp, show_links=show_links, show_headers=show_headers, output_format=output_format)
 
-    def capabilities(self, url=None, show_links=True, show_headers=False, output_format=None):
-        # type: (Optional[str], bool, bool, Optional[AnyOutputFormat]) -> OperationResult
+    def capabilities(self, url=None, auth=None, show_links=True, show_headers=False, output_format=None):
+        # type: (Optional[str], Optional[AuthHandler], bool, bool, Optional[AnyOutputFormat]) -> OperationResult
         """
         List all available :term:`Process` on the instance.
 
@@ -419,6 +492,9 @@ class WeaverClient(object):
             :ref:`proc_op_getcap`
 
         :param url: Instance URL if not already provided during client creation.
+        :param auth:
+            Instance authentication handler if not already created during client creation.
+            Should perform required adjustments to request to allow access control of protected contents.
         :param show_links: Indicate if ``links`` section should be preserved in returned result body.
         :param show_headers: Indicate if response headers should be returned in result output.
         :param output_format: Select an alternate output representation of the result body contents.
@@ -427,7 +503,10 @@ class WeaverClient(object):
         base = self._get_url(url)
         path = f"{base}/processes"
         query = {"detail": False}  # not supported by non-Weaver, but save the work if possible
-        resp = request_extra("GET", path, params=query, headers=self._headers, settings=self._settings)
+        resp = self._request("GET", path, params=query, headers=self._headers, settings=self._settings, auth=auth)
+        result = self._parse_result(resp)
+        if not result.success:
+            return result
         body = resp.json()
         processes = body.get("processes")
         if isinstance(processes, list) and all(isinstance(proc, dict) for proc in processes):
@@ -443,6 +522,7 @@ class WeaverClient(object):
     def describe(self,
                  process_id,                # type: str
                  url=None,                  # type: Optional[str]
+                 auth=None,                 # type: Optional[AuthHandler]
                  schema=ProcessSchema.OGC,  # type: Optional[ProcessSchemaType]
                  show_links=True,           # type: bool
                  show_headers=False,        # type: bool
@@ -456,6 +536,9 @@ class WeaverClient(object):
 
         :param process_id: Identifier of the process to describe.
         :param url: Instance URL if not already provided during client creation.
+        :param auth:
+            Instance authentication handler if not already created during client creation.
+            Should perform required adjustments to request to allow access control of protected contents.
         :param schema: Representation schema of the returned process description.
         :param show_links: Indicate if ``links`` section should be preserved in returned result body.
         :param show_headers: Indicate if response headers should be returned in result output.
@@ -467,7 +550,7 @@ class WeaverClient(object):
         query = None
         if isinstance(schema, str) and schema.upper() in ProcessSchema.values():
             query = {"schema": schema.upper()}
-        resp = request_extra("GET", path, params=query, headers=self._headers, settings=self._settings)
+        resp = self._request("GET", path, params=query, headers=self._headers, settings=self._settings, auth=auth)
         # API response from this request can contain 'description' matching the process description
         # rather than a generic response 'description'. Enforce the provided message to avoid confusion.
         msg = "Process description successfully retrieved."
@@ -592,6 +675,7 @@ class WeaverClient(object):
                 timeout=None,           # type: Optional[int]
                 interval=None,          # type: Optional[int]
                 url=None,               # type: Optional[str]
+                auth=None,              # type: Optional[AuthHandler]
                 show_links=True,        # type: bool
                 show_headers=False,     # type: bool
                 output_format=None,     # type: Optional[AnyOutputFormat]
@@ -629,6 +713,9 @@ class WeaverClient(object):
         :param interval:
             Monitoring interval (seconds) between job status polling requests.
         :param url: Instance URL if not already provided during client creation.
+        :param auth:
+            Instance authentication handler if not already created during client creation.
+            Should perform required adjustments to request to allow access control of protected contents.
         :param show_links: Indicate if ``links`` section should be preserved in returned result body.
         :param show_headers: Indicate if response headers should be returned in result output.
         :param output_format: Select an alternate output representation of the result body contents.
@@ -682,7 +769,7 @@ class WeaverClient(object):
         headers = {"Prefer": "respond-async"}  # for more recent servers, OGC-API compliant async request
         headers.update(self._headers)
         headers.update(auth_headers)
-        resp = request_extra("POST", path, json=data, headers=headers, settings=self._settings)
+        resp = self._request("POST", path, json=data, headers=headers, settings=self._settings, auth=auth)
         result = self._parse_result(resp, show_links=show_links, show_headers=show_headers, output_format=output_format)
         if not monitor or not result.success:
             return result
@@ -692,8 +779,15 @@ class WeaverClient(object):
         return self.monitor(job_url, timeout=timeout, interval=interval,
                             show_links=show_links, show_headers=show_headers, output_format=output_format)
 
-    def upload(self, file_path, content_type=None, url=None, show_links=True, show_headers=False, output_format=None):
-        # type: (str, Optional[str], Optional[str], bool, bool, Optional[AnyOutputFormat]) -> OperationResult
+    def upload(self,
+               file_path,           # type: str
+               content_type=None,   # type: Optional[str]
+               url=None,            # type: Optional[str]
+               auth=None,           # type: Optional[AuthHandler]
+               show_links=True,     # type: bool
+               show_headers=False,  # type: bool
+               output_format=None,  # type: Optional[AnyOutputFormat]
+               ):                   # type: (...) -> OperationResult
         """
         Upload a local file to the :term:`Vault`.
 
@@ -710,6 +804,9 @@ class WeaverClient(object):
             This should be an IANA Media-Type, optionally with additional parameters such as charset.
             If not provided, attempts to guess it based on the file extension.
         :param url: Instance URL if not already provided during client creation.
+        :param auth:
+            Instance authentication handler if not already created during client creation.
+            Should perform required adjustments to request to allow access control of protected contents.
         :param show_links: Indicate if ``links`` section should be preserved in returned result body.
         :param show_headers: Indicate if response headers should be returned in result output.
         :param output_format: Select an alternate output representation of the result body contents.
@@ -742,11 +839,13 @@ class WeaverClient(object):
             "Cache-Control": "no-cache",     # ensure the cache is not used to return a previously uploaded file
         }
         # allow retry to avoid some sporadic HTTP 403 errors
-        resp = request_extra("POST", path, headers=req_headers, settings=self._settings, files=files, retry=2)
+        resp = self._request("POST", path, files=files, retry=2, auth=auth,
+                             headers=req_headers, settings=self._settings)
         return self._parse_result(resp, show_links=show_links, show_headers=show_headers, output_format=output_format)
 
     def jobs(self,
              url=None,              # type: Optional[str]
+             auth=None,             # type: Optional[AuthHandler]
              show_links=True,       # type: bool
              show_headers=False,    # type: bool
              output_format=None,    # type: Optional[AnyOutputFormat]
@@ -763,6 +862,9 @@ class WeaverClient(object):
             :ref:`proc_op_status`
 
         :param url: Instance URL if not already provided during client creation.
+        :param auth:
+            Instance authentication handler if not already created during client creation.
+            Should perform required adjustments to request to allow access control of protected contents.
         :param show_links: Indicate if ``links`` section should be preserved in returned result body.
         :param show_headers: Indicate if response headers should be returned in result output.
         :param output_format: Select an alternate output representation of the result body contents.
@@ -787,12 +889,12 @@ class WeaverClient(object):
             query["detail"] = detail
         if isinstance(groups, bool) and groups:
             query["groups"] = groups
-        resp = request_extra("GET", jobs_url, params=query, headers=self._headers, settings=self._settings)
+        resp = self._request("GET", jobs_url, params=query, headers=self._headers, settings=self._settings, auth=auth)
         return self._parse_result(resp, output_format=output_format,
                                   nested_links="jobs", show_links=show_links, show_headers=show_headers)
 
-    def status(self, job_reference, url=None, show_links=True, show_headers=False, output_format=None):
-        # type: (str, Optional[str], bool, bool, Optional[AnyOutputFormat]) -> OperationResult
+    def status(self, job_reference, url=None, auth=None, show_links=True, show_headers=False, output_format=None):
+        # type: (str, Optional[str], Optional[AuthHandler], bool, bool, Optional[AnyOutputFormat]) -> OperationResult
         """
         Obtain the status of a :term:`Job`.
 
@@ -801,6 +903,9 @@ class WeaverClient(object):
 
         :param job_reference: Either the full :term:`Job` status URL or only its UUID.
         :param url: Instance URL if not already provided during client creation.
+        :param auth:
+            Instance authentication handler if not already created during client creation.
+            Should perform required adjustments to request to allow access control of protected contents.
         :param show_links: Indicate if ``links`` section should be preserved in returned result body.
         :param show_headers: Indicate if response headers should be returned in result output.
         :param output_format: Select an alternate output representation of the result body contents.
@@ -808,7 +913,7 @@ class WeaverClient(object):
         """
         job_id, job_url = self._parse_job_ref(job_reference, url)
         LOGGER.info("Getting job status: [%s]", job_id)
-        resp = request_extra("GET", job_url, headers=self._headers, settings=self._settings)
+        resp = self._request("GET", job_url, headers=self._headers, settings=self._settings, auth=auth)
         return self._parse_result(resp, show_links=show_links, show_headers=show_headers, output_format=output_format)
 
     def monitor(self,
@@ -817,6 +922,7 @@ class WeaverClient(object):
                 interval=None,                      # type: Optional[int]
                 wait_for_status=Status.SUCCEEDED,   # type: str
                 url=None,                           # type: Optional[str]
+                auth=None,                          # type: Optional[AuthHandler]
                 show_links=True,                    # type: bool
                 show_headers=False,                 # type: bool
                 output_format=None,                 # type: Optional[AnyOutputFormat]
@@ -832,6 +938,9 @@ class WeaverClient(object):
         :param interval: wait interval (seconds) between polling monitor requests.
         :param wait_for_status: monitor until the requested status is reached (default: job failed or succeeded).
         :param url: Instance URL if not already provided during client creation.
+        :param auth:
+            Instance authentication handler if not already created during client creation.
+            Should perform required adjustments to request to allow access control of protected contents.
         :param show_links: Indicate if ``links`` section should be preserved in returned result body.
         :param show_headers: Indicate if response headers should be returned in result output.
         :param output_format: Select an alternate output representation of the result body contents.
@@ -844,7 +953,7 @@ class WeaverClient(object):
         LOGGER.debug("Job URL: [%s]", job_url)
         once = True
         while remain >= 0 or once:
-            resp = request_extra("GET", job_url, headers=self._headers, settings=self._settings)
+            resp = self._request("GET", job_url, headers=self._headers, settings=self._settings, auth=auth)
             if resp.status_code != 200:
                 return OperationResult(False, "Could not find job with specified reference.", {"job": job_reference})
             body = resp.json()
@@ -862,8 +971,8 @@ class WeaverClient(object):
             once = False
         return OperationResult(False, f"Monitoring timeout reached ({timeout}s). Job did not complete in time.")
 
-    def _download_references(self, outputs, out_links, out_dir, job_id):
-        # type: (ExecutionResults, AnyHeadersContainer, str, str) -> ExecutionResults
+    def _download_references(self, outputs, out_links, out_dir, job_id, auth=None):
+        # type: (ExecutionResults, AnyHeadersContainer, str, str, Optional[AuthHandler]) -> ExecutionResults
         """
         Download file references from results response contents and link headers.
 
@@ -892,7 +1001,7 @@ class WeaverClient(object):
                 is_list = False
             for i, item in enumerate(value):
                 if "href" in item:
-                    file_path = fetch_file(item["href"], out_dir, link=False)
+                    file_path = fetch_file(item["href"], out_dir, link=False, auth=auth)
                     if is_list:
                         outputs[output][i]["path"] = file_path
                         outputs[output][i]["source"] = "body"
@@ -910,7 +1019,7 @@ class WeaverClient(object):
             rel = params["rel"][0].split(".")
             output = rel[0]
             is_array = len(rel) > 1 and str.isnumeric(rel[1])
-            file_path = fetch_file(href, out_dir, link=False)
+            file_path = fetch_file(href, out_dir, link=False, auth=auth)
             value = {"href": href, "type": ctype, "path": file_path, "source": "link"}
             if output in outputs:
                 if isinstance(outputs[output], dict):  # in case 'rel="<output>.<index"' was not employed
@@ -926,6 +1035,7 @@ class WeaverClient(object):
                 out_dir=None,           # type: Optional[str]
                 download=False,         # type: bool
                 url=None,               # type: Optional[str]
+                auth=None,              # type: Optional[AuthHandler]
                 show_links=True,        # type: bool
                 show_headers=False,     # type: bool
                 output_format=None,     # type: Optional[AnyOutputFormat]
@@ -937,6 +1047,9 @@ class WeaverClient(object):
         :param out_dir: Output directory where to store downloaded files if requested (default: CURDIR/JobID/<outputs>).
         :param download: Download any file reference found within results (CAUTION: could transfer lots of data!).
         :param url: Instance URL if not already provided during client creation.
+        :param auth:
+            Instance authentication handler if not already created during client creation.
+            Should perform required adjustments to request to allow access control of protected contents.
         :param show_links: Indicate if ``links`` section should be preserved in returned result body.
         :param show_headers: Indicate if response headers should be returned in result output.
         :param output_format: Select an alternate output representation of the result body contents.
@@ -950,7 +1063,7 @@ class WeaverClient(object):
         # with this endpoint, outputs IDs are directly at the root of the body
         result_url = f"{job_url}/results"
         LOGGER.info("Retrieving results from [%s]", result_url)
-        resp = request_extra("GET", result_url, headers=self._headers, settings=self._settings)
+        resp = self._request("GET", result_url, headers=self._headers, settings=self._settings, auth=auth)
         res_out = self._parse_result(resp, output_format=output_format,
                                      show_links=show_links, show_headers=show_headers)
 
@@ -962,19 +1075,22 @@ class WeaverClient(object):
         if not download:
             res_out.message = "Listing job results."
             return res_out
-        outputs = self._download_references(outputs, out_links, out_dir, job_id)
+        outputs = self._download_references(outputs, out_links, out_dir, job_id, auth=auth)
         # rebuild result with modified outputs that contains downloaded paths
         result = OperationResult(True, "Retrieved job results.", outputs, headers, code=200)
         return self._parse_result(result, body=outputs, output_format=output_format,
-                                  show_links=show_links, show_headers=show_headers)
+                                  show_links=show_links, show_headers=show_headers, content_type=ContentType.APP_JSON)
 
-    def dismiss(self, job_reference, url=None, show_links=True, show_headers=False, output_format=None):
-        # type: (str, Optional[str], bool, bool, Optional[AnyOutputFormat]) -> OperationResult
+    def dismiss(self, job_reference, url=None, auth=None, show_links=True, show_headers=False, output_format=None):
+        # type: (str, Optional[str], Optional[AuthHandler], bool, bool, Optional[AnyOutputFormat]) -> OperationResult
         """
         Dismiss pending or running :term:`Job`, or clear result artifacts from a completed :term:`Job`.
 
         :param job_reference: Either the full :term:`Job` status URL or only its UUID.
         :param url: Instance URL if not already provided during client creation.
+        :param auth:
+            Instance authentication handler if not already created during client creation.
+            Should perform required adjustments to request to allow access control of protected contents.
         :param show_links: Indicate if ``links`` section should be preserved in returned result body.
         :param show_headers: Indicate if response headers should be returned in result output.
         :param output_format: Select an alternate output representation of the result body contents.
@@ -982,7 +1098,7 @@ class WeaverClient(object):
         """
         job_id, job_url = self._parse_job_ref(job_reference, url)
         LOGGER.debug("Dismissing job: [%s]", job_id)
-        resp = request_extra("DELETE", job_url, headers=self._headers, settings=self._settings)
+        resp = self._request("DELETE", job_url, headers=self._headers, settings=self._settings, auth=auth)
         return self._parse_result(resp, show_links=show_links, show_headers=show_headers, output_format=output_format)
 
 
@@ -1049,6 +1165,49 @@ def add_shared_options(parser):
         "-F", "--format", choices=sorted(OutputFormat.values()), dest="output_format",
         help=f"Select an alternative output representation (default: {OutputFormat.JSON_STR}).\n\n{fmt_docs}"
     )
+    auth_grp = parser.add_argument_group("Authentication")
+    auth_grp.add_argument(
+        "-AH", "--auth-handler", default=fully_qualified_name(BasicAuthHandler)
+    )
+    auth_grp.add_argument(
+        "-AU", "--auth-url",
+    )
+    auth_grp.add_argument(
+        "-AI", "--auth-identity",
+    )
+    auth_grp.add_argument(
+        "-AP", "--auth-password",
+    )
+
+
+def parse_auth(kwargs):
+    # type: (Dict[str, Any]) -> Optional[AuthHandler]
+    """
+    Parses arguments that can define an authentication handler and remove them from dictionary for following calls.
+    """
+    auth_handler = kwargs.pop("auth_handler", None)
+    auth_url = kwargs.pop("auth_url", None)
+    auth_identity = kwargs.pop("auth_identity", None)
+    auth_password = kwargs.pop("auth_password", None)
+    if not auth_handler:
+        return None
+    auth_handler = import_target(auth_handler)
+    if not auth_handler:
+        return None
+    if not issubclass(auth_handler, (AuthHandler, AuthBase)):
+        return None
+    auth_sign = inspect.signature(auth_handler)
+    if len(auth_sign.parameters) == 0:
+        auth_handler = auth_handler()
+        if auth_url and hasattr(auth_handler, "url"):
+            auth_handler.url = auth_url
+        if auth_identity and hasattr(auth_handler, "identity"):
+            auth_handler.identity = auth_identity
+        if auth_password and hasattr(auth_handler, "password"):
+            auth_handler.password = auth_password
+    else:
+        auth_handler = auth_handler(auth_url, auth_identity, auth_password)
+    return auth_handler
 
 
 def add_process_param(parser, description=None, required=True):
@@ -1231,7 +1390,7 @@ def make_parser():
         "-t", "--token", dest="token",
         help="Authentication token to retrieve a Docker image reference from a private registry during execution."
     )
-    op_deploy_creds = op_deploy_token.add_argument_group("Credentials")
+    op_deploy_creds = op_deploy_token.add_argument_group("Docker Credentials")
     op_deploy_creds.add_argument(
         "-U", "--username", dest="username",
         help="Username to compute the authentication token for Docker image retrieval from a private registry."
@@ -1510,13 +1669,14 @@ def main(*args):
         parser.print_help()
         return 0
     url = kwargs.pop("url", None)
-    client = WeaverClient(url)
+    auth = parse_auth(kwargs)
+    client = WeaverClient(url, auth=auth)
     result = getattr(client, oper)(**kwargs)
     if result.success:
-        LOGGER.info("%s successful. %s", oper.title(), result.message)
+        LOGGER.info("%s successful. %s\n", oper.title(), result.message)
         print(result.text)  # use print in case logger disabled or level error/warn
         return 0
-    LOGGER.error("%s failed. %s", oper.title(), result.message)
+    LOGGER.error("%s failed. %s\n---\nStatus Code: %s\n---", oper.title(), result.message, result.code)
     print(result.text)
     return -1
 

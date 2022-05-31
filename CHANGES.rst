@@ -16,7 +16,7 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Fix `CLI` operations assuming valid JSON response to instead return error response content and status code.
 
 .. _changes_4.17.0:
 

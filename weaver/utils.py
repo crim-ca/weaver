@@ -1,6 +1,7 @@
 import difflib
 import errno
 import functools
+import importlib.util
 import inspect
 import json
 import logging
@@ -55,6 +56,7 @@ from weaver.warning import TimeZoneInfoAlreadySetWarning
 from weaver.xml_util import XML
 
 if TYPE_CHECKING:
+    from types import FrameType
     from typing import Any, Callable, Dict, List, Iterable, NoReturn, Optional, Type, Tuple, Union
 
     from weaver.execute import AnyExecuteControlOption, AnyExecuteMode
@@ -376,11 +378,11 @@ def parse_kvp(query,                    # type: str
         }
 
     :param query: Definition to be parsed as :term:`KVP`.
-    :param key_value_sep: Separator that delimitates the keys from their values.
+    :param key_value_sep: Separator that delimits the keys from their values.
     :param pair_sep: Separator that distinguish between different ``(key, value)`` entries.
     :param nested_pair_sep: Separator to parse values of pairs containing nested :term:`KVP` definition.
     :param multi_value_sep:
-        Separator that delimitates multiple values associated to the same key.
+        Separator that delimits multiple values associated to the same key.
         If empty or ``None``, values will be left as a single entry in the list under the key.
     :param accumulate_keys: Whether replicated keys should be considered equivalent to multi-value entries.
     :param unescape_quotes: Whether to remove single and double quotes around values.
@@ -636,6 +638,58 @@ def fully_qualified_name(obj):
     if "builtins" in getattr(cls, "__module__", "builtins"):  # sometimes '_sitebuiltins'
         return cls.__name__
     return ".".join([cls.__module__, cls.__name__])
+
+
+def import_target(target, default_root=None):
+    # type: (str, Optional[str]) -> Optional[Any]
+    """
+    Imports a target resource class or function from a Python script as module or directly from a module reference.
+
+    The Python script does not need to be defined within a module directory (i.e.: with ``__init__.py``).
+    Files can be imported from virtually anywhere. To avoid name conflicts in generated module references,
+    each imported target employs its full escaped file path as module name.
+
+    Formats expected as follows:
+
+    .. code-block:: text
+
+        "path/to/script.py:function"
+        "path/to/script.py:Class"
+        "module.path.function"
+        "module.path.Class"
+
+    :param target: Resource to be imported.
+    :param default_root: Root directory to employ if target is relative (default :data:`magpie.constants.MAGPIE_ROOT`).
+    :return: Found and imported resource or None.
+    """
+    if ":" in target:
+        mod_path, target = target.rsplit(":", 1)
+        if not mod_path.startswith("/"):
+            if default_root:
+                mod_root = default_root
+            else:
+                mod_root = os.path.abspath(os.path.curdir)
+            if not os.path.isdir(mod_root):
+                LOGGER.warning("Cannot import relative target, root directory not found: [%s]", mod_root)
+                return None
+            mod_path = os.path.join(mod_root, mod_path)
+        mod_path = os.path.abspath(mod_path)
+        if not os.path.isfile(mod_path):
+            LOGGER.warning("Cannot import target reference, file not found: [%s]", mod_path)
+            return None
+        mod_name = re.sub(r"\W", "_", mod_path)
+        mod_spec = importlib.util.spec_from_file_location(mod_name, mod_path)
+    else:
+        mod_name = target
+        mod_path, target = target.rsplit(".", 1)
+        mod_spec = importlib.util.find_spec(mod_path)
+    if not mod_spec:
+        LOGGER.warning("Cannot import target reference [%s], not found in file: [%s]", mod_name, mod_path)
+        return None
+
+    mod = importlib.util.module_from_spec(mod_spec)
+    mod_spec.loader.exec_module(mod)
+    return getattr(mod, target, None)
 
 
 def now(tz_name=None):
@@ -970,6 +1024,7 @@ def make_dirs(path, mode=0o755, exist_ok=False):
 
 
 def get_caller_name(skip=2, base_class=False):
+    # type: (int, bool) -> str
     """
     Find the name of a parent caller function or method.
 
@@ -983,7 +1038,7 @@ def get_caller_name(skip=2, base_class=False):
     """
     # reference: https://gist.github.com/techtonik/2151727
 
-    def stack_(frame):
+    def stack_(frame):  # type: (FrameType) -> List[FrameType]
         frame_list = []
         while frame:
             frame_list.append(frame)
