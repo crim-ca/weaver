@@ -163,7 +163,7 @@ class OutputFormat(Constants):
             return data
         if fmt == OutputFormat.JSON_STR:
             return repr_json(data, indent=2, ensure_ascii=False)
-        if fmt == OutputFormat.JSON_RAW:
+        if fmt in [OutputFormat.JSON_RAW, OutputFormat.TEXT, OutputFormat.TXT]:
             return repr_json(data, indent=None, ensure_ascii=False)
         if fmt in [OutputFormat.XML, OutputFormat.XML_RAW, OutputFormat.XML_STR]:
             pretty = fmt == OutputFormat.XML_STR
