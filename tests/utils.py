@@ -8,6 +8,7 @@ import importlib
 import inspect
 import io
 import json
+import logging
 import mimetypes
 import os
 import re
@@ -36,6 +37,7 @@ from pyramid.registry import Registry
 from requests import Response
 from webtest import TestApp, TestResponse
 
+from weaver import __name__ as __package__
 from weaver.app import main as weaver_app
 from weaver.config import WEAVER_DEFAULT_INI_CONFIG, WeaverConfiguration, get_weaver_config_file
 from weaver.database import get_db
@@ -72,6 +74,8 @@ if TYPE_CHECKING:
     MockReturnType = TypeVar("MockReturnType")
 
     CommandType = Callable[[Union[str, Tuple[str]]], int]
+
+LOGGER = logging.getLogger(".".join([__package__, __name__]))
 
 MOCK_AWS_REGION = "us-central-1"
 MOCK_HTTP_REF = "http://localhost.mock"
@@ -480,7 +484,9 @@ def mocked_sub_requests(app,                # type: TestApp
             req_kwargs["upload_files"] = files
             allow_json = False
         # remove unsupported parameters that cannot be passed down to TestApp
-        for key in ["timeout", "cert", "auth", "ssl_verify", "verify", "language", "stream"]:
+        for key in ["timeout", "cert", "ssl_verify", "verify", "language", "stream"]:
+            if key in req_kwargs:
+                LOGGER.warning("Dropping unsupported '%s' parameter for mocked test request.", key)
             req_kwargs.pop(key, None)
         cookies = req_kwargs.pop("cookies", None)
         if cookies:
@@ -499,7 +505,18 @@ def mocked_sub_requests(app,                # type: TestApp
             if isinstance(content, str):
                 req_kwargs["params"] = json.loads(req_kwargs["params"])
         req = getattr(app, method)
+        # perform authentication step if provided
+        auth = req_kwargs.pop("auth", None)
+        if auth and callable(auth):
+            auth_req = MockedAuthRequest()
+            auth(auth_req)
+            if auth_req.headers:
+                req_kwargs.setdefault("headers", {})
+                req_kwargs["headers"].update(auth_req.headers)
         return url, req, req_kwargs
+
+    class MockedAuthRequest(object):
+        headers = {}
 
     def _patch_response_methods(response, url):
         # type: (AnyResponseType, str) -> None

@@ -245,8 +245,12 @@ class RequestAuthHandler(AuthHandler, HTTPBasicAuth):
     def __call__(self, request):
         # type: (AnyRequestType) -> AnyRequestType
         auth_token = self.request_auth()
-        auth_header = self.auth_header(auth_token)
-        request.headers.update(auth_header)
+        if not auth_token:
+            LOGGER.warning("Expected authorization token could not be retrieved from: [%s] in [%s]",
+                           self.url, fully_qualified_name(self))
+        else:
+            auth_header = self.auth_header(auth_token)
+            request.headers.update(auth_header)
         return request
 
 

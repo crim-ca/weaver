@@ -1165,14 +1165,15 @@ class TestWeaverClientAuthBase(TestWeaverClientBase):
 
     @classmethod
     def setup_auth_app(cls):
-        def get_auth(request):
+
+        def auth_view(request):
             # type: (AnyRequestType) -> AnyResponseType
             token = str(uuid.uuid4())
             request.registry.settings.setdefault("auth", set())
             request.registry.settings["auth"].add(token)
             return HTTPOk(json={"access_token": token})
 
-        def access(request):
+        def proxy_view(request):
             # type: (AnyRequestType) -> AnyResponseType
             auth = request.headers.get("Authorization")  # should be added by a auth-handler called inline of operation
             if not auth:
@@ -1186,10 +1187,10 @@ class TestWeaverClientAuthBase(TestWeaverClientBase):
             return resp
 
         config = setup_config_from_settings(cls.settings)
-        config.add_route(name="auth", pattern=cls.auth_path)
+        config.add_route(name="auth", pattern=cls.auth_path + "/")  # matcher requires extra slash auto-added
         config.add_route(name="proxy", pattern=cls.proxy_path + "/.*")
-        config.add_view(get_auth, "auth")
-        config.add_view(access, "proxy")
+        config.add_view(auth_view, name="auth")
+        config.add_view(proxy_view, name="proxy")
         cls.auth_app = WebTestApp(config.make_wsgi_app())
 
         # create client with proxied endpoint
@@ -1216,7 +1217,7 @@ class TestWeaverCLIAuth(TestWeaverClientAuthBase):
         ]
         auth_opts = [
             "--auth-handler", fully_qualified_name(BearerAuthHandler),
-            "--auth-url", self.auth_path,
+            "--auth-url", self.auth_url,
         ]
 
         # verify that service is 'protected', error to access it without auth parameters
