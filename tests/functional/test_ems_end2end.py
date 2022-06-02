@@ -28,11 +28,6 @@ if TYPE_CHECKING:
 @pytest.mark.skipif(condition=not len(str(os.getenv("WEAVER_TEST_SERVER_HOSTNAME", ""))),
                     reason="Test server not defined!")
 class WorkflowTestRunnerRemoteWithAuth(WorkflowTestRunnerBase):
-    def __init__(self, *args, **kwargs):
-        # won't run this as a test suite, only its derived classes
-        setattr(self, "__test__", self is WorkflowTestRunnerBase)
-        super(WorkflowTestRunnerRemoteWithAuth, self).__init__(*args, **kwargs)
-
     @classmethod
     def setup_test_processes_before(cls):
         # security configs if enabled

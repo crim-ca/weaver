@@ -46,7 +46,7 @@ if TYPE_CHECKING:
 
     from responses import RequestsMock
 
-    from weaver.typedefs import AnyResponseType, CookiesType, HeadersType, JSON, SettingsType
+    from weaver.typedefs import AnyRequestMethod, AnyResponseType, CookiesType, HeadersType, JSON, SettingsType
 
 
 class WorkflowProcesses(enum.Enum):
@@ -140,14 +140,14 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
 
     def __init__(self, *args, **kwargs):
         # won't run this as a test suite, only its derived classes
-        setattr(self, "__test__", self is WorkflowTestRunnerBase)
+        setattr(self, "__test__", self is not WorkflowTestRunnerBase)
         super(WorkflowTestRunnerBase, self).__init__(*args, **kwargs)
 
     @classmethod
     def setUpClass(cls):
         # disable SSL warnings from logs
         try:
-            import urllib3  # noqa
+            import urllib3.exceptions  # noqa
             urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
         except ImportError:
             pass
@@ -558,7 +558,7 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
 
     @classmethod
     def request(cls,                    # pylint: disable=W0221
-                method,                 # type: str
+                method,                 # type: AnyRequestMethod
                 url,                    # type: str
                 ignore_errors=False,    # type: bool
                 force_requests=False,   # type: bool

@@ -62,7 +62,7 @@ if TYPE_CHECKING:
     from owslib.wps import Process as ProcessOWSWPS
     from pywps.app import Process as ProcessPyWPS
 
-    from weaver.typedefs import AnyHeadersContainer, AnyRequestType, AnyResponseType, SettingsType
+    from weaver.typedefs import AnyHeadersContainer, AnyRequestMethod, AnyRequestType, AnyResponseType, SettingsType
 
     # pylint: disable=C0103,invalid-name,E1101,no-member
     MockPatch = mock._patch  # noqa
@@ -407,7 +407,7 @@ def mocked_file_response(path, url):
 
 
 def mocked_sub_requests(app,                # type: TestApp
-                        method_function,    # type: Union[str, Callable[[Any], MockReturnType]]
+                        method_function,    # type: Union[AnyRequestMethod, Callable[[Any], MockReturnType]]
                         *args,              # type: Any
                         only_local=False,   # type: bool
                         **kwargs,           # type: Any
@@ -441,6 +441,7 @@ def mocked_sub_requests(app,                # type: TestApp
     real_signature = inspect.signature(real_request)
 
     def _parse_for_app_req(method, url, **req_kwargs):
+        # type: (AnyRequestMethod, str, Any) -> Tuple[str, Callable, Dict[str, Any]]
         """
         Obtain request details with adjustments to support specific handling for :class:`webTest.TestApp`.
 
@@ -501,6 +502,7 @@ def mocked_sub_requests(app,                # type: TestApp
         return url, req, req_kwargs
 
     def _patch_response_methods(response, url):
+        # type: (AnyResponseType, str) -> None
         if not hasattr(response, "content"):
             setattr(response, "content", response.body)
         if not hasattr(response, "reason"):
@@ -511,6 +513,7 @@ def mocked_sub_requests(app,                # type: TestApp
             setattr(response, "url", url)
 
     def mocked_app_request(method, url=None, session=None, **req_kwargs):
+        # type: (AnyRequestMethod, Optional[str], Optional[RealSession], Any) -> AnyResponseType
         """
         Mock requests under the web test application under specific conditions.
 
@@ -560,7 +563,7 @@ def mocked_sub_requests(app,                # type: TestApp
         stack.enter_context(mock.patch.object(FileLocal, "validator", new_callable=mock_file_regex))
         stack.enter_context(mock.patch.object(TestResponse, "json", new=TestResponseJsonCallable.json))
         if isinstance(method_function, str):
-            req_url, req_func, kwargs = _parse_for_app_req(method_function, *args, **kwargs)
+            req_url, req_func, kwargs = _parse_for_app_req(method_function, *args, **kwargs)  # type: ignore
             kwargs.setdefault("expect_errors", True)
             resp = req_func(req_url, **kwargs)
             _patch_response_methods(resp, req_url)
@@ -660,7 +663,7 @@ def mocked_remote_server_requests_wps1(server_configs,          # type: Union[Mo
     :returns: wrapper that mocks multiple WPS-1 servers and their responses with provided processes and XML contents.
     """
 
-    def get_xml(ref):
+    def get_xml(ref):  # type: (str) -> str
         if data:
             return ref
         with open(ref, mode="r", encoding="utf-8") as file:
@@ -700,6 +703,7 @@ def mocked_remote_server_requests_wps1(server_configs,          # type: Union[Mo
             _mock_resp.add(meth, url, body=body, headers=xml_header)
 
     def mocked_remote_server_wrapper(test):
+        # type: (Callable) -> Callable
         @functools.wraps(test)
         def mock_requests_wps1(*args, **kwargs):
             """

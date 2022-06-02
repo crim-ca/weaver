@@ -13,6 +13,8 @@ import uuid
 from typing import TYPE_CHECKING
 
 import pytest
+from pyramid.httpexceptions import HTTPForbidden, HTTPOk, HTTPUnauthorized
+from webtest import TestApp as WebTestApp
 
 from tests.functional.utils import ResourcesUtil, WpsConfigBase
 from tests.utils import (
@@ -21,33 +23,36 @@ from tests.utils import (
     mocked_execute_celery,
     mocked_sub_requests,
     mocked_wps_output,
-    run_command
+    run_command,
+    setup_config_from_settings
 )
-from weaver.cli import WeaverClient, main as weaver_cli
+from weaver.base import classproperty
+from weaver.cli import BearerAuthHandler, WeaverClient, main as weaver_cli
 from weaver.formats import ContentType, OutputFormat, get_cwl_file_format
 from weaver.processes.constants import ProcessSchema
 from weaver.status import Status
+from weaver.utils import fully_qualified_name
 from weaver.wps.utils import map_wps_output_location
 
 if TYPE_CHECKING:
-    from typing import Dict
+    from typing import Dict, Optional
+
+    from weaver.typedefs import AnyRequestType, AnyResponseType
 
 
 @pytest.mark.cli
 @pytest.mark.functional
 class TestWeaverClientBase(WpsConfigBase, ResourcesUtil):
-    def __init__(self, *args, **kwargs):
-        # won't run this as a test suite, only its derived classes
-        setattr(self, "__test__", self is TestWeaverClientBase)
-        super(TestWeaverClientBase, self).__init__(*args, **kwargs)
 
     @classmethod
     def setUpClass(cls):
-        cls.settings.update({
+        settings = copy.deepcopy(cls.settings or {})
+        settings.update({
             "weaver.vault_dir": tempfile.mkdtemp(prefix="weaver-test-"),
             "weaver.wps_output_dir": tempfile.mkdtemp(prefix="weaver-test-"),
             "weaver.wps_output_url": "http://random-file-server.com/wps-outputs"
         })
+        cls.settings = settings
         super(TestWeaverClientBase, cls).setUpClass()
         cls.url = get_weaver_url(cls.app.app.registry)
         cls.client = WeaverClient(cls.url)
@@ -510,6 +515,23 @@ class TestWeaverCLI(TestWeaverClientBase):
         assert any("\"id\": \"Echo\"" in line for line in lines)
         assert any("\"deploymentDone\": true" in line for line in lines)
 
+    def test_deploy_help(self):
+        """
+        Validate some special handling to generate special combinations of help argument details.
+        """
+        lines = run_command(["weaver", "deploy", "--help"], trim=False)
+        args_help = "[-T TOKEN | ( -U USERNAME -P PASSWORD )]"
+        assert any(args_help in line for line in lines)
+        docker_auth_help = "Docker Authentication Arguments"
+        docker_lines = []
+        for i, line in enumerate(lines):
+            if line.startswith(docker_auth_help):
+                docker_lines = lines[i:]
+                break
+        assert docker_lines
+        docker_opts = ["-T TOKEN", "-U USERNAME", "-P PASSWORD"]
+        assert all(any(opt in line for line in docker_lines) for opt in docker_opts)
+
     def test_deploy_payload_body_cwl_embedded(self):
         test_id = f"{self.test_process_prefix}-deploy-body-no-cwl"
         payload = self.retrieve_payload("Echo", "deploy", local=True)
@@ -711,7 +733,7 @@ class TestWeaverCLI(TestWeaverClientBase):
                 "describe",
                 "-u", self.url,
                 "-p", proc,
-                "-L",
+                "-nL",
             ],
             trim=False,
             entrypoint=weaver_cli,
@@ -864,7 +886,7 @@ class TestWeaverCLI(TestWeaverClientBase):
                     "results",
                     "-u", self.url,
                     "-j", job_id,
-                    "-H",   # must display header to get 'Link'
+                    "-wH",   # must display header to get 'Link'
                     "-F", OutputFormat.YAML,
                 ],
                 trim=False,
@@ -884,7 +906,7 @@ class TestWeaverCLI(TestWeaverClientBase):
                     "results",
                     "-u", self.url,
                     "-j", job_id,
-                    "-H",   # must display header to get 'Link'
+                    "-wH",   # must display header to get 'Link'
                     "-F", OutputFormat.YAML,
                     "-D",
                     "-O", out_tmp
@@ -1015,7 +1037,7 @@ class TestWeaverCLI(TestWeaverClientBase):
                 "status",
                 "-j", job_url,
                 "-F", OutputFormat.JSON_STR,
-                "-H"
+                "-wH",
             ],
             trim=False,
             entrypoint=weaver_cli,
@@ -1097,7 +1119,7 @@ class TestWeaverCLI(TestWeaverClientBase):
                 "status",
                 "-j", job_url,
                 "-F", OutputFormat.XML_STR,
-                "-H"
+                "-wH"
             ],
             trim=False,
             entrypoint=weaver_cli,
@@ -1132,3 +1154,90 @@ class TestWeaverCLI(TestWeaverClientBase):
         assert len(lines) == 1, "should NOT be indented, raw data directly in one block"
         assert lines[0].startswith("<?xml")
         assert lines[0].endswith("</result>")
+
+
+class TestWeaverClientAuthBase(TestWeaverClientBase):
+    auth_app = None  # type: Optional[WebTestApp]
+    auth_path = "/auth"
+    proxy_path = "/proxy"
+    auth_url = classproperty(fget=lambda self: self.url + self.auth_path)
+    proxy_url = classproperty(fget=lambda self: self.url + self.proxy_path)
+
+    @classmethod
+    def setup_auth_app(cls):
+        def get_auth(request):
+            # type: (AnyRequestType) -> AnyResponseType
+            token = str(uuid.uuid4())
+            request.registry.settings.setdefault("auth", set())
+            request.registry.settings["auth"].add(token)
+            return HTTPOk(json={"access_token": token})
+
+        def access(request):
+            # type: (AnyRequestType) -> AnyResponseType
+            auth = request.headers.get("Authorization")  # should be added by a auth-handler called inline of operation
+            if not auth:
+                return HTTPUnauthorized()
+            token = auth.split(" ")[-1]
+            allow = request.registry.settings.get("auth", set())
+            if token not in allow:
+                return HTTPForbidden()
+            path = request.path_qs.split(cls.proxy_path, 1)[-1]
+            resp = mocked_sub_requests(cls.app, request.method, path, only_local=True, headers=request.headers)
+            return resp
+
+        config = setup_config_from_settings(cls.settings)
+        config.add_route(name="auth", pattern=cls.auth_path)
+        config.add_route(name="proxy", pattern=cls.proxy_path + "/.*")
+        config.add_view(get_auth, "auth")
+        config.add_view(access, "proxy")
+        cls.auth_app = WebTestApp(config.make_wsgi_app())
+
+        # create client with proxied endpoint
+        # do not add auth by default to test unauthorized/forbidden access
+        # each CLI/Client operation should provided it explicitly to obtain access using auth token
+        cls.client = WeaverClient(cls.proxy_url)
+
+    @classmethod
+    def setUpClass(cls):
+        super(TestWeaverClientAuthBase, cls).setUpClass()
+        cls.setup_auth_app()
+
+
+class TestWeaverCLIAuth(TestWeaverClientAuthBase):
+
+    def test_describe_auth(self):
+        # prints formatted JSON ProcessDescription over many lines
+        proc = self.test_process["Echo"]
+        desc_opts = [
+            # "weaver",
+            "describe",
+            "-u", self.proxy_url,
+            "-p", proc,
+        ]
+        auth_opts = [
+            "--auth-handler", fully_qualified_name(BearerAuthHandler),
+            "--auth-url", self.auth_path,
+        ]
+
+        # verify that service is 'protected', error to access it without auth parameters
+        lines = mocked_sub_requests(
+            self.auth_app, run_command, desc_opts,
+            trim=False,
+            entrypoint=weaver_cli,
+            only_local=True,
+            expect_error=True,
+        )
+        assert any("401 Unauthorized" in line for line in lines)
+
+        # validate successful access when auth is added with handler
+        lines = mocked_sub_requests(
+            self.auth_app, run_command, desc_opts + auth_opts,
+            trim=False,
+            entrypoint=weaver_cli,
+            only_local=True,
+            expect_error=False,
+        )
+        # ignore indents of fields from formatted JSON content
+        assert any(f"\"id\": \"{proc}\"" in line for line in lines)
+        assert any("\"inputs\": {" in line for line in lines)
+        assert any("\"outputs\": {" in line for line in lines)

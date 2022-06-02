@@ -7,7 +7,7 @@ import inspect
 from typing import TYPE_CHECKING, NewType
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, List, Optional, Union
+    from typing import Any, Callable, Dict, List, Optional, Union
 
     from weaver.typedefs import AnyKey
 
@@ -91,7 +91,12 @@ class classproperty(property):  # pylint: disable=C0103,invalid-name
         https://stackoverflow.com/a/5191224
     """
 
-    def __init__(self, fget=None, fset=None, fdel=None, doc=None):
+    def __init__(self,
+                 fget=None,     # type: Optional[Callable[[object], Any]]
+                 fset=None,     # type: Optional[Callable[[object, Any], None]]
+                 fdel=None,     # type: Optional[Callable[[object], None]]
+                 doc="",        # type: str
+                 ):             # type: (...) -> None
         super(classproperty, self).__init__(fget=fget, fset=fset, fdel=fdel, doc=doc)
         self.__doc__ = inspect.cleandoc(doc)
 

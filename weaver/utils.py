@@ -66,6 +66,7 @@ if TYPE_CHECKING:
         AnyHeadersContainer,
         AnySettingsContainer,
         AnyRegistryContainer,
+        AnyRequestMethod,
         AnyResponseType,
         AnyValueType,
         HeadersType,
@@ -1260,7 +1261,7 @@ def _request_cached(method, url, kwargs):
 
 
 @retry_on_cache_error
-def request_extra(method,                       # type: str
+def request_extra(method,                       # type: AnyRequestMethod
                   url,                          # type: str
                   retries=None,                 # type: Optional[int]
                   backoff=None,                 # type: Optional[Number]

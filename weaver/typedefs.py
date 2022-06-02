@@ -66,6 +66,7 @@ if TYPE_CHECKING:
     from pywps.app import WPSRequest
     from pywps.inout import BoundingBoxInput, ComplexInput, LiteralInput
     from requests import PreparedRequest, Request as RequestsRequest
+    from requests.models import Response as RequestsResponse
     from requests.structures import CaseInsensitiveDict
     from webob.headers import ResponseHeaders, EnvironHeaders
     from webob.response import Response as WebobResponse
@@ -258,8 +259,13 @@ if TYPE_CHECKING:
     HeaderCookiesTuple = Union[Tuple[None, None], Tuple[HeadersBaseType, CookiesBaseType]]
     AnyHeadersContainer = Union[HeadersBaseType, ResponseHeaders, EnvironHeaders, CaseInsensitiveDict]
     AnyCookiesContainer = Union[CookiesBaseType, WPSRequest, PyramidRequest, AnyHeadersContainer]
-    AnyResponseType = Union[PyramidResponse, WebobResponse, TestResponse]
+    AnyResponseType = Union[PyramidResponse, WebobResponse, RequestsResponse, TestResponse]
     AnyRequestType = Union[PyramidRequest, WerkzeugRequest, PreparedRequest, RequestsRequest, DummyRequest]
+    RequestMethod = Literal[
+        "HEAD", "GET", "POST", "PUT", "PATCH", "DELETE",
+        "head", "get", "post", "put", "patch", "delete",
+    ]
+    AnyRequestMethod = Union[RequestMethod, str]
     HTTPValid = Union[HTTPSuccessful, HTTPRedirection]
 
     AnyProcess = Union[Process, ProcessOWS, ProcessWPS, JSON]

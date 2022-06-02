@@ -12,11 +12,22 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add `CLI` *Authentication Handler* parameters and corresponding ``auth`` argument of instantiated classes for
+  ``WeaverClient`` methods that allows inline request authentication and authorization resolution to access a
+  protected service. Any *Authentication Handler* implementation can be used to fulfill required server functionalities.
+- Replaced `CLI` option ``-t`` by ``-T`` (`Docker` token) during ``deploy`` operation to match naming convention of
+  other options.
+- Replaced `CLI` option ``-H`` by ``nH`` (``--no-headers``) and ``wH`` (``--with-headers``) to respectively
+  enable or (explicitly) disable return of headers from response of the executed operation.
+- Replaced `CLI` option ``-L`` by ``nL`` (``--no-links``) and ``wL`` (``--with-links``) to respectively
+  enable (explicitly) or disable return of links from response of the executed operation.
+- Replaced previously defined ``-H`` option by new ``-H/--header`` argument allowing insertion of explicitly provided
+  request headers for relevant requests called by the executed operation.
 
 Fixes:
 ------
 - Fix `CLI` operations assuming valid JSON response to instead return error response content and status code.
+- Fix `CLI` rendering of various optional arguments and groups when displaying help messages.
 
 .. _changes_4.17.0:
 
