@@ -16,7 +16,7 @@ Changes:
   ``WeaverClient`` methods that allows inline request authentication and authorization resolution to access a
   protected service. Any *Authentication Handler* implementation can be used to fulfill required server functionalities.
 - Replaced `CLI` option ``-t`` by ``-T`` (`Docker` token) during ``deploy`` operation to match naming convention of
-  other options.
+  other options (resolves `#400 <https://github.com/crim-ca/weaver/issues/400>`_).
 - Replaced `CLI` option ``-H`` by ``nH`` (``--no-headers``) and ``wH`` (``--with-headers``) to respectively
   enable or (explicitly) disable return of headers from response of the executed operation.
 - Replaced `CLI` option ``-L`` by ``nL`` (``--no-links``) and ``wL`` (``--with-links``) to respectively
