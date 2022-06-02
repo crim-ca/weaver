@@ -1526,6 +1526,32 @@ class ValidateHeaderAction(argparse._AppendAction):  # noqa
 
 class ParagraphFormatter(argparse.HelpFormatter):
     # pragma: no cover  # somehow marked not covered, but functionality covered by 'test_execute_help_details'
+
+    def _format_usage(self, *args, **kwargs):
+        parser = getattr(self, "parser", None)
+        mode = False
+
+        if isinstance(parser, WeaverArgumentParser):
+            mode = parser.help_mode
+            parser.help_mode = True
+        text = super(ParagraphFormatter, self)._format_usage(*args, **kwargs)
+
+        # patch invalid combinations of [()] caused by mutually exclusive group with nested inclusive group
+        # (see docker auth parameters hacks)
+        search = r"\((([\-\w\s]+)(\|([\-\w\s]+))+)\]\)"
+
+        def replace(match):
+            grp = match.groups()
+            found = []
+            for i in range(1, len(grp), 2):
+                found.append(grp[i].strip())
+            return "( " + " ".join(found) + " )]"
+
+        text = re.sub(search, replace, text)
+        if isinstance(parser, WeaverArgumentParser):
+            parser.help_mode = mode  # don't reset, apply original mode that was active before handled here
+        return text
+
     def _format_action(self, action):
         # type: (argparse.Action) -> str
         """
@@ -1593,22 +1619,23 @@ class WeaverArgumentParser(ArgumentParserFixedRequiredArgs, SubArgumentParserFix
     Parser that provides fixes for proper representation of `Weaver` :term:`CLI` arguments.
     """
 
+    def __init__(self, *args, **kwargs):
+        super(WeaverArgumentParser, self).__init__(*args, **kwargs)
+        self.help_mode = False
+        """
+        Option enabled only during help formatting to generate different conditional evaluations.
+        """
+
+    def _get_formatter(self):
+        formatter = super(WeaverArgumentParser, self)._get_formatter()
+        setattr(formatter, "parser", self)
+        return formatter
+
     def format_help(self):
         # type: () -> str
+        self.help_mode = True
         text = super(WeaverArgumentParser, self).format_help() + "\n"
-
-        # patch invalid combinations of [()] caused by mutually exclusive group with nested inclusive group
-        # (see docker auth parameters hacks)
-        search = r"\((([\-\w\s]+)(\|([\-\w\s]+))+)\]\)"
-
-        def replace(match):
-            grp = match.groups()
-            found = []
-            for i in range(1, len(grp), 2):
-                found.append(grp[i].strip())
-            return "( " + " ".join(found) + " )]"
-
-        text = re.sub(search, replace, text)
+        self.help_mode = False
         return text
 
 
@@ -1700,7 +1727,7 @@ def make_parser():
     # when actions are evaluated for actual executions, conditional 'required' will consider them as options
     # when actions are printed in help, they will be considered required, causing ( ) to be added to form the
     # rendered group of *mutually required* arguments
-    setattr(op_deploy_creds, "required", property(fget=lambda group: group._container.help_mode))
+    setattr(op_deploy_creds, "required", property(fget=lambda group: parser.help_mode))
     # following adjust references in order to make arguments appear within sections/groups as intended
     op_deploy._mutually_exclusive_groups.append(op_deploy_creds)  # type: ignore
     op_deploy_group._group_actions.append(op_deploy_pwd)
