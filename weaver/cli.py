@@ -869,7 +869,8 @@ class WeaverClient(object):
             # FIXME: allow filtering 'outputs' (https://github.com/crim-ca/weaver/issues/380)
             "outputs": {}
         }
-        result = self.describe(process_id, url=base)
+        # omit x-headers on purpose for 'describe', assume they are intended for 'execute' operation only
+        result = self.describe(process_id, url=base, auth=auth)
         if not result.success:
             return OperationResult(False, "Could not obtain process description for execution.",
                                    body=result.body, headers=result.headers, code=result.code, text=result.text)
@@ -890,10 +891,10 @@ class WeaverClient(object):
 
         LOGGER.info("Executing [%s] with inputs:\n%s", process_id, OutputFormat.convert(values, OutputFormat.JSON_STR))
         path = f"{base}/processes/{process_id}/execution"  # use OGC-API compliant endpoint (not '/jobs')
-        headers = {"Prefer": "respond-async"}  # for more recent servers, OGC-API compliant async request
-        headers.update(self._headers)
-        headers.update(auth_headers)
-        resp = self._request("POST", path, json=data, headers=headers, x_headers=headers,
+        exec_headers = {"Prefer": "respond-async"}  # for more recent servers, OGC-API compliant async request
+        exec_headers.update(self._headers)
+        exec_headers.update(auth_headers)
+        resp = self._request("POST", path, json=data, headers=exec_headers, x_headers=headers,
                              settings=self._settings, auth=auth)
         result = self._parse_result(resp, with_links=with_links, with_headers=with_headers, output_format=output_format)
         if not monitor or not result.success:
@@ -901,7 +902,7 @@ class WeaverClient(object):
         # although Weaver returns "jobID" in the body for convenience,
         # employ the "Location" header to be OGC-API compliant
         job_url = resp.headers.get("Location", "")
-        return self.monitor(job_url, timeout=timeout, interval=interval,
+        return self.monitor(job_url, timeout=timeout, interval=interval, auth=auth,  # omit x-headers on purpose
                             with_links=with_links, with_headers=with_headers, output_format=output_format)
 
     def upload(self,
@@ -1210,7 +1211,8 @@ class WeaverClient(object):
         :returns: Result details and local paths if downloaded.
         """
         job_id, job_url = self._parse_job_ref(job_reference, url)
-        status = self.status(job_url)
+        # omit x-headers on purpose for 'status', assume they are intended for 'results' operation only
+        status = self.status(job_url, auth=auth)
         if not status.success:
             return OperationResult(False, "Cannot process results from incomplete or failed job.", status.body)
         # use results endpoint instead of outputs to be OGC-API compliant, should be able to target non-Weaver instance
@@ -1308,7 +1310,7 @@ def make_logging_options(parser):
     lvl_opts.add_argument("--verbose", "-v", action="store_true", help="Output informative logging details.")
     lvl_names = ["DEBUG", "INFO", "WARN", "ERROR"]
     lvl_opts.add_argument("--log-level", "-l", dest="log_level",
-                          choices=list(sorted(lvl_names)), type=str.lower,
+                          choices=list(sorted(lvl_names)), type=str.upper,
                           help="Explicit log level to employ (default: %(default)s, case-insensitive).")
 
 
@@ -1322,10 +1324,10 @@ def add_shared_options(parser):
     links_grp = parser.add_mutually_exclusive_group()
     links_grp.add_argument("-nL", "--no-links", dest="with_links", action="store_false",
                            help="Remove \"links\" section from returned result body.")
-    links_grp.add_argument("-wL", "--with-links", dest="with_links", action="store_true",
+    links_grp.add_argument("-wL", "--with-links", dest="with_links", action="store_true", default=True,
                            help="Preserve \"links\" section from returned result body (default).")
     headers_grp = parser.add_mutually_exclusive_group()
-    headers_grp.add_argument("-nH", "--no-headers", dest="with_headers", action="store_false",
+    headers_grp.add_argument("-nH", "--no-headers", dest="with_headers", action="store_false", default=False,
                              help="Omit response headers, only returning the result body (default).")
     headers_grp.add_argument("-wH", "--with-headers", dest="with_headers", action="store_true",
                              help="Return response headers additionally to the result body.")
@@ -1346,7 +1348,7 @@ def add_shared_options(parser):
     ])
     fmt_choices = [fmt.upper() for fmt in sorted(OutputFormat.values())]
     parser.add_argument(
-        "-F", "--format", choices=fmt_choices, type=str.lower, dest="output_format",
+        "-F", "--format", choices=fmt_choices, type=str.upper, dest="output_format",
         help=(
             f"Select an alternative output representation (default: {OutputFormat.JSON_STR.upper()}, case-insensitive)."
             f"\n\n{fmt_docs}"
@@ -1527,13 +1529,34 @@ class ValidateHeaderAction(argparse._AppendAction):  # noqa
 class ParagraphFormatter(argparse.HelpFormatter):
     # pragma: no cover  # somehow marked not covered, but functionality covered by 'test_execute_help_details'
 
-    def _format_usage(self, *args, **kwargs):
+    @property
+    def help_mode(self):
         parser = getattr(self, "parser", None)
-        mode = False
-
         if isinstance(parser, WeaverArgumentParser):
-            mode = parser.help_mode
-            parser.help_mode = True
+            return parser.help_mode
+        return False
+
+    @help_mode.setter
+    def help_mode(self, mode):
+        parser = getattr(self, "parser", None)
+        if isinstance(parser, WeaverArgumentParser):
+            parser.help_mode = mode
+
+    def add_usage(self, *args, **kwargs):
+        super(ParagraphFormatter, self).add_usage(*args, **kwargs)
+
+    def format_help(self):
+        # type: () -> str
+        mode = self.help_mode
+        self.help_mode = True
+        text = super(ParagraphFormatter, self).format_help()
+        if self.help_mode != mode:
+            self.help_mode = mode
+        return text
+
+    def _format_usage(self, *args, **kwargs):  # type: ignore
+        mode = self.help_mode
+        self.help_mode = True
         text = super(ParagraphFormatter, self)._format_usage(*args, **kwargs)
 
         # patch invalid combinations of [()] caused by mutually exclusive group with nested inclusive group
@@ -1548,8 +1571,8 @@ class ParagraphFormatter(argparse.HelpFormatter):
             return "( " + " ".join(found) + " )]"
 
         text = re.sub(search, replace, text)
-        if isinstance(parser, WeaverArgumentParser):
-            parser.help_mode = mode  # don't reset, apply original mode that was active before handled here
+        if self.help_mode != mode:
+            self.help_mode = mode
         return text
 
     def _format_action(self, action):
@@ -1592,9 +1615,9 @@ class SubArgumentParserFixedMutexGroups(argparse.ArgumentParser):
         container._mutually_exclusive_groups = []
         super(SubArgumentParserFixedMutexGroups, self)._add_container_actions(container)
         for group in groups:
-            mutex_group = self.add_mutually_exclusive_group(required=group.required)
-            for action in group._group_actions:
-                mutex_group._group_actions.append(action)
+            # following is like calling 'add_mutually_exclusive_group' but avoids enforced '_MutuallyExclusiveGroup'
+            # use provided instance directly to preserve class implementation (an any added special handling)
+            self._mutually_exclusive_groups.append(group)
         container._mutually_exclusive_groups = tmp_mutex_groups
 
 
@@ -1614,19 +1637,54 @@ class ArgumentParserFixedRequiredArgs(argparse.ArgumentParser):
         return action
 
 
+class WeaverSubParserAction(argparse._SubParsersAction):  # noqa
+    def add_parser(self, *args, **kwargs):  # type: ignore
+        sub_parser = super(WeaverSubParserAction, self).add_parser(*args, **kwargs)
+        parser = getattr(self, "parser", None)  # type: WeaverArgumentParser
+        sub_parser._conditional_groups = parser._conditional_groups
+        sub_parser._help_mode = parser._help_mode
+        return sub_parser
+
+
 class WeaverArgumentParser(ArgumentParserFixedRequiredArgs, SubArgumentParserFixedMutexGroups):
     """
     Parser that provides fixes for proper representation of `Weaver` :term:`CLI` arguments.
     """
 
     def __init__(self, *args, **kwargs):
+        # type: (Any, Any) -> None
         super(WeaverArgumentParser, self).__init__(*args, **kwargs)
-        self.help_mode = False
+        self._help_mode = False
+        self._conditional_groups = []
+
+    def add_subparsers(self, *args, **kwargs):  # type: ignore
+        self.register("action", "parsers", WeaverSubParserAction)
+        group = super(WeaverArgumentParser, self).add_subparsers(*args, **kwargs)
+        setattr(group, "parser", self)
+        return group
+
+    @property
+    def help_mode(self):
         """
         Option enabled only during help formatting to generate different conditional evaluations.
         """
+        return self._help_mode
+
+    @help_mode.setter
+    def help_mode(self, mode):
+        if self._help_mode != mode:
+            self._help_mode = mode
+            for group, help_required, use_required in self._conditional_groups:
+                group.required = help_required if self._help_mode else use_required
+
+    def add_help_conditional(self, container, help_required=True, use_required=False):
+        # type: (argparse._ActionsContainer, bool, bool) -> argparse._ActionsContainer  # noqa
+        setattr(container, "required", use_required)
+        self._conditional_groups.append((container, help_required, use_required))
+        return container
 
     def _get_formatter(self):
+        # type: () -> argparse.HelpFormatter
         formatter = super(WeaverArgumentParser, self)._get_formatter()
         setattr(formatter, "parser", self)
         return formatter
@@ -1727,7 +1785,7 @@ def make_parser():
     # when actions are evaluated for actual executions, conditional 'required' will consider them as options
     # when actions are printed in help, they will be considered required, causing ( ) to be added to form the
     # rendered group of *mutually required* arguments
-    setattr(op_deploy_creds, "required", property(fget=lambda group: parser.help_mode))
+    parser.add_help_conditional(op_deploy_creds)
     # following adjust references in order to make arguments appear within sections/groups as intended
     op_deploy._mutually_exclusive_groups.append(op_deploy_creds)  # type: ignore
     op_deploy_group._group_actions.append(op_deploy_pwd)

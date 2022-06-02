@@ -43,8 +43,15 @@ class Constants(object, metaclass=_Const):
     @classmethod
     def get(cls, key_or_value, default=None):
         # type: (Union[AnyKey, EnumType], Optional[Any]) -> Any
-        if key_or_value in cls.names():
-            return cls.__dict__.get(key_or_value, default)
+        if isinstance(key_or_value, str):
+            upper_key = key_or_value.upper()
+            lower_key = key_or_value.lower()
+        else:
+            upper_key = lower_key = key_or_value
+        if upper_key in cls.names():
+            return cls.__dict__.get(upper_key, default)
+        if lower_key in cls.names():
+            return cls.__dict__.get(lower_key, default)
         if key_or_value in cls.values():
             return key_or_value
         return default
