@@ -1489,7 +1489,7 @@ class ValidateMethodAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
         # type: (argparse.ArgumentParser, argparse.Namespace, Union[str, Sequence[Any], None], Optional[str]) -> None
         if values not in self.methods:
-            allow = ', '.join(self.methods)
+            allow = ", ".join(self.methods)
             error = f"Value '{values}' is not a valid HTTP method, must be one of [{allow}]."
             raise argparse.ArgumentError(self, error)
         setattr(namespace, self.dest, values)
