@@ -5108,7 +5108,8 @@ get_single_job_status_responses = {
     "200": OkGetJobStatusResponse(description="success", examples={
         "JobStatusSuccess": {
             "summary": "Successful job status response.",
-            "value": EXAMPLES["job_status_success.json"]},
+            "value": EXAMPLES["job_status_success.json"],
+        },
         "JobStatusFailure": {
             "summary": "Failed job status response.",
             "value": EXAMPLES["job_status_failed.json"],
@@ -5123,7 +5124,12 @@ get_prov_single_job_status_responses.update({
     "403": ForbiddenProviderLocalResponseSchema(),
 })
 delete_job_responses = {
-    "200": OkDismissJobResponse(description="success"),
+    "200": OkDismissJobResponse(description="success", examples={
+        "JobDismissedSuccess": {
+            "summary": "Successful job dismissed response.",
+            "value": EXAMPLES["job_dismissed_success.json"]
+        },
+    }),
     "400": InvalidJobResponseSchema(),
     "404": NotFoundJobResponseSchema(),
     "410": GoneJobResponseSchema(),

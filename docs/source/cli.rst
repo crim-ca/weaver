@@ -66,14 +66,63 @@ CLI and Client Examples
 Following sections present different typical usage of the :ref:`cli_commands` and :ref:`client_commands`.
 Operations are equivalent between the :term:`CLI` and Python client.
 
-Note that more operations and option parameters are available,
-and are not all necessarily represented in below examples.
+.. note::
+    Much more operations and option parameters are available.
+    They are not all necessarily represented in below examples.
+    Explore available arguments using ``weaver <operation> --help`` or
+    using the above documentation for :ref:`client_commands` and `cli_commands`.
 
 For each of the following examples, the client is created as follows:
 
 .. code-block:: python
 
     client = WeaverClient(url="{WEAVER_URL}")
+
+
+.. _cli_example_auth:
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Authentication Example
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For any operation that requires authentication/authorization to access a protected service targeted by ``{WEAVER_URL}``,
+it is possible to either provide the ``auth`` parameter during initialization of the :py:class:`weaver.cli.WeaverClient`
+itself (the specific :py:class:`weaver.cli.AuthHandler` is reused for **all** operations), or as argument to individual
+methods when calling the respective operation (handler only used for that step).
+
+When using the :ref:`Python Interface <client_commands>`, any class implementation that derives from
+:py:class:`weaver.cli.AuthHandler` or :py:class:`requests.auth.AuthBase` can be used for the ``auth`` argument. This
+class must implement a ``__call__`` method taking and returning a ``request`` instance, and must apply any relevant
+modifications to grant the necessary authentication/authorization details. This ``__call__`` will be performed inline
+prior to sending the actual request toward the service.
+
+.. note::
+    There are multiple predefined handlers available for use:
+
+    - :py:class:`requests.auth.HTTPBasicAuth`
+    - :py:class:`requests.auth.HTTPProxyAuth`
+    - :py:class:`requests.auth.HTTPDigestAuth`
+    - :py:class:`weaver.cli.BasicAuthHandler`
+    - :py:class:`weaver.cli.BearerAuthHandler`
+    - :py:class:`weaver.cli.CookieAuthHandler`
+    - |requests-magpie-auth|_
+
+.. |requests-magpie-auth| replace:: ``requests_magpie.MagpieAuth``
+.. _requests-magpie-auth: https://github.com/Ouranosinc/requests-magpie/blob/master/requests_magpie.py
+
+When using the :ref:`CLI <cli_commands>`, the specific :py:class:`weaver.cli.AuthHandler` implementation to employ
+must be provided using the ``--auth-handler`` (``-aH``) argument. This can be an importable (installed) class module
+path or a plain Python script path separated with a ``:`` character followed by the class definition.
+
+Below are examples of possible commands:
+
+.. code-block:: shell
+
+    weaver capabilities -u {WEAVER_URL} -aH requests_magpie.MagpieAuth -aU ${MAGPIE_URL} -aI <username> -aP <password>
+
+.. code-block:: python
+
+    client.capabilities(auth=requests_magpie.MagpieAuth("${MAGPIE_URL]", "<username>", "<password>"))
 
 
 .. _cli_example_deploy:
@@ -153,8 +202,21 @@ with the specified :term:`Process` and provided inputs.
 Dismiss Example
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. todo:: example
+Accomplishes the :term:`Job` dismiss request to either cancel an accepted or running :term:`Job` or to remove
+any stored results from a successful execution.
 
+.. code-block:: shell
+
+    weaver dismiss -u {WEAVER_URL} -j "29af3a33-0a3e-477d-863e-efccc97e0b02"
+
+.. code-block:: python
+
+    client.dismiss("29af3a33-0a3e-477d-863e-efccc97e0b02")
+
+Sample Output:
+
+.. literalinclude:: ../../weaver/wps_restapi/examples/job_dismiss_success.json
+    :language: json
 
 .. _cli_example_status:
 
@@ -162,14 +224,59 @@ Dismiss Example
 GetStatus Example
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+Accomplishes the :ref:`GetStatus <proc_op_status>` operation to request the current status of a :term:`Job`.
 
-.. todo:: example
+.. code-block:: shell
+
+    weaver status -u {WEAVER_URL} -j "14c68477-c3ed-4784-9c0f-a4c9e1344db5"
+
+.. code-block:: python
+
+    client.status("14c68477-c3ed-4784-9c0f-a4c9e1344db5")
+
+
+Sample Output:
+
+.. literalinclude:: ../../weaver/wps_restapi/examples/job_status_success.json
+    :language: json
+
+.. _cli_example_jobs:
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Jobs Example
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Accomplishes the :term:`Job` listing request to obtain known :term:`Job` definitions using filter search queries.
+
+.. code-block:: shell
+
+    weaver jobs -u {WEAVER_URL} -nL
+
+.. code-block:: python
+
+    client.jobs(with_links=False)
+
+.. note::
+    Option ``-nL`` and argument ``with_links`` are used to omit ``links`` section in sample output.
+
+Sample Output:
+
+.. literalinclude:: ../../weaver/wps_restapi/examples/job_listing.json
+    :language: json
 
 .. _cli_example_monitor:
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Monitor Example
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If a :term:`Job` was summited for execution, it is possible to perform :ref:`Status Monitoring <proc_op_monitor>` of
+this :term:`Job` until completion or until the specified timeout is reached. This can be performed at any moment on
+a pending or running :term:`Job`.
+
+.. seealso::
+    It is possible to directly perform monitoring when calling the :ref:`Job Execution <cli_example_execute>` operation.
+    Simply provide the relevant arguments and options applicable to the monitoring step during the ``execute`` call.
 
 .. todo:: example
 
@@ -180,8 +287,26 @@ Monitor Example
 Results Example
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+Retrieves the :ref:`Job Results <proc_op_result>` from a successful :term:`Job` execution.
 
-.. todo:: example
+.. note::
+    It is possible to employ the ``download`` argument to retrieve `File` outputs from a :term:`Job`. If this is
+    enabled, files will be downloaded using the URL references specified in the :term:`Job` result and store them
+    in the specified local output directory.
+
+.. code-block:: shell
+
+    weaver results -u {WEAVER_URL} -j "14c68477-c3ed-4784-9c0f-a4c9e1344db5"
+
+.. code-block:: python
+
+    client.results("14c68477-c3ed-4784-9c0f-a4c9e1344db5")
+
+
+Sample Output:
+
+.. literalinclude:: ../../weaver/wps_restapi/examples/job_results.json
+    :language: json
 
 .. _cli_example_upload:
 
