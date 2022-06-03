@@ -48,12 +48,21 @@ class Constants(object, metaclass=_Const):
             lower_key = key_or_value.lower()
         else:
             upper_key = lower_key = key_or_value
-        if upper_key in cls.names():
-            return cls.__dict__.get(upper_key, default)
-        if lower_key in cls.names():
-            return cls.__dict__.get(lower_key, default)
-        if key_or_value in cls.values():
-            return key_or_value
+        names = cls.names()
+        values = cls.values()
+        found = None
+        if upper_key in names:
+            found = cls.__dict__.get(upper_key, default)
+        elif lower_key in names:
+            found = cls.__dict__.get(lower_key, default)
+        elif upper_key in values:
+            found = upper_key
+        elif lower_key in values:
+            found = lower_key
+        if found:
+            if isinstance(found, classproperty):
+                found = found.fget(cls)
+            return found
         return default
 
     @classmethod

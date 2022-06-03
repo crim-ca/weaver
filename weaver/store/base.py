@@ -18,6 +18,7 @@ if TYPE_CHECKING:
         SettingsType,
         TypedDict
     )
+    from weaver.visibility import AnyVisibility
 
     JobGroupCategory = TypedDict("JobGroupCategory",
                                  {"category": Dict[str, Optional[str]], "count": int, "jobs": List[Job]})
@@ -55,7 +56,7 @@ class StoreServices(StoreInterface):
 
     @abc.abstractmethod
     def fetch_by_name(self, name, visibility=None):
-        # type: (str, Optional[str]) -> Service
+        # type: (str, Optional[AnyVisibility]) -> Service
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -79,12 +80,12 @@ class StoreProcesses(StoreInterface):
 
     @abc.abstractmethod
     def delete_process(self, process_id, visibility=None):
-        # type: (str, Optional[str]) -> bool
+        # type: (str, Optional[AnyVisibility]) -> bool
         raise NotImplementedError
 
     @abc.abstractmethod
     def list_processes(self,
-                       visibility=None,     # type: Optional[str]
+                       visibility=None,     # type: Optional[AnyVisibility, List[AnyVisibility]]
                        page=None,           # type: Optional[int]
                        limit=None,          # type: Optional[int]
                        sort=None,           # type: Optional[str]
@@ -94,17 +95,17 @@ class StoreProcesses(StoreInterface):
 
     @abc.abstractmethod
     def fetch_by_id(self, process_id, visibility=None):
-        # type: (str, Optional[str]) -> Process
+        # type: (str, Optional[AnyVisibility]) -> Process
         raise NotImplementedError
 
     @abc.abstractmethod
     def get_visibility(self, process_id):
-        # type: (str) -> str
+        # type: (str) -> AnyVisibility
         raise NotImplementedError
 
     @abc.abstractmethod
     def set_visibility(self, process_id, visibility):
-        # type: (str, str) -> None
+        # type: (str, AnyVisibility) -> None
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -129,7 +130,7 @@ class StoreJobs(StoreInterface):
                  execute_response=None,     # type: Optional[AnyExecuteResponse]
                  custom_tags=None,          # type: Optional[List[str]]
                  user_id=None,              # type: Optional[int]
-                 access=None,               # type: Optional[str]
+                 access=None,               # type: Optional[AnyVisibility]
                  context=None,              # type: Optional[str]
                  notification_email=None,   # type: Optional[str]
                  accept_language=None,      # type: Optional[str]

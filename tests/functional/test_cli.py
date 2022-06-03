@@ -32,6 +32,7 @@ from weaver.formats import ContentType, OutputFormat, get_cwl_file_format
 from weaver.processes.constants import ProcessSchema
 from weaver.status import Status
 from weaver.utils import fully_qualified_name
+from weaver.visibility import Visibility
 from weaver.wps.utils import map_wps_output_location
 
 if TYPE_CHECKING:
@@ -453,7 +454,10 @@ class TestWeaverCLI(TestWeaverClientBase):
     @classmethod
     def setUpClass(cls):
         super(TestWeaverCLI, cls).setUpClass()
-        cls.test_job = cls.job_store.save_job(task_id="12345678-1111-2222-3333-111122223333", process="fake-process")
+        job = cls.job_store.save_job(task_id="12345678-1111-2222-3333-111122223333",
+                                     process="fake-process", access=Visibility.PUBLIC)
+        job.status = Status.SUCCEEDED
+        cls.test_job = cls.job_store.update_job(job)
 
     def test_help_operations(self):
         lines = run_command(
@@ -1008,6 +1012,32 @@ class TestWeaverCLI(TestWeaverClientBase):
         assert any("jobs" in line for line in lines)
         assert any("total" in line for line in lines)
         assert any("limit" in line for line in lines)
+
+    def test_jobs_no_links_limit_status_filters(self):
+        lines = mocked_sub_requests(
+            self.app, run_command,
+            [
+                # "weaver",
+                "jobs",
+                "-u", self.url,
+                "-S", Status.SUCCEEDED,
+                "-N", 1,
+                "-nL",
+            ],
+            trim=False,
+            entrypoint=weaver_cli,
+            only_local=True,
+        )
+        assert lines
+        assert len(lines) > 1, "Should be automatically indented with readable format"
+        text = "".join(lines)
+        body = json.loads(text)
+        assert isinstance(body["jobs"], list) and len(body["jobs"]) == 1
+        assert isinstance(body["jobs"][0], str)  # JobID
+        assert body["page"] == 0
+        assert body["limit"] == 1
+        assert "total" in body and isinstance(body["total"], int)  # ignore actual variable amount
+        assert "links" not in body
 
     def test_output_format_json_pretty(self):
         job_url = f"{self.url}/jobs/{self.test_job.id}"

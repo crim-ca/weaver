@@ -503,7 +503,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         return [Process(item) for item in found]
 
     def fetch_by_id(self, process_id, visibility=None):
-        # type: (str, Optional[Visibility]) -> Process
+        # type: (str, Optional[AnyVisibility]) -> Process
         """
         Get process for given :paramref:`process_id` from storage, optionally filtered by :paramref:`visibility`.
 
@@ -580,7 +580,7 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
                  execute_response=None,     # type: Optional[AnyExecuteResponse]
                  custom_tags=None,          # type: Optional[List[str]]
                  user_id=None,              # type: Optional[int]
-                 access=None,               # type: Optional[str]
+                 access=None,               # type: Optional[AnyVisibility]
                  context=None,              # type: Optional[str]
                  notification_email=None,   # type: Optional[str]
                  accept_language=None,      # type: Optional[str]

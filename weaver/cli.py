@@ -31,7 +31,7 @@ from weaver.processes.convert import (
 )
 from weaver.processes.utils import get_process_information
 from weaver.processes.wps_package import get_process_definition
-from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory
+from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.utils import (
     fetch_file,
     fully_qualified_name,
@@ -371,7 +371,8 @@ class WeaverClient(object):
                         nested = body.get(nested_links, [])
                         if isinstance(nested, list):
                             for item in nested:
-                                item.pop("links", None)
+                                if isinstance(item, dict):
+                                    item.pop("links", None)
                     body.pop("links", None)
                 msg = body.get("description", body.get("message", "undefined"))
             if code >= 400:
@@ -668,8 +669,9 @@ class WeaverClient(object):
         base = self._get_url(url)
         path = f"{base}/processes/{process_id}"
         query = None
-        if isinstance(schema, str) and schema.upper() in ProcessSchema.values():
-            query = {"schema": schema.upper()}
+        schema = ProcessSchema.get(schema)
+        if schema:
+            query = {"schema": schema}
         resp = self._request("GET", path, params=query, headers=self._headers, x_headers=headers,
                              settings=self._settings, auth=auth)
         # API response from this request can contain 'description' matching the process description
@@ -1018,7 +1020,7 @@ class WeaverClient(object):
         if isinstance(limit, int) and limit > 0:
             query["limit"] = limit
         if isinstance(status, str) and status:
-            query["status"] = status
+            query["status"] = map_status(status)
         if isinstance(detail, bool) and detail:
             query["detail"] = detail
         if isinstance(groups, bool) and groups:
@@ -1826,8 +1828,8 @@ def make_parser():
     add_shared_options(op_describe)
     add_process_param(op_describe)
     op_describe.add_argument(
-        "-S", "--schema", dest="schema", choices=ProcessSchema.values(), default=ProcessSchema.OGC,
-        help="Representation schema of the returned process description."
+        "-S", "--schema", dest="schema", choices=ProcessSchema.values(), type=str.upper, default=ProcessSchema.OGC,
+        help="Representation schema of the returned process description (default: %(default)s, case-insensitive)."
     )
 
     op_execute = WeaverArgumentParser(
@@ -1927,7 +1929,7 @@ def make_parser():
         help="Specify the amount of jobs to list per page."
     )
     op_jobs.add_argument(
-        "-S", "--status", dest="status", choices=Status.values(),
+        "-S", "--status", dest="status", choices=Status.values(), type=str.lower,
         help="Filter job listing only to matching status."
     )
     op_jobs.add_argument(
@@ -2064,7 +2066,12 @@ def main(*args):
     url = kwargs.pop("url", None)
     auth = parse_auth(kwargs)
     client = WeaverClient(url, auth=auth)
-    result = getattr(client, oper)(**kwargs)
+    try:
+        result = getattr(client, oper)(**kwargs)
+    except Exception as exc:
+        msg = "Operation failed due to exception."
+        err = fully_qualified_name(exc)
+        result = OperationResult(False, message=msg, body={"message": msg, "cause": str(exc), "error": err})
     if result.success:
         LOGGER.info("%s successful. %s\n", oper.title(), result.message)
         print(result.text)  # use print in case logger disabled or level error/warn
