@@ -80,6 +80,7 @@ Operations are equivalent between the :term:`CLI` and Python client.
 For each of the following examples, the client is created as follows:
 
 .. code-block:: python
+    :caption: Python
 
     client = WeaverClient(url="{WEAVER_URL}")
 
@@ -124,6 +125,7 @@ handler implementation.
 Below are examples of possible commands:
 
 .. code-block:: shell
+    :caption: Command Line
 
     weaver capabilities -u {WEAVER_URL} -aH requests_magpie.MagpieAuth -aU ${MAGPIE_URL} -aI <username> -aP <password>
 
@@ -168,12 +170,14 @@ desired :ref:`application-package`.
 The contents of below URL definition is also available in :ref:`example_app_pkg_script`.
 
 .. code-block:: shell
+    :caption: Command Line
 
     weaver deploy -u {WEAVER_URL} \
         -p docker-python-script-report \
         --cwl https://raw.githubusercontent.com/crim-ca/weaver/master/docs/examples/docker-python-script-report.cwl
 
 .. code-block:: python
+    :caption: Python
 
     client.deploy(
         process_id="docker-python-script-report",
@@ -196,10 +200,12 @@ Accomplishes the *Undeployment* request to remove a previously :ref:`Deployed <p
 from the service. Requires a `Weaver` or |ogc-api-proc-part2|_ compliant instance.
 
 .. code-block:: shell
+    :caption: Command Line
 
     weaver undeploy -u {WEAVER_URL} -p docker-python-script-report
 
 .. code-block:: python
+    :caption: Python
 
     client.undeploy("docker-python-script-report")
 
@@ -217,10 +223,12 @@ GetCapabilities Example
 Accomplishes the :ref:`GetCapabilities <proc_op_getcap>` request to obtain a list of available :term:`Process`.
 
 .. code-block:: shell
+    :caption: Command Line
 
     weaver capabilities -u {WEAVER_URL}
 
 .. code-block:: python
+    :caption: Python
 
     client.capabilities()
 
@@ -239,10 +247,12 @@ DescribeProcess Example
 Accomplishes the :ref:`DescribeProcess <proc_op_describe>` request to obtain the :term:`Process` definition.
 
 .. code-block:: shell
+    :caption: Command Line
 
     weaver describe -u {WEAVER_URL} -p jsonarray2netcdf
 
 .. code-block:: python
+    :caption: Python
 
     client.describe("jsonarray2netcdf")
 
@@ -285,6 +295,7 @@ Arguments can be provided using literal string entries by repeating ``-I`` optio
 to be submitted to the :term:`Process`. Please refer to :term:`CLI` :ref:`execute` help message for more explanations.
 
 .. code-block:: shell
+    :caption: Command Line
 
     weaver execute -u {WEAVER_URL} -p Echo \
         -I "message='Hello World!'" \
@@ -302,6 +313,7 @@ When using the :ref:`Python Interface <client_commands>`, the inputs can be prov
 above :term:`CLI` variations, but it is usually more intuitive to use a Python :class:`dict` directly.
 
 .. code-block:: python
+    :caption: Python
 
     client.execute("Echo", {
         "message": "Hello World!",
@@ -333,10 +345,12 @@ Accomplishes the :term:`Job` dismiss request to either cancel an accepted or run
 any stored results from a successful execution.
 
 .. code-block:: shell
+    :caption: Command Line
 
     weaver dismiss -u {WEAVER_URL} -j "29af3a33-0a3e-477d-863e-efccc97e0b02"
 
 .. code-block:: python
+    :caption: Python
 
     client.dismiss("29af3a33-0a3e-477d-863e-efccc97e0b02")
 
@@ -354,10 +368,12 @@ GetStatus Example
 Accomplishes the :ref:`GetStatus <proc_op_status>` operation to request the current status of a :term:`Job`.
 
 .. code-block:: shell
+    :caption: Command Line
 
     weaver status -u {WEAVER_URL} -j "797c0c5e-9bc2-4bf3-ab73-5f3df32044a8"
 
 .. code-block:: python
+    :caption: Python
 
     client.status("797c0c5e-9bc2-4bf3-ab73-5f3df32044a8")
 
@@ -376,10 +392,12 @@ Jobs Example
 Accomplishes the :term:`Job` listing request to obtain known :term:`Job` definitions using filter search queries.
 
 .. code-block:: shell
+    :caption: Command Line
 
     weaver jobs -u {WEAVER_URL} -nL
 
 .. code-block:: python
+    :caption: Python
 
     client.jobs(with_links=False)
 
@@ -407,11 +425,13 @@ a pending or running :term:`Job`.
 
 
 .. code-block:: shell
+    :caption: Command Line
 
     # assuming job is 'running'
     weaver monitor -u {WEAVER_URL} -j "14c68477-c3ed-4784-9c0f-a4c9e1344db5"
 
 .. code-block:: python
+    :caption: Python
 
     client.results("14c68477-c3ed-4784-9c0f-a4c9e1344db5")
 
@@ -432,10 +452,12 @@ Retrieves the :ref:`Job Results <proc_op_result>` from a successful :term:`Job` 
     in the specified local output directory.
 
 .. code-block:: shell
+    :caption: Command Line
 
     weaver results -u {WEAVER_URL} -j "14c68477-c3ed-4784-9c0f-a4c9e1344db5"
 
 .. code-block:: python
+    :caption: Python
 
     client.results("14c68477-c3ed-4784-9c0f-a4c9e1344db5")
 
@@ -461,10 +483,12 @@ This operation allows manual upload of a local file to the :term:`Vault`.
     :ref:`file_vault_inputs` and :ref:`vault_upload` provide more details about this feature.
 
 .. code-block:: shell
+    :caption: Command Line
 
     weaver upload -u {WEAVER_URL} -f /path/to/file.txt
 
 .. code-block:: python
+    :caption: Python
 
     client.upload("/path/to/file.txt")
 

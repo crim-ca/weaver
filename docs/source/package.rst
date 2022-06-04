@@ -87,11 +87,10 @@ Because a Python runner is required, the |cwl-docker-req|_ specification defines
 meets our needs. Note that in this case, special interpretation of ``$(...)`` entries within the definition can be
 provided to tell :term:`CWL` how to map :term:`Job` input values to the dynamically created script.
 
-.. _example_app_pkg_script:
-
 .. literalinclude:: ../examples/docker-python-script-report.cwl
     :language: yaml
     :caption: Sample CWL definition of a Python script
+    :name: example_app_pkg_script
 
 .. _app_pkg_docker:
 
@@ -130,10 +129,12 @@ For the moment, only ``Basic`` (:rfc:`7617`) authentication is supported.
 To generate the base64 token, following methods can be used:
 
 .. code-block:: shell
+    :caption: Command Line
 
     echo -n "<username>:<password>" | base64
 
 .. code-block:: python
+    :caption: Python
 
     import base64
     base64.b64encode(b"<username>:<password>")
