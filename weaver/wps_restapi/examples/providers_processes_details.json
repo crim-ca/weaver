@@ -13,9 +13,9 @@
       "outputTransmission": [
         "value"
       ],
-      "processDescriptionURL": "http://localhost:4002/processes/ColibriFlyingpigeon_SubsetBbox",
-      "processEndpointWPS1": "http://localhost:4002/ows/wps",
-      "executeEndpoint": "http://localhost:4002/processes/ColibriFlyingpigeon_SubsetBbox/jobs"
+      "processDescriptionURL": "http://schema-example.com/processes/ColibriFlyingpigeon_SubsetBbox",
+      "processEndpointWPS1": "http://schema-example.com/ows/wps",
+      "executeEndpoint": "http://schema-example.com/processes/ColibriFlyingpigeon_SubsetBbox/jobs"
     },
     {
       "id": "OutardeFlyingpigeon_SubsetBbox",
@@ -30,9 +30,9 @@
       "outputTransmission": [
         "value"
       ],
-      "processDescriptionURL": "http://localhost:4002/processes/OutardeFlyingpigeon_SubsetBbox",
-      "processEndpointWPS1": "http://localhost:4002/ows/wps",
-      "executeEndpoint": "http://localhost:4002/processes/OutardeFlyingpigeon_SubsetBbox/jobs"
+      "processDescriptionURL": "http://schema-example.com/processes/OutardeFlyingpigeon_SubsetBbox",
+      "processEndpointWPS1": "http://schema-example.com/ows/wps",
+      "executeEndpoint": "http://schema-example.com/processes/OutardeFlyingpigeon_SubsetBbox/jobs"
     },
     {
       "id": "Staging_S2L1C",
@@ -49,9 +49,9 @@
       "outputTransmission": [
         "value"
       ],
-      "processDescriptionURL": "http://localhost:4002/processes/Staging_S2L1C",
-      "processEndpointWPS1": "http://localhost:4002/ows/wps",
-      "executeEndpoint": "http://localhost:4002/processes/Staging_S2L1C/jobs"
+      "processDescriptionURL": "http://schema-example.com/processes/Staging_S2L1C",
+      "processEndpointWPS1": "http://schema-example.com/ows/wps",
+      "executeEndpoint": "http://schema-example.com/processes/Staging_S2L1C/jobs"
     },
     {
       "id": "Staging_S2L1C-mock-docker",
@@ -68,9 +68,9 @@
       "outputTransmission": [
         "value"
       ],
-      "processDescriptionURL": "http://localhost:4002/processes/Staging_S2L1C-mock-docker",
-      "processEndpointWPS1": "http://localhost:4002/ows/wps",
-      "executeEndpoint": "http://localhost:4002/processes/Staging_S2L1C-mock-docker/jobs"
+      "processDescriptionURL": "http://schema-example.com/processes/Staging_S2L1C-mock-docker",
+      "processEndpointWPS1": "http://schema-example.com/ows/wps",
+      "executeEndpoint": "http://schema-example.com/processes/Staging_S2L1C-mock-docker/jobs"
     },
     {
       "id": "WaterExtent_S2-mock-docker",
@@ -87,9 +87,9 @@
       "outputTransmission": [
         "value"
       ],
-      "processDescriptionURL": "http://localhost:4002/processes/WaterExtent_S2-mock-docker",
-      "processEndpointWPS1": "http://localhost:4002/ows/wps",
-      "executeEndpoint": "http://localhost:4002/processes/WaterExtent_S2-mock-docker/jobs"
+      "processDescriptionURL": "http://schema-example.com/processes/WaterExtent_S2-mock-docker",
+      "processEndpointWPS1": "http://schema-example.com/ows/wps",
+      "executeEndpoint": "http://schema-example.com/processes/WaterExtent_S2-mock-docker/jobs"
     },
     {
       "id": "WorkflowWaterExtent",
@@ -106,9 +106,9 @@
       "outputTransmission": [
         "value"
       ],
-      "processDescriptionURL": "http://localhost:4002/processes/WorkflowWaterExtent",
-      "processEndpointWPS1": "http://localhost:4002/ows/wps",
-      "executeEndpoint": "http://localhost:4002/processes/WorkflowWaterExtent/jobs"
+      "processDescriptionURL": "http://schema-example.com/processes/WorkflowWaterExtent",
+      "processEndpointWPS1": "http://schema-example.com/ows/wps",
+      "executeEndpoint": "http://schema-example.com/processes/WorkflowWaterExtent/jobs"
     },
     {
       "id": "WorkflowWaterExtent-mock",
@@ -125,9 +125,9 @@
       "outputTransmission": [
         "value"
       ],
-      "processDescriptionURL": "http://localhost:4002/processes/WorkflowWaterExtent-mock",
-      "processEndpointWPS1": "http://localhost:4002/ows/wps",
-      "executeEndpoint": "http://localhost:4002/processes/WorkflowWaterExtent-mock/jobs"
+      "processDescriptionURL": "http://schema-example.com/processes/WorkflowWaterExtent-mock",
+      "processEndpointWPS1": "http://schema-example.com/ows/wps",
+      "executeEndpoint": "http://schema-example.com/processes/WorkflowWaterExtent-mock/jobs"
     },
     {
       "id": "anti-spoofing",
@@ -161,9 +161,9 @@
       "outputTransmission": [
         "value"
       ],
-      "processDescriptionURL": "http://localhost:4002/processes/anti-spoofing",
-      "processEndpointWPS1": "http://localhost:4002/ows/wps",
-      "executeEndpoint": "http://localhost:4002/processes/anti-spoofing/jobs"
+      "processDescriptionURL": "http://schema-example.com/processes/anti-spoofing",
+      "processEndpointWPS1": "http://schema-example.com/ows/wps",
+      "executeEndpoint": "http://schema-example.com/processes/anti-spoofing/jobs"
     },
     {
       "id": "docker-demo-cat",
@@ -180,9 +180,9 @@
       "outputTransmission": [
         "value"
       ],
-      "processDescriptionURL": "http://localhost:4002/processes/docker-demo-cat",
-      "processEndpointWPS1": "http://localhost:4002/ows/wps",
-      "executeEndpoint": "http://localhost:4002/processes/docker-demo-cat/jobs"
+      "processDescriptionURL": "http://schema-example.com/processes/docker-demo-cat",
+      "processEndpointWPS1": "http://schema-example.com/ows/wps",
+      "executeEndpoint": "http://schema-example.com/processes/docker-demo-cat/jobs"
     },
     {
       "id": "docker-python-script",
@@ -197,9 +197,9 @@
       "outputTransmission": [
         "value"
       ],
-      "processDescriptionURL": "http://localhost:4002/processes/docker-python-script",
-      "processEndpointWPS1": "http://localhost:4002/ows/wps",
-      "executeEndpoint": "http://localhost:4002/processes/docker-python-script/jobs"
+      "processDescriptionURL": "http://schema-example.com/processes/docker-python-script",
+      "processEndpointWPS1": "http://schema-example.com/ows/wps",
+      "executeEndpoint": "http://schema-example.com/processes/docker-python-script/jobs"
     },
     {
       "id": "file2string_array",
@@ -214,9 +214,9 @@
       "outputTransmission": [
         "value"
       ],
-      "processDescriptionURL": "http://localhost:4002/processes/file2string_array",
-      "processEndpointWPS1": "http://localhost:4002/ows/wps",
-      "executeEndpoint": "http://localhost:4002/processes/file2string_array/jobs"
+      "processDescriptionURL": "http://schema-example.com/processes/file2string_array",
+      "processEndpointWPS1": "http://schema-example.com/ows/wps",
+      "executeEndpoint": "http://schema-example.com/processes/file2string_array/jobs"
     },
     {
       "id": "image-utils",
@@ -241,9 +241,9 @@
       "outputTransmission": [
         "value"
       ],
-      "processDescriptionURL": "http://localhost:4002/processes/image-utils",
-      "processEndpointWPS1": "http://localhost:4002/ows/wps",
-      "executeEndpoint": "http://localhost:4002/processes/image-utils/jobs"
+      "processDescriptionURL": "http://schema-example.com/processes/image-utils",
+      "processEndpointWPS1": "http://schema-example.com/ows/wps",
+      "executeEndpoint": "http://schema-example.com/processes/image-utils/jobs"
     },
     {
       "id": "jsonarray2netcdf",
@@ -260,9 +260,9 @@
       "outputTransmission": [
         "value"
       ],
-      "processDescriptionURL": "http://localhost:4002/processes/jsonarray2netcdf",
-      "processEndpointWPS1": "http://localhost:4002/ows/wps",
-      "executeEndpoint": "http://localhost:4002/processes/jsonarray2netcdf/jobs"
+      "processDescriptionURL": "http://schema-example.com/processes/jsonarray2netcdf",
+      "processEndpointWPS1": "http://schema-example.com/ows/wps",
+      "executeEndpoint": "http://schema-example.com/processes/jsonarray2netcdf/jobs"
     },
     {
       "id": "las2tif",
@@ -315,9 +315,9 @@
       "outputTransmission": [
         "value"
       ],
-      "processDescriptionURL": "http://localhost:4002/processes/las2tif",
-      "processEndpointWPS1": "http://localhost:4002/ows/wps",
-      "executeEndpoint": "http://localhost:4002/processes/las2tif/jobs"
+      "processDescriptionURL": "http://schema-example.com/processes/las2tif",
+      "processEndpointWPS1": "http://schema-example.com/ows/wps",
+      "executeEndpoint": "http://schema-example.com/processes/las2tif/jobs"
     },
     {
       "id": "metalink2netcdf",
@@ -334,9 +334,9 @@
       "outputTransmission": [
         "value"
       ],
-      "processDescriptionURL": "http://localhost:4002/processes/metalink2netcdf",
-      "processEndpointWPS1": "http://localhost:4002/ows/wps",
-      "executeEndpoint": "http://localhost:4002/processes/metalink2netcdf/jobs"
+      "processDescriptionURL": "http://schema-example.com/processes/metalink2netcdf",
+      "processEndpointWPS1": "http://schema-example.com/ows/wps",
+      "executeEndpoint": "http://schema-example.com/processes/metalink2netcdf/jobs"
     },
     {
       "id": "python-script",
@@ -354,9 +354,9 @@
       "outputTransmission": [
         "value"
       ],
-      "processDescriptionURL": "http://localhost:4002/processes/python-script",
-      "processEndpointWPS1": "http://localhost:4002/ows/wps",
-      "executeEndpoint": "http://localhost:4002/processes/python-script/jobs"
+      "processDescriptionURL": "http://schema-example.com/processes/python-script",
+      "processEndpointWPS1": "http://schema-example.com/ows/wps",
+      "executeEndpoint": "http://schema-example.com/processes/python-script/jobs"
     },
     {
       "id": "sleep",
@@ -372,9 +372,9 @@
       "outputTransmission": [
         "value"
       ],
-      "processDescriptionURL": "http://localhost:4002/processes/sleep",
-      "processEndpointWPS1": "http://localhost:4002/ows/wps",
-      "executeEndpoint": "http://localhost:4002/processes/sleep/jobs"
+      "processDescriptionURL": "http://schema-example.com/processes/sleep",
+      "processEndpointWPS1": "http://schema-example.com/ows/wps",
+      "executeEndpoint": "http://schema-example.com/processes/sleep/jobs"
     },
     {
       "id": "test_blurring",
@@ -399,9 +399,9 @@
       "outputTransmission": [
         "value"
       ],
-      "processDescriptionURL": "http://localhost:4002/processes/test_blurring",
-      "processEndpointWPS1": "http://localhost:4002/ows/wps",
-      "executeEndpoint": "http://localhost:4002/processes/test_blurring/jobs"
+      "processDescriptionURL": "http://schema-example.com/processes/test_blurring",
+      "processEndpointWPS1": "http://schema-example.com/ows/wps",
+      "executeEndpoint": "http://schema-example.com/processes/test_blurring/jobs"
     },
     {
       "id": "test_generation",
@@ -426,9 +426,9 @@
       "outputTransmission": [
         "value"
       ],
-      "processDescriptionURL": "http://localhost:4002/processes/test_generation",
-      "processEndpointWPS1": "http://localhost:4002/ows/wps",
-      "executeEndpoint": "http://localhost:4002/processes/test_generation/jobs"
+      "processDescriptionURL": "http://schema-example.com/processes/test_generation",
+      "processEndpointWPS1": "http://schema-example.com/ows/wps",
+      "executeEndpoint": "http://schema-example.com/processes/test_generation/jobs"
     },
     {
       "id": "test_workflow",
@@ -445,9 +445,9 @@
       "outputTransmission": [
         "value"
       ],
-      "processDescriptionURL": "http://localhost:4002/processes/test_workflow",
-      "processEndpointWPS1": "http://localhost:4002/ows/wps",
-      "executeEndpoint": "http://localhost:4002/processes/test_workflow/jobs"
+      "processDescriptionURL": "http://schema-example.com/processes/test_workflow",
+      "processEndpointWPS1": "http://schema-example.com/ows/wps",
+      "executeEndpoint": "http://schema-example.com/processes/test_workflow/jobs"
     }
   ],
   "providers": [
@@ -495,21 +495,21 @@
           "type": "application/json",
           "title": "Service definition.",
           "hreflang": "en-CA",
-          "href": "http://localhost:4002/providers/catalog-46",
+          "href": "http://schema-example.com/providers/catalog-46",
           "rel": "service"
         },
         {
           "type": "application/json",
           "title": "Service definition.",
           "hreflang": "en-CA",
-          "href": "http://localhost:4002/providers/catalog-46",
+          "href": "http://schema-example.com/providers/catalog-46",
           "rel": "self"
         },
         {
           "type": "application/json",
           "title": "Listing of processes provided by this service.",
           "hreflang": "en-CA",
-          "href": "http://localhost:4002/providers/catalog-46/processes",
+          "href": "http://schema-example.com/providers/catalog-46/processes",
           "rel": "http://www.opengis.net/def/rel/ogc/1.0/processes"
         }
       ],
@@ -526,10 +526,10 @@
           "metadata": [],
           "inputs": [],
           "outputs": [],
-          "url": "http://localhost:4002/providers/catalog-46/processes/getpoint",
-          "executeEndpoint": "http://localhost:4002/providers/catalog-46/processes/getpoint/jobs",
+          "url": "http://schema-example.com/providers/catalog-46/processes/getpoint",
+          "executeEndpoint": "http://schema-example.com/providers/catalog-46/processes/getpoint/jobs",
           "processEndpointWPS1": "https://host-140-46.rdext.crim.ca/twitcher/ows/proxy/catalog?service=WPS&request=DescribeProcess&version=1.0.0&identifier=getpoint",
-          "processDescriptionURL": "http://localhost:4002/providers/catalog-46/processes/getpoint",
+          "processDescriptionURL": "http://schema-example.com/providers/catalog-46/processes/getpoint",
           "type": "wps-remote",
           "package": {
             "cwlVersion": "v1.0",
@@ -557,10 +557,10 @@
           "metadata": [],
           "inputs": [],
           "outputs": [],
-          "url": "http://localhost:4002/providers/catalog-46/processes/ncplotly",
-          "executeEndpoint": "http://localhost:4002/providers/catalog-46/processes/ncplotly/jobs",
+          "url": "http://schema-example.com/providers/catalog-46/processes/ncplotly",
+          "executeEndpoint": "http://schema-example.com/providers/catalog-46/processes/ncplotly/jobs",
           "processEndpointWPS1": "https://host-140-46.rdext.crim.ca/twitcher/ows/proxy/catalog?service=WPS&request=DescribeProcess&version=1.0.0&identifier=ncplotly",
-          "processDescriptionURL": "http://localhost:4002/providers/catalog-46/processes/ncplotly",
+          "processDescriptionURL": "http://schema-example.com/providers/catalog-46/processes/ncplotly",
           "type": "wps-remote",
           "package": {
             "cwlVersion": "v1.0",
@@ -588,10 +588,10 @@
           "metadata": [],
           "inputs": [],
           "outputs": [],
-          "url": "http://localhost:4002/providers/catalog-46/processes/pavicrawler",
-          "executeEndpoint": "http://localhost:4002/providers/catalog-46/processes/pavicrawler/jobs",
+          "url": "http://schema-example.com/providers/catalog-46/processes/pavicrawler",
+          "executeEndpoint": "http://schema-example.com/providers/catalog-46/processes/pavicrawler/jobs",
           "processEndpointWPS1": "https://host-140-46.rdext.crim.ca/twitcher/ows/proxy/catalog?service=WPS&request=DescribeProcess&version=1.0.0&identifier=pavicrawler",
-          "processDescriptionURL": "http://localhost:4002/providers/catalog-46/processes/pavicrawler",
+          "processDescriptionURL": "http://schema-example.com/providers/catalog-46/processes/pavicrawler",
           "type": "wps-remote",
           "package": {
             "cwlVersion": "v1.0",
@@ -619,10 +619,10 @@
           "metadata": [],
           "inputs": [],
           "outputs": [],
-          "url": "http://localhost:4002/providers/catalog-46/processes/pavicsearch",
-          "executeEndpoint": "http://localhost:4002/providers/catalog-46/processes/pavicsearch/jobs",
+          "url": "http://schema-example.com/providers/catalog-46/processes/pavicsearch",
+          "executeEndpoint": "http://schema-example.com/providers/catalog-46/processes/pavicsearch/jobs",
           "processEndpointWPS1": "https://host-140-46.rdext.crim.ca/twitcher/ows/proxy/catalog?service=WPS&request=DescribeProcess&version=1.0.0&identifier=pavicsearch",
-          "processDescriptionURL": "http://localhost:4002/providers/catalog-46/processes/pavicsearch",
+          "processDescriptionURL": "http://schema-example.com/providers/catalog-46/processes/pavicsearch",
           "type": "wps-remote",
           "package": {
             "cwlVersion": "v1.0",
@@ -650,10 +650,10 @@
           "metadata": [],
           "inputs": [],
           "outputs": [],
-          "url": "http://localhost:4002/providers/catalog-46/processes/pavicsupdate",
-          "executeEndpoint": "http://localhost:4002/providers/catalog-46/processes/pavicsupdate/jobs",
+          "url": "http://schema-example.com/providers/catalog-46/processes/pavicsupdate",
+          "executeEndpoint": "http://schema-example.com/providers/catalog-46/processes/pavicsupdate/jobs",
           "processEndpointWPS1": "https://host-140-46.rdext.crim.ca/twitcher/ows/proxy/catalog?service=WPS&request=DescribeProcess&version=1.0.0&identifier=pavicsupdate",
-          "processDescriptionURL": "http://localhost:4002/providers/catalog-46/processes/pavicsupdate",
+          "processDescriptionURL": "http://schema-example.com/providers/catalog-46/processes/pavicsupdate",
           "type": "wps-remote",
           "package": {
             "cwlVersion": "v1.0",
@@ -681,10 +681,10 @@
           "metadata": [],
           "inputs": [],
           "outputs": [],
-          "url": "http://localhost:4002/providers/catalog-46/processes/pavicsvalidate",
-          "executeEndpoint": "http://localhost:4002/providers/catalog-46/processes/pavicsvalidate/jobs",
+          "url": "http://schema-example.com/providers/catalog-46/processes/pavicsvalidate",
+          "executeEndpoint": "http://schema-example.com/providers/catalog-46/processes/pavicsvalidate/jobs",
           "processEndpointWPS1": "https://host-140-46.rdext.crim.ca/twitcher/ows/proxy/catalog?service=WPS&request=DescribeProcess&version=1.0.0&identifier=pavicsvalidate",
-          "processDescriptionURL": "http://localhost:4002/providers/catalog-46/processes/pavicsvalidate",
+          "processDescriptionURL": "http://schema-example.com/providers/catalog-46/processes/pavicsvalidate",
           "type": "wps-remote",
           "package": {
             "cwlVersion": "v1.0",
@@ -712,10 +712,10 @@
           "metadata": [],
           "inputs": [],
           "outputs": [],
-          "url": "http://localhost:4002/providers/catalog-46/processes/period2indices",
-          "executeEndpoint": "http://localhost:4002/providers/catalog-46/processes/period2indices/jobs",
+          "url": "http://schema-example.com/providers/catalog-46/processes/period2indices",
+          "executeEndpoint": "http://schema-example.com/providers/catalog-46/processes/period2indices/jobs",
           "processEndpointWPS1": "https://host-140-46.rdext.crim.ca/twitcher/ows/proxy/catalog?service=WPS&request=DescribeProcess&version=1.0.0&identifier=period2indices",
-          "processDescriptionURL": "http://localhost:4002/providers/catalog-46/processes/period2indices",
+          "processDescriptionURL": "http://schema-example.com/providers/catalog-46/processes/period2indices",
           "type": "wps-remote",
           "package": {
             "cwlVersion": "v1.0",
@@ -743,10 +743,10 @@
           "metadata": [],
           "inputs": [],
           "outputs": [],
-          "url": "http://localhost:4002/providers/catalog-46/processes/pavicstestdocs",
-          "executeEndpoint": "http://localhost:4002/providers/catalog-46/processes/pavicstestdocs/jobs",
+          "url": "http://schema-example.com/providers/catalog-46/processes/pavicstestdocs",
+          "executeEndpoint": "http://schema-example.com/providers/catalog-46/processes/pavicstestdocs/jobs",
           "processEndpointWPS1": "https://host-140-46.rdext.crim.ca/twitcher/ows/proxy/catalog?service=WPS&request=DescribeProcess&version=1.0.0&identifier=pavicstestdocs",
-          "processDescriptionURL": "http://localhost:4002/providers/catalog-46/processes/pavicstestdocs",
+          "processDescriptionURL": "http://schema-example.com/providers/catalog-46/processes/pavicstestdocs",
           "type": "wps-remote",
           "package": {
             "cwlVersion": "v1.0",
@@ -814,21 +814,21 @@
           "type": "application/json",
           "title": "Service definition.",
           "hreflang": "en-CA",
-          "href": "http://localhost:4002/providers/hummingbird-69",
+          "href": "http://schema-example.com/providers/hummingbird-69",
           "rel": "service"
         },
         {
           "type": "application/json",
           "title": "Service definition.",
           "hreflang": "en-CA",
-          "href": "http://localhost:4002/providers/hummingbird-69",
+          "href": "http://schema-example.com/providers/hummingbird-69",
           "rel": "self"
         },
         {
           "type": "application/json",
           "title": "Listing of processes provided by this service.",
           "hreflang": "en-CA",
-          "href": "http://localhost:4002/providers/hummingbird-69/processes",
+          "href": "http://schema-example.com/providers/hummingbird-69/processes",
           "rel": "http://www.opengis.net/def/rel/ogc/1.0/processes"
         }
       ],
@@ -858,10 +858,10 @@
           ],
           "inputs": [],
           "outputs": [],
-          "url": "http://localhost:4002/providers/hummingbird-69/processes/ncdump",
-          "executeEndpoint": "http://localhost:4002/providers/hummingbird-69/processes/ncdump/jobs",
+          "url": "http://schema-example.com/providers/hummingbird-69/processes/ncdump",
+          "executeEndpoint": "http://schema-example.com/providers/hummingbird-69/processes/ncdump/jobs",
           "processEndpointWPS1": "https://host-140-69.rdext.crim.ca/twitcher/ows/proxy/hummingbird?service=WPS&request=DescribeProcess&version=1.0.0&identifier=ncdump",
-          "processDescriptionURL": "http://localhost:4002/providers/hummingbird-69/processes/ncdump",
+          "processDescriptionURL": "http://schema-example.com/providers/hummingbird-69/processes/ncdump",
           "type": "wps-remote",
           "package": {
             "cwlVersion": "v1.0",
@@ -908,10 +908,10 @@
           ],
           "inputs": [],
           "outputs": [],
-          "url": "http://localhost:4002/providers/hummingbird-69/processes/spotchecker",
-          "executeEndpoint": "http://localhost:4002/providers/hummingbird-69/processes/spotchecker/jobs",
+          "url": "http://schema-example.com/providers/hummingbird-69/processes/spotchecker",
+          "executeEndpoint": "http://schema-example.com/providers/hummingbird-69/processes/spotchecker/jobs",
           "processEndpointWPS1": "https://host-140-69.rdext.crim.ca/twitcher/ows/proxy/hummingbird?service=WPS&request=DescribeProcess&version=1.0.0&identifier=spotchecker",
-          "processDescriptionURL": "http://localhost:4002/providers/hummingbird-69/processes/spotchecker",
+          "processDescriptionURL": "http://schema-example.com/providers/hummingbird-69/processes/spotchecker",
           "type": "wps-remote",
           "package": {
             "cwlVersion": "v1.0",
@@ -976,10 +976,10 @@
           ],
           "inputs": [],
           "outputs": [],
-          "url": "http://localhost:4002/providers/hummingbird-69/processes/cchecker",
-          "executeEndpoint": "http://localhost:4002/providers/hummingbird-69/processes/cchecker/jobs",
+          "url": "http://schema-example.com/providers/hummingbird-69/processes/cchecker",
+          "executeEndpoint": "http://schema-example.com/providers/hummingbird-69/processes/cchecker/jobs",
           "processEndpointWPS1": "https://host-140-69.rdext.crim.ca/twitcher/ows/proxy/hummingbird?service=WPS&request=DescribeProcess&version=1.0.0&identifier=cchecker",
-          "processDescriptionURL": "http://localhost:4002/providers/hummingbird-69/processes/cchecker",
+          "processDescriptionURL": "http://schema-example.com/providers/hummingbird-69/processes/cchecker",
           "type": "wps-remote",
           "package": {
             "cwlVersion": "v1.0",
@@ -1032,10 +1032,10 @@
           ],
           "inputs": [],
           "outputs": [],
-          "url": "http://localhost:4002/providers/hummingbird-69/processes/cfchecker",
-          "executeEndpoint": "http://localhost:4002/providers/hummingbird-69/processes/cfchecker/jobs",
+          "url": "http://schema-example.com/providers/hummingbird-69/processes/cfchecker",
+          "executeEndpoint": "http://schema-example.com/providers/hummingbird-69/processes/cfchecker/jobs",
           "processEndpointWPS1": "https://host-140-69.rdext.crim.ca/twitcher/ows/proxy/hummingbird?service=WPS&request=DescribeProcess&version=1.0.0&identifier=cfchecker",
-          "processDescriptionURL": "http://localhost:4002/providers/hummingbird-69/processes/cfchecker",
+          "processDescriptionURL": "http://schema-example.com/providers/hummingbird-69/processes/cfchecker",
           "type": "wps-remote",
           "package": {
             "cwlVersion": "v1.0",
@@ -1076,10 +1076,10 @@
           ],
           "inputs": [],
           "outputs": [],
-          "url": "http://localhost:4002/providers/hummingbird-69/processes/cmor_checker",
-          "executeEndpoint": "http://localhost:4002/providers/hummingbird-69/processes/cmor_checker/jobs",
+          "url": "http://schema-example.com/providers/hummingbird-69/processes/cmor_checker",
+          "executeEndpoint": "http://schema-example.com/providers/hummingbird-69/processes/cmor_checker/jobs",
           "processEndpointWPS1": "https://host-140-69.rdext.crim.ca/twitcher/ows/proxy/hummingbird?service=WPS&request=DescribeProcess&version=1.0.0&identifier=cmor_checker",
-          "processDescriptionURL": "http://localhost:4002/providers/hummingbird-69/processes/cmor_checker",
+          "processDescriptionURL": "http://schema-example.com/providers/hummingbird-69/processes/cmor_checker",
           "type": "wps-remote",
           "package": {
             "cwlVersion": "v1.0",
@@ -1144,10 +1144,10 @@
           ],
           "inputs": [],
           "outputs": [],
-          "url": "http://localhost:4002/providers/hummingbird-69/processes/qa_cfchecker",
-          "executeEndpoint": "http://localhost:4002/providers/hummingbird-69/processes/qa_cfchecker/jobs",
+          "url": "http://schema-example.com/providers/hummingbird-69/processes/qa_cfchecker",
+          "executeEndpoint": "http://schema-example.com/providers/hummingbird-69/processes/qa_cfchecker/jobs",
           "processEndpointWPS1": "https://host-140-69.rdext.crim.ca/twitcher/ows/proxy/hummingbird?service=WPS&request=DescribeProcess&version=1.0.0&identifier=qa_cfchecker",
-          "processDescriptionURL": "http://localhost:4002/providers/hummingbird-69/processes/qa_cfchecker",
+          "processDescriptionURL": "http://schema-example.com/providers/hummingbird-69/processes/qa_cfchecker",
           "type": "wps-remote",
           "package": {
             "cwlVersion": "v1.0",
@@ -1212,10 +1212,10 @@
           ],
           "inputs": [],
           "outputs": [],
-          "url": "http://localhost:4002/providers/hummingbird-69/processes/qa_checker",
-          "executeEndpoint": "http://localhost:4002/providers/hummingbird-69/processes/qa_checker/jobs",
+          "url": "http://schema-example.com/providers/hummingbird-69/processes/qa_checker",
+          "executeEndpoint": "http://schema-example.com/providers/hummingbird-69/processes/qa_checker/jobs",
           "processEndpointWPS1": "https://host-140-69.rdext.crim.ca/twitcher/ows/proxy/hummingbird?service=WPS&request=DescribeProcess&version=1.0.0&identifier=qa_checker",
-          "processDescriptionURL": "http://localhost:4002/providers/hummingbird-69/processes/qa_checker",
+          "processDescriptionURL": "http://schema-example.com/providers/hummingbird-69/processes/qa_checker",
           "type": "wps-remote",
           "package": {
             "cwlVersion": "v1.0",
@@ -1256,10 +1256,10 @@
           ],
           "inputs": [],
           "outputs": [],
-          "url": "http://localhost:4002/providers/hummingbird-69/processes/cdo_sinfo",
-          "executeEndpoint": "http://localhost:4002/providers/hummingbird-69/processes/cdo_sinfo/jobs",
+          "url": "http://schema-example.com/providers/hummingbird-69/processes/cdo_sinfo",
+          "executeEndpoint": "http://schema-example.com/providers/hummingbird-69/processes/cdo_sinfo/jobs",
           "processEndpointWPS1": "https://host-140-69.rdext.crim.ca/twitcher/ows/proxy/hummingbird?service=WPS&request=DescribeProcess&version=1.0.0&identifier=cdo_sinfo",
-          "processDescriptionURL": "http://localhost:4002/providers/hummingbird-69/processes/cdo_sinfo",
+          "processDescriptionURL": "http://schema-example.com/providers/hummingbird-69/processes/cdo_sinfo",
           "type": "wps-remote",
           "package": {
             "cwlVersion": "v1.0",
@@ -1300,10 +1300,10 @@
           ],
           "inputs": [],
           "outputs": [],
-          "url": "http://localhost:4002/providers/hummingbird-69/processes/cdo_operation",
-          "executeEndpoint": "http://localhost:4002/providers/hummingbird-69/processes/cdo_operation/jobs",
+          "url": "http://schema-example.com/providers/hummingbird-69/processes/cdo_operation",
+          "executeEndpoint": "http://schema-example.com/providers/hummingbird-69/processes/cdo_operation/jobs",
           "processEndpointWPS1": "https://host-140-69.rdext.crim.ca/twitcher/ows/proxy/hummingbird?service=WPS&request=DescribeProcess&version=1.0.0&identifier=cdo_operation",
-          "processDescriptionURL": "http://localhost:4002/providers/hummingbird-69/processes/cdo_operation",
+          "processDescriptionURL": "http://schema-example.com/providers/hummingbird-69/processes/cdo_operation",
           "type": "wps-remote",
           "package": {
             "cwlVersion": "v1.0",
@@ -1344,10 +1344,10 @@
           ],
           "inputs": [],
           "outputs": [],
-          "url": "http://localhost:4002/providers/hummingbird-69/processes/cdo_copy",
-          "executeEndpoint": "http://localhost:4002/providers/hummingbird-69/processes/cdo_copy/jobs",
+          "url": "http://schema-example.com/providers/hummingbird-69/processes/cdo_copy",
+          "executeEndpoint": "http://schema-example.com/providers/hummingbird-69/processes/cdo_copy/jobs",
           "processEndpointWPS1": "https://host-140-69.rdext.crim.ca/twitcher/ows/proxy/hummingbird?service=WPS&request=DescribeProcess&version=1.0.0&identifier=cdo_copy",
-          "processDescriptionURL": "http://localhost:4002/providers/hummingbird-69/processes/cdo_copy",
+          "processDescriptionURL": "http://schema-example.com/providers/hummingbird-69/processes/cdo_copy",
           "type": "wps-remote",
           "package": {
             "cwlVersion": "v1.0",
@@ -1394,10 +1394,10 @@
           ],
           "inputs": [],
           "outputs": [],
-          "url": "http://localhost:4002/providers/hummingbird-69/processes/cdo_bbox",
-          "executeEndpoint": "http://localhost:4002/providers/hummingbird-69/processes/cdo_bbox/jobs",
+          "url": "http://schema-example.com/providers/hummingbird-69/processes/cdo_bbox",
+          "executeEndpoint": "http://schema-example.com/providers/hummingbird-69/processes/cdo_bbox/jobs",
           "processEndpointWPS1": "https://host-140-69.rdext.crim.ca/twitcher/ows/proxy/hummingbird?service=WPS&request=DescribeProcess&version=1.0.0&identifier=cdo_bbox",
-          "processDescriptionURL": "http://localhost:4002/providers/hummingbird-69/processes/cdo_bbox",
+          "processDescriptionURL": "http://schema-example.com/providers/hummingbird-69/processes/cdo_bbox",
           "type": "wps-remote",
           "package": {
             "cwlVersion": "v1.0",
@@ -1438,10 +1438,10 @@
           ],
           "inputs": [],
           "outputs": [],
-          "url": "http://localhost:4002/providers/hummingbird-69/processes/cdo_indices",
-          "executeEndpoint": "http://localhost:4002/providers/hummingbird-69/processes/cdo_indices/jobs",
+          "url": "http://schema-example.com/providers/hummingbird-69/processes/cdo_indices",
+          "executeEndpoint": "http://schema-example.com/providers/hummingbird-69/processes/cdo_indices/jobs",
           "processEndpointWPS1": "https://host-140-69.rdext.crim.ca/twitcher/ows/proxy/hummingbird?service=WPS&request=DescribeProcess&version=1.0.0&identifier=cdo_indices",
-          "processDescriptionURL": "http://localhost:4002/providers/hummingbird-69/processes/cdo_indices",
+          "processDescriptionURL": "http://schema-example.com/providers/hummingbird-69/processes/cdo_indices",
           "type": "wps-remote",
           "package": {
             "cwlVersion": "v1.0",
@@ -1494,10 +1494,10 @@
           ],
           "inputs": [],
           "outputs": [],
-          "url": "http://localhost:4002/providers/hummingbird-69/processes/ensembles",
-          "executeEndpoint": "http://localhost:4002/providers/hummingbird-69/processes/ensembles/jobs",
+          "url": "http://schema-example.com/providers/hummingbird-69/processes/ensembles",
+          "executeEndpoint": "http://schema-example.com/providers/hummingbird-69/processes/ensembles/jobs",
           "processEndpointWPS1": "https://host-140-69.rdext.crim.ca/twitcher/ows/proxy/hummingbird?service=WPS&request=DescribeProcess&version=1.0.0&identifier=ensembles",
-          "processDescriptionURL": "http://localhost:4002/providers/hummingbird-69/processes/ensembles",
+          "processDescriptionURL": "http://schema-example.com/providers/hummingbird-69/processes/ensembles",
           "type": "wps-remote",
           "package": {
             "cwlVersion": "v1.0",
@@ -1550,10 +1550,10 @@
           ],
           "inputs": [],
           "outputs": [],
-          "url": "http://localhost:4002/providers/hummingbird-69/processes/cdo_inter_mpi",
-          "executeEndpoint": "http://localhost:4002/providers/hummingbird-69/processes/cdo_inter_mpi/jobs",
+          "url": "http://schema-example.com/providers/hummingbird-69/processes/cdo_inter_mpi",
+          "executeEndpoint": "http://schema-example.com/providers/hummingbird-69/processes/cdo_inter_mpi/jobs",
           "processEndpointWPS1": "https://host-140-69.rdext.crim.ca/twitcher/ows/proxy/hummingbird?service=WPS&request=DescribeProcess&version=1.0.0&identifier=cdo_inter_mpi",
-          "processDescriptionURL": "http://localhost:4002/providers/hummingbird-69/processes/cdo_inter_mpi",
+          "processDescriptionURL": "http://schema-example.com/providers/hummingbird-69/processes/cdo_inter_mpi",
           "type": "wps-remote",
           "package": {
             "cwlVersion": "v1.0",

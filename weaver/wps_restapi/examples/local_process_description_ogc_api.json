@@ -30,43 +30,43 @@
     }
   },
   "visibility": "public",
-  "processEndpointWPS1": "http://localhost:4002/wps",
-  "processDescriptionURL": "http://localhost:4002/processes/jsonarray2netcdf/jobs",
-  "executeEndpoint": "http://localhost:4002/processes/jsonarray2netcdf/jobs",
+  "processEndpointWPS1": "http://schema-example.com/wps",
+  "processDescriptionURL": "http://schema-example.com/processes/jsonarray2netcdf/jobs",
+  "executeEndpoint": "http://schema-example.com/processes/jsonarray2netcdf/jobs",
   "links": [
     {
       "type": "application/json",
       "title": "Process description.",
       "hreflang": "en-CA",
-      "href": "http://localhost:4002/processes/jsonarray2netcdf",
+      "href": "http://schema-example.com/processes/jsonarray2netcdf",
       "rel": "self"
     },
     {
       "type": "application/json",
       "title": "Process description.",
       "hreflang": "en-CA",
-      "href": "http://localhost:4002/processes/jsonarray2netcdf",
+      "href": "http://schema-example.com/processes/jsonarray2netcdf",
       "rel": "process-desc"
     },
     {
       "type": "application/json",
       "title": "Process execution endpoint for job submission.",
       "hreflang": "en-CA",
-      "href": "http://localhost:4002/processes/jsonarray2netcdf/execution",
+      "href": "http://schema-example.com/processes/jsonarray2netcdf/execution",
       "rel": "execute"
     },
     {
       "type": "application/json",
       "title": "List of registered processes.",
       "hreflang": "en-CA",
-      "href": "http://localhost:4002/processes",
+      "href": "http://schema-example.com/processes",
       "rel": "collection"
     },
     {
       "type": "application/xml",
       "title": "Service definition.",
       "hreflang": "en-CA",
-      "href": "http://localhost:4002/ows/wps?service=WPS&request=GetCapabilities",
+      "href": "http://schema-example.com/ows/wps?service=WPS&request=GetCapabilities",
       "rel": "service-desc"
     }
   ]

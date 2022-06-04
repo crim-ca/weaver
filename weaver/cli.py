@@ -1866,18 +1866,21 @@ def make_parser():
             Note that ``File`` in this case is expected to be an URL location where the file can be download from.
             When a local file is supplied, Weaver will automatically convert it to a remote Vault File in order to
             upload it at the specified URL location and make it available for the remote process.
-
-            Array input (``maxOccurs > 1``) can be specified using semicolon (;) separated values after the input ID.
-            The type of an element-wise item of this array can also be provided (i.e.: ``arrayInput:int=1;2;3``).
+            
+            Inputs with multiplicity (``maxOccurs > 1``) can be specified using semicolon (``;``) separated values
+            after a single input ID. Note that this is not the same as an single-value array-like input, which should
+            use comma (``,``) separated values instead.
+            The type of an element-wise item of this input can also be provided (i.e.: ``multiInput:int=1;2;3``).
             Alternatively, the same input ID can be repeated over many ``-I`` options each providing an element of the
-            multi-value array to be formed.
+            multi-value input to be formed (i.e.: ``-I multiInput=1 -I multiInput=2 -I multiInput=3``).
 
             Additional parameters can be specified following any ``<value>`` using any amount of ``@<param>=<info>``
             specifiers. Those will be added to the inputs body submitted for execution. This can be used, amongst other
-            things, to provide a file's ``mediaType`` or ``encoding`` details. When using array values, each value in
-            the array can take ``@`` parameters independently.
+            things, to provide a file's ``mediaType`` or ``encoding`` details. When using multi-value inputs, each item
+            value can take ``@`` parameters independently with distinct properties.
 
-            Any value that contains special separator characters (:;@) must URL-encoded (%%XX) to avoid invalid parsing.
+            Any value that contains special separator characters (``:;@``) to be used as literal entries 
+            must be URL-encoded (``%%XX``) to avoid invalid parsing.
 
             Example: ``-I message='Hello Weaver' -I value:int=1234 -I file:File=data.xml@mediaType=text/xml``
         """)

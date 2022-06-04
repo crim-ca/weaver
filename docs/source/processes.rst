@@ -871,13 +871,13 @@ combinations.
 .. [#vault2file]
     When a |vault_ref| file is specified, the local :ref:`WPS-REST` process can make use of it directly. The file is
     therefore retrieved from the :term:`Vault` using the provided UUID and access token to be passed to the application.
-    See :ref:`file_vault_inputs` and :ref:`vault` for more details.
+    See :ref:`file_vault_inputs` and :ref:`vault_upload` for more details.
 
 .. [#vault2http]
     When a |vault_ref| file is specified, the remote process needs to access it using the hosted :term:`Vault` endpoint.
     Therefore, `Weaver` converts any vault reference to the corresponding location and inserts the access token in the
-    requests headers to authorize download from the remote server. See :ref:`file_vault_inputs` and :ref:`vault` for
-    more details.
+    requests headers to authorize download from the remote server. See :ref:`file_vault_inputs` and :ref:`vault_upload`
+    for more details.
 
 .. [#wf]
     Workflows are only available on :term:`EMS` and :term:`HYBRID` instances. Since they chain processes,
@@ -920,7 +920,7 @@ When using |vault_ref| references, the resulting file name will be obtained from
 the ``Content-Disposition`` within the uploaded content of the ``multipart/form-data`` request.
 
 .. seealso::
-    - :ref:`vault`
+    - :ref:`vault_upload`
 
 .. _file_vault_token:
 .. _file_vault_inputs:
@@ -929,7 +929,7 @@ File Vault Inputs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. seealso::
-    Refer to :ref:`vault` section for general details about the :term:`Vault` feature.
+    Refer to :ref:`vault_upload` section for general details about the :term:`Vault` feature.
 
 Stored files in the :term:`Vault` can be employed as input for :ref:`proc_op_execute` operation using the
 provided |vault_ref| reference from the response following upload. The :ref:`Execute <proc_op_execute>`
@@ -1320,7 +1320,7 @@ Note again that the more the :term:`Process` is verbose, the more tracking will 
     A *local* :term:`Process` would have its :term:`Job` references as ``/processes/{processId}/jobs/{jobID}/...``
     while a :ref:`proc_remote_provider` will use ``/provider/{providerName}/processes/{processId}/jobs/{jobID}/...``.
 
-.. _vault:
+.. _vault_upload:
 
 Uploading File to the Vault
 -----------------------------

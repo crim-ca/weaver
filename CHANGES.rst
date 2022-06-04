@@ -25,6 +25,7 @@ Changes:
 - Replaced previously defined ``-H`` option by new ``-H/--header`` argument allowing insertion of explicitly provided
   request headers for relevant requests called by the executed operation.
 - Add case insensitive support of values for common `API`, `CLI`, and ``WeaverClient`` parameter choices.
+- Add all missing `CLI` and ``WeaverClient`` examples in the documentation.
 
 Fixes:
 ------

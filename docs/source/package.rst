@@ -87,6 +87,8 @@ Because a Python runner is required, the |cwl-docker-req|_ specification defines
 meets our needs. Note that in this case, special interpretation of ``$(...)`` entries within the definition can be
 provided to tell :term:`CWL` how to map :term:`Job` input values to the dynamically created script.
 
+.. _example_app_pkg_script:
+
 .. literalinclude:: ../examples/docker-python-script-report.cwl
     :language: yaml
     :caption: Sample CWL definition of a Python script
