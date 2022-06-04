@@ -19,7 +19,8 @@ Weaver (the nest-builder)
 
 `Weaver` is an OGC-API flavored |ems| that allows the execution of workflows chaining various
 applications and |wps| inputs and outputs. Remote execution is deferred by the `EMS` to one or many
-|ades| or remote service providers, and employs |cwl| configurations to define an |ogc-apppkg|_ deployed for each process.
+|ades| or remote service providers, and employs |cwl| configurations to define an |ogc-apppkg|_ deployed
+for each process.
 
 
 .. start-badges
@@ -104,8 +105,8 @@ ensuring the transfer of files accordingly between instances when located across
 
 `Weaver` can also accomplish the `ADES` role in order to perform application deployment at the data source using
 the application definition provided by |cwl| configuration. It can then directly execute
-a registered process |ogc-apppkg|_ with received inputs from a WPS request to expose output results for a following `ADES`
-in a `EMS` workflow execution chain.
+a registered process |ogc-apppkg|_ with received inputs from a WPS request to expose output results for a
+following `ADES` in a `EMS` workflow execution chain.
 
 `Weaver` **extends** |ogc-proc-api|_ by providing additional functionalities such as more detailed job logs
 endpoints, adding more process management and search request options than required by the standard, and supporting
