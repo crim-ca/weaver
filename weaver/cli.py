@@ -1866,7 +1866,7 @@ def make_parser():
             Note that ``File`` in this case is expected to be an URL location where the file can be download from.
             When a local file is supplied, Weaver will automatically convert it to a remote Vault File in order to
             upload it at the specified URL location and make it available for the remote process.
-            
+
             Inputs with multiplicity (``maxOccurs > 1``) can be specified using semicolon (``;``) separated values
             after a single input ID. Note that this is not the same as an single-value array-like input, which should
             use comma (``,``) separated values instead.
@@ -1879,7 +1879,7 @@ def make_parser():
             things, to provide a file's ``mediaType`` or ``encoding`` details. When using multi-value inputs, each item
             value can take ``@`` parameters independently with distinct properties.
 
-            Any value that contains special separator characters (``:;@``) to be used as literal entries 
+            Any value that contains special separator characters (``:;@``) to be used as literal entries
             must be URL-encoded (``%%XX``) to avoid invalid parsing.
 
             Example: ``-I message='Hello Weaver' -I value:int=1234 -I file:File=data.xml@mediaType=text/xml``
