@@ -170,11 +170,12 @@ class OperationResult(AutoBase):
 class AuthHandler(AuthBase):
     url = None       # type: Optional[str]
     method = "GET"   # type: AnyRequestMethod
+    headers = {}     # type: Optional[AnyHeadersContainer]
     identity = None  # type: Optional[str]
     password = None  # type: Optional[str]  # nosec
 
-    def __init__(self, identity=None, password=None, url=None, method="GET"):
-        # type: (Optional[str], Optional[str], Optional[str], AnyRequestMethod) -> None
+    def __init__(self, identity=None, password=None, url=None, method="GET", headers=None):
+        # type: (Optional[str], Optional[str], Optional[str], AnyRequestMethod, Optional[AnyHeadersContainer]) -> None
         if identity is not None:
             self.identity = identity
         if password is not None:
@@ -183,10 +184,15 @@ class AuthHandler(AuthBase):
             self.url = url
         if method is not None:
             self.method = method
+        if headers:
+            self.headers = headers
 
     @abc.abstractmethod
     def __call__(self, request):
         # type: (AnyRequestType) -> AnyRequestType
+        """
+        Operation that performs inline authentication retrieval prior to sending the request.
+        """
         raise NotImplementedError
 
 
@@ -229,13 +235,25 @@ class RequestAuthHandler(AuthHandler, HTTPBasicAuth):
 
     def request_auth(self):
         # type: () -> Optional[str]
-        resp = request_extra(self.method, self.url, headers={"Accept": ContentType.APP_JSON})
+        """
+        Performs a request using authentication parameters to retrieve the authorization token.
+        """
+        auth_headers = {"Accept": ContentType.APP_JSON}
+        auth_headers.update(self.headers)
+        resp = request_extra(self.method, self.url, headers=auth_headers)
         if resp.status_code != 200:
             return None
-        ctype = get_header("Content-Type", resp.headers)
+        return self.response_parser(resp)
+
+    def response_parser(self, response):
+        # type: (Response) -> Optional[str]
+        """
+        Parses a valid authentication response to extract the received authorization token.
+        """
+        ctype = get_header("Content-Type", response.headers)
         auth = None
         if ContentType.APP_JSON in ctype:
-            body = resp.json()
+            body = response.json()
             if self.auth_token_name:
                 auth = body.get(self.auth_token_name)
             else:
@@ -1365,7 +1383,7 @@ def add_shared_options(parser):
         for handler in [BasicAuthHandler, BearerAuthHandler, CookieAuthHandler]
     ])
     auth_grp.add_argument(
-        "-aH", "--auth-handler",
+        "-aC", "--auth-class", "--auth-handler", dest="auth_handler", metavar="AUTH_HANDLER_CLASS",
         help=(
             "Script or module path reference to class implementation to handle inline request authentication. "
             "Format [path/to/script.py:module.AuthHandlerClass] or [installed.module.AuthHandlerClass] is expected.\n\n"
@@ -1374,11 +1392,11 @@ def add_shared_options(parser):
         )
     )
     auth_grp.add_argument(
-        "-aI", "--auth-identity",
+        "-aI", "--auth-identity", "--auth-username", dest="auth_identity", metavar="IDENTITY",
         help="Authentication identity (or username) to be passed down to the specified Authentication Handler."
     )
     auth_grp.add_argument(
-        "-aP", "--auth-password",
+        "-aP", "--auth-password", dest="auth_password", metavar="PASSWORD",
         help="Authentication password to be passed down to the specified Authentication Handler."
     )
     auth_grp.add_argument(
@@ -1386,11 +1404,22 @@ def add_shared_options(parser):
         help="Authentication URL to be passed down to the specified Authentication Handler."
     )
     auth_grp.add_argument(
-        "-aM", "--auth-method", action=ValidateMethodAction, choices=ValidateMethodAction.methods, type=str.upper,
+        "-aM", "--auth-method", dest="auth_method", metavar="HTTP_METHOD",
+        action=ValidateMethodAction, choices=ValidateMethodAction.methods, type=str.upper,
         default=AuthHandler.method,
         help=(
             "Authentication HTTP request method to be passed down to the specified Authentication Handler "
             "(default: %(default)s, case-insensitive)."
+        )
+    )
+    auth_grp.add_argument(
+        "-aH", "--auth-header", action=ValidateHeaderAction, nargs=1, dest="auth_headers", metavar="HEADER",
+        help=(
+            "Additional headers to apply for sending requests when using the authentication handler. "
+            "This option can be provided multiple times, each with a value formatted as:\n\n'Header-Name: value'\n\n"
+            "Header names are case-insensitive. "
+            "Quotes can be used in the <value> portion to delimit it. "
+            "Surrounding spaces are trimmed."
         )
     )
 
@@ -1405,6 +1434,7 @@ def parse_auth(kwargs):
     auth_password = kwargs.pop("auth_password", None)
     auth_url = kwargs.pop("auth_url", None)
     auth_method = kwargs.pop("auth_method", None)
+    auth_headers = kwargs.pop("auth_headers", {})
     if not (auth_handler and isinstance(auth_handler, str)):
         return None
     auth_handler_name = auth_handler
@@ -1424,25 +1454,34 @@ def parse_auth(kwargs):
         )
         return None
     auth_sign = inspect.signature(auth_handler)
+    auth_opts = [
+        ("username", auth_identity),
+        ("identity", auth_identity),
+        ("password", auth_password),
+        ("url", auth_url),
+        ("method", auth_method),
+        ("headers", CaseInsensitiveDict(auth_headers)),
+    ]
     if len(auth_sign.parameters) == 0:
         auth_handler = auth_handler()
-        if auth_identity and hasattr(auth_handler, "identity"):
-            auth_handler.identity = auth_identity
-        if auth_password and hasattr(auth_handler, "password"):
-            auth_handler.password = auth_password
-        if auth_url and hasattr(auth_handler, "url"):
-            auth_handler.url = auth_url
-        if auth_method and hasattr(auth_handler, "method"):
-            auth_handler.method = auth_method
+        for auth_param, auth_option in auth_opts:
+            if auth_option and hasattr(auth_handler, auth_param):
+                setattr(auth_handler, auth_param, auth_option)
     else:
-        auth_options = [
-            ("identity", auth_identity),
-            ("password", auth_password),
-            ("url", auth_url),
-            ("method", auth_method)
-        ]
         auth_params = list(auth_sign.parameters)
-        auth_kwargs = {opt: val for opt, val in auth_options if opt in auth_params}
+        auth_kwargs = {opt: val for opt, val in auth_opts if opt in auth_params}
+        # allow partial match of required parameters by name to better support custom implementations
+        # (e.g.: 'MagpieAuth' using 'magpie_url' instead of plain 'url')
+        for param_name, param in auth_sign.parameters.items():
+            if param.kind not in [param.POSITIONAL_ONLY, param.POSITIONAL_OR_KEYWORD]:
+                continue
+            if param_name not in auth_kwargs:
+                for opt, val in auth_opts:
+                    if param_name.endswith(opt):
+                        LOGGER.debug("Using authentication partial match: [%s] -> [%s]", opt, param_name)
+                        auth_kwargs[param_name] = val
+                        break
+        LOGGER.debug("Using authentication parameters: %s", auth_kwargs)
         auth_handler = auth_handler(**auth_kwargs)
     LOGGER.info("Will use specified Authentication Handler [%s] with provided options.", auth_handler_name)
     return auth_handler
