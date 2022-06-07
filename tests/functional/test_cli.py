@@ -504,6 +504,34 @@ class TestWeaverCLI(TestWeaverClientBase):
         ]
         assert all(any(op in line for line in lines) for op in operations)
 
+    def test_auth_options_invalid(self):
+        """
+        Validates some custom argument parser actions to validate special handling.
+        """
+        args = ["processes", "-u", self.url, "-aH", "not-valid-header"]
+        lines = run_command(args, entrypoint=weaver_cli, trim=False, expect_error=True)
+        assert lines
+        assert "error: argument -aH" in lines[-1]
+
+        args = ["processes", "-u", self.url, "-aM", "NOT_HTTP_METHOD"]
+        lines = run_command(args, entrypoint=weaver_cli, trim=False, expect_error=True)
+        assert lines
+        assert "error: argument -aM" in lines[-1]
+
+    def test_auth_options_many_headers_valid(self):
+        """
+        Validates headers appendable with custom argument parser action when multiple options are provided.
+        """
+        lines = mocked_sub_requests(
+            self.app, run_command,
+            ["processes", "-u", self.url, "-aH", "Accept:application/json", "-aH", "User-Agent:test"],
+            entrypoint=weaver_cli,
+            trim=False,
+            only_local=True,
+        )
+        assert lines, "lines should be captured from successful execution"
+        assert "processes" in "".join(lines)
+
     def test_log_options_any_level(self):
         """
         Logging parameters should be allowed at main parser level or under any operation subparser.
@@ -977,11 +1005,12 @@ class TestWeaverCLI(TestWeaverClientBase):
         """
         lines = run_command(
             [
-                "weaver",
+                # "weaver",
                 "execute",
                 "--help",
             ],
-            trim=False
+            trim=False,
+            entrypoint=weaver_cli,
         )
         start = -1
         end = -1

@@ -333,7 +333,10 @@ def run_command(command, trim=True, expect_error=False, entrypoint=None):
 
     :param command: Command to run.
     :param trim: Filter out visually empty lines.
-    :param expect_error: Expect the returned code to be any non-zero value.
+    :param expect_error:
+        Expect the returned code to be any non-zero value. Otherwise, the returned code must be zero for success.
+        Any mismatching error code between expected success/failure is asserted to ensure expected conditions happened.
+        If error is expected, ``stderr`` is captured and returned. Otherwise, ``stdout`` is captured and returned.
     :param entrypoint:
         Main command to pass arguments directly (instead of using subprocess) and returning the command exit status.
         This is useful to simulate calling the command from the shell, but remain in current
@@ -357,9 +360,19 @@ def run_command(command, trim=True, expect_error=False, entrypoint=None):
         out, err = proc.communicate()
     else:
         stdout = io.StringIO()
-        with contextlib.redirect_stdout(stdout):
-            err = entrypoint(*tuple(command))
-        out = stdout.getvalue()
+        stderr = io.StringIO()
+        try:
+            with contextlib.redirect_stderr(stderr), contextlib.redirect_stdout(stdout):
+                err = entrypoint(*tuple(command))
+            out = stdout.getvalue()
+        except SystemExit as exc:
+            err = exc.code
+            if not expect_error and err != 0:
+                raise  # raise directly to have the most context/traceback as possible in failed test
+            if expect_error:
+                out = stderr.getvalue()
+            else:
+                out = stdout.getvalue()
     if expect_error:
         assert err, f"process returned successfully when error was expected: {err!s}"
     else:

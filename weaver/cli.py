@@ -1579,8 +1579,6 @@ class ValidateHeaderAction(argparse._AppendAction):  # noqa
 
 
 class ParagraphFormatter(argparse.HelpFormatter):
-    # pragma: no cover  # somehow marked not covered, but functionality covered by 'test_execute_help_details'
-
     @property
     def help_mode(self):
         parser = getattr(self, "parser", None)
