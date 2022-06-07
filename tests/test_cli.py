@@ -5,15 +5,23 @@ import base64
 import inspect
 import json
 import tempfile
+import uuid
 from contextlib import ExitStack
 from urllib.parse import quote
 
 import mock
 import pytest
 import yaml
+from webtest import TestRequest
 
-from tests.utils import run_command
-from weaver.cli import OperationResult, WeaverClient, main as weaver_cli
+from tests.utils import MockedResponse, run_command
+from weaver.cli import (
+    BasicAuthHandler,
+    BearerAuthHandler,
+    CookieAuthHandler,
+    OperationResult,
+    WeaverClient, main as weaver_cli
+)
 from weaver.formats import ContentType
 
 
@@ -168,3 +176,45 @@ def test_parse_inputs_with_media_type():
             }
         ]
     }
+
+
+def mocked_auth_response(token_name, token_value, *_, **__):
+    resp = MockedResponse()
+    resp.json_body = {token_name: token_value}
+    resp.headers = {"Content-Type": ContentType.APP_JSON}
+    return resp
+
+
+def test_auth_handler_basic():
+    req = TestRequest({})
+    auth = BasicAuthHandler(username="test", password=str(uuid.uuid4()))
+    resp = auth.__call__(req)  # type: ignore
+    assert "Authorization" in resp.headers and len(resp.headers["Authorization"])
+    assert resp.headers["Authorization"].startswith("Basic")
+
+
+def test_auth_handler_bearer():
+    req = TestRequest({})
+    auth = BearerAuthHandler(identity=str(uuid.uuid4()))
+    token = str(uuid.uuid4())
+    with mock.patch(
+        "requests.Session.request",
+        side_effect=lambda *_, **__: mocked_auth_response("access_token", token)
+    ):
+        resp = auth.__call__(req)  # type: ignore
+    assert "Authorization" in resp.headers and len(resp.headers["Authorization"])
+    assert resp.headers["Authorization"].startswith("Bearer") and resp.headers["Authorization"].endswith(token)
+
+
+def test_auth_handler_cookie():
+    req = TestRequest({})
+    auth = CookieAuthHandler(identity=str(uuid.uuid4()))
+    token = str(uuid.uuid4())
+    with mock.patch(
+        "requests.Session.request",
+        side_effect=lambda *_, **__: mocked_auth_response("access_token", token)
+    ):
+        resp = auth.__call__(req)  # type: ignore
+    assert "Authorization" not in resp.headers
+    assert "Cookie" in resp.headers and len(resp.headers["Cookie"])
+    assert resp.headers["Cookie"] == token

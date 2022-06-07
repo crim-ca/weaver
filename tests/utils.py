@@ -372,6 +372,14 @@ def run_command(command, trim=True, expect_error=False, entrypoint=None):
     return out_lines
 
 
+class MockedResponse(TestResponse):
+    """
+    Replaces the ``json`` property by the expected callable from all real response implementations.
+    """
+    def json(self):  # pylint: disable=W0236,invalid-overridden-method
+        return self.json_body or json.loads(self.body.decode("UTF-8"))
+
+
 def mocked_file_response(path, url):
     # type: (str, str) -> Union[Response, HTTPException]
     """
@@ -398,7 +406,7 @@ def mocked_file_response(path, url):
     class StreamReader(object):
         _data = [None, content]  # should technically be split up more to respect chuck size...
 
-        def read(self, chuck_size=None):  # noqa: E811
+        def read(self, chuck_size=None):  # noqa  # E811, parameter not used, but must be present as passed by kwargs
             return self._data.pop(-1)
 
     # add extra methods that 'real' response would have and that are employed by underlying code

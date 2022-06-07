@@ -202,9 +202,20 @@ class BasicAuthHandler(AuthHandler, HTTPBasicAuth):
 
     Authentication URL and method are not needed for this handler.
     """
+    def __init__(self, username, password, **kwargs):
+        # type: (str, str, Any) -> None
+        AuthHandler.__init__(self, identity=username, password=password, **kwargs)
+        HTTPBasicAuth.__init__(self, username=username, password=password)
+
     @property
     def username(self):
+        # type: () -> str
         return self.identity
+
+    @username.setter
+    def username(self, username):
+        # type: (str) -> None
+        self.identity = username
 
     def __call__(self, request):
         # type: (AnyRequestType) -> AnyRequestType
@@ -1583,9 +1594,6 @@ class ParagraphFormatter(argparse.HelpFormatter):
         if isinstance(parser, WeaverArgumentParser):
             parser.help_mode = mode
 
-    def add_usage(self, *args, **kwargs):
-        super(ParagraphFormatter, self).add_usage(*args, **kwargs)
-
     def format_help(self):
         # type: () -> str
         mode = self.help_mode
@@ -1600,16 +1608,20 @@ class ParagraphFormatter(argparse.HelpFormatter):
         self.help_mode = True
         text = super(ParagraphFormatter, self)._format_usage(*args, **kwargs)
 
-        # patch invalid combinations of [()] caused by mutually exclusive group with nested inclusive group
+        # patch invalid closing combinations of [()] caused by mutually exclusive group with nested inclusive group
         # (see docker auth parameters hacks)
-        search = r"\((([\-\w\s]+)(\|([\-\w\s]+))+)\]\)"
+        # depending on Python version, the erroneously generated options are slightly different:
+        # - [ -X opt | (-Y opt | -z opt])
+        # - [ -X opt | (-Y opt | -z opt)
+        search = r"(\[[\-\w\s]+\|\s*)\((([\-\w\s]+)(\|([\-\w\s]+))+)\]?\)"
 
         def replace(match):
+            # type: (re.Match) -> str
             grp = match.groups()
             found = []
-            for i in range(1, len(grp), 2):
+            for i in range(2, len(grp), 2):
                 found.append(grp[i].strip())
-            return "( " + " ".join(found) + " )]"
+            return grp[0] + "( " + " ".join(found) + " )]"
 
         text = re.sub(search, replace, text)
         if self.help_mode != mode:

@@ -12,6 +12,7 @@ import tempfile
 import uuid
 from typing import TYPE_CHECKING
 
+import mock
 import pytest
 from pyramid.httpexceptions import HTTPForbidden, HTTPOk, HTTPUnauthorized
 from webtest import TestApp as WebTestApp
@@ -27,7 +28,7 @@ from tests.utils import (
     setup_config_from_settings
 )
 from weaver.base import classproperty
-from weaver.cli import BearerAuthHandler, WeaverClient, main as weaver_cli
+from weaver.cli import AuthHandler, BearerAuthHandler, WeaverClient, main as weaver_cli
 from weaver.formats import ContentType, OutputFormat, get_cwl_file_format
 from weaver.processes.constants import ProcessSchema
 from weaver.status import Status
@@ -130,6 +131,26 @@ class TestWeaverClient(TestWeaverClientBase):
 
     def test_processes(self):
         self.process_listing_op(self.client.processes)
+
+    def test_custom_auth_handler(self):
+        """
+        Validate use of custom authentication handler works. Called operation does not matter.
+        """
+        token = str(uuid.uuid4())
+
+        class CustomAuthHandler(AuthHandler):
+            def __call__(self, request):
+                request.headers["Custom-Authorization"] = f"token={token}&user={self.identity}"
+                return request
+
+        auth = CustomAuthHandler(identity="test")  # insert an auth property that should be used by prepared request
+        # skip result parsing to return obtained response directly, which contains a reference to the prepared request
+        with mock.patch.object(WeaverClient, "_parse_result", side_effect=lambda r, *_, **__: r):
+            resp = mocked_sub_requests(self.app, self.client.describe, self.test_process["Echo"], auth=auth)
+        assert resp.status_code == 200, "Operation should have been called successfully"
+        assert resp.json["id"] == self.test_process["Echo"], "Operation should have been called successfully"
+        assert "Custom-Authorization" in resp.request.headers
+        assert resp.request.headers["Custom-Authorization"] == f"token={token}&user=test"
 
     def test_deploy_payload_body_cwl_embedded(self):
         test_id = f"{self.test_process_prefix}-deploy-body-no-cwl"

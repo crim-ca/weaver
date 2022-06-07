@@ -19,7 +19,7 @@ class _Const(type):
         raise TypeError(f"Constant [{cls.__name__}.{key}] is not modifiable!")
 
     def __setitem__(cls, key, value):
-        _Const.__setattr__(cls, key, value)
+        _Const.__setattr__(cls, key, value)  # pragma: no cover  # hard to test, but no constants works without it
 
     def __contains__(cls, item):
         return cls.get(item) is not None
