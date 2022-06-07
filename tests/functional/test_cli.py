@@ -42,6 +42,11 @@ if TYPE_CHECKING:
     from weaver.typedefs import AnyRequestType, AnyResponseType
 
 
+class FakeAuthHandler(object):
+    def __call__(self, *_, **__):
+        return None
+
+
 @pytest.mark.cli
 @pytest.mark.functional
 class TestWeaverClientBase(WpsConfigBase, ResourcesUtil):
@@ -508,20 +513,35 @@ class TestWeaverCLI(TestWeaverClientBase):
         """
         Validates some custom argument parser actions to validate special handling.
         """
-        args = ["processes", "-u", self.url, "-aC", "random.HandlerDoesNotExist"]
+        name = "random.HandlerDoesNotExist"
+        args = ["processes", "-u", self.url, "-aC", name]
         lines = run_command(args, entrypoint=weaver_cli, trim=False, expect_error=True)
         assert lines
-        assert "error: argument -aC" in lines[-1] and "random.HandlerDoesNotExist" in lines[-1]
+        assert "error: argument -aC" in lines[-1] and name in lines[-1]
 
-    def test_auth_options_invalid(self):
+    def test_auth_handler_bad_type(self):
         """
-        Validates some custom argument parser actions to validate special handling.
+        Validate that even if authentication handler class is resolved, it must be of appropriate type.
+        """
+        name = fully_qualified_name(FakeAuthHandler)
+        args = ["processes", "-u", self.url, "-aC", name]
+        lines = run_command(args, entrypoint=weaver_cli, trim=False, expect_error=True)
+        assert lines
+        assert "error: argument -aC" in lines[-1] and name in lines[-1] and "oneOf[AuthHandler, AuthBase]" in lines[-1]
+
+    def test_auth_headers_invalid(self):
+        """
+        Validates custom argument parser action to validate special handling.
         """
         args = ["processes", "-u", self.url, "-aH", "not-valid-header"]
         lines = run_command(args, entrypoint=weaver_cli, trim=False, expect_error=True)
         assert lines
         assert "error: argument -aH" in lines[-1]
 
+    def test_auth_http_method_invalid(self):
+        """
+        Validates custom argument parser action to validate special handling.
+        """
         args = ["processes", "-u", self.url, "-aM", "NOT_HTTP_METHOD"]
         lines = run_command(args, entrypoint=weaver_cli, trim=False, expect_error=True)
         assert lines

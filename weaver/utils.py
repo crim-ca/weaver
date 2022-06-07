@@ -1228,11 +1228,11 @@ def retry_on_cache_error(func):
             if "Cache region not configured" in str(exc):
                 LOGGER.debug("Invalid cache region setup detected, retrying operation after setup...")
                 setup_cache(get_settings() or {})
-            else:
+            else:  # pragma: no cover
                 raise  # if not the expected cache exception, ignore retry attempt
         try:
             return func(*args, **kwargs)
-        except BeakerException as exc:
+        except BeakerException as exc:  # pragma: no cover
             LOGGER.error("Invalid cache region setup could not be resolved: [%s]", exc)
             raise
     return wrapped
@@ -1453,6 +1453,7 @@ def download_file_http(file_reference, file_outdir, settings=None, **request_kwa
     request_kwargs.pop("stream", None)
     resp = request_extra("get", file_reference, stream=True, retries=3, settings=settings, **request_kwargs)
     if resp.status_code >= 400:
+        # pragma: no cover
         # use method since response object does not derive from Exception, therefore cannot be raised directly
         if hasattr(resp, "raise_for_status"):
             resp.raise_for_status()
@@ -1619,7 +1620,7 @@ def load_file(file_path, text=False):
     except OSError as exc:
         LOGGER.debug("Loading error: %s", exc, exc_info=exc)
         raise
-    except ScannerError as exc:
+    except ScannerError as exc:  # pragma: no cover
         LOGGER.debug("Parsing error: %s", exc, exc_info=exc)
         raise ValueError("Failed parsing file content as JSON or YAML.")
 
@@ -1664,7 +1665,7 @@ def get_sane_name(name, min_len=3, max_len=None, assert_invalid=True, replace_ch
     :param replace_character:
         Single character to use for replacement of invalid ones if :paramref:`assert_invalid` is ``False``.
     """
-    if not isinstance(replace_character, str) or not len(replace_character) == 1:
+    if not isinstance(replace_character, str) or not len(replace_character) == 1:  # pragma: no cover
         raise ValueError(f"Single replace character is expected, got invalid [{replace_character!s}]")
     max_len = max_len or len(name)
     if assert_invalid:

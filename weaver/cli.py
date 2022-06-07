@@ -411,7 +411,7 @@ class WeaverClient(object):
                 _success = True
             msg = message or getattr(response, "message", None) or msg or "undefined"
             text = text or OutputFormat.convert(body, output_format or OutputFormat.JSON_STR, item_root="result")
-        except Exception as exc:  # noqa
+        except Exception as exc:  # noqa  # pragma: no cover  # ignore safeguard against error in implementation
             msg = "Could not parse body."
             text = body = response.text
             LOGGER.warning(msg, exc_info=exc)
@@ -452,7 +452,7 @@ class WeaverClient(object):
                 desc["id"] = process_id
             data.setdefault("processDescription", desc)  # already applied if description was found/updated at any level
             desc["visibility"] = Visibility.PUBLIC
-        except (ValueError, TypeError, ScannerError) as exc:
+        except (ValueError, TypeError, ScannerError) as exc:  # pragma: no cover
             return OperationResult(False, f"Failed resolution of body definition: [{exc!s}]", body)
         return OperationResult(True, "", data)
 
@@ -478,7 +478,7 @@ class WeaverClient(object):
                 LOGGER.debug("Override provided CWL into provided/loaded body for process: [%s]", p_id)
                 get_process_definition(info, package=cwl, headers=headers)  # validate
                 body["executionUnit"] = [{"unit": cwl}]
-        except (PackageRegistrationError, ScannerError) as exc:
+        except (PackageRegistrationError, ScannerError) as exc:  # pragma: no cover
             message = f"Failed resolution of package definition: [{exc!s}]"
             return OperationResult(False, message, cwl)
         return OperationResult(True, p_id, body)
@@ -751,7 +751,7 @@ class WeaverClient(object):
                 )
             ):
                 values = cwl2json_input_values(inputs, schema=ProcessSchema.OGC)
-            if values is null:
+            if values is null:  # pragma: no cover  # ignore safeguard against error in implementation
                 raise ValueError("Input values parsed as null. Could not properly detect employed schema.")
             values = convert_input_values_schema(values, schema=ProcessSchema.OGC)
         except Exception as exc:
@@ -1258,7 +1258,7 @@ class WeaverClient(object):
         outputs = res_out.body
         headers = res_out.headers
         out_links = res_out.links(["Link"])
-        if not res_out.success or not (isinstance(res_out.body, dict) or len(out_links)):
+        if not res_out.success or not (isinstance(res_out.body, dict) or len(out_links)):  # pragma: no cover
             return OperationResult(False, "Could not retrieve any output results from job.", outputs, headers)
         if not download:
             res_out.message = "Listing job results."
