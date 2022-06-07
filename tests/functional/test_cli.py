@@ -504,6 +504,15 @@ class TestWeaverCLI(TestWeaverClientBase):
         ]
         assert all(any(op in line for line in lines) for op in operations)
 
+    def test_auth_handler_unresolved(self):
+        """
+        Validates some custom argument parser actions to validate special handling.
+        """
+        args = ["processes", "-u", self.url, "-aC", "random.HandlerDoesNotExist"]
+        lines = run_command(args, entrypoint=weaver_cli, trim=False, expect_error=True)
+        assert lines
+        assert "error: argument -aC" in lines[-1] and "random.HandlerDoesNotExist" in lines[-1]
+
     def test_auth_options_invalid(self):
         """
         Validates some custom argument parser actions to validate special handling.
@@ -1089,6 +1098,30 @@ class TestWeaverCLI(TestWeaverClientBase):
         assert body["page"] == 0
         assert body["limit"] == 1
         assert "total" in body and isinstance(body["total"], int)  # ignore actual variable amount
+        assert "links" not in body
+
+    def test_jobs_no_links_nested_detail(self):
+        lines = mocked_sub_requests(
+            self.app, run_command,
+            [
+                # "weaver",
+                "jobs",
+                "-u", self.url,
+                "-S", Status.SUCCEEDED,
+                "-D",   # when details active, each job lists its own links
+                "-nL",  # unless links are requested to be removed (top-most and nested ones)
+            ],
+            trim=False,
+            entrypoint=weaver_cli,
+            only_local=True,
+        )
+        assert lines
+        assert len(lines) > 1, "Should be automatically indented with readable format"
+        text = "".join(lines)
+        body = json.loads(text)
+        assert isinstance(body["jobs"], list)
+        assert all(isinstance(job, dict) for job in body["jobs"]), "Jobs should be JSON objects when details requested"
+        assert all("links" not in job for job in body["jobs"])
         assert "links" not in body
 
     def test_output_format_json_pretty(self):

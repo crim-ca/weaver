@@ -50,7 +50,7 @@ from weaver.visibility import Visibility
 from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Union
+    from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Type, Union
 
     from requests import Response
 
@@ -1395,6 +1395,7 @@ def add_shared_options(parser):
     ])
     auth_grp.add_argument(
         "-aC", "--auth-class", "--auth-handler", dest="auth_handler", metavar="AUTH_HANDLER_CLASS",
+        action=ValidateAuthHandlerAction,
         help=(
             "Script or module path reference to class implementation to handle inline request authentication. "
             "Format [path/to/script.py:module.AuthHandlerClass] or [installed.module.AuthHandlerClass] is expected.\n\n"
@@ -1436,7 +1437,7 @@ def add_shared_options(parser):
 
 
 def parse_auth(kwargs):
-    # type: (Dict[str, Any]) -> Optional[AuthHandler]
+    # type: (Dict[str, Union[Type[AuthHandler], str, None]]) -> Optional[AuthHandler]
     """
     Parses arguments that can define an authentication handler and remove them from dictionary for following calls.
     """
@@ -1446,24 +1447,9 @@ def parse_auth(kwargs):
     auth_url = kwargs.pop("auth_url", None)
     auth_method = kwargs.pop("auth_method", None)
     auth_headers = kwargs.pop("auth_headers", {})
-    if not (auth_handler and isinstance(auth_handler, str)):
-        return None
-    auth_handler_name = auth_handler
-    auth_handler = import_target(auth_handler)
-    if not auth_handler:
-        LOGGER.warning(
-            "Specified Authentication Handler [%s] could not be found. Reference will be ignored.",
-            auth_handler_name
-        )
+    if not (auth_handler and issubclass(auth_handler, (AuthHandler, AuthBase))):
         return None
     auth_handler_name = fully_qualified_name(auth_handler)
-    if not issubclass(auth_handler, (AuthHandler, AuthBase)):
-        LOGGER.warning(
-            "Detected Authentication Handler [%s] is not of appropriate sub-type: oneOf[AuthHandler, AuthBase]. "
-            "Reference will be ignored.",
-            auth_handler_name
-        )
-        return None
     auth_sign = inspect.signature(auth_handler)
     auth_opts = [
         ("username", auth_identity),
@@ -1535,6 +1521,25 @@ def set_parser_sections(parser):
     # type: (argparse.ArgumentParser) -> None
     parser._optionals.title = OPTIONAL_ARGS_TITLE
     parser._positionals.title = REQUIRED_ARGS_TITLE
+
+
+class ValidateAuthHandlerAction(argparse.Action):
+    def __call__(self, parser, namespace, auth_handler_ref, option_string=None):
+        # type: (argparse.ArgumentParser, argparse.Namespace, Optional[str], Optional[str]) -> None
+        if not (auth_handler_ref and isinstance(auth_handler_ref, str)):
+            return None
+        auth_handler = import_target(auth_handler_ref)
+        if not auth_handler:
+            error = f"Could not resolve class reference to specified Authentication Handler: [{auth_handler_ref}]."
+            raise argparse.ArgumentError(self, error)
+        auth_handler_name = fully_qualified_name(auth_handler)
+        if not issubclass(auth_handler, (AuthHandler, AuthBase)):
+            error = (
+                f"Resolved Authentication Handler [{auth_handler_name}] is "
+                "not of appropriate sub-type: oneOf[AuthHandler, AuthBase]."
+            )
+            raise argparse.ArgumentError(self, error)
+        setattr(namespace, self.dest, auth_handler)
 
 
 class ValidateMethodAction(argparse.Action):
