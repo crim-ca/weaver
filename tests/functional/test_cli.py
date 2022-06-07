@@ -134,7 +134,9 @@ class TestWeaverClient(TestWeaverClientBase):
 
     def test_custom_auth_handler(self):
         """
-        Validate use of custom authentication handler works. Called operation does not matter.
+        Validate use of custom authentication handler works.
+
+        Called operation does not matter.
         """
         token = str(uuid.uuid4())
 
