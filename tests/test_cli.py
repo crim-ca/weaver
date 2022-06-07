@@ -20,7 +20,8 @@ from weaver.cli import (
     BearerAuthHandler,
     CookieAuthHandler,
     OperationResult,
-    WeaverClient, main as weaver_cli
+    WeaverClient,
+    main as weaver_cli
 )
 from weaver.formats import ContentType
 
