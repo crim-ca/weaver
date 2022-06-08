@@ -117,10 +117,10 @@ toward the service.
 .. _requests-magpie-auth: https://github.com/Ouranosinc/requests-magpie/blob/master/requests_magpie.py
 
 When using the :ref:`cli_commands`, the specific :py:class:`weaver.cli.AuthHandler` implementation to employ
-must be provided using the ``--auth-handler`` (``-aH``) argument. This can be an importable (installed) class module
-reference or a plain Python script path separated with a ``:`` character followed by the class name definition.
-Other ``--auth`` prefixed arguments can also be supplied, but their actual use depend on the targeted authentication
-handler implementation.
+must be provided using the ``--auth-handler``/``--auth-class`` (``-aC``) argument. This can be an importable (installed)
+class module reference or a plain Python script path separated with a ``:`` character followed by the class name
+definition. Other ``--auth`` prefixed arguments can also be supplied, but their actual use depend on the targeted
+authentication handler implementation.
 
 Below are examples of possible commands:
 
