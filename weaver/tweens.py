@@ -9,7 +9,14 @@ from weaver.owsexceptions import OWSException, OWSNotImplemented
 from weaver.utils import clean_json_text_body, fully_qualified_name
 
 if TYPE_CHECKING:
-    from typing import Union
+    from typing import Callable, Union
+
+    from pyramid.config import Configurator
+    from pyramid.registry import Registry
+
+    from weaver.typedefs import AnyViewResponse, PyramidRequest
+
+    ViewHandler = Callable[[PyramidRequest], AnyViewResponse]
 
 LOGGER = logging.getLogger(__name__)
 
@@ -44,6 +51,7 @@ def error_repr(http_err):
 
 
 def ows_response_tween(request, handler):
+    # type: (PyramidRequest, ViewHandler) -> AnyViewResponse
     """
     Tween that wraps any API request with appropriate dispatch of error conversion to handle formatting.
     """
@@ -97,6 +105,7 @@ def ows_response_tween(request, handler):
 
 
 def ows_response_tween_factory_excview(handler, registry):  # noqa: F811
+    # type: (ViewHandler, Registry) -> ViewHandler
     """
     Tween factory which produces a tween which transforms common exceptions into OWS specific exceptions.
     """
@@ -104,10 +113,13 @@ def ows_response_tween_factory_excview(handler, registry):  # noqa: F811
 
 
 def ows_response_tween_factory_ingress(handler, registry):  # noqa: F811
+    # type: (ViewHandler, Registry) -> ViewHandler
     """
     Tween factory which produces a tween which transforms common exceptions into OWS specific exceptions.
     """
     def handle_ows_tween(request):
+        # type: (PyramidRequest) -> AnyViewResponse
+
         # because the EXCVIEW will also wrap any exception raised that should before be handled by OWS response
         # to allow conversions to occur, use a flag that will re-raise the result
         setattr(handler, OWS_TWEEN_HANDLED, True)
@@ -121,6 +133,8 @@ OWS_RESPONSE_INGRESS = fully_qualified_name(ows_response_tween_factory_ingress)
 
 
 def includeme(config):
+    # type: (Configurator) -> None
+
     # using 'INGRESS' to run `weaver.wps_restapi.api` views that fix HTTP code before OWS response
     config.add_tween(OWS_RESPONSE_INGRESS, under=INGRESS)
     # using 'EXCVIEW' to run over any other 'valid' exception raised to adjust formatting and log

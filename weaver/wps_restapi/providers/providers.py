@@ -26,9 +26,7 @@ from weaver.wps_restapi.providers.utils import check_provider_requirements, get_
 from weaver.wps_restapi.utils import get_schema_ref, handle_schema_validation
 
 if TYPE_CHECKING:
-    from pyramid.request import Request
-
-    from weaver.typedefs import AnyResponseType
+    from weaver.typedefs import AnyViewResponse, PyramidRequest
 
 LOGGER = logging.getLogger(__name__)
 
@@ -38,7 +36,7 @@ LOGGER = logging.getLogger(__name__)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 @check_provider_requirements
 def get_providers(request):
-    # type: (Request) -> AnyResponseType
+    # type: (PyramidRequest) -> AnyViewResponse
     """
     Lists registered providers.
     """
@@ -60,7 +58,7 @@ def get_providers(request):
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 @check_provider_requirements
 def add_provider(request):
-    # type: (Request) -> AnyResponseType
+    # type: (PyramidRequest) -> AnyViewResponse
     """
     Register a new service provider.
     """
@@ -121,7 +119,7 @@ def add_provider(request):
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 @check_provider_requirements
 def remove_provider(request):
-    # type: (Request) -> AnyResponseType
+    # type: (PyramidRequest) -> AnyViewResponse
     """
     Remove an existing service provider.
     """
@@ -140,7 +138,7 @@ def remove_provider(request):
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 @check_provider_requirements
 def get_provider(request):
-    # type: (Request) -> AnyResponseType
+    # type: (PyramidRequest) -> AnyViewResponse
     """
     Get a provider definition (GetCapabilities).
     """
@@ -154,7 +152,7 @@ def get_provider(request):
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 @check_provider_requirements
 def get_provider_processes(request):
-    # type: (Request) -> AnyResponseType
+    # type: (PyramidRequest) -> AnyViewResponse
     """
     Retrieve available provider processes (GetCapabilities).
     """
@@ -170,7 +168,7 @@ def get_provider_processes(request):
 
 @check_provider_requirements
 def describe_provider_process(request):
-    # type: (Request) -> Process
+    # type: (PyramidRequest) -> Process
     """
     Obtains a remote service process description in a compatible local process format.
 
@@ -193,7 +191,7 @@ def describe_provider_process(request):
 @handle_schema_validation()
 @check_provider_requirements
 def get_provider_process(request):
-    # type: (Request) -> AnyResponseType
+    # type: (PyramidRequest) -> AnyViewResponse
     """
     Retrieve a process description (DescribeProcess).
     """
@@ -212,7 +210,7 @@ def get_provider_process(request):
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 @check_provider_requirements
 def submit_provider_job(request):
-    # type: (Request) -> AnyResponseType
+    # type: (PyramidRequest) -> AnyViewResponse
     """
     Execute a remote provider process.
     """

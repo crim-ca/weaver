@@ -28,7 +28,7 @@ from weaver.wps_restapi.processes.utils import get_process_list_links, get_proce
 from weaver.wps_restapi.providers.utils import get_provider_services
 
 if TYPE_CHECKING:
-    from weaver.typedefs import JSON
+    from weaver.typedefs import JSON, AnyViewResponse, PyramidRequest
 
 LOGGER = logging.getLogger(__name__)
 
@@ -37,6 +37,7 @@ LOGGER = logging.getLogger(__name__)
                           response_schemas=sd.get_processes_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_processes(request):
+    # type: (PyramidRequest) -> AnyViewResponse
     """
     List registered processes (GetCapabilities).
 
@@ -136,6 +137,7 @@ def get_processes(request):
                            schema=sd.PostProcessesEndpoint(), response_schemas=sd.post_processes_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def add_local_process(request):
+    # type: (PyramidRequest) -> AnyViewResponse
     """
     Register a local process.
     """
@@ -146,6 +148,7 @@ def add_local_process(request):
                         schema=sd.ProcessEndpoint(), response_schemas=sd.get_process_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_local_process(request):
+    # type: (PyramidRequest) -> AnyViewResponse
     """
     Get a registered local process information (DescribeProcess).
     """
@@ -164,6 +167,7 @@ def get_local_process(request):
                                 schema=sd.ProcessPackageEndpoint(), response_schemas=sd.get_process_package_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_local_process_package(request):
+    # type: (PyramidRequest) -> AnyViewResponse
     """
     Get a registered local process package definition.
     """
@@ -175,6 +179,7 @@ def get_local_process_package(request):
                                 schema=sd.ProcessPayloadEndpoint(), response_schemas=sd.get_process_payload_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_local_process_payload(request):
+    # type: (PyramidRequest) -> AnyViewResponse
     """
     Get a registered local process payload definition.
     """
@@ -187,6 +192,7 @@ def get_local_process_payload(request):
                                    response_schemas=sd.get_process_visibility_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_process_visibility(request):
+    # type: (PyramidRequest) -> AnyViewResponse
     """
     Get the visibility of a registered local process.
     """
@@ -199,6 +205,7 @@ def get_process_visibility(request):
                                    response_schemas=sd.put_process_visibility_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def set_process_visibility(request):
+    # type: (PyramidRequest) -> AnyViewResponse
     """
     Set the visibility of a registered local process.
     """
@@ -228,6 +235,7 @@ def set_process_visibility(request):
                            schema=sd.ProcessEndpoint(), response_schemas=sd.delete_process_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def delete_local_process(request):
+    # type: (PyramidRequest) -> AnyViewResponse
     """
     Unregister a local process.
     """
@@ -269,6 +277,7 @@ def delete_local_process(request):
                               schema=sd.PostProcessJobsEndpoint(), response_schemas=sd.post_process_jobs_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def submit_local_job(request):
+    # type: (PyramidRequest) -> AnyViewResponse
     """
     Execute a process registered locally.
 

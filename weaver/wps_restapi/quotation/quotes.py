@@ -23,7 +23,7 @@ from weaver.wps_restapi.processes.processes import submit_local_job
 if TYPE_CHECKING:
     from weaver.datatype import Process
 
-    from weaver.typedefs import AnyResponseType, PyramidRequest
+    from weaver.typedefs import AnyViewResponse, PyramidRequest
 
 LOGGER = logging.getLogger(__name__)
 
@@ -32,7 +32,7 @@ LOGGER = logging.getLogger(__name__)
                                 schema=sd.PostProcessQuoteRequestEndpoint(), response_schemas=sd.post_quotes_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def request_quote(request):
-    # type: (PyramidRequest) -> AnyResponseType
+    # type: (PyramidRequest) -> AnyViewResponse
     """
     Request a quotation for a process.
     """
@@ -124,7 +124,7 @@ def request_quote(request):
                        schema=sd.QuotesEndpoint(), response_schemas=sd.get_quote_list_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_quote_list(request):
-    # type: (PyramidRequest) -> AnyResponseType
+    # type: (PyramidRequest) -> AnyViewResponse
     """
     Get list of quotes IDs.
     """
@@ -153,7 +153,7 @@ def get_quote_list(request):
                       schema=sd.QuoteEndpoint(), response_schemas=sd.get_quote_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_quote_info(request):
-    # type: (PyramidRequest) -> AnyResponseType
+    # type: (PyramidRequest) -> AnyViewResponse
     """
     Get quote information.
     """
@@ -172,7 +172,7 @@ def get_quote_info(request):
                        schema=sd.PostQuote(), response_schemas=sd.post_quote_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def execute_quote(request):
-    # type: (PyramidRequest) -> AnyResponseType
+    # type: (PyramidRequest) -> AnyViewResponse
     """
     Execute a quoted process.
     """

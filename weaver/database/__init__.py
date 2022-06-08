@@ -6,13 +6,18 @@ from pyramid.settings import asbool
 from weaver.database.mongodb import MongoDatabase
 from weaver.utils import get_registry, get_settings
 
-LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
-    from weaver.typedefs import AnySettingsContainer
+    from typing import Optional
+
+    from pyramid.config import Configurator
+
+    from weaver.typedefs import AnyRegistryContainer
+
+LOGGER = logging.getLogger(__name__)
 
 
-def get_db(container, reset_connection=False):
-    # type: (AnySettingsContainer, bool) -> MongoDatabase
+def get_db(container=None, reset_connection=False):
+    # type: (Optional[AnyRegistryContainer], bool) -> MongoDatabase
     """
     Obtains the database connection from configured application settings.
 
@@ -24,12 +29,12 @@ def get_db(container, reset_connection=False):
         return registry.db
     database = MongoDatabase(container)
     if reset_connection:
-        registry = get_registry(container)
         registry.db = database
     return database
 
 
 def includeme(config):
+    # type: (Configurator) -> None
     settings = get_settings(config)
     if asbool(settings.get("weaver.build_docs", False)):
         LOGGER.info("Skipping database when building docs...")

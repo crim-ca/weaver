@@ -25,9 +25,11 @@ from weaver.wps.utils import get_wps_url
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
-    from weaver.typedefs import AnySettingsContainer, CWL
-    from cwltool.context import RuntimeContext
     from typing import Any, Dict, Type, Union
+
+    from cwltool.context import RuntimeContext
+
+    from weaver.typedefs import AnyRegistryContainer, CWL
 
 LOGGER = logging.getLogger(__name__)
 
@@ -103,7 +105,7 @@ def _get_builtin_package(process_id, package):
 
 
 def register_builtin_processes(container):
-    # type: (AnySettingsContainer) -> None
+    # type: (AnyRegistryContainer) -> None
     """
     Registers every ``builtin`` CWL package to the processes database.
 

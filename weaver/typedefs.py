@@ -56,7 +56,7 @@ if TYPE_CHECKING:
     from celery.app import Celery
     from celery.result import AsyncResult, EagerResult, GroupResult, ResultSet
     from owslib.wps import BoundingBoxDataInput, ComplexDataInput, Process as ProcessOWS, WPSExecution
-    from pyramid.httpexceptions import HTTPSuccessful, HTTPRedirection
+    from pyramid.httpexceptions import HTTPException, HTTPSuccessful, HTTPRedirection
     from pyramid.registry import Registry
     from pyramid.request import Request as PyramidRequest
     from pyramid.response import Response as PyramidResponse
@@ -259,8 +259,9 @@ if TYPE_CHECKING:
     HeaderCookiesTuple = Union[Tuple[None, None], Tuple[HeadersBaseType, CookiesBaseType]]
     AnyHeadersContainer = Union[HeadersBaseType, ResponseHeaders, EnvironHeaders, CaseInsensitiveDict]
     AnyCookiesContainer = Union[CookiesBaseType, WPSRequest, PyramidRequest, AnyHeadersContainer]
-    AnyResponseType = Union[PyramidResponse, WebobResponse, RequestsResponse, TestResponse]
     AnyRequestType = Union[PyramidRequest, WerkzeugRequest, PreparedRequest, RequestsRequest, DummyRequest]
+    AnyResponseType = Union[PyramidResponse, WebobResponse, RequestsResponse, TestResponse]
+    AnyViewResponse = Union[PyramidResponse, WebobResponse, HTTPException]
     RequestMethod = Literal[
         "HEAD", "GET", "POST", "PUT", "PATCH", "DELETE",
         "head", "get", "post", "put", "patch", "delete",

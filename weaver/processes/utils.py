@@ -54,8 +54,9 @@ if TYPE_CHECKING:
     from pyramid.request import Request
 
     from weaver.typedefs import (
-        AnyContainer,
         AnyHeadersContainer,
+        AnyRegistryContainer,
+        AnyRequestType,
         AnySettingsContainer,
         CWL,
         FileSystemPathType,
@@ -245,7 +246,7 @@ def _validate_deploy_process_info(process_info, reference, package, settings, he
 
 
 def deploy_process_from_payload(payload, container, overwrite=False):
-    # type: (JSON, AnyContainer, bool) -> HTTPException
+    # type: (JSON, Union[AnySettingsContainer, AnyRequestType], bool) -> HTTPException
     """
     Deploy the process after resolution of all references and validation of the parameters from payload definition.
 
@@ -253,8 +254,10 @@ def deploy_process_from_payload(payload, container, overwrite=False):
     matching :class:`weaver.wps_restapi.swagger_definitions.ProcessDescription`.
 
     :param payload: JSON payload that was specified during the process deployment request.
-    :param container: container to retrieve application settings.
-    :param overwrite: whether to allow override of an existing process definition if conflict occurs.
+    :param container:
+        Container to retrieve application settings.
+        If it is a ``request``-like object, additional parameters may be used to identify the payload schema.
+    :param overwrite: Whether to allow override of an existing process definition if conflict occurs.
     :returns: HTTPOk if the process registration was successful.
     :raises HTTPException: for any invalid process deployment step.
     """
@@ -419,7 +422,7 @@ def parse_wps_process_config(config_entry):
 
 
 def register_wps_processes_static(service_url, service_name, service_visibility, service_processes, container):
-    # type: (str, str, bool, List[str], AnySettingsContainer) -> None
+    # type: (str, str, bool, List[str], AnyRegistryContainer) -> None
     """
     Register WPS-1 :term:`Process` under a service :term:`Provider` as static references.
 
@@ -490,7 +493,7 @@ def register_wps_processes_static(service_url, service_name, service_visibility,
 
 
 def register_wps_processes_dynamic(service_name, service_url, service_visibility, container):
-    # type: (str, str, bool, AnySettingsContainer) -> None
+    # type: (str, str, bool, AnyRegistryContainer) -> None
     """
     Register a WPS service ``provider`` such that ``processes`` under it are dynamically accessible on demand.
 

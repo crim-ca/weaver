@@ -19,6 +19,7 @@ from weaver.base import Constants, classproperty
 if TYPE_CHECKING:
     from typing import Any, Dict, List, Optional, Tuple, Union
 
+    from weaver.base import PropertyDataType
     from weaver.typedefs import JSON, AnyRequestType
 
 LOGGER = logging.getLogger(__name__)
@@ -120,8 +121,11 @@ class OutputFormat(Constants):
     """)
 
     @classmethod
-    def get(cls, format_or_version, default=JSON, allow_version=True):  # pylint: disable=W0221,W0237
-        # type: (Union[str, AnyOutputFormat], AnyOutputFormat, bool) -> AnyOutputFormat
+    def get(cls,                    # pylint: disable=W0221,W0237  # arguments differ/renamed
+            format_or_version,      # type: Union[str, AnyOutputFormat, PropertyDataType]
+            default=JSON,           # type: AnyOutputFormat
+            allow_version=True,     # type: bool
+            ):                      # type: (...) ->  Union[AnyOutputFormat, PropertyDataType]
         """
         Resolve the applicable output format.
 
