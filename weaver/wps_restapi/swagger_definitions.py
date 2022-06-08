@@ -3783,9 +3783,20 @@ class CWLVersion(Version):
     validator = SemanticVersion(v_prefix=True, rc_suffix=False)
 
 
-class CWL(PermissiveMappingSchema):
+class CWLIdentifier(ProcessIdentifier):
+    description = (
+        "Reference to the process identifier. If CWL is provided within a process deployment payload, this can be "
+        "omitted. If used in a deployment with only CWL details, this information is required."
+    )
+
+
+class CWLBase(ExtendedMappingSchema):
     cwlVersion = CWLVersion()
+
+
+class CWLApp(PermissiveMappingSchema):
     _class = CWLClass()
+    id = CWLIdentifier(missing=drop)  # can be omitted only if within a process deployment that also includes it
     requirements = CWLRequirements(description="Explicit requirement to execute the application package.", missing=drop)
     hints = CWLHints(description="Non-failing additional hints that can help resolve extra requirements.", missing=drop)
     baseCommand = CWLCommand(description="Command called in the docker image or on shell according to requirements "
@@ -3794,6 +3805,10 @@ class CWL(PermissiveMappingSchema):
     arguments = CWLArguments(description="Base arguments passed to the command.", missing=drop)
     inputs = CWLInputsDefinition(description="All inputs available to the Application Package.")
     outputs = CWLOutputsDefinition(description="All outputs produced by the Application Package.")
+
+
+class CWL(CWLBase, CWLApp):
+    pass
 
 
 class Unit(ExtendedMappingSchema):
@@ -4115,7 +4130,10 @@ class ProcessDescriptionChoiceType(OneOfKeywordSchema):
     ]
 
 
-class Deploy(ExtendedMappingSchema):
+class DeployOGCAppPackage(NotKeywordSchema, ExtendedMappingSchema):
+    _not = [
+        CWLBase()
+    ]
     processDescription = ProcessDescriptionChoiceType()
     executionUnit = ExecutionUnitList()
     immediateDeployment = ExtendedSchemaNode(Boolean(), missing=drop, default=True)
@@ -4123,8 +4141,63 @@ class Deploy(ExtendedMappingSchema):
     owsContext = OWSContext(missing=drop)
 
 
+class CWLGraphItem(CWLApp):  # no 'cwlVersion', only one at the top
+    id = CWLIdentifier()  # required in this case
+
+
+class CWLGraphList(ExtendedSequenceSchema):
+    cwl = CWLGraphItem()
+
+
+class CWLGraphBase(ExtendedMappingSchema):
+    graph = CWLGraphList(
+        name="$graph", description=(
+            "Graph definition that combines one or many CWL application packages within a single payload. "
+            "If an single application is given (list of one item), it will be deployed as normal CWL by itself. "
+            "If multiple applications are defined, the first MUST be the top-most Workflow process. "
+            "Other items deployment will be performed, and the full deployment will be persisted only if all are "
+            "valid. The resulting Workflow will be registered as a package by itself (i.e: not as a graph)."
+        )
+    )
+
+
+class DeployCWLGraph(CWLBase, CWLGraphBase):
+    pass
+
+
+class DeployCWL(NotKeywordSchema, CWL):
+    _not = [
+        CWLGraphBase()
+    ]
+    id = CWLIdentifier()  # required in this case
+
+
+class Deploy(OneOfKeywordSchema):
+    _one_of = [
+        DeployOGCAppPackage(),
+        DeployCWL(),
+        DeployCWLGraph(),
+    ]
+
+
+class DeployContentType(ContentTypeHeader):
+    example = ContentType.APP_JSON
+    default = ContentType.APP_JSON
+    validator = OneOf([
+        ContentType.APP_JSON,
+        ContentType.APP_CWL,
+        ContentType.APP_CWL_JSON,
+        ContentType.APP_CWL_YAML,
+        ContentType.APP_CWL_X,
+        ContentType.APP_OGC_PKG_JSON,
+        ContentType.APP_OGC_PKG_YAML,
+        ContentType.APP_YAML,
+    ])
+
+
 class DeployHeaders(RequestHeaders):
     x_auth_docker = XAuthDockerHeader()
+    content_type = DeployContentType()
 
 
 class PostProcessesEndpoint(ExtendedMappingSchema):

@@ -1999,23 +1999,17 @@ class Process(Base):
 
     @property
     def payload(self):
-        # type: () -> Union[JSON, str]
+        # type: () -> JSON
         """
-        Deployment specification as :term:`JSON` body or raw :term:`YAML` content.
+        Deployment specification as :term:`JSON`.
         """
         body = self.get("payload", {})
         return self._decode(body) if isinstance(body, dict) else body
 
     @payload.setter
     def payload(self, body):
-        # type: (Union[JSON, str]) -> None
-        if isinstance(body, dict):
-            payload = self._decode(body)
-        elif body and isinstance(body, str):
-            payload = body
-        else:
-            payload = {}
-        self["payload"] = payload
+        # type: (JSON) -> None
+        self["payload"] = self._encode(body) if isinstance(body, dict) else {}
 
     # encode(->)/decode(<-) characters that cannot be in a key during save to db
     _character_codes = [("$", "\uFF04"), (".", "\uFF0E")]

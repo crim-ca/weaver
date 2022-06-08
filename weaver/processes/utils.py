@@ -1,5 +1,5 @@
-import os
 import logging
+import os
 import pathlib
 import warnings
 from copy import deepcopy
@@ -17,7 +17,8 @@ from pyramid.httpexceptions import (
     HTTPForbidden,
     HTTPNotFound,
     HTTPOk,
-    HTTPUnprocessableEntity
+    HTTPUnprocessableEntity,
+    HTTPUnsupportedMediaType
 )
 from pyramid.settings import asbool
 
@@ -60,7 +61,7 @@ from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
-    from typing import List, Optional, Tuple, Union
+    from typing import Any, List, Optional, Tuple, Union
 
     from pyramid.request import Request
 
@@ -256,8 +257,38 @@ def _validate_deploy_process_info(process_info, reference, package, settings, he
         raise HTTPUnprocessableEntity(detail=msg)
 
 
+def _load_payload(payload, content_type):
+    # type: (Union[JSON, str], ContentType) -> Union[JSON, CWL]
+    """
+    Load the request payload with validation of expected content type.
+    """
+    try:
+        content_type = sd.DeployContentType().deserialize(content_type)
+        if isinstance(payload, str):
+            payload = yaml.safe_load(payload)
+        if not isinstance(payload, dict):
+            raise TypeError("Not a valid JSON body for process deployment.")
+    except colander.Invalid as exc:
+        raise HTTPUnsupportedMediaType(json={
+            "title": "Unsupported Media Type",
+            "type": "UnsupportedMediaType",
+            "detail": str(exc),
+            "status": HTTPUnsupportedMediaType.code,
+            "cause": str(content_type),
+        })
+    except Exception as exc:
+        raise HTTPBadRequest(json={
+            "title": "Bad Request",
+            "type": "BadRequest",
+            "detail": "Unable to parse process deployment content.",
+            "status": HTTPBadRequest.code,
+            "cause": str(exc),
+        })
+    return payload
+
+
 def deploy_process_from_payload(payload, container, overwrite=False):
-    # type: (JSON, Union[AnySettingsContainer, AnyRequestType], bool) -> HTTPException
+    # type: (Union[JSON, str], Union[AnySettingsContainer, AnyRequestType], bool) -> HTTPException
     """
     Deploy the process after resolution of all references and validation of the parameters from payload definition.
 
@@ -272,7 +303,11 @@ def deploy_process_from_payload(payload, container, overwrite=False):
     :returns: HTTPOk if the process registration was successful.
     :raises HTTPException: for any invalid process deployment step.
     """
+    headers = getattr(container, "headers", {})  # container is any request (as when called from API Deploy request)
+    c_type = ContentType.get(get_header("Content-Type", headers), default=ContentType.APP_OGC_PKG_JSON)
+
     # use deepcopy of to remove any circular dependencies before writing to mongodb or any updates to the payload
+    payload = _load_payload(payload, c_type)
     payload_copy = deepcopy(payload)
     payload = _check_deploy(payload)
 
@@ -286,8 +321,6 @@ def deploy_process_from_payload(payload, container, overwrite=False):
     ows_context = process_info.pop("owsContext", None)
     reference = None
     package = None
-    headers = getattr(container, "headers", {})  # container is any request (as when called from API Deploy request)
-    c_type = get_header("Content-Type", headers, default=ContentType.APP_OGC_PKG_JSON)
     found = False
     if process_href:
         reference = process_href  # reference type handled downstream
@@ -647,7 +680,7 @@ def register_wps_processes_from_config(container, wps_processes_file_path=None):
 
 
 def register_cwl_processes_from_config(container):
-    # type: (AnyRegistryContainer) -> None
+    # type: (AnyRegistryContainer) -> int
     """
     Load multiple :term:`CWL` definitions from a directory to register corresponding :term:`Process`.
 
@@ -669,6 +702,7 @@ def register_cwl_processes_from_config(container):
         If the entry is omitted, default location :data:`WEAVER_CONFIG_DIR` is used to search for :term:`CWL` files.
 
     :param container: Registry container to obtain database reference as well as application settings.
+    :returns: Number of successfully registered processes from found :term:`CWL` files.
     """
     from weaver.processes.wps_package import load_package_file
 
@@ -682,14 +716,14 @@ def register_cwl_processes_from_config(container):
     elif cwl_processes_dir == "":
         warnings.warn("Configuration setting [weaver.cwl_processes_dir] for CWL processes registration "
                       "is explicitly defined as empty. Not loading anything.", RuntimeWarning)
-        return
+        return 0
 
     if not os.path.isdir(cwl_processes_dir):
         warnings.warn(
             "Configuration setting [weaver.cwl_processes_dir] for CWL processes registration "
             f"is not an existing directory: [{cwl_processes_dir}]. Not loading anything.", RuntimeWarning
         )
-        return
+        return 0
     cwl_processes_dir = os.path.abspath(cwl_processes_dir)
     cwl_files = sorted(pathlib.Path(cwl_processes_dir).rglob("*.cwl"))
     if not cwl_files:
@@ -697,7 +731,7 @@ def register_cwl_processes_from_config(container):
             f"Configuration directory [{cwl_processes_dir}] for CWL processes registration "
             "does not contain any CWL file. Not loading anything.", RuntimeWarning
         )
-        return
+        return 0
 
     register_count = 0
     register_total = len(cwl_files)
@@ -716,3 +750,4 @@ def register_cwl_processes_from_config(container):
         LOGGER.info("Successfully registered %s processes from CWL files.", register_total)
     elif register_count != register_total:
         LOGGER.warning("Partial registration of CWL processes, only %s/%s succeeded.", register_count, register_total)
+    return register_count

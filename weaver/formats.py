@@ -46,13 +46,14 @@ class ContentType(Constants):
     APP_CWL = "application/cwl"
     APP_CWL_JSON = "application/cwl+json"
     APP_CWL_YAML = "application/cwl+yaml"
-    APP_X_CWL = "application/x-cwl"  # backward compatible format, others are official
+    APP_CWL_X = "application/x-cwl"  # backward compatible format, others are official
     APP_FORM = "application/x-www-form-urlencoded"
     APP_GEOJSON = "application/geo+json"
     APP_GZIP = "application/gzip"
     APP_HDF5 = "application/x-hdf5"
     APP_JSON = "application/json"
     APP_OGC_PKG_JSON = "application/ogcapppkg+json"
+    APP_OGC_PKG_YAML = "application/ogcapppkg+yaml"
     APP_NETCDF = "application/x-netcdf"
     APP_OCTET_STREAM = "application/octet-stream"
     APP_PDF = "application/pdf"
@@ -76,7 +77,7 @@ class ContentType(Constants):
     VIDEO_MPEG = "video/mpeg"
 
     # special handling
-    ANY_CWL = {APP_CWL, APP_CWL_JSON, APP_CWL_YAML, APP_X_CWL}
+    ANY_CWL = {APP_CWL, APP_CWL_JSON, APP_CWL_YAML, APP_CWL_X}
     ANY_XML = {APP_XML, TEXT_XML}
     ANY = "*/*"
 
@@ -331,7 +332,7 @@ IANA_MAPPING = {
     ContentType.APP_CWL: ContentType.APP_CWL,
     ContentType.APP_CWL_JSON: ContentType.APP_CWL,
     ContentType.APP_CWL_YAML: ContentType.APP_CWL,
-    ContentType.APP_X_CWL: ContentType.APP_CWL,
+    ContentType.APP_CWL_X: ContentType.APP_CWL,
 }
 EDAM_NAMESPACE = "edam"
 EDAM_NAMESPACE_URL = "http://edamontology.org/"
@@ -342,7 +343,7 @@ EDAM_MAPPING = {
     ContentType.APP_CWL: "format_3857",
     ContentType.APP_CWL_JSON: "format_3857",
     ContentType.APP_CWL_YAML: "format_3857",
-    ContentType.APP_X_CWL: "format_3857",
+    ContentType.APP_CWL_X: "format_3857",
     ContentType.IMAGE_GIF: "format_3467",
     ContentType.IMAGE_JPEG: "format_3579",
     ContentType.APP_HDF5: "format_3590",

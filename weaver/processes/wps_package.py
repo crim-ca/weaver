@@ -721,6 +721,18 @@ def get_auth_requirements(requirement, headers):
     return None
 
 
+def get_process_identifier(process_info, package):
+    # type: (JSON, CWL) -> str
+    """
+    Obtain a sane name identifier reference from the :term:`Process` or the :term:`Application Package`.
+    """
+    process_id = get_any_id(process_info)
+    if not process_id:
+        process_id = package.get("id")
+    process_id = get_sane_name(process_id, assert_invalid=True)
+    return process_id
+
+
 def get_process_definition(process_offering, reference=None, package=None, data_source=None, headers=None):
     # type: (JSON, Optional[str], Optional[CWL], Optional[str], Optional[AnyHeadersContainer]) -> JSON
     """
@@ -753,7 +765,7 @@ def get_process_definition(process_offering, reference=None, package=None, data_
             raise exc_type(f"Invalid package/reference definition. {reason} generated error: [{exc!s}].")
 
     if not (isinstance(package, dict) or isinstance(reference, str)):
-        raise PackageRegistrationError("Invalid parameters amongst one of [package, reference].")
+        raise PackageRegistrationError("Invalid parameters, one of [package, reference] is required.")
     if package and reference:
         raise PackageRegistrationError("Simultaneous parameters [package, reference] not allowed.")
 
@@ -797,7 +809,10 @@ def get_process_definition(process_offering, reference=None, package=None, data_
     )
 
     # obtain any retrieved process id if not already provided from upstream process offering, and clean it
-    process_id = get_sane_name(get_any_id(process_info), assert_invalid=False)
+    process_id = try_or_raise_package_error(
+        lambda: get_process_identifier(process_info, package),
+        reason="Obtaining process identifier"
+    )
     if not process_id:
         raise PackageRegistrationError("Could not retrieve any process identifier.")
 
@@ -1539,7 +1554,7 @@ class WpsPackage(Process):
 
         # auto-map local file if possible after security check
         if input_scheme == "vault":
-            vault_id = urlparse(input_location).hostname
+            vault_id = urlparse(input_location).hostname  # type: str  # noqa
             input_url = get_vault_url(vault_id, self.settings)
             resp = request_extra("HEAD", input_url, settings=self.settings, headers=self.auth)
             if resp.status_code == 200:

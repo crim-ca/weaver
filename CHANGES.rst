@@ -10,8 +10,23 @@ Changes
 `Unreleased <https://github.com/crim-ca/weaver/tree/master>`_ (latest)
 ========================================================================
 
+.. _`OGC Application Package`: https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/master/extensions/deploy_replace_undeploy/standard/openapi/schemas/ogcapppkg.yaml
+
 Changes:
 --------
+- Add support of official `CWL` IANA types to allow `Process` deployment with the relevant ``Content-Type`` header
+  for the submitted payload (see `common-workflow-language/common-workflow-language#421 (comment)
+  <https://github.com/common-workflow-language/common-workflow-language/issues/421#issuecomment-1122010820>`_,
+  relates to `opengeospatial/NamingAuthority#169 <https://github.com/opengeospatial/NamingAuthority/issues/169>`_,
+  resolves `#434 <https://github.com/crim-ca/weaver/issues/434>`_).
+- Support `Process` deployment using only `CWL` content provided it contains an ``id`` field representing the target
+  `Process` ID as per recommendation in `OGC Best Practice for Earth Observation Application Package, CWL Document
+  <https://docs.ogc.org/bp/20-089r1.html#toc26>`_ (resolves `#434 <https://github.com/crim-ca/weaver/issues/434>`_).
+- Support `Process` deployment with a payload using ``YAML`` content instead of ``JSON``. This ``YAML`` content
+  **MUST** be submitted in the request with a ``Content-Type`` header either equal to ``application/x-yaml`` or
+  ``application/ogcapppkg+yaml`` for the `OGC Application Package`_ schema, or using ``application/cwl+yaml`` for
+  a `CWL`-only definition. The definition will be loaded and converted to ``JSON`` for schema validation. Otherwise,
+  ``JSON`` contents is assumed to be directly provided in the request payload for validation as previously accomplished.
 - Add `CLI` *Authentication Handler* parameters and corresponding ``auth`` argument of instantiated classes for
   ``WeaverClient`` methods that allows inline request authentication and authorization resolution to access a
   protected service. Any *Authentication Handler* implementation can be used to fulfill required server functionalities.
@@ -29,6 +44,7 @@ Changes:
 
 Fixes:
 ------
+- Fix ``Process.payload`` improperly encoded in case of special characters where allowed such as in `CWL` definition.
 - Fix `CLI` operations assuming valid JSON response to instead return error response content and status code.
 - Fix `CLI` rendering of various optional arguments and groups when displaying help messages.
 - Fix invalid handling of ``Constants`` definitions mixed with ``classproperty`` such as in ``OutputFormat`` causing

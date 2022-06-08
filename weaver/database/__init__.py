@@ -7,22 +7,26 @@ from weaver.database.mongodb import MongoDatabase
 from weaver.utils import get_registry, get_settings
 
 if TYPE_CHECKING:
-    from typing import Optional
+    from typing import Optional, Union
 
     from pyramid.config import Configurator
 
-    from weaver.typedefs import AnyRegistryContainer
+    from weaver.typedefs import AnyRegistryContainer, AnySettingsContainer
 
 LOGGER = logging.getLogger(__name__)
 
 
 def get_db(container=None, reset_connection=False):
-    # type: (Optional[AnyRegistryContainer], bool) -> MongoDatabase
+    # type: (Optional[Union[AnyRegistryContainer, AnySettingsContainer]], bool) -> MongoDatabase
     """
     Obtains the database connection from configured application settings.
 
     If :paramref:`reset_connection` is ``True``, the :paramref:`container` must be the application :class:`Registry` or
     any container that can retrieve it to accomplish reference reset. Otherwise, any settings container can be provided.
+
+    .. note::
+        It is preferable to provide a registry reference to reuse any available connection whenever possible.
+        Giving application settings will require establishing a new connection.
     """
     registry = get_registry(container, nothrow=True)
     if not reset_connection and registry and isinstance(getattr(registry, "db", None), MongoDatabase):
