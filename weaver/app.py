@@ -13,8 +13,8 @@ from pyramid.config import Configurator
 from weaver.config import WEAVER_DEFAULT_REQUEST_OPTIONS_CONFIG, get_weaver_config_file, get_weaver_configuration
 from weaver.database import get_db
 from weaver.processes.builtin import register_builtin_processes
-from weaver.processes.utils import register_wps_processes_from_config
-from weaver.utils import get_settings, parse_extra_options, setup_cache, setup_loggers
+from weaver.processes.utils import register_cwl_processes_from_config, register_wps_processes_from_config
+from weaver.utils import parse_extra_options, setup_cache, setup_loggers
 from weaver.wps_restapi.patches import patch_pyramid_view_no_auto_head_get_method
 
 if TYPE_CHECKING:
@@ -75,7 +75,7 @@ def main(global_config, **settings):
     local_config.include("weaver")
 
     LOGGER.info("Running database migration...")
-    db = get_db(settings)
+    db = get_db(local_config)
     db.run_migration()
 
     if settings.get("weaver.celery", False):
@@ -85,7 +85,9 @@ def main(global_config, **settings):
         register_builtin_processes(local_config)
 
         LOGGER.info("Registering WPS-1 processes from configuration file...")
-        wps_processes_file = get_settings(local_config).get("weaver.wps_processes_file")
-        register_wps_processes_from_config(wps_processes_file, local_config)
+        register_wps_processes_from_config(local_config)
+
+        LOGGER.info("Registering CWL processes from configuration directory...")
+        register_cwl_processes_from_config(local_config)
 
     return local_config.make_wsgi_app()

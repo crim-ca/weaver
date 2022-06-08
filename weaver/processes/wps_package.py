@@ -335,7 +335,7 @@ def _check_package_file(cwl_file_path_or_url):
     return cwl_path
 
 
-def _load_package_file(file_path):
+def load_package_file(file_path):
     # type: (str) -> CWL
     """
     Loads the package in YAML/JSON format specified by the file path.
@@ -541,7 +541,7 @@ def _generate_process_with_cwl_from_reference(reference):
     reference_path, reference_ext = os.path.splitext(reference)
     reference_name = os.path.split(reference_path)[-1]
     if reference_ext.replace(".", "") in PACKAGE_EXTENSIONS:
-        cwl_package = _load_package_file(reference)
+        cwl_package = load_package_file(reference)
         process_info = {"identifier": reference_name}
 
     # match against WPS-1/2 reference
@@ -581,11 +581,11 @@ def _generate_process_with_cwl_from_reference(reference):
             if "process" in payload or "owsContext" in payload:
                 process_info = payload.get("process", payload)
                 ows_ref = process_info.get("owsContext", {}).get("offering", {}).get("content", {}).get("href")
-                cwl_package = _load_package_file(ows_ref)
+                cwl_package = load_package_file(ows_ref)
             # if somehow the CWL was referenced without an extension, handle it here
             # also handle parsed WPS-3 process description also with a reference
             elif "cwlVersion" in payload:
-                cwl_package = _load_package_file(reference)
+                cwl_package = load_package_file(reference)
                 process_info = {"identifier": reference_name}
         else:
             raise ValueError(f"Unknown parsing methodology of Content-Type [{content_type}] for reference resolution.")

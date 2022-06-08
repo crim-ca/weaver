@@ -1,4 +1,6 @@
+import os
 import logging
+import pathlib
 import warnings
 from copy import deepcopy
 from distutils.version import LooseVersion
@@ -20,6 +22,7 @@ from pyramid.httpexceptions import (
 from pyramid.settings import asbool
 
 from weaver.config import (
+    WEAVER_CONFIG_DIR,
     WEAVER_DEFAULT_WPS_PROCESSES_CONFIG,
     WeaverFeature,
     get_weaver_config_file,
@@ -39,9 +42,17 @@ from weaver.exceptions import (
     ServiceNotFound,
     log_unhandled_exceptions
 )
+from weaver.formats import ContentType
 from weaver.processes.types import ProcessType
 from weaver.store.base import StoreProcesses, StoreServices
-from weaver.utils import fully_qualified_name, generate_diff, get_sane_name, get_settings, get_url_without_query
+from weaver.utils import (
+    fully_qualified_name,
+    generate_diff,
+    get_header,
+    get_sane_name,
+    get_settings,
+    get_url_without_query
+)
 from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_client
 from weaver.wps_restapi import swagger_definitions as sd
@@ -275,6 +286,8 @@ def deploy_process_from_payload(payload, container, overwrite=False):
     ows_context = process_info.pop("owsContext", None)
     reference = None
     package = None
+    headers = getattr(container, "headers", {})  # container is any request (as when called from API Deploy request)
+    c_type = get_header("Content-Type", headers, default=ContentType.APP_OGC_PKG_JSON)
     found = False
     if process_href:
         reference = process_href  # reference type handled downstream
@@ -289,7 +302,10 @@ def deploy_process_from_payload(payload, container, overwrite=False):
         package = None
         reference = content.get("href")
         found = isinstance(reference, str)
-    else:
+    elif c_type in (ContentType.ANY_CWL + [ContentType.APP_JSON]) and "cwlVersion" in payload:
+        package = payload
+        process_info = {}
+    else:  # ogc-apppkg type, but no explicit check since used by default (backward compat)
         if deployment_profile_name:  # optional hint
             allowed_profile_suffix = [ProcessType.APPLICATION, ProcessType.WORKFLOW]
             if not any(deployment_profile_name.lower().endswith(typ) for typ in allowed_profile_suffix):
@@ -327,7 +343,6 @@ def deploy_process_from_payload(payload, container, overwrite=False):
 
     # update and validate process information using WPS process offering, CWL/WPS reference or CWL package definition
     settings = get_settings(container)
-    headers = getattr(container, "headers", {})  # container is any request (as when called from API Deploy request)
     process_info = _validate_deploy_process_info(process_info, reference, package, settings, headers)
 
     restapi_url = get_wps_restapi_base_url(settings)
@@ -544,25 +559,47 @@ def register_wps_processes_dynamic(service_name, service_url, service_visibility
         LOGGER.exception("Exception during provider registration: [%s] [%r]. Skipping...", service_name, ex)
 
 
-def register_wps_processes_from_config(wps_processes_file_path, container):
-    # type: (Optional[FileSystemPathType], AnySettingsContainer) -> None
+def register_wps_processes_from_config(container, wps_processes_file_path=None):
+    # type: (AnyRegistryContainer, Optional[FileSystemPathType]) -> None
     """
-    Registers remote `WPS` providers and/or processes as specified from the configuration file.
+    Registers remote :term:`WPS` providers and/or processes as specified from the configuration file.
 
-    Loads a `wps_processes.yml` file and registers `WPS-1` providers processes to the
-    current `Weaver` instance as equivalent `WPS-2` processes.
+    Loads a ``wps_processes.yml`` file and registers  processes under `WPS-1/2`_ providers to the
+    current `Weaver` instance as equivalent :term:`OGC API - Processes` instances.
 
-    References listed under ``processes`` are registered.
-    When the reference is a service (provider), registration of each WPS process is done individually
-    for each of the specified providers with ID ``[service]_[process]`` per listed process by ``GetCapabilities``.
+    References listed under ``processes`` are registered statically (by themselves, unchanging snapshot).
+    References listed under ``providers``, the :term:`WPS` themselves are registered, making each :term:`Process`
+    listed in their ``GetCapabilities`` available. In this case, registered processes are defined dynamically,
+    meaning they will be fetched on the provider each time a request refers to them, keeping their definition
+    up-to-date with the remote server.
 
     .. versionadded:: 1.14.0
         When references are specified using ``providers`` section instead of ``processes``, the registration
-        only saves the remote WPS provider endpoint to dynamically populate WPS processes on demand.
+        only saves the remote WPS provider endpoint to dynamically populate :term:`WPS` processes on demand.
+        Previous behavior was to register each :term:`WPS` process individually with ID ``[service]_[process]``.
+
+    .. versionchanged:: 4.19.0
+        Parameter position are inverted.
+        If :paramref:`wps_processes_file_path` is explicitly provided, it is used directly without considering settings.
+        Otherwise, automatically employ the definition in setting: ``weaver.wps_processes_file``.
 
     .. seealso::
-        - `weaver.wps_processes.yml.example` for additional file format details
+        - `weaver.wps_processes.yml.example` for additional file format details.
+
+    .. note::
+        Settings with an explicit empty ``weaver.wps_processes_file`` entry will be considered as *nothing to load*.
+        If the entry is omitted, default location :data:`WEAVER_DEFAULT_WPS_PROCESSES_CONFIG` is attempted instead.
+
+    :param container: Registry container to obtain database reference as well as application settings.
+    :param wps_processes_file_path: Override file path to employ instead of default settings definition.
     """
+    if wps_processes_file_path is not None:
+        LOGGER.info("Using WPS-1 explicit override parameter to obtain file reference.")
+    else:
+        LOGGER.info("Using WPS-1 file reference from configuration settings.")
+        settings = get_settings(container)
+        wps_processes_file_path = settings.get("weaver.wps_processes_file")
+
     if wps_processes_file_path is None:
         warnings.warn("No file specified for WPS-1 providers registration.", RuntimeWarning)
         wps_processes_file_path = get_weaver_config_file("", WEAVER_DEFAULT_WPS_PROCESSES_CONFIG,
@@ -607,3 +644,75 @@ def register_wps_processes_from_config(wps_processes_file_path, container):
         msg = f"Invalid WPS-1 providers configuration file caused: [{fully_qualified_name(exc)}]({exc!s})."
         LOGGER.exception(msg)
         raise RuntimeError(msg)
+
+
+def register_cwl_processes_from_config(container):
+    # type: (AnyRegistryContainer) -> None
+    """
+    Load multiple :term:`CWL` definitions from a directory to register corresponding :term:`Process`.
+
+    .. versionadded:: 4.19.0
+
+    Each individual :term:`CWL` definition must fully describe a :term:`Process` by itself. Therefore, an ``id`` must
+    be available in the file to indicate the target deployment reference. In case of conflict, the existing database
+    :term:`Process` will be overridden to ensure file updates are applied.
+
+    Files are loaded in alphabetical order. If a :term:`Workflow` needs to refer to other processes, they should be
+    named in way that dependencies will be resolvable prior to the registration of the :term:`Workflow` :term:`Process`.
+    The resolved directory to search for :term:`CWL` will be traversed recursively.
+    This, along with the name of :term:`CWL` files themselves, can be used to resolve order-dependent loading cases.
+    Only ``.cwl`` extensions are considered to avoid invalid parsing of other files that could be defined in the shared
+    configuration directory.
+
+    .. note::
+        Settings with an explicit empty ``weaver.cwl_processes_dir`` entry will be considered as *nothing to load*.
+        If the entry is omitted, default location :data:`WEAVER_CONFIG_DIR` is used to search for :term:`CWL` files.
+
+    :param container: Registry container to obtain database reference as well as application settings.
+    """
+    from weaver.processes.wps_package import load_package_file
+
+    settings = get_settings(container)
+    cwl_processes_dir = settings.get("weaver.cwl_processes_dir")
+
+    if cwl_processes_dir is None:
+        warnings.warn("No configuration setting [weaver.cwl_processes_dir] specified for CWL processes registration. "
+                      f"Will use default location: [{WEAVER_CONFIG_DIR}]", RuntimeWarning)
+        cwl_processes_dir = WEAVER_CONFIG_DIR
+    elif cwl_processes_dir == "":
+        warnings.warn("Configuration setting [weaver.cwl_processes_dir] for CWL processes registration "
+                      "is explicitly defined as empty. Not loading anything.", RuntimeWarning)
+        return
+
+    if not os.path.isdir(cwl_processes_dir):
+        warnings.warn(
+            "Configuration setting [weaver.cwl_processes_dir] for CWL processes registration "
+            f"is not an existing directory: [{cwl_processes_dir}]. Not loading anything.", RuntimeWarning
+        )
+        return
+    cwl_processes_dir = os.path.abspath(cwl_processes_dir)
+    cwl_files = sorted(pathlib.Path(cwl_processes_dir).rglob("*.cwl"))
+    if not cwl_files:
+        warnings.warn(
+            f"Configuration directory [{cwl_processes_dir}] for CWL processes registration "
+            "does not contain any CWL file. Not loading anything.", RuntimeWarning
+        )
+        return
+
+    register_count = 0
+    register_total = len(cwl_files)
+    for cwl_path in cwl_files:
+        try:
+            cwl = load_package_file(str(cwl_path))
+            deploy_process_from_payload(cwl, settings, overwrite=True)
+        except (HTTPException, PackageRegistrationError) as exc:
+            warnings.warn(
+                f"Failed registration of process from CWL file: [{cwl_path!s}] "
+                f"caused by [{fully_qualified_name(exc)}]({exc!s}). "
+                "Skipping definition.", RuntimeWarning
+            )
+            continue
+    if register_count and register_count == register_total:
+        LOGGER.info("Successfully registered %s processes from CWL files.", register_total)
+    elif register_count != register_total:
+        LOGGER.warning("Partial registration of CWL processes, only %s/%s succeeded.", register_count, register_total)
