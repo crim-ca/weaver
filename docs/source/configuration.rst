@@ -1,6 +1,9 @@
 .. include:: references.rst
 .. _configuration:
 
+.. default location to quickly reference items without the explicit and long prefix
+.. py:currentmodule:: weaver.config
+
 ******************
 Configuration
 ******************
@@ -76,8 +79,21 @@ they are optional and which default value or operation is applied in each situat
 
 .. versionadded:: 4.0.0
 
+- | ``weaver.cwl_euid = <int>`` [:class:`int`, *experimental*]
+  | (default: ``None``, auto-resolved by :term:`CWL` with effective machine user)
+  |
+  | Define the effective machine user ID to be used for running the :term:`Application Package`.
 
-- | ``weaver.wps = true|false``
+.. versionadded:: 1.9.0
+
+- | ``weaver.cwl_egid = <int>`` [:class:`int`, *experimental*]
+  | (default: ``None``, auto-resolved by :term:`CWL` with the group of the effective user)
+  |
+  | Define the effective machine group ID to be used for running the :term:`Application Package`.
+
+.. versionadded:: 1.9.0
+
+- | ``weaver.wps = true|false`` [:class:`bool`-like]
   | (default: ``true``)
   |
   | Enables the WPS-1/2 endpoint.
@@ -177,7 +193,7 @@ they are optional and which default value or operation is applied in each situat
   |
   | Prefix where process :term:`Job` worker should execute the :term:`Process` from.
 
-- | ``weaver.wps_restapi = true|false``
+- | ``weaver.wps_restapi = true|false`` [:class:`bool`-like]
   | (default: ``true``)
   |
   | Enable the WPS-REST endpoint.
@@ -215,8 +231,8 @@ they are optional and which default value or operation is applied in each situat
 
 .. versionadded:: 4.15.0
 
-- | ``weaver.exec_sync_max_wait``
-  | (default: ``20``, :class:`int`, seconds)
+- | ``weaver.exec_sync_max_wait = <int>`` [:class:`int`, seconds]
+  | (default: ``20``)
   |
   | Defines the maximum duration allowed for running a :term:`Job` execution in `synchronous` mode.
   |
@@ -225,8 +241,8 @@ they are optional and which default value or operation is applied in each situat
 
 .. versionadded:: 4.15.0
 
-- | ``weaver.quote_sync_max_wait``
-  | (default: ``20``, :class:`int`, seconds)
+- | ``weaver.quote_sync_max_wait = <int>`` [:class:`int`, seconds]
+  | (default: ``20``)
   |
   | Defines the maximum duration allowed for running a :term:`Quote` estimation in `synchronous` mode.
   |
@@ -321,6 +337,8 @@ using the ``Weaver.data_sources`` configuration setting.
 .. seealso::
     More details about the implication of :term:`Data Source` are provided in :ref:`data-source`.
 
+.. _conf_wps_processes:
+
 Configuration of WPS Processes
 =======================================
 
@@ -347,19 +365,65 @@ Please refer to `wps_processes.yml.example`_ for explicit format, keywords suppo
     Using this registration method, the processes will always reflect the latest modification from the
     remote WPS provider.
 
-To specify a custom YAML file, you can define the setting named ``weaver.wps_processes_file`` with the appropriate path
-within the employed ``weaver.ini`` file that starts your application. By default, this setting will look for the
-provided path as absolute location, then will attempt to resolve relative path (corresponding to where the application
-is started from), and will also look within the |weaver-config|_ directory. If none of the files can be found, the
-operation is skipped.
 
-To ensure that this feature is disabled and to avoid any unexpected auto-deployment provided by this functionality,
-simply set setting ``weaver.wps_processes_file`` as *undefined* (i.e.: nothing after ``=`` in ``weaver.ini``).
+- | ``weaver.wps_processes_file = <file-path>``
+  | (default: :py:data:`WEAVER_DEFAULT_WPS_PROCESSES_CONFIG` located in :py:data:`WEAVER_CONFIG_DIR`)
+  |
+  | Defines a custom :term:`YAML` file corresponding to `wps_processes.yml.example`_ schema to pre-load :term:`WPS`
+    processes and/or providers for registration at application startup.
+  |
+  | The value defined by this setting will look for the provided path as absolute location, then will attempt to
+    resolve relative path (corresponding to where the application is started from), and will also look within
+    the |weaver-config|_ directory. If none of the files can be found, the operation is skipped.
+  |
+  | To ensure that this feature is disabled and to avoid any unexpected auto-deployment provided by this functionality,
+    simply set setting ``weaver.wps_processes_file`` as *undefined* (i.e.: nothing after ``=`` in ``weaver.ini``).
+    The default value is employed if the setting is not defined at all.
 
 .. seealso::
     - `weaver.ini.example`_
     - `wps_processes.yml.example`_
 
+.. _conf_cwl_processes:
+
+Configuration of CWL Processes
+=======================================
+
+.. versionadded:: 4.19.0
+
+Although `Weaver` supports :ref:`Deployment <proc_op_deploy>` and dynamic management of :term:`Process` definitions
+while the web application is running, it is sometime more convenient for service providers to offer a set of predefined
+:ref:`application-package` definitions. In order to automatically register such definitions (or update them if changed),
+without having to repeat any deployment requests after the application was started, it is possible to employ the
+configuration setting ``weaver.cwl_processes_dir``. Registration of a :term:`Process` using this approach will result
+in an identical definition as if it was :ref:`Deployed <proc_op_deploy>` using :term:`API` requests or using the
+:ref:`cli` interfaces.
+
+- | ``weaver.cwl_processes_dir = <dir-path>``
+  | (default: :py:data:`WEAVER_CONFIG_DIR`)
+  |
+  | Defines the root directory where to *recursively* and *alphabetically* (as flat list) load any :term:`CWL` file
+    to deploy the corresponding :term:`Process` definitions.
+  |
+  | The value defined by this setting will look for the provided path as absolute location, then will attempt to
+    resolve relative path (corresponding to where the application is started from). If none of the files can be found,
+    the operation is skipped.
+  |
+  | To ensure that this feature is disabled and to avoid any unexpected auto-deployment provided by this functionality,
+    simply set setting ``weaver.cwl_processes_dir`` as *undefined* (i.e.: nothing after ``=`` in ``weaver.ini``).
+    The default value is employed if the setting is not defined at all.
+
+.. note::
+    When registering processes using :term:`CWL`, it is mandatory for those definitions to provide an ``id`` within
+    the file along other :term:`CWL` details to let `Weaver` know which :term:`Process` reference to use for deployment.
+
+.. warning::
+    If a :term:`Process` depends on another definition, such as in the case of a :ref:`proc_workflow` definition, all
+    dependencies must be registered prior to this :term:`Process`. Consider naming your :term:`CWL` files to take
+    advantage of loading order to resolve such situations.
+
+.. seealso::
+    - `weaver.ini.example`_
 
 .. _conf_request_options:
 
@@ -391,7 +455,7 @@ etc. on a per-request basis, leave other requests unaffected and generally more 
   | Path of the :term:`Request Options` definitions to employ.
 
 
-- | ``weaver.ssl_verify = true|false``
+- | ``weaver.ssl_verify = true|false`` [:class:`bool`-like]
   | (default: ``true``)
   |
   | Toggle the SSL certificate verification across all requests.
@@ -402,6 +466,35 @@ etc. on a per-request basis, leave other requests unaffected and generally more 
     access or personal user data references. This should be employed only for quickly resolving issues during
     development. Consider fixing SSL certificates on problematic servers, or disable the verification on a per-request
     basis using :term:`Request Options` for acceptable cases.
+
+
+.. _conf_vault:
+
+Configuration of File Vault
+=======================================
+
+.. versionadded:: 4.9.0
+
+Configuration of the :term:`Vault` is required in order to obtain access to its functionalities
+and to enable its :term:`API` endpoints. This feature is notably employed to push local files to a remote `Weaver`
+instance when using the :ref:`cli` utilities, in order to use them for the :term:`Job` execution. Please refer to
+below references for more details.
+
+.. seealso::
+    - :ref:`vault_upload`
+    - :ref:`file_vault_inputs`
+
+- | ``weaver.vault = true|false`` [:class:`bool`-like]
+  | (default: ``true``)
+  |
+  | Toggles the :term:`Vault` feature.
+
+- | ``weaver.vault_dir = <dir-path>``
+  | (default: ``/tmp/vault``)
+  |
+  | Defines the default location where to write :ref:`files uploaded to the Vault <vault_upload>`.
+  |
+  | If the directory does not exist, it is created on demand by the feature making use of it.
 
 
 Starting the Application

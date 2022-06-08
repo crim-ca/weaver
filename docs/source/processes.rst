@@ -1325,12 +1325,15 @@ Note again that the more the :term:`Process` is verbose, the more tracking will 
 Uploading File to the Vault
 -----------------------------
 
+The :term:`Vault` is available as secured storage for uploading files to be employed later for :term:`Process`
+execution (see also :ref:`file_vault_inputs`).
+
 .. note::
     The :term:`Vault` is a specific feature of `Weaver`. Other :term:`ADES`, :term:`EMS` and :term:`OGC API - Processes`
     servers are not expected to provide this endpoint nor support the |vault_ref| reference format.
 
-The :term:`Vault` is available as secured storage for uploading files to be employed later for :term:`Process`
-execution (see also :ref:`file_vault_inputs`).
+.. seealso::
+    Refer to :ref:`conf_vault` for applicable settings for this feature.
 
 When upload succeeds, the response will return a :term:`Vault` UUID and an ``access_token`` to access the file.
 Uploaded files cannot be accessed unless the proper credentials are provided. Requests toward the :term:`Vault` should
@@ -1346,7 +1349,7 @@ the file from the :term:`Vault`. For both HTTP methods, the ``X-Auth-Vault`` hea
 
 .. note::
     The :term:`Vault` acts only as temporary file storage. For this reason, once the file has been downloaded, it is
-    immediately deleted. Download can only occur once. It is assumed that the resource that must employ it will have
+    *immediately deleted*. Download can only occur once. It is assumed that the resource that must employ it will have
     created a local copy from the download and the :term:`Vault` doesn't require to preserve it anymore. This behaviour
     intends to limit the duration for which potentially sensitive data remains available in the :term:`Vault` as well
     as performing cleanup to limit storage space.
