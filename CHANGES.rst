@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_4.18.0:
+
+`4.18.0 <https://github.com/crim-ca/weaver/tree/4.18.0>`_ (2022-06-09)
+========================================================================
+
+Changes:
+--------
 - Add `CLI` *Authentication Handler* parameters and corresponding ``auth`` argument of instantiated classes for
   ``WeaverClient`` methods that allows inline request authentication and authorization resolution to access a
   protected service. Any *Authentication Handler* implementation can be used to fulfill required server functionalities.
