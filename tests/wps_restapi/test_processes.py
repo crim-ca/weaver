@@ -7,6 +7,7 @@ import json
 import os
 import tempfile
 import unittest
+import yaml
 from copy import deepcopy
 from typing import TYPE_CHECKING
 
@@ -14,6 +15,7 @@ import colander
 import pyramid.testing
 import pytest
 import stopit
+import webtest.app
 
 from tests import resources
 from tests.utils import (
@@ -663,11 +665,10 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert resp.status_code == 400
         assert "'Deploy.DeployCWL.id': 'Missing required field.'" in resp.json["cause"]
 
-    def test_deploy_process_CWL_direct_JSON(self):
+    def deploy_process_CWL_direct(self, content_type, graph_count=0):
         p_id = "test-direct-cwl-json"
-        cwl = {
+        cwl_core = {
             "id": p_id,
-            "cwlVersion": "v1.0",
             "class": "CommandLineTool",
             "baseCommand": ["python3", "-V"],
             "inputs": {},
@@ -680,18 +681,29 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                 }
             },
         }
-        headers = {"Content-Type": ContentType.APP_CWL_JSON}
+        cwl = {}
+        cwl_base = {"cwlVersion": "v1.0"}
+        cwl.update(cwl_base)
+        if graph_count:
+            cwl["$graph"] = [cwl_core] * graph_count
+        else:
+            cwl.update(cwl_core)
+        if "yaml" in content_type:
+            cwl = yaml.safe_dump(cwl, sort_keys=False)
+        headers = {"Content-Type": content_type}
         desc = self.deploy_process_make_visible_and_fetch_deployed(cwl, p_id, headers=headers, assert_io=False)
         pkg = self.get_application_package(p_id)
         assert desc["deploymentProfile"] == "http://www.opengis.net/profiles/eoc/dockerizedApplication"
 
         # once parsed, CWL I/O are converted to listing form
         # rest should remain intact with the original definition
-        cwl["inputs"] = []
-        cwl_out = cwl["outputs"]["output"]
+        expect_cwl = copy.deepcopy(cwl_base)
+        expect_cwl.update(cwl_core)
+        expect_cwl["inputs"] = []
+        cwl_out = cwl_core["outputs"]["output"]
         cwl_out["id"] = "output"
-        cwl["outputs"] = [cwl_out]
-        assert pkg == cwl
+        expect_cwl["outputs"] = [cwl_out]
+        assert pkg == expect_cwl
 
         # process description should have been generated with relevant I/O
         proc = desc["process"]
@@ -704,8 +716,25 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             "formats": [{"default": True, "mediaType": "text/plain"}]
         }]
 
+    def test_deploy_process_CWL_direct_JSON(self):
+        self.deploy_process_CWL_direct(ContentType.APP_CWL_JSON)
+
     def test_deploy_process_CWL_direct_YAML(self):
-        raise NotImplementedError
+        self.deploy_process_CWL_direct(ContentType.APP_CWL_YAML)
+
+    def test_deploy_process_CWL_direct_graph_JSON(self):
+        self.deploy_process_CWL_direct(ContentType.APP_CWL_JSON, graph_count=1)
+
+    def test_deploy_process_CWL_direct_graph_YAML(self):
+        self.deploy_process_CWL_direct(ContentType.APP_CWL_YAML, graph_count=1)
+
+    def test_deploy_process_CWL_direct_graph_multi_invalid(self):
+        with pytest.raises(webtest.app.AppError) as exc:
+            self.deploy_process_CWL_direct(ContentType.APP_CWL_JSON, graph_count=2)
+        error = str(exc.value)
+        assert "400 Bad Request" in error
+        assert "Invalid schema" in error
+        assert "Longer than maximum length 1" in error
 
     def test_deploy_process_CWL_DockerRequirement_href(self):
         with contextlib.ExitStack() as stack:

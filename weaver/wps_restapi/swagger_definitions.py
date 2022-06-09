@@ -3715,10 +3715,15 @@ class CWLInputList(ExtendedSequenceSchema):
     input = CWLInputItem(title="Input", description="Input specification. " + CWL_DOC_MESSAGE)
 
 
+class CWLInputEmpty(EmptyMappingSchema):
+    pass
+
+
 class CWLInputsDefinition(OneOfKeywordSchema):
     _one_of = [
         CWLInputList(description="Package inputs defined as items."),
         CWLInputMap(description="Package inputs defined as mapping."),
+        CWLInputEmpty(description="Package inputs as empty mapping when it takes no arguments."),
     ]
 
 
@@ -3808,7 +3813,7 @@ class CWLApp(PermissiveMappingSchema):
 
 
 class CWL(CWLBase, CWLApp):
-    pass
+    _sort_first = ["cwlVersion", "id", "class"]
 
 
 class Unit(ExtendedMappingSchema):
@@ -4176,18 +4181,15 @@ class CWLGraphBase(ExtendedMappingSchema):
 
 
 class DeployCWLGraph(CWLBase, CWLGraphBase):
-    pass
+    _sort_first = ["cwlVersion", "$graph"]
 
 
 class DeployCWL(NotKeywordSchema, CWL):
+    _sort_first = ["cwlVersion", "id", "class"]
     _not = [
         CWLGraphBase()
     ]
     id = CWLIdentifier()  # required in this case
-    inputs = CWLInputsDefinition(
-        missing=drop,  # empty definition permitted during deployment
-        description="All inputs available to the Application Package.",
-    )
 
 
 class Deploy(OneOfKeywordSchema):
@@ -4220,7 +4222,20 @@ class DeployHeaders(RequestHeaders):
 
 class PostProcessesEndpoint(ExtendedMappingSchema):
     header = DeployHeaders(description="Headers employed for process deployment.")
-    body = Deploy(title="Deploy")
+    body = Deploy(title="Deploy", examples={
+        "DeployCWL": {
+            "summary": "Deploy a process from a CWL definition.",
+            "value": EXAMPLES["deploy_process_cwl.json"],
+        },
+        "DeployOGC": {
+            "summary": "Deploy a process from an OGC Application Package definition.",
+            "value": EXAMPLES["deploy_process_ogcapppkg.json"],
+        },
+        "DeployWPS": {
+            "summary": "Deploy a process from a remote WPS-1 reference URL.",
+            "value": EXAMPLES["deploy_process_wps1.json"],
+        }
+    })
 
 
 class WpsOutputContextHeader(ExtendedSchemaNode):

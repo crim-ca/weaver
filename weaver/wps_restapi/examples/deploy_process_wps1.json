@@ -1,0 +1,13 @@
+{
+  "processDescription": {
+    "process": {
+      "id": "remote-process-wps1"
+    }
+  },
+  "executionUnit": [
+    {
+      "href": "https://example.com?service=WPS&request=DescribeProcess&identifier=remote-process-wps1&version=1.0.0"
+    }
+  ],
+  "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication"
+}

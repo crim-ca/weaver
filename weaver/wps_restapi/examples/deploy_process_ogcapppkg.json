@@ -1,0 +1,42 @@
+{
+  "processDescription": {
+    "id": "Echo",
+    "title": "Example Echo",
+    "version": "1.0",
+    "description": "Example process that simply echo's back the input message for testing purposes.",
+    "keywords": [
+      "test"
+    ],
+    "inputs": {
+      "message": {
+        "description": "Message to echo.",
+        "minOccurs": 1,
+        "maxOccurs": 1,
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    "outputs": {
+      "output": {
+        "description": "Output file with echo message.",
+        "schema": {
+          "type": "string",
+          "contentMediaType": "text/plain"
+        }
+      }
+    }
+  },
+  "jobControlOptions": [
+    "async-execute"
+  ],
+  "outputTransmission": [
+    "reference"
+  ],
+  "executionUnit": [
+    {
+      "href": "https://raw.githubusercontent.com/crim-ca/weaver/master/tests/functional/application-packages/Echo/echo.cwl"
+    }
+  ],
+  "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication"
+}
