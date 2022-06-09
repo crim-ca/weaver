@@ -5,7 +5,7 @@
       "id": "finch",
       "title": "Finch",
       "description": "A Web Processing Service for Climate Indicators.",
-      "url": "http://localhost:8095/wps",
+      "url": "http://remote-provider.com/wps",
       "type": "wps-remote",
       "public": false,
       "keywords": [
@@ -45,28 +45,28 @@
           "type": "application/xml",
           "title": "Service description (GetCapabilities).",
           "hreflang": "en-US",
-          "href": "http://localhost:8095/wps?service=WPS&request=GetCapabilities",
+          "href": "http://remote-provider.com/wps?service=WPS&request=GetCapabilities",
           "rel": "service-desc"
         },
         {
           "type": "application/json",
           "title": "Service definition.",
           "hreflang": "en-US",
-          "href": "http://localhost:4002/providers/finch",
+          "href": "http://schema-example.com/providers/finch",
           "rel": "service"
         },
         {
           "type": "application/json",
           "title": "Service definition.",
           "hreflang": "en-CA",
-          "href": "http://localhost:4002/providers/finch",
+          "href": "http://schema-example.com/providers/finch",
           "rel": "self"
         },
         {
           "type": "application/json",
           "title": "Listing of processes provided by this service.",
           "hreflang": "en-CA",
-          "href": "http://localhost:4002/providers/finch/processes",
+          "href": "http://schema-example.com/providers/finch/processes",
           "rel": "processes"
         }
       ]
@@ -121,21 +121,21 @@
           "type": "application/json",
           "title": "Service definition.",
           "hreflang": "en-US",
-          "href": "http://localhost:4002/providers/hummingbird",
+          "href": "http://schema-example.com/providers/hummingbird",
           "rel": "service"
         },
         {
           "type": "application/json",
           "title": "Service definition.",
           "hreflang": "en-CA",
-          "href": "http://localhost:4002/providers/hummingbird",
+          "href": "http://schema-example.com/providers/hummingbird",
           "rel": "self"
         },
         {
           "type": "application/json",
           "title": "Listing of processes provided by this service.",
           "hreflang": "en-CA",
-          "href": "http://localhost:4002/providers/hummingbird/processes",
+          "href": "http://schema-example.com/providers/hummingbird/processes",
           "rel": "processes"
         }
       ]

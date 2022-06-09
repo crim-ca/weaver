@@ -4630,6 +4630,12 @@ class CreatedJobLocationHeader(ResponseHeaders):
 
 class CreatedLaunchJobResponse(ExtendedMappingSchema):
     description = "Job successfully submitted to processing queue. Execution should begin when resources are available."
+    examples = {
+        "JobAccepted": {
+            "summary": "Job accepted for execution.",
+            "value": EXAMPLES["job_status_accepted.json"]
+        }
+    }
     header = CreatedJobLocationHeader()
     body = CreatedJobStatusSchema()
 
@@ -4962,7 +4968,12 @@ get_processes_responses = {
     "500": InternalServerErrorResponseSchema(),
 }
 post_processes_responses = {
-    "201": OkPostProcessesResponse(),
+    "201": OkPostProcessesResponse(examples={
+        "ProcessDeployed": {
+            "summary": "Process successfully deployed.",
+            "value": EXAMPLES["local_process_deploy_success.json"],
+        }
+    }),
     "500": InternalServerErrorResponseSchema(),
 }
 get_process_responses = {
@@ -5012,7 +5023,12 @@ put_process_visibility_responses = {
     "500": InternalServerErrorResponseSchema(),
 }
 delete_process_responses = {
-    "200": OkDeleteProcessResponse(),
+    "200": OkDeleteProcessResponse(examples={
+        "ProcessUndeployed": {
+            "summary": "Process successfully undeployed.",
+            "value": EXAMPLES["local_process_undeploy_success.json"],
+        }
+    }),
     "403": ForbiddenProcessAccessResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
@@ -5108,7 +5124,8 @@ get_single_job_status_responses = {
     "200": OkGetJobStatusResponse(description="success", examples={
         "JobStatusSuccess": {
             "summary": "Successful job status response.",
-            "value": EXAMPLES["job_status_success.json"]},
+            "value": EXAMPLES["job_status_success.json"],
+        },
         "JobStatusFailure": {
             "summary": "Failed job status response.",
             "value": EXAMPLES["job_status_failed.json"],
@@ -5123,7 +5140,12 @@ get_prov_single_job_status_responses.update({
     "403": ForbiddenProviderLocalResponseSchema(),
 })
 delete_job_responses = {
-    "200": OkDismissJobResponse(description="success"),
+    "200": OkDismissJobResponse(description="success", examples={
+        "JobDismissedSuccess": {
+            "summary": "Successful job dismissed response.",
+            "value": EXAMPLES["job_dismissed_success.json"]
+        },
+    }),
     "400": InvalidJobResponseSchema(),
     "404": NotFoundJobResponseSchema(),
     "410": GoneJobResponseSchema(),

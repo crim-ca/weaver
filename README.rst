@@ -19,7 +19,8 @@ Weaver (the nest-builder)
 
 `Weaver` is an OGC-API flavored |ems| that allows the execution of workflows chaining various
 applications and |wps| inputs and outputs. Remote execution is deferred by the `EMS` to one or many
-|ades| or remote service providers, and employs |cwl| configurations to define an |ogc-apppkg|_ deployed for each process.
+|ades| or remote service providers, and employs |cwl| configurations to define an |ogc-apppkg|_ deployed
+for each process.
 
 
 .. start-badges
@@ -104,8 +105,8 @@ ensuring the transfer of files accordingly between instances when located across
 
 `Weaver` can also accomplish the `ADES` role in order to perform application deployment at the data source using
 the application definition provided by |cwl| configuration. It can then directly execute
-a registered process |ogc-apppkg|_ with received inputs from a WPS request to expose output results for a following `ADES`
-in a `EMS` workflow execution chain.
+a registered process |ogc-apppkg|_ with received inputs from a WPS request to expose output results for a
+following `ADES` in a `EMS` workflow execution chain.
 
 `Weaver` **extends** |ogc-proc-api|_ by providing additional functionalities such as more detailed job logs
 endpoints, adding more process management and search request options than required by the standard, and supporting
@@ -262,8 +263,8 @@ Videos and more functionalities were introduced in `Weaver` following |ogc-eo-ap
 Corresponding developments are reported in the |ogc-eo-apps-pilot-er|_.
 
 `Weaver` has been used to participate in interoperability testing effort that lead to |ogc-best-practices-eo-apppkg|_
-technical report. This resulted, along with previous efforts, in the definition of |ogc-api-proc-ext-part2| backed by 
-validated test cases using |cwl| as the represention method for the deployment and execution of |ogc-apppkg|_ close 
+technical report. This resulted, along with previous efforts, in the definition of |ogc-api-proc-part2-ext| backed by
+validated test cases using |cwl| as the representation method for the deployment and execution of |ogc-apppkg|_ close
 to the data.
 
 The project is furthermore developed through the *Data Analytics for Canadian Climate Services* (`DACCS`_) initiative.

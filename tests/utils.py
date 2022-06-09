@@ -8,6 +8,7 @@ import importlib
 import inspect
 import io
 import json
+import logging
 import mimetypes
 import os
 import re
@@ -36,6 +37,7 @@ from pyramid.registry import Registry
 from requests import Response
 from webtest import TestApp, TestResponse
 
+from weaver import __name__ as __package__
 from weaver.app import main as weaver_app
 from weaver.config import WEAVER_DEFAULT_INI_CONFIG, WeaverConfiguration, get_weaver_config_file
 from weaver.database import get_db
@@ -62,7 +64,7 @@ if TYPE_CHECKING:
     from owslib.wps import Process as ProcessOWSWPS
     from pywps.app import Process as ProcessPyWPS
 
-    from weaver.typedefs import AnyHeadersContainer, AnyRequestType, AnyResponseType, SettingsType
+    from weaver.typedefs import AnyHeadersContainer, AnyRequestMethod, AnyRequestType, AnyResponseType, SettingsType
 
     # pylint: disable=C0103,invalid-name,E1101,no-member
     MockPatch = mock._patch  # noqa
@@ -72,6 +74,8 @@ if TYPE_CHECKING:
     MockReturnType = TypeVar("MockReturnType")
 
     CommandType = Callable[[Union[str, Tuple[str]]], int]
+
+LOGGER = logging.getLogger(".".join([__package__, __name__]))
 
 MOCK_AWS_REGION = "us-central-1"
 MOCK_HTTP_REF = "http://localhost.mock"
@@ -329,7 +333,10 @@ def run_command(command, trim=True, expect_error=False, entrypoint=None):
 
     :param command: Command to run.
     :param trim: Filter out visually empty lines.
-    :param expect_error: Expect the returned code to be any non-zero value.
+    :param expect_error:
+        Expect the returned code to be any non-zero value. Otherwise, the returned code must be zero for success.
+        Any mismatching error code between expected success/failure is asserted to ensure expected conditions happened.
+        If error is expected, ``stderr`` is captured and returned. Otherwise, ``stdout`` is captured and returned.
     :param entrypoint:
         Main command to pass arguments directly (instead of using subprocess) and returning the command exit status.
         This is useful to simulate calling the command from the shell, but remain in current
@@ -353,9 +360,19 @@ def run_command(command, trim=True, expect_error=False, entrypoint=None):
         out, err = proc.communicate()
     else:
         stdout = io.StringIO()
-        with contextlib.redirect_stdout(stdout):
-            err = entrypoint(*tuple(command))
-        out = stdout.getvalue()
+        stderr = io.StringIO()
+        try:
+            with contextlib.redirect_stderr(stderr), contextlib.redirect_stdout(stdout):
+                err = entrypoint(*tuple(command))
+            out = stdout.getvalue()
+        except SystemExit as exc:
+            err = exc.code
+            if not expect_error and err != 0:
+                raise  # raise directly to have the most context/traceback as possible in failed test
+            if expect_error:
+                out = stderr.getvalue()
+            else:
+                out = stdout.getvalue()
     if expect_error:
         assert err, f"process returned successfully when error was expected: {err!s}"
     else:
@@ -366,6 +383,14 @@ def run_command(command, trim=True, expect_error=False, entrypoint=None):
     if not expect_error:
         assert len(out_lines), "could not retrieve any console output"
     return out_lines
+
+
+class MockedResponse(TestResponse):
+    """
+    Replaces the ``json`` property by the expected callable from all real response implementations.
+    """
+    def json(self):  # pylint: disable=W0236,invalid-overridden-method
+        return self.json_body or json.loads(self.body.decode("UTF-8"))
 
 
 def mocked_file_response(path, url):
@@ -394,7 +419,7 @@ def mocked_file_response(path, url):
     class StreamReader(object):
         _data = [None, content]  # should technically be split up more to respect chuck size...
 
-        def read(self, chuck_size=None):  # noqa: E811
+        def read(self, chuck_size=None):  # noqa  # E811, parameter not used, but must be present as passed by kwargs
             return self._data.pop(-1)
 
     # add extra methods that 'real' response would have and that are employed by underlying code
@@ -407,7 +432,7 @@ def mocked_file_response(path, url):
 
 
 def mocked_sub_requests(app,                # type: TestApp
-                        method_function,    # type: Union[str, Callable[[Any], MockReturnType]]
+                        method_function,    # type: Union[AnyRequestMethod, Callable[[Any], MockReturnType]]
                         *args,              # type: Any
                         only_local=False,   # type: bool
                         **kwargs,           # type: Any
@@ -441,6 +466,7 @@ def mocked_sub_requests(app,                # type: TestApp
     real_signature = inspect.signature(real_request)
 
     def _parse_for_app_req(method, url, **req_kwargs):
+        # type: (AnyRequestMethod, str, Any) -> Tuple[str, Callable, Dict[str, Any]]
         """
         Obtain request details with adjustments to support specific handling for :class:`webTest.TestApp`.
 
@@ -479,7 +505,9 @@ def mocked_sub_requests(app,                # type: TestApp
             req_kwargs["upload_files"] = files
             allow_json = False
         # remove unsupported parameters that cannot be passed down to TestApp
-        for key in ["timeout", "cert", "auth", "ssl_verify", "verify", "language", "stream"]:
+        for key in ["timeout", "cert", "ssl_verify", "verify", "language", "stream"]:
+            if key in req_kwargs:
+                LOGGER.warning("Dropping unsupported '%s' parameter for mocked test request.", key)
             req_kwargs.pop(key, None)
         cookies = req_kwargs.pop("cookies", None)
         if cookies:
@@ -498,9 +526,21 @@ def mocked_sub_requests(app,                # type: TestApp
             if isinstance(content, str):
                 req_kwargs["params"] = json.loads(req_kwargs["params"])
         req = getattr(app, method)
+        # perform authentication step if provided
+        auth = req_kwargs.pop("auth", None)
+        if auth and callable(auth):
+            auth_req = MockedAuthRequest()
+            auth(auth_req)
+            if auth_req.headers:
+                req_kwargs.setdefault("headers", {})
+                req_kwargs["headers"].update(auth_req.headers)
         return url, req, req_kwargs
 
+    class MockedAuthRequest(object):
+        headers = {}
+
     def _patch_response_methods(response, url):
+        # type: (AnyResponseType, str) -> None
         if not hasattr(response, "content"):
             setattr(response, "content", response.body)
         if not hasattr(response, "reason"):
@@ -511,6 +551,7 @@ def mocked_sub_requests(app,                # type: TestApp
             setattr(response, "url", url)
 
     def mocked_app_request(method, url=None, session=None, **req_kwargs):
+        # type: (AnyRequestMethod, Optional[str], Optional[RealSession], Any) -> AnyResponseType
         """
         Mock requests under the web test application under specific conditions.
 
@@ -560,7 +601,7 @@ def mocked_sub_requests(app,                # type: TestApp
         stack.enter_context(mock.patch.object(FileLocal, "validator", new_callable=mock_file_regex))
         stack.enter_context(mock.patch.object(TestResponse, "json", new=TestResponseJsonCallable.json))
         if isinstance(method_function, str):
-            req_url, req_func, kwargs = _parse_for_app_req(method_function, *args, **kwargs)
+            req_url, req_func, kwargs = _parse_for_app_req(method_function, *args, **kwargs)  # type: ignore
             kwargs.setdefault("expect_errors", True)
             resp = req_func(req_url, **kwargs)
             _patch_response_methods(resp, req_url)
@@ -660,7 +701,7 @@ def mocked_remote_server_requests_wps1(server_configs,          # type: Union[Mo
     :returns: wrapper that mocks multiple WPS-1 servers and their responses with provided processes and XML contents.
     """
 
-    def get_xml(ref):
+    def get_xml(ref):  # type: (str) -> str
         if data:
             return ref
         with open(ref, mode="r", encoding="utf-8") as file:
@@ -700,6 +741,7 @@ def mocked_remote_server_requests_wps1(server_configs,          # type: Union[Mo
             _mock_resp.add(meth, url, body=body, headers=xml_header)
 
     def mocked_remote_server_wrapper(test):
+        # type: (Callable) -> Callable
         @functools.wraps(test)
         def mock_requests_wps1(*args, **kwargs):
             """

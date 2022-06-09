@@ -33,6 +33,6 @@
       }
     ],
     "visibility": "public",
-    "executeEndpoint": "http://localhost:4002/processes/jsonarray2netcdf/jobs"
+    "executeEndpoint": "http://schema-example.com/processes/jsonarray2netcdf/jobs"
   }
 }

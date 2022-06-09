@@ -12,11 +12,28 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add `CLI` *Authentication Handler* parameters and corresponding ``auth`` argument of instantiated classes for
+  ``WeaverClient`` methods that allows inline request authentication and authorization resolution to access a
+  protected service. Any *Authentication Handler* implementation can be used to fulfill required server functionalities.
+- Add `CLI` handling of uncaught exceptions to gracefully report message and error instead of exception traceback.
+- Replaced `CLI` option ``-t`` by ``-T`` (`Docker` token) during ``deploy`` operation to match naming convention of
+  other options (resolves `#400 <https://github.com/crim-ca/weaver/issues/400>`_).
+- Replaced `CLI` option ``-H`` by ``nH`` (``--no-headers``) and ``wH`` (``--with-headers``) to respectively
+  enable or (explicitly) disable return of headers from response of the executed operation.
+- Replaced `CLI` option ``-L`` by ``nL`` (``--no-links``) and ``wL`` (``--with-links``) to respectively
+  enable (explicitly) or disable return of links from response of the executed operation.
+- Replaced previously defined ``-H`` option by new ``-H/--header`` argument allowing insertion of explicitly provided
+  request headers for relevant requests called by the executed operation.
+- Add case insensitive support of values for common `API`, `CLI`, and ``WeaverClient`` parameter choices.
+- Add all missing `CLI` and ``WeaverClient`` examples in the documentation.
 
 Fixes:
 ------
-- No change.
+- Fix `CLI` operations assuming valid JSON response to instead return error response content and status code.
+- Fix `CLI` rendering of various optional arguments and groups when displaying help messages.
+- Fix invalid handling of ``Constants`` definitions mixed with ``classproperty`` such as in ``OutputFormat`` causing
+  returned value to be the ``classproperty`` itself instead of the retrieved value from its getter definition.
+- Fix minor typing definitions that were incorrect.
 
 .. _changes_4.17.0:
 
@@ -45,8 +62,9 @@ Fixes:
 
 Changes:
 --------
-- Add `OpenGIS <http://www.opengis.net/def/glossary>`_ as a potential namespace resolver for common geospatial
-  Media-Types such as ``image/tiff; subtype=geotiff`` that must be distinguished from generic IANA formats.
+- Add `OpenGIS <https://defs.opengis.net/vocprez/object?uri=http://www.opengis.net/def/glossary>`_ as a potential
+  namespace resolver for common geospatial Media-Types such as ``image/tiff; subtype=geotiff`` that must be
+  distinguished from generic IANA formats.
 
 Fixes:
 ------

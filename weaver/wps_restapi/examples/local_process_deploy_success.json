@@ -1,0 +1,22 @@
+{
+  "description": "Process successfully deployed.",
+  "processSummary": {
+    "id": "docker-python-script-report",
+    "mutable": true,
+    "keywords": [
+      "application"
+    ],
+    "metadata": [],
+    "jobControlOptions": [
+      "async-execute",
+      "sync-execute"
+    ],
+    "outputTransmission": [
+      "reference",
+      "value"
+    ],
+    "processDescriptionURL": "http://schema-example.com/processes/docker-python-script-report",
+    "executeEndpoint": "http://schema-example.com/processes/docker-python-script-report/jobs"
+  },
+  "deploymentDone": true
+}

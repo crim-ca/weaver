@@ -7,7 +7,7 @@ import inspect
 from typing import TYPE_CHECKING, NewType
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, List, Optional, Union
+    from typing import Any, Callable, Dict, List, Optional, Union
 
     from weaver.typedefs import AnyKey
 
@@ -19,7 +19,7 @@ class _Const(type):
         raise TypeError(f"Constant [{cls.__name__}.{key}] is not modifiable!")
 
     def __setitem__(cls, key, value):
-        _Const.__setattr__(cls, key, value)
+        _Const.__setattr__(cls, key, value)  # pragma: no cover  # hard to test, but no constants works without it
 
     def __contains__(cls, item):
         return cls.get(item) is not None
@@ -43,10 +43,26 @@ class Constants(object, metaclass=_Const):
     @classmethod
     def get(cls, key_or_value, default=None):
         # type: (Union[AnyKey, EnumType], Optional[Any]) -> Any
-        if key_or_value in cls.names():
-            return cls.__dict__.get(key_or_value, default)
-        if key_or_value in cls.values():
-            return key_or_value
+        if isinstance(key_or_value, str):
+            upper_key = key_or_value.upper()
+            lower_key = key_or_value.lower()
+        else:
+            upper_key = lower_key = key_or_value
+        names = cls.names()
+        values = cls.values()
+        found = None
+        if upper_key in names:
+            found = cls.__dict__.get(upper_key, default)
+        elif lower_key in names:
+            found = cls.__dict__.get(lower_key, default)
+        elif upper_key in values:
+            found = upper_key
+        elif lower_key in values:
+            found = lower_key
+        if found:
+            if isinstance(found, classproperty):
+                found = found.fget(cls)
+            return found
         return default
 
     @classmethod
@@ -91,7 +107,12 @@ class classproperty(property):  # pylint: disable=C0103,invalid-name
         https://stackoverflow.com/a/5191224
     """
 
-    def __init__(self, fget=None, fset=None, fdel=None, doc=None):
+    def __init__(self,
+                 fget=None,     # type: Optional[Callable[[object], Any]]
+                 fset=None,     # type: Optional[Callable[[object, Any], None]]
+                 fdel=None,     # type: Optional[Callable[[object], None]]
+                 doc="",        # type: str
+                 ):             # type: (...) -> None
         super(classproperty, self).__init__(fget=fget, fset=fset, fdel=fdel, doc=doc)
         self.__doc__ = inspect.cleandoc(doc)
 

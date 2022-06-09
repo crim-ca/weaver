@@ -90,6 +90,7 @@ provided to tell :term:`CWL` how to map :term:`Job` input values to the dynamica
 .. literalinclude:: ../examples/docker-python-script-report.cwl
     :language: yaml
     :caption: Sample CWL definition of a Python script
+    :name: example_app_pkg_script
 
 .. _app_pkg_docker:
 
@@ -128,10 +129,12 @@ For the moment, only ``Basic`` (:rfc:`7617`) authentication is supported.
 To generate the base64 token, following methods can be used:
 
 .. code-block:: shell
+    :caption: Command Line
 
     echo -n "<username>:<password>" | base64
 
 .. code-block:: python
+    :caption: Python
 
     import base64
     base64.b64encode(b"<username>:<password>")
