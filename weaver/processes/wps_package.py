@@ -21,7 +21,7 @@ import tempfile
 import time
 import uuid
 from typing import TYPE_CHECKING
-from urllib.parse import urlparse
+from urllib.parse import parse_qsl, urlparse
 
 import cwltool
 import cwltool.docker
@@ -35,6 +35,7 @@ from pywps.inout import BoundingBoxInput, ComplexInput, LiteralInput
 from pywps.inout.basic import SOURCE_TYPE
 from pywps.inout.storage.file import FileStorageBuilder
 from pywps.inout.storage.s3 import S3StorageBuilder
+from requests.structures import CaseInsensitiveDict
 
 from weaver.config import WeaverConfiguration, WeaverFeature, get_weaver_configuration
 from weaver.database import get_db
@@ -525,8 +526,32 @@ def _update_package_metadata(wps_package_metadata, cwl_package_package):
         )
 
 
-def _generate_process_with_cwl_from_reference(reference):
-    # type: (str) -> Tuple[CWL, JSON]
+def _patch_wps_process_description_url(reference, process_hint):
+    # type: (str, Optional[JSON]) -> str
+    """
+    Rebuilds a :term:`WPS` ``ProcessDescription`` URL from other details.
+
+    A ``GetCapabilities`` request can be submitted with an ID in query params directly.
+    Otherwise, check if a process hint can provide the ID.
+    """
+    parts = reference.split("?", 1)
+    if len(parts) == 2:
+        url, query = parts
+        params = CaseInsensitiveDict(parse_qsl(query))
+        process_id = get_any_id(params)
+        if not process_id:
+            process_id = get_any_id(process_hint or {})
+            if process_id:
+                params["identifier"] = process_id
+        if process_id and params.get("request", "").lower() == "getcapabilities":
+            params["request"] = "DescribeProcess"
+        query = "&".join([f"{key}={val}" for key, val in params.items()])
+        reference = url + "?" + query
+    return reference
+
+
+def _generate_process_with_cwl_from_reference(reference, process_hint=None):
+    # type: (str, Optional[JSON]) -> Tuple[CWL, JSON]
     """
     Resolves the ``reference`` type (`CWL`, `WPS-1`, `WPS-2`, `WPS-3`) and generates a `CWL` ``package`` from it.
 
@@ -547,6 +572,7 @@ def _generate_process_with_cwl_from_reference(reference):
     # match against WPS-1/2 reference
     else:
         settings = get_settings()
+        reference = _patch_wps_process_description_url(reference, process_hint)
         response = request_extra("GET", reference, retries=3, settings=settings)
         if response.status_code != HTTPOk.code:
             raise HTTPServiceUnavailable(
@@ -772,7 +798,7 @@ def get_process_definition(process_offering, reference=None, package=None, data_
     process_info = process_offering
     if reference:
         package, process_info = try_or_raise_package_error(
-            lambda: _generate_process_with_cwl_from_reference(reference),
+            lambda: _generate_process_with_cwl_from_reference(reference, process_info),
             reason="Loading package from reference")
         process_info.update(process_offering)   # override upstream details
     if not isinstance(package, dict):

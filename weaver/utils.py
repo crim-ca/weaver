@@ -57,7 +57,7 @@ from weaver.xml_util import XML
 
 if TYPE_CHECKING:
     from types import FrameType
-    from typing import Any, Callable, Dict, List, Iterable, NoReturn, Optional, Type, Tuple, Union
+    from typing import Any, Callable, Dict, List, Iterable, MutableMapping, NoReturn, Optional, Type, Tuple, Union
 
     from weaver.execute import AnyExecuteControlOption, AnyExecuteMode
     from weaver.status import Status
@@ -105,6 +105,7 @@ class CaseInsensitive(str):
         return hash(self.__str)
 
     def __str__(self):
+        # type: () -> str
         return self.__str
 
     def __repr__(self):
@@ -205,7 +206,7 @@ def get_weaver_url(container):
 
 
 def get_any_id(info, default=None, pop=False, key=False):
-    # type: (JSON, Optional[str], bool, bool) -> Optional[str]
+    # type: (MutableMapping, Optional[str], bool, bool) -> Optional[str]
     """
     Retrieves a dictionary `id-like` key using multiple common variations ``[id, identifier, _id]``.
 
@@ -223,7 +224,7 @@ def get_any_id(info, default=None, pop=False, key=False):
 
 
 def get_any_value(info, default=None, file=True, data=True, pop=False, key=False):
-    # type: (JSON, Any, bool, bool, bool, bool) -> AnyValueType
+    # type: (MutableMapping, Any, bool, bool, bool, bool) -> AnyValueType
     """
     Retrieves a dictionary `value-like` key using multiple common variations ``[href, value, reference, data]``.
 

@@ -994,7 +994,6 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             resources.TEST_REMOTE_SERVER_URL
         )
 
-    @pytest.mark.skip(reason="not implemented")
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
         resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
@@ -1005,12 +1004,14 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         Test process deployment using a WPS-1 GetCapabilities URL specified as process description reference.
         """
         body = {
-            "processDescription": {"href": resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_URL},  # this one should be used
+            "processDescription": {
+                "id": resources.TEST_REMOTE_PROCESS_WPS1_ID,            # must tell which process from GetCapabilities
+                "href": resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_URL,  # this one should be used
+            },
             "executionUnit": [{"href": resources.TEST_REMOTE_SERVER_URL}]  # some URL just to fulfill schema validation
         }
         self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_PROCESS_WPS1_ID)
 
-    @pytest.mark.skip(reason="not implemented")
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
         resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
@@ -1027,7 +1028,6 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         body["processDescription"]["process"].update(ows_context_href(resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_URL))
         self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_PROCESS_WPS1_ID)
 
-    @pytest.mark.skip(reason="not implemented")
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
         resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,

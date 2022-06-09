@@ -4117,16 +4117,26 @@ class DeployProcessOffering(ProcessControl):
     processVersion = Version(title="processVersion", missing=drop)
 
 
-class DeployProcessDescription(ProcessDeployment, ProcessControl):
+class DeployProcessDescription(NotKeywordSchema, ProcessDeployment, ProcessControl):
+    _not = [
+        Reference()  # avoid conflict with deploy by href
+    ]
     schema_ref = f"{OGC_API_SCHEMA_URL}/{OGC_API_SCHEMA_VERSION}/core/openapi/schemas/process.yaml"
     description = "Process description fields directly provided."
 
 
+class DeployReference(Reference):
+    id = ProcessIdentifier(missing=drop, description=(
+        "Optional identifier of the specific process to obtain the description from in case the reference URL "
+        "corresponds to an endpoint that can refer to multiple process definitions (e.g.: GetCapabilities)."
+    ))
+
+
 class ProcessDescriptionChoiceType(OneOfKeywordSchema):
     _one_of = [
-        Reference(),
+        DeployReference(),
         DeployProcessOffering(),
-        DeployProcessDescription()
+        DeployProcessDescription(),
     ]
 
 
