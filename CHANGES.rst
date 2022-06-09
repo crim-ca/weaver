@@ -28,6 +28,10 @@ Changes:
 - Add partial support of `CWL` with ``$graph`` representation for the special case where the graph is composed of a list
   of exactly one `Application Package`. Multi/nested-`CWL` definitions are **NOT** supported
   (relates to `#56 <https://github.com/crim-ca/weaver/issues/56>`_).
+- Add ``weaver.cwl_processes_dir`` configuration setting for preloading, registering or updating a set of
+  known `Process` definitions from `CWL` files stored in a nested directory structure. This allows a service provider
+  that uses `Weaver` to offer their `Processes` to directly maintain their definitions from the set of `CWL` files and
+  upload changes in the web application at startup without need to manually undeploy and redeploy each `Process`.
 
 Fixes:
 ------
