@@ -600,7 +600,7 @@ def register_wps_processes_dynamic(service_name, service_url, service_visibility
 
 
 def register_wps_processes_from_config(container, wps_processes_file_path=None):
-    # type: (AnyRegistryContainer, Optional[FileSystemPathType]) -> None
+    # type: (AnySettingsContainer, Optional[FileSystemPathType]) -> None
     """
     Registers remote :term:`WPS` providers and/or processes as specified from the configuration file.
 

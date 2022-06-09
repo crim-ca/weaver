@@ -25,7 +25,7 @@ def test_register_wps_processes_from_config_empty():
         f.flush()
         f.seek(0)
         try:
-            register_wps_processes_from_config(f.name, {})
+            register_wps_processes_from_config({}, f.name)
         except Exception:  # noqa
             pytest.fail("Empty file should not raise any error")
 
@@ -34,7 +34,7 @@ def test_register_wps_processes_from_config_empty():
         f.flush()
         f.seek(0)
         try:
-            register_wps_processes_from_config(f.name, {})
+            register_wps_processes_from_config({}, f.name)
         except Exception:  # noqa
             pytest.fail("File with empty 'processes' section should not raise any error")
 
@@ -43,7 +43,7 @@ def test_register_wps_processes_from_config_empty():
         f.flush()
         f.seek(0)
         try:
-            register_wps_processes_from_config(f.name, {})
+            register_wps_processes_from_config({}, f.name)
         except Exception:  # noqa
             pytest.fail("File with empty 'providers' section should not raise any error")
 
@@ -52,14 +52,14 @@ def test_register_wps_processes_from_config_empty():
         f.flush()
         f.seek(0)
         try:
-            register_wps_processes_from_config(f.name, {})
+            register_wps_processes_from_config({}, f.name)
         except Exception:  # noqa
             pytest.fail("File with empty 'providers' and 'processes' sections should not raise any error")
 
 
 def test_register_wps_processes_from_config_missing():
     try:
-        register_wps_processes_from_config("/this/path/des/not/exist", {})
+        register_wps_processes_from_config({}, "/this/path/des/not/exist")
     except Exception:  # noqa
         pytest.fail("Path pointing to missing file should not raise any error")
 
@@ -128,7 +128,7 @@ def test_register_wps_processes_from_config_valid():
         try:
             # note:
             #   can take some time to process since OWSLib must parse all GetCapabilities/DescribeProcesses responses
-            register_wps_processes_from_config(f.name, config)
+            register_wps_processes_from_config(config, f.name)
         except Exception:  # noqa
             pytest.fail("Valid definitions in configuration file should not raise any error")
 
