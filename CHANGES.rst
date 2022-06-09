@@ -62,8 +62,9 @@ Fixes:
 
 Changes:
 --------
-- Add `OpenGIS <http://www.opengis.net/def/glossary>`_ as a potential namespace resolver for common geospatial
-  Media-Types such as ``image/tiff; subtype=geotiff`` that must be distinguished from generic IANA formats.
+- Add `OpenGIS <https://defs.opengis.net/vocprez/object?uri=http://www.opengis.net/def/glossary>`_ as a potential
+  namespace resolver for common geospatial Media-Types such as ``image/tiff; subtype=geotiff`` that must be
+  distinguished from generic IANA formats.
 
 Fixes:
 ------
