@@ -61,7 +61,7 @@ from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
-    from typing import Any, List, Optional, Tuple, Union
+    from typing import List, Optional, Tuple, Union
 
     from pyramid.request import Request
 
@@ -143,7 +143,6 @@ def _check_deploy(payload):
     """
     Validate minimum deploy payload field requirements with exception handling.
     """
-    # FIXME: handle colander invalid directly in tween (https://github.com/crim-ca/weaver/issues/112)
     message = "Process deployment definition is invalid."
     try:
         results = sd.Deploy().deserialize(payload)
@@ -207,6 +206,7 @@ def _check_deploy(payload):
                 generate_diff(p_exec_unit, r_exec_unit, val_name="original payload", ref_name="parsed result")
             )
         return results
+    # FIXME: handle colander invalid directly in tween (https://github.com/crim-ca/weaver/issues/112)
     except colander.Invalid as exc:
         LOGGER.debug("Failed deploy body schema validation:\n%s", exc)
         raise HTTPBadRequest(json={
@@ -287,6 +287,7 @@ def _load_payload(payload, content_type):
     return payload
 
 
+# FIXME: supported nested and $graph multi-deployment (https://github.com/crim-ca/weaver/issues/56)
 def deploy_process_from_payload(payload, container, overwrite=False):
     # type: (Union[JSON, str], Union[AnySettingsContainer, AnyRequestType], bool) -> HTTPException
     """
@@ -312,7 +313,7 @@ def deploy_process_from_payload(payload, container, overwrite=False):
     payload = _check_deploy(payload)
 
     # validate identifier naming for unsupported characters
-    process_description = payload.get("processDescription")
+    process_description = payload.get("processDescription", {})  # empty possible if CWL directly passed
     process_info = process_description.get("process", process_description)
     process_href = process_description.pop("href", None)
 
@@ -335,9 +336,14 @@ def deploy_process_from_payload(payload, container, overwrite=False):
         package = None
         reference = content.get("href")
         found = isinstance(reference, str)
-    elif c_type in (ContentType.ANY_CWL + [ContentType.APP_JSON]) and "cwlVersion" in payload:
-        package = payload
+    elif c_type in (list(ContentType.ANY_CWL) + [ContentType.APP_JSON]) and "cwlVersion" in payload:
         process_info = {}
+        package = payload
+        if "$graph" in package and isinstance(package["$graph"], list) and len(package["$graph"]) == 1:
+            # consider package as if provided in non-graph representation
+            # must preserve top level fields (e.g.: 'cwlVersion') and nested graph item
+            package.update(package.pop("$graph")[0])
+        found = True
     else:  # ogc-apppkg type, but no explicit check since used by default (backward compat)
         if deployment_profile_name:  # optional hint
             allowed_profile_suffix = [ProcessType.APPLICATION, ProcessType.WORKFLOW]
@@ -363,6 +369,7 @@ def deploy_process_from_payload(payload, container, overwrite=False):
             "ProcessDescription.href",
             "ProcessDescription.owsContext.content.href",
             "executionUnit[*].(unit|href)",
+            "{ <CWL> }",
         ]
         raise HTTPBadRequest(
             f"Missing one of required parameters {params} to obtain package/process definition or reference."

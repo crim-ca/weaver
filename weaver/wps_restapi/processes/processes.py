@@ -141,7 +141,7 @@ def add_local_process(request):
     """
     Register a local process.
     """
-    return deploy_process_from_payload(request.body, request)
+    return deploy_process_from_payload(request.text, request)  # use text to allow parsing as JSON or YAML
 
 
 @sd.process_service.get(tags=[sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS], renderer=OutputFormat.JSON,

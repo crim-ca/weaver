@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING
 
 import duration
 import yaml
-from colander import DateTime, Email, Money, OneOf, Range, Regex, drop, null, required
+from colander import DateTime, Email, Length, Money, OneOf, Range, Regex, drop, null, required
 from dateutil import parser as date_parser
 
 from weaver import __meta__
@@ -4149,15 +4149,19 @@ class CWLGraphList(ExtendedSequenceSchema):
     cwl = CWLGraphItem()
 
 
+# FIXME: supported nested and $graph multi-deployment (https://github.com/crim-ca/weaver/issues/56)
 class CWLGraphBase(ExtendedMappingSchema):
     graph = CWLGraphList(
         name="$graph", description=(
-            "Graph definition that combines one or many CWL application packages within a single payload. "
-            "If an single application is given (list of one item), it will be deployed as normal CWL by itself. "
-            "If multiple applications are defined, the first MUST be the top-most Workflow process. "
-            "Other items deployment will be performed, and the full deployment will be persisted only if all are "
-            "valid. The resulting Workflow will be registered as a package by itself (i.e: not as a graph)."
-        )
+            "Graph definition that defines *exactly one* CWL application package represented as list. "
+            "Multiple definitions simultaneously deployed is NOT supported at the moment."
+            # "Graph definition that combines one or many CWL application packages within a single payload. "
+            # "If an single application is given (list of one item), it will be deployed as normal CWL by itself. "
+            # "If multiple applications are defined, the first MUST be the top-most Workflow process. "
+            # "Deployment of other items will be performed, and the full deployment will be persisted only if all are "
+            # "valid. The resulting Workflow will be registered as a package by itself (i.e: not as a graph)."
+        ),
+        validator=Length(min=1, max=1)
     )
 
 
@@ -4170,6 +4174,10 @@ class DeployCWL(NotKeywordSchema, CWL):
         CWLGraphBase()
     ]
     id = CWLIdentifier()  # required in this case
+    inputs = CWLInputsDefinition(
+        missing=drop,  # empty definition permitted during deployment
+        description="All inputs available to the Application Package.",
+    )
 
 
 class Deploy(OneOfKeywordSchema):

@@ -25,6 +25,9 @@ Changes:
   ``application/ogcapppkg+yaml`` for the |ogc-app-pkg|_ schema, or using ``application/cwl+yaml`` for
   a `CWL`-only definition. The definition will be loaded and converted to ``JSON`` for schema validation. Otherwise,
   ``JSON`` contents is assumed to be directly provided in the request payload for validation as previously accomplished.
+- Add partial support of `CWL` with ``$graph`` representation for the special case where the graph is composed of a list
+  of exactly one `Application Package`. Multi/nested-`CWL` definitions are **NOT** supported
+  (relates to `#56 <https://github.com/crim-ca/weaver/issues/56>`_).
 
 Fixes:
 ------
