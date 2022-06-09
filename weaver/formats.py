@@ -307,7 +307,7 @@ _CONTENT_TYPE_SYNONYM_MAPPING = {
 #   - IANA: https://www.iana.org/assignments/media-types/media-types.xhtml
 #   - EDAM-classes: http://bioportal.bioontology.org/ontologies/EDAM/?p=classes (section 'Format')
 #   - EDAM-browser: https://ifb-elixirfr.github.io/edam-browser/
-#   - OpenGIS vocabulary: http://www.opengis.net/def/glossary
+#   - OpenGIS vocabulary: https://defs.opengis.net/vocprez/object?uri=http://www.opengis.net/def/glossary
 IANA_NAMESPACE = "iana"
 IANA_NAMESPACE_URL = "https://www.iana.org/assignments/media-types/"
 IANA_NAMESPACE_DEFINITION = {IANA_NAMESPACE: IANA_NAMESPACE_URL}
@@ -352,6 +352,10 @@ EDAM_MAPPING = {
     ContentType.APP_YAML: "format_3750",
     ContentType.TEXT_PLAIN: "format_1964",
 }
+# Official links to be employed in definitions must be formed as:
+#   http://www.opengis.net/def/glossary/...
+# But they should be redirected to full definitions as:
+#   https://defs.opengis.net/vocprez/object?uri=http://www.opengis.net/def/glossary/...
 OPENGIS_NAMESPACE = "opengis"
 OPENGIS_NAMESPACE_URL = "http://www.opengis.net/"
 OPENGIS_NAMESPACE_DEFINITION = {OPENGIS_NAMESPACE: OPENGIS_NAMESPACE_URL}
