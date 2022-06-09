@@ -7,7 +7,6 @@ import json
 import os
 import tempfile
 import unittest
-import yaml
 from copy import deepcopy
 from typing import TYPE_CHECKING
 
@@ -16,6 +15,7 @@ import pyramid.testing
 import pytest
 import stopit
 import webtest.app
+import yaml
 
 from tests import resources
 from tests.utils import (

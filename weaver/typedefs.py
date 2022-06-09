@@ -173,6 +173,8 @@ if TYPE_CHECKING:
         "name": CWL_WorkflowStepID,
         "reference": str,  # URL
     })
+    _CWL = "CWL"  # type: TypeAlias
+    CWL_Graph = List[_CWL]
     CWL = TypedDict("CWL", {
         "cwlVersion": str,
         "class": CWL_Class,
@@ -188,7 +190,8 @@ if TYPE_CHECKING:
         "outputs": CWL_Outputs,
         "steps": Dict[CWL_WorkflowStepID, CWL_WorkflowStep],
         "$namespaces": Dict[str, str],
-        "$schemas": Dict[str, str]
+        "$schemas": Dict[str, str],
+        "$graph": CWL_Graph,
     }, total=False)
     CWL_WorkflowStepPackage = TypedDict("CWL_WorkflowStepPackage", {
         "id": str,          # reference ID of the package

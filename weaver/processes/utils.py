@@ -287,8 +287,17 @@ def _load_payload(payload, content_type):
     return payload
 
 
-# FIXME: supported nested and $graph multi-deployment (https://github.com/crim-ca/weaver/issues/56)
-def deploy_process_from_payload(payload, container, overwrite=False):
+# FIXME: supported nested process and $graph multi-deployment (https://github.com/crim-ca/weaver/issues/56)
+def resolve_cwl_graph(package):
+    # type: (CWL) -> CWL
+    if "$graph" in package and isinstance(package["$graph"], list) and len(package["$graph"]) == 1:
+        # consider package as if provided in non-graph representation
+        # must preserve top level fields (e.g.: 'cwlVersion') and nested graph item
+        package.update(package.pop("$graph")[0])
+    return package
+
+
+def deploy_process_from_payload(payload, container, overwrite=False):  # pylint: disable=R1260,too-complex
     # type: (Union[JSON, str], Union[AnySettingsContainer, AnyRequestType], bool) -> HTTPException
     """
     Deploy the process after resolution of all references and validation of the parameters from payload definition.
@@ -338,11 +347,7 @@ def deploy_process_from_payload(payload, container, overwrite=False):
         found = isinstance(reference, str)
     elif c_type in (list(ContentType.ANY_CWL) + [ContentType.APP_JSON]) and "cwlVersion" in payload:
         process_info = {}
-        package = payload
-        if "$graph" in package and isinstance(package["$graph"], list) and len(package["$graph"]) == 1:
-            # consider package as if provided in non-graph representation
-            # must preserve top level fields (e.g.: 'cwlVersion') and nested graph item
-            package.update(package.pop("$graph")[0])
+        package = resolve_cwl_graph(payload)
         found = True
     else:  # ogc-apppkg type, but no explicit check since used by default (backward compat)
         if deployment_profile_name:  # optional hint
