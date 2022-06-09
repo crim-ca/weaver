@@ -10,8 +10,6 @@ Changes
 `Unreleased <https://github.com/crim-ca/weaver/tree/master>`_ (latest)
 ========================================================================
 
-.. _`OGC Application Package`: https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/master/extensions/deploy_replace_undeploy/standard/openapi/schemas/ogcapppkg.yaml
-
 Changes:
 --------
 - Add support of official `CWL` IANA types to allow `Process` deployment with the relevant ``Content-Type`` header
@@ -24,7 +22,7 @@ Changes:
   <https://docs.ogc.org/bp/20-089r1.html#toc26>`_ (resolves `#434 <https://github.com/crim-ca/weaver/issues/434>`_).
 - Support `Process` deployment with a payload using ``YAML`` content instead of ``JSON``. This ``YAML`` content
   **MUST** be submitted in the request with a ``Content-Type`` header either equal to ``application/x-yaml`` or
-  ``application/ogcapppkg+yaml`` for the `OGC Application Package`_ schema, or using ``application/cwl+yaml`` for
+  ``application/ogcapppkg+yaml`` for the |ogc-app-pkg|_ schema, or using ``application/cwl+yaml`` for
   a `CWL`-only definition. The definition will be loaded and converted to ``JSON`` for schema validation. Otherwise,
   ``JSON`` contents is assumed to be directly provided in the request payload for validation as previously accomplished.
 
