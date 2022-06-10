@@ -11,10 +11,9 @@ from urllib.parse import parse_qsl, urlparse
 import mock
 import pytest
 from pyramid import testing
-from pyramid.testing import DummyRequest
 from pywps.inout.inputs import LiteralInput
 
-from tests.utils import setup_mongodb_processstore
+from tests.utils import MockedRequest, setup_mongodb_processstore
 from weaver.processes import opensearch
 from weaver.processes.constants import OpenSearchField
 from weaver.processes.opensearch import make_param_id
@@ -61,7 +60,7 @@ def load_json_test_file(filename):
 
 
 def make_request(**kw):
-    request = DummyRequest(**kw)
+    request = MockedRequest(**kw)
     if request.registry.settings is None:
         request.registry.settings = {}
     request.registry.settings["weaver.url"] = "localhost"

@@ -883,7 +883,7 @@ def str2bytes(string):
         raise TypeError(f"Cannot convert item to bytes: {type(string)!r}")
     if isinstance(string, bytes):
         return string
-    return string.encode()
+    return string.encode("UTF-8")
 
 
 def bytes2str(string):
@@ -895,7 +895,7 @@ def bytes2str(string):
         raise TypeError(f"Cannot convert item to unicode: {type(string)!r}")
     if not isinstance(string, bytes):
         return string
-    return string.decode()
+    return string.decode("UTF-8")
 
 
 def islambda(func):
