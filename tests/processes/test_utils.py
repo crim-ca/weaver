@@ -1,5 +1,8 @@
+import json
+import os
 import tempfile
 
+import mock
 import pytest
 import yaml
 
@@ -10,8 +13,9 @@ from tests.utils import (
     setup_mongodb_processstore,
     setup_mongodb_servicestore
 )
+from weaver.exceptions import PackageRegistrationError
 from weaver.processes.constants import CWL_REQUIREMENT_APP_WPS1
-from weaver.processes.utils import register_wps_processes_from_config
+from weaver.processes.utils import register_cwl_processes_from_config, register_wps_processes_from_config
 
 WPS1_URL1 = resources.TEST_REMOTE_SERVER_URL
 WPS1_URL2 = "http://yet-another-server.com"
@@ -186,3 +190,144 @@ def test_register_wps_processes_from_config_valid():
     proc6 = p_store.fetch_by_id(proc6_id)
     assert proc6.package["hints"][CWL_REQUIREMENT_APP_WPS1]["provider"] == WPS1_URL4 + "/"
     assert proc6.package["hints"][CWL_REQUIREMENT_APP_WPS1]["process"] == resources.WPS_LITERAL_COMPLEX_IO_ID
+
+
+def test_register_cwl_processes_from_config_undefined():
+    assert register_cwl_processes_from_config({}) == 0
+
+
+def test_register_cwl_processes_from_config_empty_var():
+    settings = {"weaver.cwl_processes_dir": ""}
+    assert register_cwl_processes_from_config(settings) == 0
+
+
+def test_register_cwl_processes_from_config_not_a_dir():
+    with tempfile.NamedTemporaryFile(mode="w") as tmp_file:
+        tmp_file.write("data")
+
+        settings = {"weaver.cwl_processes_dir": tmp_file.name}
+        assert register_cwl_processes_from_config(settings) == 0
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_dir = os.path.join(tmp_dir, "does-not-exist")
+        settings = {"weaver.cwl_processes_dir": tmp_dir}
+        assert register_cwl_processes_from_config(settings) == 0
+
+
+def test_register_cwl_processes_from_config_dir_no_cwl():
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        settings = {"weaver.cwl_processes_dir": tmp_dir}
+        assert register_cwl_processes_from_config(settings) == 0
+
+        with tempfile.NamedTemporaryFile(dir=tmp_dir, suffix=".json", mode="w", delete=False) as tmp_file:
+            tmp_file.write(json.dumps({"data": "test"}))
+
+        assert register_cwl_processes_from_config(settings) == 0
+
+
+def test_register_cwl_processes_from_config_load_recursive():
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        first_dir = os.path.join(tmp_dir, "first")
+        nested_dir = os.path.join(tmp_dir, "nested")
+        deeper_dir = os.path.join(nested_dir, "deeper")
+        os.makedirs(first_dir)
+        os.makedirs(deeper_dir)
+
+        # Write files in **un**ordered fashion to validate ordered loading occurs:
+        # /tmp
+        #   /dir
+        #     file3.cwl
+        #     random.yml
+        #     file5.cwl
+        #     /first
+        #       b_file9.cwl         # note: must appear before file2 and a_file8, 'nested' loaded after 'first'
+        #       file2.cwl
+        #       invalid.cwl
+        #     /nested
+        #       a_file8.cwl         # note: must appear after file2 and b_file9, 'nested' loaded after 'first'
+        #       random.json
+        #       file1.cwl
+        #       file4.cwl
+        #       /deeper
+        #         c_file7.cwl
+        #         file0.cwl
+        #         file6.cwl
+        #         invalid.cwl
+        #
+        # Loaded order:
+        #   /tmp/dir/file3.cwl
+        #   /tmp/dir/file5.cwl
+        #   /tmp/dir/first/b_file9.cwl
+        #   /tmp/dir/first/file2.cwl
+        #   /tmp/dir/nested/a_file8.cwl
+        #   /tmp/dir/nested/file1.cwl               # note:
+        #   /tmp/dir/nested/file4.cwl               dir 'deeper' purposely named to appear before
+        #   /tmp/dir/nested/deeper/file0.cwl        'file#' one level above if they were sorted *only*
+        #   /tmp/dir/nested/deeper/file6.cwl        alphabetically not considering directory structure
+        valid_order = [3, 5, 9, 2, 8, 1, 4, 7, 0, 6]
+        # doest not need to be valid CWL, mocked loading
+        cwl_ordered = [{"cwlVersion": "v1.0", "id": str(i)} for i in range(len(valid_order))]
+        with open(os.path.join(tmp_dir, "file3.cwl"), mode="w", encoding="utf-8") as tmp_file:
+            tmp_file.write(json.dumps(cwl_ordered[3]))
+        with open(os.path.join(tmp_dir, "file5.cwl"), mode="w", encoding="utf-8") as tmp_file:
+            tmp_file.write(json.dumps(cwl_ordered[5]))
+        with open(os.path.join(tmp_dir, "random.yml"), mode="w", encoding="utf-8") as tmp_file:
+            tmp_file.write("random: data")
+        with open(os.path.join(first_dir, "file2.cwl"), mode="w", encoding="utf-8") as tmp_file:
+            tmp_file.write(json.dumps(cwl_ordered[2]))
+        with open(os.path.join(first_dir, "invalid.cwl"), mode="w", encoding="utf-8") as tmp_file:
+            tmp_file.write(json.dumps({"invalid": True}))
+        with open(os.path.join(first_dir, "b_file9.cwl"), mode="w", encoding="utf-8") as tmp_file:
+            tmp_file.write(json.dumps(cwl_ordered[9]))
+        with open(os.path.join(nested_dir, "file1.cwl"), mode="w", encoding="utf-8") as tmp_file:
+            tmp_file.write(json.dumps(cwl_ordered[1]))
+        with open(os.path.join(nested_dir, "file4.cwl"), mode="w", encoding="utf-8") as tmp_file:
+            tmp_file.write(json.dumps(cwl_ordered[4]))
+        with open(os.path.join(nested_dir, "random.json"), mode="w", encoding="utf-8") as tmp_file:
+            tmp_file.write(json.dumps({"random": "data"}))
+        with open(os.path.join(nested_dir, "a_file8.cwl"), mode="w", encoding="utf-8") as tmp_file:
+            tmp_file.write(json.dumps(cwl_ordered[8]))
+        with open(os.path.join(deeper_dir, "c_file7.cwl"), mode="w", encoding="utf-8") as tmp_file:
+            tmp_file.write(json.dumps(cwl_ordered[7]))
+        with open(os.path.join(deeper_dir, "file0.cwl"), mode="w", encoding="utf-8") as tmp_file:
+            tmp_file.write(json.dumps(cwl_ordered[0]))
+        with open(os.path.join(deeper_dir, "file6.cwl"), mode="w", encoding="utf-8") as tmp_file:
+            tmp_file.write(json.dumps(cwl_ordered[6]))
+        with open(os.path.join(deeper_dir, "invalid.cwl"), mode="w", encoding="utf-8") as tmp_file:
+            tmp_file.write(json.dumps({"invalid": True}))
+
+        def no_op_valid(_cwl, *_, **__):  # type: ignore
+            if isinstance(_cwl, dict) and "invalid" in _cwl:
+                raise PackageRegistrationError("CWL INVALID")
+
+        with mock.patch("weaver.processes.utils.deploy_process_from_payload", side_effect=no_op_valid) as mocked:
+            settings = {"weaver.cwl_processes_dir": tmp_dir}
+            assert register_cwl_processes_from_config(settings) == len(cwl_ordered)
+
+        call_count = len(cwl_ordered) + 2  # 2 invalid
+        assert mocked.call_count == call_count
+        valid_calls = list(call for call in mocked.call_args_list if "invalid" not in call.args[0])
+        assert len(valid_calls) == len(cwl_ordered)
+        for i, (order, call) in enumerate(zip(valid_order, valid_calls)):
+            assert call.args[0] == cwl_ordered[order], f"Expected CWL does not match load order at position: {i}"
+
+
+def test_register_cwl_processes_from_config_error_handling():
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        with open(os.path.join(tmp_dir, "ignore.cwl"), mode="w", encoding="utf-8") as tmp_file:
+            tmp_file.write("not important")
+
+        def raise_deploy(*_, **__):
+            raise PackageRegistrationError("test")
+
+        with mock.patch("weaver.processes.utils.deploy_process_from_payload", side_effect=raise_deploy) as mocked:
+            settings = {"weaver.cwl_processes_dir": tmp_dir}
+            assert register_cwl_processes_from_config(settings) == 0
+            assert mocked.call_count == 1
+        with mock.patch("weaver.processes.utils.deploy_process_from_payload", side_effect=raise_deploy) as mocked:
+            result = None
+            with pytest.raises(PackageRegistrationError) as exc:
+                settings["weaver.cwl_processes_register_error"] = "true"
+                result = register_cwl_processes_from_config(settings)
+            assert mocked.call_count == 1
+            assert result is None  # not returned

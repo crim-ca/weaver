@@ -32,6 +32,8 @@ Changes:
   known `Process` definitions from `CWL` files stored in a nested directory structure. This allows a service provider
   that uses `Weaver` to offer their `Processes` to directly maintain their definitions from the set of `CWL` files and
   upload changes in the web application at startup without need to manually undeploy and redeploy each `Process`.
+- Add ``weaver.cwl_processes_register_error`` to fail fast any `Process` registration error from `CWL` when loading
+  files at startup.
 
 Fixes:
 ------

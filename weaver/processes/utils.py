@@ -692,7 +692,7 @@ def register_wps_processes_from_config(container, wps_processes_file_path=None):
 
 
 def register_cwl_processes_from_config(container):
-    # type: (AnyRegistryContainer) -> int
+    # type: (AnySettingsContainer) -> int
     """
     Load multiple :term:`CWL` definitions from a directory to register corresponding :term:`Process`.
 
@@ -737,7 +737,9 @@ def register_cwl_processes_from_config(container):
         )
         return 0
     cwl_processes_dir = os.path.abspath(cwl_processes_dir)
-    cwl_files = sorted(pathlib.Path(cwl_processes_dir).rglob("*.cwl"))
+    cwl_files = sorted(pathlib.Path(cwl_processes_dir).rglob("*.cwl"),
+                       # consider directory structure to sort, then use usual alphabetical order for same level
+                       key=lambda file: (len(str(file).split("/")), str(file)))
     if not cwl_files:
         warnings.warn(
             f"Configuration directory [{cwl_processes_dir}] for CWL processes registration "
@@ -747,16 +749,22 @@ def register_cwl_processes_from_config(container):
 
     register_count = 0
     register_total = len(cwl_files)
+    register_error = asbool(settings.get("weaver.cwl_processes_register_error", False))
     for cwl_path in cwl_files:
         try:
             cwl = load_package_file(str(cwl_path))
             deploy_process_from_payload(cwl, settings, overwrite=True)
+            register_count += 1
         except (HTTPException, PackageRegistrationError) as exc:
-            warnings.warn(
+            msg = (
                 f"Failed registration of process from CWL file: [{cwl_path!s}] "
-                f"caused by [{fully_qualified_name(exc)}]({exc!s}). "
-                "Skipping definition.", RuntimeWarning
+                f"caused by [{fully_qualified_name(exc)}]({exc!s})."
             )
+            if register_error:
+                LOGGER.info("Requested immediate CWL registration failure with 'weaver.cwl_processes_register_error'.")
+                LOGGER.error(msg)
+                raise
+            warnings.warn(msg + " Skipping definition.", RuntimeWarning)
             continue
     if register_count and register_count == register_total:
         LOGGER.info("Successfully registered %s processes from CWL files.", register_total)

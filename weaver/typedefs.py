@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING  # pragma: no cover
 
 if TYPE_CHECKING:
     import os

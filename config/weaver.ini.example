@@ -85,6 +85,7 @@ weaver.cwl_egid =
 # default configuration directory is used if this entry is removed
 # only CWL files are considered, lookup in directory is recursive
 weaver.cwl_processes_dir =
+weaver.cwl_processes_register_error = false
 
 # --- Weaver WPS settings ---
 weaver.wps = true

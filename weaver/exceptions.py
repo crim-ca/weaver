@@ -412,6 +412,7 @@ def handle_known_exceptions(function):
 
     @functools.wraps(function)
     def wrapped(*_, **__):
+        # type: (Any, Any) -> Any
         try:
             return function(*_, **__)
         except (WeaverException, OWSException, HTTPException) as exc:
@@ -466,6 +467,7 @@ def log_unhandled_exceptions(logger=LOGGER, message="Unhandled exception occurre
         # type: (Callable[[Any, Any], Any]) -> Callable
         @functools.wraps(function)
         def call(*args, **kwargs):
+            # type: (Any, Any) -> Any
             try:
                 # handle input arguments that are extended by various pyramid operations
                 if is_request:

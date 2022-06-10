@@ -40,7 +40,7 @@ def get_db(container=None, reset_connection=False):
 def includeme(config):
     # type: (Configurator) -> None
     settings = get_settings(config)
-    if asbool(settings.get("weaver.build_docs", False)):
+    if asbool(settings.get("weaver.build_docs", False)):  # pragma: no cover
         LOGGER.info("Skipping database when building docs...")
         return
 

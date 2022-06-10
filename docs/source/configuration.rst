@@ -402,12 +402,17 @@ in an identical definition as if it was :ref:`Deployed <proc_op_deploy>` using :
 - | ``weaver.cwl_processes_dir = <dir-path>``
   | (default: :py:data:`WEAVER_CONFIG_DIR`)
   |
-  | Defines the root directory where to *recursively* and *alphabetically* (as flat list) load any :term:`CWL` file
-    to deploy the corresponding :term:`Process` definitions.
+  | Defines the root directory where to *recursively* and *alphabetically* load any :term:`CWL` file
+    to deploy the corresponding :term:`Process` definitions. Files at higher levels are loaded first before moving
+    down into lower directories of the structure.
+  |
+  | Any failed deployment from a seemingly valid :term:`CWL` will be logged with the corresponding error message.
+    Loading will proceed by ignoring failing cases according to ``weaver.cwl_processes_register_error`` setting.
+    The number of successful :term:`Process` deployments will also be reported if any should occur.
   |
   | The value defined by this setting will look for the provided path as absolute location, then will attempt to
-    resolve relative path (corresponding to where the application is started from). If none of the files can be found,
-    the operation is skipped.
+    resolve relative path (corresponding to where the application is started from). If no :term:`CWL` file could be
+    found, the operation is skipped.
   |
   | To ensure that this feature is disabled and to avoid any unexpected auto-deployment provided by this functionality,
     simply set setting ``weaver.cwl_processes_dir`` as *undefined* (i.e.: nothing after ``=`` in ``weaver.ini``).
@@ -421,6 +426,13 @@ in an identical definition as if it was :ref:`Deployed <proc_op_deploy>` using :
     If a :term:`Process` depends on another definition, such as in the case of a :ref:`proc_workflow` definition, all
     dependencies must be registered prior to this :term:`Process`. Consider naming your :term:`CWL` files to take
     advantage of loading order to resolve such situations.
+
+- | ``weaver.cwl_processes_register_error = true|false`` [:class:`bool`]
+  | (default: ``false``, *ignore failures*)
+  |
+  | Indicate if `Weaver` should ignore failing :term:`Process` deployments (when ``false``), due to unsuccessful
+    registration of :term:`CWL` files found within any sub-directory of ``weaver.cwl_processes_dir`` path, or
+    immediately fail (when ``true``) when an issue is raised during :term:`Process` deployment.
 
 .. seealso::
     - `weaver.ini.example`_
