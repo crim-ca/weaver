@@ -326,7 +326,7 @@ def test_register_cwl_processes_from_config_error_handling():
             assert mocked.call_count == 1
         with mock.patch("weaver.processes.utils.deploy_process_from_payload", side_effect=raise_deploy) as mocked:
             result = None
-            with pytest.raises(PackageRegistrationError) as exc:
+            with pytest.raises(PackageRegistrationError):
                 settings["weaver.cwl_processes_register_error"] = "true"
                 result = register_cwl_processes_from_config(settings)
             assert mocked.call_count == 1
