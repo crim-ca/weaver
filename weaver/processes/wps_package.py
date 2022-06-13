@@ -80,6 +80,7 @@ from weaver.status import STATUS_PYWPS_IDS, Status, StatusCompliant, map_status
 from weaver.store.base import StoreJobs, StoreProcesses
 from weaver.utils import (
     SUPPORTED_FILE_SCHEMES,
+    bytes2str,
     fetch_file,
     get_any_id,
     get_header,
@@ -813,27 +814,9 @@ def get_process_definition(process_offering, reference=None, package=None, data_
 
 
 class WpsPackage(Process):
-    # defined on __init__ call
-    package = None                  # type: Optional[CWL]
-    # defined only after/while _handler is called (or sub-methods)
-    package_id = None               # type: Optional[str]
-    package_type = None             # type: Optional[str]
-    package_requirement = None      # type: Optional[CWL_RequirementsDict]
-    package_log_hook_stderr = None  # type: Optional[str]
-    package_log_hook_stdout = None  # type: Optional[str]
-    percent = None                  # type: Optional[Number]
-    remote_execution = None         # type: Optional[bool]
-    log_file = None                 # type: Optional[str]
-    log_level = None                # type: Optional[int]
-    logger = None                   # type: Optional[logging.Logger]
-    step_packages = None            # type: Optional[CWL_WorkflowStepPackageMap]
-    step_launched = None            # type: Optional[List[str]]
-    request = None                  # type: Optional[WorkerRequest]
-    response = None                 # type: Optional[ExecuteResponse]
-    _job = None                     # type: Optional[Job]
 
-    def __init__(self, **kw):
-        # type: (**Any) -> None
+    def __init__(self, package=None, payload=None, **kw):
+        # type: (CWL, Optional[JSON], **Any) -> None
         """
         Creates a `WPS-3 Process` instance to execute a `CWL` application package definition.
 
@@ -842,8 +825,25 @@ class WpsPackage(Process):
 
         Provided ``kw`` should correspond to :meth:`weaver.datatype.Process.params_wps`
         """
-        self.payload = kw.pop("payload")
-        self.package = kw.pop("package")
+        # defined only after/while _handler is called (or sub-methods)
+        self.package_id = None               # type: Optional[str]
+        self.package_type = None             # type: Optional[str]
+        self.package_requirement = None      # type: Optional[CWL_RequirementsDict]
+        self.package_log_hook_stderr = None  # type: Optional[str]
+        self.package_log_hook_stdout = None  # type: Optional[str]
+        self.percent = None                  # type: Optional[Number]
+        self.remote_execution = None         # type: Optional[bool]
+        self.log_file = None                 # type: Optional[str]
+        self.log_level = None                # type: Optional[int]
+        self.logger = None                   # type: Optional[logging.Logger]
+        self.step_packages = None            # type: Optional[CWL_WorkflowStepPackageMap]
+        self.step_launched = None            # type: Optional[List[str]]
+        self.request = None                  # type: Optional[WorkerRequest]
+        self.response = None                 # type: Optional[ExecuteResponse]
+        self._job = None                     # type: Optional[Job]
+
+        self.payload = payload
+        self.package = package
         self.settings = get_settings()
         if not self.package:
             raise PackageRegistrationError("Missing required package definition for package process.")
@@ -1539,7 +1539,7 @@ class WpsPackage(Process):
 
         # auto-map local file if possible after security check
         if input_scheme == "vault":
-            vault_id = urlparse(input_location).hostname
+            vault_id = bytes2str(urlparse(input_location).hostname)
             input_url = get_vault_url(vault_id, self.settings)
             resp = request_extra("HEAD", input_url, settings=self.settings, headers=self.auth)
             if resp.status_code == 200:

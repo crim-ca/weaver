@@ -186,6 +186,8 @@ if TYPE_CHECKING:
         "inputs": CWL_Inputs,
         "outputs": CWL_Outputs,
         "steps": Dict[CWL_WorkflowStepID, CWL_WorkflowStep],
+        "stderr": str,
+        "stdout": str,
         "$namespaces": Dict[str, str],
         "$schemas": Dict[str, str]
     }, total=False)

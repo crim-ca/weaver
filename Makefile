@@ -365,6 +365,15 @@ clean-dist: clean	## remove *all* files that are not controlled by 'git' except 
 # -v:  list of test names with PASS/FAIL/SKIP/ERROR/etc. next to it
 # -vv: extended collection of stdout/stderr on top of test results
 TEST_VERBOSITY ?= -v
+override TEST_VERBOSE_FLAG := $(shell echo $(TEST_VERBOSITY) | tr ' ' '\n' | grep -E "^\-v+" || echo "")
+override TEST_VERBOSE_CAPTURE := $(shell \
+	test $$(echo "$(TEST_VERBOSE_FLAG)" | tr -cd 'v' | wc -c) -gt 1 && echo 1 || echo 0 \
+)
+ifeq ($(filter $(TEST_VERBOSITY),"--capture"),)
+  ifeq ($(TEST_VERBOSE_CAPTURE),1)
+    TEST_VERBOSITY := $(TEST_VERBOSITY) --capture tee-sys
+  endif
+endif
 
 # autogen tests variants with pre-install of dependencies using the '-only' target references
 TESTS := unit func cli workflow online offline no-tb14 spec coverage
@@ -431,7 +440,7 @@ test-spec-only:	mkdir-reports  ## run tests with custom specification (pytest fo
 	@echo "Running custom tests from input specification..."
 	@[ "${SPEC}" ] || ( echo ">> 'SPEC' is not set"; exit 1 )
 	@bash -c '$(CONDA_CMD) pytest tests $(TEST_VERBOSITY) \
-		-m "${SPEC}" --junitxml "$(REPORTS_DIR)/test-results.xml"'
+		-k "${SPEC}" --junitxml "$(REPORTS_DIR)/test-results.xml"'
 
 .PHONY: test-smoke
 test-smoke: docker-test     ## alias to 'docker-test' executing smoke test of built docker images
