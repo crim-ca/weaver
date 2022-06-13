@@ -16,7 +16,8 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Move ``WpsPackage`` properties to instance level to avoid potential referencing of attributes across same class
+  used by distinct running `Process`.
 
 .. _changes_4.18.0:
 
