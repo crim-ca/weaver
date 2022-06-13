@@ -64,7 +64,9 @@ class MockWpsPackage(WpsPackage):
     """
     Mock of WPS package definition that ignores real status location updates and returns the mock for test validation.
     """
-    mock_status_location = None
+    def __init__(self, *_, **__):
+        super(MockWpsPackage, self).__init__(*_, **__)
+        self.mock_status_location = None
 
     @property
     def status_location(self):
@@ -186,7 +188,7 @@ def test_stdout_stderr_logging_for_commandline_tool_success():
         assert f"{log_cwltool} completed success" in log_data
 
 
-def test_stdout_stderr_logging_for_commandline_tool_failure():
+def test_stdout_stderr_logging_for_commandline_tool_failure(caplog):
     """
     Execute a process and assert that stderr is correctly logged to log file upon failing process execution.
     """
@@ -211,18 +213,20 @@ def test_stdout_stderr_logging_for_commandline_tool_failure():
     except PackageExecutionError as exception:
         assert "Failed package execution" in exception.args[0]
         assert "Missing required input parameter 'message'" in exception.args[0]
-        log_err = stderr.getvalue()
+        # depending on debug/command-line & pytest test order, the captured logs by be 'hijacked' or not
+        # use whichever one is active (stderr empty if captured by pytest)
+        log_err = stderr.getvalue() or caplog.text
         assert "Could not retrieve any internal application log." not in log_err, (
             "Since tool did not reach execution, not captured logged is expected."
         )
         assert "Traceback (most recent call last):" in log_err
-        assert "[weaver.processes.wps_package|mock-process]" in log_err
+        assert "weaver.processes.wps_package|mock-process" in log_err
         assert "Missing required input parameter 'message'" in log_err
     else:
         pytest.fail("\"wps_package._handler()\" was expected to throw \"PackageExecutionError\" exception")
 
 
-def test_stdout_stderr_logging_for_commandline_tool_exception():
+def test_stdout_stderr_logging_for_commandline_tool_exception(caplog):
     """
     Execute a process and assert that traceback is correctly logged to log file upon failing process execution.
     """
@@ -246,11 +250,13 @@ def test_stdout_stderr_logging_for_commandline_tool_exception():
             wps_package_instance._handler(wps_request, wps_response)
     except PackageExecutionError as exception:
         assert "Completed permanentFail" in exception.args[0]
-        log_err = stderr.getvalue()
+        # depending on debug/command-line & pytest test order, the captured logs by be 'hijacked' or not
+        # use whichever one is active (stderr empty if captured by pytest)
+        log_err = stderr.getvalue() or caplog.text
         assert "Could not retrieve any internal application log." in log_err, (
             "Since command did not run, nothing captured is expected"
         )
         assert "Traceback (most recent call last):" in log_err
-        assert "[weaver.processes.wps_package|mock-process]" in log_err
+        assert "weaver.processes.wps_package|mock-process" in log_err
     else:
         pytest.fail("\"wps_package._handler()\" was expected to throw \"PackageExecutionError\" exception")
