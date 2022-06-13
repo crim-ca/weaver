@@ -40,6 +40,8 @@ Fixes:
 - Fix `Process` deployment using a `WPS-1/2` URL reference defining a ``GetCapabilities`` request to resolve
   the corresponding ``DescribeProcess`` request if the `Process` ID can be inferred from other known locations
   (relates to `#11 <https://github.com/crim-ca/weaver/issues/11>`_).
+- Move ``WpsPackage`` properties to instance level to avoid potential referencing of attributes across same class
+  used by distinct running `Process`.
 
 .. _changes_4.18.0:
 
