@@ -1,0 +1,7 @@
+{
+    "title": "NoSuchProcess",
+    "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/no-such-process",
+    "detail": "Process with specified reference identifier does not exist.",
+    "status": 404,
+    "cause": "does-not-exist"
+}

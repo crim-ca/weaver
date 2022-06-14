@@ -17,8 +17,7 @@ from pyramid.httpexceptions import (
     HTTPForbidden,
     HTTPNotFound,
     HTTPOk,
-    HTTPUnprocessableEntity,
-    HTTPUnsupportedMediaType
+    HTTPUnprocessableEntity
 )
 from pyramid.settings import asbool
 
@@ -57,7 +56,7 @@ from weaver.utils import (
 from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_client
 from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.utils import get_wps_restapi_base_url
+from weaver.wps_restapi.utils import get_wps_restapi_base_url, parse_content
 
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
@@ -107,7 +106,7 @@ def get_process(process_id=None, request=None, settings=None, store=None):
         raise ProcessNotFound(json={
             "title": "NoSuchProcess",
             "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/no-such-process",
-            "detail": "Process with specified reference identifier does not exist.",
+            "detail": sd.NotFoundProcessResponse.description,
             "status": ProcessNotFound.code,
             "cause": str(process_id)
         })
@@ -257,36 +256,6 @@ def _validate_deploy_process_info(process_info, reference, package, settings, he
         raise HTTPUnprocessableEntity(detail=msg)
 
 
-def _load_payload(payload, content_type):
-    # type: (Union[JSON, str], ContentType) -> Union[JSON, CWL]
-    """
-    Load the request payload with validation of expected content type.
-    """
-    try:
-        content_type = sd.DeployContentType().deserialize(content_type)
-        if isinstance(payload, str):
-            payload = yaml.safe_load(payload)
-        if not isinstance(payload, dict):
-            raise TypeError("Not a valid JSON body for process deployment.")
-    except colander.Invalid as exc:
-        raise HTTPUnsupportedMediaType(json={
-            "title": "Unsupported Media Type",
-            "type": "UnsupportedMediaType",
-            "detail": str(exc),
-            "status": HTTPUnsupportedMediaType.code,
-            "cause": str(content_type),
-        })
-    except Exception as exc:
-        raise HTTPBadRequest(json={
-            "title": "Bad Request",
-            "type": "BadRequest",
-            "detail": "Unable to parse process deployment content.",
-            "status": HTTPBadRequest.code,
-            "cause": str(exc),
-        })
-    return payload
-
-
 # FIXME: supported nested process and $graph multi-deployment (https://github.com/crim-ca/weaver/issues/56)
 def resolve_cwl_graph(package):
     # type: (CWL) -> CWL
@@ -317,7 +286,12 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
     c_type = ContentType.get(get_header("Content-Type", headers), default=ContentType.APP_OGC_PKG_JSON)
 
     # use deepcopy of to remove any circular dependencies before writing to mongodb or any updates to the payload
-    payload = _load_payload(payload, c_type)
+    payload = parse_content(
+        request=None,
+        content=payload,
+        content_type=c_type,
+        content_type_schema=sd.DeployContentType,
+    )
     payload_copy = deepcopy(payload)
     payload = _check_deploy(payload)
 

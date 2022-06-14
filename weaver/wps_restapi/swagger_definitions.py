@@ -487,33 +487,40 @@ class XAuthDockerHeader(ExtendedSchemaNode):
     missing = drop
 
 
-class RequestContentTypeHeader(OneOfKeywordSchema):
-    _one_of = [
-        JsonHeader(),
-        XmlHeader(),
-    ]
+class RequestContentTypeHeader(ContentTypeHeader):
+    example = ContentType.APP_JSON
+    default = ContentType.APP_JSON
+    validator = OneOf([
+        ContentType.APP_JSON,
+        # ContentType.APP_XML,
+    ])
 
 
-class ResponseContentTypeHeader(OneOfKeywordSchema):
-    _one_of = [
-        JsonHeader(),
-        XmlHeader(),
-        HtmlHeader(),
-    ]
+class ResponseContentTypeHeader(ContentTypeHeader):
+    example = ContentType.APP_JSON
+    default = ContentType.APP_JSON
+    validator = OneOf([
+        ContentType.APP_JSON,
+        ContentType.APP_XML,
+        ContentType.TEXT_XML,
+        ContentType.TEXT_HTML,
+    ])
 
 
-class RequestHeaders(RequestContentTypeHeader):
+class RequestHeaders(ExtendedMappingSchema):
     """
     Headers that can indicate how to adjust the behavior and/or result the be provided in the response.
     """
     accept = AcceptHeader()
     accept_language = AcceptLanguageHeader()
+    content_type = RequestContentTypeHeader()
 
 
 class ResponseHeaders(ResponseContentTypeHeader):
     """
     Headers describing resulting response.
     """
+    content_type = ResponseContentTypeHeader()
 
 
 class RedirectHeaders(ResponseHeaders):
@@ -525,7 +532,7 @@ class NoContent(ExtendedMappingSchema):
     default = {}
 
 
-class FileUploadHeaders(RequestContentTypeHeader):
+class FileUploadHeaders(RequestHeaders):
     # MUST be multipart for upload
     content_type = ContentTypeHeader(
         example=f"{ContentType.MULTI_PART_FORM}; boundary=43003e2f205a180ace9cd34d98f911ff",
@@ -4238,6 +4245,43 @@ class PostProcessesEndpoint(ExtendedMappingSchema):
     })
 
 
+class PatchProcessBodySchema(ExtendedMappingSchema):
+    description = ExtendedSchemaNode(String(), missing=drop, description="New description to override current one.")
+    version = Version(missing=drop, example="1.2.3", description=(
+        "Explicit version to employ for updated process. "
+        "Must not already exist and must be greater than the latest available semantic version of corresponding level. "
+        "For example, if only versions '1.2.3' and '1.3.1' exist, the submitted version can be anything before "
+        "version '1.2.0' excluding it (i.e.: '1.1.X', '0.1.2', etc.), between '1.2.4' and '1.3.0' exclusively, or "
+        "'1.3.2' and anything above. If no version is provided, the next *patch* level after the current process "
+        "version is applied. If the current process did not define any version, it is assumed '0.0.0' and this patch"
+        "will use '0.0.1'."
+    ))
+    keywords = KeywordList(missing=drop, description=(
+        "Keywords to add to existing definitions. "
+        "To remove all keywords, submit an empty list. "
+        "To replace keywords, perform two requests, one with empty list and the following one with new definitions."
+    ))
+    metadata = MetadataList(missing=drop, description=(
+        "Metadata to add to existing definitions. "
+        "To remove all metadata, submit an empty list. "
+        "To replace metadata, perform two requests, one with empty list and the following one with new definitions."
+    ))
+
+
+class PutProcessBodySchema(Deploy):
+    pass
+
+
+class PatchProcessEndpoint(ProcessPath):
+    headers = RequestHeaders()
+    body = PatchProcessBodySchema()
+
+
+class PutProcessEndpoint(ProcessPath):
+    headers = RequestHeaders()
+    body = PutProcessBodySchema()
+
+
 class WpsOutputContextHeader(ExtendedSchemaNode):
     # ok to use 'name' in this case because target 'key' in the mapping must
     # be that specific value but cannot have a field named with this format
@@ -4653,6 +4697,18 @@ class OkPostProcessesResponse(ExtendedMappingSchema):
 class BadRequestGetProcessInfoResponse(ExtendedMappingSchema):
     description = "Missing process identifier."
     body = NoContent()
+
+
+class NotFoundProcessResponse(ExtendedMappingSchema):
+    description = "Process with specified reference identifier does not exist."
+    examples = {
+        "ProcessNotFound": {
+            "summary": "Example response when specified process reference cannot be found.",
+            "value": EXAMPLES["local_process_not_found.json"]
+        }
+    }
+    header = ResponseHeaders()
+    body = ErrorJsonResponseBodySchema()
 
 
 class OkGetProcessInfoResponse(ExtendedMappingSchema):
@@ -5082,6 +5138,12 @@ post_processes_responses = {
     }),
     "500": InternalServerErrorResponseSchema(),
 }
+patch_process_responses = {
+    "200": OkGetProcessInfoResponse(description="success"),
+    "400": BadRequestGetProcessInfoResponse(),
+    "404": NotFoundProcessResponse(),
+    "500": InternalServerErrorResponseSchema(),
+}
 get_process_responses = {
     "200": OkGetProcessInfoResponse(description="success", examples={
         "ProcessDescriptionSchemaOGC": {
@@ -5096,6 +5158,7 @@ get_process_responses = {
         }
     }),
     "400": BadRequestGetProcessInfoResponse(),
+    "404": NotFoundProcessResponse(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_process_package_responses = {

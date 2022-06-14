@@ -12,6 +12,7 @@ import traceback
 import uuid
 import warnings
 from datetime import datetime, timedelta
+from distutils.version import LooseVersion
 from io import BytesIO
 from logging import ERROR, INFO, Logger, getLevelName, getLogger
 from secrets import compare_digest, token_hex
@@ -1785,6 +1786,15 @@ class Process(Base):
         self["id"] = value
 
     @property
+    def tag(self):
+        # type: () -> str
+        """
+        Full identifier including the version for an unique reference.
+        """
+        version = self.version or "latest"
+        return f"{self.id}:{version}"
+
+    @property
     def title(self):
         # type: () -> str
         return self.get("title", self.id)
@@ -1816,8 +1826,9 @@ class Process(Base):
 
     @property
     def version(self):
-        # type: () -> Optional[str]
-        return self.get("version")
+        # type: () -> Optional[LooseVersion]
+        version = self.get("version")
+        return LooseVersion(version) if version else None
 
     @property
     def inputs(self):
@@ -2102,7 +2113,7 @@ class Process(Base):
             "abstract": self.abstract,
             "keywords": self.keywords,
             "metadata": self.metadata,
-            "version": self.version,
+            "version": str(self.version),
             # escape potential OpenAPI JSON $ref in 'schema' also used by Mongo BSON
             "inputs": [self._encode(_input) for _input in self.inputs or []],
             "outputs": [self._encode(_output) for _output in self.outputs or []],
@@ -2131,7 +2142,7 @@ class Process(Base):
             "abstract": self.abstract,
             "keywords": self.keywords,
             "metadata": self.metadata,
-            "version": self.version,
+            "version": str(self.version),
             "inputs": self.inputs,
             "outputs": self.outputs,
             "package": self.package,

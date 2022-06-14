@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 import colander
 from pyramid.httpexceptions import (
     HTTPBadRequest,
+    HTTPConflict,
     HTTPException,
     HTTPForbidden,
     HTTPNotFound,
@@ -26,6 +27,7 @@ from weaver.visibility import Visibility
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.processes.utils import get_process_list_links, get_processes_filtered_by_valid_schemas
 from weaver.wps_restapi.providers.utils import get_provider_services
+from weaver.wps_restapi.utils import parse_content
 
 if TYPE_CHECKING:
     from weaver.typedefs import JSON, AnyViewResponse, PyramidRequest
@@ -142,6 +144,46 @@ def add_local_process(request):
     Register a local process.
     """
     return deploy_process_from_payload(request.text, request)  # use text to allow parsing as JSON or YAML
+
+
+@sd.process_service.patch(tags=[sd.TAG_PROCESSES, sd.TAG_DEPLOY, sd.TAG_DESCRIBEPROCESS], renderer=OutputFormat.JSON,
+                          schema=sd.PatchProcessEndpoint(), response_schemas=sd.patch_process_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
+def patch_local_process(request):
+    # type: (PyramidRequest) -> AnyViewResponse
+    """
+    Update metadata of a registered local process.
+
+    Updates the new process patch semantic version if not specified explicitly.
+    """
+    data = parse_content(request, content_schema=sd.PatchProcessBodySchema)
+    store = get_db(request).get_store(StoreProcesses)
+    process = get_process(request=request, store=store)
+    try:
+        version = data.get("version") or process.version
+    except ProcessNotFound:
+        pass
+    else:
+        raise HTTPConflict()
+
+
+    return HTTPOk()
+
+
+@sd.process_service.patch(tags=[sd.TAG_PROCESSES, sd.TAG_DEPLOY, sd.TAG_DESCRIBEPROCESS], renderer=OutputFormat.JSON,
+                          schema=sd.PatchProcessEndpoint(), response_schemas=sd.patch_process_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
+def put_local_process(request):
+    # type: (PyramidRequest) -> AnyViewResponse
+    """
+    Update a process with a new definition.
+
+    Updates the new process minor semantic version from the previous one if not specified explicitly.
+    """
+    data = parse_content(request, content_schema=sd.PutProcessBodySchema)
+    store = get_db(request).get_store(StoreProcesses)
+    process = get_process(request=request, store=store)
+    return HTTPOk()
 
 
 @sd.process_service.get(tags=[sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS], renderer=OutputFormat.JSON,
