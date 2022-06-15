@@ -281,6 +281,13 @@ class SLUG(ExtendedSchemaNode):
     pattern = r"^[A-Za-z0-9]+(?:(-|_)[A-Za-z0-9]+)*$"
 
 
+class Tag(ExtendedSchemaNode):
+    schema_type = String
+    description = "Identifier with tagged version forming an unique reference."
+    # ranges used to remove starting/ending ^$ characters
+    pattern = SLUG.pattern[:-1] + rf"(:{SemanticVersion(v_prefix=False, rc_suffix=False).pattern[1:-1]})?$"
+
+
 class URL(ExtendedSchemaNode):
     schema_type = String
     description = "URL reference."
@@ -569,7 +576,7 @@ class DescriptionSchema(ExtendedMappingSchema):
 
 
 class KeywordList(ExtendedSequenceSchema):
-    keyword = ExtendedSchemaNode(String())
+    keyword = ExtendedSchemaNode(String(), validator=Length(min=1))
 
 
 class Language(ExtendedSchemaNode):
@@ -1140,7 +1147,7 @@ class DeployMinMaxOccurs(ExtendedMappingSchema):
 # does not inherit from 'DescriptionLinks' because other 'ProcessDescription<>' schema depend from this without 'links'
 class ProcessDescriptionType(DescriptionBase, DescriptionExtra):
     id = ProcessIdentifier()
-    version = Version(missing=drop)
+    version = Version(missing=drop, example="1.2.3")
     mutable = ExtendedSchemaNode(Boolean(), default=True, description=(
         "Indicates if the process is mutable (dynamically deployed), or immutable (builtin with this instance)."
     ))
@@ -1680,9 +1687,19 @@ class VisibilitySchema(ExtendedMappingSchema):
 #########################################################
 
 
+class ProcessIdentifierTag(Tag):
+    pass
+
+
 class ProcessPath(ExtendedMappingSchema):
-    # FIXME: support versioning with <id:tag> (https://github.com/crim-ca/weaver/issues/107)
-    process_id = AnyIdentifier(description="Process identifier.", example="jsonarray2netcdf")
+    process_id = ProcessIdentifierTag(
+        example="jsonarray2netcdf[:1.0.0]",
+        description=(
+            "Process identifier with optional tag version. "
+            "If tag is omitted, the latest version of that process is considered. "
+            "Otherwise, the specific revision must be matched."
+        ),
+    )
 
 
 class ProviderPath(ExtendedMappingSchema):
@@ -3802,6 +3819,17 @@ class CWLIdentifier(ProcessIdentifier):
     )
 
 
+class CWLIntentURL(URL):
+    description = (
+        "Identifier URL to a concept for the type of computational operation accomplished by this Process "
+        "(see example operations: http://edamontology.org/operation_0004)."
+    )
+
+
+class CWLIntent(ExtendedSequenceSchema):
+    item = CWLIntentURL()
+
+
 class CWLBase(ExtendedMappingSchema):
     cwlVersion = CWLVersion()
 
@@ -3809,6 +3837,7 @@ class CWLBase(ExtendedMappingSchema):
 class CWLApp(PermissiveMappingSchema):
     _class = CWLClass()
     id = CWLIdentifier(missing=drop)  # can be omitted only if within a process deployment that also includes it
+    intent = CWLIntent(missing=drop)
     requirements = CWLRequirements(description="Explicit requirement to execute the application package.", missing=drop)
     hints = CWLHints(description="Non-failing additional hints that can help resolve extra requirements.", missing=drop)
     baseCommand = CWLCommand(description="Command called in the docker image or on shell according to requirements "
@@ -4187,12 +4216,28 @@ class CWLGraphBase(ExtendedMappingSchema):
     )
 
 
-class DeployCWLGraph(CWLBase, CWLGraphBase):
-    _sort_first = ["cwlVersion", "$graph"]
+class UpdateVersion(ExtendedMappingSchema):
+    version = Version(missing=drop, example="1.2.3", description=(
+        "Explicit version to employ for initial or updated process definition. "
+        "Must not already exist and must be greater than the latest available semantic version for the "
+        "corresponding version level according to the applied update operation. "
+        "For example, if only versions '1.2.3' and '1.3.1' exist, the submitted version can be anything before "
+        "version '1.2.0' excluding it (i.e.: '1.1.X', '0.1.2', etc.), between '1.2.4' and '1.3.0' exclusively, or "
+        "'1.3.2' and anything above. If no version is provided, the next *patch* level after the current process "
+        "version is applied. If the current process did not define any version, it is assumed '0.0.0' and this patch"
+        "will use '0.0.1'. The applicable update level (MAJOR, MINOR, PATCH) depends on the operation being applied. "
+        "As a rule of thumb, if changes affect only metadata, PATCH is required. If changes affect parameters or "
+        "execution method of the process, but not directly its entire definition, MINOR is required. If the process "
+        "must be completely redeployed due to application redefinition, MAJOR is required."
+    ))
 
 
-class DeployCWL(NotKeywordSchema, CWL):
-    _sort_first = ["cwlVersion", "id", "class"]
+class DeployCWLGraph(CWLBase, CWLGraphBase, UpdateVersion):
+    _sort_first = ["cwlVersion", "version", "$graph"]
+
+
+class DeployCWL(NotKeywordSchema, CWL, UpdateVersion):
+    _sort_first = ["cwlVersion", "version", "id", "class"]
     _not = [
         CWLGraphBase()
     ]
@@ -4245,17 +4290,8 @@ class PostProcessesEndpoint(ExtendedMappingSchema):
     })
 
 
-class PatchProcessBodySchema(ExtendedMappingSchema):
+class PatchProcessBodySchema(UpdateVersion):
     description = ExtendedSchemaNode(String(), missing=drop, description="New description to override current one.")
-    version = Version(missing=drop, example="1.2.3", description=(
-        "Explicit version to employ for updated process. "
-        "Must not already exist and must be greater than the latest available semantic version of corresponding level. "
-        "For example, if only versions '1.2.3' and '1.3.1' exist, the submitted version can be anything before "
-        "version '1.2.0' excluding it (i.e.: '1.1.X', '0.1.2', etc.), between '1.2.4' and '1.3.0' exclusively, or "
-        "'1.3.2' and anything above. If no version is provided, the next *patch* level after the current process "
-        "version is applied. If the current process did not define any version, it is assumed '0.0.0' and this patch"
-        "will use '0.0.1'."
-    ))
     keywords = KeywordList(missing=drop, description=(
         "Keywords to add to existing definitions. "
         "To remove all keywords, submit an empty list. "
@@ -4268,7 +4304,7 @@ class PatchProcessBodySchema(ExtendedMappingSchema):
     ))
 
 
-class PutProcessBodySchema(Deploy):
+class PutProcessBodySchema(Deploy, UpdateVersion):
     pass
 
 

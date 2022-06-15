@@ -46,12 +46,16 @@ from weaver.formats import ContentType
 from weaver.processes.types import ProcessType
 from weaver.store.base import StoreProcesses, StoreServices
 from weaver.utils import (
+    VersionFormat,
+    VersionLevel,
+    as_version_major_minor_patch,
     fully_qualified_name,
     generate_diff,
     get_header,
     get_sane_name,
     get_settings,
-    get_url_without_query
+    get_url_without_query,
+    is_update_version
 )
 from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_client
@@ -256,7 +260,25 @@ def _validate_deploy_process_info(process_info, reference, package, settings, he
         raise HTTPUnprocessableEntity(detail=msg)
 
 
+def _validate_deploy_process_version(process, store):
+    # type: (Process, StoreProcesses) -> None
+    """
+    Validate that any specified version for :term:`Process` deployment is valid against any other existing versions.
+    """
+    if process.version:
+        proc_ver = as_version_major_minor_patch(process.version, VersionFormat.STRING)
+        versions = store.find_versions(process.id, VersionFormat.STRING)
+        if not is_update_version(proc_ver, versions, VersionLevel.MAJOR):
+            raise HTTPConflict(json={
+                "code": "ProcessInvalidParameter",
+                "description": "Process version already taken or prior to more recent versions.",
+                "cause": {"versions": versions},
+                "value": proc_ver,
+            })
+
+
 # FIXME: supported nested process and $graph multi-deployment (https://github.com/crim-ca/weaver/issues/56)
+#   see also: https://www.commonwl.org/v1.2/CommandLineTool.html#Packed_documents
 def resolve_cwl_graph(package):
     # type: (CWL) -> CWL
     if "$graph" in package and isinstance(package["$graph"], list) and len(package["$graph"]) == 1:
@@ -320,7 +342,7 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
         reference = content.get("href")
         found = isinstance(reference, str)
     elif c_type in (list(ContentType.ANY_CWL) + [ContentType.APP_JSON]) and "cwlVersion" in payload:
-        process_info = {}
+        process_info = {"version": payload.pop("version", None)}
         package = resolve_cwl_graph(payload)
         found = True
     else:  # ogc-apppkg type, but no explicit check since used by default (backward compat)
@@ -394,6 +416,7 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
     try:
         store = get_db(container).get_store(StoreProcesses)
         process = Process(process_info)
+        _validate_deploy_process_version(process, store)
         sd.ProcessSummary().deserialize(process)  # make if fail before save if invalid
         store.save_process(process, overwrite=overwrite)
         process_summary = process.summary()

@@ -40,6 +40,8 @@ from weaver.quotation.status import QuoteStatus
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.utils import localize_datetime  # for backward compatibility of previously saved jobs not time-locale-aware
 from weaver.utils import (
+    VersionFormat,
+    as_version_major_minor_patch,
     fully_qualified_name,
     get_job_log_msg,
     get_log_date_fmt,
@@ -69,6 +71,7 @@ if TYPE_CHECKING:
         AnyProcess,
         AnySettingsContainer,
         AnyUUID,
+        AnyVersion,
         ExecutionInputs,
         ExecutionOutputs,
         Number,
@@ -1799,16 +1802,17 @@ class Process(Base):
         # type: () -> str
         return self.get("title", self.id)
 
-    @property
-    def abstract(self):
+    def _get_desc(self):
         # type: () -> str
-        return self.get("abstract", "")
-
-    @property
-    def description(self):
-        # OGC-API-Processes v1 field representation
+        # OGC-API-Processes v1 field representation use 'description'
         # bw-compat with existing processes that defined it as abstract
-        return self.abstract or self.get("description", "")
+        return self.get("abstract", "") or self.get("description", "")
+
+    def _set_desc(self, description):
+        # type: (str) -> None
+        self["abstract"] = description
+
+    description = abstract = property(fget=_get_desc, fset=_set_desc, doc="Process description.")
 
     @property
     def keywords(self):
@@ -1819,16 +1823,33 @@ class Process(Base):
             self["keywords"] = keywords
         return dict.__getitem__(self, "keywords")
 
+    @keywords.setter
+    def keywords(self, keywords):
+        # type: (List[str]) -> None
+        self["keywords"] = list(set(sd.KeywordList().deserialize(keywords)))
+
     @property
     def metadata(self):
         # type: () -> List[Metadata]
         return self.get("metadata", [])
+
+    @metadata.setter
+    def metadata(self, metadata):
+        # type: (List[Metadata]) -> None
+        self["metadata"] = sd.MetadataList().deserialize(metadata)
 
     @property
     def version(self):
         # type: () -> Optional[LooseVersion]
         version = self.get("version")
         return LooseVersion(version) if version else None
+
+    @version.setter
+    def version(self, version):
+        # type: (AnyVersion) -> None
+        if not isinstance(version, str):
+            version = as_version_major_minor_patch(version, VersionFormat.STRING)
+        self["version"] = sd.Version().deserialize(version)
 
     @property
     def inputs(self):
@@ -2114,6 +2135,7 @@ class Process(Base):
             "keywords": self.keywords,
             "metadata": self.metadata,
             "version": str(self.version),
+            "additional_links": self.additional_links,
             # escape potential OpenAPI JSON $ref in 'schema' also used by Mongo BSON
             "inputs": [self._encode(_input) for _input in self.inputs or []],
             "outputs": [self._encode(_output) for _output in self.outputs or []],
@@ -2203,10 +2225,31 @@ class Process(Base):
             link.setdefault("hreflang", AcceptLanguage.EN_CA)
         # add user-provided additional links, no type/hreflang added since we cannot guess them
         known_links = {link.get("rel") for link in links}
-        extra_links = self.get("additional_links", [])
+        extra_links = self.additional_links
         extra_links = [link for link in extra_links if link.get("rel") not in known_links]
         links.extend(extra_links)
         return links
+
+    @property
+    def additional_links(self):
+        # type: () -> List[Link]
+        return self.get("additional_links", [])
+
+    @additional_links.setter
+    def additional_links(self, links):
+        # type: (List[Link]) -> None
+        links = sd.LinkList().deserialize(links)
+        self["additional_links"] = []  # don't flag an existing rel that is about to be overridden as conflicting
+        all_rel = [link["rel"] for link in self.links()]
+        for link in links:
+            rel = link["rel"]
+            if rel in all_rel:
+                raise ValueError(
+                    f"Value of '{self.__name__}.additional_links' is not valid. "
+                    f"Unique links relations are required but '{rel}' is already taken."
+                )
+            all_rel.append(rel)
+        self["additional_links"] = links
 
     def href(self, container=None):
         # type: (Optional[AnySettingsContainer]) -> str

@@ -575,8 +575,14 @@ class VersionLevel(Constants):
     PATCH = "patch"
 
 
-def as_version_major_minor_patch(version):
-    # type: (Optional[AnyVersion]) -> Tuple[int, int, int]
+class VersionFormat(Constants):
+    OBJECT = "object"  # LooseVersion
+    STRING = "string"  # "x.y.z"
+    PARTS = "parts"    # tuple/list
+
+
+def as_version_major_minor_patch(version, version_format=VersionFormat.PARTS):
+    # type: (Optional[AnyVersion], VersionFormat) -> AnyVersion
     """
     Generates a ``MAJOR.MINOR.PATCH`` version with padded with zeros for any missing parts.
     """
@@ -585,9 +591,15 @@ def as_version_major_minor_patch(version):
     elif isinstance(version, (list, tuple)):
         ver_parts = [int(part) for part in version]
     else:
-        ver_parts = []
+        ver_parts = []  # default "0.0.0" for backward compatibility
     ver_parts = ver_parts[:3]
-    return tuple(ver_parts + [0] * max(0, 3 - len(ver_parts)))  # type: ignore
+    ver_tuple = tuple(ver_parts + [0] * max(0, 3 - len(ver_parts)))
+    if version_format in [VersionFormat.STRING, VersionFormat.OBJECT]:
+        ver_str = ".".join(str(part) for part in ver_tuple)
+        if version_format == VersionFormat.STRING:
+            return ver_str
+        return LooseVersion(ver_str)
+    return ver_tuple
 
 
 def is_update_version(version, taken_versions, version_level=VersionLevel.PATCH):

@@ -1,4 +1,5 @@
 import abc
+from distutils.version import LooseVersion
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -12,6 +13,7 @@ if TYPE_CHECKING:
     from weaver.execute import AnyExecuteResponse
     from weaver.typedefs import (
         AnyUUID,
+        AnyVersion,
         ExecutionInputs,
         ExecutionOutputs,
         DatetimeIntervalType,
@@ -96,6 +98,16 @@ class StoreProcesses(StoreInterface):
     @abc.abstractmethod
     def fetch_by_id(self, process_id, visibility=None):
         # type: (str, Optional[AnyVisibility]) -> Process
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def find_versions(self, process_id, version_format):
+        # type: (str, VersionFormat) -> List[LooseVersion]
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def update_version(self, process_id, version):
+        # type: (str, AnyVersion) -> Process
         raise NotImplementedError
 
     @abc.abstractmethod

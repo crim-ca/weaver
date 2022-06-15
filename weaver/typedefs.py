@@ -183,6 +183,7 @@ if TYPE_CHECKING:
         "label": str,
         "doc": str,
         "id": Optional[str],
+        "intent": Optional[str],
         "s:keywords": List[str],
         "baseCommand": Optional[Union[str, List[str]]],
         "parameters": Optional[List[str]],

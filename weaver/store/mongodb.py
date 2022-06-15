@@ -4,11 +4,13 @@ Stores to read/write data to from/to `MongoDB` using pymongo.
 
 import logging
 import uuid
+from distutils.version import LooseVersion
 from typing import TYPE_CHECKING
 
 import pymongo
 from pymongo import ASCENDING, DESCENDING
 from pymongo.collation import Collation
+from pymongo.collection import ReturnDocument
 from pymongo.errors import DuplicateKeyError
 from pyramid.request import Request
 from pywps import Process as ProcessWPS
@@ -43,7 +45,16 @@ from weaver.processes.types import ProcessType
 from weaver.sort import Sort, SortMethods
 from weaver.status import JOB_STATUS_CATEGORIES, Status, map_status
 from weaver.store.base import StoreBills, StoreJobs, StoreProcesses, StoreQuotes, StoreServices, StoreVault
-from weaver.utils import fully_qualified_name, get_base_url, get_sane_name, get_weaver_url, islambda, now
+from weaver.utils import (
+    VersionFormat,
+    as_version_major_minor_patch,
+    fully_qualified_name,
+    get_base_url,
+    get_sane_name,
+    get_weaver_url,
+    islambda,
+    now
+)
 from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_url
 
@@ -55,7 +66,15 @@ if TYPE_CHECKING:
     from weaver.execute import AnyExecuteResponse
     from weaver.processes.types import AnyProcessType
     from weaver.store.base import DatetimeIntervalType, JobGroupCategory, JobSearchResult
-    from weaver.typedefs import AnyProcess, AnyProcessClass, AnyUUID, AnyValueType, ExecutionInputs, ExecutionOutputs
+    from weaver.typedefs import (
+        AnyProcess,
+        AnyProcessClass,
+        AnyUUID,
+        AnyValueType,
+        AnyVersion,
+        ExecutionInputs,
+        ExecutionOutputs
+    )
     from weaver.visibility import AnyVisibility
 
     MongodbValue = Union[AnyValueType, datetime.datetime]
@@ -513,13 +532,51 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         :param visibility: one value amongst :py:mod:`weaver.visibility`.
         :return: An instance of :class:`weaver.datatype.Process`.
         """
+        version = ""
+        if ":" in process_id:
+            process_id, version = process_id.split(":", 1)
         sane_name = get_sane_name(process_id, **self.sane_name_config)
+        if version:
+            sane_name += ":" + as_version_major_minor_patch(version, VersionFormat.STRING)
         process = self.collection.find_one({"identifier": sane_name})
         if not process:
             raise ProcessNotFound(f"Process '{sane_name}' could not be found.")
         process = Process(process)
         if visibility is not None and process.visibility != visibility:
             raise ProcessNotAccessible(f"Process '{sane_name}' cannot be accessed.")
+        return process
+
+    def find_versions(self, process_id, version_format):
+        # type: (str, VersionFormat) -> List[LooseVersion]
+        """
+        Retrieves all existing versions of a given process.
+        """
+        sane_name = get_sane_name(process_id, **self.sane_name_config)
+        version_name = rf"^{sane_name}(:[0-9]+\.[0-9]+.[0-9]+)?$"
+        versions = self.collection.find(
+            filter={"identifier": version_name},
+            projection={"_id": False, "version": True},
+        )
+        return [as_version_major_minor_patch(ver["version"], version_format) for ver in versions]
+
+    def update_version(self, process_id, version):
+        # type: (str, AnyVersion) -> Process
+        """
+        Update the specified (latest) process ID to represent the indicated version.
+        """
+        sane_name = get_sane_name(process_id, **self.sane_name_config)
+        version = as_version_major_minor_patch(version, VersionFormat.STRING)
+        # update ID to allow direct fetch by ID using tagged version
+        # this also clears the unique ID index requirement
+        new_name = sane_name + ":" + version
+        process = self.collection.find_one_and_update(
+            filter={"identifier": sane_name},
+            update={"identifier": new_name, "version": version},
+            return_document=ReturnDocument.AFTER
+        )
+        if not process:
+            raise ProcessNotFound(f"Process '{sane_name}' could not be found for version update.")
+        process = Process(process)
         return process
 
     def get_visibility(self, process_id):
