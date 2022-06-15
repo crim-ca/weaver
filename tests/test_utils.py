@@ -4,6 +4,7 @@ import contextlib
 import inspect
 import json
 import os
+import random
 import shutil
 import tempfile
 import uuid
@@ -35,6 +36,7 @@ from weaver.formats import ContentType
 from weaver.status import JOB_STATUS_CATEGORIES, STATUS_PYWPS_IDS, STATUS_PYWPS_MAP, Status, StatusCompliant, map_status
 from weaver.utils import (
     NullType,
+    VersionLevel,
     apply_number_with_unit,
     assert_sane_name,
     bytes2str,
@@ -46,6 +48,7 @@ from weaver.utils import (
     get_sane_name,
     get_ssl_verify_option,
     get_url_without_query,
+    is_update_version,
     is_valid_url,
     localize_datetime,
     make_dirs,
@@ -94,6 +97,53 @@ def test_is_url_valid():
     assert is_valid_url("file:///my/path") is True
     assert is_valid_url("/my/path") is False
     assert is_valid_url(None) is False
+
+
+def test_is_update_version():
+    versions = [
+        "0.1.2",
+        "1.0.3",
+        "1.2.0",
+        "1.2.3",
+        "1.2.4",
+        "1.3.1",
+    ]
+    random.shuffle(versions)
+
+    assert not is_update_version("0.1.0", versions, VersionLevel.PATCH)
+    assert not is_update_version("1.0.1", versions, VersionLevel.PATCH)
+    assert not is_update_version("1.2.1", versions, VersionLevel.PATCH)
+    assert not is_update_version("1.2.3", versions, VersionLevel.PATCH)
+    assert not is_update_version("1.3.0", versions, VersionLevel.PATCH)
+    assert not is_update_version("1.3.1", versions, VersionLevel.PATCH)
+
+    assert not is_update_version("0.1.0", versions, VersionLevel.MINOR)
+    assert not is_update_version("0.1.4", versions, VersionLevel.MINOR)
+    assert not is_update_version("1.2.5", versions, VersionLevel.MINOR)
+    assert not is_update_version("1.3.2", versions, VersionLevel.MINOR)
+
+    assert not is_update_version("0.1.0", versions, VersionLevel.MAJOR)
+    assert not is_update_version("0.1.4", versions, VersionLevel.MAJOR)
+    assert not is_update_version("0.2.0", versions, VersionLevel.MAJOR)
+    assert not is_update_version("0.2.9", versions, VersionLevel.MAJOR)
+    assert not is_update_version("1.2.5", versions, VersionLevel.MAJOR)
+    assert not is_update_version("1.3.2", versions, VersionLevel.MAJOR)
+    assert not is_update_version("1.4.0", versions, VersionLevel.MAJOR)
+
+    assert is_update_version("0.1.3", versions, VersionLevel.PATCH)
+    assert is_update_version("1.2.5", versions, VersionLevel.PATCH)
+    assert is_update_version("1.3.2", versions, VersionLevel.PATCH)
+
+    assert is_update_version("0.2.0", versions, VersionLevel.MINOR)
+    assert is_update_version("0.2.1", versions, VersionLevel.MINOR)
+    assert is_update_version("0.3.0", versions, VersionLevel.MINOR)
+    assert is_update_version("1.4.0", versions, VersionLevel.MINOR)
+    assert is_update_version("1.5.0", versions, VersionLevel.MINOR)
+    assert is_update_version("2.0.0", versions, VersionLevel.MINOR)
+    assert is_update_version("2.1.3", versions, VersionLevel.MINOR)
+
+    assert is_update_version("2.0.0", versions, VersionLevel.MAJOR)
+    assert is_update_version("2.1.3", versions, VersionLevel.MAJOR)
 
 
 def test_get_url_without_query():

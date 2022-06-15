@@ -22,7 +22,7 @@ from weaver.processes.execution import submit_job
 from weaver.processes.utils import deploy_process_from_payload, get_process
 from weaver.status import Status
 from weaver.store.base import StoreJobs, StoreProcesses
-from weaver.utils import fully_qualified_name, get_any_id
+from weaver.utils import as_version_major_minor_patch, fully_qualified_name, get_any_id, is_update_version
 from weaver.visibility import Visibility
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.processes.utils import get_process_list_links, get_processes_filtered_by_valid_schemas
@@ -158,9 +158,21 @@ def patch_local_process(request):
     """
     data = parse_content(request, content_schema=sd.PatchProcessBodySchema)
     store = get_db(request).get_store(StoreProcesses)
-    process = get_process(request=request, store=store)
+    process = get_process(request=request, store=store)  # latest if only 'processId', or specific version if using tag
+    process_versions = ...  # FIXME: new store method
+
+    # employ user provided version or bump to next PATCH version from selected process
+    # must be tested in both cases against available versions since selected process is not necessarily the latest
+    version = data.get("version")
+    if not version:
+        version = as_version_major_minor_patch(process.version)
+        version[-1] += 1  # bump PATCH
+
+    # version must be within available range against selected process for PATCH update
+    if not is_update_version(version, process_versions):
+        raise HTTPUnprocessableEntity()
     try:
-        version = data.get("version") or process.version
+
     except ProcessNotFound:
         pass
     else:

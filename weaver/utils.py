@@ -16,6 +16,7 @@ import warnings
 from copy import deepcopy
 from datetime import datetime
 from typing import TYPE_CHECKING
+from distutils.version import LooseVersion
 from urllib.parse import ParseResult, unquote, urlparse, urlunsplit
 
 import boto3
@@ -49,6 +50,7 @@ from webob.headers import EnvironHeaders, ResponseHeaders
 from werkzeug.wrappers import Request as WerkzeugRequest
 from yaml.scanner import ScannerError
 
+from weaver.base import Constants
 from weaver.execute import ExecuteControlOption, ExecuteMode
 from weaver.formats import ContentType, get_content_type
 from weaver.status import map_status
@@ -69,6 +71,7 @@ if TYPE_CHECKING:
         AnyRequestMethod,
         AnyResponseType,
         AnyValueType,
+        AnyVersion,
         HeadersType,
         JSON,
         KVP,
@@ -564,6 +567,99 @@ def is_valid_url(url):
         return bool(urlparse(url).scheme)
     except Exception:  # noqa: W0703 # nosec: B110
         return False
+
+
+class VersionLevel(Constants):
+    MAJOR = "major"
+    MINOR = "minor"
+    PATCH = "patch"
+
+
+def as_version_major_minor_patch(version):
+    # type: (Optional[AnyVersion]) -> Tuple[int, int, int]
+    """
+    Generates a ``MAJOR.MINOR.PATCH`` version with padded with zeros for any missing parts.
+    """
+    if isinstance(version, (str, float, int)):
+        ver_parts = list(LooseVersion(str(version)).version)
+    elif isinstance(version, (list, tuple)):
+        ver_parts = [int(part) for part in version]
+    else:
+        ver_parts = []
+    ver_parts = ver_parts[:3]
+    return tuple(ver_parts + [0] * max(0, 3 - len(ver_parts)))  # type: ignore
+
+
+def is_update_version(version, taken_versions, version_level=VersionLevel.PATCH):
+    # type: (AnyVersion, Iterable[AnyVersion], VersionLevel) -> bool
+    """
+    Determines if the version corresponds to an available update version of specified level compared to existing ones.
+
+    :param version: Version to validate.
+    :param taken_versions: Existing versions that cannot be reused.
+    :param version_level:
+        Level to consider availability of versions for update.
+        If the specified version corresponds to an older version compared to available ones, it will have fit within
+        the specified version level range to be considered valid.
+        For example, requesting 'PATCH' level will require that the specified version is greater than the last available
+        version against other existing versions of same 'MAJOR.MINOR' parts. Requesting 'MINOR' level will require that
+        the specified version is greater than last available version against other existing versions of same 'MAJOR'
+        part. Finally, requesting 'MAJOR' level will require that the specified version is greater than all other
+        existing versions for update, since 'MAJOR' is the highest possible semantic part.
+    :return: Status of availability of the version.
+    """
+
+    def _pad_incr(_parts, _index=None):  # type: (Tuple[int, ...], Optional[int]) -> Tuple[int, ...]
+        """
+        Pads versions to always have 3 parts in case some were omitted, then increment part index if requested.
+        """
+        _parts = list(_parts) + [0] * max(0, 3 - len(_parts))
+        if _index is not None:
+            _parts[_index] += 1
+        return tuple(_parts)
+
+    if not taken_versions:
+        return True
+
+    version = as_version_major_minor_patch(version)
+    other_versions = sorted([as_version_major_minor_patch(ver) for ver in taken_versions])
+    ver_min = other_versions[0]
+    for ver in other_versions:  # find versions just above and below specified
+        if ver == version:
+            return False
+        if version < ver:
+            # if next versions are at the same semantic level as requested one,
+            # then not an update version since another higher one is already defined
+            # handle MAJOR separately since it can only be the most recent one
+            if version_level == VersionLevel.MINOR:
+                if _pad_incr(version[:1]) == _pad_incr(ver[:1]):
+                    return False
+            elif version_level == VersionLevel.PATCH:
+                if _pad_incr(version[:2]) == _pad_incr(ver[:2]):
+                    return False
+            break
+        ver_min = ver
+    else:
+        # major update must be necessarily the last version,
+        # so no lower version found to break out of loop
+        if version_level == VersionLevel.MAJOR:
+            return _pad_incr(version[:1]) > _pad_incr(other_versions[-1][:1])
+
+    # if found previous version and next version was not already taken
+    # the requested one must be one above previous one at same semantic level,
+    # and must be one below the upper semantic level to be an available version
+    if version_level == VersionLevel.MAJOR:
+        min_version = _pad_incr(ver_min[:1], 0)
+        max_version = (float("inf"), float("inf"), float("inf"))
+    elif version_level == VersionLevel.MINOR:
+        min_version = _pad_incr(ver_min[:2], 1)
+        max_version = _pad_incr(ver_min[:2], 0)
+    elif version_level == VersionLevel.PATCH:
+        min_version = _pad_incr(ver_min[:3], 2)
+        max_version = _pad_incr(ver_min[:2], 1)
+    else:
+        raise NotImplementedError(f"Unknown version level: {version_level!s}")
+    return min_version <= tuple(version) < max_version
 
 
 def is_uuid(maybe_uuid):

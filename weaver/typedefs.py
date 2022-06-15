@@ -6,6 +6,7 @@ if TYPE_CHECKING:
     import typing
     import uuid
     from datetime import datetime
+    from distutils.version import LooseVersion
     from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Type, Union
 
     import psutil
@@ -84,6 +85,7 @@ if TYPE_CHECKING:
     AnyValueType = Optional[ValueType]  # avoid naming ambiguity with PyWPS AnyValue
     AnyKey = Union[str, int]
     AnyUUID = Union[str, uuid.UUID]
+    AnyVersion = Union[LooseVersion, Number, str, Tuple[int, ...], List[int]]
     # add more levels of explicit definitions than necessary to simulate JSON recursive structure better than 'Any'
     # amount of repeated equivalent definition makes typing analysis 'work well enough' for most use cases
     _JSON: TypeAlias = "JSON"
