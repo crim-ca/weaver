@@ -4,11 +4,9 @@ Stores to read/write data to from/to `MongoDB` using pymongo.
 
 import logging
 import uuid
-from distutils.version import LooseVersion
 from typing import TYPE_CHECKING
 
 import pymongo
-from pymongo import ASCENDING, DESCENDING
 from pymongo.collation import Collation
 from pymongo.collection import ReturnDocument
 from pymongo.errors import DuplicateKeyError
@@ -230,7 +228,7 @@ class ListingMixin(object):
                 "cause": "sort",
                 "value": str(sort_field),
             })
-        sort_order = DESCENDING if sort in (Sort.FINISHED, Sort.CREATED) else ASCENDING
+        sort_order = pymongo.DESCENDING if sort in (Sort.FINISHED, Sort.CREATED) else pymongo.ASCENDING
         return {sort: sort_order}
 
     @staticmethod
@@ -473,20 +471,33 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
                        limit=None,          # type: Optional[int]
                        sort=None,           # type: Optional[str]
                        total=False,         # type: bool
+                       revisions=False,     # type: bool
+                       process=None,        # type: Optional[str]
                        ):                   # type: (...) -> Union[List[Process], Tuple[List[Process], int]]
         """
         Lists all processes in database, optionally filtered by `visibility`.
 
         :param visibility: One or many value amongst :class:`Visibility`.
-        :param page: page number to return when using result paging.
-        :param limit: number of processes per page when using result paging.
-        :param sort: field which is used for sorting results (default: process ID, descending).
-        :param total: request the total number of processes to be calculated (ignoring paging).
+        :param page: Page number to return when using result paging.
+        :param limit: Number of processes per page when using result paging.
+        :param sort: Field which is used for sorting results (default: process ID, descending).
+        :param total: Request the total number of processes to be calculated (ignoring paging).
+        :param revisions: Include all process revisions instead of only latest ones.
+        :param process: Limit results only to specified process ID (makes sense mostly when combined with revisions).
         :returns:
             List of sorted, and possibly page-filtered, processes matching queries.
             If ``total`` was requested, return a tuple of this list and the number of processes.
         """
-        search_filters = {}
+        search_filters = {}  # type: MongodbSearchFilter
+
+        if process and revisions:
+            search_filters["identifier"] = {"$regex": rf"^{process}(:.*)?$"}  # revisions of that process
+        elif process and not revisions:
+            search_filters["identifier"] = process  # not very relevant 'listing', but valid (explicit ID)
+        elif not process and not revisions:
+            search_filters["identifier"] = {"$regex": r"^[\w\-]+$"}  # exclude ':' to keep only latest (default)
+        # otherwise, last case returns 'everything', so nothing to 'filter'
+
         if visibility is None:
             visibility = Visibility.values()
         if not isinstance(visibility, list):
@@ -504,7 +515,12 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         if sort in [Sort.ID, Sort.PROCESS]:
             sort = Sort.ID_LONG
         sort_allowed = list(SortMethods.PROCESS) + ["_id"]
-        sort_method = {"$sort": self._apply_sort_method(sort, Sort.ID_LONG, sort_allowed)}
+        sort_fields = self._apply_sort_method(sort, Sort.ID_LONG, sort_allowed)
+        if revisions and sort in [Sort.ID, Sort.ID_LONG, Sort.PROCESS]:
+            # if listing many revisions, sort by version on top of ID to make listing more natural
+            sort_version = self._apply_sort_method(Sort.VERSION, Sort.VERSION, sort_allowed)
+            sort_fields.update(sort_version)
+        sort_method = {"$sort": sort_fields}
 
         search_pipeline = [{"$match": search_filters}, sort_method]
         paging_pipeline = self._apply_paging_pipeline(page, limit)
@@ -528,26 +544,33 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
 
         If ``visibility=None``, the process is retrieved (if existing) regardless of its visibility value.
 
-        :param process_id: process identifier
-        :param visibility: one value amongst :py:mod:`weaver.visibility`.
+        :param process_id: Process identifier (optionally with version tag).
+        :param visibility: One value amongst :py:mod:`weaver.visibility`.
         :return: An instance of :class:`weaver.datatype.Process`.
         """
-        version = ""
+        ver_str = version = None
+        process_ref = process_id
         if ":" in process_id:
             process_id, version = process_id.split(":", 1)
         sane_name = get_sane_name(process_id, **self.sane_name_config)
+        search = {"identifier": sane_name}
         if version:
-            sane_name += ":" + as_version_major_minor_patch(version, VersionFormat.STRING)
-        process = self.collection.find_one({"identifier": sane_name})
+            ver_str = as_version_major_minor_patch(version, VersionFormat.STRING)
+            sane_tag = sane_name + ":" + ver_str
+            search = {"$or": [{"identifier": sane_name, "version": ver_str}, {"identifier": sane_tag}]}
+        process = self.collection.find_one(search)
         if not process:
-            raise ProcessNotFound(f"Process '{sane_name}' could not be found.")
+            raise ProcessNotFound(f"Process '{process_ref}' could not be found.")
         process = Process(process)
+        if version:
+            process.id = process_id  # replace tagged ID to make it transparent of version
+            process.version = ver_str
         if visibility is not None and process.visibility != visibility:
-            raise ProcessNotAccessible(f"Process '{sane_name}' cannot be accessed.")
+            raise ProcessNotAccessible(f"Process '{process_ref}' cannot be accessed.")
         return process
 
-    def find_versions(self, process_id, version_format):
-        # type: (str, VersionFormat) -> List[LooseVersion]
+    def find_versions(self, process_id, version_format=VersionFormat.OBJECT):
+        # type: (str, VersionFormat) -> List[AnyVersion]
         """
         Retrieves all existing versions of a given process.
         """
@@ -556,13 +579,14 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         versions = self.collection.find(
             filter={"identifier": version_name},
             projection={"_id": False, "version": True},
+            sort=[(Sort.VERSION, pymongo.ASCENDING)],
         )
         return [as_version_major_minor_patch(ver["version"], version_format) for ver in versions]
 
     def update_version(self, process_id, version):
         # type: (str, AnyVersion) -> Process
         """
-        Update the specified (latest) process ID to represent the indicated version.
+        Updates the specified (latest) process ID to represent the indicated (older) version.
         """
         sane_name = get_sane_name(process_id, **self.sane_name_config)
         version = as_version_major_minor_patch(version, VersionFormat.STRING)
@@ -571,8 +595,8 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         new_name = sane_name + ":" + version
         process = self.collection.find_one_and_update(
             filter={"identifier": sane_name},
-            update={"identifier": new_name, "version": version},
-            return_document=ReturnDocument.AFTER
+            update={"$set": {"identifier": new_name, "version": version}},
+            return_document=ReturnDocument.AFTER,
         )
         if not process:
             raise ProcessNotFound(f"Process '{sane_name}' could not be found for version update.")
@@ -734,7 +758,7 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
         For user-specific access to available jobs, use :meth:`MongodbJobStore.find_jobs` instead.
         """
         jobs = []
-        for job in self.collection.find().sort("id", ASCENDING):
+        for job in self.collection.find().sort(Sort.ID, pymongo.ASCENDING):
             jobs.append(Job(job))
         return jobs
 
@@ -1086,7 +1110,7 @@ class MongodbQuoteStore(StoreQuotes, MongodbStore):
         Lists all quotes in `MongoDB` storage.
         """
         quotes = []
-        for quote in self.collection.find().sort("id", ASCENDING):
+        for quote in self.collection.find().sort("id", pymongo.ASCENDING):
             quotes.append(Quote(quote))
         return quotes
 
@@ -1108,7 +1132,7 @@ class MongodbQuoteStore(StoreQuotes, MongodbStore):
         if sort not in SortMethods.QUOTE:
             raise QuoteNotFound(f"Invalid sorting method: '{sort!s}'")
 
-        sort_order = ASCENDING
+        sort_order = pymongo.ASCENDING
         sort_criteria = [(sort, sort_order)]
         found = self.collection.find(search_filters)
         count = found.count()
@@ -1162,7 +1186,7 @@ class MongodbBillStore(StoreBills, MongodbStore):
         Lists all bills in `MongoDB` storage.
         """
         bills = []
-        for bill in self.collection.find().sort("id", ASCENDING):
+        for bill in self.collection.find().sort(Sort.ID, pymongo.ASCENDING):
             bills.append(Bill(bill))
         return bills
 
@@ -1184,7 +1208,7 @@ class MongodbBillStore(StoreBills, MongodbStore):
         if sort not in SortMethods.BILL:
             raise BillNotFound(f"Invalid sorting method: '{sort!r}'")
 
-        sort_order = ASCENDING
+        sort_order = pymongo.ASCENDING
         sort_criteria = [(sort, sort_order)]
         found = self.collection.find(search_filters)
         count = found.count()

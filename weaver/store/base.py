@@ -1,6 +1,7 @@
 import abc
-from distutils.version import LooseVersion
 from typing import TYPE_CHECKING
+
+from weaver.utils import VersionFormat
 
 if TYPE_CHECKING:
     import datetime
@@ -92,6 +93,8 @@ class StoreProcesses(StoreInterface):
                        limit=None,          # type: Optional[int]
                        sort=None,           # type: Optional[str]
                        total=False,         # type: bool
+                       revisions=False,     # type: bool
+                       process=None,        # type: Optional[str]
                        ):                   # type: (...) -> Union[List[Process], Tuple[List[Process], int]]
         raise NotImplementedError
 
@@ -101,8 +104,8 @@ class StoreProcesses(StoreInterface):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def find_versions(self, process_id, version_format):
-        # type: (str, VersionFormat) -> List[LooseVersion]
+    def find_versions(self, process_id, version_format=VersionFormat.OBJECT):
+        # type: (str, VersionFormat) -> List[AnyVersion]
         raise NotImplementedError
 
     @abc.abstractmethod

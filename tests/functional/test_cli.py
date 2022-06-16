@@ -245,10 +245,12 @@ class TestWeaverClient(TestWeaverClientBase):
 
     def test_describe(self):
         result = mocked_sub_requests(self.app, self.client.describe, self.test_process["Echo"])
+        assert self.test_payload["Echo"]["version"] == "1.0", "Original version submitted should be partial."
+
         assert result.success
         # see deployment file for details that are expected here
         assert result.body["id"] == self.test_process["Echo"]
-        assert result.body["version"] == "1.0"
+        assert result.body["version"] == "1.0.0", "Resulting version missing MAJOR.MINOR.PATCH parts should be padded."
         assert result.body["keywords"] == ["test", "application"]  # app is added by Weaver since not CWL Workflow
         assert "message" in result.body["inputs"]
         assert result.body["inputs"]["message"]["title"] == "message"

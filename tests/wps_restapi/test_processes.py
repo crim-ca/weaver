@@ -270,6 +270,9 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert resp.status_code == 400
         assert "ListingInvalidParameter" in resp.json["error"]
 
+    def test_get_processes_with_revisions(self):
+        raise NotImplementedError  # FIXME
+
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
         resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
@@ -665,10 +668,9 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert resp.status_code == 400
         assert "'Deploy.DeployCWL.id': 'Missing required field.'" in resp.json["cause"]
 
-    def deploy_process_CWL_direct(self, content_type, graph_count=0):
-        p_id = "test-direct-cwl-json"
+    def deploy_process_CWL_direct(self, content_type, graph_count=0, process_id="test-direct-cwl-json", version=None):
         cwl_core = {
-            "id": p_id,
+            "id": process_id,
             "class": "CommandLineTool",
             "baseCommand": ["python3", "-V"],
             "inputs": {},
@@ -684,6 +686,8 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         cwl = {}
         cwl_base = {"cwlVersion": "v1.0"}
         cwl.update(cwl_base)
+        if version:
+            cwl["version"] = version
         if graph_count:
             cwl["$graph"] = [cwl_core] * graph_count
         else:
@@ -691,8 +695,8 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         if "yaml" in content_type:
             cwl = yaml.safe_dump(cwl, sort_keys=False)
         headers = {"Content-Type": content_type}
-        desc = self.deploy_process_make_visible_and_fetch_deployed(cwl, p_id, headers=headers, assert_io=False)
-        pkg = self.get_application_package(p_id)
+        desc = self.deploy_process_make_visible_and_fetch_deployed(cwl, process_id, headers=headers, assert_io=False)
+        pkg = self.get_application_package(process_id)
         assert desc["deploymentProfile"] == "http://www.opengis.net/profiles/eoc/dockerizedApplication"
 
         # once parsed, CWL I/O are converted to listing form
@@ -707,7 +711,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
 
         # process description should have been generated with relevant I/O
         proc = desc["process"]
-        assert proc["id"] == p_id
+        assert proc["id"] == process_id
         assert proc["inputs"] == []
         assert proc["outputs"] == [{
             "id": "output",
@@ -715,6 +719,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             "schema": {"type": "string", "contentMediaType": "text/plain"},
             "formats": [{"default": True, "mediaType": "text/plain"}]
         }]
+        return cwl
 
     def test_deploy_process_CWL_direct_JSON(self):
         self.deploy_process_CWL_direct(ContentType.APP_CWL_JSON)
@@ -1087,6 +1092,96 @@ class WpsRestApiProcessesTest(unittest.TestCase):
     @pytest.mark.skip(reason="not implemented")
     def test_deploy_process_WPS3_DescribeProcess_executionUnit(self):
         raise NotImplementedError
+
+    def test_update_process_not_found(self):
+        resp = self.app.patch_json("/processes/not-found", params={}, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 404
+
+    def test_update_process_no_data(self):
+        p_id = "test-update-no-data"
+        self.deploy_process_CWL_direct(ContentType.APP_JSON, process_id=p_id)
+        resp = self.app.patch_json(f"/processes/{p_id}", params={}, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 400
+        assert resp.json["cause"] == "No parameters provided for update."
+
+        data = {"description": None, "title": None}
+        resp = self.app.patch_json(f"/processes/{p_id}", params=data, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 400
+        assert resp.json["cause"] == "No parameters provided for update."
+
+    def test_update_process_latest_valid(self):
+        p_id = "test-update-cwl-json"
+        self.deploy_process_CWL_direct(ContentType.APP_JSON, process_id=p_id)
+        data = {
+            "description": "New description",
+            "title": "Another title",
+        }
+        resp = self.app.patch_json(f"/processes/{p_id}", params=data, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.json["processSummary"]["title"] == data["title"]
+        assert resp.json["processSummary"]["description"] == data["description"]
+
+        resp = self.app.get(f"/processes/{p_id}", headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.json["title"] == data["title"]
+        assert resp.json["description"] == data["description"]
+
+    def test_update_process_older_valid(self):
+        p_id = "test-update-cwl-json"
+        version = "1.2.3"
+        self.deploy_process_CWL_direct(ContentType.APP_JSON, process_id=p_id, version=version)
+        resp = self.app.get(f"/processes/{p_id}", headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.json["version"] == version
+        assert "description" not in resp.json
+
+        data = {
+            "description": "New description",
+            "title": "Another title",
+        }
+        resp = self.app.patch_json(f"/processes/{p_id}:{version}", params=data, headers=self.json_headers)
+        assert resp.status_code == 200
+
+        resp = self.app.get(f"/processes/{p_id}", headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.json["version"] == "1.2.4", "Patch update expected"
+        assert resp.json["title"] == data["title"]
+        assert resp.json["description"] == data["description"]
+
+        data = {
+            "title": "Another change with version",
+            "version": "1.2.7",  # doesn't have to be the one right after latest (as long as greater than 1.2.4)
+        }
+        resp = self.app.patch_json(f"/processes/{p_id}:{version}", params=data, headers=self.json_headers)
+        assert resp.status_code == 200
+
+        # check final result with both explicit '1.2.7' version and new 'latest'
+        for p_ref in [p_id, f"{p_id}:1.2.7"]:
+            resp = self.app.get(f"/processes/{p_ref}", headers=self.json_headers)
+            assert resp.status_code == 200
+            assert resp.json["version"] == data["version"], "Specific version update expected"
+            assert resp.json["title"] == data["title"]
+            assert "description" not in resp.json, (
+                "Not modified since no new value, value from reference process must be used. "
+                "Must not make use of the intermediate '1.2.4' version, as '1.2.3' was explicitly requested as reference."
+            )
+
+    def test_replace_process_latest_valid(self):
+        p_id = "test-update-cwl-json"
+        self.deploy_process_CWL_direct(ContentType.APP_JSON, process_id=p_id)
+        data = {
+            "description": "New description",
+            "title": "Another title",
+        }
+        resp = self.app.patch_json(f"/processes/{p_id}", params=data, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.json["processSummary"]["title"] == data["title"]
+        assert resp.json["processSummary"]["description"] == data["description"]
+
+        resp = self.app.get(f"/processes/{p_id}", headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.json["title"] == data["title"]
+        assert resp.json["description"] == data["description"]
 
     def test_delete_process_success(self):
         path = f"/processes/{self.process_public.identifier}"

@@ -283,7 +283,7 @@ class SLUG(ExtendedSchemaNode):
 
 class Tag(ExtendedSchemaNode):
     schema_type = String
-    description = "Identifier with tagged version forming an unique reference."
+    description = "Identifier with optional tagged version forming an unique reference."
     # ranges used to remove starting/ending ^$ characters
     pattern = SLUG.pattern[:-1] + rf"(:{SemanticVersion(v_prefix=False, rc_suffix=False).pattern[1:-1]})?$"
 
@@ -2810,13 +2810,17 @@ class ProcessSummary(
     _sort_first = PROCESS_DESCRIPTION_FIELD_FIRST
     _sort_after = PROCESS_DESCRIPTION_FIELD_AFTER
 
+    id = ProcessIdentifierTag(description="Process identifier or tagged representation if revision was requested.")
+
 
 class ProcessSummaryList(ExtendedSequenceSchema):
     summary = ProcessSummary()
 
 
 class ProcessNamesList(ExtendedSequenceSchema):
-    process_name = ProcessIdentifier()
+    process_name = ProcessIdentifierTag(
+        description="Process identifier or tagged representation if revision was requested."
+    )
 
 
 class ProcessListing(OneOfKeywordSchema):
@@ -4290,22 +4294,75 @@ class PostProcessesEndpoint(ExtendedMappingSchema):
     })
 
 
+class UpdateInputOutputBase(DescriptionType, InputOutputDescriptionMeta):
+    pass
+
+
+class UpdateInputOutputItem(InputIdentifierType, UpdateInputOutputBase):
+    pass
+
+
+class UpdateInputOutputList(ExtendedSequenceSchema):
+    io_item = UpdateInputOutputItem()
+
+
+class UpdateInputOutputMap(PermissiveMappingSchema):
+    io_id = UpdateInputOutputBase(
+        variable="{input-output-id}",
+        description="Input/Output definition under mapping for process update."
+    )
+
+
+class UpdateInputOutputDefinition(OneOfKeywordSchema):
+    _one_of = [
+        UpdateInputOutputMap(),
+        UpdateInputOutputList(),
+    ]
+
+
 class PatchProcessBodySchema(UpdateVersion):
-    description = ExtendedSchemaNode(String(), missing=drop, description="New description to override current one.")
+    title = ExtendedSchemaNode(String(), missing=drop, description=(
+        "New title to override current one. "
+        "Automatic change version level: PATCH."
+    ))
+    description = ExtendedSchemaNode(String(), missing=drop, description=(
+        "New description to override current one. "
+        "Automatic change version level: PATCH."
+    ))
     keywords = KeywordList(missing=drop, description=(
-        "Keywords to add to existing definitions. "
+        "Keywords to add (append) to existing definitions. "
         "To remove all keywords, submit an empty list. "
-        "To replace keywords, perform two requests, one with empty list and the following one with new definitions."
+        "To replace keywords, perform two requests, one with empty list and the following one with new definitions. "
+        "Automatic change version level: PATCH."
     ))
     metadata = MetadataList(missing=drop, description=(
-        "Metadata to add to existing definitions. "
+        "Metadata to add (append) to existing definitions. "
         "To remove all metadata, submit an empty list. "
-        "To replace metadata, perform two requests, one with empty list and the following one with new definitions."
+        "To replace metadata, perform two requests, one with empty list and the following one with new definitions. "
+        "Relations must be unique across existing and new submitted metadata. "
+        "Automatic change version level: PATCH."
+    ))
+    links = LinkList(missing=drop, description=(
+        "Links to add (append) to existing definitions. Relations must be unique. "
+        "To remove all (additional) links, submit an empty list. "
+        "To replace links, perform two requests, one with empty list and the following one with new definitions. "
+        "Note that modifications to links only considers custom links. Other automatically generated links such as "
+        "API endpoint and navigation references cannot be removed or modified. "
+        "Relations must be unique across existing and new submitted links. "
+        "Automatic change version level: PATCH."
+    ))
+    inputs = UpdateInputOutputDefinition(missing=drop, description=(
+        "Update details of individual input elements. "
+        "Automatic change version level are the same as top level fields of the process for corresponding names."
+    ))
+    outputs = UpdateInputOutputDefinition(missing=drop, description=(
+        "Update details of individual output elements. "
+        "Automatic change version level are the same as top level fields of the process for corresponding names."
     ))
 
 
-class PutProcessBodySchema(Deploy, UpdateVersion):
-    pass
+class PutProcessBodySchema(Deploy):
+    description = "Process re-deployment using an updated version and definition."
 
 
 class PatchProcessEndpoint(ProcessPath):
@@ -4514,6 +4571,21 @@ class ProcessDetailQuery(ExtendedMappingSchema):
     )
 
 
+class ProcessRevisionsQuery(ExtendedMappingSchema):
+    process = ProcessIdentifier(missing=drop, description=(
+        "Process ID (excluding version) for which to filter results. "
+        "When combined with 'revisions=true', allows listing of all reversions of a given process. "
+        "If omitted when 'revisions=true', all revisions of every process ID will be returned. "
+        "If used without 'revisions' query, list should include a single process as if summary was requested directly."
+    ))
+    revisions = ExtendedSchemaNode(
+        QueryBoolean(), example=True, default=False, missing=drop, description=(
+            "Return all revisions of processes, or simply their latest version. When returning all revisions, "
+            "IDs will be replaced by '{processID}:{version}' tag representation to avoid duplicates."
+        )
+    )
+
+
 class ProviderProcessesQuery(ProcessPagingQuery, ProcessDetailQuery):
     pass
 
@@ -4563,15 +4635,35 @@ class OWSExceptionResponse(ExtendedMappingSchema):
                                  description="Specific description of the error.")
 
 
+class ErrorCause(OneOfKeywordSchema):
+    _one_of = [
+        ExtendedSchemaNode(String(), description="Error message from exception or cause of failure."),
+        PermissiveMappingSchema(description="Relevant error fields with details about the cause."),
+    ]
+
+
 class ErrorJsonResponseBodySchema(ExtendedMappingSchema):
-    code = OWSErrorCode()
-    description = ExtendedSchemaNode(String(), description="Detail about the cause of error.")
+    schema_ref = f"{OGC_API_SCHEMA_URL}/{OGC_API_SCHEMA_VERSION}/core/openapi/schemas/exception.yaml"
+    description = "JSON schema for exceptions based on RFC 7807"
+    type = OWSErrorCode()
+    title = ExtendedSchemaNode(String(), description="Short description of the error.", missing=drop)
+    detail = ExtendedSchemaNode(String(), description="Detail about the error cause.", missing=drop)
+    status = ExtendedSchemaNode(Integer(), description="Error status code.", example=400)
+    cause = ErrorCause(missing=drop)
+    value = ErrorCause(missing=drop)
     error = ErrorDetail(missing=drop)
+    instance = ExtendedSchemaNode(String(), missing=drop)
     exception = OWSExceptionResponse(missing=drop)
 
 
 class BadRequestResponseSchema(ExtendedMappingSchema):
     description = "Incorrectly formed request contents."
+    header = ResponseHeaders()
+    body = ErrorJsonResponseBodySchema()
+
+
+class ConflictRequestResponseSchema(ExtendedMappingSchema):
+    description = "Conflict between the affected entity an another existing definition."
     header = ResponseHeaders()
     body = ErrorJsonResponseBodySchema()
 
@@ -4663,7 +4755,7 @@ class OkGetProviderProcessesSchema(ExtendedMappingSchema):
     body = ProviderProcessesSchema()
 
 
-class GetProcessesQuery(ProcessPagingQuery, ProcessDetailQuery):
+class GetProcessesQuery(ProcessPagingQuery, ProcessDetailQuery, ProcessRevisionsQuery):
     providers = ExtendedSchemaNode(
         QueryBoolean(), example=True, default=False, missing=drop,
         description="List local processes as well as all sub-processes of all registered providers. "
@@ -4717,6 +4809,7 @@ class OkGetProcessesListResponse(ExtendedMappingSchema):
 
 
 class OkPostProcessDeployBodySchema(ExtendedMappingSchema):
+    description = ExtendedSchemaNode(String(), description="Detail about the operation.")
     deploymentDone = ExtendedSchemaNode(Boolean(), default=False, example=True,
                                         description="Indicates if the process was successfully deployed.")
     processSummary = ProcessSummary(missing=drop, description="Deployed process summary if successful.")
@@ -4728,6 +4821,17 @@ class OkPostProcessesResponse(ExtendedMappingSchema):
     description = "Process successfully deployed."
     header = ResponseHeaders()
     body = OkPostProcessDeployBodySchema()
+
+
+class OkPatchProcessUpdatedBodySchema(ExtendedMappingSchema):
+    description = ExtendedSchemaNode(String(), description="Detail about the operation.")
+    processSummary = ProcessSummary(missing=drop, description="Deployed process summary if successful.")
+
+
+class OkPatchProcessResponse(ExtendedMappingSchema):
+    description = "Process successfully updated."
+    header = ResponseHeaders()
+    body = OkPatchProcessUpdatedBodySchema()
 
 
 class BadRequestGetProcessInfoResponse(ExtendedMappingSchema):
@@ -5172,12 +5276,22 @@ post_processes_responses = {
             "value": EXAMPLES["local_process_deploy_success.json"],
         }
     }),
+    "400": BadRequestResponseSchema(description="Unable to parse process definition"),
+    "409": ConflictRequestResponseSchema(description="Process with same ID already exists."),
+    "422": UnprocessableEntityResponseSchema(description="Invalid schema for process definition."),
     "500": InternalServerErrorResponseSchema(),
 }
+put_process_responses = copy(post_processes_responses)
+put_process_responses.update({
+    "404": NotFoundProcessResponse(description="Process to update could not be found."),
+    "409": ConflictRequestResponseSchema(description="Process with same ID or version already exists."),
+})
 patch_process_responses = {
-    "200": OkGetProcessInfoResponse(description="success"),
-    "400": BadRequestGetProcessInfoResponse(),
-    "404": NotFoundProcessResponse(),
+    "200": OkPatchProcessResponse(description="success"),
+    "400": BadRequestGetProcessInfoResponse(description="Unable to parse process definition"),
+    "404": NotFoundProcessResponse(description="Process to update could not be found."),
+    "409": ConflictRequestResponseSchema(description="Process with same ID or version already exists."),
+    "422": UnprocessableEntityResponseSchema(description="Invalid schema for process definition."),
     "500": InternalServerErrorResponseSchema(),
 }
 get_process_responses = {

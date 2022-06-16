@@ -18,7 +18,7 @@ from weaver.wps_restapi import swagger_definitions as sd
 if TYPE_CHECKING:
     from typing import Dict, List, Optional, Tuple
 
-    from weaver.datatype import Service
+    from weaver.datatype import Service, Process
     from weaver.typedefs import JSON
 
 LOGGER = logging.getLogger(__name__)
@@ -35,6 +35,8 @@ def get_processes_filtered_by_valid_schemas(request):
     with_providers = False
     if get_weaver_configuration(settings) in WeaverFeature.REMOTE:
         with_providers = asbool(request.params.get("providers", False))
+    revisions_param = sd.ProcessRevisionsQuery(unknown="ignore").deserialize(request.params)
+    with_revisions = revisions_param.get("revisions")
     paging_query = sd.ProcessPagingQuery()
     paging_value = {param.name: param.default for param in paging_query.children}
     paging_names = set(paging_value)
@@ -47,14 +49,20 @@ def get_processes_filtered_by_valid_schemas(request):
         })
 
     store = get_db(request).get_store(StoreProcesses)
-    processes, total_local_processes = store.list_processes(visibility=Visibility.PUBLIC, total=True, **paging_param)
+    processes, total_local_processes = store.list_processes(
+        visibility=Visibility.PUBLIC,
+        total=True,
+        **revisions_param,
+        **paging_param
+    )
     valid_processes = []
     invalid_processes_ids = []
-    for process in processes:
+    for process in processes:  # type: Process
         try:
-            valid_processes.append(process.summary())
+            valid_processes.append(process.summary(revision=with_revisions))
         except colander.Invalid as invalid:
-            LOGGER.debug("Invalid process [%s] because:\n%s", process.identifier, invalid)
+            process_ref = process.tag if with_revisions else process.identifier
+            LOGGER.debug("Invalid process [%s] because:\n%s", process_ref, invalid)
             invalid_processes_ids.append(process.identifier)
     return valid_processes, invalid_processes_ids, paging_param, with_providers, total_local_processes
 

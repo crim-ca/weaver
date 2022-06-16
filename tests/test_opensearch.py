@@ -177,6 +177,7 @@ def test_deploy_opensearch():
         stack.enter_context(mock.patch("weaver.wps_restapi.processes.processes.get_db", side_effect=MockDB))
         stack.enter_context(mock.patch("weaver.wps_restapi.processes.utils.get_db", side_effect=MockDB))
         stack.enter_context(mock.patch("weaver.wps_restapi.processes.utils.get_settings", side_effect=_get_mocked))
+        stack.enter_context(mock.patch("weaver.datatype.get_settings", side_effect=_get_mocked))
         stack.enter_context(mock.patch("weaver.processes.utils.get_db", side_effect=MockDB))
         stack.enter_context(mock.patch("weaver.processes.utils.get_settings", side_effect=_get_mocked))
         # given

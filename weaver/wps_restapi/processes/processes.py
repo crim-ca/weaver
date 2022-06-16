@@ -1,12 +1,9 @@
-import copy
-
 import logging
 from typing import TYPE_CHECKING
 
 import colander
 from pyramid.httpexceptions import (
     HTTPBadRequest,
-    HTTPConflict,
     HTTPException,
     HTTPForbidden,
     HTTPNotFound,
@@ -21,15 +18,14 @@ from weaver.exceptions import ProcessNotFound, ServiceException, log_unhandled_e
 from weaver.formats import OutputFormat, repr_json
 from weaver.processes import opensearch
 from weaver.processes.execution import submit_job
-from weaver.processes.utils import deploy_process_from_payload, get_process
+from weaver.processes.utils import deploy_process_from_payload, get_process, update_process_metadata
 from weaver.status import Status
 from weaver.store.base import StoreJobs, StoreProcesses
-from weaver.utils import VersionLevel, as_version_major_minor_patch, fully_qualified_name, get_any_id, is_update_version
+from weaver.utils import clean_json_text_body, fully_qualified_name, get_any_id
 from weaver.visibility import Visibility
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.processes.utils import get_process_list_links, get_processes_filtered_by_valid_schemas
 from weaver.wps_restapi.providers.utils import get_provider_services
-from weaver.wps_restapi.utils import parse_content
 
 if TYPE_CHECKING:
     from weaver.typedefs import JSON, AnyViewResponse, PyramidRequest
@@ -132,9 +128,15 @@ def get_processes(request):
         })
     except HTTPException:
         raise
-    # FIXME: handle colander invalid directly in tween (https://github.com/crim-ca/weaver/issues/112)
-    except colander.Invalid as ex:
-        raise HTTPBadRequest(f"Invalid schema: [{ex!s}]")
+    except colander.Invalid as exc:
+        raise HTTPBadRequest(json={
+            "type": "InvalidParameterValue",
+            "title": "Invalid parameter value.",
+            "description": "Submitted request parameters are invalid or could not be processed.",
+            "cause": clean_json_text_body(f"Invalid schema: [{exc.msg or exc!s}]"),
+            "error": exc.__class__.__name__,
+            "value": repr_json(exc.value, force_string=False),
+        })
 
 
 @sd.processes_service.post(tags=[sd.TAG_PROCESSES, sd.TAG_DEPLOY], renderer=OutputFormat.JSON,
@@ -146,6 +148,21 @@ def add_local_process(request):
     Register a local process.
     """
     return deploy_process_from_payload(request.text, request)  # use text to allow parsing as JSON or YAML
+
+
+@sd.process_service.put(tags=[sd.TAG_PROCESSES, sd.TAG_DEPLOY], renderer=OutputFormat.JSON,
+                        schema=sd.PutProcessEndpoint(), response_schemas=sd.put_process_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
+def put_local_process(request):
+    # type: (PyramidRequest) -> AnyViewResponse
+    """
+    Update a registered local process with a new definition.
+
+    Updates the new process MAJOR semantic version from the previous one if not specified explicitly.
+    For MINOR or PATCH changes to metadata of the process definition, consider using the PATCH request.
+    """
+    process = get_process(request=request)
+    return deploy_process_from_payload(request.text, request, overwrite=process)
 
 
 @sd.process_service.patch(tags=[sd.TAG_PROCESSES, sd.TAG_DEPLOY], renderer=OutputFormat.JSON,
@@ -161,110 +178,7 @@ def patch_local_process(request):
     Changes to properties that might impact process operation such as supported formats implies MINOR update.
     Changes that completely redefine the process require a MAJOR update using PUT request.
     """
-    data = parse_content(request, content_schema=sd.PatchProcessBodySchema)
-    store = get_db(request).get_store(StoreProcesses)
-    process = get_process(request=request, store=store)  # latest if only 'processId', or specific version if using tag
-    if not process.mutable:
-        raise HTTPForbidden(json={
-            "title": "Process immutable.",
-            "type": "ProcessImmutable",
-            "detail": "Cannot update an immutable process.",
-            "status": HTTPForbidden.code,
-            "cause": {"mutable": False}
-        })
-
-    # apply requested changes for update
-    # (see 'PatchProcessBodySchema' for specific handling based on unspecified/null/empty-list)
-    description = data.get("description")
-    keywords = data.get("keywords")
-    metadata = data.get("metadata")
-    links = data.get("links")
-    update_level = VersionLevel.PATCH  # metadata only
-    try:
-        any_update = False
-        if description is not None:
-            any_update = True
-            process.description = description
-        if isinstance(keywords, list):
-            any_update = True
-            if not len(keywords):
-                process.keywords = []
-            else:
-                keys = copy.deepcopy(process.keywords)
-                keys.extend(keywords)
-                process.keywords = keys
-        if isinstance(metadata, list):
-            any_update = True
-            if not len(metadata):
-                process.metadata = []
-            else:
-                meta = copy.deepcopy(process.metadata)
-                meta.extend(metadata)
-                process.metadata = meta
-        if isinstance(links, list):
-            any_update = True
-            if not len(links):
-                process.additional_links = []
-            else:
-                x_links = copy.deepcopy(process.additional_links)
-                x_links.extend(links)
-                process.additional_links = x_links
-        if not any_update:
-            raise colander.Invalid(None, msg="No parameters provided for update.")
-    except colander.Invalid as exc:
-        raise HTTPBadRequest(json={
-            "code": "ProcessInvalidParameter",
-            "description": "Process update parameters failed validation.",
-            "error": colander.Invalid.__name__,
-            "cause": str(exc),
-            "value": repr_json(exc.value, force_string=False),
-        })
-
-    # employ user provided version or bump to next PATCH version from selected process
-    # must be tested in both cases against available versions since selected process is not necessarily the latest
-    version = data.get("version")
-    old_version = process.version
-    if not version:
-        new_version = as_version_major_minor_patch(old_version)
-        if update_level == VersionLevel.PATCH:
-            new_version[2] += 1  # bump PATCH
-        elif update_level == VersionLevel.MINOR:
-            new_version[1] += 1  # bump MINOR
-    else:
-        new_version = as_version_major_minor_patch(version)
-    # version must be within available range against selected process for needed update level
-    process_versions = store.find_versions(process.id)
-    if not is_update_version(new_version, process_versions, update_level):
-        raise HTTPUnprocessableEntity()
-    process.version = new_version
-
-    try:
-        old_process = store.update_version(process.id, old_version)
-        new_process = store.save_process(process)
-    except ProcessNotFound:
-        pass
-    else:
-        raise HTTPConflict()
-
-
-    return HTTPOk()
-
-
-@sd.process_service.put(tags=[sd.TAG_PROCESSES, sd.TAG_DEPLOY], renderer=OutputFormat.JSON,
-                        schema=sd.PostProcessesEndpoint(), response_schemas=sd.patch_process_responses)
-@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
-def put_local_process(request):
-    # type: (PyramidRequest) -> AnyViewResponse
-    """
-    Update a registered local process with a new definition.
-
-    Updates the new process MAJOR semantic version from the previous one if not specified explicitly.
-    For MINOR or PATCH changes to metadata definitions, consider using the PATCH request.
-    """
-    data = parse_content(request, content_schema=sd.PutProcessBodySchema)
-    store = get_db(request).get_store(StoreProcesses)
-    process = get_process(request=request, store=store)
-    return HTTPOk()
+    return update_process_metadata(request)
 
 
 @sd.process_service.get(tags=[sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS], renderer=OutputFormat.JSON,

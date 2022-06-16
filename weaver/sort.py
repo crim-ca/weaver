@@ -12,6 +12,7 @@ class Sort(Constants):
     PRICE = "price"
     ID = "id"
     ID_LONG = "identifier"  # long form employed by Processes in DB representation
+    VERSION = "version"
 
 
 class SortMethods(Constants):
@@ -20,6 +21,7 @@ class SortMethods(Constants):
         Sort.ID_LONG,  # will replace by short ID to conform with JSON representation
         Sort.PROCESS,  # since listing processes, can be an alias to ID
         Sort.CREATED,
+        Sort.VERSION,
     ])
     JOB = frozenset([
         Sort.CREATED,
