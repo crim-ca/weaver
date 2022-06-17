@@ -271,7 +271,53 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert "ListingInvalidParameter" in resp.json["error"]
 
     def test_get_processes_with_revisions(self):
-        raise NotImplementedError  # FIXME
+        """Example:
+        http://localhost:4002/processes?detail=false&revisions=true
+
+          "processes": [
+            "anti-spoofing:0.1.0",
+            "CatFile:1.0.0",
+            "ColibriFlyingpigeon_SubsetBbox",
+            "demo-cat-file:1.0.0",
+            "docker-demo-cat",
+            "docker-python-script",
+            "DockerNetCDF2Text",
+            "Echo:1.0.0",
+            "file_index_selector:1.1.0",
+            "file2string_array:1.2.0",
+            "image-utils:0.0.1",
+            "jsonarray2netcdf:1.3.0",
+            "las2tif",
+            "memory-usage",
+            "memory-usage-2",
+            "memory-usage-3",
+            "memory-usage-4",
+            "memory-usage-5",
+            "memory-usage-6",
+            "memory-usage-script",
+            "metalink2netcdf:1.2.0",
+            "OutardeFlyingpigeon_SubsetBbox",
+            "python-script",
+            "sleep",
+            "Staging_S2L1C:0.0.1",
+            "Staging_S2L1C-mock-docker:0.0.1",
+            "test_blurring:0.0.1",
+            "test_generation:0.0.1",
+            "test_workflow:0.0.1",
+            "test-echo:1.0.0",
+            "test-report",
+            "WaterExtent_S2-mock-docker:0.0.1",
+            "WorkflowWaterExtent:0.0.1",
+            "WorkflowWaterExtent-mock:0.0.1",
+            "WPS1JsonArray2NetCDF:0.0.1"
+          ],
+        """
+        # FIXME:
+        # create some processes with different combinations of revisions, no-version, single-version
+        path = get_path_kvp("/processes", revisions=True, detail=False)
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+
+        raise NotImplementedError
 
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,

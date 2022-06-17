@@ -76,9 +76,9 @@ if TYPE_CHECKING:
     from weaver.visibility import AnyVisibility
 
     MongodbValue = Union[AnyValueType, datetime.datetime]
-    MongodbSearchFilter = Dict[str, Union[MongodbValue, List[MongodbValue], Dict[str, AnyValueType]]]
-    MongodbSearchStep = Union[MongodbValue, MongodbSearchFilter]
-    MongodbSearchPipeline = List[Dict[str, Union[str, Dict[str, MongodbSearchStep]]]]
+    MongodbAggregateExpression = Dict[str, Union[MongodbValue, List[MongodbValue], Dict[str, AnyValueType]]]
+    MongodbAggregateStep = Union[MongodbValue, MongodbAggregateExpression]
+    MongodbAggregatePipeline = List[Dict[str, Union[str, Dict[str, MongodbAggregateStep]]]]
 
 LOGGER = logging.getLogger(__name__)
 
@@ -207,7 +207,7 @@ class MongodbServiceStore(StoreServices, MongodbStore):
 class ListingMixin(object):
     @staticmethod
     def _apply_paging_pipeline(page, limit):
-        # type: (Optional[int], Optional[int]) -> List[MongodbSearchStep]
+        # type: (Optional[int], Optional[int]) -> List[MongodbAggregateStep]
         if isinstance(page, int) and isinstance(limit, int):
             return [{"$skip": page * limit}, {"$limit": limit}]
         if page is None and isinstance(limit, int):
@@ -216,7 +216,7 @@ class ListingMixin(object):
 
     @staticmethod
     def _apply_sort_method(sort_field, sort_default, sort_allowed):
-        # type: (Optional[str], str, List[str]) -> MongodbSearchFilter
+        # type: (Optional[str], str, List[str]) -> MongodbAggregateExpression
         sort = sort_field  # keep original sort field in case of error
         if sort is None:
             sort = sort_default
@@ -233,7 +233,7 @@ class ListingMixin(object):
 
     @staticmethod
     def _apply_total_result(search_pipeline, extra_pipeline):
-        # type: (MongodbSearchPipeline, MongodbSearchPipeline) -> MongodbSearchPipeline
+        # type: (MongodbAggregatePipeline, MongodbAggregatePipeline) -> MongodbAggregatePipeline
         """
         Extends the pipeline operations in order to obtain the grand total of matches in parallel to other filtering.
 
@@ -488,7 +488,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
             List of sorted, and possibly page-filtered, processes matching queries.
             If ``total`` was requested, return a tuple of this list and the number of processes.
         """
-        search_filters = {}  # type: MongodbSearchFilter
+        search_filters = {}  # type: MongodbAggregateExpression
 
         if process and revisions:
             search_filters["identifier"] = {"$regex": rf"^{process}(:.*)?$"}  # revisions of that process
@@ -507,6 +507,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
             if vis not in Visibility:
                 raise ValueError(f"Invalid visibility value '{v!s}' is not one of {list(Visibility.values())!s}")
         search_filters["visibility"] = {"$in": list(visibility)}
+        insert_fields = []  # type: MongodbAggregatePipeline
 
         # processes do not have 'created', but ObjectID in '_id' has the particularity of embedding creation time
         if sort == Sort.CREATED:
@@ -517,12 +518,23 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         sort_allowed = list(SortMethods.PROCESS) + ["_id"]
         sort_fields = self._apply_sort_method(sort, Sort.ID_LONG, sort_allowed)
         if revisions and sort in [Sort.ID, Sort.ID_LONG, Sort.PROCESS]:
-            # if listing many revisions, sort by version on top of ID to make listing more natural
-            sort_version = self._apply_sort_method(Sort.VERSION, Sort.VERSION, sort_allowed)
-            sort_fields.update(sort_version)
-        sort_method = {"$sort": sort_fields}
+            # If listing many revisions, sort by version on top of ID to make listing more natural.
+            # Because the "latest version" is saved with 'id' only while "older revisions" are saved with 'id:version',
+            # that more recent version would always appear first since alphabetical sort: 'id' (latest) < 'id:version'.
+            # Work around this by dynamically reassigning 'id' by itself.
+            insert_fields = [
+                {"$set": {"tag": {"$cond": {
+                    "if": {"identifier": "/^.*:.*$/"},
+                    "then": "$identifier",
+                    "else": {"$concat": ["$identifier", ":", "$version"]},
+                }}}},
+                {"$set": {"id_version": {"$split": ["$tag", ":"]}}},
+                {"$set": {"identifier": {"$arrayElemAt": ["$id_version", 0]}}},
+            ]
+            sort_fields = {"identifier": pymongo.ASCENDING, "version": pymongo.ASCENDING}
+        sort_method = [{"$sort": sort_fields}]
 
-        search_pipeline = [{"$match": search_filters}, sort_method]
+        search_pipeline = insert_fields + [{"$match": search_filters}] + sort_method
         paging_pipeline = self._apply_paging_pipeline(page, limit)
         if total:
             pipeline = self._apply_total_result(search_pipeline, paging_pipeline)
@@ -577,7 +589,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         sane_name = get_sane_name(process_id, **self.sane_name_config)
         version_name = rf"^{sane_name}(:[0-9]+\.[0-9]+.[0-9]+)?$"
         versions = self.collection.find(
-            filter={"identifier": version_name},
+            filter={"identifier": {"$regex": version_name}},
             projection={"_id": False, "version": True},
             sort=[(Sort.VERSION, pymongo.ASCENDING)],
         )
@@ -854,7 +866,7 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
         return results
 
     def _find_jobs_grouped(self, pipeline, group_categories):
-        # type: (MongodbSearchPipeline, List[str]) -> Tuple[JobGroupCategory, int]
+        # type: (MongodbAggregatePipeline, List[str]) -> Tuple[JobGroupCategory, int]
         """
         Retrieves jobs regrouped by specified field categories and predefined search pipeline filters.
         """
@@ -892,7 +904,7 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
         return items, total
 
     def _find_jobs_paging(self, search_pipeline, page, limit):
-        # type: (MongodbSearchPipeline, Optional[int], Optional[int]) -> Tuple[List[Job], int]
+        # type: (MongodbAggregatePipeline, Optional[int], Optional[int]) -> Tuple[List[Job], int]
         """
         Retrieves jobs limited by specified paging parameters and predefined search pipeline filters.
         """
@@ -921,7 +933,7 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
 
     @staticmethod
     def _apply_access_filter(access, request):
-        # type: (AnyVisibility, Request) -> MongodbSearchFilter
+        # type: (AnyVisibility, Request) -> MongodbAggregateExpression
         search_filters = {}
         if not request:
             search_filters["access"] = Visibility.PUBLIC
@@ -943,9 +955,9 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
 
     @staticmethod
     def _apply_ref_or_type_filter(job_type, process, service):
-        # type: (Optional[str], Optional[str], Optional[str]) -> MongodbSearchFilter
+        # type: (Optional[str], Optional[str], Optional[str]) -> MongodbAggregateExpression
 
-        search_filters = {}  # type: MongodbSearchFilter
+        search_filters = {}  # type: MongodbAggregateExpression
         if job_type == "process":
             search_filters["service"] = None
         elif job_type == "provider":
@@ -971,8 +983,8 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
 
     @staticmethod
     def _apply_status_filter(status):
-        # type: (Optional[str]) -> MongodbSearchFilter
-        search_filters = {}  # type: MongodbSearchFilter
+        # type: (Optional[str]) -> MongodbAggregateExpression
+        search_filters = {}  # type: MongodbAggregateExpression
         if status in JOB_STATUS_CATEGORIES:
             category_statuses = list(JOB_STATUS_CATEGORIES[status])
             search_filters["status"] = {"$in": category_statuses}
@@ -982,7 +994,7 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
 
     @staticmethod
     def _apply_datetime_filter(datetime_interval):
-        # type: (Optional[DatetimeIntervalType]) -> MongodbSearchFilter
+        # type: (Optional[DatetimeIntervalType]) -> MongodbAggregateExpression
         search_filters = {}
         if datetime_interval is not None:
             if datetime_interval.get("after", False):
@@ -999,7 +1011,7 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
 
     @staticmethod
     def _apply_duration_filter(pipeline, min_duration, max_duration):
-        # type: (MongodbSearchPipeline, Optional[int], Optional[int]) -> MongodbSearchPipeline
+        # type: (MongodbAggregatePipeline, Optional[int], Optional[int]) -> MongodbAggregatePipeline
         """
         Generate the filter required for comparing against :meth:`Job.duration`.
 

@@ -1147,7 +1147,7 @@ class DeployMinMaxOccurs(ExtendedMappingSchema):
 # does not inherit from 'DescriptionLinks' because other 'ProcessDescription<>' schema depend from this without 'links'
 class ProcessDescriptionType(DescriptionBase, DescriptionExtra):
     id = ProcessIdentifier()
-    version = Version(missing=drop, example="1.2.3")
+    version = Version(missing=None, example="1.2.3")
     mutable = ExtendedSchemaNode(Boolean(), default=True, description=(
         "Indicates if the process is mutable (dynamically deployed), or immutable (builtin with this instance)."
     ))

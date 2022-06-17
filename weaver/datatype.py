@@ -1798,7 +1798,7 @@ class Process(Base):
         proc_id = self.id.split(":")[0]
         # bw-compat, if no version available, no update was applied (single deploy)
         # there is no need to define a tag as only one result can be found
-        # on next (if any) update request, this reversion will be updated with a default version
+        # on next (if any) update request, this revision will be updated with a default version
         if self.version is None:
             return proc_id
         version = as_version_major_minor_patch(self.version, VersionFormat.STRING)
@@ -2235,8 +2235,8 @@ class Process(Base):
             proc_hist = f"{proc_list}?detail=false&revisions=true&process={self.id}"
             links.extend([
                 {"href": proc_tag, "rel": "working-copy", "title": "Tagged version of this process description."},
-                {"href": proc_desc, "rel": "latest-version", "title": "Most recent reversion of this process."},
-                {"href": proc_hist, "rel": "version-history", "title": "Listing of all reversions of this process."},
+                {"href": proc_desc, "rel": "latest-version", "title": "Most recent revision of this process."},
+                {"href": proc_hist, "rel": "version-history", "title": "Listing of all revisions of this process."},
             ])
             versions = get_db(container).get_store(StoreProcesses).find_versions(self.id, VersionFormat.OBJECT)
             proc_ver = as_version_major_minor_patch(self.version, VersionFormat.OBJECT)
@@ -2245,12 +2245,12 @@ class Process(Base):
             if prev_ver:
                 proc_prev = f"{proc_desc}:{prev_ver[-1]!s}"
                 links.append(
-                    {"href": proc_prev, "rel": "predecessor-version", "title": "Previous reversion of this process."}
+                    {"href": proc_prev, "rel": "predecessor-version", "title": "Previous revision of this process."}
                 )
             if next_ver:
                 proc_next = f"{proc_desc}:{next_ver[0]!s}"
                 links.append(
-                    {"href": proc_next, "rel": "successor-version", "title": "Next reversion of this process."}
+                    {"href": proc_next, "rel": "successor-version", "title": "Next revision of this process."}
                 )
         if self.service:
             api_base_url = proc_list.rsplit("/", 1)[0]
