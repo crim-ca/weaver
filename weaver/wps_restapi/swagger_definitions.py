@@ -1691,19 +1691,34 @@ class ProcessIdentifierTag(Tag):
     pass
 
 
-class ProcessPath(ExtendedMappingSchema):
+class LocalProcessQuery(ExtendedMappingSchema):
+    version = Version(example="1.2.3", missing=drop, description=(
+        "Specific process version to locate. "
+        "If process ID was requested with tagged 'id:version' revision format, this parameter is ignored."
+    ))
+
+
+class LocalProcessPath(ExtendedMappingSchema):
     process_id = ProcessIdentifierTag(
         example="jsonarray2netcdf[:1.0.0]",
         description=(
             "Process identifier with optional tag version. "
-            "If tag is omitted, the latest version of that process is considered. "
-            "Otherwise, the specific revision must be matched."
+            "If tag is omitted, the latest version of that process is assumed. "
+            "Otherwise, the specific process revision as 'id:version' must be matched. "
+            "Alternatively, the plain process ID can be specified in combination to 'version' query parameter."
         ),
     )
 
 
 class ProviderPath(ExtendedMappingSchema):
     provider_id = AnyIdentifier(description="Remote provider identifier.", example="hummingbird")
+
+
+class ProviderProcessPath(ProviderPath):
+    # note: Tag representation not allowed in this case
+    process_id = ProcessIdentifier(example="provider-process", description=(
+        "Identifier of a process that is offered by the remote provider."
+    ))
 
 
 class JobPath(ExtendedMappingSchema):
@@ -2509,34 +2524,42 @@ class ProcessDescriptionQuery(ExtendedMappingSchema):
     )
 
 
-class ProviderProcessEndpoint(ProviderPath, ProcessPath):
+class ProviderProcessEndpoint(ProviderProcessPath):
     header = RequestHeaders()
     querystring = ProcessDescriptionQuery()
 
 
-class ProcessEndpoint(ProcessPath):
+class LocalProcessDescriptionQuery(ProcessDescriptionQuery, LocalProcessQuery):
+    pass
+
+
+class ProcessEndpoint(LocalProcessPath):
     header = RequestHeaders()
-    querystring = ProcessDescriptionQuery()
+    querystring = LocalProcessDescriptionQuery()
 
 
-class ProcessPackageEndpoint(ProcessPath):
+class ProcessPackageEndpoint(LocalProcessPath):
     header = RequestHeaders()
+    querystring = LocalProcessQuery()
 
 
-class ProcessPayloadEndpoint(ProcessPath):
+class ProcessPayloadEndpoint(LocalProcessPath):
     header = RequestHeaders()
+    querystring = LocalProcessQuery()
 
 
-class ProcessVisibilityGetEndpoint(ProcessPath):
+class ProcessVisibilityGetEndpoint(LocalProcessPath):
     header = RequestHeaders()
+    querystring = LocalProcessQuery()
 
 
-class ProcessVisibilityPutEndpoint(ProcessPath):
+class ProcessVisibilityPutEndpoint(LocalProcessPath):
     header = RequestHeaders()
+    querystring = LocalProcessQuery()
     body = VisibilitySchema()
 
 
-class ProviderJobEndpoint(ProviderPath, ProcessPath, JobPath):
+class ProviderJobEndpoint(ProviderProcessPath, JobPath):
     header = RequestHeaders()
 
 
@@ -2544,11 +2567,11 @@ class JobEndpoint(JobPath):
     header = RequestHeaders()
 
 
-class ProcessInputsEndpoint(ProcessPath, JobPath):
+class ProcessInputsEndpoint(LocalProcessPath, JobPath):
     header = RequestHeaders()
 
 
-class ProviderInputsEndpoint(ProviderPath, ProcessPath, JobPath):
+class ProviderInputsEndpoint(ProviderProcessPath, JobPath):
     header = RequestHeaders()
 
 
@@ -2575,7 +2598,7 @@ class JobInputsEndpoint(JobPath):
     querystring = JobInputsOutputsQuery()
 
 
-class JobOutputQuery(ExtendedMappingSchema):
+class JobResultsQuery(ExtendedMappingSchema):
     schema = ExtendedSchemaNode(
         String(),
         title="JobOutputResultsSchema",
@@ -2584,7 +2607,8 @@ class JobOutputQuery(ExtendedMappingSchema):
         validator=OneOfCaseInsensitive(JobInputsOutputsSchema.values()),
         summary="Selects the schema employed for representation of job outputs.",
         description=(
-            "Selects the schema employed for representation of job outputs for providing file Content-Type details. "
+            "Selects the schema employed for representation of job results (produced outputs) "
+            "for providing file Content-Type details. "
             f"When '{JobInputsOutputsSchema.OLD}' is employed, "
             "'format.mimeType' is used and 'type' is reported as well. "
             f"When '{JobInputsOutputsSchema.OGC}' is employed, "
@@ -2595,19 +2619,23 @@ class JobOutputQuery(ExtendedMappingSchema):
     )
 
 
-class ProcessOutputsEndpoint(ProcessPath, JobPath):
-    header = RequestHeaders()
-    querystring = JobOutputQuery()
-
-
-class ProviderOutputsEndpoint(ProviderPath, ProcessPath, JobPath):
-    header = RequestHeaders()
-    querystring = JobOutputQuery()
+class LocalProcessJobResultsQuery(LocalProcessQuery, JobResultsQuery):
+    pass
 
 
 class JobOutputsEndpoint(JobPath):
     header = RequestHeaders()
-    querystring = JobOutputQuery()
+    querystring = LocalProcessJobResultsQuery()
+
+
+class ProcessOutputsEndpoint(LocalProcessPath, JobPath):
+    header = RequestHeaders()
+    querystring = LocalProcessJobResultsQuery()
+
+
+class ProviderOutputsEndpoint(ProviderProcessPath, JobPath):
+    header = RequestHeaders()
+    querystring = JobResultsQuery()
 
 
 class ProcessResultEndpoint(ProcessOutputsEndpoint):
@@ -2625,19 +2653,19 @@ class JobResultEndpoint(JobPath):
     header = RequestHeaders()
 
 
-class ProcessResultsEndpoint(ProcessPath, JobPath):
+class ProcessResultsEndpoint(LocalProcessPath, JobPath):
     header = RequestHeaders()
 
 
-class ProviderResultsEndpoint(ProviderPath, ProcessPath, JobPath):
+class ProviderResultsEndpoint(ProviderProcessPath, JobPath):
     header = RequestHeaders()
 
 
-class JobResultsEndpoint(ProviderPath, ProcessPath, JobPath):
+class JobResultsEndpoint(ProviderProcessPath, JobPath):
     header = RequestHeaders()
 
 
-class ProviderExceptionsEndpoint(ProviderPath, ProcessPath, JobPath):
+class ProviderExceptionsEndpoint(ProviderProcessPath, JobPath):
     header = RequestHeaders()
 
 
@@ -2645,11 +2673,12 @@ class JobExceptionsEndpoint(JobPath):
     header = RequestHeaders()
 
 
-class ProcessExceptionsEndpoint(ProcessPath, JobPath):
+class ProcessExceptionsEndpoint(LocalProcessPath, JobPath):
     header = RequestHeaders()
+    querystring = LocalProcessQuery()
 
 
-class ProviderLogsEndpoint(ProviderPath, ProcessPath, JobPath):
+class ProviderLogsEndpoint(ProviderProcessPath, JobPath):
     header = RequestHeaders()
 
 
@@ -2657,19 +2686,21 @@ class JobLogsEndpoint(JobPath):
     header = RequestHeaders()
 
 
-class ProcessLogsEndpoint(ProcessPath, JobPath):
+class ProcessLogsEndpoint(LocalProcessPath, JobPath):
     header = RequestHeaders()
+    querystring = LocalProcessQuery()
 
 
 class JobStatisticsEndpoint(JobPath):
     header = RequestHeaders()
 
 
-class ProcessJobStatisticsEndpoint(ProcessPath, JobPath):
+class ProcessJobStatisticsEndpoint(LocalProcessPath, JobPath):
     header = RequestHeaders()
+    querystring = LocalProcessQuery()
 
 
-class ProviderJobStatisticsEndpoint(ProviderPath, ProcessPath, JobPath):
+class ProviderJobStatisticsEndpoint(ProviderProcessPath, JobPath):
     header = RequestHeaders()
 
 
@@ -2809,8 +2840,6 @@ class ProcessSummary(
     """
     _sort_first = PROCESS_DESCRIPTION_FIELD_FIRST
     _sort_after = PROCESS_DESCRIPTION_FIELD_AFTER
-
-    id = ProcessIdentifierTag(description="Process identifier or tagged representation if revision was requested.")
 
 
 class ProcessSummaryList(ExtendedSequenceSchema):
@@ -4365,13 +4394,15 @@ class PutProcessBodySchema(Deploy):
     description = "Process re-deployment using an updated version and definition."
 
 
-class PatchProcessEndpoint(ProcessPath):
+class PatchProcessEndpoint(LocalProcessPath):
     headers = RequestHeaders()
+    querystring = LocalProcessQuery()
     body = PatchProcessBodySchema()
 
 
-class PutProcessEndpoint(ProcessPath):
+class PutProcessEndpoint(LocalProcessPath):
     headers = RequestHeaders()
+    querystring = LocalProcessQuery()
     body = PutProcessBodySchema()
 
 
@@ -4395,8 +4426,9 @@ class ExecuteHeaders(RequestHeaders):
     x_wps_output_context = WpsOutputContextHeader()
 
 
-class PostProcessJobsEndpoint(ProcessPath):
+class PostProcessJobsEndpoint(LocalProcessPath):
     header = ExecuteHeaders()
+    querystring = LocalProcessQuery()
     body = Execute()
 
 
@@ -4432,21 +4464,23 @@ class GetJobsQueries(ExtendedMappingSchema):
                               description="Comma-separated values of tags assigned to jobs")
 
 
-class GetJobsRequest(ExtendedMappingSchema):
+class GetJobsEndpoint(ExtendedMappingSchema):
     header = RequestHeaders()
     querystring = GetJobsQueries()
 
 
-class GetJobsEndpoint(GetJobsRequest):
+class GetProcessJobsQuery(LocalProcessQuery, GetJobsQueries):
     pass
 
 
-class GetProcessJobsEndpoint(GetJobsRequest, ProcessPath):
-    pass
+class GetProcessJobsEndpoint(LocalProcessPath):
+    header = RequestHeaders()
+    querystring = GetProcessJobsQuery()
 
 
-class GetProviderJobsEndpoint(GetJobsRequest, ProviderPath, ProcessPath):
-    pass
+class GetProviderJobsEndpoint(ProviderProcessPath):
+    header = RequestHeaders()
+    querystring = GetJobsQueries()
 
 
 class JobIdentifierList(ExtendedSequenceSchema):
@@ -4462,20 +4496,22 @@ class DeleteJobsEndpoint(ExtendedMappingSchema):
     body = DeleteJobsBodySchema()
 
 
-class DeleteProcessJobsEndpoint(DeleteJobsEndpoint, ProcessPath):
+class DeleteProcessJobsEndpoint(DeleteJobsEndpoint, LocalProcessPath):
+    querystring = LocalProcessQuery()
+
+
+class DeleteProviderJobsEndpoint(DeleteJobsEndpoint, ProviderProcessPath):
     pass
 
 
-class DeleteProviderJobsEndpoint(DeleteJobsEndpoint, ProviderPath, ProcessPath):
-    pass
-
-
-class GetProcessJobEndpoint(ProcessPath):
+class GetProcessJobEndpoint(LocalProcessPath):
     header = RequestHeaders()
+    querystring = LocalProcessQuery()
 
 
-class DeleteProcessJobEndpoint(ProcessPath):
+class DeleteProcessJobEndpoint(LocalProcessPath):
     header = RequestHeaders()
+    querystring = LocalProcessQuery()
 
 
 class BillsEndpoint(ExtendedMappingSchema):
@@ -4486,12 +4522,14 @@ class BillEndpoint(BillPath):
     header = RequestHeaders()
 
 
-class ProcessQuotesEndpoint(ProcessPath):
+class ProcessQuotesEndpoint(LocalProcessPath):
     header = RequestHeaders()
+    querystring = LocalProcessQuery()
 
 
-class ProcessQuoteEndpoint(ProcessPath, QuotePath):
+class ProcessQuoteEndpoint(LocalProcessPath, QuotePath):
     header = RequestHeaders()
+    querystring = LocalProcessQuery()
 
 
 class GetQuotesQueries(ExtendedMappingSchema):
@@ -4510,8 +4548,9 @@ class QuoteEndpoint(QuotePath):
     header = RequestHeaders()
 
 
-class PostProcessQuote(ProcessPath, QuotePath):
+class PostProcessQuote(LocalProcessPath, QuotePath):
     header = RequestHeaders()
+    querystring = LocalProcessQuery()
     body = NoContent()
 
 
@@ -4524,8 +4563,9 @@ class QuoteProcessParametersSchema(ExecuteInputOutputs):
     pass
 
 
-class PostProcessQuoteRequestEndpoint(ProcessPath, QuotePath):
+class PostProcessQuoteRequestEndpoint(LocalProcessPath, QuotePath):
     header = RequestHeaders()
+    querystring = LocalProcessQuery()
     body = QuoteProcessParametersSchema()
 
 

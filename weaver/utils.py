@@ -15,7 +15,7 @@ import time
 import warnings
 from copy import deepcopy
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, overload
 from distutils.version import LooseVersion
 from urllib.parse import ParseResult, unquote, urlparse, urlunsplit
 
@@ -59,7 +59,19 @@ from weaver.xml_util import XML
 
 if TYPE_CHECKING:
     from types import FrameType
-    from typing import Any, Callable, Dict, List, Iterable, MutableMapping, NoReturn, Optional, Type, Tuple, Union
+    from typing import (
+        Any,
+        Callable,
+        Dict,
+        List,
+        Iterable,
+        MutableMapping,
+        NoReturn,
+        Optional,
+        Type,
+        Tuple,
+        Union
+    )
 
     from weaver.execute import AnyExecuteControlOption, AnyExecuteMode
     from weaver.status import Status
@@ -70,15 +82,18 @@ if TYPE_CHECKING:
         AnyRegistryContainer,
         AnyRequestMethod,
         AnyResponseType,
+        AnyUUID,
         AnyValueType,
         AnyVersion,
         HeadersType,
         JSON,
         KVP,
         KVP_Item,
+        Literal,
         OpenAPISchema,
         Number,
-        SettingsType
+        SettingsType,
+        TypeGuard
     )
 
 LOGGER = logging.getLogger(__name__)
@@ -562,7 +577,7 @@ def get_url_without_query(url):
 
 
 def is_valid_url(url):
-    # type: (Optional[str]) -> bool
+    # type: (Optional[str]) -> TypeGuard[str]
     try:
         return bool(urlparse(url).scheme)
     except Exception:  # noqa: W0703 # nosec: B110
@@ -579,6 +594,30 @@ class VersionFormat(Constants):
     OBJECT = "object"  # LooseVersion
     STRING = "string"  # "x.y.z"
     PARTS = "parts"    # tuple/list
+
+
+@overload
+def as_version_major_minor_patch(version, version_format):
+    # type: (AnyVersion, Literal[VersionFormat.OBJECT]) -> LooseVersion
+    ...
+
+
+@overload
+def as_version_major_minor_patch(version, version_format):
+    # type: (AnyVersion, Literal[VersionFormat.STRING]) -> str
+    ...
+
+
+@overload
+def as_version_major_minor_patch(version, version_format):
+    # type: (AnyVersion, Literal[VersionFormat.PARTS]) -> Tuple[int, int, int]
+    ...
+
+
+@overload
+def as_version_major_minor_patch(version):
+    # type: (AnyVersion) -> Tuple[int, int, int]
+    ...
 
 
 def as_version_major_minor_patch(version, version_format=VersionFormat.PARTS):
@@ -603,7 +642,7 @@ def as_version_major_minor_patch(version, version_format=VersionFormat.PARTS):
 
 
 def is_update_version(version, taken_versions, version_level=VersionLevel.PATCH):
-    # type: (AnyVersion, Iterable[AnyVersion], VersionLevel) -> bool
+    # type: (AnyVersion, Iterable[AnyVersion], VersionLevel) -> TypeGuard[AnyVersion]
     """
     Determines if the version corresponds to an available update version of specified level compared to existing ones.
 
@@ -675,7 +714,7 @@ def is_update_version(version, taken_versions, version_level=VersionLevel.PATCH)
 
 
 def is_uuid(maybe_uuid):
-    # type: (Any) -> bool
+    # type: (Any) -> TypeGuard[AnyUUID]
     """
     Evaluates if the provided input is a UUID-like string.
     """
@@ -1735,7 +1774,7 @@ def load_file(file_path, text=False):
 
 
 def is_remote_file(file_location):
-    # type: (str) -> bool
+    # type: (str) -> TypeGuard[str]
     """
     Parses to file location to figure out if it is remotely available or a local path.
     """

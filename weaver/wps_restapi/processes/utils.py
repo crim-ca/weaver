@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING
 
 import colander
 from pyramid.httpexceptions import HTTPBadRequest
-from pyramid.request import Request
 from pyramid.settings import asbool
 
 from weaver.config import WeaverFeature, get_weaver_configuration
@@ -19,13 +18,30 @@ if TYPE_CHECKING:
     from typing import Dict, List, Optional, Tuple
 
     from weaver.datatype import Service, Process
-    from weaver.typedefs import JSON
+    from weaver.typedefs import JSON, PyramidRequest
 
 LOGGER = logging.getLogger(__name__)
 
 
+def resolve_process_tag(request, process_query=False):
+    # type: (PyramidRequest, bool) -> str
+    """
+    Obtain the tagged process reference from request path and/or query according to available information.
+    """
+    if process_query:
+        process_id = request.params.get("process")
+    else:
+        process_id = request.matchdict.get("process_id", "")
+    params = sd.LocalProcessQuery().deserialize(request.params)
+    version = params.get("version")
+    if version and ":" not in process_id:  # priority to tagged version over query if specified
+        process_id = f"{process_id}:{version}"
+    process_id = sd.ProcessIdentifierTag(name="ProcessID").deserialize(process_id)
+    return process_id
+
+
 def get_processes_filtered_by_valid_schemas(request):
-    # type: (Request) -> Tuple[List[JSON], List[str], Dict[str, Optional[int]], bool, int]
+    # type: (PyramidRequest) -> Tuple[List[JSON], List[str], Dict[str, Optional[int]], bool, int]
     """
     Validates the processes summary schemas and returns them into valid/invalid lists.
 
@@ -68,7 +84,7 @@ def get_processes_filtered_by_valid_schemas(request):
 
 
 def get_process_list_links(request, paging, total, provider=None):
-    # type: (Request, Dict[str, int], Optional[int], Optional[Service]) -> List[JSON]
+    # type: (PyramidRequest, Dict[str, int], Optional[int], Optional[Service]) -> List[JSON]
     """
     Obtains a list of all relevant links for the corresponding :term:`Process` listing defined by query parameters.
 
@@ -126,4 +142,14 @@ def get_process_list_links(request, paging, total, provider=None):
                 "href": get_path_kvp(proc_url, page=cur_page + 1, **kvp_params), "rel": "next",
                 "type": ContentType.APP_JSON, "title": "Next page of processes query listing."
             })
+    process = kvp_params.get("process")
+    if process and ":" not in str(process):
+        proc_hist = f"{proc_url}?detail=false&revisions=true&process={process}"
+        proc_desc = f"{proc_url}/{process}"
+        links.extend([
+            {"href": proc_desc, "rel": "latest-version",
+             "type": ContentType.APP_JSON, "title": "Most recent revision of this process."},
+            {"href": proc_hist, "rel": "version-history",
+             "type": ContentType.APP_JSON, "title": "Listing of all revisions of this process."},
+        ])
     return links

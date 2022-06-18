@@ -270,7 +270,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert resp.status_code == 400
         assert "ListingInvalidParameter" in resp.json["error"]
 
-    def test_get_processes_with_revisions(self):
+    def test_get_processes_with_tagged_revisions(self):
         """Example:
         http://localhost:4002/processes?detail=false&revisions=true
 
@@ -311,6 +311,8 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             "WorkflowWaterExtent-mock:0.0.1",
             "WPS1JsonArray2NetCDF:0.0.1"
           ],
+
+        .. versionadded:: 4.20
         """
         # FIXME:
         # create some processes with different combinations of revisions, no-version, single-version
@@ -318,6 +320,14 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
 
         raise NotImplementedError
+
+    def test_get_processes_with_history_revisions(self):
+        """
+        When requesting specific process ID with revisions, version history of this process is listed.
+
+        .. versionadded:: 4.20
+        """
+        raise NotImplementedError  # FIXME
 
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
@@ -1156,6 +1166,11 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert resp.json["cause"] == "No parameters provided for update."
 
     def test_update_process_latest_valid(self):
+        """
+        Update the current process revision with new metadata (making it an older revision and new one becomes latest).
+
+        .. versionadded:: 4.20
+        """
         p_id = "test-update-cwl-json"
         self.deploy_process_CWL_direct(ContentType.APP_JSON, process_id=p_id)
         data = {
@@ -1173,6 +1188,11 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert resp.json["description"] == data["description"]
 
     def test_update_process_older_valid(self):
+        """
+        Update an older process (already a previous revision) with new metadata.
+
+        .. versionadded:: 4.20
+        """
         p_id = "test-update-cwl-json"
         version = "1.2.3"
         self.deploy_process_CWL_direct(ContentType.APP_JSON, process_id=p_id, version=version)
@@ -1209,10 +1229,23 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             assert resp.json["title"] == data["title"]
             assert "description" not in resp.json, (
                 "Not modified since no new value, value from reference process must be used. "
-                "Must not make use of the intermediate '1.2.4' version, as '1.2.3' was explicitly requested as reference."
+                "Must not make use of the intermediate '1.2.4' version, since '1.2.3' explicitly requested for update."
             )
 
+    def test_update_process_jobs_adjusted(self):
+        """
+        Validate that given a valid process update, associated jobs update their references to preserve links.
+
+        .. versionadded:: 4.20
+        """
+        raise NotImplementedError
+
     def test_replace_process_latest_valid(self):
+        """
+        Redeploy a process by replacing its definition (MAJOR revision update).
+
+        .. versionadded:: 4.20
+        """
         p_id = "test-update-cwl-json"
         self.deploy_process_CWL_direct(ContentType.APP_JSON, process_id=p_id)
         data = {

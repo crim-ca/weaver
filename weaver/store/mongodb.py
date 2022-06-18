@@ -1,7 +1,7 @@
 """
 Stores to read/write data to from/to `MongoDB` using pymongo.
 """
-
+import copy
 import logging
 import uuid
 from typing import TYPE_CHECKING
@@ -599,6 +599,8 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         # type: (str, AnyVersion) -> Process
         """
         Updates the specified (latest) process ID to represent the indicated (older) version.
+
+        :returns: Updated process definition with older revision.
         """
         sane_name = get_sane_name(process_id, **self.sane_name_config)
         version = as_version_major_minor_patch(version, VersionFormat.STRING)
@@ -620,7 +622,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         """
         Get `visibility` of a process.
 
-        :return: One value amongst `weaver.visibility`.
+        :returns: One value amongst `weaver.visibility`.
         """
         process = self.fetch_by_id(process_id)
         return process.visibility
@@ -723,6 +725,27 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
         if job is None:
             raise JobRegistrationError("Failed to retrieve registered job.")
         return job
+
+    def batch_update_jobs(self, job_filter, job_update):
+        # type: (Dict[str, Any], Dict[str, Any]) -> int
+        """
+        Update specified fields of matched jobs against filters.
+
+        :param job_update: Fields and values to update on matched jobs.
+        :param job_filter: Fields to filter jobs to be updated.
+        :return: Number of affected jobs.
+        """
+        filter_keys = Job.properties()
+        job_update = copy.deepcopy(job_update)
+        for job_key in list(job_update):
+            if job_key not in filter_keys:
+                job_update.pop(job_key)
+        job_filter = copy.deepcopy(job_filter)
+        for job_key in list(job_filter):
+            if job_key not in filter_keys:
+                job_filter.pop(job_key)
+        result = self.collection.update_many(filter=job_filter, update=job_update)
+        return result.modified_count
 
     def update_job(self, job):
         # type: (Job) -> Job

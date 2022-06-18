@@ -57,7 +57,7 @@ from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, IO, List, Optional, Union
+    from typing import Any, Callable, Dict, IO, Iterator, List, Optional, Union
 
     from owslib.wps import WebProcessingService
 
@@ -129,6 +129,21 @@ class DictBase(dict):
         _type = fully_qualified_name(self)
         _repr = dict.__repr__(self)
         return f"{_type} ({_repr})"
+
+    @classmethod
+    def properties(cls, fget=True, fset=True):
+        # type: (bool, bool) -> Iterator[str]
+        """
+        Get names of properties stored in the object, optionally filtered by read-only or write-only conditions.
+        """
+        return iter(
+            name for name, prop in inspect.getmembers(cls)
+            if not name.startswith("_") and isinstance(prop, property) and (
+                (fget and fset and prop.fget is not None and prop.fset is not None) or
+                (fget and not fset and prop.fget is not None and prop.fset is None) or
+                (not fget and fset and prop.fget is None and prop.fset is not None)
+            )
+        )
 
     def dict(self):
         # type: () -> AnyParams
@@ -2220,7 +2235,6 @@ class Process(Base):
         proc_self = (proc_list + "/" + self.tag) if self.version else proc_desc
         links = [
             {"href": proc_self, "rel": "self", "title": "Current process description."},
-            {"href": proc_desc, "rel": "current", "title": "Current version of process description."},
             {"href": proc_desc, "rel": "process-meta", "title": "Process definition."},
             {"href": proc_exec, "rel": "http://www.opengis.net/def/rel/ogc/1.0/execute",
              "title": "Process execution endpoint for job submission."},

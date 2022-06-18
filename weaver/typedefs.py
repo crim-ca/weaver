@@ -1,5 +1,8 @@
 from typing import TYPE_CHECKING  # pragma: no cover
 
+# FIXME:
+#  replace invalid 'Optional' (type or None) used instead of 'NotRequired' (optional key) when better supported
+#  https://youtrack.jetbrains.com/issue/PY-53611/Support-PEP-655-typingRequiredtypingNotRequired-for-TypedDicts
 if TYPE_CHECKING:
     import os
     import sys
@@ -10,23 +13,8 @@ if TYPE_CHECKING:
     from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Type, Union
 
     import psutil
+    from typing_extensions import Literal, Protocol, TypeAlias, TypedDict, TypeGuard
 
-    if hasattr(typing, "TypedDict"):
-        from typing import TypedDict  # pylint: disable=E0611,no-name-in-module  # Python >= 3.8
-    else:
-        from typing_extensions import TypedDict
-    if hasattr(typing, "Literal"):
-        from typing import Literal  # pylint: disable=E0611,no-name-in-module  # Python >= 3.8
-    else:
-        from typing_extensions import Literal
-    if hasattr(typing, "Protocol"):
-        from typing import Protocol  # pylint: disable=E0611,no-name-in-module  # Python >= 3.8
-    else:
-        from typing_extensions import Protocol
-    if hasattr(typing, "TypeAlias"):
-        from typing import TypeAlias  # pylint: disable=E0611,no-name-in-module  # Python >= 3.10
-    else:
-        from typing_extensions import TypeAlias
     if hasattr(os, "PathLike"):
         FileSystemPathType = Union[os.PathLike, str]
     else:
@@ -364,7 +352,8 @@ if TYPE_CHECKING:
         "type": Optional[str],
     }, total=False)
     ExecutionResultArray = List[ExecutionResultObject]
-    ExecutionResults = Dict[str, Union[ExecutionResultObject, ExecutionResultArray]]
+    ExecutionResultValue = Union[ExecutionResultObject, ExecutionResultArray]
+    ExecutionResults = Dict[str, ExecutionResultValue]
 
     # reference employed as 'JobMonitorReference' by 'WPS1Process'
     JobExecution = TypedDict("JobExecution", {"execution": WPSExecution})

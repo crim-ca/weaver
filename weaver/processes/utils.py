@@ -45,7 +45,7 @@ from weaver.exceptions import (
 )
 from weaver.formats import ContentType, repr_json
 from weaver.processes.types import ProcessType
-from weaver.store.base import StoreProcesses, StoreServices
+from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
 from weaver.utils import (
     VersionFormat,
     VersionLevel,
@@ -62,12 +62,11 @@ from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_client
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import get_wps_restapi_base_url, parse_content
+from weaver.wps_restapi.processes.utils import resolve_process_tag
 
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from typing import List, Optional, Tuple, Union
-
-    from pyramid.request import Request
 
     from weaver.typedefs import (
         AnyHeadersContainer,
@@ -78,6 +77,7 @@ if TYPE_CHECKING:
         CWL,
         FileSystemPathType,
         JSON,
+        PyramidRequest,
         Number,
         SettingsType
     )
@@ -86,23 +86,26 @@ if TYPE_CHECKING:
 # FIXME:
 #   https://github.com/crim-ca/weaver/issues/215
 #   define common Exception classes that won't require this type of conversion
-def get_process(process_id=None, request=None, settings=None, store=None):
-    # type: (Optional[str], Optional[Request], Optional[SettingsType], Optional[StoreProcesses]) -> Process
+def get_process(process_id=None, request=None, settings=None):
+    # type: (Optional[str], Optional[PyramidRequest], Optional[SettingsType]) -> Process
     """
     Obtain the specified process and validate information, returning appropriate HTTP error if invalid.
 
     Process identifier must be provided from either the request path definition or literal ID.
     Database must be retrievable from either the request, underlying settings, or direct store reference.
 
+    .. versionchanged:: 4.20
+        Process identifier can also be an 'id:version' tag. Also, the request query parameter 'version' can be used.
+        If using the :paramref:`process_id` explicitly instead of the request, a versioned :term:`Process` reference
+        MUST employ the tagged representation to resolve the appropriate :term:`Process` revision.
+
     Different parameter combinations are intended to be used as needed or more appropriate, such that redundant
     operations can be reduced where some objects are already fetched from previous operations.
     """
-    if process_id is None and request is not None:
-        process_id = request.matchdict.get("process_id", "")
-    if store is None:
-        store = get_db(settings or request).get_store(StoreProcesses)
+    store = get_db(settings or request).get_store(StoreProcesses)
     try:
-        process_id = sd.ProcessIdentifierTag(name="id").deserialize(process_id)
+        if process_id is None and request is not None:
+            process_id = resolve_process_tag(request)
         process = store.fetch_by_id(process_id, visibility=Visibility.PUBLIC)
         return process
     except (InvalidIdentifierValue, MissingIdentifierValue, colander.Invalid) as exc:
@@ -407,10 +410,9 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
 
     # FIXME: handle colander invalid directly in tween (https://github.com/crim-ca/weaver/issues/112)
     try:
-        store = get_db(container).get_store(StoreProcesses)
         process = Process(process_info)
         sd.ProcessSummary().deserialize(process)  # make it fail before save if invalid, then apply for real
-        process_summary = _update_deploy_process_version(process, overwrite, version, VersionLevel.MAJOR, store)
+        process_summary = _update_deploy_process_version(process, overwrite, version, VersionLevel.MAJOR, container)
     except ProcessRegistrationError as exc:
         raise HTTPConflict(detail=str(exc))
     except ValueError as exc:
@@ -512,18 +514,19 @@ def _bump_process_version(process, version, update_level):
     return new_version
 
 
-def _update_deploy_process_version(process, process_overwrite, version_hint, update_level, store):
-    # type: (Process, Union[Process, bool], AnyVersion, VersionLevel, StoreProcesses) -> JSON
+def _update_deploy_process_version(process, process_overwrite, version_hint, update_level, container=None):
+    # type: (Process, Union[Process, bool], AnyVersion, VersionLevel, Optional[AnySettingsContainer]) -> JSON
     """
-    Validate that any specified version for :term:`Process` deployment is valid against any other existing versions.
+    Handle all necessary update operations of a :term:`Process` definition.
 
+    Validate that any specified version for :term:`Process` deployment is valid against any other existing versions.
     If the replacement targets another existing process explicitly (update request), perform any necessary database
     adjustments to replace the old process references for the creation of the updated process if all versions are valid.
 
     :param process: Desired new process definition.
     :param process_overwrite: Optional old process from which update of the definition in database could be required.
     :param version_hint: New version to be applied for the new process. If unspecified, try guessing from old process.
-    :param store: Handle to process storage to update processes as needed.
+    :param container: Any container to retrieve a database connection.
     :returns: Process summary with definition retrieved from storage (saved) after all operations were applied.
     :raises HTTPException: Relevant error is raised in the even of any erroneous process definition (old and new).
     """
@@ -535,6 +538,10 @@ def _update_deploy_process_version(process, process_overwrite, version_hint, upd
             "status": HTTPForbidden.code,
             "cause": {"mutable": False}
         })
+
+    db = get_db(container)
+    store = db.get_store(StoreProcesses)
+
     if process.version:
         proc_ver = as_version_major_minor_patch(process.version, VersionFormat.STRING)
         versions = store.find_versions(process.id, VersionFormat.STRING)
@@ -564,11 +571,19 @@ def _update_deploy_process_version(process, process_overwrite, version_hint, upd
     old_version = None
     op_override = process_overwrite
     try:
-        # if source process for update is not the latest, no need to rewrite ID since it is not
+        # if source process for update is not the latest, no need to rewrite 'id:version' since it is not only 'id'
+        # otherwise, replace latest process 'id' by explicit 'id:version'
         if isinstance(process_overwrite, Process) and process_overwrite.latest:
+            pid_only = process_overwrite.id
             old_version = process_overwrite.version
-            store.update_version(process_overwrite.id, old_version)
-            op_override = False
+            old_process = store.update_version(pid_only, old_version)
+            process_tag = old_process.tag
+            # since 'id' reference changes from old to new process,
+            # reflect the change in any job that could refer to it
+            job_store = db.get_store(StoreJobs)
+            n_updated = job_store.batch_update_jobs({"process": pid_only}, {"process": process_tag})
+            LOGGER.debug("Updated %s jobs from process [%s] to old revision [%s]", n_updated, pid_only, process_tag)
+            op_override = False  # make sure no conflict when saving process afterward
         process.version = new_version
         new_process = store.save_process(process, overwrite=op_override)
         process_summary = new_process.summary()
@@ -601,11 +616,10 @@ def update_process_metadata(request):
     :return:
     """
     data = parse_content(request, content_schema=sd.PatchProcessBodySchema)
-    store = get_db(request).get_store(StoreProcesses)
-    process = get_process(request=request, store=store)  # latest if only 'processId', or specific version if using tag
+    process = get_process(request=request)  # latest if only 'processId', or specific version if using tag
     update_level = _apply_process_updates(process, data)
     user_version = data.get("version")
-    process_summary = _update_deploy_process_version(process, process, user_version, update_level, store)
+    process_summary = _update_deploy_process_version(process, process, user_version, update_level, request)
     data = {
         "description": sd.OkPatchProcessResponse.description,
         "processSummary": process_summary,

@@ -5,7 +5,7 @@ from weaver.utils import VersionFormat
 
 if TYPE_CHECKING:
     import datetime
-    from typing import Dict, List, Optional, Tuple, Union
+    from typing import Any, Dict, List, Optional, Tuple, Union
 
     from pyramid.request import Request
     from pywps import Process as ProcessWPS
@@ -151,6 +151,11 @@ class StoreJobs(StoreInterface):
                  accept_language=None,      # type: Optional[str]
                  created=None,              # type: Optional[datetime.datetime]
                  ):                         # type: (...) -> Job
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def batch_update_jobs(self, job_filter, job_update):
+        # type: (Dict[str, Any], Dict[str, Any]) -> int
         raise NotImplementedError
 
     @abc.abstractmethod

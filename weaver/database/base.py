@@ -65,6 +65,36 @@ class DatabaseInterface(metaclass=abc.ABCMeta):
         raise TypeError(f"Unsupported store type selector: [{store_type}] ({type(store_type)})")
 
     @overload
+    def get_store(self, store_type):
+        # type: (StoreBillsSelector) -> StoreBills
+        ...
+
+    @overload
+    def get_store(self, store_type):
+        # type: (StoreQuotesSelector) -> StoreQuotes
+        ...
+
+    @overload
+    def get_store(self, store_type):
+        # type: (StoreJobsSelector) -> StoreJobs
+        ...
+
+    @overload
+    def get_store(self, store_type):
+        # type: (StoreProcessesSelector) -> StoreProcesses
+        ...
+
+    @overload
+    def get_store(self, store_type):
+        # type: (StoreServicesSelector) -> StoreServices
+        ...
+
+    @overload
+    def get_store(self, store_type):
+        # type: (StoreVaultSelector) -> StoreVault
+        ...
+
+    @overload
     def get_store(self, store_type, *store_args, **store_kwargs):
         # type: (StoreBillsSelector, *Any, **Any) -> StoreBills
         ...
