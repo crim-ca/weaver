@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_4.19.0:
+
+`4.19.0 <https://github.com/crim-ca/weaver/tree/4.19.0>`_ (2022-07-05)
+========================================================================
+
+Changes:
+--------
 - Add support of official `CWL` IANA types to allow `Process` deployment with the relevant ``Content-Type`` header
   for the submitted payload (see `common-workflow-language/common-workflow-language#421 (comment)
   <https://github.com/common-workflow-language/common-workflow-language/issues/421#issuecomment-1122010820>`_,
