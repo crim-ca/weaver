@@ -12,11 +12,20 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add support of `Process` revisions (resolves `#107 <https://github.com/crim-ca/weaver/issues/107>`_).
+- Add``PATCH /processes/{processID}`` request, allowing `MINOR` and `PATCH` level modifications that can be applied
+  to an existing `Process` in order to revise non-execution critical information such as its documented description.
+- Add ``PUT /processes/{processID}`` request, allowing `MAJOR` revision to essentially redeploy a new `Process`,
+  but leaving some form of relationship with the older version by reusing the same `Process` ID.
+- Add support of ``{processID}:{version}`` representation in request path and `Job` ``processID`` to reference the
+  specific `Process` revisions when fetch `Process` description and `Job` status.
+- Add search query ``version`` and ``revisions`` to fetch a specific `Process` revision, or all versions history.
+- Add more entries in ``links`` referring to `Process` revisions whenever applicable.
 
 Fixes:
 ------
-- No change.
+- Fix invalid ``minimum`` and ``maximum`` OpenAPI fields that were defined as ``minLength`` and ``maxLength``
+  (duplicates definitions) for `Process` description and deployment schema validation.
 
 .. _changes_4.19.0:
 
@@ -50,8 +59,6 @@ Changes:
 
 Fixes:
 ------
-- Fix invalid ``minimum`` and ``maximum`` OpenAPI fields that were defined as ``minLength`` and ``maxLength``
-  (duplicates definitions) for `Process` description and deployment schema validation.
 - Fix `Process` deployment using a `WPS-1/2` URL reference defining a ``GetCapabilities`` request to resolve
   the corresponding ``DescribeProcess`` request if the `Process` ID can be inferred from other known locations
   (relates to `#11 <https://github.com/crim-ca/weaver/issues/11>`_).
