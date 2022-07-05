@@ -81,6 +81,11 @@ weaver.quote_sync_max_wait = 20
 # (default: use cwltool auto-resolution according to running machine and current user/group)
 weaver.cwl_euid =
 weaver.cwl_egid =
+# directory where to load predefined process definitions defined with CWL files
+# default configuration directory is used if this entry is removed
+# only CWL files are considered, lookup in directory is recursive
+weaver.cwl_processes_dir =
+weaver.cwl_processes_register_error = false
 
 # --- Weaver WPS settings ---
 weaver.wps = true

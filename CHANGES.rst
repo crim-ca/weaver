@@ -12,10 +12,34 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add support of official `CWL` IANA types to allow `Process` deployment with the relevant ``Content-Type`` header
+  for the submitted payload (see `common-workflow-language/common-workflow-language#421 (comment)
+  <https://github.com/common-workflow-language/common-workflow-language/issues/421#issuecomment-1122010820>`_,
+  relates to `opengeospatial/NamingAuthority#169 <https://github.com/opengeospatial/NamingAuthority/issues/169>`_,
+  resolves `#434 <https://github.com/crim-ca/weaver/issues/434>`_).
+- Support `Process` deployment using only `CWL` content provided it contains an ``id`` field representing the target
+  `Process` ID as per recommendation in `OGC Best Practice for Earth Observation Application Package, CWL Document
+  <https://docs.ogc.org/bp/20-089r1.html#toc26>`_ (resolves `#434 <https://github.com/crim-ca/weaver/issues/434>`_).
+- Support `Process` deployment with a payload using ``YAML`` content instead of ``JSON``. This ``YAML`` content
+  **MUST** be submitted in the request with a ``Content-Type`` header either equal to ``application/x-yaml`` or
+  ``application/ogcapppkg+yaml`` for the |ogc-app-pkg|_ schema, or using ``application/cwl+yaml`` for
+  a `CWL`-only definition. The definition will be loaded and converted to ``JSON`` for schema validation. Otherwise,
+  ``JSON`` contents is assumed to be directly provided in the request payload for validation as previously accomplished.
+- Add partial support of `CWL` with ``$graph`` representation for the special case where the graph is composed of a list
+  of exactly one `Application Package`. Multi/nested-`CWL` definitions are **NOT** supported
+  (relates to `#56 <https://github.com/crim-ca/weaver/issues/56>`_).
+- Add ``weaver.cwl_processes_dir`` configuration setting for preloading, registering or updating a set of
+  known `Process` definitions from `CWL` files stored in a nested directory structure. This allows a service provider
+  that uses `Weaver` to offer their `Processes` to directly maintain their definitions from the set of `CWL` files and
+  upload changes in the web application at startup without need to manually undeploy and redeploy each `Process`.
+- Add ``weaver.cwl_processes_register_error`` to fail fast any `Process` registration error from `CWL` when loading
+  files at startup.
 
 Fixes:
 ------
+- Fix `Process` deployment using a `WPS-1/2` URL reference defining a ``GetCapabilities`` request to resolve
+  the corresponding ``DescribeProcess`` request if the `Process` ID can be inferred from other known locations
+  (relates to `#11 <https://github.com/crim-ca/weaver/issues/11>`_).
 - Move ``WpsPackage`` properties to instance level to avoid potential referencing of attributes across same class
   used by distinct running `Process`.
 
@@ -43,6 +67,7 @@ Changes:
 
 Fixes:
 ------
+- Fix ``Process.payload`` improperly encoded in case of special characters where allowed such as in `CWL` definition.
 - Fix `CLI` operations assuming valid JSON response to instead return error response content and status code.
 - Fix `CLI` rendering of various optional arguments and groups when displaying help messages.
 - Fix invalid handling of ``Constants`` definitions mixed with ``classproperty`` such as in ``OutputFormat`` causing

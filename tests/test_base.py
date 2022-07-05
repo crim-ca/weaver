@@ -1,6 +1,6 @@
 import pytest
 
-from weaver.base import Constants, ExtendedEnum
+from weaver.base import Constants, ExtendedEnum, classproperty
 
 
 class DummyConstant(Constants):
@@ -11,6 +11,8 @@ class DummyConstant(Constants):
     t4 = "T4"
     T5 = "random5"  # ensure name is case-insensitive (not matched via the lowercase value)
     t6 = "RANDOM6"  # ensure name is case-insensitive (not matched via the uppercase value)
+    T7 = classproperty(fget=lambda self: "t7")
+    t8 = classproperty(fget=lambda self: "T8")
 
 
 def test_constants_get_by_name_or_value_case_insensitive():
@@ -30,6 +32,28 @@ def test_constants_get_by_name_or_value_case_insensitive():
     assert DummyConstant.get("RANDOM5") == DummyConstant.T5
     assert DummyConstant.get("random6") == DummyConstant.t6
     assert DummyConstant.get("RANDOM6") == DummyConstant.t6
+    assert DummyConstant.get("t7") == DummyConstant.T7
+    assert DummyConstant.get("T7") == DummyConstant.T7
+    assert DummyConstant.get("t8") == DummyConstant.t8
+    assert DummyConstant.get("T8") == DummyConstant.t8
+
+
+def test_constants_get_by_attribute():
+    assert DummyConstant.get(DummyConstant.T1) == DummyConstant.T1
+    assert DummyConstant.get(DummyConstant.T2) == DummyConstant.T2
+    assert DummyConstant.get(DummyConstant.t3) == DummyConstant.t3
+    assert DummyConstant.get(DummyConstant.t4) == DummyConstant.t4
+    assert DummyConstant.get(DummyConstant.T5) == DummyConstant.T5
+    assert DummyConstant.get(DummyConstant.t6) == DummyConstant.t6
+    assert DummyConstant.get(DummyConstant.T7) == DummyConstant.T7
+    assert DummyConstant.get(DummyConstant.t8) == DummyConstant.t8
+
+
+def test_constants_classproperty_as_string():
+    assert isinstance(DummyConstant.get("T7"), str)
+    assert isinstance(DummyConstant.T7, str)
+    assert isinstance(DummyConstant.get("T8"), str)
+    assert isinstance(DummyConstant.t8, str)
 
 
 def test_constants_in_by_name_or_value():
@@ -41,6 +65,14 @@ def test_constants_in_by_name_or_value():
     assert "T3" in DummyConstant
     assert "t4" in DummyConstant
     assert "T4" in DummyConstant
+    assert "t5" in DummyConstant
+    assert "T5" in DummyConstant
+    assert "t6" in DummyConstant
+    assert "T6" in DummyConstant
+    assert "t7" in DummyConstant
+    assert "T7" in DummyConstant
+    assert "t8" in DummyConstant
+    assert "T8" in DummyConstant
 
 
 def test_constants_immutable():

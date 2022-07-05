@@ -21,7 +21,7 @@ import tempfile
 import time
 import uuid
 from typing import TYPE_CHECKING
-from urllib.parse import urlparse
+from urllib.parse import parse_qsl, urlparse
 
 import cwltool
 import cwltool.docker
@@ -35,6 +35,7 @@ from pywps.inout import BoundingBoxInput, ComplexInput, LiteralInput
 from pywps.inout.basic import SOURCE_TYPE
 from pywps.inout.storage.file import FileStorageBuilder
 from pywps.inout.storage.s3 import S3StorageBuilder
+from requests.structures import CaseInsensitiveDict
 
 from weaver.config import WeaverConfiguration, WeaverFeature, get_weaver_configuration
 from weaver.database import get_db
@@ -336,7 +337,7 @@ def _check_package_file(cwl_file_path_or_url):
     return cwl_path
 
 
-def _load_package_file(file_path):
+def load_package_file(file_path):
     # type: (str) -> CWL
     """
     Loads the package in YAML/JSON format specified by the file path.
@@ -526,8 +527,32 @@ def _update_package_metadata(wps_package_metadata, cwl_package_package):
         )
 
 
-def _generate_process_with_cwl_from_reference(reference):
-    # type: (str) -> Tuple[CWL, JSON]
+def _patch_wps_process_description_url(reference, process_hint):
+    # type: (str, Optional[JSON]) -> str
+    """
+    Rebuilds a :term:`WPS` ``ProcessDescription`` URL from other details.
+
+    A ``GetCapabilities`` request can be submitted with an ID in query params directly.
+    Otherwise, check if a process hint can provide the ID.
+    """
+    parts = reference.split("?", 1)
+    if len(parts) == 2:
+        url, query = parts
+        params = CaseInsensitiveDict(parse_qsl(query))
+        process_id = get_any_id(params)
+        if not process_id:
+            process_id = get_any_id(process_hint or {})
+            if process_id:
+                params["identifier"] = process_id
+        if process_id and params.get("request", "").lower() == "getcapabilities":
+            params["request"] = "DescribeProcess"
+        query = "&".join([f"{key}={val}" for key, val in params.items()])
+        reference = url + "?" + query
+    return reference
+
+
+def _generate_process_with_cwl_from_reference(reference, process_hint=None):
+    # type: (str, Optional[JSON]) -> Tuple[CWL, JSON]
     """
     Resolves the ``reference`` type (`CWL`, `WPS-1`, `WPS-2`, `WPS-3`) and generates a `CWL` ``package`` from it.
 
@@ -542,12 +567,13 @@ def _generate_process_with_cwl_from_reference(reference):
     reference_path, reference_ext = os.path.splitext(reference)
     reference_name = os.path.split(reference_path)[-1]
     if reference_ext.replace(".", "") in PACKAGE_EXTENSIONS:
-        cwl_package = _load_package_file(reference)
+        cwl_package = load_package_file(reference)
         process_info = {"identifier": reference_name}
 
     # match against WPS-1/2 reference
     else:
         settings = get_settings()
+        reference = _patch_wps_process_description_url(reference, process_hint)
         response = request_extra("GET", reference, retries=3, settings=settings)
         if response.status_code != HTTPOk.code:
             raise HTTPServiceUnavailable(
@@ -582,11 +608,11 @@ def _generate_process_with_cwl_from_reference(reference):
             if "process" in payload or "owsContext" in payload:
                 process_info = payload.get("process", payload)
                 ows_ref = process_info.get("owsContext", {}).get("offering", {}).get("content", {}).get("href")
-                cwl_package = _load_package_file(ows_ref)
+                cwl_package = load_package_file(ows_ref)
             # if somehow the CWL was referenced without an extension, handle it here
             # also handle parsed WPS-3 process description also with a reference
             elif "cwlVersion" in payload:
-                cwl_package = _load_package_file(reference)
+                cwl_package = load_package_file(reference)
                 process_info = {"identifier": reference_name}
         else:
             raise ValueError(f"Unknown parsing methodology of Content-Type [{content_type}] for reference resolution.")
@@ -722,6 +748,18 @@ def get_auth_requirements(requirement, headers):
     return None
 
 
+def get_process_identifier(process_info, package):
+    # type: (JSON, CWL) -> str
+    """
+    Obtain a sane name identifier reference from the :term:`Process` or the :term:`Application Package`.
+    """
+    process_id = get_any_id(process_info)
+    if not process_id:
+        process_id = package.get("id")
+    process_id = get_sane_name(process_id, assert_invalid=True)
+    return process_id
+
+
 def get_process_definition(process_offering, reference=None, package=None, data_source=None, headers=None):
     # type: (JSON, Optional[str], Optional[CWL], Optional[str], Optional[AnyHeadersContainer]) -> JSON
     """
@@ -754,14 +792,14 @@ def get_process_definition(process_offering, reference=None, package=None, data_
             raise exc_type(f"Invalid package/reference definition. {reason} generated error: [{exc!s}].")
 
     if not (isinstance(package, dict) or isinstance(reference, str)):
-        raise PackageRegistrationError("Invalid parameters amongst one of [package, reference].")
+        raise PackageRegistrationError("Invalid parameters, one of [package, reference] is required.")
     if package and reference:
         raise PackageRegistrationError("Simultaneous parameters [package, reference] not allowed.")
 
     process_info = process_offering
     if reference:
         package, process_info = try_or_raise_package_error(
-            lambda: _generate_process_with_cwl_from_reference(reference),
+            lambda: _generate_process_with_cwl_from_reference(reference, process_info),
             reason="Loading package from reference")
         process_info.update(process_offering)   # override upstream details
     if not isinstance(package, dict):
@@ -798,7 +836,10 @@ def get_process_definition(process_offering, reference=None, package=None, data_
     )
 
     # obtain any retrieved process id if not already provided from upstream process offering, and clean it
-    process_id = get_sane_name(get_any_id(process_info), assert_invalid=False)
+    process_id = try_or_raise_package_error(
+        lambda: get_process_identifier(process_info, package),
+        reason="Obtaining process identifier"
+    )
     if not process_id:
         raise PackageRegistrationError("Could not retrieve any process identifier.")
 

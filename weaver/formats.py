@@ -19,6 +19,7 @@ from weaver.base import Constants, classproperty
 if TYPE_CHECKING:
     from typing import Any, Dict, List, Optional, Tuple, Union
 
+    from weaver.base import PropertyDataType
     from weaver.typedefs import JSON, AnyRequestType
 
 LOGGER = logging.getLogger(__name__)
@@ -42,12 +43,17 @@ class ContentType(Constants):
         <type> "/" [x- | <tree> "."] <subtype> ["+" suffix] *[";" parameter=value]
     """
 
-    APP_CWL = "application/x-cwl"
+    APP_CWL = "application/cwl"
+    APP_CWL_JSON = "application/cwl+json"
+    APP_CWL_YAML = "application/cwl+yaml"
+    APP_CWL_X = "application/x-cwl"  # backward compatible format, others are official
     APP_FORM = "application/x-www-form-urlencoded"
     APP_GEOJSON = "application/geo+json"
     APP_GZIP = "application/gzip"
     APP_HDF5 = "application/x-hdf5"
     APP_JSON = "application/json"
+    APP_OGC_PKG_JSON = "application/ogcapppkg+json"
+    APP_OGC_PKG_YAML = "application/ogcapppkg+yaml"
     APP_NETCDF = "application/x-netcdf"
     APP_OCTET_STREAM = "application/octet-stream"
     APP_PDF = "application/pdf"
@@ -71,6 +77,7 @@ class ContentType(Constants):
     VIDEO_MPEG = "video/mpeg"
 
     # special handling
+    ANY_CWL = {APP_CWL, APP_CWL_JSON, APP_CWL_YAML, APP_CWL_X}
     ANY_XML = {APP_XML, TEXT_XML}
     ANY = "*/*"
 
@@ -120,8 +127,11 @@ class OutputFormat(Constants):
     """)
 
     @classmethod
-    def get(cls, format_or_version, default=JSON, allow_version=True):  # pylint: disable=W0221,W0237
-        # type: (Union[str, AnyOutputFormat], AnyOutputFormat, bool) -> AnyOutputFormat
+    def get(cls,                    # pylint: disable=W0221,W0237  # arguments differ/renamed
+            format_or_version,      # type: Union[str, AnyOutputFormat, PropertyDataType]
+            default=JSON,           # type: AnyOutputFormat
+            allow_version=True,     # type: bool
+            ):                      # type: (...) ->  Union[AnyOutputFormat, PropertyDataType]
         """
         Resolve the applicable output format.
 
@@ -317,13 +327,23 @@ IANA_KNOWN_MEDIA_TYPES = {
 # but prefer the IANA resolution with is the primary reference for Media-Types
 IANA_MAPPING = {
     ContentType.APP_JSON: ContentType.APP_JSON,
+    # CWL now has an official IANA definition:
+    # https://www.iana.org/assignments/media-types/application/cwl
+    ContentType.APP_CWL: ContentType.APP_CWL,
+    ContentType.APP_CWL_JSON: ContentType.APP_CWL,
+    ContentType.APP_CWL_YAML: ContentType.APP_CWL,
+    ContentType.APP_CWL_X: ContentType.APP_CWL,
 }
 EDAM_NAMESPACE = "edam"
 EDAM_NAMESPACE_URL = "http://edamontology.org/"
 EDAM_NAMESPACE_DEFINITION = {EDAM_NAMESPACE: EDAM_NAMESPACE_URL}
 EDAM_SCHEMA = "http://edamontology.org/EDAM_1.24.owl"
 EDAM_MAPPING = {
+    # preserve CWL EDAM definitions for backward compatibility in case they were used in deployed processes
     ContentType.APP_CWL: "format_3857",
+    ContentType.APP_CWL_JSON: "format_3857",
+    ContentType.APP_CWL_YAML: "format_3857",
+    ContentType.APP_CWL_X: "format_3857",
     ContentType.IMAGE_GIF: "format_3467",
     ContentType.IMAGE_JPEG: "format_3579",
     ContentType.APP_HDF5: "format_3590",

@@ -12,6 +12,8 @@ from weaver.utils import get_settings
 if TYPE_CHECKING:
     from typing import Optional
 
+    from pyramid.config import Configurator
+
     from weaver.typedefs import AnySettingsContainer
 
 LOGGER = logging.getLogger(__name__)
@@ -77,8 +79,8 @@ def get_weaver_config_file(file_path, default_config_file, generate_default_from
     """
     Validates that the specified configuration file can be found, or falls back to the default one.
 
-    Handles 'relative' paths for settings in ``WEAVER_DEFAULT_INI_CONFIG`` referring to other configuration files.
-    Default file must be one of ``WEAVER_DEFAULT_CONFIGS``.
+    Handles 'relative' paths for settings in :data:`WEAVER_DEFAULT_INI_CONFIG` referring to other configuration files.
+    Default file must be one of :data:`WEAVER_DEFAULT_CONFIGS`.
 
     If both the specified file and the default file cannot be found, default file under ``WEAVER_DEFAULT_INI_CONFIG`` is
     auto-generated from the corresponding ``.example`` file if :paramref:`generate_default_from_example` is ``True``.
@@ -119,4 +121,5 @@ def get_weaver_config_file(file_path, default_config_file, generate_default_from
 
 
 def includeme(config):  # noqa: E811
+    # type: (Configurator) -> None
     LOGGER.debug("Loading weaver configuration.")

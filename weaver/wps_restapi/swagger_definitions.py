@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING
 
 import duration
 import yaml
-from colander import DateTime, Email, Money, OneOf, Range, Regex, drop, null, required
+from colander import DateTime, Email, Length, Money, OneOf, Range, Regex, drop, null, required
 from dateutil import parser as date_parser
 
 from weaver import __meta__
@@ -3715,10 +3715,15 @@ class CWLInputList(ExtendedSequenceSchema):
     input = CWLInputItem(title="Input", description="Input specification. " + CWL_DOC_MESSAGE)
 
 
+class CWLInputEmpty(EmptyMappingSchema):
+    pass
+
+
 class CWLInputsDefinition(OneOfKeywordSchema):
     _one_of = [
         CWLInputList(description="Package inputs defined as items."),
         CWLInputMap(description="Package inputs defined as mapping."),
+        CWLInputEmpty(description="Package inputs as empty mapping when it takes no arguments."),
     ]
 
 
@@ -3783,9 +3788,20 @@ class CWLVersion(Version):
     validator = SemanticVersion(v_prefix=True, rc_suffix=False)
 
 
-class CWL(PermissiveMappingSchema):
+class CWLIdentifier(ProcessIdentifier):
+    description = (
+        "Reference to the process identifier. If CWL is provided within a process deployment payload, this can be "
+        "omitted. If used in a deployment with only CWL details, this information is required."
+    )
+
+
+class CWLBase(ExtendedMappingSchema):
     cwlVersion = CWLVersion()
+
+
+class CWLApp(PermissiveMappingSchema):
     _class = CWLClass()
+    id = CWLIdentifier(missing=drop)  # can be omitted only if within a process deployment that also includes it
     requirements = CWLRequirements(description="Explicit requirement to execute the application package.", missing=drop)
     hints = CWLHints(description="Non-failing additional hints that can help resolve extra requirements.", missing=drop)
     baseCommand = CWLCommand(description="Command called in the docker image or on shell according to requirements "
@@ -3794,6 +3810,10 @@ class CWL(PermissiveMappingSchema):
     arguments = CWLArguments(description="Base arguments passed to the command.", missing=drop)
     inputs = CWLInputsDefinition(description="All inputs available to the Application Package.")
     outputs = CWLOutputsDefinition(description="All outputs produced by the Application Package.")
+
+
+class CWL(CWLBase, CWLApp):
+    _sort_first = ["cwlVersion", "id", "class"]
 
 
 class Unit(ExtendedMappingSchema):
@@ -4102,20 +4122,33 @@ class DeployProcessOffering(ProcessControl):
     processVersion = Version(title="processVersion", missing=drop)
 
 
-class DeployProcessDescription(ProcessDeployment, ProcessControl):
+class DeployProcessDescription(NotKeywordSchema, ProcessDeployment, ProcessControl):
+    _not = [
+        Reference()  # avoid conflict with deploy by href
+    ]
     schema_ref = f"{OGC_API_SCHEMA_URL}/{OGC_API_SCHEMA_VERSION}/core/openapi/schemas/process.yaml"
     description = "Process description fields directly provided."
 
 
+class DeployReference(Reference):
+    id = ProcessIdentifier(missing=drop, description=(
+        "Optional identifier of the specific process to obtain the description from in case the reference URL "
+        "corresponds to an endpoint that can refer to multiple process definitions (e.g.: GetCapabilities)."
+    ))
+
+
 class ProcessDescriptionChoiceType(OneOfKeywordSchema):
     _one_of = [
-        Reference(),
+        DeployReference(),
         DeployProcessOffering(),
-        DeployProcessDescription()
+        DeployProcessDescription(),
     ]
 
 
-class Deploy(ExtendedMappingSchema):
+class DeployOGCAppPackage(NotKeywordSchema, ExtendedMappingSchema):
+    _not = [
+        CWLBase()
+    ]
     processDescription = ProcessDescriptionChoiceType()
     executionUnit = ExecutionUnitList()
     immediateDeployment = ExtendedSchemaNode(Boolean(), missing=drop, default=True)
@@ -4123,13 +4156,86 @@ class Deploy(ExtendedMappingSchema):
     owsContext = OWSContext(missing=drop)
 
 
+class CWLGraphItem(CWLApp):  # no 'cwlVersion', only one at the top
+    id = CWLIdentifier()  # required in this case
+
+
+class CWLGraphList(ExtendedSequenceSchema):
+    cwl = CWLGraphItem()
+
+
+# FIXME: supported nested and $graph multi-deployment (https://github.com/crim-ca/weaver/issues/56)
+class CWLGraphBase(ExtendedMappingSchema):
+    graph = CWLGraphList(
+        name="$graph", description=(
+            "Graph definition that defines *exactly one* CWL application package represented as list. "
+            "Multiple definitions simultaneously deployed is NOT supported at the moment."
+            # "Graph definition that combines one or many CWL application packages within a single payload. "
+            # "If an single application is given (list of one item), it will be deployed as normal CWL by itself. "
+            # "If multiple applications are defined, the first MUST be the top-most Workflow process. "
+            # "Deployment of other items will be performed, and the full deployment will be persisted only if all are "
+            # "valid. The resulting Workflow will be registered as a package by itself (i.e: not as a graph)."
+        ),
+        validator=Length(min=1, max=1)
+    )
+
+
+class DeployCWLGraph(CWLBase, CWLGraphBase):
+    _sort_first = ["cwlVersion", "$graph"]
+
+
+class DeployCWL(NotKeywordSchema, CWL):
+    _sort_first = ["cwlVersion", "id", "class"]
+    _not = [
+        CWLGraphBase()
+    ]
+    id = CWLIdentifier()  # required in this case
+
+
+class Deploy(OneOfKeywordSchema):
+    _one_of = [
+        DeployOGCAppPackage(),
+        DeployCWL(),
+        DeployCWLGraph(),
+    ]
+
+
+class DeployContentType(ContentTypeHeader):
+    example = ContentType.APP_JSON
+    default = ContentType.APP_JSON
+    validator = OneOf([
+        ContentType.APP_JSON,
+        ContentType.APP_CWL,
+        ContentType.APP_CWL_JSON,
+        ContentType.APP_CWL_YAML,
+        ContentType.APP_CWL_X,
+        ContentType.APP_OGC_PKG_JSON,
+        ContentType.APP_OGC_PKG_YAML,
+        ContentType.APP_YAML,
+    ])
+
+
 class DeployHeaders(RequestHeaders):
     x_auth_docker = XAuthDockerHeader()
+    content_type = DeployContentType()
 
 
 class PostProcessesEndpoint(ExtendedMappingSchema):
     header = DeployHeaders(description="Headers employed for process deployment.")
-    body = Deploy(title="Deploy")
+    body = Deploy(title="Deploy", examples={
+        "DeployCWL": {
+            "summary": "Deploy a process from a CWL definition.",
+            "value": EXAMPLES["deploy_process_cwl.json"],
+        },
+        "DeployOGC": {
+            "summary": "Deploy a process from an OGC Application Package definition.",
+            "value": EXAMPLES["deploy_process_ogcapppkg.json"],
+        },
+        "DeployWPS": {
+            "summary": "Deploy a process from a remote WPS-1 reference URL.",
+            "value": EXAMPLES["deploy_process_wps1.json"],
+        }
+    })
 
 
 class WpsOutputContextHeader(ExtendedSchemaNode):

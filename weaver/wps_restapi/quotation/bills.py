@@ -1,4 +1,5 @@
 import logging
+from typing import TYPE_CHECKING
 
 from pyramid.httpexceptions import HTTPNotFound, HTTPOk
 
@@ -8,6 +9,9 @@ from weaver.formats import OutputFormat
 from weaver.store.base import StoreBills
 from weaver.wps_restapi import swagger_definitions as sd
 
+if TYPE_CHECKING:
+    from weaver.typedefs import AnyViewResponse, PyramidRequest
+
 LOGGER = logging.getLogger(__name__)
 
 
@@ -15,6 +19,7 @@ LOGGER = logging.getLogger(__name__)
                       schema=sd.BillsEndpoint(), response_schemas=sd.get_bill_list_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_bill_list(request):
+    # type: (PyramidRequest) -> AnyViewResponse
     """
     Get list of bills IDs.
     """
@@ -27,6 +32,7 @@ def get_bill_list(request):
                      schema=sd.BillEndpoint(), response_schemas=sd.get_bill_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_bill_info(request):
+    # type: (PyramidRequest) -> AnyViewResponse
     """
     Get bill information.
     """

@@ -1,0 +1,19 @@
+{
+    "cwlVersion": "v1.0",
+    "class": "CommandLineTool",
+    "requirements": {
+        "DockerRequirement": {
+            "dockerPull": "python:3.7-alpine"
+        }
+    },
+    "baseCommand": ["python3", "-V"],
+    "inputs": {},
+    "outputs": {
+        "output": {
+            "type": "File",
+            "outputBinding": {
+                "glob": "stdout.log"
+            }
+        }
+    }
+}

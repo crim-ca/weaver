@@ -14,6 +14,8 @@ import colander
 import pyramid.testing
 import pytest
 import stopit
+import webtest.app
+import yaml
 
 from tests import resources
 from tests.utils import (
@@ -34,7 +36,7 @@ from weaver.datatype import AuthenticationTypes, Process, Service
 from weaver.exceptions import JobNotFound, ProcessNotFound
 from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import AcceptLanguage, ContentType, get_cwl_file_format
-from weaver.processes.constants import CWL_REQUIREMENT_APP_WPS1, ProcessSchema
+from weaver.processes.constants import CWL_REQUIREMENT_APP_DOCKER, CWL_REQUIREMENT_APP_WPS1, ProcessSchema
 from weaver.processes.wps_testing import WpsTestProcess
 from weaver.status import Status
 from weaver.utils import fully_qualified_name, get_path_kvp, load_file, ows_context_href
@@ -535,26 +537,32 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert process_wps_endpoint == weaver_wps_path
 
     @staticmethod
-    def assert_deployed_wps3(response_json, expected_process_id):
+    def assert_deployed_wps3(response_json, expected_process_id, assert_io=True):
         proc = response_json["process"]
         assert expected_process_id in proc["id"]
-        assert len(proc["inputs"]) == 1
-        assert proc["inputs"][0]["id"] == "input-1"
-        assert proc["inputs"][0]["minOccurs"] == 1
-        assert proc["inputs"][0]["maxOccurs"] == 1
-        assert "formats" not in proc["inputs"][0]   # literal data doesn't have "formats"
-        assert len(proc["outputs"]) == 1
-        assert proc["outputs"][0]["id"] == "output"
-        assert "minOccurs" not in proc["outputs"][0]
-        assert "maxOccurs" not in proc["outputs"][0]
-        # TODO: handling multiple outputs (https://github.com/crim-ca/weaver/issues/25)
-        # assert proc["outputs"][0]["minOccurs"] == "1"
-        # assert proc["outputs"][0]["maxOccurs"] == "1"
-        assert isinstance(proc["outputs"][0]["formats"], list)
-        assert len(proc["outputs"][0]["formats"]) == 1
-        assert proc["outputs"][0]["formats"][0]["mediaType"] == ContentType.APP_JSON
+        if assert_io:
+            assert len(proc["inputs"]) == 1
+            assert proc["inputs"][0]["id"] == "input-1"
+            assert proc["inputs"][0]["minOccurs"] == 1
+            assert proc["inputs"][0]["maxOccurs"] == 1
+            assert "formats" not in proc["inputs"][0]   # literal data doesn't have "formats"
+            assert len(proc["outputs"]) == 1
+            assert proc["outputs"][0]["id"] == "output"
+            assert "minOccurs" not in proc["outputs"][0]
+            assert "maxOccurs" not in proc["outputs"][0]
+            # TODO: handling multiple outputs (https://github.com/crim-ca/weaver/issues/25)
+            # assert proc["outputs"][0]["minOccurs"] == "1"
+            # assert proc["outputs"][0]["maxOccurs"] == "1"
+            assert isinstance(proc["outputs"][0]["formats"], list)
+            assert len(proc["outputs"][0]["formats"]) == 1
+            assert proc["outputs"][0]["formats"][0]["mediaType"] == ContentType.APP_JSON
 
-    def deploy_process_make_visible_and_fetch_deployed(self, deploy_payload, expected_process_id):
+    def deploy_process_make_visible_and_fetch_deployed(self,
+                                                       deploy_payload,
+                                                       expected_process_id,
+                                                       headers=None,
+                                                       assert_io=True,
+                                                       ):
         """
         Deploy, make visible and obtain process description.
 
@@ -565,7 +573,12 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         .. note::
             This is a shortcut method for all ``test_deploy_process_<>`` cases.
         """
-        resp = self.app.post_json("/processes", params=deploy_payload, headers=self.json_headers)
+        deploy_headers = copy.deepcopy(self.json_headers)
+        deploy_headers.update(headers or {})
+        if "json" in deploy_headers.get("Content-Type", "json"):
+            resp = self.app.post_json("/processes", params=deploy_payload, headers=deploy_headers)
+        else:
+            resp = self.app.post("/processes", params=deploy_payload, headers=deploy_headers)
         assert resp.status_code == 201
         assert resp.content_type == ContentType.APP_JSON
 
@@ -580,7 +593,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         proc_query = {"schema": ProcessSchema.OLD}
         resp = self.app.get(proc_url, params=proc_query, headers=self.json_headers)
         assert resp.status_code == 200
-        self.assert_deployed_wps3(resp.json, expected_process_id)
+        self.assert_deployed_wps3(resp.json, expected_process_id, assert_io=assert_io)
         return resp.json
 
     def get_application_package(self, process_id):
@@ -609,7 +622,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         """
         cwl = load_file(os.path.join(WEAVER_ROOT_DIR, "docs/examples/docker-shell-script-cat.cwl"))  # type: CWL
         docker = "fake.repo/org/private-image:latest"
-        cwl["requirements"]["DockerRequirement"]["dockerPull"] = docker
+        cwl["requirements"][CWL_REQUIREMENT_APP_DOCKER]["dockerPull"] = docker
         body = self.get_process_deploy_template(cwl=cwl)
         headers = copy.deepcopy(self.json_headers)
 
@@ -631,10 +644,156 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert process.auth.token == token
         assert process.auth.docker == docker
 
-    # FIXME: implement
-    @pytest.mark.skip(reason="not implemented")
+    def test_deploy_process_CWL_direct_raised_missing_id(self):
+        # normally valid CWL, but not when submitted directly due to missing ID for the process
+        cwl = {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "baseCommand": ["python3", "-V"],
+            "inputs": {},
+            "outputs": {
+                "output": {
+                    "type": "File",
+                    "outputBinding": {
+                        "glob": "stdout.log"
+                    },
+                }
+            },
+        }
+        headers = {"Content-Type": ContentType.APP_CWL_JSON, "Accept": ContentType.APP_JSON}
+        resp = self.app.post_json("/processes", params=cwl, headers=headers, expect_errors=True)
+        assert resp.status_code == 400
+        assert "'Deploy.DeployCWL.id': 'Missing required field.'" in resp.json["cause"]
+
+    def deploy_process_CWL_direct(self, content_type, graph_count=0):
+        p_id = "test-direct-cwl-json"
+        cwl_core = {
+            "id": p_id,
+            "class": "CommandLineTool",
+            "baseCommand": ["python3", "-V"],
+            "inputs": {},
+            "outputs": {
+                "output": {
+                    "type": "File",
+                    "outputBinding": {
+                        "glob": "stdout.log"
+                    },
+                }
+            },
+        }
+        cwl = {}
+        cwl_base = {"cwlVersion": "v1.0"}
+        cwl.update(cwl_base)
+        if graph_count:
+            cwl["$graph"] = [cwl_core] * graph_count
+        else:
+            cwl.update(cwl_core)
+        if "yaml" in content_type:
+            cwl = yaml.safe_dump(cwl, sort_keys=False)
+        headers = {"Content-Type": content_type}
+        desc = self.deploy_process_make_visible_and_fetch_deployed(cwl, p_id, headers=headers, assert_io=False)
+        pkg = self.get_application_package(p_id)
+        assert desc["deploymentProfile"] == "http://www.opengis.net/profiles/eoc/dockerizedApplication"
+
+        # once parsed, CWL I/O are converted to listing form
+        # rest should remain intact with the original definition
+        expect_cwl = copy.deepcopy(cwl_base)
+        expect_cwl.update(cwl_core)
+        expect_cwl["inputs"] = []
+        cwl_out = cwl_core["outputs"]["output"]
+        cwl_out["id"] = "output"
+        expect_cwl["outputs"] = [cwl_out]
+        assert pkg == expect_cwl
+
+        # process description should have been generated with relevant I/O
+        proc = desc["process"]
+        assert proc["id"] == p_id
+        assert proc["inputs"] == []
+        assert proc["outputs"] == [{
+            "id": "output",
+            "title": "output",
+            "schema": {"type": "string", "contentMediaType": "text/plain"},
+            "formats": [{"default": True, "mediaType": "text/plain"}]
+        }]
+
+    def test_deploy_process_CWL_direct_JSON(self):
+        self.deploy_process_CWL_direct(ContentType.APP_CWL_JSON)
+
+    def test_deploy_process_CWL_direct_YAML(self):
+        self.deploy_process_CWL_direct(ContentType.APP_CWL_YAML)
+
+    def test_deploy_process_CWL_direct_graph_JSON(self):
+        self.deploy_process_CWL_direct(ContentType.APP_CWL_JSON, graph_count=1)
+
+    def test_deploy_process_CWL_direct_graph_YAML(self):
+        self.deploy_process_CWL_direct(ContentType.APP_CWL_YAML, graph_count=1)
+
+    def test_deploy_process_CWL_direct_graph_multi_invalid(self):
+        with pytest.raises(webtest.app.AppError) as exc:
+            self.deploy_process_CWL_direct(ContentType.APP_CWL_JSON, graph_count=2)
+        error = str(exc.value)
+        assert "400 Bad Request" in error
+        assert "Invalid schema" in error
+        assert "Longer than maximum length 1" in error
+
     def test_deploy_process_CWL_DockerRequirement_href(self):
-        raise NotImplementedError
+        with contextlib.ExitStack() as stack:
+            stack.enter_context(mocked_wps_output(self.settings))
+            out_dir = self.settings["weaver.wps_output_dir"]
+            out_url = self.settings["weaver.wps_output_url"]
+            tmp_dir = stack.enter_context(tempfile.TemporaryDirectory(dir=out_dir))
+            tmp_file = os.path.join(tmp_dir, "docker-python.cwl")
+            tmp_href = tmp_file.replace(out_dir, out_url, 1)
+            cwl = {
+                "cwlVersion": "v1.0",
+                "class": "CommandLineTool",
+                "requirements": {
+                    CWL_REQUIREMENT_APP_DOCKER: {
+                        "dockerPull": "python:3.7-alpine"
+                    }
+                },
+                "baseCommand": ["python3", "-V"],
+                "inputs": {},
+                "outputs": {
+                    "output": {
+                        "type": "File",
+                        "outputBinding": {
+                            "glob": "stdout.log"
+                        },
+                    }
+                },
+            }
+            with open(tmp_file, mode="w", encoding="utf-8") as cwl_file:
+                json.dump(cwl, cwl_file)
+
+            p_id = "test-docker-python-version"
+            body = {
+                "processDescription": {"process": {"id": p_id}},
+                "executionUnit": [{"href": tmp_href}],
+                "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication",
+            }
+            desc = self.deploy_process_make_visible_and_fetch_deployed(body, p_id, assert_io=False)
+            pkg = self.get_application_package(p_id)
+            assert desc["deploymentProfile"] == "http://www.opengis.net/profiles/eoc/dockerizedApplication"
+
+            # once parsed, CWL I/O are converted to listing form
+            # rest should remain intact with the original definition
+            cwl["inputs"] = []
+            cwl_out = cwl["outputs"]["output"]
+            cwl_out["id"] = "output"
+            cwl["outputs"] = [cwl_out]
+            assert pkg == cwl
+
+            # process description should have been generated with relevant I/O
+            proc = desc["process"]
+            assert proc["id"] == p_id
+            assert proc["inputs"] == []
+            assert proc["outputs"] == [{
+                "id": "output",
+                "title": "output",
+                "schema": {"type": "string", "contentMediaType": "text/plain"},
+                "formats": [{"default": True, "mediaType": "text/plain"}]
+            }]
 
     # FIXME: implement
     @pytest.mark.skip(reason="not implemented")
@@ -864,7 +1023,6 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             resources.TEST_REMOTE_SERVER_URL
         )
 
-    @pytest.mark.skip(reason="not implemented")
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
         resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
@@ -875,12 +1033,14 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         Test process deployment using a WPS-1 GetCapabilities URL specified as process description reference.
         """
         body = {
-            "processDescription": {"href": resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_URL},  # this one should be used
+            "processDescription": {
+                "id": resources.TEST_REMOTE_PROCESS_WPS1_ID,            # must tell which process from GetCapabilities
+                "href": resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_URL,  # this one should be used
+            },
             "executionUnit": [{"href": resources.TEST_REMOTE_SERVER_URL}]  # some URL just to fulfill schema validation
         }
         self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_PROCESS_WPS1_ID)
 
-    @pytest.mark.skip(reason="not implemented")
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
         resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
@@ -897,7 +1057,6 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         body["processDescription"]["process"].update(ows_context_href(resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_URL))
         self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_PROCESS_WPS1_ID)
 
-    @pytest.mark.skip(reason="not implemented")
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
         resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,

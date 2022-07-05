@@ -1,13 +1,18 @@
 import logging
+from typing import TYPE_CHECKING
 
 from weaver.formats import OutputFormat
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.quotation import bills as b, quotes as q
 
+if TYPE_CHECKING:
+    from pyramid.config import Configurator
+
 LOGGER = logging.getLogger(__name__)
 
 
 def includeme(config):
+    # type: (Configurator) -> None
     LOGGER.info("Adding WPS REST API quotation...")
     settings = config.registry.settings
     config.add_route(**sd.service_api_route_info(sd.process_quotes_service, settings))

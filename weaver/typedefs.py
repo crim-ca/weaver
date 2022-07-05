@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING  # pragma: no cover
 
 if TYPE_CHECKING:
     import os
@@ -56,7 +56,7 @@ if TYPE_CHECKING:
     from celery.app import Celery
     from celery.result import AsyncResult, EagerResult, GroupResult, ResultSet
     from owslib.wps import BoundingBoxDataInput, ComplexDataInput, Process as ProcessOWS, WPSExecution
-    from pyramid.httpexceptions import HTTPSuccessful, HTTPRedirection
+    from pyramid.httpexceptions import HTTPException, HTTPSuccessful, HTTPRedirection
     from pyramid.registry import Registry
     from pyramid.request import Request as PyramidRequest
     from pyramid.response import Response as PyramidResponse
@@ -173,11 +173,14 @@ if TYPE_CHECKING:
         "name": CWL_WorkflowStepID,
         "reference": str,  # URL
     })
+    _CWL = "CWL"  # type: TypeAlias
+    CWL_Graph = List[_CWL]
     CWL = TypedDict("CWL", {
         "cwlVersion": str,
         "class": CWL_Class,
         "label": str,
         "doc": str,
+        "id": Optional[str],
         "s:keywords": List[str],
         "baseCommand": Optional[Union[str, List[str]]],
         "parameters": Optional[List[str]],
@@ -189,7 +192,8 @@ if TYPE_CHECKING:
         "stderr": str,
         "stdout": str,
         "$namespaces": Dict[str, str],
-        "$schemas": Dict[str, str]
+        "$schemas": Dict[str, str],
+        "$graph": CWL_Graph,
     }, total=False)
     CWL_WorkflowStepPackage = TypedDict("CWL_WorkflowStepPackage", {
         "id": str,          # reference ID of the package
@@ -261,8 +265,9 @@ if TYPE_CHECKING:
     HeaderCookiesTuple = Union[Tuple[None, None], Tuple[HeadersBaseType, CookiesBaseType]]
     AnyHeadersContainer = Union[HeadersBaseType, ResponseHeaders, EnvironHeaders, CaseInsensitiveDict]
     AnyCookiesContainer = Union[CookiesBaseType, WPSRequest, PyramidRequest, AnyHeadersContainer]
-    AnyResponseType = Union[PyramidResponse, WebobResponse, RequestsResponse, TestResponse]
     AnyRequestType = Union[PyramidRequest, WerkzeugRequest, PreparedRequest, RequestsRequest, DummyRequest]
+    AnyResponseType = Union[PyramidResponse, WebobResponse, RequestsResponse, TestResponse]
+    AnyViewResponse = Union[PyramidResponse, WebobResponse, HTTPException]
     RequestMethod = Literal[
         "HEAD", "GET", "POST", "PUT", "PATCH", "DELETE",
         "head", "get", "post", "put", "patch", "delete",

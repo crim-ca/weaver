@@ -2001,7 +2001,7 @@ class Process(Base):
     def payload(self):
         # type: () -> JSON
         """
-        Deployment specification as JSON body.
+        Deployment specification as :term:`JSON`.
         """
         body = self.get("payload", {})
         return self._decode(body) if isinstance(body, dict) else body
@@ -2009,7 +2009,7 @@ class Process(Base):
     @payload.setter
     def payload(self, body):
         # type: (JSON) -> None
-        self["payload"] = self._decode(body) if isinstance(body, dict) else {}
+        self["payload"] = self._encode(body) if isinstance(body, dict) else {}
 
     # encode(->)/decode(<-) characters that cannot be in a key during save to db
     _character_codes = [("$", "\uFF04"), (".", "\uFF0E")]

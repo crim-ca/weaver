@@ -1,9 +1,15 @@
 import logging
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pyramid.config import Configurator
 
 LOGGER = logging.getLogger(__name__)
 
 
 def includeme(config):
+    # type: (Configurator) -> None
+
     from weaver.formats import OutputFormat
     from weaver.wps_restapi import swagger_definitions as sd
     from weaver.wps_restapi.processes import processes as p

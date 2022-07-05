@@ -34,6 +34,7 @@ from pyramid import testing
 from pyramid.config import Configurator
 from pyramid.httpexceptions import HTTPException, HTTPNotFound, HTTPUnprocessableEntity
 from pyramid.registry import Registry
+from pyramid.testing import DummyRequest
 from requests import Response
 from webtest import TestApp, TestResponse
 
@@ -45,6 +46,7 @@ from weaver.datatype import Service
 from weaver.formats import ContentType
 from weaver.store.mongodb import MongodbJobStore, MongodbProcessStore, MongodbServiceStore
 from weaver.utils import (
+    bytes2str,
     fetch_file,
     get_header,
     get_path_kvp,
@@ -64,7 +66,14 @@ if TYPE_CHECKING:
     from owslib.wps import Process as ProcessOWSWPS
     from pywps.app import Process as ProcessPyWPS
 
-    from weaver.typedefs import AnyHeadersContainer, AnyRequestMethod, AnyRequestType, AnyResponseType, SettingsType
+    from weaver.typedefs import (
+        JSON,
+        AnyHeadersContainer,
+        AnyRequestMethod,
+        AnyRequestType,
+        AnyResponseType,
+        SettingsType
+    )
 
     # pylint: disable=C0103,invalid-name,E1101,no-member
     MockPatch = mock._patch  # noqa
@@ -385,12 +394,23 @@ def run_command(command, trim=True, expect_error=False, entrypoint=None):
     return out_lines
 
 
+class MockedRequest(DummyRequest):
+    """
+    Patch missing properties that are expected from :mod:`pyramid` requests.
+    """
+    json = {}  # type: JSON
+
+    @property
+    def text(self):
+        return bytes2str(self.body) if self.body else json.dumps(self.json, ensure_ascii=False)
+
+
 class MockedResponse(TestResponse):
     """
-    Replaces the ``json`` property by the expected callable from all real response implementations.
+    Replaces the ``json`` property by the expected callable from responses using :mod:`requests` implementation.
     """
     def json(self):  # pylint: disable=W0236,invalid-overridden-method
-        return self.json_body or json.loads(self.body.decode("UTF-8"))
+        return self.json_body or json.loads(bytes2str(self.body))
 
 
 def mocked_file_response(path, url):
@@ -989,7 +1009,7 @@ def mocked_process_package():
     Provides mocks that bypasses execution when calling :module:`weaver.processes.wps_package` functions.
     """
     return (
-        mock.patch("weaver.processes.wps_package._load_package_file", return_value={"class": "test"}),
+        mock.patch("weaver.processes.wps_package.load_package_file", return_value={"class": "test"}),
         mock.patch("weaver.processes.wps_package._load_package_content", return_value=(None, "test", None)),
         mock.patch("weaver.processes.wps_package._get_package_inputs_outputs", return_value=(None, None)),
         mock.patch("weaver.processes.wps_package._merge_package_inputs_outputs", return_value=([], [])),

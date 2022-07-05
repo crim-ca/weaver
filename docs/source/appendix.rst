@@ -169,7 +169,8 @@ Glossary
         later retrieval using an access token.
 
         .. seealso::
-            :ref:`vault_upload`
+            - :ref:`vault_upload`
+            - :ref:`file_vault_inputs`
 
     WKT
         Well-Known Text geometry representation.
