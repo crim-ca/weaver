@@ -559,7 +559,7 @@ def submit_job(request, reference, tags=None):
     lang = request.accept_language.header_value  # can only preemptively check if local process
     if isinstance(reference, Process):
         service_url = reference.processEndpointWPS1
-        process_id = reference.tag  # use explicit 'id:version' process revision if available, otherwise simply 'id'
+        process_id = reference.identifier  # explicit 'id:version' process revision if available, otherwise simply 'id'
         visibility = reference.visibility
         is_workflow = reference.type == ProcessType.WORKFLOW
         is_local = True

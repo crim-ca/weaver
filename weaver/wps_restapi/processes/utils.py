@@ -26,7 +26,24 @@ LOGGER = logging.getLogger(__name__)
 def resolve_process_tag(request, process_query=False):
     # type: (PyramidRequest, bool) -> str
     """
-    Obtain the tagged process reference from request path and/or query according to available information.
+    Obtain the tagged :term:`Process` reference from request path and/or query according to available information.
+
+    Whether the :term:`Process` is specified by path or query, another ``version`` query can be provided to specify
+    the desired revision by itself. This ``version`` query is considered only if another version indication is not
+    already specified in the :term:`Process` reference using the tagged semantic.
+
+    When ``process_query = False``, possible combinations are as follows:
+
+    - ``/processes/{processID}:{version}``
+    - ``/processes/{processID}?version={version}``
+
+    When ``process_query = True``, possible combinations are as follows:
+
+    - ``/...?process={processID}:{version}``
+    - ``/...?process={processID}&version={version}``
+
+    :param request: Request from which to retrieve the process reference.
+    :param process_query: Whether the process ID reference is located in request path or ``process={id}`` query.
     """
     if process_query:
         process_id = request.params.get("process")

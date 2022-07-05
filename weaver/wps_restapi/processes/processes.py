@@ -278,7 +278,7 @@ def delete_local_process(request):
     """
     db = get_db(request)
     proc_store = db.get_store(StoreProcesses)
-    process = get_process(request=request, store=proc_store)
+    process = get_process(request=request)
     process_id = process.id
     if not process.mutable:
         raise HTTPForbidden(json={

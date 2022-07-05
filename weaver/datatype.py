@@ -600,7 +600,7 @@ class Service(Base):
 
 class Job(Base):
     """
-    Dictionary that contains OWS service jobs.
+    Dictionary that contains :term:`Job` details for local :term:`Process` or remote :term:`OWS` execution.
 
     It always has ``id`` and ``task_id`` keys.
     """
@@ -1796,13 +1796,28 @@ class Process(Base):
         # type: (str) -> None
         self["id"] = _id
 
-    id = identifier = property(fget=_get_id, fset=_set_id, doc="Process identifier.")
+    id = identifier = property(fget=_get_id, fset=_set_id, doc=(
+        "Unique process identifier with optional version number if it corresponds to an older revision."
+    ))
 
     @property
     def latest(self):
         # type: () -> bool
+        """
+        Checks if this :term:`Process` corresponds to the latest revision.
+        """
         # if ID loaded from DB contains a version, it is not the latest by design
         return ":" not in self.id
+
+    @property
+    def name(self):
+        # type: () -> str
+        """
+        Obtain only the :term:`Process` name portion of the unique identifier.
+        """
+        if self.version:
+            return self.id.rsplit(":", 1)[0]
+        return self.id
 
     @property
     def tag(self):
@@ -2252,7 +2267,7 @@ class Process(Base):
                 {"href": proc_desc, "rel": "latest-version", "title": "Most recent revision of this process."},
                 {"href": proc_hist, "rel": "version-history", "title": "Listing of all revisions of this process."},
             ])
-            versions = get_db(container).get_store(StoreProcesses).find_versions(self.id, VersionFormat.OBJECT)
+            versions = get_db(container).get_store(StoreProcesses).find_versions(self.name, VersionFormat.OBJECT)
             proc_ver = as_version_major_minor_patch(self.version, VersionFormat.OBJECT)
             prev_ver = list(filter(lambda ver: ver < proc_ver, versions))
             next_ver = list(filter(lambda ver: ver > proc_ver, versions))

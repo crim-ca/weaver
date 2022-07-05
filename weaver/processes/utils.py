@@ -296,9 +296,11 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
         Container to retrieve application settings.
         If it is a ``request``-like object, additional parameters may be used to identify the payload schema.
     :param overwrite:
-        In case of a pure deployment (from scratch), indicates (using :class:`bool` whether to allow override of
-        an existing process definition if conflict occurs.
-        In case of an update deployment (from previous), indicate which process to be replaced with updated version.
+        In case of a pure deployment (from scratch), indicates (using :class:`bool`) whether to allow override of
+        an existing process definition if conflict occurs. No versioning is applied in this case (full replacement).
+        In case of an update deployment (from previous), indicates which process to be replaced with updated version.
+        The new version should not conflict with another existing process version. If payload doesn't provide a new
+        version, the following `MAJOR` version from the specified overwrite process is used to define the new revision.
     :returns: HTTPOk if the process registration was successful.
     :raises HTTPException: for any invalid process deployment step.
     """
@@ -406,26 +408,19 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
     # don't leave them there as they would be seen as if the 'Process' class generated the field
     if "links" in process_info:
         process_info["additional_links"] = process_info.pop("links")
-    version = process_info.get("version")
 
     # FIXME: handle colander invalid directly in tween (https://github.com/crim-ca/weaver/issues/112)
     try:
-        process = Process(process_info)
-        sd.ProcessSummary().deserialize(process)  # make it fail before save if invalid, then apply for real
-        process_summary = _update_deploy_process_version(process, overwrite, version, VersionLevel.MAJOR, container)
-    except ProcessRegistrationError as exc:
-        raise HTTPConflict(detail=str(exc))
+        process = Process(process_info)  # if 'version' was provided in deploy info, it will be added as hint here
+        if isinstance(overwrite, Process):
+            process_summary = _update_deploy_process_version(process, overwrite, VersionLevel.MAJOR, container)
+        else:
+            process_summary = _save_deploy_process(process, overwrite, container)
     except ValueError as exc:
         LOGGER.error("Failed schema validation of deployed process summary:\n%s", exc)
         raise HTTPBadRequest(detail=str(exc))
-    except colander.Invalid as exc:
-        LOGGER.error("Failed schema validation of deployed process summary:\n%s", exc)
-        raise HTTPBadRequest(json={
-            "description": "Failed schema validation of deployed process summary.",
-            "cause": f"Invalid schema: [{exc.msg or exc!s}]",
-            "error": exc.__class__.__name__,
-            "value": exc.value
-        })
+    except HTTPException:
+        raise
     data = {
         "description": sd.OkPostProcessesResponse.description,
         "processSummary": process_summary,
@@ -437,7 +432,143 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
     return HTTPCreated(json=data)
 
 
-def _apply_process_updates(process, update_data):
+def _save_deploy_process(process, override, container):
+    # type: (Process, bool, AnySettingsContainer) -> JSON
+    """
+    Store the :class:`Process` to database with error handling and appropriate message reporting the problem.
+    """
+    try:
+        sd.ProcessSummary().deserialize(process)  # make it fail before save if invalid, then apply for real
+        db = get_db(container)
+        store = db.get_store(StoreProcesses)
+        new_process = store.save_process(process, overwrite=override)
+        process_summary = new_process.summary()
+    except ProcessRegistrationError as exc:
+        raise HTTPConflict(json={
+            "type": "ProcessRegistrationError",
+            "title": "Process definition conflict.",
+            "detail": str(exc),
+            "status": HTTPConflict.code,
+            "cause": {"process_id": process.id},
+        })
+    except colander.Invalid as exc:
+        LOGGER.error("Failed schema validation of updated process summary:\n%s", exc)
+        raise HTTPBadRequest(json={
+            "description": "Failed schema validation of process summary.",
+            "cause": f"Invalid schema: [{exc.msg or exc!s}]",
+            "error": exc.__class__.__name__,
+            "value": exc.value
+        })
+    return process_summary
+
+
+def _update_deploy_process_version(process, process_overwrite, update_level, container=None):
+    # type: (Process, Process, VersionLevel, Optional[AnySettingsContainer]) -> JSON
+    """
+    Handle all necessary update operations of a :term:`Process` definition.
+
+    Validate that any specified version for :term:`Process` deployment is valid against any other existing versions.
+    If the replacement targets another existing process explicitly (update request), perform any necessary database
+    adjustments to replace the old process references for the creation of the updated process to ensure all versions
+    and links remain valid against their original references.
+
+    :param process: Desired new process definition.
+    :param process_overwrite: Old process from which update of the definition in database could be required.
+    :param container: Any container to retrieve a database connection.
+    :returns: Process summary with definition retrieved from storage (saved) after all operations were applied.
+    :raises HTTPException: Relevant error is raised in the even of any erroneous process definition (old and new).
+    """
+    if not process.mutable:
+        raise HTTPForbidden(json={
+            "type": "ProcessImmutable",
+            "title": "Process immutable.",
+            "detail": "Cannot update an immutable process.",
+            "status": HTTPForbidden.code,
+            "cause": {"mutable": False}
+        })
+
+    if not process.name == process_overwrite.name:
+        raise HTTPBadRequest(json={
+            "type": "InvalidParameterValue",
+            "title": "Invalid process identifier.",
+            "detail": "Specified process identifier in payload definition does not match expected ID in request path.",
+            "status": HTTPBadRequest.code,
+            "cause": {"pathProcessID": process_overwrite.name, "bodyProcessID": process.name}
+        })
+
+    db = get_db(container)
+    store = db.get_store(StoreProcesses)
+
+    # if no new version was specified, simply take the next one relevant for the update level
+    # then check that new version is within available range against target process for required update level
+    new_version = process.version if process.version else _bump_process_version(process_overwrite.version, update_level)
+    taken_versions = store.find_versions(process.id, VersionFormat.STRING)  # string format for output if error
+    if not is_update_version(new_version, taken_versions, update_level):
+        new_version = as_version_major_minor_patch(new_version, VersionFormat.STRING)
+        raise HTTPConflict(json={
+            "type": "InvalidParameterValue",
+            "title": "Invalid version value.",
+            "detail": (
+                "Process version either conflicts with already taken revisions or "
+                "semantic version is not of appropriate update level for requested changes."
+            ),
+            "status": HTTPConflict.code,
+            "cause": {"revisions": taken_versions, "version": new_version, "change": update_level}
+        })
+
+    old_version = None
+    op_override = process_overwrite
+    try:
+        # if source process for update is not the latest, no need to rewrite 'id:version' since it is not only 'id'
+        # otherwise, replace latest process 'id' by explicit 'id:version'
+        if process_overwrite.latest:
+            pid_only = process_overwrite.name
+            old_version = process_overwrite.version
+            old_process = store.update_version(pid_only, old_version)
+            process_tag = old_process.tag
+            # since 'id' reference changes from old to new process,
+            # reflect the change in any job that could refer to it
+            job_store = db.get_store(StoreJobs)
+            n_updated = job_store.batch_update_jobs({"process": pid_only}, {"process": process_tag})
+            LOGGER.debug("Updated %s jobs from process [%s] to old revision [%s]", n_updated, pid_only, process_tag)
+            op_override = False  # make sure no conflict when saving process afterward
+        process.version = new_version
+        process_summary = _save_deploy_process(process, op_override, container)
+    # add more version information to already handled error to better report the real conflict of revisions if any
+    except (ProcessRegistrationError, HTTPConflict):
+        if old_version is not None:
+            old_version = as_version_major_minor_patch(old_version, VersionFormat.STRING)
+        if new_version is not None:
+            new_version = as_version_major_minor_patch(new_version, VersionFormat.STRING)
+        raise HTTPConflict(json={
+            "type": "ProcessRegistrationError",
+            "title": "Process definition conflict.",
+            "detail": "Failed update of process conflicting with another definition or revision.",
+            "status": HTTPConflict.code,
+            "cause": {"process_id": process.id, "old_version": old_version, "new_version": new_version},
+        })
+    return process_summary
+
+
+def _bump_process_version(version, update_level):
+    # type: (AnyVersion, VersionLevel) -> AnyVersion
+    """
+    Obtain the relevant version with specified level incremented by one.
+    """
+    new_version = list(as_version_major_minor_patch(version, VersionFormat.PARTS))
+    if update_level == VersionLevel.PATCH:
+        new_version[2] += 1
+    elif update_level == VersionLevel.MINOR:
+        new_version[1] += 1
+        new_version[2] = 0
+    elif update_level == VersionLevel.MAJOR:
+        new_version[0] += 1
+        new_version[1] = 0
+        new_version[2] = 0
+    return new_version
+
+
+def _apply_process_metadata(process, update_data):
     # type: (Process, JSON) -> VersionLevel
     """
     Apply requested changes for update of the :term:`Process`.
@@ -492,138 +623,31 @@ def _apply_process_updates(process, update_data):
     return update_level
 
 
-def _bump_process_version(process, version, update_level):
-    # type: (Process, Optional[AnyVersion], VersionLevel) -> AnyVersion
-    """
-    Obtain the relevant version for the :term:`Process`.
-
-    Employ user provided version or bump to next requested version level from selected process.
-    Must be tested in both cases against available versions since selected process is not necessarily the latest.
-    """
-    old_version = process.version
-    if not version:
-        new_version = list(as_version_major_minor_patch(old_version, VersionFormat.PARTS))
-        if update_level == VersionLevel.PATCH:
-            new_version[2] += 1
-        elif update_level == VersionLevel.MINOR:
-            new_version[1] += 1
-        elif update_level == VersionLevel.MAJOR:
-            new_version[0] += 1
-    else:
-        new_version = as_version_major_minor_patch(version)
-    return new_version
-
-
-def _update_deploy_process_version(process, process_overwrite, version_hint, update_level, container=None):
-    # type: (Process, Union[Process, bool], AnyVersion, VersionLevel, Optional[AnySettingsContainer]) -> JSON
-    """
-    Handle all necessary update operations of a :term:`Process` definition.
-
-    Validate that any specified version for :term:`Process` deployment is valid against any other existing versions.
-    If the replacement targets another existing process explicitly (update request), perform any necessary database
-    adjustments to replace the old process references for the creation of the updated process if all versions are valid.
-
-    :param process: Desired new process definition.
-    :param process_overwrite: Optional old process from which update of the definition in database could be required.
-    :param version_hint: New version to be applied for the new process. If unspecified, try guessing from old process.
-    :param container: Any container to retrieve a database connection.
-    :returns: Process summary with definition retrieved from storage (saved) after all operations were applied.
-    :raises HTTPException: Relevant error is raised in the even of any erroneous process definition (old and new).
-    """
-    if not process.mutable:
-        raise HTTPForbidden(json={
-            "title": "Process immutable.",
-            "type": "ProcessImmutable",
-            "detail": "Cannot update an immutable process.",
-            "status": HTTPForbidden.code,
-            "cause": {"mutable": False}
-        })
-
-    db = get_db(container)
-    store = db.get_store(StoreProcesses)
-
-    if process.version:
-        proc_ver = as_version_major_minor_patch(process.version, VersionFormat.STRING)
-        versions = store.find_versions(process.id, VersionFormat.STRING)
-        if not is_update_version(proc_ver, versions, VersionLevel.MAJOR):
-            raise HTTPConflict(json={
-                "code": "ProcessInvalidParameter",
-                "description": "Process version already taken or prior to more recent versions.",
-                "cause": {"versions": versions},
-                "value": proc_ver,
-            })
-    new_version = _bump_process_version(process, version_hint, update_level)
-    # version must be within available range against selected process for needed update level
-    process_versions = store.find_versions(process.id)
-    if not is_update_version(new_version, process_versions, update_level):
-        new_version = as_version_major_minor_patch(new_version, VersionFormat.STRING)
-        raise HTTPUnprocessableEntity(json={
-            "type": "InvalidParameterValue",
-            "title": "Invalid version value.",
-            "detail": (
-                "Process version either conflicts with existing ones or "
-                "is not of appropriate update level for requested changes."
-            ),
-            "status": HTTPUnprocessableEntity.code,
-            "cause": {"versions": process_versions, "version": new_version, "change": update_level}
-        })
-
-    old_version = None
-    op_override = process_overwrite
-    try:
-        # if source process for update is not the latest, no need to rewrite 'id:version' since it is not only 'id'
-        # otherwise, replace latest process 'id' by explicit 'id:version'
-        if isinstance(process_overwrite, Process) and process_overwrite.latest:
-            pid_only = process_overwrite.id
-            old_version = process_overwrite.version
-            old_process = store.update_version(pid_only, old_version)
-            process_tag = old_process.tag
-            # since 'id' reference changes from old to new process,
-            # reflect the change in any job that could refer to it
-            job_store = db.get_store(StoreJobs)
-            n_updated = job_store.batch_update_jobs({"process": pid_only}, {"process": process_tag})
-            LOGGER.debug("Updated %s jobs from process [%s] to old revision [%s]", n_updated, pid_only, process_tag)
-            op_override = False  # make sure no conflict when saving process afterward
-        process.version = new_version
-        new_process = store.save_process(process, overwrite=op_override)
-        process_summary = new_process.summary()
-    except ProcessRegistrationError as exc:
-        old_version = as_version_major_minor_patch(old_version, VersionFormat.STRING)
-        new_version = as_version_major_minor_patch(new_version, VersionFormat.STRING)
-        raise HTTPConflict(json={
-            "type": "ProcessRegistrationError",
-            "title": "Failed update of process.",
-            "detail": str(exc),
-            "status": HTTPConflict.code,
-            "cause": {"process_id": process.id, "old_version": old_version, "new_version": new_version},
-        })
-    except colander.Invalid as exc:
-        LOGGER.error("Failed schema validation of updated process summary:\n%s", exc)
-        raise HTTPBadRequest(json={
-            "description": "Failed schema validation of updated process summary.",
-            "cause": f"Invalid schema: [{exc.msg or exc!s}]",
-            "error": exc.__class__.__name__,
-            "value": exc.value
-        })
-    return process_summary
-
-
 def update_process_metadata(request):
     # type: (AnyRequestType) -> HTTPException
     """
-    Process
-    :param request:
-    :return:
+    Update only MINOR or PATCH level :term:`Process` metadata.
+
+    Desired new version can be eiter specified explicitly in request payload, or will be guessed accordingly to
+    detected changes to be applied.
     """
     data = parse_content(request, content_schema=sd.PatchProcessBodySchema)
-    process = get_process(request=request)  # latest if only 'processId', or specific version if using tag
-    update_level = _apply_process_updates(process, data)
-    user_version = data.get("version")
-    process_summary = _update_deploy_process_version(process, process, user_version, update_level, request)
+    old_process = get_process(request=request)
+    new_process = copy.deepcopy(old_process)
+    update_level = _apply_process_metadata(new_process, data)
+    # apply the new version requested by the user,
+    # or make sure the old one is removed to avoid conflict
+    user_version = data.get("version") or None
+    if user_version:
+        new_process.version = user_version
+    else:
+        new_process.pop("version", None)
+    new_process.id = old_process.name  # remove any version reference in ID
+    process_summary = _update_deploy_process_version(new_process, old_process, update_level, request)
     data = {
         "description": sd.OkPatchProcessResponse.description,
         "processSummary": process_summary,
-        "links": process.links(request),
+        "links": new_process.links(request),
     }
     return HTTPOk(json=data)
 

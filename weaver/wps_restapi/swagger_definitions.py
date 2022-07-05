@@ -399,6 +399,11 @@ class ProcessIdentifier(AnyOfKeywordSchema):
     ]
 
 
+class ProcessIdentifierTag(AnyOfKeywordSchema):
+    description = "Process identifier with optional revision tag."
+    _any_of = [Tag] + ProcessIdentifier._any_of  # type: ignore  # noqa: W0212
+
+
 class Version(ExtendedSchemaNode):
     # note: internally use LooseVersion, so don't be too strict about pattern
     schema_type = String
@@ -1032,8 +1037,8 @@ class PropertyOAS(PermissiveMappingSchema):
     read_only = ExtendedSchemaNode(Boolean(), name="readOnly", missing=drop)
     write_only = ExtendedSchemaNode(Boolean(), name="writeOnly", missing=drop)
     multiple_of = MultipleOfOAS(name="multipleOf", missing=drop, validator=BoundedRange(min=0, exclusive_min=True))
-    minimum = ExtendedSchemaNode(Integer(), name="minLength", missing=drop, validator=Range(min=0))  # default=0
-    maximum = ExtendedSchemaNode(Integer(), name="maxLength", missing=drop, validator=Range(min=0))
+    minimum = ExtendedSchemaNode(Integer(), name="minimum", missing=drop, validator=Range(min=0))  # default=0
+    maximum = ExtendedSchemaNode(Integer(), name="maximum", missing=drop, validator=Range(min=0))
     exclusive_min = ExtendedSchemaNode(Boolean(), name="exclusiveMinimum", missing=drop)  # default=False
     exclusive_max = ExtendedSchemaNode(Boolean(), name="exclusiveMaximum", missing=drop)  # default=False
     min_length = ExtendedSchemaNode(Integer(), name="minLength", missing=drop, validator=Range(min=0))  # default=0
@@ -1146,8 +1151,8 @@ class DeployMinMaxOccurs(ExtendedMappingSchema):
 
 # does not inherit from 'DescriptionLinks' because other 'ProcessDescription<>' schema depend from this without 'links'
 class ProcessDescriptionType(DescriptionBase, DescriptionExtra):
-    id = ProcessIdentifier()
-    version = Version(missing=None, example="1.2.3")
+    id = ProcessIdentifierTag()
+    version = Version(missing=None, default=None, example="1.2.3")
     mutable = ExtendedSchemaNode(Boolean(), default=True, description=(
         "Indicates if the process is mutable (dynamically deployed), or immutable (builtin with this instance)."
     ))
@@ -1685,10 +1690,6 @@ class VisibilitySchema(ExtendedMappingSchema):
 #########################################################
 # Path parameter definitions
 #########################################################
-
-
-class ProcessIdentifierTag(Tag):
-    pass
 
 
 class LocalProcessQuery(ExtendedMappingSchema):
@@ -2999,8 +3000,8 @@ class DurationISO(ExtendedSchemaNode):
 
 class JobStatusInfo(ExtendedMappingSchema):
     jobID = UUID(example="a9d14bf4-84e0-449a-bac8-16e598efe807", description="ID of the job.")
-    processID = ProcessIdentifier(missing=None, default=None,
-                                  description="Process identifier corresponding to the job execution.")
+    processID = ProcessIdentifierTag(missing=None, default=None,
+                                     description="Process identifier corresponding to the job execution.")
     providerID = ProcessIdentifier(missing=None, default=None,
                                    description="Provider identifier corresponding to the job execution.")
     type = JobTypeEnum(description="Type of the element associated to the creation of this job.")
@@ -3050,7 +3051,7 @@ class JobCollection(ExtendedSequenceSchema):
 
 class CreatedJobStatusSchema(DescriptionSchema):
     jobID = UUID(description="Unique identifier of the created job for execution.")
-    processID = ProcessIdentifier(description="Identifier of the process that will be executed.")
+    processID = ProcessIdentifierTag(description="Identifier of the process that will be executed.")
     providerID = AnyIdentifier(description="Remote provider identifier if applicable.", missing=drop)
     status = ExtendedSchemaNode(String(), example=Status.ACCEPTED)
     location = ExtendedSchemaNode(String(), example="http://{host}/weaver/processes/{my-process-id}/jobs/{my-job-id}")
@@ -3371,7 +3372,7 @@ class QuoteStatusSchema(ExtendedSchemaNode):
 class PartialQuoteSchema(ExtendedMappingSchema):
     id = UUID(description="Quote ID.")
     status = QuoteStatusSchema()
-    processID = ProcessIdentifier(description="Process identifier corresponding to the quote definition.")
+    processID = ProcessIdentifierTag(description="Process identifier corresponding to the quote definition.")
 
 
 class Price(ExtendedSchemaNode):
@@ -4200,7 +4201,7 @@ class DeployProcessDescription(NotKeywordSchema, ProcessDeployment, ProcessContr
 
 
 class DeployReference(Reference):
-    id = ProcessIdentifier(missing=drop, description=(
+    id = ProcessIdentifierTag(missing=drop, description=(
         "Optional identifier of the specific process to obtain the description from in case the reference URL "
         "corresponds to an endpoint that can refer to multiple process definitions (e.g.: GetCapabilities)."
     ))
@@ -4274,7 +4275,7 @@ class DeployCWL(NotKeywordSchema, CWL, UpdateVersion):
     _not = [
         CWLGraphBase()
     ]
-    id = CWLIdentifier()  # required in this case
+    id = CWLIdentifier()  # required in this case, cannot have a version directly as tag, use 'version' field instead
 
 
 class Deploy(OneOfKeywordSchema):
@@ -4451,8 +4452,10 @@ class GetJobsQueries(ExtendedMappingSchema):
         description="Maximum duration (seconds) between started time and current/finished time of jobs to find.")
     datetime = DateTimeInterval(missing=drop, default=None)
     status = JobStatusEnum(missing=drop, default=None)
-    processID = ProcessIdentifier(missing=drop, default=null, description="Alias to 'process' for OGC-API compliance.")
-    process = ProcessIdentifier(missing=drop, default=None, description="Identifier of the process to filter search.")
+    processID = ProcessIdentifierTag(missing=drop, default=null,
+                                     description="Alias to 'process' for OGC-API compliance.")
+    process = ProcessIdentifierTag(missing=drop, default=None,
+                                   description="Identifier of the process to filter search.")
     service = AnyIdentifier(missing=drop, default=null, description="Alias to 'provider' for backward compatibility.")
     provider = AnyIdentifier(missing=drop, default=None, description="Identifier of service provider to filter search.")
     type = JobTypeEnum(missing=drop, default=null,
@@ -4464,13 +4467,17 @@ class GetJobsQueries(ExtendedMappingSchema):
                               description="Comma-separated values of tags assigned to jobs")
 
 
-class GetJobsEndpoint(ExtendedMappingSchema):
-    header = RequestHeaders()
-    querystring = GetJobsQueries()
-
-
 class GetProcessJobsQuery(LocalProcessQuery, GetJobsQueries):
     pass
+
+
+class GetProviderJobsQueries(GetJobsQueries):  # ':version' not allowed for process ID in this case
+    pass
+
+
+class GetJobsEndpoint(ExtendedMappingSchema):
+    header = RequestHeaders()
+    querystring = GetProcessJobsQuery()  # allowed version in this case since can be either local or remote processes
 
 
 class GetProcessJobsEndpoint(LocalProcessPath):
@@ -4480,7 +4487,7 @@ class GetProcessJobsEndpoint(LocalProcessPath):
 
 class GetProviderJobsEndpoint(ProviderProcessPath):
     header = RequestHeaders()
-    querystring = GetJobsQueries()
+    querystring = GetProviderJobsQueries()
 
 
 class JobIdentifierList(ExtendedSequenceSchema):

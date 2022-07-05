@@ -37,6 +37,8 @@ Changes:
 
 Fixes:
 ------
+- Fix invalid ``minimum`` and ``maximum`` OpenAPI fields that were defined as ``minLength`` and ``maxLength``
+  (duplicates definitions) for `Process` description and deployment schema validation.
 - Fix `Process` deployment using a `WPS-1/2` URL reference defining a ``GetCapabilities`` request to resolve
   the corresponding ``DescribeProcess`` request if the `Process` ID can be inferred from other known locations
   (relates to `#11 <https://github.com/crim-ca/weaver/issues/11>`_).

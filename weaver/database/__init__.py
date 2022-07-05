@@ -1,6 +1,7 @@
 import logging
 from typing import TYPE_CHECKING
 
+from pyramid.request import Request
 from pyramid.settings import asbool
 
 from weaver.database.mongodb import MongoDatabase
@@ -28,6 +29,10 @@ def get_db(container=None, reset_connection=False):
         It is preferable to provide a registry reference to reuse any available connection whenever possible.
         Giving application settings will require establishing a new connection.
     """
+    if not reset_connection and isinstance(container, Request):
+        db = getattr(container, "db", None)
+        if isinstance(db, MongoDatabase):
+            return db
     registry = get_registry(container, nothrow=True)
     if not reset_connection and registry and isinstance(getattr(registry, "db", None), MongoDatabase):
         return registry.db

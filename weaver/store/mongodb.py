@@ -563,20 +563,19 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         ver_str = version = None
         process_ref = process_id
         if ":" in process_id:
-            process_id, version = process_id.split(":", 1)
+            process_id, version = process_id.rsplit(":", 1)
         sane_name = get_sane_name(process_id, **self.sane_name_config)
         search = {"identifier": sane_name}
         if version:
             ver_str = as_version_major_minor_patch(version, VersionFormat.STRING)
             sane_tag = sane_name + ":" + ver_str
-            search = {"$or": [{"identifier": sane_name, "version": ver_str}, {"identifier": sane_tag}]}
+            search = {"$or": [{"identifier": sane_tag}, {"identifier": sane_name, "version": ver_str}]}
         process = self.collection.find_one(search)
         if not process:
             raise ProcessNotFound(f"Process '{process_ref}' could not be found.")
         process = Process(process)
         if version:
-            process.id = process_id  # replace tagged ID to make it transparent of version
-            process.version = ver_str
+            process.version = ver_str  # ensure version was applied just in case
         if visibility is not None and process.visibility != visibility:
             raise ProcessNotAccessible(f"Process '{process_ref}' cannot be accessed.")
         return process
@@ -735,7 +734,7 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
         :param job_filter: Fields to filter jobs to be updated.
         :return: Number of affected jobs.
         """
-        filter_keys = Job.properties()
+        filter_keys = list(Job.properties())
         job_update = copy.deepcopy(job_update)
         for job_key in list(job_update):
             if job_key not in filter_keys:
@@ -744,6 +743,11 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
         for job_key in list(job_filter):
             if job_key not in filter_keys:
                 job_filter.pop(job_key)
+        if not job_update:
+            raise JobUpdateError(f"No job parameters specified to apply update.")
+        job_update = {"$set": job_update}
+        LOGGER.debug("Batch jobs update:\nfilter:\n%s\nupdate:\n%s",
+                     repr_json(job_filter, indent=2), repr_json(job_update, indent=2))
         result = self.collection.update_many(filter=job_filter, update=job_update)
         return result.modified_count
 
