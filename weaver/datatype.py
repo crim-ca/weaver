@@ -1929,6 +1929,13 @@ class Process(Base):
                     _input["schema"] = self._decode(input_schema)
         return inputs
 
+    @inputs.setter
+    def inputs(self, inputs):
+        # type: (List[Dict[str, JSON]]) -> None
+        if not isinstance(inputs, list):
+            raise TypeError("Inputs container expected as list to normalize process definitions.")
+        self["inputs"] = inputs
+
     @property
     def outputs(self):
         # type: () -> Optional[List[Dict[str, JSON]]]
@@ -1957,6 +1964,13 @@ class Process(Base):
             if isinstance(output_schema, dict):
                 _output["schema"] = self._decode(output_schema)
         return outputs
+
+    @outputs.setter
+    def outputs(self, outputs):
+        # type: (List[Dict[str, JSON]]) -> None
+        if not isinstance(outputs, list):
+            raise TypeError("Outputs container expected as list to normalize process definitions.")
+        self["outputs"] = outputs
 
     @property
     def jobControlOptions(self):  # noqa: N802

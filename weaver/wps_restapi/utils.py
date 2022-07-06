@@ -9,11 +9,13 @@ from pyramid.httpexceptions import (
     HTTPBadRequest,
     HTTPInternalServerError,
     HTTPSuccessful,
+    HTTPUnprocessableEntity,
     HTTPUnsupportedMediaType,
     status_map
 )
 import yaml
 
+from weaver.formats import repr_json
 from weaver.utils import get_header, get_settings, get_weaver_url
 from weaver.wps_restapi import swagger_definitions as sd
 
@@ -141,7 +143,7 @@ def handle_schema_validation(schema=None):
     :param schema: If provided, document this schema as the reference of the failed schema validation.
     :raises HTTPBadRequest: If any schema validation error occurs when handling the decorated function.
     """
-    def decorator(func):
+    def decorator(func):  # type: (Callable[[Any, Any], Any]) -> Callable[[Any, Any], Any]
         @functools.wraps(func)
         def wrapped(*args, **kwargs):
             try:
@@ -188,8 +190,6 @@ def parse_content(request=None,                                         # type: 
             content_type = content_type_schema().deserialize(content_type)
         if isinstance(content, str):
             content = yaml.safe_load(content)
-        if content_schema is not None:
-            content = content_schema().deserialize(content)
         if not isinstance(content, dict):
             raise TypeError("Not a valid JSON body for process deployment.")
     except colander.Invalid as exc:
@@ -207,5 +207,17 @@ def parse_content(request=None,                                         # type: 
             "detail": "Unable to parse contents.",
             "status": HTTPBadRequest.code,
             "cause": str(exc),
+        })
+    try:
+        if content_schema is not None:
+            content = content_schema().deserialize(content)
+    except colander.Invalid as exc:
+        raise HTTPUnprocessableEntity(json={
+            "type": "InvalidParameterValue",
+            "title": "Failed schema validation.",
+            "status": HTTPUnprocessableEntity.code,
+            "error": colander.Invalid.__name__,
+            "cause": exc.msg,
+            "value": repr_json(exc.value, force_string=False),
         })
     return content

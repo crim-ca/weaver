@@ -328,7 +328,47 @@ class WpsRestApiProcessesTest(unittest.TestCase):
 
         .. versionadded:: 4.20
         """
-        raise NotImplementedError  # FIXME
+        p_id = "test-process-history-revision"
+        self.deploy_process_CWL_direct(ContentType.APP_JSON, process_id=p_id, version="1.2.3")
+        data = {"title": "first revision", "version": "1.2.5"}
+        resp = self.app.patch_json(f"/processes/{p_id}", params=data, headers=self.json_headers)
+        assert resp.status_code == 200
+        data = {"title": "second revision", "version": "1.3.2"}
+        resp = self.app.patch_json(f"/processes/{p_id}", params=data, headers=self.json_headers)
+        assert resp.status_code == 200
+        data = {"title": "older revision", "version": "0.1.0"}
+        resp = self.app.patch_json(f"/processes/{p_id}", params=data, headers=self.json_headers)
+        assert resp.status_code == 200
+        data = {"title": "latest revision", "version": "2.0.0"}
+        resp = self.app.patch_json(f"/processes/{p_id}", params=data, headers=self.json_headers)
+        assert resp.status_code == 200
+
+        path = get_path_kvp("/processes", process=p_id, revisions=True, detail=False)
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        body = resp.json
+        assert "processes" in body and len(body["processes"]) > 0
+        assert body["processes"] == [
+            f"{p_id}:0.1.0",
+            f"{p_id}:1.2.3",
+            f"{p_id}:1.2.5",
+            f"{p_id}:1.3.2",
+            f"{p_id}:2.0.0",
+        ], "sorted processes by version with tagged representation expected when requesting revisions"
+
+        path = get_path_kvp("/processes", process=p_id, revisions=True, detail=True)
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        body = resp.json
+        assert "processes" in body and len(body["processes"]) > 0
+        info = [(proc["id"], proc["version"]) for proc in body["processes"]]
+        assert info == [
+            (f"{p_id}:0.1.0", "0.1.0"),
+            (f"{p_id}:1.2.3", "1.2.3"),
+            (f"{p_id}:1.2.5", "1.2.5"),
+            (f"{p_id}:1.3.2", "1.3.2"),
+            (f"{p_id}:2.0.0", "2.0.0"),
+        ]
 
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
@@ -1462,6 +1502,32 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         body = resp.json
         assert body["version"] == v3
         assert body["id"] == p_id
+
+    def test_delete_process_revision(self):
+        """
+        Process revisions can be deleted (undeployed) just like any other process.
+
+        In the event that the revision to delete happens to be the active latest, the next one by semantic version
+        should become the new latest revision.
+
+        .. versionadded:: 4.20
+        """
+        p_id = "test-delete-process-revision"
+        self.deploy_process_CWL_direct(ContentType.APP_JSON, process_id=p_id, version="1.2.3")
+        data = {"title": "first revision", "version": "1.2.5"}
+        resp = self.app.patch_json(f"/processes/{p_id}", params=data, headers=self.json_headers)
+        assert resp.status_code == 200
+        data = {"title": "second revision", "version": "1.3.2"}
+        resp = self.app.patch_json(f"/processes/{p_id}", params=data, headers=self.json_headers)
+        assert resp.status_code == 200
+        data = {"title": "older revision", "version": "0.1.0"}
+        resp = self.app.patch_json(f"/processes/{p_id}", params=data, headers=self.json_headers)
+        assert resp.status_code == 200
+        data = {"title": "latest revision", "version": "2.0.0"}
+        resp = self.app.patch_json(f"/processes/{p_id}", params=data, headers=self.json_headers)
+        assert resp.status_code == 200
+
+        resp = self.app.delete_json(f"/processes/{p_id}:", headers=self.json_headers)
 
     def test_delete_process_success(self):
         path = f"/processes/{self.process_public.identifier}"

@@ -44,6 +44,7 @@ from weaver.exceptions import (
     log_unhandled_exceptions
 )
 from weaver.formats import ContentType, repr_json
+from weaver.processes.convert import normalize_ordered_io
 from weaver.processes.types import ProcessType
 from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
 from weaver.utils import (
@@ -52,6 +53,7 @@ from weaver.utils import (
     as_version_major_minor_patch,
     fully_qualified_name,
     generate_diff,
+    get_any_id,
     get_header,
     get_sane_name,
     get_settings,
@@ -505,15 +507,24 @@ def _update_deploy_process_version(process, process_overwrite, update_level, con
     taken_versions = store.find_versions(process.id, VersionFormat.STRING)  # string format for output if error
     if not is_update_version(new_version, taken_versions, update_level):
         new_version = as_version_major_minor_patch(new_version, VersionFormat.STRING)
-        raise HTTPConflict(json={
+        ref_version = as_version_major_minor_patch(process_overwrite.version, VersionFormat.STRING)
+        if new_version in taken_versions:
+            http_error = HTTPConflict
+            message = "Process version conflicts with already taken revisions."
+        else:
+            http_error = HTTPUnprocessableEntity
+            message = "Semantic version is not of appropriate update level for requested changes."
+        raise http_error(json={
             "type": "InvalidParameterValue",
             "title": "Invalid version value.",
-            "detail": (
-                "Process version either conflicts with already taken revisions or "
-                "semantic version is not of appropriate update level for requested changes."
-            ),
-            "status": HTTPConflict.code,
-            "cause": {"revisions": taken_versions, "version": new_version, "change": update_level}
+            "detail": message,
+            "status": http_error.code,
+            "cause": {
+                "revisions": taken_versions,
+                "reference": ref_version,
+                "version": new_version,
+                "change": update_level,
+            }
         })
 
     old_version = None
@@ -578,48 +589,151 @@ def _apply_process_metadata(process, update_data):
     accomplished when attempting to apply changes.
 
     .. seealso::
-        :class:`sd.PatchProcessBodySchema` for specific field handling based on unspecified value, null or empty-list.
+        Schema :class:`sd.PatchProcessBodySchema` describes specific field handling based on unspecified value, null
+        or empty-list. Corresponding update levels required for fields are also provided in this schema definition.
 
     :param process: Process to modify. Can be the latest or a previously tagged version.
     :param update_data: Fields with updated data to apply to the process.
     :return: Applicable update level based on updates to be applied.
     """
-    update_fields = ["title", "description", "keywords", "metadata", ("links", "additional_links")]
-    update_level = VersionLevel.PATCH  # metadata only
-    any_update = False
-    try:
+    patch_update_fields = ["title", "description", "keywords", "metadata", ("links", "additional_links")]
+    minor_update_fields = ["jobControlOptions", "outputTransmission", "visibility"]
+    update_level = VersionLevel.PATCH  # metadata only, elevate to MINOR if corresponding fields changed
+    field = value = None  # any last set item that raises an unexpected error can be reported in exception handler
+
+    def _apply_change(data, dest, name, update_fields):
+        # type: (JSON, Union[Process, JSON], str, List[Union[str, Tuple[str, str]]]) -> bool
+        """
+        Apply sub-changes to relevant destination container.
+
+        :param data: New information changes to be applied.
+        :param dest: Target location to set new value changes.
+        :param name: Target location name for error reporting.
+        :return: Status indicating if any change was applied.
+        """
+        nonlocal field, value  # propagate outside function
+
+        any_change = False
         for source in update_fields:
             target = source
             if isinstance(source, tuple):
                 source, target = source
-            value = update_data.get(source)
+            field = f"{name}.{target}"
+            value = data.get(source)
             if value is None:
                 continue
-            any_update = True
             # list appends new content unless explicitly empty to reset
             if isinstance(value, list):
                 if not len(value):
-                    setattr(process, target, [])
+                    current = getattr(dest, target, [])
+                    if current != value:
+                        setattr(dest, target, [])
+                        any_change = True
                 else:
-                    info = copy.deepcopy(getattr(process, source, []))
+                    info = copy.deepcopy(getattr(dest, source, []))
                     info.extend(value)
-                    setattr(process, target, info)
+                    setattr(dest, target, info)
+                    any_change = True
             else:
-                setattr(process, target, value)
-        if not any_update:
-            raise colander.Invalid(
-                sd.PatchProcessBodySchema(name="content"),
-                msg="No parameters provided for update.",
-                value=update_data,
-            )
-    except colander.Invalid as exc:
+                current = getattr(dest, target, None)
+                if current != value:
+                    setattr(dest, target, value)
+                    any_change = True
+        return any_change
+
+    try:
+        any_update_inputs = any_update_outputs = False
+
+        inputs = update_data.get("inputs")
+        if inputs:
+            inputs_current = process.inputs
+            inputs_changes = normalize_ordered_io(inputs, order_hints=inputs_current)
+            inputs_updated = {get_any_id(i, pop=True): i for i in copy.deepcopy(inputs_current)}
+            inputs_allowed = list(inputs_updated)
+            for input_data in inputs_changes:
+                input_id = get_any_id(input_data)
+                if input_id not in inputs_allowed:
+                    raise HTTPUnprocessableEntity(json={
+                        "type": "InvalidParameterValue",
+                        "title": "Unknown input identifier.",
+                        "detail": "Process update parameters specified an input unknown to this process.",
+                        "status": HTTPUnprocessableEntity.code,
+                        "cause": {"input.id": input_id, "inputs": inputs_allowed},
+                    })
+                input_def = inputs_updated[input_id]
+                input_name = f"process.inputs[{input_id}]"
+                any_update_inputs |= _apply_change(input_data, input_def, input_name, patch_update_fields)
+
+            # early exit if nothing was updated when fields were specified expecting something to be applied
+            # avoid potentially indicating that update was accomplished when it would not be
+            if not any_update_inputs:
+                raise HTTPBadRequest(json={
+                    "type": "InvalidParameterValue",
+                    "title": "Failed process input parameter update.",
+                    "detail": "Provided parameters not applicable for update or no changed values could be detected.",
+                    "value": repr_json(update_data, force_string=False),
+                })
+            field = "process.inputs"
+            value = normalize_ordered_io(inputs_updated, order_hints=inputs_current)
+            process.inputs = value
+
+        outputs = update_data.get("outputs")
+        if outputs:
+            outputs_current = process.outputs
+            outputs_changes = normalize_ordered_io(outputs, order_hints=outputs_current)
+            outputs_updated = {get_any_id(o, pop=True): o for o in copy.deepcopy(outputs_current)}
+            outputs_allowed = list(outputs_updated)
+            for output_data in outputs_changes:
+                output_id = get_any_id(output_data)
+                if output_id not in outputs_allowed:
+                    raise HTTPUnprocessableEntity(json={
+                        "type": "InvalidParameterValue",
+                        "title": "Unknown output identifier.",
+                        "detail": "Process update parameters specified an output unknown to this process.",
+                        "status": HTTPUnprocessableEntity.code,
+                        "cause": {"output.id": output_id, "outputs": outputs_allowed},
+                    })
+                output_def = outputs_updated[output_id]
+                output_name = f"process.outputs[{output_id}]"
+                any_update_outputs |= _apply_change(output_data, output_def, output_name, patch_update_fields)
+
+            # early exit if nothing was updated when fields were specified expecting something to be applied
+            # avoid potentially indicating that update was accomplished when it would not be
+            if not any_update_outputs:
+                raise HTTPBadRequest(json={
+                    "type": "InvalidParameterValue",
+                    "title": "Failed process output parameter update.",
+                    "detail": "Provided parameters not applicable for update or no changed values could be detected.",
+                    "value": repr_json(update_data, force_string=False),
+                })
+            field = "process.outputs"
+            value = normalize_ordered_io(outputs_updated, order_hints=outputs_current)
+            process.outputs = value
+
+        any_update_process = _apply_change(update_data, process, "process", patch_update_fields)
+        any_update_minor = _apply_change(update_data, process, "process", minor_update_fields)
+        if any_update_minor:
+            update_level = VersionLevel.MINOR
+
+        if not any((any_update_process, any_update_minor, any_update_inputs, any_update_outputs)):
+            raise HTTPBadRequest(json={
+                "type": "InvalidParameterValue",
+                "title": "Failed process parameter update.",
+                "detail": "Provided parameters not applicable for update or no changed values could be detected.",
+                "value": repr_json(update_data, force_string=False),
+            })
+    except HTTPException:
+        raise
+    except Exception as exc:
         raise HTTPBadRequest(json={
-            "code": "ProcessInvalidParameter",
-            "description": "Process update parameters failed validation.",
-            "error": colander.Invalid.__name__,
-            "cause": exc.msg,
-            "value": repr_json(exc.value, force_string=False),
+            "type": "InvalidParameterValue",
+            "title": "Failed process parameter update.",
+            "detail": "Process update parameters failed validation or produced an error when applying change.",
+            "error": fully_qualified_name(exc),
+            "cause": {"message": str(exc), "field": field},
+            "value": repr_json(value, force_string=False),
         })
+
     return update_level
 
 

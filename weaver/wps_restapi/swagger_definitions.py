@@ -2942,6 +2942,10 @@ class ProcessDescription(OneOfKeywordSchema):
 
 
 class ProcessDeployment(ProcessSummary, ProcessContext, ProcessDeployMeta):
+    # override ID to forbid deploy to contain a tagged version part
+    # if version should be applied, it must be provided with its 'Version' field
+    id = ProcessIdentifier()
+
     # explicit "abstract" handling for bw-compat, new versions should use "description"
     # only allowed in deploy to support older servers that report abstract (or parsed from WPS-1/2)
     # recent OGC-API v1+ will usually provide directly "description" as per the specification
@@ -4201,7 +4205,7 @@ class DeployProcessDescription(NotKeywordSchema, ProcessDeployment, ProcessContr
 
 
 class DeployReference(Reference):
-    id = ProcessIdentifierTag(missing=drop, description=(
+    id = ProcessIdentifier(missing=drop, description=(
         "Optional identifier of the specific process to obtain the description from in case the reference URL "
         "corresponds to an endpoint that can refer to multiple process definitions (e.g.: GetCapabilities)."
     ))
@@ -4353,24 +4357,24 @@ class UpdateInputOutputDefinition(OneOfKeywordSchema):
 class PatchProcessBodySchema(UpdateVersion):
     title = ExtendedSchemaNode(String(), missing=drop, description=(
         "New title to override current one. "
-        "Automatic change version level: PATCH."
+        "Minimum required change version level: PATCH."
     ))
     description = ExtendedSchemaNode(String(), missing=drop, description=(
         "New description to override current one. "
-        "Automatic change version level: PATCH."
+        "Minimum required change version level: PATCH."
     ))
     keywords = KeywordList(missing=drop, description=(
         "Keywords to add (append) to existing definitions. "
         "To remove all keywords, submit an empty list. "
         "To replace keywords, perform two requests, one with empty list and the following one with new definitions. "
-        "Automatic change version level: PATCH."
+        "Minimum required change version level: PATCH."
     ))
     metadata = MetadataList(missing=drop, description=(
         "Metadata to add (append) to existing definitions. "
         "To remove all metadata, submit an empty list. "
         "To replace metadata, perform two requests, one with empty list and the following one with new definitions. "
         "Relations must be unique across existing and new submitted metadata. "
-        "Automatic change version level: PATCH."
+        "Minimum required change version level: PATCH."
     ))
     links = LinkList(missing=drop, description=(
         "Links to add (append) to existing definitions. Relations must be unique. "
@@ -4379,15 +4383,27 @@ class PatchProcessBodySchema(UpdateVersion):
         "Note that modifications to links only considers custom links. Other automatically generated links such as "
         "API endpoint and navigation references cannot be removed or modified. "
         "Relations must be unique across existing and new submitted links. "
-        "Automatic change version level: PATCH."
+        "Minimum required change version level: PATCH."
     ))
     inputs = UpdateInputOutputDefinition(missing=drop, description=(
         "Update details of individual input elements. "
-        "Automatic change version level are the same as top level fields of the process for corresponding names."
+        "Minimum required change version levels are the same as process-level fields of corresponding names."
     ))
     outputs = UpdateInputOutputDefinition(missing=drop, description=(
         "Update details of individual output elements. "
-        "Automatic change version level are the same as top level fields of the process for corresponding names."
+        "Minimum required change version levels are the same as process-level fields of corresponding names."
+    ))
+    jobControlOptions = JobControlOptionsList(missing=drop, description=(
+        "New job control options supported by this process for its execution. "
+        "Minimum required at least MINOR update."
+    ))
+    outputTransmission = TransmissionModeList(missing=drop, description=(
+        "New output transmission methods supported following this process execution. "
+        "Minimum required at least MINOR update."
+    ))
+    visibility = VisibilityValue(missing=drop, description=(
+        "New process visibility. "
+        "Minimum required at least MINOR update."
     ))
 
 
@@ -4717,6 +4733,12 @@ class ConflictRequestResponseSchema(ExtendedMappingSchema):
 
 class UnprocessableEntityResponseSchema(ExtendedMappingSchema):
     description = "Wrong format of given parameters."
+    header = ResponseHeaders()
+    body = ErrorJsonResponseBodySchema()
+
+
+class UnsupportedMediaTypeResponseSchema(ExtendedMappingSchema):
+    description = "Media-Type not supported for this request."
     header = ResponseHeaders()
     body = ErrorJsonResponseBodySchema()
 
@@ -5325,6 +5347,7 @@ post_processes_responses = {
     }),
     "400": BadRequestResponseSchema(description="Unable to parse process definition"),
     "409": ConflictRequestResponseSchema(description="Process with same ID already exists."),
+    "415": UnsupportedMediaTypeResponseSchema(description="Unsupported Media-Type for process deployment."),
     "422": UnprocessableEntityResponseSchema(description="Invalid schema for process definition."),
     "500": InternalServerErrorResponseSchema(),
 }
@@ -5334,7 +5357,7 @@ put_process_responses.update({
     "409": ConflictRequestResponseSchema(description="Process with same ID or version already exists."),
 })
 patch_process_responses = {
-    "200": OkPatchProcessResponse(description="success"),
+    "200": OkPatchProcessResponse(),
     "400": BadRequestGetProcessInfoResponse(description="Unable to parse process definition"),
     "404": NotFoundProcessResponse(description="Process to update could not be found."),
     "409": ConflictRequestResponseSchema(description="Process with same ID or version already exists."),
