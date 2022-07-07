@@ -1459,7 +1459,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         """
         p_id = "test-update-job-refs"
         self.deploy_process_CWL_direct(ContentType.APP_JSON, process_id=p_id)
-        job = self.job_store.save_job(task_id=uuid.uuid4(), process=p_id)
+        job = self.job_store.save_job(task_id=uuid.uuid4(), process=p_id, access=Visibility.PUBLIC)
 
         # verify that job initially refers to "latest" process
         path = f"/jobs/{job.id}"
@@ -1469,7 +1469,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         path = get_path_kvp(f"/processes/{p_id}/jobs", detail=False)
         resp = self.app.get(path, headers=self.json_headers)
         body = resp.json
-        assert len(body["jobs"]) > 1 and str(job.id) in body["jobs"]
+        assert len(body["jobs"]) == 1 and str(job.id) in body["jobs"]
 
         # update process
         data = {
@@ -1478,8 +1478,8 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         }
         resp = self.app.patch_json(f"/processes/{p_id}", params=data, headers=self.json_headers)
         assert resp.status_code == 200
-        p_rev = resp.json["version"]
-        assert p_rev is not None
+        body = resp.json
+        assert "version" in body["processSummary"] and body["processSummary"]["version"] not in [None, "0.0.0"]
 
         # verify job was updated with new reference
         path = f"/jobs/{job.id}"
