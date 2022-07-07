@@ -368,9 +368,9 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert resp.status_code == 200
         body = resp.json
         assert "processes" in body and len(body["processes"]) > 0
-        info = [(proc["id"], proc["version"]) for proc in body["processes"]]
-        expect = [(p_id, ver) for ver in versions]
-        assert info == expect
+        result = [(proc["id"], proc["version"]) for proc in body["processes"]]
+        expect = list(zip(revisions, versions))
+        assert result == expect
 
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,

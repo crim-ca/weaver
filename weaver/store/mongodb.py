@@ -794,7 +794,7 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
             if job_key not in filter_keys:
                 job_filter.pop(job_key)
         if not job_update:
-            raise JobUpdateError(f"No job parameters specified to apply update.")
+            raise JobUpdateError("No job parameters specified to apply update.")
         job_update = {"$set": job_update}
         LOGGER.debug("Batch jobs update:\nfilter:\n%s\nupdate:\n%s",
                      repr_json(job_filter, indent=2), repr_json(job_update, indent=2))

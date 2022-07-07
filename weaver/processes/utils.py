@@ -594,7 +594,7 @@ def _bump_process_version(version, update_level):
     return new_version
 
 
-def _apply_process_metadata(process, update_data):
+def _apply_process_metadata(process, update_data):  # pylint: disable=R1260,too-complex  # FIXME
     # type: (Process, JSON) -> VersionLevel
     """
     Apply requested changes for update of the :term:`Process`.
