@@ -4,10 +4,11 @@ from typing import TYPE_CHECKING, overload
 from weaver.store.base import StoreInterface
 
 if TYPE_CHECKING:
-    from typing import Any
+    from typing import Any, Type, Union
+    from typing_extensions import Literal
 
     from weaver.store.base import StoreBills, StoreJobs, StoreProcesses, StoreQuotes, StoreServices, StoreVault
-    from weaver.typedefs import AnySettingsContainer, JSON, Literal, Type, Union
+    from weaver.typedefs import AnySettingsContainer, JSON
 
     AnyStore = Union[
         StoreBills,

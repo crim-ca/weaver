@@ -72,6 +72,7 @@ if TYPE_CHECKING:
         Tuple,
         Union
     )
+    from typing_extensions import TypeGuard
 
     from weaver.execute import AnyExecuteControlOption, AnyExecuteMode
     from weaver.status import Status
@@ -92,8 +93,7 @@ if TYPE_CHECKING:
         Literal,
         OpenAPISchema,
         Number,
-        SettingsType,
-        TypeGuard
+        SettingsType
     )
 
 LOGGER = logging.getLogger(__name__)

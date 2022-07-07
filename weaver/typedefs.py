@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Type, Union
 
     import psutil
-    from typing_extensions import Literal, NotRequired, Protocol, TypeAlias, TypedDict, TypeGuard
+    from typing_extensions import Literal, NotRequired, Protocol, TypeAlias, TypedDict
 
     if hasattr(os, "PathLike"):
         FileSystemPathType = Union[os.PathLike, str]
