@@ -305,55 +305,44 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         return sorted(versions)
 
     def test_get_processes_with_tagged_revisions(self):
-        """Example:
-        http://localhost:4002/processes?detail=false&revisions=true
-
-          "processes": [
-            "anti-spoofing:0.1.0",
-            "CatFile:1.0.0",
-            "ColibriFlyingpigeon_SubsetBbox",
-            "demo-cat-file:1.0.0",
-            "docker-demo-cat",
-            "docker-python-script",
-            "DockerNetCDF2Text",
-            "Echo:1.0.0",
-            "file_index_selector:1.1.0",
-            "file2string_array:1.2.0",
-            "image-utils:0.0.1",
-            "jsonarray2netcdf:1.3.0",
-            "las2tif",
-            "memory-usage",
-            "memory-usage-2",
-            "memory-usage-3",
-            "memory-usage-4",
-            "memory-usage-5",
-            "memory-usage-6",
-            "memory-usage-script",
-            "metalink2netcdf:1.2.0",
-            "OutardeFlyingpigeon_SubsetBbox",
-            "python-script",
-            "sleep",
-            "Staging_S2L1C:0.0.1",
-            "Staging_S2L1C-mock-docker:0.0.1",
-            "test_blurring:0.0.1",
-            "test_generation:0.0.1",
-            "test_workflow:0.0.1",
-            "test-echo:1.0.0",
-            "test-report",
-            "WaterExtent_S2-mock-docker:0.0.1",
-            "WorkflowWaterExtent:0.0.1",
-            "WorkflowWaterExtent-mock:0.0.1",
-            "WPS1JsonArray2NetCDF:0.0.1"
-          ],
+        """
+        Listing of mixed processes with and without revisions.
 
         .. versionadded:: 4.20
         """
-        # FIXME:
-        # create some processes with different combinations of revisions, no-version, single-version
         path = get_path_kvp("/processes", revisions=True, detail=False)
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 200
+        body = resp.json
+        proc_no_revs = body["processes"]
+        assert len(proc_no_revs) > 0, "cannot test mixed no-revision/with-revisions listing without prior processes"
 
-        raise NotImplementedError
+        # create some processes with different combinations of revisions, no-version, single-version
+        proc1_id = "first-process"
+        proc1_versions = self.deploy_process_revisions(proc1_id)
+        proc1_tags = [f"{proc1_id}:{ver}" for ver in proc1_versions]
+        proc2_id = "other-process"
+        proc2_versions = self.deploy_process_revisions(proc2_id)
+        proc2_tags = [f"{proc2_id}:{ver}" for ver in proc2_versions]
+        proc_total = len(proc_no_revs) + len(proc1_versions) + len(proc2_versions)
+
+        path = get_path_kvp("/processes", revisions=True, detail=False)
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 200
+        body = resp.json
+        assert len(body["processes"]) == proc_total
+        assert body["processes"] == sorted(proc_no_revs + proc1_tags + proc2_tags)
+
+        path = get_path_kvp("/processes", revisions=True, detail=True)
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 200
+        body = resp.json
+        assert len(body["processes"]) == proc_total
+        proc_result = [(proc["id"], proc["version"]) for proc in body["processes"]]
+        proc_expect = [(proc_id, "0.0.0") for proc_id in proc_no_revs]
+        proc_expect += [(tag, ver) for tag, ver in zip(proc1_tags, proc1_versions)]
+        proc_expect += [(tag, ver) for tag, ver in zip(proc2_tags, proc2_versions)]
+        assert proc_result == sorted(proc_expect)
 
     def test_get_processes_with_history_revisions(self):
         """
@@ -1262,12 +1251,17 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         self.deploy_process_CWL_direct(ContentType.APP_JSON, process_id=p_id)
         resp = self.app.patch_json(f"/processes/{p_id}", params={}, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 400
-        assert resp.json["cause"] == "No parameters provided for update."
+        assert resp.json["title"] == "Failed process parameter update."
 
         data = {"description": None, "title": None}
         resp = self.app.patch_json(f"/processes/{p_id}", params=data, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 400
-        assert resp.json["cause"] == "No parameters provided for update."
+        assert resp.json["title"] == "Failed process parameter update."
+
+        data = {"unknown-field": "new content"}
+        resp = self.app.patch_json(f"/processes/{p_id}", params=data, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 400
+        assert resp.json["title"] == "Failed process parameter update."
 
     def test_update_process_latest_valid(self):
         """
