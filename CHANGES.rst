@@ -13,13 +13,19 @@ Changes
 Changes:
 --------
 - Add support of `Process` revisions (resolves `#107 <https://github.com/crim-ca/weaver/issues/107>`_).
-- Add``PATCH /processes/{processID}`` request, allowing `MINOR` and `PATCH` level modifications that can be applied
-  to an existing `Process` in order to revise non-execution critical information such as its documented description.
-- Add ``PUT /processes/{processID}`` request, allowing `MAJOR` revision to essentially redeploy a new `Process`,
-  but leaving some form of relationship with the older version by reusing the same `Process` ID.
-- Add support of ``{processID}:{version}`` representation in request path and `Job` ``processID`` to reference the
-  specific `Process` revisions when fetch `Process` description and `Job` status.
-- Add search query ``version`` and ``revisions`` to fetch a specific `Process` revision, or all versions history.
+- Add ``PATCH /processes/{processID}`` request, allowing ``MINOR`` and ``PATCH`` level modifications that can be
+  applied to an existing `Process` in order to revise non-execution critical information. Level ``PATCH`` is used to
+  identify changes with no impact on execution whatsoever, only affecting metadata such as its documented description.
+  Level ``MINOR`` is used to update components that affect only execution *methodology* (e.g.: sync/async) or `Process`
+  retrieval, but that do not directly impact *what* is executed (i.e.: the `Application Package` does not change).
+- Add ``PUT /processes/{processID}`` request, allowing ``MAJOR`` revision to essentially redeploy a new `Process`,
+  but leaving some form of relationship with older versions by reusing the same `Process` ID. This ``MAJOR`` update
+  level implies a relatively critical change to execute the `Process`, such as the addition, removal or modification
+  of an input or output, directly impacting the `Application Package` definition and parameters the `Process` offers.
+- Add support of ``{processID}:{version}`` representation in request path and ``processID`` of the `Job` definition
+  to reference the specific `Process` revisions when fetching a `Process` description or a `Job` status.
+- Add search query ``version`` and ``revisions`` parameters to allow description of a specific `Process` revision, or
+  listing all its versions history.
 - Add more entries in ``links`` referring to `Process` revisions whenever applicable.
 
 Fixes:

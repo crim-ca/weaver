@@ -470,12 +470,15 @@ def _update_deploy_process_version(process, process_overwrite, update_level, con
     Handle all necessary update operations of a :term:`Process` definition.
 
     Validate that any specified version for :term:`Process` deployment is valid against any other existing versions.
-    If the replacement targets another existing process explicitly (update request), perform any necessary database
-    adjustments to replace the old process references for the creation of the updated process to ensure all versions
-    and links remain valid against their original references.
+    Perform any necessary database adjustments to replace the old :term:`Process` references for the creation of the
+    updated :term:`Process` to ensure all versions and links remain valid against their original references.
 
     :param process: Desired new process definition.
     :param process_overwrite: Old process from which update of the definition in database could be required.
+    :param update_level:
+        Minimum semantic version level required for this update operation.
+        If the new :term:`Process` definition did not provide a version explicitly, this level will be used to
+        automatically infer the following revision number based on the old :term:`Process` reference.
     :param container: Any container to retrieve a database connection.
     :returns: Process summary with definition retrieved from storage (saved) after all operations were applied.
     :raises HTTPException: Relevant error is raised in the even of any erroneous process definition (old and new).

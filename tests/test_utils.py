@@ -108,7 +108,7 @@ def test_is_update_version():
         "1.2.4",
         "1.3.1",
     ]
-    random.shuffle(versions)
+    random.shuffle(versions)  # function must not depend on input order
 
     assert not is_update_version("0.1.0", versions, VersionLevel.PATCH)
     assert not is_update_version("1.0.1", versions, VersionLevel.PATCH)
@@ -116,11 +116,14 @@ def test_is_update_version():
     assert not is_update_version("1.2.3", versions, VersionLevel.PATCH)
     assert not is_update_version("1.3.0", versions, VersionLevel.PATCH)
     assert not is_update_version("1.3.1", versions, VersionLevel.PATCH)
+    assert not is_update_version("1.4.5", versions, VersionLevel.PATCH)  # no 1.4.x to update from
 
     assert not is_update_version("0.1.0", versions, VersionLevel.MINOR)
     assert not is_update_version("0.1.4", versions, VersionLevel.MINOR)
     assert not is_update_version("1.2.5", versions, VersionLevel.MINOR)
     assert not is_update_version("1.3.2", versions, VersionLevel.MINOR)
+    assert not is_update_version("2.0.0", versions, VersionLevel.MINOR)  # no 2.x to update from
+    assert not is_update_version("2.1.3", versions, VersionLevel.MINOR)
 
     assert not is_update_version("0.1.0", versions, VersionLevel.MAJOR)
     assert not is_update_version("0.1.4", versions, VersionLevel.MAJOR)
@@ -139,8 +142,6 @@ def test_is_update_version():
     assert is_update_version("0.3.0", versions, VersionLevel.MINOR)
     assert is_update_version("1.4.0", versions, VersionLevel.MINOR)
     assert is_update_version("1.5.0", versions, VersionLevel.MINOR)
-    assert is_update_version("2.0.0", versions, VersionLevel.MINOR)
-    assert is_update_version("2.1.3", versions, VersionLevel.MINOR)
 
     assert is_update_version("2.0.0", versions, VersionLevel.MAJOR)
     assert is_update_version("2.1.3", versions, VersionLevel.MAJOR)
