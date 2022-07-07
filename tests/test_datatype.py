@@ -169,3 +169,15 @@ def test_process_io_schema_ignore_uri():
     # if 'default format' "schema" exists, it must not cause an error when parsing the object
     wps_proc = proc_obj.wps()
     assert any(isinstance(out.json.get("schema"), str) for out in wps_proc.outputs)
+
+
+@pytest.mark.parametrize("process_id,result", [
+    ("urn:test:1.2.3", ("urn:test", "1.2.3")),
+    ("urn:uuid:process:test", ("urn:uuid:process:test", None)),
+    ("urn:test:random-test:1.3.4", ("urn:test:random-test", "1.3.4")),
+    ("random-test:1", ("random-test", "1")),
+    ("random-test:1.3.4", ("random-test", "1.3.4")),
+    ("random-test:not.a.version", ("random-test:not.a.version", None)),
+])
+def test_process_split_version(process_id, result):
+    assert Process.split_version(process_id) == result

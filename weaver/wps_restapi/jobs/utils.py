@@ -18,7 +18,7 @@ from pyramid.response import FileResponse
 from pyramid_celery import celery_app
 
 from weaver.database import get_db
-from weaver.datatype import Job
+from weaver.datatype import Job, Process
 from weaver.exceptions import (
     InvalidIdentifierValue,
     JobGone,
@@ -122,7 +122,6 @@ def get_job(request):
         process_tag = resolve_process_tag(request)  # find version if available as well
     else:
         process_tag = job.process
-    process_id = process_tag.split(":")[0]
     if provider_id:
         forbid_local_only(request)
 
@@ -140,6 +139,8 @@ def get_job(request):
             },
             code=title, locator="provider", description=desc  # old format
         )
+
+    process_id = Process.split_version(process_tag)[0]
     if job.process not in [process_id, process_tag]:
         title = "NoSuchProcess"
         desc = "Could not find job reference corresponding to specified process reference."

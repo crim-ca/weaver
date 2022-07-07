@@ -459,11 +459,21 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
 
         If ``visibility=None``, the process is deleted (if existing) regardless of its visibility value.
         """
-        sane_name = get_sane_name(process_id, **self.sane_name_config)
-        process = self.fetch_by_id(sane_name, visibility=visibility)
+        process = self.fetch_by_id(process_id, visibility=visibility)  # ensure accessible before delete
         if not process:
-            raise ProcessNotFound(f"Process '{sane_name}' could not be found.")
-        return bool(self.collection.delete_one({"identifier": sane_name}).deleted_count)
+            raise ProcessNotFound(f"Process '{process_id}' could not be found.")
+        revisions = self.find_versions(process_id, VersionFormat.STRING)
+        search, _ = self._get_revision_search(process_id)
+        status = bool(self.collection.delete_one(search).deleted_count)
+        if not status or not len(revisions) > 1 or not process.version:
+            return status
+        # if process was the latest revision, fallback to previous one as new latest
+        version = as_version_major_minor_patch(process.version, VersionFormat.STRING)
+        if version == revisions[-1]:
+            latest = revisions[-2]  # prior version
+            proc_latest = f"{process_id}:{latest}"
+            self.revert_latest(proc_latest)
+        return status
 
     def list_processes(self,
                        visibility=None,     # type: Optional[AnyVisibility, List[AnyVisibility]]
@@ -549,6 +559,24 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
             return items, total
         return [Process(item) for item in found]
 
+    def _get_revision_search(self, process_id):
+        # type: (str) -> Tuple[MongodbAggregateExpression, Optional[str]]
+        """
+        Obtain the search criteria and version of the specified :term:`Process` ID if it specified a revision tag.
+
+        :return: Database search operation and the matched version as string.
+        """
+        version = None
+        if ":" in process_id:
+            process_id, version = Process.split_version(process_id)
+        sane_name = get_sane_name(process_id, **self.sane_name_config)
+        search = {"identifier": sane_name}
+        if version:
+            version = as_version_major_minor_patch(version, VersionFormat.STRING)  # make sure it is padded
+            sane_tag = sane_name + ":" + version
+            search = {"$or": [{"identifier": sane_tag}, {"identifier": sane_name, "version": version}]}
+        return search, version
+
     def fetch_by_id(self, process_id, visibility=None):
         # type: (str, Optional[AnyVisibility]) -> Process
         """
@@ -560,24 +588,15 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         :param visibility: One value amongst :py:mod:`weaver.visibility`.
         :return: An instance of :class:`weaver.datatype.Process`.
         """
-        ver_str = version = None
-        process_ref = process_id
-        if ":" in process_id:
-            process_id, version = process_id.rsplit(":", 1)
-        sane_name = get_sane_name(process_id, **self.sane_name_config)
-        search = {"identifier": sane_name}
-        if version:
-            ver_str = as_version_major_minor_patch(version, VersionFormat.STRING)
-            sane_tag = sane_name + ":" + ver_str
-            search = {"$or": [{"identifier": sane_tag}, {"identifier": sane_name, "version": ver_str}]}
+        search, version = self._get_revision_search(process_id)
         process = self.collection.find_one(search)
         if not process:
-            raise ProcessNotFound(f"Process '{process_ref}' could not be found.")
+            raise ProcessNotFound(f"Process '{process_id}' could not be found.")
         process = Process(process)
         if version:
-            process.version = ver_str  # ensure version was applied just in case
+            process.version = version  # ensure version was applied just in case
         if visibility is not None and process.visibility != visibility:
-            raise ProcessNotAccessible(f"Process '{process_ref}' cannot be accessed.")
+            raise ProcessNotAccessible(f"Process '{process_id}' cannot be accessed.")
         return process
 
     def find_versions(self, process_id, version_format=VersionFormat.OBJECT):
@@ -585,6 +604,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         """
         Retrieves all existing versions of a given process.
         """
+        process_id = Process.split_version(process_id)[0]  # version never needed to fetch all revisions
         sane_name = get_sane_name(process_id, **self.sane_name_config)
         version_name = rf"^{sane_name}(:[0-9]+\.[0-9]+.[0-9]+)?$"
         versions = self.collection.find(
@@ -597,7 +617,10 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
     def update_version(self, process_id, version):
         # type: (str, AnyVersion) -> Process
         """
-        Updates the specified (latest) process ID to represent the indicated (older) version.
+        Updates the specified (latest) process ID to become an older revision.
+
+        .. seealso::
+            Use :meth:`revert_latest` for the inverse operation.
 
         :returns: Updated process definition with older revision.
         """
@@ -613,6 +636,33 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         )
         if not process:
             raise ProcessNotFound(f"Process '{sane_name}' could not be found for version update.")
+        process = Process(process)
+        return process
+
+    def revert_latest(self, process_id):
+        # type: (str) -> Process
+        """
+        Makes the specified (older) revision process the new latest revision.
+
+        Assumes there are no active *latest* in storage. If one is still defined, it will generate a conflict.
+        The process ID must also contain a tagged revision. Failing to provide a version will fail the operation.
+
+        .. seealso::
+            Use :meth:`update_version` for the inverse operation.
+
+        :returns: Updated process definition with older revision.
+        """
+        search, version = self._get_revision_search(process_id)
+        if not version:
+            raise ProcessNotFound(f"Process '{process_id}' missing version part to revert as latest.")
+        p_name = Process.split_version(process_id)[0]
+        process = self.collection.find_one_and_update(
+            filter=search,
+            update={"$set": {"identifier": p_name, "version": version}},
+            return_document=ReturnDocument.AFTER,
+        )
+        if not process:
+            raise ProcessNotFound(f"Process '{process_id}' could not be found for revert as latest.")
         process = Process(process)
         return process
 

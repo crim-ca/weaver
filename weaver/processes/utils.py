@@ -44,7 +44,7 @@ from weaver.exceptions import (
     log_unhandled_exceptions
 )
 from weaver.formats import ContentType, repr_json
-from weaver.processes.convert import normalize_ordered_io
+from weaver.processes.convert import get_field, normalize_ordered_io, set_field
 from weaver.processes.types import ProcessType
 from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
 from weaver.utils import (
@@ -79,10 +79,22 @@ if TYPE_CHECKING:
         CWL,
         FileSystemPathType,
         JSON,
+        Literal,
         PyramidRequest,
+        NotRequired,
         Number,
-        SettingsType
+        SettingsType,
+        TypedDict
     )
+
+    UpdateFieldListMethod = Literal["append", "override"]
+    UpdateFieldListSpec = TypedDict("UpdateFieldListSpec", {
+        "source": str,
+        "target": NotRequired[str],
+        "unique": NotRequired[bool],
+        "method": UpdateFieldListMethod,
+    }, total=True)
+    UpdateFields = List[Union[str, UpdateFieldListMethod]]
 
 
 # FIXME:
@@ -599,19 +611,30 @@ def _apply_process_metadata(process, update_data):
     :param update_data: Fields with updated data to apply to the process.
     :return: Applicable update level based on updates to be applied.
     """
-    patch_update_fields = ["title", "description", "keywords", "metadata", ("links", "additional_links")]
-    minor_update_fields = ["jobControlOptions", "outputTransmission", "visibility"]
+    patch_update_fields = [
+        "title",
+        "description",
+        dict(source="keywords", method="append", unique=True),
+        dict(source="metadata", method="append"),
+        dict(source="links", method="append", target="additional_links"),
+    ]
+    minor_update_fields = [
+        dict(source="jobControlOptions", method="override", unique=True),
+        dict(source="outputTransmission", method="override", unique=True),
+        "visibility",
+    ]
     update_level = VersionLevel.PATCH  # metadata only, elevate to MINOR if corresponding fields changed
     field = value = None  # any last set item that raises an unexpected error can be reported in exception handler
 
     def _apply_change(data, dest, name, update_fields):
-        # type: (JSON, Union[Process, JSON], str, List[Union[str, Tuple[str, str]]]) -> bool
+        # type: (JSON, Union[Process, JSON], str, UpdateFields) -> bool
         """
         Apply sub-changes to relevant destination container.
 
         :param data: New information changes to be applied.
         :param dest: Target location to set new value changes.
         :param name: Target location name for error reporting.
+        :param update_fields: Fields that can be updated, with extra specifications on how to handle them.
         :return: Status indicating if any change was applied.
         """
         nonlocal field, value  # propagate outside function
@@ -619,28 +642,41 @@ def _apply_process_metadata(process, update_data):
         any_change = False
         for source in update_fields:
             target = source
-            if isinstance(source, tuple):
-                source, target = source
-            field = f"{name}.{target}"
+            method = None
+            unique = False
+            if isinstance(source, dict):
+                src = source["source"]
+                target = source.get("target", src)
+                method = source.get("method", None)
+                unique = source.get("unique", False)
+                source = src
             value = data.get(source)
             if value is None:
                 continue
+            field = f"{name}.{target}"
             # list appends new content unless explicitly empty to reset
-            if isinstance(value, list):
+            # list override always replace full content
+            if isinstance(value, list) and method == "append":
                 if not len(value):
-                    current = getattr(dest, target, [])
+                    current = get_field(dest, target, default=[])
                     if current != value:
-                        setattr(dest, target, [])
+                        set_field(dest, target, [])
                         any_change = True
                 else:
-                    info = copy.deepcopy(getattr(dest, source, []))
-                    info.extend(value)
-                    setattr(dest, target, info)
-                    any_change = True
+                    current = get_field(dest, source, default=[])
+                    merged = copy.deepcopy(current)
+                    merged.extend(value)
+                    if unique:
+                        merged = list(dict.fromkeys(merged))  # not set to preserve order
+                    if current != merged:
+                        set_field(dest, target, current)
+                        any_change = True
             else:
-                current = getattr(dest, target, None)
+                current = get_field(dest, target, default=None)
+                if unique and isinstance(value, list):
+                    value = list(dict.fromkeys(value))  # not set to preserve order
                 if current != value:
-                    setattr(dest, target, value)
+                    set_field(dest, target, value)
                     any_change = True
         return any_change
 

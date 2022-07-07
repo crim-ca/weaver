@@ -46,7 +46,7 @@ from weaver.wps.utils import get_wps_url
 from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
-    from typing import Optional, Tuple
+    from typing import List, Optional, Tuple
 
     from weaver.processes.constants import ProcessSchemaType
     from weaver.typedefs import CWL, JSON, AnyHeadersContainer, AnyVersion
@@ -271,6 +271,39 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert resp.status_code == 400
         assert "ListingInvalidParameter" in resp.json["error"]
 
+    def deploy_process_revisions(self, process_id):
+        # type: (str) -> List[str]
+        """
+        Generates some revisions of a given process.
+        """
+        versions = ["1.2.0"]
+        cwl, _ = self.deploy_process_CWL_direct(ContentType.APP_JSON, process_id=process_id, version=versions[0])
+        data = {"title": "first revision", "version": "1.2.3"}
+        resp = self.app.patch_json(f"/processes/{process_id}", params=data, headers=self.json_headers)
+        assert resp.status_code == 200
+        versions.append(data["version"])
+        data = {"title": "second revision", "version": "1.2.5"}
+        resp = self.app.patch_json(f"/processes/{process_id}", params=data, headers=self.json_headers)
+        assert resp.status_code == 200
+        versions.append(data["version"])
+        data = {"title": "third revision", "version": "1.3.2", "jobControlOptions": [ExecuteControlOption.SYNC]}
+        resp = self.app.patch_json(f"/processes/{process_id}", params=data, headers=self.json_headers)
+        assert resp.status_code == 200
+        versions.append(data["version"])
+        data = {"title": "fourth revision", "version": "1.3.4"}
+        resp = self.app.patch_json(f"/processes/{process_id}", params=data, headers=self.json_headers)
+        assert resp.status_code == 200
+        versions.append(data["version"])
+        data = copy.deepcopy(cwl)  # type: JSON
+        data.update({"version": "2.0.0", "inputs": {"message": {"type": "string"}}})
+        resp = self.app.put_json(f"/processes/{process_id}", params=data, headers=self.json_headers)
+        assert resp.status_code == 201
+        versions.append(data["version"])
+        data = {"value": Visibility.PUBLIC}  # must make visible otherwise will not be listed/retrievable
+        resp = self.app.put_json(f"/processes/{process_id}/visibility", params=data, headers=self.json_headers)
+        assert resp.status_code == 200
+        return sorted(versions)
+
     def test_get_processes_with_tagged_revisions(self):
         """Example:
         http://localhost:4002/processes?detail=false&revisions=true
@@ -329,32 +362,17 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         .. versionadded:: 4.20
         """
         p_id = "test-process-history-revision"
-        self.deploy_process_CWL_direct(ContentType.APP_JSON, process_id=p_id, version="1.2.3")
-        data = {"title": "first revision", "version": "1.2.5"}
-        resp = self.app.patch_json(f"/processes/{p_id}", params=data, headers=self.json_headers)
-        assert resp.status_code == 200
-        data = {"title": "second revision", "version": "1.3.2"}
-        resp = self.app.patch_json(f"/processes/{p_id}", params=data, headers=self.json_headers)
-        assert resp.status_code == 200
-        data = {"title": "older revision", "version": "0.1.0"}
-        resp = self.app.patch_json(f"/processes/{p_id}", params=data, headers=self.json_headers)
-        assert resp.status_code == 200
-        data = {"title": "latest revision", "version": "2.0.0"}
-        resp = self.app.patch_json(f"/processes/{p_id}", params=data, headers=self.json_headers)
-        assert resp.status_code == 200
+        versions = self.deploy_process_revisions(p_id)
+        revisions = [f"{p_id}:{ver}" for ver in versions]
 
         path = get_path_kvp("/processes", process=p_id, revisions=True, detail=False)
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
         body = resp.json
         assert "processes" in body and len(body["processes"]) > 0
-        assert body["processes"] == [
-            f"{p_id}:0.1.0",
-            f"{p_id}:1.2.3",
-            f"{p_id}:1.2.5",
-            f"{p_id}:1.3.2",
-            f"{p_id}:2.0.0",
-        ], "sorted processes by version with tagged representation expected when requesting revisions"
+        assert body["processes"] == revisions, (
+            "sorted processes by version with tagged representation expected when requesting revisions"
+        )
 
         path = get_path_kvp("/processes", process=p_id, revisions=True, detail=True)
         resp = self.app.get(path, headers=self.json_headers)
@@ -362,13 +380,8 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         body = resp.json
         assert "processes" in body and len(body["processes"]) > 0
         info = [(proc["id"], proc["version"]) for proc in body["processes"]]
-        assert info == [
-            (f"{p_id}:0.1.0", "0.1.0"),
-            (f"{p_id}:1.2.3", "1.2.3"),
-            (f"{p_id}:1.2.5", "1.2.5"),
-            (f"{p_id}:1.3.2", "1.3.2"),
-            (f"{p_id}:2.0.0", "2.0.0"),
-        ]
+        expect = [(p_id, ver) for ver in versions]
+        assert info == expect
 
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
@@ -697,6 +710,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         return resp.json
 
     def get_application_package(self, process_id):
+        # type: (str) -> CWL
         resp = self.app.get(f"/processes/{process_id}/package", headers=self.json_headers)
         assert resp.status_code == 200
         return resp.json
@@ -1344,6 +1358,96 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                 "Must not make use of the intermediate '1.2.4' version, since '1.2.3' explicitly requested for update."
             )
 
+    def test_update_process_auto_revision(self):
+        """
+        When updating a process, if not version is explicitly provided, the next one is automatically applied.
+
+        Next version depends on the level of changes implied. Proper semantic level should be bumped using corresponding
+        information that gets updated.
+        """
+        p_id = "test-process-auto-revision"
+        cwl, _ = self.deploy_process_CWL_direct(ContentType.APP_JSON, process_id=p_id, version="1.0")
+
+        data = {"title": "new title"}
+        resp = self.app.patch_json(f"/processes/{p_id}", params=data, headers=self.json_headers)
+        assert resp.status_code == 200
+        body = resp.json
+        assert body["processSummary"]["title"] == data["title"]
+        assert body["processSummary"]["version"] == "1.0.1", "only metadata updated, PATCH auto-revision expected"
+
+        old_title = data["title"]
+        data = {"description": "modify description"}
+        resp = self.app.patch_json(f"/processes/{p_id}", params=data, headers=self.json_headers)
+        assert resp.status_code == 200
+        body = resp.json
+        assert body["processSummary"]["title"] == old_title
+        assert body["processSummary"]["version"] == "1.0.2", "only metadata updated, PATCH auto-revision expected"
+        assert body["processSummary"]["description"] == data["description"]
+        assert body["processSummary"]["jobControlOptions"] == [ExecuteControlOption.ASYNC]  # default, validate for next
+
+        old_desc = data["description"]
+        data = {"jobControlOptions": ExecuteControlOption.values(), "title": "any exec control"}
+        resp = self.app.patch_json(f"/processes/{p_id}", params=data, headers=self.json_headers)
+        assert resp.status_code == 200
+        body = resp.json
+        assert body["processSummary"]["title"] == data["title"]
+        assert body["processSummary"]["version"] == "1.1.0", "MINOR revision expected for change that affects execute"
+        assert body["processSummary"]["description"] == old_desc
+        assert body["processSummary"]["jobControlOptions"] == data["jobControlOptions"]
+
+        old_title = data["title"]
+        old_jco = data["jobControlOptions"]
+        data = {"outputs": {"output": {"title": "the output"}}}
+        resp = self.app.patch_json(f"/processes/{p_id}", params=data, headers=self.json_headers)
+        assert resp.status_code == 200
+        body = resp.json
+        assert body["processSummary"]["title"] == old_title
+        assert body["processSummary"]["version"] == "1.1.1", "only metadata updated, PATCH auto-revision expected"
+        assert body["processSummary"]["description"] == old_desc
+        assert body["processSummary"]["jobControlOptions"] == old_jco
+        resp = self.app.get(f"/processes/{p_id}", headers=self.json_headers)
+        assert resp.status_code == 200
+        body = resp.json
+        assert body["outputs"]["output"]["title"] == data["outputs"]["output"]["title"]
+
+        cwl["inputs"] = {"message": {"type": "string"}}
+        cwl.pop("version", None)  # make sure none specified, let MAJOR auto-revision with latest
+        data = {
+            "processDescription": {"process": {"id": p_id, "visibility": Visibility.PUBLIC}},
+            "executionUnit": [{"unit": cwl}]
+        }
+        resp = self.app.put_json(f"/processes/{p_id}", params=data, headers=self.json_headers)
+        assert resp.status_code == 201
+        body = resp.json
+        assert "title" not in body["processSummary"]  # everything resets because PUT replaces, not updated like PATCH
+        assert "description" not in body["processSummary"]
+        assert body["processSummary"]["version"] == "2.0.0", "full process updated, MAJOR auto-revision expected"
+        assert body["processSummary"]["jobControlOptions"] == ExecuteControlOption.values()
+        resp = self.app.get(f"/processes/{p_id}", headers=self.json_headers)
+        assert resp.status_code == 200
+        body = resp.json
+        assert "message" in body["inputs"]
+        assert "description" not in body["outputs"]["output"]
+        assert body["outputs"]["output"]["title"] == "output", "default title generated from ID since none provided"
+
+        data = {  # validate mixed format use and distinct PATCH/MINOR level changes
+            "title": "mixed format",
+            "outputs": [{"id": "output", "title": "updated output title", "description": "new description added"}],
+            "inputs": {"message": {"description": "message input"}},
+        }
+        resp = self.app.patch_json(f"/processes/{p_id}", params=data, headers=self.json_headers)
+        assert resp.status_code == 200
+        body = resp.json
+        assert body["processSummary"]["title"] == data["title"]
+        assert body["processSummary"]["version"] == "2.0.1", "only metadata updated, PATCH auto-revision expected"
+        resp = self.app.get(f"/processes/{p_id}", headers=self.json_headers)
+        assert resp.status_code == 200
+        body = resp.json
+        assert body["version"] == "2.0.1", "only metadata updated, PATCH auto-revision expected"
+        assert body["inputs"]["message"]["description"] == data["inputs"]["message"]["description"]
+        assert body["outputs"]["output"]["title"] == data["outputs"][0]["title"]
+        assert body["outputs"]["output"]["description"] == data["outputs"][0]["description"]
+
     def test_update_process_jobs_adjusted(self):
         """
         Validate that given a valid process update, associated jobs update their references to preserve links.
@@ -1513,21 +1617,39 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         .. versionadded:: 4.20
         """
         p_id = "test-delete-process-revision"
-        self.deploy_process_CWL_direct(ContentType.APP_JSON, process_id=p_id, version="1.2.3")
-        data = {"title": "first revision", "version": "1.2.5"}
-        resp = self.app.patch_json(f"/processes/{p_id}", params=data, headers=self.json_headers)
-        assert resp.status_code == 200
-        data = {"title": "second revision", "version": "1.3.2"}
-        resp = self.app.patch_json(f"/processes/{p_id}", params=data, headers=self.json_headers)
-        assert resp.status_code == 200
-        data = {"title": "older revision", "version": "0.1.0"}
-        resp = self.app.patch_json(f"/processes/{p_id}", params=data, headers=self.json_headers)
-        assert resp.status_code == 200
-        data = {"title": "latest revision", "version": "2.0.0"}
-        resp = self.app.patch_json(f"/processes/{p_id}", params=data, headers=self.json_headers)
+        versions = self.deploy_process_revisions(p_id)
+
+        # delete a process revision
+        del_ver = versions[3]  # pick any not latest
+        path = f"/processes/{p_id}:{del_ver}"
+        resp = self.app.delete_json(path, headers=self.json_headers)
         assert resp.status_code == 200
 
-        resp = self.app.delete_json(f"/processes/{p_id}:", headers=self.json_headers)
+        # check that revision was properly removed
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 404
+        path = get_path_kvp("/processes", detail=False, revisions=True, process=p_id)
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        body = resp.json
+        assert body["processes"] == [f"{p_id}:{ver}" for ver in versions if ver != del_ver]
+
+        # check that latest version was not affected since it wasn't the latest that was deleted
+        resp = self.app.get(f"/processes/{p_id}", headers=self.json_headers)
+        assert resp.status_code == 200
+        body = resp.json
+        assert body["version"] == versions[-1]
+
+        # delete latest to valide it gets updated with the version before it
+        latest_ver = versions[-1]
+        path = f"/processes/{p_id}:{latest_ver}"
+        resp = self.app.delete_json(path, headers=self.json_headers)
+        assert resp.status_code == 200
+
+        resp = self.app.get(f"/processes/{p_id}", headers=self.json_headers)
+        assert resp.status_code == 200
+        body = resp.json
+        assert body["version"] == versions[-2], "new latest should be the version before the previously removed latest"
 
     def test_delete_process_success(self):
         path = f"/processes/{self.process_public.identifier}"

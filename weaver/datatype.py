@@ -57,7 +57,7 @@ from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, IO, Iterator, List, Optional, Union
+    from typing import Any, Callable, Dict, IO, Iterator, List, Optional, Tuple, Union
 
     from owslib.wps import WebProcessingService
 
@@ -1800,6 +1800,23 @@ class Process(Base):
         "Unique process identifier with optional version number if it corresponds to an older revision."
     ))
 
+    @classmethod
+    def split_version(cls, process_id):
+        # type: (str) -> Tuple[str, Optional[str]]
+        """
+        Split the tagged version from the :term:`Process` identifier considering any required special handling.
+
+        :returns: Process ID (only) and the version if any was available in tagged reference.
+        """
+        # note::
+        #   Consider 'urn:...' prefix that could cause ':' characters to be present although maybe no version in ID?
+        #   Mot currently permitted due to schema validation parsing of ID on deploy, but could become permitted...
+        result = process_id.rsplit(":", 1)
+        if not len(result) == 2:
+            return process_id, None
+        p_id, version = result
+        return (p_id, version) if all(str.isnumeric(part) for part in version.split(".")) else (process_id, None)
+
     @property
     def latest(self):
         # type: () -> bool
@@ -1816,7 +1833,7 @@ class Process(Base):
         Obtain only the :term:`Process` name portion of the unique identifier.
         """
         if self.version:
-            return self.id.rsplit(":", 1)[0]
+            return self.split_version(self.id)[0]
         return self.id
 
     @property
@@ -1825,7 +1842,7 @@ class Process(Base):
         """
         Full identifier including the version for an unique reference.
         """
-        proc_id = self.id.split(":")[0]
+        proc_id = self.split_version(self.id)[0]
         # bw-compat, if no version available, no update was applied (single deploy)
         # there is no need to define a tag as only one result can be found
         # on next (if any) update request, this revision will be updated with a default version
@@ -1979,7 +1996,6 @@ class Process(Base):
         Control options that indicate which :term:`Job` execution modes are supported by the :term:`Process`.
 
         .. note::
-
             There are no official mentions about the ordering of ``jobControlOptions``.
             Nevertheless, it is often expected that the first item can be considered the default mode when none is
             requested explicitly (at execution time). With the definition of execution mode through the ``Prefer``

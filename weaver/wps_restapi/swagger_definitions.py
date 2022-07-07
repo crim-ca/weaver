@@ -4395,15 +4395,18 @@ class PatchProcessBodySchema(UpdateVersion):
     ))
     jobControlOptions = JobControlOptionsList(missing=drop, description=(
         "New job control options supported by this process for its execution. "
-        "Minimum required at least MINOR update."
+        "All desired job control options must be provided (full override, not appending). "
+        "Order is important to define the default behaviour (first item) to use when unspecified during job execution. "
+        "Minimum required change version level: MINOR."
     ))
     outputTransmission = TransmissionModeList(missing=drop, description=(
         "New output transmission methods supported following this process execution. "
-        "Minimum required at least MINOR update."
+        "All desired output transmission modes must be provided (full override, not appending). "
+        "Minimum required change version level: MINOR."
     ))
     visibility = VisibilityValue(missing=drop, description=(
         "New process visibility. "
-        "Minimum required at least MINOR update."
+        "Minimum required change version level: MINOR."
     ))
 
 
