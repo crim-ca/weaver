@@ -5,6 +5,7 @@ from copy import deepcopy
 from typing import TYPE_CHECKING
 
 import colander
+import yaml
 from pyramid.httpexceptions import (
     HTTPBadRequest,
     HTTPInternalServerError,
@@ -13,7 +14,6 @@ from pyramid.httpexceptions import (
     HTTPUnsupportedMediaType,
     status_map
 )
-import yaml
 
 from weaver.formats import repr_json
 from weaver.utils import get_header, get_settings, get_weaver_url

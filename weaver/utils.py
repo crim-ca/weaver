@@ -15,8 +15,8 @@ import time
 import warnings
 from copy import deepcopy
 from datetime import datetime
-from typing import TYPE_CHECKING, overload
 from distutils.version import LooseVersion
+from typing import TYPE_CHECKING, overload
 from urllib.parse import ParseResult, unquote, urlparse, urlunsplit
 
 import boto3

@@ -1,6 +1,4 @@
 # pylint: disable=R1729  # ignore non-generator representation employed for displaying test log results
-import uuid
-
 import base64
 import contextlib
 import copy
@@ -8,6 +6,7 @@ import json
 import os
 import tempfile
 import unittest
+import uuid
 from copy import deepcopy
 from typing import TYPE_CHECKING
 

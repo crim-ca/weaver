@@ -63,8 +63,8 @@ from weaver.utils import (
 from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_client
 from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.utils import get_wps_restapi_base_url, parse_content
 from weaver.wps_restapi.processes.utils import resolve_process_tag
+from weaver.wps_restapi.utils import get_wps_restapi_base_url, parse_content
 
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
