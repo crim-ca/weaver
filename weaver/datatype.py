@@ -1824,7 +1824,7 @@ class Process(Base):
         Checks if this :term:`Process` corresponds to the latest revision.
         """
         # if ID loaded from DB contains a version, it is not the latest by design
-        return ":" not in self.id
+        return self.split_version(self.id)[-1] is None
 
     @property
     def name(self):

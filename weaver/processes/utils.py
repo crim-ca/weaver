@@ -100,8 +100,8 @@ if TYPE_CHECKING:
 # FIXME:
 #   https://github.com/crim-ca/weaver/issues/215
 #   define common Exception classes that won't require this type of conversion
-def get_process(process_id=None, request=None, settings=None):
-    # type: (Optional[str], Optional[PyramidRequest], Optional[SettingsType]) -> Process
+def get_process(process_id=None, request=None, settings=None, revision=True):
+    # type: (Optional[str], Optional[PyramidRequest], Optional[SettingsType], bool) -> Process
     """
     Obtain the specified process and validate information, returning appropriate HTTP error if invalid.
 
@@ -115,11 +115,21 @@ def get_process(process_id=None, request=None, settings=None):
 
     Different parameter combinations are intended to be used as needed or more appropriate, such that redundant
     operations can be reduced where some objects are already fetched from previous operations.
+
+    :param process_id: Explicit :term:`Process` identifier to employ for lookup.
+    :param request: When no explicit ID specified, try to find information from the request.
+    :param settings:
+        Application settings for database connection. Can be guessed from local thread or request object if not given.
+    :param revision:
+        When parsing the :term:`Process` ID (either explicit or from request), indicate if any tagged revision
+        specifier should be used or dropped.
     """
     store = get_db(settings or request).get_store(StoreProcesses)
     try:
         if process_id is None and request is not None:
             process_id = resolve_process_tag(request)
+        if not revision:
+            process_id = Process.split_version(process_id)[0]
         process = store.fetch_by_id(process_id, visibility=Visibility.PUBLIC)
         return process
     except (InvalidIdentifierValue, MissingIdentifierValue, colander.Invalid) as exc:
@@ -504,7 +514,7 @@ def _update_deploy_process_version(process, process_overwrite, update_level, con
             "cause": {"mutable": False}
         })
 
-    if not process.name == process_overwrite.name:
+    if process.name != process_overwrite.name:
         raise HTTPBadRequest(json={
             "type": "InvalidParameterValue",
             "title": "Invalid process identifier.",

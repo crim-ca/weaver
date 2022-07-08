@@ -1570,7 +1570,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                 "version": "4.3.2",  # explicitly provided to avoid auto-bump to '3.0.0'
                 # use OAS representation in this case to validate it is still valid using update request
                 "inputs": {"number": {"schema": {"type": "integer", "minimum": 1, "maximum": 3}}},
-                "visible": Visibility.PUBLIC,  # ensure we can retrieve the description later
+                "visibility": Visibility.PUBLIC,  # ensure we can retrieve the description later
             },
             "executionUnit": [{"unit": cwl_v3}],
         }

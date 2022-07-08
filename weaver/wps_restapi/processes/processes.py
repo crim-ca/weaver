@@ -161,7 +161,7 @@ def put_local_process(request):
     Updates the new process MAJOR semantic version from the previous one if not specified explicitly.
     For MINOR or PATCH changes to metadata of the process definition, consider using the PATCH request.
     """
-    process = get_process(request=request)
+    process = get_process(request=request, revision=False)  # ignore tagged version since must always be latest
     return deploy_process_from_payload(request.text, request, overwrite=process)
 
 
