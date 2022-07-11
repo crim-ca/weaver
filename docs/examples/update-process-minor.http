@@ -3,6 +3,7 @@ Host: weaver.example.com
 Content-Type: application/json
 
 {
+  "description": "process async only",
   "jobControlOptions": ["async-execute"],
   "version": "1.4.0"
 }
