@@ -1,0 +1,8 @@
+PATCH /processes/test-process HTTP/1.1
+Host: weaver.example.com
+Content-Type: application/json
+
+{
+  "jobControlOptions": ["async-execute"],
+  "version": "1.4.0"
+}

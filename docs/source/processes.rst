@@ -413,6 +413,133 @@ that define the process references and expected inputs/outputs.
 .. _`Provider requests`: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Providers
 .. _`Process requests`: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Processes
 
+.. versionchanged:: 4.20
+
+With the addition of :term:`Process` revisions (see :ref:`Update Operation <proc_op_update` below), a registered
+:term:`Process` specified only by ``{processID}`` will retrieve the latest revision of that :term:`Process`.
+A specific older revision can be obtained by adding the tagged version in the path (``{processID}:{version}``) or
+adding the request query parameter ``version``.
+
+Using revisions provided through ``PUT`` and ``PATCH`` requests, it is also possible to list specific or all existing
+revisions of a given or multiple processes simultaneously using the ``revisions`` and ``version`` query parameters with
+the |getcap-req|_ request.
+
+
+.. _proc_op_undeploy:
+.. _proc_op_update:
+
+Update, replace or remove an existing process (Update, Replace, Undeploy)
+-----------------------------------------------------------------------------
+
+Since `Weaver` supports |ogc-api-proc-ext-part2|_, it is able to remove a previously registered :term:`Process` using
+the :ref:`Deployment <proc_op_deploy>` request. The undeploy operation consist of a ``DELETE`` request targeting the
+specific ``{WEAVER_URL}/processes/{processID}`` to be removed.
+
+.. note::
+    The :term:`Process` must be accessible by the user considering any visibility configuration to perform this step.
+    See :ref:`proc_op_deploy` section for details.
+
+.. versionadded:: 4.20
+
+Starting from version `4.20 <https://github.com/crim-ca/weaver/tree/4.20.0>`_, a :term:`Process` can be replaced or
+updated using respectively the ``PUT`` and ``PATCH`` requests onto the specific ``{WEAVER_URL}/processes/{processID}``
+location of the reference to modify.
+
+.. note::
+    The :term:`Process` partial update operation (using ``PATCH``) is specific to `Weaver` only.
+    |ogc-api-proc-ext-part2|_ only mandates the definition of ``PUT`` request for full override of a :term:`Process`.
+
+When a :term:`Process` is modified using the ``PATCH`` operation, only the new definitions need to be provided, and
+unspecified items are transferred over from the referenced :term:`Process` (i.e.: the previous revision). Using either
+the ``PUT`` or ``PATCH`` requests, previous revisions can be referenced using two formats:
+
+- ``{processID}:{version}`` as request path parameters (instead of usual ``{processID}`` only)
+- ``{processID}`` in the request path combined with ``?version={version}`` query parameter
+
+`Weaver` employs ``MAJOR.MINOR.PATCH`` semantic versioning to maintain revisions of updated or replaced :term:`Process`
+definitions. The next revision number to employ for update or replacement can either be provided explicitly in the
+request body using a ``version``, or be omitted. When omitted, the next revision will be guessed automatically based
+on the previous available revision according to the level of changes required. In either cases, the resolved ``version``
+will have to be available and respect the expected update level to be accepted as a new valid :term:`Process` revision.
+The applicable revision level depends on the contents being modified using submitted request body fields according
+to the following table. When a combination of the below items occur, the higher update level is required.
+
++-------------+-----------+------------------------------------+------------------------------------------------------+
+| HTTP Method | Level     | Change                             | Examples                                             |
++=============+===========+====================================+======================================================+
+| ``PATCH``   | ``PATCH`` | Modifications to metadata          | - :term:`Process` ``description``, ``title`` strings |
+|             |           | not impacting the :term:`Process`  | - :term:`Process` ``keywords``, ``metadata`` lists   |
+|             |           | execution or definition.           | - inputs/outputs ``description``, ``title`` strings  |
+|             |           |                                    | - inputs/outputs ``keywords``, ``metadata`` lists    |
++-------------+-----------+------------------------------------+------------------------------------------------------+
+| ``PATCH``   | ``MINOR`` | Modification that impacts *how*    | - :term:`Process` ``jobControlOptions`` (async/sync) |
+|             |           | the :term:`Process` could be       | - :term:`Process` ``outputTransmission`` (ref/value) |
+|             |           | executed, but not its definition.  | - :term:`Process` ``visibility``                     |
++-------------+-----------+------------------------------------+------------------------------------------------------+
+| ``PUT``     | ``MAJOR`` | Modification that impacts *what*   | - Any :term:`Application Package` modification       |
+|             |           | the :term:`Process` executes.      | - Any inputs/outputs change (formats, occurs, type)  |
+|             |           |                                    | - Any inputs/outputs addition or removal             |
++-------------+-----------+------------------------------------+------------------------------------------------------+
+
+.. note::
+    For all applicable fields of updating a :term:`Process`, refer to the schema of |update-req|_.
+    For replacing a :term:`Process`, refer instead to the schema of |replace-req|_. The replacement request contents
+    are extremely similar to the :ref:`Deploy <proc_op_deploy>` schema since the full :term:`Process` definition must
+    be provided.
+
+For example, if the ``test-process:1.2.3`` was previously deployed, and is the active latest revision of that
+:term:`Process`, submitting the below request body will produce a ``PATCH`` revision as ``test-process:1.2.4``.
+
+.. literalinclude:: ../examples/update-process-patch.http
+    :language: http
+    :caption: Sample request for ``PATCH`` revision
+
+Here, only metadata is adjusted and there is no risk to impact produced results or execution methods of the
+:term:`Process`. An external user would probably not even notice the :term:`Process` changed, which is why ``PATCH``
+is reasonable in this case. Notice that the ``version`` is not explicitly provided in the body. It is guessed
+automatically from the modified contents. Also, the example displays how :term:`Process`-level and
+inputs/outputs-level metadata can be updated.
+
+Similarly, the following request would produce a ``MINOR`` revision of ``test-process``. Since both ``PATCH`` and
+``MINOR`` level contents are defined for update, the higher ``MINOR`` revision is required. In this case ``MINOR`` is
+required because ``jobControlOptions`` (forced to asynchronous execution for following versions) would break any future
+request made by users that would expect the :term:`Process` to run (or support) synchronous execution.
+
+Notice that this time, the :term:`Process` reference does not indicate the revision in the path (no ``:1.2.4`` part).
+This automatically resolves to the updated revision ``test-process:1.2.4`` that became the new latest revision following
+our previous ``PATCH`` request.
+
+.. literalinclude:: ../examples/update-process-minor.http
+    :language: http
+    :caption: Sample request for ``MINOR`` revision
+
+In this case, the desired ``version`` (``1.4.0``) is also specified explicitly in the body. Since the updated number
+(``MINOR = 4``) matches the expected update level from the above table and respects an higher level than the reference
+``1.2.4`` :term:`Process`, this revision value will be accepted (instead of auto-resolved ``1.3.0`` otherwise). Note
+that if ``2.4.0`` was specified instead, the version would be refused, as `Weaver` does not consider this modification
+to be worth a ``MAJOR`` revision, and tries to keep version levels consistent. Skipping numbers (i.e.: ``1.3.0`` in this
+case), is permitted as long as there are no other versions above of the same level (i.e.: ``1.4.0`` would be refused if
+``1.5.0`` existed). This allows some level of flexibility with revisions in case users want to use specific numbering
+values that have more meaning to them. It is recommended to let `Weaver` auto-update version values between updates if
+this level of fined-grained control is not required.
+
+.. note::
+    To avoid conflicting definitions, a :term:`Process` cannot be :ref:`Deployed <proc_op_deploy>` directly using a
+    ``{processID}:{version}`` reference. Deployments are expected as the *first revision* and should only include the
+    ``{processID}`` portion as their identifier.
+
+If the user desires a specific version to deploy, the ``PUT`` request should be used with the appropriate ``version``
+within the request body. It is although up to the user to provide the full definition of that :term:`Process`,
+as ``PUT`` request will completely replace the previous definition rather than transfer over previous updates
+(i.e: ``PATCH`` requests).
+
+Even when a :term:`Process` is *"replaced"* using ``PUT``, the older revision is not actually removed and undeployed
+(``DELETE`` request). It is therefore still possible to refer to the old revision using explicit references with the
+corresponding ``version``. `Weaver` keeps track of revisions by corresponding ``{processID}`` entries such that if
+the latest revision is undeployed, the previous revision will automatically become the latest once again. For complete
+replacement, the user should instead perform a ``DELETE`` of all existing revisions (to avoid conflicts) followed by a
+new :ref:`Deploy <proc_op_deploy>` request.
+
 .. _proc_op_execute:
 
 Execution of a process (Execute)
@@ -482,6 +609,14 @@ and parametrization of various input/output combinations. Let's employ the follo
 
 .. |exec-api| replace:: OpenAPI Execute
 .. _exec-api: `exec-req`_
+
+
+.. versionchanged:: 4.20
+
+With the addition of :term:`Process` revisions (see :ref:`Update Operation <proc_op_update` section), a registered
+:term:`Process` specified only by ``{processID}`` will execute the latest revision of that :term:`Process`. An older
+revision can be executed by adding the tagged version in the path (``{processID}:{version}``) or adding the request
+query parameter ``version``.
 
 .. _proc_exec_body:
 
@@ -1206,7 +1341,7 @@ email-specific settings (see: :ref:`Configuration`).
 .. _proc_op_status:
 .. _proc_op_monitor:
 
-Monitoring of a process (GetStatus)
+Monitoring of a process execution (GetStatus)
 ---------------------------------------------------------------------
 
 Monitoring the execution of a :term:`Job` consists of polling the status ``Location`` provided from the :ref:`Execute`
