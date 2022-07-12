@@ -40,6 +40,8 @@ class GenericApiRoutesTestCase(unittest.TestCase):
             else:
                 rtype = [rtype]
             rel = link["rel"]
+
+            # request endpoint to validate it is accessible
             if "localhost" in path:
                 resp = self.testapp.get(urlparse(path).path, expect_errors=True)  # allow error for wps without queries
             else:
@@ -49,10 +51,23 @@ class GenericApiRoutesTestCase(unittest.TestCase):
                 # some sites will explicitly block bots, retry with mocked user-agent simulating human user access
                 resp = request_extra("GET", path, headers={"User-Agent": "Mozilla"},
                                      retries=3, retry_after=True, ssl_verify=False, allow_redirects=True)
+
+            # validate contents and expected media-type
             code = resp.status_code
             test = f"({rel}) [{path}]"
             assert code in [200, 400], f"Reference link expected to be found, got [{code}] for {test}"
+
+            # FIXME: patch broken content-type from reference websites
+            #  (see https://github.com/opengeospatial/NamingAuthority/issues/183)
+            ctype_header_links = {
+                "http://schemas.opengis.net/wps/": ContentType.APP_XML
+            }
             ctype = resp.headers.get("Content-Type", "").split(";")[0].strip()
+            if not ctype:
+                for ref_link in ctype_header_links:
+                    if path.startswith(ref_link):
+                        ctype = ctype_header_links[ref_link]
+                        break
             assert ctype in rtype, f"Reference link content does not match [{ctype}]!=[{rtype}] for {test}"
 
     def test_version_format(self):
