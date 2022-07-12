@@ -615,7 +615,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
 
     def test_deploy_process_CWL_DockerRequirement_auth_header_format(self):
         """
-        Test deployment ofa process with authentication to access the referenced repository.
+        Test deployment of a process with authentication to access the referenced repository.
 
         .. note::
             Use same definition as the one provided in :ref:`app_pkg_script` documentation.

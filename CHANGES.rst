@@ -16,7 +16,8 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Fix `CLI` not allowing expected combination of ``--username`` and ``--password`` for Docker authentication when
+  deploying a `Process` that needs it to retrieve the referenced repository and image in its `CWL` definition.
 
 .. _changes_4.19.0:
 

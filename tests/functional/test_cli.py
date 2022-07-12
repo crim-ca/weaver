@@ -1,6 +1,7 @@
 """
 Functional tests for :mod:`weaver.cli`.
 """
+import base64
 
 import contextlib
 import copy
@@ -29,8 +30,9 @@ from tests.utils import (
 )
 from weaver.base import classproperty
 from weaver.cli import AuthHandler, BearerAuthHandler, WeaverClient, main as weaver_cli
-from weaver.formats import ContentType, OutputFormat, get_cwl_file_format
-from weaver.processes.constants import ProcessSchema
+from weaver.datatype import DockerAuthentication
+from weaver.formats import ContentType, OutputFormat, get_cwl_file_format, repr_json
+from weaver.processes.constants import CWL_REQUIREMENT_APP_DOCKER, ProcessSchema
 from weaver.status import Status
 from weaver.utils import fully_qualified_name
 from weaver.visibility import Visibility
@@ -39,7 +41,7 @@ from weaver.wps.utils import map_wps_output_location
 if TYPE_CHECKING:
     from typing import Dict, Optional
 
-    from weaver.typedefs import AnyRequestType, AnyResponseType
+    from weaver.typedefs import AnyRequestType, AnyResponseType, CWL
 
 
 class FakeAuthHandler(object):
@@ -599,13 +601,21 @@ class TestWeaverCLI(TestWeaverClientBase):
         assert any("\"id\": \"Echo\"" in line for line in lines)
         assert any("\"deploymentDone\": true" in line for line in lines)
 
-    def test_deploy_help(self):
+    def test_deploy_docker_auth_help(self):
         """
         Validate some special handling to generate special combinations of help argument details.
         """
-        lines = run_command(["weaver", "deploy", "--help"], trim=False)
+        lines = run_command([
+                # "weaver",
+                "deploy",
+                "--help",
+            ],
+            trim=False,
+            entrypoint=weaver_cli,
+        )
         args_help = "[-T TOKEN | ( -U USERNAME -P PASSWORD )]"
-        assert any(args_help in line for line in lines)
+        err_help = f"Expression '{args_help}' not matched in:\n{repr_json(lines, indent=2)}"
+        assert any(args_help in line for line in lines), err_help
         docker_auth_help = "Docker Authentication Arguments"
         docker_lines = []
         for i, line in enumerate(lines):
@@ -614,7 +624,237 @@ class TestWeaverCLI(TestWeaverClientBase):
                 break
         assert docker_lines
         docker_opts = ["-T TOKEN", "-U USERNAME", "-P PASSWORD"]
-        assert all(any(opt in line for line in docker_lines) for opt in docker_opts)
+        docker_help = f"Arguments {docker_opts} not found in {repr_json(docker_lines, indent=2)}"
+        assert all(any(opt in line for line in docker_lines) for opt in docker_opts), docker_help
+
+    @staticmethod
+    def add_docker_pull_ref(cwl, ref):
+        # type: (CWL, str) -> CWL
+        cwl.setdefault("requirements", {})
+        cwl["requirements"].setdefault(CWL_REQUIREMENT_APP_DOCKER, {})
+        cwl["requirements"][CWL_REQUIREMENT_APP_DOCKER] = {"dockerPull": ref}
+        return cwl
+
+    def test_deploy_docker_auth_username_password_valid(self):
+        """
+        Test that username and password arguments can be provided simultaneously for docker login.
+
+        .. note::
+            Docker Authentication and corresponding deployment is not evaluated here, only arguments parsing.
+
+        .. seealso::
+            :meth:`tests.wps_restapi.test_processes.WpsRestApiProcessesTest.test_deploy_process_CWL_DockerRequirement_auth_header_format`
+        """
+        p_id = self.fully_qualified_test_process_name()
+        docker_reg = "fake.repo"
+        docker_img = "org/project/private-image:latest"
+        docker_ref = f"{docker_reg}/{docker_img}"
+        docker_usr = "random"
+        docker_pwd = str(uuid.uuid4())
+        package = self.retrieve_payload("Echo", "package", local=True)
+        package = self.add_docker_pull_ref(package, docker_ref)
+        lines = mocked_sub_requests(
+            self.app, run_command,
+            [
+                # weaver
+                "deploy",
+                "-D",
+                "-u", self.url,
+                "-p", p_id,
+                "--cwl", package,
+                "-U", docker_usr,
+                "-P", docker_pwd,
+            ],
+            trim=False,
+            entrypoint=weaver_cli,
+            only_local=True,
+        )
+        assert any("\"description\": \"Process successfully deployed.\"" in line for line in lines)
+        assert any(f"\"id\": \"{p_id}\"" in line for line in lines)
+
+        # validate saved process contains the appropriate credentials
+        process = self.process_store.fetch_by_id(p_id)
+        assert process.auth.type == DockerAuthentication.type
+        assert process.auth.docker == docker_ref
+        assert process.auth.image == docker_img
+        assert process.auth.registry == docker_reg
+        assert process.auth.credentials == {"registry": docker_reg, "username": docker_usr, "password": docker_pwd}
+
+    def test_deploy_docker_auth_token_valid(self):
+        """
+        Test that token argument can be provided by itself for docker login.
+
+        .. note::
+            Docker Authentication and corresponding deployment is not evaluated here, only arguments parsing.
+
+        .. seealso::
+            :meth:`tests.wps_restapi.test_processes.WpsRestApiProcessesTest.test_deploy_process_CWL_DockerRequirement_auth_header_format`
+        """
+        p_id = self.fully_qualified_test_process_name()
+        docker_reg = "fake.repo"
+        docker_img = "org/project/private-image:latest"
+        docker_ref = f"{docker_reg}/{docker_img}"
+        docker_usr = "random"
+        docker_pwd = str(uuid.uuid4())
+        docker_tkt = base64.b64encode(f"{docker_usr}:{docker_pwd}".encode("utf-8")).decode("utf-8")
+        package = self.retrieve_payload("Echo", "package", local=True)
+        package = self.add_docker_pull_ref(package, docker_ref)
+        lines = mocked_sub_requests(
+            self.app, run_command,
+            [
+                # weaver
+                "deploy",
+                "-D",
+                "-u", self.url,
+                "-p", p_id,
+                "--cwl", package,
+                "-T", docker_tkt,
+            ],
+            trim=False,
+            entrypoint=weaver_cli,
+            only_local=True,
+        )
+        assert any("\"description\": \"Process successfully deployed.\"" in line for line in lines)
+        assert any(f"\"id\": \"{p_id}\"" in line for line in lines)
+
+        # validate saved process contains the appropriate credentials
+        process = self.process_store.fetch_by_id(p_id)
+        assert process.auth.type == DockerAuthentication.type
+        assert process.auth.docker == docker_ref
+        assert process.auth.image == docker_img
+        assert process.auth.registry == docker_reg
+        assert process.auth.token == docker_tkt
+        assert process.auth.credentials == {"registry": docker_reg, "username": docker_usr, "password": docker_pwd}
+
+    def test_deploy_docker_auth_username_or_password_with_token_invalid(self):
+        """
+        Test that username/password cannot be combined with token for docker login.
+
+        All parameter values are themselves valid, only their combination that are not.
+        """
+        p_id = self.fully_qualified_test_process_name()
+        docker_reg = "fake.repo"
+        docker_img = "org/project/private-image:latest"
+        docker_ref = f"{docker_reg}/{docker_img}"
+        docker_usr = "random"
+        docker_pwd = str(uuid.uuid4())
+        docker_tkt = base64.b64encode(f"{docker_usr}:{docker_pwd}".encode("utf-8")).decode("utf-8")
+        package = self.retrieve_payload("Echo", "package", local=True)
+        package = self.add_docker_pull_ref(package, docker_ref)
+
+        lines = mocked_sub_requests(
+            self.app, run_command,
+            [
+                # weaver
+                "deploy",
+                "-D",
+                "-u", self.url,
+                "-p", p_id,
+                "--cwl", package,
+                "-U", docker_usr,
+                "-T", docker_tkt,
+            ],
+            trim=False,
+            entrypoint=weaver_cli,
+            only_local=True,
+            expect_error=True,
+        )
+        assert "usage: weaver deploy" in lines[0]
+        assert "weaver deploy: error: argument -T/--token: not allowed with argument -U/--username" == lines[-1]
+
+        lines = mocked_sub_requests(
+            self.app, run_command,
+            [
+                # weaver
+                "deploy",
+                "-u", self.url,
+                "-p", p_id,
+                "--cwl", package,
+                "-P", docker_pwd,
+                "-T", docker_tkt,
+            ],
+            trim=False,
+            entrypoint=weaver_cli,
+            only_local=True,
+            expect_error=True,
+        )
+        assert "usage: weaver deploy" in lines[0]
+        assert "weaver deploy: error: argument -T/--token: not allowed with argument -P/--password" == lines[-1]
+
+        lines = mocked_sub_requests(
+            self.app, run_command,
+            [
+                # weaver
+                "deploy",
+                "-u", self.url,
+                "-p", p_id,
+                "--cwl", package,
+                "-U", docker_usr,
+                "-P", docker_pwd,
+                "-T", docker_tkt,  # should not pass this time as (username + password: valid) while ignoring token
+            ],
+            trim=False,
+            entrypoint=weaver_cli,
+            only_local=True,
+            expect_error=True,
+        )
+        assert "usage: weaver deploy" in lines[0]
+        assert (  # any first that disallows
+            "weaver deploy: error: argument -T/--token: not allowed with argument -U/--username" == lines[-1] or
+            "weaver deploy: error: argument -T/--token: not allowed with argument -P/--password" == lines[-1]
+        )
+
+    def test_deploy_docker_auth_username_or_password_missing_invalid(self):
+        """
+        Test that username/password cannot be used on their own for docker login, even if token is not provided.
+
+        All parameter values are themselves valid, only their combination that are not.
+        """
+        p_id = self.fully_qualified_test_process_name()
+        docker_reg = "fake.repo"
+        docker_img = "org/project/private-image:latest"
+        docker_ref = f"{docker_reg}/{docker_img}"
+        docker_usr = "random"
+        docker_pwd = str(uuid.uuid4())
+        package = self.retrieve_payload("Echo", "package", local=True)
+        package = self.add_docker_pull_ref(package, docker_ref)
+
+        lines = mocked_sub_requests(
+            self.app, run_command,
+            [
+                # weaver
+                "deploy",
+                "-D",
+                "-u", self.url,
+                "-p", p_id,
+                "--cwl", package,
+                "-U", docker_usr,
+            ],
+            trim=False,
+            entrypoint=weaver_cli,
+            only_local=True,
+            expect_error=True,
+        )
+        assert "usage: weaver deploy" in lines[0]
+        assert "weaver deploy: error: argument -U/--username: must be combined with -P/--password" == lines[-1]
+
+        lines = mocked_sub_requests(
+            self.app, run_command,
+            [
+                # weaver
+                "deploy",
+                "-u", self.url,
+                "-p", p_id,
+                "--cwl", package,
+                "-P", docker_pwd,
+            ],
+            trim=False,
+            entrypoint=weaver_cli,
+            only_local=True,
+            expect_error=True,
+        )
+        assert "usage: weaver deploy" in lines[0]
+        assert "weaver deploy: error: argument -U/--username: must be combined with -P/--password" == lines[-1]
 
     def test_deploy_payload_body_cwl_embedded(self):
         test_id = f"{self.test_process_prefix}-deploy-body-no-cwl"
@@ -1339,7 +1579,7 @@ class TestWeaverClientAuthBase(TestWeaverClientBase):
         cls.setup_auth_app()
 
 
-class TestWeaverCLIAuth(TestWeaverClientAuthBase):
+class TestWeaverCLIAuthHandler(TestWeaverClientAuthBase):
 
     def test_describe_auth(self):
         # prints formatted JSON ProcessDescription over many lines
