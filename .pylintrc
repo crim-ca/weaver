@@ -299,7 +299,10 @@ docstring-quote=double
 expected-line-ending-format=
 
 # Regexp for a line that is allowed to be longer than the limit.
-ignore-long-lines=^\s*(# )?<?https?://\S+>?$
+# - Ignore HTTP(S) URL
+# - Ignore RST references (e.g.: long method path)
+# Both could be indented (e.g.: within a docstring, class, function, etc.)
+ignore-long-lines=^\s*(# )?<?https?://\S+>?$|^\s*\:\w+\:\`\S+\`$
 
 # Number of spaces of indent required inside a hanging or continued line.
 indent-after-paren=4

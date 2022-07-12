@@ -605,7 +605,8 @@ class TestWeaverCLI(TestWeaverClientBase):
         """
         Validate some special handling to generate special combinations of help argument details.
         """
-        lines = run_command([
+        lines = run_command(
+            [
                 # "weaver",
                 "deploy",
                 "--help",
@@ -760,7 +761,7 @@ class TestWeaverCLI(TestWeaverClientBase):
             expect_error=True,
         )
         assert "usage: weaver deploy" in lines[0]
-        assert "weaver deploy: error: argument -T/--token: not allowed with argument -U/--username" == lines[-1]
+        assert lines[-1] == "weaver deploy: error: argument -T/--token: not allowed with argument -U/--username"
 
         lines = mocked_sub_requests(
             self.app, run_command,
@@ -779,7 +780,7 @@ class TestWeaverCLI(TestWeaverClientBase):
             expect_error=True,
         )
         assert "usage: weaver deploy" in lines[0]
-        assert "weaver deploy: error: argument -T/--token: not allowed with argument -P/--password" == lines[-1]
+        assert lines[-1] == "weaver deploy: error: argument -T/--token: not allowed with argument -P/--password"
 
         lines = mocked_sub_requests(
             self.app, run_command,
@@ -800,8 +801,8 @@ class TestWeaverCLI(TestWeaverClientBase):
         )
         assert "usage: weaver deploy" in lines[0]
         assert (  # any first that disallows
-            "weaver deploy: error: argument -T/--token: not allowed with argument -U/--username" == lines[-1] or
-            "weaver deploy: error: argument -T/--token: not allowed with argument -P/--password" == lines[-1]
+            lines[-1] == "weaver deploy: error: argument -T/--token: not allowed with argument -U/--username" or
+            lines[-1] == "weaver deploy: error: argument -T/--token: not allowed with argument -P/--password"
         )
 
     def test_deploy_docker_auth_username_or_password_missing_invalid(self):
@@ -836,7 +837,7 @@ class TestWeaverCLI(TestWeaverClientBase):
             expect_error=True,
         )
         assert "usage: weaver deploy" in lines[0]
-        assert "weaver deploy: error: argument -U/--username: must be combined with -P/--password" == lines[-1]
+        assert lines[-1] == "weaver deploy: error: argument -U/--username: must be combined with -P/--password"
 
         lines = mocked_sub_requests(
             self.app, run_command,
@@ -854,7 +855,7 @@ class TestWeaverCLI(TestWeaverClientBase):
             expect_error=True,
         )
         assert "usage: weaver deploy" in lines[0]
-        assert "weaver deploy: error: argument -U/--username: must be combined with -P/--password" == lines[-1]
+        assert lines[-1] == "weaver deploy: error: argument -U/--username: must be combined with -P/--password"
 
     def test_deploy_payload_body_cwl_embedded(self):
         test_id = f"{self.test_process_prefix}-deploy-body-no-cwl"
