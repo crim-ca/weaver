@@ -302,7 +302,7 @@ It is part of `PAVICS`_ and `Birdhouse`_ ecosystems and is available within the 
 .. _ogc-eo-apps-pilot-er: http://docs.opengeospatial.org/per/20-045.html
 .. |ogc-best-practices-eo-apppkg| replace:: OGC Best Practice for Earth Observation Application Package
 .. _ogc-best-practices-eo-apppkg: https://docs.ogc.org/bp/20-089r1.html
-.. |ogc-api-proc-ext-part2| replace:: `OGC API - Processes - Part 2: Deploy, Replace, Undeploy`_ (DRU) extension
+.. |ogc-api-proc-part2| replace:: `OGC API - Processes - Part 2: Deploy, Replace, Undeploy`_ (DRU) extension
 .. _`OGC API - Processes - Part 2: Deploy, Replace, Undeploy`: https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/deploy_replace_undeploy
 .. |ogc-apppkg| replace:: `OGC Application Package`
 .. _ogc-apppkg: https://github.com/opengeospatial/ogcapi-processes/blob/master/extensions/deploy_replace_undeploy/standard/openapi/schemas/ogcapppkg.yaml

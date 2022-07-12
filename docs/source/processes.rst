@@ -431,7 +431,7 @@ the |getcap-req|_ request.
 Update, replace or remove an existing process (Update, Replace, Undeploy)
 -----------------------------------------------------------------------------
 
-Since `Weaver` supports |ogc-api-proc-ext-part2|_, it is able to remove a previously registered :term:`Process` using
+Since `Weaver` supports |ogc-api-proc-part2|_, it is able to remove a previously registered :term:`Process` using
 the :ref:`Deployment <proc_op_deploy>` request. The undeploy operation consist of a ``DELETE`` request targeting the
 specific ``{WEAVER_URL}/processes/{processID}`` to be removed.
 
@@ -447,7 +447,7 @@ location of the reference to modify.
 
 .. note::
     The :term:`Process` partial update operation (using ``PATCH``) is specific to `Weaver` only.
-    |ogc-api-proc-ext-part2|_ only mandates the definition of ``PUT`` request for full override of a :term:`Process`.
+    |ogc-api-proc-part2|_ only mandates the definition of ``PUT`` request for full override of a :term:`Process`.
 
 When a :term:`Process` is modified using the ``PATCH`` operation, only the new definitions need to be provided, and
 unspecified items are transferred over from the referenced :term:`Process` (i.e.: the previous revision). Using either
