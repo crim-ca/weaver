@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_4.20.0:
+
+`4.20.0 <https://github.com/crim-ca/weaver/tree/4.20.0>`_ (2022-07-15)
+========================================================================
+
+Changes:
+--------
 - Add support of `Process` revisions (resolves `#107 <https://github.com/crim-ca/weaver/issues/107>`_).
 - Add ``PATCH /processes/{processID}`` request, allowing ``MINOR`` and ``PATCH`` level modifications that can be
   applied to an existing `Process` in order to revise non-execution critical information. Level ``PATCH`` is used to
