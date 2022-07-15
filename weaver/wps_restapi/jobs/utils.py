@@ -18,7 +18,7 @@ from pyramid.response import FileResponse
 from pyramid_celery import celery_app
 
 from weaver.database import get_db
-from weaver.datatype import Job
+from weaver.datatype import Job, Process
 from weaver.exceptions import (
     InvalidIdentifierValue,
     JobGone,
@@ -48,6 +48,7 @@ from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_output_dir, get_wps_output_url, map_wps_output_location
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.constants import JobInputsOutputsSchema
+from weaver.wps_restapi.processes.utils import resolve_process_tag
 from weaver.wps_restapi.providers.utils import forbid_local_only
 
 if TYPE_CHECKING:
@@ -76,8 +77,17 @@ LOGGER = get_task_logger(__name__)
 def get_job(request):
     # type: (PyramidRequest) -> Job
     """
-    Obtain a job from request parameters.
+    Obtain a :term:`Job` from request parameters.
 
+    .. versionchanged:: 4.20
+        When looking for :term:`Job` that refers to a local :term:`Process`, allow implicit resolution of the
+        unspecified ``version`` portion to automatically resolve the identifier. Consider that validation of
+        the expected :term:`Process` for this :term:`Job` is "good enough", since the specific ID is not actually
+        required to obtain the :term:`Job` (could be queried by ID only on the ``/jobs/{jobId}`` endpoint.
+        If the ``version`` is provided though (either query parameter or tagged representation), the validation
+        will ensure that it matches explicitly.
+
+    :param request: Request with path and query parameters to retrieve the desired job.
     :returns: Job information if found.
     :raise HTTPNotFound: with JSON body details on missing/non-matching job, process, provider IDs.
     """
@@ -107,7 +117,11 @@ def get_job(request):
         )
 
     provider_id = request.matchdict.get("provider_id", job.service)
-    process_id = request.matchdict.get("process_id", job.process)
+    process_tag = request.matchdict.get("process_id")
+    if process_tag:
+        process_tag = resolve_process_tag(request)  # find version if available as well
+    else:
+        process_tag = job.process
     if provider_id:
         forbid_local_only(request)
 
@@ -121,11 +135,13 @@ def get_job(request):
                 "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/no-such-job",
                 "detail": desc,
                 "status": OWSNotFound.code,
-                "cause": str(process_id)
+                "cause": str(provider_id)
             },
             code=title, locator="provider", description=desc  # old format
         )
-    if job.process != process_id:
+
+    process_id = Process.split_version(process_tag)[0]
+    if job.process not in [process_id, process_tag]:
         title = "NoSuchProcess"
         desc = "Could not find job reference corresponding to specified process reference."
         raise OWSNotFound(
@@ -136,7 +152,7 @@ def get_job(request):
                 "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/no-such-job",
                 "detail": desc,
                 "status": OWSNotFound.code,
-                "cause": str(process_id)
+                "cause": str(process_tag)
             },
             code=title, locator="process", description=desc  # old format
         )
@@ -415,7 +431,7 @@ def get_job_results_response(job, container, headers=None):
     is_raw = job.execution_response == ExecuteResponse.RAW
     results, refs = get_results(job, container, value_key="value",
                                 schema=JobInputsOutputsSchema.OGC,  # not strict to provide more format details
-                                link_references=is_raw)  # type: Union[ExecutionResults, HeadersTupleType]
+                                link_references=is_raw)
     headers = headers or {}
     if "location" not in headers:
         headers["Location"] = job.status_url(container)
@@ -434,10 +450,11 @@ def get_job_results_response(job, container, headers=None):
         refs.extend(headers.items())
         return HTTPNoContent(headers=refs)
 
-    # raw response can be only data value, only link or a mix of them
+    # raw response can be data-only value, link-only or a mix of them
     if results:
         # https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_process-execute-sync-raw-value-one
-        out_info = list(results.items())[0][-1]
+        out_vals = list(results.items())
+        out_info = out_vals[0][-1]
         out_type = get_any_value(out_info, key=True)
         out_data = get_any_value(out_info)
 

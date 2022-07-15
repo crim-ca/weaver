@@ -281,6 +281,13 @@ class SLUG(ExtendedSchemaNode):
     pattern = r"^[A-Za-z0-9]+(?:(-|_)[A-Za-z0-9]+)*$"
 
 
+class Tag(ExtendedSchemaNode):
+    schema_type = String
+    description = "Identifier with optional tagged version forming an unique reference."
+    # ranges used to remove starting/ending ^$ characters
+    pattern = SLUG.pattern[:-1] + rf"(:{SemanticVersion(v_prefix=False, rc_suffix=False).pattern[1:-1]})?$"
+
+
 class URL(ExtendedSchemaNode):
     schema_type = String
     description = "URL reference."
@@ -392,6 +399,11 @@ class ProcessIdentifier(AnyOfKeywordSchema):
     ]
 
 
+class ProcessIdentifierTag(AnyOfKeywordSchema):
+    description = "Process identifier with optional revision tag."
+    _any_of = [Tag] + ProcessIdentifier._any_of  # type: ignore  # noqa: W0212
+
+
 class Version(ExtendedSchemaNode):
     # note: internally use LooseVersion, so don't be too strict about pattern
     schema_type = String
@@ -487,33 +499,40 @@ class XAuthDockerHeader(ExtendedSchemaNode):
     missing = drop
 
 
-class RequestContentTypeHeader(OneOfKeywordSchema):
-    _one_of = [
-        JsonHeader(),
-        XmlHeader(),
-    ]
+class RequestContentTypeHeader(ContentTypeHeader):
+    example = ContentType.APP_JSON
+    default = ContentType.APP_JSON
+    validator = OneOf([
+        ContentType.APP_JSON,
+        # ContentType.APP_XML,
+    ])
 
 
-class ResponseContentTypeHeader(OneOfKeywordSchema):
-    _one_of = [
-        JsonHeader(),
-        XmlHeader(),
-        HtmlHeader(),
-    ]
+class ResponseContentTypeHeader(ContentTypeHeader):
+    example = ContentType.APP_JSON
+    default = ContentType.APP_JSON
+    validator = OneOf([
+        ContentType.APP_JSON,
+        ContentType.APP_XML,
+        ContentType.TEXT_XML,
+        ContentType.TEXT_HTML,
+    ])
 
 
-class RequestHeaders(RequestContentTypeHeader):
+class RequestHeaders(ExtendedMappingSchema):
     """
     Headers that can indicate how to adjust the behavior and/or result the be provided in the response.
     """
     accept = AcceptHeader()
     accept_language = AcceptLanguageHeader()
+    content_type = RequestContentTypeHeader()
 
 
 class ResponseHeaders(ResponseContentTypeHeader):
     """
     Headers describing resulting response.
     """
+    content_type = ResponseContentTypeHeader()
 
 
 class RedirectHeaders(ResponseHeaders):
@@ -525,7 +544,7 @@ class NoContent(ExtendedMappingSchema):
     default = {}
 
 
-class FileUploadHeaders(RequestContentTypeHeader):
+class FileUploadHeaders(RequestHeaders):
     # MUST be multipart for upload
     content_type = ContentTypeHeader(
         example=f"{ContentType.MULTI_PART_FORM}; boundary=43003e2f205a180ace9cd34d98f911ff",
@@ -562,7 +581,7 @@ class DescriptionSchema(ExtendedMappingSchema):
 
 
 class KeywordList(ExtendedSequenceSchema):
-    keyword = ExtendedSchemaNode(String())
+    keyword = ExtendedSchemaNode(String(), validator=Length(min=1))
 
 
 class Language(ExtendedSchemaNode):
@@ -1018,8 +1037,8 @@ class PropertyOAS(PermissiveMappingSchema):
     read_only = ExtendedSchemaNode(Boolean(), name="readOnly", missing=drop)
     write_only = ExtendedSchemaNode(Boolean(), name="writeOnly", missing=drop)
     multiple_of = MultipleOfOAS(name="multipleOf", missing=drop, validator=BoundedRange(min=0, exclusive_min=True))
-    minimum = ExtendedSchemaNode(Integer(), name="minLength", missing=drop, validator=Range(min=0))  # default=0
-    maximum = ExtendedSchemaNode(Integer(), name="maxLength", missing=drop, validator=Range(min=0))
+    minimum = ExtendedSchemaNode(Integer(), name="minimum", missing=drop, validator=Range(min=0))  # default=0
+    maximum = ExtendedSchemaNode(Integer(), name="maximum", missing=drop, validator=Range(min=0))
     exclusive_min = ExtendedSchemaNode(Boolean(), name="exclusiveMinimum", missing=drop)  # default=False
     exclusive_max = ExtendedSchemaNode(Boolean(), name="exclusiveMaximum", missing=drop)  # default=False
     min_length = ExtendedSchemaNode(Integer(), name="minLength", missing=drop, validator=Range(min=0))  # default=0
@@ -1132,8 +1151,8 @@ class DeployMinMaxOccurs(ExtendedMappingSchema):
 
 # does not inherit from 'DescriptionLinks' because other 'ProcessDescription<>' schema depend from this without 'links'
 class ProcessDescriptionType(DescriptionBase, DescriptionExtra):
-    id = ProcessIdentifier()
-    version = Version(missing=drop)
+    id = ProcessIdentifierTag()
+    version = Version(missing=None, default=None, example="1.2.3")
     mutable = ExtendedSchemaNode(Boolean(), default=True, description=(
         "Indicates if the process is mutable (dynamically deployed), or immutable (builtin with this instance)."
     ))
@@ -1673,13 +1692,34 @@ class VisibilitySchema(ExtendedMappingSchema):
 #########################################################
 
 
-class ProcessPath(ExtendedMappingSchema):
-    # FIXME: support versioning with <id:tag> (https://github.com/crim-ca/weaver/issues/107)
-    process_id = AnyIdentifier(description="Process identifier.", example="jsonarray2netcdf")
+class LocalProcessQuery(ExtendedMappingSchema):
+    version = Version(example="1.2.3", missing=drop, description=(
+        "Specific process version to locate. "
+        "If process ID was requested with tagged 'id:version' revision format, this parameter is ignored."
+    ))
+
+
+class LocalProcessPath(ExtendedMappingSchema):
+    process_id = ProcessIdentifierTag(
+        example="jsonarray2netcdf[:1.0.0]",
+        description=(
+            "Process identifier with optional tag version. "
+            "If tag is omitted, the latest version of that process is assumed. "
+            "Otherwise, the specific process revision as 'id:version' must be matched. "
+            "Alternatively, the plain process ID can be specified in combination to 'version' query parameter."
+        ),
+    )
 
 
 class ProviderPath(ExtendedMappingSchema):
     provider_id = AnyIdentifier(description="Remote provider identifier.", example="hummingbird")
+
+
+class ProviderProcessPath(ProviderPath):
+    # note: Tag representation not allowed in this case
+    process_id = ProcessIdentifier(example="provider-process", description=(
+        "Identifier of a process that is offered by the remote provider."
+    ))
 
 
 class JobPath(ExtendedMappingSchema):
@@ -2485,34 +2525,42 @@ class ProcessDescriptionQuery(ExtendedMappingSchema):
     )
 
 
-class ProviderProcessEndpoint(ProviderPath, ProcessPath):
+class ProviderProcessEndpoint(ProviderProcessPath):
     header = RequestHeaders()
     querystring = ProcessDescriptionQuery()
 
 
-class ProcessEndpoint(ProcessPath):
+class LocalProcessDescriptionQuery(ProcessDescriptionQuery, LocalProcessQuery):
+    pass
+
+
+class ProcessEndpoint(LocalProcessPath):
     header = RequestHeaders()
-    querystring = ProcessDescriptionQuery()
+    querystring = LocalProcessDescriptionQuery()
 
 
-class ProcessPackageEndpoint(ProcessPath):
+class ProcessPackageEndpoint(LocalProcessPath):
     header = RequestHeaders()
+    querystring = LocalProcessQuery()
 
 
-class ProcessPayloadEndpoint(ProcessPath):
+class ProcessPayloadEndpoint(LocalProcessPath):
     header = RequestHeaders()
+    querystring = LocalProcessQuery()
 
 
-class ProcessVisibilityGetEndpoint(ProcessPath):
+class ProcessVisibilityGetEndpoint(LocalProcessPath):
     header = RequestHeaders()
+    querystring = LocalProcessQuery()
 
 
-class ProcessVisibilityPutEndpoint(ProcessPath):
+class ProcessVisibilityPutEndpoint(LocalProcessPath):
     header = RequestHeaders()
+    querystring = LocalProcessQuery()
     body = VisibilitySchema()
 
 
-class ProviderJobEndpoint(ProviderPath, ProcessPath, JobPath):
+class ProviderJobEndpoint(ProviderProcessPath, JobPath):
     header = RequestHeaders()
 
 
@@ -2520,11 +2568,11 @@ class JobEndpoint(JobPath):
     header = RequestHeaders()
 
 
-class ProcessInputsEndpoint(ProcessPath, JobPath):
+class ProcessInputsEndpoint(LocalProcessPath, JobPath):
     header = RequestHeaders()
 
 
-class ProviderInputsEndpoint(ProviderPath, ProcessPath, JobPath):
+class ProviderInputsEndpoint(ProviderProcessPath, JobPath):
     header = RequestHeaders()
 
 
@@ -2551,7 +2599,7 @@ class JobInputsEndpoint(JobPath):
     querystring = JobInputsOutputsQuery()
 
 
-class JobOutputQuery(ExtendedMappingSchema):
+class JobResultsQuery(ExtendedMappingSchema):
     schema = ExtendedSchemaNode(
         String(),
         title="JobOutputResultsSchema",
@@ -2560,7 +2608,8 @@ class JobOutputQuery(ExtendedMappingSchema):
         validator=OneOfCaseInsensitive(JobInputsOutputsSchema.values()),
         summary="Selects the schema employed for representation of job outputs.",
         description=(
-            "Selects the schema employed for representation of job outputs for providing file Content-Type details. "
+            "Selects the schema employed for representation of job results (produced outputs) "
+            "for providing file Content-Type details. "
             f"When '{JobInputsOutputsSchema.OLD}' is employed, "
             "'format.mimeType' is used and 'type' is reported as well. "
             f"When '{JobInputsOutputsSchema.OGC}' is employed, "
@@ -2571,19 +2620,23 @@ class JobOutputQuery(ExtendedMappingSchema):
     )
 
 
-class ProcessOutputsEndpoint(ProcessPath, JobPath):
-    header = RequestHeaders()
-    querystring = JobOutputQuery()
-
-
-class ProviderOutputsEndpoint(ProviderPath, ProcessPath, JobPath):
-    header = RequestHeaders()
-    querystring = JobOutputQuery()
+class LocalProcessJobResultsQuery(LocalProcessQuery, JobResultsQuery):
+    pass
 
 
 class JobOutputsEndpoint(JobPath):
     header = RequestHeaders()
-    querystring = JobOutputQuery()
+    querystring = LocalProcessJobResultsQuery()
+
+
+class ProcessOutputsEndpoint(LocalProcessPath, JobPath):
+    header = RequestHeaders()
+    querystring = LocalProcessJobResultsQuery()
+
+
+class ProviderOutputsEndpoint(ProviderProcessPath, JobPath):
+    header = RequestHeaders()
+    querystring = JobResultsQuery()
 
 
 class ProcessResultEndpoint(ProcessOutputsEndpoint):
@@ -2601,19 +2654,19 @@ class JobResultEndpoint(JobPath):
     header = RequestHeaders()
 
 
-class ProcessResultsEndpoint(ProcessPath, JobPath):
+class ProcessResultsEndpoint(LocalProcessPath, JobPath):
     header = RequestHeaders()
 
 
-class ProviderResultsEndpoint(ProviderPath, ProcessPath, JobPath):
+class ProviderResultsEndpoint(ProviderProcessPath, JobPath):
     header = RequestHeaders()
 
 
-class JobResultsEndpoint(ProviderPath, ProcessPath, JobPath):
+class JobResultsEndpoint(ProviderProcessPath, JobPath):
     header = RequestHeaders()
 
 
-class ProviderExceptionsEndpoint(ProviderPath, ProcessPath, JobPath):
+class ProviderExceptionsEndpoint(ProviderProcessPath, JobPath):
     header = RequestHeaders()
 
 
@@ -2621,11 +2674,12 @@ class JobExceptionsEndpoint(JobPath):
     header = RequestHeaders()
 
 
-class ProcessExceptionsEndpoint(ProcessPath, JobPath):
+class ProcessExceptionsEndpoint(LocalProcessPath, JobPath):
     header = RequestHeaders()
+    querystring = LocalProcessQuery()
 
 
-class ProviderLogsEndpoint(ProviderPath, ProcessPath, JobPath):
+class ProviderLogsEndpoint(ProviderProcessPath, JobPath):
     header = RequestHeaders()
 
 
@@ -2633,19 +2687,21 @@ class JobLogsEndpoint(JobPath):
     header = RequestHeaders()
 
 
-class ProcessLogsEndpoint(ProcessPath, JobPath):
+class ProcessLogsEndpoint(LocalProcessPath, JobPath):
     header = RequestHeaders()
+    querystring = LocalProcessQuery()
 
 
 class JobStatisticsEndpoint(JobPath):
     header = RequestHeaders()
 
 
-class ProcessJobStatisticsEndpoint(ProcessPath, JobPath):
+class ProcessJobStatisticsEndpoint(LocalProcessPath, JobPath):
     header = RequestHeaders()
+    querystring = LocalProcessQuery()
 
 
-class ProviderJobStatisticsEndpoint(ProviderPath, ProcessPath, JobPath):
+class ProviderJobStatisticsEndpoint(ProviderProcessPath, JobPath):
     header = RequestHeaders()
 
 
@@ -2792,7 +2848,9 @@ class ProcessSummaryList(ExtendedSequenceSchema):
 
 
 class ProcessNamesList(ExtendedSequenceSchema):
-    process_name = ProcessIdentifier()
+    process_name = ProcessIdentifierTag(
+        description="Process identifier or tagged representation if revision was requested."
+    )
 
 
 class ProcessListing(OneOfKeywordSchema):
@@ -2884,6 +2942,10 @@ class ProcessDescription(OneOfKeywordSchema):
 
 
 class ProcessDeployment(ProcessSummary, ProcessContext, ProcessDeployMeta):
+    # override ID to forbid deploy to contain a tagged version part
+    # if version should be applied, it must be provided with its 'Version' field
+    id = ProcessIdentifier()
+
     # explicit "abstract" handling for bw-compat, new versions should use "description"
     # only allowed in deploy to support older servers that report abstract (or parsed from WPS-1/2)
     # recent OGC-API v1+ will usually provide directly "description" as per the specification
@@ -2942,8 +3004,8 @@ class DurationISO(ExtendedSchemaNode):
 
 class JobStatusInfo(ExtendedMappingSchema):
     jobID = UUID(example="a9d14bf4-84e0-449a-bac8-16e598efe807", description="ID of the job.")
-    processID = ProcessIdentifier(missing=None, default=None,
-                                  description="Process identifier corresponding to the job execution.")
+    processID = ProcessIdentifierTag(missing=None, default=None,
+                                     description="Process identifier corresponding to the job execution.")
     providerID = ProcessIdentifier(missing=None, default=None,
                                    description="Provider identifier corresponding to the job execution.")
     type = JobTypeEnum(description="Type of the element associated to the creation of this job.")
@@ -2993,7 +3055,7 @@ class JobCollection(ExtendedSequenceSchema):
 
 class CreatedJobStatusSchema(DescriptionSchema):
     jobID = UUID(description="Unique identifier of the created job for execution.")
-    processID = ProcessIdentifier(description="Identifier of the process that will be executed.")
+    processID = ProcessIdentifierTag(description="Identifier of the process that will be executed.")
     providerID = AnyIdentifier(description="Remote provider identifier if applicable.", missing=drop)
     status = ExtendedSchemaNode(String(), example=Status.ACCEPTED)
     location = ExtendedSchemaNode(String(), example="http://{host}/weaver/processes/{my-process-id}/jobs/{my-job-id}")
@@ -3314,7 +3376,7 @@ class QuoteStatusSchema(ExtendedSchemaNode):
 class PartialQuoteSchema(ExtendedMappingSchema):
     id = UUID(description="Quote ID.")
     status = QuoteStatusSchema()
-    processID = ProcessIdentifier(description="Process identifier corresponding to the quote definition.")
+    processID = ProcessIdentifierTag(description="Process identifier corresponding to the quote definition.")
 
 
 class Price(ExtendedSchemaNode):
@@ -3795,6 +3857,17 @@ class CWLIdentifier(ProcessIdentifier):
     )
 
 
+class CWLIntentURL(URL):
+    description = (
+        "Identifier URL to a concept for the type of computational operation accomplished by this Process "
+        "(see example operations: http://edamontology.org/operation_0004)."
+    )
+
+
+class CWLIntent(ExtendedSequenceSchema):
+    item = CWLIntentURL()
+
+
 class CWLBase(ExtendedMappingSchema):
     cwlVersion = CWLVersion()
 
@@ -3802,6 +3875,7 @@ class CWLBase(ExtendedMappingSchema):
 class CWLApp(PermissiveMappingSchema):
     _class = CWLClass()
     id = CWLIdentifier(missing=drop)  # can be omitted only if within a process deployment that also includes it
+    intent = CWLIntent(missing=drop)
     requirements = CWLRequirements(description="Explicit requirement to execute the application package.", missing=drop)
     hints = CWLHints(description="Non-failing additional hints that can help resolve extra requirements.", missing=drop)
     baseCommand = CWLCommand(description="Command called in the docker image or on shell according to requirements "
@@ -4180,16 +4254,32 @@ class CWLGraphBase(ExtendedMappingSchema):
     )
 
 
-class DeployCWLGraph(CWLBase, CWLGraphBase):
-    _sort_first = ["cwlVersion", "$graph"]
+class UpdateVersion(ExtendedMappingSchema):
+    version = Version(missing=drop, example="1.2.3", description=(
+        "Explicit version to employ for initial or updated process definition. "
+        "Must not already exist and must be greater than the latest available semantic version for the "
+        "corresponding version level according to the applied update operation. "
+        "For example, if only versions '1.2.3' and '1.3.1' exist, the submitted version can be anything before "
+        "version '1.2.0' excluding it (i.e.: '1.1.X', '0.1.2', etc.), between '1.2.4' and '1.3.0' exclusively, or "
+        "'1.3.2' and anything above. If no version is provided, the next *patch* level after the current process "
+        "version is applied. If the current process did not define any version, it is assumed '0.0.0' and this patch"
+        "will use '0.0.1'. The applicable update level (MAJOR, MINOR, PATCH) depends on the operation being applied. "
+        "As a rule of thumb, if changes affect only metadata, PATCH is required. If changes affect parameters or "
+        "execution method of the process, but not directly its entire definition, MINOR is required. If the process "
+        "must be completely redeployed due to application redefinition, MAJOR is required."
+    ))
 
 
-class DeployCWL(NotKeywordSchema, CWL):
-    _sort_first = ["cwlVersion", "id", "class"]
+class DeployCWLGraph(CWLBase, CWLGraphBase, UpdateVersion):
+    _sort_first = ["cwlVersion", "version", "$graph"]
+
+
+class DeployCWL(NotKeywordSchema, CWL, UpdateVersion):
+    _sort_first = ["cwlVersion", "version", "id", "class"]
     _not = [
         CWLGraphBase()
     ]
-    id = CWLIdentifier()  # required in this case
+    id = CWLIdentifier()  # required in this case, cannot have a version directly as tag, use 'version' field instead
 
 
 class Deploy(OneOfKeywordSchema):
@@ -4238,6 +4328,104 @@ class PostProcessesEndpoint(ExtendedMappingSchema):
     })
 
 
+class UpdateInputOutputBase(DescriptionType, InputOutputDescriptionMeta):
+    pass
+
+
+class UpdateInputOutputItem(InputIdentifierType, UpdateInputOutputBase):
+    pass
+
+
+class UpdateInputOutputList(ExtendedSequenceSchema):
+    io_item = UpdateInputOutputItem()
+
+
+class UpdateInputOutputMap(PermissiveMappingSchema):
+    io_id = UpdateInputOutputBase(
+        variable="{input-output-id}",
+        description="Input/Output definition under mapping for process update."
+    )
+
+
+class UpdateInputOutputDefinition(OneOfKeywordSchema):
+    _one_of = [
+        UpdateInputOutputMap(),
+        UpdateInputOutputList(),
+    ]
+
+
+class PatchProcessBodySchema(UpdateVersion):
+    title = ExtendedSchemaNode(String(), missing=drop, description=(
+        "New title to override current one. "
+        "Minimum required change version level: PATCH."
+    ))
+    description = ExtendedSchemaNode(String(), missing=drop, description=(
+        "New description to override current one. "
+        "Minimum required change version level: PATCH."
+    ))
+    keywords = KeywordList(missing=drop, description=(
+        "Keywords to add (append) to existing definitions. "
+        "To remove all keywords, submit an empty list. "
+        "To replace keywords, perform two requests, one with empty list and the following one with new definitions. "
+        "Minimum required change version level: PATCH."
+    ))
+    metadata = MetadataList(missing=drop, description=(
+        "Metadata to add (append) to existing definitions. "
+        "To remove all metadata, submit an empty list. "
+        "To replace metadata, perform two requests, one with empty list and the following one with new definitions. "
+        "Relations must be unique across existing and new submitted metadata. "
+        "Minimum required change version level: PATCH."
+    ))
+    links = LinkList(missing=drop, description=(
+        "Links to add (append) to existing definitions. Relations must be unique. "
+        "To remove all (additional) links, submit an empty list. "
+        "To replace links, perform two requests, one with empty list and the following one with new definitions. "
+        "Note that modifications to links only considers custom links. Other automatically generated links such as "
+        "API endpoint and navigation references cannot be removed or modified. "
+        "Relations must be unique across existing and new submitted links. "
+        "Minimum required change version level: PATCH."
+    ))
+    inputs = UpdateInputOutputDefinition(missing=drop, description=(
+        "Update details of individual input elements. "
+        "Minimum required change version levels are the same as process-level fields of corresponding names."
+    ))
+    outputs = UpdateInputOutputDefinition(missing=drop, description=(
+        "Update details of individual output elements. "
+        "Minimum required change version levels are the same as process-level fields of corresponding names."
+    ))
+    jobControlOptions = JobControlOptionsList(missing=drop, description=(
+        "New job control options supported by this process for its execution. "
+        "All desired job control options must be provided (full override, not appending). "
+        "Order is important to define the default behaviour (first item) to use when unspecified during job execution. "
+        "Minimum required change version level: MINOR."
+    ))
+    outputTransmission = TransmissionModeList(missing=drop, description=(
+        "New output transmission methods supported following this process execution. "
+        "All desired output transmission modes must be provided (full override, not appending). "
+        "Minimum required change version level: MINOR."
+    ))
+    visibility = VisibilityValue(missing=drop, description=(
+        "New process visibility. "
+        "Minimum required change version level: MINOR."
+    ))
+
+
+class PutProcessBodySchema(Deploy):
+    description = "Process re-deployment using an updated version and definition."
+
+
+class PatchProcessEndpoint(LocalProcessPath):
+    headers = RequestHeaders()
+    querystring = LocalProcessQuery()
+    body = PatchProcessBodySchema()
+
+
+class PutProcessEndpoint(LocalProcessPath):
+    headers = RequestHeaders()
+    querystring = LocalProcessQuery()
+    body = PutProcessBodySchema()
+
+
 class WpsOutputContextHeader(ExtendedSchemaNode):
     # ok to use 'name' in this case because target 'key' in the mapping must
     # be that specific value but cannot have a field named with this format
@@ -4258,8 +4446,9 @@ class ExecuteHeaders(RequestHeaders):
     x_wps_output_context = WpsOutputContextHeader()
 
 
-class PostProcessJobsEndpoint(ProcessPath):
+class PostProcessJobsEndpoint(LocalProcessPath):
     header = ExecuteHeaders()
+    querystring = LocalProcessQuery()
     body = Execute()
 
 
@@ -4282,8 +4471,10 @@ class GetJobsQueries(ExtendedMappingSchema):
         description="Maximum duration (seconds) between started time and current/finished time of jobs to find.")
     datetime = DateTimeInterval(missing=drop, default=None)
     status = JobStatusEnum(missing=drop, default=None)
-    processID = ProcessIdentifier(missing=drop, default=null, description="Alias to 'process' for OGC-API compliance.")
-    process = ProcessIdentifier(missing=drop, default=None, description="Identifier of the process to filter search.")
+    processID = ProcessIdentifierTag(missing=drop, default=null,
+                                     description="Alias to 'process' for OGC-API compliance.")
+    process = ProcessIdentifierTag(missing=drop, default=None,
+                                   description="Identifier of the process to filter search.")
     service = AnyIdentifier(missing=drop, default=null, description="Alias to 'provider' for backward compatibility.")
     provider = AnyIdentifier(missing=drop, default=None, description="Identifier of service provider to filter search.")
     type = JobTypeEnum(missing=drop, default=null,
@@ -4295,21 +4486,27 @@ class GetJobsQueries(ExtendedMappingSchema):
                               description="Comma-separated values of tags assigned to jobs")
 
 
-class GetJobsRequest(ExtendedMappingSchema):
+class GetProcessJobsQuery(LocalProcessQuery, GetJobsQueries):
+    pass
+
+
+class GetProviderJobsQueries(GetJobsQueries):  # ':version' not allowed for process ID in this case
+    pass
+
+
+class GetJobsEndpoint(ExtendedMappingSchema):
     header = RequestHeaders()
-    querystring = GetJobsQueries()
+    querystring = GetProcessJobsQuery()  # allowed version in this case since can be either local or remote processes
 
 
-class GetJobsEndpoint(GetJobsRequest):
-    pass
+class GetProcessJobsEndpoint(LocalProcessPath):
+    header = RequestHeaders()
+    querystring = GetProcessJobsQuery()
 
 
-class GetProcessJobsEndpoint(GetJobsRequest, ProcessPath):
-    pass
-
-
-class GetProviderJobsEndpoint(GetJobsRequest, ProviderPath, ProcessPath):
-    pass
+class GetProviderJobsEndpoint(ProviderProcessPath):
+    header = RequestHeaders()
+    querystring = GetProviderJobsQueries()
 
 
 class JobIdentifierList(ExtendedSequenceSchema):
@@ -4325,20 +4522,22 @@ class DeleteJobsEndpoint(ExtendedMappingSchema):
     body = DeleteJobsBodySchema()
 
 
-class DeleteProcessJobsEndpoint(DeleteJobsEndpoint, ProcessPath):
+class DeleteProcessJobsEndpoint(DeleteJobsEndpoint, LocalProcessPath):
+    querystring = LocalProcessQuery()
+
+
+class DeleteProviderJobsEndpoint(DeleteJobsEndpoint, ProviderProcessPath):
     pass
 
 
-class DeleteProviderJobsEndpoint(DeleteJobsEndpoint, ProviderPath, ProcessPath):
-    pass
-
-
-class GetProcessJobEndpoint(ProcessPath):
+class GetProcessJobEndpoint(LocalProcessPath):
     header = RequestHeaders()
+    querystring = LocalProcessQuery()
 
 
-class DeleteProcessJobEndpoint(ProcessPath):
+class DeleteProcessJobEndpoint(LocalProcessPath):
     header = RequestHeaders()
+    querystring = LocalProcessQuery()
 
 
 class BillsEndpoint(ExtendedMappingSchema):
@@ -4349,12 +4548,14 @@ class BillEndpoint(BillPath):
     header = RequestHeaders()
 
 
-class ProcessQuotesEndpoint(ProcessPath):
+class ProcessQuotesEndpoint(LocalProcessPath):
     header = RequestHeaders()
+    querystring = LocalProcessQuery()
 
 
-class ProcessQuoteEndpoint(ProcessPath, QuotePath):
+class ProcessQuoteEndpoint(LocalProcessPath, QuotePath):
     header = RequestHeaders()
+    querystring = LocalProcessQuery()
 
 
 class GetQuotesQueries(ExtendedMappingSchema):
@@ -4373,8 +4574,9 @@ class QuoteEndpoint(QuotePath):
     header = RequestHeaders()
 
 
-class PostProcessQuote(ProcessPath, QuotePath):
+class PostProcessQuote(LocalProcessPath, QuotePath):
     header = RequestHeaders()
+    querystring = LocalProcessQuery()
     body = NoContent()
 
 
@@ -4387,8 +4589,9 @@ class QuoteProcessParametersSchema(ExecuteInputOutputs):
     pass
 
 
-class PostProcessQuoteRequestEndpoint(ProcessPath, QuotePath):
+class PostProcessQuoteRequestEndpoint(LocalProcessPath, QuotePath):
     header = RequestHeaders()
+    querystring = LocalProcessQuery()
     body = QuoteProcessParametersSchema()
 
 
@@ -4431,6 +4634,21 @@ class ProcessDetailQuery(ExtendedMappingSchema):
     detail = ExtendedSchemaNode(
         QueryBoolean(), example=True, default=True, missing=drop,
         description="Return summary details about each process, or simply their IDs."
+    )
+
+
+class ProcessRevisionsQuery(ExtendedMappingSchema):
+    process = ProcessIdentifier(missing=drop, description=(
+        "Process ID (excluding version) for which to filter results. "
+        "When combined with 'revisions=true', allows listing of all reversions of a given process. "
+        "If omitted when 'revisions=true', all revisions of every process ID will be returned. "
+        "If used without 'revisions' query, list should include a single process as if summary was requested directly."
+    ))
+    revisions = ExtendedSchemaNode(
+        QueryBoolean(), example=True, default=False, missing=drop, description=(
+            "Return all revisions of processes, or simply their latest version. When returning all revisions, "
+            "IDs will be replaced by '{processID}:{version}' tag representation to avoid duplicates."
+        )
     )
 
 
@@ -4483,10 +4701,24 @@ class OWSExceptionResponse(ExtendedMappingSchema):
                                  description="Specific description of the error.")
 
 
+class ErrorCause(OneOfKeywordSchema):
+    _one_of = [
+        ExtendedSchemaNode(String(), description="Error message from exception or cause of failure."),
+        PermissiveMappingSchema(description="Relevant error fields with details about the cause."),
+    ]
+
+
 class ErrorJsonResponseBodySchema(ExtendedMappingSchema):
-    code = OWSErrorCode()
-    description = ExtendedSchemaNode(String(), description="Detail about the cause of error.")
+    schema_ref = f"{OGC_API_SCHEMA_URL}/{OGC_API_SCHEMA_VERSION}/core/openapi/schemas/exception.yaml"
+    description = "JSON schema for exceptions based on RFC 7807"
+    type = OWSErrorCode()
+    title = ExtendedSchemaNode(String(), description="Short description of the error.", missing=drop)
+    detail = ExtendedSchemaNode(String(), description="Detail about the error cause.", missing=drop)
+    status = ExtendedSchemaNode(Integer(), description="Error status code.", example=400)
+    cause = ErrorCause(missing=drop)
+    value = ErrorCause(missing=drop)
     error = ErrorDetail(missing=drop)
+    instance = ExtendedSchemaNode(String(), missing=drop)
     exception = OWSExceptionResponse(missing=drop)
 
 
@@ -4496,8 +4728,20 @@ class BadRequestResponseSchema(ExtendedMappingSchema):
     body = ErrorJsonResponseBodySchema()
 
 
+class ConflictRequestResponseSchema(ExtendedMappingSchema):
+    description = "Conflict between the affected entity an another existing definition."
+    header = ResponseHeaders()
+    body = ErrorJsonResponseBodySchema()
+
+
 class UnprocessableEntityResponseSchema(ExtendedMappingSchema):
     description = "Wrong format of given parameters."
+    header = ResponseHeaders()
+    body = ErrorJsonResponseBodySchema()
+
+
+class UnsupportedMediaTypeResponseSchema(ExtendedMappingSchema):
+    description = "Media-Type not supported for this request."
     header = ResponseHeaders()
     body = ErrorJsonResponseBodySchema()
 
@@ -4583,7 +4827,7 @@ class OkGetProviderProcessesSchema(ExtendedMappingSchema):
     body = ProviderProcessesSchema()
 
 
-class GetProcessesQuery(ProcessPagingQuery, ProcessDetailQuery):
+class GetProcessesQuery(ProcessPagingQuery, ProcessDetailQuery, ProcessRevisionsQuery):
     providers = ExtendedSchemaNode(
         QueryBoolean(), example=True, default=False, missing=drop,
         description="List local processes as well as all sub-processes of all registered providers. "
@@ -4637,6 +4881,7 @@ class OkGetProcessesListResponse(ExtendedMappingSchema):
 
 
 class OkPostProcessDeployBodySchema(ExtendedMappingSchema):
+    description = ExtendedSchemaNode(String(), description="Detail about the operation.")
     deploymentDone = ExtendedSchemaNode(Boolean(), default=False, example=True,
                                         description="Indicates if the process was successfully deployed.")
     processSummary = ProcessSummary(missing=drop, description="Deployed process summary if successful.")
@@ -4650,9 +4895,32 @@ class OkPostProcessesResponse(ExtendedMappingSchema):
     body = OkPostProcessDeployBodySchema()
 
 
+class OkPatchProcessUpdatedBodySchema(ExtendedMappingSchema):
+    description = ExtendedSchemaNode(String(), description="Detail about the operation.")
+    processSummary = ProcessSummary(missing=drop, description="Deployed process summary if successful.")
+
+
+class OkPatchProcessResponse(ExtendedMappingSchema):
+    description = "Process successfully updated."
+    header = ResponseHeaders()
+    body = OkPatchProcessUpdatedBodySchema()
+
+
 class BadRequestGetProcessInfoResponse(ExtendedMappingSchema):
     description = "Missing process identifier."
     body = NoContent()
+
+
+class NotFoundProcessResponse(ExtendedMappingSchema):
+    description = "Process with specified reference identifier does not exist."
+    examples = {
+        "ProcessNotFound": {
+            "summary": "Example response when specified process reference cannot be found.",
+            "value": EXAMPLES["local_process_not_found.json"]
+        }
+    }
+    header = ResponseHeaders()
+    body = ErrorJsonResponseBodySchema()
 
 
 class OkGetProcessInfoResponse(ExtendedMappingSchema):
@@ -5080,6 +5348,23 @@ post_processes_responses = {
             "value": EXAMPLES["local_process_deploy_success.json"],
         }
     }),
+    "400": BadRequestResponseSchema(description="Unable to parse process definition"),
+    "409": ConflictRequestResponseSchema(description="Process with same ID already exists."),
+    "415": UnsupportedMediaTypeResponseSchema(description="Unsupported Media-Type for process deployment."),
+    "422": UnprocessableEntityResponseSchema(description="Invalid schema for process definition."),
+    "500": InternalServerErrorResponseSchema(),
+}
+put_process_responses = copy(post_processes_responses)
+put_process_responses.update({
+    "404": NotFoundProcessResponse(description="Process to update could not be found."),
+    "409": ConflictRequestResponseSchema(description="Process with same ID or version already exists."),
+})
+patch_process_responses = {
+    "200": OkPatchProcessResponse(),
+    "400": BadRequestGetProcessInfoResponse(description="Unable to parse process definition"),
+    "404": NotFoundProcessResponse(description="Process to update could not be found."),
+    "409": ConflictRequestResponseSchema(description="Process with same ID or version already exists."),
+    "422": UnprocessableEntityResponseSchema(description="Invalid schema for process definition."),
     "500": InternalServerErrorResponseSchema(),
 }
 get_process_responses = {
@@ -5096,6 +5381,7 @@ get_process_responses = {
         }
     }),
     "400": BadRequestGetProcessInfoResponse(),
+    "404": NotFoundProcessResponse(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_process_package_responses = {

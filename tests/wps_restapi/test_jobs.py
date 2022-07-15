@@ -909,7 +909,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         """
         uri = sd.openapi_json_service.path
         resp = self.app.get(uri, headers=self.json_headers)
-        schema_prefix = sd.GetJobsQueries.__name__
+        schema_prefix = sd.GetProcessJobsQuery.__name__
         assert not resp.json["parameters"][f"{schema_prefix}.page"]["required"]
         assert not resp.json["parameters"][f"{schema_prefix}.limit"]["required"]
 

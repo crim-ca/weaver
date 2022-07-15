@@ -33,6 +33,10 @@ def includeme(config):
                     request_method="POST", renderer=OutputFormat.JSON)
     config.add_view(p.get_local_process, route_name=sd.process_service.name,
                     request_method="GET", renderer=OutputFormat.JSON)
+    config.add_view(p.patch_local_process, route_name=sd.process_service.name,
+                    request_method="PATCH", renderer=OutputFormat.JSON)
+    config.add_view(p.put_local_process, route_name=sd.process_service.name,
+                    request_method="PUT", renderer=OutputFormat.JSON)
     config.add_view(p.delete_local_process, route_name=sd.process_service.name,
                     request_method="DELETE", renderer=OutputFormat.JSON)
     config.add_view(p.get_local_process_package, route_name=sd.process_package_service.name,

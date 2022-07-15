@@ -1,31 +1,20 @@
 from typing import TYPE_CHECKING  # pragma: no cover
 
+# FIXME:
+#  replace invalid 'Optional' (type or None) used instead of 'NotRequired' (optional key) when better supported
+#  https://youtrack.jetbrains.com/issue/PY-53611/Support-PEP-655-typingRequiredtypingNotRequired-for-TypedDicts
 if TYPE_CHECKING:
     import os
     import sys
     import typing
     import uuid
     from datetime import datetime
+    from distutils.version import LooseVersion
     from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Type, Union
 
     import psutil
+    from typing_extensions import Literal, NotRequired, Protocol, TypeAlias, TypedDict
 
-    if hasattr(typing, "TypedDict"):
-        from typing import TypedDict  # pylint: disable=E0611,no-name-in-module  # Python >= 3.8
-    else:
-        from typing_extensions import TypedDict
-    if hasattr(typing, "Literal"):
-        from typing import Literal  # pylint: disable=E0611,no-name-in-module  # Python >= 3.8
-    else:
-        from typing_extensions import Literal
-    if hasattr(typing, "Protocol"):
-        from typing import Protocol  # pylint: disable=E0611,no-name-in-module  # Python >= 3.8
-    else:
-        from typing_extensions import Protocol
-    if hasattr(typing, "TypeAlias"):
-        from typing import TypeAlias  # pylint: disable=E0611,no-name-in-module  # Python >= 3.10
-    else:
-        from typing_extensions import TypeAlias
     if hasattr(os, "PathLike"):
         FileSystemPathType = Union[os.PathLike, str]
     else:
@@ -84,6 +73,7 @@ if TYPE_CHECKING:
     AnyValueType = Optional[ValueType]  # avoid naming ambiguity with PyWPS AnyValue
     AnyKey = Union[str, int]
     AnyUUID = Union[str, uuid.UUID]
+    AnyVersion = Union[LooseVersion, Number, str, Tuple[int, ...], List[int]]
     # add more levels of explicit definitions than necessary to simulate JSON recursive structure better than 'Any'
     # amount of repeated equivalent definition makes typing analysis 'work well enough' for most use cases
     _JSON: TypeAlias = "JSON"
@@ -98,15 +88,15 @@ if TYPE_CHECKING:
         "rel": str,
         "title": str,
         "href": str,
-        "hreflang": Optional[str],
-        "type": Optional[str],  # IANA Media-Type
+        "hreflang": NotRequired[str],
+        "type": NotRequired[str],  # IANA Media-Type
     }, total=False)
     Metadata = TypedDict("Metadata", {
         "title": str,
         "role": str,  # URL
         "value": str,
-        "lang": str,
-        "type": str,  # FIXME: relevant?
+        "lang": NotRequired[str],
+        "type": NotRequired[str],  # FIXME: relevant?
     }, total=False)
 
     LogLevelStr = Literal[
@@ -117,7 +107,11 @@ if TYPE_CHECKING:
 
     # CWL definition
     GlobType = TypedDict("GlobType", {"glob": Union[str, List[str]]}, total=False)
-    CWL_IO_FileValue = TypedDict("CWL_IO_FileValue", {"class": str, "path": str, "format": Optional[str]}, total=True)
+    CWL_IO_FileValue = TypedDict("CWL_IO_FileValue", {
+        "class": str,
+        "path": str,
+        "format": NotRequired[Optional[str]],
+    }, total=True)
     CWL_IO_Value = Union[AnyValueType, List[AnyValueType], CWL_IO_FileValue, List[CWL_IO_FileValue]]
     CWL_IO_NullableType = Union[str, List[str]]  # "<type>?" or ["<type>", "null"]
     CWL_IO_NestedType = TypedDict("CWL_IO_NestedType", {"type": CWL_IO_NullableType}, total=True)
@@ -133,21 +127,21 @@ if TYPE_CHECKING:
     CWL_IO_TypeItem = Union[str, CWL_IO_NestedType, CWL_IO_ArrayType, CWL_IO_EnumType]
     CWL_IO_DataType = Union[CWL_IO_TypeItem, List[CWL_IO_TypeItem]]
     CWL_Input_Type = TypedDict("CWL_Input_Type", {
-        "id": Optional[str],    # representation used by plain CWL definition
-        "name": Optional[str],  # representation used by parsed tool instance
+        "id": NotRequired[str],     # representation used by plain CWL definition
+        "name": NotRequired[str],   # representation used by parsed tool instance
         "type": CWL_IO_DataType,
-        "items": Union[str, CWL_IO_EnumType],
-        "symbols": Optional[CWL_IO_EnumSymbols],
-        "format": Optional[Union[str, List[str]]],
-        "inputBinding": Optional[Any],
-        "default": Optional[AnyValueType],
+        "items": NotRequired[Union[str, CWL_IO_EnumType]],
+        "symbols": NotRequired[CWL_IO_EnumSymbols],
+        "format": NotRequired[Optional[Union[str, List[str]]]],
+        "inputBinding": NotRequired[Any],
+        "default": NotRequired[Optional[AnyValueType]],
     }, total=False)
     CWL_Output_Type = TypedDict("CWL_Output_Type", {
-        "id": Optional[str],    # representation used by plain CWL definition
-        "name": Optional[str],  # representation used by parsed tool instance
+        "id": NotRequired[str],    # representation used by plain CWL definition
+        "name": NotRequired[str],  # representation used by parsed tool instance
         "type": CWL_IO_DataType,
-        "format": Optional[Union[str, List[str]]],
-        "outputBinding": Optional[GlobType]
+        "format": NotRequired[Optional[Union[str, List[str]]]],
+        "outputBinding": NotRequired[GlobType]
     }, total=False)
     CWL_Inputs = Union[List[CWL_Input_Type], Dict[str, CWL_Input_Type]]
     CWL_Outputs = Union[List[CWL_Output_Type], Dict[str, CWL_Output_Type]]
@@ -180,20 +174,21 @@ if TYPE_CHECKING:
         "class": CWL_Class,
         "label": str,
         "doc": str,
-        "id": Optional[str],
+        "id": NotRequired[str],
+        "intent": NotRequired[str],
         "s:keywords": List[str],
-        "baseCommand": Optional[Union[str, List[str]]],
-        "parameters": Optional[List[str]],
-        "requirements": CWL_AnyRequirements,
-        "hints": CWL_AnyRequirements,
+        "baseCommand": NotRequired[Optional[Union[str, List[str]]]],
+        "parameters": NotRequired[List[str]],
+        "requirements": NotRequired[CWL_AnyRequirements],
+        "hints": NotRequired[CWL_AnyRequirements],
         "inputs": CWL_Inputs,
         "outputs": CWL_Outputs,
-        "steps": Dict[CWL_WorkflowStepID, CWL_WorkflowStep],
-        "stderr": str,
-        "stdout": str,
-        "$namespaces": Dict[str, str],
-        "$schemas": Dict[str, str],
-        "$graph": CWL_Graph,
+        "steps": NotRequired[Dict[CWL_WorkflowStepID, CWL_WorkflowStep]],
+        "stderr": NotRequired[str],
+        "stdout": NotRequired[str],
+        "$namespaces": NotRequired[Dict[str, str]],
+        "$schemas": NotRequired[Dict[str, str]],
+        "$graph": NotRequired[CWL_Graph],
     }, total=False)
     CWL_WorkflowStepPackage = TypedDict("CWL_WorkflowStepPackage", {
         "id": str,          # reference ID of the package
@@ -220,12 +215,12 @@ if TYPE_CHECKING:
     CWL_RuntimeOutputFile = TypedDict("CWL_RuntimeOutputFile", {
         "class": str,
         "location": str,
-        "format": Optional[str],
+        "format": NotRequired[Optional[str]],
         "basename": str,
         "nameroot": str,
         "nameext": str,
-        "checksum": Optional[str],
-        "size": Optional[str]
+        "checksum": NotRequired[str],
+        "size": NotRequired[str]
     }, total=False)
     CWL_RuntimeInput = Union[CWL_RuntimeLiteral, CWL_RuntimeInputFile]
     CWL_RuntimeInputsMap = Dict[str, CWL_RuntimeInput]
@@ -291,39 +286,41 @@ if TYPE_CHECKING:
 
     # data source configuration
     DataSourceFileRef = TypedDict("DataSourceFileRef", {
-        "ades": str,                # target ADES to dispatch
-        "netloc": str,              # definition to match file references against
-        "default": Optional[bool],  # default ADES when no match was possible (single one allowed in config)
+        "ades": str,                    # target ADES to dispatch
+        "netloc": str,                  # definition to match file references against
+        "default": NotRequired[bool],   # default ADES when no match was possible (single one allowed in config)
     }, total=True)
     DataSourceOpenSearch = TypedDict("DataSourceOpenSearch", {
-        "ades": str,                     # target ADES to dispatch
-        "netloc": str,                   # where to send OpenSearch request
-        "collection_id": Optional[str],  # OpenSearch collection ID to match against
-        "default": Optional[bool],       # default ADES when no match was possible (single one allowed)
-        "accept_schemes": Optional[List[str]],     # allowed URL schemes (http, https, etc.)
-        "mime_types": Optional[List[str]],         # allowed Media-Types (text/xml, application/json, etc.)
-        "rootdir": str,                  # root position of the data to retrieve
-        "osdd_url": str,                 # global OpenSearch description document to employ
+        "ades": str,                                # target ADES to dispatch
+        "netloc": str,                              # where to send OpenSearch request
+        "collection_id": NotRequired[str],          # OpenSearch collection ID to match against
+        "default": NotRequired[bool],               # default ADES when no match was possible (single one allowed)
+        "accept_schemes": NotRequired[List[str]],   # allowed URL schemes (http, https, etc.)
+        "mime_types": NotRequired[List[str]],       # allowed Media-Types (text/xml, application/json, etc.)
+        "rootdir": str,                             # root position of the data to retrieve
+        "osdd_url": str,                            # global OpenSearch description document to employ
     }, total=True)
     DataSource = Union[DataSourceFileRef, DataSourceOpenSearch]
     DataSourceConfig = Dict[str, DataSource]  # JSON/YAML file contents
 
     JobValueFormat = TypedDict("JobValueFormat", {
-        "mime_type": Optional[str],
-        "media_type": Optional[str],
-        "encoding": Optional[str],
-        "schema": Optional[str],
-        "extension": Optional[str],
+        "mime_type": NotRequired[str],
+        "media_type": NotRequired[str],
+        "encoding": NotRequired[str],
+        "schema": NotRequired[str],
+        "extension": NotRequired[str],
     }, total=False)
     JobValueFile = TypedDict("JobValueFile", {
-        "href": Optional[str],
-        "format": Optional[JobValueFormat],
+        "href": str,
+        "format": NotRequired[JobValueFormat],
     }, total=False)
     JobValueData = TypedDict("JobValueData", {
-        "data": Optional[AnyValueType],
-        "value": Optional[AnyValueType],
+        "data": AnyValueType,
     }, total=False)
-    JobValueObject = Union[JobValueData, JobValueFile]
+    JobValueValue = TypedDict("JobValueValue", {
+        "value": AnyValueType,
+    }, total=False)
+    JobValueObject = Union[JobValueData, JobValueValue, JobValueFile]
     JobValueFileItem = TypedDict("JobValueFileItem", {
         "id": str,
         "href": Optional[str],
@@ -331,8 +328,11 @@ if TYPE_CHECKING:
     }, total=False)
     JobValueDataItem = TypedDict("JobValueDataItem", {
         "id": str,
-        "data": Optional[AnyValueType],
-        "value": Optional[AnyValueType],
+        "data": AnyValueType,
+    }, total=False)
+    JobValueValueItem = TypedDict("JobValueValueItem", {
+        "id": str,
+        "value": AnyValueType,
     }, total=False)
     JobValueItem = Union[JobValueDataItem, JobValueFileItem]
     JobExpectItem = TypedDict("JobExpectItem", {"id": str}, total=True)
@@ -355,13 +355,18 @@ if TYPE_CHECKING:
     ExecutionOutputsList = List[ExecutionOutputItem]
     ExecutionOutputsMap = Dict[str, ExecutionOutputObject]
     ExecutionOutputs = Union[ExecutionOutputsList, ExecutionOutputsMap]
-    ExecutionResultObject = TypedDict("ExecutionResultObject", {
-        "value": Optional[AnyValueType],
+    ExecutionResultObjectRef = TypedDict("ExecutionResultObjectRef", {
         "href": Optional[str],
-        "type": Optional[str],
+        "type": NotRequired[str],
     }, total=False)
+    ExecutionResultObjectValue = TypedDict("ExecutionResultObjectValue", {
+        "value": Optional[AnyValueType],
+        "type": NotRequired[str],
+    }, total=False)
+    ExecutionResultObject = Union[ExecutionResultObjectRef, ExecutionResultObjectValue]
     ExecutionResultArray = List[ExecutionResultObject]
-    ExecutionResults = Dict[str, Union[ExecutionResultObject, ExecutionResultArray]]
+    ExecutionResultValue = Union[ExecutionResultObject, ExecutionResultArray]
+    ExecutionResults = Dict[str, ExecutionResultValue]
 
     # reference employed as 'JobMonitorReference' by 'WPS1Process'
     JobExecution = TypedDict("JobExecution", {"execution": WPSExecution})
@@ -397,8 +402,8 @@ if TYPE_CHECKING:
         "sizeBytes": int,
     }, total=True)
     Statistics = TypedDict("Statistics", {
-        "application": Optional[ApplicationStatistics],
-        "process": Optional[ProcessStatistics],
+        "application": NotRequired[ApplicationStatistics],
+        "process": NotRequired[ProcessStatistics],
         "outputs": Dict[str, OutputStatistics],
     }, total=False)
 
@@ -418,36 +423,36 @@ if TYPE_CHECKING:
     }, total=False)
     OpenAPISchemaProperty = TypedDict("OpenAPISchemaProperty", {
         "type": OpenAPISchemaTypes,
-        "format": str,
-        "default": Any,
-        "example": Any,
-        "title": str,
-        "description": str,
-        "enum": List[Union[str, Number]],
-        "items": List[_OpenAPISchema, OpenAPISchemaReference],
-        "required": List[str],
-        "nullable": bool,
-        "deprecated": bool,
-        "readOnly": bool,
-        "writeOnly": bool,
-        "multipleOf": Number,
-        "minimum": Number,
-        "maximum": Number,
-        "exclusiveMinimum": bool,
-        "exclusiveMaximum": bool,
-        "minLength": Number,
-        "maxLength": Number,
-        "pattern": str,
-        "minItems": Number,
-        "maxItems": Number,
-        "uniqueItems": bool,
-        "minProperties": Number,
-        "maxProperties": Number,
-        "contentMediaType": str,
-        "contentEncoding": str,
-        "contentSchema": str,
-        "properties": Dict[str, _OpenAPISchemaProperty],
-        "additionalProperties": Union[bool, Dict[str, Union[_OpenAPISchema, OpenAPISchemaReference]]],
+        "format": NotRequired[str],
+        "default": NotRequired[Any],
+        "example": NotRequired[Any],
+        "title": NotRequired[str],
+        "description": NotRequired[str],
+        "enum": NotRequired[List[Union[str, Number]]],
+        "items": NotRequired[List[_OpenAPISchema, OpenAPISchemaReference]],
+        "required": NotRequired[List[str]],
+        "nullable": NotRequired[bool],
+        "deprecated": NotRequired[bool],
+        "readOnly": NotRequired[bool],
+        "writeOnly": NotRequired[bool],
+        "multipleOf": NotRequired[Number],
+        "minimum": NotRequired[Number],
+        "maximum": NotRequired[Number],
+        "exclusiveMinimum": NotRequired[bool],
+        "exclusiveMaximum": NotRequired[bool],
+        "minLength": NotRequired[Number],
+        "maxLength": NotRequired[Number],
+        "pattern": NotRequired[str],
+        "minItems": NotRequired[Number],
+        "maxItems": NotRequired[Number],
+        "uniqueItems": NotRequired[bool],
+        "minProperties": NotRequired[Number],
+        "maxProperties": NotRequired[Number],
+        "contentMediaType": NotRequired[str],
+        "contentEncoding": NotRequired[str],
+        "contentSchema": NotRequired[str],
+        "properties": NotRequired[Dict[str, _OpenAPISchemaProperty]],
+        "additionalProperties": NotRequired[Union[bool, Dict[str, Union[_OpenAPISchema, OpenAPISchemaReference]]]],
     }, total=False)
     OpenAPISchemaObject = TypedDict("OpenAPISchemaObject", {
         "type": Literal["object"],

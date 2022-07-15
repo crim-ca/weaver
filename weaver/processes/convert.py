@@ -2609,9 +2609,9 @@ def normalize_ordered_io(io_section, order_hints=None):
 
     First, converts I/O definitions defined as dictionary to an equivalent :class:`list` representation,
     in order to work only with a single representation method. The :class:`list` is chosen over :class:`dict` because
-    sequences can enforce a specific order, while mapping have no particular order. The list representation ensures
-    that I/O order is preserved when written to file and reloaded afterwards regardless of each server and/or library's
-    implementation of the mapping container.
+    sequences can enforce a specific order, while mapping (when saved as :term:`JSON` or :term:`YAML`) have no specific
+    order. The list representation ensures that I/O order is preserved when written to file and reloaded afterwards
+    regardless of server and/or library's implementation of the mapping container.
 
     If this function fails to correctly order any I/O or cannot correctly guarantee such result because of the provided
     parameters (e.g.: no hints given when required), the result will not break nor change the final processing behaviour

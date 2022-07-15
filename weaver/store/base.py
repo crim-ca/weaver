@@ -1,9 +1,11 @@
 import abc
 from typing import TYPE_CHECKING
 
+from weaver.utils import VersionFormat
+
 if TYPE_CHECKING:
     import datetime
-    from typing import Dict, List, Optional, Tuple, Union
+    from typing import Any, Dict, List, Optional, Tuple, Union
 
     from pyramid.request import Request
     from pywps import Process as ProcessWPS
@@ -12,6 +14,7 @@ if TYPE_CHECKING:
     from weaver.execute import AnyExecuteResponse
     from weaver.typedefs import (
         AnyUUID,
+        AnyVersion,
         ExecutionInputs,
         ExecutionOutputs,
         DatetimeIntervalType,
@@ -90,12 +93,24 @@ class StoreProcesses(StoreInterface):
                        limit=None,          # type: Optional[int]
                        sort=None,           # type: Optional[str]
                        total=False,         # type: bool
+                       revisions=False,     # type: bool
+                       process=None,        # type: Optional[str]
                        ):                   # type: (...) -> Union[List[Process], Tuple[List[Process], int]]
         raise NotImplementedError
 
     @abc.abstractmethod
     def fetch_by_id(self, process_id, visibility=None):
         # type: (str, Optional[AnyVisibility]) -> Process
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def find_versions(self, process_id, version_format=VersionFormat.OBJECT):
+        # type: (str, VersionFormat) -> List[AnyVersion]
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def update_version(self, process_id, version):
+        # type: (str, AnyVersion) -> Process
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -136,6 +151,11 @@ class StoreJobs(StoreInterface):
                  accept_language=None,      # type: Optional[str]
                  created=None,              # type: Optional[datetime.datetime]
                  ):                         # type: (...) -> Job
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def batch_update_jobs(self, job_filter, job_update):
+        # type: (Dict[str, Any], Dict[str, Any]) -> int
         raise NotImplementedError
 
     @abc.abstractmethod

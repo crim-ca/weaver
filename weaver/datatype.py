@@ -37,8 +37,11 @@ from weaver.processes.convert import get_field, json2oas_io, normalize_ordered_i
 from weaver.processes.types import ProcessType
 from weaver.quotation.status import QuoteStatus
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
+from weaver.store.base import StoreProcesses
 from weaver.utils import localize_datetime  # for backward compatibility of previously saved jobs not time-locale-aware
 from weaver.utils import (
+    VersionFormat,
+    as_version_major_minor_patch,
     fully_qualified_name,
     get_job_log_msg,
     get_log_date_fmt,
@@ -54,7 +57,7 @@ from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, IO, List, Optional, Union
+    from typing import Any, Callable, Dict, IO, Iterator, List, Optional, Tuple, Union
 
     from owslib.wps import WebProcessingService
 
@@ -68,6 +71,7 @@ if TYPE_CHECKING:
         AnyProcess,
         AnySettingsContainer,
         AnyUUID,
+        AnyVersion,
         ExecutionInputs,
         ExecutionOutputs,
         Number,
@@ -125,6 +129,21 @@ class DictBase(dict):
         _type = fully_qualified_name(self)
         _repr = dict.__repr__(self)
         return f"{_type} ({_repr})"
+
+    @classmethod
+    def properties(cls, fget=True, fset=True):
+        # type: (bool, bool) -> Iterator[str]
+        """
+        Get names of properties stored in the object, optionally filtered by read-only or write-only conditions.
+        """
+        return iter(
+            name for name, prop in inspect.getmembers(cls)
+            if not name.startswith("_") and isinstance(prop, property) and (
+                (fget and fset and prop.fget is not None and prop.fset is not None) or
+                (fget and not fset and prop.fget is not None and prop.fset is None) or
+                (not fget and fset and prop.fget is None and prop.fset is not None)
+            )
+        )
 
     def dict(self):
         # type: () -> AnyParams
@@ -462,9 +481,9 @@ class Service(Base):
 
         When metadata fetching is disabled, the generated summary will contain only information available locally.
 
-        :param container: employed to retrieve application settings.
-        :param fetch: indicates whether metadata should be fetched from remote.
-        :param ignore: indicates if failing metadata retrieval/parsing should be silently discarded or raised.
+        :param container: Employed to retrieve application settings.
+        :param fetch: Indicates whether metadata should be fetched from remote.
+        :param ignore: Indicates if failing metadata retrieval/parsing should be silently discarded or raised.
         :return: generated summary information.
         :raises ServiceParsingError:
             If the target service provider is not reachable, content is not parsable or any other error related to
@@ -581,7 +600,7 @@ class Service(Base):
 
 class Job(Base):
     """
-    Dictionary that contains OWS service jobs.
+    Dictionary that contains :term:`Job` details for local :term:`Process` or remote :term:`OWS` execution.
 
     It always has ``id`` and ``task_id`` keys.
     """
@@ -1765,40 +1784,94 @@ class Process(Base):
         if "id" not in self and "identifier" not in self:
             raise TypeError("'id' OR 'identifier' is required")
         if "id" not in self:
-            self["id"] = self.pop("identifier")
+            self.id = self.pop("identifier")
         if "package" not in self:
             raise TypeError("'package' is required")
 
-    @property
-    def id(self):
+    def _get_id(self):
         # type: () -> str
         return dict.__getitem__(self, "id")
 
+    def _set_id(self, _id):
+        # type: (str) -> None
+        self["id"] = _id
+
+    id = identifier = property(fget=_get_id, fset=_set_id, doc=(
+        "Unique process identifier with optional version number if it corresponds to an older revision."
+    ))
+
+    @classmethod
+    def split_version(cls, process_id):
+        # type: (str) -> Tuple[str, Optional[str]]
+        """
+        Split the tagged version from the :term:`Process` identifier considering any required special handling.
+
+        :returns: Process ID (only) and the version if any was available in tagged reference.
+        """
+        # note::
+        #   Consider 'urn:...' prefix that could cause ':' characters to be present although maybe no version in ID?
+        #   Mot currently permitted due to schema validation parsing of ID on deploy, but could become permitted...
+        result = process_id.rsplit(":", 1)
+        if not len(result) == 2:
+            return process_id, None
+        p_id, version = result
+        return (p_id, version) if all(str.isnumeric(part) for part in version.split(".")) else (process_id, None)
+
     @property
-    def identifier(self):
+    def latest(self):
+        # type: () -> bool
+        """
+        Checks if this :term:`Process` corresponds to the latest revision.
+        """
+        # if ID loaded from DB contains a version, it is not the latest by design
+        return self.split_version(self.id)[-1] is None
+
+    @property
+    def name(self):
         # type: () -> str
+        """
+        Obtain only the :term:`Process` name portion of the unique identifier.
+        """
+        if self.version:
+            return self.split_version(self.id)[0]
         return self.id
 
-    @identifier.setter
-    def identifier(self, value):
-        # type: (str) -> None
-        self["id"] = value
+    @property
+    def tag(self):
+        # type: () -> str
+        """
+        Full identifier including the version for an unique reference.
+        """
+        proc_id = self.split_version(self.id)[0]
+        # bw-compat, if no version available, no update was applied (single deploy)
+        # there is no need to define a tag as only one result can be found
+        # on next (if any) update request, this revision will be updated with a default version
+        if self.version is None:
+            return proc_id
+        version = as_version_major_minor_patch(self.version, VersionFormat.STRING)
+        return f"{proc_id}:{version}"
 
     @property
     def title(self):
         # type: () -> str
         return self.get("title", self.id)
 
-    @property
-    def abstract(self):
-        # type: () -> str
-        return self.get("abstract", "")
+    @title.setter
+    def title(self, title):
+        # type: (str) -> None
+        self["title"] = title
 
-    @property
-    def description(self):
-        # OGC-API-Processes v1 field representation
+    def _get_desc(self):
+        # type: () -> str
+        # OGC-API-Processes v1 field representation use 'description'
         # bw-compat with existing processes that defined it as abstract
-        return self.abstract or self.get("description", "")
+        return self.get("abstract", "") or self.get("description", "")
+
+    def _set_desc(self, description):
+        # type: (str) -> None
+        self["abstract"] = description
+
+    description = abstract = property(fget=_get_desc, fset=_set_desc, doc="Process description.")
 
     @property
     def keywords(self):
@@ -1809,15 +1882,32 @@ class Process(Base):
             self["keywords"] = keywords
         return dict.__getitem__(self, "keywords")
 
+    @keywords.setter
+    def keywords(self, keywords):
+        # type: (List[str]) -> None
+        self["keywords"] = list(set(sd.KeywordList().deserialize(keywords)))
+
     @property
     def metadata(self):
         # type: () -> List[Metadata]
         return self.get("metadata", [])
 
+    @metadata.setter
+    def metadata(self, metadata):
+        # type: (List[Metadata]) -> None
+        self["metadata"] = sd.MetadataList().deserialize(metadata)
+
     @property
     def version(self):
         # type: () -> Optional[str]
         return self.get("version")
+
+    @version.setter
+    def version(self, version):
+        # type: (AnyVersion) -> None
+        if not isinstance(version, str):
+            version = as_version_major_minor_patch(version, VersionFormat.STRING)
+        self["version"] = sd.Version().deserialize(version)
 
     @property
     def inputs(self):
@@ -1856,6 +1946,13 @@ class Process(Base):
                     _input["schema"] = self._decode(input_schema)
         return inputs
 
+    @inputs.setter
+    def inputs(self, inputs):
+        # type: (List[Dict[str, JSON]]) -> None
+        if not isinstance(inputs, list):
+            raise TypeError("Inputs container expected as list to normalize process definitions.")
+        self["inputs"] = inputs
+
     @property
     def outputs(self):
         # type: () -> Optional[List[Dict[str, JSON]]]
@@ -1885,6 +1982,13 @@ class Process(Base):
                 _output["schema"] = self._decode(output_schema)
         return outputs
 
+    @outputs.setter
+    def outputs(self, outputs):
+        # type: (List[Dict[str, JSON]]) -> None
+        if not isinstance(outputs, list):
+            raise TypeError("Outputs container expected as list to normalize process definitions.")
+        self["outputs"] = outputs
+
     @property
     def jobControlOptions(self):  # noqa: N802
         # type: () -> List[AnyExecuteControlOption]
@@ -1892,7 +1996,6 @@ class Process(Base):
         Control options that indicate which :term:`Job` execution modes are supported by the :term:`Process`.
 
         .. note::
-
             There are no official mentions about the ordering of ``jobControlOptions``.
             Nevertheless, it is often expected that the first item can be considered the default mode when none is
             requested explicitly (at execution time). With the definition of execution mode through the ``Prefer``
@@ -2103,6 +2206,7 @@ class Process(Base):
             "keywords": self.keywords,
             "metadata": self.metadata,
             "version": self.version,
+            "additional_links": self.additional_links,
             # escape potential OpenAPI JSON $ref in 'schema' also used by Mongo BSON
             "inputs": [self._encode(_input) for _input in self.inputs or []],
             "outputs": [self._encode(_output) for _output in self.outputs or []],
@@ -2151,6 +2255,12 @@ class Process(Base):
         """
         return sd.Process().deserialize(self.dict())
 
+    _links = property(
+        fget=lambda self: self.get("_links", []),
+        fset=lambda self, value: dict.__setitem__(self, "_links", value),
+        doc="Cache pre-computed links."
+    )
+
     def links(self, container=None):
         # type: (Optional[AnySettingsContainer]) -> List[Link]
         """
@@ -2158,12 +2268,18 @@ class Process(Base):
 
         :param container: object that helps retrieve instance details, namely the host URL.
         """
+        from weaver.database import get_db
+
+        if self._links:  # save re-computation time if already done
+            return self._links
+
         proc_desc = self.href(container)
         proc_list = proc_desc.rsplit("/", 1)[0]
         jobs_list = proc_desc + sd.jobs_service.path
         proc_exec = proc_desc + "/execution"
+        proc_self = (proc_list + "/" + self.tag) if self.version else proc_desc
         links = [
-            {"href": proc_desc, "rel": "self", "title": "Current process description."},
+            {"href": proc_self, "rel": "self", "title": "Current process description."},
             {"href": proc_desc, "rel": "process-meta", "title": "Process definition."},
             {"href": proc_exec, "rel": "http://www.opengis.net/def/rel/ogc/1.0/execute",
              "title": "Process execution endpoint for job submission."},
@@ -2173,6 +2289,28 @@ class Process(Base):
              "title": "List of job executions corresponding to this process."},
             {"href": proc_list, "rel": "up", "title": "List of processes registered under the service."},
         ]
+        if self.version:
+            proc_tag = f"{proc_list}/{self.tag}"
+            proc_hist = f"{proc_list}?detail=false&revisions=true&process={self.id}"
+            links.extend([
+                {"href": proc_tag, "rel": "working-copy", "title": "Tagged version of this process description."},
+                {"href": proc_desc, "rel": "latest-version", "title": "Most recent revision of this process."},
+                {"href": proc_hist, "rel": "version-history", "title": "Listing of all revisions of this process."},
+            ])
+            versions = get_db(container).get_store(StoreProcesses).find_versions(self.name, VersionFormat.OBJECT)
+            proc_ver = as_version_major_minor_patch(self.version, VersionFormat.OBJECT)
+            prev_ver = list(filter(lambda ver: ver < proc_ver, versions))
+            next_ver = list(filter(lambda ver: ver > proc_ver, versions))
+            if prev_ver:
+                proc_prev = f"{proc_desc}:{prev_ver[-1]!s}"
+                links.append(
+                    {"href": proc_prev, "rel": "predecessor-version", "title": "Previous revision of this process."}
+                )
+            if next_ver:
+                proc_next = f"{proc_desc}:{next_ver[0]!s}"
+                links.append(
+                    {"href": proc_next, "rel": "successor-version", "title": "Next revision of this process."}
+                )
         if self.service:
             api_base_url = proc_list.rsplit("/", 1)[0]
             wps_base_url = self.processEndpointWPS1.split("?")[0]
@@ -2192,10 +2330,34 @@ class Process(Base):
             link.setdefault("hreflang", AcceptLanguage.EN_CA)
         # add user-provided additional links, no type/hreflang added since we cannot guess them
         known_links = {link.get("rel") for link in links}
-        extra_links = self.get("additional_links", [])
+        extra_links = self.additional_links
         extra_links = [link for link in extra_links if link.get("rel") not in known_links]
         links.extend(extra_links)
+        self._links = links
         return links
+
+    @property
+    def additional_links(self):
+        # type: () -> List[Link]
+        return self.get("additional_links", [])
+
+    @additional_links.setter
+    def additional_links(self, links):
+        # type: (List[Link]) -> None
+        links = sd.LinkList().deserialize(links)
+        self["additional_links"] = []  # don't flag an existing rel that is about to be overridden as conflicting
+        self._links = []  # need recompute
+        all_rel = [link["rel"] for link in self.links()]
+        for link in links:
+            rel = link["rel"]
+            if rel in all_rel:
+                raise ValueError(
+                    f"Value of '{self.__name__}.additional_links' is not valid. "
+                    f"Unique links relations are required but '{rel}' is already taken."
+                )
+            all_rel.append(rel)
+        self["additional_links"] = links
+        self._links = []  # need recompute on future call
 
     def href(self, container=None):
         # type: (Optional[AnySettingsContainer]) -> str
@@ -2257,12 +2419,17 @@ class Process(Base):
         # process fields directly at root + I/O as mappings
         return sd.ProcessDescriptionOGC().deserialize(process)
 
-    def summary(self):
-        # type: () -> JSON
+    def summary(self, revision=False):
+        # type: (bool) -> JSON
         """
         Obtains the JSON serializable summary representation of the process.
+
+        :param revision: Replace the process identifier by the complete tag representation.
         """
-        return sd.ProcessSummary().deserialize(self.dict())
+        data = self.dict()
+        if revision:
+            data["id"] = self.tag
+        return sd.ProcessSummary().deserialize(data)
 
     @staticmethod
     def from_wps(wps_process, **extra_params):
