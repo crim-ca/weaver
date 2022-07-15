@@ -1706,11 +1706,10 @@ class WeaverSubParserAction(argparse._SubParsersAction):  # noqa
         parent_parsers = kwargs.get("parents", [])
         for _parser in [parser] + parent_parsers:
             sub_parser._formatters.update(_parser._formatters)
-        for _parser in [sub_parser] + parent_parsers:
             # propagate sub parser such that full '<main> <mode>' is used as program name if error
             for rule in _parser._rules:
                 rule = (sub_parser, *rule[1:])
-                parser._rules.add(rule)  # type: ignore
+                sub_parser._rules.add(rule)  # type: ignore
         return sub_parser
 
 
@@ -1729,7 +1728,7 @@ class WeaverArgumentParser(ArgumentParserFixedRequiredArgs, SubArgumentParserFix
 
     def add_subparsers(self, *args, **kwargs):  # type: ignore
         self.register("action", "parsers", WeaverSubParserAction)
-        group = super(WeaverArgumentParser, self).add_subparsers(*args, **kwargs)
+        group = super(WeaverArgumentParser, self).add_subparsers(*args, **kwargs)  # type: WeaverSubParserAction
         setattr(group, "parser", self)
         return group
 
@@ -1779,13 +1778,20 @@ class WeaverArgumentParser(ArgumentParserFixedRequiredArgs, SubArgumentParserFix
         # type: (Callable[[argparse.Namespace], Optional[bool]], str) -> None
         self._rules.add((self, rule, failure))
 
-    def parse_args(self, args=None, namespace=None):
-        # type: (Optional[Sequence[str]], Optional[argparse.Namespace]) -> argparse.Namespace
-        ns = super(WeaverArgumentParser, self).parse_args(args=args, namespace=namespace)
+    def parse_known_args(self, args=None, namespace=None):
+        # type: (Optional[Sequence[str]], Optional[argparse.Namespace]) -> Tuple[argparse.Namespace, Sequence[str]]
+        """
+        Parse argument actions with handling of additional rules if any were defined.
+
+        .. note::
+            It is important to derive and call :meth:`parse_known_args` rather than :meth:`parse_args` to ensure
+            nested subparsers rules validation can also be invoked.
+        """
+        ns, args = super(WeaverArgumentParser, self).parse_known_args(args=args, namespace=namespace)
         for container, rule, failure in self._rules:
             if rule(ns) not in [None, True]:
                 container.error(failure)
-        return ns
+        return ns, args
 
 
 def make_parser():
