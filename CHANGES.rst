@@ -30,6 +30,8 @@ Changes:
 
 Fixes:
 ------
+- Fix `CLI` not allowing expected combination of ``--username`` and ``--password`` for Docker authentication when
+  deploying a `Process` that needs it to retrieve the referenced repository and image in its `CWL` definition.
 - Fix invalid ``minimum`` and ``maximum`` OpenAPI fields that were defined as ``minLength`` and ``maxLength``
   (duplicates definitions) for `Process` description and deployment schema validation.
 

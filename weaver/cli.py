@@ -50,7 +50,7 @@ from weaver.visibility import Visibility
 from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Type, Union
+    from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Set, Tuple, Type, Union
 
     from requests import Response
 
@@ -81,6 +81,10 @@ if TYPE_CHECKING:
         AnyOutputFormat = str
         ProcessSchemaType = str
         StatusType = str
+
+    ConditionalGroup = Tuple[argparse._ActionsContainer, bool, bool]  # noqa
+    PostHelpFormatter = Callable[[str], str]
+    ArgumentParserRule = Tuple[argparse._ActionsContainer, Callable[[argparse.Namespace], Optional[bool]], str]  # noqa
 
 LOGGER = logging.getLogger(__name__)
 
@@ -1699,6 +1703,13 @@ class WeaverSubParserAction(argparse._SubParsersAction):  # noqa
         parser = getattr(self, "parser", None)  # type: WeaverArgumentParser
         sub_parser._conditional_groups = parser._conditional_groups
         sub_parser._help_mode = parser._help_mode
+        parent_parsers = kwargs.get("parents", [])
+        for _parser in [parser] + parent_parsers:
+            sub_parser._formatters.update(_parser._formatters)
+            # propagate sub parser such that full '<main> <mode>' is used as program name if error
+            for rule in _parser._rules:
+                rule = (sub_parser, *rule[1:])
+                sub_parser._rules.add(rule)  # type: ignore
         return sub_parser
 
 
@@ -1711,11 +1722,13 @@ class WeaverArgumentParser(ArgumentParserFixedRequiredArgs, SubArgumentParserFix
         # type: (Any, Any) -> None
         super(WeaverArgumentParser, self).__init__(*args, **kwargs)
         self._help_mode = False
-        self._conditional_groups = []
+        self._conditional_groups = set()    # type: Set[ConditionalGroup]
+        self._formatters = set()            # type: Set[PostHelpFormatter]
+        self._rules = set()                 # type: Set[ArgumentParserRule]
 
     def add_subparsers(self, *args, **kwargs):  # type: ignore
         self.register("action", "parsers", WeaverSubParserAction)
-        group = super(WeaverArgumentParser, self).add_subparsers(*args, **kwargs)
+        group = super(WeaverArgumentParser, self).add_subparsers(*args, **kwargs)  # type: WeaverSubParserAction
         setattr(group, "parser", self)
         return group
 
@@ -1736,8 +1749,15 @@ class WeaverArgumentParser(ArgumentParserFixedRequiredArgs, SubArgumentParserFix
     def add_help_conditional(self, container, help_required=True, use_required=False):
         # type: (argparse._ActionsContainer, bool, bool) -> argparse._ActionsContainer  # noqa
         setattr(container, "required", use_required)
-        self._conditional_groups.append((container, help_required, use_required))
+        self._conditional_groups.add((container, help_required, use_required))
         return container
+
+    def add_formatter(self, formatter):
+        # type: (Callable[[str], str]) -> None
+        """
+        Define a POST-help formatter.
+        """
+        self._formatters.add(formatter)
 
     def _get_formatter(self):
         # type: () -> argparse.HelpFormatter
@@ -1749,8 +1769,29 @@ class WeaverArgumentParser(ArgumentParserFixedRequiredArgs, SubArgumentParserFix
         # type: () -> str
         self.help_mode = True
         text = super(WeaverArgumentParser, self).format_help() + "\n"
+        for fmt in self._formatters:
+            text = fmt(text)
         self.help_mode = False
         return text
+
+    def add_rule(self, rule, failure):
+        # type: (Callable[[argparse.Namespace], Optional[bool]], str) -> None
+        self._rules.add((self, rule, failure))
+
+    def parse_known_args(self, args=None, namespace=None):
+        # type: (Optional[Sequence[str]], Optional[argparse.Namespace]) -> Tuple[argparse.Namespace, Sequence[str]]
+        """
+        Parse argument actions with handling of additional rules if any were defined.
+
+        .. note::
+            It is important to derive and call :meth:`parse_known_args` rather than :meth:`parse_args` to ensure
+            nested subparsers rules validation can also be invoked.
+        """
+        ns, args = super(WeaverArgumentParser, self).parse_known_args(args=args, namespace=namespace)
+        for container, rule, failure in self._rules:
+            if rule(ns) not in [None, True]:
+                container.error(failure)
+        return ns, args
 
 
 def make_parser():
@@ -1822,17 +1863,16 @@ def make_parser():
         title=docker_auth_title,
         description=docker_auth_desc,
     )
-    op_deploy_token = op_deploy_group.add_mutually_exclusive_group()
-    op_deploy_token.add_argument(
+    op_deploy_token = op_deploy_group.add_argument_group(title=docker_auth_title, description=docker_auth_desc)
+    op_deploy_creds = op_deploy_token.add_argument_group(title=docker_auth_title, description=docker_auth_desc)
+    op_deploy_tkt = op_deploy_token.add_argument(
         "-T", "--token", dest="token",
         help="Authentication token to retrieve a Docker image reference from a protected registry during execution."
     )
-    op_deploy_creds = op_deploy_token.add_argument_group(docker_auth_title, docker_auth_desc)
     op_deploy_usr = op_deploy_creds.add_argument(
         "-U", "--username", dest="username",
         help="Username to compute the authentication token for Docker image retrieval from a protected registry."
     )
-    op_deploy_group._group_actions.append(op_deploy_usr)
     op_deploy_pwd = op_deploy_creds.add_argument(
         "-P", "--password", dest="password",
         help="Password to compute the authentication token for Docker image retrieval from a protected registry."
@@ -1843,10 +1883,26 @@ def make_parser():
     # rendered group of *mutually required* arguments
     parser.add_help_conditional(op_deploy_creds)
     # following adjust references in order to make arguments appear within sections/groups as intended
-    op_deploy._mutually_exclusive_groups.append(op_deploy_creds)  # type: ignore
+    op_deploy_mutex_usr_tkt = op_deploy_group.add_mutually_exclusive_group()
+    op_deploy_mutex_usr_tkt._group_actions.append(op_deploy_usr)
+    op_deploy_mutex_usr_tkt._group_actions.append(op_deploy_tkt)
+    op_deploy_mutex_pwd_tkt = op_deploy_group.add_mutually_exclusive_group()
+    op_deploy_mutex_pwd_tkt._group_actions.append(op_deploy_pwd)
+    op_deploy_mutex_pwd_tkt._group_actions.append(op_deploy_tkt)
+    op_deploy_group._group_actions.append(op_deploy_usr)
     op_deploy_group._group_actions.append(op_deploy_pwd)
-    op_deploy_token._group_actions.append(op_deploy_usr)
-    op_deploy_token._group_actions.append(op_deploy_pwd)
+    op_deploy_group._group_actions.append(op_deploy_tkt)
+    # force a specific representation and validation of arguments to better reflect expected combinations
+    op_deploy.add_formatter(
+        lambda _help: _help.replace(
+            "[-T TOKEN] [-U USERNAME] [-P PASSWORD]",
+            "[-T TOKEN | ( -U USERNAME -P PASSWORD )]"
+        )
+    )
+    op_deploy.add_rule(
+        lambda _ns: bool(_ns.username) == bool(_ns.password),
+        "argument -U/--username: must be combined with -P/--password"
+    )
 
     op_deploy.add_argument(
         "-D", "--delete", "--undeploy", dest="undeploy", action="store_true",
