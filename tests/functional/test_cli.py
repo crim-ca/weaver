@@ -2,7 +2,6 @@
 Functional tests for :mod:`weaver.cli`.
 """
 import base64
-
 import contextlib
 import copy
 import json
