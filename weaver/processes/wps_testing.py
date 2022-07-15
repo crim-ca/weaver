@@ -21,7 +21,7 @@ class WpsTestProcess(Process):
 
         # remove duplicates/unsupported keywords
         title = kw.pop("title", kw.get("identifier"))
-        version = kw.pop("version", "0.0")
+        version = kw.pop("version", "0.0.0")
         kw.pop("inputs", None)
         kw.pop("outputs", None)
         kw.pop("payload", None)

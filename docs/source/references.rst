@@ -121,31 +121,35 @@
 .. _deploy-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Processes%2Fpaths%2F~1processes%2Fpost
 .. |getcap-req| replace:: ``GET {WEAVER_URL}/processes`` (GetCapabilities)
 .. _getcap-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Processes%2Fpaths%2F~1processes%2Fget
-.. |describe-req| replace:: ``GET {WEAVER_URL}/processes/{id}`` (DescribeProcess)
+.. |describe-req| replace:: ``GET {WEAVER_URL}/processes/{processID}`` (DescribeProcess)
 .. _describe-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Processes%2Fpaths%2F~1processes~1%7Bprocess_id%7D~1package%2Fget
+.. |update-req| replace:: ``PATCH {WEAVER_URL}/processes/{processID}`` (Update)
+.. _update-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Processes/paths/~1processes~1{process_id}/patch
+.. |replace-req| replace:: ``PUT {WEAVER_URL}/processes/{processID}`` (Replace)
+.. _replace-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Processes/paths/~1processes~1{process_id}/put
 .. |exec-req-name| replace:: Execute
 .. _exec-req-name: `exec-req`_
-.. |exec-req| replace:: ``POST {WEAVER_URL}/processes/{id}/execution`` (Execute)
+.. |exec-req| replace:: ``POST {WEAVER_URL}/processes/{processID}/execution`` (Execute)
 .. _exec-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Processes/paths/~1processes~1{process_id}~1execution/post
-.. |exec-req-job| replace:: ``POST {WEAVER_URL}/processes/{id}/jobs`` (Execute)
+.. |exec-req-job| replace:: ``POST {WEAVER_URL}/processes/{processID}/jobs`` (Execute)
 .. _exec-req-job: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Processes%2Fpaths%2F~1processes~1{process_id}~1jobs%2Fpost
-.. |vis-req| replace:: ``PUT {WEAVER_URL}/processes/{id}/visibility`` (Visibility)
+.. |vis-req| replace:: ``PUT {WEAVER_URL}/processes/{processID}/visibility`` (Visibility)
 .. _vis-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Processes%2Fpaths%2F~1processes~1%7Bprocess_id%7D~1visibility%2Fput
-.. |pkg-req| replace:: ``GET {WEAVER_URL}/processes/{id}/package`` (Package)
+.. |pkg-req| replace:: ``GET {WEAVER_URL}/processes/{processID}/package`` (Package)
 .. _pkg-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Processes%2Fpaths%2F~1processes~1%7Bprocess_id%7D~1package%2Fget
-.. |log-req| replace:: ``GET {WEAVER_URL}/processes/{id}/jobs/{id}/logs`` (GetLogs)
+.. |log-req| replace:: ``GET {WEAVER_URL}/processes/{processID}/jobs/{jobID}/logs`` (GetLogs)
 .. _log-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Logs%2Fpaths%2F~1processes~1%7Bprocess_id%7D~1jobs~1%7Bjob_id%7D~1logs%2Fget
-.. |except-req| replace:: ``GET {WEAVER_URL}/processes/{id}/jobs/{id}/exceptions`` (GetLogs)
+.. |except-req| replace:: ``GET {WEAVER_URL}/processes/{processID}/jobs/{jobID}/exceptions`` (GetLogs)
 .. _except-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Logs%2Fpaths%2F~1processes~1%7Bprocess_id%7D~1jobs~1%7Bjob_id%7D~1logs%2Fget
 .. |status-req-name| replace:: Status
 .. _status-req-name: `status-req`_
-.. |status-req| replace:: ``GET {WEAVER_URL}/processes/{id}/jobs/{id}`` (GetStatus)
+.. |status-req| replace:: ``GET {WEAVER_URL}/processes/{processID}/jobs/{jobID}`` (GetStatus)
 .. _status-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Status%2Fpaths%2F~1processes~1{process_id}~1jobs~1{job_id}%2Fget
-.. |inputs-req| replace:: ``GET {WEAVER_URL}/jobs/{id}/inputs`` (Inputs)
+.. |inputs-req| replace:: ``GET {WEAVER_URL}/jobs/{jobID}/inputs`` (Inputs)
 .. _inputs-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/inputs/paths/~1jobs~1{job_id}~1inputs/get
-.. |outputs-req| replace:: ``GET {WEAVER_URL}/jobs/{id}/outputs`` (Outputs)
+.. |outputs-req| replace:: ``GET {WEAVER_URL}/jobs/{jobID}/outputs`` (Outputs)
 .. _outputs-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/outputs/paths/~1jobs~1{job_id}~1outputs/get
-.. |results-req| replace:: ``GET {WEAVER_URL}/jobs/{id}/results`` (Results)
+.. |results-req| replace:: ``GET {WEAVER_URL}/jobs/{jobID}/results`` (Results)
 .. _results-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Results/paths/~1jobs~1{job_id}~1results/get
 .. |update-token-req| replace:: Update Token
 .. _update-token-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/UpdateToken/paths/~1processes~1{process_id}/put

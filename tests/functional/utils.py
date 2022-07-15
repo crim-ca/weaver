@@ -32,8 +32,9 @@ from weaver.visibility import Visibility
 
 if TYPE_CHECKING:
     from typing import Any, Dict, Optional, Union
+    from typing_extensions import Literal
 
-    from weaver.typedefs import AnyRequestMethod, AnyResponseType, JSON, Literal, SettingsType
+    from weaver.typedefs import AnyRequestMethod, AnyResponseType, JSON, SettingsType
 
     ReferenceType = Literal["deploy", "describe", "execute", "package"]
 

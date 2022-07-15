@@ -245,6 +245,10 @@ class TestWeaverClient(TestWeaverClientBase):
 
     def test_describe(self):
         result = mocked_sub_requests(self.app, self.client.describe, self.test_process["Echo"])
+        assert self.test_payload["Echo"]["processDescription"]["process"]["version"] == "1.0", (
+            "Original version submitted should be partial."
+        )
+
         assert result.success
         # see deployment file for details that are expected here
         assert result.body["id"] == self.test_process["Echo"]
@@ -261,7 +265,9 @@ class TestWeaverClient(TestWeaverClientBase):
         assert result.body["outputs"]["output"]["description"] == "Output file with echo message."
         assert result.body["outputs"]["output"]["formats"] == [{"default": True, "mediaType": ContentType.TEXT_PLAIN}]
         assert "undefined" not in result.message, "CLI should not have confused process description as response detail."
-        assert "description" not in result.body, "CLI should not have overridden the process description field."
+        assert result.body["description"] == (
+            "Dummy process that simply echo's back the input message for testing purposes."
+        ), "CLI should not have overridden the process description field."
 
     def run_execute_inputs_schema_variant(self, inputs_param, process="Echo",
                                           preload=False, location=False, expect_success=True, mock_exec=True):

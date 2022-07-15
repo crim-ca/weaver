@@ -510,7 +510,7 @@ int-import-graph=
 
 # Force import order to recognize a module as part of the standard
 # compatibility libraries.
-known-standard-library=posixpath
+known-standard-library=posixpath,typing,typing_extensions
 
 # Force import order to recognize a module as part of a third party library.
 known-third-party=enchant,cornice_swagger,cwltool,cwt,docker
