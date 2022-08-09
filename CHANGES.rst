@@ -12,7 +12,8 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add `CLI` support for remote `Provider` processes listing, registration, un-registration and execution.
+- Add `CLI` options for `Process` listing with detailed descriptions, paging, limit and sorting queries.
 
 Fixes:
 ------

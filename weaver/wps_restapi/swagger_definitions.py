@@ -147,6 +147,9 @@ PROCESS_DESCRIPTION_FIELD_AFTER_OLD_SCHEMA = ["links"]
 PROCESS_IO_FIELD_FIRST = ["id", "title", "description", "minOccurs", "maxOccurs"]
 PROCESS_IO_FIELD_AFTER = ["literalDataDomains", "formats", "crs", "bbox"]
 
+PROCESSES_LISTING_FIELD_FIRST = ["description", "processes", "providers"]
+PROCESSES_LISTING_FIELD_AFTER = ["page", "limit", "total", "links"]
+
 PROVIDER_DESCRIPTION_FIELD_FIRST = [
     "id",
     "title",
@@ -160,6 +163,9 @@ PROVIDER_DESCRIPTION_FIELD_FIRST = [
     "metadata",
 ]
 PROVIDER_DESCRIPTION_FIELD_AFTER = ["links"]
+
+JOBS_LISTING_FIELD_FIRST = ["description", "jobs", "groups"]
+JOBS_LISTING_FIELD_AFTER = ["page", "limit", "total", "links"]
 
 #########################################################
 # Examples
@@ -3099,6 +3105,9 @@ class GetQueriedJobsSchema(OneOfKeywordSchema):
                                description="Total number of matched jobs regardless of grouping or paging result.")
     links = LinkList(missing=drop)
 
+    _sort_first = JOBS_LISTING_FIELD_FIRST
+    _sort_after = JOBS_LISTING_FIELD_AFTER
+
 
 class DismissedJobSchema(ExtendedMappingSchema):
     status = JobStatusEnum()
@@ -4870,8 +4879,8 @@ class ProcessListingMetadata(ExtendedMappingSchema):
 
 
 class MultiProcessesListing(DescriptionSchema, ProcessCollection, ProvidersProcessesCollection, ProcessListingMetadata):
-    _sort_first = ["description", "processes"]
-    _sort_after = ["links"]
+    _sort_first = PROCESSES_LISTING_FIELD_FIRST
+    _sort_after = PROCESSES_LISTING_FIELD_AFTER
 
 
 class OkGetProcessesListResponse(ExtendedMappingSchema):

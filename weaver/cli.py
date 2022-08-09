@@ -32,6 +32,7 @@ from weaver.processes.convert import (
 from weaver.processes.utils import get_process_information
 from weaver.processes.wps_package import get_process_definition
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
+from weaver.sort import Sort, SortMethods
 from weaver.utils import (
     fetch_file,
     fully_qualified_name,
@@ -508,6 +509,10 @@ class WeaverClient(object):
             return {sd.XAuthDockerHeader.name: f"Basic {token}"}
         return {}
 
+    def register(self):  # TODO
+
+    def unregister(self):  # TODO
+
     def deploy(self,
                process_id=None,     # type: Optional[str]
                body=None,           # type: Optional[Union[JSON, str]]
@@ -629,7 +634,12 @@ class WeaverClient(object):
                      headers=None,          # type: Optional[AnyHeadersContainer]
                      with_links=True,       # type: bool
                      with_headers=False,    # type: bool
+                     with_providers=False,  # type: bool
                      output_format=None,    # type: Optional[AnyOutputFormat]
+                     sort=None,             # type: Optional[Sort]
+                     page=None,             # type: Optional[int]
+                     limit=None,            # type: Optional[int]
+                     detail=False,          # type: bool
                      ):                     # type: (...) -> OperationResult
         """
         List all available :term:`Process` on the instance.
@@ -646,12 +656,21 @@ class WeaverClient(object):
             Note that this can break functionalities if expected headers are overridden. Use with care.
         :param with_links: Indicate if ``links`` section should be preserved in returned result body.
         :param with_headers: Indicate if response headers should be returned in result output.
+        :param with_providers: Indicate if remote providers should be listed as well along with local processes.
         :param output_format: Select an alternate output representation of the result body contents.
+        :param sort: Sorting field to list processes. Name must be one of the fields supported by process objects.
+        :param page: Paging index to list processes.
+        :param limit: Amount of processes to list per page.
+        :param detail: Obtain detailed process descriptions.
         :returns: Results of the operation.
         """
         base = self._get_url(url)
         path = f"{base}/processes"
-        query = {"detail": False}  # not supported by non-Weaver, but save the work if possible
+        # queries not supported by non-Weaver, but default values save extra work if possible
+        query = {"detail": detail, "providers": with_providers}
+        query.update({
+            name: param for name, param in [("sort", sort), ("page", page), ("limit", limit)] if param is not None
+        })
         resp = self._request("GET", path, params=query, headers=self._headers, x_headers=headers,
                              settings=self._settings, auth=auth)
         result = self._parse_result(resp)
@@ -659,8 +678,17 @@ class WeaverClient(object):
             return result
         body = resp.json()
         processes = body.get("processes")
-        if isinstance(processes, list) and all(isinstance(proc, dict) for proc in processes):
-            body = [get_any_id(proc) for proc in processes]
+        providers = body.get("providers")
+        # in case the instance does not support 'detail' query and returns full-detail process/provider descriptions,
+        # generate the corresponding ID-only listing by extracting the relevant components
+        if not detail and isinstance(processes, list) and all(isinstance(proc, dict) for proc in processes):
+            body["processes"] = [get_any_id(proc) for proc in processes]
+        if not detail and isinstance(providers, list) and all(isinstance(prov, dict) for prov in providers):
+            if all(isinstance(proc, dict) for prov in providers for proc in prov.get("processes", [])):
+                body["providers"] = [
+                    {"id": get_any_id(prov), "processes": [get_any_id(proc) for proc in prov.get("processes", [])]}
+                    for prov in providers
+                ]
         return self._parse_result(resp, body=body, output_format=output_format,
                                   with_links=with_links, with_headers=with_headers)
 
@@ -671,6 +699,7 @@ class WeaverClient(object):
 
     def describe(self,
                  process_id,                # type: str
+                 provider_id=None,          # type: Optional[str]
                  url=None,                  # type: Optional[str]
                  auth=None,                 # type: Optional[AuthHandler]
                  headers=None,              # type: Optional[AnyHeadersContainer]
@@ -685,7 +714,8 @@ class WeaverClient(object):
         .. seealso::
             :ref:`proc_op_describe`
 
-        :param process_id: Identifier of the process to describe.
+        :param process_id: Identifier of the local or remote process to describe.
+        :param provider_id: Identifier of the provider from which to locate a remote process to describe.
         :param url: Instance URL if not already provided during client creation.
         :param auth:
             Instance authentication handler if not already created during client creation.
@@ -699,8 +729,7 @@ class WeaverClient(object):
         :param output_format: Select an alternate output representation of the result body contents.
         :returns: Results of the operation.
         """
-        base = self._get_url(url)
-        path = f"{base}/processes/{process_id}"
+        path = self._get_process_url(url, process_id, provider_id)
         query = None
         schema = ProcessSchema.get(schema)
         if schema:
@@ -711,6 +740,15 @@ class WeaverClient(object):
         # rather than a generic response 'description'. Enforce the provided message to avoid confusion.
         return self._parse_result(resp, message="Retrieving process description.", output_format=output_format,
                                   with_links=with_links, with_headers=with_headers)
+
+    def _get_process_url(self, url, process_id, provider_id=None):
+        # type: (str, str, Optional[str]) -> str
+        base = self._get_url(url)
+        if provider_id:
+            path = f"{base}/providers/{provider_id}/processes/{process_id}"
+        else:
+            path = f"{base}/processes/{process_id}"
+        return path
 
     @staticmethod
     def _parse_inputs(inputs):
@@ -825,6 +863,7 @@ class WeaverClient(object):
 
     def execute(self,
                 process_id,             # type: str
+                provider_id=None,       # type: Optional[str]
                 inputs=None,            # type: Optional[Union[str, JSON]]
                 monitor=False,          # type: bool
                 timeout=None,           # type: Optional[int]
@@ -840,13 +879,13 @@ class WeaverClient(object):
         """
         Execute a :term:`Job` for the specified :term:`Process` with provided inputs.
 
-        When submitting inputs with :term:`OGC API - Processes` schema, top-level ``inputs`` key is expected.
-        Under it, either the mapping (key-value) or listing (id,value) representation are accepted.
-        If ``inputs`` is not found, the alternative :term:`CWL` will be assumed.
+        When submitting inputs with :term:`OGC API - Processes` schema, top-level ``inputs`` field is expected.
+        Under this field, either the :term:`OGC` mapping (key-value) or listing (id,value) representations are accepted.
 
+        If the top-level ``inputs`` field is not found, the alternative :term:`CWL` representation will be assumed.
         When submitting inputs with :term:`CWL` *job* schema, plain key-value(s) pairs are expected.
-        All values should be provided directly under the key (including arrays), except for ``File``
-        type that must include the ``class`` and ``path`` details.
+        All values should be provided directly under the key (including arrays), except for ``File`` type that must
+        include details as the ``class: File`` and ``path`` with location.
 
         .. seealso::
             :ref:`proc_op_execute`
@@ -857,7 +896,8 @@ class WeaverClient(object):
             over servers that could decide to ignore sync/async preferences, and avoids closing/timeout connection
             errors that could occur for long running processes, since status is pooled iteratively rather than waiting.
 
-        :param process_id: Identifier of the process to execute.
+        :param process_id: Identifier of the local or remote process to execute.
+        :param provider_id: Identifier of the provider from which to locate a remote process to execute.
         :param inputs:
             Literal :term:`JSON` or :term:`YAML` contents of the inputs submitted and inserted into the execution body,
             using either the :term:`OGC API - Processes` or :term:`CWL` format, or a file path/URL referring to them.
@@ -905,7 +945,7 @@ class WeaverClient(object):
             "outputs": {}
         }
         # omit x-headers on purpose for 'describe', assume they are intended for 'execute' operation only
-        result = self.describe(process_id, url=base, auth=auth)
+        result = self.describe(process_id, provider_id=provider_id, url=base, auth=auth)
         if not result.success:
             return OperationResult(False, "Could not obtain process description for execution.",
                                    body=result.body, headers=result.headers, code=result.code, text=result.text)
@@ -925,11 +965,12 @@ class WeaverClient(object):
             data["outputs"][output_id] = {"transmissionMode": out_mode}
 
         LOGGER.info("Executing [%s] with inputs:\n%s", process_id, OutputFormat.convert(values, OutputFormat.JSON_STR))
-        path = f"{base}/processes/{process_id}/execution"  # use OGC-API compliant endpoint (not '/jobs')
+        desc_url = self._get_process_url(base, process_id, provider_id)
+        exec_url = f"{desc_url}/execution"  # use OGC-API compliant endpoint (not '/jobs')
         exec_headers = {"Prefer": "respond-async"}  # for more recent servers, OGC-API compliant async request
         exec_headers.update(self._headers)
         exec_headers.update(auth_headers)
-        resp = self._request("POST", path, json=data, headers=exec_headers, x_headers=headers,
+        resp = self._request("POST", exec_url, json=data, headers=exec_headers, x_headers=headers,
                              settings=self._settings, auth=auth)
         result = self._parse_result(resp, with_links=with_links, with_headers=with_headers, output_format=output_format)
         if not monitor or not result.success:
@@ -1015,6 +1056,7 @@ class WeaverClient(object):
              with_links=True,       # type: bool
              with_headers=False,    # type: bool
              output_format=None,    # type: Optional[AnyOutputFormat]
+             sort=None,             # type: Optional[Sort]
              page=None,             # type: Optional[int]
              limit=None,            # type: Optional[int]
              status=None,           # type: Optional[StatusType]
@@ -1037,6 +1079,7 @@ class WeaverClient(object):
         :param with_links: Indicate if ``links`` section should be preserved in returned result body.
         :param with_headers: Indicate if response headers should be returned in result output.
         :param output_format: Select an alternate output representation of the result body contents.
+        :param sort: Sorting field to list jobs. Name must be one of the fields supported by job objects.
         :param page: Paging index to list jobs.
         :param limit: Amount of jobs to list per page.
         :param status: Filter job listing only to matching status.
@@ -1052,6 +1095,8 @@ class WeaverClient(object):
             query["page"] = page
         if isinstance(limit, int) and limit > 0:
             query["limit"] = limit
+        if sort is not None:
+            query["sort"] = sort
         if isinstance(status, str) and status:
             query["status"] = map_status(status)
         if isinstance(detail, bool) and detail:
@@ -1440,6 +1485,28 @@ def add_shared_options(parser):
     )
 
 
+def add_listing_options(parser, item):
+    # type: (argparse.ArgumentParser, str) -> None
+    parser.add_argument(
+        "-P", "--page", dest="page", type=int,
+        help=f"Specify the paging index for {item} listing."
+    )
+    parser.add_argument(
+        "-N", "--number", "--limit", dest="limit", type=int,
+        help=f"Specify the amount of {item} to list per page."
+    )
+    parser.add_argument(
+        "-D", "--detail", dest="detail", action="store_true", default=False,
+        help=f"Obtain detailed {item} descriptions instead of only their ID."
+    )
+    sort_methods = SortMethods.get(item)
+    if sort_methods:
+        parser.add_argument(
+            "-O", "--order", "--sort", dest="sort", choices=sort_methods, type=str.lower,
+            help=f"Sorting field to list {item}. Name must be one of the fields supported by {item} objects."
+        )
+
+
 def parse_auth(kwargs):
     # type: (Dict[str, Union[Type[AuthHandler], str, None]]) -> Optional[AuthHandler]
     """
@@ -1486,6 +1553,18 @@ def parse_auth(kwargs):
         auth_handler = auth_handler(**auth_kwargs)
     LOGGER.info("Will use specified Authentication Handler [%s] with provided options.", auth_handler_name)
     return auth_handler
+
+
+def add_provider_param(parser, description=None, required=True):
+    # type: (argparse.ArgumentParser, Optional[str], bool) -> None
+    operation = parser.prog.split(" ")[-1]
+    parser.add_argument(
+        "-pI", "--provider", dest="provider_id", required=required,
+        help=description if description else (
+            "Identifier of a remote provider under which the referred process "
+            f"can be found to run {operation} operation."
+        )
+    )
 
 
 def add_process_param(parser, description=None, required=True):
@@ -1558,7 +1637,7 @@ class ValidateMethodAction(argparse.Action):
         setattr(namespace, self.dest, values)
 
 
-class ValidateHeaderAction(argparse._AppendAction):  # noqa
+class ValidateHeaderAction(argparse._AppendAction):  # noqa: W0212
     def __call__(self, parser, namespace, values, option_string=None):
         # type: (argparse.ArgumentParser, argparse.Namespace, Union[str, Sequence[Any], None], Optional[str]) -> None
 
@@ -1697,7 +1776,7 @@ class ArgumentParserFixedRequiredArgs(argparse.ArgumentParser):
         return action
 
 
-class WeaverSubParserAction(argparse._SubParsersAction):  # noqa
+class WeaverSubParserAction(argparse._SubParsersAction):  # noqa: W0212
     def add_parser(self, *args, **kwargs):  # type: ignore
         sub_parser = super(WeaverSubParserAction, self).add_parser(*args, **kwargs)
         parser = getattr(self, "parser", None)  # type: WeaverArgumentParser
@@ -1919,6 +1998,30 @@ def make_parser():
     add_shared_options(op_undeploy)
     add_process_param(op_undeploy)
 
+    op_register = WeaverArgumentParser(
+        "register",
+        description="Register a remote provider.",
+        formatter_class=ParagraphFormatter,
+    )
+    set_parser_sections(op_register)
+    add_url_param(op_register)
+    add_shared_options(op_register)
+    add_provider_param(op_register)
+    op_register.add_argument(
+        "-pU", "--provider-url", dest="provider_url", required=True,
+        help="Endpoint URL of the remote provider to register."
+    )
+
+    op_unregister = WeaverArgumentParser(
+        "unregister",
+        description="Unregister a remote provider.",
+        formatter_class=ParagraphFormatter,
+    )
+    set_parser_sections(op_unregister)
+    add_url_param(op_unregister)
+    add_shared_options(op_unregister)
+    add_provider_param(op_unregister)
+
     op_capabilities = WeaverArgumentParser(
         "capabilities",
         description="List available processes.",
@@ -1927,6 +2030,13 @@ def make_parser():
     set_parser_sections(op_capabilities)
     add_url_param(op_capabilities)
     add_shared_options(op_capabilities)
+    add_listing_options(op_capabilities, item="process")
+    prov_args_grp = op_capabilities.add_argument_group(title="", description="")
+    prov_show_grp = prov_args_grp.add_mutually_exclusive_group()
+    prov_show_grp.add_argument("-nP", "--no-providers", dest="with_providers", action="store_false", default=False,
+                               help="Omit \"providers\" listing from returned result body (default).")
+    prov_show_grp.add_argument("-wP", "--with-providers", dest="with_providers", action="store_true",
+                               help="Include \"providers\" listing in returned result body along with local processes.")
 
     op_describe = WeaverArgumentParser(
         "describe",
@@ -1937,6 +2047,7 @@ def make_parser():
     add_url_param(op_describe)
     add_shared_options(op_describe)
     add_process_param(op_describe)
+    add_provider_param(op_describe, required=False)
     op_describe.add_argument(
         "-S", "--schema", dest="schema", choices=ProcessSchema.values(), type=str.upper, default=ProcessSchema.OGC,
         help="Representation schema of the returned process description (default: %(default)s, case-insensitive)."
@@ -1951,6 +2062,7 @@ def make_parser():
     add_url_param(op_execute)
     add_shared_options(op_execute)
     add_process_param(op_execute)
+    add_provider_param(op_execute, required=False)
     op_execute.add_argument(
         "-I", "--inputs", dest="inputs",
         required=True, nargs=1, action="append",  # collect max 1 item per '-I', but allow many '-I'
@@ -2033,21 +2145,10 @@ def make_parser():
     set_parser_sections(op_jobs)
     add_url_param(op_jobs, required=True)
     add_shared_options(op_jobs)
-    op_jobs.add_argument(
-        "-P", "--page", dest="page", type=int,
-        help="Specify the paging index for listing jobs."
-    )
-    op_jobs.add_argument(
-        "-N", "--number", "--limit", dest="limit", type=int,
-        help="Specify the amount of jobs to list per page."
-    )
+    add_listing_options(op_jobs, item="job")
     op_jobs.add_argument(
         "-S", "--status", dest="status", choices=Status.values(), type=str.lower,
         help="Filter job listing only to matching status."
-    )
-    op_jobs.add_argument(
-        "-D", "--detail", dest="detail", action="store_true",
-        help="Obtain detailed job descriptions."
     )
     op_jobs.add_argument(
         "-G", "--groups", dest="groups", action="store_true",
@@ -2136,6 +2237,8 @@ def make_parser():
     operations = [
         op_deploy,
         op_undeploy,
+        op_register,
+        op_unregister,
         op_capabilities,
         op_describe,
         op_execute,
