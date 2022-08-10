@@ -73,7 +73,6 @@ class TestWeaverClientBase(WpsConfigBase, ResourcesUtil):
 
     def setUp(self):
         self.service_store.clear_services()
-        self.job_store.clear_jobs()
 
         processes = self.process_store.list_processes()
         test_processes = filter(lambda _proc: _proc.id.startswith(self.test_process_prefix), processes)
