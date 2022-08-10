@@ -1146,7 +1146,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         """
         body = {
             "processDescription": {
-                "id": resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID,            # must tell which process from GetCapabilities
+                "id": resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID,    # must tell which process from GetCapabilities
                 "href": resources.TEST_REMOTE_SERVER_WPS1_GETCAP_URL,  # this one should be used
             },
             "executionUnit": [{"href": resources.TEST_REMOTE_SERVER_URL}]  # some URL just to fulfill schema validation
