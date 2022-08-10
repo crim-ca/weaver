@@ -25,6 +25,9 @@ Fixes:
 ------
 - Fix invalid ``POST /providers/{provider_id}/processes/{process_id}/execution`` endpoint that was missing
   the `Process` portion to mimic the `OGC API - Processes` execution endpoint of a `Job` for a remote `Provider`.
+- Fix result file names resolution for staging outputs retrieved from the `Job` execution on a remote `Provider` where
+  the `Process` outputs files are not generated using the same glob naming convention as expected by the `CWL` outputs
+  of the corresponding `Process`.
 
 .. _changes_4.20.0:
 

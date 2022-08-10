@@ -197,8 +197,8 @@ if TYPE_CHECKING:
     CWL_WorkflowStepPackageMap = Dict[CWL_WorkflowStepID, CWL_WorkflowStepPackage]
 
     # CWL loading
-    CWL_WorkflowInputs = Dict[str, AnyValueType]   # mapping of ID:value
-    CWL_ExpectedOutputs = Dict[str, AnyValueType]  # mapping of ID:value
+    CWL_WorkflowInputs = Dict[str, AnyValueType]   # mapping of ID:value (any type)
+    CWL_ExpectedOutputs = Dict[str, AnyValueType]  # mapping of ID:pattern (File only)
     CWL_ToolPathObjectType = Dict[str, Any]
     JobProcessDefinitionCallback = Callable[[str, Dict[str, str], Dict[str, Any]], WpsProcessInterface]
 

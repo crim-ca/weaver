@@ -51,7 +51,7 @@ if TYPE_CHECKING:
 
     from weaver.typedefs import (
         AnyValueType,
-        CWL_ExpectedOutputs,
+        CWL_Output_Type,
         CWL_ToolPathObjectType,
         JobProcessDefinitionCallback,
     )
@@ -440,7 +440,7 @@ class WpsWorkflowJob(JobBase):
                  hints,             # type: List[Dict[Text, Text]]
                  name,              # type: Text
                  wps_process,       # type: WpsProcessInterface
-                 expected_outputs,  # type: List[CWL_ExpectedOutputs]
+                 expected_outputs,  # type: List[CWL_Output_Type]
                  ):                 # type: (...) -> None
         super(WpsWorkflowJob, self).__init__(builder, joborder, None, requirements, hints, name)
         self.wps_process = wps_process

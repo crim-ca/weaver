@@ -312,6 +312,12 @@ class WpsProcessInterface(object):
             The :term:`CWL` runner expects the output file(s) to be written matching definition in ``expected_outputs``,
             but this definition could be a glob pattern to match multiple file and/or nested directories.
             We cannot rely on specific file names to be mapped, since glob can match many (eg: ``"*.txt"``).
+
+        .. seealso::
+            Function :func:`weaver.processes.convert.any2cwl_io` defines a generic glob pattern using the output ID
+            and expected file extension based on Content-Type format. Since the remote :term:`WPS` :term:`Process`
+            doesn't necessarily produces file names with the output ID as expected to find them (could be anything),
+            staging must patch locations to let :term:`CWL` runtime resolve the files according to glob definitions.
         """
         for result in results:
             res_id = get_any_id(result)
@@ -322,8 +328,9 @@ class WpsProcessInterface(object):
             result_values = get_any_value(result)
             if not isinstance(result_values, list):
                 result_values = [result_values]
-            cwl_out_dir = out_dir.rstrip("/")
-            for value in result_values:
+            cwl_out_dir = "/".join([out_dir.rstrip("/"), res_id])
+            os.makedirs(cwl_out_dir, mode=0o700, exist_ok=True)
+            for index, value in enumerate(result_values):
                 src_name = value.split("/")[-1]
                 dst_path = "/".join([cwl_out_dir, src_name])
                 # performance improvement:
