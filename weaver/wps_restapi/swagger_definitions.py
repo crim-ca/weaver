@@ -265,7 +265,7 @@ provider_logs_service = Service(name="provider_logs", path=provider_service.path
 provider_stats_service = Service(name="provider_stats", path=provider_service.path + process_stats_service.path)
 provider_exceptions_service = Service(name="provider_exceptions",
                                       path=provider_service.path + process_exceptions_service.path)
-provider_execution_service = Service(name="provider_execution", path=provider_service.path + "/execution")
+provider_execution_service = Service(name="provider_execution", path=provider_process_service.path + "/execution")
 
 # backward compatibility deprecated routes
 job_result_service = Service(name="job_result", path=job_service.path + "/result")

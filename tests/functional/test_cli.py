@@ -17,11 +17,13 @@ import pytest
 from pyramid.httpexceptions import HTTPForbidden, HTTPOk, HTTPUnauthorized
 from webtest import TestApp as WebTestApp
 
+from tests import resources
 from tests.functional.utils import ResourcesUtil, WpsConfigBase
 from tests.utils import (
     get_weaver_url,
     mocked_dismiss_process,
     mocked_execute_celery,
+    mocked_remote_server_requests_wps1,
     mocked_sub_requests,
     mocked_wps_output,
     run_command,
@@ -29,7 +31,7 @@ from tests.utils import (
 )
 from weaver.base import classproperty
 from weaver.cli import AuthHandler, BearerAuthHandler, WeaverClient, main as weaver_cli
-from weaver.datatype import DockerAuthentication
+from weaver.datatype import DockerAuthentication, Service
 from weaver.formats import ContentType, OutputFormat, get_cwl_file_format, repr_json
 from weaver.processes.constants import CWL_REQUIREMENT_APP_DOCKER, ProcessSchema
 from weaver.status import Status
@@ -70,6 +72,9 @@ class TestWeaverClientBase(WpsConfigBase, ResourcesUtil):
         cls.test_process_prefix = "test-client"
 
     def setUp(self):
+        self.service_store.clear_services()
+        self.job_store.clear_jobs()
+
         processes = self.process_store.list_processes()
         test_processes = filter(lambda _proc: _proc.id.startswith(self.test_process_prefix), processes)
         for proc in test_processes:
@@ -116,10 +121,15 @@ class TestWeaverClient(TestWeaverClientBase):
             test_file.write(data)
         return test_file_path
 
-    def process_listing_op(self, operation):
-        result = mocked_sub_requests(self.app, operation)
+    def process_listing_op(self, operation, **op_kwargs):
+        result = mocked_sub_requests(self.app, operation, only_local=True, **op_kwargs)
         assert result.success
         assert "processes" in result.body
+        assert "undefined" not in result.message
+        return result
+
+    def test_capabilities(self):
+        result = self.process_listing_op(self.client.capabilities)
         assert set(result.body["processes"]) == {
             # builtin
             "file2string_array",
@@ -130,13 +140,108 @@ class TestWeaverClient(TestWeaverClientBase):
             self.test_process["CatFile"],
             self.test_process["Echo"],
         }
-        assert "undefined" not in result.message
-
-    def test_capabilities(self):
-        self.process_listing_op(self.client.capabilities)
 
     def test_processes(self):
-        self.process_listing_op(self.client.processes)
+        result = self.process_listing_op(self.client.processes)
+        assert set(result.body["processes"]) == {
+            # builtin
+            "file2string_array",
+            "file_index_selector",
+            "jsonarray2netcdf",
+            "metalink2netcdf",
+            # test process
+            self.test_process["CatFile"],
+            self.test_process["Echo"],
+        }
+
+    def test_processes_with_details(self):
+        result = self.process_listing_op(self.client.processes, detail=True)
+        assert all(isinstance(proc, dict) for proc in result.body["processes"])
+        expect_ids = [proc["id"] for proc in result.body["processes"]]
+        assert set(expect_ids) == {
+            # builtin
+            "file2string_array",
+            "file_index_selector",
+            "jsonarray2netcdf",
+            "metalink2netcdf",
+            # test process
+            self.test_process["CatFile"],
+            self.test_process["Echo"],
+        }
+
+    @mocked_remote_server_requests_wps1([
+        (resources.TEST_REMOTE_SERVER_URL, resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML, [
+            resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML
+        ]),
+        (resources.TEST_HUMMINGBIRD_WPS1_URL, resources.TEST_HUMMINGBIRD_WPS1_GETCAP_XML, []),
+        (resources.TEST_EMU_WPS1_GETCAP_URL, resources.TEST_EMU_WPS1_GETCAP_XML, []),
+    ])
+    def test_processes_with_providers(self):
+        prov1 = Service(name="emu", url=resources.TEST_EMU_WPS1_GETCAP_URL, public=True)
+        prov2 = Service(name="hummingbird", url=resources.TEST_HUMMINGBIRD_WPS1_URL, public=True)
+        prov3 = Service(name="test-service", url=resources.TEST_REMOTE_SERVER_URL, public=True)
+        self.service_store.save_service(prov1)
+        self.service_store.save_service(prov2)
+        self.service_store.save_service(prov3)
+
+        result = self.process_listing_op(self.client.processes, with_providers=True)
+        assert len(result.body["processes"]) > 0, "Local processes should be reported as well along with providers."
+        assert "providers" in result.body
+        assert result.body["providers"] == [
+            {"id": prov1.name, "processes": resources.TEST_EMU_WPS1_PROCESSES},
+            {"id": prov2.name, "processes": resources.TEST_HUMMINGBIRD_WPS1_PROCESSES},
+            {"id": prov3.name, "processes": resources.TEST_REMOTE_SERVER_WPS1_PROCESSES},
+        ]
+
+    @mocked_remote_server_requests_wps1([
+        resources.TEST_REMOTE_SERVER_URL,
+        resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
+        [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML]
+    ])
+    def test_register_provider(self):
+        prov_id = "test-server"
+        prov_url = resources.TEST_REMOTE_SERVER_URL
+        result = mocked_sub_requests(self.app, self.client.register, prov_id, prov_url, only_local=True)
+        assert result.success
+        assert result.body["id"] == "test-server"
+        assert result.body["title"] == "Mock Remote Server"
+        assert result.body["description"] == "Testing"
+        assert result.body["type"] == "wps-remote"
+        assert "links" in result.body
+        for link in result.body["links"]:
+            if link["rel"] != "service-desc":
+                continue
+            assert "request=GetCapabilities" in link["href"]
+            assert link["type"] == ContentType.APP_XML
+            break
+        else:
+            self.fail("Could not find expected remote WPS link reference.")
+        for link in result.body["links"]:
+            if link["rel"] != "service":
+                continue
+            assert link["href"] == f"{self.url}/providers/{prov_id}"
+            assert link["type"] == ContentType.APP_JSON
+            break
+        else:
+            self.fail("Could not find expected provider JSON link reference.")
+        for link in result.body["links"]:
+            if link["rel"] != "http://www.opengis.net/def/rel/ogc/1.0/processes":
+                continue
+            assert link["href"] == f"{self.url}/providers/{prov_id}/processes"
+            assert link["type"] == ContentType.APP_JSON
+            break
+        else:
+            self.fail("Could not find expected provider sub-processes link reference.")
+
+    def test_unregister_provider(self):
+        prov = Service(name="test-service", url=resources.TEST_REMOTE_SERVER_URL, public=True)
+        self.service_store.save_service(prov)
+
+        result = mocked_sub_requests(self.app, self.client.unregister, prov.name, only_local=True)
+        assert result.success
+        assert result.message == "Successfully unregistered provider."
+        assert result.code == 204
+        assert result.body is None
 
     def test_custom_auth_handler(self):
         """
@@ -1126,7 +1231,7 @@ class TestWeaverCLI(TestWeaverClientBase):
             assert any("\"location\": \"" in line for line in lines)
             job_loc = [line for line in lines if "location" in line][0]
             job_ref = [line for line in job_loc.split("\"") if line][-1]
-            job_id = job_ref.split("/")[-1]
+            job_id = str(job_ref).split("/")[-1]
 
             lines = mocked_sub_requests(
                 self.app, run_command,

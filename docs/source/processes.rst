@@ -272,38 +272,41 @@ be indicated in the logs with the appropriate step and message where the error o
 Remote Provider
 --------------------
 
-Remote provider correspond to a remote service that provides similar interfaces as supported by `Weaver`
-(:term:`WPS`-like). For example, a remote :term:`WPS`-1 :term:`XML` endpoint can be referenced as a provider. When an
-API `Providers`_-scoped request is executed, for example to list is processes capabilities
-(see :ref:`GetCapabilities <proc_op_getcap>`),
-`Weaver` will send the corresponding request using the registered reference URL to access the remote server and
-reply with parsed response, as if they its processes were registered locally.
+A remote :term:`Provider` corresponds to a service hosted remotely that provides similar or compatible
+(:term:`WPS`-like) interfaces supported by `Weaver`. For example, a remote :term:`WPS`-1 :term:`XML` endpoint
+can be referenced as a :term:`Provider`. When an API `Providers`_-scoped request is executed, for example to list its
+process capabilities (see :ref:`GetCapabilities <proc_op_getcap>`), `Weaver` will send the corresponding request using
+the reference URL from the registered :term:`Provider` to access the remote server and reply with the parsed response,
+as if its processes were registered locally.
 
 Since remote providers obviously require access to the remote service, `Weaver` will only be able to provide results
 if the service is accessible with respect to standard implementation features and supported specifications.
 
-The main advantage of using `Weaver`'s endpoint rather than directly accessing the referenced remote provider processes
-is in the case of limited functionality offered by the service. For instance, :term:`WPS`-1 do not always offer
-:ref:`proc_op_status` feature, and there is no extensive job monitoring availability. Since `Weaver` *wraps* the
-original reference with its own endpoints, these features indirectly become employable. Similarly, although
-:term:`WPS`-1 offers :term:`XML`-only endpoints, the parsing operation accomplished by `Weaver` makes theses services
-available as :term:`WPS-REST` :term:`JSON` endpoints. On top of that, registering a remote :term:`Provider`
-into `Weaver` allows the user to use it as a central hub to keep references to all his accessible services and dispatch
+The main advantage of using `Weaver`'s endpoint rather than directly accessing the referenced remote :term:`Provider`
+processes is to palliate the limited functionalities offered by the service. For instance, :term:`WPS`-1 do not always
+offer :ref:`proc_op_status` feature, and there is no extensive :term:`Job` monitoring capabilities. Since `Weaver`
+effectively *wraps* the referenced :term:`Provider` with its own endpoints, these features indirectly become employable
+through an extended :term:`OGC API - Processes` interface. Similarly, although many :term:`WPS`-1 offer :term:`XML`-only
+responses, the parsing operation accomplished by `Weaver` makes theses services available as :term:`WPS-REST`
+:term:`JSON` endpoints with automatic conversion. On top of that, registering a remote :term:`Provider` into `Weaver`
+allows the user to use it as a central hub to keep references to all his remotely accessible services and dispatch
 :term:`Job` executions from a common location.
 
 A *remote provider* differs from previously presented `WPS-1/2`_ processes such that the underlying processes of the
 service are not registered locally. For example, if a remote service has two WPS processes, only top-level service URL
 will be registered locally (in `Weaver`'s database) and the application will have no explicit knowledge of these remote
-processes. When calling process-specific requests (e.g.: :ref:`DescribeProcess <proc_op_describe>` or
-:ref:`Execute <proc_op_execute>`), `Weaver` will re-send the
-corresponding request directly to the remote provider each time and return the result accordingly. On the other hand,
-a `WPS-1/2`_ reference would be parsed and saved locally with the response *at the time of deployment*. This means that
-a deployed `WPS-1/2`_ reference would act as a *snapshot* of the reference (which could become out-of-sync), while
-`Remote Provider`_ will dynamically update according to the re-fetched response from the remote service. If our example
-remote service was extended to have a third WPS process, it would immediately be reflected in
-:ref:`GetCapabilities <proc_op_getcap>` and :ref:`DescribeProcess <proc_op_describe>` retrieved via `Weaver`
-`Providers`_-scoped requests. This would not be the case for the `WPS-1/2`_
-reference that would need manual update (deploy the third process to register it in `Weaver`).
+processes until requested. When calling :term:`Process`-specific requests
+(e.g.: :ref:`DescribeProcess <proc_op_describe>` or :ref:`Execute <proc_op_execute>`), `Weaver` will re-send the
+corresponding request (with appropriate interface conversion) directly to the remote :term:`Provider` each time and
+return the result accordingly. On the other hand, a `WPS-1/2`_ reference would be parsed and saved locally with the
+response *at the time of deployment*. This means that a deployed `WPS-1/2`_ reference would act as a *snapshot* of the
+reference :term:`Process` (which could become out-of-sync), while `Remote Provider`_ will dynamically update according
+to the re-fetched response from the remote service each time, always keeping the obtained description in sync with the
+remote :term:`Provider`. If our example remote service was extended to have a third :term:`WPS` process, it would
+immediately and transparently be reflected in :ref:`GetCapabilities <proc_op_getcap>`
+and :ref:`DescribeProcess <proc_op_describe>` retrieved by `Weaver` on `Providers`_-scoped requests without any change
+to the registered :term:`Provider` definition. This would not be the case for the `WPS-1/2`_ reference that would need
+a manual update (i.e.: deploy the third :term:`Process` to register it in `Weaver`).
 
 
 .. _`Providers`: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Providers

@@ -81,7 +81,7 @@ class WpsProviderTest(WpsConfigBase):
 
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
-        resources.TEST_HUMMINGBIRD_GETCAP_WPS1_XML,
+        resources.TEST_HUMMINGBIRD_WPS1_GETCAP_XML,
         [resources.TEST_HUMMINGBIRD_DESCRIBE_WPS1_XML],
     ])
     def test_register_describe_execute_ncdump(self, mock_responses):
@@ -124,7 +124,7 @@ class WpsProviderTest(WpsConfigBase):
         resp = self.app.get(path, headers=self.json_headers)
         body = resp.json
         assert resp.status_code == 200
-        assert "processes" in body and len(body["processes"]) == 14  # in TEST_HUMMINGBIRD_GETCAP_WPS1_XML
+        assert "processes" in body and len(body["processes"]) == len(resources.TEST_HUMMINGBIRD_WPS1_PROCESSES)
         processes = {process["id"]: process for process in body["processes"]}
         assert "ncdump" in processes
         assert processes["ncdump"]["version"] == "4.4.1.1"

@@ -20,7 +20,8 @@ from tests.utils import (
     setup_config_with_mongodb,
     setup_config_with_pywps,
     setup_mongodb_jobstore,
-    setup_mongodb_processstore
+    setup_mongodb_processstore,
+    setup_mongodb_servicestore
 )
 from weaver import WEAVER_ROOT_DIR
 from weaver.database import get_db
@@ -173,6 +174,7 @@ class WpsConfigBase(unittest.TestCase):
         config = setup_config_with_mongodb(config)
         config = setup_config_with_pywps(config)
         config = setup_config_with_celery(config)
+        cls.service_store = setup_mongodb_servicestore(config)  # force reset
         cls.process_store = setup_mongodb_processstore(config)  # force reset
         cls.job_store = setup_mongodb_jobstore(config)
         cls.app = get_test_weaver_app(config=config, settings=cls.settings)
@@ -314,6 +316,7 @@ class AuthTokenApp(WpsConfigBase):
         config = setup_config_with_mongodb(config)
         config = setup_config_with_pywps(config)
         config = setup_config_with_celery(config)
+        cls.service_store = setup_mongodb_servicestore(config)  # force reset
         cls.process_store = setup_mongodb_processstore(config)  # force reset
         cls.job_store = setup_mongodb_jobstore(config)
         cls.app = get_test_weaver_app(config=config, settings=cls.settings)

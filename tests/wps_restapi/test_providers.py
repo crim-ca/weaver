@@ -88,8 +88,8 @@ class WpsRestApiProvidersTest(WpsProviderBase):
 
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
-        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
-        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
+        resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
+        [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
     ])
     def test_provider_listing_error_handling_queries(self, mock_responses):
         """
@@ -101,7 +101,7 @@ class WpsRestApiProvidersTest(WpsProviderBase):
         # register service reachable but returning invalid XML
         invalid_id = self.remote_provider_name + "-invalid"
         invalid_url = resources.TEST_REMOTE_SERVER_URL + "/invalid"
-        with open(resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML, mode="r", encoding="utf-8") as xml:
+        with open(resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML, mode="r", encoding="utf-8") as xml:
             # inject badly formatted XML in otherwise valid GetCapabilities response
             # following causes 'wps.provider' to be 'None', which raises during metadata link generation (no check)
             invalid_data = xml.read().replace(
@@ -116,7 +116,7 @@ class WpsRestApiProvidersTest(WpsProviderBase):
         # register service reachable wit invalid XML but can be recovered since it does not impact structure directly
         recover_id = self.remote_provider_name + "-recover"
         recover_url = resources.TEST_REMOTE_SERVER_URL + "/recover"
-        with open(resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML, mode="r", encoding="utf-8") as xml:
+        with open(resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML, mode="r", encoding="utf-8") as xml:
             # inject badly formatted XML in otherwise valid GetCapabilities response
             # following causes 'wps.processes' to be unresolvable, but service definition itself works
             recover_data = xml.read().replace(
@@ -168,8 +168,8 @@ class WpsRestApiProvidersTest(WpsProviderBase):
 
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
-        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
-        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
+        resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
+        [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
     ])
     def test_register_provider_invalid(self, mock_responses):
         """
@@ -177,7 +177,7 @@ class WpsRestApiProvidersTest(WpsProviderBase):
         """
         invalid_id = self.remote_provider_name + "-invalid"
         invalid_url = resources.TEST_REMOTE_SERVER_URL + "/invalid"
-        with open(resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML, mode="r", encoding="utf-8") as xml:
+        with open(resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML, mode="r", encoding="utf-8") as xml:
             # inject badly formatted XML in otherwise valid GetCapabilities response
             # following causes 'wps.provider' to be 'None', which raises during metadata link generation (no check)
             invalid_data = xml.read().replace(
@@ -209,8 +209,8 @@ class WpsRestApiProvidersTest(WpsProviderBase):
 
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
-        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
-        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
+        resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
+        [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
     ])
     def test_register_provider_recoverable(self, mock_responses):
         """
@@ -223,7 +223,7 @@ class WpsRestApiProvidersTest(WpsProviderBase):
         """
         recover_id = self.remote_provider_name + "-recover"
         recover_url = resources.TEST_REMOTE_SERVER_URL + "/recover"
-        with open(resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML, mode="r", encoding="utf-8") as xml:
+        with open(resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML, mode="r", encoding="utf-8") as xml:
             # inject badly formatted XML in otherwise valid GetCapabilities response
             # following causes 'wps.processes' to be unresolvable, but service definition itself works
             recover_data = xml.read().replace(
@@ -238,8 +238,8 @@ class WpsRestApiProvidersTest(WpsProviderBase):
 
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
-        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
-        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
+        resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
+        [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
     ])
     def test_register_provider_success(self):
         resp = self.register_provider()
@@ -253,8 +253,8 @@ class WpsRestApiProvidersTest(WpsProviderBase):
 
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
-        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
-        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
+        resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
+        [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
     ])
     def test_register_provider_conflict(self):
         self.register_provider(clear=True, error=False)
@@ -263,8 +263,8 @@ class WpsRestApiProvidersTest(WpsProviderBase):
 
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
-        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
-        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
+        resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
+        [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
     ])
     def test_get_provider_processes(self):
         self.register_provider()
@@ -285,15 +285,15 @@ class WpsRestApiProvidersTest(WpsProviderBase):
             assert len(process["jobControlOptions"]) == 1
             assert ExecuteControlOption.ASYNC in process["jobControlOptions"]
             remote_processes.append(process["id"])
-        assert resources.TEST_REMOTE_PROCESS_WPS1_ID in remote_processes
+        assert resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID in remote_processes
 
     @pytest.mark.xfail(condition=LooseVersion(owslib.__version__) <= LooseVersion("0.25.0"),
                        reason="OWSLib fix for retrieval of processVersion from DescribeProcess not yet available "
                               "(https://github.com/geopython/OWSLib/pull/794)")
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
-        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
-        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
+        resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
+        [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
     ])
     def test_get_provider_process_description_with_version(self):
         """
@@ -308,7 +308,7 @@ class WpsRestApiProvidersTest(WpsProviderBase):
             - Full description validation (OLD schema): :meth:`test_get_provider_process_description_old_schema`
             - Fix in PR `geopython/OWSLib#794 <https://github.com/geopython/OWSLib/pull/794>`_
         """
-        path = f"/providers/{self.remote_provider_name}/processes/{resources.TEST_REMOTE_PROCESS_WPS1_ID}"
+        path = f"/providers/{self.remote_provider_name}/processes/{resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID}"
         resp = self.app.get(path, params={"schema": ProcessSchema.OLD}, headers=self.json_headers)
         assert resp.status_code == 200
         assert resp.content_type == ContentType.APP_JSON
@@ -324,14 +324,14 @@ class WpsRestApiProvidersTest(WpsProviderBase):
 
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
-        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
-        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
+        resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
+        [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
     ])
     def test_get_provider_process_description_old_schema(self):
         self.register_provider()
 
         query = {"schema": ProcessSchema.OLD}
-        path = f"/providers/{self.remote_provider_name}/processes/{resources.TEST_REMOTE_PROCESS_WPS1_ID}"
+        path = f"/providers/{self.remote_provider_name}/processes/{resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID}"
         resp = self.app.get(path, params=query, headers=self.json_headers)
         body = resp.json
         assert resp.status_code == 200
@@ -339,7 +339,7 @@ class WpsRestApiProvidersTest(WpsProviderBase):
         assert "process" in resp.json and isinstance(body["process"], dict)
         process = body["process"]
         assert "id" in process and isinstance(process["id"], str)
-        assert process["id"] == resources.TEST_REMOTE_PROCESS_WPS1_ID
+        assert process["id"] == resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID
         assert "title" in process and isinstance(process["title"], str)
         assert "description" in process and isinstance(process["description"], str)
         # evaluated in separate test (test_get_provider_process_description_with_version)
@@ -357,20 +357,20 @@ class WpsRestApiProvidersTest(WpsProviderBase):
 
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
-        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
-        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
+        resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
+        [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
     ])
     def test_get_provider_process_description_ogc_schema(self):
         self.register_provider()
 
-        path = f"/providers/{self.remote_provider_name}/processes/{resources.TEST_REMOTE_PROCESS_WPS1_ID}"
+        path = f"/providers/{self.remote_provider_name}/processes/{resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID}"
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
         assert resp.content_type == ContentType.APP_JSON
         assert "process" not in resp.json and isinstance(resp.json, dict)
         process = resp.json
         assert "id" in process and isinstance(process["id"], str)
-        assert process["id"] == resources.TEST_REMOTE_PROCESS_WPS1_ID
+        assert process["id"] == resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID
         assert "title" in process and isinstance(process["title"], str)
         assert "description" in process and isinstance(process["description"], str)
         # evaluated in separate test (test_get_provider_process_description_with_version)
@@ -390,7 +390,7 @@ class WpsRestApiProvidersTest(WpsProviderBase):
 
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
-        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
+        resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
         [resources.WPS_NO_INPUTS_XML],
     ])
     def test_get_provider_process_no_inputs(self):
@@ -415,7 +415,7 @@ class WpsRestApiProvidersTest(WpsProviderBase):
 
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
-        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,  # don't care
+        resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,  # don't care
         [resources.WPS_LITERAL_VALUES_IO_XML],
     ])
     def test_get_provider_process_literal_values(self):
@@ -602,7 +602,7 @@ class WpsRestApiProvidersTest(WpsProviderBase):
                               "(https://github.com/geopython/OWSLib/pull/796)")
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
-        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,  # don't care
+        resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,  # don't care
         [resources.WPS_LITERAL_VALUES_IO_XML],
     ])
     def test_get_provider_process_complex_maximum_megabytes(self):
@@ -647,7 +647,7 @@ class WpsProviderLocalOnlyTest(WpsProviderBase):
 
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
-        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
+        resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
         []
     ])
     def test_forbidden_register_provider(self):
@@ -656,44 +656,44 @@ class WpsProviderLocalOnlyTest(WpsProviderBase):
 
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
-        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
-        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
+        resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
+        [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
     ])
     def test_forbidden_describe_process(self):
         prov = f"/providers/{self.remote_provider_name}"
-        path = f"{prov}/processes/{resources.TEST_REMOTE_PROCESS_WPS1_ID}/jobs"
+        path = f"{prov}/processes/{resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID}/jobs"
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 403, f"\n{resp.json}"
 
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
-        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
-        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
+        resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
+        [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
     ])
     def test_forbidden_execute_process(self):
         prov = f"/providers/{self.remote_provider_name}"
-        path = f"{prov}/processes/{resources.TEST_REMOTE_PROCESS_WPS1_ID}/jobs"
+        path = f"{prov}/processes/{resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID}/jobs"
         resp = self.app.post_json(path, params={}, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 403, f"\n{resp.json}"
 
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
-        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
-        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
+        resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
+        [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
     ])
     def test_forbidden_list_jobs(self):
         prov = f"/providers/{self.remote_provider_name}"
-        path = f"{prov}/processes/{resources.TEST_REMOTE_PROCESS_WPS1_ID}/jobs"
+        path = f"{prov}/processes/{resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID}/jobs"
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 403, f"\n{resp.json}"
 
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
-        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
-        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
+        resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
+        [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
     ])
     def test_forbidden_get_job(self):
         prov = f"/providers/{self.remote_provider_name}"
-        path = f"{prov}/processes/{resources.TEST_REMOTE_PROCESS_WPS1_ID}/jobs/{self.job.id}"
+        path = f"{prov}/processes/{resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID}/jobs/{self.job.id}"
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 403, f"\n{resp.json}"
