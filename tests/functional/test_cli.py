@@ -34,6 +34,7 @@ from weaver.cli import AuthHandler, BearerAuthHandler, WeaverClient, main as wea
 from weaver.datatype import DockerAuthentication, Service
 from weaver.formats import ContentType, OutputFormat, get_cwl_file_format, repr_json
 from weaver.processes.constants import CWL_REQUIREMENT_APP_DOCKER, ProcessSchema
+from weaver.processes.types import ProcessType
 from weaver.status import Status
 from weaver.utils import fully_qualified_name
 from weaver.visibility import Visibility
@@ -205,7 +206,7 @@ class TestWeaverClient(TestWeaverClientBase):
         assert result.body["id"] == "test-server"
         assert result.body["title"] == "Mock Remote Server"
         assert result.body["description"] == "Testing"
-        assert result.body["type"] == "wps-remote"
+        assert result.body["type"] == ProcessType.WPS_REMOTE
         assert "links" in result.body
         for link in result.body["links"]:
             if link["rel"] != "service-desc":
@@ -690,6 +691,29 @@ class TestWeaverCLI(TestWeaverClientBase):
                 only_local=True,
             )
             assert any(f"\"id\": \"{proc}\"" in line for line in lines)
+
+    @mocked_remote_server_requests_wps1([
+        resources.TEST_REMOTE_SERVER_URL,
+        resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
+        [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML]
+    ])
+    def test_register_provider(self):
+        lines = mocked_sub_requests(
+            self.app, run_command,
+            [
+                # weaver
+                "register",
+                "-u", self.url,
+                "-pI", "test-provider",
+                "-pU", resources.TEST_REMOTE_SERVER_URL,
+            ],
+            trim=False,
+            entrypoint=weaver_cli,
+            only_local=True,
+        )
+        assert any("\"id\": \"test-provider\"" in line for line in lines)
+        assert any(f"\"url\": \"{resources.TEST_REMOTE_SERVER_URL}\"" in line for line in lines)
+        assert any(f"\"type\": \"{ProcessType.WPS_REMOTE}\"" in line for line in lines)
 
     def test_deploy_no_process_id_option(self):
         payload = self.retrieve_payload("Echo", "deploy", local=True, ref_found=True)
