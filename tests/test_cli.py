@@ -68,7 +68,7 @@ def test_parse_inputs_from_file():
             json.dump({"inputs": {"input1": "data"}}, input_json)
             input_json.flush()
             input_json.seek(0)
-            result = WeaverClient().execute("fake_process", input_json.name, url="http://fake.domain.com")
+            result = WeaverClient().execute("fake_process", inputs=input_json.name, url="http://fake.domain.com")
     assert result is mock_result
     assert len(inputs) == 1
     assert inputs[0] == {"input1": "data"}
