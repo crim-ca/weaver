@@ -18,6 +18,8 @@ Changes:
 - Add `CLI` options for HTTP request timeout and retry control when required for specific use cases.
   For example, a `Weaver` instance with many registered `Provider` references could take longer than default
   timeout of 5s to populate the full list of remotely accessible processes retrieved from each `WPS` service.
+- Add `CLI` output of most recently retrieved `Job` status during ``execute`` operation in combination of monitoring
+  flag to report the produced `Job` reference ID and URL in case monitoring timeout is reached before its completion.
 
 Fixes:
 ------

@@ -1305,6 +1305,7 @@ class WeaverClient(object):
         LOGGER.info("Monitoring job [%s] for %ss at intervals of %ss.", job_id, timeout, delta)
         LOGGER.debug("Job URL: [%s]", job_url)
         once = True
+        resp = None
         while remain >= 0 or once:
             resp = self._request("GET", job_url,
                                  headers=self._headers, x_headers=headers, settings=self._settings, auth=auth,
@@ -1324,7 +1325,12 @@ class WeaverClient(object):
             time.sleep(delta)
             remain -= delta
             once = False
-        return OperationResult(False, f"Monitoring timeout reached ({timeout}s). Job did not complete in time.")
+        # parse the latest available status response to provide at least the reference to the incomplete job
+        msg = f"Monitoring timeout reached ({timeout}s). Job [{job_id}] did not complete in time."
+        if resp:
+            return self._parse_result(resp, success=False, message=msg, with_links=with_links,
+                                      with_headers=with_headers, output_format=output_format)
+        return OperationResult(False, msg)
 
     def _download_references(self, outputs, out_links, out_dir, job_id, auth=None):
         # type: (ExecutionResults, AnyHeadersContainer, str, str, Optional[AuthHandler]) -> ExecutionResults
