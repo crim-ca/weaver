@@ -31,8 +31,8 @@ from weaver.processes.convert import (
 )
 from weaver.processes.utils import get_process_information
 from weaver.processes.wps_package import get_process_definition
-from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.sort import Sort, SortMethods
+from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.utils import (
     fetch_file,
     fully_qualified_name,

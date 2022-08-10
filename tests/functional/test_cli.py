@@ -1231,7 +1231,7 @@ class TestWeaverCLI(TestWeaverClientBase):
             assert any("\"location\": \"" in line for line in lines)
             job_loc = [line for line in lines if "location" in line][0]
             job_ref = [line for line in job_loc.split("\"") if line][-1]
-            job_id = str(job_ref).split("/")[-1]
+            job_id = str(job_ref).rsplit("/", 1)[-1]
 
             lines = mocked_sub_requests(
                 self.app, run_command,
