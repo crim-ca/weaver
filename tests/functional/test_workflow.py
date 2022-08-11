@@ -1011,7 +1011,7 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
         """
         Test that validates the retrieval of nested directory output files between workflow steps.
 
-        Following the execution of a :term:`Workflow` step, :term:`Application Package` that use an ``outputBinding``
+        Following the execution of a :term:`Workflow` step, an :term:`Application Package` using an ``outputBinding``
         with ``glob`` looking for the file to stage out within a sub-directory as follows are automatically generated
         under the output directory by :term:`CWL` within the same structure.
 

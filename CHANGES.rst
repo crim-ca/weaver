@@ -12,11 +12,22 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add `CLI` support for `Process` listing, `Job` execution, service registration and un-registration in the context
+  of a `Process` offered by a remote `Provider` reference.
+- Add `CLI` options for `Process` listing with detailed descriptions, paging, limit and sorting queries.
+- Add `CLI` options for HTTP request timeout and retry control when required for specific use cases.
+  For example, a `Weaver` instance with many registered `Provider` references could take longer than default
+  timeout of 5s to populate the full list of remotely accessible processes retrieved from each `WPS` service.
+- Add `CLI` output of most recently retrieved `Job` status during ``execute`` operation in combination of monitoring
+  flag to report the produced `Job` reference ID and URL in case monitoring timeout is reached before its completion.
 
 Fixes:
 ------
-- No change.
+- Fix invalid ``POST /providers/{provider_id}/processes/{process_id}/execution`` endpoint that was missing
+  the `Process` portion to mimic the `OGC API - Processes` execution endpoint of a `Job` for a remote `Provider`.
+- Fix result file names resolution for staging outputs retrieved from the `Job` execution on a remote `Provider` where
+  the `Process` outputs files are not generated using the same glob naming convention as expected by the `CWL` outputs
+  of the corresponding `Process`.
 
 .. _changes_4.20.0:
 

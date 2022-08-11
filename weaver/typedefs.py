@@ -197,20 +197,25 @@ if TYPE_CHECKING:
     CWL_WorkflowStepPackageMap = Dict[CWL_WorkflowStepID, CWL_WorkflowStepPackage]
 
     # CWL loading
-    CWL_WorkflowInputs = Dict[str, AnyValueType]   # mapping of ID:value
-    CWL_ExpectedOutputs = Dict[str, AnyValueType]  # mapping of ID:value
+    CWL_WorkflowInputs = Dict[str, AnyValueType]   # mapping of ID:value (any type)
+    CWL_ExpectedOutputs = Dict[str, AnyValueType]  # mapping of ID:pattern (File only)
     CWL_ToolPathObjectType = Dict[str, Any]
     JobProcessDefinitionCallback = Callable[[str, Dict[str, str], Dict[str, Any]], WpsProcessInterface]
 
     # CWL runtime
     CWL_RuntimeLiteral = Union[str, float, int]
+    CWL_RuntimeLiteralObject = TypedDict("CWL_RuntimeLiteralObject", {
+        "id": str,
+        "value": CWL_RuntimeLiteral,
+    }, total=False)
     CWL_RuntimeInputFile = TypedDict("CWL_RuntimeInputFile", {
+        "id": NotRequired[str],
         "class": str,
         "location": str,
-        "format": Optional[str],
+        "format": NotRequired[Optional[str]],
         "basename": str,
         "nameroot": str,
-        "nameext": str
+        "nameext": str,
     }, total=False)
     CWL_RuntimeOutputFile = TypedDict("CWL_RuntimeOutputFile", {
         "class": str,
@@ -220,10 +225,11 @@ if TYPE_CHECKING:
         "nameroot": str,
         "nameext": str,
         "checksum": NotRequired[str],
-        "size": NotRequired[str]
+        "size": NotRequired[str],
     }, total=False)
     CWL_RuntimeInput = Union[CWL_RuntimeLiteral, CWL_RuntimeInputFile]
     CWL_RuntimeInputsMap = Dict[str, CWL_RuntimeInput]
+    CWL_RuntimeInputList = List[Union[CWL_RuntimeLiteralObject, CWL_RuntimeInputFile]]
     CWL_RuntimeOutput = Union[CWL_RuntimeLiteral, CWL_RuntimeOutputFile]
 
     # OWSLib Execution
@@ -417,9 +423,9 @@ if TYPE_CHECKING:
         "$ref": _OpenAPISchema
     }, total=True)
     OpenAPISchemaMetadata = TypedDict("OpenAPISchemaMetadata", {
-        "$id": str,         # reference to external '$ref' after local resolution for tracking
-        "$schema": str,     # how to parse schema (usually: 'https://json-schema.org/draft/2020-12/schema')
-        "@context": str,    # extra details or JSON-LD references
+        "$id": NotRequired[str],        # reference to external '$ref' after local resolution for tracking
+        "$schema": NotRequired[str],    # how to parse schema (usually: 'https://json-schema.org/draft/2020-12/schema')
+        "@context": NotRequired[str],   # extra details or JSON-LD references
     }, total=False)
     OpenAPISchemaProperty = TypedDict("OpenAPISchemaProperty", {
         "type": OpenAPISchemaTypes,

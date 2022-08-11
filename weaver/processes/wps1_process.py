@@ -8,7 +8,7 @@ from weaver.execute import ExecuteMode
 from weaver.formats import get_format
 from weaver.owsexceptions import OWSNoApplicableCode
 from weaver.processes.constants import WPS_COMPLEX_DATA
-from weaver.processes.convert import ows2json_output_data
+from weaver.processes.convert import DEFAULT_FORMAT, ows2json_output_data
 from weaver.processes.utils import map_progress
 from weaver.processes.wps_process_base import WpsProcessInterface, WpsRemoteJobProgress
 from weaver.status import Status, map_status
@@ -28,7 +28,7 @@ if TYPE_CHECKING:
     from owslib.wps import WebProcessingService
 
     from weaver.typedefs import (
-        CWL_RuntimeInputsMap,
+        CWL_RuntimeInputList,
         JobExecution,
         JobInputs,
         JobOutputs,
@@ -58,13 +58,14 @@ class Wps1Process(WpsProcessInterface):
         # following are defined after 'prepare' step
         self.wps_provider = None    # type: Optional[WebProcessingService]
         self.wps_process = None     # type: Optional[ProcessOWS]
+        self.stage_output_id_nested = True
         super(Wps1Process, self).__init__(
             request,
             lambda _message, _progress, _status: update_status(_message, _progress, _status, self.provider)
         )
 
     def format_inputs(self, workflow_inputs):
-        # type: (CWL_RuntimeInputsMap) -> OWS_InputDataValues
+        # type: (CWL_RuntimeInputList) -> OWS_InputDataValues
         """
         Convert submitted :term:`CWL` workflow inputs into corresponding :mod:`OWSLib.wps` representation for execution.
 
@@ -99,7 +100,7 @@ class Wps1Process(WpsProcessInterface):
                     fmt = val.get("format")  # format as namespace:link
                     val = val["location"]
                     if fmt:
-                        fmt = get_format(workflow_inputs[input_key]["format"])  # format as content-type
+                        fmt = get_format(fmt, default=DEFAULT_FORMAT)  # format as content-type
                         mime_type = fmt.mime_type or None
                         encoding = fmt.encoding or None  # avoid empty string
 

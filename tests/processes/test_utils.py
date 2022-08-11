@@ -73,14 +73,16 @@ def test_register_wps_processes_from_config_missing():
 @pytest.mark.functional
 @mocked_remote_server_requests_wps1([
     # has 1 process listed
-    (WPS1_URL1, resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML, [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML]),
+    (WPS1_URL1, resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML, [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML]),
     # has 1 process listed
-    (WPS1_URL2, resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML, [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML]),
+    (WPS1_URL2, resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML, [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML]),
     # has 1 process listed
-    (WPS1_URL3, resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML, [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML]),
+    (WPS1_URL3, resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML, [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML]),
     # has 11 processes listed
     # although they don't match processes in GetCaps, simulate fetching only those directly so we can omit real ones
-    (WPS1_URL4, resources.WPS_CAPS_EMU_XML, [resources.WPS_ENUM_ARRAY_IO_XML, resources.WPS_LITERAL_COMPLEX_IO_XML]),
+    (WPS1_URL4, resources.TEST_EMU_WPS1_GETCAP_XML, [
+        resources.WPS_ENUM_ARRAY_IO_XML, resources.WPS_LITERAL_COMPLEX_IO_XML
+    ]),
 ])
 def test_register_wps_processes_from_config_valid():
     """
@@ -118,7 +120,7 @@ def test_register_wps_processes_from_config_valid():
                 # the 'GetCapabilities' provides which processes to iterate over
                 resources.GET_CAPABILITIES_TEMPLATE_URL.format(WPS1_URL2),
                 # following will call DescribeProcess
-                resources.DESCRIBE_PROCESS_TEMPLATE_URL.format(WPS1_URL3, resources.TEST_REMOTE_PROCESS_WPS1_ID),
+                resources.DESCRIBE_PROCESS_TEMPLATE_URL.format(WPS1_URL3, resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID),
                 # same as GetCapabilities with iteration on available processes with DescribeProcess,
                 # but will replace the default server name by the provided one (so can reuse same URL)
                 {"name": "test-static-process", "url": WPS1_URL1},
@@ -162,24 +164,24 @@ def test_register_wps_processes_from_config_valid():
     assert len(processes) == 6, "Number of static remote WPS-1 processes registered should match number from file."
 
     # static processes inferred names are a concatenation of the URL sanitized/slug + process-ID
-    proc1_id = infer_name1 + "_" + resources.TEST_REMOTE_PROCESS_WPS1_ID
+    proc1_id = infer_name1 + "_" + resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID
     proc1 = p_store.fetch_by_id(proc1_id)
     assert proc1.package["hints"][CWL_REQUIREMENT_APP_WPS1]["provider"] == WPS1_URL1 + "/"
-    assert proc1.package["hints"][CWL_REQUIREMENT_APP_WPS1]["process"] == resources.TEST_REMOTE_PROCESS_WPS1_ID
-    proc2_id = infer_name2 + "_" + resources.TEST_REMOTE_PROCESS_WPS1_ID
+    assert proc1.package["hints"][CWL_REQUIREMENT_APP_WPS1]["process"] == resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID
+    proc2_id = infer_name2 + "_" + resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID
     proc2 = p_store.fetch_by_id(proc2_id)
     assert proc2.package["hints"][CWL_REQUIREMENT_APP_WPS1]["provider"] == WPS1_URL2 + "/"
-    assert proc2.package["hints"][CWL_REQUIREMENT_APP_WPS1]["process"] == resources.TEST_REMOTE_PROCESS_WPS1_ID
-    proc3_id = infer_name3 + "_" + resources.TEST_REMOTE_PROCESS_WPS1_ID
+    assert proc2.package["hints"][CWL_REQUIREMENT_APP_WPS1]["process"] == resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID
+    proc3_id = infer_name3 + "_" + resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID
     proc3 = p_store.fetch_by_id(proc3_id)
     assert proc3.package["hints"][CWL_REQUIREMENT_APP_WPS1]["provider"] == WPS1_URL3 + "/"
-    assert proc3.package["hints"][CWL_REQUIREMENT_APP_WPS1]["process"] == resources.TEST_REMOTE_PROCESS_WPS1_ID
+    assert proc3.package["hints"][CWL_REQUIREMENT_APP_WPS1]["process"] == resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID
     # although an explicit name is provided, the URL point to generic GetCapabilities
     # therefore, multiple processes *could* be registered, which require same server-name+process-id concat as above
-    proc4_id = "test-static-process_" + resources.TEST_REMOTE_PROCESS_WPS1_ID
+    proc4_id = "test-static-process_" + resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID
     proc4 = p_store.fetch_by_id(proc4_id)
     assert proc4.package["hints"][CWL_REQUIREMENT_APP_WPS1]["provider"] == WPS1_URL1 + "/"
-    assert proc4.package["hints"][CWL_REQUIREMENT_APP_WPS1]["process"] == resources.TEST_REMOTE_PROCESS_WPS1_ID
+    assert proc4.package["hints"][CWL_REQUIREMENT_APP_WPS1]["process"] == resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID
     # last server is the same, but specific IDs are given
     # still, concat happens to avoid conflicts against multiple servers sharing process-IDs, although distinct
     proc5_id = "test-filter-process_" + resources.WPS_ENUM_ARRAY_IO_ID

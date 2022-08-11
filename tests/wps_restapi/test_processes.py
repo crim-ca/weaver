@@ -373,8 +373,8 @@ class WpsRestApiProcessesTest(unittest.TestCase):
 
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
-        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
-        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
+        resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
+        [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
     ])
     def test_get_processes_with_providers(self):
         test_svc_id = "test-provider-processes-listing"
@@ -395,15 +395,15 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert "id" in prov and prov["id"] == test_svc_id
         assert "processes" in prov and isinstance(prov["processes"], list)
         assert all(isinstance(proc, str) for proc in prov["processes"])
-        assert len(prov["processes"]) == 2  # number of descriptions in TEST_REMOTE_PROCESS_GETCAP_WPS1_XML
+        assert len(prov["processes"]) == 2  # number of descriptions in TEST_REMOTE_SERVER_WPS1_GETCAP_XML
         assert set(prov["processes"]) == {"pavicstestdocs", "test-remote-process-wps1"}
         assert resp.json["total"] == total + 2, "Grand total of local+remote processes should be reported."
 
     # register valid server here, and another invalid within test
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
-        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
-        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
+        resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
+        [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
     ])
     def test_get_processes_with_providers_error_servers(self, mock_responses):
         # register service reachable but returning invalid XML
@@ -916,8 +916,8 @@ class WpsRestApiProcessesTest(unittest.TestCase):
 
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
-        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
-        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
+        resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
+        [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
     ])
     def test_deploy_process_CWL_WPS1Requirement_href(self):
         with contextlib.ExitStack() as stack:
@@ -934,7 +934,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                     "class": "CommandLineTool",
                     "hints": {
                         CWL_REQUIREMENT_APP_WPS1: {
-                            "process": resources.TEST_REMOTE_PROCESS_WPS1_ID,
+                            "process": resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID,
                             "provider": resources.TEST_REMOTE_SERVER_URL
                         }
                     },
@@ -960,21 +960,21 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                 }, cwl_file)
 
             body = {
-                "processDescription": {"process": {"id": resources.TEST_REMOTE_PROCESS_WPS1_ID}},
+                "processDescription": {"process": {"id": resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID}},
                 "executionUnit": [{"href": tmp_href}],
                 # FIXME: avoid error on omitted deploymentProfileName (https://github.com/crim-ca/weaver/issues/319)
                 "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
             }
-            self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_PROCESS_WPS1_ID)
+            self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID)
             self.validate_wps1_package(
-                resources.TEST_REMOTE_PROCESS_WPS1_ID,
+                resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID,
                 resources.TEST_REMOTE_SERVER_URL
             )
 
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
-        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
-        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
+        resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
+        [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
     ])
     def test_deploy_process_CWL_WPS1Requirement_owsContext(self):
         ns, fmt = get_cwl_file_format(ContentType.APP_JSON)
@@ -983,7 +983,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             "class": "CommandLineTool",
             "hints": {
                 CWL_REQUIREMENT_APP_WPS1: {
-                    "process": resources.TEST_REMOTE_PROCESS_WPS1_ID,
+                    "process": resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID,
                     "provider": resources.TEST_REMOTE_SERVER_URL
                 }
             },
@@ -1019,7 +1019,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
 
             body = {
                 "processDescription": {"process": {
-                    "id": resources.TEST_REMOTE_PROCESS_WPS1_ID,
+                    "id": resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID,
                 }},
                 "executionUnit": [{"href": resources.TEST_REMOTE_SERVER_URL}],  # just to fulfill schema validation
                 # FIXME: avoid error on omitted deploymentProfileName (https://github.com/crim-ca/weaver/issues/319)
@@ -1027,16 +1027,16 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             }
             ows_ctx = ows_context_href(tmp_http)
             body["processDescription"]["process"].update(ows_ctx)
-            self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_PROCESS_WPS1_ID)
+            self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID)
             self.validate_wps1_package(
-                resources.TEST_REMOTE_PROCESS_WPS1_ID,
+                resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID,
                 resources.TEST_REMOTE_SERVER_URL
             )
 
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
-        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
-        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
+        resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
+        [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
     ])
     def test_deploy_process_CWL_WPS1Requirement_executionUnit(self):
         ns, fmt = get_cwl_file_format(ContentType.APP_JSON)
@@ -1045,7 +1045,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             "class": "CommandLineTool",
             "hints": {
                 CWL_REQUIREMENT_APP_WPS1: {
-                    "process": resources.TEST_REMOTE_PROCESS_WPS1_ID,
+                    "process": resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID,
                     "provider": resources.TEST_REMOTE_SERVER_URL
                 }
             },
@@ -1071,71 +1071,74 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         }
         body = {
             "processDescription": {"process": {
-                "id": resources.TEST_REMOTE_PROCESS_WPS1_ID,
+                "id": resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID,
             }},
             "executionUnit": [{"unit": cwl}],
             # FIXME: avoid error on omitted deploymentProfileName (https://github.com/crim-ca/weaver/issues/319)
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
         }
-        self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_PROCESS_WPS1_ID)
+        self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID)
         self.validate_wps1_package(
-            resources.TEST_REMOTE_PROCESS_WPS1_ID,
+            resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID,
             resources.TEST_REMOTE_SERVER_URL
         )
 
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
-        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
-        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
+        resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
+        [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
     ])
     def test_deploy_process_WPS1_DescribeProcess_href(self):
         body = {
-            "processDescription": {"href": resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_URL},  # this one should be used
+            "processDescription": {
+                "href": resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_URL  # this one should be used
+            },
             "executionUnit": [{"href": resources.TEST_REMOTE_SERVER_URL}]  # some URL just to fulfill schema validation
         }
-        self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_PROCESS_WPS1_ID)
+        self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID)
         self.validate_wps1_package(
-            resources.TEST_REMOTE_PROCESS_WPS1_ID,
+            resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID,
             resources.TEST_REMOTE_SERVER_URL
         )
 
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
-        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
-        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
+        resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
+        [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
     ])
     def test_deploy_process_WPS1_DescribeProcess_owsContext(self):
         body = {
-            "processDescription": {"process": {"id": resources.TEST_REMOTE_PROCESS_WPS1_ID}},
+            "processDescription": {"process": {"id": resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID}},
             "executionUnit": [{"href": resources.TEST_REMOTE_SERVER_URL}]  # some URL just to fulfill schema validation
         }
-        body["processDescription"]["process"].update(ows_context_href(resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_URL))
-        self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_PROCESS_WPS1_ID)
+        desc_url = ows_context_href(resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_URL)
+        body["processDescription"]["process"].update(desc_url)
+        self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID)
 
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
-        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
-        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
+        resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
+        [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
     ])
     def test_deploy_process_WPS1_DescribeProcess_executionUnit(self):
         """
         Test process deployment using a WPS-1 DescribeProcess URL specified as an execution unit reference.
         """
         body = {
-            "processDescription": {"process": {"id": resources.TEST_REMOTE_PROCESS_WPS1_ID}},
-            "executionUnit": [{"href": resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_URL}],
+            "processDescription": {"process": {"id": resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID}},
+            "executionUnit": [{"href": resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_URL}],
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
         }
-        self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_PROCESS_WPS1_ID)
+        self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID)
         self.validate_wps1_package(
-            resources.TEST_REMOTE_PROCESS_WPS1_ID,
+            resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID,
             resources.TEST_REMOTE_SERVER_URL
         )
 
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
-        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
-        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
+        resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
+        [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
     ])
     def test_deploy_process_WPS1_GetCapabilities_href(self):
         """
@@ -1143,44 +1146,44 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         """
         body = {
             "processDescription": {
-                "id": resources.TEST_REMOTE_PROCESS_WPS1_ID,            # must tell which process from GetCapabilities
-                "href": resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_URL,  # this one should be used
+                "id": resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID,    # must tell which process from GetCapabilities
+                "href": resources.TEST_REMOTE_SERVER_WPS1_GETCAP_URL,  # this one should be used
             },
             "executionUnit": [{"href": resources.TEST_REMOTE_SERVER_URL}]  # some URL just to fulfill schema validation
         }
-        self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_PROCESS_WPS1_ID)
+        self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID)
 
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
-        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
-        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
+        resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
+        [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
     ])
     def test_deploy_process_WPS1_GetCapabilities_owsContext(self):
         """
         Test process deployment using a WPS-1 GetCapabilities URL specified through the OwsContext definition.
         """
         body = {
-            "processDescription": {"process": {"id": resources.TEST_REMOTE_PROCESS_WPS1_ID}},
+            "processDescription": {"process": {"id": resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID}},
             "executionUnit": [{"href": resources.TEST_REMOTE_SERVER_URL}]  # some URL just to fulfill schema validation
         }
-        body["processDescription"]["process"].update(ows_context_href(resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_URL))
-        self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_PROCESS_WPS1_ID)
+        body["processDescription"]["process"].update(ows_context_href(resources.TEST_REMOTE_SERVER_WPS1_GETCAP_URL))
+        self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID)
 
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
-        resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_XML,
-        [resources.TEST_REMOTE_PROCESS_DESCRIBE_WPS1_XML],
+        resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
+        [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
     ])
     def test_deploy_process_WPS1_GetCapabilities_executionUnit(self):
         """
         Test process deployment using a WPS-1 GetCapabilities URL specified through the ExecutionUnit parameter.
         """
         body = {
-            "processDescription": {"process": {"id": resources.TEST_REMOTE_PROCESS_WPS1_ID}},
-            "executionUnit": [{"href": resources.TEST_REMOTE_PROCESS_GETCAP_WPS1_URL}],
+            "processDescription": {"process": {"id": resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID}},
+            "executionUnit": [{"href": resources.TEST_REMOTE_SERVER_WPS1_GETCAP_URL}],
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
         }
-        self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_PROCESS_WPS1_ID)
+        self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID)
 
     # FIXME: implement
     @pytest.mark.skip(reason="not implemented")

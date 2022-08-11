@@ -2517,12 +2517,12 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         assert "default" not in pkg["outputs"][0]
         assert pkg["outputs"][0]["format"] == EDAM_NETCDF
         assert pkg["outputs"][0]["type"] == "File"
-        assert pkg["outputs"][0]["outputBinding"]["glob"] == "output_netcdf.nc"
+        assert pkg["outputs"][0]["outputBinding"]["glob"] == "output_netcdf/*.nc"
         assert pkg["outputs"][1]["id"] == "output_log"
         assert "default" not in pkg["outputs"][1]
         assert pkg["outputs"][1]["format"] == EDAM_PLAIN
         assert pkg["outputs"][1]["type"] == "File"
-        assert pkg["outputs"][1]["outputBinding"]["glob"] == "output_log.*"
+        assert pkg["outputs"][1]["outputBinding"]["glob"] == "output_log/*.*"
 
         # process description I/O validation
         assert len(proc["inputs"]) == 2
