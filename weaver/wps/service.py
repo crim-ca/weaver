@@ -150,6 +150,7 @@ class WorkerService(ServiceWPS):
     """
 
     def __init__(self, *_, is_worker=False, settings=None, **__):
+        # type: (*Any, bool, SettingsType, **Any) -> None
         super(WorkerService, self).__init__(*_, **__)
         self.is_worker = is_worker
         self.settings = settings or get_settings()
@@ -364,6 +365,7 @@ class WorkerService(ServiceWPS):
 
 
 def get_pywps_service(environ=None, is_worker=False):
+    # type: (SettingsType, bool) -> WorkerService
     """
     Generates the PyWPS Service that provides WPS-1/2 XML endpoint.
     """

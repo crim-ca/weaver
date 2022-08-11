@@ -148,6 +148,7 @@ class ProcessSchema(Constants):
     """
     OGC = "OGC"
     OLD = "OLD"
+    WPS = "WPS"
 
 
 if TYPE_CHECKING:

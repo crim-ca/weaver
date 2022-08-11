@@ -11,12 +11,14 @@ from pyramid.httpexceptions import (
     HTTPServiceUnavailable,
     HTTPUnprocessableEntity
 )
+from pyramid.response import Response
 from pyramid.settings import asbool
 
 from weaver.database import get_db
 from weaver.exceptions import ProcessNotFound, ServiceException, log_unhandled_exceptions
-from weaver.formats import OutputFormat, repr_json
+from weaver.formats import ContentType, OutputFormat, add_content_type_charset, guess_target_format, repr_json
 from weaver.processes import opensearch
+from weaver.processes.constants import ProcessSchema
 from weaver.processes.execution import submit_job
 from weaver.processes.utils import deploy_process_from_payload, get_process, update_process_metadata
 from weaver.status import Status
@@ -193,8 +195,13 @@ def get_local_process(request):
         process = get_process(request=request)
         process["inputs"] = opensearch.replace_inputs_describe_process(process.inputs, process.payload)
         schema = request.params.get("schema")
-        offering = process.offering(schema)
-        return HTTPOk(json=offering)
+        ctype = guess_target_format(request)
+        if ctype in ContentType.ANY_XML or str(schema).upper() == ProcessSchema.WPS:
+            offering = process.offering(ProcessSchema.WPS, request=request)
+            return Response(offering, content_type=add_content_type_charset(ContentType.APP_XML, "UTF-8"))
+        else:
+            offering = process.offering(schema)
+            return HTTPOk(json=offering)
     # FIXME: handle colander invalid directly in tween (https://github.com/crim-ca/weaver/issues/112)
     except colander.Invalid as ex:
         raise HTTPBadRequest(f"Invalid schema: [{ex!s}]\nValue: [{ex.value!s}]")

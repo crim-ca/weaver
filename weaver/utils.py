@@ -69,6 +69,7 @@ if TYPE_CHECKING:
         NoReturn,
         Optional,
         Type,
+        TypeVar,
         Tuple,
         Union
     )
@@ -95,6 +96,12 @@ if TYPE_CHECKING:
         Number,
         SettingsType
     )
+
+    OriginalClass = TypeVar("OriginalClass")
+    ExtenderMixin = TypeVar("ExtenderMixin")
+
+    class ExtendedClass(OriginalClass, ExtenderMixin):
+        ...
 
 LOGGER = logging.getLogger(__name__)
 
@@ -776,6 +783,16 @@ def parse_extra_options(option_str, sep=","):
     else:
         extra_options = {}
     return extra_options
+
+
+def extend_instance(obj, cls):
+    # type: (OriginalClass, Type[ExtenderMixin]) -> ExtendedClass
+    """
+    Extend an existing instance of a given class by applying new definitions from the specified mixin class type.
+    """
+    base_cls = obj.__class__
+    obj.__class__ = type(obj.__class__.__name__, (base_cls, cls), {})
+    return obj
 
 
 def fully_qualified_name(obj):

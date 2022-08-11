@@ -7,7 +7,8 @@
         service="WPS"
         version="1.0.0"
         xml:lang="en-US"
-        xsi:schemaLocation="http://www.opengis.net/wps/1.0.0 http://schemas.opengis.net/wps/1.0.0/wpsGetCapabilities_response.xsd"
+        xsi:schemaLocation="http://www.opengis.net/wps/1.0.0
+                            http://schemas.opengis.net/wps/1.0.0/wpsGetCapabilities_response.xsd"
         updateSequence="1"
 >
     <ows:ServiceIdentification>

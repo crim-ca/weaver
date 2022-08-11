@@ -20,6 +20,9 @@ Changes:
   timeout of 5s to populate the full list of remotely accessible processes retrieved from each `WPS` service.
 - Add `CLI` output of most recently retrieved `Job` status during ``execute`` operation in combination of monitoring
   flag to report the produced `Job` reference ID and URL in case monitoring timeout is reached before its completion.
+- Add support of `XML` content for `Process` description response from the REST API endpoint based on the `WPS`
+  definition when any query between ``schema=WPS``, ``f=xml``, ``format=xml`` or the ``Accept`` header referring
+  to `XML` Media-Type is identified in the request (resolves `#125 <https://github.com/crim-ca/weaver/issues/125>`_).
 
 Fixes:
 ------

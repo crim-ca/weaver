@@ -27,6 +27,9 @@ from docker.auth import decode_auth
 from owslib.util import ServiceException as OWSServiceException
 from owslib.wps import Process as ProcessOWS, WPSException
 from pywps import Process as ProcessWPS
+from pywps.app import WPSRequest
+from pywps.response.describe import DescribeResponse
+from werkzeug.wrappers.accept import AcceptMixin
 
 from weaver import xml_util
 from weaver.exceptions import ProcessInstanceError, ServiceParsingError
@@ -42,6 +45,7 @@ from weaver.utils import localize_datetime  # for backward compatibility of prev
 from weaver.utils import (
     VersionFormat,
     as_version_major_minor_patch,
+    extend_instance,
     fully_qualified_name,
     get_job_log_msg,
     get_log_date_fmt,
@@ -69,6 +73,7 @@ if TYPE_CHECKING:
     from weaver.typedefs import (
         AnyLogLevel,
         AnyProcess,
+        AnyRequestType,
         AnySettingsContainer,
         AnyUUID,
         AnyVersion,
@@ -2371,11 +2376,12 @@ class Process(Base):
         proc_desc = base_url + sd.process_service.path.format(process_id=self.id)
         return proc_desc
 
-    def offering(self, schema=ProcessSchema.OGC):
-        # type: (ProcessSchemaType) -> JSON
+    def offering(self, schema=ProcessSchema.OGC, request=None):
+        # type: (ProcessSchemaType, AnyRequestType) -> JSON
         """
-        Obtains the JSON serializable offering/description representation of the process.
+        Obtains the :term:`JSON` or :term:`XML` serializable offering/description representation of the :term:`Process`.
 
+        :param request: HTTP request that can provide more details on how to describe the process.
         :param schema:
             One of values defined by :class:`sd.ProcessDescriptionSchemaQuery` to select which
             process description representation to generate (see each schema for details).
@@ -2384,6 +2390,9 @@ class Process(Base):
             Property name ``offering`` is employed to differentiate from the string process ``description`` field.
             The result of this JSON representation is still the ``ProcessDescription`` schema.
         """
+        if schema == ProcessSchema.WPS:
+            return self.xml(request)
+
         process = self.dict()
         links = self.links()
         process.update({
@@ -2517,6 +2526,20 @@ class Process(Base):
             return process
         raise TypeError(f"Unknown process type to convert: [{fully_qualified_name(process)}]")
 
+    def xml(self, request):
+        # type: (AnyRequestType) -> str
+        """
+        Obtain the raw :term:`XML` representation of the :term:`Process` using :term:`WPS` schema.
+        """
+        processes = {self.id: self.wps()}
+        x_request = extend_instance(request, AcceptMixin)  # type: Union[AnyRequestType, AcceptMixin]
+        wps_request = WPSRequest()
+        wps_request.language = x_request.accept_language.header_value
+        wps_request.http_request = x_request  # set instead of init param to bypass extra setup arguments
+        describer = DescribeResponse(wps_request, None, processes=processes, identifiers=list(processes))
+        offering, _ = describer.get_response_doc()
+        return offering
+
     def wps(self):
         # type: () -> ProcessWPS
         """
@@ -2526,6 +2549,7 @@ class Process(Base):
         from weaver.processes.wps_default import HelloWPS
         from weaver.processes.wps_package import WpsPackage
         from weaver.processes.wps_testing import WpsTestProcess
+
         process_map = {
             HelloWPS.identifier: HelloWPS,
             ProcessType.TEST: WpsTestProcess,
