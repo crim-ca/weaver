@@ -28,10 +28,13 @@ from weaver.warning import MissingParameterWarning
 from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
-    from typing import Any, Union
+    from typing import Any, Tuple, Union
 
     from weaver.typedefs import (
         AnyHeadersContainer,
+        CWL,
+        CWL_RuntimeInputsMap,
+        HeadersType,
         JSON,
         JobInputs,
         JobMonitorReference,
@@ -60,11 +63,11 @@ class Wps3RemoteJobProgress(WpsRemoteJobProgress):
 class Wps3Process(WpsProcessInterface):
     def __init__(self,
                  step_payload,      # type: JSON
-                 joborder,          # type: JSON
+                 joborder,          # type: CWL_RuntimeInputsMap
                  process,           # type: str
                  request,           # type: WorkerRequest
                  update_status,     # type: UpdateStatusPartialFunction
-                 ):
+                 ):                 # type: (...) -> None
         super(Wps3Process, self).__init__(
             request,
             lambda _message, _progress, _status: update_status(_message, _progress, _status, self.provider or "local")
@@ -73,6 +76,7 @@ class Wps3Process(WpsProcessInterface):
         self.process = process
 
     def resolve_data_source(self, step_payload, joborder):
+        # type: (CWL, CWL_RuntimeInputsMap) -> Tuple[str, str, JSON]
         try:
             # Presume that all EOImage given as input can be resolved to the same ADES
             # So if we got multiple inputs or multiple values for an input, we take the first one as reference
@@ -101,6 +105,8 @@ class Wps3Process(WpsProcessInterface):
         return data_source, url, deploy_body
 
     def get_user_auth_header(self):
+        # type: () -> HeadersType
+
         # TODO: find a better way to generalize this to Magpie credentials?
         if not asbool(self.settings.get("ades.use_auth_token", True)):
             return {}
@@ -215,6 +221,7 @@ class Wps3Process(WpsProcessInterface):
         response.raise_for_status()
 
     def prepare(self):
+        # type: () -> None
         visible = self.is_visible()
         if not visible:  # includes private visibility and non-existing cases
             if visible is None:

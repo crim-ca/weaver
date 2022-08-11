@@ -114,6 +114,7 @@ if TYPE_CHECKING:
         ExecutionOutputs,
         JobValueFile,
         JSON,
+        NotRequired,
         OpenAPISchema,
         OpenAPISchemaArray,
         OpenAPISchemaObject,
@@ -133,9 +134,11 @@ if TYPE_CHECKING:
     OWS_IO_Type = Union[OWS_Input_Type, OWS_Output_Type]
     JSON_IO_Type = JSON
     JSON_IO_TypedInfo = TypedDict("JSON_IO_TypedInfo", {
-        "type": WPS_DataType,  # noqa
+        "type": WPS_DataType,
         "data_type": Optional[str],
         "data_uom": Optional[bool],
+        "minOccurs": NotRequired[int],
+        "maxOccurs": NotRequired[int],
     }, total=False)
     JSON_IO_ListOrMap = Union[List[JSON], Dict[str, Union[JSON, str]]]
     CWL_IO_Type = Union[CWL_Input_Type, CWL_Output_Type]
@@ -397,10 +400,7 @@ def ows2json_output_data(output, process_description, container=None):
     return json_output
 
 
-# FIXME: support metalink unwrapping (weaver #25)
-# FIXME: reuse functions
-#   definitely can be improved and simplified with 'fetch_file' function
-#   then return parsed contents from that file
+# FIXME: support metalink unwrapping / multi-output array (weaver https://github.com/crim-ca/weaver/issues/25)
 def _get_multi_json_references(output, container):
     # type: (OWS_Output_Type, Optional[AnySettingsContainer]) -> Optional[List[JSON]]
     """

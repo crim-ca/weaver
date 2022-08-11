@@ -51,6 +51,7 @@ if TYPE_CHECKING:
 
     from weaver.typedefs import (
         AnyValueType,
+        CWL_ExpectedOutputs,
         CWL_Output_Type,
         CWL_ToolPathObjectType,
         JobProcessDefinitionCallback,
@@ -444,7 +445,7 @@ class WpsWorkflowJob(JobBase):
                  ):                 # type: (...) -> None
         super(WpsWorkflowJob, self).__init__(builder, joborder, None, requirements, hints, name)
         self.wps_process = wps_process
-        self.expected_outputs = {}  # type: Dict[str, str]  # {id: file-pattern}
+        self.expected_outputs = {}  # type: CWL_ExpectedOutputs  # {id: file-pattern}
         for output in expected_outputs:
             # TODO Should we support something else?
             if is_cwl_file_type(output):

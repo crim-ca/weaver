@@ -201,11 +201,14 @@ class WpsRestApiProvidersTest(WpsProviderBase):
         resp = self.register_provider(clear=True, error=True, data={"id": unresponsive_id, "url": unresponsive_url})
         assert resp.status_code == 422, "Unprocessable response expected for invalid XML"
         assert unresponsive_id in resp.json["description"]
-        err_msg = "Expected service to have trouble retrieving metadata"
+        err_msg = "Expected service to have trouble retrieving metadata, error: {} not in {}"
+        # different errors/causes are raised first based on requests version, but same issue
         known_causes = ["Connection refused", "Connection aborted", "not accessible"]
-        known_errors = ["ConnectionError", "SSLError"]  # different one raised based on requests version, but same issue
-        assert any(err_cause in resp.json["cause"] for err_cause in known_causes), err_msg
-        assert any(err_class in resp.json["error"] for err_class in known_errors), err_msg
+        known_errors = ["ConnectionError", "ConnectTimeout", "SSLError"]
+        resp_cause = resp.json["cause"]
+        resp_error = resp.json["error"]
+        assert any(err_cause in resp_cause for err_cause in known_causes), err_msg.format(resp_cause, known_causes)
+        assert any(err_class in resp_error for err_class in known_errors), err_msg.format(resp_error, known_errors)
 
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
