@@ -332,10 +332,26 @@ def delete_local_process(request):
     raise HTTPForbidden("Deletion of process has been refused by the database or could not have been validated.")
 
 
-@sd.process_execution_service.post(tags=[sd.TAG_PROCESSES, sd.TAG_EXECUTE, sd.TAG_JOBS], renderer=OutputFormat.JSON,
-                                   schema=sd.PostProcessJobsEndpoint(), response_schemas=sd.post_process_jobs_responses)
-@sd.process_jobs_service.post(tags=[sd.TAG_PROCESSES, sd.TAG_EXECUTE, sd.TAG_JOBS], renderer=OutputFormat.JSON,
-                              schema=sd.PostProcessJobsEndpoint(), response_schemas=sd.post_process_jobs_responses)
+@sd.process_execution_service.post(tags=[sd.TAG_PROCESSES, sd.TAG_EXECUTE, sd.TAG_JOBS],
+                                   content_type=ContentType.APP_XML,
+                                   renderer=OutputFormat.JSON,
+                                   schema=sd.PostProcessJobsEndpointXML(),
+                                   response_schemas=sd.post_process_jobs_responses)
+@sd.process_jobs_service.post(tags=[sd.TAG_PROCESSES, sd.TAG_EXECUTE, sd.TAG_JOBS],
+                              content_type=ContentType.APP_XML,
+                              renderer=OutputFormat.JSON,
+                              schema=sd.PostProcessJobsEndpointXML(),
+                              response_schemas=sd.post_process_jobs_responses)
+@sd.process_execution_service.post(tags=[sd.TAG_PROCESSES, sd.TAG_EXECUTE, sd.TAG_JOBS],
+                                   content_type=ContentType.APP_JSON,
+                                   renderer=OutputFormat.JSON,
+                                   schema=sd.PostProcessJobsEndpointJSON(),
+                                   response_schemas=sd.post_process_jobs_responses)
+@sd.process_jobs_service.post(tags=[sd.TAG_PROCESSES, sd.TAG_EXECUTE, sd.TAG_JOBS],
+                              content_type=ContentType.APP_JSON,
+                              renderer=OutputFormat.JSON,
+                              schema=sd.PostProcessJobsEndpointJSON(),
+                              response_schemas=sd.post_process_jobs_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def submit_local_job(request):
     # type: (PyramidRequest) -> AnyViewResponse

@@ -1738,6 +1738,7 @@ class LocalProcessQuery(ExtendedMappingSchema):
 class LocalProcessPath(ExtendedMappingSchema):
     process_id = ProcessIdentifierTag(
         example="jsonarray2netcdf[:1.0.0]",
+        summary="Process identifier with optional tag version.",
         description=(
             "Process identifier with optional tag version. "
             "If tag is omitted, the latest version of that process is assumed. "
@@ -3385,6 +3386,12 @@ class ExecuteInputOutputs(ExtendedMappingSchema):
 
 
 class Execute(ExecuteInputOutputs):
+    examples = {
+        "ExecuteJSON": {
+            "summary": "Execute a process job using REST JSON payload with OGC API schema.",
+            "value": EXAMPLES["job_execute.json"],
+        },
+    }
     mode = JobExecuteModeEnum(
         missing=drop,
         default=ExecuteMode.AUTO,
@@ -4486,15 +4493,48 @@ class WpsOutputContextHeader(ExtendedSchemaNode):
     default = None
 
 
-class ExecuteHeaders(RequestHeaders):
+class ExecuteHeadersBase(RequestHeaders):
     description = "Request headers supported for job execution."
     x_wps_output_context = WpsOutputContextHeader()
 
 
-class PostProcessJobsEndpoint(LocalProcessPath):
-    header = ExecuteHeaders()
+class ExecuteHeadersJSON(ExecuteHeadersBase):
+    content_type = ContentTypeHeader(
+        missing=drop, default=ContentType.APP_JSON,
+        validator=OneOf([ContentType.APP_JSON])
+    )
+
+
+class ExecuteHeadersXML(ExecuteHeadersBase):
+    content_type = ContentTypeHeader(
+        missing=drop, default=ContentType.APP_XML,
+        validator=OneOf(ContentType.ANY_XML)
+    )
+
+
+class PostProcessJobsEndpointJSON(LocalProcessPath):
+    content_type = ContentType.APP_JSON
+    header = ExecuteHeadersJSON()
     querystring = LocalProcessQuery()
     body = Execute()
+
+
+class PostProcessJobsEndpointXML(LocalProcessPath):
+    content_type = ContentType.APP_XML
+    header = ExecuteHeadersXML()
+    querystring = LocalProcessQuery()
+    body = WPSExecutePost(
+        # very important to override 'name' in this case
+        # original schema uses it to specify the XML class name
+        # in this context, it is used to defined the 'in' location of this schema to form 'requestBody' in OpenAPI
+        name="body",
+        examples={
+            "ExecuteXML": {
+                "summary": "Execute a process job using WPS-like XML payload.",
+                "value": EXAMPLES["wps_execute_request.xml"],
+            }
+        }
+    )
 
 
 class GetJobsQueries(ExtendedMappingSchema):
@@ -4714,7 +4754,7 @@ class PostProviderProcessJobRequest(ExtendedMappingSchema):
     """
     Launching a new process request definition.
     """
-    header = ExecuteHeaders()
+    header = ExecuteHeadersJSON()
     querystring = LaunchJobQuerystring()
     body = Execute()
 
