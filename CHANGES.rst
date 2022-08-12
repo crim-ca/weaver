@@ -23,6 +23,8 @@ Changes:
 - Add support of `XML` content for `Process` description response from the REST API endpoint based on the `WPS`
   definition when any query between ``schema=WPS``, ``f=xml``, ``format=xml`` or the ``Accept`` header referring
   to `XML` Media-Type is identified in the request (resolves `#125 <https://github.com/crim-ca/weaver/issues/125>`_).
+- Add support of ``f`` and ``format`` query parameters to describe a `Process` with `JSON` when requested from
+  the `WPS` endpoint with redirect to REST API URL (resolves `#125 <https://github.com/crim-ca/weaver/issues/125>`_).
 
 Fixes:
 ------
