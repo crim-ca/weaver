@@ -36,6 +36,7 @@ Fixes:
 - Fix result file names resolution for staging outputs retrieved from the `Job` execution on a remote `Provider` where
   the `Process` outputs files are not generated using the same glob naming convention as expected by the `CWL` outputs
   of the corresponding `Process`.
+- Fix `Job` submission response generation potentially duplicating ``Content-Type`` and ``Content-Length`` headers.
 
 .. _changes_4.20.0:
 
