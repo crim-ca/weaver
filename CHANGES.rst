@@ -25,6 +25,9 @@ Changes:
   to `XML` Media-Type is identified in the request (resolves `#125 <https://github.com/crim-ca/weaver/issues/125>`_).
 - Add support of ``f`` and ``format`` query parameters to describe a `Process` with `JSON` when requested from
   the `WPS` endpoint with redirect to REST API URL (resolves `#125 <https://github.com/crim-ca/weaver/issues/125>`_).
+- Add support of `Job` submission with `WPS`-like `XML` content and HTTP ``POST`` request directly submitted through
+  the `OGC APi - Processes` REST endpoint. Response is returned in `JSON` regardless of `WPS`-like `Job` submission
+  in order to provide the status response (resolves `#125 <https://github.com/crim-ca/weaver/issues/125>`_).
 
 Fixes:
 ------

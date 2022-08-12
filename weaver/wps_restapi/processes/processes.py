@@ -13,18 +13,35 @@ from pyramid.httpexceptions import (
 )
 from pyramid.response import Response
 from pyramid.settings import asbool
+from werkzeug.wrappers.request import BaseRequest
 
 from weaver.database import get_db
 from weaver.exceptions import ProcessNotFound, ServiceException, log_unhandled_exceptions
-from weaver.formats import ContentType, OutputFormat, add_content_type_charset, guess_target_format, repr_json
+from weaver.formats import (
+    ContentType,
+    OutputFormat,
+    add_content_type_charset,
+    clean_mime_type_format,
+    guess_target_format,
+    repr_json
+)
 from weaver.processes import opensearch
 from weaver.processes.constants import ProcessSchema
 from weaver.processes.execution import submit_job
 from weaver.processes.utils import deploy_process_from_payload, get_process, update_process_metadata
 from weaver.status import Status
 from weaver.store.base import StoreJobs, StoreProcesses
-from weaver.utils import clean_json_text_body, fully_qualified_name, get_any_id
+from weaver.utils import (
+    clean_json_text_body,
+    extend_instance,
+    fully_qualified_name,
+    get_any_id,
+    get_header,
+    get_path_kvp
+)
 from weaver.visibility import Visibility
+from weaver.wps.service import get_pywps_service
+from weaver.wps.utils import get_wps_path
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.processes.utils import get_process_list_links, get_processes_filtered_by_valid_schemas
 from weaver.wps_restapi.providers.utils import get_provider_services
@@ -328,4 +345,17 @@ def submit_local_job(request):
     Execution location and method is according to deployed Application Package.
     """
     process = get_process(request=request)
+    ctype = clean_mime_type_format(get_header("content-type", request.headers, default=None), strip_parameters=True)
+    if ctype in ContentType.ANY_XML:
+        # Send the XML request to the WPS endpoint which knows how to parse it properly.
+        # Execution will end up in the same 'submit_job_handler' function as other branch for JSON.
+        service = get_pywps_service()
+        wps_params = {"version": "1.0.0", "request": "Execute", "service": "WPS", "identifier": process.id}
+        request.path_info = get_wps_path(request)
+        request.query_string = get_path_kvp("", **wps_params)[1:]
+        location = request.application_url + request.path_info + request.query_string
+        LOGGER.warning("Route redirection [%s] -> [%s] for WPS-XML support.", request.url, location)
+        http_request = extend_instance(request, BaseRequest)
+        http_request.shallow = False
+        return service.call(http_request)
     return submit_job(request, process, tags=["wps-rest"])

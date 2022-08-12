@@ -663,7 +663,7 @@ def clean_mime_type_format(mime_type, suffix_subtype=False, strip_parameters=Fal
 
 
 def guess_target_format(request, default=ContentType.APP_JSON):
-    # type: (AnyRequestType, str) -> str
+    # type: (AnyRequestType, Optional[Union[ContentType, str]]) -> ContentType
     """
     Guess the best applicable response ``Content-Type`` header from the request.
 
