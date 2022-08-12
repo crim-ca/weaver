@@ -75,3 +75,4 @@ simplejson
 urlmatch
 xmltodict
 webob
+werkzeug
