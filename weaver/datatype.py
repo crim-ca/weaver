@@ -29,7 +29,7 @@ from owslib.wps import Process as ProcessOWS, WPSException
 from pywps import Process as ProcessWPS
 from pywps.app import WPSRequest
 from pywps.response.describe import DescribeResponse
-from werkzeug.wrappers.accept import AcceptMixin
+from werkzeug.wrappers import Request as WerkzeugRequest
 
 from weaver import xml_util
 from weaver.exceptions import ProcessInstanceError, ServiceParsingError
@@ -2531,11 +2531,12 @@ class Process(Base):
         """
         Obtain the raw :term:`XML` representation of the :term:`Process` using :term:`WPS` schema.
         """
-        processes = {self.id: self.wps()}
-        x_request = extend_instance(request, AcceptMixin)  # type: Union[AnyRequestType, AcceptMixin]
+        # make sure 'accept_mimetypes' can be found if missing from the provided request implementation
+        http_request = extend_instance(request, WerkzeugRequest)  # type: Union[AnyRequestType, WerkzeugRequest]
         wps_request = WPSRequest()
-        wps_request.language = x_request.accept_language.header_value
-        wps_request.http_request = x_request  # set instead of init param to bypass extra setup arguments
+        wps_request.language = http_request.accept_language.header_value
+        wps_request.http_request = http_request  # set instead of init param to bypass extra setup arguments
+        processes = {self.id: self.wps()}
         describer = DescribeResponse(wps_request, None, processes=processes, identifiers=list(processes))
         offering, _ = describer.get_response_doc()
         return offering

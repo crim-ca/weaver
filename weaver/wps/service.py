@@ -13,6 +13,7 @@ from pywps.inout.storage import StorageAbstract
 from pywps.response import WPSResponse
 from pywps.response.execute import ExecuteResponse
 from requests.structures import CaseInsensitiveDict
+from werkzeug.wrappers.request import Request as WerkzeugRequest
 
 from weaver.database import get_db
 from weaver.datatype import Process
@@ -97,6 +98,8 @@ class WorkerRequest(WPSRequest):
 
     def __init__(self, http_request=None, http_headers=None, **kwargs):
         # type: (Optional[AnyRequestType], Optional[AnyHeadersContainer], **Any) -> None
+        if http_request and not isinstance(http_request, WerkzeugRequest):
+            http_request = extend_instance(http_request, WerkzeugRequest)
         super(WorkerRequest, self).__init__(http_request, **kwargs)
         self.auth_headers = CaseInsensitiveDict()
         if http_request:

@@ -13,7 +13,7 @@ from pyramid.httpexceptions import (
 )
 from pyramid.response import Response
 from pyramid.settings import asbool
-from werkzeug.wrappers.request import BaseRequest
+from werkzeug.wrappers.request import Request as WerkzeugRequest
 
 from weaver.database import get_db
 from weaver.exceptions import ProcessNotFound, ServiceException, log_unhandled_exceptions
@@ -355,7 +355,7 @@ def submit_local_job(request):
         request.query_string = get_path_kvp("", **wps_params)[1:]
         location = request.application_url + request.path_info + request.query_string
         LOGGER.warning("Route redirection [%s] -> [%s] for WPS-XML support.", request.url, location)
-        http_request = extend_instance(request, BaseRequest)
+        http_request = extend_instance(request, WerkzeugRequest)
         http_request.shallow = False
         return service.call(http_request)
     return submit_job(request, process, tags=["wps-rest"])
