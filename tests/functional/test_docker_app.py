@@ -13,6 +13,7 @@ from weaver.formats import ContentType
 from weaver.processes.wps_package import CWL_REQUIREMENT_APP_DOCKER
 from weaver.utils import fetch_file, get_any_value, load_file, str2bytes
 from weaver.wps.utils import get_wps_url
+from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 
 @pytest.mark.functional
@@ -168,8 +169,11 @@ class WpsPackageDockerAppTest(WpsConfigBase):
 
         self.validate_outputs(job_id, results, outputs, test_content)
 
-    def wps_execute(self, version, accept):
-        wps_url = get_wps_url(self.settings)
+    def wps_execute(self, version, accept, url=None):
+        if url:
+            wps_url = url
+        else:
+            wps_url = get_wps_url(self.settings)
         if version == "1.0.0":
             test_content = "Test file in Docker - WPS KVP"
             wps_method = "GET"
@@ -306,6 +310,14 @@ class WpsPackageDockerAppTest(WpsConfigBase):
             - :meth:`test_execute_wps_xml_post_resp_json`
         """
         self.wps_execute("2.0.0", ContentType.APP_JSON)
+
+    def test_execute_rest_xml_post_resp_json(self):
+        """
+        Test :term:`XML` content using :term:`WPS` format submitted to REST endpoint gets redirected automatically.
+        """
+        base = get_wps_restapi_base_url(self.settings)
+        url = f"{base}/processes/{self.process_id}/execution"
+        self.wps_execute("2.0.0", ContentType.APP_JSON, url=url)
 
     def test_execute_docker_embedded_python_script(self):
         test_proc = "test-docker-python-script"

@@ -2534,10 +2534,10 @@ class Process(Base):
         # make sure 'accept_mimetypes' can be found if missing from the provided request implementation
         http_request = extend_instance(request, WerkzeugRequest)  # type: Union[AnyRequestType, WerkzeugRequest]
         wps_request = WPSRequest()
-        wps_request.language = http_request.accept_language.header_value
+        wps_request.language = http_request.accept_language.header_value or AcceptLanguage.EN_CA
         wps_request.http_request = http_request  # set instead of init param to bypass extra setup arguments
         processes = {self.id: self.wps()}
-        describer = DescribeResponse(wps_request, None, processes=processes, identifiers=list(processes))
+        describer = DescribeResponse(wps_request, uuid=None, processes=processes, identifiers=list(processes))
         offering, _ = describer.get_response_doc()
         return offering
 
