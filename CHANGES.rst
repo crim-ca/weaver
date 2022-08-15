@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_4.21.0:
+
+`4.21.0 <https://github.com/crim-ca/weaver/tree/4.21.0>`_ (2022-08-15)
+========================================================================
+
+Changes:
+--------
 - Add `CLI` support for `Process` listing, `Job` execution, service registration and un-registration in the context
   of a `Process` offered by a remote `Provider` reference.
 - Add `CLI` options for `Process` listing with detailed descriptions, paging, limit and sorting queries.
