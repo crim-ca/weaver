@@ -1,52 +1,53 @@
 <wps:ExecuteResponse
-		xmlns:wps="http://www.opengis.net/wps/1.0.0"
-		xmlns:ows="http://www.opengis.net/ows/1.1"
-		xmlns:xlink="http://www.w3.org/1999/xlink"
-		xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-		xsi:schemaLocation="http://www.opengis.net/wps/1.0.0 ../wpsExecute_response.xsd"
-		service="WPS"
-		version="1.0.0"
-		xml:lang="en-CA"
-		serviceInstance="http://schema-example/wps"
-		statusLocation="http://schema-example/wpsoutputs/14c68477-c3ed-4784-9c0f-a4c9e1344db5.xml"
+        xmlns:wps="http://www.opengis.net/wps/1.0.0"
+        xmlns:ows="http://www.opengis.net/ows/1.1"
+        xmlns:xlink="http://www.w3.org/1999/xlink"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.opengis.net/wps/1.0.0
+                            http://www.opengis.net/wps/1.0.0/wpsExecute_response.xsd"
+        service="WPS"
+        version="1.0.0"
+        xml:lang="en-CA"
+        serviceInstance="http://schema-example/wps"
+        statusLocation="http://schema-example/wpsoutputs/14c68477-c3ed-4784-9c0f-a4c9e1344db5.xml"
 >
-	<wps:Process wps:processVersion="1.1">
-		<ows:Identifier>jsonarray2netcdf</ows:Identifier>
-		<ows:Title>JSON array to NetCDF</ows:Title>
-		<ows:Abstract>
-			Extracts and fetches NetCDF files from a JSON file containing an URL string array,
-			and provides them on the output directory.
-		</ows:Abstract>
-	</wps:Process>
-	<wps:Status creationTime="2021-03-02T03:32:38.487000+00:00">
-		<wps:ProcessSucceeded/>
-	</wps:Status>
-	<wps:DataInputs>
-		<wps:Input>
-			<ows:Identifier>dataset</ows:Identifier>
-			<ows:Title>Playground area</ows:Title>
-			<wps:Reference
-					xlink:href="https://schema-example.com/data/test.nc"
-					mimeType="application/json"
-					encoding="UTF-8"
-			/>
-		</wps:Input>
-	</wps:DataInputs>
-	<wps:OutputDefinitions>
-		<wps:Output mimeType="text/plain" encoding="UTF-8" asReference="true">
-			<ows:Identifier>output</ows:Identifier>
-			<ows:Title>Output</ows:Title>
-		</wps:Output>
-	</wps:OutputDefinitions>
-	<wps:ProcessOutputs>
-		<wps:Output>
-			<ows:Identifier>Output</ows:Identifier>
-			<ows:Title>Output</ows:Title>
-			<wps:Reference
-					xlink:href="http://schema-example.com/wpsoutputs/14c68477-c3ed-4784-9c0f-a4c9e1344db5/output.txt"
-				  	mimeType="text/plain"
-				  	encoding="UTF-8"
-			/>
-		</wps:Output>
-	</wps:ProcessOutputs>
+    <wps:Process wps:processVersion="1.1">
+        <ows:Identifier>jsonarray2netcdf</ows:Identifier>
+        <ows:Title>JSON array to NetCDF</ows:Title>
+        <ows:Abstract>
+            Extracts and fetches NetCDF files from a JSON file containing an URL string array,
+            and provides them on the output directory.
+        </ows:Abstract>
+    </wps:Process>
+    <wps:Status creationTime="2021-03-02T03:32:38.487000+00:00">
+        <wps:ProcessSucceeded/>
+    </wps:Status>
+    <wps:DataInputs>
+        <wps:Input>
+            <ows:Identifier>dataset</ows:Identifier>
+            <ows:Title>Playground area</ows:Title>
+            <wps:Reference
+                    xlink:href="https://schema-example.com/data/test.nc"
+                    mimeType="application/json"
+                    encoding="UTF-8"
+            />
+        </wps:Input>
+    </wps:DataInputs>
+    <wps:OutputDefinitions>
+        <wps:Output mimeType="text/plain" encoding="UTF-8" asReference="true">
+            <ows:Identifier>output</ows:Identifier>
+            <ows:Title>Output</ows:Title>
+        </wps:Output>
+    </wps:OutputDefinitions>
+    <wps:ProcessOutputs>
+        <wps:Output>
+            <ows:Identifier>Output</ows:Identifier>
+            <ows:Title>Output</ows:Title>
+            <wps:Reference
+                    xlink:href="http://schema-example.com/wpsoutputs/14c68477-c3ed-4784-9c0f-a4c9e1344db5/output.txt"
+                      mimeType="text/plain"
+                      encoding="UTF-8"
+            />
+        </wps:Output>
+    </wps:ProcessOutputs>
 </wps:ExecuteResponse>

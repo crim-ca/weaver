@@ -26,7 +26,7 @@ from dateutil import parser as date_parser
 from weaver import __meta__
 from weaver.config import WeaverFeature
 from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
-from weaver.formats import AcceptLanguage, ContentType
+from weaver.formats import AcceptLanguage, ContentType, OutputFormat
 from weaver.owsexceptions import OWSMissingParameterValue
 from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_BUILTIN,
@@ -543,6 +543,36 @@ class ResponseHeaders(ResponseContentTypeHeader):
 
 class RedirectHeaders(ResponseHeaders):
     Location = URL(example="https://job/123/result", description="Redirect resource location.")
+
+
+class AcceptFormatHeaders(ExtendedMappingSchema):
+    accept = AcceptHeader(description="Output format selector. Equivalent to 'f' or 'format' queries.")
+    accept_language = AcceptLanguageHeader(description="Output content language if supported.")
+
+
+class OutputFormatQuery(ExtendedSchemaNode):
+    schema_type = String
+    description = "Output format selector for requested contents."
+    example = OutputFormat.JSON
+    validator = OneOf(OutputFormat.values())
+
+
+class FormatQueryValue(OneOfKeywordSchema):
+    _one_of = [
+        MediaType(),
+        OutputFormatQuery()
+    ]
+
+
+class FormatQuery(ExtendedMappingSchema):
+    f = FormatQueryValue(
+        missing=drop,
+        description="Output format selector. Equivalent to 'format' query or 'Accept' header."
+    )
+    format = FormatQueryValue(
+        missing=drop,
+        description="Output format selector. Equivalent to 'f' query or 'Accept' header."
+    )
 
 
 class NoContent(ExtendedMappingSchema):
@@ -1708,6 +1738,7 @@ class LocalProcessQuery(ExtendedMappingSchema):
 class LocalProcessPath(ExtendedMappingSchema):
     process_id = ProcessIdentifierTag(
         example="jsonarray2netcdf[:1.0.0]",
+        summary="Process identifier with optional tag version.",
         description=(
             "Process identifier with optional tag version. "
             "If tag is omitted, the latest version of that process is assumed. "
@@ -2519,14 +2550,16 @@ class ProcessDescriptionQuery(ExtendedMappingSchema):
     schema = ExtendedSchemaNode(
         String(), example=ProcessSchema.OGC, default=ProcessSchema.OGC,
         validator=OneOfCaseInsensitive(ProcessSchema.values()),
-        summary="Selects the desired schema representation of the process description",
+        summary="Selects the desired schema representation of the process description.",
         description=(
             "Selects the desired schema representation of the process description. "
             f"When '{ProcessSchema.OGC}' is used, inputs and outputs will be represented as mapping of objects. "
             "Process metadata are also directly provided at the root of the content. "
             f"When '{ProcessSchema.OLD}' is used, inputs and outputs will be represented as list of objects with ID. "
             "Process metadata are also reported nested under a 'process' field. "
-            "See '#/definitions/ProcessDescription' schema for more details about each case."
+            "See '#/definitions/ProcessDescription' schema for more details about each case. "
+            "These schemas are all represented with JSON content. "
+            f"For the XML definition, employ '{ProcessSchema.WPS}' or any format selector (f, format, Accept) with XML."
         )
     )
 
@@ -2536,12 +2569,16 @@ class ProviderProcessEndpoint(ProviderProcessPath):
     querystring = ProcessDescriptionQuery()
 
 
-class LocalProcessDescriptionQuery(ProcessDescriptionQuery, LocalProcessQuery):
+class LocalProcessDescriptionQuery(ProcessDescriptionQuery, LocalProcessQuery, FormatQuery):
+    pass
+
+
+class LocalProcessEndpointHeaders(AcceptFormatHeaders, RequestHeaders):  # order important for descriptions to appear
     pass
 
 
 class ProcessEndpoint(LocalProcessPath):
-    header = RequestHeaders()
+    header = LocalProcessEndpointHeaders()
     querystring = LocalProcessDescriptionQuery()
 
 
@@ -3349,6 +3386,12 @@ class ExecuteInputOutputs(ExtendedMappingSchema):
 
 
 class Execute(ExecuteInputOutputs):
+    examples = {
+        "ExecuteJSON": {
+            "summary": "Execute a process job using REST JSON payload with OGC API schema.",
+            "value": EXAMPLES["job_execute.json"],
+        },
+    }
     mode = JobExecuteModeEnum(
         missing=drop,
         default=ExecuteMode.AUTO,
@@ -4450,15 +4493,48 @@ class WpsOutputContextHeader(ExtendedSchemaNode):
     default = None
 
 
-class ExecuteHeaders(RequestHeaders):
+class ExecuteHeadersBase(RequestHeaders):
     description = "Request headers supported for job execution."
     x_wps_output_context = WpsOutputContextHeader()
 
 
-class PostProcessJobsEndpoint(LocalProcessPath):
-    header = ExecuteHeaders()
+class ExecuteHeadersJSON(ExecuteHeadersBase):
+    content_type = ContentTypeHeader(
+        missing=drop, default=ContentType.APP_JSON,
+        validator=OneOf([ContentType.APP_JSON])
+    )
+
+
+class ExecuteHeadersXML(ExecuteHeadersBase):
+    content_type = ContentTypeHeader(
+        missing=drop, default=ContentType.APP_XML,
+        validator=OneOf(ContentType.ANY_XML)
+    )
+
+
+class PostProcessJobsEndpointJSON(LocalProcessPath):
+    content_type = ContentType.APP_JSON
+    header = ExecuteHeadersJSON()
     querystring = LocalProcessQuery()
     body = Execute()
+
+
+class PostProcessJobsEndpointXML(LocalProcessPath):
+    content_type = ContentType.APP_XML
+    header = ExecuteHeadersXML()
+    querystring = LocalProcessQuery()
+    body = WPSExecutePost(
+        # very important to override 'name' in this case
+        # original schema uses it to specify the XML class name
+        # in this context, it is used to defined the 'in' location of this schema to form 'requestBody' in OpenAPI
+        name="body",
+        examples={
+            "ExecuteXML": {
+                "summary": "Execute a process job using WPS-like XML payload.",
+                "value": EXAMPLES["wps_execute_request.xml"],
+            }
+        }
+    )
 
 
 class GetJobsQueries(ExtendedMappingSchema):
@@ -4678,7 +4754,7 @@ class PostProviderProcessJobRequest(ExtendedMappingSchema):
     """
     Launching a new process request definition.
     """
-    header = ExecuteHeaders()
+    header = ExecuteHeadersJSON()
     querystring = LaunchJobQuerystring()
     body = Execute()
 
@@ -5387,6 +5463,10 @@ get_process_responses = {
             "summary": "Description of a local process registered in Weaver (Old Schema) "
                        "with fields nested under a process section and using inputs/outputs listed with IDs.",
             "value": EXAMPLES["local_process_description.json"],
+        },
+        "ProcessDescriptionSchemaWPS": {
+            "Summary": "Description of a local process registered in Weaver (WPS Schema) when requesting XML format.",
+            "value": EXAMPLES["wps_describeprocess.xml"],
         }
     }),
     "400": BadRequestGetProcessInfoResponse(),

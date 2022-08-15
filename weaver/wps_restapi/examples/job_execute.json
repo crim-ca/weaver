@@ -1,0 +1,28 @@
+{
+  "response": "document",
+  "inputs": {
+    "literalDataInput": 1,
+    "literalDataOther": {
+      "value": 1.23
+    },
+    "complexFileInput": {
+      "href": "http://schema-example.com/data/image.tif",
+      "format": {
+        "mediaType": "image/tiff; application=geotiff",
+        "encoding": "base64"
+      }
+    },
+    "ogcStyleFileInput": {
+      "href": "http://schema-example.com/data/image.tif",
+      "type": "image/tiff; application=geotiff"
+    }
+  },
+  "outputs": {
+    "outputData": {
+      "transmissionMode": "value"
+    },
+    "outputFile": {
+      "transmissionMode": "reference"
+    }
+  }
+}

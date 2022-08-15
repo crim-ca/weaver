@@ -39,6 +39,7 @@ from weaver.utils import (
     get_any_id,
     get_any_value,
     get_file_headers,
+    get_header,
     get_path_kvp,
     get_settings,
     get_weaver_url,
@@ -63,6 +64,7 @@ if TYPE_CHECKING:
         AnyValueType,
         ExecutionResultArray,
         ExecutionResultObject,
+        ExecutionResultValue,
         ExecutionResults,
         HeadersTupleType,
         JSON,
@@ -453,8 +455,8 @@ def get_job_results_response(job, container, headers=None):
     # raw response can be data-only value, link-only or a mix of them
     if results:
         # https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_process-execute-sync-raw-value-one
-        out_vals = list(results.items())
-        out_info = out_vals[0][-1]
+        out_vals = list(results.items())  # type: List[Tuple[str, ExecutionResultValue]]  # noqa
+        out_info = out_vals[0][-1]        # type: ExecutionResultValue
         out_type = get_any_value(out_info, key=True)
         out_data = get_any_value(out_info)
 
@@ -502,6 +504,13 @@ def get_job_submission_response(body, headers, error=False):
         :func:`weaver.processes.execution.submit_job`
         :func:`weaver.processes.execution.submit_job_handler`
     """
+    # convert headers to pass as list to avoid any duplicate Content-related headers
+    # otherwise auto-added by JSON handling when provided by dict-like structure
+    if hasattr(headers, "items"):
+        headers = list(headers.items())
+    get_header("Content-Type", headers, pop=True)
+    headers.append(("Content-Type", ContentType.APP_JSON))
+
     status = map_status(body.get("status"))
     if status in JOB_STATUS_CATEGORIES[StatusCategory.FINISHED]:
         if error:
@@ -513,11 +522,11 @@ def get_job_submission_response(body, headers, error=False):
             body = sd.CompletedJobStatusSchema().deserialize(body)
 
         body["description"] = http_desc
-        return http_class(json=body, headers=headers)
+        return http_class(json=body, headerlist=headers)
 
     body["description"] = sd.CreatedLaunchJobResponse.description
     body = sd.CreatedJobStatusSchema().deserialize(body)
-    return HTTPCreated(json=body, headers=headers)
+    return HTTPCreated(json=body, headerlist=headers)
 
 
 def validate_service_process(request):

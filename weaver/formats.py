@@ -663,7 +663,7 @@ def clean_mime_type_format(mime_type, suffix_subtype=False, strip_parameters=Fal
 
 
 def guess_target_format(request, default=ContentType.APP_JSON):
-    # type: (AnyRequestType, str) -> str
+    # type: (AnyRequestType, Optional[Union[ContentType, str]]) -> ContentType
     """
     Guess the best applicable response ``Content-Type`` header from the request.
 
@@ -691,7 +691,7 @@ def guess_target_format(request, default=ContentType.APP_JSON):
         if content_type:
             content_type = get_content_type(content_type)
     if not content_type:
-        content_type = get_header("accept", request.headers, default=default)
+        content_type = get_header("accept", request.headers, default=default or "")
         for ctype in content_type.split(","):
             ctype = clean_mime_type_format(ctype, suffix_subtype=True, strip_parameters=True)
             if ctype != default:

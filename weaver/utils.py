@@ -69,6 +69,7 @@ if TYPE_CHECKING:
         NoReturn,
         Optional,
         Type,
+        TypeVar,
         Tuple,
         Union
     )
@@ -95,6 +96,12 @@ if TYPE_CHECKING:
         Number,
         SettingsType
     )
+
+    OriginalClass = TypeVar("OriginalClass")
+    ExtenderMixin = TypeVar("ExtenderMixin")
+
+    class ExtendedClass(OriginalClass, ExtenderMixin):
+        ...
 
 LOGGER = logging.getLogger(__name__)
 
@@ -778,6 +785,16 @@ def parse_extra_options(option_str, sep=","):
     return extra_options
 
 
+def extend_instance(obj, cls):
+    # type: (OriginalClass, Type[ExtenderMixin]) -> ExtendedClass
+    """
+    Extend an existing instance of a given class by applying new definitions from the specified mixin class type.
+    """
+    base_cls = obj.__class__
+    obj.__class__ = type(obj.__class__.__name__, (base_cls, cls), {})
+    return obj
+
+
 def fully_qualified_name(obj):
     # type: (Union[Any, Type[Any]]) -> str
     """
@@ -1073,7 +1090,7 @@ all_cap_re = re.compile(r"([a-z0-9])([A-Z])")
 def get_path_kvp(path, sep=",", **params):
     # type: (str, str, **KVP_Item) -> str
     """
-    Generates the URL with Key-Value-Pairs (KVP) query parameters.
+    Generates the URL with Key-Value-Pairs (:term:`KVP`) query parameters.
 
     :param path: WPS URL or Path
     :param sep: separator to employ when multiple values are provided.

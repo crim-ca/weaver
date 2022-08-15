@@ -20,6 +20,14 @@ Changes:
   timeout of 5s to populate the full list of remotely accessible processes retrieved from each `WPS` service.
 - Add `CLI` output of most recently retrieved `Job` status during ``execute`` operation in combination of monitoring
   flag to report the produced `Job` reference ID and URL in case monitoring timeout is reached before its completion.
+- Add support of `XML` content for `Process` description response from the REST API endpoint based on the `WPS`
+  definition when any query between ``schema=WPS``, ``f=xml``, ``format=xml`` or the ``Accept`` header referring
+  to `XML` Media-Type is identified in the request (resolves `#125 <https://github.com/crim-ca/weaver/issues/125>`_).
+- Add support of ``f`` and ``format`` query parameters to describe a `Process` with `JSON` when requested from
+  the `WPS` endpoint with redirect to REST API URL (resolves `#125 <https://github.com/crim-ca/weaver/issues/125>`_).
+- Add support of `Job` submission with `WPS`-like `XML` content and HTTP ``POST`` request directly submitted through
+  the `OGC APi - Processes` REST endpoint. Response is returned in `JSON` regardless of `WPS`-like `Job` submission
+  in order to provide the status response (resolves `#125 <https://github.com/crim-ca/weaver/issues/125>`_).
 
 Fixes:
 ------
@@ -28,6 +36,7 @@ Fixes:
 - Fix result file names resolution for staging outputs retrieved from the `Job` execution on a remote `Provider` where
   the `Process` outputs files are not generated using the same glob naming convention as expected by the `CWL` outputs
   of the corresponding `Process`.
+- Fix `Job` submission response generation potentially duplicating ``Content-Type`` and ``Content-Length`` headers.
 
 .. _changes_4.20.0:
 

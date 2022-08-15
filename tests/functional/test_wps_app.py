@@ -35,7 +35,7 @@ class WpsAppTest(unittest.TestCase):
     def setUp(self):
         self.wps_path = "/ows/wps"
         settings = {
-            "weaver.url": "",
+            "weaver.url": "https://localhost",
             "weaver.wps": True,
             "weaver.wps_path": self.wps_path,
             "weaver.wps_metadata_identification_title": "Weaver WPS Test Server",
@@ -97,6 +97,23 @@ class WpsAppTest(unittest.TestCase):
         template = "service=wps&request=describeprocess&version=1.0.0&identifier={}"
         params = template.format(HelloWPS.identifier)
         resp = self.app.get(self.make_url(params))
+        assert resp.status_code == 200
+        assert resp.content_type in ContentType.ANY_XML
+        resp.mustcontain("</wps:ProcessDescriptions>")
+
+    def test_describeprocess_json_format_query(self):
+        template = "service=wps&request=describeprocess&version=1.0.0&identifier={}&f=json"
+        params = template.format(HelloWPS.identifier)
+        resp = self.app.get(self.make_url(params))
+        assert 300 <= resp.status_code < 400, "redirect response to REST-JSON formatted endpoint expected"
+        resp = resp.follow()
+        assert resp.status_code == 200
+        assert resp.content_type in ContentType.APP_JSON
+        assert resp.json["id"] == HelloWPS.identifier
+
+    def test_describeprocess_xml_format_from_restapi_url(self):
+        url = f"/processes/{HelloWPS.identifier}"
+        resp = self.app.get(url, headers={"Accept": ContentType.APP_XML})
         assert resp.status_code == 200
         assert resp.content_type in ContentType.ANY_XML
         resp.mustcontain("</wps:ProcessDescriptions>")
