@@ -311,6 +311,8 @@ class WpsRestApiProvidersTest(WpsProviderBase):
             - Full description validation (OLD schema): :meth:`test_get_provider_process_description_old_schema`
             - Fix in PR `geopython/OWSLib#794 <https://github.com/geopython/OWSLib/pull/794>`_
         """
+        self.register_provider()
+
         path = f"/providers/{self.remote_provider_name}/processes/{resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID}"
         resp = self.app.get(path, params={"schema": ProcessSchema.OLD}, headers=self.json_headers)
         assert resp.status_code == 200
@@ -322,8 +324,8 @@ class WpsRestApiProvidersTest(WpsProviderBase):
         assert resp.content_type == ContentType.APP_JSON
         desc = resp.json
 
-        assert "version" in proc and isinstance(proc["version"], str) and proc["version"] == "1.0.0"
-        assert "version" in desc and isinstance(desc["version"], str) and desc["version"] == "1.0.0"
+        assert "version" in proc and isinstance(proc["version"], str) and proc["version"] == "0.5"
+        assert "version" in desc and isinstance(desc["version"], str) and desc["version"] == "0.5"
 
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
