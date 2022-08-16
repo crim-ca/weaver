@@ -16,7 +16,9 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Bump version ``OWSLib==0.26.0`` to fix ``processVersion`` attribute resolution from `WPS` remote `Provider` definition
+  to populate ``Process.version`` property employed in converted `Process` description to `OGC API - Process` schema
+  (relates to `geopython/OWSLib#794 <https://github.com/geopython/OWSLib/pull/794>`_).
 
 .. _changes_4.21.0:
 
