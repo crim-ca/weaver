@@ -69,7 +69,7 @@ if TYPE_CHECKING:
 
     ReturnValue = TypeVar("ReturnValue")  # alias to identify the same return value as a decorated/wrapped function
     AnyCallable = TypeVar("AnyCallable", bound=Callable[..., Any])  # callable used for decorated/wrapped functions
-    AnyCallableWrapped = TypeVar("AnyCallableWrapped", bound=Callable[[..., Any], ReturnValue])
+    AnyCallableWrapped = Callable[[..., Any], ReturnValue]
     AnyCallableAnyArgs = Union[Callable[[], ReturnValue], Callable[[..., Any], ReturnValue]]
 
     # pylint: disable=C0103,invalid-name
