@@ -1795,8 +1795,10 @@ class WpsPackage(Process):
         self.step_launched.append(jobname)
         self.update_status(f"Preparing to launch {jobtype} {jobname}.", start_step_progress, Status.RUNNING)
 
-        def _update_status_dispatch(_message, _progress, _status, _provider, error=None, **__):
-            # type: (str, Number, AnyStatusType, str, Optional[Exception], Any) -> None
+        def _update_status_dispatch(_message, _progress, _status, _provider, *_, error=None, **__):
+            # type: (str, Number, AnyStatusType, str, Any, Optional[Exception], Any) -> None
+            if LOGGER.isEnabledFor(logging.DEBUG) and (_ or __):
+                LOGGER.debug("Received additional unhandled args/kwargs to dispatched update status: %s, %s", _, __)
             self.step_update_status(
                 _message, _progress, start_step_progress, end_step_progress, jobname, _provider, _status, error=error
             )

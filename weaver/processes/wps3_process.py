@@ -70,7 +70,9 @@ class Wps3Process(WpsProcessInterface):
                  ):                 # type: (...) -> None
         super(Wps3Process, self).__init__(
             request,
-            lambda _message, _progress, _status: update_status(_message, _progress, _status, self.provider or "local")
+            lambda _message, _progress, _status, *args, **kwargs: update_status(
+                _message, _progress, _status, self.provider or "local", *args, **kwargs
+            )
         )
         self.provider, self.url, self.deploy_body = self.resolve_data_source(step_payload, joborder)
         self.process = process
