@@ -11,10 +11,10 @@ from weaver.store.base import StoreServices
 from weaver.utils import get_settings
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, List
+    from typing import Any, Callable, List, Tuple
 
     from weaver.datatype import Service
-    from weaver.typedefs import AnySettingsContainer
+    from weaver.typedefs import AnyRequestType, AnySettingsContainer
 
 LOGGER = logging.getLogger(__name__)
 
@@ -69,6 +69,7 @@ def check_provider_requirements(func):
 
 
 def get_service(request):
+    # type: (AnyRequestType) -> Tuple[Service, StoreServices]
     """
     Get the request service using provider_id from the service store.
     """

@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from typing import Any, Callable, Dict, Optional, Union
 
     from weaver.formats import ContentType
-    from weaver.typedefs import CWL, JSON, AnyRequestType, AnySettingsContainer, HeadersType
+    from weaver.typedefs import CWL, JSON, AnyRequestType, AnySettingsContainer, HeadersType, ReturnValue
 
 LOGGER = logging.getLogger(__name__)
 
@@ -143,9 +143,10 @@ def handle_schema_validation(schema=None):
     :param schema: If provided, document this schema as the reference of the failed schema validation.
     :raises HTTPBadRequest: If any schema validation error occurs when handling the decorated function.
     """
-    def decorator(func):  # type: (Callable[[Any, Any], Any]) -> Callable[[Any, Any], Any]
+    def decorator(func):  # type: (Callable[[Any, Any], ReturnValue]) -> Callable[[Any, Any], ReturnValue]
         @functools.wraps(func)
         def wrapped(*args, **kwargs):
+            # type: (*Any, **Any) -> ReturnValue
             try:
                 return func(*args, **kwargs)
             except colander.Invalid as ex:

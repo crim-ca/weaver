@@ -35,7 +35,9 @@ from weaver.owsexceptions import (
 
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
-    from typing import Any, Callable, Type
+    from typing import Any, Callable, Type, Union
+
+    from weaver.typedefs import ReturnValue
 
 
 class WeaverException(Exception):
@@ -390,7 +392,7 @@ class VaultFileInstanceError(HTTPInternalServerError, OWSNoApplicableCode, Vault
 #   https://github.com/crim-ca/weaver/issues/215
 #   define common Exception classes that won't require this type of conversion
 def handle_known_exceptions(function):
-    # type: (Callable[[Any, Any], Any]) -> Callable
+    # type: (Callable[[Any, Any], ReturnValue]) -> Callable
     """
     Decorator that catches lower-level raised exception that are known to :mod:`weaver` but not by :mod:`pywps`.
 
@@ -412,7 +414,7 @@ def handle_known_exceptions(function):
 
     @functools.wraps(function)
     def wrapped(*_, **__):
-        # type: (Any, Any) -> Any
+        # type: (Any, Any) -> Union[ReturnValue, OWSException]
         try:
             return function(*_, **__)
         except (WeaverException, OWSException, HTTPException) as exc:
@@ -464,10 +466,10 @@ def log_unhandled_exceptions(logger=LOGGER, message="Unhandled exception occurre
     known_exceptions = tuple(known_exceptions)
 
     def wrap(function):
-        # type: (Callable[[Any, Any], Any]) -> Callable
+        # type: (Callable[[Any, Any], ReturnValue]) -> Callable
         @functools.wraps(function)
         def call(*args, **kwargs):
-            # type: (Any, Any) -> Any
+            # type: (Any, Any) -> ReturnValue
             try:
                 # handle input arguments that are extended by various pyramid operations
                 if is_request:

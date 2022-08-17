@@ -129,6 +129,7 @@ class WpsProcessInterface(object):
             err_msg = f"{fully_qualified_name(exc)}: {exc!s}"
             err_ctx = "Dispatch and monitoring of remote process caused an unhandled error."
             LOGGER.exception("%s [%s]", err_ctx, err_msg, exc_info=exc)
+            self.update_status(err_msg, WpsRemoteJobProgress.CLEANUP, Status.RUNNING, error=exc)
             self.update_status("Running final cleanup operations following failed execution.",
                                WpsRemoteJobProgress.CLEANUP, Status.RUNNING)
             self.cleanup()

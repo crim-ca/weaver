@@ -3,7 +3,9 @@ from time import sleep
 from typing import TYPE_CHECKING
 
 from owslib.wps import ComplexDataInput
+from requests.exceptions import HTTPError
 
+from weaver import xml_util
 from weaver.execute import ExecuteMode
 from weaver.formats import get_format
 from weaver.owsexceptions import OWSNoApplicableCode
@@ -13,14 +15,16 @@ from weaver.processes.utils import map_progress
 from weaver.processes.wps_process_base import WpsProcessInterface, WpsRemoteJobProgress
 from weaver.status import Status, map_status
 from weaver.utils import (
+    bytes2str,
     get_any_id,
     get_any_value,
     get_job_log_msg,
     get_log_monitor_msg,
     raise_on_xml_exception,
+    retry_on_condition,
     wait_secs
 )
-from weaver.wps.utils import check_wps_status, get_wps_client
+from weaver.wps.utils import check_wps_status, get_exception_from_xml_status, get_wps_client
 
 if TYPE_CHECKING:
     from typing import Optional
@@ -61,7 +65,9 @@ class Wps1Process(WpsProcessInterface):
         self.stage_output_id_nested = True
         super(Wps1Process, self).__init__(
             request,
-            lambda _message, _progress, _status: update_status(_message, _progress, _status, self.provider)
+            lambda _message, _progress, _status, *args, **kwargs: update_status(
+                _message, _progress, _status, self.provider, *args, **kwargs
+            )
         )
 
     def format_inputs(self, workflow_inputs):
@@ -152,12 +158,20 @@ class Wps1Process(WpsProcessInterface):
     def dispatch(self, process_inputs, process_outputs):
         # type: (JobInputs, JobOutputs) -> JobExecution
         wps_outputs = [(output["id"], output["as_ref"]) for output in process_outputs]
-        execution = self.wps_provider.execute(
+
+        # some WPS servers sometime have trouble executing the process (unhandled internal server errors due to DB)
+        # perform retry attempts if possible to silently ignore those error cases and return a successful run
+        execution = retry_on_condition(
+            self.wps_provider.execute,
+            # wps params
             self.process,
             inputs=process_inputs,
             output=wps_outputs,
             mode=ExecuteMode.ASYNC,
-            lineage=True
+            lineage=True,
+            # retry params
+            condition=lambda exc: isinstance(exc, HTTPError) and exc.response.status_code == 500,
+            retries=5,
         )
         if not execution.process and execution.errors:
             raise execution.errors[0]
@@ -170,6 +184,7 @@ class Wps1Process(WpsProcessInterface):
         num_retries = 0
         run_step = 0
         job_id = "<undefined>"
+        log_progress = Wps1RemoteJobProgress.MONITOR
         while execution.isNotComplete() or run_step == 0:
             if num_retries >= max_retries:
                 raise Exception(f"Could not read status document after {max_retries} retries. Giving up.")
@@ -203,11 +218,19 @@ class Wps1Process(WpsProcessInterface):
         if not execution.isSucceded():
             exec_msg = execution.statusMessage or "Job failed."
             exec_status = map_status(execution.getStatus())
+            exec_status_url = execution.statusLocation
             LOGGER.debug(get_log_monitor_msg(job_id,
                                              exec_status,
                                              execution.percentCompleted,
                                              exec_msg,
-                                             execution.statusLocation))
+                                             exec_status_url))
+            # provide more details in logs of parent job process about the cause of the failing remote execution
+            xml_err = bytes2str(xml_util.tostring(execution.response))
+            xml_exc = get_exception_from_xml_status(execution.response)
+            self.update_status(
+                f"Retrieved error status response from WPS remote provider on [{exec_status_url}]:\n{xml_err}\n",
+                log_progress, Status.FAILED, error=xml_exc
+            )
             return False
         return True
 

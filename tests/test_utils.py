@@ -58,6 +58,7 @@ from weaver.utils import (
     parse_prefer_header_execute_mode,
     pass_http_error,
     request_extra,
+    retry_on_condition,
     str2bytes,
     xml_path_elements,
     xml_strip_ns
@@ -922,3 +923,43 @@ def test_parse_number_with_unit(number, binary, expect):
 def test_parse_number_with_unit_error():
     with pytest.raises(ValueError):
         parse_number_with_unit(123)  # noqa
+
+
+def custom_handler_fail(*_):
+    raise NotImplementedError("test not implemented error")
+
+
+def custom_handler_valid(exception):
+    return "sporadic error" in str(exception)
+
+
+@pytest.mark.parametrize("errors,raises,conditions,retries", [
+    ([True, False, None], TypeError, ValueError, 2),    # first ValueError handled, second raises TypeError directly
+    ([True, False, None], ValueError, ValueError, 0),   # first ValueError handled but re-raised since retries exhausted
+    ([True, None], None, ValueError, 2),                # first ValueError handled, second succeeds
+    ([None, False], None, ValueError, 10),              # immediate success, no retry required
+    ([False, None], TypeError, ValueError, 0),          # no retry, first ValueError re-raised since retries exhausted
+    ([False, None], TypeError, ValueError, -1),         # same as previous, non positive retries defaults to zero
+    ([True, False, None], None, (ValueError, TypeError), 4),    # both errors allowed, succeeds on 3rd after 2 retries
+    ([True, False, None], NotImplementedError, custom_handler_fail, 3),  # itself raises, bubbles up error with no-retry
+    ([True, False, None], TypeError, custom_handler_valid, 3),  # first ValueError handled with text, TypeError re-raise
+])
+def test_retry_on_condition(errors, raises, conditions, retries):
+    def function():
+        err = errors.pop(0)
+        if err is True:
+            raise ValueError("test sporadic error")
+        if err is False:
+            raise TypeError("test unhandled error")
+        return "OK"
+
+    result = None
+    try:
+        result = retry_on_condition(function, conditions, retries)
+    except Exception as exc:
+        assert raises is not None, "Expected no unhandled error raised"
+        assert isinstance(exc, raises), "Expected specific error to be raised"
+    if raises is None:
+        assert result == "OK", "Expected to succeed after retries"
+    else:
+        assert result is None, "Expected failure following raised error"

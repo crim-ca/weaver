@@ -12,13 +12,19 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add `WPS` remote `Provider` retry conditions to handle known problematic cases during `Process` execution (on remote)
+  that can lead to sporadic failures of the monitored `Job`. When possible, retried submission leading to successful
+  execution will result in the monitored `Job` to complete successfully and transparently to the user. Relevant errors
+  and retry attempts are provided in the `Job` logs.
+- Add `WPS` remote `Provider` status exception response as `XML` message from the failed remote execution within the
+  monitored local `Job` logs to help users understand how resolve any encountered issue on the remote service.
 
 Fixes:
 ------
 - Bump version ``OWSLib==0.26.0`` to fix ``processVersion`` attribute resolution from `WPS` remote `Provider` definition
   to populate ``Process.version`` property employed in converted `Process` description to `OGC API - Process` schema
   (relates to `geopython/OWSLib#794 <https://github.com/geopython/OWSLib/pull/794>`_).
+- Fixes and improvements for typing definitions.
 
 .. _changes_4.21.0:
 
