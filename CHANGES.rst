@@ -17,7 +17,7 @@ Changes:
   execution will result in the monitored `Job` to complete successfully and transparently to the user. Relevant errors
   and retry attempts are provided in the `Job` logs.
 - Add `WPS` remote `Provider` status exception response as `XML` message from the failed remote execution within the
-  monitored local `Job` logs to help users understand how resolve any encountered issue on the remote service.
+  monitored local `Job` logs to help users understand how to resolve any encountered issue on the remote service.
 
 Fixes:
 ------
