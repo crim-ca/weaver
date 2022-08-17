@@ -1421,7 +1421,7 @@ def retry_on_condition(operation,               # type: Callable[[..., Any], Ret
             all(inspect.isclass(exc) and issubclass(exc, Exception) for exc in condition)
         )
     ):
-        condition_check = lambda _exc: isinstance(_exc, condition)
+        condition_check = lambda _exc: isinstance(_exc, condition)  # noqa: E731
     else:
         condition_check = condition
 
