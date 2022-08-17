@@ -16,9 +16,15 @@ To use the module, import is as if importing ``lxml.etree``:
 
     data = xml_util.fromstring("<xml>content</xml>")
 """
+from typing import TYPE_CHECKING
 
 from lxml import etree as lxml_etree  # nosec: B410  # flagged known issue, this is what the applied fix below is about
 from owslib.wps import etree as owslib_wps_etree
+
+if TYPE_CHECKING:
+    from io import BufferedReader
+    from typing import Union
+
 
 XML_PARSER = lxml_etree.XMLParser(
     # security fix: XML external entity (XXE) injection
@@ -45,10 +51,12 @@ _lxml_fromstring = lxml_etree.fromstring
 
 
 def fromstring(text, parser=XML_PARSER):
+    # type: (str, lxml_etree.XMLParser) -> XML
     return _lxml_fromstring(text, parser=parser)  # nosec: B410
 
 
 def parse(source, parser=XML_PARSER):
+    # type: (Union[str, BufferedReader], lxml_etree.XMLParser) -> XML
     return lxml_etree.parse(source, parser=parser)  # nosec: B410
 
 

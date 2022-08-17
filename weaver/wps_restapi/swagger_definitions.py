@@ -5466,7 +5466,7 @@ get_process_responses = {
         },
         "ProcessDescriptionSchemaWPS": {
             "Summary": "Description of a local process registered in Weaver (WPS Schema) when requesting XML format.",
-            "value": EXAMPLES["wps_describeprocess.xml"],
+            "value": EXAMPLES["wps_describeprocess_response.xml"],
         }
     }),
     "400": BadRequestGetProcessInfoResponse(),
@@ -5794,21 +5794,29 @@ wps_responses = {
     "200": OkWPSResponse(examples={
         "GetCapabilities": {
             "summary": "GetCapabilities example response.",
-            "value": EXAMPLES["wps_getcapabilities.xml"]
+            "value": EXAMPLES["wps_getcapabilities_response.xml"]
         },
         "DescribeProcess": {
             "summary": "DescribeProcess example response.",
-            "value": EXAMPLES["wps_describeprocess.xml"]
+            "value": EXAMPLES["wps_describeprocess_response.xml"]
         },
-        "Execute": {
-            "summary": "Execute example response.",
+        "ExecuteSuccess": {
+            "summary": "Successful process execute example response.",
             "value": EXAMPLES["wps_execute_response.xml"]
+        },
+        "ExecuteFailed": {
+            "summary": "Failed process execute example response.",
+            "value": EXAMPLES["wps_execute_failed_response.xml"]
         }
     }),
     "400": ErrorWPSResponse(examples={
         "MissingParameterError": {
             "summary": "Error report in case of missing request parameter.",
-            "value": EXAMPLES["wps_missing_parameter.xml"],
+            "value": EXAMPLES["wps_missing_parameter_response.xml"],
+        },
+        "AccessForbiddenError": {
+            "summary": "Error report in case of forbidden access to the service.",
+            "value": EXAMPLES["wps_access_forbidden_response.xml"],
         }
     }),
     "500": ErrorWPSResponse(),

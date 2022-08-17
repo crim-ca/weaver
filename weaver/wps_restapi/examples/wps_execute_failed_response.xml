@@ -1,0 +1,29 @@
+<wps:ExecuteResponse
+        xmlns:gml="http://www.opengis.net/gml"
+        xmlns:ows="http://www.opengis.net/ows/1.1"
+        xmlns:wps="http://www.opengis.net/wps/1.0.0" xmlns:xlink="http://www.w3.org/1999/xlink"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.opengis.net/wps/1.0.0 http://schemas.opengis.net/wps/1.0.0/wpsExecute_response.xsd"
+        service="WPS"
+        version="1.0.0"
+        xml:lang="en-US"
+        serviceInstance="https://example.com/wps?service=WPS&amp;request=GetCapabilities"
+        statusLocation="https://example.com/wpsoutputs/hummingbird/78260a22-1ddd-11ed-bb76-0242ac1e1919.xml">
+    <wps:Process wps:processVersion="4.4.1.1">
+        <ows:Identifier>ncdump</ows:Identifier>
+        <ows:Title>NCDump</ows:Title>
+        <ows:Abstract>Run ncdump to retrieve NetCDF header metadata.</ows:Abstract>
+    </wps:Process>
+    <wps:Status creationTime="2022-08-17T03:34:15Z">
+        <wps:ProcessFailed>
+            <ows:ExceptionReport version="1.0.0">
+                <ows:Exception exceptionCode="NoApplicableCode" locator="None">
+                    <ows:ExceptionText>
+                        Process error: Process.py._run_process Line 246 This result object does not return rows.
+                        It has been closed automatically.
+                    </ows:ExceptionText>
+                </ows:Exception>
+            </ows:ExceptionReport>
+        </wps:ProcessFailed>
+    </wps:Status>
+</wps:ExecuteResponse>

@@ -9,9 +9,62 @@ import pytest
 from pyramid.httpexceptions import HTTPUnprocessableEntity
 from pyramid.testing import DummyRequest
 
+from tests.resources import load_example
 from tests.utils import mocked_remote_wps
+from weaver import xml_util
 from weaver.formats import AcceptLanguage, ContentType
-from weaver.wps.utils import get_wps_client, get_wps_output_context, map_wps_output_location, set_wps_language
+from weaver.owsexceptions import OWSAccessForbidden, OWSException, OWSMissingParameterValue, OWSNoApplicableCode
+from weaver.wps.utils import (
+    get_exception_from_xml_status,
+    get_wps_client,
+    get_wps_output_context,
+    map_wps_output_location,
+    set_wps_language
+)
+
+
+@pytest.mark.parametrize("xml_file,ows_exception", [
+    ("wps_missing_parameter_response.xml", OWSMissingParameterValue),   # 'ows:ExceptionReport' directly at root
+    ("wps_access_forbidden_response.xml", OWSAccessForbidden),          # 'ExceptionReport' at root (default ns is ows)
+    ("wps_execute_failed_response.xml", OWSNoApplicableCode),           # 'ows:ExceptionReport' nested in Execute failed
+])
+def test_get_exception_from_xml_status(xml_file, ows_exception):
+    xml_str = load_example(xml_file, text=True)
+    xml = xml_util.fromstring(xml_str)
+    exc = get_exception_from_xml_status(xml)
+    assert isinstance(exc, OWSException) and type(exc) is not OWSException, "Should be the exact derived type"
+    assert exc.code == ows_exception.code
+
+
+@pytest.mark.parametrize("formatter", [
+    xml_util.fromstring,
+    lambda _xml: _xml.encode(),
+    str,
+])
+def test_get_exception_from_xml_status_unknown_ows_exception(formatter):
+    xml = formatter("""
+    <ows:ExceptionReport xmlns:ows="http://www.opengis.net/ows/1.1">
+        <ows:Exception exceptionCode="UnknownException" locator="unknown">
+            <ows:ExceptionText>Test Error</ows:ExceptionText>
+        </ows:Exception>
+    </ows:ExceptionReport>
+    """)
+    exc = get_exception_from_xml_status(xml)
+    assert isinstance(exc, OWSException) and type(exc) is OWSException, "Should be exactly the default type"
+    assert exc.code == "UnknownException"
+    assert exc.message == "Test Error"
+    assert exc.locator == "unknown"
+
+
+def test_get_exception_from_xml_status_unknown_other_exception():
+    xml = xml_util.fromstring("<FakeException>Not valid</FakeException>")
+    exc = get_exception_from_xml_status(xml)
+    assert exc is None
+
+
+def test_get_exception_from_xml_not_xml_input():
+    exc = get_exception_from_xml_status(object())  # type: ignore
+    assert exc is None
 
 
 def test_set_wps_language():
