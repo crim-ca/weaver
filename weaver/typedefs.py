@@ -67,8 +67,10 @@ if TYPE_CHECKING:
     from weaver.datatype import Process
     from weaver.status import AnyStatusType
 
-    AnyCallable = TypeVar("AnyCallable", bound=Callable[..., Any])  # callable used for decorated/wrapped functions
     ReturnValue = TypeVar("ReturnValue")  # alias to identify the same return value as a decorated/wrapped function
+    AnyCallable = TypeVar("AnyCallable", bound=Callable[..., Any])  # callable used for decorated/wrapped functions
+    AnyCallableWrapped = TypeVar("AnyCallableWrapped", bound=Callable[[..., Any], ReturnValue])
+    AnyCallableAnyArgs = Union[Callable[[], ReturnValue], Callable[[..., Any], ReturnValue]]
 
     # pylint: disable=C0103,invalid-name
     Number = Union[int, float]

@@ -37,7 +37,7 @@ LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from typing import Any, Callable, Type, Union
 
-    from weaver.typedefs import ReturnValue
+    from weaver.typedefs import AnyCallableWrapped, ReturnValue
 
 
 class WeaverException(Exception):
@@ -392,7 +392,7 @@ class VaultFileInstanceError(HTTPInternalServerError, OWSNoApplicableCode, Vault
 #   https://github.com/crim-ca/weaver/issues/215
 #   define common Exception classes that won't require this type of conversion
 def handle_known_exceptions(function):
-    # type: (Callable[[Any, Any], ReturnValue]) -> Callable
+    # type: (AnyCallableWrapped) -> Callable
     """
     Decorator that catches lower-level raised exception that are known to :mod:`weaver` but not by :mod:`pywps`.
 

@@ -945,21 +945,36 @@ def custom_handler_valid(exception):
     ([True, False, None], TypeError, custom_handler_valid, 3),  # first ValueError handled with text, TypeError re-raise
 ])
 def test_retry_on_condition(errors, raises, conditions, retries):
-    def function():
-        err = errors.pop(0)
+    test_errors = []
+
+    def function_no_args():
+        err = test_errors.pop(0)
         if err is True:
             raise ValueError("test sporadic error")
         if err is False:
             raise TypeError("test unhandled error")
         return "OK"
 
-    result = None
-    try:
-        result = retry_on_condition(function, conditions, retries)
-    except Exception as exc:
-        assert raises is not None, "Expected no unhandled error raised"
-        assert isinstance(exc, raises), "Expected specific error to be raised"
-    if raises is None:
-        assert result == "OK", "Expected to succeed after retries"
-    else:
-        assert result is None, "Expected failure following raised error"
+    def function_with_args(value, keyword=None):  # noqa
+        return function_no_args()
+
+    def run_test(*args, **kwargs):
+        test_errors.clear()
+        test_errors.extend(errors)
+        test_case = " (operation " + ("with" if args and kwargs else "without") + " args)"
+        result = None
+        try:
+            if args and kwargs:
+                result = retry_on_condition(function_with_args, *args, **kwargs, condition=conditions, retries=retries)
+            else:
+                result = retry_on_condition(function_no_args, condition=conditions, retries=retries)
+        except Exception as exc:
+            assert raises is not None, "Expected no unhandled error raised" + test_case
+            assert isinstance(exc, raises), "Expected specific error to be raised" + test_case
+        if raises is None:
+            assert result == "OK", "Expected to succeed after retries" + test_case
+        else:
+            assert result is None, "Expected failure following raised error" + test_case
+
+    run_test()
+    run_test(1, keyword="test")

@@ -79,6 +79,7 @@ if TYPE_CHECKING:
     from weaver.status import Status
     from weaver.typedefs import (
         AnyCallable,
+        AnyCallableAnyArgs,
         AnyKey,
         AnyHeadersContainer,
         AnySettingsContainer,
@@ -1397,7 +1398,7 @@ def get_request_options(method, url, settings):
     return request_options
 
 
-def retry_on_condition(operation,               # type: Callable[[..., Any], ReturnValue]
+def retry_on_condition(operation,               # type: AnyCallableAnyArgs
                        *args,                   # type: Any
                        condition=Exception,     # type: RetryCondition
                        retries=1,               # type: int
@@ -1437,7 +1438,10 @@ def retry_on_condition(operation,               # type: Callable[[..., Any], Ret
     LOGGER.debug("Running operation '%s' with conditional retries (%s).", name, retries)
     while remain >= 0:
         try:
-            return operation(*args, **kwargs)
+            sig = inspect.signature(operation)
+            if sig.parameters:
+                return operation(*args, **kwargs)
+            return operation()
         except Exception as exc:
             if not condition_check(exc):
                 LOGGER.error("Operation '%s' failed with unhandled condition to retry. Aborting.", name)
