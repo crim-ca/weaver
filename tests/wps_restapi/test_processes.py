@@ -845,6 +845,28 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert "Invalid schema" in error
         assert "Longer than maximum length 1" in error
 
+    @staticmethod
+    def get_cwl_docker_python_version():
+        return {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "requirements": {
+                CWL_REQUIREMENT_APP_DOCKER: {
+                    "dockerPull": "python:3.7-alpine"
+                }
+            },
+            "baseCommand": ["python3", "-V"],
+            "inputs": {},
+            "outputs": {
+                "output": {
+                    "type": "File",
+                    "outputBinding": {
+                        "glob": "stdout.log"
+                    },
+                }
+            },
+        }
+
     def test_deploy_process_CWL_DockerRequirement_href(self):
         with contextlib.ExitStack() as stack:
             stack.enter_context(mocked_wps_output(self.settings))
@@ -853,25 +875,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             tmp_dir = stack.enter_context(tempfile.TemporaryDirectory(dir=out_dir))
             tmp_file = os.path.join(tmp_dir, "docker-python.cwl")
             tmp_href = tmp_file.replace(out_dir, out_url, 1)
-            cwl = {
-                "cwlVersion": "v1.0",
-                "class": "CommandLineTool",
-                "requirements": {
-                    CWL_REQUIREMENT_APP_DOCKER: {
-                        "dockerPull": "python:3.7-alpine"
-                    }
-                },
-                "baseCommand": ["python3", "-V"],
-                "inputs": {},
-                "outputs": {
-                    "output": {
-                        "type": "File",
-                        "outputBinding": {
-                            "glob": "stdout.log"
-                        },
-                    }
-                },
-            }
+            cwl = self.get_cwl_docker_python_version()
             with open(tmp_file, mode="w", encoding="utf-8") as cwl_file:
                 json.dump(cwl, cwl_file)
 
@@ -904,10 +908,44 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                 "formats": [{"default": True, "mediaType": "text/plain"}]
             }]
 
-    # FIXME: implement
-    @pytest.mark.skip(reason="not implemented")
     def test_deploy_process_CWL_DockerRequirement_owsContext(self):
-        raise NotImplementedError
+        with contextlib.ExitStack() as stack:
+            stack.enter_context(mocked_wps_output(self.settings))
+            out_dir = self.settings["weaver.wps_output_dir"]
+            out_url = self.settings["weaver.wps_output_url"]
+            tmp_dir = stack.enter_context(tempfile.TemporaryDirectory(dir=out_dir))
+            tmp_file = os.path.join(tmp_dir, "docker-python.cwl")
+            tmp_href = tmp_file.replace(out_dir, out_url, 1)
+            cwl = self.get_cwl_docker_python_version()
+            with open(tmp_file, mode="w", encoding="utf-8") as cwl_file:
+                json.dump(cwl, cwl_file)
+
+            ows_ctx = ows_context_href(tmp_href)
+            p_id = "test-docker-python-version"
+            proc = ows_ctx.update({"id": p_id})
+            body = {"processDescription": {"process": proc}}
+            desc = self.deploy_process_make_visible_and_fetch_deployed(body, p_id, assert_io=False)
+            pkg = self.get_application_package(p_id)
+            assert desc["deploymentProfile"] == "http://www.opengis.net/profiles/eoc/dockerizedApplication"
+
+            # once parsed, CWL I/O are converted to listing form
+            # rest should remain intact with the original definition
+            cwl["inputs"] = []
+            cwl_out = cwl["outputs"]["output"]
+            cwl_out["id"] = "output"
+            cwl["outputs"] = [cwl_out]
+            assert pkg == cwl
+
+            # process description should have been generated with relevant I/O
+            proc = desc["process"]
+            assert proc["id"] == p_id
+            assert proc["inputs"] == []
+            assert proc["outputs"] == [{
+                "id": "output",
+                "title": "output",
+                "schema": {"type": "string", "contentMediaType": "text/plain"},
+                "formats": [{"default": True, "mediaType": "text/plain"}]
+            }]
 
     # FIXME: implement
     @pytest.mark.skip(reason="not implemented")
