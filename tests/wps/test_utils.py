@@ -29,6 +29,7 @@ from weaver.wps.utils import (
     ("wps_execute_failed_response.xml", OWSNoApplicableCode),           # 'ows:ExceptionReport' nested in Execute failed
 ])
 def test_get_exception_from_xml_status(xml_file, ows_exception):
+    # pylint: disable=C0123  # use type instead of isinstance, since we actually want to exclude classes inheritance
     xml_str = load_example(xml_file, text=True)
     xml = xml_util.fromstring(xml_str)
     exc = get_exception_from_xml_status(xml)
@@ -42,6 +43,7 @@ def test_get_exception_from_xml_status(xml_file, ows_exception):
     str,
 ])
 def test_get_exception_from_xml_status_unknown_ows_exception(formatter):
+    # pylint: disable=C0123  # use type instead of isinstance, since we actually want to exclude classes inheritance
     xml = formatter("""
     <ows:ExceptionReport xmlns:ows="http://www.opengis.net/ows/1.1">
         <ows:Exception exceptionCode="UnknownException" locator="unknown">
