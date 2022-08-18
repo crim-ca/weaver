@@ -59,13 +59,13 @@ WPS_NO_INPUTS_URL = DESCRIBE_PROCESS_TEMPLATE_URL.format(
 )
 
 
-def load_example(file_name):
-    # type: (str) -> Union[JSON, str]
+def load_example(file_name, text=False):
+    # type: (str, bool) -> Union[JSON, str]
     file_path = os.path.join(EXAMPLES_PATH, file_name)
-    return load_file(file_path)
+    return load_file(file_path, text=text)
 
 
-def load_resource(file_name):
-    # type: (str) -> Union[JSON, str]
+def load_resource(file_name, text=False):
+    # type: (str, bool) -> Union[JSON, str]
     file_path = os.path.join(RESOURCES_PATH, file_name)
-    return load_file(file_path)
+    return load_file(file_path, text=text)

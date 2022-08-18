@@ -78,6 +78,8 @@ if TYPE_CHECKING:
     from weaver.execute import AnyExecuteControlOption, AnyExecuteMode
     from weaver.status import Status
     from weaver.typedefs import (
+        AnyCallable,
+        AnyCallableAnyArgs,
         AnyKey,
         AnyHeadersContainer,
         AnySettingsContainer,
@@ -94,8 +96,11 @@ if TYPE_CHECKING:
         Literal,
         OpenAPISchema,
         Number,
+        ReturnValue,
         SettingsType
     )
+
+    RetryCondition = Union[Type[Exception], Iterable[Type[Exception]], Callable[[Exception], bool]]
 
     OriginalClass = TypeVar("OriginalClass")
     ExtenderMixin = TypeVar("ExtenderMixin")
@@ -1393,8 +1398,65 @@ def get_request_options(method, url, settings):
     return request_options
 
 
+def retry_on_condition(operation,               # type: AnyCallableAnyArgs
+                       *args,                   # type: Any
+                       condition=Exception,     # type: RetryCondition
+                       retries=1,               # type: int
+                       **kwargs,                # type: Any
+                       ):                       # type: (...) -> ReturnValue
+    """
+    Retries the operation call up to the amount of specified retries if the condition is encountered.
+
+    :param operation: Any callable lambda, function, method, class that sporadically raises an exception to catch.
+    :param condition:
+        Exception(s) to catch or callable that takes the raised exception to handle it with more conditions.
+        In case of a callable, success/failure result should be returned to indicate if retry is needed.
+        If retry is not requested by the handler for the specified exception, it is raised directly.
+    :param retries: Amount of retries to perform. If retries are exhausted, the final exception is re-raised.
+    :return: Expected normal operation return value if it was handled within the specified amount of retries.
+    """
+    if (
+        (inspect.isclass(condition) and issubclass(condition, Exception)) or
+        (
+            hasattr(condition, "__iter__") and
+            all(inspect.isclass(_exc) and issubclass(_exc, Exception) for _exc in condition)
+        )
+    ):
+        condition_check = lambda _exc: isinstance(_exc, condition)  # noqa: E731
+    else:
+        condition_check = condition
+
+    # zero is similar to no-retry (not much point to pass through this call if passed explicitly, but valid)
+    if not isinstance(retries, int) or retries <= 0:
+        LOGGER.warning("Invalid retry amount must be a positive integer, got '%s'. "
+                       "Using no-retry pass-through operation.", retries)
+        retries = 0
+
+    name = fully_qualified_name(operation)
+    remain = retries
+    last_exc = None
+    LOGGER.debug("Running operation '%s' with conditional retries (%s).", name, retries)
+    while remain >= 0:
+        try:
+            sig = inspect.signature(operation)
+            if sig.parameters:
+                return operation(*args, **kwargs)
+            return operation()
+        except Exception as exc:
+            if not condition_check(exc):
+                LOGGER.error("Operation '%s' failed with unhandled condition to retry. Aborting.", name)
+                raise exc
+            remain -= 1
+            attempt = retries - remain
+            last_exc = exc
+            LOGGER.warning("Operation '%s' failed but matched handler condition for retry. Retrying (%s/%s)...",
+                           name, attempt, retries)
+    LOGGER.error("Operation '%s' still failing. Maximum retry attempts reached (%s).", name, retries)
+    raise last_exc
+
+
 def retry_on_cache_error(func):
-    # type: (Callable[[...], Any]) -> Callable
+    # type: (AnyCallable) -> AnyCallable
     """
     Decorator to handle invalid cache setup.
 
@@ -1402,7 +1464,7 @@ def retry_on_cache_error(func):
     """
     @functools.wraps(func)
     def wrapped(*args, **kwargs):
-        # type: (*Any, **Any) -> Any
+        # type: (*Any, **Any) -> ReturnValue
         try:
             return func(*args, **kwargs)
         except BeakerException as exc:

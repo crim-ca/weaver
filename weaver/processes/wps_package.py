@@ -83,6 +83,7 @@ from weaver.utils import (
     SUPPORTED_FILE_SCHEMES,
     bytes2str,
     fetch_file,
+    fully_qualified_name,
     get_any_id,
     get_header,
     get_job_log_msg,
@@ -1215,8 +1216,8 @@ class WpsPackage(Process):
             self.logger.log(logging.WARNING if (app_euid == "0" or app_egid == "0") else logging.INFO,
                             "Visible application CWL euid:egid [%s:%s]", app_euid, app_egid)
 
-    def update_status(self, message, progress, status):
-        # type: (str, Number, AnyStatusType) -> None
+    def update_status(self, message, progress, status, error=None):
+        # type: (str, Number, AnyStatusType, Optional[Exception]) -> None
         """
         Updates the `PyWPS` real job status from a specified parameters.
         """
@@ -1235,34 +1236,54 @@ class WpsPackage(Process):
         # pywps overrides 'status' by 'accepted' in 'update_status', so use the '_update_status' to enforce the status
         # using protected method also avoids weird overrides of progress percent on failure and final 'success' status
         self.response._update_status(pywps_status_id, message, self.percent)  # noqa: W0212
-        self.log_message(status=status, message=message, progress=progress)
+        if isinstance(error, Exception):
+            self.exception_message(exception_type=type(error), exception=error,
+                                   status=status, message=message, progress=progress)
+        else:
+            self.log_message(status=status, message=message, progress=progress)
 
-    def step_update_status(self, message, progress, start_step_progress, end_step_progress, step_name,
-                           target_host, status):
-        # type: (str, Number, Number, Number, str, AnyValueType, str) -> None
+    def step_update_status(self,
+                           message,                 # type: str
+                           progress,                # type: Number
+                           start_step_progress,     # type: Number
+                           end_step_progress,       # type: Number
+                           step_name,               # type: str
+                           target_host,             # type: str
+                           status,                  # type: AnyStatusType
+                           error=None,              # type: Optional[Exception]
+                           ):                       # type: (...) -> None
         self.update_status(
             message=f"[provider: {target_host}, step: {step_name}] - {str(message).strip()}",
             progress=map_progress(progress, start_step_progress, end_step_progress),
             status=status,
+            error=error,
         )
 
     def log_message(self, status, message, progress=None, level=logging.INFO):
         # type: (AnyStatusType, str, Optional[Number], int) -> None
         progress = progress if progress is not None else self.percent
         message = get_job_log_msg(status=map_status(status), message=message, progress=progress)
-        self.logger.log(level, message, exc_info=level > logging.INFO)
+        # Avoid logging plain 'NoneType: None' if exception was handled (therefore nothing raised) but should still
+        # be reported as error. Otherwise, include it manually the same way it would be added automatically.
+        exc_info = None
+        if level > logging.INFO:
+            exc_info = sys.exc_info()
+            if exc_info == (None, None, None):
+                exc_info = None
+        self.logger.log(level, message, exc_info=exc_info)
 
     def exception_message(self, exception_type, exception=None, message="no message",
-                          status=Status.EXCEPTION, level=logging.ERROR):
-        # type: (Type[Exception], Optional[Exception], str, AnyStatusType, int) -> Exception
+                          status=Status.EXCEPTION, progress=None, level=logging.ERROR):
+        # type: (Type[Exception], Optional[Exception], str, AnyStatusType, Optional[Number], int) -> Exception
         """
         Logs to the job the specified error message with the provided exception type.
 
         :returns: formatted exception with message to be raised by calling function.
         """
-        exception_msg = f" [{exception!r}]" if isinstance(exception, Exception) else ""
-        self.log_message(status=status, level=level, message=f"{exception_type.__name__}: {message}{exception_msg}")
-        return exception_type(f"{message}{exception_msg}")
+        exc_msg = f": [{exception!s}]" if isinstance(exception, Exception) else ""
+        err_msg = f"{message}\n{fully_qualified_name(exception_type)}{exc_msg}"
+        self.log_message(status=status, level=level, message=err_msg, progress=progress)
+        return exception_type(f"{message}{exc_msg}")
 
     @property
     def job(self):
@@ -1774,9 +1795,12 @@ class WpsPackage(Process):
         self.step_launched.append(jobname)
         self.update_status(f"Preparing to launch {jobtype} {jobname}.", start_step_progress, Status.RUNNING)
 
-        def _update_status_dispatch(_message, _progress, _status, _provider):
+        def _update_status_dispatch(_message, _progress, _status, _provider, *_, error=None, **__):
+            # type: (str, Number, AnyStatusType, str, Any, Optional[Exception], Any) -> None
+            if LOGGER.isEnabledFor(logging.DEBUG) and (_ or __):
+                LOGGER.debug("Received additional unhandled args/kwargs to dispatched update status: %s, %s", _, __)
             self.step_update_status(
-                _message, _progress, start_step_progress, end_step_progress, jobname, _provider, _status
+                _message, _progress, start_step_progress, end_step_progress, jobname, _provider, _status, error=error
             )
 
         def _get_wps1_params(_requirement):

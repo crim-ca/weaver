@@ -1,3 +1,4 @@
+import inspect
 import logging
 import os
 import re
@@ -12,10 +13,11 @@ from pyramid.httpexceptions import HTTPNotFound, HTTPOk, HTTPUnprocessableEntity
 from pywps import configuration as pywps_config
 from webob.acceptparse import create_accept_language_header
 
-from weaver import xml_util
+from weaver import owsexceptions, xml_util
 from weaver.config import get_weaver_configuration
 from weaver.formats import AcceptLanguage
 from weaver.utils import (
+    bytes2str,
     get_header,
     get_no_cache_option,
     get_request_options,
@@ -332,6 +334,55 @@ def check_wps_status(location=None,     # type: Optional[str]
     if not isinstance(execution.response, xml_util.XML):
         execution.response = xml_util.fromstring(execution.response)
     return execution
+
+
+def get_exception_from_xml_status(xml):
+    # type: (Union[xml_util.XML, str]) -> Optional[owsexceptions.OWSException]
+    """
+    Retrieves the :term:`OWS` exception that corresponds to the :term:`XML` status.
+
+    Expects the following :term:`XML` status response structure (``ows:Exception`` block can be at any level):
+
+    .. code-block:: xml
+        <ows:Exception exceptionCode="NoApplicableCode" locator="None">
+          <ows:ExceptionText>Error message about the cause of the exception.</ows:ExceptionText>
+        </ows:Exception>
+
+    :param xml: XML tree object with exception details.
+    :return:
+        Matched :class:`owsexceptions.OWSException`.
+        If no matching exception code is found within available exception classes, defaults to generic ``OWSException``.
+        If any parsing error occurs, returns nothing.
+    """
+
+    try:
+        if isinstance(xml, (str, bytes)):
+            xml = xml_util.fromstring(bytes2str(xml))
+        if not isinstance(xml, xml_util.XML):
+            return None
+        # Exception blocks can be with or without 'ows' prefix depending on which default namespace was defined
+        ows_exc_xml = xml.find("Exception", namespaces=xml.nsmap)  # type: Optional[xml_util.XML]
+        if ows_exc_xml is None:
+            ows_exc_xml = xml.xpath("//ows:Exception", namespaces=xml.nsmap)[0]  # type: Optional[xml_util.XML]
+        ows_exc_txt = ows_exc_xml.find("ExceptionText", namespaces=xml.nsmap)    # type: Optional[xml_util.XML]
+        if ows_exc_txt is None:
+            ows_exc_txt = ows_exc_xml.xpath("//ows:ExceptionText", namespaces=xml.nsmap)[0]
+        ows_exc_msg = ows_exc_txt.text
+        ows_exc_loc = ows_exc_xml.attrib.get("locator") or ows_exc_xml.attrib.get("locater")  # some WPS have typo
+        ows_exc_code = ows_exc_xml.attrib["exceptionCode"]
+        for ows_exc_name in dir(owsexceptions):
+            ows_exc_cls = getattr(owsexceptions, ows_exc_name)
+            if (
+                inspect.isclass(ows_exc_cls) and
+                issubclass(ows_exc_cls, owsexceptions.OWSException) and
+                ows_exc_cls is not owsexceptions.OWSException and
+                ows_exc_code == ows_exc_cls.code
+            ):
+                return ows_exc_cls(ows_exc_msg, code=ows_exc_code, locator=ows_exc_loc)
+        return owsexceptions.OWSException(ows_exc_msg, code=ows_exc_code, locator=ows_exc_loc)
+    except Exception as exc:
+        LOGGER.error("Failed mapping of OWS Exception from error codes.", exc_info=exc)
+    return None
 
 
 def load_pywps_config(container, config=None):

@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     import uuid
     from datetime import datetime
     from distutils.version import LooseVersion
-    from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Type, Union
+    from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Type, TypeVar, Union
 
     import psutil
     from typing_extensions import Literal, NotRequired, Protocol, TypeAlias, TypedDict
@@ -66,6 +66,11 @@ if TYPE_CHECKING:
     from weaver.processes.wps_process_base import WpsProcessInterface
     from weaver.datatype import Process
     from weaver.status import AnyStatusType
+
+    ReturnValue = TypeVar("ReturnValue")  # alias to identify the same return value as a decorated/wrapped function
+    AnyCallable = TypeVar("AnyCallable", bound=Callable[..., Any])  # callable used for decorated/wrapped functions
+    AnyCallableWrapped = Callable[[..., Any], ReturnValue]
+    AnyCallableAnyArgs = Union[Callable[[], ReturnValue], Callable[[..., Any], ReturnValue]]
 
     # pylint: disable=C0103,invalid-name
     Number = Union[int, float]
@@ -280,9 +285,10 @@ if TYPE_CHECKING:
     AnyProcessClass = Union[Type[Process], Type[ProcessWPS]]
 
     # update_status(message, progress, status, *args, **kwargs)
-    class UpdateStatusPartialFunction(Protocol):
-        def __call__(self, message: str, progress: Number, status: AnyStatusType, *args: Any, **kwargs: Any) -> None:
-            pass
+    UpdateStatusPartialFunction = TypeVar(
+        "UpdateStatusPartialFunction",
+        bound=Callable[[str, Number, AnyStatusType, ..., Any], None]
+    )
 
     DatetimeIntervalType = TypedDict("DatetimeIntervalType", {
         "before": datetime,
