@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_4.22.0:
+
+`4.22.0 <https://github.com/crim-ca/weaver/tree/4.22.0>`_ (2022-08-18)
+========================================================================
+
+Changes:
+--------
 - Add `WPS` remote `Provider` retry conditions to handle known problematic cases during `Process` execution (on remote)
   that can lead to sporadic failures of the monitored `Job`. When possible, retried submission leading to successful
   execution will result in the monitored `Job` to complete successfully and transparently to the user. Relevant errors
