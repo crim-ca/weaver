@@ -439,8 +439,8 @@ def load_pywps_config(container, config=None):
     # find output url from app config (path/url) or wps config (url only)
     # note: needs to be configured even when using S3 bucket since XML status is provided locally
     if "weaver.wps_output_url" not in settings:
-        output_path = settings.get("weaver.wps_output_path", "")
-        if isinstance(output_path, str):
+        output_path = settings.get("weaver.wps_output_path", "").rstrip("/")
+        if output_path and isinstance(output_path, str):
             output_url = os.path.join(get_weaver_url(settings), output_path.strip("/"))
         else:
             output_url = pywps_config.get_config_value("server", "outputurl")

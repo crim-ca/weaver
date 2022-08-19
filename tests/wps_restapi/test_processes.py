@@ -63,6 +63,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         cls.settings = {
             "weaver.url": "https://localhost",
             "weaver.wps_path": "/ows/wps",
+            "weaver.wps_output_url": "http://localhost/wpsoutputs",
         }
         cls.config = setup_config_with_mongodb(settings=cls.settings)
         cls.app = get_test_weaver_app(config=cls.config)
@@ -680,7 +681,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         deploy_headers.update(headers or {})
         resp = mocked_sub_requests(self.app, "post", "/processes",  # mock in case of TestApp self-reference URLs
                                    data=deploy_payload, headers=deploy_headers, only_local=True)
-        assert resp.status_code == 201, resp.text
+        assert resp.status_code == 201, f"{resp!s}\n{resp.text}"
         assert resp.content_type == ContentType.APP_JSON
 
         # apply visibility to allow retrieval
@@ -837,8 +838,9 @@ class WpsRestApiProcessesTest(unittest.TestCase):
     def test_deploy_process_CWL_direct_graph_YAML(self):
         self.deploy_process_CWL_direct(ContentType.APP_CWL_YAML, graph_count=1)
 
+    # FIXME: make xfail once nested CWL definitions implemented (https://github.com/crim-ca/weaver/issues/56)
     def test_deploy_process_CWL_direct_graph_multi_invalid(self):
-        with pytest.raises(webtest.app.AppError) as exc:
+        with pytest.raises((webtest.app.AppError, AssertionError)) as exc:  # noqa
             self.deploy_process_CWL_direct(ContentType.APP_CWL_JSON, graph_count=2)
         error = str(exc.value)
         assert "400 Bad Request" in error
@@ -873,6 +875,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             stack.enter_context(mocked_wps_output(self.settings))
             out_dir = self.settings["weaver.wps_output_dir"]
             out_url = self.settings["weaver.wps_output_url"]
+            assert out_url.startswith("http"), "test can run only if reference is a HTTP reference"  # sanity check
             tmp_dir = stack.enter_context(tempfile.TemporaryDirectory(dir=out_dir))
             tmp_file = os.path.join(tmp_dir, "docker-python.cwl")
             tmp_href = tmp_file.replace(out_dir, out_url, 1)
@@ -914,6 +917,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             stack.enter_context(mocked_wps_output(self.settings))
             out_dir = self.settings["weaver.wps_output_dir"]
             out_url = self.settings["weaver.wps_output_url"]
+            assert out_url.startswith("http"), "test can run only if reference is a HTTP reference"  # sanity check
             tmp_dir = stack.enter_context(tempfile.TemporaryDirectory(dir=out_dir))
             tmp_file = os.path.join(tmp_dir, "docker-python.cwl")
             tmp_href = tmp_file.replace(out_dir, out_url, 1)
@@ -992,6 +996,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             stack.enter_context(mocked_wps_output(self.settings))
             out_dir = self.settings["weaver.wps_output_dir"]
             out_url = self.settings["weaver.wps_output_url"]
+            assert out_url.startswith("http"), "test can run only if reference is a HTTP reference"  # sanity check
             tmp_dir = stack.enter_context(tempfile.TemporaryDirectory(dir=out_dir))
             tmp_file = os.path.join(tmp_dir, "wps1.cwl")
             tmp_href = tmp_file.replace(out_dir, out_url, 1)
@@ -1079,6 +1084,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             stack.enter_context(mocked_wps_output(self.settings))
             wps_dir = self.settings["weaver.wps_output_dir"]
             wps_url = self.settings["weaver.wps_output_url"]
+            assert wps_url.startswith("http"), "test can run only if reference is a HTTP reference"  # sanity check
             tmp_file = stack.enter_context(tempfile.NamedTemporaryFile(dir=wps_dir, mode="w", suffix=".cwl"))
             tmp_http = tmp_file.name.replace(wps_dir, wps_url, 1)
             json.dump(cwl, tmp_file)
