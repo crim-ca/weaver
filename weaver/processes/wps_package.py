@@ -23,6 +23,7 @@ import uuid
 from typing import TYPE_CHECKING
 from urllib.parse import parse_qsl, urlparse
 
+import colander
 import cwltool
 import cwltool.docker
 import docker
@@ -571,17 +572,26 @@ def _generate_process_with_cwl_from_reference(reference, process_hint=None):
         cwl_package = load_package_file(reference)
         process_info = {"identifier": reference_name}
 
-    # match against WPS-1/2 reference
+    # match reference against WPS-1/2 or WPS-3/OGC-API (with CWL href) or CWL (without extension, e.g.: API endpoint)
     else:
         settings = get_settings()
-        reference = _patch_wps_process_description_url(reference, process_hint)
-        response = request_extra("GET", reference, retries=3, settings=settings)
+        # since WPS-1/2 servers can sometimes reply with an error if missing query parameters, provide them
+        # even in the case of potential *OGC API - Processes* reference since we don't know yet what it refers to
+        ref_wps = _patch_wps_process_description_url(reference, process_hint)
+        response = request_extra("GET", ref_wps, retries=3, settings=settings)
         if response.status_code != HTTPOk.code:
             raise HTTPServiceUnavailable(
-                f"Couldn't obtain a valid response from [{reference}]. "
+                f"Couldn't obtain a valid response from [{ref_wps}]. "
                 f"Service response: [{response.status_code} {response.reason}]"
             )
         content_type = get_header("Content-Type", response.headers)
+        ogc_api_ctypes = {
+            ContentType.APP_JSON,
+            ContentType.APP_YAML,
+            ContentType.APP_OGC_PKG_JSON,
+            ContentType.APP_OGC_PKG_YAML,
+        }.union(ContentType.ANY_CWL)
+        ogc_api_json = {ctype for ctype in ogc_api_ctypes if ctype.endswith("json")}
 
         # try to detect incorrectly reported media-type using common structures
         if ContentType.TEXT_PLAIN in content_type:
@@ -595,28 +605,39 @@ def _generate_process_with_cwl_from_reference(reference, process_hint=None):
                                "for WPS reference [%s].", content_type, ContentType.TEXT_XML, reference)
                 content_type = ContentType.TEXT_XML
 
+        payload = None
         if any(ct in content_type for ct in ContentType.ANY_XML):
             # attempt to retrieve a WPS-1 ProcessDescription definition
             cwl_package, process_info = xml_wps2cwl(response, settings)
 
-        elif any(ct in content_type for ct in [ContentType.APP_JSON, ContentType.APP_YAML]):
-            if content_type == ContentType.APP_YAML:
-                payload = yaml.safe_load(response.text)
-            else:
-                payload = response.json()
-            # attempt to retrieve a WPS-3 Process definition, owsContext is expected in body
-            # OLD schema nests everything under 'process', OGC schema provides everything at the root
-            if "process" in payload or "owsContext" in payload:
-                process_info = payload.get("process", payload)
+        elif any(ct in content_type for ct in ogc_api_ctypes):
+            # use property with preloaded contents to be faster if reported explicitly of this type
+            # YAML load can still parse JSON if not reported explicitly
+            payload = response.json() if content_type in ogc_api_json else yaml.safe_load(response.text)
+            # attempt to retrieve a WPS-3 Process definition
+            # - owsContext possible in older body definitions
+            # - OLD schema nests everything under 'process'
+            # - OGC schema provides everything at the root, but must distinguish from CWL with 'id'
+            if (
+                ("process" in payload or "owsContext" in payload)
+                and "cwlVersion" not in payload
+                and sd.ProcessDescription(missing=colander.drop).deserialize(payload) is not colander.drop
+            ):
+                process_info = payload.get("process", payload)  # OLD/OGC schemas nested process or directly offered
                 ows_ref = process_info.get("owsContext", {}).get("offering", {}).get("content", {}).get("href")
-                cwl_package = load_package_file(ows_ref)
+                proc_ref = process_info.get("href")
+                cwl_package = load_package_file(ows_ref or proc_ref)
             # if somehow the CWL was referenced without an extension, handle it here
             # also handle parsed WPS-3 process description also with a reference
             elif "cwlVersion" in payload:
                 cwl_package = load_package_file(reference)
                 process_info = {"identifier": reference_name}
-        else:
-            raise ValueError(f"Unknown parsing methodology of Content-Type [{content_type}] for reference resolution.")
+
+        if not process_info:
+            raise ValueError(
+                f"Unknown parsing methodology of Content-Type [{content_type}] "
+                f"for reference [{reference}] with contents:\n{repr_json(payload)}\n"
+            )
 
     return cwl_package, process_info
 

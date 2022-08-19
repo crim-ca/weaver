@@ -25,6 +25,7 @@ from tests.utils import (
     mocked_process_job_runner,
     mocked_process_package,
     mocked_remote_server_requests_wps1,
+    mocked_sub_requests,
     mocked_wps_output,
     setup_config_with_mongodb,
     setup_mongodb_jobstore,
@@ -39,7 +40,7 @@ from weaver.formats import AcceptLanguage, ContentType, get_cwl_file_format
 from weaver.processes.constants import CWL_REQUIREMENT_APP_DOCKER, CWL_REQUIREMENT_APP_WPS1, ProcessSchema
 from weaver.processes.wps_testing import WpsTestProcess
 from weaver.status import Status
-from weaver.utils import fully_qualified_name, get_path_kvp, load_file, ows_context_href
+from weaver.utils import fully_qualified_name, get_path_kvp, get_weaver_url, load_file, ows_context_href
 from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_url
 from weaver.wps_restapi import swagger_definitions as sd
@@ -65,6 +66,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         }
         cls.config = setup_config_with_mongodb(settings=cls.settings)
         cls.app = get_test_weaver_app(config=cls.config)
+        cls.url = get_weaver_url(cls.app.app.registry)
         cls.json_headers = {"Accept": ContentType.APP_JSON, "Content-Type": ContentType.APP_JSON}
 
     @classmethod
@@ -676,11 +678,9 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         """
         deploy_headers = copy.deepcopy(self.json_headers)
         deploy_headers.update(headers or {})
-        if "json" in deploy_headers.get("Content-Type", "json"):
-            resp = self.app.post_json("/processes", params=deploy_payload, headers=deploy_headers)
-        else:
-            resp = self.app.post("/processes", params=deploy_payload, headers=deploy_headers)
-        assert resp.status_code == 201
+        resp = mocked_sub_requests(self.app, "post", "/processes",  # mock in case of TestApp self-reference URLs
+                                   data=deploy_payload, headers=deploy_headers, only_local=True)
+        assert resp.status_code == 201, resp.text
         assert resp.content_type == ContentType.APP_JSON
 
         # apply visibility to allow retrieval
@@ -847,6 +847,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
 
     @staticmethod
     def get_cwl_docker_python_version():
+        # type: () -> CWL
         return {
             "cwlVersion": "v1.0",
             "class": "CommandLineTool",
@@ -922,8 +923,8 @@ class WpsRestApiProcessesTest(unittest.TestCase):
 
             ows_ctx = ows_context_href(tmp_href)
             p_id = "test-docker-python-version"
-            proc = ows_ctx.update({"id": p_id})
-            body = {"processDescription": {"process": proc}}
+            ows_ctx.update({"id": p_id})
+            body = {"processDescription": {"process": ows_ctx}}  # optional 'executionUnit' since 'owsContext' has href
             desc = self.deploy_process_make_visible_and_fetch_deployed(body, p_id, assert_io=False)
             pkg = self.get_application_package(p_id)
             assert desc["deploymentProfile"] == "http://www.opengis.net/profiles/eoc/dockerizedApplication"
@@ -947,10 +948,39 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                 "formats": [{"default": True, "mediaType": "text/plain"}]
             }]
 
-    # FIXME: implement
-    @pytest.mark.skip(reason="not implemented")
     def test_deploy_process_CWL_DockerRequirement_executionUnit(self):
-        raise NotImplementedError
+        with contextlib.ExitStack() as stack:
+            stack.enter_context(mocked_wps_output(self.settings))
+            cwl = self.get_cwl_docker_python_version()
+
+            p_id = "test-docker-python-version"
+            body = {
+                "processDescription": {"process": {"id": p_id}},
+                "executionUnit": [{"unit": cwl}],
+                "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication",
+            }
+            desc = self.deploy_process_make_visible_and_fetch_deployed(body, p_id, assert_io=False)
+            pkg = self.get_application_package(p_id)
+            assert desc["deploymentProfile"] == "http://www.opengis.net/profiles/eoc/dockerizedApplication"
+
+            # once parsed, CWL I/O are converted to listing form
+            # rest should remain intact with the original definition
+            cwl["inputs"] = []
+            cwl_out = cwl["outputs"]["output"]
+            cwl_out["id"] = "output"
+            cwl["outputs"] = [cwl_out]
+            assert pkg == cwl
+
+            # process description should have been generated with relevant I/O
+            proc = desc["process"]
+            assert proc["id"] == p_id
+            assert proc["inputs"] == []
+            assert proc["outputs"] == [{
+                "id": "output",
+                "title": "output",
+                "schema": {"type": "string", "contentMediaType": "text/plain"},
+                "formats": [{"default": True, "mediaType": "text/plain"}]
+            }]
 
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
