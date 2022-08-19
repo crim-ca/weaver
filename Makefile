@@ -682,24 +682,12 @@ fix-lint-only: mkdir-reports  ## fix some PEP8 code style problems automatically
 			-v -j 0 -i -r $(APP_ROOT) \
 		1> >(tee "$(REPORTS_DIR)/fixed-lint.txt")'
 
-# FIXME: move parameters to setup.cfg when implemented (https://github.com/myint/docformatter/issues/10)
-# NOTE:
-#	Don't employ '--wrap-descriptions 120' since they *enforce* that length and rearranges format if any word can fit
-#	within remaining space, which often cause big diffs of ugly formatting for no important reason. Instead only check
-#	general formatting operations, and let other linter capture docstrings going over 120 (what we really care about).
 .PHONY: fix-docf-only
 fix-docf-only: mkdir-reports  ## fix some PEP8 code documentation style problems automatically
 	@echo "Fixing PEP8 code documentation problems..."
 	@-rm -fr "$(REPORTS_DIR)/fixed-docf.txt"
 	@bash -c '$(CONDA_CMD) \
-		docformatter \
-			--pre-summary-newline \
-			--wrap-descriptions 0 \
-			--wrap-summaries 120 \
-			--make-summary-multi-line \
-			--in-place \
-			--recursive \
-			$(APP_ROOT) \
+		docformatter --config "$(APP_ROOT)/setup.cfg" "$(APP_ROOT)" \
 		1> >(tee "$(REPORTS_DIR)/fixed-docf.txt")'
 
 .PHONY: fix-fstring-only

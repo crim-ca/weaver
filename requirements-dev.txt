@@ -8,7 +8,7 @@ bump2version
 codacy-coverage
 coverage
 doc8>=0.8.1
-docformatter
+docformatter>=1.5.0     # add support of config file
 flake8
 flynt
 isort>=4.3.21,<5
