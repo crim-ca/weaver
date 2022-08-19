@@ -970,9 +970,9 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
                                      "workflow of different process types.")
 
     # FIXME: implement + re-enable 'CWL_REQUIREMENT_SCATTER'
-    @pytest.mark.xfail(
-        reason="ScatterFeatureRequirement not yet supported (https://github.com/crim-ca/weaver/issues/105)"
-    )
+    #@pytest.mark.xfail(
+    #    reason="ScatterFeatureRequirement not yet supported (https://github.com/crim-ca/weaver/issues/105)"
+    #)
     def test_workflow_mixed_rest_builtin_wps1_docker_scatter_requirements(self):
         """
         Test the use of multiple applications of different :term:`Process` type in a :term:`Workflow`.
@@ -981,6 +981,44 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
             1. Convert JSON array of NetCDF references to corresponding NetCDF files
                (process registered with ``WPS1Requirement`` using WPS-1 interface of builtin ``jsonarray2netcdf``).
             2. Convert NetCDF file to raw text data dumps (using scattered applications per-file).
+
+        .. seealso::
+            Inverse :term:`WPS-1` / :term:`OGC API - Processes` process references from
+            :meth:`test_workflow_mixed_wps1_builtin_rest_docker_scatter_requirements`.
+        """
+
+        with contextlib.ExitStack() as stack:
+            tmp_host = "https://mocked-file-server.com"  # must match in 'Execute_WorkflowScatterCopyNestedOutDir.json'
+            tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())
+            nc_refs = []
+            for i in range(3):
+                nc_name = f"test-file-{i}.nc"
+                nc_refs.append(os.path.join(tmp_host, nc_name))
+                with open(os.path.join(tmp_dir, nc_name), mode="w", encoding="utf-8") as tmp_file:
+                    tmp_file.write(f"DUMMY NETCDF DATA #{i}")
+            with open(os.path.join(tmp_dir, "netcdf-array.json"), mode="w", encoding="utf-8") as tmp_file:
+                json.dump(nc_refs, tmp_file)  # must match execution body
+
+            def mock_tmp_input(requests_mock):
+                mocked_file_server(tmp_dir, tmp_host, self.settings, requests_mock=requests_mock)
+
+            self.workflow_runner(WorkflowProcesses.WORKFLOW_WPS1_SCATTER_COPY_NETCDF,
+                                 [WorkflowProcesses.APP_DOCKER_NETCDF_2_TEXT,  # required for reference by WPS below
+                                  WorkflowProcesses.APP_WPS1_DOCKER_NETCDF_2_TEXT],
+                                 log_full_trace=True, requests_mock_callback=mock_tmp_input)
+
+    def test_workflow_mixed_wps1_builtin_rest_docker_scatter_requirements(self):
+        """
+        Test the use of multiple applications of different :term:`Process` type in a :term:`Workflow`.
+
+        Steps:
+            1. Convert JSON array of NetCDF references to corresponding NetCDF files
+               (process registered with ``WPS1Requirement`` using WPS-1 interface of builtin ``jsonarray2netcdf``).
+            2. Convert NetCDF file to raw text data dumps (using scattered applications per-file).
+
+        .. seealso::
+            Inverse :term:`WPS-1` / :term:`OGC API - Processes` process references from
+            :meth:`test_workflow_mixed_rest_builtin_wps1_docker_scatter_requirements`.
         """
 
         with contextlib.ExitStack() as stack:
@@ -999,7 +1037,8 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
                 mocked_file_server(tmp_dir, tmp_host, self.settings, requests_mock=requests_mock)
 
             self.workflow_runner(WorkflowProcesses.WORKFLOW_REST_SCATTER_COPY_NETCDF,
-                                 [WorkflowProcesses.APP_WPS1_DOCKER_NETCDF_2_TEXT],
+                                 [WorkflowProcesses.APP_WPS1_JSON_ARRAY_2_NETCDF,  # no need to register its builtin ref
+                                  WorkflowProcesses.APP_DOCKER_NETCDF_2_TEXT],
                                  log_full_trace=True, requests_mock_callback=mock_tmp_input)
 
     def test_workflow_docker_applications(self):

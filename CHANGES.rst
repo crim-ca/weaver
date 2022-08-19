@@ -12,11 +12,14 @@ Changes
 
 Changes:
 --------
-- No change.
+- Support `CWL` definition for ``ScatterFeatureRequirement``
+  (resolves `#105 <https://github.com/crim-ca/weaver/issues/105>`_).
+- Add `OGC` Media-Type ontology for ``File`` format references within `CWL` definition.
+- Adjust ``builtin`` process ``jsonarray2netcdf`` (version ``2.0``) to employ `OGC` Media-Type for NetCDF.
 
 Fixes:
 ------
-- No change.
+- Fix implementation of various functional test cases for `Workflow` execution.
 
 .. _changes_4.23.0:
 

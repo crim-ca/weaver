@@ -81,7 +81,7 @@ CWL_REQUIREMENT_FEATURES = frozenset([
     CWL_REQUIREMENT_ENV_VAR,
     CWL_REQUIREMENT_INIT_WORKDIR,
     CWL_REQUIREMENT_RESOURCE,   # FIXME: perform pre-check on job submit? (https://github.com/crim-ca/weaver/issues/138)
-    # CWL_REQUIREMENT_SCATTER,  # FIXME: see workflow test + fix https://github.com/crim-ca/weaver/issues/105
+    CWL_REQUIREMENT_SCATTER,
 ])
 """
 Set of :term:`CWL` requirements that corresponds to extra functionalities not completely defining
