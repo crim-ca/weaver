@@ -669,7 +669,7 @@ fix-imports-only: mkdir-reports	## apply import code checks corrections
 # global detection of those errors (typos, bad indents), unless explicitly added and excluded for readability purposes.
 # WARNING: this will cause inconsistencies between what 'check-lint' detects and what 'fix-lint' can actually fix
 _DEFAULT_SETUP_ERROR := E126,E226,E402,F401,W503,W504
-_EXTRA_SETUP_ERROR := E241
+_EXTRA_SETUP_ERROR := E241,E731
 
 .PHONY: fix-lint-only
 fix-lint-only: mkdir-reports  ## fix some PEP8 code style problems automatically

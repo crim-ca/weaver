@@ -211,6 +211,7 @@ class SchemaRefResolver(JsonSchemaRefResolver):
     Reference resolver that supports both :term:`JSON` and :term:`YAML` files from a remote location.
     """
     # only need to override the remote resolution to add YAML support
+
     def resolve_remote(self, uri):
         # type: (str) -> OpenAPISchema
         try:

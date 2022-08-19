@@ -207,6 +207,7 @@ class BasicAuthHandler(AuthHandler, HTTPBasicAuth):
 
     Authentication URL and method are not needed for this handler.
     """
+
     def __init__(self, username, password, **kwargs):
         # type: (str, str, Any) -> None
         AuthHandler.__init__(self, identity=username, password=password, **kwargs)
@@ -292,6 +293,7 @@ class BearerAuthHandler(RequestAuthHandler):
     """
     Adds the ``Authorization`` header formed of the authentication bearer token from the underlying request.
     """
+
     def auth_header(self, token):
         # type: (str) -> AnyHeadersContainer
         return {"Authorization": f"Bearer {token}"}
@@ -301,6 +303,7 @@ class CookieAuthHandler(RequestAuthHandler):
     """
     Adds the ``Authorization`` header formed of the authentication bearer token from the underlying request.
     """
+
     def auth_header(self, token):
         # type: (str) -> AnyHeadersContainer
         return {"Cookie": token}
