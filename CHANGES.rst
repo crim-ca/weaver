@@ -12,11 +12,14 @@ Changes
 
 Changes:
 --------
-- No change.
+- Adjust OpenAPI schema definitions for `Process` deployment to allow ``owsContext`` by itself without duplicated
+  information that was required by mandatory ``executionUnit`` definition.
 
 Fixes:
 ------
-- No change.
+- Fix implementation of functional ``DockerRequirement`` test cases for `Process` deployment when references are
+  provided by ``href`` within the ``executionUnit`` or ``owsContext``
+  (relates to `#11 <https://github.com/crim-ca/weaver/issues/11>`_).
 
 .. _changes_4.22.0:
 

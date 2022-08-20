@@ -25,6 +25,7 @@ from tests.utils import (
     mocked_process_job_runner,
     mocked_process_package,
     mocked_remote_server_requests_wps1,
+    mocked_sub_requests,
     mocked_wps_output,
     setup_config_with_mongodb,
     setup_mongodb_jobstore,
@@ -39,7 +40,7 @@ from weaver.formats import AcceptLanguage, ContentType, get_cwl_file_format
 from weaver.processes.constants import CWL_REQUIREMENT_APP_DOCKER, CWL_REQUIREMENT_APP_WPS1, ProcessSchema
 from weaver.processes.wps_testing import WpsTestProcess
 from weaver.status import Status
-from weaver.utils import fully_qualified_name, get_path_kvp, load_file, ows_context_href
+from weaver.utils import fully_qualified_name, get_path_kvp, get_weaver_url, load_file, ows_context_href
 from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_url
 from weaver.wps_restapi import swagger_definitions as sd
@@ -62,9 +63,11 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         cls.settings = {
             "weaver.url": "https://localhost",
             "weaver.wps_path": "/ows/wps",
+            "weaver.wps_output_url": "http://localhost/wpsoutputs",
         }
         cls.config = setup_config_with_mongodb(settings=cls.settings)
         cls.app = get_test_weaver_app(config=cls.config)
+        cls.url = get_weaver_url(cls.app.app.registry)
         cls.json_headers = {"Accept": ContentType.APP_JSON, "Content-Type": ContentType.APP_JSON}
 
     @classmethod
@@ -676,11 +679,9 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         """
         deploy_headers = copy.deepcopy(self.json_headers)
         deploy_headers.update(headers or {})
-        if "json" in deploy_headers.get("Content-Type", "json"):
-            resp = self.app.post_json("/processes", params=deploy_payload, headers=deploy_headers)
-        else:
-            resp = self.app.post("/processes", params=deploy_payload, headers=deploy_headers)
-        assert resp.status_code == 201
+        resp = mocked_sub_requests(self.app, "post", "/processes",  # mock in case of TestApp self-reference URLs
+                                   data=deploy_payload, headers=deploy_headers, only_local=True)
+        assert resp.status_code == 201, f"{resp!s}\n{resp.text}"
         assert resp.content_type == ContentType.APP_JSON
 
         # apply visibility to allow retrieval
@@ -837,41 +838,48 @@ class WpsRestApiProcessesTest(unittest.TestCase):
     def test_deploy_process_CWL_direct_graph_YAML(self):
         self.deploy_process_CWL_direct(ContentType.APP_CWL_YAML, graph_count=1)
 
+    # FIXME: make xfail once nested CWL definitions implemented (https://github.com/crim-ca/weaver/issues/56)
     def test_deploy_process_CWL_direct_graph_multi_invalid(self):
-        with pytest.raises(webtest.app.AppError) as exc:
+        with pytest.raises((webtest.app.AppError, AssertionError)) as exc:  # noqa
             self.deploy_process_CWL_direct(ContentType.APP_CWL_JSON, graph_count=2)
         error = str(exc.value)
         assert "400 Bad Request" in error
         assert "Invalid schema" in error
         assert "Longer than maximum length 1" in error
 
+    @staticmethod
+    def get_cwl_docker_python_version():
+        # type: () -> CWL
+        return {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "requirements": {
+                CWL_REQUIREMENT_APP_DOCKER: {
+                    "dockerPull": "python:3.7-alpine"
+                }
+            },
+            "baseCommand": ["python3", "-V"],
+            "inputs": {},
+            "outputs": {
+                "output": {
+                    "type": "File",
+                    "outputBinding": {
+                        "glob": "stdout.log"
+                    },
+                }
+            },
+        }
+
     def test_deploy_process_CWL_DockerRequirement_href(self):
         with contextlib.ExitStack() as stack:
             stack.enter_context(mocked_wps_output(self.settings))
             out_dir = self.settings["weaver.wps_output_dir"]
             out_url = self.settings["weaver.wps_output_url"]
+            assert out_url.startswith("http"), "test can run only if reference is a HTTP reference"  # sanity check
             tmp_dir = stack.enter_context(tempfile.TemporaryDirectory(dir=out_dir))
             tmp_file = os.path.join(tmp_dir, "docker-python.cwl")
             tmp_href = tmp_file.replace(out_dir, out_url, 1)
-            cwl = {
-                "cwlVersion": "v1.0",
-                "class": "CommandLineTool",
-                "requirements": {
-                    CWL_REQUIREMENT_APP_DOCKER: {
-                        "dockerPull": "python:3.7-alpine"
-                    }
-                },
-                "baseCommand": ["python3", "-V"],
-                "inputs": {},
-                "outputs": {
-                    "output": {
-                        "type": "File",
-                        "outputBinding": {
-                            "glob": "stdout.log"
-                        },
-                    }
-                },
-            }
+            cwl = self.get_cwl_docker_python_version()
             with open(tmp_file, mode="w", encoding="utf-8") as cwl_file:
                 json.dump(cwl, cwl_file)
 
@@ -904,15 +912,79 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                 "formats": [{"default": True, "mediaType": "text/plain"}]
             }]
 
-    # FIXME: implement
-    @pytest.mark.skip(reason="not implemented")
     def test_deploy_process_CWL_DockerRequirement_owsContext(self):
-        raise NotImplementedError
+        with contextlib.ExitStack() as stack:
+            stack.enter_context(mocked_wps_output(self.settings))
+            out_dir = self.settings["weaver.wps_output_dir"]
+            out_url = self.settings["weaver.wps_output_url"]
+            assert out_url.startswith("http"), "test can run only if reference is a HTTP reference"  # sanity check
+            tmp_dir = stack.enter_context(tempfile.TemporaryDirectory(dir=out_dir))
+            tmp_file = os.path.join(tmp_dir, "docker-python.cwl")
+            tmp_href = tmp_file.replace(out_dir, out_url, 1)
+            cwl = self.get_cwl_docker_python_version()
+            with open(tmp_file, mode="w", encoding="utf-8") as cwl_file:
+                json.dump(cwl, cwl_file)
 
-    # FIXME: implement
-    @pytest.mark.skip(reason="not implemented")
+            ows_ctx = ows_context_href(tmp_href)
+            p_id = "test-docker-python-version"
+            ows_ctx.update({"id": p_id})
+            body = {"processDescription": {"process": ows_ctx}}  # optional 'executionUnit' since 'owsContext' has href
+            desc = self.deploy_process_make_visible_and_fetch_deployed(body, p_id, assert_io=False)
+            pkg = self.get_application_package(p_id)
+            assert desc["deploymentProfile"] == "http://www.opengis.net/profiles/eoc/dockerizedApplication"
+
+            # once parsed, CWL I/O are converted to listing form
+            # rest should remain intact with the original definition
+            cwl["inputs"] = []
+            cwl_out = cwl["outputs"]["output"]
+            cwl_out["id"] = "output"
+            cwl["outputs"] = [cwl_out]
+            assert pkg == cwl
+
+            # process description should have been generated with relevant I/O
+            proc = desc["process"]
+            assert proc["id"] == p_id
+            assert proc["inputs"] == []
+            assert proc["outputs"] == [{
+                "id": "output",
+                "title": "output",
+                "schema": {"type": "string", "contentMediaType": "text/plain"},
+                "formats": [{"default": True, "mediaType": "text/plain"}]
+            }]
+
     def test_deploy_process_CWL_DockerRequirement_executionUnit(self):
-        raise NotImplementedError
+        with contextlib.ExitStack() as stack:
+            stack.enter_context(mocked_wps_output(self.settings))
+            cwl = self.get_cwl_docker_python_version()
+
+            p_id = "test-docker-python-version"
+            body = {
+                "processDescription": {"process": {"id": p_id}},
+                "executionUnit": [{"unit": cwl}],
+                "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication",
+            }
+            desc = self.deploy_process_make_visible_and_fetch_deployed(body, p_id, assert_io=False)
+            pkg = self.get_application_package(p_id)
+            assert desc["deploymentProfile"] == "http://www.opengis.net/profiles/eoc/dockerizedApplication"
+
+            # once parsed, CWL I/O are converted to listing form
+            # rest should remain intact with the original definition
+            cwl["inputs"] = []
+            cwl_out = cwl["outputs"]["output"]
+            cwl_out["id"] = "output"
+            cwl["outputs"] = [cwl_out]
+            assert pkg == cwl
+
+            # process description should have been generated with relevant I/O
+            proc = desc["process"]
+            assert proc["id"] == p_id
+            assert proc["inputs"] == []
+            assert proc["outputs"] == [{
+                "id": "output",
+                "title": "output",
+                "schema": {"type": "string", "contentMediaType": "text/plain"},
+                "formats": [{"default": True, "mediaType": "text/plain"}]
+            }]
 
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
@@ -924,6 +996,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             stack.enter_context(mocked_wps_output(self.settings))
             out_dir = self.settings["weaver.wps_output_dir"]
             out_url = self.settings["weaver.wps_output_url"]
+            assert out_url.startswith("http"), "test can run only if reference is a HTTP reference"  # sanity check
             tmp_dir = stack.enter_context(tempfile.TemporaryDirectory(dir=out_dir))
             tmp_file = os.path.join(tmp_dir, "wps1.cwl")
             tmp_href = tmp_file.replace(out_dir, out_url, 1)
@@ -1011,6 +1084,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             stack.enter_context(mocked_wps_output(self.settings))
             wps_dir = self.settings["weaver.wps_output_dir"]
             wps_url = self.settings["weaver.wps_output_url"]
+            assert wps_url.startswith("http"), "test can run only if reference is a HTTP reference"  # sanity check
             tmp_file = stack.enter_context(tempfile.NamedTemporaryFile(dir=wps_dir, mode="w", suffix=".cwl"))
             tmp_http = tmp_file.name.replace(wps_dir, wps_url, 1)
             json.dump(cwl, tmp_file)

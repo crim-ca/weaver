@@ -409,6 +409,7 @@ class MockedResponse(TestResponse):
     """
     Replaces the ``json`` property by the expected callable from responses using :mod:`requests` implementation.
     """
+
     def json(self):  # pylint: disable=W0236,invalid-overridden-method
         return self.json_body or json.loads(bytes2str(self.body))
 

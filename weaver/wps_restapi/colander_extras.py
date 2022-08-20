@@ -202,6 +202,7 @@ class BoundedRange(colander.Range):
     """
     Validator of value within range with added ``exclusive`` bounds support.
     """
+
     def __init__(self, min=None, max=None, exclusive_min=False, exclusive_max=False, **kwargs):
         # type: (Optional[Union[float, int]], Optional[Union[float, int]], bool, bool, Any) -> None
         self.min_excl = exclusive_min

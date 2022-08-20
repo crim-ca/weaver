@@ -888,7 +888,8 @@ class WpsRestApiJobsTest(unittest.TestCase):
 
         .. seealso::
             - `/req/collections/rc-limit-response
-                <https://github.com/opengeospatial/ogcapi-common/blob/master/collections/requirements/collections/REQ_rc-limit-response.adoc>`_
+              <https://github.com/opengeospatial/ogcapi-common/blob/master/
+              api_modules/limit/requirements/REQ_rc-limit-response.adoc>`_
         """
         limit_parameter = 20
         path = get_path_kvp(sd.jobs_service.path, limit=limit_parameter)
@@ -905,7 +906,8 @@ class WpsRestApiJobsTest(unittest.TestCase):
 
         .. seealso::
             - `/req/collections/rc-limit-response
-                <https://github.com/opengeospatial/ogcapi-common/blob/master/collections/requirements/collections/REQ_rc-limit-response.adoc>`_
+              <https://github.com/opengeospatial/ogcapi-common/blob/master/
+              api_modules/limit/requirements/REQ_rc-limit-response.adoc>`_
         """
         uri = sd.openapi_json_service.path
         resp = self.app.get(uri, headers=self.json_headers)
@@ -918,8 +920,9 @@ class WpsRestApiJobsTest(unittest.TestCase):
         Test that only filtered jobs before a certain time are returned when ``datetime`` query parameter is provided.
 
         .. seealso::
-            - `/req/collections/rc-time-collections-response
-                <https://github.com/opengeospatial/ogcapi-common/blob/master/collections/requirements/collections/REQ_rc-time-collections-response.adoc>`_
+            - `/req/collections/rc-datetime-response
+              <https://github.com/opengeospatial/ogcapi-common/blob/master/
+              api_modules/datetime/requirements/REQ_rc-datetime-response.adoc>`_
         """
         datetime_before = DATETIME_INTERVAL_OPEN_START_SYMBOL + self.datetime_interval[0]
         path = get_path_kvp(sd.jobs_service.path, datetime=datetime_before)
@@ -945,8 +948,9 @@ class WpsRestApiJobsTest(unittest.TestCase):
         Test that only filtered jobs after a certain time are returned when ``datetime`` query parameter is provided.
 
         .. seealso::
-            - `/req/collections/rc-time-collections-response
-                <https://github.com/opengeospatial/ogcapi-common/blob/master/collections/requirements/collections/REQ_rc-time-collections-response.adoc>`_
+            - `/req/collections/rc-datetime-response
+              <https://github.com/opengeospatial/ogcapi-common/blob/master/
+              api_modules/datetime/requirements/REQ_rc-datetime-response.adoc>`_
         """
         datetime_after = str(self.datetime_interval[2] + DATETIME_INTERVAL_OPEN_END_SYMBOL)
         path = get_path_kvp(sd.jobs_service.path, datetime=datetime_after)
@@ -968,8 +972,9 @@ class WpsRestApiJobsTest(unittest.TestCase):
         Test that only filtered jobs in the time interval are returned when ``datetime`` query parameter is provided.
 
         .. seealso::
-            - `/req/collections/rc-time-collections-response
-                <https://github.com/opengeospatial/ogcapi-common/blob/master/collections/requirements/collections/REQ_rc-time-collections-response.adoc>`_
+            - `/req/collections/rc-datetime-response
+              <https://github.com/opengeospatial/ogcapi-common/blob/master/
+              api_modules/datetime/requirements/REQ_rc-datetime-response.adoc>`_
         """
         datetime_interval = self.datetime_interval[1] + DATETIME_INTERVAL_CLOSED_SYMBOL + self.datetime_interval[3]
         path = get_path_kvp(sd.jobs_service.path, datetime=datetime_interval)
@@ -993,8 +998,9 @@ class WpsRestApiJobsTest(unittest.TestCase):
         Test that only filtered jobs at a specific time are returned when ``datetime`` query parameter is provided.
 
         .. seealso::
-            - `/req/collections/rc-time-collections-response
-                <https://github.com/opengeospatial/ogcapi-common/blob/master/collections/requirements/collections/REQ_rc-time-collections-response.adoc>`_
+            - `/req/collections/rc-datetime-response
+              <https://github.com/opengeospatial/ogcapi-common/blob/master/
+              api_modules/datetime/requirements/REQ_rc-datetime-response.adoc>`_
         """
         datetime_match = self.datetime_interval[1]
         path = get_path_kvp(sd.jobs_service.path, datetime=datetime_match)
@@ -1015,8 +1021,9 @@ class WpsRestApiJobsTest(unittest.TestCase):
         Test that incorrectly formatted ``datetime`` query parameter value is handled.
 
         .. seealso::
-            - `/req/collections/rc-time-collections-response
-                <https://github.com/opengeospatial/ogcapi-common/blob/master/collections/requirements/collections/REQ_rc-time-collections-response.adoc>`_
+            - `/req/collections/rc-datetime-response
+              <https://github.com/opengeospatial/ogcapi-common/blob/master/
+              api_modules/datetime/requirements/REQ_rc-datetime-response.adoc>`_
 
         Value of ``datetime_invalid`` is not formatted against the RFC-3339 datetime format.
         For more details refer to https://datatracker.ietf.org/doc/html/rfc3339#section-5.6.
@@ -1031,8 +1038,9 @@ class WpsRestApiJobsTest(unittest.TestCase):
         Test that invalid ``datetime`` query parameter value is handled.
 
         .. seealso::
-            - `/req/collections/rc-time-collections-response
-                <https://github.com/opengeospatial/ogcapi-common/blob/master/collections/requirements/collections/REQ_rc-time-collections-response.adoc>`_
+            - `/req/collections/rc-datetime-response
+              <https://github.com/opengeospatial/ogcapi-common/blob/master/
+              api_modules/datetime/requirements/REQ_rc-datetime-response.adoc>`_
 
         Value of ``datetime_invalid`` represents a datetime interval where the limit dates are inverted.
         The minimum is greater than the maximum datetime limit.
@@ -1047,8 +1055,9 @@ class WpsRestApiJobsTest(unittest.TestCase):
         Test that invalid ``datetime`` query parameter value with a range is handled.
 
         .. seealso::
-            - `/req/collections/rc-time-collections-response
-                <https://github.com/opengeospatial/ogcapi-common/blob/master/collections/requirements/collections/REQ_rc-time-collections-response.adoc>`_
+            - `/req/collections/rc-datetime-response
+              <https://github.com/opengeospatial/ogcapi-common/blob/master/
+              api_modules/datetime/requirements/REQ_rc-datetime-response.adoc>`_
 
         Value of ``datetime_before`` represents a bad open range datetime interval.
         """
@@ -1214,6 +1223,8 @@ class WpsRestApiJobsTest(unittest.TestCase):
 
     def test_get_job_invalid_uuid(self):
         """
+        Test handling of invalid UUID reference to search job.
+
         .. versionchanged:: 4.6.0
             Jobs must explicitly use an :class:`uuid.UUID` object to search.
             Any value provided in path parameter that does not correspond to such definition raises a bad request.

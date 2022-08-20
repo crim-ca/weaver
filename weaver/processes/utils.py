@@ -342,9 +342,10 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
     payload = _check_deploy(payload)
 
     # validate identifier naming for unsupported characters
-    process_description = payload.get("processDescription", {})  # empty possible if CWL directly passed
-    process_info = process_description.get("process", process_description)
-    process_href = process_description.pop("href", None)
+    process_desc = payload.get("processDescription", {})  # empty possible if CWL directly passed
+    process_info = process_desc.get("process", process_desc)
+    process_href = process_desc.pop("href", None)
+    process_param = "processDescription.process" if "process" in process_desc else "processDescription"
 
     # retrieve CWL package definition, either via "href" (WPS-1/2), "owsContext" or "executionUnit" (package/reference)
     deployment_profile_name = payload.get("deploymentProfileName", "")
@@ -358,10 +359,10 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
     elif isinstance(ows_context, dict):
         offering = ows_context.get("offering")
         if not isinstance(offering, dict):
-            raise HTTPUnprocessableEntity("Invalid parameter 'processDescription.process.owsContext.offering'.")
+            raise HTTPUnprocessableEntity(f"Invalid parameter '{process_param}.owsContext.offering'.")
         content = offering.get("content")
         if not isinstance(content, dict):
-            raise HTTPUnprocessableEntity("Invalid parameter 'processDescription.process.owsContext.offering.content'.")
+            raise HTTPUnprocessableEntity(f"Invalid parameter '{process_param}.owsContext.offering.content'.")
         package = None
         reference = content.get("href")
         found = isinstance(reference, str)
@@ -391,6 +392,8 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
                 break
     if not found:
         params = [
+            "ProcessDescription.process.href",
+            "ProcessDescription.process.owsContext.content.href",
             "ProcessDescription.href",
             "ProcessDescription.owsContext.content.href",
             "executionUnit[*].(unit|href)",
@@ -416,11 +419,11 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
 
     # ensure that required "processEndpointWPS1" in db is added,
     # will be auto-fixed to localhost if not specified in body
-    process_info["processEndpointWPS1"] = process_description.get("processEndpointWPS1")
+    process_info["processEndpointWPS1"] = process_desc.get("processEndpointWPS1")
     process_info["executeEndpoint"] = execute_endpoint
     process_info["payload"] = payload_copy
-    process_info["jobControlOptions"] = process_description.get("jobControlOptions", [])
-    process_info["outputTransmission"] = process_description.get("outputTransmission", [])
+    process_info["jobControlOptions"] = process_desc.get("jobControlOptions", [])
+    process_info["outputTransmission"] = process_desc.get("outputTransmission", [])
     process_info["processDescriptionURL"] = description_url
     # insert the "resolved" context using details retrieved from "executionUnit"/"href" or directly with "owsContext"
     if "owsContext" not in process_info and reference:

@@ -115,6 +115,15 @@ IO_INFO_IDS = (
 OGC_API_REPO_URL = "https://github.com/opengeospatial/ogcapi-processes"
 OGC_API_SCHEMA_URL = "https://raw.githubusercontent.com/opengeospatial/ogcapi-processes"
 OGC_API_SCHEMA_VERSION = "master"
+OGC_API_SCHEMA_BASE = f"{OGC_API_SCHEMA_URL}/{OGC_API_SCHEMA_VERSION}"
+OGC_API_SCHEMA_CORE = f"{OGC_API_SCHEMA_BASE}/core/openapi/schemas"
+OGC_API_EXAMPLES_CORE = f"{OGC_API_SCHEMA_BASE}/core/examples"
+OGC_API_SCHEMA_EXT_DEPLOY = f"{OGC_API_SCHEMA_BASE}/extensions/deploy_replace_undeploy/standard/openapi/schemas"
+OGC_API_EXAMPLES_EXT_DEPLOY = f"{OGC_API_SCHEMA_BASE}/extensions/deploy_replace_undeploy/examples"
+# not available yet:
+OGC_API_SCHEMA_EXT_BILL = f"{OGC_API_SCHEMA_BASE}/extensions/billing/standard/openapi/schemas"
+OGC_API_SCHEMA_EXT_QUOTE = f"{OGC_API_SCHEMA_BASE}/extensions/quotation/standard/openapi/schemas"
+OGC_API_SCHEMA_EXT_WORKFLOW = f"{OGC_API_SCHEMA_BASE}/extensions/workflows/standard/openapi/schemas"
 
 DATETIME_INTERVAL_CLOSED_SYMBOL = "/"
 DATETIME_INTERVAL_OPEN_START_SYMBOL = "../"
@@ -746,7 +755,7 @@ class Format(ExtendedMappingSchema):
     """
     Used to respect ``mediaType`` field as suggested per `OGC-API`.
     """
-    schema_ref = f"{OGC_API_SCHEMA_URL}/{OGC_API_SCHEMA_VERSION}/core/openapi/schemas/format.yaml"
+    schema_ref = f"{OGC_API_SCHEMA_CORE}/format.yaml"
     mediaType = MediaType(default=ContentType.TEXT_PLAIN, example=ContentType.APP_JSON)
     encoding = ExtendedSchemaNode(String(), missing=drop)
     schema = FormatSchema(missing=drop)
@@ -831,7 +840,7 @@ class ResultFormat(FormatDescription):
     """
     Format employed for reference results respecting 'OGC API - Processes' schemas.
     """
-    schema_ref = f"{OGC_API_SCHEMA_URL}/{OGC_API_SCHEMA_VERSION}/core/openapi/schemas/formatDescription.yaml"
+    schema_ref = f"{OGC_API_SCHEMA_CORE}/formatDescription.yaml"
     mediaType = MediaType(String())
     encoding = ExtendedSchemaNode(String(), missing=drop)
     schema = FormatSchema(missing=drop)
@@ -977,7 +986,7 @@ class InputOutputDescriptionMeta(ExtendedMappingSchema):
 
 
 class ReferenceOAS(ExtendedMappingSchema):
-    schema_ref = f"{OGC_API_SCHEMA_URL}/{OGC_API_SCHEMA_VERSION}/core/openapi/schemas/reference.yaml"
+    schema_ref = f"{OGC_API_SCHEMA_CORE}/reference.yaml"
     _ref = ReferenceURL(name="$ref", description="External OpenAPI schema reference.")
 
 
@@ -1129,7 +1138,7 @@ class DefinitionOAS(AnyOfKeywordSchema):
 
 class OAS(OneOfKeywordSchema):
     description = "OpenAPI schema definition."
-    schema_ref = f"{OGC_API_SCHEMA_URL}/{OGC_API_SCHEMA_VERSION}/core/openapi/schemas/schema.yaml"
+    schema_ref = f"{OGC_API_SCHEMA_CORE}/schema.yaml"
     _one_of = [
         ReferenceOAS(),
         DefinitionOAS(),
@@ -1277,7 +1286,7 @@ class LiteralReference(ExtendedMappingSchema):
 
 # https://github.com/opengeospatial/ogcapi-processes/blob/e6893b/extensions/workflows/openapi/workflows.yaml#L1707-L1716
 class NameReferenceType(ExtendedMappingSchema):
-    schema_ref = f"{OGC_API_SCHEMA_URL}/{OGC_API_SCHEMA_VERSION}/core/openapi/schemas/nameReferenceType.yaml"
+    schema_ref = f"{OGC_API_SCHEMA_CORE}/nameReferenceType.yaml"
     name = ExtendedSchemaNode(String())
     reference = ReferenceURL(missing=drop, description="Reference URL to schema definition of the named entity.")
 
@@ -1629,7 +1638,7 @@ class DeployOutputTypeAny(OneOfKeywordSchema):
 
 
 class JobExecuteModeEnum(ExtendedSchemaNode):
-    schema_ref = f"{OGC_API_SCHEMA_URL}/{OGC_API_SCHEMA_VERSION}/core/openapi/schemas/execute.yaml"
+    schema_ref = f"{OGC_API_SCHEMA_CORE}/execute.yaml"
     schema_type = String
     title = "JobExecuteMode"
     # no default to enforce required input as per OGC-API schemas
@@ -1647,7 +1656,7 @@ class JobControlOptionsEnum(ExtendedSchemaNode):
 
 
 class JobResponseOptionsEnum(ExtendedSchemaNode):
-    schema_ref = f"{OGC_API_SCHEMA_URL}/{OGC_API_SCHEMA_VERSION}/core/openapi/schemas/execute.yaml"
+    schema_ref = f"{OGC_API_SCHEMA_CORE}/execute.yaml"
     schema_type = String
     title = "JobResponseOptions"
     # no default to enforce required input as per OGC-API schemas
@@ -3228,7 +3237,7 @@ class ExecuteInputListValues(ExtendedSequenceSchema):
 #   https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/link.yaml
 # But explicitly in the context of an execution input, rather than any other link (eg: metadata)
 class ExecuteInputFileLink(Link):  # for other metadata (title, hreflang, etc.)
-    schema_ref = f"{OGC_API_SCHEMA_URL}/{OGC_API_SCHEMA_VERSION}/core/openapi/schemas/link.yaml"
+    schema_ref = f"{OGC_API_SCHEMA_CORE}/link.yaml"
     href = ExecuteReferenceURL(  # no just a plain 'URL' like 'Link' has (extended with s3, vault, etc.)
         description="Location of the file reference."
     )
@@ -3278,7 +3287,7 @@ class ExecuteInputInlineValue(OneOfKeywordSchema):
 #     - $ref: "inputValueNoObject.yaml"
 #     - type: object
 class ExecuteInputObjectData(OneOfKeywordSchema):
-    schema_ref = f"{OGC_API_SCHEMA_URL}/{OGC_API_SCHEMA_VERSION}/core/openapi/schemas/inputValue.yaml"
+    schema_ref = f"{OGC_API_SCHEMA_CORE}/inputValue.yaml"
     description = "Data value of any schema "
     _one_of = [
         ExecuteInputInlineValue(),
@@ -3288,7 +3297,7 @@ class ExecuteInputObjectData(OneOfKeywordSchema):
 
 # https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/qualifiedInputValue.yaml
 class ExecuteInputQualifiedValue(Format):
-    schema_ref = f"{OGC_API_SCHEMA_URL}/{OGC_API_SCHEMA_VERSION}/core/openapi/schemas/qualifiedInputValue.yaml"
+    schema_ref = f"{OGC_API_SCHEMA_CORE}/qualifiedInputValue.yaml"
     value = ExecuteInputObjectData()    # can be anything, including literal value, array of them, nested object
 
 
@@ -3300,7 +3309,7 @@ class ExecuteInputQualifiedValue(Format):
 #     - $ref: "link.yaml"
 #
 class ExecuteInputInlineOrRefData(OneOfKeywordSchema):
-    schema_ref = f"{OGC_API_SCHEMA_URL}/{OGC_API_SCHEMA_VERSION}/core/openapi/schemas/inlineOrRefData.yaml"
+    schema_ref = f"{OGC_API_SCHEMA_CORE}/inlineOrRefData.yaml"
     _one_of = [
         ExecuteInputInlineValue(),     # <inline-literal>
         ExecuteInputQualifiedValue(),  # {"value": <anything>}
@@ -3333,7 +3342,7 @@ class ExecuteInputData(OneOfKeywordSchema):
 #           $ref: "inlineOrRefData.yaml"
 #
 class ExecuteInputMapAdditionalProperties(ExtendedMappingSchema):
-    schema_ref = f"{OGC_API_SCHEMA_URL}/{OGC_API_SCHEMA_VERSION}/core/openapi/schemas/execute.yaml"
+    schema_ref = f"{OGC_API_SCHEMA_CORE}/execute.yaml"
     input_id = ExecuteInputData(variable="{input-id}", title="ExecuteInputValue",
                                 description="Received mapping input value definition during job submission.")
 
@@ -3372,7 +3381,7 @@ class ExecuteInputOutputs(ExtendedMappingSchema):
     #   - 'tests.wps_restapi.test_colander_extras.test_oneof_variable_dict_or_list'
     #
     # OGC 'execute.yaml' also does not enforce any required item.
-    schema_ref = f"{OGC_API_SCHEMA_URL}/{OGC_API_SCHEMA_VERSION}/core/openapi/schemas/execute.yaml"
+    schema_ref = f"{OGC_API_SCHEMA_CORE}/execute.yaml"
     inputs = ExecuteInputValues(default={}, description="Values submitted for execution.")
     outputs = ExecuteOutputSpec(
         description=(
@@ -4068,7 +4077,7 @@ class ResultReferenceList(ExtendedSequenceSchema):
 
 
 class ResultData(OneOfKeywordSchema):
-    schema_ref = f"{OGC_API_SCHEMA_URL}/{OGC_API_SCHEMA_VERSION}/core/openapi/schemas/result.yaml"
+    schema_ref = f"{OGC_API_SCHEMA_CORE}/result.yaml"
     _one_of = [
         # must place formatted value first since both value/format fields are simultaneously required
         # other classes require only one of the two, and therefore are more permissive during schema validation
@@ -4085,7 +4094,7 @@ class Result(ExtendedMappingSchema):
     """
     Result outputs obtained from a successful process job execution.
     """
-    example_ref = f"{OGC_API_SCHEMA_URL}/{OGC_API_SCHEMA_VERSION}/core/examples/json/Result.json"
+    example_ref = f"{OGC_API_EXAMPLES_CORE}/json/Result.json"
     output_id = ResultData(
         variable="{output-id}", title="ResultData",
         description=(
@@ -4243,6 +4252,35 @@ class ExecutionUnitList(ExtendedSequenceSchema):
     )
 
 
+class ProcessDeploymentWithContext(ProcessDeployment):
+    description = "Process deployment with OWS Context reference."
+    owsContext = OWSContext(missing=required)
+
+
+class DeployProcessOfferingContext(ProcessControl):
+    # alternative definition to make 'executionUnit' optional if instead provided through 'owsContext'
+    # case were definition is nested under 'processDescription.process'
+    process = ProcessDeploymentWithContext(
+        description="Process definition nested under process field for backward compatibility."
+    )
+    processVersion = Version(title="processVersion", missing=drop)
+
+
+class DeployProcessDescriptionContext(NotKeywordSchema, ProcessDeploymentWithContext, ProcessControl):
+    # alternative definition to make 'executionUnit' optional if instead provided through 'owsContext'
+    # case were definition is directly under 'processDescription'
+    _not = [
+        Reference()  # avoid conflict with deploy by href
+    ]
+
+
+class DeployProcessContextChoiceType(OneOfKeywordSchema):
+    _one_of = [
+        DeployProcessOfferingContext(),
+        DeployProcessDescriptionContext(),
+    ]
+
+
 class DeployProcessOffering(ProcessControl):
     process = ProcessDeployment(description="Process definition nested under process field for backward compatibility.")
     processVersion = Version(title="processVersion", missing=drop)
@@ -4252,7 +4290,7 @@ class DeployProcessDescription(NotKeywordSchema, ProcessDeployment, ProcessContr
     _not = [
         Reference()  # avoid conflict with deploy by href
     ]
-    schema_ref = f"{OGC_API_SCHEMA_URL}/{OGC_API_SCHEMA_VERSION}/core/openapi/schemas/process.yaml"
+    schema_ref = f"{OGC_API_SCHEMA_CORE}/process.yaml"
     description = "Process description fields directly provided."
 
 
@@ -4271,15 +4309,31 @@ class ProcessDescriptionChoiceType(OneOfKeywordSchema):
     ]
 
 
-class DeployOGCAppPackage(NotKeywordSchema, ExtendedMappingSchema):
+class ExecutionUnitDefinition(ExtendedMappingSchema):
+    executionUnit = ExecutionUnitList()
+
+
+class DeployParameters(ExtendedMappingSchema):
+    immediateDeployment = ExtendedSchemaNode(Boolean(), missing=drop, default=True)
+    deploymentProfileName = URL(missing=drop)
+
+
+class DeployOGCAppPackage(NotKeywordSchema, ExecutionUnitDefinition, DeployParameters):
+    description = "Deployment using standard OGC Application Package definition."
+    schema_ref = f"{OGC_API_SCHEMA_EXT_DEPLOY}/ogcapppkg.yaml"
     _not = [
         CWLBase()
     ]
     processDescription = ProcessDescriptionChoiceType()
-    executionUnit = ExecutionUnitList()
-    immediateDeployment = ExtendedSchemaNode(Boolean(), missing=drop, default=True)
-    deploymentProfileName = URL(missing=drop)
-    owsContext = OWSContext(missing=drop)
+
+
+class DeployContextDefinition(NotKeywordSchema, DeployParameters):
+    # alternative definition to make 'executionUnit' optional if instead provided in 'owsContext' (somewhere nested)
+    _not = [
+        CWLBase(),
+        ExecutionUnitDefinition(),
+    ]
+    processDescription = DeployProcessContextChoiceType()
 
 
 class CWLGraphItem(CWLApp):  # no 'cwlVersion', only one at the top
@@ -4337,6 +4391,7 @@ class DeployCWL(NotKeywordSchema, CWL, UpdateVersion):
 class Deploy(OneOfKeywordSchema):
     _one_of = [
         DeployOGCAppPackage(),
+        DeployContextDefinition(),
         DeployCWL(),
         DeployCWLGraph(),
     ]
@@ -4794,7 +4849,7 @@ class ErrorCause(OneOfKeywordSchema):
 
 
 class ErrorJsonResponseBodySchema(ExtendedMappingSchema):
-    schema_ref = f"{OGC_API_SCHEMA_URL}/{OGC_API_SCHEMA_VERSION}/core/openapi/schemas/exception.yaml"
+    schema_ref = f"{OGC_API_SCHEMA_CORE}/exception.yaml"
     description = "JSON schema for exceptions based on RFC 7807"
     type = OWSErrorCode()
     title = ExtendedSchemaNode(String(), description="Short description of the error.", missing=drop)

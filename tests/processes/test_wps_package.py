@@ -65,6 +65,7 @@ class MockWpsPackage(WpsPackage):
     """
     Mock of WPS package definition that ignores real status location updates and returns the mock for test validation.
     """
+
     def __init__(self, *_, **__):
         super(MockWpsPackage, self).__init__(*_, **__)
         self.mock_status_location = None
