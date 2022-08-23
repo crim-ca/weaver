@@ -998,6 +998,8 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
     @staticmethod
     def _apply_tags_filter(tags):
         # type: (Optional[Union[str, List[str]]]) -> MongodbAggregateExpression
+        if not tags:
+            return {}
         bad_tags = [vis for vis in Visibility.values() if vis in tags]
         if any(bad_tags):
             raise JobInvalidParameter(json={
