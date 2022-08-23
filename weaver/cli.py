@@ -1326,18 +1326,18 @@ class WeaverClient(object):
         return self._parse_result(resp, with_links=with_links, with_headers=with_headers, output_format=output_format)
 
     @copy_doc(_job_info)
-    def logs(self, *args, **kwargs):
-        return self._job_info("/logs", *args, **kwargs)
+    def logs(self, **kwargs):
+        return self._job_info("/logs", **kwargs)
 
     @copy_doc(_job_info)
-    def exceptions(self, *args, **kwargs):
-        return self._job_info("/exceptions", *args, **kwargs)
+    def exceptions(self, **kwargs):
+        return self._job_info("/exceptions", **kwargs)
 
     errors = exceptions  # alias
 
     @copy_doc(_job_info)
-    def statistics(self, *args, **kwargs):
-        return self._job_info("/statistics", *args, **kwargs)
+    def statistics(self, **kwargs):
+        return self._job_info("/statistics", **kwargs)
 
     stats = statistics  # alias
 

@@ -14,6 +14,8 @@ from typing import TYPE_CHECKING
 
 import mock
 import pytest
+from owslib.ows import DEFAULT_OWS_NAMESPACE
+from owslib.wps import WPSException
 from pyramid.httpexceptions import HTTPForbidden, HTTPOk, HTTPUnauthorized
 from webtest import TestApp as WebTestApp
 
@@ -1846,6 +1848,117 @@ class TestWeaverCLI(TestWeaverClientBase):
         assert len(lines) == 1, "should NOT be indented, raw data directly in one block"
         assert lines[0].startswith("<?xml")
         assert lines[0].endswith("</result>")
+
+    def test_job_logs(self):
+        job = self.job_store.save_job(task_id=uuid.uuid4(), process="test-process", access=Visibility.PUBLIC)
+        job.save_log(message="test start", progress=0, status=Status.ACCEPTED)
+        job.save_log(message="test run", progress=50, status=Status.RUNNING)
+        job.save_log(message="test done", progress=100, status=Status.SUCCEEDED)
+        job = self.job_store.update_job(job)
+
+        lines = mocked_sub_requests(
+            self.app, run_command,
+            [
+                # "weaver",
+                "logs",
+                "-u", self.url,
+                "-j", str(job.id),
+            ],
+            trim=False,
+            entrypoint=weaver_cli,
+            only_local=True,
+        )
+        assert len(lines) == 5
+        assert lines[0] == "["
+        assert f"0% {Status.ACCEPTED}" in lines[1]
+        assert f"50% {Status.RUNNING}" in lines[2]
+        assert f"100% {Status.SUCCEEDED}" in lines[3]
+        assert lines[4] == "]"
+
+    def test_job_exceptions(self):
+        xml_error = resources.load_example("wps_access_forbidden_response.xml", xml=True)
+        wps_error = WPSException(xml_error.xpath(".//ows:Exception", namespaces={"ows": DEFAULT_OWS_NAMESPACE})[0])
+        job = self.job_store.save_job(task_id=uuid.uuid4(), process="test-process", access=Visibility.PUBLIC)
+        job.save_log(message="test start", progress=0, status=Status.ACCEPTED)
+        job.save_log(message="test run", progress=50, status=Status.RUNNING)
+        job.save_log(message="test error", progress=80, status=Status.FAILED, errors=ValueError("test-error"))
+        job.save_log(message="test error", progress=80, status=Status.FAILED, errors=wps_error)
+        job = self.job_store.update_job(job)
+
+        lines = mocked_sub_requests(
+            self.app, run_command,
+            [
+                # "weaver",
+                "exceptions",
+                "-u", self.url,
+                "-j", str(job.id),
+            ],
+            trim=False,
+            entrypoint=weaver_cli,
+            only_local=True,
+        )
+        assert len(lines)
+        text = "".join(lines)
+        body = json.loads(text)
+        assert body == [
+            "test-error",
+            {"Code": "AccessForbidden", "Locator": "service", "Text": "Access to service is forbidden."}
+        ]
+
+    def test_job_statistics(self):
+        job = self.job_store.save_job(task_id=uuid.uuid4(), process="test-process", access=Visibility.PUBLIC)
+        job.statistics = resources.load_example("job_statistics.json")
+        job.status = Status.SUCCEEDED  # error if not completed
+        job = self.job_store.update_job(job)
+
+        lines = mocked_sub_requests(
+            self.app, run_command,
+            [
+                # "weaver",
+                "statistics",
+                "-u", self.url,
+                "-j", str(job.id),
+            ],
+            trim=False,
+            entrypoint=weaver_cli,
+            only_local=True,
+        )
+        assert len(lines)
+        text = "".join(lines)
+        body = json.loads(text)
+        assert body == job.statistics
+
+    def test_job_info_wrong_status(self):
+        # results/statistics must be in success status
+        job = self.job_store.save_job(task_id=uuid.uuid4(), process="test-process", access=Visibility.PUBLIC)
+        job.statistics = resources.load_example("job_statistics.json")
+        job.save_log(message="Some info", status=Status.ACCEPTED, errors=ValueError("failed"))
+        job = self.job_store.update_job(job)
+
+        for operation, status, expect in [
+            ("results", Status.FAILED, "JobResultsFailed"),
+            ("statistics", Status.FAILED, "404 Not Found"),
+            # ("exceptions", Status.SUCCEEDED, "404 Not Found"),  # no error, just irrelevant or empty
+        ]:
+            job.status = status
+            job = self.job_store.update_job(job)
+            lines = mocked_sub_requests(
+                self.app, run_command,
+                [
+                    # "weaver",
+                    operation,
+                    "-u", self.url,
+                    "-j", str(job.id),
+                    "-nL",
+                ],
+                trim=False,
+                entrypoint=weaver_cli,
+                only_local=True,
+                expect_error=True,
+            )
+            assert len(lines)
+            text = "".join(lines)
+            assert expect in text
 
 
 class TestWeaverClientAuthBase(TestWeaverClientBase):
