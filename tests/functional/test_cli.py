@@ -54,6 +54,7 @@ class FakeAuthHandler(object):
 @pytest.mark.cli
 @pytest.mark.functional
 class TestWeaverClientBase(WpsConfigBase, ResourcesUtil):
+    test_process_prefix = "test-client-"
 
     @classmethod
     def setUpClass(cls):
@@ -70,8 +71,6 @@ class TestWeaverClientBase(WpsConfigBase, ResourcesUtil):
         cli_logger = logging.getLogger("weaver.cli")
         cli_logger.setLevel(logging.DEBUG)
 
-        cls.test_process_prefix = "test-client"
-
     def setUp(self):
         self.job_store.clear_jobs()
         self.service_store.clear_services()
@@ -85,7 +84,7 @@ class TestWeaverClientBase(WpsConfigBase, ResourcesUtil):
         self.test_process = {}
         self.test_payload = {}
         for process in ["Echo", "CatFile"]:
-            self.test_process[process] = f"{self.test_process_prefix}-{process}"
+            self.test_process[process] = f"{self.test_process_prefix}{process}"
             self.test_payload[process] = self.retrieve_payload(process, "deploy", local=True)
             self.deploy_process(self.test_payload[process], process_id=self.test_process[process])
 
@@ -592,13 +591,12 @@ class TestWeaverClient(TestWeaverClientBase):
 
 
 class TestWeaverCLI(TestWeaverClientBase):
-    @classmethod
-    def setUpClass(cls):
-        super(TestWeaverCLI, cls).setUpClass()
-        job = cls.job_store.save_job(task_id="12345678-1111-2222-3333-111122223333",
-                                     process="fake-process", access=Visibility.PUBLIC)
+    def setUp(self):
+        super(TestWeaverCLI, self).setUp()
+        job = self.job_store.save_job(task_id="12345678-1111-2222-3333-111122223333",
+                                      process="fake-process", access=Visibility.PUBLIC)
         job.status = Status.SUCCEEDED
-        cls.test_job = cls.job_store.update_job(job)
+        self.test_job = self.job_store.update_job(job)
 
     def test_help_operations(self):
         lines = run_command(
@@ -1556,6 +1554,71 @@ class TestWeaverCLI(TestWeaverClientBase):
         jobs_success = list(filter(lambda _job: _job["status"] == Status.SUCCEEDED, body["jobs"]))
         assert len(jobs_accept) == 1 and jobs_accept[0]["jobID"] == str(job_a.uuid)
         assert len(jobs_success) == 1 and jobs_success[0]["jobID"] == str(job_s.uuid)
+
+    @mocked_remote_server_requests_wps1([
+        "https://random.com",
+        resources.load_resource(resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML).replace(
+            "<ows:Identifier>test-remote-process-wps1</ows:Identifier>",
+            f"<ows:Identifier>{TestWeaverClientBase.test_process_prefix}Echo</ows:Identifier>",
+        ),
+        [
+            resources.load_resource(resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML).replace(
+                "<ows:Identifier>test-remote-process-wps1</ows:Identifier>",
+                f"<ows:Identifier>{TestWeaverClientBase.test_process_prefix}Echo</ows:Identifier>",
+            )
+        ],
+    ], data=True)
+    def test_jobs_filter_process_provider(self):
+        # process/provider references must be actual definitions in db, see setUp
+        svc = self.service_store.save_service(Service(name="random", url="https://random.com", public=True))
+        proc = self.test_process["Echo"]
+        job1 = self.job_store.save_job(task_id=uuid.uuid4(), process=proc, access=Visibility.PUBLIC)
+        job2 = self.job_store.save_job(task_id=uuid.uuid4(), process=proc, service=svc.name,
+                                       access=Visibility.PUBLIC)
+        self.job_store.save_job(task_id=uuid.uuid4(), process="CatFile", access=Visibility.PUBLIC)
+
+        lines = mocked_sub_requests(
+            self.app, run_command,
+            [
+                # "weaver",
+                "jobs",
+                "-u", self.url,
+                "-fP", job1.process,
+                "-nL",  # unless links are requested to be removed (top-most and nested ones)
+            ],
+            trim=False,
+            entrypoint=weaver_cli,
+            only_local=True,
+        )
+        assert lines
+        assert len(lines) > 1, "Should be automatically indented with readable format"
+        text = "".join(lines)
+        body = json.loads(text)
+        assert isinstance(body["jobs"], list)
+        assert len(body["jobs"]) == 2
+        assert sorted(body["jobs"]) == sorted([str(job1.uuid), str(job2.uuid)])
+
+        lines = mocked_sub_requests(
+            self.app, run_command,
+            [
+                # "weaver",
+                "jobs",
+                "-u", self.url,
+                "-fP", job1.process,
+                "-fS", job2.service,
+                "-nL",  # unless links are requested to be removed (top-most and nested ones)
+            ],
+            trim=False,
+            entrypoint=weaver_cli,
+            only_local=True,
+        )
+        assert lines
+        assert len(lines) > 1, "Should be automatically indented with readable format"
+        text = "".join(lines)
+        body = json.loads(text)
+        assert isinstance(body["jobs"], list)
+        assert len(body["jobs"]) == 1
+        assert body["jobs"] == [str(job2.uuid)]
 
     def test_output_format_json_pretty(self):
         job_url = f"{self.url}/jobs/{self.test_job.id}"
