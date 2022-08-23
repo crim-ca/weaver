@@ -1518,6 +1518,7 @@ class TestWeaverCLI(TestWeaverClientBase):
         assert "links" not in body
 
     def test_jobs_filter_status_multi(self):
+        self.job_store.clear_jobs()
         job = self.job_store.save_job(task_id=uuid.uuid4(), process="test-process", access=Visibility.PUBLIC)
         job.status = Status.SUCCEEDED
         job_s = self.job_store.update_job(job)
