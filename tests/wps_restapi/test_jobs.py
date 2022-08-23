@@ -1,13 +1,11 @@
 import contextlib
 import datetime
-import json
 import logging
 import os
 import shutil
 import tempfile
 import unittest
 import warnings
-from collections import OrderedDict
 from datetime import date
 from distutils.version import LooseVersion
 from typing import TYPE_CHECKING
@@ -31,6 +29,7 @@ from tests.utils import (
     setup_mongodb_processstore,
     setup_mongodb_servicestore
 )
+from tests.functional.utils import JobUtils
 from weaver.datatype import Job, Service
 from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import ContentType
@@ -54,7 +53,7 @@ if TYPE_CHECKING:
     from weaver.visibility import AnyVisibility
 
 
-class WpsRestApiJobsTest(unittest.TestCase):
+class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
     settings = {}
     config = None
 
@@ -205,37 +204,6 @@ class WpsRestApiJobsTest(unittest.TestCase):
         if add_info:
             self.job_info.append(job)
         return job
-
-    def message_with_jobs_mapping(self, message="", indent=2):
-        """
-        For helping debugging of auto-generated job ids.
-        """
-        mapping = OrderedDict(sorted((str(j.task_id), str(j.id)) for j in self.job_store.list_jobs()))
-        return f"{message}\nMapping Task-ID/Job-ID:\n{json.dumps(mapping, indent=indent)}"
-
-    def assert_equal_with_jobs_diffs(self, jobs_result, jobs_expect,
-                                     test_values=None, message="", indent=2, index=None, invert=False):
-        jobs_result = [str(job_id) for job_id in jobs_result]
-        jobs_expect = [str(job_id) for job_id in jobs_expect]
-        mapping = {str(job.id): str(job.task_id) for job in self.job_info}
-        missing = set(jobs_expect) - set(jobs_result)
-        unknown = set(jobs_result) - set(jobs_expect)
-        assert (
-            (invert or len(jobs_result) == len(jobs_expect)) and
-            all((job not in jobs_expect if invert else job in jobs_expect) for job in jobs_result)
-        ), (
-            (message if message else "Different jobs returned than expected") +
-            (f" (index: {index})" if index is not None else "") +
-            ("\nResponse: " + json.dumps(sorted(jobs_result), indent=indent)) +
-            ("\nExpected: " + json.dumps(sorted(jobs_expect), indent=indent)) +
-            ("\nMissing: " + json.dumps(sorted(f"{job} ({mapping[job]})" for job in missing), indent=indent)) +
-            ("\nUnknown: " + json.dumps(sorted(f"{job} ({mapping[job]})" for job in unknown), indent=indent)) +
-            ("\nTesting: " + (
-                (json.dumps(test_values, indent=indent) if isinstance(test_values, (dict, list)) else test_values)
-                if test_values else ""
-            )) +
-            (self.message_with_jobs_mapping())
-        )
 
     def get_job_request_auth_mock(self, user_id):
         is_admin = self.user_admin_id == user_id

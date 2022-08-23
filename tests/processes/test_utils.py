@@ -61,6 +61,14 @@ def test_register_wps_processes_from_config_empty():
             pytest.fail("File with empty 'providers' and 'processes' sections should not raise any error")
 
 
+def test_register_wps_processes_from_config_omitted():
+    with mock.patch("weaver.processes.utils.register_wps_processes_static") as mocked_static:
+        with mock.patch("weaver.processes.utils.register_wps_processes_dynamic") as mocked_dynamic:
+            assert register_wps_processes_from_config({"weaver.wps_processes_file": ""}) is None
+            assert not mocked_static.called
+            assert not mocked_dynamic.called
+
+
 def test_register_wps_processes_from_config_missing():
     try:
         register_wps_processes_from_config({}, "/this/path/des/not/exist")

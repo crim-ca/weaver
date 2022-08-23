@@ -1687,7 +1687,7 @@ class JobStatusSearchEnum(ExtendedSchemaNode):
     title = "JobStatusSearch"
     default = Status.ACCEPTED
     example = Status.ACCEPTED
-    validator = StringOneOf(JOB_STATUS_SEARCH_API, delimiter=",")
+    validator = StringOneOf(JOB_STATUS_SEARCH_API, delimiter=",", case_sensitive=False)
 
 
 class JobTypeEnum(ExtendedSchemaNode):

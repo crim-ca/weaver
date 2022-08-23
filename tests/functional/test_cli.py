@@ -18,7 +18,7 @@ from pyramid.httpexceptions import HTTPForbidden, HTTPOk, HTTPUnauthorized
 from webtest import TestApp as WebTestApp
 
 from tests import resources
-from tests.functional.utils import ResourcesUtil, WpsConfigBase
+from tests.functional.utils import JobUtils, ResourcesUtil, WpsConfigBase
 from tests.utils import (
     get_weaver_url,
     mocked_dismiss_process,
@@ -35,7 +35,7 @@ from weaver.datatype import DockerAuthentication, Service
 from weaver.formats import ContentType, OutputFormat, get_cwl_file_format, repr_json
 from weaver.processes.constants import CWL_REQUIREMENT_APP_DOCKER, ProcessSchema
 from weaver.processes.types import ProcessType
-from weaver.status import Status
+from weaver.status import Status, StatusCategory
 from weaver.utils import fully_qualified_name
 from weaver.visibility import Visibility
 from weaver.wps.utils import map_wps_output_location
@@ -53,7 +53,7 @@ class FakeAuthHandler(object):
 
 @pytest.mark.cli
 @pytest.mark.functional
-class TestWeaverClientBase(WpsConfigBase, ResourcesUtil):
+class TestWeaverClientBase(WpsConfigBase, ResourcesUtil, JobUtils):
     test_process_prefix = "test-client-"
 
     @classmethod
@@ -588,6 +588,39 @@ class TestWeaverClient(TestWeaverClientBase):
             result = mocked_sub_requests(self.app, self.client.dismiss, str(job.id))
             assert result.success
             assert "undefined" not in result.message
+
+    def test_jobs_search_multi_status(self):
+        self.job_store.clear_jobs()
+        proc = self.test_process["Echo"]
+        job1 = self.job_store.save_job(task_id=uuid.uuid4(), process=proc, access=Visibility.PUBLIC)
+        job2 = self.job_store.save_job(task_id=uuid.uuid4(), process=proc, access=Visibility.PUBLIC)
+        job3 = self.job_store.save_job(task_id=uuid.uuid4(), process=proc, access=Visibility.PUBLIC)
+        job1.status = Status.SUCCEEDED
+        job2.status = Status.FAILED
+        job3.status = Status.RUNNING
+        job1 = self.job_store.update_job(job1)
+        job2 = self.job_store.update_job(job2)
+        job3 = self.job_store.update_job(job3)
+        jobs = [job1, job2, job3]
+
+        for test_status, job_expect in [
+            (Status.SUCCEEDED, [job1]),
+            ([Status.SUCCEEDED], [job1]),
+            ([Status.SUCCEEDED, Status.RUNNING], [job1, job3]),
+            (f"{Status.SUCCEEDED},{Status.RUNNING}", [job1, job3]),
+            (StatusCategory.FINISHED, [job1, job2]),
+            (StatusCategory.FINISHED.value, [job1, job2]),
+            ([StatusCategory.FINISHED], [job1, job2]),
+            ([StatusCategory.FINISHED.value], [job1, job2]),
+            (f"{StatusCategory.FINISHED.value},{Status.FAILED}", [job1, job2]),  # failed within finished, nothing added
+            ([StatusCategory.FINISHED.value, Status.RUNNING], [job1, job2, job3]),
+            ([StatusCategory.FINISHED, Status.RUNNING], [job1, job2, job3]),
+            (f"{StatusCategory.FINISHED.value},{Status.RUNNING}", [job1, job2, job3]),
+        ]:
+            result = mocked_sub_requests(self.app, self.client.jobs, status=test_status, detail=False)
+            expect = [job.id for job in job_expect]
+            assert result.success
+            self.assert_equal_with_jobs_diffs(result.body["jobs"], expect, test_status, jobs=jobs)
 
 
 class TestWeaverCLI(TestWeaverClientBase):

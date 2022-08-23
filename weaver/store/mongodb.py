@@ -41,7 +41,7 @@ from weaver.execute import ExecuteMode
 from weaver.formats import repr_json
 from weaver.processes.types import ProcessType
 from weaver.sort import Sort, SortMethods
-from weaver.status import JOB_STATUS_CATEGORIES, Status, map_status
+from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.store.base import StoreBills, StoreJobs, StoreProcesses, StoreQuotes, StoreServices, StoreVault
 from weaver.utils import (
     VersionFormat,
@@ -1072,11 +1072,12 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
             return search_filters
         if not isinstance(status, list):
             status = [status]
-        if any(_status in JOB_STATUS_CATEGORIES for _status in status) or len(status) > 1:
+        if any(_status in StatusCategory for _status in status) or len(status) > 1:
             statuses = set()
             for _status in status:
-                if _status in JOB_STATUS_CATEGORIES:
-                    statuses.union(JOB_STATUS_CATEGORIES[status])
+                if _status in StatusCategory:
+                    category_status = JOB_STATUS_CATEGORIES[StatusCategory[_status]]
+                    statuses = statuses.union(category_status)
                 else:
                     statuses.add(_status)
             search_filters["status"] = {"$in": list(statuses)}  # type: ignore

@@ -87,7 +87,7 @@ JOB_STATUS_CATEGORIES = {
 # FIXME: see below detail in map_status about 'successful', partially compliant to OGC statuses
 # https://github.com/opengeospatial/ogcapi-processes/blob/ca8e90/core/openapi/schemas/statusCode.yaml
 JOB_STATUS_CODE_API = JOB_STATUS_CATEGORIES[StatusCompliant.OGC] - {Status.SUCCESSFUL}
-JOB_STATUS_SEARCH_API = set(list(JOB_STATUS_CODE_API) + [str(StatusCategory.FINISHED)])
+JOB_STATUS_SEARCH_API = set(list(JOB_STATUS_CODE_API) + [StatusCategory.FINISHED.value.lower()])
 
 # id -> str
 STATUS_PYWPS_MAP = {s: _WPS_STATUS._fields[s].lower() for s in range(len(WPS_STATUS))}

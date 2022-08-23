@@ -204,7 +204,7 @@ class StringOneOf(colander.OneOf):
     """
 
     def __init__(self, choices, delimiter=",", case_sensitive=True, **kwargs):
-        # type: (Iterable[str], str, str, Any) -> None
+        # type: (Iterable[str], str, bool, Any) -> None
         self._delim = delimiter
         if not case_sensitive:
             choices = OneOfCaseInsensitive(choices).choices

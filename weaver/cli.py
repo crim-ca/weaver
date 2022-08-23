@@ -78,11 +78,11 @@ if TYPE_CHECKING:
     try:
         from weaver.formats import AnyOutputFormat
         from weaver.processes.constants import ProcessSchemaType
-        from weaver.status import StatusType
+        from weaver.status import AnyStatusSearch
     except ImportError:
         AnyOutputFormat = str
+        AnyStatusSearch = str
         ProcessSchemaType = str
-        StatusType = str
 
     ConditionalGroup = Tuple[argparse._ActionsContainer, bool, bool]  # noqa
     PostHelpFormatter = Callable[[str], str]
@@ -1174,7 +1174,7 @@ class WeaverClient(object):
              sort=None,             # type: Optional[Sort]
              page=None,             # type: Optional[int]
              limit=None,            # type: Optional[int]
-             status=None,           # type: Optional[Union[StatusType, List[StatusType]]]
+             status=None,           # type: Optional[Union[AnyStatusSearch, List[AnyStatusSearch]]]
              detail=False,          # type: bool
              groups=False,          # type: bool
              process=None,          # type: Optional[str]
@@ -1220,11 +1220,11 @@ class WeaverClient(object):
             query["limit"] = limit
         if sort is not None:
             query["sort"] = sort
-        if isinstance(status, str) and status:
-            status = status.split(",")
+        if isinstance(status, (str, Status, StatusCategory)) and status:
+            status = str(getattr(status, "value", status)).split(",")  # consider enum or plain single/multi string
         if isinstance(status, list) and status:
-            status = [map_status(_status) for _status in status]
-            query["status"] = ",".join(status)
+            status = [StatusCategory.get(_status, map_status(_status)) for _status in status]
+            query["status"] = ",".join([str(getattr(_status, "value", _status)) for _status in status])
         if isinstance(detail, bool) and detail:
             query["detail"] = detail
         if isinstance(groups, bool) and groups:

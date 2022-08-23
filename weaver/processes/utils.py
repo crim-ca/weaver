@@ -1057,7 +1057,7 @@ def register_wps_processes_from_config(container, wps_processes_file_path=None):
             register_wps_processes_dynamic(svc_name, svc_url, svc_vis, container)
 
         LOGGER.info("Finished processing configuration file [%s].", wps_processes_file_path)
-    except Exception as exc:
+    except Exception as exc:  # pragma: no cover
         msg = f"Invalid WPS-1 providers configuration file caused: [{fully_qualified_name(exc)}]({exc!s})."
         LOGGER.exception(msg)
         raise RuntimeError(msg)
