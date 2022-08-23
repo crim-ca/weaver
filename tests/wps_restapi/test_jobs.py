@@ -111,16 +111,17 @@ class WpsRestApiJobsTest(unittest.TestCase):
         self.make_job(task_id="0000-0000-0000-0000",
                       process=self.process_public.identifier, service=None,
                       user_id=self.user_editor1_id, status=Status.SUCCEEDED, progress=100, access=Visibility.PUBLIC,
+                      tags=["unique"],
                       logs=[
                           ("Start", logging.INFO, Status.ACCEPTED, 1),
                           ("Process", logging.INFO, Status.RUNNING, 10),
                           ("Complete", logging.INFO, Status.SUCCEEDED, 100)
                       ])
         self.make_job(task_id="0000-0000-0000-1111",
-                      process=self.process_unknown, service=self.service_public.name,
+                      process=self.process_unknown, service=self.service_public.name, tags=["test-two", "other"],
                       user_id=self.user_editor1_id, status=Status.FAILED, progress=99, access=Visibility.PUBLIC)
         self.make_job(task_id="0000-0000-0000-2222",
-                      process=self.process_private.identifier, service=None,
+                      process=self.process_private.identifier, service=None, tags=["test-two"],
                       user_id=self.user_editor1_id, status=Status.FAILED, progress=55, access=Visibility.PUBLIC)
         # same process as job 0, but private (ex: job ran with private process, then process made public afterwards)
         self.make_job(task_id="0000-0000-0000-3333",
@@ -174,6 +175,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
                  exceptions=None,   # type: Optional[List[JSON]]
                  logs=None,         # type: Optional[List[Union[str, Tuple[str, AnyLogLevel, AnyStatusType, Number]]]]
                  statistics=None,   # type: Optional[Statistics]
+                 tags=None,         # type: Optional[List[str]]
                  add_info=True,     # type: bool
                  ):                 # type: (...) -> Job
         if isinstance(created, str):
@@ -197,6 +199,8 @@ class WpsRestApiJobsTest(unittest.TestCase):
             job.exceptions = exceptions
         if statistics is not None:
             job.statistics = statistics
+        if tags is not None:
+            job.tags = tags
         job = self.job_store.update_job(job)
         if add_info:
             self.job_info.append(job)
@@ -915,7 +919,36 @@ class WpsRestApiJobsTest(unittest.TestCase):
         assert not resp.json["parameters"][f"{schema_prefix}.page"]["required"]
         assert not resp.json["parameters"][f"{schema_prefix}.limit"]["required"]
 
-    def test_jobs_datetime_before(self):
+    def test_get_jobs_filter_by_tags_single(self):
+        path = get_path_kvp(sd.jobs_service.path, tags="unique", detail=False)
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.APP_JSON
+        assert resp.json["total"] == 1
+        assert resp.json["jobs"][0] == str(self.job_info[0].id)
+
+        path = get_path_kvp(sd.jobs_service.path, tags="test-two", detail=False)
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.APP_JSON
+        assert resp.json["total"] == 2
+        assert sorted(resp.json["jobs"]) == sorted([str(self.job_info[1].id), str(self.job_info[2].id)])
+
+    def test_get_jobs_filter_by_tags_multi(self):
+        path = get_path_kvp(sd.jobs_service.path, tags="unique,other", detail=False)
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.APP_JSON
+        assert resp.json["total"] == 0
+
+        path = get_path_kvp(sd.jobs_service.path, tags="test-two,other", detail=False)
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.APP_JSON
+        assert resp.json["total"] == 1
+        assert resp.json["jobs"][0] == str(self.job_info[1].id)
+
+    def test_get_jobs_datetime_before(self):
         """
         Test that only filtered jobs before a certain time are returned when ``datetime`` query parameter is provided.
 
