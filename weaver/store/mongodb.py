@@ -1081,7 +1081,7 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
                     statuses.add(_status)
             search_filters["status"] = {"$in": list(statuses)}  # type: ignore
         elif status:
-            search_filters["status"] = status
+            search_filters["status"] = status[0]
         return search_filters
 
     @staticmethod

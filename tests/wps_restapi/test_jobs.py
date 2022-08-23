@@ -230,7 +230,10 @@ class WpsRestApiJobsTest(unittest.TestCase):
             ("\nExpected: " + json.dumps(sorted(jobs_expect), indent=indent)) +
             ("\nMissing: " + json.dumps(sorted(f"{job} ({mapping[job]})" for job in missing), indent=indent)) +
             ("\nUnknown: " + json.dumps(sorted(f"{job} ({mapping[job]})" for job in unknown), indent=indent)) +
-            ("\nTesting: " + (test_values if test_values else "")) +
+            ("\nTesting: " + (
+                (json.dumps(test_values, indent=indent) if isinstance(test_values, (dict, list)) else test_values)
+                if test_values else ""
+            )) +
             (self.message_with_jobs_mapping())
         )
 
@@ -1209,7 +1212,6 @@ class WpsRestApiJobsTest(unittest.TestCase):
         result_jobs = resp.json["jobs"]
         self.assert_equal_with_jobs_diffs(result_jobs, expect_jobs, test)
 
-    @pytest.mark.xfail(reason="Multiple statuses not supported")  # FIXME: support comma-separated list of statuses
     def test_get_jobs_by_status_multi(self):
         test = {"status": f"{Status.SUCCEEDED},{Status.RUNNING}"}
         path = get_path_kvp(sd.jobs_service.path, **test)
