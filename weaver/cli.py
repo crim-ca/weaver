@@ -1202,12 +1202,12 @@ class WeaverClient(object):
         :param sort: Sorting field to list jobs. Name must be one of the fields supported by job objects.
         :param page: Paging index to list jobs.
         :param limit: Amount of jobs to list per page.
-        :param status: Filter job listing only to matching status.
+        :param status: Filter job listing only to matching status. If multiple are provided, must match one of them.
         :param detail: Obtain detailed job descriptions.
         :param groups: Obtain grouped representation of jobs per provider and process categories.
         :param process: Obtain jobs executed only by matching :term:`Process`.
         :param provider: Obtain jobs only matching remote :term:`Provider`.
-        :param tags: Obtain jobs filtered by matching tags.
+        :param tags: Obtain jobs filtered by matching tags. Jobs must match all tags simultaneously, not one of them.
         :returns: Retrieved status of the job.
         """
         base_url = self._get_url(url)
@@ -2398,11 +2398,23 @@ def make_parser():
     add_listing_options(op_jobs, item="job")
     op_jobs.add_argument(
         "-S", "--status", dest="status", choices=Status.values(), type=str.lower, nargs="+",
-        help="Filter job listing only to matching status."
+        help="Filter job listing only to matching status. If multiple are provided, must match one of them."
     )
     op_jobs.add_argument(
         "-G", "--groups", dest="groups", action="store_true",
         help="Obtain grouped representation of jobs per provider and process categories."
+    )
+    op_jobs.add_argument(
+        "-fP", "--process", dest="process",
+        help="Filter job listing only to matching process (local and/or remote whether combined with '-fS')."
+    )
+    op_jobs.add_argument(
+        "-fS", "--provider", "--service", dest="provider",
+        help="Filter job listing only to matching remote service provider."
+    )
+    op_jobs.add_argument(
+        "-fT", "--tags", dest="tags", type=str.lower, nargs="+",
+        help="Filter job listing only to matching tags. Jobs must match all tags simultaneously, not one of them."
     )
 
     op_dismiss = WeaverArgumentParser(

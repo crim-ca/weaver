@@ -12,6 +12,7 @@ if TYPE_CHECKING:
 
     from weaver.datatype import Bill, Job, Process, Quote, Service, VaultFile
     from weaver.execute import AnyExecuteResponse
+    from weaver.status import AnyStatusSearch
     from weaver.typedefs import (
         AnyUUID,
         AnyVersion,
@@ -186,7 +187,7 @@ class StoreJobs(StoreInterface):
                   tags=None,                # type: Optional[List[str]]
                   access=None,              # type: Optional[str]
                   notification_email=None,  # type: Optional[str]
-                  status=None,              # type: Optional[str]
+                  status=None,              # type: Optional[AnyStatusSearch, List[AnyStatusSearch]]
                   sort=None,                # type: Optional[str]
                   page=0,                   # type: Optional[int]
                   limit=10,                 # type: Optional[int]

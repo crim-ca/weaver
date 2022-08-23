@@ -198,6 +198,26 @@ class OneOfCaseInsensitive(colander.OneOf):
             return super(OneOfCaseInsensitive, self).__call__(node, value)
 
 
+class StringOneOf(colander.OneOf):
+    """
+    Validator that ensures the given value matches one of the available choices, but defined by string delimited values.
+    """
+
+    def __init__(self, choices, delimiter=",", case_sensitive=True, **kwargs):
+        # type: (Iterable[str], str, str, Any) -> None
+        self._delim = delimiter
+        if not case_sensitive:
+            choices = OneOfCaseInsensitive(choices).choices
+        super(StringOneOf, self).__init__(choices, **kwargs)
+
+    def __call__(self, node, value):
+        # type: (colander.SchemaNode, Any) -> None
+        if not isinstance(value, str):
+            super(StringOneOf, self).__call__(node, value)  # raise accordingly
+        for val in value.split(self._delim):
+            super(StringOneOf, self).__call__(node, val)  # raise accordingly
+
+
 class BoundedRange(colander.Range):
     """
     Validator of value within range with added ``exclusive`` bounds support.

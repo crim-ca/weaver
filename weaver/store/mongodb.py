@@ -63,6 +63,7 @@ if TYPE_CHECKING:
 
     from weaver.execute import AnyExecuteResponse
     from weaver.processes.types import AnyProcessType
+    from weaver.status import AnyStatusSearch
     from weaver.store.base import DatetimeIntervalType, JobGroupCategory, JobSearchResult
     from weaver.typedefs import (
         AnyProcess,
@@ -76,7 +77,8 @@ if TYPE_CHECKING:
     from weaver.visibility import AnyVisibility
 
     MongodbValue = Union[AnyValueType, datetime.datetime]
-    MongodbAggregateExpression = Dict[str, Union[MongodbValue, List[MongodbValue], Dict[str, AnyValueType]]]
+    MongodbAggregateValue = Union[MongodbValue, List[MongodbValue], Dict[str, AnyValueType, List[AnyValueType]]]
+    MongodbAggregateExpression = Dict[str, MongodbAggregateValue]
     MongodbAggregateStep = Union[MongodbValue, MongodbAggregateExpression]
     MongodbAggregatePipeline = List[Dict[str, Union[str, Dict[str, MongodbAggregateStep]]]]
 
@@ -858,7 +860,7 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
                   tags=None,                # type: Optional[List[str]]
                   access=None,              # type: Optional[str]
                   notification_email=None,  # type: Optional[str]
-                  status=None,              # type: Optional[str]
+                  status=None,              # type: Optional[AnyStatusSearch, List[AnyStatusSearch]]
                   sort=None,                # type: Optional[str]
                   page=0,                   # type: Optional[int]
                   limit=10,                 # type: Optional[int]
@@ -1064,11 +1066,20 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
 
     @staticmethod
     def _apply_status_filter(status):
-        # type: (Optional[str]) -> MongodbAggregateExpression
+        # type: (Optional[Union[AnyStatusSearch, List[AnyStatusSearch]]]) -> MongodbAggregateExpression
         search_filters = {}  # type: MongodbAggregateExpression
-        if status in JOB_STATUS_CATEGORIES:
-            category_statuses = list(JOB_STATUS_CATEGORIES[status])
-            search_filters["status"] = {"$in": category_statuses}
+        if not status:
+            return search_filters
+        if not isinstance(status, list):
+            status = [status]
+        if any(_status in JOB_STATUS_CATEGORIES for _status in status) or len(status) > 1:
+            statuses = set()
+            for _status in status:
+                if _status in JOB_STATUS_CATEGORIES:
+                    statuses.union(JOB_STATUS_CATEGORIES[status])
+                else:
+                    statuses.add(_status)
+            search_filters["status"] = {"$in": list(statuses)}  # type: ignore
         elif status:
             search_filters["status"] = status
         return search_filters

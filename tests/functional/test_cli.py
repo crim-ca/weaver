@@ -73,6 +73,7 @@ class TestWeaverClientBase(WpsConfigBase, ResourcesUtil):
         cls.test_process_prefix = "test-client"
 
     def setUp(self):
+        self.job_store.clear_jobs()
         self.service_store.clear_services()
 
         processes = self.process_store.list_processes()
@@ -1517,6 +1518,44 @@ class TestWeaverCLI(TestWeaverClientBase):
         assert all(isinstance(job, dict) for job in body["jobs"]), "Jobs should be JSON objects when details requested"
         assert all("links" not in job for job in body["jobs"])
         assert "links" not in body
+
+    def test_jobs_filter_status_multi(self):
+        job = self.job_store.save_job(task_id=uuid.uuid4(), process="test-process", access=Visibility.PUBLIC)
+        job.status = Status.SUCCEEDED
+        job_s = self.job_store.update_job(job)
+        job = self.job_store.save_job(task_id=uuid.uuid4(), process="test-process", access=Visibility.PUBLIC)
+        job.status = Status.FAILED
+        job_f = self.job_store.update_job(job)
+        job = self.job_store.save_job(task_id=uuid.uuid4(), process="test-process", access=Visibility.PUBLIC)
+        job.status = Status.ACCEPTED
+        job_a = self.job_store.update_job(job)
+
+        lines = mocked_sub_requests(
+            self.app, run_command,
+            [
+                # "weaver",
+                "jobs",
+                "-u", self.url,
+                "-S", Status.SUCCEEDED, Status.ACCEPTED,
+                "-D",
+                "-nL",  # unless links are requested to be removed (top-most and nested ones)
+            ],
+            trim=False,
+            entrypoint=weaver_cli,
+            only_local=True,
+        )
+        assert lines
+        assert len(lines) > 1, "Should be automatically indented with readable format"
+        text = "".join(lines)
+        body = json.loads(text)
+        assert isinstance(body["jobs"], list)
+        assert len(body["jobs"])
+        assert not any(_job["jobID"] == str(job_f.uuid) for _job in body["jobs"])
+        assert all(job["status"] in [Status.SUCCEEDED, Status.ACCEPTED] for job in body["jobs"])
+        jobs_accept = list(filter(lambda _job: _job["status"] == Status.ACCEPTED, body["jobs"]))
+        jobs_success = list(filter(lambda _job: _job["status"] == Status.SUCCEEDED, body["jobs"]))
+        assert len(jobs_accept) == 1 and jobs_accept[0]["jobID"] == str(job_a.uuid)
+        assert len(jobs_success) == 1 and jobs_success[0]["jobID"] == str(job_s.uuid)
 
     def test_output_format_json_pretty(self):
         job_url = f"{self.url}/jobs/{self.test_job.id}"

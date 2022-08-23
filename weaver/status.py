@@ -87,6 +87,7 @@ JOB_STATUS_CATEGORIES = {
 # FIXME: see below detail in map_status about 'successful', partially compliant to OGC statuses
 # https://github.com/opengeospatial/ogcapi-processes/blob/ca8e90/core/openapi/schemas/statusCode.yaml
 JOB_STATUS_CODE_API = JOB_STATUS_CATEGORIES[StatusCompliant.OGC] - {Status.SUCCESSFUL}
+JOB_STATUS_SEARCH_API = set(list(JOB_STATUS_CODE_API) + [str(StatusCategory.FINISHED)])
 
 # id -> str
 STATUS_PYWPS_MAP = {s: _WPS_STATUS._fields[s].lower() for s in range(len(WPS_STATUS))}
@@ -109,7 +110,25 @@ if TYPE_CHECKING:
         Status.EXCEPTION,
         Status.UNKNOWN
     ]
-    AnyStatusType = Union[StatusType, int]
+    AnyStatusType = Union[Status, StatusType, int]
+
+    AnyStatusCategory = Union[
+        StatusCategory,
+        Literal[
+            StatusCategory.RUNNING,
+            StatusCategory.FINISHED,
+            StatusCategory.FAILED,
+        ],
+    ]
+
+    AnyStatusOrCategory = Union[AnyStatusType, AnyStatusCategory]
+
+    AnyStatusSearch = [
+        Status,  # not 'AnyStatusType' to disallow 'int'
+        StatusType,
+        StatusCategory,
+        AnyStatusCategory,
+    ]
 
 
 def map_status(wps_status, compliant=StatusCompliant.OGC):
@@ -135,7 +154,7 @@ def map_status(wps_status, compliant=StatusCompliant.OGC):
         return map_status(STATUS_PYWPS_MAP[wps_status], compliant)
 
     # remove 'Process' from OWSLib statuses and lower for every compliant
-    job_status = wps_status.lower().replace("process", "")
+    job_status = str(wps_status).lower().replace("process", "")
 
     if compliant == StatusCompliant.OGC:
         if job_status in JOB_STATUS_CATEGORIES[StatusCategory.RUNNING]:
