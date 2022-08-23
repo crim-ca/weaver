@@ -1174,7 +1174,7 @@ class WeaverClient(object):
              sort=None,             # type: Optional[Sort]
              page=None,             # type: Optional[int]
              limit=None,            # type: Optional[int]
-             status=None,           # type: Optional[StatusType]
+             status=None,           # type: Optional[Union[StatusType, List[StatusType]]]
              detail=False,          # type: bool
              groups=False,          # type: bool
              process=None,          # type: Optional[str]
@@ -1221,7 +1221,10 @@ class WeaverClient(object):
         if sort is not None:
             query["sort"] = sort
         if isinstance(status, str) and status:
-            query["status"] = map_status(status)
+            status = status.split(",")
+        if isinstance(status, list) and status:
+            status = [map_status(_status) for _status in status]
+            query["status"] = ",".join(status)
         if isinstance(detail, bool) and detail:
             query["detail"] = detail
         if isinstance(groups, bool) and groups:
@@ -2394,7 +2397,7 @@ def make_parser():
     add_shared_options(op_jobs)
     add_listing_options(op_jobs, item="job")
     op_jobs.add_argument(
-        "-S", "--status", dest="status", choices=Status.values(), type=str.lower,
+        "-S", "--status", dest="status", choices=Status.values(), type=str.lower, nargs="+",
         help="Filter job listing only to matching status."
     )
     op_jobs.add_argument(
