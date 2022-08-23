@@ -41,6 +41,8 @@ from weaver.formats import (
     EDAM_MAPPING,
     EDAM_NAMESPACE,
     IANA_NAMESPACE,
+    OGC_MAPPING,
+    OGC_NAMESPACE,
     AcceptLanguage,
     ContentType,
     get_cwl_file_format
@@ -57,7 +59,7 @@ if TYPE_CHECKING:
     from weaver.typedefs import JSON
 
 EDAM_PLAIN = EDAM_NAMESPACE + ":" + EDAM_MAPPING[ContentType.TEXT_PLAIN]
-EDAM_NETCDF = EDAM_NAMESPACE + ":" + EDAM_MAPPING[ContentType.APP_NETCDF]
+OGC_NETCDF = OGC_NAMESPACE + ":" + OGC_MAPPING[ContentType.APP_NETCDF]
 # note: x-tar cannot be mapped during CWL format resolution (not official schema),
 #       it remains explicit tar definition in WPS context
 IANA_TAR = IANA_NAMESPACE + ":" + ContentType.APP_TAR  # noqa # pylint: disable=unused-variable
@@ -2497,7 +2499,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         assert isinstance(pkg["inputs"], list)
         assert pkg["inputs"][0]["id"] == "tasmax"
         assert "default" not in pkg["inputs"][0]
-        assert pkg["inputs"][0]["format"] == EDAM_NETCDF
+        assert pkg["inputs"][0]["format"] == OGC_NETCDF
         assert isinstance(pkg["inputs"][0]["type"], list), "since minOccurs=1, single value non-array must be allowed"
         assert len(pkg["inputs"][0]["type"]) == 2, "single type and array type of same base"
         assert pkg["inputs"][0]["type"][0] == "File", "since minOccurs=1, should be type directly"
@@ -2515,7 +2517,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         assert isinstance(pkg["outputs"], list)
         assert pkg["outputs"][0]["id"] == "output_netcdf"
         assert "default" not in pkg["outputs"][0]
-        assert pkg["outputs"][0]["format"] == EDAM_NETCDF
+        assert pkg["outputs"][0]["format"] == OGC_NETCDF
         assert pkg["outputs"][0]["type"] == "File"
         assert pkg["outputs"][0]["outputBinding"]["glob"] == "output_netcdf/*.nc"
         assert pkg["outputs"][1]["id"] == "output_log"

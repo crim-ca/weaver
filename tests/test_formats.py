@@ -1,6 +1,7 @@
 import os
 
 import mock
+import pytest
 from pyramid.httpexceptions import HTTPOk, HTTPRequestTimeout
 from pyramid.response import Response
 from pywps.inout.formats import Format
@@ -69,8 +70,13 @@ def test_get_format_default_no_extension():
 
 
 def test_get_cwl_file_format_tuple():
-    tested = set(f.FORMAT_NAMESPACES)
-    for mime_type in [f.ContentType.APP_JSON, f.ContentType.APP_NETCDF, f.ContentType.IMAGE_GEOTIFF]:
+    untested = set(f.FORMAT_NAMESPACES)
+    tests = [
+        f.ContentType.APP_JSON,
+        f.ContentType.APP_NETCDF,
+        f.ContentType.APP_HDF5,
+    ]
+    for mime_type in tests:
         res = f.get_cwl_file_format(mime_type, make_reference=False)
         assert isinstance(res, tuple) and len(res) == 2
         ns, fmt = res
@@ -79,24 +85,34 @@ def test_get_cwl_file_format_tuple():
         assert list(ns.values())[0].startswith("http")
         ns_name = list(ns.keys())[0]
         assert fmt.startswith(f"{ns_name}:")
-        tested.remove(ns_name)
-    assert len(tested) == 0, "test did not evaluate every namespace variation"
+        untested.remove(ns_name)
+    for ns in list(untested):
+        ns_map_name = f"{ns.upper()}_MAPPING"
+        ns_map = getattr(f, ns_map_name, None)
+        if ns_map is not None and len(ns_map) == 0:
+            untested.remove(ns)  # ignore empty mappings
+    assert len(untested) == 0, "test did not evaluate every namespace variation"
 
 
 def test_get_cwl_file_format_reference():
-    tested = set(f.FORMAT_NAMESPACES)
+    untested = set(f.FORMAT_NAMESPACES)
     tests = [
         (f.IANA_NAMESPACE_DEFINITION, f.ContentType.APP_JSON),
-        (f.EDAM_NAMESPACE_DEFINITION, f.ContentType.APP_NETCDF),
-        (f.OPENGIS_NAMESPACE_DEFINITION, f.ContentType.IMAGE_GEOTIFF),
+        (f.EDAM_NAMESPACE_DEFINITION, f.ContentType.APP_HDF5),
+        (f.OGC_NAMESPACE_DEFINITION, f.ContentType.IMAGE_OGC_GEOTIFF),
     ]
     for ns, mime_type in tests:
         res = f.get_cwl_file_format(mime_type, make_reference=True)
         ns_name, ns_url = list(ns.items())[0]
         assert isinstance(res, str)
-        assert res.startswith(ns_url)
-        tested.remove(ns_name)
-    assert len(tested) == 0, "test did not evaluate every namespace variation"
+        assert res.startswith(ns_url), f"[{res}] does not start with [{ns_url}]"
+        untested.remove(ns_name)
+    for ns in list(untested):
+        ns_map_name = f"{ns.upper()}_MAPPING"
+        ns_map = getattr(f, ns_map_name, None)
+        if ns_map is not None and len(ns_map) == 0:
+            untested.remove(ns)  # ignore empty mappings
+    assert len(untested) == 0, "test did not evaluate every namespace variation"
 
 
 def test_get_cwl_file_format_unknown():
@@ -196,13 +212,24 @@ def test_clean_mime_type_format_edam():
     assert res_type == mime_type  # application/x-type
 
 
+@pytest.mark.skipif(condition=not f.OPENGIS_MAPPING, reason="No OpenGIS format mappings defined to test")
 def test_clean_mime_type_format_opengis():
     mime_type, fmt = list(f.OPENGIS_MAPPING.items())[0]
-    gis_fmt = f"{f.OPENGIS_NAMESPACE}:{fmt}"  # "edam:format_####"
+    gis_fmt = f"{f.OPENGIS_NAMESPACE}:{fmt}"  # "opengis:####"
     res_type = f.clean_mime_type_format(gis_fmt)
     assert res_type == mime_type
-    gis_fmt = os.path.join(list(f.OPENGIS_NAMESPACE_DEFINITION.values())[0], fmt)  # "edam-url/format_####"
+    gis_fmt = os.path.join(list(f.OPENGIS_NAMESPACE_DEFINITION.values())[0], fmt)
     res_type = f.clean_mime_type_format(gis_fmt)
+    assert res_type == mime_type  # application/x-type
+
+
+def test_clean_mime_type_format_ogc():
+    mime_type, fmt = list(f.OGC_MAPPING.items())[0]
+    ogc_fmt = f"{f.OGC_NAMESPACE}:{fmt}"  # "ogc:####"
+    res_type = f.clean_mime_type_format(ogc_fmt)
+    assert res_type == mime_type
+    ogc_fmt = os.path.join(list(f.OGC_NAMESPACE_DEFINITION.values())[0], fmt)
+    res_type = f.clean_mime_type_format(ogc_fmt)
     assert res_type == mime_type  # application/x-type
 
 
