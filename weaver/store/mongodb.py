@@ -925,6 +925,7 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
 
         search_filters.update(self._apply_status_filter(status))
         search_filters.update(self._apply_ref_or_type_filter(job_type, process, service))
+        search_filters.update(self._apply_tags_filter(tags, request))
         search_filters.update(self._apply_access_filter(access, request))
         search_filters.update(self._apply_datetime_filter(datetime_interval))
 

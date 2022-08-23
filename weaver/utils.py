@@ -2172,3 +2172,22 @@ def parse_number_with_unit(number, binary=None):
     except (AttributeError, KeyError, ValueError, TypeError):
         raise ValueError(f"Invalid number with optional unit string could not be parsed: [{number!s}]")
     return val
+
+
+def copy_doc(copy_func):
+    # type: (AnyCallableAnyArgs) -> AnyCallableAnyArgs
+    """
+    Decorator to copy the docstring from one callable to another.
+
+    .. code-block:: python
+
+        copy_doc(self.copy_func)(self.func)
+
+        @copy_doc(func)
+        def copy_func(self): pass
+    """
+    def wrapper(func):
+        # type: (AnyCallableAnyArgs) -> AnyCallableAnyArgs
+        func.__doc__ = copy_func.__doc__
+        return func
+    return wrapper

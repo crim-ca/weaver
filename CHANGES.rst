@@ -12,11 +12,14 @@ Changes
 
 Changes:
 --------
+- Add `CLI` and `WeaverClient` support of ``logs``, ``exceptions`` and ``statistics`` retrieval.
+- Add `CLI` and `WeaverClient` support of `Job` search filtered by ``tags``, ``process`` and ``providers`` queries.
 - Adjust OpenAPI schema definitions for `Process` deployment to allow ``owsContext`` by itself without duplicated
   information that was required by mandatory ``executionUnit`` definition.
 
 Fixes:
 ------
+- Fix ``tags`` query parameter not applied to filter `Job` search requests.
 - Fix implementation of functional ``DockerRequirement`` test cases for `Process` deployment when references are
   provided by ``href`` within the ``executionUnit`` or ``owsContext``
   (relates to `#11 <https://github.com/crim-ca/weaver/issues/11>`_).
