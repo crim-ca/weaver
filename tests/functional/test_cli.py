@@ -1589,6 +1589,53 @@ class TestWeaverCLI(TestWeaverClientBase):
         assert len(jobs_accept) == 1 and jobs_accept[0]["jobID"] == str(job_a.uuid)
         assert len(jobs_success) == 1 and jobs_success[0]["jobID"] == str(job_s.uuid)
 
+    def test_jobs_filter_tags(self):
+        self.job_store.clear_jobs()
+        job1 = self.job_store.save_job(task_id=uuid.uuid4(), process="test-process", access=Visibility.PUBLIC)
+        job1.tags = ["test1", "test-share"]
+        job1 = self.job_store.update_job(job1)
+        job2 = self.job_store.save_job(task_id=uuid.uuid4(), process="test-process", access=Visibility.PUBLIC)
+        job2.tags = ["test2", "test-share"]
+        job2 = self.job_store.update_job(job2)
+        job3 = self.job_store.save_job(task_id=uuid.uuid4(), process="test-process", access=Visibility.PUBLIC)
+        job3.tags = ["test3"]
+        job3 = self.job_store.update_job(job3)
+        jobs = [job1, job2, job3]
+
+        # note: tags are not 'oneOf', they are 'allOf'
+        for test_tags, expect_jobs in [
+            (["test1"], [job1]),
+            (["test2"], [job2]),
+            (["test3"], [job3]),
+            (["test1,test2"], []),
+            (["test1", "test2"], []),
+            (["test-share"], [job1, job2]),
+            (["test1,test-share"], [job1]),
+            (["test1", "test-share"], [job1]),
+            (["test1", "test3"], []),
+            (["test-share,test3"], []),
+            (["test-share", "test3"], []),
+        ]:
+            lines = mocked_sub_requests(
+                self.app, run_command,
+                [
+                    # "weaver",
+                    "jobs",
+                    "-u", self.url,
+                    "-fT", *test_tags,
+                    "-nL",  # unless links are requested to be removed (top-most and nested ones)
+                ],
+                trim=False,
+                entrypoint=weaver_cli,
+                only_local=True,
+            )
+            assert lines
+            assert len(lines) > 1, "Should be automatically indented with readable format"
+            text = "".join(lines)
+            body = json.loads(text)
+            assert isinstance(body["jobs"], list)
+            self.assert_equal_with_jobs_diffs(body["jobs"], expect_jobs, test_tags, jobs=jobs)
+
     @mocked_remote_server_requests_wps1([
         "https://random.com",
         resources.load_resource(resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML).replace(
