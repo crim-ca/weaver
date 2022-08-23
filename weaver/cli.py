@@ -2471,10 +2471,10 @@ def make_parser():
         ),
         formatter_class=ParagraphFormatter,
     )
-    set_parser_sections(op_exceptions)
-    add_url_param(op_exceptions, required=False)
-    add_job_ref_param(op_exceptions)
-    add_shared_options(op_exceptions)
+    set_parser_sections(op_statistics)
+    add_url_param(op_statistics, required=False)
+    add_job_ref_param(op_statistics)
+    add_shared_options(op_statistics)
 
     op_results = WeaverArgumentParser(
         "results",
