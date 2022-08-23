@@ -1327,17 +1327,17 @@ class WeaverClient(object):
 
     @copy_doc(_job_info)
     def logs(self, *args, **kwargs):
-        return self._job_info(x_path="/logs", *args, **kwargs)
+        return self._job_info("/logs", *args, **kwargs)
 
     @copy_doc(_job_info)
     def exceptions(self, *args, **kwargs):
-        return self._job_info(x_path="/exceptions", *args, **kwargs)
+        return self._job_info("/exceptions", *args, **kwargs)
 
     errors = exceptions  # alias
 
     @copy_doc(_job_info)
     def statistics(self, *args, **kwargs):
-        return self._job_info(x_path="/statistics", *args, **kwargs)
+        return self._job_info("/statistics", *args, **kwargs)
 
     stats = statistics  # alias
 
