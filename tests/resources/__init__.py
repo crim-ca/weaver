@@ -1,7 +1,7 @@
 import os
 from typing import TYPE_CHECKING
 
-from weaver import WEAVER_MODULE_DIR
+from weaver import WEAVER_MODULE_DIR, xml_util
 from weaver.utils import load_file
 
 if TYPE_CHECKING:
@@ -59,13 +59,20 @@ WPS_NO_INPUTS_URL = DESCRIBE_PROCESS_TEMPLATE_URL.format(
 )
 
 
-def load_example(file_name, text=False):
-    # type: (str, bool) -> Union[JSON, str]
+def _load_path(file_path, text=False, xml=False):
+    # type: (str, bool, bool) -> Union[JSON, xml_util.XML, str]
+    if xml:
+        return xml_util.parse(file_path)
+    return load_file(file_path, text=text)
+
+
+def load_example(file_name, text=False, xml=False):
+    # type: (str, bool, bool) -> Union[JSON, xml_util.XML, str]
     file_path = os.path.join(EXAMPLES_PATH, file_name)
-    return load_file(file_path, text=text)
+    return _load_path(file_path, text=text, xml=xml)
 
 
-def load_resource(file_name, text=False):
-    # type: (str, bool) -> Union[JSON, str]
+def load_resource(file_name, text=False, xml=False):
+    # type: (str, bool, bool) -> Union[JSON, xml_util.XML, str]
     file_path = os.path.join(RESOURCES_PATH, file_name)
-    return load_file(file_path, text=text)
+    return _load_path(file_path, text=text, xml=xml)

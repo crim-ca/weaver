@@ -2,6 +2,7 @@ import json
 import os
 import time
 import unittest
+from collections import OrderedDict
 from copy import deepcopy
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
@@ -25,6 +26,7 @@ from tests.utils import (
 )
 from weaver import WEAVER_ROOT_DIR
 from weaver.database import get_db
+from weaver.datatype import Job
 from weaver.formats import ContentType
 from weaver.processes.constants import ProcessSchema
 from weaver.status import Status
@@ -32,10 +34,10 @@ from weaver.utils import fully_qualified_name, load_file
 from weaver.visibility import Visibility
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Optional, Union
+    from typing import Any, Dict, Iterable, Optional, Union
     from typing_extensions import Literal
 
-    from weaver.typedefs import AnyRequestMethod, AnyResponseType, JSON, SettingsType
+    from weaver.typedefs import AnyRequestMethod, AnyResponseType, AnyUUID, JSON, SettingsType
 
     ReferenceType = Literal["deploy", "describe", "execute", "package"]
 
@@ -154,6 +156,51 @@ class ResourcesUtil(object):
                     tested_ref.append(path)
         except (IOError, ValueError):
             pass
+
+
+class JobUtils(object):
+    job_store = None
+    job_info = None  # type: Iterable[Job]
+
+    def message_with_jobs_mapping(self, message="", indent=2):
+        # type: (str, int) -> str
+        """
+        For helping debugging of auto-generated job ids.
+        """
+        mapping = OrderedDict(sorted((str(j.task_id), str(j.id)) for j in self.job_store.list_jobs()))
+        return f"{message}\nMapping Task-ID/Job-ID:\n{json.dumps(mapping, indent=indent)}"
+
+    def assert_equal_with_jobs_diffs(self,
+                                     jobs_result,           # type: Iterable[Union[AnyUUID, Job]]
+                                     jobs_expect,           # type: Iterable[Union[AnyUUID, Job]]
+                                     test_values=None,      # type: Union[JSON, str]
+                                     message="",            # type: str
+                                     indent=2,              # type: int
+                                     index=None,            # type: Optional[int]
+                                     invert=False,          # type: bool
+                                     jobs=None,             # type: Iterable[Job]
+                                     ):                     # type: (...) -> None
+        jobs_result = [str(job.id) if isinstance(job, Job) else str(job) for job in jobs_result]
+        jobs_expect = [str(job.id) if isinstance(job, Job) else str(job) for job in jobs_expect]
+        mapping = {str(job.id): str(job.task_id) for job in (jobs or self.job_info)}
+        missing = set(jobs_expect) - set(jobs_result)
+        unknown = set(jobs_result) - set(jobs_expect)
+        assert (
+            (invert or len(jobs_result) == len(jobs_expect)) and
+            all((job not in jobs_expect if invert else job in jobs_expect) for job in jobs_result)
+        ), (
+            (message if message else "Different jobs returned than expected") +
+            (f" (index: {index})" if index is not None else "") +
+            ("\nResponse: " + json.dumps(sorted(jobs_result), indent=indent)) +
+            ("\nExpected: " + json.dumps(sorted(jobs_expect), indent=indent)) +
+            ("\nMissing: " + json.dumps(sorted(f"{job} ({mapping[job]})" for job in missing), indent=indent)) +
+            ("\nUnknown: " + json.dumps(sorted(f"{job} ({mapping[job]})" for job in unknown), indent=indent)) +
+            ("\nTesting: " + (
+                (json.dumps(test_values, indent=indent) if isinstance(test_values, (dict, list)) else str(test_values))
+                if test_values else ""
+            )) +
+            (self.message_with_jobs_mapping())
+        )
 
 
 @pytest.mark.functional

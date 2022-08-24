@@ -1,13 +1,11 @@
 import contextlib
 import datetime
-import json
 import logging
 import os
 import shutil
 import tempfile
 import unittest
 import warnings
-from collections import OrderedDict
 from datetime import date
 from distutils.version import LooseVersion
 from typing import TYPE_CHECKING
@@ -18,6 +16,7 @@ import pyramid.testing
 import pytest
 from dateutil import parser as date_parser
 
+from tests.functional.utils import JobUtils
 from tests.resources import load_example
 from tests.utils import (
     get_links,
@@ -54,7 +53,7 @@ if TYPE_CHECKING:
     from weaver.visibility import AnyVisibility
 
 
-class WpsRestApiJobsTest(unittest.TestCase):
+class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
     settings = {}
     config = None
 
@@ -111,16 +110,17 @@ class WpsRestApiJobsTest(unittest.TestCase):
         self.make_job(task_id="0000-0000-0000-0000",
                       process=self.process_public.identifier, service=None,
                       user_id=self.user_editor1_id, status=Status.SUCCEEDED, progress=100, access=Visibility.PUBLIC,
+                      tags=["unique"],
                       logs=[
                           ("Start", logging.INFO, Status.ACCEPTED, 1),
                           ("Process", logging.INFO, Status.RUNNING, 10),
                           ("Complete", logging.INFO, Status.SUCCEEDED, 100)
                       ])
         self.make_job(task_id="0000-0000-0000-1111",
-                      process=self.process_unknown, service=self.service_public.name,
+                      process=self.process_unknown, service=self.service_public.name, tags=["test-two", "other"],
                       user_id=self.user_editor1_id, status=Status.FAILED, progress=99, access=Visibility.PUBLIC)
         self.make_job(task_id="0000-0000-0000-2222",
-                      process=self.process_private.identifier, service=None,
+                      process=self.process_private.identifier, service=None, tags=["test-two"],
                       user_id=self.user_editor1_id, status=Status.FAILED, progress=55, access=Visibility.PUBLIC)
         # same process as job 0, but private (ex: job ran with private process, then process made public afterwards)
         self.make_job(task_id="0000-0000-0000-3333",
@@ -174,6 +174,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
                  exceptions=None,   # type: Optional[List[JSON]]
                  logs=None,         # type: Optional[List[Union[str, Tuple[str, AnyLogLevel, AnyStatusType, Number]]]]
                  statistics=None,   # type: Optional[Statistics]
+                 tags=None,         # type: Optional[List[str]]
                  add_info=True,     # type: bool
                  ):                 # type: (...) -> Job
         if isinstance(created, str):
@@ -197,38 +198,12 @@ class WpsRestApiJobsTest(unittest.TestCase):
             job.exceptions = exceptions
         if statistics is not None:
             job.statistics = statistics
+        if tags is not None:
+            job.tags = tags
         job = self.job_store.update_job(job)
         if add_info:
             self.job_info.append(job)
         return job
-
-    def message_with_jobs_mapping(self, message="", indent=2):
-        """
-        For helping debugging of auto-generated job ids.
-        """
-        mapping = OrderedDict(sorted((str(j.task_id), str(j.id)) for j in self.job_store.list_jobs()))
-        return f"{message}\nMapping Task-ID/Job-ID:\n{json.dumps(mapping, indent=indent)}"
-
-    def assert_equal_with_jobs_diffs(self, jobs_result, jobs_expect,
-                                     test_values=None, message="", indent=2, index=None, invert=False):
-        jobs_result = [str(job_id) for job_id in jobs_result]
-        jobs_expect = [str(job_id) for job_id in jobs_expect]
-        mapping = {str(job.id): str(job.task_id) for job in self.job_info}
-        missing = set(jobs_expect) - set(jobs_result)
-        unknown = set(jobs_result) - set(jobs_expect)
-        assert (
-            (invert or len(jobs_result) == len(jobs_expect)) and
-            all((job not in jobs_expect if invert else job in jobs_expect) for job in jobs_result)
-        ), (
-            (message if message else "Different jobs returned than expected") +
-            (f" (index: {index})" if index is not None else "") +
-            ("\nResponse: " + json.dumps(sorted(jobs_result), indent=indent)) +
-            ("\nExpected: " + json.dumps(sorted(jobs_expect), indent=indent)) +
-            ("\nMissing: " + json.dumps(sorted(f"{job} ({mapping[job]})" for job in missing), indent=indent)) +
-            ("\nUnknown: " + json.dumps(sorted(f"{job} ({mapping[job]})" for job in unknown), indent=indent)) +
-            ("\nTesting: " + (test_values if test_values else "")) +
-            (self.message_with_jobs_mapping())
-        )
 
     def get_job_request_auth_mock(self, user_id):
         is_admin = self.user_admin_id == user_id
@@ -915,7 +890,36 @@ class WpsRestApiJobsTest(unittest.TestCase):
         assert not resp.json["parameters"][f"{schema_prefix}.page"]["required"]
         assert not resp.json["parameters"][f"{schema_prefix}.limit"]["required"]
 
-    def test_jobs_datetime_before(self):
+    def test_get_jobs_filter_by_tags_single(self):
+        path = get_path_kvp(sd.jobs_service.path, tags="unique", detail=False)
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.APP_JSON
+        assert resp.json["total"] == 1
+        assert resp.json["jobs"][0] == str(self.job_info[0].id)
+
+        path = get_path_kvp(sd.jobs_service.path, tags="test-two", detail=False)
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.APP_JSON
+        assert resp.json["total"] == 2
+        assert sorted(resp.json["jobs"]) == sorted([str(self.job_info[1].id), str(self.job_info[2].id)])
+
+    def test_get_jobs_filter_by_tags_multi(self):
+        path = get_path_kvp(sd.jobs_service.path, tags="unique,other", detail=False)
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.APP_JSON
+        assert resp.json["total"] == 0
+
+        path = get_path_kvp(sd.jobs_service.path, tags="test-two,other", detail=False)
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.APP_JSON
+        assert resp.json["total"] == 1
+        assert resp.json["jobs"][0] == str(self.job_info[1].id)
+
+    def test_get_jobs_datetime_before(self):
         """
         Test that only filtered jobs before a certain time are returned when ``datetime`` query parameter is provided.
 
@@ -1176,7 +1180,6 @@ class WpsRestApiJobsTest(unittest.TestCase):
         result_jobs = resp.json["jobs"]
         self.assert_equal_with_jobs_diffs(result_jobs, expect_jobs, test)
 
-    @pytest.mark.xfail(reason="Multiple statuses not supported")  # FIXME: support comma-separated list of statuses
     def test_get_jobs_by_status_multi(self):
         test = {"status": f"{Status.SUCCEEDED},{Status.RUNNING}"}
         path = get_path_kvp(sd.jobs_service.path, **test)

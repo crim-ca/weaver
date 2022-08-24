@@ -14,11 +14,13 @@ from typing import TYPE_CHECKING
 
 import mock
 import pytest
+from owslib.ows import DEFAULT_OWS_NAMESPACE
+from owslib.wps import WPSException
 from pyramid.httpexceptions import HTTPForbidden, HTTPOk, HTTPUnauthorized
 from webtest import TestApp as WebTestApp
 
 from tests import resources
-from tests.functional.utils import ResourcesUtil, WpsConfigBase
+from tests.functional.utils import JobUtils, ResourcesUtil, WpsConfigBase
 from tests.utils import (
     get_weaver_url,
     mocked_dismiss_process,
@@ -35,7 +37,7 @@ from weaver.datatype import DockerAuthentication, Service
 from weaver.formats import ContentType, OutputFormat, get_cwl_file_format, repr_json
 from weaver.processes.constants import CWL_REQUIREMENT_APP_DOCKER, ProcessSchema
 from weaver.processes.types import ProcessType
-from weaver.status import Status
+from weaver.status import Status, StatusCategory
 from weaver.utils import fully_qualified_name
 from weaver.visibility import Visibility
 from weaver.wps.utils import map_wps_output_location
@@ -53,7 +55,8 @@ class FakeAuthHandler(object):
 
 @pytest.mark.cli
 @pytest.mark.functional
-class TestWeaverClientBase(WpsConfigBase, ResourcesUtil):
+class TestWeaverClientBase(WpsConfigBase, ResourcesUtil, JobUtils):
+    test_process_prefix = "test-client-"
 
     @classmethod
     def setUpClass(cls):
@@ -70,9 +73,8 @@ class TestWeaverClientBase(WpsConfigBase, ResourcesUtil):
         cli_logger = logging.getLogger("weaver.cli")
         cli_logger.setLevel(logging.DEBUG)
 
-        cls.test_process_prefix = "test-client"
-
     def setUp(self):
+        self.job_store.clear_jobs()
         self.service_store.clear_services()
 
         processes = self.process_store.list_processes()
@@ -84,7 +86,7 @@ class TestWeaverClientBase(WpsConfigBase, ResourcesUtil):
         self.test_process = {}
         self.test_payload = {}
         for process in ["Echo", "CatFile"]:
-            self.test_process[process] = f"{self.test_process_prefix}-{process}"
+            self.test_process[process] = f"{self.test_process_prefix}{process}"
             self.test_payload[process] = self.retrieve_payload(process, "deploy", local=True)
             self.deploy_process(self.test_payload[process], process_id=self.test_process[process])
 
@@ -266,7 +268,7 @@ class TestWeaverClient(TestWeaverClientBase):
         assert resp.request.headers["Custom-Authorization"] == f"token={token}&user=test"
 
     def test_deploy_payload_body_cwl_embedded(self):
-        test_id = f"{self.test_process_prefix}-deploy-body-no-cwl"
+        test_id = f"{self.test_process_prefix}deploy-body-no-cwl"
         payload = self.retrieve_payload("Echo", "deploy", local=True)
         package = self.retrieve_payload("Echo", "package", local=True)
         payload["executionUnit"][0] = {"unit": package}
@@ -280,7 +282,7 @@ class TestWeaverClient(TestWeaverClientBase):
         assert "undefined" not in result.message
 
     def test_deploy_payload_file_cwl_embedded(self):
-        test_id = f"{self.test_process_prefix}-deploy-file-no-cwl"
+        test_id = f"{self.test_process_prefix}deploy-file-no-cwl"
         payload = self.retrieve_payload("Echo", "deploy", local=True)
         package = self.retrieve_payload("Echo", "package", local=True, ref_found=True)
         payload["executionUnit"][0] = {"href": package}
@@ -298,7 +300,7 @@ class TestWeaverClient(TestWeaverClientBase):
         assert "undefined" not in result.message
 
     def test_deploy_payload_inject_cwl_body(self):
-        test_id = f"{self.test_process_prefix}-deploy-body-with-cwl-body"
+        test_id = f"{self.test_process_prefix}deploy-body-with-cwl-body"
         payload = self.retrieve_payload("Echo", "deploy", local=True)
         package = self.retrieve_payload("Echo", "package", local=True)
         payload.pop("executionUnit", None)
@@ -312,7 +314,7 @@ class TestWeaverClient(TestWeaverClientBase):
         assert "undefined" not in result.message
 
     def test_deploy_payload_inject_cwl_file(self):
-        test_id = f"{self.test_process_prefix}-deploy-body-with-cwl-file"
+        test_id = f"{self.test_process_prefix}deploy-body-with-cwl-file"
         payload = self.retrieve_payload("Echo", "deploy", local=True)
         package = self.retrieve_payload("Echo", "package", local=True, ref_found=True)
         payload.pop("executionUnit", None)
@@ -326,7 +328,7 @@ class TestWeaverClient(TestWeaverClientBase):
         assert "undefined" not in result.message
 
     def test_deploy_with_undeploy(self):
-        test_id = f"{self.test_process_prefix}-deploy-undeploy-flag"
+        test_id = f"{self.test_process_prefix}deploy-undeploy-flag"
         deploy = self.test_payload["Echo"]
         result = mocked_sub_requests(self.app, self.client.deploy, test_id, deploy)
         assert result.success
@@ -589,15 +591,47 @@ class TestWeaverClient(TestWeaverClientBase):
             assert result.success
             assert "undefined" not in result.message
 
+    def test_jobs_search_multi_status(self):
+        self.job_store.clear_jobs()
+        proc = self.test_process["Echo"]
+        job1 = self.job_store.save_job(task_id=uuid.uuid4(), process=proc, access=Visibility.PUBLIC)
+        job2 = self.job_store.save_job(task_id=uuid.uuid4(), process=proc, access=Visibility.PUBLIC)
+        job3 = self.job_store.save_job(task_id=uuid.uuid4(), process=proc, access=Visibility.PUBLIC)
+        job1.status = Status.SUCCEEDED
+        job2.status = Status.FAILED
+        job3.status = Status.RUNNING
+        job1 = self.job_store.update_job(job1)
+        job2 = self.job_store.update_job(job2)
+        job3 = self.job_store.update_job(job3)
+        jobs = [job1, job2, job3]
+
+        for test_status, job_expect in [
+            (Status.SUCCEEDED, [job1]),
+            ([Status.SUCCEEDED], [job1]),
+            ([Status.SUCCEEDED, Status.RUNNING], [job1, job3]),
+            (f"{Status.SUCCEEDED},{Status.RUNNING}", [job1, job3]),
+            (StatusCategory.FINISHED, [job1, job2]),
+            (StatusCategory.FINISHED.value, [job1, job2]),
+            ([StatusCategory.FINISHED], [job1, job2]),
+            ([StatusCategory.FINISHED.value], [job1, job2]),
+            (f"{StatusCategory.FINISHED.value},{Status.FAILED}", [job1, job2]),  # failed within finished, nothing added
+            ([StatusCategory.FINISHED.value, Status.RUNNING], [job1, job2, job3]),
+            ([StatusCategory.FINISHED, Status.RUNNING], [job1, job2, job3]),
+            (f"{StatusCategory.FINISHED.value},{Status.RUNNING}", [job1, job2, job3]),
+        ]:
+            result = mocked_sub_requests(self.app, self.client.jobs, status=test_status, detail=False)
+            expect = [job.id for job in job_expect]
+            assert result.success
+            self.assert_equal_with_jobs_diffs(result.body["jobs"], expect, test_status, jobs=jobs)
+
 
 class TestWeaverCLI(TestWeaverClientBase):
-    @classmethod
-    def setUpClass(cls):
-        super(TestWeaverCLI, cls).setUpClass()
-        job = cls.job_store.save_job(task_id="12345678-1111-2222-3333-111122223333",
-                                     process="fake-process", access=Visibility.PUBLIC)
+    def setUp(self):
+        super(TestWeaverCLI, self).setUp()
+        job = self.job_store.save_job(task_id="12345678-1111-2222-3333-111122223333",
+                                      process="fake-process", access=Visibility.PUBLIC)
         job.status = Status.SUCCEEDED
-        cls.test_job = cls.job_store.update_job(job)
+        self.test_job = self.job_store.update_job(job)
 
     def test_help_operations(self):
         lines = run_command(
@@ -991,7 +1025,7 @@ class TestWeaverCLI(TestWeaverClientBase):
         assert lines[-1] == "weaver deploy: error: argument -U/--username: must be combined with -P/--password"
 
     def test_deploy_payload_body_cwl_embedded(self):
-        test_id = f"{self.test_process_prefix}-deploy-body-no-cwl"
+        test_id = f"{self.test_process_prefix}deploy-body-no-cwl"
         payload = self.retrieve_payload("Echo", "deploy", local=True)
         package = self.retrieve_payload("Echo", "package", local=True)
         payload["executionUnit"][0] = {"unit": package}
@@ -1013,7 +1047,7 @@ class TestWeaverCLI(TestWeaverClientBase):
         assert any("\"deploymentDone\": true" in line for line in lines)
 
     def test_deploy_payload_file_cwl_embedded(self):
-        test_id = f"{self.test_process_prefix}-deploy-file-no-cwl"
+        test_id = f"{self.test_process_prefix}deploy-file-no-cwl"
         payload = self.retrieve_payload("Echo", "deploy", local=True)
         package = self.retrieve_payload("Echo", "package", local=True, ref_found=True)
         payload["executionUnit"][0] = {"href": package}
@@ -1040,7 +1074,7 @@ class TestWeaverCLI(TestWeaverClientBase):
             assert any("\"deploymentDone\": true" in line for line in lines)
 
     def test_deploy_payload_inject_cwl_body(self):
-        test_id = f"{self.test_process_prefix}-deploy-body-with-cwl-body"
+        test_id = f"{self.test_process_prefix}deploy-body-with-cwl-body"
         payload = self.retrieve_payload("Echo", "deploy", local=True)
         package = self.retrieve_payload("Echo", "package", local=True)
         payload.pop("executionUnit", None)
@@ -1063,7 +1097,7 @@ class TestWeaverCLI(TestWeaverClientBase):
         assert any("\"deploymentDone\": true" in line for line in lines)
 
     def test_deploy_payload_inject_cwl_file(self):
-        test_id = f"{self.test_process_prefix}-deploy-body-with-cwl-file"
+        test_id = f"{self.test_process_prefix}deploy-body-with-cwl-file"
         payload = self.retrieve_payload("Echo", "deploy", local=True)
         package = self.retrieve_payload("Echo", "package", local=True, ref_found=True)
         payload.pop("executionUnit", None)
@@ -1107,7 +1141,7 @@ class TestWeaverCLI(TestWeaverClientBase):
 
         # use both combination of process description to validate resolution
         for i, payload in enumerate([payload_direct, payload_nested]):
-            test_id = f"{self.test_process_prefix}-deploy-body-with-process-info-{i}"
+            test_id = f"{self.test_process_prefix}deploy-body-with-process-info-{i}"
             package = self.retrieve_payload("Echo", "package", local=True)
             package["outputs"]["output"]["format"] = cwl_fmt
             package["$namespaces"] = cwl_ns
@@ -1518,6 +1552,157 @@ class TestWeaverCLI(TestWeaverClientBase):
         assert all("links" not in job for job in body["jobs"])
         assert "links" not in body
 
+    def test_jobs_filter_status_multi(self):
+        self.job_store.clear_jobs()
+        job = self.job_store.save_job(task_id=uuid.uuid4(), process="test-process", access=Visibility.PUBLIC)
+        job.status = Status.SUCCEEDED
+        job_s = self.job_store.update_job(job)
+        job = self.job_store.save_job(task_id=uuid.uuid4(), process="test-process", access=Visibility.PUBLIC)
+        job.status = Status.FAILED
+        job_f = self.job_store.update_job(job)
+        job = self.job_store.save_job(task_id=uuid.uuid4(), process="test-process", access=Visibility.PUBLIC)
+        job.status = Status.ACCEPTED
+        job_a = self.job_store.update_job(job)
+
+        lines = mocked_sub_requests(
+            self.app, run_command,
+            [
+                # "weaver",
+                "jobs",
+                "-u", self.url,
+                "-S", Status.SUCCEEDED, Status.ACCEPTED,
+                "-D",
+                "-nL",  # unless links are requested to be removed (top-most and nested ones)
+            ],
+            trim=False,
+            entrypoint=weaver_cli,
+            only_local=True,
+        )
+        assert lines
+        assert len(lines) > 1, "Should be automatically indented with readable format"
+        text = "".join(lines)
+        body = json.loads(text)
+        assert isinstance(body["jobs"], list)
+        assert len(body["jobs"])
+        assert not any(_job["jobID"] == str(job_f.uuid) for _job in body["jobs"])
+        assert all(job["status"] in [Status.SUCCEEDED, Status.ACCEPTED] for job in body["jobs"])
+        jobs_accept = list(filter(lambda _job: _job["status"] == Status.ACCEPTED, body["jobs"]))
+        jobs_success = list(filter(lambda _job: _job["status"] == Status.SUCCEEDED, body["jobs"]))
+        assert len(jobs_accept) == 1 and jobs_accept[0]["jobID"] == str(job_a.uuid)
+        assert len(jobs_success) == 1 and jobs_success[0]["jobID"] == str(job_s.uuid)
+
+    def test_jobs_filter_tags(self):
+        self.job_store.clear_jobs()
+        job1 = self.job_store.save_job(task_id=uuid.uuid4(), process="test-process", access=Visibility.PUBLIC)
+        job1.tags = ["test1", "test-share"]
+        job1 = self.job_store.update_job(job1)
+        job2 = self.job_store.save_job(task_id=uuid.uuid4(), process="test-process", access=Visibility.PUBLIC)
+        job2.tags = ["test2", "test-share"]
+        job2 = self.job_store.update_job(job2)
+        job3 = self.job_store.save_job(task_id=uuid.uuid4(), process="test-process", access=Visibility.PUBLIC)
+        job3.tags = ["test3"]
+        job3 = self.job_store.update_job(job3)
+        jobs = [job1, job2, job3]
+
+        # note: tags are not 'oneOf', they are 'allOf'
+        for test_tags, expect_jobs in [
+            (["test1"], [job1]),
+            (["test2"], [job2]),
+            (["test3"], [job3]),
+            (["test1,test2"], []),
+            (["test1", "test2"], []),
+            (["test-share"], [job1, job2]),
+            (["test1,test-share"], [job1]),
+            (["test1", "test-share"], [job1]),
+            (["test1", "test3"], []),
+            (["test-share,test3"], []),
+            (["test-share", "test3"], []),
+        ]:
+            lines = mocked_sub_requests(
+                self.app, run_command,
+                [
+                    # "weaver",
+                    "jobs",
+                    "-u", self.url,
+                    "-fT", *test_tags,
+                    "-nL",  # unless links are requested to be removed (top-most and nested ones)
+                ],
+                trim=False,
+                entrypoint=weaver_cli,
+                only_local=True,
+            )
+            assert lines
+            assert len(lines) > 1, "Should be automatically indented with readable format"
+            text = "".join(lines)
+            body = json.loads(text)
+            assert isinstance(body["jobs"], list)
+            self.assert_equal_with_jobs_diffs(body["jobs"], expect_jobs, test_tags, jobs=jobs)
+
+    @mocked_remote_server_requests_wps1([
+        "https://random.com",
+        resources.load_resource(resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML).replace(
+            "<ows:Identifier>test-remote-process-wps1</ows:Identifier>",
+            f"<ows:Identifier>{TestWeaverClientBase.test_process_prefix}Echo</ows:Identifier>",
+        ),
+        [
+            resources.load_resource(resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML).replace(
+                "<ows:Identifier>test-remote-process-wps1</ows:Identifier>",
+                f"<ows:Identifier>{TestWeaverClientBase.test_process_prefix}Echo</ows:Identifier>",
+            )
+        ],
+    ], data=True)
+    def test_jobs_filter_process_provider(self):
+        # process/provider references must be actual definitions in db, see setUp
+        svc = self.service_store.save_service(Service(name="random", url="https://random.com", public=True))
+        proc = self.test_process["Echo"]
+        job1 = self.job_store.save_job(task_id=uuid.uuid4(), process=proc, access=Visibility.PUBLIC)
+        job2 = self.job_store.save_job(task_id=uuid.uuid4(), process=proc, service=svc.name,
+                                       access=Visibility.PUBLIC)
+        self.job_store.save_job(task_id=uuid.uuid4(), process="CatFile", access=Visibility.PUBLIC)
+
+        lines = mocked_sub_requests(
+            self.app, run_command,
+            [
+                # "weaver",
+                "jobs",
+                "-u", self.url,
+                "-fP", job1.process,
+                "-nL",  # unless links are requested to be removed (top-most and nested ones)
+            ],
+            trim=False,
+            entrypoint=weaver_cli,
+            only_local=True,
+        )
+        assert lines
+        assert len(lines) > 1, "Should be automatically indented with readable format"
+        text = "".join(lines)
+        body = json.loads(text)
+        assert isinstance(body["jobs"], list)
+        assert len(body["jobs"]) == 2
+        assert sorted(body["jobs"]) == sorted([str(job1.uuid), str(job2.uuid)])
+
+        lines = mocked_sub_requests(
+            self.app, run_command,
+            [
+                # "weaver",
+                "jobs",
+                "-u", self.url,
+                "-fP", job1.process,
+                "-fS", job2.service,
+                "-nL",  # unless links are requested to be removed (top-most and nested ones)
+            ],
+            trim=False,
+            entrypoint=weaver_cli,
+            only_local=True,
+        )
+        assert lines
+        assert len(lines) > 1, "Should be automatically indented with readable format"
+        text = "".join(lines)
+        body = json.loads(text)
+        assert isinstance(body["jobs"], list)
+        assert len(body["jobs"]) == 1
+        assert body["jobs"] == [str(job2.uuid)]
+
     def test_output_format_json_pretty(self):
         job_url = f"{self.url}/jobs/{self.test_job.id}"
         for format_option in [[], ["-F", OutputFormat.JSON_STR]]:
@@ -1663,6 +1848,117 @@ class TestWeaverCLI(TestWeaverClientBase):
         assert len(lines) == 1, "should NOT be indented, raw data directly in one block"
         assert lines[0].startswith("<?xml")
         assert lines[0].endswith("</result>")
+
+    def test_job_logs(self):
+        job = self.job_store.save_job(task_id=uuid.uuid4(), process="test-process", access=Visibility.PUBLIC)
+        job.save_log(message="test start", progress=0, status=Status.ACCEPTED)
+        job.save_log(message="test run", progress=50, status=Status.RUNNING)
+        job.save_log(message="test done", progress=100, status=Status.SUCCEEDED)
+        job = self.job_store.update_job(job)
+
+        lines = mocked_sub_requests(
+            self.app, run_command,
+            [
+                # "weaver",
+                "logs",
+                "-u", self.url,
+                "-j", str(job.id),
+            ],
+            trim=False,
+            entrypoint=weaver_cli,
+            only_local=True,
+        )
+        assert len(lines) == 5
+        assert lines[0] == "["
+        assert f"0% {Status.ACCEPTED}" in lines[1]
+        assert f"50% {Status.RUNNING}" in lines[2]
+        assert f"100% {Status.SUCCEEDED}" in lines[3]
+        assert lines[4] == "]"
+
+    def test_job_exceptions(self):
+        xml_error = resources.load_example("wps_access_forbidden_response.xml", xml=True)
+        wps_error = WPSException(xml_error.xpath(".//ows:Exception", namespaces={"ows": DEFAULT_OWS_NAMESPACE})[0])
+        job = self.job_store.save_job(task_id=uuid.uuid4(), process="test-process", access=Visibility.PUBLIC)
+        job.save_log(message="test start", progress=0, status=Status.ACCEPTED)
+        job.save_log(message="test run", progress=50, status=Status.RUNNING)
+        job.save_log(message="test error", progress=80, status=Status.FAILED, errors=ValueError("test-error"))
+        job.save_log(message="test error", progress=80, status=Status.FAILED, errors=wps_error)
+        job = self.job_store.update_job(job)
+
+        lines = mocked_sub_requests(
+            self.app, run_command,
+            [
+                # "weaver",
+                "exceptions",
+                "-u", self.url,
+                "-j", str(job.id),
+            ],
+            trim=False,
+            entrypoint=weaver_cli,
+            only_local=True,
+        )
+        assert len(lines)
+        text = "".join(lines)
+        body = json.loads(text)
+        assert body == [
+            "test-error",
+            {"Code": "AccessForbidden", "Locator": "service", "Text": "Access to service is forbidden."}
+        ]
+
+    def test_job_statistics(self):
+        job = self.job_store.save_job(task_id=uuid.uuid4(), process="test-process", access=Visibility.PUBLIC)
+        job.statistics = resources.load_example("job_statistics.json")
+        job.status = Status.SUCCEEDED  # error if not completed
+        job = self.job_store.update_job(job)
+
+        lines = mocked_sub_requests(
+            self.app, run_command,
+            [
+                # "weaver",
+                "statistics",
+                "-u", self.url,
+                "-j", str(job.id),
+            ],
+            trim=False,
+            entrypoint=weaver_cli,
+            only_local=True,
+        )
+        assert len(lines)
+        text = "".join(lines)
+        body = json.loads(text)
+        assert body == job.statistics
+
+    def test_job_info_wrong_status(self):
+        # results/statistics must be in success status
+        job = self.job_store.save_job(task_id=uuid.uuid4(), process="test-process", access=Visibility.PUBLIC)
+        job.statistics = resources.load_example("job_statistics.json")
+        job.save_log(message="Some info", status=Status.ACCEPTED, errors=ValueError("failed"))
+        job = self.job_store.update_job(job)
+
+        for operation, status, expect in [
+            ("results", Status.FAILED, "JobResultsFailed"),
+            ("statistics", Status.FAILED, "404 Not Found"),
+            # ("exceptions", Status.SUCCEEDED, "404 Not Found"),  # no error, just irrelevant or empty
+        ]:
+            job.status = status
+            job = self.job_store.update_job(job)
+            lines = mocked_sub_requests(
+                self.app, run_command,
+                [
+                    # "weaver",
+                    operation,
+                    "-u", self.url,
+                    "-j", str(job.id),
+                    "-nL",
+                ],
+                trim=False,
+                entrypoint=weaver_cli,
+                only_local=True,
+                expect_error=True,
+            )
+            assert len(lines)
+            text = "".join(lines)
+            assert expect in text
 
 
 class TestWeaverClientAuthBase(TestWeaverClientBase):

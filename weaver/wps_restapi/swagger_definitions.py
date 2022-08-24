@@ -47,7 +47,7 @@ from weaver.processes.constants import (
 )
 from weaver.quotation.status import QuoteStatus
 from weaver.sort import Sort, SortMethods
-from weaver.status import JOB_STATUS_CODE_API, Status
+from weaver.status import JOB_STATUS_CODE_API, JOB_STATUS_SEARCH_API, Status
 from weaver.visibility import Visibility
 from weaver.wps_restapi.colander_extras import (
     AllOfKeywordSchema,
@@ -68,6 +68,7 @@ from weaver.wps_restapi.colander_extras import (
     PermissiveSequenceSchema,
     SchemeURL,
     SemanticVersion,
+    StringOneOf,
     StringRange,
     XMLObject
 )
@@ -1679,6 +1680,14 @@ class JobStatusEnum(ExtendedSchemaNode):
     default = Status.ACCEPTED
     example = Status.ACCEPTED
     validator = OneOf(JOB_STATUS_CODE_API)
+
+
+class JobStatusSearchEnum(ExtendedSchemaNode):
+    schema_type = String
+    title = "JobStatusSearch"
+    default = Status.ACCEPTED
+    example = Status.ACCEPTED
+    validator = StringOneOf(JOB_STATUS_SEARCH_API, delimiter=",", case_sensitive=False)
 
 
 class JobTypeEnum(ExtendedSchemaNode):
@@ -4610,7 +4619,8 @@ class GetJobsQueries(ExtendedMappingSchema):
         Integer(allow_string=True), name="maxDuration", missing=drop, default=null, validator=Range(min=0),
         description="Maximum duration (seconds) between started time and current/finished time of jobs to find.")
     datetime = DateTimeInterval(missing=drop, default=None)
-    status = JobStatusEnum(missing=drop, default=None)
+    status = JobStatusSearchEnum(description="One of more comma-separated statuses to filter jobs.",
+                                 missing=drop, default=None)
     processID = ProcessIdentifierTag(missing=drop, default=null,
                                      description="Alias to 'process' for OGC-API compliance.")
     process = ProcessIdentifierTag(missing=drop, default=None,
@@ -4623,7 +4633,7 @@ class GetJobsQueries(ExtendedMappingSchema):
     access = JobAccess(missing=drop, default=None)
     notification_email = ExtendedSchemaNode(String(), missing=drop, validator=Email())
     tags = ExtendedSchemaNode(String(), missing=drop, default=None,
-                              description="Comma-separated values of tags assigned to jobs")
+                              description="Comma-separated values of tags assigned to jobs.")
 
 
 class GetProcessJobsQuery(LocalProcessQuery, GetJobsQueries):

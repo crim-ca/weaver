@@ -358,7 +358,7 @@ def collect_statistics(process, settings=None, job=None, rss_start=None):
         if stats and job:
             job.statistics = stats
         return stats or None
-    except Exception as exc:
+    except Exception as exc:  # pragma: no cover
         LOGGER.warning("Ignoring error that occurred during statistics collection [%s]", str(exc), exc_info=exc)
 
 
@@ -375,7 +375,7 @@ def fetch_wps_process(job, wps_url, headers, settings):
         raise OWSNoApplicableCode(f"Failed to retrieve WPS capabilities. Error: [{ex!s}].")
     try:
         wps_process = wps.describeprocess(job.process)
-    except Exception as ex:
+    except Exception as ex:  # pragma: no cover
         raise OWSNoApplicableCode(f"Failed to retrieve WPS process description. Error: [{ex!s}].")
     return wps_process
 
@@ -575,7 +575,7 @@ def submit_job(request, reference, tags=None):
         is_workflow = False
         is_local = False
         tags += "remote"
-    else:
+    else:  # pragma: no cover
         LOGGER.error("Expected process/service, got: %s", type(reference))
         raise TypeError("Invalid process or service reference to execute job.")
     tags = request.params.get("tags", "").split(",") + tags

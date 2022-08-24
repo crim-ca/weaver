@@ -75,6 +75,7 @@ def get_queried_jobs(request):
     detail = filters.pop("detail", False)
     groups = filters.pop("groups", "").split(",") if filters.get("groups", False) else filters.pop("groups", None)
 
+    filters["status"] = filters["status"].split(",") if "status" in filters else None
     filters["tags"] = list(filter(lambda s: s, filters["tags"].split(",") if filters.get("tags", False) else ""))
     filters["notification_email"] = (
         encrypt_email(filters["notification_email"], settings)

@@ -41,7 +41,7 @@ from weaver.execute import ExecuteMode
 from weaver.formats import repr_json
 from weaver.processes.types import ProcessType
 from weaver.sort import Sort, SortMethods
-from weaver.status import JOB_STATUS_CATEGORIES, Status, map_status
+from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.store.base import StoreBills, StoreJobs, StoreProcesses, StoreQuotes, StoreServices, StoreVault
 from weaver.utils import (
     VersionFormat,
@@ -63,6 +63,7 @@ if TYPE_CHECKING:
 
     from weaver.execute import AnyExecuteResponse
     from weaver.processes.types import AnyProcessType
+    from weaver.status import AnyStatusSearch
     from weaver.store.base import DatetimeIntervalType, JobGroupCategory, JobSearchResult
     from weaver.typedefs import (
         AnyProcess,
@@ -76,7 +77,8 @@ if TYPE_CHECKING:
     from weaver.visibility import AnyVisibility
 
     MongodbValue = Union[AnyValueType, datetime.datetime]
-    MongodbAggregateExpression = Dict[str, Union[MongodbValue, List[MongodbValue], Dict[str, AnyValueType]]]
+    MongodbAggregateValue = Union[MongodbValue, List[MongodbValue], Dict[str, AnyValueType, List[AnyValueType]]]
+    MongodbAggregateExpression = Dict[str, MongodbAggregateValue]
     MongodbAggregateStep = Union[MongodbValue, MongodbAggregateExpression]
     MongodbAggregatePipeline = List[Dict[str, Union[str, Dict[str, MongodbAggregateStep]]]]
 
@@ -858,7 +860,7 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
                   tags=None,                # type: Optional[List[str]]
                   access=None,              # type: Optional[str]
                   notification_email=None,  # type: Optional[str]
-                  status=None,              # type: Optional[str]
+                  status=None,              # type: Optional[AnyStatusSearch, List[AnyStatusSearch]]
                   sort=None,                # type: Optional[str]
                   page=0,                   # type: Optional[int]
                   limit=10,                 # type: Optional[int]
@@ -925,6 +927,7 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
 
         search_filters.update(self._apply_status_filter(status))
         search_filters.update(self._apply_ref_or_type_filter(job_type, process, service))
+        search_filters.update(self._apply_tags_filter(tags))
         search_filters.update(self._apply_access_filter(access, request))
         search_filters.update(self._apply_datetime_filter(datetime_interval))
 
@@ -996,6 +999,9 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
 
     @staticmethod
     def _apply_tags_filter(tags):
+        # type: (Optional[Union[str, List[str]]]) -> MongodbAggregateExpression
+        if not tags:
+            return {}
         bad_tags = [vis for vis in Visibility.values() if vis in tags]
         if any(bad_tags):
             raise JobInvalidParameter(json={
@@ -1060,13 +1066,23 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
 
     @staticmethod
     def _apply_status_filter(status):
-        # type: (Optional[str]) -> MongodbAggregateExpression
+        # type: (Optional[Union[AnyStatusSearch, List[AnyStatusSearch]]]) -> MongodbAggregateExpression
         search_filters = {}  # type: MongodbAggregateExpression
-        if status in JOB_STATUS_CATEGORIES:
-            category_statuses = list(JOB_STATUS_CATEGORIES[status])
-            search_filters["status"] = {"$in": category_statuses}
+        if not status:
+            return search_filters
+        if not isinstance(status, list):
+            status = [status]
+        if any(_status in StatusCategory for _status in status) or len(status) > 1:
+            statuses = set()
+            for _status in status:
+                if _status in StatusCategory:
+                    category_status = JOB_STATUS_CATEGORIES[StatusCategory[_status]]
+                    statuses = statuses.union(category_status)
+                else:
+                    statuses.add(_status)
+            search_filters["status"] = {"$in": list(statuses)}  # type: ignore
         elif status:
-            search_filters["status"] = status
+            search_filters["status"] = status[0]
         return search_filters
 
     @staticmethod

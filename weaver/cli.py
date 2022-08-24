@@ -34,6 +34,7 @@ from weaver.processes.wps_package import get_process_definition
 from weaver.sort import Sort, SortMethods
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.utils import (
+    copy_doc,
     fetch_file,
     fully_qualified_name,
     get_any_id,
@@ -77,11 +78,11 @@ if TYPE_CHECKING:
     try:
         from weaver.formats import AnyOutputFormat
         from weaver.processes.constants import ProcessSchemaType
-        from weaver.status import StatusType
+        from weaver.status import AnyStatusSearch
     except ImportError:
         AnyOutputFormat = str
+        AnyStatusSearch = str
         ProcessSchemaType = str
-        StatusType = str
 
     ConditionalGroup = Tuple[argparse._ActionsContainer, bool, bool]  # noqa
     PostHelpFormatter = Callable[[str], str]
@@ -1173,9 +1174,12 @@ class WeaverClient(object):
              sort=None,             # type: Optional[Sort]
              page=None,             # type: Optional[int]
              limit=None,            # type: Optional[int]
-             status=None,           # type: Optional[StatusType]
+             status=None,           # type: Optional[Union[AnyStatusSearch, List[AnyStatusSearch]]]
              detail=False,          # type: bool
              groups=False,          # type: bool
+             process=None,          # type: Optional[str]
+             provider=None,         # type: Optional[str]
+             tags=None,             # type: Optional[Union[str, List[str]]]
              ):                     # type: (...) -> OperationResult
         """
         Obtain a listing of :term:`Job`.
@@ -1198,9 +1202,12 @@ class WeaverClient(object):
         :param sort: Sorting field to list jobs. Name must be one of the fields supported by job objects.
         :param page: Paging index to list jobs.
         :param limit: Amount of jobs to list per page.
-        :param status: Filter job listing only to matching status.
+        :param status: Filter job listing only to matching status. If multiple are provided, must match one of them.
         :param detail: Obtain detailed job descriptions.
         :param groups: Obtain grouped representation of jobs per provider and process categories.
+        :param process: Obtain jobs executed only by matching :term:`Process`.
+        :param provider: Obtain jobs only matching remote :term:`Provider`.
+        :param tags: Obtain jobs filtered by matching tags. Jobs must match all tags simultaneously, not one of them.
         :returns: Retrieved status of the job.
         """
         base_url = self._get_url(url)
@@ -1213,12 +1220,23 @@ class WeaverClient(object):
             query["limit"] = limit
         if sort is not None:
             query["sort"] = sort
-        if isinstance(status, str) and status:
-            query["status"] = map_status(status)
+        if isinstance(status, (str, Status, StatusCategory)) and status:
+            status = str(getattr(status, "value", status)).split(",")  # consider enum or plain single/multi string
+        if isinstance(status, list) and status:
+            status = [StatusCategory.get(_status, map_status(_status)) for _status in status]
+            query["status"] = ",".join([str(getattr(_status, "value", _status)) for _status in status])
         if isinstance(detail, bool) and detail:
             query["detail"] = detail
         if isinstance(groups, bool) and groups:
             query["groups"] = groups
+        if isinstance(process, str) and process:
+            query["process"] = process
+        if isinstance(provider, str) and provider:
+            query["provider"] = provider
+        if isinstance(tags, list):
+            tags = ",".join(tags)
+        if isinstance(tags, str) and tags:
+            query["tags"] = tags
         resp = self._request("GET", jobs_url, params=query,
                              headers=self._headers, x_headers=headers, settings=self._settings, auth=auth,
                              request_timeout=request_timeout, request_retries=request_retries)
@@ -1255,7 +1273,7 @@ class WeaverClient(object):
         :param request_timeout: Maximum timout duration (seconds) to wait for a response when performing HTTP requests.
         :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
         :param output_format: Select an alternate output representation of the result body contents.
-        :returns: Retrieved status of the job.
+        :returns: Retrieved status of the :term:`Job`.
         """
         job_id, job_url = self._parse_job_ref(job_reference, url)
         LOGGER.info("Getting job status: [%s]", job_id)
@@ -1263,6 +1281,65 @@ class WeaverClient(object):
                              headers=self._headers, x_headers=headers, settings=self._settings, auth=auth,
                              request_timeout=request_timeout, request_retries=request_retries)
         return self._parse_result(resp, with_links=with_links, with_headers=with_headers, output_format=output_format)
+
+    def _job_info(self,
+                  x_path,                   # type: str
+                  job_reference,            # type: str
+                  url=None,                 # type: Optional[str]
+                  auth=None,                # type: Optional[AuthHandler]
+                  headers=None,             # type: Optional[AnyHeadersContainer]
+                  with_links=True,          # type: bool
+                  with_headers=False,       # type: bool
+                  request_timeout=None,     # type: Optional[int]
+                  request_retries=None,     # type: Optional[int]
+                  output_format=None,       # type: Optional[AnyOutputFormat]
+                  ):                        # type: (...) -> OperationResult
+        """
+        Obtain the information from a :term:`Job`.
+
+        The :term:`Job` must be in the expected status to retrieve relevant information.
+
+        .. seealso::
+            :ref:`proc_op_result`
+
+        :param job_reference: Either the full :term:`Job` status URL or only its UUID.
+        :param url: Instance URL if not already provided during client creation.
+        :param auth:
+            Instance authentication handler if not already created during client creation.
+            Should perform required adjustments to request to allow access control of protected contents.
+        :param headers:
+            Additional headers to employ when sending request.
+            Note that this can break functionalities if expected headers are overridden. Use with care.
+        :param with_links: Indicate if ``links`` section should be preserved in returned result body.
+        :param with_headers: Indicate if response headers should be returned in result output.
+        :param request_timeout: Maximum timout duration (seconds) to wait for a response when performing HTTP requests.
+        :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
+        :param output_format: Select an alternate output representation of the result body contents.
+        :returns: Retrieved information from the :term:`Job`.
+        """
+        job_id, job_url = self._parse_job_ref(job_reference, url)
+        job_path = f"{job_url}{x_path}"
+        LOGGER.info("Getting job information (%s): [%s]", job_path.rsplit("/", 1)[-1], job_id)
+        resp = self._request("GET", job_path,
+                             headers=self._headers, x_headers=headers, settings=self._settings, auth=auth,
+                             request_timeout=request_timeout, request_retries=request_retries)
+        return self._parse_result(resp, with_links=with_links, with_headers=with_headers, output_format=output_format)
+
+    @copy_doc(_job_info)
+    def logs(self, **kwargs):
+        return self._job_info("/logs", **kwargs)
+
+    @copy_doc(_job_info)
+    def exceptions(self, **kwargs):
+        return self._job_info("/exceptions", **kwargs)
+
+    errors = exceptions  # alias
+
+    @copy_doc(_job_info)
+    def statistics(self, **kwargs):
+        return self._job_info("/statistics", **kwargs)
+
+    stats = statistics  # alias
 
     def monitor(self,
                 job_reference,                      # type: str
@@ -2320,12 +2397,24 @@ def make_parser():
     add_shared_options(op_jobs)
     add_listing_options(op_jobs, item="job")
     op_jobs.add_argument(
-        "-S", "--status", dest="status", choices=Status.values(), type=str.lower,
-        help="Filter job listing only to matching status."
+        "-S", "--status", dest="status", choices=Status.values(), type=str.lower, nargs="+",
+        help="Filter job listing only to matching status. If multiple are provided, must match one of them."
     )
     op_jobs.add_argument(
         "-G", "--groups", dest="groups", action="store_true",
         help="Obtain grouped representation of jobs per provider and process categories."
+    )
+    op_jobs.add_argument(
+        "-fP", "--process", dest="process",
+        help="Filter job listing only to matching process (local and/or remote whether combined with '-fS')."
+    )
+    op_jobs.add_argument(
+        "-fS", "--provider", "--service", dest="provider",
+        help="Filter job listing only to matching remote service provider."
+    )
+    op_jobs.add_argument(
+        "-fT", "--tags", dest="tags", type=str.lower, nargs="+",
+        help="Filter job listing only to matching tags. Jobs must match all tags simultaneously, not one of them."
     )
 
     op_dismiss = WeaverArgumentParser(
@@ -2360,6 +2449,47 @@ def make_parser():
     add_url_param(op_status, required=False)
     add_job_ref_param(op_status)
     add_shared_options(op_status)
+
+    op_logs = WeaverArgumentParser(
+        "logs",
+        description=(
+            "Obtain the logs of a job using a reference UUID or URL. "
+            "Only guaranteed by Weaver instances. Pure 'OGC API - Processes' servers might not implement this feature."
+        ),
+        formatter_class=ParagraphFormatter,
+    )
+    set_parser_sections(op_logs)
+    add_url_param(op_logs, required=False)
+    add_job_ref_param(op_logs)
+    add_shared_options(op_logs)
+
+    op_exceptions = WeaverArgumentParser(
+        "exceptions",
+        description=(
+            "Obtain the exceptions and error details of a failed job using a reference UUID or URL. "
+            "If the job is not marked with failed status, this will return an error. "
+            "Only guaranteed by Weaver instances. Pure 'OGC API - Processes' servers might not implement this feature."
+        ),
+        formatter_class=ParagraphFormatter,
+    )
+    set_parser_sections(op_exceptions)
+    add_url_param(op_exceptions, required=False)
+    add_job_ref_param(op_exceptions)
+    add_shared_options(op_exceptions)
+
+    op_statistics = WeaverArgumentParser(
+        "statistics",
+        description=(
+            "Obtain the computation statistics details of a successful job using a reference UUID or URL. "
+            "If the job is not marked with succeeded status, this will return an error. "
+            "Only guaranteed by Weaver instances. Pure 'OGC API - Processes' servers might not implement this feature."
+        ),
+        formatter_class=ParagraphFormatter,
+    )
+    set_parser_sections(op_statistics)
+    add_url_param(op_statistics, required=False)
+    add_job_ref_param(op_statistics)
+    add_shared_options(op_statistics)
 
     op_results = WeaverArgumentParser(
         "results",
@@ -2419,11 +2549,16 @@ def make_parser():
         op_monitor,
         op_dismiss,
         op_status,
+        op_logs,
+        op_exceptions,
+        op_statistics,
         op_results,
         op_upload,
     ]
     aliases = {
-        "processes": op_capabilities
+        "processes": op_capabilities,
+        "errors": op_exceptions,
+        "stats": op_statistics,
     }
     for op_parser in operations:
         op_aliases = [alias for alias, op_alias in aliases.items() if op_alias is op_parser]

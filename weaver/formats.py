@@ -463,7 +463,7 @@ def get_content_type(extension, charset=None, default=None):
 
 
 def add_content_type_charset(content_type, charset):
-    # type: (str, Optional[str]) -> str
+    # type: (Union[str, ContentType], Optional[str]) -> str
     """
     Apply the specific charset to the content-type with some validation in case of conflicting definitions.
 
