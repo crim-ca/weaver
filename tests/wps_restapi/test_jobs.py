@@ -16,6 +16,7 @@ import pyramid.testing
 import pytest
 from dateutil import parser as date_parser
 
+from tests.functional.utils import JobUtils
 from tests.resources import load_example
 from tests.utils import (
     get_links,
@@ -29,7 +30,6 @@ from tests.utils import (
     setup_mongodb_processstore,
     setup_mongodb_servicestore
 )
-from tests.functional.utils import JobUtils
 from weaver.datatype import Job, Service
 from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import ContentType
