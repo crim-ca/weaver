@@ -263,7 +263,7 @@ Videos and more functionalities were introduced in `Weaver` following |ogc-eo-ap
 Corresponding developments are reported in the |ogc-eo-apps-pilot-er|_.
 
 `Weaver` has been used to participate in interoperability testing effort that lead to |ogc-best-practices-eo-apppkg|_
-technical report. This resulted, along with previous efforts, in the definition of |ogc-api-proc-part2-ext| backed by
+technical report. This resulted, along with previous efforts, in the definition of |ogc-api-proc-part2| backed by
 validated test cases using |cwl| as the representation method for the deployment and execution of |ogc-apppkg|_ close
 to the data.
 
