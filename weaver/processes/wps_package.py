@@ -104,6 +104,7 @@ from weaver.vault.utils import (
     map_vault_location,
     parse_vault_token
 )
+from weaver.wps.service import ReferenceStatusLocationStorage
 from weaver.wps.utils import get_wps_output_dir, get_wps_output_url, map_wps_output_location
 from weaver.wps_restapi import swagger_definitions as sd
 
@@ -945,6 +946,11 @@ class WpsPackage(Process):
         or log file references that derive from it will be automatically stored in the same nested context.
         """
         if self._job_status_file:
+            return self._job_status_file
+        # avoid error in case process execution is a remote provider (eg: during workflow step)
+        # file is already defined in a specific location and cannot be moved
+        if isinstance(self.status_store, ReferenceStatusLocationStorage):
+            self._job_status_file = self.status_store.location()
             return self._job_status_file
         status_file = super(WpsPackage, self).status_filename
         if self.job.context:
