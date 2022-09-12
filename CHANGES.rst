@@ -24,6 +24,8 @@ Fixes:
 - Fix implementation of functional ``DockerRequirement`` test cases for `Process` deployment when references are
   provided by ``href`` within the ``executionUnit`` or ``owsContext``
   (relates to `#11 <https://github.com/crim-ca/weaver/issues/11>`_).
+- Fix ``weaver.wps_output_context`` sub-directory resolved from default settings or ``X-WPS-Output-Context`` request
+  header not employed for storing the `XML` status location and `Job` log files next to the `Job` outputs directory.
 
 .. _changes_4.22.0:
 
