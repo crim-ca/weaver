@@ -9,7 +9,6 @@ from pyramid.httpexceptions import HTTPBadRequest, HTTPSeeOther
 from pyramid.request import Request as PyramidRequest
 from pywps.app import Process as ProcessWPS, WPSRequest
 from pywps.app.Service import Service as ServiceWPS
-from pywps.inout.storage import StorageAbstract
 from pywps.response import WPSResponse
 from pywps.response.execute import ExecuteResponse
 from requests.structures import CaseInsensitiveDict
@@ -27,6 +26,7 @@ from weaver.processes.utils import get_process
 from weaver.store.base import StoreProcesses
 from weaver.utils import extend_instance, get_header, get_registry, get_settings, get_weaver_url
 from weaver.visibility import Visibility
+from weaver.wps.storage import ReferenceStatusLocationStorage
 from weaver.wps.utils import (
     check_wps_status,
     get_wps_local_status_location,
@@ -55,42 +55,11 @@ if TYPE_CHECKING:
     )
 
 
-class ReferenceStatusLocationStorage(StorageAbstract):
-    """
-    Simple storage that simply redirects to a pre-existing status location.
-    """
-    # pylint: disable=W0222  # ignore mismatch signature of method params not employed
-
-    def __init__(self, url_location, settings):
-        # type: (str, SettingsType) -> None
-        self._url = url_location
-        # location might not exist yet based on worker execution timing
-        self._file = get_wps_local_status_location(url_location, settings, must_exist=False)
-
-    def url(self, *_, **__):
-        """
-        URL location of the XML status file.
-        """
-        return self._url
-
-    def location(self, *_, **__):
-        """
-        Directory location of the XML status file.
-        """
-        return self._file
-
-    def store(self, *_, **__):
-        pass
-
-    def write(self, *_, **__):
-        pass
-
-
 class WorkerRequest(WPSRequest):
     """
     Extended :mod:`pywps` request with additional handling provided by :mod:`weaver`.
     """
-    _auth_headers = CaseInsensitiveDict({  # take advantage of case insensitive only, value don't care
+    _auth_headers = CaseInsensitiveDict({  # take advantage of case-insensitive only, value don't care
         "Authorization": None,
         "X-Auth": None,
         sd.XAuthVaultFileHeader.name: None,
