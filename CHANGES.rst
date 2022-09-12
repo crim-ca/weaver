@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_4.23.0:
+
+`4.23.0 <https://github.com/crim-ca/weaver/tree/4.23.0>`_ (2022-09-12)
+========================================================================
+
+Changes:
+--------
 - Add `CLI` and `WeaverClient` support of ``logs``, ``exceptions`` and ``statistics`` retrieval.
 - Add `CLI` and `WeaverClient` support of `Job` search filtered by ``tags``, ``process`` and ``providers`` queries.
 - Add `CLI`, `WeaverClient` and `API` support of `Job` search filtered by multiple ``status`` values.
