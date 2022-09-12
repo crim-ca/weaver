@@ -948,6 +948,8 @@ class WpsPackage(Process):
             return self._job_status_file
         status_file = super(WpsPackage, self).status_filename
         if self.job.context:
+            status_store_ctx_dir = os.path.join(self.status_store.target, self.job.context)
+            os.makedirs(status_store_ctx_dir, exist_ok=True)
             status_file = os.path.join(self.job.context, status_file)
         self._job_status_file = status_file
         return status_file
