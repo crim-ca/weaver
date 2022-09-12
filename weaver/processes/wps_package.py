@@ -184,6 +184,8 @@ def retrieve_package_job_log(execution, job, progress_min=0, progress_max=100):
     try:
         # weaver package log every status update into this file (we no longer rely on the http monitoring)
         out_dir = get_wps_output_dir(get_settings())
+        if job.context:
+            out_dir = os.path.join(out_dir, job.context)
         # if the process is a weaver package this status xml should be available in the process output dir
         log_path = get_status_location_log_path(execution.statusLocation, out_dir=out_dir)
         with open(log_path, mode="r", encoding="utf-8") as log_file:
@@ -904,6 +906,7 @@ class WpsPackage(Process):
         self.request = None                  # type: Optional[WorkerRequest]
         self.response = None                 # type: Optional[ExecuteResponse]
         self._job = None                     # type: Optional[Job]
+        self._job_status_file = None         # type: Optional[str]
 
         self.payload = payload
         self.package = package
@@ -931,6 +934,23 @@ class WpsPackage(Process):
             status_supported=True,
             **kw
         )
+
+    @property
+    def status_filename(self):
+        # type: () -> str
+        """
+        Obtain the XML status location of this process when executed.
+
+        The status location applies the ``WPS-Output-Context`` if defined such that any following output
+        or log file references that derive from it will be automatically stored in the same nested context.
+        """
+        if self._job_status_file:
+            return self._job_status_file
+        status_file = super(WpsPackage, self).status_filename
+        if self.job.context:
+            status_file = os.path.join(self.job.context, status_file)
+        self._job_status_file = status_file
+        return status_file
 
     def setup_loggers(self, log_stdout_stderr=True):
         # type: (bool) -> None

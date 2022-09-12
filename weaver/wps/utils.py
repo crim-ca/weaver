@@ -125,7 +125,7 @@ def get_wps_output_context(request):
     """
     Obtains and validates allowed values for sub-directory context of WPS outputs in header ``X-WPS-Output-Context``.
 
-    :raises HTTPUnprocessableEntity: if the header was provided an contains invalid or illegal value.
+    :raises HTTPUnprocessableEntity: if the header was provided and contains invalid or illegal value.
     :returns: validated context or None if not specified.
     """
     headers = getattr(request, "headers", {})
