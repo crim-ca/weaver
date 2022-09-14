@@ -1035,7 +1035,8 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
             nc_refs = []
             for i in range(3):
                 nc_name = f"test-file-{i}.nc"
-                nc_refs.append(os.path.join(tmp_host, nc_name))
+                nc_path = os.path.join(tmp_dir, nc_name)
+                nc_refs.append(f"file://{nc_path}")
                 with open(os.path.join(tmp_dir, nc_name), mode="w", encoding="utf-8") as tmp_file:
                     tmp_file.write(f"DUMMY NETCDF DATA #{i}")
             with open(os.path.join(tmp_dir, "netcdf-array.json"), mode="w", encoding="utf-8") as tmp_file:
@@ -1043,6 +1044,7 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
 
             def mock_tmp_input(requests_mock):
                 mocked_file_server(tmp_dir, tmp_host, self.settings, requests_mock=requests_mock)
+                mocked_wps_output(self.settings, requests_mock=requests_mock)
 
             self.workflow_runner(WorkflowProcesses.WORKFLOW_REST_SCATTER_COPY_NETCDF,
                                  [WorkflowProcesses.APP_WPS1_JSON_ARRAY_2_NETCDF,  # no need to register its builtin ref

@@ -1811,22 +1811,16 @@ class WpsPackage(Process):
             step_details = self.step_packages[job_name]
         except KeyError:  # Perform check directly first in case a step was called literally as '<name>_<index>'
             # In case of Workflow with scattering, job name might be suffixed with an index
-            req = get_application_requirement(self.package, CWL_REQUIREMENT_SCATTER, default={}, validate=False)
-            if not (req and "_" in job_name):
+            # Also, to avoid ambiguous references of Workflow steps running in parallel (distinct jobs),
+            # unique keys are generated for matching step names, since their sub-CWL might differ.
+            # (see 'cwltool.process.uniquename')
+            if "_" not in job_name:
                 raise
             job_name, job_index = job_name.rsplit("_", 1)
             if not job_index.isnumeric():
                 raise
             LOGGER.debug("Resolved step name with index from scattering: [%s](%s)", job_name, job_index)
             step_details = self.step_packages[job_name]
-            if "scatter" not in self.package["steps"][job_name]:
-                self.log_message(
-                    self.job.status,
-                    f"Expected scatter feature to match resolved name [{job_name}]({job_index}) "
-                    "but no scatter specification was found in that step's package.",
-                    level=logging.ERROR,
-                )
-                raise
         return step_details
 
     def get_job_process_definition(self, job_name, job_order, tool):  # noqa: E811
