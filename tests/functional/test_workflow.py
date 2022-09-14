@@ -940,7 +940,8 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
             nc_refs = []
             for i in range(3):
                 nc_name = f"test-file-{i}.nc"
-                nc_refs.append(os.path.join("file://" + tmp_dir, nc_name))
+                nc_path = os.path.join(tmp_dir, nc_name)
+                nc_refs.append(f"file://{nc_path}")
                 with open(os.path.join(tmp_dir, nc_name), mode="w", encoding="utf-8") as tmp_file:
                     tmp_file.write(f"DUMMY NETCDF DATA #{i}")
             with open(os.path.join(tmp_dir, "netcdf-array.json"), mode="w", encoding="utf-8") as tmp_file:
@@ -969,10 +970,6 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
                              message="Workflow output data should have made it through the "
                                      "workflow of different process types.")
 
-    # FIXME: implement + re-enable 'CWL_REQUIREMENT_SCATTER'
-    #@pytest.mark.xfail(
-    #    reason="ScatterFeatureRequirement not yet supported (https://github.com/crim-ca/weaver/issues/105)"
-    #)
     def test_workflow_mixed_rest_builtin_wps1_docker_scatter_requirements(self):
         """
         Test the use of multiple applications of different :term:`Process` type in a :term:`Workflow`.
@@ -982,18 +979,23 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
                (process registered with ``WPS1Requirement`` using WPS-1 interface of builtin ``jsonarray2netcdf``).
             2. Convert NetCDF file to raw text data dumps (using scattered applications per-file).
 
+        .. note::
+            Because ``jsonarray2netcdf`` is running in subprocess instantiated by :mod:`cwltool`, file-server
+            location cannot be mocked by the test suite. Employ local test paths as if they where already fetched.
+
         .. seealso::
             Inverse :term:`WPS-1` / :term:`OGC API - Processes` process references from
             :meth:`test_workflow_mixed_wps1_builtin_rest_docker_scatter_requirements`.
         """
 
         with contextlib.ExitStack() as stack:
-            tmp_host = "https://mocked-file-server.com"  # must match in 'Execute_WorkflowScatterCopyNestedOutDir.json'
+            tmp_host = "https://mocked-file-server.com"    # must match in 'WorkflowWPS1ScatterCopyNetCDF/execute.yml'
             tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())
             nc_refs = []
             for i in range(3):
                 nc_name = f"test-file-{i}.nc"
-                nc_refs.append(os.path.join(tmp_host, nc_name))
+                nc_path = os.path.join(tmp_dir, nc_name)
+                nc_refs.append(f"file://{nc_path}")
                 with open(os.path.join(tmp_dir, nc_name), mode="w", encoding="utf-8") as tmp_file:
                     tmp_file.write(f"DUMMY NETCDF DATA #{i}")
             with open(os.path.join(tmp_dir, "netcdf-array.json"), mode="w", encoding="utf-8") as tmp_file:
@@ -1001,6 +1003,7 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
 
             def mock_tmp_input(requests_mock):
                 mocked_file_server(tmp_dir, tmp_host, self.settings, requests_mock=requests_mock)
+                mocked_wps_output(self.settings, requests_mock=requests_mock)
 
             self.workflow_runner(WorkflowProcesses.WORKFLOW_WPS1_SCATTER_COPY_NETCDF,
                                  [WorkflowProcesses.APP_DOCKER_NETCDF_2_TEXT,  # required for reference by WPS below
@@ -1016,13 +1019,17 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
                (process registered with ``WPS1Requirement`` using WPS-1 interface of builtin ``jsonarray2netcdf``).
             2. Convert NetCDF file to raw text data dumps (using scattered applications per-file).
 
+        .. note::
+            Because ``jsonarray2netcdf`` is running in subprocess instantiated by :mod:`cwltool`, file-server
+            location cannot be mocked by the test suite. Employ local test paths as if they where already fetched.
+
         .. seealso::
             Inverse :term:`WPS-1` / :term:`OGC API - Processes` process references from
             :meth:`test_workflow_mixed_rest_builtin_wps1_docker_scatter_requirements`.
         """
 
         with contextlib.ExitStack() as stack:
-            tmp_host = "https://mocked-file-server.com"  # must match in 'Execute_WorkflowScatterCopyNestedOutDir.json'
+            tmp_host = "https://mocked-file-server.com"  # must match in 'WorkflowRESTScatterCopyNetCDF/execute.yml'
             tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())
             nc_refs = []
             for i in range(3):

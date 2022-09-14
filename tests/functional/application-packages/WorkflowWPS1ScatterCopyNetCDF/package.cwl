@@ -3,7 +3,9 @@ class: Workflow
 requirements:
   ScatterFeatureRequirement: {}
 inputs:
-  input_json: File
+  input_json:
+    type: File
+    format: "iana:application/json"
 outputs:
   output:
     type:
@@ -24,3 +26,5 @@ steps:
       input_nc: parse/output
     out:
       - output_txt
+$namespaces:
+  iana: "https://www.iana.org/assignments/media-types/"

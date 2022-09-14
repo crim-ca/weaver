@@ -23,12 +23,14 @@ from weaver.utils import fetch_file  # isort:skip # noqa: E402
 PACKAGE_NAME = os.path.split(os.path.splitext(__file__)[0])[-1]
 
 # setup logger since it is not run from the main 'weaver' app
-LOGGER = logging.getLogger(__name__)
-LOGGER.addHandler(logging.StreamHandler(sys.stdout))
-LOGGER.setLevel(logging.INFO)
+LOGGER = logging.getLogger(PACKAGE_NAME)
+_handler = logging.StreamHandler(sys.stdout)  # noqa
+_handler.setFormatter(logging.Formatter(fmt="[%(name)s] %(levelname)-8s %(message)s"))
+LOGGER.addHandler(_handler)
+LOGGER.setLevel(logging.DEBUG)
 
 # process details
-__version__ = "2.0"
+__version__ = "2.1"
 __title__ = "JSON array to NetCDF"
 __abstract__ = __doc__  # NOTE: '__doc__' is fetched directly, this is mostly to be informative
 
@@ -52,10 +54,10 @@ def j2n(json_reference, output_dir):
             LOGGER.debug("Parsing JSON file references.")
             for file_url in json_content:
                 LOGGER.debug("Fetching NetCDF reference from JSON file: [%s]", file_url)
-                fetch_file(file_url, output_dir, timeout=10, retry=3)
+                fetched_nc = fetch_file(file_url, output_dir, timeout=10, retry=3)
+                LOGGER.debug("Fetched NetCDF output location: [%s]", fetched_nc)
     except Exception as exc:
-        # log only debug for tracking, re-raise and actual error wil be logged by top process monitor
-        LOGGER.debug("Process '%s' raised an exception: [%s]", PACKAGE_NAME, exc)
+        LOGGER.error("Process '%s' raised an exception: [%s]", PACKAGE_NAME, exc)
         raise
     LOGGER.info("Process '%s' execution completed.", PACKAGE_NAME)
 

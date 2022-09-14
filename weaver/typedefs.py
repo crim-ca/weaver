@@ -152,7 +152,11 @@ if TYPE_CHECKING:
     CWL_Outputs = Union[List[CWL_Output_Type], Dict[str, CWL_Output_Type]]
 
     # 'requirements' includes 'hints'
-    CWL_Requirement = TypedDict("CWL_Requirement", {"class": CWL_RequirementNames}, total=False)  # type: ignore
+    CWL_Requirement = TypedDict("CWL_Requirement", {
+        "class": CWL_RequirementNames,  # type: ignore
+        "provider": NotRequired[str],
+        "process": NotRequired[str],
+    }, total=False)
     CWL_RequirementsDict = Dict[CWL_RequirementNames, Dict[str, str]]   # {'<req>': {<param>: <val>}}
     CWL_RequirementsList = List[CWL_Requirement]       # [{'class': <req>, <param>: <val>}]
     CWL_AnyRequirements = Union[CWL_RequirementsDict, CWL_RequirementsList]

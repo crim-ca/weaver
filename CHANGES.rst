@@ -12,8 +12,9 @@ Changes
 
 Changes:
 --------
-- Support `CWL` definition for ``ScatterFeatureRequirement``
-  (resolves `#105 <https://github.com/crim-ca/weaver/issues/105>`_).
+- Support `CWL` definition for ``ScatterFeatureRequirement`` for `Workflow` parallel step distribution of an
+  input array (resolves `#105 <https://github.com/crim-ca/weaver/issues/105>`_).
+- Add formatter and better logging details when executing ``builtin`` `Process` ``jsonarray2netcdf``.
 - Add `OGC` Media-Type ontology for ``File`` format references within `CWL` definition.
 - Replace `EDAM` NetCDF format reference by `OGC` NetCDF Media-Type with expected ontology definitions by processes.
   For backward compatibility, corresponding `EDAM` references will be converted to `OGC` Media-Type whenever possible.
