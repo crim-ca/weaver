@@ -23,6 +23,8 @@ Changes:
 Fixes:
 ------
 - Fix implementation of various functional test cases for `Workflow` execution.
+- Fix ``owslib`` version with enforced ``pyproj`` dependency failing in Python 3.10
+  (resolves `#459 <https://github.com/crim-ca/weaver/issues/459>`_).
 
 .. _changes_4.23.0:
 
