@@ -949,6 +949,7 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
 
             def mock_tmp_input(requests_mock):
                 mocked_file_server(tmp_dir, tmp_host, self.settings, requests_mock=requests_mock)
+                mocked_wps_output(self.settings, requests_mock=requests_mock)
 
             results = self.workflow_runner(WorkflowProcesses.WORKFLOW_REST_SELECT_COPY_NETCDF,
                                            [WorkflowProcesses.APP_DOCKER_NETCDF_2_TEXT,  # indirectly needed by WPS-1
