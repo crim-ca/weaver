@@ -490,7 +490,7 @@ def add_content_type_charset(content_type, charset):
     return content_type
 
 
-def get_cwl_file_format(mime_type, make_reference=False, must_exist=True, allow_synonym=True):
+def get_cwl_file_format(mime_type, make_reference=False, must_exist=True, allow_synonym=True):  # pylint: disable=R1260
     # type: (str, bool, bool, bool) -> Union[Tuple[Optional[JSON], Optional[str]], Optional[str]]
     """
     Obtains the extended schema reference from the media-type identifier.
