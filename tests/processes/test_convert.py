@@ -15,7 +15,7 @@ from pywps.inout.outputs import ComplexOutput
 from pywps.validator.mode import MODE
 
 from weaver.exceptions import PackageTypeError
-from weaver.formats import EDAM_MAPPING, EDAM_NAMESPACE_DEFINITION, ContentType
+from weaver.formats import OGC_MAPPING, OGC_NAMESPACE_DEFINITION, ContentType
 from weaver.processes.constants import WPS_INPUT, WPS_LITERAL, WPS_OUTPUT, ProcessSchema
 from weaver.processes.convert import _are_different_and_set  # noqa: W0212
 from weaver.processes.convert import (
@@ -102,9 +102,9 @@ def test_any2cwl_io_from_wps():
     assert cwl_io == {
         "id": "test",
         "type": "File",
-        "format": f"edam:{EDAM_MAPPING[ContentType.APP_NETCDF]}"
+        "format": f"ogc:{OGC_MAPPING[ContentType.APP_NETCDF]}"
     }
-    assert cwl_ns == EDAM_NAMESPACE_DEFINITION
+    assert cwl_ns == OGC_NAMESPACE_DEFINITION
 
     # retry by manually injecting the type to validate that
     # pre-resolved type can also be converted directly from object
@@ -115,10 +115,10 @@ def test_any2cwl_io_from_wps():
     assert cwl_io == {
         "id": "test",
         "type": "File",
-        "format": f"edam:{EDAM_MAPPING[ContentType.APP_NETCDF]}",
+        "format": f"ogc:{OGC_MAPPING[ContentType.APP_NETCDF]}",
         "default": None,
     }
-    assert cwl_ns == EDAM_NAMESPACE_DEFINITION
+    assert cwl_ns == OGC_NAMESPACE_DEFINITION
 
     wps_io.min_occurs = 10
     wps_io.max_occurs = 20
@@ -127,10 +127,10 @@ def test_any2cwl_io_from_wps():
     assert cwl_io == {
         "id": "test",
         "type": {"type": "array", "items": "File"},
-        "format": f"edam:{EDAM_MAPPING[ContentType.APP_NETCDF]}",
+        "format": f"ogc:{OGC_MAPPING[ContentType.APP_NETCDF]}",
         "default": None,
     }
-    assert cwl_ns == EDAM_NAMESPACE_DEFINITION
+    assert cwl_ns == OGC_NAMESPACE_DEFINITION
 
 
 class MockElementXML(dict):
@@ -161,10 +161,10 @@ def test_any2cwl_io_from_ows():
     assert cwl_io == {
         "id": "test",
         "type": "File",
-        "format": f"edam:{EDAM_MAPPING[ContentType.APP_NETCDF]}",
+        "format": f"ogc:{OGC_MAPPING[ContentType.APP_NETCDF]}",
         "default": None,
     }
-    assert cwl_ns == EDAM_NAMESPACE_DEFINITION
+    assert cwl_ns == OGC_NAMESPACE_DEFINITION
 
     ows_io = OWSInput(MockElementXML({}))  # skip parsing from XML, inject corresponding results directly
     ows_io.identifier = "test"
@@ -177,10 +177,10 @@ def test_any2cwl_io_from_ows():
     assert cwl_io == {
         "id": "test",
         "type": {"type": "array", "items": "File"},
-        "format": f"edam:{EDAM_MAPPING[ContentType.APP_NETCDF]}",
+        "format": f"ogc:{OGC_MAPPING[ContentType.APP_NETCDF]}",
         "default": None,
     }
-    assert cwl_ns == EDAM_NAMESPACE_DEFINITION
+    assert cwl_ns == OGC_NAMESPACE_DEFINITION
 
 
 def test_any2cwl_io_from_json():
@@ -196,9 +196,9 @@ def test_any2cwl_io_from_json():
     assert cwl_io == {
         "id": "test",
         "type": "File",
-        "format": f"edam:{EDAM_MAPPING[ContentType.APP_NETCDF]}"
+        "format": f"ogc:{OGC_MAPPING[ContentType.APP_NETCDF]}"
     }
-    assert cwl_ns == EDAM_NAMESPACE_DEFINITION
+    assert cwl_ns == OGC_NAMESPACE_DEFINITION
 
     json_io["minOccurs"] = 10
     json_io["maxOccurs"] = 20
@@ -207,9 +207,9 @@ def test_any2cwl_io_from_json():
     assert cwl_io == {
         "id": "test",
         "type": {"type": "array", "items": "File"},
-        "format": f"edam:{EDAM_MAPPING[ContentType.APP_NETCDF]}",
+        "format": f"ogc:{OGC_MAPPING[ContentType.APP_NETCDF]}",
     }
-    assert cwl_ns == EDAM_NAMESPACE_DEFINITION
+    assert cwl_ns == OGC_NAMESPACE_DEFINITION
 
 
 def test_any2cwl_io_from_oas():
@@ -225,9 +225,9 @@ def test_any2cwl_io_from_oas():
     assert cwl_io == {
         "id": "test",
         "type": "File",
-        "format": f"edam:{EDAM_MAPPING[ContentType.APP_NETCDF]}"
+        "format": f"ogc:{OGC_MAPPING[ContentType.APP_NETCDF]}"
     }
-    assert cwl_ns == EDAM_NAMESPACE_DEFINITION
+    assert cwl_ns == OGC_NAMESPACE_DEFINITION
 
     json_io["minOccurs"] = 10
     json_io["maxOccurs"] = 20
@@ -236,9 +236,9 @@ def test_any2cwl_io_from_oas():
     assert cwl_io == {
         "id": "test",
         "type": {"type": "array", "items": "File"},
-        "format": f"edam:{EDAM_MAPPING[ContentType.APP_NETCDF]}",
+        "format": f"ogc:{OGC_MAPPING[ContentType.APP_NETCDF]}",
     }
-    assert cwl_ns == EDAM_NAMESPACE_DEFINITION
+    assert cwl_ns == OGC_NAMESPACE_DEFINITION
 
 
 def test_json2wps_datatype():

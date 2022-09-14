@@ -16,7 +16,7 @@ inputs:
      prefix: "-i"
 outputs:
  output:
-   format: edam:format_3650
+   format: ogc:netcdf
    type:
      type: array
      items: File
@@ -24,4 +24,4 @@ outputs:
      glob: "*.nc"
 $namespaces:
   iana: "https://www.iana.org/assignments/media-types/"
-  edam: "http://edamontology.org/"
+  ogc: "http://www.opengis.net/def/media-type/ogc/1.0/"

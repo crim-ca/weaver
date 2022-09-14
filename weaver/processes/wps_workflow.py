@@ -139,14 +139,14 @@ class WpsWorkflow(ProcessCWL):
 
     # pylint: disable=W0221,W0237 # naming using python like arguments
     def job(self,
-            joborder,           # type: Dict[Text, AnyValueType]
+            job_order,          # type: Dict[Text, AnyValueType]
             output_callbacks,   # type: Callable[[Any, Any], Any]
             runtime_context,    # type: RuntimeContext
             ):                  # type: (...) -> Generator[Union[JobBase, CallbackJob], None, None]
         """
         Workflow job generator.
 
-        :param joborder: inputs of the job submission
+        :param job_order: inputs of the job submission
         :param output_callbacks: method to fetch step outputs and corresponding step details
         :param runtime_context: configs about execution environment
         :return:
@@ -155,18 +155,18 @@ class WpsWorkflow(ProcessCWL):
         if self.metadata["cwlVersion"] == "v1.0":
             require_prefix = "http://commonwl.org/cwltool#"
 
-        jobname = uniquename(runtime_context.name or shortname(self.tool.get("id", "job")))
+        job_name = uniquename(runtime_context.name or shortname(self.tool.get("id", "job")))
 
         # outdir must be served by the EMS because downstream step will need access to upstream steps output
         weaver_out_dir = get_wps_output_dir(get_settings())
         runtime_context.outdir = tempfile.mkdtemp(
             prefix=getdefault(runtime_context.tmp_outdir_prefix, DEFAULT_TMP_PREFIX),
             dir=weaver_out_dir)
-        builder = self._init_job(joborder, runtime_context)
+        builder = self._init_job(job_order, runtime_context)
 
-        # `jobname` is the step name and `joborder` is the actual step inputs
-        wps_workflow_job = WpsWorkflowJob(builder, builder.job, self.requirements, self.hints, jobname,
-                                          self.get_job_process_definition(jobname, joborder, self.tool),
+        # `job_name` is the step name and `job_order` is the actual step inputs
+        wps_workflow_job = WpsWorkflowJob(builder, builder.job, self.requirements, self.hints, job_name,
+                                          self.get_job_process_definition(job_name, job_order, self.tool),
                                           self.tool["outputs"])
         wps_workflow_job.prov_obj = self.prov_obj
         wps_workflow_job.successCodes = self.tool.get("successCodes")
@@ -194,7 +194,7 @@ class WpsWorkflow(ProcessCWL):
         wps_workflow_job.collect_outputs = partial(
             self.collect_output_ports, self.tool["outputs"], builder,
             compute_checksum=getdefault(runtime_context.compute_checksum, True),
-            jobname=jobname,
+            job_name=job_name,
             readers=readers)
         wps_workflow_job.output_callback = output_callbacks
 
@@ -205,7 +205,7 @@ class WpsWorkflow(ProcessCWL):
                              builder,                # type: Builder
                              outdir,                 # type: Text
                              compute_checksum=True,  # type: bool
-                             jobname="",             # type: Text
+                             job_name="",            # type: Text
                              readers=None            # type: Dict[Text, Any]
                              ):                      # type: (...) -> OutputPorts
         ret = {}  # type: OutputPorts
@@ -252,7 +252,7 @@ class WpsWorkflow(ProcessCWL):
         finally:
             if builder.mutation_manager and readers:
                 for reader in readers.values():
-                    builder.mutation_manager.release_reader(jobname, reader)
+                    builder.mutation_manager.release_reader(job_name, reader)
 
     def collect_output(self,
                        schema,                # type: Dict[Text, Any]
@@ -436,14 +436,14 @@ class WpsWorkflow(ProcessCWL):
 class WpsWorkflowJob(JobBase):
     def __init__(self,
                  builder,           # type: Builder
-                 joborder,          # type: Dict[Text, Union[Dict[Text, Any], List, Text, None]]
+                 job_order,          # type: Dict[Text, Union[Dict[Text, Any], List, Text, None]]
                  requirements,      # type: List[Dict[Text, Text]]
                  hints,             # type: List[Dict[Text, Text]]
                  name,              # type: Text
                  wps_process,       # type: WpsProcessInterface
                  expected_outputs,  # type: List[CWL_Output_Type]
                  ):                 # type: (...) -> None
-        super(WpsWorkflowJob, self).__init__(builder, joborder, None, requirements, hints, name)
+        super(WpsWorkflowJob, self).__init__(builder, job_order, None, requirements, hints, name)
         self.wps_process = wps_process
         self.expected_outputs = {}  # type: CWL_ExpectedOutputs  # {id: file-pattern}
         for output in expected_outputs:

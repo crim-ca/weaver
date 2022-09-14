@@ -28,9 +28,14 @@ executionUnit:
       inputs:
         input:
           type: File
+          format: "iana:application/json"
       outputs:
         output:
           type: File[]
+          format: "ogc:netcdf"
           outputBinding:
             glob: "*.nc"
+      $namespaces:
+        iana: "https://www.iana.org/assignments/media-types/"
+        ogc: "http://www.opengis.net/def/media-type/ogc/1.0/"
 deploymentProfileName: http://www.opengis.net/profiles/eoc/wpsApplication

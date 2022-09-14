@@ -64,6 +64,7 @@ class ContentType(Constants):
     APP_YAML = "application/x-yaml"
     APP_ZIP = "application/zip"
     IMAGE_GEOTIFF = "image/tiff; subtype=geotiff"
+    IMAGE_OGC_GEOTIFF = "mage/tiff; application=geotiff"
     IMAGE_JPEG = "image/jpeg"
     IMAGE_GIF = "image/gif"
     IMAGE_PNG = "image/png"
@@ -348,23 +349,32 @@ EDAM_MAPPING = {
     ContentType.IMAGE_JPEG: "format_3579",
     ContentType.APP_HDF5: "format_3590",
     ContentType.APP_JSON: "format_3464",
-    ContentType.APP_NETCDF: "format_3650",
     ContentType.APP_YAML: "format_3750",
     ContentType.TEXT_PLAIN: "format_1964",
 }
 # Official links to be employed in definitions must be formed as:
-#   http://www.opengis.net/def/glossary/...
+#   http://www.opengis.net/def/...
 # But they should be redirected to full definitions as:
-#   https://defs.opengis.net/vocprez/object?uri=http://www.opengis.net/def/glossary/...
+#   https://defs.opengis.net/vocprez/object?uri=http://www.opengis.net/def/...
+# See common locations:
+#   https://www.opengis.net/def/media-type
 OPENGIS_NAMESPACE = "opengis"
 OPENGIS_NAMESPACE_URL = "http://www.opengis.net/"
 OPENGIS_NAMESPACE_DEFINITION = {OPENGIS_NAMESPACE: OPENGIS_NAMESPACE_URL}
-OPENGIS_MAPPING = {
-    ContentType.IMAGE_GEOTIFF: "def/glossary/term/Geotiff"
+OPENGIS_MAPPING = {}
+# shorthand notation directly scoped under OGC Media-Types to allow: 'ogc:<media-type-id>'
+OGC_NAMESPACE = "ogc"
+OGC_NAMESPACE_URL = f"{OPENGIS_NAMESPACE_URL}def/media-type/ogc/1.0/"
+OGC_NAMESPACE_DEFINITION = {OGC_NAMESPACE: OGC_NAMESPACE_URL}
+OGC_MAPPING = {
+    ContentType.IMAGE_GEOTIFF: "geotiff",
+    ContentType.IMAGE_OGC_GEOTIFF: "geotiff",
+    ContentType.APP_NETCDF: "netcdf",
 }
 FORMAT_NAMESPACE_DEFINITIONS = {
     **IANA_NAMESPACE_DEFINITION,
     **EDAM_NAMESPACE_DEFINITION,
+    **OGC_NAMESPACE_DEFINITION,
     **OPENGIS_NAMESPACE_DEFINITION
 }
 FORMAT_NAMESPACES = frozenset(FORMAT_NAMESPACE_DEFINITIONS)
@@ -480,7 +490,7 @@ def add_content_type_charset(content_type, charset):
     return content_type
 
 
-def get_cwl_file_format(mime_type, make_reference=False, must_exist=True, allow_synonym=True):
+def get_cwl_file_format(mime_type, make_reference=False, must_exist=True, allow_synonym=True):  # pylint: disable=R1260
     # type: (str, bool, bool, bool) -> Union[Tuple[Optional[JSON], Optional[str]], Optional[str]]
     """
     Obtains the extended schema reference from the media-type identifier.
@@ -537,6 +547,8 @@ def get_cwl_file_format(mime_type, make_reference=False, must_exist=True, allow_
             return _make_if_ref(IANA_NAMESPACE_DEFINITION, IANA_NAMESPACE, IANA_MAPPING[_mime_type])
         if _mime_type in EDAM_MAPPING:  # prefer real reference if available
             return _make_if_ref(EDAM_NAMESPACE_DEFINITION, EDAM_NAMESPACE, EDAM_MAPPING[_mime_type])
+        if _mime_type in OGC_MAPPING:  # prefer real reference if available
+            return _make_if_ref(OGC_NAMESPACE_DEFINITION, OGC_NAMESPACE, OGC_MAPPING[_mime_type])
         if _mime_type in OPENGIS_MAPPING:  # prefer real reference if available
             return _make_if_ref(OPENGIS_NAMESPACE_DEFINITION, OPENGIS_NAMESPACE, OPENGIS_MAPPING[_mime_type])
         return None
@@ -651,7 +663,7 @@ def clean_mime_type_format(mime_type, suffix_subtype=False, strip_parameters=Fal
             mime_type = mime_type.replace(v + ":", "")
             break
     search = True
-    for _map in [EDAM_MAPPING, OPENGIS_MAPPING]:
+    for _map in [EDAM_MAPPING, OGC_MAPPING, OPENGIS_MAPPING]:
         if not search:
             break
         for v in _map.values():

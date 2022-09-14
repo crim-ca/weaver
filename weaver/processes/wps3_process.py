@@ -63,7 +63,7 @@ class Wps3RemoteJobProgress(WpsRemoteJobProgress):
 class Wps3Process(WpsProcessInterface):
     def __init__(self,
                  step_payload,      # type: JSON
-                 joborder,          # type: CWL_RuntimeInputsMap
+                 job_order,         # type: CWL_RuntimeInputsMap
                  process,           # type: str
                  request,           # type: WorkerRequest
                  update_status,     # type: UpdateStatusPartialFunction
@@ -74,10 +74,10 @@ class Wps3Process(WpsProcessInterface):
                 _message, _progress, _status, self.provider or "local", *args, **kwargs
             )
         )
-        self.provider, self.url, self.deploy_body = self.resolve_data_source(step_payload, joborder)
+        self.provider, self.url, self.deploy_body = self.resolve_data_source(step_payload, job_order)
         self.process = process
 
-    def resolve_data_source(self, step_payload, joborder):
+    def resolve_data_source(self, step_payload, job_order):
         # type: (CWL, CWL_RuntimeInputsMap) -> Tuple[str, str, JSON]
         try:
             # Presume that all EOImage given as input can be resolved to the same ADES
@@ -86,7 +86,7 @@ class Wps3Process(WpsProcessInterface):
             data_url = ""  # data_source will be set to the default ADES if no EOImages (anything but `None`)
             if eodata_inputs:
                 step_payload = opensearch.alter_payload_after_query(step_payload)
-                value = joborder[eodata_inputs[0]]
+                value = job_order[eodata_inputs[0]]
                 if isinstance(value, list):
                     value = value[0]  # Use the first value to determine the data source
                 data_url = value["location"]

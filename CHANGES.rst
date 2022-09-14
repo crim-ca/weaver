@@ -12,10 +12,17 @@ Changes
 
 Changes:
 --------
-- No change.
+- Support `CWL` definition for ``ScatterFeatureRequirement`` for `Workflow` parallel step distribution of an
+  input array (resolves `#105 <https://github.com/crim-ca/weaver/issues/105>`_).
+- Add formatter and better logging details when executing ``builtin`` `Process` ``jsonarray2netcdf``.
+- Add `OGC` Media-Type ontology for ``File`` format references within `CWL` definition.
+- Replace `EDAM` NetCDF format reference by `OGC` NetCDF Media-Type with expected ontology definitions by processes.
+  For backward compatibility, corresponding `EDAM` references will be converted to `OGC` Media-Type whenever possible.
+- Adjust ``builtin`` process ``jsonarray2netcdf`` (version ``2.0``) to employ `OGC` Media-Type for NetCDF.
 
 Fixes:
 ------
+- Fix implementation of various functional test cases for `Workflow` execution.
 - Fix ``owslib`` version with enforced ``pyproj`` dependency failing in Python 3.10
   (resolves `#459 <https://github.com/crim-ca/weaver/issues/459>`_).
 

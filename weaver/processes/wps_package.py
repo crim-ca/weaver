@@ -137,6 +137,7 @@ if TYPE_CHECKING:
         CWL_RequirementsList,
         CWL_Results,
         CWL_ToolPathObjectType,
+        CWL_WorkflowStepPackage,
         CWL_WorkflowStepPackageMap,
         CWL_WorkflowStepReference,
         JSON,
@@ -672,7 +673,7 @@ def get_application_requirement(package, search=None, default=None, validate=Tru
     hints = package.get("hints", {})
     all_hints = _get_package_requirements_as_class_list(reqs) + _get_package_requirements_as_class_list(hints)
     if search:
-        app_hints = list(filter(lambda h: h == search, all_hints))
+        app_hints = list(filter(lambda h: h["class"] == search, all_hints))
     else:
         app_hints = list(filter(lambda h: any(h["class"].endswith(t) for t in CWL_REQUIREMENT_APP_TYPES), all_hints))
     if len(app_hints) > 1:
@@ -1800,7 +1801,28 @@ class WpsPackage(Process):
         from weaver.processes.wps_workflow import default_make_tool
         return default_make_tool(toolpath_object, loading_context, self.get_job_process_definition)
 
-    def get_job_process_definition(self, jobname, joborder, tool):  # noqa: E811
+    def get_workflow_step_package(self, job_name):
+        # type: (str) -> CWL_WorkflowStepPackage
+        """
+        Resolve the step :term:`CWL` definition under a :term:`Workflow`.
+        """
+        try:
+            step_details = self.step_packages[job_name]
+        except KeyError:  # Perform check directly first in case a step was called literally as '<name>_<index>'
+            # In case of Workflow with scattering, job name might be suffixed with an index
+            # Also, to avoid ambiguous references of Workflow steps running in parallel (distinct jobs),
+            # unique keys are generated for matching step names, since their sub-CWL might differ.
+            # (see 'cwltool.process.uniquename')
+            if "_" not in job_name:
+                raise
+            job_name, job_index = job_name.rsplit("_", 1)
+            if not job_index.isnumeric():
+                raise
+            LOGGER.debug("Resolved step name with index from scattering: [%s](%s)", job_name, job_index)
+            step_details = self.step_packages[job_name]
+        return step_details
+
+    def get_job_process_definition(self, job_name, job_order, tool):  # noqa: E811
         # type: (str, JSON, CWL) -> WpsPackage
         """
         Obtain the execution job definition for the given process (:term:`Workflow` step implementation).
@@ -1811,48 +1833,49 @@ class WpsPackage(Process):
         It must return a :class:`weaver.processes.wps_process.WpsProcess` instance configured with the
         proper :term:`CWL` package definition, :term:`ADES` target and cookies to access it (if protected).
 
-        :param jobname: The workflow step or the package id that must be launched on an ADES :class:`string`
-        :param joborder: The params for the job :class:`dict {input_name: input_value}`
-                         input_value is one of `input_object` or `array [input_object]`
-                         input_object is one of `string` or `dict {class: File, location: string}`
-                         in our case input are expected to be File object
+        :param job_name: The workflow step or the package id that must be launched on an ADES :class:`string`
+        :param job_order: The params for the job :class:`dict {input_name: input_value}`
+                          input_value is one of `input_object` or `array [input_object]`
+                          input_object is one of `string` or `dict {class: File, location: string}`
+                          in our case input are expected to be File object
         :param tool: Whole `CWL` config including hints requirement
                      (see: :py:data:`weaver.processes.constants.CWL_REQUIREMENT_APP_TYPES`)
         """
 
-        if jobname == self.package_id:
+        if job_name == self.package_id:
             # A step is the package itself only for non-workflow package being executed on the EMS
             # default action requires ADES dispatching but hints can indicate also WPS1 or ESGF-CWT provider
             step_package_type = self.package_type
             step_payload = self.payload
             step_package = self.package
             step_process = self.package_id
-            jobtype = "package"
+            job_type = "package"
         else:
             # Here we got a step part of a workflow (self is the workflow package)
-            step_details = self.step_packages[jobname]
+            step_details = self.get_workflow_step_package(job_name)
             step_process = step_details["id"]
             step_package = step_details["package"]
             step_package_type = _get_package_type(step_package)
             step_payload = {}  # defer until package requirement resolve to avoid unnecessary fetch
-            jobtype = "step"
+            job_type = "step"
 
         # Progress made with steps presumes that they are done sequentially and have the same progress weight
         start_step_progress = self.map_step_progress(len(self.step_launched), max(1, len(self.step_packages)))
         end_step_progress = self.map_step_progress(len(self.step_launched) + 1, max(1, len(self.step_packages)))
 
-        self.step_launched.append(jobname)
-        self.update_status(f"Preparing to launch {jobtype} {jobname}.", start_step_progress, Status.RUNNING)
+        self.step_launched.append(job_name)
+        self.update_status(f"Preparing to launch {job_type} {job_name}.", start_step_progress, Status.RUNNING)
 
         def _update_status_dispatch(_message, _progress, _status, _provider, *_, error=None, **__):
             # type: (str, Number, AnyStatusType, str, Any, Optional[Exception], Any) -> None
             if LOGGER.isEnabledFor(logging.DEBUG) and (_ or __):
                 LOGGER.debug("Received additional unhandled args/kwargs to dispatched update status: %s, %s", _, __)
             self.step_update_status(
-                _message, _progress, start_step_progress, end_step_progress, jobname, _provider, _status, error=error
+                _message, _progress, start_step_progress, end_step_progress, job_name, _provider, _status, error=error
             )
 
         def _get_wps1_params(_requirement):
+            # type: (CWL_AnyRequirements) -> CWL_Requirement
             _wps_params = {}
             required_params = ["provider", "process"]
             for _param in required_params:
@@ -1869,7 +1892,7 @@ class WpsPackage(Process):
             req_class = ProcessType.WORKFLOW
             req_source = "tool class"
 
-        if jobtype == "step" and not any(
+        if job_type == "step" and not any(
             req_class.endswith(req) for req in [CWL_REQUIREMENT_APP_WPS1, CWL_REQUIREMENT_APP_ESGF_CWT]
         ):
             LOGGER.debug("Retrieve WPS-3 process payload for potential Data Source definitions to resolve.")
@@ -1900,7 +1923,7 @@ class WpsPackage(Process):
             self.logger.info("WPS-3 Package resolved from %s: %s", req_source, req_class)
             from weaver.processes.wps3_process import Wps3Process
             return Wps3Process(step_payload=step_payload,
-                               joborder=joborder,
+                               job_order=job_order,
                                process=step_process,
                                request=self.request,
                                update_status=_update_status_dispatch)

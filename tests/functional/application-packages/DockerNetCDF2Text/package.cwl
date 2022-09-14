@@ -22,8 +22,11 @@ inputs:
     type: File
     inputBinding:
       position: 1
+    format: ogc:netcdf
 outputs:
   output_txt:
     type: File
     outputBinding:
       glob: "*.txt"
+$namespaces:
+  ogc: "http://www.opengis.net/def/media-type/ogc/1.0/"

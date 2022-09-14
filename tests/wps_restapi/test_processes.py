@@ -1260,9 +1260,39 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID)
 
     # FIXME: implement
-    @pytest.mark.skip(reason="not implemented")
+    @pytest.mark.skip(reason="not implemented - experimental")
     def test_deploy_process_WPS3_DescribeProcess_href(self):
-        raise NotImplementedError
+        path = f"{self.url}/processes/jsonarray2netcdf"  # use builtin, re-deploy as "remote process"
+        p_id = "new-test-wps3"
+        body = {
+            "processDescription": {"process": {"id": p_id}},
+            "executionUnit": [{"href": path}],
+        }
+        desc = self.deploy_process_make_visible_and_fetch_deployed(body, p_id, assert_io=False)
+        assert desc["deploymentProfile"] == "http://www.opengis.net/profiles/eoc/ogcapiApplication"
+
+        # process description should have been generated with relevant I/O
+        proc = desc["process"]
+        assert proc["id"] == p_id
+        assert proc["inputs"] == []
+        assert proc["outputs"] == [{
+            "id": "output",
+            "title": "output",
+            "schema": {"type": "string", "contentMediaType": "text/plain"},
+            "formats": [{"default": True, "mediaType": "text/plain"}]
+        }]
+
+        # package should have been generated with corresponding I/O from "remote process"
+        ref = self.get_application_package("jsonarray2netcdf")
+        pkg = self.get_application_package(p_id)
+        # add the missing remote reference to the local definition to compare them
+        ref["hints"] = {  # expected to be defined in
+            "OGCAPIRequirement": {  # FIXME: implement, aka 'Wps3Process' dispatched step
+                "process": "jsonarray2netcdf",
+                "provider": self.url
+            }
+        }
+        assert pkg == ref
 
     # FIXME: implement
     @pytest.mark.skip(reason="not implemented")
