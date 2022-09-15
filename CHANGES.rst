@@ -19,6 +19,10 @@ Changes:
 - Replace `EDAM` NetCDF format reference by `OGC` NetCDF Media-Type with expected ontology definitions by processes.
   For backward compatibility, corresponding `EDAM` references will be converted to `OGC` Media-Type whenever possible.
 - Adjust ``builtin`` process ``jsonarray2netcdf`` (version ``2.0``) to employ `OGC` Media-Type for NetCDF.
+- Adjust ``schema`` input of ``jsonarray2netcdf`` to avoid erroneous definition exposing a JSON ``object`` structure
+  as a valid format, although a JSON ``array`` type is directly expected in the submitted JSON file.
+- Add support of ``builtin`` `Process` description overrides if provided along their `CWL` package definition.
+  Overrides can be specified as JSON or YAML, and follow the same merging strategies of fields as normal deployments.
 
 Fixes:
 ------

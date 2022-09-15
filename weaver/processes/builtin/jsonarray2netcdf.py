@@ -30,7 +30,7 @@ LOGGER.addHandler(_handler)
 LOGGER.setLevel(logging.DEBUG)
 
 # process details
-__version__ = "2.1"
+__version__ = "2.2"
 __title__ = "JSON array to NetCDF"
 __abstract__ = __doc__  # NOTE: '__doc__' is fetched directly, this is mostly to be informative
 

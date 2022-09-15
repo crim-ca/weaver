@@ -70,7 +70,6 @@ from weaver.processes.constants import (
     WPS_REFERENCE,
     ProcessSchema
 )
-from weaver.processes.utils import load_package_file
 from weaver.utils import (
     SchemaRefResolver,
     bytes2str,
@@ -1874,7 +1873,7 @@ def oas2json_io_keyword(io_info):
     :param io_info: :term:`OpenAPI` schema of the I/O.
     :return: Converted :term:`JSON` I/O definition, or :data:`null` if definition could not be resolved.
     """
-    # if cannot be resolved, must be too ambiguous, so assume complex data dump
+    # if it cannot be resolved, must be too ambiguous, so assume complex data dump
     io_json = {"type": WPS_COMPLEX, "supported_formats": [{"mime_type": ContentType.APP_JSON}]}
     kw_key_val = {key: val for key, val in io_info.items() if key in OAS_KEYWORD_TYPES}
     if len(kw_key_val) != 1:
