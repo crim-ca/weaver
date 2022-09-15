@@ -46,6 +46,7 @@ CWL_REQUIREMENT_APP_BUILTIN = "BuiltinRequirement"
 CWL_REQUIREMENT_APP_DOCKER = "DockerRequirement"
 CWL_REQUIREMENT_APP_DOCKER_GPU = "DockerGpuRequirement"
 CWL_REQUIREMENT_APP_ESGF_CWT = "ESGF-CWTRequirement"
+CWL_REQUIREMENT_APP_OGC_API = "OGCAPIRequirement"
 CWL_REQUIREMENT_APP_WPS1 = "WPS1Requirement"
 
 CWL_REQUIREMENT_APP_TYPES = frozenset([
@@ -97,6 +98,7 @@ Set of all :term:`CWL` requirements or hints that are supported for deployment o
 """
 
 # CWL package types and extensions
+PACKAGE_EXTENSIONS = frozenset(["yaml", "yml", "json", "cwl", "job"])
 PACKAGE_SIMPLE_TYPES = frozenset(["string", "boolean", "float", "int", "integer", "long", "double"])
 PACKAGE_LITERAL_TYPES = frozenset(PACKAGE_SIMPLE_TYPES | {"null", "Any"})
 PACKAGE_COMPLEX_TYPES = frozenset(["File"])  # FIXME: type "Directory" not supported

@@ -37,6 +37,7 @@ from weaver.datatype import AuthenticationTypes, Process, Service
 from weaver.exceptions import JobNotFound, ProcessNotFound
 from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import AcceptLanguage, ContentType, get_cwl_file_format
+from weaver.processes.builtin import register_builtin_processes
 from weaver.processes.constants import CWL_REQUIREMENT_APP_DOCKER, CWL_REQUIREMENT_APP_WPS1, ProcessSchema
 from weaver.processes.wps_testing import WpsTestProcess
 from weaver.status import Status
@@ -1259,21 +1260,12 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         }
         self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID)
 
-    # FIXME: implement
-    @pytest.mark.skip(reason="not implemented - experimental")
-    def test_deploy_process_WPS3_DescribeProcess_href(self):
-        path = f"{self.url}/processes/jsonarray2netcdf"  # use builtin, re-deploy as "remote process"
-        p_id = "new-test-wps3"
-        body = {
-            "processDescription": {"process": {"id": p_id}},
-            "executionUnit": [{"href": path}],
-        }
-        desc = self.deploy_process_make_visible_and_fetch_deployed(body, p_id, assert_io=False)
-        assert desc["deploymentProfile"] == "http://www.opengis.net/profiles/eoc/ogcapiApplication"
+    def validate_wps3_process_description(self, process_description, process_id, remote_process):
+        assert process_description["deploymentProfile"] == "http://www.opengis.net/profiles/eoc/ogcapiApplication"
 
         # process description should have been generated with relevant I/O
-        proc = desc["process"]
-        assert proc["id"] == p_id
+        proc = process_description["process"]
+        assert proc["id"] == process_id
         assert proc["inputs"] == []
         assert proc["outputs"] == [{
             "id": "output",
@@ -1283,26 +1275,52 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         }]
 
         # package should have been generated with corresponding I/O from "remote process"
-        ref = self.get_application_package("jsonarray2netcdf")
-        pkg = self.get_application_package(p_id)
+        ref = self.get_application_package(remote_process)
+        pkg = self.get_application_package(process_id)
         # add the missing remote reference to the local definition to compare them
         ref["hints"] = {  # expected to be defined in
-            "OGCAPIRequirement": {  # FIXME: implement, aka 'Wps3Process' dispatched step
+            "OGCAPIRequirement": {
                 "process": "jsonarray2netcdf",
                 "provider": self.url
             }
         }
         assert pkg == ref
 
-    # FIXME: implement
-    @pytest.mark.skip(reason="not implemented")
-    def test_deploy_process_WPS3_DescribeProcess_owsContext(self):
-        raise NotImplementedError
+    def test_deploy_process_WPS3_DescribeProcess_href(self):
+        register_builtin_processes(self.app.app.registry)  # must register since collection reset in 'setUp'
+        remote_process = "jsonarray2netcdf"  # use builtin, re-deploy as "remote process"
+        href = f"{self.url}/processes/{remote_process}"
+        p_id = "new-test-wps3"
+        body = {
+            "processDescription": {"href": href},
+        }
+        desc = self.deploy_process_make_visible_and_fetch_deployed(body, p_id, assert_io=False)
+        self.validate_wps3_process_description(desc, p_id, remote_process)
 
-    # FIXME: implement
-    @pytest.mark.skip(reason="not implemented")
+    def test_deploy_process_WPS3_DescribeProcess_owsContext(self):
+        register_builtin_processes(self.app.app.registry)  # must register since collection reset in 'setUp'
+        remote_process = "jsonarray2netcdf"  # use builtin, re-deploy as "remote process"
+        href = f"{self.url}/processes/{remote_process}"
+        p_id = "new-test-wps3"
+        ows_ctx = ows_context_href(href)
+        ows_ctx.update({"id": p_id})
+        body = {
+            "processDescription": {"process": ows_ctx}
+        }
+        desc = self.deploy_process_make_visible_and_fetch_deployed(body, p_id, assert_io=False)
+        self.validate_wps3_process_description(desc, p_id, remote_process)
+
     def test_deploy_process_WPS3_DescribeProcess_executionUnit(self):
-        raise NotImplementedError
+        register_builtin_processes(self.app.app.registry)  # must register since collection reset in 'setUp'
+        remote_process = "jsonarray2netcdf"  # use builtin, re-deploy as "remote process"
+        href = f"{self.url}/processes/{remote_process}"
+        p_id = "new-test-wps3"
+        body = {
+            "processDescription": {"process": {"id": p_id}},
+            "executionUnit": [{"href": href}],
+        }
+        desc = self.deploy_process_make_visible_and_fetch_deployed(body, p_id, assert_io=False)
+        self.validate_wps3_process_description(desc, p_id, remote_process)
 
     def test_deploy_process_with_revision_invalid(self):
         """

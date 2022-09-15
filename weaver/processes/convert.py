@@ -33,6 +33,7 @@ from weaver.formats import (
     repr_json
 )
 from weaver.processes.constants import (
+    CWL_REQUIREMENT_APP_OGC_API,
     CWL_REQUIREMENT_APP_WPS1,
     OAS_ARRAY_TYPES,
     OAS_COMPLEX_TYPES,
@@ -69,6 +70,7 @@ from weaver.processes.constants import (
     WPS_REFERENCE,
     ProcessSchema
 )
+from weaver.processes.utils import load_package_file
 from weaver.utils import (
     SchemaRefResolver,
     bytes2str,
@@ -638,10 +640,10 @@ def ows2json(wps_process, wps_service_name, wps_service_url, wps_provider_name=N
 def xml_wps2cwl(wps_process_response, settings):
     # type: (Response, AnySettingsContainer) -> Tuple[CWL, JSON]
     """
-    Obtains the ``CWL`` definition that corresponds to a XML WPS-1 process.
+    Obtains the :term:`CWL` definition that corresponds to an :term:`XML` :term:`WPS-1` process.
 
-    Converts a `WPS-1 ProcessDescription XML` tree structure to an equivalent `WPS-3 Process JSON`.  and builds the
-    associated `CWL` package in conformance to :data:`weaver.processes.wps_package.CWL_REQUIREMENT_APP_WPS1`.
+    Converts a `WPS-1 ProcessDescription XML` tree structure to an equivalent `WPS-3 Process JSON`, and builds the
+    associated :term:`CWL` package in conformance to :data:`weaver.processes.wps_package.CWL_REQUIREMENT_APP_WPS1`.
 
     :param wps_process_response: Valid response (XML, 200) from a `WPS-1 ProcessDescription`.
     :param settings: Application settings to retrieve additional request options.
@@ -678,6 +680,20 @@ def xml_wps2cwl(wps_process_response, settings):
         wps_service_name = wps_service_url.hostname
     wps_process = wps.describeprocess(process_id, xml=wps_process_response.content)
     cwl_package, process_info = ows2json(wps_process, wps_service_name, wps_service_url)
+    return cwl_package, process_info
+
+
+def json_ogcapi2cwl(payload, reference):
+    # type: (JSON, str) -> Tuple[CWL, JSON]
+    process_info = payload.get("process", payload)  # OLD/OGC schemas nested process or directly offered
+
+    # try to find a CWL reference to provide more details
+    ows_ref = process_info.get("owsContext", {}).get("offering", {}).get("content", {}).get("href")
+    proc_ref = process_info.get("href")
+    exec_unit = process_info.get("executionUnit")
+    cwl_package = load_package_file(ows_ref or proc_ref)
+
+
     return cwl_package, process_info
 
 

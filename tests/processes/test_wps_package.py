@@ -52,7 +52,7 @@ def test_check_package_file_with_posix_path():
         assert res_path == tmp_file.name
 
 
-@pytest.mark.skipif(not sys.platform.startswith("win"), reason="Test for Windows only.")
+@pytest.mark.skipif(not sys.platform.startswith("win"), reason="Test for Windows only")
 def test_check_package_file_with_windows_path():
     test_file = "C:/Windows/Temp/package.cwl"   # fake existing, just test format handled correctly
     with mock.patch("os.path.isfile", return_value=True) as mock_isfile:

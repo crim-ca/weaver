@@ -25,11 +25,13 @@ from weaver.wps.utils import get_wps_url
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Type, Union
+    from typing import Any, Callable, Dict, Type, Union
 
+    from cwltool.builder import Builder
     from cwltool.context import RuntimeContext
+    from cwltool.pathmapper import PathMapper
 
-    from weaver.typedefs import AnyRegistryContainer, CWL
+    from weaver.typedefs import CWL, JSON, AnyRegistryContainer, CWL_RequirementsList
 
 LOGGER = logging.getLogger(__name__)
 
@@ -158,6 +160,7 @@ def register_builtin_processes(container):
 
 class BuiltinProcessJobBase(CommandLineJob):
     def __init__(self, builder, joborder, make_path_mapper, requirements, hints, name):
+        # type: (Builder, JSON, Callable[..., PathMapper], CWL_RequirementsList, CWL_RequirementsList, str) -> None
         process_hints = [h for h in hints if "process" in h]
         if not process_hints or len(process_hints) != 1:
             raise PackageNotFound("Could not extract referenced process in job.")
@@ -165,6 +168,7 @@ class BuiltinProcessJobBase(CommandLineJob):
         super(BuiltinProcessJobBase, self).__init__(builder, joborder, make_path_mapper, requirements, hints, name)
 
     def _validate_process(self):
+        # type: () -> None
         try:
             registry = get_registry()
             store = get_db(registry).get_store(StoreProcesses)
@@ -175,6 +179,7 @@ class BuiltinProcessJobBase(CommandLineJob):
             raise PackageExecutionError(f"Invalid package is not of type '{ProcessType.BUILTIN}'")
 
     def _update_command(self):
+        # type: () -> None
         if len(self.command_line) and self.command_line[0] == "python":
             LOGGER.debug("Mapping generic builtin Python command to environment: [python] => [%s]", sys.executable)
             self.command_line[0] = sys.executable

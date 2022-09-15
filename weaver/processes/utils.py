@@ -44,6 +44,7 @@ from weaver.exceptions import (
     log_unhandled_exceptions
 )
 from weaver.formats import ContentType, repr_json
+from weaver.processes.constants import PACKAGE_EXTENSIONS
 from weaver.processes.convert import get_field, normalize_ordered_io, set_field
 from weaver.processes.types import ProcessType
 from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
@@ -58,7 +59,10 @@ from weaver.utils import (
     get_sane_name,
     get_settings,
     get_url_without_query,
-    is_update_version
+    is_remote_file,
+    is_update_version,
+    load_file,
+    request_extra
 )
 from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_client
@@ -901,9 +905,9 @@ def register_wps_processes_static(service_url, service_name, service_visibility,
             pass
         else:
             if (
-                    old_process.id == proc_id
-                    and old_process.processDescriptionURL == proc_url
-                    and old_process.visibility == svc_vis
+                old_process.id == proc_id
+                and old_process.processDescriptionURL == proc_url
+                and old_process.visibility == svc_vis
             ):
                 LOGGER.warning("Process already registered: [%s]. Skipping...", proc_id)
                 continue
@@ -1063,6 +1067,45 @@ def register_wps_processes_from_config(container, wps_processes_file_path=None):
         raise RuntimeError(msg)
 
 
+def _check_package_file(cwl_file_path_or_url):
+    # type: (str) -> str
+    """
+    Validates that the specified :term:`CWL` file path or URL points to an existing and allowed file format.
+
+    :param cwl_file_path_or_url: one of allowed file types path on disk, or an URL pointing to one served somewhere.
+    :returns: validated absolute path or URL of the file reference.
+    :raises PackageRegistrationError: in case of missing file, invalid format or invalid HTTP status code.
+    """
+    if is_remote_file(cwl_file_path_or_url):
+        cwl_path = cwl_file_path_or_url
+        cwl_resp = request_extra("head", cwl_path, settings=get_settings())
+        if cwl_resp.status_code != HTTPOk.code:
+            raise PackageRegistrationError(f"Cannot find CWL file at: '{cwl_path}'.")
+    else:
+        cwl_path = cwl_file_path_or_url[7:] if cwl_file_path_or_url.startswith("file://") else cwl_file_path_or_url
+        cwl_path = os.path.abspath(cwl_path)
+        if not os.path.isfile(cwl_path):
+            raise PackageRegistrationError(f"Cannot find CWL file at: '{cwl_file_path_or_url}'.")
+
+    file_ext = os.path.splitext(cwl_path)[-1].replace(".", "")
+    if file_ext not in PACKAGE_EXTENSIONS:
+        raise PackageRegistrationError(f"Not a valid CWL file type: '{file_ext}'.")
+    return cwl_path
+
+
+def load_package_file(file_path):
+    # type: (str) -> CWL
+    """
+    Loads the package in YAML/JSON format specified by the file path.
+    """
+
+    file_path = _check_package_file(file_path)
+    try:
+        return load_file(file_path)
+    except ValueError as ex:
+        raise PackageRegistrationError(f"Package parsing generated an error: [{ex!s}]")
+
+
 def register_cwl_processes_from_config(container):
     # type: (AnySettingsContainer) -> int
     """
@@ -1088,8 +1131,6 @@ def register_cwl_processes_from_config(container):
     :param container: Registry container to obtain database reference as well as application settings.
     :returns: Number of successfully registered processes from found :term:`CWL` files.
     """
-    from weaver.processes.wps_package import load_package_file
-
     settings = get_settings(container)
     cwl_processes_dir = settings.get("weaver.cwl_processes_dir")
 

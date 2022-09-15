@@ -142,21 +142,19 @@ def test_transform_execute_parameters_wps():
     assert compare(transformed) == compare(expected)
 
 
-# FIXME: move appropriately when adding BoundingBox support (https://github.com/crim-ca/weaver/issues/51)
-@pytest.mark.skip(reason="The user-provided bbox is now a comma delimited string, not a WKT.")
-def test_load_wkt():
-    data = [
-        ("POLYGON ((100 15, 104 15, 104 19, 100 19, 100 15))", "100.0,15.0,104.0,19.0"),
-        (
-            "LINESTRING (100 15, 104 15, 104 19, 100 19, 100 15)",
-            "100.0,15.0,104.0,19.0",
-        ),
-        ("LINESTRING (100 15, 104 19)", "100.0,15.0,104.0,19.0"),
-        ("MULTIPOINT ((10 10), (40 30), (20 20), (30 10))", "10.0,10.0,40.0,30.0"),
-        ("POINT (30 10)", "30.0,10.0,30.0,10.0"),
-    ]
-    for wkt, expected in data:
-        assert opensearch.load_wkt(wkt) == expected
+@pytest.mark.parametrize("wkt, expected", [
+    ("POLYGON ((100 15, 104 15, 104 19, 100 19, 100 15))", "100.0,15.0,104.0,19.0"),
+    (
+        "LINESTRING (100 15, 104 15, 104 19, 100 19, 100 15)",
+        "100.0,15.0,104.0,19.0",
+    ),
+    ("LINESTRING (100 15, 104 19)", "100.0,15.0,104.0,19.0"),
+    ("MULTIPOINT ((10 10), (40 30), (20 20), (30 10))", "10.0,10.0,40.0,30.0"),
+    ("POINT (30 10)", "30.0,10.0,30.0,10.0"),
+    ("30,10,30,10", "30.0,10.0,30.0,10.0"),
+])
+def test_load_wkt(wkt, expected):
+    assert opensearch.load_wkt_bbox_bounds(wkt) == expected
 
 
 def test_deploy_opensearch():
@@ -189,7 +187,7 @@ def test_deploy_opensearch():
         process_id = get_any_id(opensearch_payload["processDescription"]["process"])
 
         # when
-        response = processes.add_local_process(request)
+        response = processes.add_local_process(request)  # type: ignore
 
         # then
         assert response.code == 201

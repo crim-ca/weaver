@@ -23,7 +23,7 @@ from owslib.wps import etree as owslib_wps_etree
 
 if TYPE_CHECKING:
     from io import BufferedReader
-    from typing import Union
+    from typing import AnyStr, Union
 
 
 XML_PARSER = lxml_etree.XMLParser(
@@ -51,7 +51,7 @@ _lxml_fromstring = lxml_etree.fromstring
 
 
 def fromstring(text, parser=XML_PARSER):
-    # type: (str, lxml_etree.XMLParser) -> XML
+    # type: (AnyStr, lxml_etree.XMLParser) -> XML
     return _lxml_fromstring(text, parser=parser)  # nosec: B410
 
 
