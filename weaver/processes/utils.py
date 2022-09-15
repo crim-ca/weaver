@@ -72,7 +72,7 @@ from weaver.wps_restapi.utils import get_wps_restapi_base_url, parse_content
 
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
-    from typing import List, Optional, Tuple, Union
+    from typing import Any, List, Optional, Tuple, Union
 
     from weaver.typedefs import (
         AnyHeadersContainer,
@@ -348,8 +348,14 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
     # validate identifier naming for unsupported characters
     process_desc = payload.get("processDescription", {})  # empty possible if CWL directly passed
     process_info = process_desc.get("process", process_desc)
-    process_href = process_desc.pop("href", None)
-    process_param = "processDescription.process" if "process" in process_desc else "processDescription"
+    process_href = process_desc.pop("href", None) or payload.get("process", None)
+    process_href = process_href if isinstance(process_href, str) else None
+    if "process" in process_desc:
+        process_param = "processDescription.process"
+    elif process_href and "process" in payload:
+        process_param = "process"
+    else:
+        process_param = "processDescription"
 
     # retrieve CWL package definition, either via "href" (WPS-1/2), "owsContext" or "executionUnit" (package/reference)
     deployment_profile_name = payload.get("deploymentProfileName", "")
@@ -396,10 +402,11 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
                 break
     if not found:
         params = [
-            "ProcessDescription.process.href",
-            "ProcessDescription.process.owsContext.content.href",
-            "ProcessDescription.href",
-            "ProcessDescription.owsContext.content.href",
+            "process (href)",
+            "processDescription.process.href",
+            "processDescription.process.owsContext.content.href",
+            "processDescription.href",
+            "processDescription.owsContext.content.href",
             "executionUnit[*].(unit|href)",
             "{ <CWL> }",
         ]
@@ -1093,6 +1100,14 @@ def _check_package_file(cwl_file_path_or_url):
     return cwl_path
 
 
+def is_cwl_package(package):
+    # type: (Any) -> bool
+    """
+    Perform minimal validation of a :term:`CWL` package definition.
+    """
+    return isinstance(package, dict) and "cwlVersion" in package
+
+
 def load_package_file(file_path):
     # type: (str) -> CWL
     """
@@ -1101,9 +1116,12 @@ def load_package_file(file_path):
 
     file_path = _check_package_file(file_path)
     try:
-        return load_file(file_path)
+        file_data = load_file(file_path)
     except ValueError as ex:
         raise PackageRegistrationError(f"Package parsing generated an error: [{ex!s}]")
+    if is_cwl_package(file_data):
+        return file_data
+    raise PackageRegistrationError(f"Package is not a valid CWL document: [{file_path}]")
 
 
 def register_cwl_processes_from_config(container):

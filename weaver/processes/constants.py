@@ -57,15 +57,25 @@ CWL_REQUIREMENT_APP_TYPES = frozenset([
     #   - https://github.com/crim-ca/weaver/issues/138
     # CWL_REQUIREMENT_APP_DOCKER_GPU,
     CWL_REQUIREMENT_APP_ESGF_CWT,
+    CWL_REQUIREMENT_APP_OGC_API,
     CWL_REQUIREMENT_APP_WPS1,
 ])
 """
 Set of :term:`CWL` requirements consisting of known :term:`Application Package` by this `Weaver` instance.
 """
 
+CWL_REQUIREMENT_APP_LOCAL = frozenset([
+    CWL_REQUIREMENT_APP_BUILTIN,
+    CWL_REQUIREMENT_APP_DOCKER,
+])
+"""
+Set of :term:`CWL` requirements that correspond to local execution of an :term:`Application Package`.
+"""
+
 # FIXME: convert to 'Constants' class
 CWL_REQUIREMENT_APP_REMOTE = frozenset([
     CWL_REQUIREMENT_APP_ESGF_CWT,
+    CWL_REQUIREMENT_APP_OGC_API,
     CWL_REQUIREMENT_APP_WPS1,
 ])
 """

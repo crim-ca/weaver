@@ -33,6 +33,7 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_DOCKER,
     CWL_REQUIREMENT_APP_DOCKER_GPU,
     CWL_REQUIREMENT_APP_ESGF_CWT,
+    CWL_REQUIREMENT_APP_OGC_API,
     CWL_REQUIREMENT_APP_WPS1,
     CWL_REQUIREMENT_INIT_WORKDIR,
     OAS_COMPLEX_TYPES,
@@ -372,6 +373,13 @@ class VaultReference(ExtendedSchemaNode):
     description = "Vault file reference."
     example = "vault://399dc5ac-ff66-48d9-9c02-b144a975abe4"
     pattern = r"^vault://[a-f0-9]{8}(?:-?[a-f0-9]{4}){3}-?[a-f0-9]{12}$"
+
+
+class ProcessURL(ExtendedSchemaNode):
+    schema_type = String
+    description = "Process URL reference."
+    format = "url"
+    validator = SchemeURL(schemes=["http", "https"], path_pattern=r"(?:/processes/\S+/?)")
 
 
 class ReferenceURL(AnyOfKeywordSchema):
@@ -1121,7 +1129,7 @@ class ObjectPropertiesOAS(ExtendedMappingSchema):
     )
 
 
-# would not need this if we could do explicit recursive definitions but at the very least, validate that when a
+# would not need this if we could do explicit recursive definitions but at the very least, validate that when an
 # object type is specified, its properties are as well and are slightly more specific than permissive mapping
 class ObjectOAS(NotKeywordSchema, ExtendedMappingSchema):
     _not = [ReferenceOAS]
@@ -1282,14 +1290,14 @@ class NumericType(OneOfKeywordSchema):
 
 
 class LiteralReference(ExtendedMappingSchema):
-    reference = ReferenceURL()
+    reference = ExecuteReferenceURL()
 
 
 # https://github.com/opengeospatial/ogcapi-processes/blob/e6893b/extensions/workflows/openapi/workflows.yaml#L1707-L1716
 class NameReferenceType(ExtendedMappingSchema):
     schema_ref = f"{OGC_API_SCHEMA_CORE}/nameReferenceType.yaml"
     name = ExtendedSchemaNode(String())
-    reference = ReferenceURL(missing=drop, description="Reference URL to schema definition of the named entity.")
+    reference = ExecuteReferenceURL(missing=drop, description="Reference URL to schema definition of the named entity.")
 
 
 class DataTypeSchema(NameReferenceType):
@@ -1343,7 +1351,7 @@ class AnyValue(ExtendedMappingSchema):
 
 
 # https://github.com/opengeospatial/ogcapi-processes/blob/e6893b/extensions/workflows/openapi/workflows.yaml#L1801-L1803
-class ValuesReference(ReferenceURL):
+class ValuesReference(ExecuteReferenceURL):
     description = "URL where to retrieve applicable values."
 
 
@@ -1428,7 +1436,7 @@ class DescribeInputTypeDefinition(OneOfKeywordSchema):
         #   This use case is still valid because 'format' can be inferred from the combining Process/CWL contents.
         BoundingBoxInputType,
         DescribeComplexInputType,  # should be 2nd to last because very permissive, but requires format at least
-        LiteralInputType,  # must be last because it"s the most permissive (all can default if omitted)
+        LiteralInputType,  # must be last because it's the most permissive (all can default if omitted)
     ]
 
 
@@ -1440,7 +1448,7 @@ class DeployInputTypeDefinition(OneOfKeywordSchema):
         #   This use case is still valid because 'format' can be inferred from the combining Process/CWL contents.
         BoundingBoxInputType,
         DeployComplexInputType,  # should be 2nd to last because very permissive, but requires formats at least
-        LiteralInputType,  # must be last because it"s the most permissive (all can default if omitted)
+        LiteralInputType,  # must be last because it's the most permissive (all can default if omitted)
     ]
 
 
@@ -3177,16 +3185,24 @@ class DataEncodingAttributes(FormatSelection):
     pass
 
 
-class Reference(ExtendedMappingSchema):
-    title = "Reference"
-    href = ExecuteReferenceURL(description="Endpoint of the reference.")
+class ReferenceBase(ExtendedMappingSchema):
     format = DataEncodingAttributes(missing=drop)
     body = ExtendedSchemaNode(String(), missing=drop)
     bodyReference = ReferenceURL(missing=drop)
 
 
+class Reference(ReferenceBase):
+    title = "Reference"
+    href = ReferenceURL(description="Endpoint of the reference.")
+
+
+class ExecuteReference(ReferenceBase):
+    title = "ExecuteReference"
+    href = ExecuteReferenceURL(description="Endpoint of the reference.")
+
+
 class ArrayReference(ExtendedSequenceSchema):
-    item = Reference()
+    item = ExecuteReference()
 
 
 class ArrayReferenceValueType(ExtendedMappingSchema):
@@ -3217,7 +3233,7 @@ class ExecuteInputAnyType(OneOfKeywordSchema):
         AnyLiteralValueType(),
         # HTTP references with various keywords
         LiteralReference(),
-        Reference()
+        ExecuteReference()
     ]
 
 
@@ -3247,7 +3263,7 @@ class ExecuteInputListValues(ExtendedSequenceSchema):
 # But explicitly in the context of an execution input, rather than any other link (eg: metadata)
 class ExecuteInputFileLink(Link):  # for other metadata (title, hreflang, etc.)
     schema_ref = f"{OGC_API_SCHEMA_CORE}/link.yaml"
-    href = ExecuteReferenceURL(  # no just a plain 'URL' like 'Link' has (extended with s3, vault, etc.)
+    href = ExecuteReferenceURL(  # not just a plain 'URL' like 'Link' has (extended with s3, vault, etc.)
         description="Location of the file reference."
     )
     type = MediaType(
@@ -3659,6 +3675,24 @@ class ESGF_CWT_RequirementClass(ESGF_CWT_RequirementSpecification):  # noqa: N80
     _class = RequirementClass(example=CWL_REQUIREMENT_APP_ESGF_CWT, validator=OneOf([CWL_REQUIREMENT_APP_ESGF_CWT]))
 
 
+class OGCAPIRequirementSpecification(PermissiveMappingSchema):
+    title = CWL_REQUIREMENT_APP_OGC_API
+    description = (
+        "Hint indicating that the Application Package corresponds to an OGC API - Processes provider"
+        "that should be remotely executed and monitored by this instance. "
+        "(note: can only be an 'hint' as it is unofficial CWL specification)."
+    )
+    process = ReferenceURL(description="Process URL of the remote OGC API Process.")
+
+
+class OGCAPIRequirementMap(ExtendedMappingSchema):
+    req = OGCAPIRequirementSpecification(name=CWL_REQUIREMENT_APP_OGC_API)
+
+
+class OGCAPIRequirementClass(OGCAPIRequirementSpecification):
+    _class = RequirementClass(example=CWL_REQUIREMENT_APP_OGC_API, validator=OneOf([CWL_REQUIREMENT_APP_OGC_API]))
+
+
 class WPS1RequirementSpecification(PermissiveMappingSchema):
     title = CWL_REQUIREMENT_APP_WPS1
     description = (
@@ -3718,6 +3752,7 @@ class CWLHintsMap(AnyOfKeywordSchema, PermissiveMappingSchema):
         DockerGpuRequirementMap(missing=drop),
         InitialWorkDirRequirementMap(missing=drop),
         ESGF_CWT_RequirementMap(missing=drop),
+        OGCAPIRequirementMap(missing=drop),
         WPS1RequirementMap(missing=drop),
     ]
 
@@ -3732,6 +3767,7 @@ class CWLHintsItem(OneOfKeywordSchema, PermissiveMappingSchema):
         DockerGpuRequirementClass(missing=drop),
         InitialWorkDirRequirementClass(missing=drop),
         ESGF_CWT_RequirementClass(missing=drop),
+        OGCAPIRequirementClass(missing=drop),
         WPS1RequirementClass(missing=drop),
         UnknownRequirementClass(missing=drop),  # allows anything, must be last
     ]
@@ -4266,18 +4302,24 @@ class ProcessDeploymentWithContext(ProcessDeployment):
     owsContext = OWSContext(missing=required)
 
 
-class DeployProcessOfferingContext(ProcessControl):
+class ProcessVersionField(ExtendedMappingSchema):
+    processVersion = Version(
+        title="processVersion", missing=drop, deprecated=True,
+        description="Old method of specifying the process version, prefer 'version' under 'process'."
+    )
+
+
+class DeployProcessOfferingContext(ProcessControl, ProcessVersionField):
     # alternative definition to make 'executionUnit' optional if instead provided through 'owsContext'
-    # case were definition is nested under 'processDescription.process'
+    # case where definition is nested under 'processDescription.process'
     process = ProcessDeploymentWithContext(
         description="Process definition nested under process field for backward compatibility."
     )
-    processVersion = Version(title="processVersion", missing=drop)
 
 
 class DeployProcessDescriptionContext(NotKeywordSchema, ProcessDeploymentWithContext, ProcessControl):
     # alternative definition to make 'executionUnit' optional if instead provided through 'owsContext'
-    # case were definition is directly under 'processDescription'
+    # case where definition is directly under 'processDescription'
     _not = [
         Reference()  # avoid conflict with deploy by href
     ]
@@ -4290,9 +4332,8 @@ class DeployProcessContextChoiceType(OneOfKeywordSchema):
     ]
 
 
-class DeployProcessOffering(ProcessControl):
+class DeployProcessOffering(ProcessControl, ProcessVersionField):
     process = ProcessDeployment(description="Process definition nested under process field for backward compatibility.")
-    processVersion = Version(title="processVersion", missing=drop)
 
 
 class DeployProcessDescription(NotKeywordSchema, ProcessDeployment, ProcessControl):
@@ -4397,8 +4438,13 @@ class DeployCWL(NotKeywordSchema, CWL, UpdateVersion):
     id = CWLIdentifier()  # required in this case, cannot have a version directly as tag, use 'version' field instead
 
 
+class DeployOGCRemoteProcess(ExtendedMappingSchema):
+    process = ProcessURL()
+
+
 class Deploy(OneOfKeywordSchema):
     _one_of = [
+        DeployOGCRemoteProcess(),
         DeployOGCAppPackage(),
         DeployContextDefinition(),
         DeployCWL(),

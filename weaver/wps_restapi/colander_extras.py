@@ -282,14 +282,16 @@ class SchemeURL(colander.Regex):
         :class:`colander.file_uri` [local file://]
     """
 
-    def __init__(self, schemes=None, msg=None, flags=re.IGNORECASE):
-        # type: (Optional[Iterable[str]], Optional[str], Optional[re.RegexFlag]) -> None
+    def __init__(self, schemes=None, path_pattern=None, msg=None, flags=re.IGNORECASE):
+        # type: (Optional[Iterable[str]], Optional[str], Optional[str], Optional[re.RegexFlag]) -> None
         if not schemes:
             schemes = [""]
         if not msg:
             msg = colander._(f"Must be a URL matching one of schemes {schemes}")  # noqa
         regex_schemes = r"(?:" + "|".join(schemes) + r")"
         regex = colander.URL_REGEX.replace(r"(?:http|ftp)s?", regex_schemes)
+        if path_pattern:
+            regex = regex[:-1] + path_pattern + "$"
         super(SchemeURL, self).__init__(regex, msg=msg, flags=flags)
 
 

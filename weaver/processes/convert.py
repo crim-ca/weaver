@@ -11,6 +11,7 @@ from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING
 from urllib.parse import unquote, urlparse
 
+import colander
 from owslib.wps import ComplexData, Metadata as OWS_Metadata, is_reference
 from pywps import Process as ProcessWPS
 from pywps.app.Common import Metadata as WPS_Metadata
@@ -83,6 +84,7 @@ from weaver.utils import (
     str2bytes,
     transform_json
 )
+from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps.utils import get_wps_client
 
 if TYPE_CHECKING:
@@ -115,6 +117,7 @@ if TYPE_CHECKING:
         ExecutionOutputs,
         JobValueFile,
         JSON,
+        Literal,
         NotRequired,
         OpenAPISchema,
         OpenAPISchemaArray,
@@ -127,6 +130,7 @@ if TYPE_CHECKING:
 
     # typing shortcuts
     # pylint: disable=C0103,invalid-name
+    IO_Select_Type = Literal["input", "output"]  # [WPS_INPUT, WPS_OUTPUT]
     WPS_Input_Type = Union[LiteralInput, ComplexInput, BoundingBoxInput]
     WPS_Output_Type = Union[LiteralOutput, ComplexOutput, BoundingBoxOutput]
     WPS_IO_Type = Union[WPS_Input_Type, WPS_Output_Type]
@@ -445,7 +449,7 @@ def _get_multi_json_references(output, container):
 
 
 def any2cwl_io(wps_io, io_select):
-    # type: (Union[JSON_IO_Type, WPS_IO_Type, OWS_IO_Type], str) -> Tuple[CWL_IO_Type, Dict[str, str]]
+    # type: (Union[JSON_IO_Type, WPS_IO_Type, OWS_IO_Type], IO_Select_Type) -> Tuple[CWL_IO_Type, Dict[str, str]]
     """
     Converts a :term:`WPS`-like I/O from various :term:`WPS` library representations to :term:`CWL` corresponding I/O.
 
@@ -684,16 +688,72 @@ def xml_wps2cwl(wps_process_response, settings):
 
 def json_ogcapi2cwl(payload, reference):
     # type: (JSON, str) -> Tuple[CWL, JSON]
-    process_info = payload.get("process", payload)  # OLD/OGC schemas nested process or directly offered
+    """
+    Generate a :term:`CWL` for a remote :term:`OGC API - Processes` description to dispatch :term:`Process` execution.
 
-    # try to find a CWL reference to provide more details
+    .. seealso::
+        - :class:`weaver.processes.wps3_process.Wps3Process`
+
+    :param payload: :term:`JSON` :term:`Process` description in :term:`OGC API - Processes` format.
+    :param reference: URL where the :term:`Process` is located.
+    :returns: Updated :term:`CWL` package with the reference to the :term:`Process`.
+    """
+    from weaver.processes.utils import load_package_file, is_cwl_package  # pylint: disable=C0415  # circular import
+
+    process_info = payload.get("process", payload)  # type: JSON  # OLD/OGC schemas nested process or directly offered
+
+    # the process information is sufficient to define the process by itself,
+    # but attempt retrieval of further details to generate better CWL references if it can be located
     ows_ref = process_info.get("owsContext", {}).get("offering", {}).get("content", {}).get("href")
     proc_ref = process_info.get("href")
-    exec_unit = process_info.get("executionUnit")
-    cwl_package = load_package_file(ows_ref or proc_ref)
+    cwl_ref = ows_ref or proc_ref  # type: Optional[str]
+    cwl_pkg = {}  # type: CWL
+    if cwl_ref:
+        cwl_pkg = load_package_file(cwl_ref)
+    else:
+        exec_unit = process_info.get("executionUnit")
+        try:
+            if sd.ExecutionUnitList(missing=colander.drop).deserialize(exec_unit) is not colander.drop:
+                for unit in exec_unit:
+                    unit_ref = unit.get("unit")
+                    unit_pkg = unit.get("href")
+                    if unit_ref:
+                        cwl_pkg = load_package_file(unit_ref)
+                        cwl_ref = unit_ref
+                        break
+                    if is_cwl_package(unit_pkg):
+                        cwl_pkg = unit_pkg
+                        break
+        except colander.Invalid:
+            pass
 
+    if cwl_pkg:
+        # CWL resolved with most amount of metadata available
+        # remove fields that would cause conflicting specification of the local CWL for its remote counterpart
+        for drop_field in ["baseCommand", "arguments", "hints", "requirements"]:
+            cwl_pkg.pop(drop_field, None)
+    else:
+        # if no CWL could be resolved, generate I/O from process
+        for io_select in ["input", "output"]:
+            io_holder = f"{io_select}s"
+            io_struct = process_info.get(io_holder, {})
+            io_struct = normalize_ordered_io(io_struct)
+            cwl_pkg[io_holder] = {}  # type: Dict[str, CWL_IO_Type]
+            for io_def in io_struct:
+                io_id = get_field(io_def, "identifier", search_variations=True, pop_found=True)
+                cwl_pkg[io_holder][io_id] = any2cwl_io(io_def, io_select)
 
-    return cwl_package, process_info
+    # even if the remote process is actually a Workflow on the target server,
+    # dispatched execution from Weaver will consider it as a single application
+    cwl_pkg["class"] = "CommandLineTool"
+    cwl_pkg["hints"] = {
+        CWL_REQUIREMENT_APP_OGC_API: {
+            "process": reference
+        }
+    }
+    process_info["executionUnit"] = [{"unit": cwl_pkg}]
+    process_info["deploymentProfile"] = "http://www.opengis.net/profiles/eoc/ogcapiApplication"
+    return cwl_pkg, process_info
 
 
 def is_cwl_file_type(io_info):
@@ -899,7 +959,7 @@ def get_cwl_io_type(io_info):
 
 
 def cwl2wps_io(io_info, io_select):
-    # type:(CWL_IO_Type, str) -> WPS_IO_Type
+    # type:(CWL_IO_Type, IO_Select_Type) -> WPS_IO_Type
     """
     Converts input/output parameters from CWL types to WPS types.
 
@@ -2226,7 +2286,7 @@ def json2wps_allowed_values(io_info):
 
 
 def json2wps_io(io_info, io_select):  # pylint: disable=R1260
-    # type: (JSON_IO_Type, str) -> WPS_IO_Type
+    # type: (JSON_IO_Type, IO_Select_Type) -> WPS_IO_Type
     """
     Converts an I/O from a JSON dict to PyWPS types.
 
@@ -2342,7 +2402,7 @@ def json2wps_io(io_info, io_select):  # pylint: disable=R1260
             io_info.pop("literalDataDomains", None)
             return LiteralInput(**io_info)
     elif io_select == WPS_OUTPUT:
-        # following not allowed for PyWPS instance creation
+        # following not allowed for PyWPS instance creation,
         # but they are useful for other steps, so forward them afterward
         io_min = io_info.pop("min_occurs", null)
         io_max = io_info.pop("max_occurs", null)
@@ -2777,7 +2837,7 @@ def merge_io_fields(wps_io, cwl_io):
 
 
 def merge_package_io(wps_io_list, cwl_io_list, io_select):
-    # type: (List[ANY_IO_Type], List[WPS_IO_Type], str) -> List[JSON_IO_Type]
+    # type: (List[ANY_IO_Type], List[WPS_IO_Type], IO_Select_Type) -> List[JSON_IO_Type]
     """
     Merges corresponding parameters of different I/O definition sources (:term:`CWL`, :term:`OpenAPI` and :term:`WPS`).
 

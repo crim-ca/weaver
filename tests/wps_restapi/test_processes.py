@@ -1260,7 +1260,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         }
         self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID)
 
-    def validate_wps3_process_description(self, process_description, process_id, remote_process):
+    def validate_ogcapi_process_description(self, process_description, process_id, remote_process):
         assert process_description["deploymentProfile"] == "http://www.opengis.net/profiles/eoc/ogcapiApplication"
 
         # process description should have been generated with relevant I/O
@@ -1286,41 +1286,53 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         }
         assert pkg == ref
 
-    def test_deploy_process_WPS3_DescribeProcess_href(self):
-        register_builtin_processes(self.app.app.registry)  # must register since collection reset in 'setUp'
-        remote_process = "jsonarray2netcdf"  # use builtin, re-deploy as "remote process"
-        href = f"{self.url}/processes/{remote_process}"
-        p_id = "new-test-wps3"
-        body = {
-            "processDescription": {"href": href},
-        }
-        desc = self.deploy_process_make_visible_and_fetch_deployed(body, p_id, assert_io=False)
-        self.validate_wps3_process_description(desc, p_id, remote_process)
+    def test_deploy_process_OGC_API_DescribeProcess_href(self):
+        """
+        Use the basic :term:`Process` URL format for referencing remote OGC API definition.
 
-    def test_deploy_process_WPS3_DescribeProcess_owsContext(self):
+        This will be helpful to support `Part 3 - Workflow` nested definitions.
+
+        .. note::
+            This does not support nested OGC Workflows by itself.
+            Only sets up the required parsing of the body to eventually deploy them.
+
+        .. seealso::
+            - https://github.com/opengeospatial/ogcapi-processes/issues/279
+            - https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/workflows
+            - https://github.com/crim-ca/weaver/issues/412
+        """
         register_builtin_processes(self.app.app.registry)  # must register since collection reset in 'setUp'
         remote_process = "jsonarray2netcdf"  # use builtin, re-deploy as "remote process"
         href = f"{self.url}/processes/{remote_process}"
-        p_id = "new-test-wps3"
+        p_id = "new-test-ogc-api"
+        body = {"process": href}
+        desc = self.deploy_process_make_visible_and_fetch_deployed(body, p_id, assert_io=False)
+        self.validate_ogcapi_process_description(desc, p_id, remote_process)
+
+    def test_deploy_process_OGC_API_DescribeProcess_owsContext(self):
+        register_builtin_processes(self.app.app.registry)  # must register since collection reset in 'setUp'
+        remote_process = "jsonarray2netcdf"  # use builtin, re-deploy as "remote process"
+        href = f"{self.url}/processes/{remote_process}"
+        p_id = "new-test-ogc-api"
         ows_ctx = ows_context_href(href)
         ows_ctx.update({"id": p_id})
         body = {
             "processDescription": {"process": ows_ctx}
         }
         desc = self.deploy_process_make_visible_and_fetch_deployed(body, p_id, assert_io=False)
-        self.validate_wps3_process_description(desc, p_id, remote_process)
+        self.validate_ogcapi_process_description(desc, p_id, remote_process)
 
-    def test_deploy_process_WPS3_DescribeProcess_executionUnit(self):
+    def test_deploy_process_OGC_API_DescribeProcess_executionUnit(self):
         register_builtin_processes(self.app.app.registry)  # must register since collection reset in 'setUp'
         remote_process = "jsonarray2netcdf"  # use builtin, re-deploy as "remote process"
         href = f"{self.url}/processes/{remote_process}"
-        p_id = "new-test-wps3"
+        p_id = "new-test-ogc-api"
         body = {
             "processDescription": {"process": {"id": p_id}},
             "executionUnit": [{"href": href}],
         }
         desc = self.deploy_process_make_visible_and_fetch_deployed(body, p_id, assert_io=False)
-        self.validate_wps3_process_description(desc, p_id, remote_process)
+        self.validate_ogcapi_process_description(desc, p_id, remote_process)
 
     def test_deploy_process_with_revision_invalid(self):
         """

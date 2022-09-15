@@ -1,34 +1,23 @@
 import logging
 import warnings
-from time import sleep
 from typing import TYPE_CHECKING
 
 from pyramid.httpexceptions import HTTPConflict, HTTPForbidden, HTTPNotFound, HTTPOk, HTTPUnauthorized
 from pyramid.settings import asbool
 
 from weaver.exceptions import PackageExecutionError
-from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
-from weaver.formats import ContentType, repr_json
+from weaver.formats import ContentType
 from weaver.processes import opensearch
 from weaver.processes.sources import get_data_source_from_url, retrieve_data_source_url
-from weaver.processes.utils import map_progress
-from weaver.processes.wps_process_base import WpsProcessInterface, WpsRemoteJobProgress
-from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
-from weaver.utils import (
-    get_any_id,
-    get_any_message,
-    get_any_value,
-    get_job_log_msg,
-    get_log_monitor_msg,
-    pass_http_error,
-    request_extra
-)
+from weaver.processes.wps_process_base import OGCAPIRemoteProcessBase, RemoteJobProgress, WpsProcessInterface
+from weaver.status import Status
+from weaver.utils import pass_http_error, request_extra
 from weaver.visibility import Visibility
 from weaver.warning import MissingParameterWarning
 from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
-    from typing import Any, Tuple, Union
+    from typing import Tuple, Union
 
     from weaver.typedefs import (
         AnyHeadersContainer,
@@ -36,10 +25,6 @@ if TYPE_CHECKING:
         CWL_RuntimeInputsMap,
         HeadersType,
         JSON,
-        JobInputs,
-        JobMonitorReference,
-        JobOutputs,
-        JobResults,
         UpdateStatusPartialFunction
     )
     from weaver.wps.service import WorkerRequest
@@ -48,19 +33,36 @@ if TYPE_CHECKING:
 LOGGER = logging.getLogger(__name__)
 
 
-class Wps3RemoteJobProgress(WpsRemoteJobProgress):
-    PROVIDER = 1
+class Wps3RemoteJobProgress(RemoteJobProgress):
+    SETUP = 1
     PREPARE = 2
     DEPLOY = 3
     VISIBLE = 4
     READY = 5
-    EXECUTION = 9
-    MONITORING = 10
-    FETCH_OUT = 90
+    EXECUTION = 15
+    MONITORING = 20
+    STAGE_OUT = 90
     COMPLETED = 100
 
 
-class Wps3Process(WpsProcessInterface):
+class Wps3Process(WpsProcessInterface, OGCAPIRemoteProcessBase):
+    """
+    Remote or local :term:`Process` with :term:`ADES` capabilities, based on :term:`OGC API - Processes` requests.
+
+    If a referenced remote service supports :term:`Process` deployment using an :term:`Application Package`, and
+    that inputs point to a resolvable :term:`Data Source`, the execution will be dispatched to that remote location.
+    Otherwise, the :term:`Process` is executed locally.
+
+    Most of the core operations are handled by :class:`OGCAPIRemoteProcessBase` since request are sent to another
+    :term:`ADES` instance, or `Weaver` itself for :term:`Workflow` steps, both of which are :term:`OGC API - Processes`.
+    Additional operations revolve around the resolution of which remote :term:`ADES` to dispatch based on any detected
+    :term:`Data Source` location.
+
+    .. seealso::
+         - :class:`weaver.processes.wps_process_base.OGCAPIRemoteProcessBase`
+    """
+    process_type = "WPS-3"  # ADES, EMS or HYBRID (local Application or Workflow)
+
     def __init__(self,
                  step_payload,      # type: JSON
                  job_order,         # type: CWL_RuntimeInputsMap
@@ -97,12 +99,12 @@ class Wps3Process(WpsProcessInterface):
             deploy_body = step_payload
             url = retrieve_data_source_url(data_source)
         except (IndexError, KeyError) as exc:
-            LOGGER.error("Error during WPS-3 process data source resolution: [%s]", exc, exc_info=exc)
-            raise PackageExecutionError(f"Failed resolution of WPS-3 process data source: [{exc!r}]")
+            LOGGER.error("Error during %s process data source resolution: [%s]", self.process_type, exc, exc_info=exc)
+            raise PackageExecutionError(f"Failed resolution of {self.process_type} process data source: [{exc!r}]")
 
         self.provider = data_source  # fix immediately for below `update_status` call
         self.update_status(f"Provider {data_source} is selected {reason}.",
-                           Wps3RemoteJobProgress.PROVIDER, Status.RUNNING)
+                           Wps3RemoteJobProgress.SETUP, Status.RUNNING)
 
         return data_source, url, deploy_body
 
@@ -175,7 +177,7 @@ class Wps3Process(WpsProcessInterface):
             False if authorized access but process cannot be found,
             None if forbidden access.
         """
-        LOGGER.debug("Get process WPS visibility request for [%s]", self.process)
+        LOGGER.debug("Get process %s visibility request for [%s]", self.process_type, self.process)
         response = self.make_request(method="GET",
                                      url=self.url + sd.process_visibility_service.path.format(process_id=self.process),
                                      retry=False)
@@ -192,7 +194,7 @@ class Wps3Process(WpsProcessInterface):
         self.update_status("Updating process visibility on remote ADES.",
                            Wps3RemoteJobProgress.VISIBLE, Status.RUNNING)
         path = self.url + sd.process_visibility_service.path.format(process_id=self.process)
-        LOGGER.debug("Update process WPS visibility request for [%s] at [%s]", self.process, path)
+        LOGGER.debug("Update process %s visibility request for [%s] at [%s]", self.process_type, self.process, path)
         response = self.make_request(method="PUT",
                                      url=path,
                                      json={"value": visibility},
@@ -202,7 +204,7 @@ class Wps3Process(WpsProcessInterface):
 
     def describe_process(self):
         path = self.url + sd.process_service.path.format(process_id=self.process)
-        LOGGER.debug("Describe process WPS request for [%s] at [%s]", self.process, path)
+        LOGGER.debug("Describe process %s request for [%s] at [%s]", self.process_type, self.process, path)
         response = self.make_request(method="GET",
                                      url=path,
                                      retry=False,
@@ -218,7 +220,7 @@ class Wps3Process(WpsProcessInterface):
         self.update_status("Deploying process on remote ADES.",
                            Wps3RemoteJobProgress.DEPLOY, Status.RUNNING)
         path = self.url + sd.processes_service.path
-        LOGGER.debug("Deploy process WPS request for [%s] at [%s]", self.process, path)
+        LOGGER.debug("Deploy process %s request for [%s] at [%s]", self.process_type, self.process, path)
         response = self.make_request(method="POST", url=path, json=self.deploy_body, retry=True)
         response.raise_for_status()
 
@@ -246,106 +248,3 @@ class Wps3Process(WpsProcessInterface):
                 pass_http_error(exc, HTTPNotFound)
                 LOGGER.warning("Process [%s] failed setting public visibility. "
                                "Assuming feature is not supported by ADES and process is already public.", self.process)
-
-    def format_outputs(self, workflow_outputs):
-        # type: (JobOutputs) -> JobOutputs
-        for output in workflow_outputs:
-            output.update({"transmissionMode": ExecuteTransmissionMode.VALUE})
-        return workflow_outputs
-
-    def dispatch(self, process_inputs, process_outputs):
-        # type: (JobInputs, JobOutputs) -> Any
-        LOGGER.debug("Execute process WPS request for [%s]", self.process)
-        execute_body = {
-            "mode": ExecuteMode.ASYNC,
-            "response": ExecuteResponse.DOCUMENT,
-            "inputs": process_inputs,
-            "outputs": process_outputs
-        }
-        LOGGER.debug("Execute process WPS body for [%s]:\n%s", self.process, repr_json(execute_body))
-        request_url = self.url + sd.process_jobs_service.path.format(process_id=self.process)
-        response = self.make_request(method="POST", url=request_url, json=execute_body, retry=True)
-        if response.status_code != 201:
-            LOGGER.error("Request [POST %s] failed with: [%s]", request_url, response.status_code)
-            raise Exception(f"Was expecting a 201 status code from the execute request : {request_url}")
-
-        job_status_uri = response.headers["Location"]
-        return job_status_uri
-
-    def monitor(self, monitor_reference):
-        # type: (str) -> bool
-        job_status_uri = monitor_reference
-        job_status_data = self.get_job_status(job_status_uri)
-        job_status_value = map_status(job_status_data["status"])
-        job_id = job_status_data["jobID"]
-
-        self.update_status(f"Monitoring job on remote ADES : {job_status_uri}",
-                           Wps3RemoteJobProgress.MONITORING, Status.RUNNING)
-
-        while job_status_value not in JOB_STATUS_CATEGORIES[StatusCategory.FINISHED]:
-            sleep(5)
-            job_status_data = self.get_job_status(job_status_uri)
-            job_status_value = map_status(job_status_data["status"])
-
-            LOGGER.debug(get_log_monitor_msg(job_id, job_status_value,
-                                             job_status_data.get("percentCompleted", 0),
-                                             get_any_message(job_status_data), job_status_data.get("statusLocation")))
-            self.update_status(get_job_log_msg(status=job_status_value,
-                                               message=get_any_message(job_status_data),
-                                               progress=job_status_data.get("percentCompleted", 0),
-                                               duration=job_status_data.get("duration", None)),  # get if available
-                               map_progress(job_status_data.get("percentCompleted", 0),
-                                            Wps3RemoteJobProgress.MONITORING, Wps3RemoteJobProgress.FETCH_OUT),
-                               Status.RUNNING)
-
-        if job_status_value != Status.SUCCEEDED:
-            LOGGER.debug(get_log_monitor_msg(job_id, job_status_value,
-                                             job_status_data.get("percentCompleted", 0),
-                                             get_any_message(job_status_data), job_status_data.get("statusLocation")))
-            raise PackageExecutionError(job_status_data)
-        return True
-
-    def get_job_status(self, job_status_uri, retry=True):
-        # type: (JobMonitorReference, Union[bool, int]) -> JSON
-        """
-        Obtains the contents from the :term:`Job` status response.
-        """
-        response = self.make_request(method="GET", url=job_status_uri, retry=retry)  # retry in case not yet ready
-        response.raise_for_status()
-        job_status = response.json()
-        job_id = job_status_uri.split("/")[-1]
-        if "jobID" not in job_status:
-            job_status["jobID"] = job_id  # provide if not implemented by ADES
-        job_status["status"] = map_status(job_status["status"])
-        return job_status
-
-    def get_results(self, monitor_reference):
-        # type: (str) -> JobResults
-        """
-        Obtains produced output results from successful job status ID.
-        """
-        # use '/results' endpoint instead of '/outputs' to ensure support with other
-        result_url = monitor_reference + "/results"
-        response = self.make_request(method="GET", url=result_url, retry=True)
-        response.raise_for_status()
-        contents = response.json()
-
-        # backward compatibility for ADES that returns output IDs nested under 'outputs'
-        if "outputs" in contents:
-            # ensure that we don't incorrectly pick a specific output ID named 'outputs'
-            maybe_outputs = contents["outputs"]
-            if isinstance(maybe_outputs, dict) and get_any_id(maybe_outputs) is None:
-                contents = maybe_outputs
-            # backward compatibility for ADES that returns list of outputs nested under 'outputs'
-            # (i.e.: as Weaver-specific '/outputs' endpoint)
-            elif isinstance(maybe_outputs, list) and all(get_any_id(out) is not None for out in maybe_outputs):
-                contents = maybe_outputs
-
-        # rebuild the expected (old) list format for calling method
-        if isinstance(contents, dict) and all(get_any_value(out) is not None for out in contents.values()):
-            outputs = []
-            for out_id, out_val in contents.items():
-                out_val.update({"id": out_id})
-                outputs.append(out_val)
-            contents = outputs
-        return contents
