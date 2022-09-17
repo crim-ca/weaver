@@ -74,7 +74,7 @@ class RemoteJobProgress(Constants):
     COMPLETED = 100
 
 
-class WpsProcessInterface(object):
+class WpsProcessInterface(abc.ABC):
     """
     Common interface for :term:`WPS` :term:`Process` to be used for dispatching :term:`CWL` jobs.
 
@@ -403,7 +403,12 @@ class WpsProcessInterface(object):
         return execute_body_inputs
 
 
-class OGCAPIRemoteProcessBase(WpsProcessInterface, metaclass=abc.ABCMeta):
+class OGCAPIRemoteProcessBase(WpsProcessInterface, abc.ABC):
+    # items to be specified by specialized class
+    process_type = NotImplemented   # type: str
+    provider = NotImplemented       # type: str
+    url = NotImplemented            # type: str
+
     def __init__(self,
                  step_payload,      # type: JSON
                  process,           # type: str
@@ -418,11 +423,6 @@ class OGCAPIRemoteProcessBase(WpsProcessInterface, metaclass=abc.ABCMeta):
         )
         self.deploy_body = step_payload
         self.process = process
-
-    @abc.abstractmethod
-    @property
-    def process_type(self):
-        raise NotImplementedError
 
     def format_outputs(self, workflow_outputs):
         # type: (JobOutputs) -> JobOutputs

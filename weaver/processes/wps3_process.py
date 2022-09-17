@@ -9,7 +9,7 @@ from weaver.exceptions import PackageExecutionError
 from weaver.formats import ContentType
 from weaver.processes import opensearch
 from weaver.processes.sources import get_data_source_from_url, retrieve_data_source_url
-from weaver.processes.wps_process_base import OGCAPIRemoteProcessBase, RemoteJobProgress, WpsProcessInterface
+from weaver.processes.wps_process_base import OGCAPIRemoteProcessBase, RemoteJobProgress
 from weaver.status import Status
 from weaver.utils import pass_http_error, request_extra
 from weaver.visibility import Visibility
@@ -45,7 +45,7 @@ class Wps3RemoteJobProgress(RemoteJobProgress):
     COMPLETED = 100
 
 
-class Wps3Process(WpsProcessInterface, OGCAPIRemoteProcessBase):
+class Wps3Process(OGCAPIRemoteProcessBase):
     """
     Remote or local :term:`Process` with :term:`ADES` capabilities, based on :term:`OGC API - Processes` requests.
 
