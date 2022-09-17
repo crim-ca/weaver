@@ -26,6 +26,9 @@ Changes:
   as a valid format, although a JSON ``array`` type is directly expected in the submitted JSON file.
 - Add support of ``builtin`` `Process` description overrides if provided along their `CWL` package definition.
   Overrides can be specified as JSON or YAML, and follow the same merging strategies of fields as normal deployments.
+- Refactor ``weaver.processes.wps_[...]`` definitions to reuse operations for communicating with `OGC API - Processes`
+  servers across implementation for monitored `Job` with a remote `Process` type of `OGC API`, `ADES` and `Workflow`
+  with other step `Process` references.
 
 Fixes:
 ------
