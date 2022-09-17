@@ -88,7 +88,7 @@ from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps.utils import get_wps_client
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
+    from typing import Any, Callable, Dict, Iterable, List, MutableMapping, Optional, Tuple, Type, Union
     from urllib.parse import ParseResult
 
     from pywps.app import WPSRequest
@@ -130,7 +130,8 @@ if TYPE_CHECKING:
 
     # typing shortcuts
     # pylint: disable=C0103,invalid-name
-    IO_Select_Type = Literal["input", "output"]  # [WPS_INPUT, WPS_OUTPUT]
+    IO_Select_Type = Literal[WPS_INPUT, WPS_OUTPUT]
+    IO_Category_Type = Literal[WPS_LITERAL, WPS_COMPLEX]
     WPS_Input_Type = Union[LiteralInput, ComplexInput, BoundingBoxInput]
     WPS_Output_Type = Union[LiteralOutput, ComplexOutput, BoundingBoxOutput]
     WPS_IO_Type = Union[WPS_Input_Type, WPS_Output_Type]
@@ -448,6 +449,23 @@ def _get_multi_json_references(output, container):
     return None
 
 
+def get_io_type_category(io_info):
+    # type: (ANY_IO_Type) -> IO_Category_Type
+    """
+    Guesses the applicable I/O type with provided information from any known I/O structure.
+    """
+    io_type = get_field(io_info, "type", search_variations=True)
+    if isinstance(io_type, str):
+        io_type = any2cwl_literal_datatype(io_type) or any2wps_literal_datatype(io_type)
+        return WPS_COMPLEX if io_type is null else WPS_LITERAL
+    if isinstance(io_type, dict):
+        io_type = get_cwl_io_type(io_info)[0]
+        io_type = any2cwl_literal_datatype(io_type)
+        return WPS_COMPLEX if io_type is null else WPS_LITERAL
+    io_fmt = get_field(io_info, "supported_formats", search_variations=True)
+    return WPS_LITERAL if io_fmt is null else WPS_COMPLEX
+
+
 def any2cwl_io(wps_io, io_select):
     # type: (Union[JSON_IO_Type, WPS_IO_Type, OWS_IO_Type], IO_Select_Type) -> Tuple[CWL_IO_Type, Dict[str, str]]
     """
@@ -456,7 +474,7 @@ def any2cwl_io(wps_io, io_select):
     Conversion can be accomplished for :mod:`pywps` and :mod:`owslib` objects, as well as their :term:`JSON` equivalent.
     Because :term:`CWL` I/O of type ``File`` with ``format`` field are namespaced, this is also returned if needed.
 
-    :returns: converted I/O and namespace dictionary with corresponding format references as required
+    :returns: converted I/O and namespace dictionary with corresponding format references as required.
     """
     def _get_cwl_fmt_details(wps_fmt):
         # type: (ANY_Format_Type) -> Union[Tuple[Tuple[str, str], str, str], Tuple[None, None, None]]
@@ -467,11 +485,11 @@ def any2cwl_io(wps_io, io_select):
         _cwl_io_ref, _cwl_io_fmt = get_cwl_file_format(_wps_io_fmt, must_exist=True, allow_synonym=False)
         return _cwl_io_ref, _cwl_io_fmt, _cwl_io_ext
 
-    wps_io_type = get_field(wps_io, "type", search_variations=True)
+    wps_io_type = get_io_type_category(wps_io)
     wps_io_id = get_field(wps_io, "identifier", search_variations=True)
     cwl_ns = {}
     cwl_io = {"id": wps_io_id}  # type: CWL_IO_Type  # noqa
-    if wps_io_type not in WPS_COMPLEX_TYPES:
+    if wps_io_type not in list(WPS_COMPLEX_TYPES):
         cwl_io_type = any2cwl_literal_datatype(wps_io_type)
         if cwl_io_type is null:
             LOGGER.warning("Could not identify a CWL literal data type with [%s].", wps_io_type)
@@ -734,26 +752,34 @@ def json_ogcapi2cwl(payload, reference):
             cwl_pkg.pop(drop_field, None)
     else:
         # if no CWL could be resolved, generate I/O from process
+        io_ns = {}  # type: Dict[str, str]
         for io_select in ["input", "output"]:
             io_holder = f"{io_select}s"
             io_struct = process_info.get(io_holder, {})
             io_struct = normalize_ordered_io(io_struct)
             cwl_pkg[io_holder] = {}  # type: Dict[str, CWL_IO_Type]
             for io_def in io_struct:
-                io_id = get_field(io_def, "identifier", search_variations=True, pop_found=True)
-                cwl_pkg[io_holder][io_id] = any2cwl_io(io_def, io_select)
+                io_id = get_field(io_def, "identifier", search_variations=True)
+                cwl_io, cwl_ns = any2cwl_io(io_def, io_select)
+                cwl_pkg[io_holder][io_id] = cwl_io
+                io_ns.update(cwl_ns)
+        cwl_pkg.update({"$namespaces": io_ns} if io_ns else {})
 
     # even if the remote process is actually a Workflow on the target server,
     # dispatched execution from Weaver will consider it as a single application
-    cwl_pkg["class"] = "CommandLineTool"
-    cwl_pkg["hints"] = {
-        CWL_REQUIREMENT_APP_OGC_API: {
-            "process": reference
+    cwl_package = {
+        "cwlVersion": "v1.0",
+        "class": "CommandLineTool",
+        "hints": {
+            CWL_REQUIREMENT_APP_OGC_API: {
+                "process": reference
+            }
         }
     }
+    cwl_package.update(cwl_pkg)
     process_info["executionUnit"] = [{"unit": cwl_pkg}]
     process_info["deploymentProfile"] = "http://www.opengis.net/profiles/eoc/ogcapiApplication"
-    return cwl_pkg, process_info
+    return cwl_package, process_info
 
 
 def is_cwl_file_type(io_info):
@@ -2717,7 +2743,11 @@ def normalize_ordered_io(io_section, order_hints=None):
     if isinstance(io_section, dict) and not isinstance(io_section, OrderedDict) and order_hints and len(order_hints):
         # convert the hints themselves to list if they are provided as mapping
         if isinstance(order_hints, dict):
-            order_hints = [dict(id=key, **values) for key, values in order_hints.items()]
+            order_list = []
+            for key, values in order_hints.items():
+                values["id"] = key
+                order_list.append(values)
+            order_hints = order_list
 
         # pre-order I/O that can be resolved with hint when the specified I/O section is not ordered
         io_section = deepcopy(io_section)

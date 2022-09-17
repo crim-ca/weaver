@@ -4399,9 +4399,9 @@ class CWLGraphBase(ExtendedMappingSchema):
     graph = CWLGraphList(
         name="$graph", description=(
             "Graph definition that defines *exactly one* CWL application package represented as list. "
-            "Multiple definitions simultaneously deployed is NOT supported at the moment."
+            "Multiple definitions simultaneously deployed is NOT supported currently."
             # "Graph definition that combines one or many CWL application packages within a single payload. "
-            # "If an single application is given (list of one item), it will be deployed as normal CWL by itself. "
+            # "If a single application is given (list of one item), it will be deployed as normal CWL by itself. "
             # "If multiple applications are defined, the first MUST be the top-most Workflow process. "
             # "Deployment of other items will be performed, and the full deployment will be persisted only if all are "
             # "valid. The resulting Workflow will be registered as a package by itself (i.e: not as a graph)."
@@ -4439,6 +4439,10 @@ class DeployCWL(NotKeywordSchema, CWL, UpdateVersion):
 
 
 class DeployOGCRemoteProcess(ExtendedMappingSchema):
+    id = ProcessIdentifier(missing=drop, description=(
+        "Optional identifier for the new process to deploy. "
+        "If not provided, the ID inferred from the specified OGC API - Processes endpoint is reused."
+    ))
     process = ProcessURL()
 
 

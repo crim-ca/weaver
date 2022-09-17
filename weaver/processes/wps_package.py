@@ -606,6 +606,7 @@ def _generate_process_with_cwl_from_reference(reference, process_hint=None):
                 and isinstance(payload, dict) and "cwlVersion" not in payload
                 and sd.ProcessDescription(missing=colander.drop).deserialize(payload) is not colander.drop
             ):
+                payload.update(process_hint or {})  # apply provided process overrides, such as alternative ID
                 cwl_package, process_info = json_ogcapi2cwl(payload, reference)
             # if somehow the CWL was referenced without an extension, handle it here
             elif isinstance(payload, dict) and "cwlVersion" in payload:
@@ -681,7 +682,7 @@ def check_package_instance_compatible(package):
     regardless whether remote should be an :term:`ADES` or a remote :term:`Provider` (:term:`WPS` or :term:`ESGF-CWT`).
 
     :param package: CWL definition for the process.
-    :returns: reason message if must be executed remotely or ``None`` if it *could* be executed locally.
+    :returns: reason message if it must be executed remotely or ``None`` if it *could* be executed locally.
     """
     if _get_package_type(package) == ProcessType.WORKFLOW:
         return f"CWL package defines a [{ProcessType.WORKFLOW}] process that uses remote step-processes."

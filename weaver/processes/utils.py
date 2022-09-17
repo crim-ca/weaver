@@ -354,6 +354,8 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
         process_param = "processDescription.process"
     elif process_href and "process" in payload:
         process_param = "process"
+        payload.pop("process")
+        process_info = payload
     else:
         process_param = "processDescription"
 

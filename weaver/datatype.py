@@ -35,7 +35,13 @@ from weaver import xml_util
 from weaver.exceptions import ProcessInstanceError, ServiceParsingError
 from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import AcceptLanguage, ContentType, repr_json
-from weaver.processes.constants import ProcessSchema
+from weaver.processes.constants import (
+    CWL_REQUIREMENT_APP_BUILTIN,
+    CWL_REQUIREMENT_APP_DOCKER,
+    CWL_REQUIREMENT_APP_OGC_API,
+    CWL_REQUIREMENT_APP_WPS1,
+    ProcessSchema
+)
 from weaver.processes.convert import get_field, json2oas_io, normalize_ordered_io, null, ows2json, wps2json_io
 from weaver.processes.types import ProcessType
 from weaver.quotation.status import QuoteStatus
@@ -2083,21 +2089,30 @@ class Process(Base):
     @property
     def deployment_profile(self):
         # type: () -> str
+        from weaver.processes.wps_package import get_application_requirement
+
         base = "http://www.opengis.net/profiles/eoc/"
-        _typ = self.type
-        if _typ == ProcessType.APPLICATION:
-            profile = base + "dockerizedApplication"
-        elif "wps" in _typ:
+        cls = str(self.package.get("class", "")).lower()
+        req = get_application_requirement(self.package).get("class")
+        typ = self.type
+
+        if cls == ProcessType.WORKFLOW:
+            profile = base + "workflow"
+        elif ProcessType.is_wps(typ):
             profile = base + "wpsApplication"
+        elif typ == ProcessType.OGC_API or req == CWL_REQUIREMENT_APP_OGC_API:
+            profile = base + "ogcapiApplication"
+        elif typ == ProcessType.APPLICATION or req == CWL_REQUIREMENT_APP_DOCKER:
+            profile = base + "dockerizedApplication"
         else:
-            profile = base + _typ
+            profile = base + typ
         return profile
 
     @property
     def package(self):
         # type: () -> Optional[CWL]
         """
-        Package CWL definition as JSON.
+        Package :term:`CWL` definition as :term:`JSON`.
         """
         pkg = self.get("package")
         return self._decode(pkg) if isinstance(pkg, dict) else pkg

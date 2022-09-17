@@ -693,10 +693,16 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         resp = self.app.put_json(vis_url, params=body, headers=self.json_headers)
         assert resp.status_code == 200
 
-        proc_query = {"schema": ProcessSchema.OLD}
+        body = self.get_process_description(proc_id)
+        self.assert_deployed_wps3(body, expected_process_id, assert_io=assert_io)
+        return body
+
+    def get_process_description(self, process_id, schema=ProcessSchema.OLD):
+        # type: (str, ProcessSchema) -> JSON
+        proc_query = {"schema": schema}
+        proc_url = f"/processes/{process_id}"
         resp = self.app.get(proc_url, params=proc_query, headers=self.json_headers)
         assert resp.status_code == 200
-        self.assert_deployed_wps3(resp.json, expected_process_id, assert_io=assert_io)
         return resp.json
 
     def get_application_package(self, process_id):
@@ -1030,7 +1036,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                             },
                         }
                     },
-                    "$namespace": ns
+                    "$namespaces": ns
                 }, cwl_file)
 
             body = {
@@ -1079,7 +1085,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                     },
                 }
             },
-            "$namespace": ns
+            "$namespaces": ns
         }
         with contextlib.ExitStack() as stack:
             stack.enter_context(mocked_wps_output(self.settings))
@@ -1142,7 +1148,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                     },
                 }
             },
-            "$namespace": ns
+            "$namespaces": ns
         }
         body = {
             "processDescription": {"process": {
@@ -1261,30 +1267,32 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID)
 
     def validate_ogcapi_process_description(self, process_description, process_id, remote_process):
+        # type: (JSON, str, str) -> None
+        assert process_id != remote_process
         assert process_description["deploymentProfile"] == "http://www.opengis.net/profiles/eoc/ogcapiApplication"
 
         # process description should have been generated with relevant I/O
         proc = process_description["process"]
+        ref_desc = self.get_process_description(remote_process)
+        ref_proc = ref_desc["process"]
+        ref_url = ref_proc["processDescriptionURL"]
         assert proc["id"] == process_id
-        assert proc["inputs"] == []
-        assert proc["outputs"] == [{
-            "id": "output",
-            "title": "output",
-            "schema": {"type": "string", "contentMediaType": "text/plain"},
-            "formats": [{"default": True, "mediaType": "text/plain"}]
-        }]
+        assert proc["inputs"] == ref_proc["inputs"]
+        assert proc["outputs"] == ref_proc["outputs"]
 
         # package should have been generated with corresponding I/O from "remote process"
         ref = self.get_application_package(remote_process)
         pkg = self.get_application_package(process_id)
-        # add the missing remote reference to the local definition to compare them
-        ref["hints"] = {  # expected to be defined in
+        assert pkg["hints"] == {
             "OGCAPIRequirement": {
-                "process": "jsonarray2netcdf",
-                "provider": self.url
+                "process": ref_url
             }
         }
-        assert pkg == ref
+        for io_select in ["input", "output"]:
+            io_section = f"{io_select}s"
+            for io_pkg, io_ref in zip(pkg[io_section], ref[io_section]):
+                assert io_pkg["id"] == io_ref["id"]
+                assert io_pkg["format"] == io_ref["format"]
 
     def test_deploy_process_OGC_API_DescribeProcess_href(self):
         """
@@ -1305,7 +1313,10 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         remote_process = "jsonarray2netcdf"  # use builtin, re-deploy as "remote process"
         href = f"{self.url}/processes/{remote_process}"
         p_id = "new-test-ogc-api"
-        body = {"process": href}
+        body = {
+            "id": p_id,  # normally optional, but since an existing process is re-deployed, conflict ID is raised
+            "process": href
+        }
         desc = self.deploy_process_make_visible_and_fetch_deployed(body, p_id, assert_io=False)
         self.validate_ogcapi_process_description(desc, p_id, remote_process)
 
