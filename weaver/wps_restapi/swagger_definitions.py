@@ -3978,6 +3978,33 @@ class CWLBase(ExtendedMappingSchema):
     cwlVersion = CWLVersion()
 
 
+class CWLScatterMulti(ExtendedSequenceSchema):
+    id = CWLIdentifier("")
+
+
+class CWLScatter(OneOfKeywordSchema):
+    _one_of = [
+        CWLIdentifier(),
+        CWLScatterMulti()
+    ]
+
+
+class CWLScatterMethod(ExtendedSchemaNode):
+    schema_type = String
+    description = (
+        "Describes how to decompose the scattered input into a discrete set of jobs. "
+        "When 'dotproduct', specifies that each of the input arrays are aligned and one element taken from each array"
+        "to construct each job. It is an error if all input arrays are of different length. "
+        "When 'nested_crossproduct', specifies the Cartesian product of the inputs, producing a job for every "
+        "combination of the scattered inputs. The output must be nested arrays for each level of scattering, "
+        "in the order that the input arrays are listed in the scatter field. "
+        "When 'flat_crossproduct', specifies the Cartesian product of the inputs, producing a job for every "
+        "combination of the scattered inputs. The output arrays must be flattened to a single level, but otherwise "
+        "listed in the order that the input arrays are listed in the scatter field."
+    )
+    validator = OneOf(["dotproduct", "nested_crossproduct", "flat_crossproduct"])
+
+
 class CWLApp(PermissiveMappingSchema):
     _class = CWLClass()
     id = CWLIdentifier(missing=drop)  # can be omitted only if within a process deployment that also includes it
@@ -3990,6 +4017,11 @@ class CWLApp(PermissiveMappingSchema):
     arguments = CWLArguments(description="Base arguments passed to the command.", missing=drop)
     inputs = CWLInputsDefinition(description="All inputs available to the Application Package.")
     outputs = CWLOutputsDefinition(description="All outputs produced by the Application Package.")
+    scatter = CWLScatter(missing=drop, description=(
+        "One or more input identifier of an application step within a Workflow were an array-based input to that "
+        "Workflow should be scattered across multiple instances of the step application."
+    ))
+    scatterMethod = CWLScatterMethod(missing=drop)
 
 
 class CWL(CWLBase, CWLApp):

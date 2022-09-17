@@ -364,29 +364,28 @@ def get_conformance(category):
         ogcapi_proc_apppkg + "/req/app-pck/wf",
         ogcapi_proc_apppkg + "/req/app-pck/wf-inputs",
         ogcapi_proc_apppkg + "/req/app-pck/metadata",
-        # FIXME: Support Fan-In/Fan-Out workflow (https://github.com/crim-ca/weaver/issues/105)
-        # ogcapi_proc_apppkg + "/rec/app-pck/fan-out",
-        # ogcapi_proc_apppkg + "/conf/app-pck-stage-in",
-        # ogcapi_proc_apppkg + "/req/app-pck-stage-in",
+        ogcapi_proc_apppkg + "/rec/app-pck/fan-out",
+        ogcapi_proc_apppkg + "/conf/app-pck-stage-in",
+        ogcapi_proc_apppkg + "/req/app-pck-stage-in",
         # FIXME: Support for STAC metadata (https://github.com/crim-ca/weaver/issues/103)
         #   not sure about requirement: "staging of EO products SHALL be of type 'Directory'."
         # ogcapi_proc_apppkg + "/req/app-pck-stage-in/clt-stac",
         # ogcapi_proc_apppkg + "/req/app-pck-stage-in/wf-stac",
-        # ogcapi_proc_apppkg + "/conf/app-pck-stage-out",
-        # ogcapi_proc_apppkg + "/req/app-pck-stage-out",
+        ogcapi_proc_apppkg + "/conf/app-pck-stage-out",
+        ogcapi_proc_apppkg + "/req/app-pck-stage-out",
         # ogcapi_proc_apppkg + "/req/app-pck-stage-out/output-stac"
         ogcapi_proc_apppkg + "/conf/plt",
         ogcapi_proc_apppkg + "/req/plt",
         ogcapi_proc_apppkg + "/req/plt/api",
         ogcapi_proc_apppkg + "/req/plt/inputs",
         ogcapi_proc_apppkg + "/req/plt/file",
+        ogcapi_proc_apppkg + "/conf/plt-stage-in",
+        ogcapi_proc_apppkg + "/req/plt-stage-in",
         # FIXME: Support for STAC metadata (https://github.com/crim-ca/weaver/issues/103)
-        # ogcapi_proc_apppkg + "/conf/plt-stage-in",
-        # ogcapi_proc_apppkg + "/req/plt-stage-in",
         # ogcapi_proc_apppkg + "/req/plt-stage-in/input-stac",
         # ogcapi_proc_apppkg + "/req/plt-stage-in/stac-stage",
-        # ogcapi_proc_apppkg + "/conf/plt-stage-out",
-        # ogcapi_proc_apppkg + "/req/plt-stage-out",
+        ogcapi_proc_apppkg + "/conf/plt-stage-out",
+        ogcapi_proc_apppkg + "/req/plt-stage-out",
         # ogcapi_proc_apppkg + "/req/plt-stage-out/stac-stage",
     ]
     if category not in [None, ConformanceCategory.ALL]:

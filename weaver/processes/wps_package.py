@@ -1783,7 +1783,7 @@ class WpsPackage(Process):
         try:
             step_details = self.step_packages[job_name]
         except KeyError:  # Perform check directly first in case a step was called literally as '<name>_<index>'
-            # In case of Workflow with scattering, job name might be suffixed with an index
+            # In case of Workflow with scattering, job name might be suffixed with an index.
             # Also, to avoid ambiguous references of Workflow steps running in parallel (distinct jobs),
             # unique keys are generated for matching step names, since their sub-CWL might differ.
             # (see 'cwltool.process.uniquename')
@@ -1792,7 +1792,7 @@ class WpsPackage(Process):
             job_name, job_index = job_name.rsplit("_", 1)
             if not job_index.isnumeric():
                 raise
-            LOGGER.debug("Resolved step name with index from scattering: [%s](%s)", job_name, job_index)
+            LOGGER.debug("Resolved step name with index: [%s](%s)", job_name, job_index)
             step_details = self.step_packages[job_name]
         return step_details
 
