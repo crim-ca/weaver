@@ -1220,7 +1220,7 @@ class ExtendedSequenceSchema(DefaultSchemaNode, DropableSchemaNode, colander.Seq
         super(ExtendedSequenceSchema, self).__init__(*args, **kwargs)
         self._validate()
 
-    def _validate(self):  # pylint: disable=arguments-differ
+    def _validate(self):  # pylint: disable=arguments-differ,arguments-renamed
         ExtendedSchemaBase._validate(self.children[0])
 
 

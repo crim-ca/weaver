@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 import tempfile
 
 import mock
@@ -16,11 +17,49 @@ from tests.utils import (
 from weaver.exceptions import PackageRegistrationError
 from weaver.processes.constants import CWL_REQUIREMENT_APP_WPS1
 from weaver.processes.utils import register_cwl_processes_from_config, register_wps_processes_from_config
+from weaver.processes.utils import _check_package_file  # noqa: W0212
 
 WPS1_URL1 = resources.TEST_REMOTE_SERVER_URL
 WPS1_URL2 = "http://yet-another-server.com"
 WPS1_URL3 = "http://one-more-server.com"
 WPS1_URL4 = "http://emu-server.com"
+
+
+class MockResponseOk(object):
+    status_code = 200
+
+
+def test_check_package_file_with_url():
+    package_url = "https://example.com/package.cwl"
+    with mock.patch("requests.Session.request", return_value=MockResponseOk()) as mock_request:
+        res_path = _check_package_file(package_url)
+        assert mock_request.call_count == 1
+        assert mock_request.call_args[0][:2] == ("head", package_url)  # ignore extra args
+    assert res_path == package_url
+
+
+def test_check_package_file_with_file_scheme():
+    with mock.patch("requests.Session.request", return_value=MockResponseOk()) as mock_request:
+        with tempfile.NamedTemporaryFile(mode="r", suffix="test-package.cwl") as tmp_file:
+            package_file = f"file://{tmp_file.name}"
+            res_path = _check_package_file(package_file)
+            mock_request.assert_not_called()
+            assert res_path == tmp_file.name
+
+
+def test_check_package_file_with_posix_path():
+    with tempfile.NamedTemporaryFile(mode="r", suffix="test-package.cwl") as tmp_file:
+        res_path = _check_package_file(tmp_file.name)
+        assert res_path == tmp_file.name
+
+
+@pytest.mark.skipif(not sys.platform.startswith("win"), reason="Test for Windows only")
+def test_check_package_file_with_windows_path():
+    test_file = "C:/Windows/Temp/package.cwl"   # fake existing, just test format handled correctly
+    with mock.patch("os.path.isfile", return_value=True) as mock_isfile:
+        res_path = _check_package_file(test_file)
+        mock_isfile.assert_called_with(test_file)
+    assert res_path == test_file
 
 
 def test_register_wps_processes_from_config_empty():
@@ -335,7 +374,7 @@ def test_register_cwl_processes_from_config_error_handling():
             assert register_cwl_processes_from_config(settings) == 0
             assert mocked.call_count == 1
         with mock.patch("weaver.processes.utils.deploy_process_from_payload", side_effect=raise_deploy) as mocked:
-            result = None
+            result = None  # noqa
             with pytest.raises(PackageRegistrationError):
                 settings["weaver.cwl_processes_register_error"] = "true"
                 result = register_cwl_processes_from_config(settings)

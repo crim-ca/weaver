@@ -118,15 +118,20 @@ if TYPE_CHECKING:
         "format": NotRequired[Optional[str]],
     }, total=True)
     CWL_IO_Value = Union[AnyValueType, List[AnyValueType], CWL_IO_FileValue, List[CWL_IO_FileValue]]
-    CWL_IO_NullableType = Union[str, List[str]]  # "<type>?" or ["<type>", "null"]
+    CWL_IO_LiteralType = Literal["string", "boolean", "float", "int", "integer", "long", "double"]
+    CWL_IO_ComplexType = Literal["File", "Directory"]
+    CWL_IO_SpecialType = Literal["null", "Any"]
+    CWL_IO_ArrayBaseType = Literal["array"]
+    CWL_IO_BaseType = Union[CWL_IO_LiteralType, CWL_IO_ComplexType, CWL_IO_ArrayBaseType, CWL_IO_SpecialType]
+    CWL_IO_NullableType = Union[str, List[CWL_IO_BaseType]]  # "<type>?" or ["<type>", "null"]
     CWL_IO_NestedType = TypedDict("CWL_IO_NestedType", {"type": CWL_IO_NullableType}, total=True)
     CWL_IO_EnumSymbols = Union[List[str], List[int], List[float]]
     CWL_IO_EnumType = TypedDict("CWL_IO_EnumType", {
-        "type": str,
+        "type": Literal["enum"],
         "symbols": CWL_IO_EnumSymbols,
     })
     CWL_IO_ArrayType = TypedDict("CWL_IO_ArrayType", {
-        "type": str,
+        "type": CWL_IO_ArrayBaseType,
         "items": Union[str, CWL_IO_EnumType],  # "items" => type of every item
     })
     CWL_IO_TypeItem = Union[str, CWL_IO_NestedType, CWL_IO_ArrayType, CWL_IO_EnumType]

@@ -189,7 +189,7 @@ def mocked_auth_response(token_name, token_value, *_, **__):
 def test_auth_handler_basic():
     req = TestRequest({})
     auth = BasicAuthHandler(username="test", password=str(uuid.uuid4()))
-    resp = auth.__call__(req)  # type: ignore
+    resp = auth(req)  # type: ignore
     assert "Authorization" in resp.headers and len(resp.headers["Authorization"])
     assert resp.headers["Authorization"].startswith("Basic")
 
@@ -202,7 +202,7 @@ def test_auth_handler_bearer():
         "requests.Session.request",
         side_effect=lambda *_, **__: mocked_auth_response("access_token", token)
     ):
-        resp = auth.__call__(req)  # type: ignore
+        resp = auth(req)  # type: ignore
     assert "Authorization" in resp.headers and len(resp.headers["Authorization"])
     assert resp.headers["Authorization"].startswith("Bearer") and resp.headers["Authorization"].endswith(token)
 
@@ -215,7 +215,7 @@ def test_auth_handler_cookie():
         "requests.Session.request",
         side_effect=lambda *_, **__: mocked_auth_response("access_token", token)
     ):
-        resp = auth.__call__(req)  # type: ignore
+        resp = auth(req)  # type: ignore
     assert "Authorization" not in resp.headers
     assert "Cookie" in resp.headers and len(resp.headers["Cookie"])
     assert resp.headers["Cookie"] == token

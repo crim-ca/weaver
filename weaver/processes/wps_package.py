@@ -1896,7 +1896,6 @@ class WpsPackage(Process):
             from weaver.processes.ogc_api_process import OGCAPIRemoteProcess
             params = _get_req_params(requirement, ["process"])
             return OGCAPIRemoteProcess(step_payload=step_payload,
-                                       job_order=job_order,
                                        process=params["process"],
                                        request=self.request,
                                        update_status=_update_status_dispatch)

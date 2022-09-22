@@ -71,6 +71,8 @@ class Wps3Process(OGCAPIRemoteProcessBase):
                  update_status,     # type: UpdateStatusPartialFunction
                  ):                 # type: (...) -> None
         super(Wps3Process, self).__init__(
+            step_payload,
+            process,
             request,
             lambda _message, _progress, _status, *args, **kwargs: update_status(
                 _message, _progress, _status, self.provider or "local", *args, **kwargs

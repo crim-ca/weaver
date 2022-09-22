@@ -52,7 +52,9 @@ _lxml_fromstring = lxml_etree.fromstring
 
 def fromstring(text, parser=XML_PARSER):
     # type: (AnyStr, lxml_etree.XMLParser) -> XML
-    return _lxml_fromstring(text, parser=parser)  # nosec: B410
+    from weaver.utils import str2bytes
+
+    return _lxml_fromstring(str2bytes(text), parser=parser)  # nosec: B410
 
 
 def parse(source, parser=XML_PARSER):

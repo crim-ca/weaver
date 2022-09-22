@@ -16,16 +16,28 @@ from pywps.validator.mode import MODE
 
 from weaver.exceptions import PackageTypeError
 from weaver.formats import OGC_MAPPING, OGC_NAMESPACE_DEFINITION, ContentType
-from weaver.processes.constants import WPS_INPUT, WPS_LITERAL, WPS_OUTPUT, ProcessSchema
+from weaver.processes.constants import (
+    WPS_BOUNDINGBOX,
+    WPS_COMPLEX,
+    WPS_COMPLEX_TYPES,
+    WPS_INPUT,
+    WPS_LITERAL,
+    WPS_LITERAL_DATA_TYPES,
+    WPS_OUTPUT,
+    ProcessSchema
+)
 from weaver.processes.convert import _are_different_and_set  # noqa: W0212
 from weaver.processes.convert import (
     DEFAULT_FORMAT,
     PACKAGE_ARRAY_MAX_SIZE,
+    CWLIODefinition,
     any2cwl_io,
     complex2json,
     convert_input_values_schema,
     cwl2json_input_values,
     cwl2wps_io,
+    get_cwl_io_type,
+    get_io_type_category,
     is_cwl_array_type,
     is_cwl_enum_type,
     is_cwl_file_type,
@@ -359,7 +371,46 @@ def test_cwl2wps_io_record_format():
     assert wps_io.supported_formats[0].mime_type == ContentType.APP_JSON
 
 
-def testis_cwl_array_type_explicit_invalid_item():
+@pytest.mark.parametrize("io_type, io_info", [
+    (WPS_LITERAL, {"type": WPS_LITERAL}),
+    (WPS_COMPLEX, {"type": WPS_COMPLEX}),
+    (WPS_BOUNDINGBOX, {"type": WPS_BOUNDINGBOX}),
+] + [
+    (WPS_LITERAL, {"type": _type}) for _type in WPS_LITERAL_DATA_TYPES
+] + [
+    (WPS_COMPLEX, {"type": _type}) for _type in WPS_COMPLEX_TYPES
+] + [
+    (WPS_LITERAL, {"type": ["null", _type]}) for _type in WPS_LITERAL_DATA_TYPES
+] + [
+    (WPS_LITERAL, {"type": {"type": "array", "items": _type}}) for _type in WPS_LITERAL_DATA_TYPES
+])
+def test_get_io_type_category(io_type, io_info):
+    assert get_io_type_category(io_info) == io_type, f"Testing: {io_info}"
+
+
+@pytest.mark.parametrize("io_info, io_def", [
+    ({"type": "string"},
+     CWLIODefinition(type="string")),
+    ({"type": "int"},
+     CWLIODefinition(type="int")),
+    ({"type": "float"},
+     CWLIODefinition(type="float")),
+    ({"type": {"type": "enum", "symbols": ["a", "b", "c"]}},
+     CWLIODefinition(type="string", enum=True, symbols=["a", "b", "c"], mode=MODE.SIMPLE)),
+    ({"type": {"type": "array", "items": "string"}},
+     CWLIODefinition(type="string", array=True, min_occurs=1, max_occurs=PACKAGE_ARRAY_MAX_SIZE)),
+    ({"type": ["null", "string"]},
+     CWLIODefinition(type="string", null=True, min_occurs=0)),
+    ({"type": "string?"},
+     CWLIODefinition(type="string", null=True, min_occurs=0)),
+])
+def test_get_cwl_io_type(io_info, io_def):
+    io_def.name = io_info["name"] = "test"
+    io_res = get_cwl_io_type(io_info)
+    assert io_res == io_def
+
+
+def test_is_cwl_array_type_explicit_invalid_item():
     io_info = {
         "name": "test",
         "type": {
@@ -371,7 +422,7 @@ def testis_cwl_array_type_explicit_invalid_item():
         is_cwl_array_type(io_info)
 
 
-def testis_cwl_array_type_shorthand_invalid_item():
+def test_is_cwl_array_type_shorthand_invalid_item():
     """
     In case of shorthand syntax, because type is only a string, it shouldn't raise.
 
@@ -391,7 +442,7 @@ def testis_cwl_array_type_shorthand_invalid_item():
         pytest.fail("should not raise an error in this case")
 
 
-def testis_cwl_array_type_not_array():
+def test_is_cwl_array_type_not_array():
     io_info = {
         "name": "test",
         "type": "float",
@@ -403,7 +454,7 @@ def testis_cwl_array_type_not_array():
     assert res[3] == AnyValue
 
 
-def testis_cwl_array_type_simple_enum():
+def test_is_cwl_array_type_simple_enum():
     io_info = {
         "name": "test",
         "type": "enum",
@@ -416,7 +467,7 @@ def testis_cwl_array_type_simple_enum():
     assert res[3] == AnyValue
 
 
-def testis_cwl_array_type_explicit_base():
+def test_is_cwl_array_type_explicit_base():
     io_info = {
         "name": "test",
         "type": {
@@ -431,7 +482,7 @@ def testis_cwl_array_type_explicit_base():
     assert res[3] == AnyValue
 
 
-def testis_cwl_array_type_explicit_enum():
+def test_is_cwl_array_type_explicit_enum():
     io_info = {
         "name": "test",
         "type": {
@@ -449,7 +500,7 @@ def testis_cwl_array_type_explicit_enum():
     assert res[3] == ["a", "b", "c"]
 
 
-def testis_cwl_array_type_shorthand_base():
+def test_is_cwl_array_type_shorthand_base():
     io_info = {
         "name": "test",
         "type": "string[]",
@@ -461,7 +512,7 @@ def testis_cwl_array_type_shorthand_base():
     assert res[3] == AnyValue
 
 
-def testis_cwl_array_type_shorthand_enum():
+def test_is_cwl_array_type_shorthand_enum():
     io_info = {
         "name": "test",
         "type": "enum[]",
@@ -474,7 +525,7 @@ def testis_cwl_array_type_shorthand_enum():
     assert res[3] == ["a", "b", "c"]
 
 
-def testis_cwl_array_type_explicit_optional_not_array():
+def test_is_cwl_array_type_explicit_optional_not_array():
     io_info = {
         "name": "test",
         "type": ["null", "float"],
@@ -486,7 +537,7 @@ def testis_cwl_array_type_explicit_optional_not_array():
     assert res[3] == AnyValue
 
 
-def testis_cwl_array_type_explicit_optional_simple_enum():
+def test_is_cwl_array_type_explicit_optional_simple_enum():
     io_info = {
         "name": "test",
         "type": ["null", "enum"],
@@ -499,7 +550,7 @@ def testis_cwl_array_type_explicit_optional_simple_enum():
     assert res[3] == AnyValue
 
 
-def testis_cwl_array_type_explicit_optional_explicit_base():
+def test_is_cwl_array_type_explicit_optional_explicit_base():
     io_info = {
         "name": "test",
         "type": [
@@ -514,7 +565,7 @@ def testis_cwl_array_type_explicit_optional_explicit_base():
     assert res[3] == AnyValue
 
 
-def testis_cwl_array_type_explicit_optional_explicit_enum():
+def test_is_cwl_array_type_explicit_optional_explicit_enum():
     io_info = {
         "name": "test",
         "type": [
@@ -535,7 +586,7 @@ def testis_cwl_array_type_explicit_optional_explicit_enum():
     assert res[3] == ["a", "b", "c"]
 
 
-def testis_cwl_array_type_explicit_optional_shorthand_base():
+def test_is_cwl_array_type_explicit_optional_shorthand_base():
     io_info = {
         "name": "test",
         "type": ["null", "string[]"]
@@ -547,7 +598,7 @@ def testis_cwl_array_type_explicit_optional_shorthand_base():
     assert res[3] == AnyValue
 
 
-def testis_cwl_array_type_explicit_optional_shorthand_enum():
+def test_is_cwl_array_type_explicit_optional_shorthand_enum():
     io_info = {
         "name": "test",
         "type": ["null", "enum[]"],
@@ -560,7 +611,7 @@ def testis_cwl_array_type_explicit_optional_shorthand_enum():
     assert res[3] == ["a", "b", "c"]
 
 
-def testis_cwl_enum_type_string():
+def test_is_cwl_enum_type_string():
     io_info = {
         "name": "test",
         "type": {
@@ -575,7 +626,7 @@ def testis_cwl_enum_type_string():
     assert res[3] == ["a", "b", "c"]
 
 
-def testis_cwl_enum_type_float():
+def test_is_cwl_enum_type_float():
     io_info = {
         "name": "test",
         "type": {
@@ -590,7 +641,7 @@ def testis_cwl_enum_type_float():
     assert res[3] == [1.9, 2.8, 3.7]
 
 
-def testis_cwl_enum_type_int():
+def test_is_cwl_enum_type_int():
     io_info = {
         "name": "test",
         "type": {

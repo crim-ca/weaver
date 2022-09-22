@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
     from weaver.typedefs import AnyKey
 
-    PropertyDataType = TypeVar("PropertyDataType")
+    PropertyDataTypeT = TypeVar("PropertyDataTypeT")
 
 # pylint: disable=E1120,no-value-for-parameter
 
@@ -44,7 +44,7 @@ class Constants(object, metaclass=_Const):
 
     @classmethod
     def get(cls, key_or_value, default=None):
-        # type: (Union[AnyKey, EnumType, PropertyDataType], Optional[Any]) -> PropertyDataType
+        # type: (Union[AnyKey, EnumType, PropertyDataTypeT], Optional[Any]) -> PropertyDataTypeT
         if isinstance(key_or_value, str):
             upper_key = key_or_value.upper()
             lower_key = key_or_value.lower()
@@ -110,8 +110,8 @@ class classproperty(property):  # pylint: disable=C0103,invalid-name
     """
 
     def __init__(self,
-                 fget=None,     # type: Optional[Callable[[object], PropertyDataType]]
-                 fset=None,     # type: Optional[Callable[[object, PropertyDataType], None]]
+                 fget=None,     # type: Optional[Callable[[object], PropertyDataTypeT]]
+                 fset=None,     # type: Optional[Callable[[object, PropertyDataTypeT], None]]
                  fdel=None,     # type: Optional[Callable[[object], None]]
                  doc="",        # type: str
                  ):             # type: (...) -> None
@@ -119,7 +119,7 @@ class classproperty(property):  # pylint: disable=C0103,invalid-name
         self.__doc__ = inspect.cleandoc(doc)
 
     def __get__(self, cls, owner):  # noqa
-        # type: (Type[object], Any) -> PropertyDataType
+        # type: (Type[object], Any) -> PropertyDataTypeT
         return classmethod(self.fget).__get__(None, owner)()
 
 

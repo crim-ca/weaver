@@ -158,6 +158,8 @@ def test_load_wkt(wkt, expected):
 
 
 def test_deploy_opensearch():
+    from weaver.processes.utils import get_settings as real_get_settings
+
     store = setup_mongodb_processstore()
 
     class MockDB(object):
@@ -167,8 +169,8 @@ def test_deploy_opensearch():
         def get_store(self, *_):  # noqa: E811
             return store
 
-    def _get_mocked(req):
-        return req.registry.settings
+    def _get_mocked(req=None):
+        return req.registry.settings if req else real_get_settings(None)
 
     # mock db functions called by add_local_process
     with contextlib.ExitStack() as stack:

@@ -35,13 +35,7 @@ from weaver import xml_util
 from weaver.exceptions import ProcessInstanceError, ServiceParsingError
 from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import AcceptLanguage, ContentType, repr_json
-from weaver.processes.constants import (
-    CWL_REQUIREMENT_APP_BUILTIN,
-    CWL_REQUIREMENT_APP_DOCKER,
-    CWL_REQUIREMENT_APP_OGC_API,
-    CWL_REQUIREMENT_APP_WPS1,
-    ProcessSchema
-)
+from weaver.processes.constants import CWL_REQUIREMENT_APP_DOCKER, CWL_REQUIREMENT_APP_OGC_API, ProcessSchema
 from weaver.processes.convert import get_field, json2oas_io, normalize_ordered_io, null, ows2json, wps2json_io
 from weaver.processes.types import ProcessType
 from weaver.quotation.status import QuoteStatus

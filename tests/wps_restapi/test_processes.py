@@ -49,15 +49,17 @@ from weaver.wps_restapi import swagger_definitions as sd
 if TYPE_CHECKING:
     from typing import List, Optional, Tuple
 
+    from pyramid.config import Configurator
+
     from weaver.processes.constants import ProcessSchemaType
-    from weaver.typedefs import CWL, JSON, AnyHeadersContainer, AnyVersion
+    from weaver.typedefs import CWL, JSON, AnyHeadersContainer, AnyVersion, SettingsType
 
 
 # pylint: disable=C0103,invalid-name
 class WpsRestApiProcessesTest(unittest.TestCase):
-    remote_server = None
-    settings = None
-    config = None
+    remote_server = None    # type: str
+    settings = None         # type: SettingsType
+    config = None           # type: Configurator
 
     @classmethod
     def setUpClass(cls):

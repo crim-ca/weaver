@@ -1423,7 +1423,7 @@ def retry_on_condition(operation,               # type: AnyCallableAnyArgs
             all(inspect.isclass(_exc) and issubclass(_exc, Exception) for _exc in condition)
         )
     ):
-        condition_check = lambda _exc: isinstance(_exc, condition)  # noqa: E731
+        condition_check = lambda _exc: isinstance(_exc, condition)  # noqa: E731  # pylint: disable=C3001
     else:
         condition_check = condition
 
