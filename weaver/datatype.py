@@ -2086,8 +2086,9 @@ class Process(Base):
         from weaver.processes.wps_package import get_application_requirement
 
         base = "http://www.opengis.net/profiles/eoc/"
-        cls = str(self.package.get("class", "")).lower()
-        req = get_application_requirement(self.package).get("class")
+        pkg = self.package or {}
+        cls = str(pkg.get("class", "")).lower()
+        req = get_application_requirement(pkg).get("class")
         typ = self.type
 
         if cls == ProcessType.WORKFLOW:
