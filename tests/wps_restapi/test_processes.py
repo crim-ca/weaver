@@ -58,7 +58,7 @@ if TYPE_CHECKING:
 # pylint: disable=C0103,invalid-name
 class WpsRestApiProcessesTest(unittest.TestCase):
     remote_server = None    # type: str
-    settings = None         # type: SettingsType
+    settings = {}           # type: SettingsType
     config = None           # type: Configurator
 
     @classmethod
@@ -1917,7 +1917,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                     # if optional, valid since omitting field does not raise missing field in schema
                     if is_invalid:
                         msg = f"Killed test '{i}' request taking too long using:\n{data_json}"
-                        assert timeout.state == timeout.EXECUTED, msg
+                        assert timeout.state == timeout.EXECUTED, msg  # pylint: disable=E0601
 
     def test_execute_process_dont_cast_one_of(self):
         """
