@@ -2,7 +2,6 @@
 Conversion functions between corresponding data structures.
 """
 import copy
-
 import json
 import logging
 import os
@@ -87,8 +86,8 @@ from weaver.utils import (
     str2bytes,
     transform_json
 )
-from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps.utils import get_wps_client
+from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union

@@ -71,9 +71,9 @@ from weaver.processes.constants import (
 from weaver.processes.convert import (
     cwl2wps_io,
     is_cwl_array_type,
-    json_ogcapi2cwl,
     json2wps_field,
     json2wps_io,
+    json_ogcapi2cwl,
     merge_package_io,
     normalize_ordered_io,
     wps2json_io,

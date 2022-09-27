@@ -16,8 +16,8 @@ from tests.utils import (
 )
 from weaver.exceptions import PackageRegistrationError
 from weaver.processes.constants import CWL_REQUIREMENT_APP_WPS1
-from weaver.processes.utils import register_cwl_processes_from_config, register_wps_processes_from_config
 from weaver.processes.utils import _check_package_file  # noqa: W0212
+from weaver.processes.utils import register_cwl_processes_from_config, register_wps_processes_from_config
 
 WPS1_URL1 = resources.TEST_REMOTE_SERVER_URL
 WPS1_URL2 = "http://yet-another-server.com"
