@@ -275,6 +275,8 @@ def test_register_cwl_processes_from_config_dir_no_cwl():
 
 
 def test_register_cwl_processes_from_config_load_recursive():
+    from weaver.processes.utils import load_package_file as real_load_pkg_file
+
     with tempfile.TemporaryDirectory() as tmp_dir:
         first_dir = os.path.join(tmp_dir, "first")
         nested_dir = os.path.join(tmp_dir, "nested")
@@ -349,19 +351,25 @@ def test_register_cwl_processes_from_config_load_recursive():
             if isinstance(_cwl, dict) and "invalid" in _cwl:
                 raise PackageRegistrationError("CWL INVALID")
 
-        with mock.patch("weaver.processes.utils.deploy_process_from_payload", side_effect=no_op_valid) as mocked:
-            settings = {"weaver.cwl_processes_dir": tmp_dir}
-            assert register_cwl_processes_from_config(settings) == len(cwl_ordered)
+        with mock.patch("weaver.processes.utils.deploy_process_from_payload", side_effect=no_op_valid) as mocked_deploy:
+            with mock.patch("weaver.processes.utils.load_package_file", side_effect=real_load_pkg_file) as mocked_load:
+                settings = {"weaver.cwl_processes_dir": tmp_dir}
+                assert register_cwl_processes_from_config(settings) == len(cwl_ordered)
 
-        call_count = len(cwl_ordered) + 2  # 2 invalid
-        assert mocked.call_count == call_count
-        valid_calls = list(call for call in mocked.call_args_list if "invalid" not in call.args[0])
+        call_count = len(cwl_ordered)  # mock not called if invalid definition invalidated beforehand
+        assert mocked_deploy.call_count == call_count
+        assert mocked_load.call_count == call_count + 2  # 2 "invalid.cwl"
+        valid_calls = list(call for call in mocked_load.call_args_list if "invalid" not in call.args[0])
+        deploy_calls = mocked_deploy.call_args_list
         assert len(valid_calls) == len(cwl_ordered)
-        for i, (order, call) in enumerate(zip(valid_order, valid_calls)):
+        assert len(valid_calls) == len(deploy_calls)
+        for i, (order, call) in enumerate(zip(valid_order, deploy_calls)):
             assert call.args[0] == cwl_ordered[order], f"Expected CWL does not match load order at position: {i}"
 
 
 def test_register_cwl_processes_from_config_error_handling():
+    from weaver.processes.utils import load_package_file as real_load_pkg_file
+
     with tempfile.TemporaryDirectory() as tmp_dir:
         with open(os.path.join(tmp_dir, "ignore.cwl"), mode="w", encoding="utf-8") as tmp_file:
             tmp_file.write("not important")
@@ -369,14 +377,18 @@ def test_register_cwl_processes_from_config_error_handling():
         def raise_deploy(*_, **__):
             raise PackageRegistrationError("test")
 
-        with mock.patch("weaver.processes.utils.deploy_process_from_payload", side_effect=raise_deploy) as mocked:
-            settings = {"weaver.cwl_processes_dir": tmp_dir}
-            assert register_cwl_processes_from_config(settings) == 0
-            assert mocked.call_count == 1
-        with mock.patch("weaver.processes.utils.deploy_process_from_payload", side_effect=raise_deploy) as mocked:
-            result = None  # noqa
-            with pytest.raises(PackageRegistrationError):
-                settings["weaver.cwl_processes_register_error"] = "true"
-                result = register_cwl_processes_from_config(settings)
-            assert mocked.call_count == 1
-            assert result is None  # not returned
+        with mock.patch("weaver.processes.utils.deploy_process_from_payload", side_effect=raise_deploy) as mock_deploy:
+            with mock.patch("weaver.processes.utils.load_package_file", side_effect=real_load_pkg_file) as mock_load:
+                settings = {"weaver.cwl_processes_dir": tmp_dir}
+                assert register_cwl_processes_from_config(settings) == 0
+                assert mock_deploy.call_count == 0, "Deploy should not be reached due to failed CWL pre-validation."
+                assert mock_load.call_count == 1
+        with mock.patch("weaver.processes.utils.deploy_process_from_payload", side_effect=raise_deploy) as mock_deploy:
+            with mock.patch("weaver.processes.utils.load_package_file", side_effect=real_load_pkg_file) as mock_load:
+                result = None  # noqa
+                with pytest.raises(PackageRegistrationError):
+                    settings["weaver.cwl_processes_register_error"] = "true"
+                    result = register_cwl_processes_from_config(settings)
+                assert mock_deploy.call_count == 0, "Deploy should not be reached due to failed CWL pre-validation."
+                assert mock_load.call_count == 1
+                assert result is None  # not returned

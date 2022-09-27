@@ -422,15 +422,21 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
 
     def _get_process_type(self, process):
         # type: (AnyProcess) -> AnyProcessType
-        return self._get_process_field(process, {
+        type_mappers = {
+            # pylint: disable=unhashable-member  # known false-positive (https://github.com/PyCQA/pylint/issues/7501)
             Process: lambda: process.type,
             ProcessWPS: lambda: getattr(process, "type", ProcessType.WPS_LOCAL)
-        }).lower()
+        }
+        return self._get_process_field(process, type_mappers).lower()
 
     def _get_process_endpoint_wps1(self, process):
         # type: (AnyProcess) -> str
-        url = self._get_process_field(process, {Process: lambda: process.processEndpointWPS1,
-                                                ProcessWPS: lambda: None})
+        url_mappers = {
+            # pylint: disable=unhashable-member  # known false-positive (https://github.com/PyCQA/pylint/issues/7501)
+            Process: lambda: process.processEndpointWPS1,
+            ProcessWPS: lambda: None
+        }
+        url = self._get_process_field(process, url_mappers)
         if not url:
             url = self.default_wps_endpoint
         return url
