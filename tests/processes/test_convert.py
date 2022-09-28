@@ -18,12 +18,7 @@ from pywps.inout.outputs import ComplexOutput
 from pywps.validator.mode import MODE
 
 from weaver.exceptions import PackageTypeError
-from weaver.formats import (
-    IANA_NAMESPACE_DEFINITION,
-    OGC_MAPPING,
-    OGC_NAMESPACE_DEFINITION,
-    ContentType
-)
+from weaver.formats import IANA_NAMESPACE_DEFINITION, OGC_MAPPING, OGC_NAMESPACE_DEFINITION, ContentType
 from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_OGC_API,
     WPS_BOUNDINGBOX,
