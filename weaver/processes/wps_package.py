@@ -73,9 +73,9 @@ from weaver.processes.convert import (
     is_cwl_array_type,
     json2wps_field,
     json2wps_io,
-    json_ogcapi2cwl,
     merge_package_io,
     normalize_ordered_io,
+    ogcapi2cwl_process,
     wps2json_io,
     xml_wps2cwl
 )
@@ -607,7 +607,7 @@ def _generate_process_with_cwl_from_reference(reference, process_hint=None):
                 and sd.ProcessDescription(missing=colander.drop).deserialize(payload) is not colander.drop
             ):
                 payload.update(process_hint or {})  # apply provided process overrides, such as alternative ID
-                cwl_package, process_info = json_ogcapi2cwl(payload, reference)
+                cwl_package, process_info = ogcapi2cwl_process(payload, reference)
             # if somehow the CWL was referenced without an extension, handle it here
             elif isinstance(payload, dict) and "cwlVersion" in payload:
                 cwl_package = payload

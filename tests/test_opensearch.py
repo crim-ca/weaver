@@ -21,7 +21,7 @@ from weaver.utils import get_any_id
 from weaver.wps_restapi.processes import processes
 
 if TYPE_CHECKING:
-    from typing import Dict
+    from typing import Any, Dict, Optional, Type
 
     from weaver.typedefs import JSON, DataSourceOpenSearch
 
@@ -155,6 +155,26 @@ def test_transform_execute_parameters_wps():
 ])
 def test_load_wkt(wkt, expected):
     assert opensearch.load_wkt_bbox_bounds(wkt) == expected
+
+
+@pytest.mark.parametrize("bbox, expected", [
+    ("1,2,3,4", None),
+    ("1, 2 ,3 ,4 ", None),
+    ("-1, 2.2 ,-3.3 ,4 ", None),
+    ("1", ValueError),
+    ("1,2", ValueError),
+    ("1,2,3", ValueError),
+    (None, ValueError),
+    (1234, ValueError),
+])
+def test_validate_bbox(bbox, expected):  # type: (Any, Optional[Type[Exception]]) -> None
+    try:
+        opensearch.validate_bbox(bbox)
+        assert expected is None, f"Exception {expected} was expected but none was raised."
+    except Exception as exc:
+        assert expected is not None and isinstance(exc, expected), (
+            f"Unexpected or incorrect exception raised: {exc!r}, expected: {expected!s}."
+        )
 
 
 def test_deploy_opensearch():

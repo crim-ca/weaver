@@ -3,10 +3,13 @@ Unit tests of functions within :mod:`weaver.processes.convert`.
 """
 # pylint: disable=R1729  # ignore non-generator representation employed for displaying test log results
 
+import json
+import tempfile
 from collections import OrderedDict
 from copy import deepcopy
 
 import pytest
+import yaml
 from owslib.wps import ComplexData, Input as OWSInput
 from pywps.inout.formats import Format
 from pywps.inout.inputs import ComplexInput, LiteralInput
@@ -15,8 +18,14 @@ from pywps.inout.outputs import ComplexOutput
 from pywps.validator.mode import MODE
 
 from weaver.exceptions import PackageTypeError
-from weaver.formats import OGC_MAPPING, OGC_NAMESPACE_DEFINITION, ContentType
+from weaver.formats import (
+    IANA_NAMESPACE_DEFINITION,
+    OGC_MAPPING,
+    OGC_NAMESPACE_DEFINITION,
+    ContentType
+)
 from weaver.processes.constants import (
+    CWL_REQUIREMENT_APP_OGC_API,
     WPS_BOUNDINGBOX,
     WPS_COMPLEX,
     WPS_COMPLEX_TYPES,
@@ -45,6 +54,7 @@ from weaver.processes.convert import (
     json2wps_datatype,
     merge_io_formats,
     normalize_ordered_io,
+    ogcapi2cwl_process,
     repr2json_input_values,
     set_field,
     wps2json_io
@@ -1138,3 +1148,192 @@ def test_set_field():
     set_field(data, "z", None)
     assert getattr(data, "y", 2)
     assert getattr(data, "z", null) is None
+
+
+def test_ogcapi2cwl_process_with_extra_href():
+    href = "https://remote-server.com/processes/test-process"
+    with tempfile.NamedTemporaryFile(mode="w", suffix="test-package.cwl") as tmp_file:
+        cwl_ns = {}
+        cwl_ns.update(IANA_NAMESPACE_DEFINITION)
+        cwl_ns.update(OGC_NAMESPACE_DEFINITION)
+        pkg = {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "baseCommand": ["dont-care"],
+            "arguments": ["irrelevant"],
+            "inputs": {
+                "in-str": {"type": "string", "inputBinding": {"position": 1}},
+                "in-int": {"type": "int", "inputBinding": {"position": 2}},
+                "in-float": {"type": "float", "inputBinding": {"position": 3}},
+                "in-file": {"type": "File", "format": f"iana:{ContentType.APP_JSON}",
+                            "inputBinding": {"prefix": "-f"}},
+            },
+            "outputs": {
+                "output": {"type": "File", "format": "ogc:geotiff",
+                           "outputBinding": {"glob": "output/*.tiff"}},
+            },
+            "$namespaces": cwl_ns
+        }
+        yaml.safe_dump(pkg, tmp_file, sort_keys=False)
+        tmp_file.flush()
+        tmp_file.seek(0)
+        body = {
+            "process": {"href": tmp_file.name}
+        }
+        cwl, info = ogcapi2cwl_process(body, href)
+    assert info is not body, "copy should be created, not inplace modifications"
+    assert cwl != pkg, "Conversion should have slightly modified the reference CWL"
+    pkg.pop("baseCommand")
+    pkg.pop("arguments")
+    pkg["hints"] = {
+        CWL_REQUIREMENT_APP_OGC_API: {
+            "process": href
+        }
+    }
+    assert pkg == cwl
+    assert info == {
+        "process": {"href": tmp_file.name},  # carried over, rest is generated
+        "executionUnit": [{"unit": cwl}],
+        "deploymentProfile": "http://www.opengis.net/profiles/eoc/ogcapiApplication",
+    }, "Process information should have been generated with additional details extracted from CWL."
+
+
+def test_ogcapi2cwl_process_with_extra_exec_unit():
+    href = "https://remote-server.com/processes/test-process"
+    cwl_ns = {}
+    cwl_ns.update(IANA_NAMESPACE_DEFINITION)
+    cwl_ns.update(OGC_NAMESPACE_DEFINITION)
+    pkg = {
+        "cwlVersion": "v1.0",
+        "class": "CommandLineTool",
+        "baseCommand": ["dont-care"],
+        "arguments": ["irrelevant"],
+        "inputs": {
+            "in-str": {"type": "string", "inputBinding": {"position": 1}},
+            "in-int": {"type": "int", "inputBinding": {"position": 2}},
+            "in-float": {"type": "float", "inputBinding": {"position": 3}},
+            "in-file": {"type": "File", "format": f"iana:{ContentType.APP_JSON}",
+                        "inputBinding": {"prefix": "-f"}},
+        },
+        "outputs": {
+            "output": {"type": "File", "format": "ogc:geotiff",
+                       "outputBinding": {"glob": "output/*.tiff"}},
+        },
+        "$namespaces": cwl_ns
+    }
+    body = {
+        "process": {
+            "id": "test-process"
+        },
+        "executionUnit": [
+            {"unit": pkg}
+        ]
+    }
+    cwl, info = ogcapi2cwl_process(body, href)
+    assert info is not body and info != body, "copy should be created, not inplace modifications"
+    assert cwl is not pkg and cwl != pkg
+    pkg.pop("baseCommand")
+    pkg.pop("arguments")
+    pkg["hints"] = {
+        CWL_REQUIREMENT_APP_OGC_API: {
+            "process": href
+        }
+    }
+    assert pkg == cwl
+    body["deploymentProfile"] = "http://www.opengis.net/profiles/eoc/ogcapiApplication"
+    assert info == body
+
+
+def test_ogcapi2cwl_process_with_extra_exec_href():
+    href = "https://remote-server.com/processes/test-process"
+    cwl_ns = {}
+    cwl_ns.update(IANA_NAMESPACE_DEFINITION)
+    cwl_ns.update(OGC_NAMESPACE_DEFINITION)
+    with tempfile.NamedTemporaryFile(mode="w", suffix="test-package.cwl") as tmp_file:
+        pkg = {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "baseCommand": ["dont-care"],
+            "arguments": ["irrelevant"],
+            "inputs": {
+                "in-str": {"type": "string", "inputBinding": {"position": 1}},
+                "in-int": {"type": "int", "inputBinding": {"position": 2}},
+                "in-float": {"type": "float", "inputBinding": {"position": 3}},
+                "in-file": {"type": "File", "format": f"iana:{ContentType.APP_JSON}",
+                            "inputBinding": {"prefix": "-f"}},
+            },
+            "outputs": {
+                "output": {"type": "File", "format": "ogc:geotiff",
+                           "outputBinding": {"glob": "output/*.tiff"}},
+            },
+            "$namespaces": cwl_ns
+        }
+        json.dump(pkg, tmp_file)
+        tmp_file.flush()
+        tmp_file.seek(0)
+        body = {
+            "process": {
+                "id": "test-process"
+            },
+            "executionUnit": [
+                {"href": tmp_file.name}
+            ]
+        }
+        cwl, info = ogcapi2cwl_process(body, href)
+    assert info is not body and info != body, "copy should be created, not inplace modifications"
+    assert cwl is not pkg and cwl != pkg
+    pkg.pop("baseCommand")
+    pkg.pop("arguments")
+    pkg["hints"] = {
+        CWL_REQUIREMENT_APP_OGC_API: {
+            "process": href
+        }
+    }
+    assert pkg == cwl
+    body["executionUnit"] = [{"unit": cwl}]
+    body["deploymentProfile"] = "http://www.opengis.net/profiles/eoc/ogcapiApplication"
+    assert info == body, "Execution unit should be rewritten with OGC-API hints requirement."
+
+
+def test_ogcapi2cwl_process_without_extra():
+    href = "https://remote-server.com/processes/test-process"
+    body = {
+        "inputs": {
+            "in-str": {"schema": {"type": "string"}},
+            "in-int": {"schema": {"type": "integer"}},
+            "in-float": {"schema": {"type": "number"}},
+            "in-file": {"schema": {"type": "string", "contentMediaType": ContentType.APP_JSON}},
+        },
+        "outputs": {
+            "output": {"schema": {"type": "string", "contentMediaType": ContentType.IMAGE_GEOTIFF}},
+        }
+    }
+    cwl, info = ogcapi2cwl_process(body, href)
+    assert info is not body, "copy should be created, not inplace modifications"
+    cwl_ns = {}
+    cwl_ns.update(IANA_NAMESPACE_DEFINITION)
+    cwl_ns.update(OGC_NAMESPACE_DEFINITION)
+    assert cwl == {
+        "cwlVersion": "v1.0",
+        "class": "CommandLineTool",
+        "hints": {
+            CWL_REQUIREMENT_APP_OGC_API: {
+                "process": href
+            }
+        },
+        "inputs": {
+            "in-str": {"type": "string"},
+            "in-int": {"type": "int"},
+            "in-float": {"type": "float"},
+            "in-file": {"type": "File", "format": f"iana:{ContentType.APP_JSON}"},
+        },
+        "outputs": {
+            "output": {"type": "File", "format": "ogc:geotiff",
+                       "outputBinding": {"glob": "output/*.tiff"}},
+        },
+        "$namespaces": cwl_ns
+    }
+    assert info != body
+    body["executionUnit"] = [{"unit": cwl}]
+    body["deploymentProfile"] = "http://www.opengis.net/profiles/eoc/ogcapiApplication"
+    assert info == body, "Process information should be updated with minimal details since no CWL detected in input."

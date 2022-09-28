@@ -66,7 +66,7 @@ def validate_bbox(bbox):
     try:
         if not len(list(map(float, bbox.split(",")))) == 4:
             raise ValueError
-    except ValueError:
+    except (AttributeError, TypeError, ValueError):
         raise ValueError(f"Could not parse bbox as a list of 4 floats: {bbox}")
 
 
