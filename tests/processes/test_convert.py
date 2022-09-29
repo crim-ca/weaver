@@ -3,10 +3,13 @@ Unit tests of functions within :mod:`weaver.processes.convert`.
 """
 # pylint: disable=R1729  # ignore non-generator representation employed for displaying test log results
 
+import json
+import tempfile
 from collections import OrderedDict
 from copy import deepcopy
 
 import pytest
+import yaml
 from owslib.wps import ComplexData, Input as OWSInput
 from pywps.inout.formats import Format
 from pywps.inout.inputs import ComplexInput, LiteralInput
@@ -15,17 +18,30 @@ from pywps.inout.outputs import ComplexOutput
 from pywps.validator.mode import MODE
 
 from weaver.exceptions import PackageTypeError
-from weaver.formats import OGC_MAPPING, OGC_NAMESPACE_DEFINITION, ContentType
-from weaver.processes.constants import WPS_INPUT, WPS_LITERAL, WPS_OUTPUT, ProcessSchema
+from weaver.formats import IANA_NAMESPACE_DEFINITION, OGC_MAPPING, OGC_NAMESPACE_DEFINITION, ContentType
+from weaver.processes.constants import (
+    CWL_REQUIREMENT_APP_OGC_API,
+    WPS_BOUNDINGBOX,
+    WPS_COMPLEX,
+    WPS_COMPLEX_TYPES,
+    WPS_INPUT,
+    WPS_LITERAL,
+    WPS_LITERAL_DATA_TYPES,
+    WPS_OUTPUT,
+    ProcessSchema
+)
 from weaver.processes.convert import _are_different_and_set  # noqa: W0212
 from weaver.processes.convert import (
     DEFAULT_FORMAT,
     PACKAGE_ARRAY_MAX_SIZE,
+    CWLIODefinition,
     any2cwl_io,
     complex2json,
     convert_input_values_schema,
     cwl2json_input_values,
     cwl2wps_io,
+    get_cwl_io_type,
+    get_io_type_category,
     is_cwl_array_type,
     is_cwl_enum_type,
     is_cwl_file_type,
@@ -33,6 +49,7 @@ from weaver.processes.convert import (
     json2wps_datatype,
     merge_io_formats,
     normalize_ordered_io,
+    ogcapi2cwl_process,
     repr2json_input_values,
     set_field,
     wps2json_io
@@ -359,7 +376,46 @@ def test_cwl2wps_io_record_format():
     assert wps_io.supported_formats[0].mime_type == ContentType.APP_JSON
 
 
-def testis_cwl_array_type_explicit_invalid_item():
+@pytest.mark.parametrize("io_type, io_info", [
+    (WPS_LITERAL, {"type": WPS_LITERAL}),
+    (WPS_COMPLEX, {"type": WPS_COMPLEX}),
+    (WPS_BOUNDINGBOX, {"type": WPS_BOUNDINGBOX}),
+] + [
+    (WPS_LITERAL, {"type": _type}) for _type in WPS_LITERAL_DATA_TYPES
+] + [
+    (WPS_COMPLEX, {"type": _type}) for _type in WPS_COMPLEX_TYPES
+] + [
+    (WPS_LITERAL, {"type": ["null", _type]}) for _type in WPS_LITERAL_DATA_TYPES
+] + [
+    (WPS_LITERAL, {"type": {"type": "array", "items": _type}}) for _type in WPS_LITERAL_DATA_TYPES
+])
+def test_get_io_type_category(io_type, io_info):
+    assert get_io_type_category(io_info) == io_type, f"Testing: {io_info}"
+
+
+@pytest.mark.parametrize("io_info, io_def", [
+    ({"type": "string"},
+     CWLIODefinition(type="string")),
+    ({"type": "int"},
+     CWLIODefinition(type="int")),
+    ({"type": "float"},
+     CWLIODefinition(type="float")),
+    ({"type": {"type": "enum", "symbols": ["a", "b", "c"]}},
+     CWLIODefinition(type="string", enum=True, symbols=["a", "b", "c"], mode=MODE.SIMPLE)),
+    ({"type": {"type": "array", "items": "string"}},
+     CWLIODefinition(type="string", array=True, min_occurs=1, max_occurs=PACKAGE_ARRAY_MAX_SIZE)),
+    ({"type": ["null", "string"]},
+     CWLIODefinition(type="string", null=True, min_occurs=0)),
+    ({"type": "string?"},
+     CWLIODefinition(type="string", null=True, min_occurs=0)),
+])
+def test_get_cwl_io_type(io_info, io_def):
+    io_def.name = io_info["name"] = "test"
+    io_res = get_cwl_io_type(io_info)
+    assert io_res == io_def
+
+
+def test_is_cwl_array_type_explicit_invalid_item():
     io_info = {
         "name": "test",
         "type": {
@@ -371,7 +427,7 @@ def testis_cwl_array_type_explicit_invalid_item():
         is_cwl_array_type(io_info)
 
 
-def testis_cwl_array_type_shorthand_invalid_item():
+def test_is_cwl_array_type_shorthand_invalid_item():
     """
     In case of shorthand syntax, because type is only a string, it shouldn't raise.
 
@@ -391,7 +447,7 @@ def testis_cwl_array_type_shorthand_invalid_item():
         pytest.fail("should not raise an error in this case")
 
 
-def testis_cwl_array_type_not_array():
+def test_is_cwl_array_type_not_array():
     io_info = {
         "name": "test",
         "type": "float",
@@ -403,7 +459,7 @@ def testis_cwl_array_type_not_array():
     assert res[3] == AnyValue
 
 
-def testis_cwl_array_type_simple_enum():
+def test_is_cwl_array_type_simple_enum():
     io_info = {
         "name": "test",
         "type": "enum",
@@ -416,7 +472,7 @@ def testis_cwl_array_type_simple_enum():
     assert res[3] == AnyValue
 
 
-def testis_cwl_array_type_explicit_base():
+def test_is_cwl_array_type_explicit_base():
     io_info = {
         "name": "test",
         "type": {
@@ -431,7 +487,7 @@ def testis_cwl_array_type_explicit_base():
     assert res[3] == AnyValue
 
 
-def testis_cwl_array_type_explicit_enum():
+def test_is_cwl_array_type_explicit_enum():
     io_info = {
         "name": "test",
         "type": {
@@ -449,7 +505,7 @@ def testis_cwl_array_type_explicit_enum():
     assert res[3] == ["a", "b", "c"]
 
 
-def testis_cwl_array_type_shorthand_base():
+def test_is_cwl_array_type_shorthand_base():
     io_info = {
         "name": "test",
         "type": "string[]",
@@ -461,7 +517,7 @@ def testis_cwl_array_type_shorthand_base():
     assert res[3] == AnyValue
 
 
-def testis_cwl_array_type_shorthand_enum():
+def test_is_cwl_array_type_shorthand_enum():
     io_info = {
         "name": "test",
         "type": "enum[]",
@@ -474,7 +530,7 @@ def testis_cwl_array_type_shorthand_enum():
     assert res[3] == ["a", "b", "c"]
 
 
-def testis_cwl_array_type_explicit_optional_not_array():
+def test_is_cwl_array_type_explicit_optional_not_array():
     io_info = {
         "name": "test",
         "type": ["null", "float"],
@@ -486,7 +542,7 @@ def testis_cwl_array_type_explicit_optional_not_array():
     assert res[3] == AnyValue
 
 
-def testis_cwl_array_type_explicit_optional_simple_enum():
+def test_is_cwl_array_type_explicit_optional_simple_enum():
     io_info = {
         "name": "test",
         "type": ["null", "enum"],
@@ -499,7 +555,7 @@ def testis_cwl_array_type_explicit_optional_simple_enum():
     assert res[3] == AnyValue
 
 
-def testis_cwl_array_type_explicit_optional_explicit_base():
+def test_is_cwl_array_type_explicit_optional_explicit_base():
     io_info = {
         "name": "test",
         "type": [
@@ -514,7 +570,7 @@ def testis_cwl_array_type_explicit_optional_explicit_base():
     assert res[3] == AnyValue
 
 
-def testis_cwl_array_type_explicit_optional_explicit_enum():
+def test_is_cwl_array_type_explicit_optional_explicit_enum():
     io_info = {
         "name": "test",
         "type": [
@@ -535,7 +591,7 @@ def testis_cwl_array_type_explicit_optional_explicit_enum():
     assert res[3] == ["a", "b", "c"]
 
 
-def testis_cwl_array_type_explicit_optional_shorthand_base():
+def test_is_cwl_array_type_explicit_optional_shorthand_base():
     io_info = {
         "name": "test",
         "type": ["null", "string[]"]
@@ -547,7 +603,7 @@ def testis_cwl_array_type_explicit_optional_shorthand_base():
     assert res[3] == AnyValue
 
 
-def testis_cwl_array_type_explicit_optional_shorthand_enum():
+def test_is_cwl_array_type_explicit_optional_shorthand_enum():
     io_info = {
         "name": "test",
         "type": ["null", "enum[]"],
@@ -560,7 +616,7 @@ def testis_cwl_array_type_explicit_optional_shorthand_enum():
     assert res[3] == ["a", "b", "c"]
 
 
-def testis_cwl_enum_type_string():
+def test_is_cwl_enum_type_string():
     io_info = {
         "name": "test",
         "type": {
@@ -575,7 +631,7 @@ def testis_cwl_enum_type_string():
     assert res[3] == ["a", "b", "c"]
 
 
-def testis_cwl_enum_type_float():
+def test_is_cwl_enum_type_float():
     io_info = {
         "name": "test",
         "type": {
@@ -590,7 +646,7 @@ def testis_cwl_enum_type_float():
     assert res[3] == [1.9, 2.8, 3.7]
 
 
-def testis_cwl_enum_type_int():
+def test_is_cwl_enum_type_int():
     io_info = {
         "name": "test",
         "type": {
@@ -1087,3 +1143,192 @@ def test_set_field():
     set_field(data, "z", None)
     assert getattr(data, "y", 2)
     assert getattr(data, "z", null) is None
+
+
+def test_ogcapi2cwl_process_with_extra_href():
+    href = "https://remote-server.com/processes/test-process"
+    with tempfile.NamedTemporaryFile(mode="w", suffix="test-package.cwl") as tmp_file:
+        cwl_ns = {}
+        cwl_ns.update(IANA_NAMESPACE_DEFINITION)
+        cwl_ns.update(OGC_NAMESPACE_DEFINITION)
+        pkg = {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "baseCommand": ["dont-care"],
+            "arguments": ["irrelevant"],
+            "inputs": {
+                "in-str": {"type": "string", "inputBinding": {"position": 1}},
+                "in-int": {"type": "int", "inputBinding": {"position": 2}},
+                "in-float": {"type": "float", "inputBinding": {"position": 3}},
+                "in-file": {"type": "File", "format": f"iana:{ContentType.APP_JSON}",
+                            "inputBinding": {"prefix": "-f"}},
+            },
+            "outputs": {
+                "output": {"type": "File", "format": "ogc:geotiff",
+                           "outputBinding": {"glob": "output/*.tiff"}},
+            },
+            "$namespaces": cwl_ns
+        }
+        yaml.safe_dump(pkg, tmp_file, sort_keys=False)
+        tmp_file.flush()
+        tmp_file.seek(0)
+        body = {
+            "process": {"href": tmp_file.name}
+        }
+        cwl, info = ogcapi2cwl_process(body, href)
+    assert info is not body, "copy should be created, not inplace modifications"
+    assert cwl != pkg, "Conversion should have slightly modified the reference CWL"
+    pkg.pop("baseCommand")
+    pkg.pop("arguments")
+    pkg["hints"] = {
+        CWL_REQUIREMENT_APP_OGC_API: {
+            "process": href
+        }
+    }
+    assert pkg == cwl
+    assert info == {
+        "process": {"href": tmp_file.name},  # carried over, rest is generated
+        "executionUnit": [{"unit": cwl}],
+        "deploymentProfile": "http://www.opengis.net/profiles/eoc/ogcapiApplication",
+    }, "Process information should have been generated with additional details extracted from CWL."
+
+
+def test_ogcapi2cwl_process_with_extra_exec_unit():
+    href = "https://remote-server.com/processes/test-process"
+    cwl_ns = {}
+    cwl_ns.update(IANA_NAMESPACE_DEFINITION)
+    cwl_ns.update(OGC_NAMESPACE_DEFINITION)
+    pkg = {
+        "cwlVersion": "v1.0",
+        "class": "CommandLineTool",
+        "baseCommand": ["dont-care"],
+        "arguments": ["irrelevant"],
+        "inputs": {
+            "in-str": {"type": "string", "inputBinding": {"position": 1}},
+            "in-int": {"type": "int", "inputBinding": {"position": 2}},
+            "in-float": {"type": "float", "inputBinding": {"position": 3}},
+            "in-file": {"type": "File", "format": f"iana:{ContentType.APP_JSON}",
+                        "inputBinding": {"prefix": "-f"}},
+        },
+        "outputs": {
+            "output": {"type": "File", "format": "ogc:geotiff",
+                       "outputBinding": {"glob": "output/*.tiff"}},
+        },
+        "$namespaces": cwl_ns
+    }
+    body = {
+        "process": {
+            "id": "test-process"
+        },
+        "executionUnit": [
+            {"unit": pkg}
+        ]
+    }
+    cwl, info = ogcapi2cwl_process(body, href)
+    assert info is not body and info != body, "copy should be created, not inplace modifications"
+    assert cwl is not pkg and cwl != pkg
+    pkg.pop("baseCommand")
+    pkg.pop("arguments")
+    pkg["hints"] = {
+        CWL_REQUIREMENT_APP_OGC_API: {
+            "process": href
+        }
+    }
+    assert pkg == cwl
+    body["deploymentProfile"] = "http://www.opengis.net/profiles/eoc/ogcapiApplication"
+    assert info == body
+
+
+def test_ogcapi2cwl_process_with_extra_exec_href():
+    href = "https://remote-server.com/processes/test-process"
+    cwl_ns = {}
+    cwl_ns.update(IANA_NAMESPACE_DEFINITION)
+    cwl_ns.update(OGC_NAMESPACE_DEFINITION)
+    with tempfile.NamedTemporaryFile(mode="w", suffix="test-package.cwl") as tmp_file:
+        pkg = {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "baseCommand": ["dont-care"],
+            "arguments": ["irrelevant"],
+            "inputs": {
+                "in-str": {"type": "string", "inputBinding": {"position": 1}},
+                "in-int": {"type": "int", "inputBinding": {"position": 2}},
+                "in-float": {"type": "float", "inputBinding": {"position": 3}},
+                "in-file": {"type": "File", "format": f"iana:{ContentType.APP_JSON}",
+                            "inputBinding": {"prefix": "-f"}},
+            },
+            "outputs": {
+                "output": {"type": "File", "format": "ogc:geotiff",
+                           "outputBinding": {"glob": "output/*.tiff"}},
+            },
+            "$namespaces": cwl_ns
+        }
+        json.dump(pkg, tmp_file)
+        tmp_file.flush()
+        tmp_file.seek(0)
+        body = {
+            "process": {
+                "id": "test-process"
+            },
+            "executionUnit": [
+                {"href": tmp_file.name}
+            ]
+        }
+        cwl, info = ogcapi2cwl_process(body, href)
+    assert info is not body and info != body, "copy should be created, not inplace modifications"
+    assert cwl is not pkg and cwl != pkg
+    pkg.pop("baseCommand")
+    pkg.pop("arguments")
+    pkg["hints"] = {
+        CWL_REQUIREMENT_APP_OGC_API: {
+            "process": href
+        }
+    }
+    assert pkg == cwl
+    body["executionUnit"] = [{"unit": cwl}]
+    body["deploymentProfile"] = "http://www.opengis.net/profiles/eoc/ogcapiApplication"
+    assert info == body, "Execution unit should be rewritten with OGC-API hints requirement."
+
+
+def test_ogcapi2cwl_process_without_extra():
+    href = "https://remote-server.com/processes/test-process"
+    body = {
+        "inputs": {
+            "in-str": {"schema": {"type": "string"}},
+            "in-int": {"schema": {"type": "integer"}},
+            "in-float": {"schema": {"type": "number"}},
+            "in-file": {"schema": {"type": "string", "contentMediaType": ContentType.APP_JSON}},
+        },
+        "outputs": {
+            "output": {"schema": {"type": "string", "contentMediaType": ContentType.IMAGE_GEOTIFF}},
+        }
+    }
+    cwl, info = ogcapi2cwl_process(body, href)
+    assert info is not body, "copy should be created, not inplace modifications"
+    cwl_ns = {}
+    cwl_ns.update(IANA_NAMESPACE_DEFINITION)
+    cwl_ns.update(OGC_NAMESPACE_DEFINITION)
+    assert cwl == {
+        "cwlVersion": "v1.0",
+        "class": "CommandLineTool",
+        "hints": {
+            CWL_REQUIREMENT_APP_OGC_API: {
+                "process": href
+            }
+        },
+        "inputs": {
+            "in-str": {"type": "string"},
+            "in-int": {"type": "int"},
+            "in-float": {"type": "float"},
+            "in-file": {"type": "File", "format": f"iana:{ContentType.APP_JSON}"},
+        },
+        "outputs": {
+            "output": {"type": "File", "format": "ogc:geotiff",
+                       "outputBinding": {"glob": "output/*.tiff"}},
+        },
+        "$namespaces": cwl_ns
+    }
+    assert info != body
+    body["executionUnit"] = [{"unit": cwl}]
+    body["deploymentProfile"] = "http://www.opengis.net/profiles/eoc/ogcapiApplication"
+    assert info == body, "Process information should be updated with minimal details since no CWL detected in input."

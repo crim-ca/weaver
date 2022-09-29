@@ -26,7 +26,6 @@ from weaver import xml_util
 from weaver.formats import ContentType
 from weaver.processes.wps_default import HelloWPS
 from weaver.processes.wps_testing import WpsTestProcess
-from weaver.utils import str2bytes
 from weaver.visibility import Visibility
 
 
@@ -85,7 +84,7 @@ class WpsAppTest(unittest.TestCase):
         assert resp.status_code == 200
         assert resp.content_type in ContentType.ANY_XML
         resp.mustcontain("<wps:ProcessOfferings>")
-        root = xml_util.fromstring(str2bytes(resp.text))  # test response has no 'content'
+        root = xml_util.fromstring(resp.text)  # test response has no 'content'
         process_offerings = list(filter(lambda e: "ProcessOfferings" in e.tag, root.iter(xml_util.Element)))
         assert len(process_offerings) == 1
         processes = [p for p in process_offerings[0]]

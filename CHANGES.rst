@@ -12,13 +12,23 @@ Changes
 
 Changes:
 --------
+- Support deployment of a local `Process` using a remote `OGC API - Processes` reference
+  (resolves `#11 <https://github.com/crim-ca/weaver/issues/11>`_).
 - Support `CWL` definition for ``ScatterFeatureRequirement`` for `Workflow` parallel step distribution of an
-  input array (resolves `#105 <https://github.com/crim-ca/weaver/issues/105>`_).
+  input array (resolves `#105 <https://github.com/crim-ca/weaver/issues/105>`_
+  and relates to `#462 <https://github.com/crim-ca/weaver/issues/462>`_).
 - Add formatter and better logging details when executing ``builtin`` `Process` ``jsonarray2netcdf``.
 - Add `OGC` Media-Type ontology for ``File`` format references within `CWL` definition.
-- Replace `EDAM` NetCDF format reference by `OGC` NetCDF Media-Type with expected ontology definitions by processes.
+- Replace `EDAM` NetCDF format reference by `OGC` NetCDF Media-Type with expected ontology definitions by processes
   For backward compatibility, corresponding `EDAM` references will be converted to `OGC` Media-Type whenever possible.
 - Adjust ``builtin`` process ``jsonarray2netcdf`` (version ``2.0``) to employ `OGC` Media-Type for NetCDF.
+- Adjust ``schema`` input of ``jsonarray2netcdf`` to avoid erroneous definition exposing a JSON ``object`` structure
+  as a valid format, although a JSON ``array`` type is directly expected in the submitted JSON file.
+- Add support of ``builtin`` `Process` description overrides if provided along their `CWL` package definition.
+  Overrides can be specified as JSON or YAML, and follow the same merging strategies of fields as normal deployments.
+- Refactor ``weaver.processes.wps_[...]`` definitions to reuse operations for communicating with `OGC API - Processes`
+  servers across implementation for monitored `Job` with a remote `Process` type of `OGC API`, `ADES` and `Workflow`
+  with other step `Process` references.
 
 Fixes:
 ------

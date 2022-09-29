@@ -1,0 +1,26 @@
+inputs:
+   input:
+     description: JSON file formed of an array of file URIs, each representing NetCDF contents.
+     # Avoid default schema generated from 'iana:application/json' in CWL.
+     # Default produces a simple object with additionalProperties, which is invalid for the expected array of URI.
+     # However, we cannot submit the array directly during execution (since it causes an ambiguity with cardinality
+     # min/max occurs that are used to represent many files for one input).
+     schema:
+       type: string
+       format: uri
+       contentMediaType: "application/json"
+       # If arrays could be submitted directly as JSON input without cardinality ambiguity,
+       # the following definition could be specified to be more explicit.
+       # oneOf:
+       #   - type: string
+       #     format: uri
+       #     contentMediaType: "application/json"
+       #   - type: object
+       #     properties:
+       #       value:
+       #         type: array
+       #         items:
+       #           type: string
+       #           format: uri
+       #           contentMediaType: "application/x-netcdf"
+       #         minItems: 1

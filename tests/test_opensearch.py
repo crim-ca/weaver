@@ -21,7 +21,7 @@ from weaver.utils import get_any_id
 from weaver.wps_restapi.processes import processes
 
 if TYPE_CHECKING:
-    from typing import Dict
+    from typing import Any, Dict, Optional, Type
 
     from weaver.typedefs import JSON, DataSourceOpenSearch
 
@@ -142,24 +142,44 @@ def test_transform_execute_parameters_wps():
     assert compare(transformed) == compare(expected)
 
 
-# FIXME: move appropriately when adding BoundingBox support (https://github.com/crim-ca/weaver/issues/51)
-@pytest.mark.skip(reason="The user-provided bbox is now a comma delimited string, not a WKT.")
-def test_load_wkt():
-    data = [
-        ("POLYGON ((100 15, 104 15, 104 19, 100 19, 100 15))", "100.0,15.0,104.0,19.0"),
-        (
-            "LINESTRING (100 15, 104 15, 104 19, 100 19, 100 15)",
-            "100.0,15.0,104.0,19.0",
-        ),
-        ("LINESTRING (100 15, 104 19)", "100.0,15.0,104.0,19.0"),
-        ("MULTIPOINT ((10 10), (40 30), (20 20), (30 10))", "10.0,10.0,40.0,30.0"),
-        ("POINT (30 10)", "30.0,10.0,30.0,10.0"),
-    ]
-    for wkt, expected in data:
-        assert opensearch.load_wkt(wkt) == expected
+@pytest.mark.parametrize("wkt, expected", [
+    ("POLYGON ((100 15, 104 15, 104 19, 100 19, 100 15))", "100.0,15.0,104.0,19.0"),
+    (
+        "LINESTRING (100 15, 104 15, 104 19, 100 19, 100 15)",
+        "100.0,15.0,104.0,19.0",
+    ),
+    ("LINESTRING (100 15, 104 19)", "100.0,15.0,104.0,19.0"),
+    ("MULTIPOINT ((10 10), (40 30), (20 20), (30 10))", "10.0,10.0,40.0,30.0"),
+    ("POINT (30 10)", "30.0,10.0,30.0,10.0"),
+    ("30,10,30,10", "30.0,10.0,30.0,10.0"),
+])
+def test_load_wkt(wkt, expected):
+    assert opensearch.load_wkt_bbox_bounds(wkt) == expected
+
+
+@pytest.mark.parametrize("bbox, expected", [
+    ("1,2,3,4", None),
+    ("1, 2 ,3 ,4 ", None),
+    ("-1, 2.2 ,-3.3 ,4 ", None),
+    ("1", ValueError),
+    ("1,2", ValueError),
+    ("1,2,3", ValueError),
+    (None, ValueError),
+    (1234, ValueError),
+])
+def test_validate_bbox(bbox, expected):  # type: (Any, Optional[Type[Exception]]) -> None
+    try:
+        opensearch.validate_bbox(bbox)
+        assert expected is None, f"Exception {expected} was expected but none was raised."
+    except Exception as exc:
+        assert expected is not None and isinstance(exc, expected), (
+            f"Unexpected or incorrect exception raised: {exc!r}, expected: {expected!s}."
+        )
 
 
 def test_deploy_opensearch():
+    from weaver.processes.utils import get_settings as real_get_settings
+
     store = setup_mongodb_processstore()
 
     class MockDB(object):
@@ -169,8 +189,8 @@ def test_deploy_opensearch():
         def get_store(self, *_):  # noqa: E811
             return store
 
-    def _get_mocked(req):
-        return req.registry.settings
+    def _get_mocked(req=None):
+        return req.registry.settings if req else real_get_settings(None)
 
     # mock db functions called by add_local_process
     with contextlib.ExitStack() as stack:
@@ -189,7 +209,7 @@ def test_deploy_opensearch():
         process_id = get_any_id(opensearch_payload["processDescription"]["process"])
 
         # when
-        response = processes.add_local_process(request)
+        response = processes.add_local_process(request)  # type: ignore
 
         # then
         assert response.code == 201

@@ -1,4 +1,5 @@
 import logging
+import re
 from collections import deque
 from copy import deepcopy
 from typing import TYPE_CHECKING
@@ -39,6 +40,24 @@ def alter_payload_after_query(payload):
     return new_payload
 
 
+WKT_BBOX_BOUNDS = re.compile(
+    r"(?P<x1>(\-?\d+(\.\d+)?)),"
+    r"(?P<y1>(\-?\d+(\.\d+)?)),"
+    r"(?P<x2>(\-?\d+(\.\d+)?)),"
+    r"(?P<y2>(\-?\d+(\.\d+)?))"
+)
+
+
+def load_wkt_bbox_bounds(wkt):
+    # type: (str) -> str
+    bounds = re.match(WKT_BBOX_BOUNDS, wkt)
+    if bounds:
+        return ",".join(map(str, map(float, wkt.split(","))))
+    bounds = shapely.wkt.loads(wkt).bounds
+    bbox_str = ",".join(map(str, bounds))
+    return bbox_str
+
+
 def validate_bbox(bbox):
     # type: (str) -> None
     """
@@ -47,7 +66,7 @@ def validate_bbox(bbox):
     try:
         if not len(list(map(float, bbox.split(",")))) == 4:
             raise ValueError
-    except ValueError:
+    except (AttributeError, TypeError, ValueError):
         raise ValueError(f"Could not parse bbox as a list of 4 floats: {bbox}")
 
 
@@ -111,7 +130,7 @@ def query_eo_images_from_wps_inputs(wps_inputs,             # type: Dict[str, De
                 enddate_ids = make_param_id(OpenSearchField.END_DATE, input_id), OpenSearchField.END_DATE
 
                 bbox_str = get_input_data(aoi_ids)
-                validate_bbox(bbox_str)
+                validate_bbox(load_wkt_bbox_bounds(bbox_str))
                 startdate = get_input_data(startdate_ids)
                 enddate = get_input_data(enddate_ids)
 
@@ -152,14 +171,6 @@ def replace_with_opensearch_scheme(link):
         link_without_scheme = link[link.find(":"):]
         return OpenSearchField.LOCAL_FILE_SCHEME + link_without_scheme
     return link
-
-
-# FIXME: move appropriately when adding BoundingBox support (https://github.com/crim-ca/weaver/issues/51)
-def load_wkt(wkt):
-    # type: (str) -> str
-    bounds = shapely.wkt.loads(wkt).bounds
-    bbox_str = ",".join(map(str, bounds))
-    return bbox_str
 
 
 class OpenSearchQuery(object):
@@ -621,6 +632,7 @@ def get_data_source(collection_id):
 
 
 def get_eo_images_ids_from_payload(payload):
+    # type: (JSON) -> List[str]
     return [get_any_id(i) for i in get_eo_images_inputs_from_payload(payload)]
 
 

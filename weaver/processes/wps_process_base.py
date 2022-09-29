@@ -1,32 +1,41 @@
+import abc
 import logging
 import os
 import shutil
 import tempfile
-from abc import abstractmethod
+import time
 from typing import TYPE_CHECKING
 
 from requests.structures import CaseInsensitiveDict
 
 from weaver.base import Constants
 from weaver.exceptions import PackageExecutionError
-from weaver.formats import ContentType
+from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
+from weaver.formats import ContentType, repr_json
 from weaver.processes.constants import OpenSearchField
-from weaver.status import Status
+from weaver.processes.utils import map_progress
+from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.utils import (
     fetch_file,
     fully_qualified_name,
     get_any_id,
+    get_any_message,
     get_any_value,
     get_cookie_headers,
+    get_job_log_msg,
+    get_log_monitor_msg,
     get_settings,
-    request_extra
+    request_extra,
+    wait_secs
 )
 from weaver.wps.utils import get_wps_output_dir, get_wps_output_url, map_wps_output_location
+from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
     from typing import Any, Optional, Union
 
     from weaver.typedefs import (
+        JSON,
         AnyCookiesContainer,
         AnyHeadersContainer,
         AnyResponseType,
@@ -45,27 +54,27 @@ if TYPE_CHECKING:
 LOGGER = logging.getLogger(__name__)
 
 
-class WpsRemoteJobProgress(Constants):
+class RemoteJobProgress(Constants):
     """
-    Progress of a remotely monitored WPS-1 job process execution.
+    Progress of a remotely monitored job process execution.
 
     .. note::
         Implementations can reuse same progress values or intermediate ones within the range of the relevant sections.
     """
-    START = 1
+    SETUP = 1
     PREPARE = 2
     READY = 5
     STAGE_IN = 10
     FORMAT_IO = 12
-    EXECUTE = 15
-    MONITOR = 20
+    EXECUTION = 15
+    MONITORING = 20
     RESULTS = 85
     STAGE_OUT = 90
     CLEANUP = 95
     COMPLETED = 100
 
 
-class WpsProcessInterface(object):
+class WpsProcessInterface(abc.ABC):
     """
     Common interface for :term:`WPS` :term:`Process` to be used for dispatching :term:`CWL` jobs.
 
@@ -101,27 +110,27 @@ class WpsProcessInterface(object):
         :param expected_outputs: expected value outputs as `{'id': 'value'}`
         """
         self.update_status("Preparing process for remote execution.",
-                           WpsRemoteJobProgress.PREPARE, Status.RUNNING)
+                           RemoteJobProgress.PREPARE, Status.RUNNING)
         self.prepare()
         self.update_status("Process ready for execute remote process.",
-                           WpsRemoteJobProgress.READY, Status.RUNNING)
+                           RemoteJobProgress.READY, Status.RUNNING)
 
         self.update_status("Staging inputs for remote execution.",
-                           WpsRemoteJobProgress.STAGE_IN, Status.RUNNING)
+                           RemoteJobProgress.STAGE_IN, Status.RUNNING)
         staged_inputs = self.stage_inputs(workflow_inputs)
 
         self.update_status("Preparing inputs/outputs for remote execution.",
-                           WpsRemoteJobProgress.FORMAT_IO, Status.RUNNING)
+                           RemoteJobProgress.FORMAT_IO, Status.RUNNING)
         expect_outputs = [{"id": output} for output in expected_outputs]
         process_inputs = self.format_inputs(staged_inputs)
         process_outputs = self.format_outputs(expect_outputs)
 
         try:
             self.update_status("Executing remote process job.",
-                               WpsRemoteJobProgress.EXECUTE, Status.RUNNING)
+                               RemoteJobProgress.EXECUTION, Status.RUNNING)
             monitor_ref = self.dispatch(process_inputs, process_outputs)
             self.update_status("Monitoring remote process job until completion.",
-                               WpsRemoteJobProgress.MONITOR, Status.RUNNING)
+                               RemoteJobProgress.MONITORING, Status.RUNNING)
             job_success = self.monitor(monitor_ref)
             if not job_success:
                 raise PackageExecutionError("Failed dispatch and monitoring of remote process execution.")
@@ -129,25 +138,25 @@ class WpsProcessInterface(object):
             err_msg = f"{fully_qualified_name(exc)}: {exc!s}"
             err_ctx = "Dispatch and monitoring of remote process caused an unhandled error."
             LOGGER.exception("%s [%s]", err_ctx, err_msg, exc_info=exc)
-            self.update_status(err_msg, WpsRemoteJobProgress.CLEANUP, Status.RUNNING, error=exc)
+            self.update_status(err_msg, RemoteJobProgress.CLEANUP, Status.RUNNING, error=exc)
             self.update_status("Running final cleanup operations following failed execution.",
-                               WpsRemoteJobProgress.CLEANUP, Status.RUNNING)
+                               RemoteJobProgress.CLEANUP, Status.RUNNING)
             self.cleanup()
             raise PackageExecutionError(err_ctx) from exc
 
         self.update_status("Retrieving job results definitions.",
-                           WpsRemoteJobProgress.RESULTS, Status.RUNNING)
+                           RemoteJobProgress.RESULTS, Status.RUNNING)
         results = self.get_results(monitor_ref)
         self.update_status("Staging job outputs from remote process.",
-                           WpsRemoteJobProgress.STAGE_OUT, Status.RUNNING)
+                           RemoteJobProgress.STAGE_OUT, Status.RUNNING)
         self.stage_results(results, expected_outputs, out_dir)
 
         self.update_status("Running final cleanup operations before completion.",
-                           WpsRemoteJobProgress.CLEANUP, Status.RUNNING)
+                           RemoteJobProgress.CLEANUP, Status.RUNNING)
         self.cleanup()
 
         self.update_status("Execution of remote process execution completed successfully.",
-                           WpsRemoteJobProgress.COMPLETED, Status.SUCCEEDED)
+                           RemoteJobProgress.COMPLETED, Status.SUCCEEDED)
 
     def prepare(self):
         # type: () -> None
@@ -179,7 +188,7 @@ class WpsProcessInterface(object):
         """
         return workflow_outputs
 
-    @abstractmethod
+    @abc.abstractmethod
     def dispatch(self, process_inputs, process_outputs):
         # type: (JobInputs, JobOutputs) -> JobMonitorReference
         """
@@ -189,7 +198,7 @@ class WpsProcessInterface(object):
         """
         raise NotImplementedError
 
-    @abstractmethod
+    @abc.abstractmethod
     def monitor(self, monitor_reference):
         # type: (JobMonitorReference) -> bool
         """
@@ -202,7 +211,7 @@ class WpsProcessInterface(object):
         """
         raise NotImplementedError
 
-    @abstractmethod
+    @abc.abstractmethod
     def get_results(self, monitor_reference):
         # type: (JobMonitorReference) -> JobResults
         """
@@ -231,7 +240,7 @@ class WpsProcessInterface(object):
                     LOGGER.debug("Removing temporary staging directory: [%s]", path)
                     shutil.rmtree(path)
             except OSError:
-                LOGGER.warning("Ignore failure to cleanup temporary staging path: [%s]", path)
+                LOGGER.warning("Ignore failure to clean up temporary staging path: [%s]", path)
 
     def get_auth_headers(self):
         # type: () -> AnyHeadersContainer
@@ -392,3 +401,132 @@ class WpsProcessInterface(object):
                     exec_input["href"] = self.host_file(exec_input["href"])
                     LOGGER.debug("Hosting intermediate input [%s] : [%s]", exec_input["id"], exec_input["href"])
         return execute_body_inputs
+
+
+class OGCAPIRemoteProcessBase(WpsProcessInterface, abc.ABC):
+    # items to be specified by specialized class
+    process_type = NotImplemented   # type: str
+    provider = NotImplemented       # type: str
+    url = NotImplemented            # type: str
+
+    def __init__(self,
+                 step_payload,      # type: JSON
+                 process,           # type: str
+                 request,           # type: WorkerRequest
+                 update_status,     # type: UpdateStatusPartialFunction
+                 ):                 # type: (...) -> None
+        super(OGCAPIRemoteProcessBase, self).__init__(
+            request,
+            lambda _message, _progress, _status, *args, **kwargs: update_status(
+                _message, _progress, _status, self.provider, *args, **kwargs
+            )
+        )
+        self.deploy_body = step_payload
+        self.process = process
+
+    def format_outputs(self, workflow_outputs):
+        # type: (JobOutputs) -> JobOutputs
+        for output in workflow_outputs:
+            output.update({"transmissionMode": ExecuteTransmissionMode.VALUE})
+        return workflow_outputs
+
+    def dispatch(self, process_inputs, process_outputs):
+        # type: (JobInputs, JobOutputs) -> Any
+        LOGGER.debug("Execute process %s request for [%s]", self.process_type, self.process)
+        execute_body = {
+            "mode": ExecuteMode.ASYNC,
+            "response": ExecuteResponse.DOCUMENT,
+            "inputs": process_inputs,
+            "outputs": process_outputs
+        }
+        LOGGER.debug("Execute process %s body for [%s]:\n%s", self.process_type, self.process, repr_json(execute_body))
+        request_url = self.url + sd.process_jobs_service.path.format(process_id=self.process)
+        response = self.make_request(method="POST", url=request_url, json=execute_body, retry=True)
+        if response.status_code != 201:
+            LOGGER.error("Request [POST %s] failed with: [%s]", request_url, response.status_code)
+            raise Exception(f"Was expecting a 201 status code from the execute request : {request_url}")
+
+        job_status_uri = response.headers["Location"]
+        return job_status_uri
+
+    def monitor(self, monitor_reference):
+        # type: (str) -> bool
+        job_status_uri = monitor_reference
+        job_status_data = self.get_job_status(job_status_uri)
+        job_status_value = map_status(job_status_data["status"])
+        job_id = job_status_data["jobID"]
+
+        self.update_status(f"Monitoring job on remote ADES : {job_status_uri}",
+                           RemoteJobProgress.MONITORING, Status.RUNNING)
+
+        retry = 0
+        while job_status_value not in JOB_STATUS_CATEGORIES[StatusCategory.FINISHED]:
+            wait = wait_secs(retry)
+            time.sleep(wait)
+            retry += 1
+
+            job_status_data = self.get_job_status(job_status_uri)
+            job_status_value = map_status(job_status_data["status"])
+
+            LOGGER.debug(get_log_monitor_msg(job_id, job_status_value,
+                                             job_status_data.get("percentCompleted", 0),
+                                             get_any_message(job_status_data), job_status_data.get("statusLocation")))
+            self.update_status(get_job_log_msg(status=job_status_value,
+                                               message=get_any_message(job_status_data),
+                                               progress=job_status_data.get("percentCompleted", 0),
+                                               duration=job_status_data.get("duration", None)),  # get if available
+                               map_progress(job_status_data.get("percentCompleted", 0),
+                                            RemoteJobProgress.MONITORING, RemoteJobProgress.STAGE_OUT),
+                               Status.RUNNING)
+
+        if job_status_value != Status.SUCCEEDED:
+            LOGGER.debug(get_log_monitor_msg(job_id, job_status_value,
+                                             job_status_data.get("percentCompleted", 0),
+                                             get_any_message(job_status_data), job_status_data.get("statusLocation")))
+            raise PackageExecutionError(job_status_data)
+        return True
+
+    def get_job_status(self, job_status_uri, retry=True):
+        # type: (JobMonitorReference, Union[bool, int]) -> JSON
+        """
+        Obtains the contents from the :term:`Job` status response.
+        """
+        response = self.make_request(method="GET", url=job_status_uri, retry=retry)  # retry in case not yet ready
+        response.raise_for_status()
+        job_status = response.json()
+        job_id = job_status_uri.split("/")[-1]
+        if "jobID" not in job_status:
+            job_status["jobID"] = job_id  # provide if not implemented by ADES
+        job_status["status"] = map_status(job_status["status"])
+        return job_status
+
+    def get_results(self, monitor_reference):
+        # type: (str) -> JobResults
+        """
+        Obtains produced output results from successful job status ID.
+        """
+        # use '/results' endpoint instead of '/outputs' to ensure support with other
+        result_url = monitor_reference + "/results"
+        response = self.make_request(method="GET", url=result_url, retry=True)
+        response.raise_for_status()
+        contents = response.json()
+
+        # backward compatibility for ADES that returns output IDs nested under 'outputs'
+        if "outputs" in contents:
+            # ensure that we don't incorrectly pick a specific output ID named 'outputs'
+            maybe_outputs = contents["outputs"]
+            if isinstance(maybe_outputs, dict) and get_any_id(maybe_outputs) is None:
+                contents = maybe_outputs
+            # backward compatibility for ADES that returns list of outputs nested under 'outputs'
+            # (i.e.: as Weaver-specific '/outputs' endpoint)
+            elif isinstance(maybe_outputs, list) and all(get_any_id(out) is not None for out in maybe_outputs):
+                contents = maybe_outputs
+
+        # rebuild the expected (old) list format for calling method
+        if isinstance(contents, dict) and all(get_any_value(out) is not None for out in contents.values()):
+            outputs = []
+            for out_id, out_val in contents.items():
+                out_val.update({"id": out_id})
+                outputs.append(out_val)
+            contents = outputs
+        return contents

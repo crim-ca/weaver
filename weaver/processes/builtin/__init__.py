@@ -5,6 +5,7 @@ from importlib import import_module
 from string import Template
 from typing import TYPE_CHECKING
 
+import yaml
 from cwltool.command_line_tool import CommandLineTool
 from cwltool.docker import DockerCommandLineJob
 from cwltool.job import CommandLineJob, JobBase
@@ -25,11 +26,18 @@ from weaver.wps.utils import get_wps_url
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Type, Union
+    from typing import Any, Callable, Dict, Type, Union
 
+    from cwltool.builder import Builder
     from cwltool.context import RuntimeContext
+    from cwltool.pathmapper import PathMapper
 
-    from weaver.typedefs import AnyRegistryContainer, CWL
+    from weaver.typedefs import CWL, JSON, AnyRegistryContainer, CWL_RequirementsList, TypedDict
+
+    BuiltinResourceMap = TypedDict("BuiltinResourceMap", {
+        "package": str,
+        "payload": JSON
+    }, total=True)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -41,13 +49,24 @@ __all__ = [
 
 
 def _get_builtin_reference_mapping(root):
-    # type: (str) -> Dict[str, str]
+    # type: (str) -> Dict[str, BuiltinResourceMap]
     """
     Generates a mapping of `reference` to actual ``builtin`` package file path.
     """
     builtin_names = [_pkg for _pkg in os.listdir(root)
                      if os.path.splitext(_pkg)[-1].replace(".", "") in PACKAGE_EXTENSIONS]
-    return {os.path.splitext(_pkg)[0]: os.path.join(root, _pkg) for _pkg in builtin_names}
+    refs = {
+        os.path.splitext(_pkg)[0]: {"package": os.path.join(root, _pkg), "payload": {}}
+        for _pkg in builtin_names
+    }
+    for builtin_ref in refs.values():
+        for ext in [".yml", ".yaml", ".json"]:
+            payload_ref = os.path.splitext(builtin_ref["package"])[0] + ext
+            if os.path.isfile(payload_ref):
+                with open(payload_ref, mode="r", encoding="utf-8") as f_payload:
+                    builtin_ref["payload"] = yaml.safe_load(f_payload) or {}
+                break
+    return refs
 
 
 def _get_builtin_metadata(process_id, process_path, meta_field, clean=False):
@@ -114,8 +133,10 @@ def register_builtin_processes(container):
     restapi_url = get_wps_restapi_base_url(container)
     builtin_apps_mapping = _get_builtin_reference_mapping(os.path.abspath(os.path.dirname(__file__)))
     builtin_processes = []
-    for process_id, process_path in builtin_apps_mapping.items():
-        process_info = get_process_definition({}, package=None, reference=process_path)
+    for process_id, process_data in builtin_apps_mapping.items():
+        process_path = process_data["package"]
+        process_desc = process_data["payload"]
+        process_info = get_process_definition(process_desc, package=None, reference=process_path)
         process_url = "/".join([restapi_url, "processes", process_id])
         process_package = _get_builtin_package(process_id, process_info["package"])
         process_abstract = _get_builtin_metadata(process_id, process_path, "__doc__", clean=True)
@@ -158,6 +179,7 @@ def register_builtin_processes(container):
 
 class BuiltinProcessJobBase(CommandLineJob):
     def __init__(self, builder, joborder, make_path_mapper, requirements, hints, name):
+        # type: (Builder, JSON, Callable[..., PathMapper], CWL_RequirementsList, CWL_RequirementsList, str) -> None
         process_hints = [h for h in hints if "process" in h]
         if not process_hints or len(process_hints) != 1:
             raise PackageNotFound("Could not extract referenced process in job.")
@@ -165,6 +187,7 @@ class BuiltinProcessJobBase(CommandLineJob):
         super(BuiltinProcessJobBase, self).__init__(builder, joborder, make_path_mapper, requirements, hints, name)
 
     def _validate_process(self):
+        # type: () -> None
         try:
             registry = get_registry()
             store = get_db(registry).get_store(StoreProcesses)
@@ -175,6 +198,7 @@ class BuiltinProcessJobBase(CommandLineJob):
             raise PackageExecutionError(f"Invalid package is not of type '{ProcessType.BUILTIN}'")
 
     def _update_command(self):
+        # type: () -> None
         if len(self.command_line) and self.command_line[0] == "python":
             LOGGER.debug("Mapping generic builtin Python command to environment: [python] => [%s]", sys.executable)
             self.command_line[0] = sys.executable

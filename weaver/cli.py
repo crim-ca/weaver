@@ -132,7 +132,7 @@ class OperationResult(AutoBase):
         # type: () -> str
         params = ["success", "code", "message"]
         quotes = [False, False, True]
-        quoted = lambda q, v: f"\"{v}\"" if q and v is not None else v  # noqa: E731
+        quoted = lambda q, v: f"\"{v}\"" if q and v is not None else v  # noqa: E731  # pylint: disable=C3001
         values = ", ".join([f"{param}={quoted(quote, getattr(self, param))}" for quote, param in zip(quotes, params)])
         return f"{type(self).__name__}({values})\n{self.text}"
 

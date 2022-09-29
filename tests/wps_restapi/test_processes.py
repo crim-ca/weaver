@@ -37,6 +37,7 @@ from weaver.datatype import AuthenticationTypes, Process, Service
 from weaver.exceptions import JobNotFound, ProcessNotFound
 from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import AcceptLanguage, ContentType, get_cwl_file_format
+from weaver.processes.builtin import register_builtin_processes
 from weaver.processes.constants import CWL_REQUIREMENT_APP_DOCKER, CWL_REQUIREMENT_APP_WPS1, ProcessSchema
 from weaver.processes.wps_testing import WpsTestProcess
 from weaver.status import Status
@@ -48,15 +49,17 @@ from weaver.wps_restapi import swagger_definitions as sd
 if TYPE_CHECKING:
     from typing import List, Optional, Tuple
 
+    from pyramid.config import Configurator
+
     from weaver.processes.constants import ProcessSchemaType
-    from weaver.typedefs import CWL, JSON, AnyHeadersContainer, AnyVersion
+    from weaver.typedefs import CWL, JSON, AnyHeadersContainer, AnyVersion, SettingsType
 
 
 # pylint: disable=C0103,invalid-name
 class WpsRestApiProcessesTest(unittest.TestCase):
-    remote_server = None
-    settings = None
-    config = None
+    remote_server = None    # type: str
+    settings = {}           # type: SettingsType
+    config = None           # type: Configurator
 
     @classmethod
     def setUpClass(cls):
@@ -692,10 +695,16 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         resp = self.app.put_json(vis_url, params=body, headers=self.json_headers)
         assert resp.status_code == 200
 
-        proc_query = {"schema": ProcessSchema.OLD}
+        body = self.get_process_description(proc_id)
+        self.assert_deployed_wps3(body, expected_process_id, assert_io=assert_io)
+        return body
+
+    def get_process_description(self, process_id, schema=ProcessSchema.OLD):
+        # type: (str, ProcessSchema) -> JSON
+        proc_query = {"schema": schema}
+        proc_url = f"/processes/{process_id}"
         resp = self.app.get(proc_url, params=proc_query, headers=self.json_headers)
         assert resp.status_code == 200
-        self.assert_deployed_wps3(resp.json, expected_process_id, assert_io=assert_io)
         return resp.json
 
     def get_application_package(self, process_id):
@@ -1029,7 +1038,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                             },
                         }
                     },
-                    "$namespace": ns
+                    "$namespaces": ns
                 }, cwl_file)
 
             body = {
@@ -1078,7 +1087,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                     },
                 }
             },
-            "$namespace": ns
+            "$namespaces": ns
         }
         with contextlib.ExitStack() as stack:
             stack.enter_context(mocked_wps_output(self.settings))
@@ -1141,7 +1150,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                     },
                 }
             },
-            "$namespace": ns
+            "$namespaces": ns
         }
         body = {
             "processDescription": {"process": {
@@ -1259,50 +1268,84 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         }
         self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID)
 
-    # FIXME: implement
-    @pytest.mark.skip(reason="not implemented - experimental")
-    def test_deploy_process_WPS3_DescribeProcess_href(self):
-        path = f"{self.url}/processes/jsonarray2netcdf"  # use builtin, re-deploy as "remote process"
-        p_id = "new-test-wps3"
-        body = {
-            "processDescription": {"process": {"id": p_id}},
-            "executionUnit": [{"href": path}],
-        }
-        desc = self.deploy_process_make_visible_and_fetch_deployed(body, p_id, assert_io=False)
-        assert desc["deploymentProfile"] == "http://www.opengis.net/profiles/eoc/ogcapiApplication"
+    def validate_ogcapi_process_description(self, process_description, process_id, remote_process):
+        # type: (JSON, str, str) -> None
+        assert process_id != remote_process
+        assert process_description["deploymentProfile"] == "http://www.opengis.net/profiles/eoc/ogcapiApplication"
 
         # process description should have been generated with relevant I/O
-        proc = desc["process"]
-        assert proc["id"] == p_id
-        assert proc["inputs"] == []
-        assert proc["outputs"] == [{
-            "id": "output",
-            "title": "output",
-            "schema": {"type": "string", "contentMediaType": "text/plain"},
-            "formats": [{"default": True, "mediaType": "text/plain"}]
-        }]
+        proc = process_description["process"]
+        ref_desc = self.get_process_description(remote_process)
+        ref_proc = ref_desc["process"]
+        ref_url = ref_proc["processDescriptionURL"]
+        assert proc["id"] == process_id
+        assert proc["inputs"] == ref_proc["inputs"]
+        assert proc["outputs"] == ref_proc["outputs"]
 
         # package should have been generated with corresponding I/O from "remote process"
-        ref = self.get_application_package("jsonarray2netcdf")
-        pkg = self.get_application_package(p_id)
-        # add the missing remote reference to the local definition to compare them
-        ref["hints"] = {  # expected to be defined in
-            "OGCAPIRequirement": {  # FIXME: implement, aka 'Wps3Process' dispatched step
-                "process": "jsonarray2netcdf",
-                "provider": self.url
+        ref = self.get_application_package(remote_process)
+        pkg = self.get_application_package(process_id)
+        assert pkg["hints"] == {
+            "OGCAPIRequirement": {
+                "process": ref_url
             }
         }
-        assert pkg == ref
+        for io_select in ["input", "output"]:
+            io_section = f"{io_select}s"
+            for io_pkg, io_ref in zip(pkg[io_section], ref[io_section]):
+                assert io_pkg["id"] == io_ref["id"]
+                assert io_pkg["format"] == io_ref["format"]
 
-    # FIXME: implement
-    @pytest.mark.skip(reason="not implemented")
-    def test_deploy_process_WPS3_DescribeProcess_owsContext(self):
-        raise NotImplementedError
+    def test_deploy_process_OGC_API_DescribeProcess_href(self):
+        """
+        Use the basic :term:`Process` URL format for referencing remote OGC API definition.
 
-    # FIXME: implement
-    @pytest.mark.skip(reason="not implemented")
-    def test_deploy_process_WPS3_DescribeProcess_executionUnit(self):
-        raise NotImplementedError
+        This will be helpful to support `Part 3 - Workflow` nested definitions.
+
+        .. note::
+            This does not support nested OGC Workflows by itself.
+            Only sets up the required parsing of the body to eventually deploy them.
+
+        .. seealso::
+            - https://github.com/opengeospatial/ogcapi-processes/issues/279
+            - https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/workflows
+            - https://github.com/crim-ca/weaver/issues/412
+        """
+        register_builtin_processes(self.app.app.registry)  # must register since collection reset in 'setUp'
+        remote_process = "jsonarray2netcdf"  # use builtin, re-deploy as "remote process"
+        href = f"{self.url}/processes/{remote_process}"
+        p_id = "new-test-ogc-api"
+        body = {
+            "id": p_id,  # normally optional, but since an existing process is re-deployed, conflict ID is raised
+            "process": href
+        }
+        desc = self.deploy_process_make_visible_and_fetch_deployed(body, p_id, assert_io=False)
+        self.validate_ogcapi_process_description(desc, p_id, remote_process)
+
+    def test_deploy_process_OGC_API_DescribeProcess_owsContext(self):
+        register_builtin_processes(self.app.app.registry)  # must register since collection reset in 'setUp'
+        remote_process = "jsonarray2netcdf"  # use builtin, re-deploy as "remote process"
+        href = f"{self.url}/processes/{remote_process}"
+        p_id = "new-test-ogc-api"
+        ows_ctx = ows_context_href(href)
+        ows_ctx.update({"id": p_id})
+        body = {
+            "processDescription": {"process": ows_ctx}
+        }
+        desc = self.deploy_process_make_visible_and_fetch_deployed(body, p_id, assert_io=False)
+        self.validate_ogcapi_process_description(desc, p_id, remote_process)
+
+    def test_deploy_process_OGC_API_DescribeProcess_executionUnit(self):
+        register_builtin_processes(self.app.app.registry)  # must register since collection reset in 'setUp'
+        remote_process = "jsonarray2netcdf"  # use builtin, re-deploy as "remote process"
+        href = f"{self.url}/processes/{remote_process}"
+        p_id = "new-test-ogc-api"
+        body = {
+            "processDescription": {"process": {"id": p_id}},
+            "executionUnit": [{"href": href}],
+        }
+        desc = self.deploy_process_make_visible_and_fetch_deployed(body, p_id, assert_io=False)
+        self.validate_ogcapi_process_description(desc, p_id, remote_process)
 
     def test_deploy_process_with_revision_invalid(self):
         """
@@ -1874,7 +1917,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                     # if optional, valid since omitting field does not raise missing field in schema
                     if is_invalid:
                         msg = f"Killed test '{i}' request taking too long using:\n{data_json}"
-                        assert timeout.state == timeout.EXECUTED, msg
+                        assert timeout.state == timeout.EXECUTED, msg  # pylint: disable=E0601
 
     def test_execute_process_dont_cast_one_of(self):
         """

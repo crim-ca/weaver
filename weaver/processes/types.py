@@ -7,6 +7,7 @@ class ProcessType(Constants):
     APPLICATION = "application"     # CWL package referencing an application (eg: Docker)
     BUILTIN = "builtin"             # Local scripts builtin Weaver for basic operations
     TEST = "test"                   # Same as local WPS, but specifically for testing
+    OGC_API = "ogcapi"              # Remote OGC API process reference
     WORKFLOW = "workflow"           # CWL package chaining multiple other process-types
     WPS_LOCAL = "wps"               # Local PyWPS process definitions
     WPS_REMOTE = "wps-remote"       # Remote WPS provider references (once instantiated from Service definition)
@@ -24,6 +25,7 @@ if TYPE_CHECKING:
         ProcessType.APPLICATION,
         ProcessType.BUILTIN,
         ProcessType.TEST,
+        ProcessType.OGC_API,
         ProcessType.WORKFLOW,
         ProcessType.WPS_LOCAL,
         ProcessType.WPS_REMOTE,

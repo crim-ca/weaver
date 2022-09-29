@@ -1423,7 +1423,7 @@ def retry_on_condition(operation,               # type: AnyCallableAnyArgs
             all(inspect.isclass(_exc) and issubclass(_exc, Exception) for _exc in condition)
         )
     ):
-        condition_check = lambda _exc: isinstance(_exc, condition)  # noqa: E731
+        condition_check = lambda _exc: isinstance(_exc, condition)  # noqa: E731  # pylint: disable=C3001
     else:
         condition_check = condition
 
@@ -1601,7 +1601,7 @@ def request_extra(method,                       # type: AnyRequestMethod
     request_options = get_request_options(method, url, settings)
     request_options.update(request_kwargs)
     request_kwargs = request_options  # update ref to ensure following modifications consider all parameters
-    # catch kw passed to request corresponding to retries parameters
+    # catch kw passed to request corresponding to 'retries' parameters
     # it is safe top pop items because 'get_request_options' creates a copy each time
     kw_retries = request_options.pop("retries", request_options.pop("retry", request_options.pop("max_retries", None)))
     kw_backoff = request_options.pop("backoff", request_options.pop("backoff_factor", None))

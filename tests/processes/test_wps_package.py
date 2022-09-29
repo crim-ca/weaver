@@ -13,52 +13,14 @@ import shutil
 import sys
 import tempfile
 
-import mock
 import pytest
-from pywps.app import WPSRequest
 
 from weaver.datatype import Process
 from weaver.exceptions import PackageExecutionError
-from weaver.processes.wps_package import WpsPackage, _check_package_file  # noqa: W0212
+from weaver.processes.wps_package import WpsPackage
+from weaver.wps.service import WorkerRequest
 
 # pylint: disable=R1729  # ignore non-generator representation employed for displaying test log results
-
-
-class MockResponseOk(object):
-    status_code = 200
-
-
-def test_check_package_file_with_url():
-    package_url = "https://example.com/package.cwl"
-    with mock.patch("requests.Session.request", return_value=MockResponseOk()) as mock_request:
-        res_path = _check_package_file(package_url)
-        assert mock_request.call_count == 1
-        assert mock_request.call_args[0][:2] == ("head", package_url)  # ignore extra args
-    assert res_path == package_url
-
-
-def test_check_package_file_with_file_scheme():
-    with mock.patch("requests.Session.request", return_value=MockResponseOk()) as mock_request:
-        with tempfile.NamedTemporaryFile(mode="r", suffix="test-package.cwl") as tmp_file:
-            package_file = f"file://{tmp_file.name}"
-            res_path = _check_package_file(package_file)
-            mock_request.assert_not_called()
-            assert res_path == tmp_file.name
-
-
-def test_check_package_file_with_posix_path():
-    with tempfile.NamedTemporaryFile(mode="r", suffix="test-package.cwl") as tmp_file:
-        res_path = _check_package_file(tmp_file.name)
-        assert res_path == tmp_file.name
-
-
-@pytest.mark.skipif(not sys.platform.startswith("win"), reason="Test for Windows only.")
-def test_check_package_file_with_windows_path():
-    test_file = "C:/Windows/Temp/package.cwl"   # fake existing, just test format handled correctly
-    with mock.patch("os.path.isfile", return_value=True) as mock_isfile:
-        res_path = _check_package_file(test_file)
-        mock_isfile.assert_called_with(test_file)
-    assert res_path == test_file
 
 
 class MockWpsPackage(WpsPackage):
@@ -79,7 +41,7 @@ class MockWpsPackage(WpsPackage):
         pass
 
 
-class MockWpsRequest(WPSRequest):
+class MockWpsRequest(WorkerRequest):
     def __init__(self, process_id=None, with_message_input=True):
         if not process_id:
             raise ValueError("must provide mock process identifier")

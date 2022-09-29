@@ -12,7 +12,7 @@ from weaver.owsexceptions import OWSNoApplicableCode
 from weaver.processes.constants import WPS_COMPLEX_DATA
 from weaver.processes.convert import DEFAULT_FORMAT, ows2json_output_data
 from weaver.processes.utils import map_progress
-from weaver.processes.wps_process_base import WpsProcessInterface, WpsRemoteJobProgress
+from weaver.processes.wps_process_base import RemoteJobProgress, WpsProcessInterface
 from weaver.status import Status, map_status
 from weaver.utils import (
     bytes2str,
@@ -46,7 +46,7 @@ if TYPE_CHECKING:
 LOGGER = logging.getLogger(__name__)
 
 
-class Wps1RemoteJobProgress(WpsRemoteJobProgress):
+class Wps1RemoteJobProgress(RemoteJobProgress):
     pass
 
 
@@ -56,7 +56,7 @@ class Wps1Process(WpsProcessInterface):
                  process,           # type: str
                  request,           # type: WorkerRequest
                  update_status,     # type: UpdateStatusPartialFunction
-                 ):
+                 ):                 # type: (...) -> None
         self.provider = provider
         self.process = process
         # following are defined after 'prepare' step
@@ -93,7 +93,7 @@ class Wps1Process(WpsProcessInterface):
             if input_val is None:
                 continue
 
-            # in case of array inputs, must repeat (id,value)
+            # in case of array inputs, must repeat (id, value)
             # in case of complex input (File), obtain location, otherwise get data value
             if not isinstance(input_val, list):
                 input_val = [input_val]
@@ -140,6 +140,7 @@ class Wps1Process(WpsProcessInterface):
         return outputs_as_ref
 
     def prepare(self):
+        # type: () -> None
         LOGGER.debug("Execute WPS-1 provider: [%s]", self.provider)
         LOGGER.debug("Execute WPS-1 process: [%s]", self.process)
         try:
@@ -184,7 +185,7 @@ class Wps1Process(WpsProcessInterface):
         num_retries = 0
         run_step = 0
         job_id = "<undefined>"
-        log_progress = Wps1RemoteJobProgress.MONITOR
+        log_progress = Wps1RemoteJobProgress.MONITORING
         while execution.isNotComplete() or run_step == 0:
             if num_retries >= max_retries:
                 raise Exception(f"Could not read status document after {max_retries} retries. Giving up.")
@@ -204,7 +205,7 @@ class Wps1Process(WpsProcessInterface):
                                           progress=execution.percentCompleted,
                                           duration=None)  # get if available
                 log_progress = map_progress(execution.percentCompleted,
-                                            Wps1RemoteJobProgress.MONITOR,
+                                            Wps1RemoteJobProgress.MONITORING,
                                             Wps1RemoteJobProgress.RESULTS)
                 self.update_status(log_msg, log_progress, Status.RUNNING)
             except Exception as exc:

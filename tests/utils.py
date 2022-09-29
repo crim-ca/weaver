@@ -1010,6 +1010,7 @@ def mocked_process_package():
     Provides mocks that bypasses execution when calling :module:`weaver.processes.wps_package` functions.
     """
     return (
+        mock.patch("weaver.processes.utils.load_package_file", return_value={"class": "test"}),
         mock.patch("weaver.processes.wps_package.load_package_file", return_value={"class": "test"}),
         mock.patch("weaver.processes.wps_package._load_package_content", return_value=(None, "test", None)),
         mock.patch("weaver.processes.wps_package._get_package_inputs_outputs", return_value=(None, None)),

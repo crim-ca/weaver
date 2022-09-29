@@ -18,7 +18,7 @@ def test_package_encode_decode():
         "$schemas": {"iana": "ref"},
         "executionUnit": [{"unit": {
             "class": "CommandLineTool",
-            "$namespace": {"iana": "ref"}
+            "$namespaces": {"iana": "ref"}
         }}]
     }
 
@@ -42,8 +42,8 @@ def test_package_encode_decode():
     assert _replace_specials("$url") in process_package_encoded["inputs"]
     assert "$format" not in process_package_encoded["outputs"]["output"]
     assert _replace_specials("$format") in process_package_encoded["outputs"]["output"]
-    assert "$namespace" not in process_package_encoded["executionUnit"][0]["unit"]
-    assert _replace_specials("$namespace") in process_package_encoded["executionUnit"][0]["unit"]
+    assert "$namespaces" not in process_package_encoded["executionUnit"][0]["unit"]
+    assert _replace_specials("$namespaces") in process_package_encoded["executionUnit"][0]["unit"]
     assert package == process.package, "package obtained from the process method should be the original decoded version"
 
 

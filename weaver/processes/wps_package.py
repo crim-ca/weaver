@@ -56,12 +56,15 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_BUILTIN,
     CWL_REQUIREMENT_APP_DOCKER,
     CWL_REQUIREMENT_APP_ESGF_CWT,
+    CWL_REQUIREMENT_APP_LOCAL,
+    CWL_REQUIREMENT_APP_OGC_API,
     CWL_REQUIREMENT_APP_REMOTE,
     CWL_REQUIREMENT_APP_TYPES,
     CWL_REQUIREMENT_APP_WPS1,
     CWL_REQUIREMENT_ENV_VAR,
     CWL_REQUIREMENT_RESOURCE,
     CWL_REQUIREMENTS_SUPPORTED,
+    PACKAGE_EXTENSIONS,
     WPS_INPUT,
     WPS_OUTPUT
 )
@@ -72,12 +75,13 @@ from weaver.processes.convert import (
     json2wps_io,
     merge_package_io,
     normalize_ordered_io,
+    ogcapi2cwl_process,
     wps2json_io,
     xml_wps2cwl
 )
 from weaver.processes.sources import retrieve_data_source_url
 from weaver.processes.types import ProcessType
-from weaver.processes.utils import map_progress
+from weaver.processes.utils import load_package_file, map_progress
 from weaver.status import STATUS_PYWPS_IDS, Status, StatusCompliant, map_status
 from weaver.store.base import StoreJobs, StoreProcesses
 from weaver.utils import (
@@ -92,8 +96,6 @@ from weaver.utils import (
     get_log_fmt,
     get_sane_name,
     get_settings,
-    is_remote_file,
-    load_file,
     request_extra,
     setup_loggers
 )
@@ -155,7 +157,6 @@ LOGGER = logging.getLogger(__name__)
 
 # CWL package references
 PACKAGE_DEFAULT_FILE_NAME = "package"
-PACKAGE_EXTENSIONS = frozenset(["yaml", "yml", "json", "cwl", "job"])
 PACKAGE_OUTPUT_HOOK_LOG_UUID = "PACKAGE_OUTPUT_HOOK_LOG_{}"
 
 # process execution progress
@@ -315,45 +316,6 @@ def _get_package_requirements_as_class_list(requirements):
             reqs[-1].update(requirements[req] or {})
         return reqs
     return [dict(req) for req in requirements]  # ensure list-of-dict instead of sequence of dict-like
-
-
-def _check_package_file(cwl_file_path_or_url):
-    # type: (str) -> str
-    """
-    Validates that the specified :term:`CWL` file path or URL points to an existing and allowed file format.
-
-    :param cwl_file_path_or_url: one of allowed file types path on disk, or an URL pointing to one served somewhere.
-    :returns: validated absolute path or URL of the file reference.
-    :raises PackageRegistrationError: in case of missing file, invalid format or invalid HTTP status code.
-    """
-    if is_remote_file(cwl_file_path_or_url):
-        cwl_path = cwl_file_path_or_url
-        cwl_resp = request_extra("head", cwl_path, settings=get_settings())
-        if cwl_resp.status_code != HTTPOk.code:
-            raise PackageRegistrationError(f"Cannot find CWL file at: '{cwl_path}'.")
-    else:
-        cwl_path = cwl_file_path_or_url[7:] if cwl_file_path_or_url.startswith("file://") else cwl_file_path_or_url
-        cwl_path = os.path.abspath(cwl_path)
-        if not os.path.isfile(cwl_path):
-            raise PackageRegistrationError(f"Cannot find CWL file at: '{cwl_file_path_or_url}'.")
-
-    file_ext = os.path.splitext(cwl_path)[-1].replace(".", "")
-    if file_ext not in PACKAGE_EXTENSIONS:
-        raise PackageRegistrationError(f"Not a valid CWL file type: '{file_ext}'.")
-    return cwl_path
-
-
-def load_package_file(file_path):
-    # type: (str) -> CWL
-    """
-    Loads the package in YAML/JSON format specified by the file path.
-    """
-
-    file_path = _check_package_file(file_path)
-    try:
-        return load_file(file_path)
-    except ValueError as ex:
-        raise PackageRegistrationError(f"Package parsing generated an error: [{ex!s}]")
 
 
 def _load_package_content(package_dict,                             # type: CWL
@@ -560,11 +522,25 @@ def _patch_wps_process_description_url(reference, process_hint):
 def _generate_process_with_cwl_from_reference(reference, process_hint=None):
     # type: (str, Optional[JSON]) -> Tuple[CWL, JSON]
     """
-    Resolves the ``reference`` type (`CWL`, `WPS-1`, `WPS-2`, `WPS-3`) and generates a `CWL` ``package`` from it.
+    Resolves the ``reference`` type representing a remote :term:`Process` and generates a `CWL` ``package`` for it.
 
-    Additionally provides minimal process details retrieved from the ``reference``.
-    The number of details obtained from the process will depend on available parameters from its description as well
-    as the number of metadata that can be mapped between it and the generated `CWL` package.
+    The reference can point to any definition amongst below known structures:
+    - :term:`CWL`
+    - :term:`WPS`-1/2
+    - :term:`WPS-REST`
+    - :term:`OGC API - Processes`
+
+    Additionally, provides minimal :term:`Process` details retrieved from the ``reference``.
+    The number of details obtained will depend on available parameters from its description as well
+    as the number of metadata that can be mapped between it and the generated :term:`CWL` package.
+
+    The resulting :term:`Process` and its :term:`CWL` will correspond to a remote instance to which execution should
+    be dispatched and monitored, except if the reference was directly a :term:`CWL` file.
+
+    .. seealso::
+        - :class:`weaver.processes.ogc_api_process.OGCAPIRemoteProcess`
+        - :class:`weaver.processes.wps1_process.Wps1Process`
+        - :class:`weaver.processes.wps3_process.Wps3Process`
     """
     cwl_package = None
     process_info = {}
@@ -573,11 +549,14 @@ def _generate_process_with_cwl_from_reference(reference, process_hint=None):
     reference_path, reference_ext = os.path.splitext(reference)
     reference_name = os.path.split(reference_path)[-1]
     if reference_ext.replace(".", "") in PACKAGE_EXTENSIONS:
-        cwl_package = load_package_file(reference)
+        try:
+            cwl_package = load_package_file(reference)
+        except PackageRegistrationError as exc:
+            LOGGER.debug("Skipping reference [%s] not matching a valid CWL package due to [%s]", reference, exc)
         process_info = {"identifier": reference_name}
 
     # match reference against WPS-1/2 or WPS-3/OGC-API (with CWL href) or CWL (without extension, e.g.: API endpoint)
-    else:
+    if not cwl_package:
         settings = get_settings()
         # since WPS-1/2 servers can sometimes reply with an error if missing query parameters, provide them
         # even in the case of potential *OGC API - Processes* reference since we don't know yet what it refers to
@@ -623,18 +602,15 @@ def _generate_process_with_cwl_from_reference(reference, process_hint=None):
             # - OLD schema nests everything under 'process'
             # - OGC schema provides everything at the root, but must distinguish from CWL with 'id'
             if (
-                ("process" in payload or "owsContext" in payload)
-                and "cwlVersion" not in payload
+                ("process" in payload or "owsContext" in payload or "id" in payload)
+                and isinstance(payload, dict) and "cwlVersion" not in payload
                 and sd.ProcessDescription(missing=colander.drop).deserialize(payload) is not colander.drop
             ):
-                process_info = payload.get("process", payload)  # OLD/OGC schemas nested process or directly offered
-                ows_ref = process_info.get("owsContext", {}).get("offering", {}).get("content", {}).get("href")
-                proc_ref = process_info.get("href")
-                cwl_package = load_package_file(ows_ref or proc_ref)
+                payload.update(process_hint or {})  # apply provided process overrides, such as alternative ID
+                cwl_package, process_info = ogcapi2cwl_process(payload, reference)
             # if somehow the CWL was referenced without an extension, handle it here
-            # also handle parsed WPS-3 process description also with a reference
-            elif "cwlVersion" in payload:
-                cwl_package = load_package_file(reference)
+            elif isinstance(payload, dict) and "cwlVersion" in payload:
+                cwl_package = payload
                 process_info = {"identifier": reference_name}
 
         if not process_info:
@@ -706,17 +682,15 @@ def check_package_instance_compatible(package):
     regardless whether remote should be an :term:`ADES` or a remote :term:`Provider` (:term:`WPS` or :term:`ESGF-CWT`).
 
     :param package: CWL definition for the process.
-    :returns: reason message if must be executed remotely or ``None`` if it *could* be executed locally.
+    :returns: reason message if it must be executed remotely or ``None`` if it *could* be executed locally.
     """
     if _get_package_type(package) == ProcessType.WORKFLOW:
         return f"CWL package defines a [{ProcessType.WORKFLOW}] process that uses remote step-processes."
     requirement = get_application_requirement(package)
     req_class = requirement["class"]
-    req_local = [CWL_REQUIREMENT_APP_BUILTIN, CWL_REQUIREMENT_APP_DOCKER]
-    req_remote = [CWL_REQUIREMENT_APP_ESGF_CWT, CWL_REQUIREMENT_APP_WPS1]
-    if req_class in req_local:
+    if req_class in CWL_REQUIREMENT_APP_LOCAL:
         return None
-    if req_class in req_remote:
+    if req_class in CWL_REQUIREMENT_APP_REMOTE:
         return f"CWL package hint/requirement [{req_class}] requires a remote provider."
     # other undefined hint/requirement for remote execution (aka: ADES dispatched WPS-3/REST/OGC-API)
     remote = all(req in req_class for req in ["provider", "process"])
@@ -1809,7 +1783,7 @@ class WpsPackage(Process):
         try:
             step_details = self.step_packages[job_name]
         except KeyError:  # Perform check directly first in case a step was called literally as '<name>_<index>'
-            # In case of Workflow with scattering, job name might be suffixed with an index
+            # In case of Workflow with scattering, job name might be suffixed with an index.
             # Also, to avoid ambiguous references of Workflow steps running in parallel (distinct jobs),
             # unique keys are generated for matching step names, since their sub-CWL might differ.
             # (see 'cwltool.process.uniquename')
@@ -1818,7 +1792,7 @@ class WpsPackage(Process):
             job_name, job_index = job_name.rsplit("_", 1)
             if not job_index.isnumeric():
                 raise
-            LOGGER.debug("Resolved step name with index from scattering: [%s](%s)", job_name, job_index)
+            LOGGER.debug("Resolved step name with index: [%s](%s)", job_name, job_index)
             step_details = self.step_packages[job_name]
         return step_details
 
@@ -1874,10 +1848,9 @@ class WpsPackage(Process):
                 _message, _progress, start_step_progress, end_step_progress, job_name, _provider, _status, error=error
             )
 
-        def _get_wps1_params(_requirement):
-            # type: (CWL_AnyRequirements) -> CWL_Requirement
+        def _get_req_params(_requirement, required_params):
+            # type: (CWL_AnyRequirements, List[str]) -> CWL_Requirement
             _wps_params = {}
-            required_params = ["provider", "process"]
             for _param in required_params:
                 if _param not in _requirement:
                     _req = _requirement["class"]
@@ -1901,7 +1874,7 @@ class WpsPackage(Process):
         if req_class.endswith(CWL_REQUIREMENT_APP_WPS1):
             self.logger.info("WPS-1 Package resolved from %s: %s", req_source, req_class)
             from weaver.processes.wps1_process import Wps1Process
-            params = _get_wps1_params(requirement)
+            params = _get_req_params(requirement, ["provider", "process"])
             return Wps1Process(
                 provider=params["provider"],
                 process=params["process"],
@@ -1911,15 +1884,26 @@ class WpsPackage(Process):
         elif req_class.endswith(CWL_REQUIREMENT_APP_ESGF_CWT):
             self.logger.info("ESGF-CWT Package resolved from %s: %s", req_source, req_class)
             from weaver.processes.esgf_process import ESGFProcess
-            params = _get_wps1_params(requirement)
+            params = _get_req_params(requirement, ["provider", "process"])
             return ESGFProcess(
                 provider=params["provider"],
                 process=params["process"],
                 request=self.request,
                 update_status=_update_status_dispatch,
             )
+        elif req_class.endswith(CWL_REQUIREMENT_APP_OGC_API):
+            self.logger.info("OGC API Package resolved from %s: %s", req_source, req_class)
+            from weaver.processes.ogc_api_process import OGCAPIRemoteProcess
+            params = _get_req_params(requirement, ["process"])
+            return OGCAPIRemoteProcess(step_payload=step_payload,
+                                       process=params["process"],
+                                       request=self.request,
+                                       update_status=_update_status_dispatch)
         else:
-            # implements both `ProcessType.APPLICATION` with `CWL_REQUIREMENT_APP_DOCKER` and `ProcessType.WORKFLOW`
+            # implements:
+            # - `ProcessType.APPLICATION` with `CWL_REQUIREMENT_APP_BUILTIN`
+            # - `ProcessType.APPLICATION` with `CWL_REQUIREMENT_APP_DOCKER`
+            # - `ProcessType.WORKFLOW` nesting calls to other processes of various types and locations
             self.logger.info("WPS-3 Package resolved from %s: %s", req_source, req_class)
             from weaver.processes.wps3_process import Wps3Process
             return Wps3Process(step_payload=step_payload,

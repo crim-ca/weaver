@@ -388,7 +388,7 @@ class TestWeaverClient(TestWeaverClientBase):
         with contextlib.ExitStack() as stack_exec:
             # use pass-through function because don't care about execution result here, only the parsing of I/O
             if mock_exec:
-                mock_exec_func = lambda *_, **__: None  # noqa: E731
+                mock_exec_func = lambda *_, **__: None  # noqa: E731  # pylint: disable=C3001
             else:
                 mock_exec_func = None
             for mock_exec_proc in mocked_execute_celery(func_execute_task=mock_exec_func):
