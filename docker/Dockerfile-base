@@ -3,7 +3,7 @@ LABEL description.short="Weaver Base"
 LABEL description.long="Workflow Execution Management Service (EMS); Application, Deployment and Execution Service (ADES)"
 LABEL maintainer="Francis Charette-Migneault <francis.charette-migneault@crim.ca>"
 LABEL vendor="CRIM"
-LABEL version="4.23.0"
+LABEL version="4.24.0"
 
 # setup paths
 ENV APP_DIR=/opt/local/src/weaver

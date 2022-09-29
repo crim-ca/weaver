@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_4.24.0:
+
+`4.24.0 <https://github.com/crim-ca/weaver/tree/4.24.0>`_ (2022-09-29)
+========================================================================
+
+Changes:
+--------
 - Support deployment of a local `Process` using a remote `OGC API - Processes` reference
   (resolves `#11 <https://github.com/crim-ca/weaver/issues/11>`_).
 - Support `CWL` definition for ``ScatterFeatureRequirement`` for `Workflow` parallel step distribution of an
