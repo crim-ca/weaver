@@ -859,7 +859,7 @@ def is_cwl_array_type(io_info, strict=True):
     io_return = {
         "array": False,
         "allow": AnyValue,
-        "type": io_info["type"],
+        "type": get_cwl_io_type_name(io_info["type"]),
         "mode": MODE.NONE,
     }
 
@@ -897,19 +897,21 @@ def is_cwl_array_type(io_info, strict=True):
         if io_type["type"] != PACKAGE_ARRAY_BASE:
             raise PackageTypeError(f"Unsupported I/O 'array' definition: '{io_info!r}'.")
         # parse enum in case we got an array of allowed symbols
-        is_enum = _update_if_sub_enum(io_type["items"])
+        io_items = get_cwl_io_type_name(io_type["items"])
+        is_enum = _update_if_sub_enum(io_items)
         if not is_enum:
             io_return["type"] = io_type["items"]
-        if io_return["type"] not in PACKAGE_ARRAY_ITEMS:  # includes Complex, so implicit literal-only check possible
-            io_type = any2cwl_literal_datatype(io_return["type"])
+        io_type = get_cwl_io_type_name(io_return["type"])
+        if io_type not in PACKAGE_ARRAY_ITEMS:  # includes Complex, so implicit literal-only check possible
+            io_type = any2cwl_literal_datatype(io_type)
             if strict or io_type not in PACKAGE_ARRAY_ITEMS:
                 raise PackageTypeError(f"Unsupported I/O 'array' definition: '{io_info!r}'.")
             io_return["type"] = io_type
         LOGGER.debug("I/O [%s] parsed as 'array' with nested dict notation", io_info["name"])
         io_return["array"] = True
     # array type conversion when defined as string '<type>[]'
-    elif isinstance(io_return["type"], str) and io_return["type"] in PACKAGE_ARRAY_TYPES:
-        io_return["type"] = io_return["type"][:-2]  # remove '[]'
+    elif isinstance(io_return["type"], str) and get_cwl_io_type_name(io_return["type"]) in PACKAGE_ARRAY_TYPES:
+        io_return["type"] = get_cwl_io_type_name(io_return["type"][:-2])  # remove '[]'
         if io_return["type"] in PACKAGE_CUSTOM_TYPES:
             # parse 'enum[]' for array of allowed symbols, provide expected structure for sub-item parsing
             io_item = deepcopy(io_info)
@@ -935,7 +937,7 @@ def is_cwl_enum_type(io_info):
         - ``io_allow``: validation values of the enum.
     :raises PackageTypeError: if the enum doesn't have the required parameters and valid format.
     """
-    io_type = io_info["type"]
+    io_type = get_cwl_io_type_name(io_info["type"])
     if not isinstance(io_type, dict) or "type" not in io_type or io_type["type"] not in PACKAGE_CUSTOM_TYPES:
         return False, io_type, MODE.NONE, None
 
@@ -962,6 +964,19 @@ def is_cwl_enum_type(io_info):
         )
 
     return True, io_type, MODE.SIMPLE, io_allow  # allowed value validator mode must be set for input
+
+
+def get_cwl_io_type_name(io_type):
+    # type: (Any) -> Any
+    """
+    Obtain the simple type-name representation of a :term:`CWL` I/O.
+
+    Depending on :mod:`cwltool` version, types are represented with or without an extended prefix, and using an
+    explicit quoted class representation rather than plain strings.
+    """
+    if isinstance(io_type, str):
+        return str(io_type.replace("org.w3id.cwl.cwl.", ""))
+    return io_type
 
 
 @dataclass
@@ -1003,7 +1018,7 @@ def get_cwl_io_type(io_info, strict=True):
     :param strict: Indicates if only pure :term:`CWL` definition is allowed, or allow implicit data-type conversions.
     :return: tuple of guessed base type and flag indicating if it can be null (optional input).
     """
-    io_type = io_info["type"]
+    io_type = get_cwl_io_type_name(io_info["type"])
     is_null = False
 
     # parse multi-definition
@@ -1076,6 +1091,8 @@ def get_cwl_io_type(io_info, strict=True):
         LOGGER.debug("io_type:       [%s]", repr(io_type))
         LOGGER.debug("type(io_type): [%s]", type(io_type))
         raise TypeError(f"I/O type has not been properly decoded. Should be a string, got: '{io_type!r}'")
+
+    io_type = get_cwl_io_type_name(io_type)
 
     # parse shorthand notation for nullable
     if io_type.endswith("?"):

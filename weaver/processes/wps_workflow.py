@@ -15,9 +15,9 @@ from cwltool.builder import CONTENT_LIMIT, Builder, substitute
 from cwltool.context import LoadingContext, RuntimeContext, getdefault
 from cwltool.errors import WorkflowException
 from cwltool.job import JobBase, relink_initialworkdir
-from cwltool.pathmapper import adjustDirObjs, adjustFileObjs, get_listing, trim_listing, visit_class
 from cwltool.process import (
     Process as ProcessCWL,
+    avroize_type,
     compute_checksums,
     normalizeFilesDirs,
     shortname,
@@ -25,7 +25,12 @@ from cwltool.process import (
     uniquename
 )
 from cwltool.stdfsaccess import StdFsAccess
-from cwltool.utils import aslist, bytes2str_in_dicts, onWindows
+from cwltool.utils import (
+    aslist,
+    adjustDirObjs, adjustFileObjs, get_listing, trim_listing, visit_class,
+    bytes2str_in_dicts, CWLObjectType, OutputCallbackType,
+    JobsGeneratorType
+)
 from cwltool.workflow import Workflow
 from schema_salad import validate
 from schema_salad.sourceline import SourceLine
@@ -242,8 +247,9 @@ class WpsWorkflow(ProcessCWL):
                     adjustFileObjs(ret, partial(compute_checksums, fs_access))
 
             validate.validate_ex(
-                self.names.get_name("outputs_record_schema", ""), ret,
-                strict=False, logger=LOGGER)
+                self.names.get_name("outputs_record_schema", None), ret,
+                strict=False, logger=LOGGER, vocab={typ: avroize_type(typ) for typ in ["File", "Directory"]}
+            )
             if ret is not None and builder.mutation_manager is not None:
                 adjustFileObjs(ret, builder.mutation_manager.set_generation)
             return ret if ret is not None else {}
@@ -457,13 +463,23 @@ class WpsWorkflowJob(JobBase):
                 output_id = shortname(output["id"])
                 self.expected_outputs[output_id] = output["outputBinding"]["glob"]
 
+    def _required_env(self):
+        # type: () -> Dict[str, str]
+        env = {}
+        env["HOME"] = self.outdir
+        env["TMPDIR"] = self.tmpdir
+        env["PATH"] = os.environ["PATH"]
+        if "SYSTEMROOT" in os.environ:
+            env["SYSTEMROOT"] = os.environ["SYSTEMROOT"]
+        return env
+
     def run(self,
             runtimeContext,     # type: RuntimeContext
             tmpdir_lock=None,   # type: Optional[ThreadLock]
             ):                  # type: (...) -> None
 
         make_dirs(self.tmpdir, exist_ok=True)
-        env = self.environment
+        env = self._required_env()
         vars_to_preserve = runtimeContext.preserve_environment
         if runtimeContext.preserve_entire_environment:
             vars_to_preserve = os.environ
@@ -471,13 +487,7 @@ class WpsWorkflowJob(JobBase):
             for key, value in os.environ.items():
                 if key in vars_to_preserve and key not in env:
                     # On Windows, subprocess env can't handle unicode.
-                    env[key] = str(value) if onWindows() else value
-        env["HOME"] = str(self.outdir) if onWindows() else self.outdir
-        env["TMPDIR"] = str(self.tmpdir) if onWindows() else self.tmpdir
-        if "PATH" not in env:
-            env["PATH"] = str(os.environ["PATH"]) if onWindows() else os.environ["PATH"]
-        if "SYSTEMROOT" not in env and "SYSTEMROOT" in os.environ:
-            env["SYSTEMROOT"] = str(os.environ["SYSTEMROOT"]) if onWindows() else os.environ["SYSTEMROOT"]
+                    env[key] = value
 
         # stageFiles(self.pathmapper, ignoreWritable=True, symLink=True, secret_store=runtimeContext.secret_store)
         if self.generatemapper:
