@@ -26,13 +26,13 @@ from cwltool.process import (
 )
 from cwltool.stdfsaccess import StdFsAccess
 from cwltool.utils import (
-    aslist,
     adjustDirObjs,
     adjustFileObjs,
+    aslist,
+    bytes2str_in_dicts,
     get_listing,
     trim_listing,
-    visit_class,
-    bytes2str_in_dicts
+    visit_class
 )
 from cwltool.workflow import Workflow
 from schema_salad import validate
