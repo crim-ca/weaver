@@ -56,7 +56,8 @@ python-dateutil
 pyramid_rewrite
 pyramid_storage
 pytz
-pywps==4.5.2
+pywps==4.5.1; python_version <= "3.6"
+pywps==4.5.2; python_version >= "3.7"
 pyyaml>=5.2
 rdflib>=5
 requests
