@@ -900,7 +900,7 @@ def is_cwl_array_type(io_info, strict=True):
         io_items = get_cwl_io_type_name(io_type["items"])
         is_enum = _update_if_sub_enum(io_items)
         if not is_enum:
-            io_return["type"] = io_type["items"]
+            io_return["type"] = io_items
         io_type = get_cwl_io_type_name(io_return["type"])
         if io_type not in PACKAGE_ARRAY_ITEMS:  # includes Complex, so implicit literal-only check possible
             io_type = any2cwl_literal_datatype(io_type)

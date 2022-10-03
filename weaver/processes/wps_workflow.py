@@ -27,9 +27,12 @@ from cwltool.process import (
 from cwltool.stdfsaccess import StdFsAccess
 from cwltool.utils import (
     aslist,
-    adjustDirObjs, adjustFileObjs, get_listing, trim_listing, visit_class,
-    bytes2str_in_dicts, CWLObjectType, OutputCallbackType,
-    JobsGeneratorType
+    adjustDirObjs,
+    adjustFileObjs,
+    get_listing,
+    trim_listing,
+    visit_class,
+    bytes2str_in_dicts
 )
 from cwltool.workflow import Workflow
 from schema_salad import validate
@@ -51,8 +54,8 @@ if TYPE_CHECKING:
     from threading import Lock as ThreadLock
     from typing import Any, Dict, Generator, List, Optional, Set, Union
 
-    from cwltool.command_line_tool import OutputPorts
-    from cwltool.provenance import ProvenanceProfile
+    from cwltool.command_line_tool import OutputPortsType
+    from cwltool.provenance_profile import ProvenanceProfile
 
     from weaver.typedefs import (
         AnyValueType,
@@ -81,6 +84,15 @@ def default_make_tool(toolpath_object,              # type: CWL_ToolPathObjectTy
                       loading_context,              # type: LoadingContext
                       get_job_process_definition,   # type: JobProcessDefinitionCallback
                       ):                            # type: (...) -> ProcessCWL
+    """
+    Generate the tool class object from the :term:`CWL` definition to handle its execution.
+
+    .. warning::
+        Package :mod:`cwltool` introduces explicit typing definitions with :mod:`mypy_extensions`.
+        This can cause ``TypeError("interpreted classes cannot inherit from compiled")`` when using
+        :class:`cwltool.process.Process` as base class for our custom definitions below.
+        To avoid the error, we must enforce the type using :func:`cast`.
+    """
     if not isinstance(toolpath_object, collections.abc.MutableMapping):
         raise WorkflowException(f"Not a dict: '{toolpath_object}'")
     if "class" in toolpath_object:
@@ -88,8 +100,8 @@ def default_make_tool(toolpath_object,              # type: CWL_ToolPathObjectTy
             builtin_process_hints = [h.get("process") for h in toolpath_object.get("hints")
                                      if h.get("class", "").endswith(CWL_REQUIREMENT_APP_BUILTIN)]
             if len(builtin_process_hints) == 1:
-                return BuiltinProcess(toolpath_object, loading_context)
-            return WpsWorkflow(toolpath_object, loading_context, get_job_process_definition)
+                return cast(BuiltinProcess, BuiltinProcess(toolpath_object, loading_context))
+            return cast(WpsWorkflow, WpsWorkflow(toolpath_object, loading_context, get_job_process_definition))
         if toolpath_object["class"] == "ExpressionTool":
             return command_line_tool.ExpressionTool(toolpath_object, loading_context)
         if toolpath_object["class"] == "Workflow":
@@ -212,8 +224,8 @@ class WpsWorkflow(ProcessCWL):
                              compute_checksum=True,  # type: bool
                              job_name="",            # type: Text
                              readers=None            # type: Dict[Text, Any]
-                             ):                      # type: (...) -> OutputPorts
-        ret = {}  # type: OutputPorts
+                             ):                      # type: (...) -> OutputPortsType
+        ret = {}  # type: OutputPortsType
         debug = LOGGER.isEnabledFor(logging.DEBUG)
         try:
             fs_access = builder.make_fs_access(outdir)
@@ -442,7 +454,7 @@ class WpsWorkflow(ProcessCWL):
 class WpsWorkflowJob(JobBase):
     def __init__(self,
                  builder,           # type: Builder
-                 job_order,          # type: Dict[Text, Union[Dict[Text, Any], List, Text, None]]
+                 job_order,         # type: Dict[Text, Union[Dict[Text, Any], List, Text, None]]
                  requirements,      # type: List[Dict[Text, Text]]
                  hints,             # type: List[Dict[Text, Text]]
                  name,              # type: Text
