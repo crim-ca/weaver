@@ -15,7 +15,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     #   Only install CLI package, 'docker-ce' and 'containerd.io' not required as they should be provided by host.
     #   Docker sibling execution is expected. See 'docker/docker-compose.yml.example' for details.
     && apt install --no-install-recommends docker-ce-cli \
-	&& rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/*
 
 # run app
 # see CHANGES (4.15.0), celery>=5 needs '-A' before 'worker'
