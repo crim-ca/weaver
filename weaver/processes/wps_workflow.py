@@ -55,10 +55,9 @@ if TYPE_CHECKING:
     from typing import Any, Dict, Generator, List, Optional, Set, Union
 
     from cwltool.command_line_tool import OutputPortsType
-    from cwltool.provenance_profile import ProvenanceProfile
+    from cwltool.utils import CWLObjectType, JobsGeneratorType
 
     from weaver.typedefs import (
-        AnyValueType,
         CWL_ExpectedOutputs,
         CWL_Output_Type,
         CWL_ToolPathObjectType,
@@ -113,24 +112,6 @@ def default_make_tool(toolpath_object,              # type: CWL_ToolPathObjectTy
     )
 
 
-class CallbackJob(object):
-    def __init__(self, job, output_callback, cachebuilder, jobcache):
-        # type: (WpsWorkflow, Callable[[Any, Any], Any], Builder, Text) -> None
-        self.job = job
-        self.output_callback = output_callback
-        self.cache_builder = cachebuilder
-        self.output_dir = jobcache
-        self.prov_obj = None  # type: Optional[ProvenanceProfile]
-
-    def run(self, loading_context):
-        # type: (RuntimeContext) -> None
-        self.output_callback(self.job.collect_output_ports(
-            self.job.tool["outputs"],
-            self.cache_builder,
-            self.output_dir,
-            getdefault(loading_context.compute_checksum, True)), "success")
-
-
 class WpsWorkflow(ProcessCWL):
     """
     Definition of a `CWL` ``workflow`` that can execute ``WPS`` application packages as intermediate job steps.
@@ -156,10 +137,10 @@ class WpsWorkflow(ProcessCWL):
 
     # pylint: disable=W0221,W0237 # naming using python like arguments
     def job(self,
-            job_order,          # type: Dict[Text, AnyValueType]
+            job_order,          # type: CWLObjectType
             output_callbacks,   # type: Callable[[Any, Any], Any]
             runtime_context,    # type: RuntimeContext
-            ):                  # type: (...) -> Generator[Union[JobBase, CallbackJob], None, None]
+            ):                  # type: (...) -> JobsGeneratorType
         """
         Workflow job generator.
 
