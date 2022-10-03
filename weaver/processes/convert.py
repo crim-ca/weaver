@@ -1039,8 +1039,9 @@ def get_cwl_io_type(io_info, strict=True):
             io_type_many = set()
             io_base_type = None
             for i, typ in enumerate(io_type):
+                typ = get_cwl_io_type_name(typ)
                 io_name = io_info["name"]
-                sub_type = {"type": typ, "name": f"{io_name}[{i}]"}
+                sub_type = {"type": typ, "name": f"{io_name}[{i}]"}  # type: CWL_IO_Type
                 is_array, array_elem, _, _ = is_cwl_array_type(sub_type, strict=strict)
                 is_enum, enum_type, _, _ = is_cwl_enum_type(sub_type)
                 # array base type more important than enum because later array conversion also handles allowed values
