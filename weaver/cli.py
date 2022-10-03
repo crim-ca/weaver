@@ -939,6 +939,8 @@ class WeaverClient(object):
                         "Cannot upload to vault: [%s]", file
                     )
                     continue
+                if not href.startswith("/"):  # Check to prevent upload of external references (http, https, etc.)
+                    continue
                 fmt = data.get("format", {})
                 ctype = get_field(fmt, "mime_type", search_variations=True)
                 if not ctype:
