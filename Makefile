@@ -532,8 +532,9 @@ check-security-deps-only: mkdir-reports  ## run security checks on package depen
 			$(SAFETY_IGNORE) \
 		1> >(tee "$(REPORTS_DIR)/check-security-deps.txt")'
 
+# FIXME: bandit excludes not working (https://github.com/PyCQA/bandit/issues/657), clean-src beforehand to avoid error
 .PHONY: check-security-code-only
-check-security-code-only: mkdir-reports  ## run security checks on source code
+check-security-code-only: mkdir-reports clean-src ## run security checks on source code
 	@echo "Running security code checks..."
 	@-rm -fr "$(REPORTS_DIR)/check-security-code.txt"
 	@bash -c '$(CONDA_CMD) \
