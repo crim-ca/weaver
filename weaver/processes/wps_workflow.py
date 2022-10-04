@@ -9,12 +9,7 @@ from cwltool import command_line_tool
 from cwltool.context import LoadingContext, RuntimeContext, getdefault
 from cwltool.errors import WorkflowException
 from cwltool.job import CommandLineJob
-from cwltool.process import (
-    Process as ProcessCWL,
-    shortname,
-    supportedProcessRequirements,
-    uniquename
-)
+from cwltool.process import Process as ProcessCWL, shortname, supportedProcessRequirements, uniquename
 from cwltool.stdfsaccess import StdFsAccess
 from cwltool.workflow import Workflow
 
