@@ -1017,9 +1017,6 @@ class WpsPackage(Process):
             if isinstance(result, CWLException):
                 result = getattr(result, "out")
                 status = Status.FAILED
-            if not result:
-                LOGGER.warning("Could not retrieve any internal application log from empty result.")
-                return []
             stderr_file = result.get(self.package_log_hook_stderr, {}).get("location", "").replace("file://", "")
             stdout_file = result.get(self.package_log_hook_stdout, {}).get("location", "").replace("file://", "")
             with_stderr_file = os.path.isfile(stderr_file)
