@@ -240,7 +240,7 @@ class WpsWorkflowJob(CommandLineJob):
                     output_glob
                 )
 
-    # pylint: disable=W0221,arguments-differ    # naming using python like arguments
+    # pylint: disable=W0221,W0237 # naming using python like arguments
     def _execute(self,
                  runtime,                   # type: List[str]
                  env,                       # type: MutableMapping[str, str]
