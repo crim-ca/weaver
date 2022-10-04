@@ -30,7 +30,7 @@ from weaver.utils import get_settings
 from weaver.wps.utils import get_wps_output_dir
 
 if TYPE_CHECKING:
-    from subprocess import Popen
+    from subprocess import Popen  # nosec: B404
     from typing import Any, Callable, Generator, List, MutableMapping, Optional
 
     from cwltool.builder import Builder
