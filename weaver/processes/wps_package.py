@@ -1362,7 +1362,10 @@ class WpsPackage(Process):
             self.package_requirement = get_application_requirement(self.package)
             try:
                 # workflows do not support stdout/stderr
-                log_stdout_stderr = self.package_type != ProcessType.WORKFLOW
+                log_stdout_stderr = (
+                    self.package_type != ProcessType.WORKFLOW
+                    and self.package_requirement.get("class") not in CWL_REQUIREMENT_APP_REMOTE
+                )
                 self.setup_loggers(log_stdout_stderr)
                 self.update_status("Preparing package logs done.", PACKAGE_PROGRESS_PREP_LOG, Status.RUNNING)
             except Exception as exc:

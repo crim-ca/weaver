@@ -196,13 +196,14 @@ class WpsWorkflow(command_line_tool.CommandLineTool):
             glob = schema["outputBinding"]["glob"]
             glob = os.path.split(glob)[-1]
             schema["outputBinding"]["glob"] = glob
-        return super(WpsWorkflow, self).collect_output(
+        output = super(WpsWorkflow, self).collect_output(
             schema,
             builder,
             outdir,
             fs_access,
             compute_checksum=compute_checksum,
         )
+        return output or {}
 
 
 class WpsWorkflowJob(CommandLineJob):
