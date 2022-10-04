@@ -26,7 +26,7 @@ from weaver.wps.utils import get_wps_output_dir
 
 if TYPE_CHECKING:
     from subprocess import Popen  # nosec: B404
-    from typing import Any, Callable, Generator, List, MutableMapping, Optional
+    from typing import Any, Callable, List, MutableMapping, Optional
 
     from cwltool.builder import Builder
     from cwltool.pathmapper import PathMapper
