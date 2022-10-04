@@ -138,7 +138,7 @@ if TYPE_CHECKING:
         CWL_RequirementNames,
         CWL_RequirementsList,
         CWL_Results,
-        CWL_ToolPathObjectType,
+        CWL_ToolPathObject,
         CWL_WorkflowStepPackage,
         CWL_WorkflowStepPackageMap,
         CWL_WorkflowStepReference,
@@ -1017,6 +1017,9 @@ class WpsPackage(Process):
             if isinstance(result, CWLException):
                 result = getattr(result, "out")
                 status = Status.FAILED
+            if not result:
+                LOGGER.warning("Could not retrieve any internal application log from empty result.")
+                return []
             stderr_file = result.get(self.package_log_hook_stderr, {}).get("location", "").replace("file://", "")
             stdout_file = result.get(self.package_log_hook_stdout, {}).get("location", "").replace("file://", "")
             with_stderr_file = os.path.isfile(stderr_file)
@@ -1771,7 +1774,7 @@ class WpsPackage(Process):
         self.logger.info("Resolved WPS output [%s] as file reference: [%s]", output_id, result_wps)
 
     def make_tool(self, toolpath_object, loading_context):
-        # type: (CWL_ToolPathObjectType, LoadingContext) -> ProcessCWL
+        # type: (CWL_ToolPathObject, LoadingContext) -> ProcessCWL
         from weaver.processes.wps_workflow import default_make_tool
         return default_make_tool(toolpath_object, loading_context, self.get_job_process_definition)
 

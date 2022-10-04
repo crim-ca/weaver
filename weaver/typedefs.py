@@ -89,12 +89,6 @@ if TYPE_CHECKING:
     _JsonItem = Union[AnyValueType, _JsonObjectItem, _JsonListItem, _JSON]
     JSON = Union[Dict[str, _JsonItem], List[_JsonItem], AnyValueType]
 
-    # JSON-like definition employed by cwltool
-    try:
-        from ruamel.yaml.comments import CommentedMap
-    except (AttributeError, ImportError, NameError):
-        CommentedMap = Dict[str, JSON]
-
     Link = TypedDict("Link", {
         "rel": str,
         "title": str,
@@ -216,10 +210,17 @@ if TYPE_CHECKING:
     })
     CWL_WorkflowStepPackageMap = Dict[CWL_WorkflowStepID, CWL_WorkflowStepPackage]
 
+    # JSON-like definition employed by cwltool
+    try:
+        from ruamel.yaml.comments import CommentedMap
+
+        CWL_ToolPathObject = CommentedMap               # CWL document definition
+    except (AttributeError, ImportError, NameError):
+        CWL_ToolPathObject = CWL  # CWL document definition
+
     # CWL loading
-    CWL_WorkflowInputs = Dict[str, AnyValueType]   # mapping of ID:value (any type)
-    CWL_ExpectedOutputs = Dict[str, AnyValueType]  # mapping of ID:pattern (File only)
-    CWL_ToolPathObjectType = Union[Dict[str, Any], CommentedMap]  # CWL document definition
+    CWL_WorkflowInputs = Dict[str, AnyValueType]    # mapping of ID:value (any type)
+    CWL_ExpectedOutputs = Dict[str, AnyValueType]   # mapping of ID:pattern (File only)
     JobProcessDefinitionCallback = Callable[[str, Dict[str, str], Dict[str, Any]], WpsProcessInterface]
 
     # CWL runtime
