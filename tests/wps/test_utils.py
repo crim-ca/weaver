@@ -218,24 +218,24 @@ def test_get_wps_output_context_resolution():
 
 def test_map_wps_output_location_duplicate_subdir():
     for tmp_dir in [
-        "/tmp/tmp/tmp",
-        "/tmp/tmpdir"
+        "/tmp/tmp/tmp",  # nosec: B108 # don't care hardcoded for test
+        "/tmp/tmpdir"    # nosec: B108 # don't care hardcoded for test
     ]:
-        wps_out = "http:///localhost/wps-output/tmp"
+        wps_out = "http:///localhost/wps-output/tmp"  # nosec: B108 # don't care hardcoded for test
         settings = {
             "weaver.wps_output_dir": tmp_dir,
             "weaver.wps_output_url": wps_out
         }
         path = map_wps_output_location(f"{wps_out}/tmp/some-file-tmp.tmp", settings, exists=False)
-        assert path == f"{tmp_dir}/tmp/some-file-tmp.tmp"
+        assert path == f"{tmp_dir}/tmp/some-file-tmp.tmp"  # nosec: B108 # don't care hardcoded for test
 
         path = map_wps_output_location(f"{tmp_dir}/here/some-file-tmp.tmp", settings, exists=False, url=True)
-        assert path == f"{wps_out}/here/some-file-tmp.tmp"
+        assert path == f"{wps_out}/here/some-file-tmp.tmp"  # nosec: B108 # don't care hardcoded for test
 
 
 def test_map_wps_output_location_exists():
     wps_url = "http:///localhost/wps-output/tmp"
-    wps_dir = "/tmp/weaver-test/test-outputs"
+    wps_dir = "/tmp/weaver-test/test-outputs"  # nosec: B108 # don't care hardcoded for test
     settings = {
         "weaver.wps_output_dir": wps_dir,
         "weaver.wps_output_url": wps_url

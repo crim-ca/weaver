@@ -12,7 +12,7 @@ import logging
 import mimetypes
 import os
 import re
-import subprocess
+import subprocess  # nosec: B404
 import sys
 import tempfile
 import uuid
@@ -358,7 +358,8 @@ def run_command(command, trim=True, expect_error=False, entrypoint=None):
         command = command.split(" ")
     command = [str(arg) for arg in command]
     if entrypoint is None:
-        out, _ = subprocess.Popen(["which", "python"], universal_newlines=True, stdout=subprocess.PIPE).communicate()
+        func = ["which", "python"]
+        out, _ = subprocess.Popen(func, universal_newlines=True, stdout=subprocess.PIPE).communicate()  # nosec: B603
         if not out:
             out = sys.executable  # fallback for some systems that fail above call
         python_path = os.path.split(out)[0]

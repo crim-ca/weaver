@@ -12,8 +12,6 @@ billiard>3.2,<3.4; sys_platform == "win32"
 #   celery's CLI interface changed
 #   https://github.com/celery/celery/blob/master/docs/whatsnew-5.2.rst#upgrading-from-celery-4x
 celery[mongodb]<4; sys_platform == "win32"  # rq.filter: <4  # pyup: ignore
-# FIXME: use celery 5.2 specifically to resolve security issue
-#   best match for now since cannot use setuptools>=59 until cwltool/rdflib-jsonld are updated
 celery[mongodb]>=5.2.2,<6; sys_platform != "win32" and python_version >= "3.7"
 # technically, >=5.2 preferred to resolve security issue, but dependency resolver cannot find it
 # FIXME: drop support? more recent versions not avilable for end-of-life python
@@ -30,10 +28,7 @@ cryptography
 # use cwltool gpu-enabled support until integrated within the original tool
 # (https://github.com/common-workflow-language/common-workflow-language/issues/587)
 ### git+https://github.com/crim-ca/cwltool@docker-gpu#egg=cwltool; python_version >= "3"
-# FIXME: remove extra CWL code and let it handle it for use
-#   - changes since cause error with invalid get_listing import location
-#   - https://github.com/crim-ca/weaver/issues/154
-cwltool==3.0.20200324120055
+cwltool==3.1.20220913185150
 docker
 duration
 git+https://github.com/ESGF/esgf-compute-api.git@v2.3.7#egg=esgf-compute-api
@@ -50,8 +45,9 @@ mako
 oauthlib
 owslib==0.27.2
 psutil
-# FIXME: pymongo>=4 breaks with kombu corresponding to pinned Celery (https://github.com/crim-ca/weaver/issues/386)
-pymongo>=3.12.0,<4
+# pymongo>=4 breaks with kombu corresponding to pinned Celery (https://github.com/crim-ca/weaver/issues/386)
+pymongo>=3.12.0,<4; python_version <= "3.6"
+pymongo>=4; python_version >= "3.7"
 pyramid>=1.7.3
 pyramid_beaker>=0.8
 pyramid_celery>=4.0.0   # required for celery>=5
@@ -60,15 +56,15 @@ python-dateutil
 pyramid_rewrite
 pyramid_storage
 pytz
-pywps==4.5.1
+pywps==4.5.1; python_version <= "3.6"
+pywps==4.5.2; python_version >= "3.7"
 pyyaml>=5.2
+rdflib>=5  # pyup: ignore
 requests
 requests_file
-# let cwltool define ruamel.yaml version (<=0.16.5)
-# ensure minimal 0.15.78 to solve install issue (python 3.8)
-# (https://bitbucket.org/ruamel/yaml/issues/261/error-while-installing-ruamelyaml-setuppy)
-ruamel.yaml>=0.15.78,<=0.16.5
-shapely
+ruamel.yaml>=0.16
+schema-salad>=8.2,<9
+shapely==1.8.2
 simplejson
 urlmatch
 xmltodict

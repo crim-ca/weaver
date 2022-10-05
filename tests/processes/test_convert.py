@@ -952,11 +952,11 @@ def test_cwl2json_input_values_ogc_format():
         "test1": {"value": "value"},
         "test2": {"value": 1},
         "test3": {"value": 1.23},
-        "test4": {"href": "/tmp/random.txt"},
+        "test4": {"href": "/tmp/random.txt"},  # nosec: B108
         "test5": [{"value": "val1"}, {"value": "val2"}],
         "test6": [{"value": 1}, {"value": 2}],
         "test7": [{"value": 1.23}, {"value": 4.56}],
-        "test8": [{"href": "/tmp/other.txt"}]
+        "test8": [{"href": "/tmp/other.txt"}]  # nosec: B108
     }
     result = cwl2json_input_values(values, ProcessSchema.OGC)
     assert result == expect
@@ -1096,17 +1096,17 @@ def test_repr2json_input_values():
         {"id": "test6", "value": 2},
         {"id": "test7", "value": 1.23},
         {"id": "test7", "value": 4.56},
-        {"id": "test8", "href": "/tmp/other.txt"},
+        {"id": "test8", "href": "/tmp/other.txt"},  # nosec: B108
         {"id": "test9", "value": "short"},
         {"id": "test10", "value": "long"},
-        {"id": "test11", "href": "/tmp/file.json", "format": {
+        {"id": "test11", "href": "/tmp/file.json", "format": {  # nosec: B108
             "mediaType": ContentType.APP_JSON, "schema": "http://schema.org/random.json"
         }},
-        {"id": "test12", "href": "/tmp/other.xml", "format": {
+        {"id": "test12", "href": "/tmp/other.xml", "format": {  # nosec: B108
             "mediaType": ContentType.TEXT_XML, "schema": "http://schema.org/random.xml"
         }},
-        {"id": "test13", "href": "/tmp/one.json", "format": {"mediaType": ContentType.APP_JSON}},
-        {"id": "test13", "href": "/tmp/two.xml", "format": {"mediaType": ContentType.TEXT_XML}},
+        {"id": "test13", "href": "/tmp/one.json", "format": {"mediaType": ContentType.APP_JSON}},  # nosec: B108
+        {"id": "test13", "href": "/tmp/two.xml", "format": {"mediaType": ContentType.TEXT_XML}},   # nosec: B108
     ]
     result = repr2json_input_values(values)
     assert result == expect

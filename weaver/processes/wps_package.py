@@ -138,7 +138,7 @@ if TYPE_CHECKING:
         CWL_RequirementNames,
         CWL_RequirementsList,
         CWL_Results,
-        CWL_ToolPathObjectType,
+        CWL_ToolPathObject,
         CWL_WorkflowStepPackage,
         CWL_WorkflowStepPackageMap,
         CWL_WorkflowStepReference,
@@ -1362,7 +1362,10 @@ class WpsPackage(Process):
             self.package_requirement = get_application_requirement(self.package)
             try:
                 # workflows do not support stdout/stderr
-                log_stdout_stderr = self.package_type != ProcessType.WORKFLOW
+                log_stdout_stderr = (
+                    self.package_type != ProcessType.WORKFLOW
+                    and self.package_requirement.get("class") not in CWL_REQUIREMENT_APP_REMOTE
+                )
                 self.setup_loggers(log_stdout_stderr)
                 self.update_status("Preparing package logs done.", PACKAGE_PROGRESS_PREP_LOG, Status.RUNNING)
             except Exception as exc:
@@ -1771,7 +1774,7 @@ class WpsPackage(Process):
         self.logger.info("Resolved WPS output [%s] as file reference: [%s]", output_id, result_wps)
 
     def make_tool(self, toolpath_object, loading_context):
-        # type: (CWL_ToolPathObjectType, LoadingContext) -> ProcessCWL
+        # type: (CWL_ToolPathObject, LoadingContext) -> ProcessCWL
         from weaver.processes.wps_workflow import default_make_tool
         return default_make_tool(toolpath_object, loading_context, self.get_job_process_definition)
 

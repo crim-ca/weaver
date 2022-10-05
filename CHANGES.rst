@@ -12,7 +12,9 @@ Changes
 
 Changes:
 --------
-- No change.
+- Refactor ``weaver.processes.wps_workflow`` definitions to delegate implementation to ``cwltool`` core classes,
+  removing code duplication and allowing update to latest revisions
+  (resolves `#154 <https://github.com/crim-ca/weaver/issues/154>`_).
 
 Fixes:
 ------

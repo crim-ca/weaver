@@ -210,10 +210,17 @@ if TYPE_CHECKING:
     })
     CWL_WorkflowStepPackageMap = Dict[CWL_WorkflowStepID, CWL_WorkflowStepPackage]
 
+    # JSON-like CWL definition employed by cwltool
+    try:
+        from ruamel.yaml.comments import CommentedMap
+
+        CWL_ToolPathObject = CommentedMap
+    except (AttributeError, ImportError, NameError):
+        CWL_ToolPathObject = CWL
+
     # CWL loading
-    CWL_WorkflowInputs = Dict[str, AnyValueType]   # mapping of ID:value (any type)
-    CWL_ExpectedOutputs = Dict[str, AnyValueType]  # mapping of ID:pattern (File only)
-    CWL_ToolPathObjectType = Dict[str, Any]
+    CWL_WorkflowInputs = Dict[str, AnyValueType]    # mapping of ID:value (any type)
+    CWL_ExpectedOutputs = Dict[str, AnyValueType]   # mapping of ID:pattern (File only)
     JobProcessDefinitionCallback = Callable[[str, Dict[str, str], Dict[str, Any]], WpsProcessInterface]
 
     # CWL runtime

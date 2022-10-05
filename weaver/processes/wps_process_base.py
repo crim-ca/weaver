@@ -431,7 +431,7 @@ class OGCAPIRemoteProcessBase(WpsProcessInterface, abc.ABC):
         return workflow_outputs
 
     def dispatch(self, process_inputs, process_outputs):
-        # type: (JobInputs, JobOutputs) -> Any
+        # type: (JobInputs, JobOutputs) -> str
         LOGGER.debug("Execute process %s request for [%s]", self.process_type, self.process)
         execute_body = {
             "mode": ExecuteMode.ASYNC,

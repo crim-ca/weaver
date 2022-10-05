@@ -23,5 +23,5 @@ requirements:
         entry: |
           amount = $(inputs.amount)
           cost = $(inputs.cost)
-          with open("report.txt", "w") as report:
-              report.write(f"Order Total: {amount * cost:0.2f}$\n")
+          with open("report.txt", mode="w", encoding="utf-8") as report:
+              report.write(f"Order Total: {amount * cost:0.2f}$\\n")
