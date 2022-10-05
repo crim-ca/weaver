@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_4.25.0:
+
+`4.25.0 <https://github.com/crim-ca/weaver/tree/4.25.0>`_ (2022-10-05)
+========================================================================
+
+Changes:
+--------
 - Refactor ``weaver.processes.wps_workflow`` definitions to delegate implementation to ``cwltool`` core classes,
   removing code duplication and allowing update to latest revisions
   (resolves `#154 <https://github.com/crim-ca/weaver/issues/154>`_).
