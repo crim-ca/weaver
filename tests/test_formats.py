@@ -20,6 +20,11 @@ def test_get_extension():
     assert f.get_extension("application/unknown") == ".unknown"
 
 
+def test_get_extension_directory():
+    assert f.get_extension(f.ContentType.APP_DIR, dot=True) == "/"
+    assert f.get_extension(f.ContentType.APP_DIR, dot=False) == "/"
+
+
 def test_get_extension_glob_any():
     assert f.get_extension(f.ContentType.ANY) == ".*"
 
@@ -30,6 +35,10 @@ def test_get_content_type():
     assert f.get_content_type(".tiff") == f.ContentType.IMAGE_TIFF
     assert f.get_content_type(".yml") == f.ContentType.APP_YAML
     assert f.get_content_type(".yaml") == f.ContentType.APP_YAML
+
+
+def test_get_content_type_directory():
+    assert f.get_content_type("/") == f.ContentType.APP_DIR
 
 
 def test_get_content_type_extra_parameters():

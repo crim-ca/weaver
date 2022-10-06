@@ -81,6 +81,15 @@ if TYPE_CHECKING:
     # [WPS1-URL, GetCapPathXML, [DescribePathXML], [ExecutePathXML]]
     MockConfigWPS1 = Sequence[str, str, Optional[Sequence[str]], Optional[Sequence[str]]]
     MockReturnType = TypeVar("MockReturnType")
+    MockHttpMethod = Union[
+        responses.HEAD,
+        responses.GET,
+        responses.POST,
+        responses.PATCH,
+        responses.PUT,
+        responses.DELETE,
+        responses.OPTIONS,
+    ]
 
     CommandType = Callable[[Union[str, Tuple[str]]], int]
 
@@ -759,14 +768,16 @@ def mocked_remote_server_requests_wps1(server_configs,          # type: Union[Mo
             all_request.add((responses.GET, getcap_with_proc_id_url + version_query, get_cap_xml))
 
     def apply_mocks(_mock_resp, _requests):
+        # type: (responses.RequestsMock, Iterable[Tuple[MockHttpMethod, str, str]]) -> None
         xml_header = {"Content-Type": ContentType.APP_XML}
         for meth, url, body in _requests:
             _mock_resp.add(meth, url, body=body, headers=xml_header)
 
     def mocked_remote_server_wrapper(test):
-        # type: (Callable) -> Callable
+        # type: (Callable[[..., Any], Any]) -> Callable[[..., Any], Any]
         @functools.wraps(test)
         def mock_requests_wps1(*args, **kwargs):
+            # type: (*Any, **Any) -> Any
             """
             Mock ``requests`` responses fetching ``test_server_wps`` WPS reference.
             """
@@ -1029,6 +1040,7 @@ def mocked_aws_credentials(test_func):
     mistakenly overriding real bucket files.
     """
     def wrapped(*args, **kwargs):
+        # type: (*Any, **Any) -> Any
         with mock.patch.dict(os.environ, {
             "AWS_ACCESS_KEY_ID": "testing",
             "AWS_SECRET_ACCESS_KEY": "testing",
@@ -1049,6 +1061,7 @@ def mocked_aws_s3(test_func):
         attempt writing to real bucket.
     """
     def wrapped(*args, **kwargs):
+        # type: (*Any, **Any) -> Any
         with moto.mock_s3():
             return test_func(*args, **kwargs)
     return wrapped
@@ -1093,12 +1106,14 @@ def mocked_http_file(test_func):
         - :func:`mocked_reference_test_file`
     """
     def mocked_file_request(file_reference, file_outdir, **kwargs):
+        # type: (str, str, **Any) -> str
         if file_reference and file_reference.startswith(MOCK_HTTP_REF):
             file_reference = file_reference.replace(MOCK_HTTP_REF, "")
         file_path = fetch_file(file_reference, file_outdir, **kwargs)
         return file_path
 
     def wrapped(*args, **kwargs):
+        # type: (*Any, **Any) -> Any
         with mock.patch("weaver.processes.wps_package.fetch_file", side_effect=mocked_file_request):
             return test_func(*args, **kwargs)
     return wrapped

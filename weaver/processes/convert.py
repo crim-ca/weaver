@@ -53,6 +53,7 @@ from weaver.processes.constants import (
     PACKAGE_ARRAY_ITEMS,
     PACKAGE_ARRAY_MAX_SIZE,
     PACKAGE_ARRAY_TYPES,
+    PACKAGE_COMPLEX_TYPES,
     PACKAGE_CUSTOM_TYPES,
     PACKAGE_ENUM_BASE,
     PACKAGE_LITERAL_TYPES,
@@ -109,7 +110,6 @@ if TYPE_CHECKING:
         AnySettingsContainer,
         AnyValueType,
         CWL,
-        CWL_IO_BaseType,
         CWL_IO_ComplexType,
         CWL_IO_EnumSymbols,
         CWL_IO_FileValue,
@@ -1101,7 +1101,8 @@ def get_cwl_io_type(io_info, strict=True):
         io_min_occurs = 0
         is_null = True
 
-    io_type = any2cwl_literal_datatype(io_type)
+    if io_type not in PACKAGE_COMPLEX_TYPES:
+        io_type = any2cwl_literal_datatype(io_type)
     io_def = CWLIODefinition(
         name=io_name,
         type=io_type,
@@ -1200,7 +1201,10 @@ def cwl2wps_io(io_info, io_select):
         else:
             # we need to minimally add 1 format, otherwise empty list is evaluated as None by pywps
             # when "supported_formats" is None, the process's json property raises because of it cannot iterate formats
-            kw["supported_formats"] = [DEFAULT_FORMAT]
+            if io_def.type == "File":
+                kw["supported_formats"] = [DEFAULT_FORMAT]
+            if io_def.type == "Directory":
+                kw["supported_formats"] = [get_format(ContentType.APP_DIR)]
             kw["mode"] = MODE.NONE  # don't validate anything as default is only raw text
         if is_output:
             if io_def.type == "Directory":

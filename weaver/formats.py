@@ -43,6 +43,7 @@ class ContentType(Constants):
         <type> "/" [x- | <tree> "."] <subtype> ["+" suffix] *[";" parameter=value]
     """
 
+    APP_DIR = "application/directory"
     APP_CWL = "application/cwl"
     APP_CWL_JSON = "application/cwl+json"
     APP_CWL_YAML = "application/cwl+yaml"
@@ -204,7 +205,8 @@ _CONTENT_TYPE_EXTENSION_OVERRIDES = {
     ContentType.APP_TAR_GZ: ".tar.gz",
     ContentType.APP_YAML: ".yml",
     ContentType.IMAGE_TIFF: ".tif",  # common alternate to .tiff
-    ContentType.ANY: ".*",   # any for glob
+    ContentType.ANY: ".*",      # any for glob
+    ContentType.APP_DIR: "/",   # force href to finish with explicit '/' to mark directory
     ContentType.APP_OCTET_STREAM: "",
     ContentType.APP_FORM: "",
     ContentType.MULTI_PART_FORM: "",
@@ -440,6 +442,8 @@ def get_extension(mime_type, dot=True):
 
     fmt = _CONTENT_TYPE_FORMAT_MAPPING.get(mime_type)
     if fmt:
+        if not fmt.extension.startswith("."):
+            return fmt.extension
         return _handle_dot(fmt.extension)
     ext = _CONTENT_TYPE_EXTENSION_MAPPING.get(mime_type)
     if ext:
@@ -462,11 +466,15 @@ def get_content_type(extension, charset=None, default=None):
     :param default: Default Content-Type to return if no extension is matched.
     :return: Matched or default Content-Type.
     """
+    ctype = None
     if not extension:
         return default
     if not extension.startswith("."):
-        extension = f".{extension}"
-    ctype = _EXTENSION_CONTENT_TYPES_MAPPING.get(extension)
+        ctype = _EXTENSION_CONTENT_TYPES_MAPPING.get(extension)
+        if not ctype:
+            extension = f".{extension}"
+    if not ctype:
+        ctype = _EXTENSION_CONTENT_TYPES_MAPPING.get(extension)
     if not ctype:
         return default
     return add_content_type_charset(ctype, charset)

@@ -880,7 +880,7 @@ Fixes:
 
 Changes:
 --------
-- No change.
+- Add support of `CWL` ``Directory`` type (resolves `#466 <https://github.com/crim-ca/weaver/issues/466>`_).
 
 Fixes:
 ------
