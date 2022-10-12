@@ -50,7 +50,7 @@ from weaver.formats import (
 from weaver.processes.constants import CWL_REQUIREMENT_APP_DOCKER, CWL_REQUIREMENT_INIT_WORKDIR, ProcessSchema
 from weaver.processes.types import ProcessType
 from weaver.status import Status
-from weaver.utils import get_any_value, fetch_file, load_file
+from weaver.utils import fetch_file, get_any_value, load_file
 from weaver.wps.utils import get_wps_output_dir, map_wps_output_location
 
 if TYPE_CHECKING:
@@ -2235,7 +2235,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             }
             for mock_exec in mocked_execute_celery():
                 stack.enter_context(mock_exec)
-            proc_url = f"/processes/DirectoryProcess/jobs"
+            proc_url = "/processes/DirectoryProcess/jobs"
             resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
                                        data=exec_body, headers=self.json_headers, only_local=True)
             assert resp.status_code in [200, 201], f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
@@ -2296,7 +2296,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         with contextlib.ExitStack() as stack:
             for mock_exec in mocked_execute_celery():
                 stack.enter_context(mock_exec)
-            proc_url = f"/processes/DirectoryProcess/jobs"
+            proc_url = "/processes/DirectoryProcess/jobs"
             resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
                                        data=exec_body, headers=self.json_headers, only_local=True)
             assert resp.status_code in [200, 201], f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
