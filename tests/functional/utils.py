@@ -4,7 +4,7 @@ import time
 import unittest
 from collections import OrderedDict
 from copy import deepcopy
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, overload
 from urllib.parse import urlparse
 
 import pyramid.testing
@@ -37,7 +37,17 @@ if TYPE_CHECKING:
     from typing import Any, Dict, Iterable, Optional, Union
     from typing_extensions import Literal
 
-    from weaver.typedefs import AnyRequestMethod, AnyResponseType, AnyUUID, JSON, SettingsType
+    from weaver.typedefs import (
+        AnyRequestMethod,
+        AnyResponseType,
+        AnyUUID,
+        CWL,
+        JSON,
+        ProcessDeployment,
+        ProcessDescription,
+        ProcessExecution,
+        SettingsType
+    )
 
     ReferenceType = Literal["deploy", "describe", "execute", "package"]
 
@@ -51,6 +61,66 @@ class ResourcesUtil(object):
 
         Can be left undefined (not overridden) if ``local=True`` is used.
         """
+
+    @classmethod
+    @overload
+    def retrieve_payload(cls,
+                         process,           # type: str
+                         ref_type=None,     # type: Literal["deploy"]
+                         ref_name=None,     # type: Optional[str]
+                         ref_found=False,   # type: Literal[False]
+                         location=None,     # type: Optional[str]
+                         local=False,       # type: bool
+                         ):                 # type: (...) -> Union[ProcessDeployment, Dict[str, JSON]]
+        ...
+
+    @classmethod
+    @overload
+    def retrieve_payload(cls,
+                         process,           # type: str
+                         ref_type=None,     # type: Literal["describe"]
+                         ref_name=None,     # type: Optional[str]
+                         ref_found=False,   # type: Literal[False]
+                         location=None,     # type: Optional[str]
+                         local=False,       # type: bool
+                         ):                 # type: (...) -> Union[ProcessDescription, Dict[str, JSON]]
+        ...
+
+    @classmethod
+    @overload
+    def retrieve_payload(cls,
+                         process,           # type: str
+                         ref_type=None,     # type: Literal["execute"]
+                         ref_name=None,     # type: Optional[str]
+                         ref_found=False,   # type: Literal[False]
+                         location=None,     # type: Optional[str]
+                         local=False,       # type: bool
+                         ):                 # type: (...) -> Union[ProcessExecution, Dict[str, JSON]]
+        ...
+
+    @classmethod
+    @overload
+    def retrieve_payload(cls,
+                         process,           # type: str
+                         ref_type=None,     # type: Literal["package"]
+                         ref_name=None,     # type: Optional[str]
+                         ref_found=False,   # type: Literal[False]
+                         location=None,     # type: Optional[str]
+                         local=False,       # type: bool
+                         ):                 # type: (...) -> CWL
+        ...
+
+    @classmethod
+    @overload
+    def retrieve_payload(cls,
+                         process,           # type: str
+                         ref_type=None,     # type: ReferenceType
+                         ref_name=None,     # type: Optional[str]
+                         ref_found=False,   # type: Literal[True]
+                         location=None,     # type: Optional[str]
+                         local=False,       # type: bool
+                         ):                 # type: (...) -> str
+        ...
 
     @classmethod
     def retrieve_payload(cls, process, ref_type=None, ref_name=None, ref_found=False, location=None, local=False):

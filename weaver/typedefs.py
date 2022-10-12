@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Type, TypeVar, Union
 
     import psutil
-    from typing_extensions import Literal, NotRequired, Protocol, TypeAlias, TypedDict
+    from typing_extensions import Literal, NotRequired, Protocol, Required, TypeAlias, TypedDict
 
     if hasattr(os, "PathLike"):
         FileSystemPathType = Union[os.PathLike, str]
@@ -62,10 +62,12 @@ if TYPE_CHECKING:
     from webtest.response import TestResponse
     from werkzeug.wrappers import Request as WerkzeugRequest
 
+    from weaver.execute import AnyExecuteControlOption, AnyExecuteMode, AnyExecuteResponse, AnyExecuteTransmissionMode
     from weaver.processes.constants import CWL_RequirementNames
     from weaver.processes.wps_process_base import WpsProcessInterface
     from weaver.datatype import Process
     from weaver.status import AnyStatusType
+    from weaver.visibility import AnyVisibility
 
     ReturnValue = TypeVar("ReturnValue")  # alias to identify the same return value as a decorated/wrapped function
     AnyCallable = TypeVar("AnyCallable", bound=Callable[..., Any])  # callable used for decorated/wrapped functions
@@ -84,24 +86,27 @@ if TYPE_CHECKING:
     _JSON: TypeAlias = "JSON"
     _JsonObjectItemAlias: TypeAlias = "_JsonObjectItem"
     _JsonListItemAlias: TypeAlias = "_JsonListItem"
-    _JsonObjectItem = Dict[str, Union[_JSON, _JsonObjectItemAlias, _JsonListItemAlias]]
-    _JsonListItem = List[Union[AnyValueType, _JsonObjectItem, _JsonListItemAlias]]
-    _JsonItem = Union[AnyValueType, _JsonObjectItem, _JsonListItem, _JSON]
-    JSON = Union[Dict[str, _JsonItem], List[_JsonItem], AnyValueType]
+    _JsonObjectItem = Dict[str, Union[AnyValueType, _JSON, _JsonObjectItemAlias, _JsonListItemAlias]]
+    _JsonListItem = List[Union[AnyValueType, _JSON, _JsonObjectItem, _JsonListItemAlias]]
+    _JsonItem = Union[AnyValueType, _JSON, _JsonObjectItem, _JsonListItem]
+    JSON = Union[Dict[str, Union[_JSON, _JsonItem]], List[Union[_JSON, _JsonItem]], AnyValueType]
 
     Link = TypedDict("Link", {
-        "rel": str,
         "title": str,
-        "href": str,
+        "rel": Required[str],
+        "href": Required[str],
         "hreflang": NotRequired[str],
         "type": NotRequired[str],  # IANA Media-Type
     }, total=False)
     Metadata = TypedDict("Metadata", {
         "title": str,
         "role": str,  # URL
+        "href": str,
+        "hreflang": str,
+        "rel": str,
         "value": str,
         "lang": NotRequired[str],
-        "type": NotRequired[str],  # FIXME: relevant?
+        "type": NotRequired[str],
     }, total=False)
 
     LogLevelStr = Literal[
@@ -184,8 +189,8 @@ if TYPE_CHECKING:
     _CWL = "CWL"  # type: TypeAlias
     CWL_Graph = List[_CWL]
     CWL = TypedDict("CWL", {
-        "cwlVersion": str,
-        "class": CWL_Class,
+        "cwlVersion": Required[str],
+        "class": Required[CWL_Class],
         "label": str,
         "doc": str,
         "id": NotRequired[str],
@@ -516,3 +521,61 @@ if TYPE_CHECKING:
         OpenAPISchemaReference,
         OpenAPISchemaMetadata,
     ]
+
+    FormatMediaType = TypedDict("FormatMediaType", {
+        "mediaType": Required[str],
+        "encoding": NotRequired[Optional[str]],
+        "schema": NotRequired[Union[str, OpenAPISchema]],
+    }, total=False)
+    ProcessInputOutputItem = TypedDict("ProcessInputOutputItem", {
+        "id": str,
+        "title": NotRequired[str],
+        "description": NotRequired[str],
+        "keywords": NotRequired[List[str]],
+        "metadata": NotRequired[List[Metadata]],
+        "schema": NotRequired[OpenAPISchema],
+        "format": NotRequired[FormatMediaType],
+        "minOccurs": int,
+        "maxOccurs": Union[int, Literal["unbounded"]],
+    }, total=False)
+    ProcessInputOutputMap = Dict[str, ProcessInputOutputItem]
+    ProcessInputOutputList = List[ProcessInputOutputItem]
+    ProcessOffering = TypedDict("ProcessOffering", {
+        "id": Required[str],
+        "version": Optional[str],
+        "title": NotRequired[str],
+        "description": NotRequired[str],
+        "keywords": NotRequired[List[str]],
+        "metadata": NotRequired[List[Metadata]],
+        "inputs": Required[Union[ProcessInputOutputMap, ProcessInputOutputList]],
+        "outputs": Required[Union[ProcessInputOutputMap, ProcessInputOutputList]],
+        "jobControlOptions": List[AnyExecuteControlOption],
+        "outputTransmission": List[AnyExecuteControlOption],
+        "deploymentProfile": str,
+        "processDescriptionURL": NotRequired[str],
+        "processEndpointWPS1": NotRequired[str],
+        "executeEndpoint": NotRequired[str],
+        "links": List[Link],
+        "visibility": NotRequired[AnyVisibility],
+    }, total=False)
+    ProcessDescriptionNested = TypedDict("ProcessDescriptionNested", {
+        "process": ProcessOffering,
+    }, total=False)
+    ProcessDescription = Union[ProcessOffering, ProcessDescriptionNested]
+
+    ExecutionUnitItem = TypedDict("ExecutionUnitItem", {
+        "unit": CWL
+    }, total=True)
+    ProcessDeployment = TypedDict("ProcessDeployment", {
+        "processDescription": ProcessDescription,
+        "executionUnit": List[Union[ExecutionUnitItem, Link]],
+        "immediateDeployment": NotRequired[bool],
+        "deploymentProfileName": str,
+    }, total=True)
+
+    ProcessExecution = TypedDict("ProcessExecution", {
+        "mode": AnyExecuteMode,
+        "response": AnyExecuteResponse,
+        "inputs": ExecutionInputs,
+        "outputs": ExecutionOutputs,
+    }, total=True)

@@ -83,7 +83,7 @@ LOGGER = logging.getLogger(__name__)
 @pytest.mark.functional
 class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
     @classmethod
-    def setUpClass(cls):
+    def setUpClass(cls) -> None:
         cls.settings = {
             "weaver.wps": True,
             "weaver.wps_path": "/ows/wps",
@@ -93,6 +93,9 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             "weaver.wps_output_dir": "/tmp/weaver-test/wps-outputs",  # nosec: B108 # don't care hardcoded for test
         }
         super(WpsPackageAppTest, cls).setUpClass()
+
+    def setUp(self) -> None:
+        self.process_store.clear_processes()
 
     @classmethod
     def request(cls, method, url, *args, **kwargs):

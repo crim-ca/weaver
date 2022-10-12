@@ -84,6 +84,7 @@ if TYPE_CHECKING:
         FileSystemPathType,
         JSON,
         Literal,
+        ProcessDeployment,
         PyramidRequest,
         NotRequired,
         Number,
@@ -182,7 +183,7 @@ def get_process_information(process_description):
 @log_unhandled_exceptions(logger=LOGGER, message="Unhandled error occurred during parsing of deploy payload.",
                           is_request=False)
 def _check_deploy(payload):
-    # type: (JSON) -> JSON
+    # type: (JSON) -> Union[ProcessDeployment, CWL]
     """
     Validate minimum deploy payload field requirements with exception handling.
     """
@@ -206,7 +207,7 @@ def _check_deploy(payload):
                 message = f"Process deployment {io_type} definition is invalid."
                 # try raising sub-schema to have specific reason
                 d_io = io_schema(name=io_type).deserialize(p_io)
-                # Raise directly if we where not able to detect the cause, but there is something incorrectly dropped.
+                # Raise directly if we were unable to detect the cause, but there is something incorrectly dropped.
                 # Only raise if indirect vs direct deserialize differ such that auto-resolved defaults omitted from
                 # submitted process I/O or unknowns fields that were correctly ignored don't cause false-positive diffs.
                 if r_io != d_io:

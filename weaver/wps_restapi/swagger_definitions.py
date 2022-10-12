@@ -1,7 +1,7 @@
 """
 Schema definitions for `OpenAPI` generation and validation of data from received requests and returned responses.
 
-This module should contain any and every definitions in use to build the Swagger UI and the OpenAPI JSON schema
+This module should contain any and every definition in use to build the Swagger UI and the OpenAPI JSON schema
 so that one can update the specification without touching any other files after the initial integration.
 
 Schemas defined in this module are employed (through ``deserialize`` method calls) to validate that data conforms to
@@ -695,7 +695,7 @@ class Link(LinkRelationship, LinkBase):
 class MetadataValue(NotKeywordSchema, ValueLanguage, MetadataBase):
     _not = [
         # make sure value metadata does not allow 'rel' and 'hreflang' reserved for link reference
-        # explicitly refuse them such that when an href/rel link is provided, only link details are possible
+        # explicitly refuse them such that when a href/rel link is provided, only link details are possible
         LinkRelationship(description="Field 'rel' must refer to a link reference with 'href'."),
         LinkLanguage(description="Field 'hreflang' must refer to a link reference with 'href'."),
     ]
@@ -2951,7 +2951,7 @@ class ProcessDeploymentProfile(ExtendedMappingSchema):
 
 class Process(
     # following are like 'ProcessSummary',
-    # except without 'ProcessControl' and 'DescriptionLinks' that are outside of nested 'process'
+    # except without 'ProcessControl' and 'DescriptionLinks' that are outside the nested 'process'
     ProcessDescriptionType, DescriptionMeta,
     # following are additional fields only in description, just like for OGC-API ProcessDescription
     ProcessContext, ProcessVisibility, ProcessLocations
