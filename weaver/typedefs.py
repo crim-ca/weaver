@@ -516,3 +516,79 @@ if TYPE_CHECKING:
         OpenAPISchemaReference,
         OpenAPISchemaMetadata,
     ]
+    OpenAPISpecLicence = TypedDict("OpenAPISpecLicence", {
+        "name": str,
+        "url": str,
+    }, total=True)
+    OpenAPISpecContact = TypedDict("OpenAPISpecContact", {
+        "name": str,
+        "email": str,
+        "url": str,
+    }, total=True)
+    OpenAPISpecInfo = TypedDict("OpenAPISpecInfo", {
+        "description": NotRequired[str],
+        "licence": OpenAPISpecLicence,
+        "contact": OpenAPISpecContact,
+        "title": str,
+        "version": str,
+    }, total=True)
+    OpenAPISpecContent = TypedDict("OpenAPISpecContent", {
+        "schema": OpenAPISchema,
+    }, total=True)
+    OpenAPISpecResponse = TypedDict("OpenAPISpecResponse", {
+        "summary": NotRequired[str],
+        "description": NotRequired[str],
+        "content": Dict[str, OpenAPISpecContent],  # Media-Type keys
+    }, total=True)
+    OpenAPISpecPath = TypedDict("OpenAPISpecPath", {
+        "responses": Dict[str, OpenAPISpecResponse],  # HTTP code keys
+        "parameters": List[OpenAPISchema],
+        "summary": str,
+        "description": str,
+        "tags": List[str],
+    }, total=True)
+    OpenAPISpecPathMethods = TypedDict("OpenAPISpecPathMethods", {
+        "head": NotRequired[OpenAPISpecPath],
+        "get": NotRequired[OpenAPISpecPath],
+        "post": NotRequired[OpenAPISpecPath],
+        "put": NotRequired[OpenAPISpecPath],
+        "patch": NotRequired[OpenAPISpecPath],
+        "delete": NotRequired[OpenAPISpecPath],
+        "options": NotRequired[OpenAPISpecPath],
+    }, total=True)
+    OpenAPISpecContent
+    OpenAPISpecParameter = TypedDict("OpenAPISpecParameter", {
+        "name": str,
+        "in": Literal["header", "cookie", "query", "path", "body"],
+        "required": bool,
+        "allowReserved": NotRequired[bool],
+        "default": NotRequired[JSON],   # Swagger 2.0, OpenAPI 3.0: nest under 'schema'
+        "summary": NotRequired[str],
+        "description": NotRequired[str],
+        "type": NotRequired[str],  # Swagger 2.0
+        "schema": OpenAPISchema,   # OpenAPI 3.0, 'content' alternative available
+        "content": NotRequired[Dict[str, OpenAPISpecContent]],  # Media-Type keys
+    }, total=True)
+    OpenAPISpecComponents = TypedDict("OpenAPISpecComponents", {
+        "schemas": NotRequired[Dict[str, OpenAPISchema]],               # $ref object name as keys
+        "parameters": NotRequired[Dict[str, OpenAPISpecParameter]],     # $ref object name as keys
+        "responses": NotRequired[Dict[str, OpenAPISpecResponse]],       # $ref object name as keys
+    }, total=True)
+    OpenAPISpecExternalDocs = TypedDict("OpenAPISpecExternalDocs", {
+        "description": str,
+        "url": str,
+    }, total=True)
+    OpenAPISpecification = TypedDict("OpenAPISpecification", {
+        "openapi": Literal["3.0.0"],
+        "info": OpenAPISpecInfo,
+        "basePath": str,
+        "host": str,
+        "schemes": List[str],
+        "tags": List[str],
+        "paths": Dict[str, OpenAPISpecPathMethods],     # API path keys nested with HTTP methods
+        "components": OpenAPISpecComponents,            # OpenAPI 3.0, nested sections with $ref object name as keys
+        "definitions": NotRequired[Dict[str, OpenAPISchema]],        # Swagger 2.0, OpenAPI 3.0: 'components/schemas'
+        "parameters": NotRequired[Dict[str, OpenAPISpecParameter]],  # Swagger 2.0, OpenAPI 3.0: 'components/parameters'
+        "responses": NotRequired[Dict[str, OpenAPISpecResponse]],    # Swagger 2.0, OpenAPI 3.0: 'components/responses'
+        "externalDocs": NotRequired[OpenAPISpecExternalDocs],
+    }, total=True)

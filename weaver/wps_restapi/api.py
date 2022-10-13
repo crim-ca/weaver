@@ -5,7 +5,6 @@ from urllib.parse import urlparse
 
 from beaker.cache import cache_region
 from cornice.service import get_services
-from cornice_swagger import CorniceSwagger
 from pyramid.authentication import Authenticated, IAuthenticationPolicy
 from pyramid.exceptions import PredicateMismatch
 from pyramid.httpexceptions import (
@@ -28,14 +27,14 @@ from weaver.owsexceptions import OWSException
 from weaver.utils import get_header, get_settings, get_weaver_url
 from weaver.wps.utils import get_wps_url
 from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.colander_extras import OAS3TypeConversionDispatcher
+from weaver.wps_restapi.colander_extras import CorniceOpenAPI
 from weaver.wps_restapi.constants import ConformanceCategory
 from weaver.wps_restapi.utils import get_wps_restapi_base_url, wps_restapi_base_path
 
 if TYPE_CHECKING:
     from typing import Callable, List, Optional
 
-    from weaver.typedefs import JSON, SettingsType, TypedDict
+    from weaver.typedefs import JSON, OpenAPISpecification, SettingsType, TypedDict
     from weaver.wps_restapi.constants import AnyConformanceCategory
 
     Conformance = TypedDict("Conformance", {
@@ -444,13 +443,13 @@ def api_frontpage_body(settings):
              "rel": "service", "type": ContentType.APP_JSON,
              "title": "WPS REST API endpoint of this service."},
             {"href": weaver_api_spec,
-             "rel": "service-desc", "type": ContentType.APP_JSON,
+             "rel": "service-desc", "type": ContentType.APP_OAS_JSON,
              "title": "OpenAPI specification of this service."},
             {"href": weaver_api_oas_ui,
              "rel": "service-doc", "type": ContentType.TEXT_HTML,
-             "title": "Human readable OpenAPI documentation of this service."},
+             "title": "Human-readable OpenAPI documentation of this service."},
             {"href": weaver_api_spec,
-             "rel": "OpenAPI", "type": ContentType.APP_JSON,
+             "rel": "OpenAPI", "type": ContentType.APP_OAS_JSON,
              "title": "OpenAPI specification of this service."},
             {"href": weaver_api_swagger,
              "rel": "swagger-ui", "type": ContentType.TEXT_HTML,
@@ -558,7 +557,7 @@ def api_conformance(request):  # noqa: F811
 
 def get_openapi_json(http_scheme="http", http_host="localhost", base_url=None,
                      use_refs=True, use_docstring_summary=True, settings=None):
-    # type: (str, str, Optional[str], bool, bool, Optional[SettingsType]) -> JSON
+    # type: (str, str, Optional[str], bool, bool, Optional[SettingsType]) -> OpenAPISpecification
     """
     Obtains the JSON schema of Weaver OpenAPI from request and response views schemas.
 
@@ -572,9 +571,8 @@ def get_openapi_json(http_scheme="http", http_host="localhost", base_url=None,
     .. seealso::
         - :mod:`weaver.wps_restapi.swagger_definitions`
     """
-    CorniceSwagger.type_converter = OAS3TypeConversionDispatcher
     depth = -1 if use_refs else 0
-    swagger = CorniceSwagger(get_services(), def_ref_depth=depth, param_ref=use_refs, resp_ref=use_refs)
+    swagger = CorniceOpenAPI(get_services(), def_ref_depth=depth, param_ref=use_refs, resp_ref=use_refs)
     swagger.ignore_methods = ["OPTIONS"]  # don't ignore HEAD, used by vault
     # function docstrings are used to create the route's summary in Swagger-UI
     swagger.summary_docstrings = use_docstring_summary
@@ -625,10 +623,10 @@ def openapi_json_cached(*args, **kwargs):
     return get_openapi_json(*args, **kwargs)
 
 
-@sd.openapi_json_service.get(tags=[sd.TAG_API], renderer=OutputFormat.JSON,
+@sd.openapi_json_service.get(tags=[sd.TAG_API], renderer=OutputFormat.JSON, content_type=ContentType.APP_OAS_JSON,
                              schema=sd.OpenAPIEndpoint(), response_schemas=sd.get_openapi_json_responses)
 def openapi_json(request):  # noqa: F811
-    # type: (Request) -> dict
+    # type: (Request) -> OpenAPISpecification
     """
     Weaver OpenAPI schema definitions.
     """
