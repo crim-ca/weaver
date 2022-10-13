@@ -1748,7 +1748,7 @@ def download_file_http(file_reference, file_outdir, settings=None, **request_kwa
 def fetch_file(file_reference, file_outdir, settings=None, link=None, move=False, **request_kwargs):
     # type: (str, str, Optional[AnySettingsContainer], Optional[bool], bool, **Any) -> str
     """
-    Fetches a file from local path, AWS-S3 bucket or remote URL, and dumps it's content to the output directory.
+    Fetches a file from local path, AWS-S3 bucket or remote URL, and dumps its content to the output directory.
 
     The output directory is expected to exist prior to this function call.
     The file reference scheme (protocol) determines from where to fetch the content.
@@ -1770,7 +1770,7 @@ def fetch_file(file_reference, file_outdir, settings=None, link=None, move=False
     :param move:
         Move local file to the output directory instead of copying or linking it.
         No effect if the output directory already contains the local file.
-        No effect if download must occurs for remote file.
+        No effect if download must occur for remote file.
     :param request_kwargs: Additional keywords to forward to request call (if needed).
     :return: Path of the local copy of the fetched file.
     :raises HTTPException: applicable HTTP-based exception if any occurred during the operation.
@@ -1877,6 +1877,27 @@ def is_remote_file(file_location):
     cwl_file_path_or_url = file_location.replace("file://", "")
     scheme = urlparse(cwl_file_path_or_url).scheme
     return scheme != "" and not posixpath.ismount(f"{scheme}:")  # windows partition
+
+
+def list_directory(location):
+    # type: (str) -> List[str]
+    """
+    Obtain directory listing from a local or remote location.
+
+    :param location: Directory reference (URL, S3, local). Trailing slash expected.
+    :returns: File locations obtained from listing. References will have the same scheme as the directory reference.
+    """
+    if not location.endswith("/"):
+        raise ValueError(f"Invalid directory location [{location}] must have a trailing slash.")
+    if location.startswith("s3://") or location.startswith("https://s3."):
+        pass
+    elif location.startswith("http://") or location.startswith("https://"):
+        pass
+    elif location.startswith("file://") or location.startswith("/"):
+        pass
+    else:
+        raise ValueError(f"Unknown scheme for directory location [{location}].")
+    return []
 
 
 REGEX_SEARCH_INVALID_CHARACTERS = re.compile(r"[^a-zA-Z0-9_\-]")
