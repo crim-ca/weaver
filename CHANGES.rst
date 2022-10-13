@@ -12,11 +12,18 @@ Changes
 
 Changes:
 --------
-- No change.
+- Return ``Content-Type: application/vnd.oai.openapi+json; version=3.0`` for OpenAPI endpoint response referenced
+  by ``service-desc`` in the API conformance details, as specified by
+  `OGC API - Processes - OpenAPI 3.0 requirement class <https://docs.ogc.org/is/18-062r2/18-062r2.html#toc43>`_.
+- Support the generation of external schema references (``$ref``) using the ``schema_ref`` attribute if provided
+  in a ``colander.SchemaNode`` that does not provide an explicit object schema definition with properties.
+- Add Python typing definitions related to OpenAPI specification.
 
 Fixes:
 ------
-- No change.
+- Fix invalid generation of OpenAPI 3.0 specification for `Weaver` API using ``cornice_swagger``.
+  The generated schema structure used to return a mix of Swagger 2.0 and OpenAPI 3.0 definitions.
+  The provided contents are now defined completely with OpenAPI 3.0 specification format.
 
 .. _changes_4.25.0:
 

@@ -2342,14 +2342,26 @@ class OAS3ParameterConversionDispatcher(ParameterConversionDispatcher):
 class OAS3DefinitionHandler(DefinitionHandler):
     json_pointer = "#/components/schemas/"
 
-    def _schema_object_to_pointer(self, schema, depth, base_name):
-        # type: (OpenAPISchema, int, str) -> OpenAPISchema
-        schema_ref = super(OAS3DefinitionHandler, self)._schema_object_to_pointer(schema, depth, base_name)
-        schema_name = schema_ref["$ref"].rsplit("/", 1)[-1]
-        schema = self.definition_registry[schema_name]
-        if "schema" not in schema:
-            self.definition_registry[schema_name] = {"schema": schema}
-        return schema_ref
+    def from_schema(self, schema_node, base_name=None):
+        # type: (colander.SchemaNode, Optional[str]) -> OpenAPISchema
+        """
+        Convert the schema node to an :term:`OAS` schema.
+
+        If the schema node provided ``schema_ref`` URL and that the object is not defined,
+        use it instead as an external reference.
+        """
+        schema_ret = super(OAS3DefinitionHandler, self).from_schema(schema_node, base_name=base_name)
+        schema_ref = getattr(schema_node, "schema_ref", None)
+        if schema_ref and isinstance(schema_ref, str):
+            name = self._get_schema_name(schema_node, base_name)
+            schema = schema_ret
+            if "$ref" in schema_ret:
+                schema = self.definition_registry[name]  # ["schema"]
+            if schema.get("type") == "object" and "properties" not in schema and "$ref" not in schema:
+                for param in list(schema):
+                    schema.pop(param)
+                schema["$ref"] = schema_ref
+        return schema_ret
 
 
 class OAS3ParameterHandler(ParameterHandler):

@@ -442,7 +442,7 @@ if TYPE_CHECKING:
     _OpenAPISchemaProperty: TypeAlias = "OpenAPISchemaProperty"
     OpenAPISchemaTypes = Literal["object", "array", "boolean", "integer", "number", "string"]
     OpenAPISchemaReference = TypedDict("OpenAPISchemaReference", {
-        "$ref": _OpenAPISchema
+        "$ref": str
     }, total=True)
     OpenAPISchemaMetadata = TypedDict("OpenAPISchemaMetadata", {
         "$id": NotRequired[str],        # reference to external '$ref' after local resolution for tracking
@@ -538,11 +538,16 @@ if TYPE_CHECKING:
     OpenAPISpecResponse = TypedDict("OpenAPISpecResponse", {
         "summary": NotRequired[str],
         "description": NotRequired[str],
-        "content": Dict[str, OpenAPISpecContent],  # Media-Type keys
+        "content": Dict[str, Union[OpenAPISpecContent, OpenAPISchemaReference]],  # Media-Type keys
+    }, total=True)
+    OpenAPISpecRequestBody = TypedDict("OpenAPISpecRequestBody", {
+        "summary": NotRequired[str],
+        "description": NotRequired[str],
+        "content": Dict[str, Union[OpenAPISpecContent, OpenAPISchemaReference]],  # Media-Type keys
     }, total=True)
     OpenAPISpecPath = TypedDict("OpenAPISpecPath", {
         "responses": Dict[str, OpenAPISpecResponse],  # HTTP code keys
-        "parameters": List[OpenAPISchema],
+        "parameters": List[Union[OpenAPISchema, OpenAPISchemaReference]],
         "summary": str,
         "description": str,
         "tags": List[str],
@@ -556,30 +561,119 @@ if TYPE_CHECKING:
         "delete": NotRequired[OpenAPISpecPath],
         "options": NotRequired[OpenAPISpecPath],
     }, total=True)
-    OpenAPISpecContent
+    OpenAPISpecExample = TypedDict("OpenAPISpecExample", {
+        "description": NotRequired[str],
+        "summary": str,
+        "value": JSON,
+        "externalValue": NotRequired[str],
+    }, total=True)
+    OpenAPISpecParamStyle = Literal[
+        # path
+        "matrix",
+        "label",
+        "simple",  # header also
+        # query
+        "form",    # cookie also
+        "spaceDelimited",
+        "pipeDelimited",
+        "deepObject",
+    ]
     OpenAPISpecParameter = TypedDict("OpenAPISpecParameter", {
         "name": str,
         "in": Literal["header", "cookie", "query", "path", "body"],
         "required": bool,
+        "style": NotRequired[OpenAPISpecParamStyle],
         "allowReserved": NotRequired[bool],
         "default": NotRequired[JSON],   # Swagger 2.0, OpenAPI 3.0: nest under 'schema'
         "summary": NotRequired[str],
         "description": NotRequired[str],
         "type": NotRequired[str],  # Swagger 2.0
         "schema": OpenAPISchema,   # OpenAPI 3.0, 'content' alternative available
-        "content": NotRequired[Dict[str, OpenAPISpecContent]],  # Media-Type keys
+        "content": NotRequired[Dict[str, OpenAPISchema]],  # Media-Type keys
+        "example": NotRequired[JSON],
+        "examples": NotRequired[Dict[str, Union[OpenAPISpecExample, OpenAPISchemaReference]]],
     }, total=True)
+    OpenAPISpecHeader = TypedDict("OpenAPISpecHeader", {
+        "summary": NotRequired[str],
+        "description": NotRequired[str],
+        "required": NotRequired[bool],
+        "deprecated": NotRequired[bool],
+        "allowEmptyValue": NotRequired[bool],
+        "allowReserved": NotRequired[bool],
+        "style": NotRequired[Literal["simple"]],
+        "explode": NotRequired[bool],
+        "schema": OpenAPISchema,
+        "content": NotRequired[Dict[str, Union[OpenAPISpecContent, OpenAPISchemaReference]]],  # Media-Type keys
+        "example": NotRequired[JSON],
+        "examples": NotRequired[Dict[str, Union[OpenAPISpecExample, OpenAPISchemaReference]]],
+    }, total=True)
+    OpenAPISpecOAuthFlowItem = TypedDict("OpenAPISpecOAuthFlowItem", {
+        "authorizationUrl": str,
+        "tokenUrl": str,
+        "refreshUrl": str,
+        "scopes": Dict[str, str],
+    }, total=True)
+    OpenAPISpecOAuthFlows = TypedDict("OpenAPISpecOAuthFlows", {
+        "implicit": OpenAPISpecOAuthFlowItem,
+        "password": OpenAPISpecOAuthFlowItem,
+        "clientCredentials": OpenAPISpecOAuthFlowItem,
+        "authorizationCode": OpenAPISpecOAuthFlowItem,
+    }, total=True)
+    OpenAPISpecSecurityScheme = TypedDict("OpenAPISpecSecurityScheme", {
+        "type": Literal["apiKey", "http", "oauth2", "openIdConnect"],
+        "name": str,
+        "in": Literal["header", "query", "cookie"],
+        "description": NotRequired[str],
+        "scheme": NotRequired[str],
+        "bearerFormat": NotRequired[str],
+        "flows": NotRequired[OpenAPISpecOAuthFlows],
+        "openIdConnectUrl": NotRequired[str],
+    }, total=True)
+    OpenAPISpecServerVariable = TypedDict("OpenAPISpecServerVariable", {
+        "description": NotRequired[str],
+        "default": str,
+        "enum": List[str],
+    }, total=True)
+    OpenAPISpecServer = TypedDict("OpenAPISpecServer", {
+        "description": NotRequired[str],
+        "url": str,
+        "variables": NotRequired[Dict[str, OpenAPISpecServerVariable]],
+    }, total=True)
+    OpenAPISpecLink = TypedDict("OpenAPISpecLink", {
+        "description": NotRequired[str],
+        "operationId": str,
+        "operationRef": str,
+        "parameters": Dict[str, OpenAPISpecParameter],
+        "requestBody": Dict[str, OpenAPISpecRequestBody],
+        "server": NotRequired[OpenAPISpecServer],
+    }, total=True)
+    OpenAPISpecPathItem = TypedDict("OpenAPISpecPathItem", {
+        "$ref": str,
+        "summary": NotRequired[str],
+        "description": NotRequired[str],
+        "parameters": List[Union[OpenAPISpecParameter, OpenAPISchemaReference]],
+        "requestBody": Dict[str, OpenAPISpecRequestBody],
+        "server": NotRequired[OpenAPISpecServer],
+    }, total=True)
+    OpenAPISpecCallback = Dict[str, OpenAPISpecPathItem]
     OpenAPISpecComponents = TypedDict("OpenAPISpecComponents", {
-        "schemas": NotRequired[Dict[str, OpenAPISchema]],               # $ref object name as keys
-        "parameters": NotRequired[Dict[str, OpenAPISpecParameter]],     # $ref object name as keys
-        "responses": NotRequired[Dict[str, OpenAPISpecResponse]],       # $ref object name as keys
+        # for each dict, keys are $ref object name
+        "schemas": NotRequired[Dict[str, Union[OpenAPISchema, OpenAPISchemaReference]]],
+        "parameters": NotRequired[Dict[str, Union[OpenAPISpecParameter, OpenAPISchemaReference]]],
+        "responses": NotRequired[Dict[str, Union[OpenAPISpecResponse, OpenAPISchemaReference]]],
+        "requestBodies": NotRequired[Dict[str, Union[OpenAPISpecRequestBody, OpenAPISchemaReference]]],
+        "examples": NotRequired[Dict[str, Union[OpenAPISpecExample, OpenAPISchemaReference]]],
+        "headers": NotRequired[Dict[str, Union[OpenAPISpecHeader, OpenAPISchemaReference]]],
+        "securitySchemes": NotRequired[Dict[str, Union[OpenAPISpecSecurityScheme, OpenAPISchemaReference]]],
+        "links": NotRequired[Dict[str, Union[OpenAPISpecLink, OpenAPISchemaReference]]],
+        "callbacks": NotRequired[Dict[str, Union[OpenAPISpecCallback, OpenAPISchemaReference]]],
     }, total=True)
     OpenAPISpecExternalDocs = TypedDict("OpenAPISpecExternalDocs", {
-        "description": str,
+        "description": NotRequired[str],
         "url": str,
     }, total=True)
     OpenAPISpecification = TypedDict("OpenAPISpecification", {
-        "openapi": Literal["3.0.0"],
+        "openapi": Literal["3.0.0", "3.0.1", "3.0.2", "3.0.3", "3.1.0"],
         "info": OpenAPISpecInfo,
         "basePath": str,
         "host": str,

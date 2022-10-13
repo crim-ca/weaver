@@ -32,7 +32,7 @@ from weaver.wps_restapi.constants import ConformanceCategory
 from weaver.wps_restapi.utils import get_wps_restapi_base_url, wps_restapi_base_path
 
 if TYPE_CHECKING:
-    from typing import Callable, List, Optional
+    from typing import Any, Callable, List, Optional
 
     from weaver.typedefs import JSON, OpenAPISpecification, SettingsType, TypedDict
     from weaver.wps_restapi.constants import AnyConformanceCategory
@@ -620,13 +620,14 @@ def get_openapi_json(http_scheme="http", http_host="localhost", base_url=None,
 
 @cache_region("doc", sd.openapi_json_service.name)
 def openapi_json_cached(*args, **kwargs):
+    # type: (*Any, **Any) -> OpenAPISpecification
     return get_openapi_json(*args, **kwargs)
 
 
-@sd.openapi_json_service.get(tags=[sd.TAG_API], renderer=OutputFormat.JSON, content_type=ContentType.APP_OAS_JSON,
+@sd.openapi_json_service.get(tags=[sd.TAG_API], renderer=OutputFormat.JSON,
                              schema=sd.OpenAPIEndpoint(), response_schemas=sd.get_openapi_json_responses)
 def openapi_json(request):  # noqa: F811
-    # type: (Request) -> OpenAPISpecification
+    # type: (Request) -> HTTPException
     """
     Weaver OpenAPI schema definitions.
     """
@@ -636,7 +637,8 @@ def openapi_json(request):  # noqa: F811
     weaver_server_url = get_weaver_url(settings)
     LOGGER.debug("Request app URL:   [%s]", request.url)
     LOGGER.debug("Weaver config URL: [%s]", weaver_server_url)
-    return openapi_json_cached(base_url=weaver_server_url, use_docstring_summary=True, settings=settings)
+    spec = openapi_json_cached(base_url=weaver_server_url, use_docstring_summary=True, settings=settings)
+    return HTTPOk(json=spec, content_type=ContentType.APP_OAS_JSON)
 
 
 @cache_region("doc", sd.api_swagger_ui_service.name)
