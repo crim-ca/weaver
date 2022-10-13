@@ -62,10 +62,10 @@ from cornice_swagger.converters.exceptions import ConversionError, NoSuchConvert
 from cornice_swagger.converters.parameters import (
     BodyParameterConverter,
     HeaderParameterConverter,
-    PathParameterConverter,
-    ParameterConverter,
     ParameterConversionDispatcher,
-    QueryParameterConverter,
+    ParameterConverter,
+    PathParameterConverter,
+    QueryParameterConverter
 )
 from cornice_swagger.converters.schema import (
     STRING_FORMATTERS,
