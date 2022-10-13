@@ -1080,13 +1080,20 @@ def mocked_aws_s3_bucket_test_file(bucket_name, file_name, file_content="mock"):
         - :func:`mocked_aws_s3`
     """
     import boto3
+    from botocore.exceptions import ClientError
+
     if not MOCK_AWS_REGION:
         s3 = boto3.client("s3")
-        s3.create_bucket(Bucket=bucket_name)
+        s3_location = None
     else:
         s3 = boto3.client("s3", region_name=MOCK_AWS_REGION)
         s3_location = {"LocationConstraint": MOCK_AWS_REGION}
+    try:
         s3.create_bucket(Bucket=bucket_name, CreateBucketConfiguration=s3_location)
+    except ClientError as exc:
+        if exc.response["Error"]["Code"] not in ["BucketAlreadyExists", "BucketAlreadyOwnedByYou"]:
+            raise
+
     with tempfile.NamedTemporaryFile(mode="w") as tmp_file:
         tmp_file.write(file_content)
         tmp_file.flush()
