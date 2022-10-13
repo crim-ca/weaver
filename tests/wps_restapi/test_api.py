@@ -36,7 +36,7 @@ class GenericApiRoutesTestCase(unittest.TestCase):
         # override media-type with alternative representations for specific rel links
         expect_ctype = {
             "service-desc": ContentType.APP_OAS_JSON,
-            "OpenAPI":  ContentType.APP_OAS_JSON,
+            "OpenAPI": ContentType.APP_OAS_JSON,
         }
         # FIXME: patch broken content-type from reference websites
         #  (see https://github.com/opengeospatial/NamingAuthority/issues/183)
