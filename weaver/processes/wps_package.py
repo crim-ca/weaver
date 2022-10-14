@@ -577,7 +577,7 @@ def _generate_process_with_cwl_from_reference(reference, process_hint=None):
         ogc_api_json = {ctype for ctype in ogc_api_ctypes if ctype.endswith("json")}
 
         # try to detect incorrectly reported media-type using common structures
-        if ContentType.TEXT_PLAIN in content_type:
+        if ContentType.TEXT_PLAIN in content_type or not content_type:
             data = response.text
             if (data.startswith("{") and data.endswith("}")) or reference.endswith(".json"):
                 LOGGER.warning("Attempting auto-resolution of invalid Content-Type [%s] to [%s] "

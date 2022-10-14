@@ -12,11 +12,15 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add more explicit ``PackageException`` error messages with contextual details when a `CWL` file reference cannot be
+  resolved correctly.
 
 Fixes:
 ------
-- No change.
+- Fix resolution of `CWL` file from references that do not provide a known ``Content-Type`` that can represent `CWL`
+  contents. This can occur when deploying a ``builtin`` `Process` from the local file reference, which does not generate
+  a request, and therefore, no ``Content-Type``. This can occurs also for servers that incorrectly or simply do not
+  report their response ``Content-Type`` header.
 
 .. _changes_4.25.0:
 
