@@ -16,7 +16,7 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Remove hard requirement ``shapely==1.8.2`` to obtain latest fixes.
 
 .. _changes_4.25.0:
 

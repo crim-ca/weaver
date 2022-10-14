@@ -64,7 +64,7 @@ requests
 requests_file
 ruamel.yaml>=0.16
 schema-salad>=8.2,<9
-shapely==1.8.2
+shapely
 simplejson
 urlmatch
 xmltodict
