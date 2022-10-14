@@ -583,6 +583,14 @@ def _generate_process_with_cwl_from_reference(reference, process_hint=None):
                 LOGGER.warning("Attempting auto-resolution of invalid Content-Type [%s] to [%s] "
                                "for CWL reference [%s].", content_type, ContentType.APP_JSON, reference)
                 content_type = ContentType.APP_JSON
+            elif reference.endswith(".yml") or reference.endswith(".yaml"):
+                LOGGER.warning("Attempting auto-resolution of invalid Content-Type [%s] to [%s] "
+                               "for CWL reference [%s].", content_type, ContentType.APP_YAML, reference)
+                content_type = ContentType.APP_YAML
+            elif reference.endswith(".cwl"):
+                LOGGER.warning("Attempting auto-resolution of invalid Content-Type [%s] to [%s] "
+                               "for CWL reference [%s].", content_type, ContentType.APP_CWL, reference)
+                content_type = ContentType.APP_CWL
             elif data.startswith("<?xml") or reference.endswith(".xml"):
                 LOGGER.warning("Attempting auto-resolution of invalid Content-Type [%s] to [%s] "
                                "for WPS reference [%s].", content_type, ContentType.TEXT_XML, reference)
