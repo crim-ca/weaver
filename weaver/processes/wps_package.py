@@ -567,7 +567,7 @@ def _generate_process_with_cwl_from_reference(reference, process_hint=None):
                 f"Couldn't obtain a valid response from [{ref_wps}]. "
                 f"Service response: [{response.status_code} {response.reason}]"
             )
-        content_type = get_header("Content-Type", response.headers)
+        content_type = get_header("Content-Type", response.headers, default="")
         ogc_api_ctypes = {
             ContentType.APP_JSON,
             ContentType.APP_YAML,
