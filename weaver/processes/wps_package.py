@@ -613,12 +613,15 @@ def _generate_process_with_cwl_from_reference(reference, process_hint=None):
                 cwl_package = payload
                 process_info = {"identifier": reference_name}
 
-        if not process_info:
-            raise ValueError(
+        if not process_info or not cwl_package:
+            raise PackageNotFound(
                 f"Unknown parsing methodology of Content-Type [{content_type}] "
                 f"for reference [{reference}] with contents:\n{repr_json(payload)}\n"
             )
-
+    if not cwl_package:
+        raise PackageNotFound(
+            f"Could not resolve any package from reference [{reference}]."
+        )
     return cwl_package, process_info
 
 
@@ -785,8 +788,7 @@ def get_process_definition(process_offering, reference=None, package=None, data_
         except Exception as exc:
             # re-raise any exception already handled by a "package" error as is, but with a more detailed message
             # handle any other sub-exception that wasn't processed by a "package" error as a registration error
-            package_errors = (PackageRegistrationError, PackageTypeError, PackageRegistrationError, PackageNotFound)
-            exc_type = type(exc) if isinstance(exc, package_errors) else PackageRegistrationError
+            exc_type = type(exc) if isinstance(exc, PackageException) else PackageRegistrationError
             exc_msg = str(exc)
             LOGGER.exception(exc_msg)
             raise exc_type(f"Invalid package/reference definition. {reason} generated error: [{exc!s}].")
