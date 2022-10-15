@@ -53,8 +53,7 @@ def _get_builtin_reference_mapping(root):
     """
     Generates a mapping of `reference` to actual ``builtin`` package file path.
     """
-    builtin_names = [_pkg for _pkg in os.listdir(root)
-                     if os.path.splitext(_pkg)[-1].replace(".", "") in PACKAGE_EXTENSIONS]
+    builtin_names = [_pkg for _pkg in os.listdir(root) if os.path.splitext(_pkg)[-1] == ".cwl"]
     refs = {
         os.path.splitext(_pkg)[0]: {"package": os.path.join(root, _pkg), "payload": {}}
         for _pkg in builtin_names
@@ -110,7 +109,7 @@ def _get_builtin_package(process_id, package):
     - Add `hints` section with :data:`CWL_REQUIREMENT_APP_BUILTIN`.
     - Replace references to environment variable :data:`WEAVER_ROOT_DIR` as needed.
 
-    The `CWL` ``hints`` are employed to avoid error from the runner that doesn't known this requirement definition.
+    The `CWL` ``hints`` are employed to avoid error from the runner that doesn't know this requirement definition.
     The ``hints`` can be directly in the package definition without triggering validation errors.
     """
     if "hints" not in package:
