@@ -18,7 +18,7 @@ from weaver.exceptions import PackageExecutionError, PackageNotFound, ProcessNot
 from weaver.execute import ExecuteControlOption
 from weaver.processes.constants import CWL_REQUIREMENT_APP_BUILTIN
 from weaver.processes.types import ProcessType
-from weaver.processes.wps_package import PACKAGE_EXTENSIONS, get_process_definition
+from weaver.processes.wps_package import get_process_definition
 from weaver.store.base import StoreProcesses
 from weaver.utils import clean_json_text_body, get_registry, ows_context_href
 from weaver.visibility import Visibility
