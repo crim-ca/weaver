@@ -377,17 +377,17 @@ class EOImageDescribeProcessHandler(object):
     def make_aoi(id_):
         # type: (str) -> JSON
         data = {
-            u"id": id_,
-            u"title": u"Area of Interest",
-            u"abstract": u"Area of Interest (Bounding Box)",
-            u"formats": [{u"mimeType": u"OGC-WKT", u"default": True}],
-            u"minOccurs": u"1",
-            u"maxOccurs": u"1",
-            u"additionalParameters": [
+            "id": id_,
+            "title": "Area of Interest",
+            "abstract": "Area of Interest (Bounding Box)",
+            "formats": [{"mimeType": "OGC-WKT", "default": True}],
+            "minOccurs": "1",
+            "maxOccurs": "1",
+            "additionalParameters": [
                 {
-                    u"role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
-                    u"parameters": [
-                        {u"name": u"CatalogSearchField", u"values": [u"bbox"]}
+                    "role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
+                    "parameters": [
+                        {"name": "CatalogSearchField", "values": ["bbox"]}
                     ],
                 }
             ],
@@ -395,24 +395,24 @@ class EOImageDescribeProcessHandler(object):
         return data
 
     @staticmethod
-    def make_collection(identifier, allowed_values):  # noqa: W0613
+    def make_collection(identifier, allowed_values):  # pylint: disable=W0613
         # type: (str, List[str]) -> JSON
-        description = u"Collection of the data."
+        description = "Collection of the data."
         data = {
-            u"id": str(identifier),
-            u"title": description,
-            u"abstract": description,
-            u"formats": [{u"mimeType": ContentType.TEXT_PLAIN, u"default": True}],
-            u"minOccurs": u"1",
-            u"maxOccurs": u"unbounded",
-            u"literalDataDomains": [{u"dataType": {u"name": u"String"}}],
-            u"additionalParameters": [
+            "id": str(identifier),
+            "title": description,
+            "abstract": description,
+            "formats": [{"mimeType": ContentType.TEXT_PLAIN, "default": True}],
+            "minOccurs": "1",
+            "maxOccurs": "unbounded",
+            "literalDataDomains": [{"dataType": {"name": "String"}}],
+            "additionalParameters": [
                 {
-                    u"role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
-                    u"parameters": [
+                    "role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
+                    "parameters": [
                         {
-                            u"name": u"CatalogSearchField",
-                            u"values": [u"parentIdentifier"],
+                            "name": "CatalogSearchField",
+                            "values": ["parentIdentifier"],
                         }
                     ],
                 }
@@ -432,18 +432,18 @@ class EOImageDescribeProcessHandler(object):
         date = OpenSearchField.START_DATE if start_date else OpenSearchField.END_DATE
         search_field = f"{date[0].lower()}{date[1:]}"
         data = {
-            u"id": id_,
-            u"title": u"Time of Interest",
-            u"abstract": u"Time of Interest (defined as Start date - End date)",
-            u"formats": [{u"mimeType": ContentType.TEXT_PLAIN, u"default": True}],
-            u"minOccurs": u"1",
-            u"maxOccurs": u"1",
-            u"literalDataDomains": [{u"dataType": {u"name": u"String"}}],
-            u"additionalParameters": [
+            "id": id_,
+            "title": "Time of Interest",
+            "abstract": "Time of Interest (defined as Start date - End date)",
+            "formats": [{"mimeType": ContentType.TEXT_PLAIN, "default": True}],
+            "minOccurs": "1",
+            "maxOccurs": "1",
+            "literalDataDomains": [{"dataType": {"name": "String"}}],
+            "additionalParameters": [
                 {
-                    u"role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
-                    u"parameters": [
-                        {u"name": u"CatalogSearchField", u"values": [search_field]}
+                    "role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
+                    "parameters": [
+                        {"name": "CatalogSearchField", "values": [search_field]}
                     ],
                 }
             ],

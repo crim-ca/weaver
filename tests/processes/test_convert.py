@@ -85,6 +85,7 @@ def test_are_different_and_set_both_set():
 
 
 def test_are_different_and_set_similar_str_formats():
+    # pylint: disable=W1406,redundant-u-string-prefix  # left for readability
     assert _are_different_and_set(b"something", u"something") is False
     assert _are_different_and_set(u"something", u"something") is False
     assert _are_different_and_set(b"something", b"something") is False

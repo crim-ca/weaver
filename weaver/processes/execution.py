@@ -370,7 +370,7 @@ def fetch_wps_process(job, wps_url, headers, settings):
     """
     try:
         wps = get_wps_client(wps_url, settings, headers=headers, language=job.accept_language)
-        raise_on_xml_exception(wps._capabilities)  # noqa
+        raise_on_xml_exception(wps._capabilities)  # noqa: W0212
     except Exception as ex:
         job.save_log(errors=ex, message=f"Failed WPS client creation for process [{job.process!s}]")
         raise OWSNoApplicableCode(f"Failed to retrieve WPS capabilities. Error: [{ex!s}].")

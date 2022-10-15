@@ -384,11 +384,13 @@ def test_assert_sane_name():
 
 
 def test_str2bytes():
+    # pylint: disable=W1406,redundant-u-string-prefix  # left for readability
     assert str2bytes(b"test-bytes") == b"test-bytes"
     assert str2bytes(u"test-unicode") == b"test-unicode"
 
 
 def test_bytes2str():
+    # pylint: disable=W1406,redundant-u-string-prefix  # left for readability
     assert bytes2str(b"test-bytes") == u"test-bytes"
     assert bytes2str(u"test-unicode") == u"test-unicode"
 
@@ -653,7 +655,7 @@ def test_fetch_file_remote_with_request():
         # share in below mocked_request, 'nonlocal' back compatible with Python 2
         tmp = {"retry": tmp_retry, "json": tmp_json, "http": tmp_http}
 
-        def mocked_request(*_, **__):  # noqa: E811
+        def mocked_request(*_, **__):
             tmp["retry"] -= 1
             if not tmp["retry"]:
                 return mocked_file_response(tmp["json"].name, tmp["http"])
