@@ -272,6 +272,7 @@ def get_test_weaver_app(config=None, settings=None):
     # type: (Optional[Configurator], Optional[SettingsType]) -> TestApp
     config = get_test_weaver_config(config=config, settings=settings)
     config.registry.settings.setdefault("weaver.ssl_verify", "false")
+    setup_config_with_mongodb(config)
     app = weaver_app({}, **config.get_settings())
     return TestApp(app)
 
