@@ -19,8 +19,7 @@ pluggy>=0.7
 # FIXME: bad interpolation of 'setup.cfg' for pytest 'log_format' (https://github.com/pytest-dev/pytest/issues/10019)
 pytest<7
 pydocstyle
-# bad docstring asterisks args handling (https://github.com/PyCQA/pylint/issues/5406)
-pylint>=2.11,!=2.12,!=2.15; python_version >= "3.6"
+pylint>=2.15.4; python_version >= "3.6"
 pylint_quotes
 responses
 safety

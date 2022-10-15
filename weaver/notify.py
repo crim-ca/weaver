@@ -92,7 +92,7 @@ def notify_job_complete(job, to_email_recipient, container):
 
     job_json = job.json(settings)
     contents = template.render(to=to_email_recipient, job=job, settings=settings, **job_json)
-    message = f"{contents}".strip(u"\n")
+    message = f"{contents}".strip("\n")
 
     if ssl:
         server = smtplib.SMTP_SSL(smtp_host, port)

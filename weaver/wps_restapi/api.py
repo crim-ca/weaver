@@ -686,7 +686,7 @@ def get_request_info(request, detail=None):
     """
     Provided additional response details based on the request and execution stack on failure.
     """
-    content = {u"route": str(request.upath_info), u"url": str(request.url), u"method": request.method}
+    content = {"route": str(request.upath_info), "url": str(request.url), "method": request.method}
     if isinstance(detail, str):
         content.update({"detail": detail})
     if hasattr(request, "exception"):
@@ -699,7 +699,7 @@ def get_request_info(request, detail=None):
         if has_json and isinstance(request.exception.json, dict):
             content.update(request.exception.json)
         elif isinstance(request.exception, HTTPServerError) and hasattr(request.exception, "message"):
-            content.update({u"exception": str(request.exception.message)})
+            content.update({"exception": str(request.exception.message)})
     elif hasattr(request, "matchdict"):
         if request.matchdict is not None and request.matchdict != "":
             content.update(request.matchdict)
