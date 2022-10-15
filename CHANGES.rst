@@ -23,6 +23,8 @@ Fixes:
   report their response ``Content-Type`` header.
 - Fix resolution of file reference with explicit `CWL` or `YAML` extensions when ``Content-Type`` is not reported or is
   indicated as ``plain/text``.
+- Fix invalid resolution of ``builtin`` `Process` that could load the optional `JSON` or `YAML` payload file intended
+  to provide additional `Process` definition details, instead of the expected `CWL` for the package definition.
 
 .. _changes_4.25.0:
 
