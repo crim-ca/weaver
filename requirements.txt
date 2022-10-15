@@ -29,6 +29,8 @@ cryptography
 # (https://github.com/common-workflow-language/common-workflow-language/issues/587)
 ### git+https://github.com/crim-ca/cwltool@docker-gpu#egg=cwltool; python_version >= "3"
 cwltool==3.1.20220913185150
+# defused required for json2xml
+defusedxml
 docker
 duration
 git+https://github.com/ESGF/esgf-compute-api.git@v2.3.7#egg=esgf-compute-api
@@ -37,7 +39,7 @@ git+https://github.com/ESGF/esgf-compute-api.git@v2.3.7#egg=esgf-compute-api
 # use pserve to continue supporting config.ini with paste settings
 gunicorn>=20.0.4
 json2xml<3.19.0; python_version <= "3.6"
-json2xml; python_version >= "3.7"
+--install-option="--no-deps" json2xml; python_version >= "3.7"
 jsonschema>=3.0.1
 lxml
 mako
