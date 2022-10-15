@@ -17,6 +17,7 @@ Changes:
 
 Fixes:
 ------
+- Remove hard requirement ``shapely==1.8.2`` to obtain latest fixes.
 - Fix resolution of `CWL` file from references that do not provide a known ``Content-Type`` that can represent `CWL`
   contents. This can occur when deploying a ``builtin`` `Process` from the local file reference, which does not generate
   a request and, therefore, no ``Content-Type``. This can occur also for servers that incorrectly or simply do not
