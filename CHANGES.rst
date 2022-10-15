@@ -12,11 +12,20 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add more explicit ``PackageException`` error messages with contextual details when a `CWL` file reference cannot be
+  resolved correctly.
 
 Fixes:
 ------
 - Remove hard requirement ``shapely==1.8.2`` to obtain latest fixes.
+- Fix resolution of `CWL` file from references that do not provide a known ``Content-Type`` that can represent `CWL`
+  contents. This can occur when deploying a ``builtin`` `Process` from the local file reference, which does not generate
+  a request and, therefore, no ``Content-Type``. This can occur also for servers that incorrectly or simply do not
+  report their response ``Content-Type`` header.
+- Fix resolution of file reference with explicit `CWL` or `YAML` extensions when ``Content-Type`` is not reported or is
+  indicated as ``plain/text``.
+- Fix invalid resolution of ``builtin`` `Process` that could load the optional `JSON` or `YAML` payload file intended
+  to provide additional `Process` definition details, instead of the expected `CWL` for the package definition.
 
 .. _changes_4.25.0:
 
