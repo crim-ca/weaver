@@ -87,6 +87,7 @@ from weaver.store.base import StoreJobs, StoreProcesses
 from weaver.utils import (
     SUPPORTED_FILE_SCHEMES,
     bytes2str,
+    fetch_directory,
     fetch_file,
     fully_qualified_name,
     get_any_id,
@@ -96,7 +97,6 @@ from weaver.utils import (
     get_log_fmt,
     get_sane_name,
     get_settings,
-    list_directory,
     request_extra,
     setup_loggers
 )
@@ -1709,13 +1709,12 @@ class WpsPackage(Process):
                 input_location = fetch_file(input_location, input_definition.workdir,
                                             settings=self.settings, headers=self.auth)
             elif input_type == "Directory":
-                self.logger.info("Directory")
-                locations = list_directory(input_location, settings=self.settings, headers=self.auth)
-                for url_loc in locations:
-                    self.logger.info("File input from listing for (%s) ATTEMPT fetch: [%s]", input_id, url_loc)
-                    dir_loc = fetch_file(input_location, input_definition.workdir,
-                                         settings=self.settings, headers=self.auth)
-                    self.logger.debug("Resolved file [%s] -> [%s]", url_loc, dir_loc)
+                locations = fetch_directory(input_location, input_definition.workdir,
+                                            settings=self.settings, headers=self.auth)
+                if self.logger.isEnabledFor(logging.DEBUG):
+                    for loc in locations:
+                        self.logger.debug("Resolved file [%s] from [%s] directory listing.", loc, input_location)
+                input_location = input_definition.workdir
             else:
                 raise PackageExecutionError(
                     f"Unknown reference staging resolution method for [{input_type}] type "

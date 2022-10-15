@@ -26,6 +26,7 @@ import requests
 import yaml
 from beaker.cache import cache_region, region_invalidate
 from beaker.exceptions import BeakerException
+from botocore.config import Config as S3Config
 from celery.app import Celery
 from jsonschema.validators import RefResolver as JsonSchemaRefResolver
 from pyramid.config import Configurator
@@ -52,7 +53,7 @@ from yaml.scanner import ScannerError
 
 from weaver.base import Constants
 from weaver.execute import ExecuteControlOption, ExecuteMode
-from weaver.formats import ContentType, get_content_type
+from weaver.formats import ContentType, get_content_type, repr_json
 from weaver.status import map_status
 from weaver.warning import TimeZoneInfoAlreadySetWarning
 from weaver.xml_util import XML
@@ -73,7 +74,7 @@ if TYPE_CHECKING:
         Tuple,
         Union
     )
-    from typing_extensions import TypeGuard
+    from typing_extensions import TypedDict, TypeGuard
 
     from weaver.execute import AnyExecuteControlOption, AnyExecuteMode
     from weaver.status import Status
@@ -101,6 +102,12 @@ if TYPE_CHECKING:
     )
 
     RetryCondition = Union[Type[Exception], Iterable[Type[Exception]], Callable[[Exception], bool]]
+    SchemeOptions = TypedDict("SchemeOptions", {
+        "file": Dict[str, JSON],
+        "http": Dict[str, JSON],  # includes HTTPS
+        "s3": Dict[str, JSON],
+        "vault": Dict[str, JSON],
+    }, total=True)
 
     OriginalClass = TypeVar("OriginalClass")
     ExtenderMixin = TypeVar("ExtenderMixin")
@@ -1745,7 +1752,101 @@ def download_file_http(file_reference, file_outdir, settings=None, **request_kwa
     return file_path
 
 
-def fetch_file(file_reference, file_outdir, settings=None, link=None, move=False, **request_kwargs):
+def resolve_s3_from_http(reference):
+    # type: (str) -> Tuple[str, str]
+    """
+    Resolve an HTTP URL reference pointing to an S3 Bucket into the shorthand URL notation with S3 scheme.
+
+    The expected reference should be formatted as follows.
+
+    .. code-block:: text
+        https://s3.[region-name.]amazonaws.com/<bucket>/[<any-quantity-of-dirs>/][<file-key>]
+
+    :param reference: HTTP-S3 URL reference.
+    :return: Updated S3 reference and applicable S3 Region name.
+    """
+    s3 = boto3.client("s3")
+    s3_url = s3.meta.endpoint_url
+    s3_region = s3.meta.region_name
+    if not reference.startswith(s3_url):
+        LOGGER.warning(
+            "Detected HTTP reference to AWS S3 bucket [%s] that mismatches server region configuration [%s]. "
+            "Attempting to switch S3 region for proper resolution.",
+            reference, s3_region
+        )
+        s3_region, s3_ref = reference.split("https://s3.")[-1].split(".amazonaws.com/")
+        s3_reference = f"s3://{s3_ref}"
+    else:
+        s3_ref = reference.replace(s3_url, "")
+        s3_reference = f"s3://{s3_ref}"
+    LOGGER.debug("Adjusting HTTP reference to S3 URL shorthand with resolved S3 Region:\n"
+                 "  Initial: [%s]\n"
+                 "  Updated: [%s]\n"
+                 "  Region:  [%s]\n",
+                 reference, s3_reference, s3_region)
+    return s3_reference, s3_region
+
+
+def resolve_s3_http_options(**request_kwargs):
+    # type: (**Any) -> Dict[str, Union[S3Config, JSON]]
+    """
+    Converts HTTP requests options to corresponding S3 configuration definitions.
+
+    Resolved parameters will only preserve valid options that can be passed directly to :class:`botocore.client.S3`
+    when initialized with :func:`boto3.client` in combination with ``"s3"`` service. Valid HTTP requests options that
+    have been resolved will be nested under ``config`` with a :class:`S3Config` where applicable.
+
+    :param request_kwargs: Request keywords to attempt mapping to S3 configuration.
+    :return: Resolved S3 client parameters.
+    """
+    params = {}
+    cfg_kw = {}
+    if "timeout" in request_kwargs:
+        cfg_kw["connect_timeout"] = request_kwargs["timeout"]
+        cfg_kw["read_timeout"] = request_kwargs["timeout"]
+    if "connect_timeout" in request_kwargs:
+        cfg_kw["connect_timeout"] = request_kwargs["connect_timeout"]
+    if "read_timeout" in request_kwargs:
+        cfg_kw["read_timeout"] = request_kwargs["read_timeout"]
+    if "cert" in request_kwargs:
+        cfg_kw["client_cert"] = request_kwargs["cert"]  # same combination of str or (str, str) accepted
+    if "verify" in request_kwargs:
+        params["verify"] = request_kwargs["verify"]  # this is passed directly to the client rather than config
+    retries = request_kwargs.pop("retries", request_kwargs.pop("retry", request_kwargs.pop("max_retries", None)))
+    if retries is not None:
+        cfg_kw["retries"] = {"max_attempts": retries}
+    if "headers" in request_kwargs:
+        user_agent = get_header("User-Agent", request_kwargs["headers"])
+        if user_agent:
+            cfg_kw["user_agent"] = user_agent
+    config = S3Config(**cfg_kw)
+    params["config"] = config
+    return params
+
+
+def resolve_scheme_options(**kwargs):
+    # type: (**Any) -> Tuple[SchemeOptions, Dict[str, Any]]
+    """
+    Splits options into their relevant group by scheme prefix.
+
+    Handled schemes are defined by :data:`SUPPORTED_FILE_SCHEMES` (exception HTTP and HTTPS are grouped together).
+
+    :param kwargs: Keywords to categorise by scheme.
+    :returns: Categorised options by scheme and all other remaining keywords.
+    """
+    options = {group: {} for group in SUPPORTED_FILE_SCHEMES}
+    keywords = {}
+    for opt, val in kwargs.items():
+        if any(opt.startswith(scheme) for scheme in list(options)):
+            opt, key = opt.split("_", 1)
+            options[opt][key] = val
+        else:
+            keywords[opt] = val
+    options["http"].update(options.pop("https"))
+    return options, keywords
+
+
+def fetch_file(file_reference, file_outdir, settings=None, link=None, move=False, **option_kwargs):
     # type: (str, str, Optional[AnySettingsContainer], Optional[bool], bool, **Any) -> str
     """
     Fetches a file from local path, AWS-S3 bucket or remote URL, and dumps its content to the output directory.
@@ -1754,6 +1855,9 @@ def fetch_file(file_reference, file_outdir, settings=None, link=None, move=False
     The file reference scheme (protocol) determines from where to fetch the content.
     Output file name and extension will be the same as the original (after link resolution if applicable).
     Requests will consider ``weaver.request_options`` when using ``http(s)://`` scheme.
+
+    .. seealso::
+        :func:`resolve_scheme_options`
 
     :param file_reference:
         Local filesystem path (optionally prefixed with ``file://``), ``s3://`` bucket location or ``http(s)://``
@@ -1771,7 +1875,10 @@ def fetch_file(file_reference, file_outdir, settings=None, link=None, move=False
         Move local file to the output directory instead of copying or linking it.
         No effect if the output directory already contains the local file.
         No effect if download must occur for remote file.
-    :param request_kwargs: Additional keywords to forward to request call (if needed).
+    :param option_kwargs:
+        Additional keywords to forward to the relevant handling method by scheme.
+        Keywords should be defined as ``<scheme>_<option>`` with one of the known :data:`SUPPORTED_FILE_SCHEMES`.
+        If not prefixed by any scheme, the option will apply to all handling methods (if applicable).
     :return: Path of the local copy of the fetched file.
     :raises HTTPException: applicable HTTP-based exception if any occurred during the operation.
     :raises ValueError: when the reference scheme cannot be identified.
@@ -1781,7 +1888,8 @@ def fetch_file(file_reference, file_outdir, settings=None, link=None, move=False
     file_path = os.path.join(file_outdir, file_name)
     if file_reference.startswith("file://"):
         file_reference = file_reference[7:]
-    LOGGER.debug("Fetching file reference: [%s]", file_href)
+    LOGGER.debug("Fetching file reference: [%s] using options:\n%s\n", file_href, repr_json(option_kwargs))
+    options, kwargs = resolve_scheme_options(**option_kwargs)
     if os.path.isfile(file_reference):
         LOGGER.debug("Fetch file resolved as local reference.")
         if move and os.path.isfile(file_path):
@@ -1808,26 +1916,17 @@ def fetch_file(file_reference, file_outdir, settings=None, link=None, move=False
             LOGGER.debug("Fetch file as local reference has no action to take, file already exists: [%s]", file_path)
     elif file_reference.startswith("s3://"):
         LOGGER.debug("Fetch file resolved as S3 bucket reference.")
-        s3 = boto3.resource("s3")
+        s3_params = resolve_s3_http_options(**options["http"], **kwargs)
+        s3_region = options["s3"].get("region") or None
+        s3_client = boto3.client("s3", region_name=s3_region, **s3_params)
         bucket_name, file_key = file_reference[5:].split("/", 1)
-        bucket = s3.Bucket(bucket_name)
-        bucket.download_file(file_key, file_path)
+        s3_client.download_file(bucket_name, file_key, file_path)
     elif file_reference.startswith("http"):
         # pseudo-http URL referring to S3 bucket, try to redirect to above S3 handling method if applicable
         if file_reference.startswith("https://s3."):
-            s3 = boto3.resource("s3")
-            # endpoint in the form: "https://s3.[region-name.]amazonaws.com/<bucket>/<file-key>"
-            if not file_reference.startswith(s3.meta.endpoint_url):
-                LOGGER.warning("Detected HTTP file reference to AWS S3 bucket that mismatches server configuration. "
-                               "Will consider it as plain HTTP with read access.")
-            else:
-                file_reference_s3 = file_reference.replace(s3.meta.endpoint_url, "")
-                file_ref_updated = f"s3://{file_reference_s3}"
-                LOGGER.debug("Adjusting file reference to S3 shorthand for further parsing:\n"
-                             "  Initial: [%s]\n"
-                             "  Updated: [%s]", file_reference, file_ref_updated)
-                return fetch_file(file_ref_updated, file_outdir, settings=settings, **request_kwargs)
-        file_path = download_file_http(file_reference, file_outdir, settings=settings, **request_kwargs)
+            s3_ref, s3_region = resolve_s3_from_http(file_reference)
+            return fetch_file(s3_ref, file_outdir, settings=settings, s3_region=s3_region, **option_kwargs)
+        file_path = download_file_http(file_reference, file_outdir, settings=settings, **options["http"], **kwargs)
     else:
         scheme = file_reference.split("://")
         scheme = "<none>" if len(scheme) < 2 else scheme[0]
@@ -1839,6 +1938,42 @@ def fetch_file(file_reference, file_outdir, settings=None, link=None, move=False
                  "  Reference: [%s]\n"
                  "  File Path: [%s]", file_href, file_path)
     return file_path
+
+
+def fetch_directory(location, out_dir, settings=None, **option_kwargs):
+    # type: (str, str, Optional[AnySettingsContainer], **Any) -> List[str]
+    """
+    Fetches all files that can be listed from a directory in local or remote location.
+
+    .. seealso::
+        :func:`resolve_scheme_options`
+
+    :param location: Directory reference (URL, S3, local). Trailing slash required.
+    :param out_dir: Output local directory path under which to place fetched files.
+    :param settings: Additional request-related settings from the application configuration (notably request-options).
+    :param option_kwargs:
+        Additional keywords to forward to the relevant handling method by scheme.
+        Keywords should be defined as ``<scheme>_<option>`` with one of the known :data:`SUPPORTED_FILE_SCHEMES`.
+        If not prefixed by any scheme, the option will apply to all handling methods (if applicable).
+    :returns: File locations retrieved from directory listing.
+    """
+    if not location.endswith("/"):
+        raise ValueError(f"Invalid directory location [{location}] must have a trailing slash.")
+    if location.startswith("s3://"):
+        LOGGER.debug("List directory resolved as S3 bucket reference.")
+        # s3 = boto3.resource("s3")
+        # bucket_name, dirs = location[5:].split("/", 1)
+        # bucket = s3.Bucket(bucket_name)
+        # bucket.download_file(location, out_dir)
+    elif location.startswith("https://s3."):
+        pass
+    elif location.startswith("http://") or location.startswith("https://"):
+        pass
+    elif location.startswith("file://") or location.startswith("/"):
+        pass
+    else:
+        raise ValueError(f"Unknown scheme for directory location [{location}].")
+    return []
 
 
 def load_file(file_path, text=False):
@@ -1877,27 +2012,6 @@ def is_remote_file(file_location):
     cwl_file_path_or_url = file_location.replace("file://", "")
     scheme = urlparse(cwl_file_path_or_url).scheme
     return scheme != "" and not posixpath.ismount(f"{scheme}:")  # windows partition
-
-
-def list_directory(location):
-    # type: (str) -> List[str]
-    """
-    Obtain directory listing from a local or remote location.
-
-    :param location: Directory reference (URL, S3, local). Trailing slash expected.
-    :returns: File locations obtained from listing. References will have the same scheme as the directory reference.
-    """
-    if not location.endswith("/"):
-        raise ValueError(f"Invalid directory location [{location}] must have a trailing slash.")
-    if location.startswith("s3://") or location.startswith("https://s3."):
-        pass
-    elif location.startswith("http://") or location.startswith("https://"):
-        pass
-    elif location.startswith("file://") or location.startswith("/"):
-        pass
-    else:
-        raise ValueError(f"Unknown scheme for directory location [{location}].")
-    return []
 
 
 REGEX_SEARCH_INVALID_CHARACTERS = re.compile(r"[^a-zA-Z0-9_\-]")

@@ -107,7 +107,7 @@ def estimate_workflow_quote(quote, process):
 
 
 @app.task(bind=True)
-def process_quote_estimator(task, quote_id):  # noqa: E811
+def process_quote_estimator(task, quote_id):
     # type: (Task, AnyUUID) -> AnyQuoteStatus
     """
     Estimate :term:`Quote` parameters for the :term:`Process` execution.

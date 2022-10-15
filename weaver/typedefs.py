@@ -33,7 +33,7 @@ if TYPE_CHECKING:
             pass
     if MemoryInfo is Any:
         if TypedDict is Dict:
-            MemoryInfo = Dict
+            MemoryInfo = Dict[str, int]
         else:
             MemoryInfo = TypedDict("MemoryInfo", {
                 "rss": int,
