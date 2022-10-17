@@ -1,3 +1,4 @@
+import datetime
 import json
 import logging
 import os
@@ -19,7 +20,7 @@ from weaver.base import Constants, classproperty
 if TYPE_CHECKING:
     from typing import Any, Dict, List, Optional, Tuple, Union
 
-    from weaver.base import PropertyDataType
+    from weaver.base import PropertyDataTypeT
     from weaver.typedefs import JSON, AnyRequestType
 
 LOGGER = logging.getLogger(__name__)
@@ -130,10 +131,10 @@ class OutputFormat(Constants):
 
     @classmethod
     def get(cls,                    # pylint: disable=W0221,W0237  # arguments differ/renamed
-            format_or_version,      # type: Union[str, AnyOutputFormat, PropertyDataType]
+            format_or_version,      # type: Union[str, AnyOutputFormat, PropertyDataTypeT]
             default=JSON,           # type: AnyOutputFormat
             allow_version=True,     # type: bool
-            ):                      # type: (...) ->  Union[AnyOutputFormat, PropertyDataType]
+            ):                      # type: (...) ->  Union[AnyOutputFormat, PropertyDataTypeT]
         """
         Resolve the applicable output format.
 
@@ -725,6 +726,13 @@ def guess_target_format(request, default=ContentType.APP_JSON):
     return content_type
 
 
+def json_default_handler(obj):
+    # type: (Any) -> Union[JSON, str, None]
+    if isinstance(obj, (datetime.date, datetime.datetime)):
+        return obj.isoformat()
+    raise TypeError(f"Type {type(obj)} not serializable.")
+
+
 def repr_json(data, force_string=True, ensure_ascii=False, indent=2, **kwargs):
     # type: (Any, bool, bool, Optional[int], **Any) -> Union[JSON, str, None]
     """
@@ -734,8 +742,11 @@ def repr_json(data, force_string=True, ensure_ascii=False, indent=2, **kwargs):
     """
     if data is None:
         return None
+    default = kwargs.pop("default", None)
+    if default is None:
+        default = json_default_handler
     try:
-        data_str = json.dumps(data, indent=indent, ensure_ascii=ensure_ascii, **kwargs)
+        data_str = json.dumps(data, indent=indent, ensure_ascii=ensure_ascii, default=default, **kwargs)
         return data_str if force_string else data
     except Exception:  # noqa: W0703 # nosec: B110
         return str(data)

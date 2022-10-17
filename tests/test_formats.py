@@ -1,3 +1,5 @@
+import datetime
+import inspect
 import os
 
 import mock
@@ -287,3 +289,28 @@ def test_clean_mime_type_format_default():
     assert f.clean_mime_type_format("", suffix_subtype=False, strip_parameters=True) is None
     assert f.clean_mime_type_format("", suffix_subtype=True, strip_parameters=False) is None
     assert f.clean_mime_type_format("", suffix_subtype=True, strip_parameters=True) is None
+
+
+def test_repr_json_default_string():
+    obj_ref = object()
+    values = {"test": obj_ref}
+    expect = f"{{'test': {str(obj_ref)}}}"
+    result = f.repr_json(values)
+    assert result == expect
+
+
+def test_repr_json_handle_datetime():
+    values = {
+        "date": datetime.datetime(2022, 6, 12, 11, 55, 44),
+        "number": 123,
+        "none": None
+    }
+    expect = inspect.cleandoc("""
+        {
+          "date": "2022-06-12T11:55:44",
+          "number": 123,
+          "none": null
+        }
+    """)
+    result = f.repr_json(values)
+    assert result == expect

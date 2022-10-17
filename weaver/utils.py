@@ -109,6 +109,10 @@ if TYPE_CHECKING:
         "vault": Dict[str, JSON],
     }, total=True)
 
+    S3DirectoryListingResponse = TypedDict("S3DirectoryListingResponse", {
+
+    }, total=True)
+
     OriginalClass = TypeVar("OriginalClass")
     ExtenderMixin = TypeVar("ExtenderMixin")
 
@@ -1924,7 +1928,9 @@ def fetch_file(file_reference, file_outdir, settings=None, link=None, move=False
     elif file_reference.startswith("http"):
         # pseudo-http URL referring to S3 bucket, try to redirect to above S3 handling method if applicable
         if file_reference.startswith("https://s3."):
+            LOGGER.debug("Detected HTTP-like S3 bucket file reference. Retrying file fetching with S3 reference.")
             s3_ref, s3_region = resolve_s3_from_http(file_reference)
+            option_kwargs.pop("s3_region", None)
             return fetch_file(s3_ref, file_outdir, settings=settings, s3_region=s3_region, **option_kwargs)
         file_path = download_file_http(file_reference, file_outdir, settings=settings, **options["http"], **kwargs)
     else:
@@ -1959,21 +1965,28 @@ def fetch_directory(location, out_dir, settings=None, **option_kwargs):
     """
     if not location.endswith("/"):
         raise ValueError(f"Invalid directory location [{location}] must have a trailing slash.")
+    LOGGER.debug("Fetching directory reference: [%s] using options:\n%s\n", location, repr_json(option_kwargs))
+    options, kwargs = resolve_scheme_options(**option_kwargs)
     if location.startswith("s3://"):
-        LOGGER.debug("List directory resolved as S3 bucket reference.")
-        # s3 = boto3.resource("s3")
-        # bucket_name, dirs = location[5:].split("/", 1)
-        # bucket = s3.Bucket(bucket_name)
-        # bucket.download_file(location, out_dir)
+        LOGGER.debug("Fetching listed files under directory resolved as S3 bucket reference.")
+        s3_params = resolve_s3_http_options(**options["http"], **kwargs)
+        s3_region = options["s3"].get("region") or None
+        s3_client = boto3.client("s3", region_name=s3_region, **s3_params)
+        bucket_name, dir_key = location[5:].split("/", 1)
+        s3_dir_resp = s3_client.list_objects_v2(Bucket=bucket_name, Prefix=dir_key)
+        LOGGER.debug("Fetched S3 directory [%s] listing contents:\n%s\n", location, repr_json(s3_dir_resp))
+
+
     elif location.startswith("https://s3."):
-        pass
+        LOGGER.debug("Detected HTTP-like S3 bucket directory reference. Retrying directory fetching with S3 reference.")
+        s3_ref, s3_region = resolve_s3_from_http(location)
+        option_kwargs.pop("s3_region", None)
+        return fetch_directory(s3_ref, out_dir, settings=settings, s3_region=s3_region, **option_kwargs)
     elif location.startswith("http://") or location.startswith("https://"):
         pass
     elif location.startswith("file://") or location.startswith("/"):
         pass
-    else:
-        raise ValueError(f"Unknown scheme for directory location [{location}].")
-    return []
+    raise ValueError(f"Unknown scheme for directory location [{location}].")
 
 
 def load_file(file_path, text=False):
