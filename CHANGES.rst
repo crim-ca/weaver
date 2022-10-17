@@ -18,6 +18,8 @@ Changes:
 Fixes:
 ------
 - Remove hard requirement ``shapely==1.8.2`` to obtain latest fixes.
+- Update ``json2xml>=3.20.0`` requirement to allow more recent ``certifi``, ``requests`` and ``urllib3`` dependencies to
+  be used by all packages (relates to `vinitkumar/json2xml#157 <https://github.com/vinitkumar/json2xml/issues/157>`_).
 - Fix resolution of `CWL` file from references that do not provide a known ``Content-Type`` that can represent `CWL`
   contents. This can occur when deploying a ``builtin`` `Process` from the local file reference, which does not generate
   a request and, therefore, no ``Content-Type``. This can occur also for servers that incorrectly or simply do not

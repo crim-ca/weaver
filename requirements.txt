@@ -39,7 +39,8 @@ git+https://github.com/ESGF/esgf-compute-api.git@v2.3.7#egg=esgf-compute-api
 # use pserve to continue supporting config.ini with paste settings
 gunicorn>=20.0.4
 json2xml<3.19.0; python_version <= "3.6"
---install-option="--no-deps" json2xml; python_version >= "3.7"
+# reduced dependencies contrains to let packages update to latest (https://github.com/vinitkumar/json2xml/issues/157)
+json2xml>=3.20.0; python_version >= "3.7"
 jsonschema>=3.0.1
 lxml
 mako
