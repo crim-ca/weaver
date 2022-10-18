@@ -64,6 +64,7 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_ENV_VAR,
     CWL_REQUIREMENT_RESOURCE,
     CWL_REQUIREMENTS_SUPPORTED,
+    PACKAGE_COMPLEX_TYPES,
     PACKAGE_EXTENSIONS,
     WPS_INPUT,
     WPS_OUTPUT
@@ -1541,20 +1542,20 @@ class WpsPackage(Process):
             # process single occurrences
             input_i = input_occurs[0]
             # handle as reference/data
-            is_array, elem_type, _, _ = is_cwl_array_type(cwl_inputs_info[input_id])
-            if isinstance(input_i, ComplexInput) or elem_type == "File":
+            io_def = is_cwl_array_type(cwl_inputs_info[input_id])
+            if isinstance(input_i, ComplexInput) or io_def.type in PACKAGE_COMPLEX_TYPES:
                 # extend array data that allow max_occur > 1
                 # drop invalid inputs returned as None
-                if is_array:
-                    input_href = [self.make_location_input(elem_type, input_def) for input_def in input_occurs]
+                if io_def.array:
+                    input_href = [self.make_location_input(io_def.type, input_def) for input_def in input_occurs]
                     input_href = [cwl_input for cwl_input in input_href if cwl_input is not None]
                 else:
-                    input_href = self.make_location_input(elem_type, input_i)
+                    input_href = self.make_location_input(io_def.type, input_i)
                 if input_href:
                     cwl_inputs[input_id] = input_href
             elif isinstance(input_i, (LiteralInput, BoundingBoxInput)):
                 # extend array data that allow max_occur > 1
-                if is_array:
+                if io_def.array:
                     input_data = [i.url if i.as_reference else i.data for i in input_occurs]
                 else:
                     input_data = input_i.url if input_i.as_reference else input_i.data

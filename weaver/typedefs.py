@@ -487,10 +487,11 @@ if TYPE_CHECKING:
         "properties": NotRequired[Dict[str, _OpenAPISchemaProperty]],
         "additionalProperties": NotRequired[Union[bool, Dict[str, Union[_OpenAPISchema, OpenAPISchemaReference]]]],
     }, total=False)
-    OpenAPISchemaObject = TypedDict("OpenAPISchemaObject", {
+    _OpenAPISchemaObject = TypedDict("_OpenAPISchemaObject", {
         "type": Literal["object"],
         "properties": Dict[str, OpenAPISchemaProperty],
     }, total=False)
+    OpenAPISchemaObject = Union[_OpenAPISchemaObject, OpenAPISchemaProperty]
     OpenAPISchemaArray = TypedDict("OpenAPISchemaArray", {
         "type": Literal["array"],
         "items": _OpenAPISchema,
@@ -514,12 +515,12 @@ if TYPE_CHECKING:
         OpenAPISchemaNot,
     ]
     OpenAPISchema = Union[
+        OpenAPISchemaMetadata,
         OpenAPISchemaObject,
         OpenAPISchemaArray,
         OpenAPISchemaKeyword,
         OpenAPISchemaProperty,
         OpenAPISchemaReference,
-        OpenAPISchemaMetadata,
     ]
 
     FormatMediaType = TypedDict("FormatMediaType", {

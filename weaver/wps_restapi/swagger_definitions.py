@@ -3279,7 +3279,7 @@ class ExecuteInputReference(Reference):
 
 
 class ExecuteInputFile(AnyOfKeywordSchema):
-    _any_of = [
+    _any_of = [                   # 'href' required for both to provide file link/reference
         ExecuteInputFileLink(),   # 'OGC' schema with 'type: <MediaType>'
         ExecuteInputReference(),  # 'OLD' schema with 'format: {mimeType|mediaType: <MediaType>}'
     ]
@@ -3337,8 +3337,8 @@ class ExecuteInputInlineOrRefData(OneOfKeywordSchema):
     schema_ref = f"{OGC_API_SCHEMA_CORE}/inlineOrRefData.yaml"
     _one_of = [
         ExecuteInputInlineValue(),     # <inline-literal>
-        ExecuteInputQualifiedValue(),  # {"value": <anything>}
-        ExecuteInputFile(),  # 'href' with either 'type' (OGC) or 'format' (OLD)
+        ExecuteInputQualifiedValue(),  # {"value": <anything>, "mediaType": "<>", "schema": <OAS link or object>}
+        ExecuteInputFile(),            # 'href' with either 'type' (OGC) or 'format' (OLD)
         # FIXME: other types here, 'bbox+crs', 'collection', 'nested process', etc.
     ]
 

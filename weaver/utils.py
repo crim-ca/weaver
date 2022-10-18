@@ -284,6 +284,10 @@ class SchemaRefResolver(JsonSchemaRefResolver):
     Reference resolver that supports both :term:`JSON` and :term:`YAML` files from a remote location.
     """
     # only need to override the remote resolution to add YAML support
+    # init overload used to patch invalid typing definition
+    def __init__(self, base_uri, referrer, *_, **__):
+        # type: (str, OpenAPISchema, *Any, **Any) -> None
+        super(SchemaRefResolver, self).__init__(base_uri, referrer, *_, **__)  # type: ignore
 
     def resolve_remote(self, uri):
         # type: (str) -> OpenAPISchema
@@ -2219,7 +2223,7 @@ def download_files_html(data,               # type: str
         # type: (str, Optional[str]) -> Generator[str]
         if not _data:
             _scheme = _url.split("://")[0]
-            _opts = options.get(_scheme, {})
+            _opts = options.get(_scheme, {})  # type: ignore
             _resp = request_extra("GET", _url, settings=settings, **_opts, **kwargs)
             ctype = get_header("Content-Type", _resp.headers, default=ContentType.TEXT_HTML)
             if _resp.status_code != 200 or not any(
