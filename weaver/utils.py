@@ -14,7 +14,14 @@ import tempfile
 import threading
 import time
 import warnings
-from concurrent.futures import ALL_COMPLETED, FIRST_EXCEPTION, CancelledError, ThreadPoolExecutor, as_completed, wait
+from concurrent.futures import (
+    ALL_COMPLETED,
+    FIRST_EXCEPTION,
+    CancelledError,
+    ThreadPoolExecutor,
+    as_completed,
+    wait as wait_until
+)
 from copy import deepcopy
 from datetime import datetime
 from distutils.version import LooseVersion
@@ -112,7 +119,8 @@ if TYPE_CHECKING:
     RetryCondition = Union[Type[Exception], Iterable[Type[Exception]], Callable[[Exception], bool]]
     SchemeOptions = TypedDict("SchemeOptions", {
         "file": Dict[str, JSON],
-        "http": Dict[str, JSON],  # includes HTTPS
+        "http": Dict[str, JSON],   # includes/duplicates HTTPS
+        "https": Dict[str, JSON],  # includes/duplicates HTTP
         "s3": Dict[str, JSON],
         "vault": Dict[str, JSON],
     }, total=True)
@@ -168,6 +176,10 @@ if TYPE_CHECKING:
 
     class ExtendedClass(OriginalClass, ExtenderMixin):
         ...
+
+    TaskInputType = TypeVar("TaskInputType")
+    TaskOutputType = TypeVar("TaskOutputType")
+
 
 LOGGER = logging.getLogger(__name__)
 
@@ -1736,8 +1748,8 @@ def request_extra(method,                       # type: AnyRequestMethod
     return err
 
 
-def download_file_http(file_reference, file_outdir, settings=None, **request_kwargs):
-    # type: (str, str, Optional[AnySettingsContainer], **Any) -> str
+def download_file_http(file_reference, file_outdir, settings=None, callback=None, **request_kwargs):
+    # type: (str, str, Optional[AnySettingsContainer], Optional[Callable[[str], None]], **Any) -> str
     """
     Downloads the file referenced by an HTTP URL location.
 
@@ -1748,6 +1760,9 @@ def download_file_http(file_reference, file_outdir, settings=None, **request_kwa
     :param file_reference: HTTP URL where the file is hosted.
     :param file_outdir: Output local directory path under which to place the downloaded file.
     :param settings: Additional request-related settings from the application configuration (notably request-options).
+    :param callback:
+        Function that gets called progressively with incoming chunks from downloaded file.
+        Can be used to monitor download progress or raise an exception to abort it.
     :param request_kwargs: Additional keywords to forward to request call (if needed).
     :return: Path of the local copy of the fetched file.
     :raises HTTPException: applicable HTTP-based exception if any unrecoverable problem occurred during fetch request.
@@ -1802,6 +1817,8 @@ def download_file_http(file_reference, file_outdir, settings=None, **request_kwa
         #   Setting 'chunk_size=None' lets the request find a suitable size according to
         #   available memory. Without this, it defaults to 1 which is extremely slow.
         for chunk in resp.iter_content(chunk_size=None):
+            if callback:
+                callback(chunk)
             file.write(chunk)
     return file_path
 
@@ -1883,7 +1900,8 @@ def resolve_scheme_options(**kwargs):
     """
     Splits options into their relevant group by scheme prefix.
 
-    Handled schemes are defined by :data:`SUPPORTED_FILE_SCHEMES` (exception HTTP and HTTPS are grouped together).
+    Handled schemes are defined by :data:`SUPPORTED_FILE_SCHEMES`.
+    HTTP and HTTPS are grouped together and share the same options.
 
     :param kwargs: Keywords to categorise by scheme.
     :returns: Categorised options by scheme and all other remaining keywords.
@@ -1897,10 +1915,11 @@ def resolve_scheme_options(**kwargs):
         else:
             keywords[opt] = val
     options["http"].update(options.pop("https"))
+    options["https"] = options["http"]
     return options, keywords
 
 
-class FetchOutputMethod(ExtendedEnum):
+class OutputMethod(ExtendedEnum):
     """
     Methodology employed to handle generation of a file or directory output that was fetched.
     """
@@ -1910,8 +1929,13 @@ class FetchOutputMethod(ExtendedEnum):
     COPY = 3
 
 
-def fetch_file(file_reference, file_outdir, out_method=FetchOutputMethod.AUTO, settings=None, **option_kwargs):
-    # type: (str, str, FetchOutputMethod, Optional[AnySettingsContainer], **Any) -> str
+def fetch_file(file_reference,                      # type: str
+               file_outdir,                         # type: str
+               out_method=OutputMethod.AUTO,   # type: OutputMethod
+               settings=None,                       # type: Optional[AnySettingsContainer]
+               callback=None,                       # type: Optional[Callable[[str], None]]
+               **option_kwargs,                     # type: Any  # SchemeOptions, RequestOptions
+               ):                                   # type: (...) -> str
     """
     Fetches a file from local path, AWS-S3 bucket or remote URL, and dumps its content to the output directory.
 
@@ -1921,26 +1945,22 @@ def fetch_file(file_reference, file_outdir, out_method=FetchOutputMethod.AUTO, s
     Requests will consider ``weaver.request_options`` when using ``http(s)://`` scheme.
 
     .. seealso::
-        :func:`resolve_scheme_options`
+        - :func:`resolve_scheme_options`
+        - :func:`adjust_file_local`
+        - :func:`download_file_http`
 
     :param file_reference:
         Local filesystem path (optionally prefixed with ``file://``), ``s3://`` bucket location or ``http(s)://``
         remote URL file reference. Reference ``https://s3.[...]`` are also considered as ``s3://``.
     :param file_outdir: Output local directory path under which to place the fetched file.
     :param settings: Additional request-related settings from the application configuration (notably request-options).
+    :param callback:
+        Function that gets called progressively with incoming chunks from downloaded file.
+        Only applicable when download occurs (remote file reference).
+        Can be used to monitor download progress or raise an exception to abort it.
     :param out_method:
         Method employed to handle the generation of the output file.
         Only applicable when the file reference is local. Remote location always generates a local copy.
-
-        - :attr:`FetchOutputMethod.LINK`: force generation of a symbolic link instead of hard copy,
-          regardless if source is directly a file or a link to one.
-        - :attr:`FetchOutputMethod.COPY`: force hard copy of the file to destination,
-          regardless if source is directly a file or a link to one.
-        - :attr:`FetchOutputMethod.MOVE`: move the local file to the output directory instead of copying or linking it.
-          If the output directory already contains the local file, raises an :class:`OSError`.
-        - :attr:`FetchOutputMethod.AUTO` (default): resolve automatically as follows.
-          When the source is a symbolic link itself, the destination will also be a link.
-          When the source is a direct file reference, the destination will be a hard copy of the file.
     :param option_kwargs:
         Additional keywords to forward to the relevant handling method by scheme.
         Keywords should be defined as ``{scheme}_{option}`` with one of the known :data:`SUPPORTED_FILE_SCHEMES`.
@@ -1958,35 +1978,14 @@ def fetch_file(file_reference, file_outdir, out_method=FetchOutputMethod.AUTO, s
     options, kwargs = resolve_scheme_options(**option_kwargs)
     if os.path.isfile(file_reference):
         LOGGER.debug("Fetch file resolved as local reference.")
-        if out_method == FetchOutputMethod.MOVE and os.path.isfile(file_path):
-            LOGGER.debug("Reference [%s] cannot be moved to path [%s] (already exists)", file_href, file_path)
-            raise OSError("Cannot move file, already in output directory!")
-        if out_method == FetchOutputMethod.MOVE:
-            shutil.move(os.path.realpath(file_reference), file_outdir)
-        # NOTE:
-        #   If file is available locally and referenced as a system link, disabling 'follow_symlinks'
-        #   creates a copy of the symlink instead of an extra hard-copy of the linked file.
-        elif os.path.islink(file_reference) and not os.path.isfile(file_path):
-            if out_method == FetchOutputMethod.LINK:
-                os.symlink(os.readlink(file_reference), file_path)
-            else:
-                shutil.copyfile(file_reference, file_path, follow_symlinks=out_method == FetchOutputMethod.COPY)
-        # otherwise copy the file if not already available
-        # expand directory of 'file_path' and full 'file_reference' to ensure many symlink don't result in same place
-        elif not os.path.isfile(file_path) or os.path.realpath(file_path) != os.path.realpath(file_reference):
-            if out_method == FetchOutputMethod.LINK:
-                os.symlink(file_reference, file_path)
-            else:
-                shutil.copyfile(file_reference, file_path)
-        else:
-            LOGGER.debug("Fetch file as local reference has no action to take, file already exists: [%s]", file_path)
+        adjust_file_local(file_href, file_outdir, out_method)
     elif file_reference.startswith("s3://"):
         LOGGER.debug("Fetch file resolved as S3 bucket reference.")
         s3_params = resolve_s3_http_options(**options["http"], **kwargs)
         s3_region = options["s3"].pop("region_name", None)
-        s3_client = boto3.client("s3", region_name=s3_region, **s3_params)
+        s3_client = boto3.client("s3", region_name=s3_region, **s3_params)  # type: S3Client
         bucket_name, file_key = file_reference[5:].split("/", 1)
-        s3_client.download_file(bucket_name, file_key, file_path)
+        s3_client.download_file(bucket_name, file_key, file_path, Callback=callback)
     elif file_reference.startswith("http"):
         # pseudo-http URL referring to S3 bucket, try to redirect to above S3 handling method if applicable
         if file_reference.startswith("https://s3."):
@@ -1994,7 +1993,14 @@ def fetch_file(file_reference, file_outdir, out_method=FetchOutputMethod.AUTO, s
             s3_ref, s3_region = resolve_s3_from_http(file_reference)
             option_kwargs.pop("s3_region", None)
             return fetch_file(s3_ref, file_outdir, settings=settings, s3_region_name=s3_region, **option_kwargs)
-        file_path = download_file_http(file_reference, file_outdir, settings=settings, **options["http"], **kwargs)
+        file_path = download_file_http(
+            file_reference,
+            file_outdir,
+            settings=settings,
+            callback=callback,
+            **options["http"],
+            **kwargs
+        )
     else:
         scheme = file_reference.split("://")
         scheme = "<none>" if len(scheme) < 2 else scheme[0]
@@ -2006,6 +2012,52 @@ def fetch_file(file_reference, file_outdir, out_method=FetchOutputMethod.AUTO, s
                  "  Reference: [%s]\n"
                  "  File Path: [%s]", file_href, file_path)
     return file_path
+
+
+def adjust_file_local(file_reference, file_outdir, out_method):
+    # type: (str, str, OutputMethod) -> None
+    """
+    Adjusts the input file reference to the output location with the requested handling method.
+
+    :param file_reference: Original location of the file.
+    :param file_outdir: Target directory of the file.
+    :param out_method:
+        Method employed to handle the generation of the output file.
+
+        - :attr:`OutputMethod.LINK`: force generation of a symbolic link instead of hard copy,
+          regardless if source is directly a file or a link to one.
+        - :attr:`OutputMethod.COPY`: force hard copy of the file to destination,
+          regardless if source is directly a file or a link to one.
+        - :attr:`OutputMethod.MOVE`: move the local file to the output directory instead of copying or linking it.
+          If the output directory already contains the local file, raises an :class:`OSError`.
+        - :attr:`OutputMethod.AUTO` (default): resolve automatically as follows.
+          When the source is a symbolic link itself, the destination will also be a link.
+          When the source is a direct file reference, the destination will be a hard copy of the file.
+    """
+    file_name = os.path.basename(os.path.realpath(file_reference))  # resolve any different name to use the original
+    file_path = os.path.join(file_outdir, file_name)
+    if out_method == OutputMethod.MOVE and os.path.isfile(file_path):
+        LOGGER.debug("Reference [%s] cannot be moved to path [%s] (already exists)", file_reference, file_path)
+        raise OSError("Cannot move file, already in output directory!")
+    if out_method == OutputMethod.MOVE:
+        shutil.move(os.path.realpath(file_reference), file_outdir)
+    # NOTE:
+    #   If file is available locally and referenced as a system link, disabling 'follow_symlinks'
+    #   creates a copy of the symlink instead of an extra hard-copy of the linked file.
+    elif os.path.islink(file_reference) and not os.path.isfile(file_path):
+        if out_method == OutputMethod.LINK:
+            os.symlink(os.readlink(file_reference), file_path)
+        else:
+            shutil.copyfile(file_reference, file_path, follow_symlinks=out_method == OutputMethod.COPY)
+    # otherwise copy the file if not already available
+    # expand directory of 'file_path' and full 'file_reference' to ensure many symlink don't result in same place
+    elif not os.path.isfile(file_path) or os.path.realpath(file_path) != os.path.realpath(file_reference):
+        if out_method == OutputMethod.LINK:
+            os.symlink(file_reference, file_path)
+        else:
+            shutil.copyfile(file_reference, file_path)
+    else:
+        LOGGER.debug("File as local reference has no action to take, file already exists: [%s]", file_path)
 
 
 def download_files_s3(s3_client, bucket_name, s3_files, out_dir):
@@ -2030,13 +2082,17 @@ def download_files_s3(s3_client, bucket_name, s3_files, out_dir):
 
     task_kill_event = threading.Event()  # abort remaining tasks if set
 
+    def _abort_callback(_chunk):  # called progressively with downloaded chunks
+        if task_kill_event.is_set():
+            raise CancelledError("Other failed download task triggered abort event.")
+
     def _download_file(_client, _bucket, _rel_file_path, _out_dir):
         # type: (S3Client, str, str, str) -> str
         if task_kill_event.is_set():
             raise CancelledError("Other failed download task triggered abort event.")
         try:
             _out_file = os.path.join(_out_dir, _rel_file_path)
-            _client.download_file(_bucket, _rel_file_path, _out_file)
+            _client.download_file(_bucket, _rel_file_path, _out_file, Callback=_abort_callback)
         except Exception:
             task_kill_event.set()
             raise
@@ -2048,14 +2104,14 @@ def download_files_s3(s3_client, bucket_name, s3_files, out_dir):
             executor.submit(_download_file, s3_client, bucket_name, file_key, out_dir)
             for file_key in s3_files
         )
-        results, failures = wait(futures, return_when=FIRST_EXCEPTION)
+        results, failures = wait_until(futures, return_when=FIRST_EXCEPTION)
         file_paths = (res.result() for res in results)
         if failures or any(not path for path in file_paths):
             # cancel scheduled tasks
             for future in futures:
                 future.cancel()
             task_kill_event.set()
-            wait(futures, return_when=ALL_COMPLETED)
+            wait_until(futures, return_when=ALL_COMPLETED)  # wait for any cleanup
             raise WeaverException(
                 "Directory download failed due to at least one failing file download in listing: "
                 f"{[repr(exc.exception()) for exc in failures]}"
@@ -2107,6 +2163,10 @@ def download_files_url(file_references,     # type: Iterable[str]
 
     task_kill_event = threading.Event()  # abort remaining tasks if set
 
+    def _abort_callback(_chunk):  # called progressively with downloaded chunks
+        if task_kill_event.is_set():
+            raise CancelledError("Other failed download task triggered abort event.")
+
     def _download_file(_file_path):
         # type: (str) -> str
         _file_parts = _file_path.split("://", 1)
@@ -2120,7 +2180,11 @@ def download_files_url(file_references,     # type: Iterable[str]
             _out_file = os.path.join(out_dir, _file_path.replace(base_url, ""))
         else:
             _out_file = os.path.join(out_dir, os.path.split(_file_path)[-1])
-        return fetch_file(_file_path, _out_file, settings=settings, **kwargs)
+        try:
+            return fetch_file(_file_path, _out_file, settings=settings, callback=_abort_callback, **kwargs)
+        except Exception:
+            task_kill_event.set()
+            raise
 
     max_workers = min(sum(1 for _ in file_references), 8)  # avoid large list memory alloc
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -2129,50 +2193,122 @@ def download_files_url(file_references,     # type: Iterable[str]
             for file_key in file_references
         )
         for future in as_completed(futures):
+            if future.exception():
+                task_kill_event.set()
             yield future.result()
 
 
 def download_files_html(data,               # type: str
                         out_dir,            # type: str
-                        base_url=None,      # type: str
+                        base_url,           # type: str
                         settings=None,      # type: Optional[AnySettingsContainer]
                         **option_kwargs,    # type: Any  # SchemeOptions, RequestOptions
                         ):                  # type: (...) -> Generator[str]
     """
     Downloads files retrieved from a directory listing provided as an index of plain HTML with file references.
 
+    If the index itself provides directories that can be browsed down, the tree hierarchy will be downloaded
+    recursively by following links. In such case, links are ignored if they cannot be resolved as a nested index pages.
+
     .. seealso::
         :func:`download_files_url`
     """
-    html = BeautifulSoup(data)
-    files = ()
+    options, kwargs = resolve_scheme_options(**option_kwargs)
 
+    def _list_refs(_url, _data=None):
+        # type: (str, Optional[str]) -> Generator[str]
+        if not _data:
+            _scheme = _url.split("://")[0]
+            _opts = options.get(_scheme, {})
+            _resp = request_extra("GET", _url, settings=settings, **_opts, **kwargs)
+            ctype = get_header("Content-Type", _resp.headers, default=ContentType.TEXT_HTML)
+            if _resp.status_code != 200 or not any(
+                _type in ctype for _type in [ContentType.TEXT_HTML] + list(ContentType.ANY_XML)
+            ):
+                return []
+            _data = _resp.text
+        _html = BeautifulSoup(_data)
+        _href = (_ref.get("href") for _ref in _html.find_all("a", recursive=True))
+        for _ref in _href:
+            if not _ref.startswith(base_url):
+                _ref = os.path.join(base_url, _ref)
+            if not _ref.endswith("/"):
+                yield _ref
+            else:
+                for _sub_ref in _list_refs(_ref):
+                    yield _sub_ref
+        return _href
+
+    files = _list_refs(base_url, data)
     return download_files_url(files, out_dir, base_url, settings=settings, **option_kwargs)
 
 
-def fetch_directory(location, out_dir, out_method=FetchOutputMethod.AUTO, settings=None, **option_kwargs):
-    # type: (str, str, FetchOutputMethod, Optional[AnySettingsContainer], **Any) -> List[str]
+def adjust_directory_local(location, out_dir, out_method):
+    # type: (str, str, OutputMethod) -> None
+    """
+    Adjusts the input directory reference to the output location with the requested handling method.
+
+    :param location: Local directory reference.
+    :param out_dir: Output local directory.
+    :param out_method:
+        Method employed to handle the generation of the output directory.
+
+        - :attr:`OutputMethod.LINK`: force generation of a symbolic link instead of hard copy,
+          regardless if source is a directly a directory or a link to one.
+        - :attr:`OutputMethod.COPY`: force hard copy of the directory to destination,
+          regardless if source is a directly a directory or a link to one.
+        - :attr:`OutputMethod.MOVE`: move the local directory's contents under the output directory instead of
+          copying or linking it. If the output directory already contains anything, raises an :class:`OSError`.
+        - :attr:`OutputMethod.AUTO` (default): resolve automatically as follows.
+          When the source is a symbolic link itself, the destination will also be a link.
+          When the source is a direct directory reference, the destination will be a recursive copy of the directory.
+    """
+    if location.startswith("file://"):
+        location = location[7:]
+    if not os.path.isdir(location):
+        raise OSError("Cannot operate with directory. "
+                      f"Reference location [{location}] does not exist or is not a directory!")
+    loc_dir = os.path.realpath(location)
+    out_dir = os.path.realpath(out_dir) if os.path.isdir(out_dir) else out_dir
+    if loc_dir == out_dir:
+        LOGGER.debug("Directory local reference has no action to take, already exists: [%s]", loc_dir)
+        return
+    if (os.path.exists(out_dir) and not os.path.isdir(out_dir)) or (os.path.isdir(out_dir) and os.listdir(out_dir)):
+        LOGGER.debug("References under [%s] cannot be placed under target path [%s] "
+                     "(target is not a directory or directory is not empty).", location, out_dir)
+        raise OSError("Cannot operate with directory."
+                      f"Output location [{out_dir}] already exists or is not an empty directory!")
+    if os.path.exists(out_dir):
+        os.remove(out_dir)  # need to remove to avoid moving contents nested under it
+    if out_method == OutputMethod.MOVE:
+        shutil.move(loc_dir, out_dir)
+    elif out_method == OutputMethod.LINK:
+        if os.path.islink(location):
+            loc_dir = os.readlink(location)
+        os.symlink(loc_dir, out_dir, target_is_directory=True)
+    else:  # AUTO: partial copy (links remain links), COPY: full copy (resolve symlinks)
+        shutil.copytree(loc_dir, out_dir,
+                        symlinks=out_method != OutputMethod.COPY,
+                        ignore_dangling_symlinks=True)
+
+
+def fetch_directory(location, out_dir, out_method=OutputMethod.AUTO, settings=None, **option_kwargs):
+    # type: (str, str, OutputMethod, Optional[AnySettingsContainer], **Any) -> List[str]
     """
     Fetches all files that can be listed from a directory in local or remote location.
 
     .. seealso::
-        :func:`resolve_scheme_options`
+        - :func:`resolve_scheme_options`
+        - :func:`adjust_directory_local`
+        - :func:`download_files_html`
+        - :func:`download_files_s3`
+        - :func:`download_files_url`
 
     :param location: Directory reference (URL, S3, local). Trailing slash required.
     :param out_dir: Output local directory path under which to place fetched files.
     :param out_method:
         Method employed to handle the generation of the output directory.
         Only applicable when the file reference is local. Remote location always generates a local copy.
-
-        - :attr:`FetchOutputMethod.LINK`: force generation of a symbolic link instead of hard copy,
-          regardless if source is a directly a directory or a link to one.
-        - :attr:`FetchOutputMethod.COPY`: force hard copy of the directory to destination,
-          regardless if source is a directly a directory or a link to one.
-        - :attr:`FetchOutputMethod.MOVE`: move the local directory's contents under the output directory instead of
-          copying or linking it. If the output directory already contains anything, raises an :class:`OSError`.
-        - :attr:`FetchOutputMethod.AUTO` (default): resolve automatically as follows.
-          When the source is a symbolic link itself, the destination will also be a link.
-          When the source is a direct directory reference, the destination will be a recursive copy of the directory.
     :param settings: Additional request-related settings from the application configuration (notably request-options).
     :param option_kwargs:
         Additional keywords to forward to the relevant handling method by scheme.
@@ -2201,18 +2337,22 @@ def fetch_directory(location, out_dir, out_method=FetchOutputMethod.AUTO, settin
         option_kwargs.pop("s3_region", None)
         return fetch_directory(s3_ref, out_dir, settings=settings, s3_region_name=s3_region, **option_kwargs)
     elif location.startswith("http://") or location.startswith("https://"):
+        LOGGER.debug("Fetch directory resolved as remote HTTP reference. Will attempt listing contents.")
         resp = request_extra("GET", location)
         ctype = get_header("Content-Type", resp.headers, default=ContentType.TEXT_HTML)
-        if ContentType.TEXT_HTML in ctype:
-            return list(download_files_html(resp.text, out_dir, settings=settings, **option_kwargs))
+        if any(_type in ctype for _type in [ContentType.TEXT_HTML] + list(ContentType.ANY_XML)):
+            return list(download_files_html(resp.text, out_dir, location, settings=settings, **option_kwargs))
         if ContentType.APP_JSON in ctype:
             body = resp.json()  # type: JSON
             if isinstance(body, list) and all(isinstance(file, str) for file in body):
                 return list(download_files_url(body, out_dir, location, settings=settings, **option_kwargs))
             LOGGER.error("Invalid JSON contents (list of files expected) from [%s]:\n%s\n", location, repr_json(body))
             raise ValueError(f"Cannot parse [{location}] response with JSON contents not providing a list of files.")
+        raise ValueError(f"Cannot list directory [{location}] with unknown parsing of Content-Type [{ctype}] response.")
     elif location.startswith("file://") or location.startswith("/"):
-        pass
+        LOGGER.debug("Fetch directory resolved as local reference.")
+        adjust_directory_local(location, out_dir, out_method)
+        return list(os.listdir(out_dir))
     raise ValueError(f"Unknown scheme for directory location [{location}].")
 
 
@@ -2503,7 +2643,7 @@ def apply_number_with_unit(number, unit="", binary=False, decimals=3):
 def parse_number_with_unit(number, binary=None):
     # type: (str, Optional[bool]) -> Number
     """
-    Parses a numeric value accompanied with a unit to generate the unit-less value without prefix factor.
+    Parses a numeric value accompanied by a unit to generate the unit-less value without prefix factor.
 
     :param number:
         Numerical value and unit. Unit is dissociated from value with first non-numerical match.

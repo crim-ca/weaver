@@ -1709,12 +1709,21 @@ class WpsPackage(Process):
                 input_location = fetch_file(input_location, input_definition.workdir,
                                             settings=self.settings, headers=self.auth)
             elif input_type == "Directory":
-                locations = fetch_directory(input_location, input_definition.workdir,
+                # Because a directory reference can contain multiple sub-dir definitions,
+                # avoid possible conflicts with other inputs by nesting them under the ID.
+                # This also ensures that each directory input can work with a clean staging directory.
+                out_dir = os.path.join(input_definition.workdir, input_definition.identifier)
+                locations = fetch_directory(input_location, out_dir,
                                             settings=self.settings, headers=self.auth)
+                if not locations:
+                    raise PackageExecutionError(
+                        f"Directory reference resolution method for input [{input_id}] "
+                        f"from location [{input_location}] did not produce any staged file."
+                    )
                 if self.logger.isEnabledFor(logging.DEBUG):
                     for loc in locations:
                         self.logger.debug("Resolved file [%s] from [%s] directory listing.", loc, input_location)
-                input_location = input_definition.workdir
+                input_location = out_dir
             else:
                 raise PackageExecutionError(
                     f"Unknown reference staging resolution method for [{input_type}] type "
