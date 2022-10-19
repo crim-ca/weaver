@@ -2248,7 +2248,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             assert "output_file" in results
             stack.enter_context(mocked_wps_output(self.settings))
             tmpdir = stack.enter_context(tempfile.TemporaryDirectory())
-            output_file = fetch_file(results["output_file"]["href"], tmpdir, self.settings)
+            output_file = fetch_file(results["output_file"]["href"], tmpdir, settings=self.settings)
             output_data = load_file(output_file, text=True)
 
             # because files under dir are fetched and mounted in stage dir, random sub-dir from CWL is generated
@@ -2316,7 +2316,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             assert "output_file" in results
             stack.enter_context(mocked_wps_output(self.settings))
             tmpdir = stack.enter_context(tempfile.TemporaryDirectory())
-            output_file = fetch_file(results["output_file"]["href"], tmpdir, self.settings)
+            output_file = fetch_file(results["output_file"]["href"], tmpdir, settings=self.settings)
             output_data = load_file(output_file, text=True)
 
             # because files under dir are fetched and mounted in stage dir, random sub-dir from CWL is generated
@@ -2377,7 +2377,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             assert "output_file" in results
             stack.enter_context(mocked_wps_output(self.settings))
             tmpdir = stack.enter_context(tempfile.TemporaryDirectory())
-            output_file = fetch_file(results["output_file"]["href"], tmpdir, self.settings)
+            output_file = fetch_file(results["output_file"]["href"], tmpdir, settings=self.settings)
             output_data = load_file(output_file, text=True)
 
             # because files under dir are fetched and mounted in stage dir, random sub-dir from CWL is generated

@@ -306,7 +306,7 @@ class WpsProcessInterface(abc.ABC):
             LOGGER.debug("Hosting file [%s] skipped since already on WPS outputs as [%s]", file_path, file_href)
         else:
             tmp_out_dir = tempfile.mkdtemp(dir=wps_out_dir)
-            file_link = fetch_file(file_path, tmp_out_dir, self.settings, link=True)
+            file_link = fetch_file(file_path, tmp_out_dir, settings=self.settings, link=True)
             file_href = file_link.replace(wps_out_dir, wps_out_url, 1)
             self.temp_staging.add(tmp_out_dir)
             LOGGER.debug("Hosting file [%s] as [%s] on [%s]", file_path, file_link, file_href)

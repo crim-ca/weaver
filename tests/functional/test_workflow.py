@@ -913,7 +913,7 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
             self.assert_test(lambda: final_output.startswith("http") and final_output.endswith(result_file),
                              message="Workflow output file with nested directory globs should have been automatically"
                                      "mapped between steps until the final staging WPS output URL.")
-            output_path = fetch_file(final_output, stage_out_tmp_dir, self.settings)
+            output_path = fetch_file(final_output, stage_out_tmp_dir, settings=self.settings)
             with open(output_path, mode="r", encoding="utf-8") as out_file:
                 output_data = out_file.read()
             self.assert_test(lambda: output_data == f"DUMMY NETCDF DATA #{expected_index}",
@@ -964,7 +964,7 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
             self.assert_test(lambda: final_output.startswith("http") and final_output.endswith(result_file),
                              message="Workflow output file with nested directory globs should have been automatically"
                                      "mapped between steps until the final staging WPS output URL.")
-            output_path = fetch_file(final_output, stage_out_tmp_dir, self.settings)
+            output_path = fetch_file(final_output, stage_out_tmp_dir, settings=self.settings)
             with open(output_path, mode="r", encoding="utf-8") as out_file:
                 output_data = out_file.read()
             self.assert_test(lambda: output_data == f"DUMMY NETCDF DATA #{expected_index}",
@@ -1100,7 +1100,7 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
             self.assert_test(lambda: final_output.startswith("http") and final_output.endswith("test-file.txt"),
                              message="Workflow output file with nested directory globs should have been automatically"
                                      "mapped between steps until the final staging WPS output URL.")
-            output_path = fetch_file(final_output, stage_out_tmp_dir, self.settings)
+            output_path = fetch_file(final_output, stage_out_tmp_dir, settings=self.settings)
             with open(output_path, mode="r", encoding="utf-8") as out_file:
                 output_data = out_file.read()
             self.assert_test(lambda: output_data == "COPY:\nCOPY:\nDUMMY DATA",

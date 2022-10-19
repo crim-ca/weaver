@@ -358,6 +358,6 @@ class WpsPackageDockerAppTest(WpsConfigBase):
             assert results["quote"]["href"].startswith("http")
             stack.enter_context(mocked_wps_output(self.settings))
             tmpdir = stack.enter_context(tempfile.TemporaryDirectory())
-            report_file = fetch_file(results["quote"]["href"], tmpdir, self.settings)
+            report_file = fetch_file(results["quote"]["href"], tmpdir, settings=self.settings)
             report_data = load_file(report_file, text=True)
             assert report_data == f"Order Total: {amount * cost:0.2f}$\n"

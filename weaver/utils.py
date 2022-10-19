@@ -1935,7 +1935,8 @@ class OutputMethod(ExtendedEnum):
 
 def fetch_file(file_reference,                      # type: str
                file_outdir,                         # type: str
-               out_method=OutputMethod.AUTO,   # type: OutputMethod
+               *,                                   # force named keyword argument for remaining
+               out_method=OutputMethod.AUTO,        # type: OutputMethod
                settings=None,                       # type: Optional[AnySettingsContainer]
                callback=None,                       # type: Optional[Callable[[str], None]]
                **option_kwargs,                     # type: Any  # SchemeOptions, RequestOptions
@@ -2296,8 +2297,13 @@ def adjust_directory_local(location, out_dir, out_method):
                         ignore_dangling_symlinks=True)
 
 
-def fetch_directory(location, out_dir, out_method=OutputMethod.AUTO, settings=None, **option_kwargs):
-    # type: (str, str, OutputMethod, Optional[AnySettingsContainer], **Any) -> List[str]
+def fetch_directory(location,                       # type: str
+                    out_dir,                        # type: str
+                    *,                              # force named keyword argument for remaining
+                    out_method=OutputMethod.AUTO,   # type: OutputMethod
+                    settings=None,                  # type: Optional[AnySettingsContainer]
+                    **option_kwargs,                # type: Any
+                    ):                              # type: (...) -> List[str]
     """
     Fetches all files that can be listed from a directory in local or remote location.
 
