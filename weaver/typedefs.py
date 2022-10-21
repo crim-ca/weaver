@@ -69,6 +69,8 @@ if TYPE_CHECKING:
     from weaver.status import AnyStatusType
     from weaver.visibility import AnyVisibility
 
+    Path = Union[os.PathLike, str, bytes]
+
     ReturnValue = TypeVar("ReturnValue")  # alias to identify the same return value as a decorated/wrapped function
     AnyCallable = TypeVar("AnyCallable", bound=Callable[..., Any])  # callable used for decorated/wrapped functions
     AnyCallableWrapped = Callable[[..., Any], ReturnValue]

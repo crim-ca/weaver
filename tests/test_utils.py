@@ -10,7 +10,7 @@ import shutil
 import tempfile
 import uuid
 from datetime import datetime
-from typing import Type
+from typing import TYPE_CHECKING
 from urllib.parse import quote, urlparse
 
 import mock
@@ -71,6 +71,9 @@ from weaver.utils import (
     xml_path_elements,
     xml_strip_ns
 )
+
+if TYPE_CHECKING:
+    from typing import List, Optional, Type
 
 # pylint: disable=R1732,W1514  # not using with open + encoding
 
@@ -621,6 +624,49 @@ def test_fetch_directory_html(include_dir_heading,       # type: bool
         expect_files = filter(lambda _f: _f.startswith("dir/"), test_http_dir_files)
         expect_files = [os.path.join(out_dir, file.split("/", 1)[-1]) for file in expect_files]
         assert list(out_files) == sorted(expect_files)
+
+
+@pytest.mark.parametrize("listing_dir,include,exclude,expect_files", [
+    ("dir/", None, None, ["dir/file.txt", "dir/sub/file.tmp", "dir/sub/nested/file.cfg", "dir/other/meta.txt"]),
+    ("dir/", None, [r".*/.*\.txt"], ["dir/sub/file.tmp", "dir/sub/nested/file.cfg"]),
+    ("dir/", [r".*/.*\.txt"], None, ["dir/file.txt", "dir/other/meta.txt"]),
+    ("dir/", [r".*file\.txt"], [r".*/.*\.txt"], ["dir/file.txt", "dir/sub/file.tmp", "dir/sub/nested/file.cfg"]),
+    ("", None, [r"dir/.*", r".*info.*"], ["main.txt", "another/nested/data.txt"]),
+])
+def test_fetch_directory_filters(listing_dir, include, exclude, expect_files):
+    # type: (str, Optional[List[str]], Optional[List[str]], List[str]) -> None
+    with contextlib.ExitStack() as stack:
+        tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())
+        test_dir_files = [
+            "main.txt",
+            "dir/file.txt",
+            "dir/sub/file.tmp",
+            "dir/sub/nested/file.cfg",
+            "dir/other/meta.txt",
+            "another/info.txt",
+            "another/nested/data.txt",
+        ]
+        for file in test_dir_files:
+            dir_path, file_path = os.path.split(file)
+            if dir_path:
+                dir_path = os.path.join(tmp_dir, dir_path)
+                file_path = os.path.join(dir_path, file_path)
+                os.makedirs(dir_path, exist_ok=True)
+            else:
+                file_path = os.path.join(tmp_dir, file_path)
+            with open(file_path, mode="w", encoding="utf-8") as f:
+                f.write("data")
+
+        out_dir = stack.enter_context(tempfile.TemporaryDirectory())
+        out_files = fetch_directory(f"file://{tmp_dir}/{listing_dir}", out_dir, include=include, exclude=exclude)
+        expect_files = [os.path.join(out_dir, file.split("/", 1)[-1]) for file in expect_files]
+        assert list(out_files) == sorted(expect_files)
+
+
+def test_fetch_directory_raise_missing_trailing_slash():
+    with tempfile.TemporaryDirectory() as tmp_dir:  # make sure missing dir is not the error
+        with pytest.raises(ValueError):
+            fetch_directory(f"file://{tmp_dir}", "/tmp")  # input location with no trailing slash
 
 
 def test_fetch_file_local_links():
