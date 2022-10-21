@@ -792,7 +792,7 @@ class TestWeaverCLI(TestWeaverClientBase):
                 break
         assert docker_lines
         docker_opts = ["-T TOKEN", "-U USERNAME", "-P PASSWORD"]
-        docker_help = f"Arguments {docker_opts} not found in {repr_json(docker_lines, indent=2)}"
+        docker_help = f"Arguments {docker_opts} not found in:\n{repr_json(docker_lines, indent=2)}"
         assert all(any(opt in line for line in docker_lines) for opt in docker_opts), docker_help
 
     @staticmethod

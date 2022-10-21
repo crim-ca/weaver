@@ -2276,7 +2276,7 @@ def oas2json_io(io_info):
                 if io_ctype and ContentType.APP_JSON in io_ctype:
                     io_formats[0]["schema"] = io_info["$id"]
     if io_type is null or io_json is null:
-        LOGGER.debug("Unknown OpenAPI to JSON I/O resolution for schema: %s", repr_json(io_info))
+        LOGGER.debug("Unknown OpenAPI to JSON I/O resolution for schema:\n%s", repr_json(io_info))
         return null
 
     # default literal value can help resolve as last resort if specific type cannot be inferred

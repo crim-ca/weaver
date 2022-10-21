@@ -1928,10 +1928,10 @@ class OutputMethod(ExtendedEnum):
     """
     Methodology employed to handle generation of a file or directory output that was fetched.
     """
-    AUTO = 0
-    LINK = 1
-    MOVE = 2
-    COPY = 3
+    AUTO = "auto"
+    LINK = "link"
+    MOVE = "move"
+    COPY = "copy"
 
 
 def fetch_file(file_reference,                      # type: str
@@ -1980,7 +1980,7 @@ def fetch_file(file_reference,                      # type: str
     file_path = os.path.join(file_outdir, file_name)
     if file_reference.startswith("file://"):
         file_reference = file_reference[7:]
-    LOGGER.debug("Fetching file reference: [%s] using options:\n%s\n", file_href, repr_json(option_kwargs))
+    LOGGER.debug("Fetching file reference: [%s] using options:\n%s", file_href, repr_json(option_kwargs))
     options, kwargs = resolve_scheme_options(**option_kwargs)
     if os.path.isfile(file_reference):
         LOGGER.debug("Fetch file resolved as local reference.")
@@ -2025,20 +2025,33 @@ def adjust_file_local(file_reference, file_outdir, out_method):
     """
     Adjusts the input file reference to the output location with the requested handling method.
 
+    Handling Methods
+    ~~~~~~~~~~~~~~~~~~~~~~
+
+    - :attr:`OutputMethod.LINK`:
+
+      Force generation of a symbolic link instead of hard copy,
+      regardless if source is directly a file or a link to one.
+
+    - :attr:`OutputMethod.COPY`:
+
+      Force hard copy of the file to destination, regardless if source is directly a file or a link to one.
+
+    - :attr:`OutputMethod.MOVE`:
+
+      Move the local file to the output directory instead of copying or linking it.
+      If the output directory already contains the local file, raises an :class:`OSError`.
+
+    - :attr:`OutputMethod.AUTO` (default):
+
+      Resolve conditionally as follows.
+
+      * When the source is a symbolic link itself, the destination will also be a link.
+      * When the source is a direct file reference, the destination will be a hard copy of the file.
+
     :param file_reference: Original location of the file.
     :param file_outdir: Target directory of the file.
-    :param out_method:
-        Method employed to handle the generation of the output file.
-
-        - :attr:`OutputMethod.LINK`: force generation of a symbolic link instead of hard copy,
-          regardless if source is directly a file or a link to one.
-        - :attr:`OutputMethod.COPY`: force hard copy of the file to destination,
-          regardless if source is directly a file or a link to one.
-        - :attr:`OutputMethod.MOVE`: move the local file to the output directory instead of copying or linking it.
-          If the output directory already contains the local file, raises an :class:`OSError`.
-        - :attr:`OutputMethod.AUTO` (default): resolve automatically as follows.
-          When the source is a symbolic link itself, the destination will also be a link.
-          When the source is a direct file reference, the destination will be a hard copy of the file.
+    :param out_method: Method employed to handle the generation of the output file.
     """
     file_name = os.path.basename(os.path.realpath(file_reference))  # resolve any different name to use the original
     file_path = os.path.join(file_outdir, file_name)
@@ -2104,7 +2117,7 @@ def download_files_s3(location,         # type: str
 
     LOGGER.debug("Resolved S3 Bucket [%s] and Region [%s] for download of files.", bucket_name, s3_region or "default")
     s3_dir_resp = s3_client.list_objects_v2(Bucket=bucket_name, Prefix=dir_key)
-    LOGGER.debug("Fetched S3 directory [%s] listing contents:\n%s\n", location, repr_json(s3_dir_resp))
+    LOGGER.debug("Fetched S3 directory [%s] listing contents:\n%s", location, repr_json(s3_dir_resp))
     s3_files = (file["Key"] for file in s3_dir_resp["Contents"])
     s3_files = (path for path in s3_files if not path.endswith("/"))
     s3_files = filter_directory_forbidden(s3_files)
@@ -2117,7 +2130,7 @@ def download_files_s3(location,         # type: str
         os.makedirs(_dir, exist_ok=True)
     base_url += "/"
 
-    LOGGER.debug("Starting fetch of individual S3 files:\n%s\n", repr_json(s3_files))
+    LOGGER.debug("Starting fetch of individual S3 files:\n%s", repr_json(s3_files))
     task_kill_event = threading.Event()  # abort remaining tasks if set
 
     def _abort_callback(_chunk):  # called progressively with downloaded chunks
@@ -2196,7 +2209,7 @@ def download_files_url(file_references,     # type: Iterable[str]
         If not prefixed by any scheme, the option will apply to all handling methods (if applicable).
     :returns: Output locations of downloaded files.
     """
-    LOGGER.debug("Starting file listing download from references:\n%s\n", repr_json(file_references))
+    LOGGER.debug("Starting file listing download from references:\n%s", repr_json(file_references))
 
     options, kwargs = resolve_scheme_options(**option_kwargs)
 
@@ -2334,6 +2347,9 @@ def filter_directory_patterns(listing, include, exclude):
 
     If a file is matched against an include pattern, it will take precedence over matches on exclude patterns.
     By default, any file that is not matched by an excluded pattern will remain in the resulting filtered set.
+    Include patterns are only intended to "add back" previously excluded matches.
+    They are **NOT** for defining "only desired items".
+    Adding include patterns without exclude patterns is redundant, as all files would be retained by default anyway.
 
     Patterns use regular expression definitions. Literal strings for exact matches are also valid.
 
@@ -2363,53 +2379,120 @@ def filter_directory_patterns(listing, include, exclude):
     return listing
 
 
-def adjust_directory_local(location, out_dir, out_method):
-    # type: (Path, Path, OutputMethod) -> None
+def adjust_directory_local(location,        # type: Path
+                           out_dir,         # type: Path
+                           out_method,      # type: OutputMethod
+                           include=None,    # type: Optional[List[str]]
+                           exclude=None,    # type: Optional[List[str]]
+                           ):               # type: (...) -> List[Path]
     """
     Adjusts the input directory reference to the output location with the requested handling method.
 
-    :param location: Local directory reference.
-    :param out_dir: Output local directory.
-    :param out_method:
-        Method employed to handle the generation of the output directory.
+    Handling Methods
+    ~~~~~~~~~~~~~~~~~~~~~~
 
-        - :attr:`OutputMethod.LINK`: force generation of a symbolic link instead of hard copy,
-          regardless if source is a directly a directory or a link to one.
-        - :attr:`OutputMethod.COPY`: force hard copy of the directory to destination,
-          regardless if source is a directly a directory or a link to one.
-        - :attr:`OutputMethod.MOVE`: move the local directory's contents under the output directory instead of
-          copying or linking it. If the output directory already contains anything, raises an :class:`OSError`.
-        - :attr:`OutputMethod.AUTO` (default): resolve automatically as follows.
-          When the source is a symbolic link itself, the destination will also be a link.
-          When the source is a direct directory reference, the destination will be a recursive copy of the directory.
+    - Source location is the output directory:
+
+      If the source location is exactly the same location as the output (after link resolution), nothing is applied,
+      unless filtered listing produces a different set of files. In that case, files to be excluded will be removed
+      from the file system. In other situations, below handling methods are considered.
+
+    - :attr:`OutputMethod.LINK`:
+
+      Force generation of the output directory as a symbolic link pointing to the original location, without any copy,
+      regardless if the source location is directly a directory or a link to one.
+      Not applicable if filtered listing does not match exactly the original source location listing.
+      In such case, resolution will use the second :attr:`OutputMethod.AUTO` handling approach instead.
+
+    - :attr:`OutputMethod.COPY`:
+
+      Force hard copy of the directory to the destination, and hard copy of all its underlying contents by resolving
+      any symbolic link along the way, regardless if the source location is directly a directory or a link to one.
+
+    - :attr:`OutputMethod.MOVE`:
+
+      Move the local directory's contents under the output directory instead of copying or linking it.
+      If the output directory already contains anything, raises an :class:`OSError`.
+      If exclusion filters yield any item to be omitted, those items will be deleted entirely from the file system.
+
+    - :attr:`OutputMethod.AUTO` (default):
+
+      Resolve conditionally as follows.
+
+      * When the source is a symbolic link itself, the destination will be a link to it
+        (handled as :attr:`OutputMethod.LINK`), unless its restriction regarding filtered listing applies.
+        In that case, switches to the other handling method below.
+
+      * When the source is a direct directory reference (or a link with differing listing after filter), the
+        destination will be a recursive copy of the source directory, but any encountered links will remain links
+        instead of resolving them and creating a copy (as accomplished by :attr:`OutputMethod.COPY`).
+
+    .. seealso::
+        :func:`filter_directory_patterns`
+
+    :param location: Local reference to the source directory.
+    :param out_dir: Local reference to the output directory.
+    :param out_method: Method employed to handle the generation of the output directory.
+    :param include: Any matching patterns for files that should be explicitly included.
+    :param exclude: Any matching patterns for files that should be excluded unless included.
     """
     if location.startswith("file://"):
         location = location[7:]
     if not os.path.isdir(location):
         raise OSError("Cannot operate with directory. "
                       f"Reference location [{location}] does not exist or is not a directory!")
+
     loc_dir = os.path.realpath(location)
     out_dir = os.path.realpath(out_dir) if os.path.isdir(out_dir) else out_dir
+    listing = list_directory_recursive(loc_dir)
+    listing = filter_directory_forbidden(listing)
+    listing = list(sorted(listing))
+    results = filter_directory_patterns(listing, include, exclude)
+    results = list(sorted(results))
+    extras = list(set(listing) - set(results))
+
     if loc_dir == out_dir:
-        LOGGER.debug("Directory local reference has no action to take, already exists: [%s]", loc_dir)
-        return
+        if listing == results:
+            LOGGER.debug("Local directory reference has no action to take, already exists: [%s]", loc_dir)
+            return listing
+        LOGGER.debug("Local directory reference [%s] matches output, but desired listing differs. "
+                     "Removing additional items:\n%s", loc_dir, repr_json(extras))
+        for file_path in extras:
+            os.remove(file_path)
+        return results
+
     if (os.path.exists(out_dir) and not os.path.isdir(out_dir)) or (os.path.isdir(out_dir) and os.listdir(out_dir)):
         LOGGER.debug("References under [%s] cannot be placed under target path [%s] "
-                     "(target is not a directory or directory is not empty).", location, out_dir)
+                     "(output is not a directory or output directory is not empty).", location, out_dir)
         raise OSError("Cannot operate with directory."
                       f"Output location [{out_dir}] already exists or is not an empty directory!")
     if os.path.exists(out_dir):
         os.rmdir(out_dir)  # need to remove to avoid moving contents nested under it
+
+    extras = [path.replace(loc_dir, out_dir) for path in extras]
+    results = [path.replace(loc_dir, out_dir) for path in results]
     if out_method == OutputMethod.MOVE:
         shutil.move(loc_dir, out_dir)
-    elif out_method == OutputMethod.LINK:
-        if os.path.islink(location):
-            loc_dir = os.readlink(location)
+        for file_path in extras:
+            os.remove(file_path)
+        return results
+    elif out_method == OutputMethod.LINK and not extras:  # fallback AUTO if not exact listing
+        # strip before 'islink', otherwise it returns false if path ends with '/' because the symlink without '/' is
+        # resolved before evaluating 'islink' relatively to the remaining '/' itself, which is the real directory
+        if os.path.islink(location.rstrip("/")):
+            loc_dir = os.readlink(location.rstrip("/"))
+        out_dir = out_dir.rstrip("/")
         os.symlink(loc_dir, out_dir, target_is_directory=True)
-    else:  # AUTO: partial copy (links remain links), COPY: full copy (resolve symlinks)
-        shutil.copytree(loc_dir, out_dir,
-                        symlinks=out_method != OutputMethod.COPY,
-                        ignore_dangling_symlinks=True)
+        return results
+    # AUTO: partial copy (links remain links)
+    # LINK: idem, when listing differ
+    # COPY: full copy (resolve symlinks)
+    shutil.copytree(loc_dir, out_dir,
+                    symlinks=out_method != OutputMethod.COPY,
+                    ignore_dangling_symlinks=True)
+    for file_path in extras:
+        os.remove(file_path)
+    return results
 
 
 def list_directory_recursive(directory):
@@ -2461,7 +2544,7 @@ def fetch_directory(location,                       # type: str
     """
     if not location.endswith("/"):
         raise ValueError(f"Invalid directory location [{location}] must have a trailing slash.")
-    LOGGER.debug("Fetching directory reference: [%s] using options:\n%s\n", location, repr_json(option_kwargs))
+    LOGGER.debug("Fetching directory reference: [%s] using options:\n%s", location, repr_json(option_kwargs))
     if location.startswith("s3://"):
         LOGGER.debug("Fetching listed files under directory resolved as S3 bucket reference.")
         listing = download_files_s3(location, out_dir,
@@ -2488,16 +2571,13 @@ def fetch_directory(location,                       # type: str
                                              include=include, exclude=exclude,
                                              settings=settings, **option_kwargs)
             else:
-                LOGGER.error("Invalid JSON from [%s] is not a list of files:\n%s\n", location, repr_json(body))
+                LOGGER.error("Invalid JSON from [%s] is not a list of files:\n%s", location, repr_json(body))
                 raise ValueError(f"Cannot parse [{location}] JSON response contents not providing a list of files.")
         else:
             raise ValueError(f"Cannot list directory [{location}]. Unknown parsing of Content-Type [{ctype}] response.")
     elif location.startswith("file://") or location.startswith("/"):
         LOGGER.debug("Fetch directory resolved as local reference.")
-        adjust_directory_local(location, out_dir, out_method)
-        listing = list_directory_recursive(out_dir)
-        listing = filter_directory_forbidden(listing)
-        listing = filter_directory_patterns(listing, include, exclude)
+        listing = adjust_directory_local(location, out_dir, out_method, include, exclude)
     else:
         raise ValueError(f"Unknown scheme for directory location [{location}].")
     listing = list(sorted(listing))
