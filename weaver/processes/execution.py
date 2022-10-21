@@ -342,7 +342,7 @@ def collect_statistics(process, settings=None, job=None, rss_start=None):
                 if res_ref and isinstance(res_ref, str):
                     if res_ref.startswith(f"/{job.id}"):  # pseudo-relative reference
                         out_dir = get_wps_output_dir(settings)
-                        res_ref = os.path.join(out_dir, res_ref[1:])
+                        res_ref = os.path.join(out_dir, res_ref.lstrip("/"))
                     if os.path.isfile(res_ref):
                         res_stat = os.stat(res_ref)
                         res_id = get_any_id(result)

@@ -2,6 +2,7 @@
 
 import contextlib
 import inspect
+import itertools
 import json
 import os
 import random
@@ -29,7 +30,13 @@ from pywps.response.status import WPS_STATUS
 from requests import Response
 from requests.exceptions import HTTPError as RequestsHTTPError
 
-from tests.utils import mocked_aws_credentials, mocked_aws_s3, mocked_aws_s3_bucket_test_file, mocked_file_response
+from tests.utils import (
+    mocked_aws_credentials,
+    mocked_aws_s3,
+    mocked_aws_s3_bucket_test_file,
+    mocked_file_response,
+    mocked_file_server
+)
 from weaver import xml_util
 from weaver.execute import ExecuteControlOption, ExecuteMode
 from weaver.formats import ContentType
@@ -40,6 +47,7 @@ from weaver.utils import (
     apply_number_with_unit,
     assert_sane_name,
     bytes2str,
+    fetch_directory,
     fetch_file,
     get_any_value,
     get_base_url,
@@ -563,6 +571,56 @@ def test_request_extra_zero_values():
     # proper detection of input backoff=0 makes all sleep calls equal to zero
     assert all(backoff == 0 for backoff in sleep_counter["called_with"])
     assert sleep_counter["called_count"] == 3  # first direct call doesn't have any sleep from retry
+
+
+@pytest.mark.parametrize(
+    "include_dir_heading,include_separators,include_code_format,include_table_format,include_modified_date",
+    itertools.product((True, False), repeat=5)
+)
+def test_fetch_directory_html(include_dir_heading,       # type: bool
+                              include_separators,        # type: bool
+                              include_code_format,       # type: bool
+                              include_table_format,      # type: bool
+                              include_modified_date,     # type: bool
+                              ):                         # type: (...) -> None
+    with contextlib.ExitStack() as stack:
+        tmp_host = "https://mocked-file-server.com"  # must match in 'Execute_WorkflowSelectCopyNestedOutDir.json'
+        tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())
+        stack.enter_context(mocked_file_server(
+            tmp_dir, tmp_host,
+            settings={},
+            mock_browse_index=True,
+            include_dir_heading=include_dir_heading,
+            include_separators=include_separators,
+            include_code_format=include_code_format,
+            include_table_format=include_table_format,
+            include_modified_date=include_modified_date,
+        ))
+        test_http_dir_files = [
+            "main.txt",
+            "dir/file.txt",
+            "dir/sub/file.tmp",
+            "dir/sub/nested/file.cfg",
+            "dir/other/meta.txt",
+            "another/info.txt",
+            "another/nested/data.txt",
+        ]
+        for file in test_http_dir_files:
+            dir_path, file_path = os.path.split(file)
+            if dir_path:
+                dir_path = os.path.join(tmp_dir, dir_path)
+                file_path = os.path.join(dir_path, file_path)
+                os.makedirs(dir_path, exist_ok=True)
+            else:
+                file_path = os.path.join(tmp_dir, file_path)
+            with open(file_path, mode="w", encoding="utf-8") as f:
+                f.write("data")
+
+        out_dir = stack.enter_context(tempfile.TemporaryDirectory())
+        out_files = fetch_directory(f"{tmp_host}/dir/", out_dir)
+        expect_files = filter(lambda _f: _f.startswith("dir/"), test_http_dir_files)
+        expect_files = [os.path.join(out_dir, file.split("/", 1)[-1]) for file in expect_files]
+        assert list(out_files) == sorted(expect_files)
 
 
 def test_fetch_file_local_links():

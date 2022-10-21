@@ -177,7 +177,7 @@ def get_wps_local_status_location(url_status_location, container, must_exist=Tru
             if found or not must_exist:
                 out_path = out_path_join
     if not found and must_exist:
-        out_path_join = os.path.join(dir_path, out_path[1:] if out_path.startswith("/") else out_path)
+        out_path_join = os.path.join(dir_path, out_path.lstrip("/"))
         if not os.path.isfile(out_path_join):
             LOGGER.debug("Could not map WPS status reference [%s] to input local file path [%s].",
                          url_status_location, out_path)

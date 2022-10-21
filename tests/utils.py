@@ -2,7 +2,6 @@
 Utility methods for various TestCase setup operations.
 """
 import contextlib
-import datetime
 import functools
 import importlib
 import inspect
@@ -17,8 +16,8 @@ import sys
 import tempfile
 import uuid
 import warnings
+from datetime import datetime
 from configparser import ConfigParser
-from inspect import isclass
 from typing import TYPE_CHECKING
 
 # Note: do NOT import 'boto3' here otherwise 'moto' will not be able to mock it effectively
@@ -65,6 +64,7 @@ if TYPE_CHECKING:
     import botocore.client  # noqa
     from owslib.wps import Process as ProcessOWSWPS
     from pywps.app import Process as ProcessPyWPS
+    from responses import _Body as BodyType  # noqa: W0212
 
     from weaver.typedefs import (
         JSON,
@@ -72,11 +72,12 @@ if TYPE_CHECKING:
         AnyRequestMethod,
         AnyRequestType,
         AnyResponseType,
+        HeadersType,
         SettingsType
     )
 
     # pylint: disable=C0103,invalid-name,E1101,no-member
-    MockPatch = mock._patch  # noqa
+    MockPatch = mock._patch  # noqa: W0212
 
     # [WPS1-URL, GetCapPathXML, [DescribePathXML], [ExecutePathXML]]
     MockConfigWPS1 = Sequence[str, str, Optional[Sequence[str]], Optional[Sequence[str]]]
@@ -115,7 +116,7 @@ def ignore_warning_regex(func, warning_message_regex, warning_categories=Depreca
     if not isinstance(warning_categories, list):
         warning_categories = [warning_categories]
     for warn in warning_categories:
-        if not isclass(warn) or not issubclass(warn, Warning):
+        if not inspect.isclass(warn) or not issubclass(warn, Warning):
             raise NotImplementedError("Argument 'warning_categories' must be one or multiple subclass(es) of Warning.")
 
     def do_test(self, *args, **kwargs):
@@ -798,14 +799,92 @@ def mocked_remote_server_requests_wps1(server_configs,          # type: Union[Mo
     return mocked_remote_server_wrapper
 
 
-def mocked_file_server(directory,               # type: str
-                       url,                     # type: str
-                       settings,                # type: SettingsType
-                       mock_get=True,           # type: bool
-                       mock_head=True,          # type: bool
-                       headers_override=None,   # type: Optional[AnyHeadersContainer]
-                       requests_mock=None,      # type: Optional[responses.RequestsMock]
-                       ):                       # type: (...) -> responses.RequestsMock
+def mocked_dir_listing(local_directory,             # type: str
+                       directory_path,              # type: str
+                       *,                           # force named keyword arguments after
+                       include_dir_heading=True,    # type: bool
+                       include_separators=True,     # type: bool
+                       include_code_format=True,    # type: bool
+                       include_table_format=True,   # type: bool
+                       include_modified_date=True,  # type: bool
+                       ):                           # type: (...) -> str
+    """
+    Generate the requested HTML directory listing.
+
+    The listing can intentionally apply additional HTML formatting tags and file metadata to ensure any parser that
+    should operate on such listing variations is able to extract expected results independently of their presence.
+
+    If :paramref:`include_code_format` and :paramref:`include_table_format` are used simultaneously, the file and
+    directory references contained within the table cells will each be wrapped to use the text code representation.
+
+    :param local_directory: Real directory location to emulate HTML listing.
+    :param directory_path: Relative base directory to be represented by the served HTML listing.
+    :param include_dir_heading: Add HTML tags with the relative directory displayed as page heading.
+    :param include_separators: Add HTML tags to place visual separators between various elements.
+    :param include_code_format: Add HTML tags wrapping the listing in a code-formatted text.
+    :param include_table_format: Add HTML tags wrapping the listing in a table.
+    :param include_modified_date: Add the file/directory modified date detail next to each item.
+    :returns: Mocked HTML listing representation of the directory contents.
+    """
+    dir_files = os.listdir(local_directory)
+    dir_files = [".."] + sorted(dir_files)  # most indexes provide the parent relative link to allow browsing upward
+    dir_files = [f"{path}/" if os.path.isdir(os.path.join(local_directory, path)) else path for path in dir_files]
+    ref_files = [
+        ("<tr><td>" if include_table_format else "") +
+        ("<pre>" if include_table_format and include_code_format else "") +
+        f"<a href=\"{href}\">{href}</a>\t\t\t" +
+        ("</pre>" if include_table_format and include_code_format else "") +
+        ("</td><td>" if include_table_format and include_modified_date else "") +
+        (
+            f"{str(datetime.fromtimestamp(os.stat(os.path.join(local_directory, href)).st_mtime)).rsplit(':', 1)[0]}"
+            if include_modified_date else ""
+        ) +
+        ("</td></tr>" if include_table_format else "")
+        for href in dir_files
+    ]
+    dir_refs = "\n" + "\n".join(ref_files)
+    dir_base = directory_path if directory_path.startswith("/") else f"/{directory_path}"
+    dir_base = dir_base if dir_base.endswith("/") else f"{dir_base}/"
+    dir_title = f"<h1>Index of {dir_base}</h1>" if include_dir_heading else ""
+    if include_table_format:
+        dir_pre = "<table>"
+        dir_post = "</tbody></table>"
+        if include_modified_date:
+            dir_mid = "<thead><th>Content</th><th>Modified</th></thead><tbody>"
+        else:
+            dir_mid = "<thead><th>Content</th></thead><tbody>"
+    else:
+        dir_pre = "<pre>" if include_code_format else ""
+        dir_mid = ""
+        dir_post = "</pre>" if include_code_format else ""
+    dir_sep = "<hr>" if include_separators else ""
+    dir_html = inspect.cleandoc(f"""
+    <html>
+        <body>
+            {dir_title}
+            {dir_sep if dir_title else ""}
+            {dir_pre}
+            {dir_mid}
+            {dir_refs}
+            {dir_post}
+            {dir_sep}
+        </body>
+    </html>
+    """)
+    return dir_html
+
+
+def mocked_file_server(directory,                   # type: str
+                       url,                         # type: str
+                       settings,                    # type: SettingsType
+                       *,                           # force named keyword arguments after
+                       mock_get=True,               # type: bool
+                       mock_head=True,              # type: bool
+                       mock_browse_index=False,     # type: bool
+                       headers_override=None,       # type: Optional[AnyHeadersContainer]
+                       requests_mock=None,          # type: Optional[responses.RequestsMock]
+                       **directory_listing_kwargs,  # type: bool
+                       ):                           # type: (...) -> responses.RequestsMock
     """
     Mocks a file server endpoint hosting some local directory files.
 
@@ -820,13 +899,15 @@ def mocked_file_server(directory,               # type: str
         refer to distinct endpoints that will not cause conflicting request patching configurations.
 
     .. seealso::
-        For WPS output directory/endpoint, consider using :func:`mocked_wps_output` instead.
+        - For WPS output directory/endpoint, consider using :func:`mocked_wps_output` instead.
+        - For applicable directory listing arguments, see :func:`mocked_dir_listing`.
 
     :param directory: Path of the directory to mock as file server resources.
     :param url: HTTP URL to mock as file server endpoint.
     :param settings: Application settings to retrieve requests options.
     :param mock_get: Whether to mock HTTP GET methods received on WPS output URL.
     :param mock_head: Whether to mock HTTP HEAD methods received on WPS output URL.
+    :param mock_browse_index: Whether to mock an ``index.html`` with file listing when requests point to a directory.
     :param headers_override: Override specified headers in produced response.
     :param requests_mock: Previously defined request mock instance to extend with new definitions.
     :return: Mocked response that would normally be obtained by a file server hosting WPS output directory.
@@ -839,7 +920,7 @@ def mocked_file_server(directory,               # type: str
     )
 
     def request_callback(request):
-        # type: (AnyRequestType) -> Tuple[int, Dict[str, str], str]
+        # type: (AnyRequestType) -> Tuple[int, HeadersType, BodyType]
         """
         Operation called when the file-server URL is matched against incoming requests that have been mocked.
         """
@@ -853,10 +934,10 @@ def mocked_file_server(directory,               # type: str
                 mime_type, encoding = mimetypes.guess_type(file_path)
                 headers.update({
                     "Server": "mocked_wps_output",
-                    "Date": str(datetime.datetime.utcnow()),
+                    "Date": str(datetime.utcnow()),
                     "Content-Type": mime_type or ContentType.TEXT_PLAIN,
                     "Content-Encoding": encoding or "",
-                    "Last-Modified": str(datetime.datetime.fromtimestamp(os.stat(file_path).st_mtime))
+                    "Last-Modified": str(datetime.fromtimestamp(os.stat(file_path).st_mtime))
                 })
                 if request.method == "HEAD":
                     headers.pop("Content-Length", None)
@@ -871,16 +952,42 @@ def mocked_file_server(directory,               # type: str
             return 405, {}, ""
         return 404, {}, ""
 
+    def browse_callback(request):
+        # type: (AnyRequestType) -> Tuple[int, HeadersType, BodyType]
+        if mock_head and request.method == "HEAD":
+            return 200, {"Content-Type": ContentType.TEXT_HTML}, ""
+        elif mock_get and request.method == "GET":
+            dir_path = request.url.replace(url, directory, 1).split(directory, 1)[-1]
+            if dir_path.endswith("index.html"):
+                dir_path = dir_path.rsplit("/", 1)[0]
+            dir_list = os.path.join(directory, dir_path.lstrip("/"))
+            dir_html = mocked_dir_listing(dir_list, dir_path, **directory_listing_kwargs)
+            headers = {"Content-Type": ContentType.TEXT_HTML, "Content-Length": str(len(dir_html))}
+            return 200, headers, dir_html
+        return 405, {}, ""
+
     mock_req = requests_mock or responses.RequestsMock(assert_all_requests_are_fired=False)
-    any_file_url = re.compile(fr"{url}/[\w\-_/.]+")  # match any sub-directory/file structure
+    if mock_browse_index:
+        # match any sub-directory/file structure, except ones ending with dir/index
+        any_file_url = re.compile(fr"^{url}/[\w\-_/.]+(?<!/)(?<!index\.html)$")
+    else:
+        # match any sub-directory/file structure
+        any_file_url = re.compile(fr"^{url}/[\w\-_/.]+$")
+    # match any sub-dirs structure, but must end by / or index.html
+    browse_dir_url = re.compile(fr"^{url}/(([\w\-_.]+/)+)?(index\.html)?$")
     if mock_get:
         mock_req.add_callback(responses.GET, any_file_url, callback=request_callback)
+        if mock_browse_index:
+            mock_req.add_callback(responses.GET, browse_dir_url, callback=browse_callback)
     if mock_head:
         mock_req.add_callback(responses.HEAD, any_file_url, callback=request_callback)
+        if mock_browse_index:
+            mock_req.add_callback(responses.HEAD, browse_dir_url, callback=browse_callback)
     return mock_req
 
 
 def mocked_wps_output(settings,                 # type: SettingsType
+                      *,                        # force named keyword arguments after
                       mock_get=True,            # type: bool
                       mock_head=True,           # type: bool
                       headers_override=None,    # type: Optional[AnyHeadersContainer]
@@ -908,7 +1015,13 @@ def mocked_wps_output(settings,                 # type: SettingsType
     """
     wps_url = get_wps_output_url(settings)
     wps_dir = get_wps_output_dir(settings)
-    return mocked_file_server(wps_dir, wps_url, settings, mock_get, mock_head, headers_override, requests_mock)
+    return mocked_file_server(
+        wps_dir, wps_url, settings,
+        mock_get=mock_get,
+        mock_head=mock_head,
+        headers_override=headers_override,
+        requests_mock=requests_mock,
+    )
 
 
 def mocked_execute_celery(celery_task="weaver.processes.execution.execute_process", func_execute_task=None):

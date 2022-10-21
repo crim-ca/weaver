@@ -73,9 +73,9 @@ if TYPE_CHECKING:
     from types import FrameType
     from typing import (
         Any,
+        AnyStr,
         Callable,
         Dict,
-        Generator,
         List,
         Iterable,
         MutableMapping,
@@ -1935,7 +1935,7 @@ class OutputMethod(ExtendedEnum):
 
 def fetch_file(file_reference,                      # type: str
                file_outdir,                         # type: str
-               *,                                   # force named keyword argument for remaining
+               *,                                   # force named keyword arguments after
                out_method=OutputMethod.AUTO,        # type: OutputMethod
                settings=None,                       # type: Optional[AnySettingsContainer]
                callback=None,                       # type: Optional[Callable[[str], None]]
@@ -2081,13 +2081,19 @@ def download_files_s3(s3_client, bucket_name, s3_files, out_dir):
     """
     LOGGER.debug("Starting S3 Bucket [%s] download of S3 files:\n%s\n", bucket_name, repr_json(s3_files))
 
-    sub_dirs = {os.path.split(path)[0] for path in s3_files if not path.endswith("/")}
-    for _dir in reversed(sorted(list(sub_dirs))):
+    s3_files = (path for path in s3_files if not path.endswith("/"))
+    s3_files = list(filter_directory_forbidden(s3_files))
+    base_url = s3_client.meta.endpoint_url.rstrip("/")
+    sub_dirs = {os.path.split(path)[0] for path in s3_files if "://" not in path or path.startswith(base_url)}
+    sub_dirs = [os.path.join(out_dir, path.replace(base_url, "").lstrip("/")) for path in sub_dirs]
+    for _dir in reversed(sorted(sub_dirs)):
         os.makedirs(_dir, exist_ok=True)
+    base_url += "/"
 
     task_kill_event = threading.Event()  # abort remaining tasks if set
 
     def _abort_callback(_chunk):  # called progressively with downloaded chunks
+        # type: (AnyStr) -> None
         if task_kill_event.is_set():
             raise CancelledError("Other failed download task triggered abort event.")
 
@@ -2098,12 +2104,16 @@ def download_files_s3(s3_client, bucket_name, s3_files, out_dir):
         try:
             _out_file = os.path.join(_out_dir, _rel_file_path)
             _client.download_file(_bucket, _rel_file_path, _out_file, Callback=_abort_callback)
-        except Exception:
+        except Exception as exc:
+            _file_path = os.path.join(_client.meta.endpoint_url, _bucket, _rel_file_path)
+            LOGGER.error("Error raised in download worker for [%s]: [%s]", _file_path, exc, exc_info=exc)
             task_kill_event.set()
             raise
         return _out_file
 
-    max_workers = min(sum(1 for _ in s3_files), 8)  # avoid large list memory alloc
+    max_workers = min(len(s3_files), 8)
+    if max_workers <= 0:
+        raise ValueError(f"No files specified for download from reference [{base_url}].")
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = (
             executor.submit(_download_file, s3_client, bucket_name, file_key, out_dir)
@@ -2126,17 +2136,17 @@ def download_files_s3(s3_client, bucket_name, s3_files, out_dir):
 
 def download_files_url(file_references,     # type: Iterable[str]
                        out_dir,             # type: str
-                       base_url=None,       # type: Optional[str]
+                       base_url,            # type: str
                        settings=None,       # type: Optional[SettingsType]
                        **option_kwargs,     # type: Any  # SchemeOptions, RequestOptions
-                       ):                   # type: (...) -> Generator[str]
+                       ):                   # type: (...) -> Iterable[str]
     """
     Download all listed files references under the output directory.
 
-    If nested directories are employed in the file paths, they will be downloaded with the same directory hierarchy
-    under the requested output directory if they match the same :paramref:`base_url`. If the :paramref:`base_url`
-    differs, they will simply be downloaded at the root of the output directory. If any conflict occurs in such case,
-    an :class:`OSError` will be raised.
+    If nested directories are employed in file paths, relative to :paramref:`base_url`, they will be downloaded
+    with the same directory hierarchy under the requested output directory. If the :paramref:`base_url` differs,
+    they will simply be downloaded at the root of the output directory. If any conflict occurs in such case, an
+    :class:`OSError` will be raised.
 
     .. seealso::
         Use :func:`download_files_s3` instead if all files share the same S3 bucket.
@@ -2145,8 +2155,8 @@ def download_files_url(file_references,     # type: Iterable[str]
     :param out_dir: Desired output location of downloaded files.
     :param base_url:
         If full URL are specified, corresponding files will be retrieved using the appropriate scheme per file
-        allowing flexible data sources. If full URL are used for *every* file, this value can be omitted.
-        Otherwise, any relative location will use this base URL to resolve the full URL prior to downloading it.
+        allowing flexible data sources. Otherwise, any relative locations use this base URL to resolve the full
+        URL prior to downloading the file.
     :param settings: Additional request-related settings from the application configuration (notably request-options).
     :param option_kwargs:
         Additional keywords to forward to the relevant handling method by scheme.
@@ -2159,16 +2169,18 @@ def download_files_url(file_references,     # type: Iterable[str]
     options, kwargs = resolve_scheme_options(**option_kwargs)
 
     file_references = (path for path in file_references if not path.endswith("/"))
-    sub_dirs = {os.path.split(path)[0] for path in file_references}
-    for _dir in reversed(sorted(list(sub_dirs))):
+    file_references = list(filter_directory_forbidden(file_references))
+    base_url = base_url.rstrip("/")
+    sub_dirs = {os.path.split(path)[0] for path in file_references if "://" not in path or path.startswith(base_url)}
+    sub_dirs = [os.path.join(out_dir, path.replace(base_url, "").lstrip("/")) for path in sub_dirs]
+    for _dir in reversed(sorted(sub_dirs)):
         os.makedirs(_dir, exist_ok=True)
-
-    if base_url and not base_url.endswith("/"):
-        base_url += "/"
+    base_url += "/"
 
     task_kill_event = threading.Event()  # abort remaining tasks if set
 
     def _abort_callback(_chunk):  # called progressively with downloaded chunks
+        # type: (AnyStr) -> None
         if task_kill_event.is_set():
             raise CancelledError("Other failed download task triggered abort event.")
 
@@ -2185,13 +2197,18 @@ def download_files_url(file_references,     # type: Iterable[str]
             _out_file = os.path.join(out_dir, _file_path.replace(base_url, ""))
         else:
             _out_file = os.path.join(out_dir, os.path.split(_file_path)[-1])
+        _out_dir = os.path.split(_out_file)[0]
         try:
-            return fetch_file(_file_path, _out_file, settings=settings, callback=_abort_callback, **kwargs)
-        except Exception:
+            return fetch_file(_file_path, _out_dir, settings=settings, callback=_abort_callback, **kwargs)
+        except Exception as exc:
+            LOGGER.error("Error raised in download worker for [%s]: [%s]", _file_path, exc, exc_info=exc)
             task_kill_event.set()
             raise
 
-    max_workers = min(sum(1 for _ in file_references), 8)  # avoid large list memory alloc
+    max_workers = min(len(file_references), 8)
+    if max_workers <= 0:
+        msg_ref = f" from reference [{base_url}]" if base_url else ""
+        raise ValueError(f"No files specified for download{msg_ref}.")
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = (
             executor.submit(_download_file, file_key)
@@ -2208,12 +2225,19 @@ def download_files_html(data,               # type: str
                         base_url,           # type: str
                         settings=None,      # type: Optional[AnySettingsContainer]
                         **option_kwargs,    # type: Any  # SchemeOptions, RequestOptions
-                        ):                  # type: (...) -> Generator[str]
+                        ):                  # type: (...) -> Iterable[str]
     """
     Downloads files retrieved from a directory listing provided as an index of plain HTML with file references.
 
     If the index itself provides directories that can be browsed down, the tree hierarchy will be downloaded
     recursively by following links. In such case, links are ignored if they cannot be resolved as a nested index pages.
+
+    Retrieval of file references from directory listing attempts to be as flexible as possible to the HTML response
+    format, by ignoring style tags and looking only for ``<a href=""/>`` references. Examples of different supported
+    format representations are presented at following locations:
+
+    - https://anaconda.org/anaconda/python/files (raw listing with text code style and minimal file metadata)
+    - https://mirrors.edge.kernel.org/pub/ (listing within a formatted table with multiple other metadata fields)
 
     .. seealso::
         :func:`download_files_url`
@@ -2221,7 +2245,7 @@ def download_files_html(data,               # type: str
     options, kwargs = resolve_scheme_options(**option_kwargs)
 
     def _list_refs(_url, _data=None):
-        # type: (str, Optional[str]) -> Generator[str]
+        # type: (str, Optional[str]) -> Iterable[str]
         if not _data:
             _scheme = _url.split("://")[0]
             _opts = options.get(_scheme, {})  # type: ignore
@@ -2234,18 +2258,33 @@ def download_files_html(data,               # type: str
             _data = _resp.text
         _html = BeautifulSoup(_data)
         _href = (_ref.get("href") for _ref in _html.find_all("a", recursive=True))
+        _href = filter_directory_forbidden(_href)  # preemptively remove forbidden items, avoid access/download attempts
         for _ref in _href:
-            if not _ref.startswith(base_url):
-                _ref = os.path.join(base_url, _ref)
+            if not _ref.startswith(_url):
+                _ref = os.path.join(_url, _ref)
             if not _ref.endswith("/"):
                 yield _ref
             else:
                 for _sub_ref in _list_refs(_ref):
                     yield _sub_ref
-        return _href
 
-    files = _list_refs(base_url, data)
+    files = list(_list_refs(base_url, data))
     return download_files_url(files, out_dir, base_url, settings=settings, **option_kwargs)
+
+
+def filter_directory_forbidden(listing):
+    # type: (Iterable[str]) -> Iterable[str]
+    """
+    Filters out items that should always be removed from directory listing results.
+    """
+    is_in = frozenset({"..", "../", "./"})
+    equal = frozenset({"."})  # because of file extensions, cannot check 'part in item'
+    for item in listing:
+        if any(part in item for part in is_in):
+            continue
+        if any(part == item for part in equal):
+            continue
+        yield item
 
 
 def adjust_directory_local(location, out_dir, out_method):
@@ -2299,8 +2338,10 @@ def adjust_directory_local(location, out_dir, out_method):
 
 def fetch_directory(location,                       # type: str
                     out_dir,                        # type: str
-                    *,                              # force named keyword argument for remaining
+                    *,                              # force named keyword arguments after
                     out_method=OutputMethod.AUTO,   # type: OutputMethod
+                    listing_include=None,           # type: Optional[List[str]]
+                    listing_exclude=None,           # type: Optional[List[str]]
                     settings=None,                  # type: Optional[AnySettingsContainer]
                     **option_kwargs,                # type: Any
                     ):                              # type: (...) -> List[str]
@@ -2314,11 +2355,17 @@ def fetch_directory(location,                       # type: str
         - :func:`download_files_s3`
         - :func:`download_files_url`
 
+    .. note::
+        When using include/exclude filters, items that do not match a valid entry from the real listing are ignored.
+        Special directories such as ``..`` and ``.`` for navigation purpose are always excluded regardless of filters.
+
     :param location: Directory reference (URL, S3, local). Trailing slash required.
     :param out_dir: Output local directory path under which to place fetched files.
     :param out_method:
         Method employed to handle the generation of the output directory.
         Only applicable when the file reference is local. Remote location always generates a local copy.
+    :param listing_include: Items to be included if detected from the applied directory listing methodology.
+    :param listing_exclude: Items to be excluded if detected from the applied directory listing methodology.
     :param settings: Additional request-related settings from the application configuration (notably request-options).
     :param option_kwargs:
         Additional keywords to forward to the relevant handling method by scheme.
@@ -2329,6 +2376,8 @@ def fetch_directory(location,                       # type: str
     if not location.endswith("/"):
         raise ValueError(f"Invalid directory location [{location}] must have a trailing slash.")
     LOGGER.debug("Fetching directory reference: [%s] using options:\n%s\n", location, repr_json(option_kwargs))
+    listing_include = set(listing_include or [])
+    listing_exclude = set(listing_exclude or [])
     if location.startswith("s3://"):
         LOGGER.debug("Fetching listed files under directory resolved as S3 bucket reference.")
         options, kwargs = resolve_scheme_options(**option_kwargs)
@@ -2340,30 +2389,51 @@ def fetch_directory(location,                       # type: str
         LOGGER.debug("Fetched S3 directory [%s] listing contents:\n%s\n", location, repr_json(s3_dir_resp))
         s3_files = [file["Key"] for file in s3_dir_resp["Contents"]]
         LOGGER.debug("Starting fetch of individual S3 files:\n%s\n", repr_json(s3_files))
-        return download_files_s3(s3_client, bucket_name, s3_files, out_dir)
+        listing = download_files_s3(s3_client, bucket_name, s3_files, out_dir)
     elif location.startswith("https://s3."):
         LOGGER.debug("Detected HTTP-like S3 bucket directory reference. Retrying directory fetching with S3 reference.")
         s3_ref, s3_region = resolve_s3_from_http(location)
         option_kwargs.pop("s3_region", None)
-        return fetch_directory(s3_ref, out_dir, settings=settings, s3_region_name=s3_region, **option_kwargs)
+        listing = fetch_directory(s3_ref, out_dir, settings=settings, s3_region_name=s3_region, **option_kwargs)
     elif location.startswith("http://") or location.startswith("https://"):
         LOGGER.debug("Fetch directory resolved as remote HTTP reference. Will attempt listing contents.")
         resp = request_extra("GET", location)
         ctype = get_header("Content-Type", resp.headers, default=ContentType.TEXT_HTML)
         if any(_type in ctype for _type in [ContentType.TEXT_HTML] + list(ContentType.ANY_XML)):
-            return list(download_files_html(resp.text, out_dir, location, settings=settings, **option_kwargs))
-        if ContentType.APP_JSON in ctype:
+            listing = download_files_html(resp.text, out_dir, location, settings=settings, **option_kwargs)
+        elif ContentType.APP_JSON in ctype:
             body = resp.json()  # type: JSON
             if isinstance(body, list) and all(isinstance(file, str) for file in body):
-                return list(download_files_url(body, out_dir, location, settings=settings, **option_kwargs))
-            LOGGER.error("Invalid JSON contents (list of files expected) from [%s]:\n%s\n", location, repr_json(body))
-            raise ValueError(f"Cannot parse [{location}] response with JSON contents not providing a list of files.")
-        raise ValueError(f"Cannot list directory [{location}] with unknown parsing of Content-Type [{ctype}] response.")
+                listing = list(download_files_url(body, out_dir, location, settings=settings, **option_kwargs))
+            else:
+                LOGGER.error("Invalid JSON from [%s] is not a list of files:\n%s\n", location, repr_json(body))
+                raise ValueError(f"Cannot parse [{location}] JSON response contents not providing a list of files.")
+        else:
+            raise ValueError(f"Cannot list directory [{location}]. Unknown parsing of Content-Type [{ctype}] response.")
     elif location.startswith("file://") or location.startswith("/"):
         LOGGER.debug("Fetch directory resolved as local reference.")
         adjust_directory_local(location, out_dir, out_method)
-        return list(os.listdir(out_dir))
-    raise ValueError(f"Unknown scheme for directory location [{location}].")
+        listing = os.listdir(out_dir)
+    else:
+        raise ValueError(f"Unknown scheme for directory location [{location}].")
+    if listing_include:
+        LOGGER.debug("Filtering directory listing\n"
+                     "  include: %s\n",
+                     "  listing: %s",
+                     listing_include, listing)
+        listing = set(listing) & listing_include
+    if listing_exclude:
+        LOGGER.debug("Filtering directory listing\n"
+                     "  exclude: %s\n",
+                     "  listing: %s",
+                     listing_exclude, listing)
+        listing = set(listing) | listing_exclude
+    listing = filter_directory_forbidden(listing)
+    listing = list(sorted(listing))
+    if LOGGER.isEnabledFor(logging.DEBUG):
+        for item in listing:
+            LOGGER.debug("Resolved file [%s] from [%s] directory listing.", item, location)
+    return listing
 
 
 def load_file(file_path, text=False):

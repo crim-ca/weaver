@@ -499,7 +499,7 @@ class TestWeaverClient(TestWeaverClientBase):
             assert output.get("href") == output_href
             output_path = output.get("path")  # inserted by download
             assert isinstance(output_path, str) and output_path.startswith(target_dir)
-            output_name = output_href.split(job_id)[-1][1:]  # everything after jobID, and without the first '/'
+            output_name = output_href.split(job_id)[-1].lstrip("/")  # everything after jobID, and without the first '/'
             output_file = os.path.join(target_dir, output_name)
             assert output_path == output_file
             assert os.path.isfile(output_file) and not os.path.islink(output_file)

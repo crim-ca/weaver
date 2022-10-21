@@ -1721,9 +1721,6 @@ class WpsPackage(Process):
                         f"Directory reference resolution method for input [{input_id}] "
                         f"from location [{input_location}] did not produce any staged file."
                     )
-                if self.logger.isEnabledFor(logging.DEBUG):
-                    for loc in locations:
-                        self.logger.debug("Resolved file [%s] from [%s] directory listing.", loc, input_location)
                 input_location = out_dir
             else:
                 raise PackageExecutionError(
