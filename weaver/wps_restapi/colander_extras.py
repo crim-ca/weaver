@@ -59,6 +59,14 @@ from typing import TYPE_CHECKING
 
 import colander
 from cornice_swagger.converters.exceptions import ConversionError, NoSuchConverter
+from cornice_swagger.converters.parameters import (
+    BodyParameterConverter,
+    HeaderParameterConverter,
+    ParameterConversionDispatcher,
+    ParameterConverter,
+    PathParameterConverter,
+    QueryParameterConverter
+)
 from cornice_swagger.converters.schema import (
     STRING_FORMATTERS,
     NumberTypeConverter,
@@ -69,9 +77,16 @@ from cornice_swagger.converters.schema import (
     convert_range_validator,
     convert_regex_validator
 )
+from cornice_swagger.swagger import CorniceSwagger, DefinitionHandler, ParameterHandler, ResponseHandler
 
 if TYPE_CHECKING:
     from typing import Any, Dict, Iterable, Optional, Sequence, Type, Union
+    from typing_extensions import Literal
+
+    from cornice import Service as CorniceService
+    from pyramid.registry import Registry
+
+    from weaver.typedefs import JSON, OpenAPISchema, OpenAPISpecification, OpenAPISpecInfo, OpenAPISpecParameter
 
 # pylint: disable=C0209,consider-using-f-string
 
@@ -2266,3 +2281,145 @@ class OAS3TypeConversionDispatcher(TypeConversionDispatcher):
             converted["xml"] = xml
 
         return converted
+
+
+class OAS3ParameterConverter(ParameterConverter):
+    reserved_params = [
+        "name",
+        "in",
+        "required",
+        "allowReserved",
+        "summary",
+        "description",
+        "schema",
+        "content",
+    ]
+
+    def convert(self, schema_node, definition_handler):
+        # type: (colander.SchemaNode, DefinitionHandler) -> OpenAPISpecParameter
+        param_spec = super(OAS3ParameterConverter, self).convert(schema_node, definition_handler)
+        if "schema" not in param_spec:
+            param_schema = {}
+            for param in list(param_spec):
+                if param not in self.reserved_params:
+                    param_schema[param] = param_spec.pop(param)
+            param_spec["schema"] = param_schema
+        return param_spec
+
+
+class OAS3BodyParameterConverter(BodyParameterConverter, OAS3ParameterConverter):
+    pass
+
+
+class OAS3PathParameterConverter(PathParameterConverter, OAS3ParameterConverter):
+    pass
+
+
+class OAS3QueryParameterConverter(QueryParameterConverter, OAS3ParameterConverter):
+    pass
+
+
+class OAS3HeaderParameterConverter(HeaderParameterConverter, OAS3ParameterConverter):
+    pass
+
+
+class OAS3CookieParameterConverter(OAS3ParameterConverter):
+    _in = "cookie"
+
+
+class OAS3ParameterConversionDispatcher(ParameterConversionDispatcher):
+    converters = {
+        "body": OAS3BodyParameterConverter,
+        "path": OAS3PathParameterConverter,
+        "querystring": OAS3QueryParameterConverter,
+        "GET": OAS3QueryParameterConverter,
+        "header": OAS3HeaderParameterConverter,
+        "headers": OAS3HeaderParameterConverter,
+        "cookie": OAS3CookieParameterConverter,  # Not available in Swagger 2.0
+    }
+
+
+class OAS3DefinitionHandler(DefinitionHandler):
+    json_pointer = "#/components/schemas/"
+
+    def from_schema(self, schema_node, base_name=None):
+        # type: (colander.SchemaNode, Optional[str]) -> OpenAPISchema
+        """
+        Convert the schema node to an :term:`OAS` schema.
+
+        If the schema node provided ``schema_ref`` URL and that the object is not defined,
+        use it instead as an external reference.
+        """
+        schema_ret = super(OAS3DefinitionHandler, self).from_schema(schema_node, base_name=base_name)
+        schema_ref = getattr(schema_node, "schema_ref", None)
+        if schema_ref and isinstance(schema_ref, str):
+            name = self._get_schema_name(schema_node, base_name)
+            schema = schema_ret
+            if "$ref" in schema_ret:
+                schema = self.definition_registry[name]  # ["schema"]
+            if schema.get("type") == "object" and "properties" not in schema and "$ref" not in schema:
+                for param in list(schema):
+                    schema.pop(param)
+                schema["$ref"] = schema_ref
+        return schema_ret
+
+
+class OAS3ParameterHandler(ParameterHandler):
+    json_pointer = "#/components/parameters/"
+
+
+class OAS3ResponseHandler(ResponseHandler):
+    json_pointer = "#/components/responses/"
+
+
+class CorniceOpenAPI(CorniceSwagger):
+    openapi_spec = 3
+
+    def __init__(self,
+                 services=None,             # type: Optional[Sequence[CorniceService]]
+                 def_ref_depth=0,           # type: int
+                 param_ref=False,           # type: bool
+                 resp_ref=False,            # type: bool
+                 pyramid_registry=None,     # type: Optional[Registry]
+                 ):                         # type: (...) -> None
+        if self.openapi_spec == 3:
+            self.definitions = OAS3DefinitionHandler
+            self.parameters = OAS3ParameterHandler
+            self.responses = OAS3ResponseHandler
+            self.type_converter = OAS3TypeConversionDispatcher
+            self.parameter_converter = OAS3ParameterConversionDispatcher
+        super(CorniceOpenAPI, self).__init__(
+            services=services,
+            def_ref_depth=def_ref_depth,
+            param_ref=param_ref,
+            resp_ref=resp_ref,
+            pyramid_registry=pyramid_registry,
+        )
+
+    def generate(self,
+                 title=None,        # type: Optional[str]
+                 version=None,      # type: Optional[str]
+                 base_path=None,    # type: Optional[str]
+                 info=None,         # type: Optional[OpenAPISpecInfo]
+                 swagger=None,      # type: Optional[JSON]
+                 openapi_spec=2,    # type: Literal[2, 3]
+                 **kwargs           # type: Any
+                 ):                 # type: (...) -> OpenAPISpecification
+        spec = super(CorniceOpenAPI, self).generate(
+            title=title,
+            version=version,
+            base_path=base_path,
+            info=info,
+            swagger=swagger,
+            openapi_spec=openapi_spec,
+            **kwargs
+        )
+        if self.openapi_spec == 3:
+            definitions = spec.pop("definitions", {})
+            parameters = spec.pop("parameters", {})
+            responses = spec.pop("responses", {})
+            spec.setdefault("components", {})
+            spec["components"].setdefault("schemas", definitions)
+            spec["components"].setdefault("parameters", parameters)
+            spec["components"].setdefault("responses", responses)
+        return spec
