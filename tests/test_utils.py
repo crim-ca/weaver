@@ -813,7 +813,7 @@ def test_fetch_directory_filters(listing_dir, include, exclude, matcher, expect_
         out_dir = stack.enter_context(tempfile.TemporaryDirectory())
         out_files = fetch_directory(f"file://{tmp_dir}/{listing_dir}", out_dir,
                                     include=include, exclude=exclude, matcher=matcher)
-        expect_files = [os.path.join(out_dir, file.split("/", 1)[-1]) for file in expect_files]
+        expect_files = [os.path.join(out_dir, file.split("/", 1)[-1] if listing_dir else file) for file in expect_files]
         assert list(out_files) == sorted(expect_files), (
             f"Out dir: [{out_dir}], Test dir:\n{repr_json(test_dir_files, indent=2)}"
         )

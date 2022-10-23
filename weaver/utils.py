@@ -2525,6 +2525,7 @@ def adjust_directory_local(location,                            # type: Path
     filtered = list(sorted(filtered))
     extras = list(set(relative) - set(filtered))
     extras = [os.path.join(out_dir, path) for path in extras]
+    desired = [os.path.join(loc_dir, path) for path in filtered]
     filtered = list(sorted(os.path.join(out_dir, path) for path in filtered))
 
     if loc_dir == out_dir:
@@ -2550,10 +2551,15 @@ def adjust_directory_local(location,                            # type: Path
     if os.path.exists(out_dir):
         os.rmdir(out_dir)  # need to remove to avoid moving contents nested under it
 
+    # avoid unnecessary copy of files marked for exclusion
+    def copy_func(src, dst, *args, **kwargs):
+        if dst in filtered:
+            return shutil.copy2(src, dst, *args, **kwargs)
+
     if out_method == OutputMethod.MOVE:
         # Calling 'shutil.move' raises 'NotADirectoryError' if the source directory is a link
         # (although contents would still be moved). Use the resolved path to avoid the error.
-        shutil.move(loc_dir, out_dir)
+        shutil.move(loc_dir, out_dir, copy_function=copy_func)
         # Remove the original link location pointing to the resolved directory to be consistent
         # with 'move' from a direct directory where the original location would not exist anymore.
         if location != loc_dir and os.path.islink(link_dir):
@@ -2572,9 +2578,8 @@ def adjust_directory_local(location,                            # type: Path
     # COPY: full copy (resolve symlinks)
     shutil.copytree(loc_dir, out_dir,
                     symlinks=out_method != OutputMethod.COPY,
-                    ignore_dangling_symlinks=True)
-    for file_path in extras:
-        os.remove(file_path)
+                    ignore_dangling_symlinks=True,
+                    copy_function=copy_func)
     return filtered
 
 
