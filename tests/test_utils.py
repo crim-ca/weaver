@@ -617,7 +617,9 @@ def test_fetch_directory_html(include_dir_heading,       # type: bool
         out_files = fetch_directory(f"{tmp_host}/dir/", out_dir)
         expect_files = filter(lambda _f: _f.startswith("dir/"), test_http_dir_files)
         expect_files = [os.path.join(out_dir, file.split("/", 1)[-1]) for file in expect_files]
-        assert list(out_files) == sorted(expect_files), f"Test dir:\n{repr_json(test_dir_files, indent=2)}"
+        assert list(out_files) == sorted(expect_files), (
+            f"Out dir: [{out_dir}], Test dir:\n{repr_json(test_dir_files, indent=2)}"
+        )
 
 
 class TemporaryLinkableDirectory(tempfile.TemporaryDirectory):
@@ -631,7 +633,8 @@ class TemporaryLinkableDirectory(tempfile.TemporaryDirectory):
             os.remove(self.name)
 
 
-@pytest.mark.parametrize("listing_dir,out_method,include,exclude,expect_files", [  # expect_files[i] = (Path, IsLink)
+# expect_files[i] = (Path, IsLink)
+@pytest.mark.parametrize("listing_dir,out_method,include,exclude,matcher,expect_files", [
     ("dir/", OutputMethod.LINK, None, None, PathMatchingMethod.REGEX, [
         ("dir/", True),
         ("dir/file.txt", False),
@@ -654,7 +657,7 @@ class TemporaryLinkableDirectory(tempfile.TemporaryDirectory):
         ("dir/other/meta.txt", False),
     ]),
     ("dir/", OutputMethod.AUTO, None, None, PathMatchingMethod.REGEX, [
-        ("dir/", True),
+        ("dir/", False),
         ("dir/file.txt", False),
         ("dir/sub/file.tmp", False),
         ("dir/sub/nested/file.cfg", False),
@@ -744,9 +747,11 @@ def test_fetch_directory_local(listing_dir,     # type: str
         expect_dirs = [(os.path.join(out_dir, path[0].split("/", 1)[-1]), path[1], path[0]) for path in expect_dirs]
         expect_files = [file for file in expect_files if not file[0].endswith("/")]
         expect_files = [(os.path.join(out_dir, file[0].split("/", 1)[-1]), file[1]) for file in expect_files]
-        assert list(out_files) == sorted(expect_files), f"Test dir:\n{repr_json(test_dir_files, indent=2)}"
+        assert list(out_files) == sorted(expect_files), (
+            f"Out dir: [{out_dir}], Test dir:\n{repr_json(test_dir_files, indent=2)}"
+        )
         out_dirs = [(path[0], os.path.islink(path[0].rstrip("/")), path[2]) for path in expect_dirs]
-        assert out_dirs == expect_dirs, f"Test dir:\n{repr_json(test_dir_files, indent=2)}"
+        assert out_dirs == expect_dirs, f"Out dir: [{out_dir}], Test dir:\n{repr_json(test_dir_files, indent=2)}"
 
 
 @pytest.mark.parametrize("listing_dir,include,exclude,matcher,expect_files", [
@@ -768,19 +773,20 @@ def test_fetch_directory_local(listing_dir,     # type: str
         "dir/sub/nested/file.cfg",
     ]),
     ("dir/", [r".*/.*\.txt"], None, PathMatchingMethod.REGEX, [
-        # adding include does not 'force' only those to be matched
-        # only
+        # adding include does not 'force' only those to be matched, only to "add back" excluded
         "dir/file.txt",
-        "dir/other/meta.txt",
+        "dir/sub/file.tmp",
         "dir/sub/nested/file.cfg",
         "dir/other/meta.txt",
     ]),
     ("dir/", [r".*\.txt"], None, PathMatchingMethod.REGEX, [
         "dir/file.txt",
+        "dir/sub/file.tmp",
+        "dir/sub/nested/file.cfg",
         "dir/other/meta.txt",
     ]),
-    ("dir/", [r".*file\.txt"], [r".*/.*\.txt"], [
-        "dir/file.txt",
+    ("dir/", [r".*file\.txt"], [r".*\.txt"], PathMatchingMethod.REGEX, [
+        "dir/file.txt",  # initially excluded, but the added back due to include
         "dir/sub/file.tmp",
         "dir/sub/nested/file.cfg",
     ]),
@@ -808,7 +814,9 @@ def test_fetch_directory_filters(listing_dir, include, exclude, matcher, expect_
         out_files = fetch_directory(f"file://{tmp_dir}/{listing_dir}", out_dir,
                                     include=include, exclude=exclude, matcher=matcher)
         expect_files = [os.path.join(out_dir, file.split("/", 1)[-1]) for file in expect_files]
-        assert list(out_files) == sorted(expect_files), f"Test dir:\n{repr_json(test_dir_files, indent=2)}"
+        assert list(out_files) == sorted(expect_files), (
+            f"Out dir: [{out_dir}], Test dir:\n{repr_json(test_dir_files, indent=2)}"
+        )
 
 
 def test_fetch_directory_raise_missing_trailing_slash():

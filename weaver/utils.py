@@ -2194,8 +2194,8 @@ def download_files_s3(location,                         # type: str
     base_url = s3_client.meta.endpoint_url.rstrip("/") + "/"
 
     # adjust patterns with full paths to ensure they still work with retrieved relative S3 keys
-    include = [incl.replace(base_url, "") if incl.startswith(base_url) else incl for incl in include or []]
-    exclude = [excl.replace(base_url, "") if excl.startswith(base_url) else excl for excl in exclude or []]
+    include = [incl.replace(base_url, "", 1) if incl.startswith(base_url) else incl for incl in include or []]
+    exclude = [excl.replace(base_url, "", 1) if excl.startswith(base_url) else excl for excl in exclude or []]
 
     LOGGER.debug("Resolved S3 Bucket [%s] and Region [%s] for download of files.", bucket_name, s3_region or "default")
     s3_dir_resp = s3_client.list_objects_v2(Bucket=bucket_name, Prefix=dir_key)
@@ -2205,6 +2205,8 @@ def download_files_s3(location,                         # type: str
     s3_files = filter_directory_forbidden(s3_files)
     s3_files = filter_directory_patterns(s3_files, include, exclude, matcher)
     s3_files = list(s3_files)
+
+    # create directories in advance to avoid potential errors in case many workers try to generate the same one
     base_url = base_url.rstrip("/")
     sub_dirs = {os.path.split(path)[0] for path in s3_files if "://" not in path or path.startswith(base_url)}
     sub_dirs = [os.path.join(out_dir, path.replace(base_url, "").lstrip("/")) for path in sub_dirs]
@@ -2212,7 +2214,7 @@ def download_files_s3(location,                         # type: str
         os.makedirs(_dir, exist_ok=True)
     base_url += "/"
 
-    LOGGER.debug("Starting fetch of individual S3 files:\n%s", repr_json(s3_files))
+    LOGGER.debug("Starting fetch of individual S3 files from [%s]:\n%s", base_url, repr_json(s3_files))
     task_kill_event = threading.Event()  # abort remaining tasks if set
 
     def _abort_callback(_chunk):  # called progressively with downloaded chunks
@@ -2295,12 +2297,25 @@ def download_files_url(file_references,                     # type: Iterable[str
     """
     LOGGER.debug("Starting file listing download from references:\n%s", repr_json(file_references))
 
-    options, kwargs = resolve_scheme_options(**option_kwargs)
-
+    # References could be coming from different base URL/scheme/host.
+    # The include/exclude patterns will have to match them exactly in the even they don't share the same base URL.
+    # However, in the event they have the same URL, patterns could refer to their relative path only to that URL.
+    # Adjust patterns accordingly to allow filter against forbidden/include/exclude with relative paths.
+    base_url = base_url.rstrip("/") + "/"
+    include = [incl.replace(base_url, "", 1) if incl.startswith(base_url) else incl for incl in include or []]
+    exclude = [excl.replace(base_url, "", 1) if excl.startswith(base_url) else excl for excl in exclude or []]
     file_references = (path for path in file_references if not path.endswith("/"))
-    file_references = filter_directory_forbidden(file_references)
-    file_references = filter_directory_patterns(file_references, include, exclude, matcher)
-    file_references = list(file_references)
+    file_refs_relative = {path for path in file_references if path.startswith(base_url)}
+    file_refs_absolute = set(file_references) - file_refs_relative
+    file_refs_relative = {path.replace(base_url, "") for path in file_refs_relative}
+    file_refs_absolute = filter_directory_forbidden(file_refs_absolute)
+    file_refs_absolute = filter_directory_patterns(file_refs_absolute, include, exclude, matcher)
+    file_refs_relative = filter_directory_forbidden(file_refs_relative)
+    file_refs_relative = filter_directory_patterns(file_refs_relative, include, exclude, matcher)
+    file_refs_relative = {os.path.join(base_url, path) for path in file_refs_relative}
+    file_references = sorted(list(set(file_refs_relative) | set(file_refs_absolute)))
+
+    # create directories in advance to avoid potential errors in case many workers try to generate the same one
     base_url = base_url.rstrip("/")
     sub_dirs = {os.path.split(path)[0] for path in file_references if "://" not in path or path.startswith(base_url)}
     sub_dirs = [os.path.join(out_dir, path.replace(base_url, "").lstrip("/")) for path in sub_dirs]
@@ -2308,6 +2323,7 @@ def download_files_url(file_references,                     # type: Iterable[str
         os.makedirs(_dir, exist_ok=True)
     base_url += "/"
 
+    LOGGER.debug("Starting fetch of individual files from [%s]:\n%s", base_url, repr_json(file_references))
     task_kill_event = threading.Event()  # abort remaining tasks if set
 
     def _abort_callback(_chunk):  # called progressively with downloaded chunks
@@ -2330,7 +2346,7 @@ def download_files_url(file_references,                     # type: Iterable[str
             _out_file = os.path.join(out_dir, os.path.split(_file_path)[-1])
         _out_dir = os.path.split(_out_file)[0]
         try:
-            return fetch_file(_file_path, _out_dir, settings=settings, callback=_abort_callback, **kwargs)
+            return fetch_file(_file_path, _out_dir, settings=settings, callback=_abort_callback, **option_kwargs)
         except Exception as exc:
             LOGGER.error("Error raised in download worker for [%s]: [%s]", _file_path, exc, exc_info=exc)
             task_kill_event.set()
@@ -2500,8 +2516,8 @@ def adjust_directory_local(location,                            # type: Path
     # Use relative paths to filter items to ensure forbidden or include/exclude patterns match
     # the provided definitions as expected, since patterns more often do not use the full path.
     # In case the patterns do use full paths though, adjust them to ensure they still work as well.
-    include = [incl.replace(loc_dir, "") if incl.startswith(loc_dir) else incl for incl in include or []]
-    exclude = [excl.replace(loc_dir, "") if excl.startswith(loc_dir) else excl for excl in exclude or []]
+    include = [incl.replace(loc_dir, "", 1) if incl.startswith(loc_dir) else incl for incl in include or []]
+    exclude = [excl.replace(loc_dir, "", 1) if excl.startswith(loc_dir) else excl for excl in exclude or []]
     relative = (path.replace(loc_dir, "") for path in listing)
     relative = filter_directory_forbidden(relative)
     relative = list(sorted(relative))
