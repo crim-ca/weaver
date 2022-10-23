@@ -54,6 +54,7 @@ class ContentType(Constants):
     APP_GZIP = "application/gzip"
     APP_HDF5 = "application/x-hdf5"
     APP_JSON = "application/json"
+    APP_OAS_JSON = "application/vnd.oai.openapi+json; version=3.0"
     APP_OGC_PKG_JSON = "application/ogcapppkg+json"
     APP_OGC_PKG_YAML = "application/ogcapppkg+yaml"
     APP_NETCDF = "application/x-netcdf"

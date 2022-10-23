@@ -14,10 +14,21 @@ Changes:
 --------
 - Add more explicit ``PackageException`` error messages with contextual details when a `CWL` file reference cannot be
   resolved correctly.
+- Return ``Content-Type: application/vnd.oai.openapi+json; version=3.0`` for OpenAPI endpoint response referenced
+  by ``service-desc`` in the API conformance details, as specified by
+  `OGC API - Processes - OpenAPI 3.0 requirement class <https://docs.ogc.org/is/18-062r2/18-062r2.html#toc43>`_.
+- Support the generation of external schema references (``$ref``) using the ``schema_ref`` attribute if provided
+  in a ``colander.SchemaNode`` that does not provide an explicit object schema definition with properties.
+- Add Python typing definitions related to OpenAPI specification.
 
 Fixes:
 ------
+- Fix invalid generation of OpenAPI 3.0 specification for `Weaver` API using ``cornice_swagger``.
+  The generated schema structure used to return a mix of Swagger 2.0 and OpenAPI 3.0 definitions.
+  The provided contents are now defined completely with OpenAPI 3.0 specification format.
 - Remove hard requirement ``shapely==1.8.2`` to obtain latest fixes.
+- Update ``json2xml>=3.20.0`` requirement to allow more recent ``certifi``, ``requests`` and ``urllib3`` dependencies to
+  be used by all packages (relates to `vinitkumar/json2xml#157 <https://github.com/vinitkumar/json2xml/issues/157>`_).
 - Fix resolution of `CWL` file from references that do not provide a known ``Content-Type`` that can represent `CWL`
   contents. This can occur when deploying a ``builtin`` `Process` from the local file reference, which does not generate
   a request and, therefore, no ``Content-Type``. This can occur also for servers that incorrectly or simply do not
