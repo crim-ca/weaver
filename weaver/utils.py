@@ -1,5 +1,6 @@
 import difflib
 import errno
+import fnmatch
 import functools
 import importlib.util
 import inspect
@@ -2079,13 +2080,88 @@ def adjust_file_local(file_reference, file_outdir, out_method):
         LOGGER.debug("File as local reference has no action to take, file already exists: [%s]", file_path)
 
 
-def download_files_s3(location,         # type: str
-                      out_dir,          # type: Path
-                      include=None,     # type: Optional[List[str]]
-                      exclude=None,     # type: Optional[List[str]]
-                      settings=None,    # type: Optional[SettingsType]
-                      **option_kwargs,  # type: Any  # Union[SchemeOptions, RequestOptions]
-                      ):                # type: (...) -> List[str]
+def filter_directory_forbidden(listing):
+    # type: (Iterable[str]) -> Iterable[str]
+    """
+    Filters out items that should always be removed from directory listing results.
+    """
+    is_in = frozenset({"..", "../", "./"})
+    equal = frozenset({"."})  # because of file extensions, cannot check 'part in item'
+    for item in listing:
+        if any(part in item for part in is_in):
+            continue
+        if any(part == item for part in equal):
+            continue
+        yield item
+
+
+class PathMatchingMethod(ExtendedEnum):
+    GLOB = "glob"
+    REGEX = "regex"
+
+
+def filter_directory_patterns(listing, include, exclude, matcher):
+    # type: (Iterable[str], Optional[Iterable[str]], Optional[Iterable[str]], PathMatchingMethod) -> List[str]
+    """
+    Filters a list of files according to a set of include/exclude patterns.
+
+    If a file is matched against an include pattern, it will take precedence over matches on exclude patterns.
+    By default, any file that is not matched by an excluded pattern will remain in the resulting filtered set.
+    Include patterns are only intended to "add back" previously excluded matches. They are **NOT** for defining
+    "only desired items". Adding include patterns without exclude patterns is redundant, as all files would be
+    retained by default anyway.
+
+    Patterns can use regular expression definitions or Unix shell-style wildcards.
+    The :paramref:`matcher` should be selected accordingly to provided patterns matching method.
+    Potential functions are :func:`re.match`, :func:`re.fullmatch`, :func:`fnmatch.fnmatch`, :func:`fnmatch.fnmatchcase`
+    Literal strings for exact matches are also valid.
+
+    .. note::
+        Provided patterns are applied directly without modifications. If the file listing contains different root
+        directories than patterns, such as if patterns are specified with relative paths, obtained results could
+        mismatch the intended behavior. Make sure to align paths accordingly for the expected filtering context.
+
+    :param listing: Files to filter.
+    :param include: Any matching patterns for files that should be explicitly included.
+    :param exclude: Any matching patterns for files that should be excluded unless included.
+    :param matcher: Pattern matching method to evaluate if a file path matches include and exclude definitions.
+    :return: Filtered files.
+    """
+    listing_include = include or []
+    listing_exclude = exclude or []
+    if listing_include or listing_exclude:
+        if matcher == PathMatchingMethod.REGEX:
+            def is_match(pattern, value):  # type: (str, str) -> bool
+                return re.fullmatch(pattern, value) is not None
+        elif matcher == PathMatchingMethod.GLOB:
+            def is_match(pattern, value):  # type: (str, str) -> bool
+                return fnmatch.fnmatchcase(value, pattern)
+        else:
+            raise ValueError(f"Unknown path pattern matching method: [{matcher}]")
+        filtered = [
+            item for item in listing if (
+                not any(is_match(re_excl, item) for re_excl in listing_exclude)
+                or any(is_match(re_incl, item) for re_incl in listing_include)
+            )
+        ]
+        LOGGER.debug("Filtering directory listing\n"
+                     "  include:  %s\n"
+                     "  exclude:  %s\n"
+                     "  listing:  %s\n"
+                     "  filtered: %s\n",
+                     listing_include, listing_exclude, listing, filtered)
+        listing = filtered
+    return listing
+
+
+def download_files_s3(location,                         # type: str
+                      out_dir,                          # type: Path
+                      include=None,                     # type: Optional[List[str]]
+                      exclude=None,                     # type: Optional[List[str]]
+                      matcher=PathMatchingMethod.GLOB,  # type: PathMatchingMethod
+                      settings=None,                    # type: Optional[SettingsType]
+                      **option_kwargs,                  # type: Any  # Union[SchemeOptions, RequestOptions]
+                      ):                                # type: (...) -> List[str]
     """
     Download all listed S3 files references under the output directory using the provided S3 bucket and client.
 
@@ -2099,6 +2175,7 @@ def download_files_s3(location,         # type: str
     :param out_dir: Desired output location of downloaded files.
     :param include: Any matching patterns for files that should be explicitly included.
     :param exclude: Any matching patterns for files that should be excluded unless included.
+    :param matcher: Pattern matching method to evaluate if a file path matches include and exclude definitions.
     :param settings: Additional request-related settings from the application configuration (notably request-options).
     :param option_kwargs:
         Additional keywords to forward to the relevant handling method by scheme.
@@ -2114,16 +2191,21 @@ def download_files_s3(location,         # type: str
     s3_region = options["s3"].pop("region_name", None)
     s3_client = boto3.client("s3", region_name=s3_region, **s3_params)  # type: S3Client
     bucket_name, dir_key = location[5:].split("/", 1)
+    base_url = s3_client.meta.endpoint_url.rstrip("/") + "/"
+
+    # adjust patterns with full paths to ensure they still work with retrieved relative S3 keys
+    include = [incl.replace(base_url, "") if incl.startswith(base_url) else incl for incl in include or []]
+    exclude = [excl.replace(base_url, "") if excl.startswith(base_url) else excl for excl in exclude or []]
 
     LOGGER.debug("Resolved S3 Bucket [%s] and Region [%s] for download of files.", bucket_name, s3_region or "default")
     s3_dir_resp = s3_client.list_objects_v2(Bucket=bucket_name, Prefix=dir_key)
     LOGGER.debug("Fetched S3 directory [%s] listing contents:\n%s", location, repr_json(s3_dir_resp))
-    s3_files = (file["Key"] for file in s3_dir_resp["Contents"])
+    s3_files = (file["Key"] for file in s3_dir_resp["Contents"])  # definitions with relative paths (like patterns)
     s3_files = (path for path in s3_files if not path.endswith("/"))
     s3_files = filter_directory_forbidden(s3_files)
-    s3_files = filter_directory_patterns(s3_files, include, exclude)
+    s3_files = filter_directory_patterns(s3_files, include, exclude, matcher)
     s3_files = list(s3_files)
-    base_url = s3_client.meta.endpoint_url.rstrip("/")
+    base_url = base_url.rstrip("/")
     sub_dirs = {os.path.split(path)[0] for path in s3_files if "://" not in path or path.startswith(base_url)}
     sub_dirs = [os.path.join(out_dir, path.replace(base_url, "").lstrip("/")) for path in sub_dirs]
     for _dir in reversed(sorted(sub_dirs)):
@@ -2175,14 +2257,15 @@ def download_files_s3(location,         # type: str
     return list(file_paths)
 
 
-def download_files_url(file_references,     # type: Iterable[str]
-                       out_dir,             # type: Path
-                       base_url,            # type: str
-                       include=None,        # type: Optional[List[str]]
-                       exclude=None,        # type: Optional[List[str]]
-                       settings=None,       # type: Optional[SettingsType]
-                       **option_kwargs,     # type: Any  # Union[SchemeOptions, RequestOptions]
-                       ):                   # type: (...) -> Iterable[str]
+def download_files_url(file_references,                     # type: Iterable[str]
+                       out_dir,                             # type: Path
+                       base_url,                            # type: str
+                       include=None,                        # type: Optional[List[str]]
+                       exclude=None,                        # type: Optional[List[str]]
+                       matcher=PathMatchingMethod.GLOB,     # type: PathMatchingMethod
+                       settings=None,                       # type: Optional[SettingsType]
+                       **option_kwargs,                     # type: Any  # Union[SchemeOptions, RequestOptions]
+                       ):                                   # type: (...) -> Iterable[str]
     """
     Download all listed files references under the output directory.
 
@@ -2202,6 +2285,7 @@ def download_files_url(file_references,     # type: Iterable[str]
         URL prior to downloading the file.
     :param include: Any matching patterns for files that should be explicitly included.
     :param exclude: Any matching patterns for files that should be excluded unless included.
+    :param matcher: Pattern matching method to evaluate if a file path matches include and exclude definitions.
     :param settings: Additional request-related settings from the application configuration (notably request-options).
     :param option_kwargs:
         Additional keywords to forward to the relevant handling method by scheme.
@@ -2215,7 +2299,7 @@ def download_files_url(file_references,     # type: Iterable[str]
 
     file_references = (path for path in file_references if not path.endswith("/"))
     file_references = filter_directory_forbidden(file_references)
-    file_references = filter_directory_patterns(file_references, include, exclude)
+    file_references = filter_directory_patterns(file_references, include, exclude, matcher)
     file_references = list(file_references)
     base_url = base_url.rstrip("/")
     sub_dirs = {os.path.split(path)[0] for path in file_references if "://" not in path or path.startswith(base_url)}
@@ -2267,14 +2351,15 @@ def download_files_url(file_references,     # type: Iterable[str]
             yield future.result()
 
 
-def download_files_html(data,               # type: str
-                        out_dir,            # type: Path
-                        base_url,           # type: str
-                        include=None,       # type: Optional[List[str]]
-                        exclude=None,       # type: Optional[List[str]]
-                        settings=None,      # type: Optional[AnySettingsContainer]
-                        **option_kwargs,    # type: Any  # Union[SchemeOptions, RequestOptions]
-                        ):                  # type: (...) -> Iterable[str]
+def download_files_html(html_data,                          # type: str
+                        out_dir,                            # type: Path
+                        base_url,                           # type: str
+                        include=None,                       # type: Optional[List[str]]
+                        exclude=None,                       # type: Optional[List[str]]
+                        matcher=PathMatchingMethod.GLOB,    # type: PathMatchingMethod
+                        settings=None,                      # type: Optional[AnySettingsContainer]
+                        **option_kwargs,                    # type: Any  # Union[SchemeOptions, RequestOptions]
+                        ):                                  # type: (...) -> Iterable[str]
     """
     Downloads files retrieved from a directory listing provided as an index of plain HTML with file references.
 
@@ -2290,6 +2375,22 @@ def download_files_html(data,               # type: str
 
     .. seealso::
         :func:`download_files_url`
+
+    :param html_data: HTML data contents with files references to download.
+    :param out_dir: Desired output location of downloaded files.
+    :param base_url:
+        If full URL are specified, corresponding files will be retrieved using the appropriate scheme per file
+        allowing flexible data sources. Otherwise, any relative locations use this base URL to resolve the full
+        URL prior to downloading the file.
+    :param include: Any matching patterns for files that should be explicitly included.
+    :param exclude: Any matching patterns for files that should be excluded unless included.
+    :param matcher: Pattern matching method to evaluate if a file path matches include and exclude definitions.
+    :param settings: Additional request-related settings from the application configuration (notably request-options).
+    :param option_kwargs:
+        Additional keywords to forward to the relevant handling method by scheme.
+        Keywords should be defined as ``{scheme}_{option}`` with one of the known :data:`SUPPORTED_FILE_SCHEMES`.
+        If not prefixed by any scheme, the option will apply to all handling methods (if applicable).
+    :returns: Output locations of downloaded files.
     """
     options, kwargs = resolve_scheme_options(**option_kwargs)
 
@@ -2317,74 +2418,21 @@ def download_files_html(data,               # type: str
                 for _sub_ref in _list_refs(_ref):
                     yield _sub_ref
 
-    files = list(_list_refs(base_url, data))
+    files = list(_list_refs(base_url, html_data))
     return download_files_url(
         files, out_dir, base_url,
-        include=include, exclude=exclude,
+        include=include, exclude=exclude, matcher=matcher,
         settings=settings, **option_kwargs
     )
 
 
-def filter_directory_forbidden(listing):
-    # type: (Iterable[str]) -> Iterable[str]
-    """
-    Filters out items that should always be removed from directory listing results.
-    """
-    is_in = frozenset({"..", "../", "./"})
-    equal = frozenset({"."})  # because of file extensions, cannot check 'part in item'
-    for item in listing:
-        if any(part in item for part in is_in):
-            continue
-        if any(part == item for part in equal):
-            continue
-        yield item
-
-
-def filter_directory_patterns(listing, include, exclude):
-    # type: (Iterable[str], Optional[Iterable[str]], Optional[Iterable[str]]) -> List[str]
-    """
-    Filters a list of files according to a set of include/exclude patterns.
-
-    If a file is matched against an include pattern, it will take precedence over matches on exclude patterns.
-    By default, any file that is not matched by an excluded pattern will remain in the resulting filtered set.
-    Include patterns are only intended to "add back" previously excluded matches.
-    They are **NOT** for defining "only desired items".
-    Adding include patterns without exclude patterns is redundant, as all files would be retained by default anyway.
-
-    Patterns use regular expression definitions. Literal strings for exact matches are also valid.
-
-    :param listing: Files to filter.
-    :param include: Any matching patterns for files that should be explicitly included.
-    :param exclude: Any matching patterns for files that should be excluded unless included.
-    :return: Filtered files.
-    """
-    listing_include = set(include or [])
-    listing_exclude = set(exclude or [])
-    if listing_include or listing_exclude:
-        patterns_include = [re.compile(pattern) for pattern in listing_include]
-        patterns_exclude = [re.compile(pattern) for pattern in listing_exclude]
-        filtered = [
-            item for item in listing if (
-                not all(re.fullmatch(re_excl, item) for re_excl in patterns_exclude)
-                or any(re.fullmatch(re_incl, item) for re_incl in patterns_include)
-            )
-        ]
-        LOGGER.debug("Filtering directory listing\n"
-                     "  include:  %s\n"
-                     "  exclude:  %s\n"
-                     "  listing:  %s\n"
-                     "  filtered: %s\n",
-                     listing_include, listing_exclude, listing, filtered)
-        listing = filtered
-    return listing
-
-
-def adjust_directory_local(location,        # type: Path
-                           out_dir,         # type: Path
-                           out_method,      # type: OutputMethod
-                           include=None,    # type: Optional[List[str]]
-                           exclude=None,    # type: Optional[List[str]]
-                           ):               # type: (...) -> List[Path]
+def adjust_directory_local(location,                            # type: Path
+                           out_dir,                             # type: Path
+                           out_method,                          # type: OutputMethod
+                           include=None,                        # type: Optional[List[str]]
+                           exclude=None,                        # type: Optional[List[str]]
+                           matcher=PathMatchingMethod.GLOB,     # type: PathMatchingMethod
+                           ):                                   # type: (...) -> List[Path]
     """
     Adjusts the input directory reference to the output location with the requested handling method.
 
@@ -2435,6 +2483,8 @@ def adjust_directory_local(location,        # type: Path
     :param out_method: Method employed to handle the generation of the output directory.
     :param include: Any matching patterns for files that should be explicitly included.
     :param exclude: Any matching patterns for files that should be excluded unless included.
+    :param matcher: Pattern matching method to evaluate if a file path matches include and exclude definitions.
+    :returns: Listing of files after resolution and filtering if applicable.
     """
     if location.startswith("file://"):
         location = location[7:]
@@ -2444,22 +2494,37 @@ def adjust_directory_local(location,        # type: Path
 
     loc_dir = os.path.realpath(location)
     out_dir = os.path.realpath(out_dir) if os.path.isdir(out_dir) else out_dir
+    loc_dir = loc_dir.rstrip("/") + "/"
+    out_dir = out_dir.rstrip("/") + "/"
     listing = list_directory_recursive(loc_dir)
-    listing = filter_directory_forbidden(listing)
-    listing = list(sorted(listing))
-    results = filter_directory_patterns(listing, include, exclude)
-    results = list(sorted(results))
-    extras = list(set(listing) - set(results))
+    # Use relative paths to filter items to ensure forbidden or include/exclude patterns match
+    # the provided definitions as expected, since patterns more often do not use the full path.
+    # In case the patterns do use full paths though, adjust them to ensure they still work as well.
+    include = [incl.replace(loc_dir, "") if incl.startswith(loc_dir) else incl for incl in include or []]
+    exclude = [excl.replace(loc_dir, "") if excl.startswith(loc_dir) else excl for excl in exclude or []]
+    relative = (path.replace(loc_dir, "") for path in listing)
+    relative = filter_directory_forbidden(relative)
+    relative = list(sorted(relative))
+    filtered = filter_directory_patterns(relative, include, exclude, matcher)
+    filtered = list(sorted(filtered))
+    extras = list(set(relative) - set(filtered))
+    extras = [os.path.join(out_dir, path) for path in extras]
+    filtered = list(sorted(os.path.join(out_dir, path) for path in filtered))
 
     if loc_dir == out_dir:
-        if listing == results:
+        if not extras:
             LOGGER.debug("Local directory reference has no action to take, already exists: [%s]", loc_dir)
-            return listing
+            return filtered
         LOGGER.debug("Local directory reference [%s] matches output, but desired listing differs. "
                      "Removing additional items:\n%s", loc_dir, repr_json(extras))
         for file_path in extras:
             os.remove(file_path)
-        return results
+        return filtered
+
+    # Any operation (islink, remove, etc.) that must operate on the link itself rather than the directory it points
+    # to must not have the final '/' in the path. Otherwise, the link path (without final '/') is resolved before
+    # evaluating the operation, which make them attempt their call on the real directory itself.
+    link_dir = location.rstrip("/")
 
     if (os.path.exists(out_dir) and not os.path.isdir(out_dir)) or (os.path.isdir(out_dir) and os.listdir(out_dir)):
         LOGGER.debug("References under [%s] cannot be placed under target path [%s] "
@@ -2469,21 +2534,23 @@ def adjust_directory_local(location,        # type: Path
     if os.path.exists(out_dir):
         os.rmdir(out_dir)  # need to remove to avoid moving contents nested under it
 
-    extras = [path.replace(loc_dir, out_dir) for path in extras]
-    results = [path.replace(loc_dir, out_dir) for path in results]
     if out_method == OutputMethod.MOVE:
+        # Calling 'shutil.move' raises 'NotADirectoryError' if the source directory is a link
+        # (although contents would still be moved). Use the resolved path to avoid the error.
         shutil.move(loc_dir, out_dir)
+        # Remove the original link location pointing to the resolved directory to be consistent
+        # with 'move' from a direct directory where the original location would not exist anymore.
+        if location != loc_dir and os.path.islink(link_dir):
+            os.remove(link_dir)
         for file_path in extras:
             os.remove(file_path)
-        return results
+        return filtered
     elif out_method == OutputMethod.LINK and not extras:  # fallback AUTO if not exact listing
-        # strip before 'islink', otherwise it returns false if path ends with '/' because the symlink without '/' is
-        # resolved before evaluating 'islink' relatively to the remaining '/' itself, which is the real directory
-        if os.path.islink(location.rstrip("/")):
-            loc_dir = os.readlink(location.rstrip("/"))
+        if os.path.islink(link_dir):
+            loc_dir = os.readlink(link_dir)
         out_dir = out_dir.rstrip("/")
         os.symlink(loc_dir, out_dir, target_is_directory=True)
-        return results
+        return filtered
     # AUTO: partial copy (links remain links)
     # LINK: idem, when listing differ
     # COPY: full copy (resolve symlinks)
@@ -2492,7 +2559,7 @@ def adjust_directory_local(location,        # type: Path
                     ignore_dangling_symlinks=True)
     for file_path in extras:
         os.remove(file_path)
-    return results
+    return filtered
 
 
 def list_directory_recursive(directory):
@@ -2505,15 +2572,16 @@ def list_directory_recursive(directory):
             yield os.path.join(path, file_name)
 
 
-def fetch_directory(location,                       # type: str
-                    out_dir,                        # type: Path
-                    *,                              # force named keyword arguments after
-                    out_method=OutputMethod.AUTO,   # type: OutputMethod
-                    include=None,                   # type: Optional[List[str]]
-                    exclude=None,                   # type: Optional[List[str]]
-                    settings=None,                  # type: Optional[AnySettingsContainer]
-                    **option_kwargs,                # type: Any
-                    ):                              # type: (...) -> List[str]
+def fetch_directory(location,                           # type: str
+                    out_dir,                            # type: Path
+                    *,                                  # force named keyword arguments after
+                    out_method=OutputMethod.AUTO,       # type: OutputMethod
+                    include=None,                       # type: Optional[List[str]]
+                    exclude=None,                       # type: Optional[List[str]]
+                    matcher=PathMatchingMethod.GLOB,    # type: PathMatchingMethod
+                    settings=None,                      # type: Optional[AnySettingsContainer]
+                    **option_kwargs,                    # type: Any
+                    ):                                  # type: (...) -> List[str]
     """
     Fetches all files that can be listed from a directory in local or remote location.
 
@@ -2535,6 +2603,7 @@ def fetch_directory(location,                       # type: str
         Only applicable when the file reference is local. Remote location always generates a local copy.
     :param include: Any matching patterns for files that should be explicitly included.
     :param exclude: Any matching patterns for files that should be excluded unless included.
+    :param matcher: Pattern matching method to evaluate if a file path matches include and exclude definitions.
     :param settings: Additional request-related settings from the application configuration (notably request-options).
     :param option_kwargs:
         Additional keywords to forward to the relevant handling method by scheme.
@@ -2548,7 +2617,7 @@ def fetch_directory(location,                       # type: str
     if location.startswith("s3://"):
         LOGGER.debug("Fetching listed files under directory resolved as S3 bucket reference.")
         listing = download_files_s3(location, out_dir,
-                                    include=include, exclude=exclude, **option_kwargs)
+                                    include=include, exclude=exclude, matcher=matcher, **option_kwargs)
     elif location.startswith("https://s3."):
         LOGGER.debug("Fetching listed files under directory resolved as HTTP-like S3 bucket reference.")
         s3_ref, s3_region = resolve_s3_from_http(location)
@@ -2562,13 +2631,13 @@ def fetch_directory(location,                       # type: str
         ctype = get_header("Content-Type", resp.headers, default=ContentType.TEXT_HTML)
         if any(_type in ctype for _type in [ContentType.TEXT_HTML] + list(ContentType.ANY_XML)):
             listing = download_files_html(resp.text, out_dir, location,
-                                          include=include, exclude=exclude,
+                                          include=include, exclude=exclude, matcher=matcher,
                                           settings=settings, **option_kwargs)
         elif ContentType.APP_JSON in ctype:
             body = resp.json()  # type: JSON
             if isinstance(body, list) and all(isinstance(file, str) for file in body):
                 listing = download_files_url(body, out_dir, location,
-                                             include=include, exclude=exclude,
+                                             include=include, exclude=exclude, matcher=matcher,
                                              settings=settings, **option_kwargs)
             else:
                 LOGGER.error("Invalid JSON from [%s] is not a list of files:\n%s", location, repr_json(body))
@@ -2577,7 +2646,8 @@ def fetch_directory(location,                       # type: str
             raise ValueError(f"Cannot list directory [{location}]. Unknown parsing of Content-Type [{ctype}] response.")
     elif location.startswith("file://") or location.startswith("/"):
         LOGGER.debug("Fetch directory resolved as local reference.")
-        listing = adjust_directory_local(location, out_dir, out_method, include, exclude)
+        listing = adjust_directory_local(location, out_dir, out_method,
+                                         include=include, exclude=exclude, matcher=matcher)
     else:
         raise ValueError(f"Unknown scheme for directory location [{location}].")
     listing = list(sorted(listing))

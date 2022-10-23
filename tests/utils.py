@@ -73,6 +73,7 @@ if TYPE_CHECKING:
         AnyRequestType,
         AnyResponseType,
         HeadersType,
+        Path,
         SettingsType
     )
 
@@ -1265,3 +1266,64 @@ def mocked_reference_test_file(file_name_or_path, href_type, file_content="mock"
         path = f"{href_prefix}{path}"
         href_type = None if "://" in path else href_type
     return f"{href_type}://{path}" if href_type else path
+
+
+def setup_test_file_hierarchy(test_paths, test_root_dir, test_data="data"):
+    # type: (Iterable[Union[Path, Tuple[Path, Optional[Path]]]], Path, str) -> List[Path]
+    """
+    Creates all requested files and directories, either directly or as system links to another file or directory.
+
+    All files and directories should be relative paths, which will be created under :paramref:`test_root_dir`.
+
+    Directory creations are requested by terminating the path with a ``/``. Similarly, directory links should have
+    a ``/`` character at the end. Mismatching file/directory link source and corresponding target is not explicitly
+    prohibited, just could yield unexpected outcomes.
+
+    Any nested file or directory definition that contains any missing parent directories on the file system will
+    have their complete parent directories hierarchy created immediately. If alternate link definitions are needed,
+    they should be specified beforehand. Files and directories paths are resolved and created in the specified order.
+
+    When any link is specified (using a tuple of source to target paths), the target location that it refers to must
+    exist before the file or directory link creation is attempted. If the target is ``None`` or empty, it will be
+    considered a plain file or directory reference as if provided directly instead of the tuple form.
+
+    :param test_paths: Paths to files, directories, or links to a file or directory to be generated.
+    :param test_root_dir: Base directory under which to create all requested elements.
+    :param test_data: Data written to created files when applicable.
+    :returns: Exhaustive listing of files and directories hierarchy under the root directory.
+    """
+    for test_item in test_paths:
+        file_path, link_target = test_item if isinstance(test_item, tuple) else (test_item, None)
+        dir_path, file_path = os.path.split(file_path)
+        # resolve paths
+        if link_target:
+            link_target = os.path.join(test_root_dir, link_target)
+        if dir_path:
+            dir_path = os.path.join(test_root_dir, dir_path)
+            if file_path:
+                file_path = os.path.join(dir_path, file_path)
+        else:
+            file_path = os.path.join(test_root_dir, file_path)
+        # create file reference
+        if file_path:
+            if dir_path:
+                os.makedirs(dir_path, exist_ok=True)
+            if link_target:
+                parent_dir = os.path.split(file_path)[0]
+                os.makedirs(parent_dir, exist_ok=True)
+                os.symlink(link_target, file_path)
+            else:
+                with open(file_path, mode="w", encoding="utf-8") as f:
+                    f.write(test_data)
+        # create dir reference
+        elif link_target and dir_path:
+            parent_dir = os.path.split(dir_path)[0]
+            os.makedirs(parent_dir, exist_ok=True)
+            os.symlink(link_target.rstrip("/"), dir_path, target_is_directory=True)
+        elif dir_path:
+            os.makedirs(dir_path, exist_ok=True)
+    listing = []
+    for path, dirs, files in os.walk(test_root_dir):
+        listing.extend((os.path.join(path, dir_path) + "/" for dir_path in dirs))
+        listing.extend((os.path.join(path, file_name) for file_name in files))
+    return sorted(listing)

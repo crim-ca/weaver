@@ -35,15 +35,17 @@ from tests.utils import (
     mocked_aws_s3,
     mocked_aws_s3_bucket_test_file,
     mocked_file_response,
-    mocked_file_server
+    mocked_file_server,
+    setup_test_file_hierarchy
 )
 from weaver import xml_util
 from weaver.execute import ExecuteControlOption, ExecuteMode
-from weaver.formats import ContentType
+from weaver.formats import ContentType, repr_json
 from weaver.status import JOB_STATUS_CATEGORIES, STATUS_PYWPS_IDS, STATUS_PYWPS_MAP, Status, StatusCompliant, map_status
 from weaver.utils import (
     NullType,
     OutputMethod,
+    PathMatchingMethod,
     VersionLevel,
     apply_number_with_unit,
     assert_sane_name,
@@ -609,22 +611,13 @@ def test_fetch_directory_html(include_dir_heading,       # type: bool
             "another/info.txt",
             "another/nested/data.txt",
         ]
-        for file in test_http_dir_files:
-            dir_path, file_path = os.path.split(file)
-            if dir_path:
-                dir_path = os.path.join(tmp_dir, dir_path)
-                file_path = os.path.join(dir_path, file_path)
-                os.makedirs(dir_path, exist_ok=True)
-            else:
-                file_path = os.path.join(tmp_dir, file_path)
-            with open(file_path, mode="w", encoding="utf-8") as f:
-                f.write("data")
+        test_dir_files = setup_test_file_hierarchy(test_http_dir_files, tmp_dir)
 
         out_dir = stack.enter_context(tempfile.TemporaryDirectory())
         out_files = fetch_directory(f"{tmp_host}/dir/", out_dir)
         expect_files = filter(lambda _f: _f.startswith("dir/"), test_http_dir_files)
         expect_files = [os.path.join(out_dir, file.split("/", 1)[-1]) for file in expect_files]
-        assert list(out_files) == sorted(expect_files)
+        assert list(out_files) == sorted(expect_files), f"Test dir:\n{repr_json(test_dir_files, indent=2)}"
 
 
 class TemporaryLinkableDirectory(tempfile.TemporaryDirectory):
@@ -639,41 +632,110 @@ class TemporaryLinkableDirectory(tempfile.TemporaryDirectory):
 
 
 @pytest.mark.parametrize("listing_dir,out_method,include,exclude,expect_files", [  # expect_files[i] = (Path, IsLink)
-    ("dir/", OutputMethod.LINK, None, None, [
+    ("dir/", OutputMethod.LINK, None, None, PathMatchingMethod.REGEX, [
         ("dir/", True),
         ("dir/file.txt", False),
         ("dir/sub/file.tmp", False),
         ("dir/sub/nested/file.cfg", False),
         ("dir/other/meta.txt", False),
     ]),
+    ("dir/", OutputMethod.COPY, None, None, PathMatchingMethod.REGEX, [
+        ("dir/", False),
+        ("dir/file.txt", False),
+        ("dir/sub/file.tmp", False),
+        ("dir/sub/nested/file.cfg", False),
+        ("dir/other/meta.txt", False),
+    ]),
+    ("dir/", OutputMethod.MOVE, None, None, PathMatchingMethod.REGEX, [
+        ("dir/", False),
+        ("dir/file.txt", False),
+        ("dir/sub/file.tmp", False),
+        ("dir/sub/nested/file.cfg", False),
+        ("dir/other/meta.txt", False),
+    ]),
+    ("dir/", OutputMethod.AUTO, None, None, PathMatchingMethod.REGEX, [
+        ("dir/", True),
+        ("dir/file.txt", False),
+        ("dir/sub/file.tmp", False),
+        ("dir/sub/nested/file.cfg", False),
+        ("dir/other/meta.txt", False),
+    ]),
+    ("another/", OutputMethod.LINK, None, None, PathMatchingMethod.REGEX, [
+        ("another/", True),
+        ("another/info.txt", False),
+        ("another/nested/data.txt", False),
+        ("another/nested/link.txt", True),
+        ("another/link-dir/", True),
+        ("another/link-dir/file.txt", False),
+        ("another/link-dir/sub/file.tmp", False),
+        ("another/link-dir/sub/nested/file.cfg", False),
+        ("another/link-dir/other/meta.txt", False),
+        ("another/link-dir/other/meta.txt", False),
+    ]),
+    ("another/", OutputMethod.COPY, None, None, PathMatchingMethod.REGEX, [
+        ("another/", False),
+        ("another/info.txt", False),
+        ("another/nested/data.txt", False),
+        ("another/nested/link.txt", False),
+        ("another/link-dir/", False),
+        ("another/link-dir/file.txt", False),
+        ("another/link-dir/sub/file.tmp", False),
+        ("another/link-dir/sub/nested/file.cfg", False),
+        ("another/link-dir/other/meta.txt", False),
+        ("another/link-dir/other/meta.txt", False),
+    ]),
+    ("another/", OutputMethod.MOVE, None, None, PathMatchingMethod.REGEX, [
+        ("another/", False),
+        ("another/info.txt", False),
+        ("another/nested/data.txt", False),
+        ("another/nested/link.txt", True),
+        ("another/link-dir/", True),
+        ("another/link-dir/file.txt", False),
+        ("another/link-dir/sub/file.tmp", False),
+        ("another/link-dir/sub/nested/file.cfg", False),
+        ("another/link-dir/other/meta.txt", False),
+        ("another/link-dir/other/meta.txt", False),
+    ]),
+    ("another/", OutputMethod.AUTO, None, None, PathMatchingMethod.REGEX, [
+        ("another/", False),
+        ("another/info.txt", False),
+        ("another/nested/data.txt", False),
+        ("another/nested/link.txt", True),
+        ("another/link-dir/", True),
+        ("another/link-dir/file.txt", False),
+        ("another/link-dir/sub/file.tmp", False),
+        ("another/link-dir/sub/nested/file.cfg", False),
+        ("another/link-dir/other/meta.txt", False),
+        ("another/link-dir/other/meta.txt", False),
+    ]),
 ])
-def test_fetch_directory_local(listing_dir, out_method, include, exclude, expect_files):
-    # type: (str, OutputMethod, Optional[List[str]], Optional[List[str]], List[Tuple[str, bool]]) -> None
+def test_fetch_directory_local(listing_dir,     # type: str
+                               out_method,      # type: OutputMethod
+                               include,         # type: Optional[List[str]]
+                               exclude,         # type: Optional[List[str]]
+                               matcher,         # type: PathMatchingMethod
+                               expect_files,    # type: List[Tuple[str, bool]]
+                               ):               # type: (...) -> None
     with contextlib.ExitStack() as stack:
         tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())
         test_dir_files = [
-            "main.txt",
-            "dir/file.txt",
-            "dir/sub/file.tmp",
-            "dir/sub/nested/file.cfg",
-            "dir/other/meta.txt",
-            "another/info.txt",
-            "another/nested/data.txt",
+            ("main.txt", None),
+            ("dir/file.txt", None),
+            ("dir/sub/file.tmp", None),
+            ("dir/sub/nested/file.cfg", None),
+            ("dir/other/meta.txt", None),
+            ("another/info.txt", None),
+            ("another/nested/data.txt", None),
+            ("another/nested/link.txt", "dir/file.txt"),
+            ("another/link-dir/", "dir/"),
+            ("link/another/", "another/"),
         ]
-        for file in test_dir_files:
-            dir_path, file_path = os.path.split(file)
-            if dir_path:
-                dir_path = os.path.join(tmp_dir, dir_path)
-                file_path = os.path.join(dir_path, file_path)
-                os.makedirs(dir_path, exist_ok=True)
-            else:
-                file_path = os.path.join(tmp_dir, file_path)
-            with open(file_path, mode="w", encoding="utf-8") as f:
-                f.write("data")
+        test_dir_files = setup_test_file_hierarchy(test_dir_files, tmp_dir)
 
+        # test
         out_dir = stack.enter_context(TemporaryLinkableDirectory())  # must exist, but can be replaced by link if needed
         out_files = fetch_directory(f"file://{tmp_dir}/{listing_dir}", out_dir,
-                                    out_method=out_method, include=include, exclude=exclude)
+                                    out_method=out_method, include=include, exclude=exclude, matcher=matcher)
         out_files = [(out, os.path.islink(out)) for out in out_files]
         # get dirs only for link checks, they are not expected from output listing
         expect_dirs = [path for path in expect_files if path[0].endswith("/")]
@@ -682,23 +744,38 @@ def test_fetch_directory_local(listing_dir, out_method, include, exclude, expect
         expect_dirs = [(os.path.join(out_dir, path[0].split("/", 1)[-1]), path[1], path[0]) for path in expect_dirs]
         expect_files = [file for file in expect_files if not file[0].endswith("/")]
         expect_files = [(os.path.join(out_dir, file[0].split("/", 1)[-1]), file[1]) for file in expect_files]
-        assert list(out_files) == sorted(expect_files)
+        assert list(out_files) == sorted(expect_files), f"Test dir:\n{repr_json(test_dir_files, indent=2)}"
         out_dirs = [(path[0], os.path.islink(path[0].rstrip("/")), path[2]) for path in expect_dirs]
-        assert out_dirs == expect_dirs
+        assert out_dirs == expect_dirs, f"Test dir:\n{repr_json(test_dir_files, indent=2)}"
 
 
-@pytest.mark.parametrize("listing_dir,include,exclude,expect_files", [
-    ("dir/", None, None, [
+@pytest.mark.parametrize("listing_dir,include,exclude,matcher,expect_files", [
+    ("dir/", None, None, PathMatchingMethod.REGEX, [
         "dir/file.txt",
         "dir/sub/file.tmp",
         "dir/sub/nested/file.cfg",
         "dir/other/meta.txt",
     ]),
-    ("dir/", None, [r".*/.*\.txt"], [
+    ("dir/", None, [r".*/.*\.txt"], PathMatchingMethod.REGEX, [
+        # 'dir/file.txt' becomes 'file.txt' (at root of out-dir) after resolution with 'dir/' listing
+        # since the exclude pattern has a '/' in it, it is not matched with relative path resolution
+        "dir/file.txt",
         "dir/sub/file.tmp",
         "dir/sub/nested/file.cfg",
     ]),
-    ("dir/", [r".*/.*\.txt"], None, [
+    ("dir/", None, [r".*\.txt"], PathMatchingMethod.REGEX, [
+        "dir/sub/file.tmp",
+        "dir/sub/nested/file.cfg",
+    ]),
+    ("dir/", [r".*/.*\.txt"], None, PathMatchingMethod.REGEX, [
+        # adding include does not 'force' only those to be matched
+        # only
+        "dir/file.txt",
+        "dir/other/meta.txt",
+        "dir/sub/nested/file.cfg",
+        "dir/other/meta.txt",
+    ]),
+    ("dir/", [r".*\.txt"], None, PathMatchingMethod.REGEX, [
         "dir/file.txt",
         "dir/other/meta.txt",
     ]),
@@ -707,13 +784,13 @@ def test_fetch_directory_local(listing_dir, out_method, include, exclude, expect
         "dir/sub/file.tmp",
         "dir/sub/nested/file.cfg",
     ]),
-    ("", None, [r"dir/.*", r".*info.*"], [
+    ("", None, [r"dir/.*", r".*info.*"], PathMatchingMethod.REGEX, [
         "main.txt",
         "another/nested/data.txt",
     ]),
 ])
-def test_fetch_directory_filters(listing_dir, include, exclude, expect_files):
-    # type: (str, Optional[List[str]], Optional[List[str]], List[str]) -> None
+def test_fetch_directory_filters(listing_dir, include, exclude, matcher, expect_files):
+    # type: (str, Optional[List[str]], Optional[List[str]], PathMatchingMethod, List[str]) -> None
     with contextlib.ExitStack() as stack:
         tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())
         test_dir_files = [
@@ -725,21 +802,13 @@ def test_fetch_directory_filters(listing_dir, include, exclude, expect_files):
             "another/info.txt",
             "another/nested/data.txt",
         ]
-        for file in test_dir_files:
-            dir_path, file_path = os.path.split(file)
-            if dir_path:
-                dir_path = os.path.join(tmp_dir, dir_path)
-                file_path = os.path.join(dir_path, file_path)
-                os.makedirs(dir_path, exist_ok=True)
-            else:
-                file_path = os.path.join(tmp_dir, file_path)
-            with open(file_path, mode="w", encoding="utf-8") as f:
-                f.write("data")
+        test_dir_files = setup_test_file_hierarchy(test_dir_files, tmp_dir)
 
         out_dir = stack.enter_context(tempfile.TemporaryDirectory())
-        out_files = fetch_directory(f"file://{tmp_dir}/{listing_dir}", out_dir, include=include, exclude=exclude)
+        out_files = fetch_directory(f"file://{tmp_dir}/{listing_dir}", out_dir,
+                                    include=include, exclude=exclude, matcher=matcher)
         expect_files = [os.path.join(out_dir, file.split("/", 1)[-1]) for file in expect_files]
-        assert list(out_files) == sorted(expect_files)
+        assert list(out_files) == sorted(expect_files), f"Test dir:\n{repr_json(test_dir_files, indent=2)}"
 
 
 def test_fetch_directory_raise_missing_trailing_slash():
