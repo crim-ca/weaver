@@ -694,7 +694,7 @@ if TYPE_CHECKING:
         "responses": NotRequired[Dict[str, OpenAPISpecResponse]],    # Swagger 2.0, OpenAPI 3.0: 'components/responses'
         "externalDocs": NotRequired[OpenAPISpecExternalDocs],
     }, total=True)
-    
+
     FormatMediaType = TypedDict("FormatMediaType", {
         "mediaType": Required[str],
         "encoding": NotRequired[Optional[str]],

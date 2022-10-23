@@ -2336,7 +2336,7 @@ def download_files_url(file_references,                     # type: Iterable[str
                 raise ValueError(f"Cannot download relative reference [{_file_path}] without a base URL.")
             _file_path = _file_path.strip("/")
             _out_file = os.path.join(out_dir, _file_path)
-            _file_ref = os.path.join(base_url, _file_path)
+            _file_path = os.path.join(base_url, _file_path)
         elif base_url and _file_path.startswith(base_url):
             _out_file = os.path.join(out_dir, _file_path.replace(base_url, ""))
         else:
