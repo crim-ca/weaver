@@ -179,9 +179,6 @@ if TYPE_CHECKING:
     class ExtendedClass(OriginalClass, ExtenderMixin):
         ...
 
-    TaskInputType = TypeVar("TaskInputType")
-    TaskOutputType = TypeVar("TaskOutputType")
-
 
 LOGGER = logging.getLogger(__name__)
 
@@ -2553,8 +2550,9 @@ def adjust_directory_local(location,                            # type: Path
 
     # avoid unnecessary copy of files marked for exclusion
     def copy_func(src, dst, *args, **kwargs):
-        if dst in filtered:
-            return shutil.copy2(src, dst, *args, **kwargs)
+        # type: (Path, Path, *Any, **Any) -> None
+        if dst not in desired:
+            shutil.copy2(src, dst, *args, **kwargs)
 
     if out_method == OutputMethod.MOVE:
         # Calling 'shutil.move' raises 'NotADirectoryError' if the source directory is a link
@@ -2588,7 +2586,7 @@ def list_directory_recursive(directory):
     """
     Local directory listing of files recursively.
     """
-    for path, dirs, files in os.walk(directory):
+    for path, _, files in os.walk(directory):
         for file_name in files:
             yield os.path.join(path, file_name)
 

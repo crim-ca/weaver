@@ -867,13 +867,13 @@ def is_cwl_array_type(io_info, strict=True):
         Parameter ``io_item`` should correspond to field ``items`` of an array I/O definition.
         Simple pass-through if the array item is not an ``enum``.
         """
-        _is_enum, _enum_type, _enum_mode, _enum_allow = is_cwl_enum_type({"type": _io_item})  # noqa: typing
-        if _is_enum:
+        _def = is_cwl_enum_type({"type": _io_item})
+        if _def.enum:
             LOGGER.debug("I/O [%s] parsed as 'array' with sub-item as 'enum'", io_info["name"])
-            io_return.type = _enum_type
-            io_return.mode = _enum_mode
-            io_return.symbols = _enum_allow  # type: ignore
-        return _is_enum
+            io_return.type = _def.type
+            io_return.mode = _def.mode
+            io_return.symbols = _def.symbols
+        return _def.enum
 
     # optional I/O could be an array of '["null", "<type>"]' with "<type>" being any of the formats parsed after
     # is it the literal representation instead of the shorthand with '?'
@@ -997,7 +997,7 @@ class CWLIODefinition:
     type: "Union[CWL_IO_LiteralType, CWL_IO_ComplexType]" = None
     """
     Type of the :term:`CWL` I/O.
-    
+
     If :attr:`enum` is ``True``, represents the enum base type.
     If :attr:`array` is ``True``, represents the item type.
     """
@@ -1005,7 +1005,7 @@ class CWLIODefinition:
     null: bool = False
     """
     Indicates if the I/O is nullable.
-     
+
     This is obtained from a type composed of ``"null"`` and something else,
     or using the shorthand ``{type}?`` notation.
     """
@@ -1013,18 +1013,18 @@ class CWLIODefinition:
     min_occurs: int = 1
     """
     Minimum number of occurrences allowed.
-    
+
     When :attr:`null` is ``True``, it is equal to ``0``.
     Otherwise, it is greater or equal to ``1``.
-    If greater than ``1``, :attr:`array` should be ``True``. 
+    If greater than ``1``, :attr:`array` should be ``True``.
     """
 
     max_occurs: int = 1
     """
     Maximum number of occurrences allowed.
-    
+
     Applies only when :attr:`array` is ``True``. Otherwise, always equal to ``1``.
-    Can take the value :data:`PACKAGE_ARRAY_MAX_SIZE` to represent ``"unbounded"`` occurrences. 
+    Can take the value :data:`PACKAGE_ARRAY_MAX_SIZE` to represent ``"unbounded"`` occurrences.
     """
 
     array: bool = False
@@ -1040,8 +1040,8 @@ class CWLIODefinition:
     symbols: "Union[CWL_IO_EnumSymbols, AnyValue, Type[AnyValue]]" = AnyValue
     mode: MODE = MODE.NONE
     """
-    Validation mode to be applied if I/O requires it. 
-    
+    Validation mode to be applied if I/O requires it.
+
     Defaults to :attr:`MODE.NONE`. Indicates how strict the validation must be.
     Usually applies when an enum must only allow a specific set of symbols.
     Can also be used with Media-Types in more advanced validation use case with :mod:`pywps`.
