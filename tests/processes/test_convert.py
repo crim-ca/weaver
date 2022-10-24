@@ -441,6 +441,7 @@ def test_is_cwl_array_type_shorthand_invalid_item():
     try:
         res = is_cwl_array_type(io_info)
         assert res.array is False
+        assert res.enum is False
         assert res.type == "unknown[]"
         assert res.mode == MODE.NONE
         assert res.symbols == AnyValue
@@ -468,9 +469,10 @@ def test_is_cwl_array_type_simple_enum():
     }
     res = is_cwl_array_type(io_info)
     assert res.array is False
-    assert res.type == "enum"
-    assert res.mode == MODE.NONE
-    assert res.symbols == AnyValue
+    assert res.enum is True
+    assert res.type == "string"
+    assert res.mode == MODE.SIMPLE
+    assert res.symbols == ["a", "b", "c"]
 
 
 def test_is_cwl_array_type_explicit_base():
@@ -483,6 +485,7 @@ def test_is_cwl_array_type_explicit_base():
     }
     res = is_cwl_array_type(io_info)
     assert res.array is True
+    assert res.enum is False
     assert res.type == "string"
     assert res.mode == MODE.NONE
     assert res.symbols == AnyValue
@@ -501,6 +504,7 @@ def test_is_cwl_array_type_explicit_enum():
     }
     res = is_cwl_array_type(io_info)
     assert res.array is True
+    assert res.enum is True
     assert res.type == "string"
     assert res.mode == MODE.SIMPLE
     assert res.symbols == ["a", "b", "c"]
@@ -513,6 +517,7 @@ def test_is_cwl_array_type_shorthand_base():
     }
     res = is_cwl_array_type(io_info)
     assert res.array is True
+    assert res.enum is False
     assert res.type == "string"
     assert res.mode == MODE.NONE
     assert res.symbols == AnyValue
@@ -526,6 +531,7 @@ def test_is_cwl_array_type_shorthand_enum():
     }
     res = is_cwl_array_type(io_info)
     assert res.array is True
+    assert res.enum is True
     assert res.type == "string"
     assert res.mode == MODE.SIMPLE
     assert res.symbols == ["a", "b", "c"]
@@ -538,6 +544,7 @@ def test_is_cwl_array_type_explicit_optional_not_array():
     }
     res = is_cwl_array_type(io_info)
     assert res.array is False
+    assert res.enum is False
     assert res.type == "float"
     assert res.mode == MODE.NONE
     assert res.symbols == AnyValue
@@ -551,6 +558,7 @@ def test_is_cwl_array_type_explicit_optional_simple_enum():
     }
     res = is_cwl_array_type(io_info)
     assert res.array is False
+    assert res.enum is False
     assert res.type == "enum"
     assert res.mode == MODE.NONE
     assert res.symbols == AnyValue
@@ -566,6 +574,7 @@ def test_is_cwl_array_type_explicit_optional_explicit_base():
     }
     res = is_cwl_array_type(io_info)
     assert res.array is True
+    assert res.enum is False
     assert res.type == "string"
     assert res.mode == MODE.NONE
     assert res.symbols == AnyValue
@@ -587,6 +596,7 @@ def test_is_cwl_array_type_explicit_optional_explicit_enum():
     }
     res = is_cwl_array_type(io_info)
     assert res.array is True
+    assert res.enum is True
     assert res.type == "string"
     assert res.mode == MODE.SIMPLE
     assert res.symbols == ["a", "b", "c"]
@@ -599,6 +609,7 @@ def test_is_cwl_array_type_explicit_optional_shorthand_base():
     }
     res = is_cwl_array_type(io_info)
     assert res.array is True
+    assert res.enum is False
     assert res.type == "string"
     assert res.mode == MODE.NONE
     assert res.symbols == AnyValue
@@ -612,6 +623,7 @@ def test_is_cwl_array_type_explicit_optional_shorthand_enum():
     }
     res = is_cwl_array_type(io_info)
     assert res.array is True
+    assert res.enum is True
     assert res.type == "string"
     assert res.mode == MODE.SIMPLE
     assert res.symbols == ["a", "b", "c"]
@@ -626,7 +638,8 @@ def test_is_cwl_enum_type_string():
         }
     }
     res = is_cwl_enum_type(io_info)
-    assert res.array is True
+    assert res.array is False
+    assert res.enum is True
     assert res.type == "string"
     assert res.mode == MODE.SIMPLE
     assert res.symbols == ["a", "b", "c"]
@@ -641,7 +654,8 @@ def test_is_cwl_enum_type_float():
         }
     }
     res = is_cwl_enum_type(io_info)
-    assert res.array is True
+    assert res.array is False
+    assert res.enum is True
     assert res.type == "float"
     assert res.mode == MODE.SIMPLE
     assert res.symbols == [1.9, 2.8, 3.7]
@@ -656,7 +670,8 @@ def test_is_cwl_enum_type_int():
         }
     }
     res = is_cwl_enum_type(io_info)
-    assert res.array is True
+    assert res.array is False
+    assert res.enum is True
     assert res.type == "int"
     assert res.mode == MODE.SIMPLE
     assert res.symbols == [1, 2, 3]

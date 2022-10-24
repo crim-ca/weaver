@@ -870,6 +870,7 @@ def is_cwl_array_type(io_info, strict=True):
         _def = is_cwl_enum_type({"type": _io_item})
         if _def.enum:
             LOGGER.debug("I/O [%s] parsed as 'array' with sub-item as 'enum'", io_info["name"])
+            io_return.enum = True
             io_return.type = _def.type
             io_return.mode = _def.mode
             io_return.symbols = _def.symbols
@@ -917,6 +918,13 @@ def is_cwl_array_type(io_info, strict=True):
             raise PackageTypeError(f"Unsupported I/O 'array' definition: '{io_info!r}'.")
         LOGGER.debug("I/O [%s] parsed as 'array' with shorthand '[]' notation", io_info["name"])
         io_return.array = True
+
+    # in case the I/O was not an array parsed with one of the above conditions,
+    # still check for enum to be consistant in returned definition if one was provided
+    try:
+        _update_if_sub_enum(io_info)
+    except PackageTypeError:
+        pass
     return io_return
 
 
@@ -929,7 +937,18 @@ def is_cwl_enum_type(io_info):
     :raises PackageTypeError: if the enum doesn't have the required parameters and valid format.
     """
     io_type = get_cwl_io_type_name(io_info["type"])
-    if not isinstance(io_type, dict) or "type" not in io_type or io_type["type"] not in PACKAGE_CUSTOM_TYPES:
+    if not isinstance(io_type, dict) or "type" not in io_type:
+        io_def = CWLIODefinition(
+            type=io_type,
+            enum=False,
+            mode=MODE.NONE,
+        )
+        return io_def
+    if isinstance(io_type, dict) and "type" in io_type and (
+        isinstance(io_type["type"], str) and io_type["type"] not in PACKAGE_CUSTOM_TYPES or
+        isinstance(io_type["type"], list)
+    ):
+        io_type = io_type["type"] if isinstance(io_type["type"], str) else PACKAGE_ARRAY_BASE
         io_def = CWLIODefinition(
             type=io_type,
             enum=False,
@@ -1110,7 +1129,7 @@ def get_cwl_io_type(io_info, strict=True):
             # check that many sub-type definitions all match same base type (no conflicting literals)
             io_type_many = set()
             io_base_type = None
-            for i, typ in enumerate(io_type):
+            for i, typ in enumerate(io_type, start=int(is_null)):
                 typ = get_cwl_io_type_name(typ)
                 io_name = io_info["name"]
                 sub_type = {"type": typ, "name": f"{io_name}[{i}]"}  # type: CWL_IO_Type
@@ -1147,11 +1166,19 @@ def get_cwl_io_type(io_info, strict=True):
 
     # convert enum types
     enum_io_def = is_cwl_enum_type(io_info)
+    is_enum = False
     if enum_io_def.enum:
-        LOGGER.debug("I/O parsed for 'enum'")
+        LOGGER.debug("I/O parsed for 'enum' from base")
         io_type = enum_io_def.type
         io_allow = enum_io_def.symbols
         io_mode = enum_io_def.mode
+        is_enum = True
+    elif array_io_def.enum:
+        LOGGER.debug("I/O parsed for 'enum' from array")
+        io_type = array_io_def.type
+        io_allow = array_io_def.symbols
+        io_mode = array_io_def.mode
+        is_enum = True
 
     # debug info for unhandled types conversion
     if not isinstance(io_type, str):
@@ -1182,7 +1209,7 @@ def get_cwl_io_type(io_info, strict=True):
         min_occurs=io_min_occurs,
         max_occurs=io_max_occurs,
         array=array_io_def.array,
-        enum=enum_io_def.enum,
+        enum=is_enum,
         symbols=io_allow,
         mode=io_mode,
     )
@@ -1787,7 +1814,7 @@ def json2oas_io_bbox(io_info, io_hint=null):
         "properties": {
             "crs": crs_schema,
             "bbox": {
-                "type": "array",
+                "type": PACKAGE_ARRAY_BASE,
                 "items": "number",
                 "oneOf": [
                     {"minItems": 4, "maxItems": 4},
@@ -1979,7 +2006,7 @@ def json2oas_io(io_info, io_hint=null):
     # because specified single-value/objects *MUST* be provided, optional can be represented only by zero-length array
     if isinstance(min_occurs, int) and (min_occurs == 0 or min_occurs > 1):
         io_schema = {
-            "type": "array",
+            "type": PACKAGE_ARRAY_BASE,
             "items": item_schema,
             "minItems": min_occurs,
         }
@@ -1988,7 +2015,7 @@ def json2oas_io(io_info, io_hint=null):
     elif max_occurs == 1 or max_occurs is null:  # assume unspecified is default=1
         io_schema = item_schema
     else:
-        array_schema = {"type": "array", "items": item_schema}
+        array_schema = {"type": PACKAGE_ARRAY_BASE, "items": item_schema}
         if isinstance(min_occurs, int):
             array_schema["minItems"] = min_occurs
         if isinstance(max_occurs, int):
