@@ -8,8 +8,9 @@ import os
 from collections import OrderedDict
 from collections.abc import Hashable
 from copy import deepcopy
+from dataclasses import dataclass
 from tempfile import TemporaryDirectory
-from typing import TYPE_CHECKING, NamedTuple
+from typing import TYPE_CHECKING
 from urllib.parse import unquote, urlparse
 
 import colander
@@ -90,7 +91,7 @@ from weaver.wps.utils import get_wps_client
 from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
+    from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Type, Union
     from urllib.parse import ParseResult
 
     from pywps.app import WPSRequest
@@ -980,20 +981,31 @@ def get_cwl_io_type_name(io_type):
     return io_type
 
 
-class CWLIODefinition(NamedTuple):
+@dataclass
+class CWLIODefinition(object):
     """
     Utility :term:`CWL` I/O definition to contain metadata from parsing results.
 
     .. seealso::
         :func:`weaver.processes.convert.get_cwl_io_type`
     """
-    # NamedTuple natively provide 'tuple()', 'list()' conversions
-    # add method required to support 'dict()' conversion as well
-    def keys(self):  # type: () -> Tuple[str]
-        return self._fields
 
-    def __getitem__(self, key):  # type: (str) -> Any
+    # provide dataclass conversions for 'tuple()', 'list()', 'dict()'
+
+    def keys(self):
+        # type: () -> List[str]
+        fields = getattr(self, "__dataclass_fields__")
+        return list(fields)
+
+    def __getitem__(self, key):
+        # type: (str) -> Any
         return getattr(self, key)
+
+    def __iter__(self):
+        # type: () -> Iterator[Any]
+        for key in self.keys():
+            value = self[key]
+            yield value
 
     # --- FIELDS ---
 
