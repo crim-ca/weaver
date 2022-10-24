@@ -2587,7 +2587,7 @@ def list_directory_recursive(directory):
     """
     Local directory listing of files recursively.
     """
-    for path, _, files in os.walk(directory):
+    for path, _, files in os.walk(directory, followlinks=True):
         for file_name in files:
             yield os.path.join(path, file_name)
 

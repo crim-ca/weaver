@@ -641,6 +641,7 @@ class TemporaryLinkableDirectory(tempfile.TemporaryDirectory):
         ("dir/sub/file.tmp", False),
         ("dir/sub/nested/file.cfg", False),
         ("dir/other/meta.txt", False),
+        ("dir/other/link.lnk", True),
     ]),
     ("dir/", OutputMethod.COPY, None, None, PathMatchingMethod.REGEX, [
         ("dir/", False),
@@ -648,6 +649,7 @@ class TemporaryLinkableDirectory(tempfile.TemporaryDirectory):
         ("dir/sub/file.tmp", False),
         ("dir/sub/nested/file.cfg", False),
         ("dir/other/meta.txt", False),
+        ("dir/other/link.lnk", False),
     ]),
     ("dir/", OutputMethod.MOVE, None, None, PathMatchingMethod.REGEX, [
         ("dir/", False),
@@ -655,6 +657,7 @@ class TemporaryLinkableDirectory(tempfile.TemporaryDirectory):
         ("dir/sub/file.tmp", False),
         ("dir/sub/nested/file.cfg", False),
         ("dir/other/meta.txt", False),
+        ("dir/other/link.lnk", True),
     ]),
     ("dir/", OutputMethod.AUTO, None, None, PathMatchingMethod.REGEX, [
         ("dir/", False),
@@ -662,6 +665,7 @@ class TemporaryLinkableDirectory(tempfile.TemporaryDirectory):
         ("dir/sub/file.tmp", False),
         ("dir/sub/nested/file.cfg", False),
         ("dir/other/meta.txt", False),
+        ("dir/other/link.lnk", True),
     ]),
     ("another/", OutputMethod.LINK, None, None, PathMatchingMethod.REGEX, [
         ("another/", True),
@@ -673,7 +677,7 @@ class TemporaryLinkableDirectory(tempfile.TemporaryDirectory):
         ("another/link-dir/sub/file.tmp", False),
         ("another/link-dir/sub/nested/file.cfg", False),
         ("another/link-dir/other/meta.txt", False),
-        ("another/link-dir/other/meta.txt", False),
+        ("another/link-dir/other/link.lnk", True),
     ]),
     ("another/", OutputMethod.COPY, None, None, PathMatchingMethod.REGEX, [
         ("another/", False),
@@ -685,7 +689,7 @@ class TemporaryLinkableDirectory(tempfile.TemporaryDirectory):
         ("another/link-dir/sub/file.tmp", False),
         ("another/link-dir/sub/nested/file.cfg", False),
         ("another/link-dir/other/meta.txt", False),
-        ("another/link-dir/other/meta.txt", False),
+        ("another/link-dir/other/link.lnk", False),
     ]),
     ("another/", OutputMethod.MOVE, None, None, PathMatchingMethod.REGEX, [
         ("another/", False),
@@ -697,7 +701,7 @@ class TemporaryLinkableDirectory(tempfile.TemporaryDirectory):
         ("another/link-dir/sub/file.tmp", False),
         ("another/link-dir/sub/nested/file.cfg", False),
         ("another/link-dir/other/meta.txt", False),
-        ("another/link-dir/other/meta.txt", False),
+        ("another/link-dir/other/link.lnk", True),
     ]),
     ("another/", OutputMethod.AUTO, None, None, PathMatchingMethod.REGEX, [
         ("another/", False),
@@ -709,7 +713,59 @@ class TemporaryLinkableDirectory(tempfile.TemporaryDirectory):
         ("another/link-dir/sub/file.tmp", False),
         ("another/link-dir/sub/nested/file.cfg", False),
         ("another/link-dir/other/meta.txt", False),
-        ("another/link-dir/other/meta.txt", False),
+        ("another/link-dir/other/link.lnk", True),
+    ]),
+    ("link/", OutputMethod.LINK, None, None, PathMatchingMethod.REGEX, [
+        ("link/", True),
+        ("link/another/", True),
+        ("link/another/info.txt", False),
+        ("link/another/nested/data.txt", False),
+        ("link/another/nested/link.txt", True),
+        ("link/another/link-dir/", True),
+        ("link/another/link-dir/file.txt", False),
+        ("link/another/link-dir/sub/file.tmp", False),
+        ("link/another/link-dir/sub/nested/file.cfg", False),
+        ("link/another/link-dir/other/meta.txt", False),
+        ("link/another/link-dir/other/link.lnk", True),
+    ]),
+    ("link/", OutputMethod.COPY, None, None, PathMatchingMethod.REGEX, [
+        ("link/", False),
+        ("link/another/", False),
+        ("link/another/info.txt", False),
+        ("link/another/nested/data.txt", False),
+        ("link/another/nested/link.txt", False),
+        ("link/another/link-dir/", False),
+        ("link/another/link-dir/file.txt", False),
+        ("link/another/link-dir/sub/file.tmp", False),
+        ("link/another/link-dir/sub/nested/file.cfg", False),
+        ("link/another/link-dir/other/meta.txt", False),
+        ("link/another/link-dir/other/link.lnk", False),
+    ]),
+    ("link/", OutputMethod.MOVE, None, None, PathMatchingMethod.REGEX, [
+        ("link/", False),
+        ("link/another/", True),
+        ("link/another/info.txt", False),
+        ("link/another/nested/data.txt", False),
+        ("link/another/nested/link.txt", True),
+        ("link/another/link-dir/", True),
+        ("link/another/link-dir/file.txt", False),
+        ("link/another/link-dir/sub/file.tmp", False),
+        ("link/another/link-dir/sub/nested/file.cfg", False),
+        ("link/another/link-dir/other/meta.txt", False),
+        ("link/another/link-dir/other/link.lnk", True),
+    ]),
+    ("link/", OutputMethod.AUTO, None, None, PathMatchingMethod.REGEX, [
+        ("link/", False),
+        ("link/another/", True),
+        ("link/another/info.txt", False),
+        ("link/another/nested/data.txt", False),
+        ("link/another/nested/link.txt", True),
+        ("link/another/link-dir/", True),
+        ("link/another/link-dir/file.txt", False),
+        ("link/another/link-dir/sub/file.tmp", False),
+        ("link/another/link-dir/sub/nested/file.cfg", False),
+        ("link/another/link-dir/other/meta.txt", False),
+        ("link/another/link-dir/other/link.lnk", True),
     ]),
 ])
 def test_fetch_directory_local(listing_dir,     # type: str
@@ -727,6 +783,7 @@ def test_fetch_directory_local(listing_dir,     # type: str
             ("dir/sub/file.tmp", None),
             ("dir/sub/nested/file.cfg", None),
             ("dir/other/meta.txt", None),
+            ("dir/other/link.lnk", "main.txt"),
             ("another/info.txt", None),
             ("another/nested/data.txt", None),
             ("another/nested/link.txt", "dir/file.txt"),
@@ -768,11 +825,29 @@ def test_fetch_directory_local(listing_dir,     # type: str
         "dir/sub/file.tmp",
         "dir/sub/nested/file.cfg",
     ]),
+    ("dir/", None, [r"*/*.txt"], PathMatchingMethod.GLOB, [
+        # 'dir/file.txt' becomes 'file.txt' (at root of out-dir) after resolution with 'dir/' listing
+        # since the exclude pattern has a '/' in it, it is not matched with relative path resolution
+        "dir/file.txt",
+        "dir/sub/file.tmp",
+        "dir/sub/nested/file.cfg",
+    ]),
     ("dir/", None, [r".*\.txt"], PathMatchingMethod.REGEX, [
         "dir/sub/file.tmp",
         "dir/sub/nested/file.cfg",
     ]),
+    ("dir/", None, [r"*.txt"], PathMatchingMethod.GLOB, [
+        "dir/sub/file.tmp",
+        "dir/sub/nested/file.cfg",
+    ]),
     ("dir/", [r".*/.*\.txt"], None, PathMatchingMethod.REGEX, [
+        # adding include does not 'force' only those to be matched, only to "add back" excluded
+        "dir/file.txt",
+        "dir/sub/file.tmp",
+        "dir/sub/nested/file.cfg",
+        "dir/other/meta.txt",
+    ]),
+    ("dir/", [r"*/*.txt"], None, PathMatchingMethod.GLOB, [
         # adding include does not 'force' only those to be matched, only to "add back" excluded
         "dir/file.txt",
         "dir/sub/file.tmp",
@@ -785,12 +860,27 @@ def test_fetch_directory_local(listing_dir,     # type: str
         "dir/sub/nested/file.cfg",
         "dir/other/meta.txt",
     ]),
+    ("dir/", [r"*.txt"], None, PathMatchingMethod.GLOB, [
+        "dir/file.txt",
+        "dir/sub/file.tmp",
+        "dir/sub/nested/file.cfg",
+        "dir/other/meta.txt",
+    ]),
     ("dir/", [r".*file\.txt"], [r".*\.txt"], PathMatchingMethod.REGEX, [
         "dir/file.txt",  # initially excluded, but the added back due to include
         "dir/sub/file.tmp",
         "dir/sub/nested/file.cfg",
     ]),
-    ("", None, [r"dir/.*", r".*info.*"], PathMatchingMethod.REGEX, [
+    ("dir/", [r"*file.txt"], [r"*.txt"], PathMatchingMethod.GLOB, [
+        "dir/file.txt",  # initially excluded, but the added back due to include
+        "dir/sub/file.tmp",
+        "dir/sub/nested/file.cfg",
+    ]),
+    ("", None, [r"dir/.*", r".*info\..*"], PathMatchingMethod.REGEX, [
+        "main.txt",
+        "another/nested/data.txt",
+    ]),
+    ("", None, [r"dir/*", r"*info.*"], PathMatchingMethod.GLOB, [
         "main.txt",
         "another/nested/data.txt",
     ]),
