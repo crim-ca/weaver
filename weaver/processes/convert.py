@@ -8,9 +8,8 @@ import os
 from collections import OrderedDict
 from collections.abc import Hashable
 from copy import deepcopy
-from dataclasses import dataclass
 from tempfile import TemporaryDirectory
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 from urllib.parse import unquote, urlparse
 
 import colander
@@ -981,14 +980,23 @@ def get_cwl_io_type_name(io_type):
     return io_type
 
 
-@dataclass
-class CWLIODefinition:
+class CWLIODefinition(NamedTuple):
     """
     Utility :term:`CWL` I/O definition to contain metadata from parsing results.
 
     .. seealso::
         :func:`weaver.processes.convert.get_cwl_io_type`
     """
+    # NamedTuple natively provide 'tuple()', 'list()' conversions
+    # add method required to support 'dict()' conversion as well
+    def keys(self):  # type: () -> Tuple[str]
+        return self._fields
+
+    def __getitem__(self, key):  # type: (str) -> Any
+        return getattr(self, key)
+
+    # --- FIELDS ---
+
     name: str = ""
     """
     Name (or identifier) or the I/O.
