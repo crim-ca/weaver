@@ -62,6 +62,7 @@ from webob.headers import EnvironHeaders, ResponseHeaders
 from werkzeug.wrappers import Request as WerkzeugRequest
 from yaml.scanner import ScannerError
 
+import xml_util
 from weaver.base import Constants, ExtendedEnum
 from weaver.exceptions import WeaverException
 from weaver.execute import ExecuteControlOption, ExecuteMode
@@ -2419,7 +2420,7 @@ def download_files_html(html_data,                          # type: str
             ):
                 return []
             _data = _resp.text
-        _html = BeautifulSoup(_data)
+        _html = BeautifulSoup(_data, builder=xml_util.HTML_TREE_BUILDER)
         _href = (_ref.get("href") for _ref in _html.find_all("a", recursive=True))
         _href = filter_directory_forbidden(_href)  # preemptively remove forbidden items, avoid access/download attempts
         for _ref in _href:
