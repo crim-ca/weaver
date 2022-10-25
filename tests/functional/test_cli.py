@@ -29,7 +29,9 @@ from tests.utils import (
     mocked_sub_requests,
     mocked_wps_output,
     run_command,
-    setup_config_from_settings
+    setup_config_from_settings,
+    mocked_file_server,
+    mocked_reference_test_file
 )
 from weaver.base import classproperty
 from weaver.cli import AuthHandler, BearerAuthHandler, WeaverClient, main as weaver_cli
@@ -968,8 +970,8 @@ class TestWeaverCLI(TestWeaverClientBase):
         )
         assert "usage: weaver deploy" in lines[0]
         assert (  # any first that disallows
-            lines[-1] == "weaver deploy: error: argument -T/--token: not allowed with argument -U/--username" or
-            lines[-1] == "weaver deploy: error: argument -T/--token: not allowed with argument -P/--password"
+                lines[-1] == "weaver deploy: error: argument -T/--token: not allowed with argument -U/--username" or
+                lines[-1] == "weaver deploy: error: argument -T/--token: not allowed with argument -P/--password"
         )
 
     def test_deploy_docker_auth_username_or_password_missing_invalid(self):
@@ -1087,7 +1089,7 @@ class TestWeaverCLI(TestWeaverClientBase):
                 "-u", self.url,
                 "-p", test_id,
                 "--body", json.dumps(payload),  # literal JSON string accepted for CLI
-                "--cwl", json.dumps(package),   # literal JSON string accepted for CLI
+                "--cwl", json.dumps(package),  # literal JSON string accepted for CLI
             ],
             trim=False,
             entrypoint=weaver_cli,
@@ -1378,7 +1380,7 @@ class TestWeaverCLI(TestWeaverClientBase):
                     "results",
                     "-u", self.url,
                     "-j", job_id,
-                    "-wH",   # must display header to get 'Link'
+                    "-wH",  # must display header to get 'Link'
                     "-F", OutputFormat.YAML,
                 ],
                 trim=False,
@@ -1387,7 +1389,7 @@ class TestWeaverCLI(TestWeaverClientBase):
             )
             sep = lines.index("---")
             headers = lines[:sep]
-            content = lines[sep+1:-1]  # ignore final newline
+            content = lines[sep + 1:-1]  # ignore final newline
             assert len(headers) and any("Link:" in hdr for hdr in headers)
             assert content == ["null"], "When no download involved, body should be the original no-content results."
 
@@ -1398,7 +1400,7 @@ class TestWeaverCLI(TestWeaverClientBase):
                     "results",
                     "-u", self.url,
                     "-j", job_id,
-                    "-wH",   # must display header to get 'Link'
+                    "-wH",  # must display header to get 'Link'
                     "-F", OutputFormat.YAML,
                     "-D",
                     "-O", out_tmp
@@ -1409,7 +1411,7 @@ class TestWeaverCLI(TestWeaverClientBase):
             )
             sep = lines.index("---")
             headers = lines[:sep]
-            content = lines[sep+1:]
+            content = lines[sep + 1:]
 
             assert len(content), "Content should have been populated from download to provide downloaded file paths."
             link = None
@@ -1536,7 +1538,7 @@ class TestWeaverCLI(TestWeaverClientBase):
                 "jobs",
                 "-u", self.url,
                 "-S", Status.SUCCEEDED,
-                "-D",   # when details active, each job lists its own links
+                "-D",  # when details active, each job lists its own links
                 "-nL",  # unless links are requested to be removed (top-most and nested ones)
             ],
             trim=False,
@@ -1742,7 +1744,7 @@ class TestWeaverCLI(TestWeaverClientBase):
         sep = "---"
         sep_pos = lines.index(sep)
         assert any("Content-Type:" in line for line in lines[1:sep_pos])
-        result = lines[sep_pos+1:]
+        result = lines[sep_pos + 1:]
         assert len(result) > 1, "should be indented, pretty printed"
         assert result[0].startswith("{")
         assert result[-1].endswith("}")
@@ -1824,7 +1826,7 @@ class TestWeaverCLI(TestWeaverClientBase):
         sep = "---"
         sep_pos = lines.index(sep)
         assert any("Content-Type:" in line for line in lines[1:sep_pos])
-        result = lines[sep_pos+1:]
+        result = lines[sep_pos + 1:]
         assert len(result) > 1, "should be indented, pretty printed"
         assert result[0].startswith("<?xml")
         assert result[1].startswith("<result>")
@@ -1959,6 +1961,47 @@ class TestWeaverCLI(TestWeaverClientBase):
             assert len(lines)
             text = "".join(lines)
             assert expect in text
+
+    def test_execute_remote_input(self):
+        """
+        Verify that specified inputs are captured for a limited number of 1 item per ``-I`` option.
+        """
+        proc = self.test_process["CatFile"]
+        with contextlib.ExitStack() as stack_exec:
+            for mock_exec_proc in mocked_execute_celery():
+                stack_exec.enter_context(mock_exec_proc)
+            tmp_dir = stack_exec.enter_context(tempfile.TemporaryDirectory())
+            tmp_file = stack_exec.enter_context(
+                # NOTE:
+                #   It is important here that the base directory is NOT the WPS output dir.
+                #   Otherwise, mapping functions when executing the process will automatically resolve the file
+                #   as if "already available" and won't trigger HTTP download that is required for this test.
+                tempfile.NamedTemporaryFile(dir=tmp_dir, prefix="", suffix=".txt")
+            )
+            tmp_name_random = os.path.split(tmp_file.name)[-1]
+            tmp_path = mocked_reference_test_file(tmp_file.name, "", "random data")
+            tmp_http = map_wps_output_location(tmp_path, self.settings, url=True, exists=True)
+            assert tmp_http is None, "Failed setup of test file. Must not be available on WPS output location."
+            tmp_host = "http://random-file-server.com"
+            tmp_http = f"{tmp_host}/{tmp_name_random}"
+            stack_exec.enter_context(mocked_file_server(tmp_dir, tmp_host, self.settings))
+            lines = mocked_sub_requests(
+                self.app, run_command,
+                [
+                    # "weaver",
+                    "execute",
+                    "-u", self.url,
+                    "-p", proc,
+                    "-M",
+                    "-T", 10,
+                    "-W", 1,
+                    "-I", f"file={tmp_http}",
+                ],
+                trim=False,
+                entrypoint=weaver_cli,
+                only_local=True,
+            )
+            assert any(f"\"status\": \"{Status.SUCCEEDED}\"" in line for line in lines)
 
 
 class TestWeaverClientAuthBase(TestWeaverClientBase):
