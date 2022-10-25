@@ -25,13 +25,13 @@ from tests.utils import (
     get_weaver_url,
     mocked_dismiss_process,
     mocked_execute_celery,
+    mocked_file_server,
+    mocked_reference_test_file,
     mocked_remote_server_requests_wps1,
     mocked_sub_requests,
     mocked_wps_output,
     run_command,
-    setup_config_from_settings,
-    mocked_file_server,
-    mocked_reference_test_file
+    setup_config_from_settings
 )
 from weaver.base import classproperty
 from weaver.cli import AuthHandler, BearerAuthHandler, WeaverClient, main as weaver_cli
