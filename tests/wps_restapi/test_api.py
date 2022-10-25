@@ -32,6 +32,18 @@ class GenericApiRoutesTestCase(unittest.TestCase):
             self.fail(f"expected valid response format as defined in schema [{ex!s}] in\n{body}")
         refs = [link["rel"] for link in body["links"]]
         assert len(body["links"]) == len(set(refs)), "Link relationships must all be unique"
+
+        # override media-type with alternative representations for specific rel links
+        expect_ctype = {
+            "service-desc": ContentType.APP_OAS_JSON,
+            "OpenAPI": ContentType.APP_OAS_JSON,
+        }
+        # FIXME: patch broken content-type from reference websites
+        #  (see https://github.com/opengeospatial/NamingAuthority/issues/183)
+        ctype_header_links = {
+            "http://schemas.opengis.net/wps/": ContentType.APP_XML
+        }
+
         for link in body["links"]:
             path = link["href"]
             rtype = link["type"]
@@ -40,6 +52,10 @@ class GenericApiRoutesTestCase(unittest.TestCase):
             else:
                 rtype = [rtype]
             rel = link["rel"]
+            exact = False
+            if rel in expect_ctype:
+                exact = True
+                rtype = [expect_ctype[rel]]
 
             # request endpoint to validate it is accessible
             if "localhost" in path:
@@ -57,12 +73,9 @@ class GenericApiRoutesTestCase(unittest.TestCase):
             test = f"({rel}) [{path}]"
             assert code in [200, 400], f"Reference link expected to be found, got [{code}] for {test}"
 
-            # FIXME: patch broken content-type from reference websites
-            #  (see https://github.com/opengeospatial/NamingAuthority/issues/183)
-            ctype_header_links = {
-                "http://schemas.opengis.net/wps/": ContentType.APP_XML
-            }
-            ctype = resp.headers.get("Content-Type", "").split(";")[0].strip()
+            ctype = resp.headers.get("Content-Type", "")
+            if not exact:
+                ctype = ctype.split(";")[0].strip()
             if not ctype:
                 for ref_link in ctype_header_links:
                     if path.startswith(ref_link):

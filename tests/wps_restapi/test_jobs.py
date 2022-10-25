@@ -63,7 +63,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
         cls.settings = {
             "weaver.url": "https://localhost",
             "weaver.wps_email_encrypt_salt": "weaver-test",
-            "weaver.wps_output_dir": "/tmp/weaver-test/wps-outputs",
+            "weaver.wps_output_dir": "/tmp/weaver-test/wps-outputs",  # nosec: B108 # don't care hardcoded for test
         }
         cls.config = setup_config_with_mongodb(settings=cls.settings)
         cls.app = get_test_weaver_app(config=cls.config)
@@ -887,8 +887,8 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
         uri = sd.openapi_json_service.path
         resp = self.app.get(uri, headers=self.json_headers)
         schema_prefix = sd.GetProcessJobsQuery.__name__
-        assert not resp.json["parameters"][f"{schema_prefix}.page"]["required"]
-        assert not resp.json["parameters"][f"{schema_prefix}.limit"]["required"]
+        assert not resp.json["components"]["parameters"][f"{schema_prefix}.page"]["required"]
+        assert not resp.json["components"]["parameters"][f"{schema_prefix}.limit"]["required"]
 
     def test_get_jobs_filter_by_tags_single(self):
         path = get_path_kvp(sd.jobs_service.path, tags="unique", detail=False)

@@ -138,7 +138,7 @@ if TYPE_CHECKING:
         CWL_RequirementNames,
         CWL_RequirementsList,
         CWL_Results,
-        CWL_ToolPathObjectType,
+        CWL_ToolPathObject,
         CWL_WorkflowStepPackage,
         CWL_WorkflowStepPackageMap,
         CWL_WorkflowStepReference,
@@ -567,7 +567,7 @@ def _generate_process_with_cwl_from_reference(reference, process_hint=None):
                 f"Couldn't obtain a valid response from [{ref_wps}]. "
                 f"Service response: [{response.status_code} {response.reason}]"
             )
-        content_type = get_header("Content-Type", response.headers)
+        content_type = get_header("Content-Type", response.headers, default="")
         ogc_api_ctypes = {
             ContentType.APP_JSON,
             ContentType.APP_YAML,
@@ -577,12 +577,20 @@ def _generate_process_with_cwl_from_reference(reference, process_hint=None):
         ogc_api_json = {ctype for ctype in ogc_api_ctypes if ctype.endswith("json")}
 
         # try to detect incorrectly reported media-type using common structures
-        if ContentType.TEXT_PLAIN in content_type:
+        if ContentType.TEXT_PLAIN in content_type or not content_type:
             data = response.text
             if (data.startswith("{") and data.endswith("}")) or reference.endswith(".json"):
                 LOGGER.warning("Attempting auto-resolution of invalid Content-Type [%s] to [%s] "
                                "for CWL reference [%s].", content_type, ContentType.APP_JSON, reference)
                 content_type = ContentType.APP_JSON
+            elif reference.endswith(".yml") or reference.endswith(".yaml"):
+                LOGGER.warning("Attempting auto-resolution of invalid Content-Type [%s] to [%s] "
+                               "for CWL reference [%s].", content_type, ContentType.APP_YAML, reference)
+                content_type = ContentType.APP_YAML
+            elif reference.endswith(".cwl"):
+                LOGGER.warning("Attempting auto-resolution of invalid Content-Type [%s] to [%s] "
+                               "for CWL reference [%s].", content_type, ContentType.APP_CWL, reference)
+                content_type = ContentType.APP_CWL
             elif data.startswith("<?xml") or reference.endswith(".xml"):
                 LOGGER.warning("Attempting auto-resolution of invalid Content-Type [%s] to [%s] "
                                "for WPS reference [%s].", content_type, ContentType.TEXT_XML, reference)
@@ -613,12 +621,15 @@ def _generate_process_with_cwl_from_reference(reference, process_hint=None):
                 cwl_package = payload
                 process_info = {"identifier": reference_name}
 
-        if not process_info:
-            raise ValueError(
+        if not process_info or not cwl_package:
+            raise PackageNotFound(
                 f"Unknown parsing methodology of Content-Type [{content_type}] "
                 f"for reference [{reference}] with contents:\n{repr_json(payload)}\n"
             )
-
+    if not cwl_package:
+        raise PackageNotFound(
+            f"Could not resolve any package from reference [{reference}]."
+        )
     return cwl_package, process_info
 
 
@@ -785,8 +796,7 @@ def get_process_definition(process_offering, reference=None, package=None, data_
         except Exception as exc:
             # re-raise any exception already handled by a "package" error as is, but with a more detailed message
             # handle any other sub-exception that wasn't processed by a "package" error as a registration error
-            package_errors = (PackageRegistrationError, PackageTypeError, PackageRegistrationError, PackageNotFound)
-            exc_type = type(exc) if isinstance(exc, package_errors) else PackageRegistrationError
+            exc_type = type(exc) if isinstance(exc, PackageException) else PackageRegistrationError
             exc_msg = str(exc)
             LOGGER.exception(exc_msg)
             raise exc_type(f"Invalid package/reference definition. {reason} generated error: [{exc!s}].")
@@ -1362,7 +1372,10 @@ class WpsPackage(Process):
             self.package_requirement = get_application_requirement(self.package)
             try:
                 # workflows do not support stdout/stderr
-                log_stdout_stderr = self.package_type != ProcessType.WORKFLOW
+                log_stdout_stderr = (
+                    self.package_type != ProcessType.WORKFLOW
+                    and self.package_requirement.get("class") not in CWL_REQUIREMENT_APP_REMOTE
+                )
                 self.setup_loggers(log_stdout_stderr)
                 self.update_status("Preparing package logs done.", PACKAGE_PROGRESS_PREP_LOG, Status.RUNNING)
             except Exception as exc:
@@ -1771,7 +1784,7 @@ class WpsPackage(Process):
         self.logger.info("Resolved WPS output [%s] as file reference: [%s]", output_id, result_wps)
 
     def make_tool(self, toolpath_object, loading_context):
-        # type: (CWL_ToolPathObjectType, LoadingContext) -> ProcessCWL
+        # type: (CWL_ToolPathObject, LoadingContext) -> ProcessCWL
         from weaver.processes.wps_workflow import default_make_tool
         return default_make_tool(toolpath_object, loading_context, self.get_job_process_definition)
 

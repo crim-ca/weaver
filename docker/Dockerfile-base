@@ -3,7 +3,7 @@ LABEL description.short="Weaver Base"
 LABEL description.long="Workflow Execution Management Service (EMS); Application, Deployment and Execution Service (ADES)"
 LABEL maintainer="Francis Charette-Migneault <francis.charette-migneault@crim.ca>"
 LABEL vendor="CRIM"
-LABEL version="4.24.0"
+LABEL version="4.25.0"
 
 # setup paths
 ENV APP_DIR=/opt/local/src/weaver
@@ -17,11 +17,11 @@ COPY requirements* setup.py README.rst CHANGES.rst ${APP_DIR}/
 
 # install runtime/package dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-		ca-certificates \
-		netbase \
-		gcc \
-		git \
-	&& pip install --no-cache-dir --upgrade -r requirements-sys.txt \
+        ca-certificates \
+        netbase \
+        gcc \
+        git \
+    && pip install --no-cache-dir --upgrade -r requirements-sys.txt \
     && pip install --no-cache-dir -r requirements.txt \
     && pip install --no-cache-dir -e ${APP_DIR} \
     && apt-get remove -y \

@@ -9,7 +9,7 @@ MAKEFILE_NAME := $(word $(words $(MAKEFILE_LIST)),$(MAKEFILE_LIST))
 # Application
 APP_ROOT    := $(abspath $(lastword $(MAKEFILE_NAME))/..)
 APP_NAME    := $(shell basename $(APP_ROOT))
-APP_VERSION ?= 4.24.0
+APP_VERSION ?= 4.25.0
 APP_INI     ?= $(APP_ROOT)/config/$(APP_NAME).ini
 DOCKER_REPO ?= pavics/weaver
 #DOCKER_REPO ?= docker-registry.crim.ca/ogc/weaver
@@ -532,8 +532,9 @@ check-security-deps-only: mkdir-reports  ## run security checks on package depen
 			$(SAFETY_IGNORE) \
 		1> >(tee "$(REPORTS_DIR)/check-security-deps.txt")'
 
+# FIXME: bandit excludes not working (https://github.com/PyCQA/bandit/issues/657), clean-src beforehand to avoid error
 .PHONY: check-security-code-only
-check-security-code-only: mkdir-reports  ## run security checks on source code
+check-security-code-only: mkdir-reports clean-src ## run security checks on source code
 	@echo "Running security code checks..."
 	@-rm -fr "$(REPORTS_DIR)/check-security-code.txt"
 	@bash -c '$(CONDA_CMD) \

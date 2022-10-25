@@ -545,7 +545,7 @@ class ResponseContentTypeHeader(ContentTypeHeader):
 
 class RequestHeaders(ExtendedMappingSchema):
     """
-    Headers that can indicate how to adjust the behavior and/or result the be provided in the response.
+    Headers that can indicate how to adjust the behavior and/or result to be provided in the response.
     """
     accept = AcceptHeader()
     accept_language = AcceptLanguageHeader()
@@ -1829,8 +1829,18 @@ class ConformanceEndpoint(ExtendedMappingSchema):
     querystring = ConformanceQueries()
 
 
+# FIXME: support YAML (https://github.com/crim-ca/weaver/issues/456)
+class OpenAPIAcceptHeader(AcceptHeader):
+    default = ContentType.APP_OAS_JSON
+    validator = OneOf([ContentType.APP_OAS_JSON, ContentType.APP_JSON])
+
+
+class OpenAPIRequestHeaders(RequestHeaders):
+    accept = OpenAPIAcceptHeader()
+
+
 class OpenAPIEndpoint(ExtendedMappingSchema):
-    header = RequestHeaders()
+    header = OpenAPIRequestHeaders()
 
 
 class SwaggerUIEndpoint(ExtendedMappingSchema):
@@ -4274,8 +4284,9 @@ class FrontpageSchema(ExtendedMappingSchema):
     parameters = FrontpageParameters()
 
 
-class SwaggerJSONSpecSchema(ExtendedMappingSchema):
-    pass
+class OpenAPISpecSchema(ExtendedMappingSchema):
+    # "http://json-schema.org/draft-04/schema#"
+    schema_ref = "https://spec.openapis.org/oas/3.0/schema/2021-09-28"
 
 
 class SwaggerUISpecSchema(ExtendedMappingSchema):
@@ -5010,9 +5021,25 @@ class OkGetFrontpageResponse(ExtendedMappingSchema):
     body = FrontpageSchema()
 
 
+class OpenAPIResponseContentTypeHeader(ContentTypeHeader):
+    example = ContentType.APP_OAS_JSON
+    default = ContentType.APP_OAS_JSON
+    validator = OneOf([ContentType.APP_OAS_JSON])
+
+
+class OpenAPIResponseHeaders(ResponseHeaders):
+    content_type = OpenAPIResponseContentTypeHeader()
+
+
 class OkGetSwaggerJSONResponse(ExtendedMappingSchema):
-    header = ResponseHeaders()
-    body = SwaggerJSONSpecSchema(description="OpenAPI JSON schema of Weaver API.")
+    header = OpenAPIResponseHeaders()
+    body = OpenAPISpecSchema(description="OpenAPI JSON schema of Weaver API.")
+    examples = {
+        "OpenAPI Schema": {
+            "summary": "OpenAPI specification of this API.",
+            "value": {"$ref": OpenAPISpecSchema.schema_ref},
+        }
+    }
 
 
 class OkGetSwaggerUIResponse(ExtendedMappingSchema):
