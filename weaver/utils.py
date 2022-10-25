@@ -1974,11 +1974,11 @@ def fetch_file(file_reference,                      # type: str
     :raises HTTPException: applicable HTTP-based exception if any occurred during the operation.
     :raises ValueError: when the reference scheme cannot be identified.
     """
+    if file_reference.startswith("file://"):
+        file_reference = file_reference[7:]
     file_href = file_reference
     file_name = os.path.basename(os.path.realpath(file_reference))  # resolve any different name to use the original
     file_path = os.path.join(file_outdir, file_name)
-    if file_reference.startswith("file://"):
-        file_reference = file_reference[7:]
     LOGGER.debug("Fetching file reference: [%s] using options:\n%s", file_href, repr_json(option_kwargs))
     options, kwargs = resolve_scheme_options(**option_kwargs)
     if os.path.isfile(file_reference):
@@ -2052,13 +2052,16 @@ def adjust_file_local(file_reference, file_outdir, out_method):
     :param file_outdir: Target directory of the file.
     :param out_method: Method employed to handle the generation of the output file.
     """
-    file_name = os.path.basename(os.path.realpath(file_reference))  # resolve any different name to use the original
+    file_loc = os.path.realpath(file_reference)
+    file_name = os.path.basename(file_loc)  # resolve any different name to use the original
     file_path = os.path.join(file_outdir, file_name)
     if out_method == OutputMethod.MOVE and os.path.isfile(file_path):
         LOGGER.debug("Reference [%s] cannot be moved to path [%s] (already exists)", file_reference, file_path)
         raise OSError("Cannot move file, already in output directory!")
     if out_method == OutputMethod.MOVE:
-        shutil.move(os.path.realpath(file_reference), file_outdir)
+        shutil.move(file_loc, file_outdir)
+        if file_loc != file_reference and os.path.islink(file_reference):
+            os.remove(file_reference)
     # NOTE:
     #   If file is available locally and referenced as a system link, disabling 'follow_symlinks'
     #   creates a copy of the symlink instead of an extra hard-copy of the linked file.

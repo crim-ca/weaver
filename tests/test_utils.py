@@ -915,17 +915,34 @@ def test_fetch_directory_raise_missing_trailing_slash():
             fetch_directory(f"file://{tmp_dir}", "/tmp")  # input location with no trailing slash
 
 
-def test_fetch_file_local_links():
+@pytest.mark.parametrize("source_link, out_method, result_link", [
+    (False, OutputMethod.LINK, True),
+    (False, OutputMethod.COPY, False),
+    (False, OutputMethod.MOVE, False),
+    (False, OutputMethod.AUTO, False),
+    (True, OutputMethod.LINK, True),
+    (True, OutputMethod.COPY, False),
+    (True, OutputMethod.MOVE, False),
+    (True, OutputMethod.AUTO, True),
+])
+def test_fetch_file_local_links(source_link, out_method, result_link):
+    # type: (bool, OutputMethod, bool) -> None
     """
     Test handling of symbolic links by function :func:`weaver.utils.fetch_file` for local files.
+
+    .. note::
+        Because :attr:`OutputMethod.MOVE` is expected to "remove" the original temporary file, an :class:`OSError` is
+        generated when :func:`tempfile.NamedTemporaryFile` attempts to delete it when closed on `with` exit, since it
+        does not exist anymore. Avoid the error by manually performing any necessary cleanup.
     """
+    tmp_file = None
     tmp_dir = tempfile.gettempdir()
     src_dir = os.path.join(tmp_dir, str(uuid.uuid4()))
     dst_dir = os.path.join(tmp_dir, str(uuid.uuid4()))
     try:
         make_dirs(src_dir, exist_ok=True)
         make_dirs(dst_dir, exist_ok=True)
-        with tempfile.NamedTemporaryFile(dir=src_dir, mode="w", suffix=".json") as tmp_json:
+        with tempfile.NamedTemporaryFile(dir=src_dir, mode="w", suffix=".json", delete=False) as tmp_json:
             tmp_data = {"message": "fetch-file-link"}
             tmp_json.write(json.dumps(tmp_data))
             tmp_json.seek(0)
@@ -934,34 +951,35 @@ def test_fetch_file_local_links():
             tmp_link = os.path.join(tmp_path, "link.json")
             os.symlink(tmp_file, tmp_link)
             dst_path = os.path.join(dst_dir, tmp_name)
-            for src_path, as_link, result_link in [
-                (tmp_file, True, True),
-                (tmp_file, False, False),
-                (tmp_file, None, False),
-                (tmp_link, True, True),
-                (tmp_link, False, False),
-                (tmp_link, None, True),
-            ]:
-                if os.path.exists(dst_path):
-                    os.remove(dst_path)
-                fetch_file(src_path, dst_dir, link=as_link)
-                assert os.path.isfile(dst_path), (
-                    f"File [{tmp_file}] should be accessible under [{dst_path}]. "
-                    f"Failed with: {(src_path, as_link, result_link)}"
-                )
-                if result_link:
-                    assert os.path.islink(dst_path), "Result is not a link when it is expected to be one."
-                else:
-                    assert not os.path.islink(dst_path), "Result is a link when it is expected not to be one."
-                assert json.load(open(dst_path)) == tmp_data, "File should be properly copied/referenced from original"
+            src_path = tmp_link if source_link else tmp_file
+            if os.path.exists(dst_path):
+                os.remove(dst_path)
+            fetch_file(src_path, dst_dir, out_method=out_method)
+            assert os.path.isfile(dst_path), (
+                f"File [{tmp_file}] should be accessible under [{dst_path}]. "
+                f"Failed with: {(src_path, out_method, result_link)}"
+            )
+            if result_link:
+                assert os.path.islink(dst_path), "Result is not a link when it is expected to be one."
+            else:
+                assert not os.path.islink(dst_path), "Result is a link when it is expected not to be one."
+            exists = os.path.exists(src_path)
+            assert not exists if out_method == OutputMethod.MOVE else exists
+            with open(dst_path, mode="r", encoding="utf-8") as dst_file:
+                dst_data = json.load(dst_file)
+            assert dst_data == tmp_data, "File should be properly copied/referenced from original"
     except OSError as exc:
         pytest.fail(f"Unexpected error raised during test: [{exc!s}]")
     finally:
         shutil.rmtree(src_dir, ignore_errors=True)
         shutil.rmtree(dst_dir, ignore_errors=True)
+        if tmp_file and os.path.isfile(tmp_file) or os.path.islink(tmp_file):
+            os.remove(tmp_file)
 
 
-def test_fetch_file_local_with_protocol():
+@pytest.mark.parametrize("protocol", ["", "file://"])
+def test_fetch_file_local_with_protocol(protocol):
+    # type: (str) -> None
     """
     Test function :func:`weaver.utils.fetch_file` when the reference is a pre-fetched local file.
     """
@@ -975,11 +993,10 @@ def test_fetch_file_local_with_protocol():
         res_path = os.path.join(res_dir, tmp_name)
         try:
             make_dirs(res_dir, exist_ok=True)
-            for protocol in ["", "file://"]:
-                tmp_path = protocol + tmp_json.name
-                fetch_file(tmp_path, res_dir)
-                assert os.path.isfile(res_path), f"File [{tmp_path}] should be accessible under [{res_path}]"
-                assert json.load(open(res_path)) == tmp_data, "File should be properly copied/referenced from original"
+            tmp_path = protocol + tmp_json.name
+            fetch_file(tmp_path, res_dir)
+            assert os.path.isfile(res_path), f"File [{tmp_path}] should be accessible under [{res_path}]"
+            assert json.load(open(res_path)) == tmp_data, "File should be properly copied/referenced from original"
         except Exception:
             raise
         finally:
