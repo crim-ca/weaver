@@ -199,7 +199,7 @@ def retrieve_package_job_log(execution, job, progress_min=0, progress_max=100):
         for i, line in enumerate(log_lines):
             progress = map_progress(i / total * 100, progress_min, progress_max)
             job.save_log(message=line.rstrip("\n"), progress=progress, status=Status.RUNNING)
-    except (KeyError, IOError):
+    except (KeyError, IOError):  # pragma: no cover
         LOGGER.warning("Failed retrieving package log for %s", job)
 
 
@@ -664,7 +664,7 @@ def get_application_requirement(package, search=None, default=None, validate=Tru
     else:
         app_hints = list(filter(lambda h: any(h["class"].endswith(t) for t in CWL_REQUIREMENT_APP_TYPES), all_hints))
     if len(app_hints) > 1:
-        raise ValueError(
+        raise PackageTypeError(
             f"Package 'requirements' and/or 'hints' define too many conflicting values: {list(app_hints)}, "
             f"only one permitted amongst {list(CWL_REQUIREMENT_APP_TYPES)}."
         )
@@ -1061,8 +1061,7 @@ class WpsPackage(Process):
             merged_log = pkg_log[:cwl_end_index] + captured_log + pkg_log[cwl_end_index:]
             with open(self.log_file, mode="w", encoding="utf-8") as pkg_log_fd:
                 pkg_log_fd.writelines(merged_log)
-        except Exception as exc:
-            # log exception, but non-failing
+        except Exception as exc:  # pragma: no cover  # log exception, but non-failing
             self.exception_message(PackageExecutionError, exception=exc, level=logging.WARNING, status=status,
                                    message="Error occurred when retrieving internal application log.")
         return captured_log
