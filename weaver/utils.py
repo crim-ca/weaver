@@ -17,7 +17,6 @@ import time
 import warnings
 from concurrent.futures import (
     ALL_COMPLETED,
-    FIRST_EXCEPTION,
     CancelledError,
     ThreadPoolExecutor,
     as_completed,
@@ -80,6 +79,7 @@ if TYPE_CHECKING:
         Dict,
         List,
         Iterable,
+        Iterator,
         MutableMapping,
         NoReturn,
         Optional,
@@ -2082,7 +2082,7 @@ def adjust_file_local(file_reference, file_outdir, out_method):
 
 
 def filter_directory_forbidden(listing):
-    # type: (Iterable[str]) -> Iterable[str]
+    # type: (Iterable[str]) -> Iterator[str]
     """
     Filters out items that should always be removed from directory listing results.
     """
@@ -2245,19 +2245,20 @@ def download_files_s3(location,                         # type: str
             executor.submit(_download_file, s3_client, bucket_name, file_key, out_dir)
             for file_key in s3_files
         )
-        results, failures = wait_until(futures, return_when=FIRST_EXCEPTION)
-        file_paths = (res.result() for res in results)
-        if failures or any(not path for path in file_paths):
-            # cancel scheduled tasks
-            for future in futures:
-                future.cancel()
-            task_kill_event.set()
-            wait_until(futures, return_when=ALL_COMPLETED)  # wait for any cleanup
+        for future in as_completed(futures):
+            if future.exception():
+                other_futures = set(futures) - {future}
+                for o_future in other_futures:
+                    o_future.cancel()
+                task_kill_event.set()
+            yield future.result()
+        # wait for any cleanup, must use set() because of https://github.com/python/cpython/issues/86104
+        results, failures = wait_until(set(futures), return_when=ALL_COMPLETED)
+        if failures or any(not path for path in results):
             raise WeaverException(
                 "Directory download failed due to at least one failing file download in listing: "
                 f"{[repr(exc.exception()) for exc in failures]}"
             )
-    return list(file_paths)
 
 
 def download_files_url(file_references,                     # type: Iterable[str]
@@ -2268,7 +2269,7 @@ def download_files_url(file_references,                     # type: Iterable[str
                        matcher=PathMatchingMethod.GLOB,     # type: PathMatchingMethod
                        settings=None,                       # type: Optional[SettingsType]
                        **option_kwargs,                     # type: Any  # Union[SchemeOptions, RequestOptions]
-                       ):                                   # type: (...) -> Iterable[str]
+                       ):                                   # type: (...) -> Iterator[str]
     """
     Download all listed files references under the output directory.
 
@@ -2376,7 +2377,7 @@ def download_files_html(html_data,                          # type: str
                         matcher=PathMatchingMethod.GLOB,    # type: PathMatchingMethod
                         settings=None,                      # type: Optional[AnySettingsContainer]
                         **option_kwargs,                    # type: Any  # Union[SchemeOptions, RequestOptions]
-                        ):                                  # type: (...) -> Iterable[str]
+                        ):                                  # type: (...) -> Iterator[str]
     """
     Downloads files retrieved from a directory listing provided as an index of plain HTML with file references.
 
@@ -2412,7 +2413,7 @@ def download_files_html(html_data,                          # type: str
     options, kwargs = resolve_scheme_options(**option_kwargs)
 
     def _list_refs(_url, _data=None):
-        # type: (str, Optional[str]) -> Iterable[str]
+        # type: (str, Optional[str]) -> Iterator[str]
         if not _data:
             _scheme = _url.split("://")[0]
             _opts = options.get(_scheme, {})  # type: ignore
@@ -2586,7 +2587,7 @@ def adjust_directory_local(location,                            # type: Path
 
 
 def list_directory_recursive(directory):
-    # type: (Path) -> Iterable[Path]
+    # type: (Path) -> Iterator[Path]
     """
     Local directory listing of files recursively.
     """
@@ -2651,6 +2652,9 @@ def fetch_directory(location,                           # type: str
     elif location.startswith("http://") or location.startswith("https://"):
         LOGGER.debug("Fetch directory resolved as remote HTTP reference. Will attempt listing contents.")
         resp = request_extra("GET", location)
+        if resp.status_code != 200:
+            LOGGER.error("Invalid response [%s] for directory listing from [%s]", resp.status_code, location)
+            raise ValueError(f"Cannot parse directory location [{location}] from [{resp.status_code}] response.")
         ctype = get_header("Content-Type", resp.headers, default=ContentType.TEXT_HTML)
         if any(_type in ctype for _type in [ContentType.TEXT_HTML] + list(ContentType.ANY_XML)):
             listing = download_files_html(resp.text, out_dir, location,
@@ -2664,7 +2668,8 @@ def fetch_directory(location,                           # type: str
                                              settings=settings, **option_kwargs)
             else:
                 LOGGER.error("Invalid JSON from [%s] is not a list of files:\n%s", location, repr_json(body))
-                raise ValueError(f"Cannot parse [{location}] JSON response contents not providing a list of files.")
+                raise ValueError(f"Cannot parse directory location [{location}] "
+                                 "expected as JSON response contents providing a list of files.")
         else:
             raise ValueError(f"Cannot list directory [{location}]. Unknown parsing of Content-Type [{ctype}] response.")
     elif location.startswith("file://") or location.startswith("/"):
