@@ -55,7 +55,9 @@ from weaver.processes.constants import (
     PACKAGE_ARRAY_TYPES,
     PACKAGE_COMPLEX_TYPES,
     PACKAGE_CUSTOM_TYPES,
+    PACKAGE_DIRECTORY_TYPE,
     PACKAGE_ENUM_BASE,
+    PACKAGE_FILE_TYPE,
     PACKAGE_LITERAL_TYPES,
     WPS_BOUNDINGBOX,
     WPS_COMPLEX,
@@ -214,7 +216,7 @@ INPUT_VALUE_TYPE_MAPPING = {
     "bool": bool,
     "boolean": bool,
     "file": unquote,
-    "File": unquote,
+    PACKAGE_FILE_TYPE: unquote,
     "float": float,
     "int": int,
     "integer": int,
@@ -470,7 +472,7 @@ def get_io_type_category(io_info):
         io_info = copy.deepcopy(io_info)
         io_info.setdefault("name", "dontcare")
         io_def = get_cwl_io_type(io_info, strict=False)
-        return WPS_COMPLEX if io_def.type in [null, "File", "Directory"] else WPS_LITERAL
+        return WPS_COMPLEX if io_def.type in [null, PACKAGE_FILE_TYPE, PACKAGE_DIRECTORY_TYPE] else WPS_LITERAL
     io_fmt = get_field(io_info, "supported_formats", search_variations=True)
     return WPS_LITERAL if io_fmt is null else WPS_COMPLEX
 
@@ -498,7 +500,7 @@ def _convert_any2cwl_io_complex(cwl_io, cwl_ns, wps_io, io_select):
     """
     cwl_io_fmt = None
     cwl_io_ext = ContentType.ANY
-    cwl_io["type"] = "File"
+    cwl_io["type"] = PACKAGE_FILE_TYPE
     cwl_id = cwl_io["id"]
 
     # inputs are allowed to define multiple 'supported' formats
@@ -831,13 +833,13 @@ def is_cwl_file_type(io_info):
     if not io_type:
         raise ValueError(f"Missing CWL 'type' definition: [{io_info!s}]")
     if isinstance(io_type, str):
-        return io_type == "File"
+        return io_type == PACKAGE_FILE_TYPE
     if isinstance(io_type, dict):
         if io_type["type"] == PACKAGE_ARRAY_BASE:
-            return io_type["items"] == "File"
-        return io_type["type"] == "File"
+            return io_type["items"] == PACKAGE_FILE_TYPE
+        return io_type["type"] == PACKAGE_FILE_TYPE
     if isinstance(io_type, list):
-        return any(typ == "File" or is_cwl_file_type({"type": typ}) for typ in io_type)
+        return any(typ == PACKAGE_FILE_TYPE or is_cwl_file_type({"type": typ}) for typ in io_type)
     raise ValueError(f"Unknown parsing of CWL 'type' format ({type(io_type)!s}) [{io_type!s}] in [{io_info}]")
 
 
@@ -1305,15 +1307,15 @@ def cwl2wps_io(io_info, io_select):
         else:
             # we need to minimally add 1 format, otherwise empty list is evaluated as None by pywps
             # when "supported_formats" is None, the process's json property raises because of it cannot iterate formats
-            if io_def.type == "File":
+            if io_def.type == PACKAGE_FILE_TYPE:
                 kw["supported_formats"] = [DEFAULT_FORMAT]
-            if io_def.type == "Directory":
+            if io_def.type == PACKAGE_DIRECTORY_TYPE:
                 kw["supported_formats"] = [get_format(ContentType.APP_DIR)]
             kw["mode"] = MODE.NONE  # don't validate anything as default is only raw text
         if is_output:
-            if io_def.type == "Directory":
+            if io_def.type == PACKAGE_DIRECTORY_TYPE:
                 kw["as_reference"] = True
-            if io_def.type == "File":
+            if io_def.type == PACKAGE_FILE_TYPE:
                 has_contents = io_info.get("contents") is not None
                 kw["as_reference"] = not has_contents
         else:
@@ -1355,14 +1357,14 @@ def cwl2json_input_values(data, schema=ProcessSchema.OGC):
     inputs = {}
     for input_id, input_value in data.items():
         # single file
-        if isinstance(input_value, dict) and input_value.get("class") == "File":
+        if isinstance(input_value, dict) and input_value.get("class") == PACKAGE_FILE_TYPE:
             inputs[input_id] = _get_file_input(input_value)
         # single literal value
         elif isinstance(input_value, (str, int, float, bool)):
             inputs[input_id] = {"value": input_value}
         # multiple files
         elif isinstance(input_value, list) and all(
-            isinstance(val, dict) and val.get("class") == "File" for val in input_value
+            isinstance(val, dict) and val.get("class") == PACKAGE_FILE_TYPE for val in input_value
         ):
             inputs[input_id] = [_get_file_input(val) for val in input_value]
         # multiple literal values
@@ -1569,7 +1571,7 @@ def repr2json_input_values(inputs):
         arr_val = str_val.split(";")
         convert = INPUT_VALUE_TYPE_MAPPING[map_typ]
         arr_val = [repr2json_input_params(val, convert) for val in arr_val]
-        if map_typ.capitalize() == "File":
+        if map_typ.capitalize() == PACKAGE_FILE_TYPE:
             val_key = "href"
             for val in arr_val:
                 ref = val["data"]

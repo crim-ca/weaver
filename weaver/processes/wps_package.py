@@ -65,7 +65,9 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_RESOURCE,
     CWL_REQUIREMENTS_SUPPORTED,
     PACKAGE_COMPLEX_TYPES,
+    PACKAGE_DIRECTORY_TYPE,
     PACKAGE_EXTENSIONS,
+    PACKAGE_FILE_TYPE,
     WPS_INPUT,
     WPS_OUTPUT
 )
@@ -1575,7 +1577,7 @@ class WpsPackage(Process):
         :returns: Updated file location if any resolution occurred.
         """
         if input_scheme == "vault":
-            if input_type != "File":
+            if input_type != PACKAGE_FILE_TYPE:
                 raise PackageExecutionError(
                     f"Vault reference must be a file, but resolved [{input_type}] type "
                     f"instead for input [{input_id}] from location [{input_location}]."
@@ -1706,10 +1708,10 @@ class WpsPackage(Process):
 
         if self.must_fetch(input_location):
             self.logger.info("%s input (%s) ATTEMPT fetch: [%s]", input_type, input_id, input_location)
-            if input_type == "File":
+            if input_type == PACKAGE_FILE_TYPE:
                 input_location = fetch_file(input_location, input_definition.workdir,
                                             settings=self.settings, headers=self.auth)
-            elif input_type == "Directory":
+            elif input_type == PACKAGE_DIRECTORY_TYPE:
                 # Because a directory reference can contain multiple sub-dir definitions,
                 # avoid possible conflicts with other inputs by nesting them under the ID.
                 # This also ensures that each directory input can work with a clean staging directory.

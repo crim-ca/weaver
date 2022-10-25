@@ -111,7 +111,9 @@ Set of all :term:`CWL` requirements or hints that are supported for deployment o
 PACKAGE_EXTENSIONS = frozenset(["yaml", "yml", "json", "cwl", "job"])
 PACKAGE_SIMPLE_TYPES = frozenset(["string", "boolean", "float", "int", "integer", "long", "double"])
 PACKAGE_LITERAL_TYPES = frozenset(PACKAGE_SIMPLE_TYPES | {"null", "Any"})
-PACKAGE_COMPLEX_TYPES = frozenset(["File", "Directory"])
+PACKAGE_FILE_TYPE = "File"
+PACKAGE_DIRECTORY_TYPE = "Directory"
+PACKAGE_COMPLEX_TYPES = frozenset([PACKAGE_FILE_TYPE, PACKAGE_DIRECTORY_TYPE])
 PACKAGE_ENUM_BASE = "enum"
 PACKAGE_CUSTOM_TYPES = frozenset([PACKAGE_ENUM_BASE])  # can be anything, but support "enum" which is more common
 PACKAGE_ARRAY_BASE = "array"
