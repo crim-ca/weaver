@@ -770,27 +770,27 @@ class Format(ExtendedMappingSchema):
     schema = FormatSchema(missing=drop)
 
 
-class DeployFormatDefaultMimeType(FormatMimeType):
+class FormatDefaultMimeType(FormatMimeType):
     description = (
         "Format for process input are assumed plain/text if the media-type was omitted and is not one of the known "
         "formats by this instance. When executing a job, the best match against supported formats by the process "
-        "definition will be used to run the process, and will fallback to the default as last resort."
+        "definition will be used to run the process, and will fall back to the default as last resort."
     )
     # NOTE:
     # The default is overridden from FormatMimeType since the FormatSelection 'oneOf' always fails,
-    # due to the 'default' value which is always generated and it causes the presence of both Format and FormatMimeType
+    # due to the 'default' value which is always generated, and it causes the presence of both Format and FormatMimeType
     mimeType = MediaType(example=ContentType.APP_JSON)
 
 
-class DeployFormatDefault(Format):
+class FormatDefaultMediaType(Format):
     description = (
         "Format for process input are assumed plain/text if the media-type was omitted and is not one of the known "
         "formats by this instance. When executing a job, the best match against supported formats by the process "
-        "definition will be used to run the process, and will fallback to the default as last resort."
+        "definition will be used to run the process, and will fall back to the default as last resort."
     )
     # NOTE:
     # The default is overridden from Format since the FormatSelection 'oneOf' always fails,
-    # due to the 'default' value which is always generated and it causes the presence of both Format and FormatMimeType
+    # due to the 'default' value which is always generated, and it causes the presence of both Format and FormatMimeType
     mediaType = MediaType(example=ContentType.APP_JSON)
 
 
@@ -799,15 +799,15 @@ class FormatSelection(OneOfKeywordSchema):
     Validation against ``mimeType`` or ``mediaType`` format.
 
     .. seealso::
-        - :class:`DeployFormatDefault`
-        - :class:`DeployFormatDefaultMimeType`
+        - :class:`FormatDefaultMediaType`
+        - :class:`FormatDefaultMimeType`
 
     .. note::
         Format are validated to be retro-compatible with pre-existing/deployed/remote processes.
     """
     _one_of = [
-        DeployFormatDefault(),
-        DeployFormatDefaultMimeType()
+        FormatDefaultMediaType(),
+        FormatDefaultMimeType()
     ]
 
 
@@ -1203,7 +1203,7 @@ class DeployMinMaxOccurs(ExtendedMappingSchema):
     maxOccurs = MaxOccursDefinition(default=null, missing=null)
 
 
-# does not inherit from 'DescriptionLinks' because other 'ProcessDescription<>' schema depend from this without 'links'
+# does not inherit from 'DescriptionLinks' because other 'ProcessDescription<>' schema depend on this without 'links'
 class ProcessDescriptionType(DescriptionBase, DescriptionExtra):
     id = ProcessIdentifierTag()
     version = Version(missing=None, default=None, example="1.2.3")
