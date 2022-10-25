@@ -15,13 +15,7 @@ import tempfile
 import threading
 import time
 import warnings
-from concurrent.futures import (
-    ALL_COMPLETED,
-    CancelledError,
-    ThreadPoolExecutor,
-    as_completed,
-    wait as wait_until
-)
+from concurrent.futures import ALL_COMPLETED, CancelledError, ThreadPoolExecutor, as_completed, wait as wait_until
 from copy import deepcopy
 from datetime import datetime
 from distutils.version import LooseVersion
