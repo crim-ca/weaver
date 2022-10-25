@@ -83,7 +83,6 @@ def _lxml_tree_parser_maker(**parser_kwargs):
     .. code-block:: python
 
         etree.XMLParser(target=self, strip_cdata=False, recover=True, encoding=encoding)
-
     """
     parser_kwargs.update(dict(
         no_network=True,
