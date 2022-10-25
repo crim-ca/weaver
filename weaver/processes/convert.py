@@ -1077,6 +1077,11 @@ class CWLIODefinition(object):
     """
 
     symbols: "Union[CWL_IO_EnumSymbols, AnyValue, Type[AnyValue]]" = AnyValue
+    """
+    Specifies the allowed values when the definition is marked as :attr:`enum`.
+    When not overriden by literal values, it uses the default :class:`AnyValue`.
+    """
+
     mode: MODE = MODE.NONE
     """
     Validation mode to be applied if I/O requires it.
