@@ -359,7 +359,7 @@ if TYPE_CHECKING:
     JobValueFileItem = TypedDict("JobValueFileItem", {
         "id": str,
         "href": Optional[str],
-        "format": Optional[JobValueFormat],
+        "format": NotRequired[JobValueFormat],
     }, total=False)
     JobValueDataItem = TypedDict("JobValueDataItem", {
         "id": str,
@@ -374,7 +374,7 @@ if TYPE_CHECKING:
     JobInputs = List[Union[JobValueItem, Dict[str, AnyValueType]]]
     JobOutputs = List[Union[JobExpectItem, Dict[str, AnyValueType]]]
     JobResults = List[JobValueItem]
-    JobMonitorReference = Any  # typically an URI of the remote job status or an execution object/handler
+    JobMonitorReference = Any  # typically a URI of the remote job status or an execution object/handler
 
     ExecutionInputsMap = Dict[str, JobValueObject]  # when schema='weaver.processes.constants.ProcessSchema.OGC'
     ExecutionInputsList = List[JobValueItem]        # when schema='weaver.processes.constants.ProcessSchema.OLD'
@@ -385,7 +385,8 @@ if TYPE_CHECKING:
     }, total=False)
     ExecutionOutputItem = TypedDict("ExecutionOutputItem", {
         "id": str,
-        "transmissionMode": str
+        "transmissionMode": AnyExecuteTransmissionMode,
+        "format": NotRequired[JobValueFormat],
     }, total=False)
     ExecutionOutputsList = List[ExecutionOutputItem]
     ExecutionOutputsMap = Dict[str, ExecutionOutputObject]
