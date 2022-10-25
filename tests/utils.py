@@ -16,8 +16,8 @@ import sys
 import tempfile
 import uuid
 import warnings
-from datetime import datetime
 from configparser import ConfigParser
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 # Note: do NOT import 'boto3' here otherwise 'moto' will not be able to mock it effectively
