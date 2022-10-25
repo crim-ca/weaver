@@ -932,8 +932,8 @@ def test_fetch_file_local_links(source_link, out_method, result_link):
 
     .. note::
         Because :attr:`OutputMethod.MOVE` is expected to "remove" the original temporary file, an :class:`OSError` is
-        generated when :func:`tempfile.NamedTemporaryFile` attempts to delete it when closed on `with` exit, since it
-        does not exist anymore. Avoid the error by manually performing any necessary cleanup.
+        generated when :func:`tempfile.NamedTemporaryFile` attempts to delete it when closed on ``with`` exit, since
+        it does not exist anymore (it was moved). Avoid the error by manually performing any necessary cleanup.
     """
     tmp_file = None
     tmp_dir = tempfile.gettempdir()
