@@ -1734,9 +1734,9 @@ class QuoteSortEnum(ExtendedSchemaNode):
 class JobTagsCommaSeparated(ExtendedSchemaNode):
     schema_type = String
     validator = CommaSeparated()
-    default=None
-    missing=drop
-    description=(
+    default = None
+    missing = drop
+    description = (
         "Comma-separated tags that can be used to filter jobs. "
         f"Only {validator.allow_chars} characters are permitted."
     )
