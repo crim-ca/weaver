@@ -88,7 +88,7 @@ jobs:
           # EMS end-2-end Workflow tests
           - os: ubuntu-latest
             python-version: "3.10"
-            allow-failure: true
+            allow-failure: false
             test-case: test-workflow-only
     steps:
       - uses: actions/checkout@v2
