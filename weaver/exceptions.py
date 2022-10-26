@@ -404,7 +404,7 @@ def handle_known_exceptions(function):
 
     The decorator simply returns the known exception such that :func:`weaver.tweens.ows_response_tween` can later
     handle it appropriately. Exceptions derived from :exc:`weaver.owsexceptions.OWSException` are employed since
-    they themselves have base references to :mod:`pywps.exceptions` classes that the service can understand.
+    they, themselves, already have base references to :mod:`pywps.exceptions` classes that the service can understand.
 
     .. warning::
         In :mod:`pywps`, ``HTTPException`` refers to :exc:`werkzeug.exceptions.HTTPException` while in

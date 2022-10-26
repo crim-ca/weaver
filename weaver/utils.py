@@ -1850,37 +1850,42 @@ def resolve_s3_from_http(reference):
     s3 = boto3.client("s3")         # type: S3Client  # created with default, environment, or ~/.aws/config
     s3_url = s3.meta.endpoint_url   # includes the region name, to be used to check if we must switch region
     s3_region = s3.meta.region_name
-    if not reference.startswith(s3_url):
-        LOGGER.warning(
-            "Detected HTTP reference to AWS S3 bucket [%s] that mismatches server region configuration [%s]. "
-            "Attempting to switch S3 region for proper resolution.",
-            reference, s3_region
-        )
-        s3_host = urlparse(reference)
-        if ".s3-accesspoint." in s3_host.hostname:
-            s3_access_point, s3_region = reference.split(".s3-accesspoint.", 1)
-            s3_access_name, s3_account = s3_access_point.rsplit("-", 1)
-            s3_region = s3_region.split(".amazonaws.com", 1)[0]
-            s3_ref = s3_host.path or "/"
-            s3_bucket = f"arn:aws:s3:{s3_region}:{s3_account}:accesspoint/{s3_access_name}"
-            s3_reference = f"s3://{s3_bucket}{s3_ref}"
-        elif ".s3." in s3_host.hostname:
-            s3_bucket, s3_region = reference.split(".s3.", 1)
-            s3_region, s3_ref = s3_region.split(".amazonaws.com", 1)
-            s3_ref = s3_ref or "/"
-            s3_reference = f"s3://{s3_ref}"
+    try:
+        if not reference.startswith(s3_url):
+            LOGGER.warning(
+                "Detected HTTP reference to AWS S3 bucket [%s] that mismatches server region configuration [%s]. "
+                "Attempting to switch S3 region for proper resolution.",
+                reference, s3_region
+            )
+            s3_host = urlparse(reference)
+            if ".s3-accesspoint." in s3_host.hostname:
+                s3_access_point, s3_region = reference.split(".s3-accesspoint.", 1)
+                s3_access_name, s3_account = s3_access_point.rsplit("-", 1)
+                s3_region = s3_region.split(".amazonaws.com", 1)[0]
+                s3_ref = s3_host.path or "/"
+                s3_bucket = f"arn:aws:s3:{s3_region}:{s3_account}:accesspoint/{s3_access_name}"
+                s3_reference = f"s3://{s3_bucket}{s3_ref}"
+            elif ".s3." in s3_host.hostname:
+                s3_bucket, s3_region = reference.split(".s3.", 1)
+                s3_region, s3_ref = s3_region.split(".amazonaws.com", 1)
+                s3_ref = s3_ref.lstrip("/")
+                s3_reference = f"s3://{s3_ref}"
+            else:
+                s3_region, s3_ref = reference.split("https://s3.")[-1].split(".amazonaws.com")
+                s3_ref = s3_ref.lstrip("/")
+                s3_reference = f"s3://{s3_ref}"
         else:
-            s3_region, s3_ref = reference.split("https://s3.")[-1].split(".amazonaws.com")
-            s3_ref = s3_ref or "/"
+            s3_ref = reference.replace(s3_url, "")
+            s3_ref = s3_ref.lstrip("/")
             s3_reference = f"s3://{s3_ref}"
-    else:
-        s3_ref = reference.replace(s3_url, "")
-        s3_ref = s3_ref.lstrip("/") if s3_ref != "/" else s3_ref
-        s3_reference = f"s3://{s3_ref}"
-    LOGGER.debug("Adjusting HTTP reference to S3 URL shorthand with resolved S3 Region:\n"
+        if s3_reference == "s3://":
+            raise ValueError("No S3 bucket, region or file/directory reference was found.")
+    except (IndexError, TypeError, ValueError) as exc:
+        raise ValueError(f"Could not parse unknown AWS S3 reference format: [{reference!s}]") from exc
+    LOGGER.debug("Adjusting HTTP reference to S3 URL style with resolved S3 Region:\n"
                  "  Initial: [%s]\n"
                  "  Updated: [%s]\n"
-                 "  Region:  [%s]\n",
+                 "  Region:  [%s]",
                  reference, s3_reference, s3_region)
     return s3_reference, s3_region
 
