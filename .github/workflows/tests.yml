@@ -33,8 +33,6 @@ jobs:
     env:
       # override make command to install directly in active python
       CONDA_CMD: ""
-      PYTHON_VERSION_DEFAULT: "3.10"
-      PYTHON_VERSION_EXPERIMENTAL: "3.12a"
     services:
       # Label used to access the service container
       mongodb:
@@ -59,37 +57,37 @@ jobs:
             test-case: test-func-only
           # experimental python
           - os: ubuntu-latest
-            python-version: "${{ env.PYTHON_VERSION_EXPERIMENTAL }}"
+            python-version: "3.12a"
             allow-failure: true
             test-case: test-unit-only
           - os: ubuntu-latest
-            python-version: "${{ env.PYTHON_VERSION_EXPERIMENTAL }}"
+            python-version: "3.12a"
             allow-failure: true
             test-case: test-func-only
           # linter tests
           - os: ubuntu-latest
-            python-version: "${{ env.PYTHON_VERSION_DEFAULT }}"
+            python-version: "3.10"
             allow-failure: false
             test-case: check-only
           # documentation build
           - os: ubuntu-latest
-            python-version: "${{ env.PYTHON_VERSION_DEFAULT }}"
+            python-version: "3.10"
             allow-failure: false
             test-case: docs
           # coverage test
           - os: ubuntu-latest
-            python-version: "${{ env.PYTHON_VERSION_DEFAULT }}"
+            python-version: "3.10"
             allow-failure: false
             test-case: test-coverage-only
           # smoke test of Docker image
           - os: ubuntu-latest
             # doesn't matter which version (Docker), but match default of repository
-            python-version: "${{ env.PYTHON_VERSION_DEFAULT }}"
+            python-version: "3.10"
             allow-failure: false
             test-case: test-docker
           # EMS end-2-end Workflow tests
           - os: ubuntu-latest
-            python-version: "${{ env.PYTHON_VERSION_DEFAULT }}"
+            python-version: "3.10"
             allow-failure: true
             test-case: test-workflow-only
     steps:
