@@ -33,6 +33,8 @@ jobs:
     env:
       # override make command to install directly in active python
       CONDA_CMD: ""
+      PYTHON_VERSION_DEFAULT: "3.10"
+      PYTHON_VERSION_EXPERIMENTAL: "3.12a"
     services:
       # Label used to access the service container
       mongodb:
@@ -42,51 +44,52 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        python-version: ["3.7", "3.8", "3.9"]
+        python-version: ["3.7", "3.8", "3.9", "3.10", "3.11"]
         allow-failure: [false]
         test-case: [test-unit-only, test-func-only]
         include:
           # end-of-life python
           - os: ubuntu-latest
-            python-version: 3.6
+            python-version: "3.6"
             allow-failure: true
             test-case: test-unit-only
           - os: ubuntu-latest
-            python-version: 3.6
+            python-version: "3.6"
             allow-failure: true
             test-case: test-func-only
           # experimental python
           - os: ubuntu-latest
-            python-version: "3.10"
+            python-version: "${{ env.PYTHON_VERSION_EXPERIMENTAL }}"
             allow-failure: true
             test-case: test-unit-only
           - os: ubuntu-latest
-            python-version: "3.10"
+            python-version: "${{ env.PYTHON_VERSION_EXPERIMENTAL }}"
             allow-failure: true
             test-case: test-func-only
           # linter tests
           - os: ubuntu-latest
-            python-version: 3.7
+            python-version: "${{ env.PYTHON_VERSION_DEFAULT }}"
             allow-failure: false
             test-case: check-only
           # documentation build
           - os: ubuntu-latest
-            python-version: 3.7
+            python-version: "${{ env.PYTHON_VERSION_DEFAULT }}"
             allow-failure: false
             test-case: docs
           # coverage test
           - os: ubuntu-latest
-            python-version: 3.7
+            python-version: "${{ env.PYTHON_VERSION_DEFAULT }}"
             allow-failure: false
             test-case: test-coverage-only
           # smoke test of Docker image
           - os: ubuntu-latest
-            python-version: 3.7  # doesn't matter which one (in docker), but match default of repo
+            # doesn't matter which version (Docker), but match default of repository
+            python-version: "${{ env.PYTHON_VERSION_DEFAULT }}"
             allow-failure: false
             test-case: test-docker
           # EMS end-2-end Workflow tests
           - os: ubuntu-latest
-            python-version: 3.7
+            python-version: "${{ env.PYTHON_VERSION_DEFAULT }}"
             allow-failure: true
             test-case: test-workflow-only
     steps:
