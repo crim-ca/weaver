@@ -49,28 +49,27 @@ def get_queried_jobs(request):
     """
 
     settings = get_settings(request)
-    service, process = validate_service_process(request)
-
     params = dict(request.params)
-    LOGGER.debug("Job search queries (raw):\n%s", repr_json(params, indent=2))
-    for param_name in ["process", "processID", "provider", "service"]:
-        params.pop(param_name, None)
-    filters = {**params, "process": process, "provider": service}
-
     if params.get("datetime", False):
         # replace white space with '+' since request.params replaces '+' with whitespaces when parsing
-        filters["datetime"] = params["datetime"].replace(" ", "+")
+        params["datetime"] = params["datetime"].replace(" ", "+")
 
     try:
-        filters = sd.GetJobsQueries().deserialize(filters)
+        params = sd.GetJobsQueries().deserialize(params)
     except Invalid as ex:
         raise HTTPBadRequest(json={
             "code": "JobInvalidParameter",
             "description": "Job query parameters failed validation.",
             "error": Invalid.__name__,
             "cause": str(ex),
-            "value": repr_json(ex.value or filters, force_string=False),
+            "value": repr_json(ex.value or params, force_string=False),
         })
+
+    service, process = validate_service_process(request)
+    LOGGER.debug("Job search queries (raw):\n%s", repr_json(params, indent=2))
+    for param_name in ["process", "processID", "provider", "service"]:
+        params.pop(param_name, None)
+    filters = {**params, "process": process, "service": service}
 
     detail = filters.pop("detail", False)
     groups = filters.pop("groups", "").split(",") if filters.get("groups", False) else filters.pop("groups", None)
@@ -81,18 +80,16 @@ def get_queried_jobs(request):
         encrypt_email(filters["notification_email"], settings)
         if filters.get("notification_email", False) else None
     )
-    filters["service"] = filters.pop("provider", None)
     filters["min_duration"] = filters.pop("minDuration", None)
     filters["max_duration"] = filters.pop("maxDuration", None)
     filters["job_type"] = filters.pop("type", None)
 
-    dti = datetime_interval_parser(filters["datetime"]) if filters.get("datetime", False) else None
+    dti = datetime_interval_parser(params["datetime"]) if params.get("datetime", False) else None
     if dti and dti.get("before", False) and dti.get("after", False) and dti["after"] > dti["before"]:
         raise HTTPUnprocessableEntity(json={
             "code": "InvalidDateFormat",
             "description": "Datetime at the start of the interval must be less than the datetime at the end."
         })
-    filters.pop("datetime", None)
     filters["datetime_interval"] = dti
     LOGGER.debug("Job search queries (processed):\n%s", repr_json(filters, indent=2))
 

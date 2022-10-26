@@ -8,11 +8,11 @@ from celery.utils.log import get_task_logger
 from pyramid.httpexceptions import (
     HTTPBadRequest,
     HTTPCreated,
+    HTTPForbidden,
     HTTPNoContent,
     HTTPNotFound,
     HTTPNotImplemented,
-    HTTPOk,
-    HTTPUnauthorized
+    HTTPOk
 )
 from pyramid.response import FileResponse
 from pyramid_celery import celery_app
@@ -24,13 +24,14 @@ from weaver.exceptions import (
     JobGone,
     JobInvalidParameter,
     JobNotFound,
+    MissingIdentifierValue,
     ProcessNotAccessible,
     ProcessNotFound,
     ServiceNotAccessible,
     ServiceNotFound
 )
 from weaver.execute import ExecuteResponse, ExecuteTransmissionMode
-from weaver.formats import ContentType, get_format
+from weaver.formats import ContentType, get_format, repr_json
 from weaver.owsexceptions import OWSNoApplicableCode, OWSNotFound
 from weaver.processes.convert import any2wps_literal_datatype, convert_output_params_schema, get_field
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
@@ -41,6 +42,7 @@ from weaver.utils import (
     get_file_headers,
     get_header,
     get_path_kvp,
+    get_sane_name,
     get_settings,
     get_weaver_url,
     is_uuid
@@ -532,32 +534,50 @@ def get_job_submission_response(body, headers, error=False):
 def validate_service_process(request):
     # type: (PyramidRequest) -> Tuple[Optional[str], Optional[str]]
     """
-    Verifies that service or process specified by path or query will raise the appropriate error if applicable.
+    Verifies that any :term:`Service` or :term:`Process` specified by path or query are valid.
+
+    :raises HTTPException: Relevant HTTP error with details if validation failed.
+    :returns: Validated and existing service and process if specified.
     """
-    service_name = (
-        request.matchdict.get("provider_id", None) or
-        request.params.get("provider", None) or
-        request.params.get("service", None)  # backward compatibility
-    )
-    process_name = (
-        request.matchdict.get("process_id", None) or
-        request.params.get("process", None) or
-        request.params.get("processID", None)  # OGC-API conformance
-    )
+    provider_path = request.matchdict.get("provider_id", None)
+    provider_query = request.params.get("provider", None)
+    service_query = request.params.get("service", None)  # backward compatibility
+    provider_items = {item for item in (provider_path, provider_query, service_query) if item is not None}
+    if len(provider_items) > 1:
+        raise HTTPBadRequest(json={
+            "type": InvalidIdentifierValue.__name__,
+            "title": "Multiple provider/service ID specified.",
+            "description": "Cannot resolve a unique service provider when distinct ID in path/query are specified.",
+            "value": repr_json(list(provider_items)),
+        })
+    service_name = (provider_path or provider_query or service_query)
+
+    process_path = request.matchdict.get("process_id", None)
+    process_query = request.params.get("process", None)
+    proc_id_query = request.params.get("processID", None)  # OGC-API conformance
+    process_items = {item for item in (process_path, process_query, proc_id_query) if item is not None}
+    if len(process_items) > 1:
+        raise HTTPBadRequest(json={
+            "type": InvalidIdentifierValue.__name__,
+            "title": "Multiple provider/service ID specified.",
+            "description": "Cannot resolve a unique service provider when distinct ID in path/query are specified.",
+            "value": repr_json(list(process_items)),
+        })
+    process_name = (process_path or process_query or proc_id_query)
+
     item_test = None
     item_type = None
-
     try:
         service = None
         if service_name:
             forbid_local_only(request)
             item_type = "Service"
-            item_test = service_name
+            item_test = get_sane_name(service_name, assert_invalid=True)
             store = get_db(request).get_store(StoreServices)
             service = store.fetch_by_name(service_name, visibility=Visibility.PUBLIC)
         if process_name:
             item_type = "Process"
-            item_test = process_name
+            item_test = resolve_process_tag(request)
             # local process
             if not service:
                 store = get_db(request).get_store(StoreProcesses)
@@ -573,14 +593,14 @@ def validate_service_process(request):
             "description": f"{item_type} reference '{item_test}' cannot be found."
         })
     except (ServiceNotAccessible, ProcessNotAccessible):
-        raise HTTPUnauthorized(json={
+        raise HTTPForbidden(json={
             "code": f"Unauthorized{item_type}",
             "description": f"{item_type} reference '{item_test}' is not accessible."
         })
-    except InvalidIdentifierValue as ex:
+    except (InvalidIdentifierValue, MissingIdentifierValue) as exc:
         raise HTTPBadRequest(json={
-            "code": InvalidIdentifierValue.__name__,
-            "description": str(ex)
+            "code": type(exc).__name__,
+            "description": str(exc)
         })
 
     return service_name, process_name

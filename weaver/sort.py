@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 from weaver.base import Constants
 
 
@@ -43,3 +45,29 @@ class SortMethods(Constants):
         Sort.QUOTE,
         Sort.CREATED,
     ])
+
+
+if TYPE_CHECKING:
+    from typing import Union
+    from typing_extensions import Literal
+
+    AnySortType = Literal[
+        Sort.CREATED,
+        Sort.FINISHED,
+        Sort.STATUS,
+        Sort.PROCESS,
+        Sort.SERVICE,
+        Sort.USER,
+        Sort.QUOTE,
+        Sort.PRICE,
+        Sort.ID,
+        Sort.ID_LONG,
+        Sort.VERSION,
+    ]
+
+    AnySortMethodsType = Union[
+        SortMethods.PROCESS,
+        SortMethods.JOB,
+        SortMethods.QUOTE,
+        SortMethods.BILL,
+    ]
