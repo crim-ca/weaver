@@ -85,6 +85,7 @@ if TYPE_CHECKING:
     from typing_extensions import NotRequired, TypedDict, TypeGuard
 
     from mypy_boto3_s3.client import S3Client
+    from mypy_boto3_s3.literals import RegionName
 
     from weaver.execute import AnyExecuteControlOption, AnyExecuteMode
     from weaver.status import Status
@@ -1822,20 +1823,32 @@ def download_file_http(file_reference, file_outdir, settings=None, callback=None
 
 
 def resolve_s3_from_http(reference):
-    # type: (str) -> Tuple[str, str]
+    # type: (str) -> Tuple[str, RegionName]
     """
     Resolve an HTTP URL reference pointing to an S3 Bucket into the shorthand URL notation with S3 scheme.
 
-    The expected reference should be formatted as follows.
+    The expected reference should be formatted with one of the following supported formats.
 
     .. code-block:: text
-        https://s3.[region-name.]amazonaws.com/<bucket>/[<any-quantity-of-dirs>/][<file-key>]
+
+        # Path-style URI
+        https://s3.{region-name}.amazonaws.com/{bucket}/[{dirs}/][{file-key}]
+
+        # Virtual-hosted–style URI
+        https://{bucket}.s3.{region-name}.amazonaws.com/[{dirs}/][{file-key}]
+
+        # Access-Point-style URI
+        https://{AccessPointName}-{AccountId}.s3-accesspoint.{region-name}.amazonaws.com/[{dirs}/][{file-key}]
+
+    .. seealso::
+        - https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-access-points.html
+        - https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-bucket-intro.html
 
     :param reference: HTTP-S3 URL reference.
     :return: Updated S3 reference and applicable S3 Region name.
     """
-    s3 = boto3.client("s3")
-    s3_url = s3.meta.endpoint_url
+    s3 = boto3.client("s3")         # type: S3Client  # created with default, environment, or ~/.aws/config
+    s3_url = s3.meta.endpoint_url   # includes the region name, to be used to check if we must switch region
     s3_region = s3.meta.region_name
     if not reference.startswith(s3_url):
         LOGGER.warning(
@@ -1843,10 +1856,26 @@ def resolve_s3_from_http(reference):
             "Attempting to switch S3 region for proper resolution.",
             reference, s3_region
         )
-        s3_region, s3_ref = reference.split("https://s3.")[-1].split(".amazonaws.com/")
-        s3_reference = f"s3://{s3_ref}"
+        s3_host = urlparse(reference)
+        if ".s3-accesspoint." in s3_host.hostname:
+            s3_access_point, s3_region = reference.split(".s3-accesspoint.", 1)
+            s3_access_name, s3_account = s3_access_point.rsplit("-", 1)
+            s3_region = s3_region.split(".amazonaws.com", 1)[0]
+            s3_ref = s3_host.path or "/"
+            s3_bucket = f"arn:aws:s3:{s3_region}:{s3_account}:accesspoint/{s3_access_name}"
+            s3_reference = f"s3://{s3_bucket}{s3_ref}"
+        elif ".s3." in s3_host.hostname:
+            s3_bucket, s3_region = reference.split(".s3.", 1)
+            s3_region, s3_ref = s3_region.split(".amazonaws.com", 1)
+            s3_ref = s3_ref or "/"
+            s3_reference = f"s3://{s3_ref}"
+        else:
+            s3_region, s3_ref = reference.split("https://s3.")[-1].split(".amazonaws.com")
+            s3_ref = s3_ref or "/"
+            s3_reference = f"s3://{s3_ref}"
     else:
         s3_ref = reference.replace(s3_url, "")
+        s3_ref = s3_ref.lstrip("/") if s3_ref != "/" else s3_ref
         s3_reference = f"s3://{s3_ref}"
     LOGGER.debug("Adjusting HTTP reference to S3 URL shorthand with resolved S3 Region:\n"
                  "  Initial: [%s]\n"

@@ -78,6 +78,8 @@ from weaver.utils import (
 if TYPE_CHECKING:
     from typing import List, Optional, Tuple, Type
 
+    from tests.utils import BucketLocationConstraintType, S3Scheme
+
 # pylint: disable=R1732,W1514  # not using with open + encoding
 
 
@@ -1130,12 +1132,24 @@ def test_fetch_file_http_content_disposition_filename():
 
 @mocked_aws_credentials
 @mocked_aws_s3
-def test_fetch_file_remote_s3_bucket():
+@pytest.mark.parametrize("s3_scheme, s3_region", [
+    ("s3", "ca-central-1"),
+    ("s3", "us-east-2"),
+    ("s3", "eu-west-1"),
+    ("https", "ca-central-1"),
+    ("https", "us-east-2"),
+    ("https", "eu-west-1"),
+])
+def test_fetch_file_remote_s3_bucket(s3_scheme, s3_region):
+    # type: (S3Scheme, BucketLocationConstraintType) -> None
     with tempfile.TemporaryDirectory() as tmpdir:
         test_file_name = "test-file.txt"
         test_file_data = "dummy file"
         test_bucket_name = "test-fake-bucket"
-        test_bucket_ref = mocked_aws_s3_bucket_test_file(test_bucket_name, test_file_name, test_file_data)
+        test_bucket_ref = mocked_aws_s3_bucket_test_file(
+            test_bucket_name, test_file_name, test_file_data,
+            s3_region=s3_region, s3_scheme=s3_scheme
+        )
         result = fetch_file(test_bucket_ref, tmpdir)
         assert result == os.path.join(tmpdir, test_file_name)
         assert os.path.isfile(result)

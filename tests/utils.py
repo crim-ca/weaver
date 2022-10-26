@@ -60,8 +60,11 @@ from weaver.wps.utils import get_wps_output_dir, get_wps_output_url
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Type, TypeVar, Union
+    from typing_extensions import Literal
 
-    import botocore.client  # noqa
+    from mypy_boto3_s3.client import S3Client
+    from mypy_boto3_s3.literals import BucketLocationConstraintType
+    from mypy_boto3_s3.type_defs import CreateBucketConfigurationTypeDef
     from owslib.wps import Process as ProcessOWSWPS
     from pywps.app import Process as ProcessPyWPS
     from responses import _Body as BodyType  # noqa: W0212
@@ -76,6 +79,8 @@ if TYPE_CHECKING:
         Path,
         SettingsType
     )
+
+    S3Scheme = Literal["s3", "https"]
 
     # pylint: disable=C0103,invalid-name,E1101,no-member
     MockPatch = mock._patch  # noqa: W0212
@@ -1146,13 +1151,18 @@ def mocked_process_package():
 
 
 def mocked_aws_credentials(test_func):
-    # type: (Callable[[...], Any]) -> Callable
+    # type: (Callable[[..., *Any], Any]) -> Callable[[..., *Any], Any]
     """
     Mocked AWS Credentials for :py:mod:`moto`.
 
     When using this fixture, ensures that if other mocks fail, at least credentials should be invalid to avoid
     mistakenly overriding real bucket files.
+
+    .. seealso::
+        - :func:`mocked_aws_s3`
+        - :func:`mocked_aws_s3_bucket_test_file`
     """
+    @functools.wraps(test_func)
     def wrapped(*args, **kwargs):
         # type: (*Any, **Any) -> Any
         with mock.patch.dict(os.environ, {
@@ -1166,14 +1176,15 @@ def mocked_aws_credentials(test_func):
 
 
 def mocked_aws_s3(test_func):
-    # type: (Callable[[...], Any]) -> Callable
+    # type: (Callable[[..., *Any], Any]) -> Callable[[..., *Any], Any]
     """
-    Mocked AWS S3 bucket for :py:mod:`boto3` over mocked AWS credentials using :py:mod:`moto`.
+    Mocked AWS S3 for :py:mod:`boto3` over mocked AWS credentials using :py:mod:`moto`.
 
-    .. warning::
-        Make sure to employ the same :py:data:`MOCK_AWS_REGION` otherwise mock will not work and S3 operations will
-        attempt writing to real bucket.
+    .. seealso::
+        - :func:`mocked_aws_credentials`
+        - :func:`mocked_aws_s3_bucket_test_file`
     """
+    @functools.wraps(test_func)
     def wrapped(*args, **kwargs):
         # type: (*Any, **Any) -> Any
         with moto.mock_s3():
@@ -1181,8 +1192,12 @@ def mocked_aws_s3(test_func):
     return wrapped
 
 
-def mocked_aws_s3_bucket_test_file(bucket_name, file_name, file_content="mock"):
-    # type: (str, str, str) -> str
+def mocked_aws_s3_bucket_test_file(bucket_name,                 # type: str
+                                   file_name,                   # type: str
+                                   file_content="mock",         # type: str
+                                   s3_region=MOCK_AWS_REGION,   # type: BucketLocationConstraintType
+                                   s3_scheme="s3",              # type: S3Scheme
+                                   ):                           # type: (...) -> str
     """
     Mock a test file as if retrieved from an AWS-S3 bucket reference.
 
@@ -1190,18 +1205,20 @@ def mocked_aws_s3_bucket_test_file(bucket_name, file_name, file_content="mock"):
     provided file key. The S3 interface employed is completely dependent of the wrapping context. For instance,
     calling this function with :func:`mocked_aws_s3` decorator will effectively employ the mocked S3 interface.
 
+    .. warning::
+        Make sure to employ the same :paramref:`s3_region` across calls when referring to the
+        same :paramref:`bucket_name`. Otherwise, mock could fail and S3 operations could be attempted
+        towards real S3 bucket locations.
+
     .. seealso::
+        - :func:`mocked_aws_credentials`
         - :func:`mocked_aws_s3`
     """
     import boto3
     from botocore.exceptions import ClientError
 
-    if not MOCK_AWS_REGION:
-        s3 = boto3.client("s3")
-        s3_location = None
-    else:
-        s3 = boto3.client("s3", region_name=MOCK_AWS_REGION)
-        s3_location = {"LocationConstraint": MOCK_AWS_REGION}
+    s3 = boto3.client("s3", region_name=s3_region)      # type: S3Client
+    s3_location = {"LocationConstraint": s3_region}     # type: CreateBucketConfigurationTypeDef
     try:
         s3.create_bucket(Bucket=bucket_name, CreateBucketConfiguration=s3_location)
     except ClientError as exc:
@@ -1212,7 +1229,10 @@ def mocked_aws_s3_bucket_test_file(bucket_name, file_name, file_content="mock"):
         tmp_file.write(file_content)
         tmp_file.flush()
         s3.upload_file(Bucket=bucket_name, Filename=tmp_file.name, Key=file_name)
-    return f"s3://{bucket_name}/{file_name}"
+    s3_prefix = ""
+    if s3_scheme == "https":
+        s3_prefix = f"s3.{s3_region}.amazonaws.com/"
+    return f"{s3_scheme}://{s3_prefix}{bucket_name}/{file_name}"
 
 
 def mocked_http_file(test_func):
