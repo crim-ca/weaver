@@ -1,7 +1,7 @@
 """
 Schema definitions for `OpenAPI` generation and validation of data from received requests and returned responses.
 
-This module should contain any and every definitions in use to build the Swagger UI and the OpenAPI JSON schema
+This module should contain any and every definition in use to build the Swagger UI and the OpenAPI JSON schema
 so that one can update the specification without touching any other files after the initial integration.
 
 Schemas defined in this module are employed (through ``deserialize`` method calls) to validate that data conforms to
@@ -54,6 +54,7 @@ from weaver.wps_restapi.colander_extras import (
     AllOfKeywordSchema,
     AnyOfKeywordSchema,
     BoundedRange,
+    CommaSeparated,
     EmptyMappingSchema,
     ExtendedBoolean as Boolean,
     ExtendedFloat as Float,
@@ -1730,9 +1731,19 @@ class QuoteSortEnum(ExtendedSchemaNode):
     validator = OneOf(SortMethods.QUOTE)
 
 
+class JobTagsCommaSeparated(ExtendedSchemaNode):
+    schema_type = String
+    validator = CommaSeparated()
+    default = None
+    missing = drop
+    description = (
+        "Comma-separated tags that can be used to filter jobs. "
+        f"Only {validator.allow_chars} characters are permitted."
+    )
+
+
 class LaunchJobQuerystring(ExtendedMappingSchema):
-    tags = ExtendedSchemaNode(String(), title="JobTags", default=None, missing=drop,
-                              description="Comma separated tags that can be used to filter jobs later")
+    tags = JobTagsCommaSeparated()
 
 
 class VisibilityValue(ExtendedSchemaNode):
@@ -4725,8 +4736,7 @@ class GetJobsQueries(ExtendedMappingSchema):
     sort = JobSortEnum(missing=drop)
     access = JobAccess(missing=drop, default=None)
     notification_email = ExtendedSchemaNode(String(), missing=drop, validator=Email())
-    tags = ExtendedSchemaNode(String(), missing=drop, default=None,
-                              description="Comma-separated values of tags assigned to jobs.")
+    tags = JobTagsCommaSeparated()
 
 
 class GetProcessJobsQuery(LocalProcessQuery, GetJobsQueries):

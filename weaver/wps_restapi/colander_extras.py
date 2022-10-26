@@ -192,7 +192,7 @@ class ConversionValueError(ConversionError, ValueError):
 
 class OneOfCaseInsensitive(colander.OneOf):
     """
-    Validator that ensures the given value matches one of the available choices, but allowing case insensitive values.
+    Validator that ensures the given value matches one of the available choices, but allowing case-insensitive values.
     """
 
     def __init__(self, choices, *args, **kwargs):
@@ -286,6 +286,22 @@ class StringRange(BoundedRange):
         if not str.isnumeric(value):
             raise colander.Invalid(node=node, value=value, msg="Value is not a numeric string.")
         return super(StringRange, self).__call__(node, float(value) if "." in value or "e" in value else int(value))
+
+
+class CommaSeparated(colander.Regex):
+    """
+    Validator that ensures the given value is a comma-separated string.
+    """
+    _MSG_ERR = colander._("Must be a comma-separated string of tags with characters [${allow_chars}].")
+
+    def __init__(self, allow_chars=r"A-Za-z0-9_-", msg=_MSG_ERR, flags=re.IGNORECASE):
+        # type: (str, str, re.RegexFlag) -> None
+        if "," in allow_chars:
+            raise ValueError("Cannot have comma character for item in comma-separated string!")
+        self.allow_chars = allow_chars
+        msg = colander._(msg, mapping={"allow_chars": allow_chars})
+        regex = rf"^[{allow_chars}]+(,[{allow_chars}]+)*$"
+        super(CommaSeparated, self).__init__(regex=regex, msg=msg, flags=flags)
 
 
 class SchemeURL(colander.Regex):
