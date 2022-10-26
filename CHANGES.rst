@@ -24,6 +24,7 @@ Changes:
 - Support the generation of external schema references (``$ref``) using the ``schema_ref`` attribute if provided
   in a ``colander.SchemaNode`` that does not provide an explicit object schema definition with properties.
 - Add Python typing definitions related to OpenAPI specification.
+- Add more validation of request arguments for improved security.
 
 Fixes:
 ------
