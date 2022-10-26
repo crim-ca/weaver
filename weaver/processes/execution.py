@@ -53,6 +53,7 @@ from weaver.wps.utils import (
 )
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.jobs.utils import get_job_results_response, get_job_submission_response
+from weaver.wps_restapi.processes.utils import resolve_process_tag
 
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
@@ -570,7 +571,7 @@ def submit_job(request, reference, tags=None):
     elif isinstance(reference, Service):
         service_url = reference.url
         provider_id = reference.id
-        process_id = request.matchdict.get("process_id")
+        process_id = resolve_process_tag(request)
         visibility = Visibility.PUBLIC
         is_workflow = False
         is_local = False
@@ -578,7 +579,8 @@ def submit_job(request, reference, tags=None):
     else:  # pragma: no cover
         LOGGER.error("Expected process/service, got: %s", type(reference))
         raise TypeError("Invalid process or service reference to execute job.")
-    tags = request.params.get("tags", "").split(",") + tags
+    queries = sd.LaunchJobQuerystring().deserialize(request.params)
+    tags = queries.get("tags", "").split(",") + tags
     user = request.authenticated_userid
     headers = dict(request.headers)
     settings = get_settings(request)
