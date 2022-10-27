@@ -4,6 +4,7 @@ import shutil
 from copy import deepcopy
 from typing import TYPE_CHECKING
 
+import colander
 from celery.utils.log import get_task_logger
 from pyramid.httpexceptions import (
     HTTPBadRequest,
@@ -597,12 +598,15 @@ def validate_service_process(request):
             "code": f"Unauthorized{item_type}",
             "description": f"{item_type} reference '{item_test}' is not accessible."
         })
-    except (InvalidIdentifierValue, MissingIdentifierValue) as exc:
+    except colander.Invalid as exc:
         raise HTTPBadRequest(json={
-            "code": type(exc).__name__,
-            "description": str(exc)
+            "type": InvalidIdentifierValue.__name__,
+            "title": "Invalid path or query parameter value.",
+            "description": "Provided path or query parameters for process and/or provider reference are invalid.",
+            "cause": f"Invalid schema: [{exc.msg!s}]",
+            "error": exc.__class__.__name__,
+            "value": exc.value
         })
-
     return service_name, process_name
 
 
