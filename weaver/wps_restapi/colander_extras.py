@@ -51,8 +51,6 @@ complementary support of one-another features.
     of generated OpenAPI model definitions. If not explicitly provided, the
     value of ``title`` **WILL** default to the name of the schema node class.
 """
-import abc
-
 import inspect
 import re
 import uuid
@@ -617,6 +615,7 @@ class ExtendedSchemaBase(colander.SchemaNode, metaclass=ExtendedSchemaMeta):
     automatically generated.
     """
     @staticmethod
+    @abstractmethod
     def schema_type():
         raise NotImplementedError("Using SchemaNode for a field requires 'schema_type' definition.")
 
@@ -725,6 +724,7 @@ class DropableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
         setattr(self, DropableSchemaNode._extension, True)
 
     @staticmethod
+    @abstractmethod
     def schema_type():
         raise NotImplementedError("Using SchemaNode for a field requires 'schema_type' definition.")
 
@@ -769,6 +769,7 @@ class DefaultSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
         setattr(self, DefaultSequenceSchema._extension, True)
 
     @staticmethod
+    @abstractmethod
     def schema_type():
         raise NotImplementedError("Using SchemaNode for a field requires 'schema_type' definition.")
 
@@ -885,6 +886,7 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
         return False
 
     @staticmethod
+    @abstractmethod
     def schema_type():
         raise NotImplementedError("Using SchemaNode for a field requires 'schema_type' definition.")
 
@@ -1099,6 +1101,7 @@ class SortableMappingSchema(ExtendedNodeInterface, ExtendedSchemaBase):
         return ExtendedSchemaNode.deserialize(self, cstruct)  # noqa
 
     @staticmethod
+    @abstractmethod
     def schema_type():
         raise NotImplementedError("Using SchemaNode for a field requires 'schema_type' definition.")
 
@@ -1163,6 +1166,7 @@ class ExtendedSchemaNode(DefaultSchemaNode, DropableSchemaNode, VariableSchemaNo
     _extension = "_ext_combined"
 
     @staticmethod
+    @abstractmethod
     def schema_type():
         raise NotImplementedError("Using SchemaNode for a field requires 'schema_type' definition.")
 
@@ -1240,7 +1244,7 @@ class ExpandStringList(colander.SchemaNode):
     DEFAULT_DELIMITER = ","
 
     @staticmethod
-    @abc.abstractmethod
+    @abstractmethod
     def schema_type():
         raise NotImplementedError("Using SchemaNode for a field requires 'schema_type' definition.")
 
