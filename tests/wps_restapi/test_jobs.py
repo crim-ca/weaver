@@ -15,6 +15,7 @@ import mock
 import pyramid.testing
 import pytest
 from dateutil import parser as date_parser
+from parameterized import parameterized
 
 from tests.functional.utils import JobUtils
 from tests.resources import load_example
@@ -713,16 +714,78 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
         assert resp.status_code == 404
         assert resp.content_type == ContentType.APP_JSON
 
-    def test_get_jobs_private_process_unauthorized_in_path(self):
+    @parameterized.expand([
+        get_path_kvp(
+            sd.jobs_service.path,
+            process="process-1", processID="process-2",
+        ),
+        get_path_kvp(
+            sd.process_jobs_service.path.format(process_id="process-1"),
+            process="process-2",
+        ),
+        get_path_kvp(
+            sd.process_jobs_service.path.format(process_id="process-1"),
+            process="process-1", processID="process-2",
+        ),
+        get_path_kvp(
+            sd.process_jobs_service.path.format(process_id="process-2"),
+            process="process-1", processID="process-1",
+        ),
+        get_path_kvp(
+            sd.provider_jobs_service.path.format(provider_id="provider-1", process_id="process-1"),
+            process="process-2",
+        ),
+        get_path_kvp(
+            sd.provider_jobs_service.path.format(provider_id="provider-1", process_id="process-1"),
+            process="process-1", processID="process-2",
+        ),
+        get_path_kvp(
+            sd.provider_jobs_service.path.format(provider_id="provider-1", process_id="process-2"),
+            process="process-1", processID="process-1",
+        ),
+        get_path_kvp(
+            sd.provider_jobs_service.path.format(provider_id="provider-1", process_id="process-1"),
+            provider="provider-2",
+        ),
+        get_path_kvp(
+            sd.provider_jobs_service.path.format(provider_id="provider-1", process_id="process-1"),
+            service="provider-2",
+        ),
+    ])
+    def test_get_jobs_process_or_service_mismatch_in_path_or_query(self, path):
+        # type: (str) -> None
+        """
+        Validate mismatching references.
+
+        When :term:`Process` or :term:`Service` references are respectively provided in path/query simultaneously,
+        but their values mismatch, an error should be raised immediately since we cannot resolve which one to use.
+        """
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 400
+        assert resp.content_type == ContentType.APP_JSON
+
+    @parameterized.expand([
+        get_path_kvp(sd.jobs_service.path, process="process-1:invalid!!!"),
+        get_path_kvp(sd.jobs_service.path, process="process-1:not-valid"),
+        get_path_kvp(sd.jobs_service.path, process="process 1:1.2.3"),
+        get_path_kvp(sd.jobs_service.path, process="process!!:1.2.3"),
+    ])
+    def test_get_jobs_process_invalid_tag_in_path_or_query(self, path):
+        # type: (str) -> None
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 400
+        assert resp.content_type == ContentType.APP_JSON
+
+    def test_get_jobs_private_process_forbidden_access_in_path(self):
         path = sd.process_jobs_service.path.format(process_id=self.process_private.identifier)
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
-        assert resp.status_code == 401
+        assert resp.status_code == 403
         assert resp.content_type == ContentType.APP_JSON
 
     def test_get_jobs_private_process_not_returned_in_query(self):
         path = get_path_kvp(sd.jobs_service.path, process=self.process_private.identifier)
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
-        assert resp.status_code == 401
+        assert resp.status_code == 403
         assert resp.content_type == ContentType.APP_JSON
 
     def test_get_jobs_service_and_process_unknown_in_path(self):
@@ -737,22 +800,22 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
         assert resp.status_code == 404
         assert resp.content_type == ContentType.APP_JSON
 
-    def test_get_jobs_private_service_public_process_unauthorized_in_path(self):
+    def test_get_jobs_private_service_public_process_forbidden_access_in_path(self):
         path = sd.provider_jobs_service.path.format(provider_id=self.service_private.name,
                                                     process_id=self.process_public.identifier)
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
-        assert resp.status_code == 401
+        assert resp.status_code == 403
         assert resp.content_type == ContentType.APP_JSON
 
-    def test_get_jobs_private_service_public_process_unauthorized_in_query(self):
+    def test_get_jobs_private_service_public_process_forbidden_access_in_query(self):
         path = get_path_kvp(sd.jobs_service.path,
                             service=self.service_private.name,
                             process=self.process_public.identifier)
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
-        assert resp.status_code == 401
+        assert resp.status_code == 403
         assert resp.content_type == ContentType.APP_JSON
 
-    def test_get_jobs_public_service_private_process_unauthorized_in_query(self):
+    def test_get_jobs_public_service_private_process_forbidden_access_in_query(self):
         """
         NOTE:
             it is up to the remote service to hide private processes

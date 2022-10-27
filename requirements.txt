@@ -7,7 +7,10 @@ boto3
 # https://github.com/celery/billiard/issues/313
 billiard>2; sys_platform != "win32"  # avoid issue with use_2to3
 billiard>3.2,<3.4; sys_platform == "win32"
-# FIXME: pymongo>=4 breaks with kombu corresponding to pinned Celery (https://github.com/crim-ca/weaver/issues/386)
+# FIXME: pymongo>=4 breaks with kombu corresponding to pinned Celery
+# - https://github.com/crim-ca/weaver/issues/386
+# - https://github.com/celery/kombu/pull/1536
+# - https://github.com/celery/celery/pull/7834
 #   celery >=4.4.3 breaks on 'future.utils' import
 #   celery's CLI interface changed
 #   https://github.com/celery/celery/blob/master/docs/whatsnew-5.2.rst#upgrading-from-celery-4x
@@ -42,15 +45,23 @@ json2xml<3.19.0; python_version <= "3.6"
 # reduced dependencies contrains to let packages update to latest (https://github.com/vinitkumar/json2xml/issues/157)
 json2xml>=3.20.0; python_version >= "3.7"
 jsonschema>=3.0.1
+# FIXME: kombu for pymongo>=4 not yet released as 5.3.0 (only pre-releases available)
+# - https://github.com/crim-ca/weaver/issues/386
+# - https://github.com/celery/kombu/pull/1536
+# - https://github.com/celery/celery/pull/7834
+kombu>=5.3.0b2,<6; python_version >= "3.7"
 lxml
 mako
 # esgf-compute-api (cwt) needs oauthlib but doesn't add it in their requirements
 oauthlib
 owslib==0.27.2
 psutil
-# pymongo>=4 breaks with kombu corresponding to pinned Celery (https://github.com/crim-ca/weaver/issues/386)
+# FIXME: pymongo>=4 breaks with kombu corresponding to pinned Celery
+# - https://github.com/crim-ca/weaver/issues/386
+# - https://github.com/celery/kombu/pull/1536
+# - https://github.com/celery/celery/pull/7834
 pymongo>=3.12.0,<4; python_version <= "3.6"
-pymongo>=4; python_version >= "3.7"
+pymongo>=4; python_version >= "3.7"     # either (pymongo>=4, kombu>=5.3.0b2) or (pymongo<4, celery<5.2)
 pyramid>=1.7.3
 pyramid_beaker>=0.8
 pyramid_celery>=4.0.0   # required for celery>=5

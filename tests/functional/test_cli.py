@@ -1030,7 +1030,7 @@ class TestWeaverCLI(TestWeaverClientBase):
         test_id = f"{self.test_process_prefix}deploy-body-no-cwl"
         payload = self.retrieve_payload("Echo", "deploy", local=True)
         package = self.retrieve_payload("Echo", "package", local=True)
-        payload["executionUnit"][0] = {"unit": package}
+        payload["executionUnit"][0] = {"unit": package}  # pylint: disable=unsubscriptable-object
 
         lines = mocked_sub_requests(
             self.app, run_command,
@@ -1052,7 +1052,7 @@ class TestWeaverCLI(TestWeaverClientBase):
         test_id = f"{self.test_process_prefix}deploy-file-no-cwl"
         payload = self.retrieve_payload("Echo", "deploy", local=True)
         package = self.retrieve_payload("Echo", "package", local=True, ref_found=True)
-        payload["executionUnit"][0] = {"href": package}
+        payload["executionUnit"][0] = {"href": package}  # pylint: disable=unsubscriptable-object
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".cwl") as body_file:
             json.dump(payload, body_file)
@@ -1145,8 +1145,8 @@ class TestWeaverCLI(TestWeaverClientBase):
         for i, payload in enumerate([payload_direct, payload_nested]):
             test_id = f"{self.test_process_prefix}deploy-body-with-process-info-{i}"
             package = self.retrieve_payload("Echo", "package", local=True)
-            package["outputs"]["output"]["format"] = cwl_fmt
-            package["$namespaces"] = cwl_ns
+            package["outputs"]["output"]["format"] = cwl_fmt    # pylint: disable=unsubscriptable-object
+            package["$namespaces"] = cwl_ns                     # pylint: disable=unsupported-assignment-operation
 
             lines = mocked_sub_requests(
                 self.app, run_command,

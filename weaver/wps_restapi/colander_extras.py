@@ -86,7 +86,17 @@ if TYPE_CHECKING:
     from cornice import Service as CorniceService
     from pyramid.registry import Registry
 
-    from weaver.typedefs import JSON, OpenAPISchema, OpenAPISpecification, OpenAPISpecInfo, OpenAPISpecParameter
+    from weaver.typedefs import (
+        JSON,
+        OpenAPISchema,
+        OpenAPISchemaAllOf,
+        OpenAPISchemaAnyOf,
+        OpenAPISchemaOneOf,
+        OpenAPISchemaNot,
+        OpenAPISpecification,
+        OpenAPISpecInfo,
+        OpenAPISpecParameter
+    )
 
 # pylint: disable=C0209,consider-using-f-string
 
@@ -192,7 +202,7 @@ class ConversionValueError(ConversionError, ValueError):
 
 class OneOfCaseInsensitive(colander.OneOf):
     """
-    Validator that ensures the given value matches one of the available choices, but allowing case insensitive values.
+    Validator that ensures the given value matches one of the available choices, but allowing case-insensitive values.
     """
 
     def __init__(self, choices, *args, **kwargs):
@@ -220,7 +230,7 @@ class StringOneOf(colander.OneOf):
 
     def __init__(self, choices, delimiter=",", case_sensitive=True, **kwargs):
         # type: (Iterable[str], str, bool, Any) -> None
-        self._delim = delimiter
+        self.delimiter = delimiter
         if not case_sensitive:
             choices = OneOfCaseInsensitive(choices).choices
         super(StringOneOf, self).__init__(choices, **kwargs)
@@ -229,7 +239,7 @@ class StringOneOf(colander.OneOf):
         # type: (colander.SchemaNode, Any) -> None
         if not isinstance(value, str):
             super(StringOneOf, self).__call__(node, value)  # raise accordingly
-        for val in value.split(self._delim):
+        for val in value.split(self.delimiter):
             super(StringOneOf, self).__call__(node, val)  # raise accordingly
 
 
@@ -286,6 +296,22 @@ class StringRange(BoundedRange):
         if not str.isnumeric(value):
             raise colander.Invalid(node=node, value=value, msg="Value is not a numeric string.")
         return super(StringRange, self).__call__(node, float(value) if "." in value or "e" in value else int(value))
+
+
+class CommaSeparated(colander.Regex):
+    """
+    Validator that ensures the given value is a comma-separated string.
+    """
+    _MSG_ERR = colander._("Must be a comma-separated string of tags with characters [${allow_chars}].")
+
+    def __init__(self, allow_chars=r"A-Za-z0-9_-", msg=_MSG_ERR, flags=re.IGNORECASE):
+        # type: (str, str, re.RegexFlag) -> None
+        if "," in allow_chars:
+            raise ValueError("Cannot have comma character for item in comma-separated string!")
+        self.allow_chars = allow_chars
+        msg = colander._(msg, mapping={"allow_chars": allow_chars})
+        regex = rf"^[{allow_chars}]+(,[{allow_chars}]+)*$"
+        super(CommaSeparated, self).__init__(regex=regex, msg=msg, flags=flags)
 
 
 class SchemeURL(colander.Regex):
@@ -589,6 +615,7 @@ class ExtendedSchemaBase(colander.SchemaNode, metaclass=ExtendedSchemaMeta):
     automatically generated.
     """
     @staticmethod
+    @abstractmethod
     def schema_type():
         raise NotImplementedError("Using SchemaNode for a field requires 'schema_type' definition.")
 
@@ -697,11 +724,11 @@ class DropableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
         setattr(self, DropableSchemaNode._extension, True)
 
     @staticmethod
+    @abstractmethod
     def schema_type():
         raise NotImplementedError("Using SchemaNode for a field requires 'schema_type' definition.")
 
-    # pylint: disable=W0222,signature-differs
-    def deserialize(self, cstruct):
+    def deserialize(self, cstruct):  # pylint: disable=W0222,signature-differs
         return ExtendedSchemaNode.deserialize(self, cstruct)  # noqa
 
     def _deserialize_impl(self, cstruct):
@@ -742,11 +769,11 @@ class DefaultSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
         setattr(self, DefaultSequenceSchema._extension, True)
 
     @staticmethod
+    @abstractmethod
     def schema_type():
         raise NotImplementedError("Using SchemaNode for a field requires 'schema_type' definition.")
 
-    # pylint: disable=W0222,signature-differs
-    def deserialize(self, cstruct):
+    def deserialize(self, cstruct):  # pylint: disable=W0222,signature-differs
         return ExtendedSchemaNode.deserialize(self, cstruct)  # noqa
 
     def _deserialize_impl(self, cstruct):
@@ -859,6 +886,7 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
         return False
 
     @staticmethod
+    @abstractmethod
     def schema_type():
         raise NotImplementedError("Using SchemaNode for a field requires 'schema_type' definition.")
 
@@ -935,8 +963,7 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
     def _get_sub_variable(self, subnodes):
         return [child for child in subnodes if getattr(child, self._variable, None)]
 
-    # pylint: disable=W0222,signature-differs
-    def deserialize(self, cstruct):
+    def deserialize(self, cstruct):  # pylint: disable=W0222,signature-differs
         return ExtendedSchemaNode.deserialize(self, cstruct)  # noqa
 
     @staticmethod
@@ -1070,11 +1097,11 @@ class SortableMappingSchema(ExtendedNodeInterface, ExtendedSchemaBase):
         super(SortableMappingSchema, self).__init__(*args, **kwargs)
         setattr(self, SortableMappingSchema._extension, True)
 
-    # pylint: disable=W0222,signature-differs
-    def deserialize(self, cstruct):
+    def deserialize(self, cstruct):  # pylint: disable=W0222,signature-differs
         return ExtendedSchemaNode.deserialize(self, cstruct)  # noqa
 
     @staticmethod
+    @abstractmethod
     def schema_type():
         raise NotImplementedError("Using SchemaNode for a field requires 'schema_type' definition.")
 
@@ -1139,6 +1166,7 @@ class ExtendedSchemaNode(DefaultSchemaNode, DropableSchemaNode, VariableSchemaNo
     _extension = "_ext_combined"
 
     @staticmethod
+    @abstractmethod
     def schema_type():
         raise NotImplementedError("Using SchemaNode for a field requires 'schema_type' definition.")
 
@@ -1195,6 +1223,41 @@ class ExtendedSchemaNode(DefaultSchemaNode, DropableSchemaNode, VariableSchemaNo
             raise colander.Invalid(node=self, msg=self.missing_msg)
 
         return SortableMappingSchema._deserialize_impl(self, result)
+
+
+class ExpandStringList(colander.SchemaNode):
+    """
+    Utility that will automatically deserialize a string to its list representation using the validator delimiter.
+
+    .. seealso::
+        - :class:`CommaSeparated`
+        - :class:`StringOneOf`
+
+    In order to use this utility, it is important to place it first in the schema node class definition.
+
+    .. code-block::
+
+        class NewNodeSchema(ExpandStringList, ExtendedSchemaNode):
+            schema_type = String
+            validator = CommaSeparated()
+    """
+    DEFAULT_DELIMITER = ","
+
+    @staticmethod
+    @abstractmethod
+    def schema_type():
+        raise NotImplementedError("Using SchemaNode for a field requires 'schema_type' definition.")
+
+    def deserialize(self, cstruct):  # pylint: disable=W0222,signature-differs
+        result = super(ExpandStringList, self).deserialize(cstruct)
+        if not isinstance(result, str) and result:
+            return result
+        validator = getattr(self, "validator", None)
+        if not validator:
+            return result
+        delimiter = getattr(validator, "delimiter", self.DEFAULT_DELIMITER)
+        result = list(filter(lambda _res: bool(_res), result.split(delimiter)))
+        return result
 
 
 class DropableSequenceSchema(DropableSchemaNode, colander.SequenceSchema):
@@ -1512,8 +1575,7 @@ class KeywordMapper(ExtendedMappingSchema):
             return KeywordMapper.deserialize(node, cstruct)
         return ExtendedSchemaNode.deserialize(node, cstruct)
 
-    # pylint: disable=W0222,signature-differs
-    def deserialize(self, cstruct):
+    def deserialize(self, cstruct):  # pylint: disable=W0222,signature-differs
         if cstruct is colander.null:
             if self.required and not VariableSchemaNode.is_variable(self):
                 raise colander.Invalid(self, "Missing required field.")
@@ -2073,7 +2135,7 @@ class OneOfKeywordTypeConverter(KeywordTypeConverter):
     """
 
     def convert_type(self, schema_node):
-        # type: (OneOfKeywordSchema) -> Dict
+        # type: (OneOfKeywordSchema) -> OpenAPISchemaOneOf
         keyword = schema_node.get_keyword_name()
         one_of_obj = {
             keyword: []
@@ -2123,11 +2185,19 @@ class AllOfKeywordTypeConverter(KeywordTypeConverter):
     Object converter that generates the ``allOf`` keyword definition.
     """
 
+    def convert_type(self, schema_node):
+        # type: (colander.SchemaNode) -> OpenAPISchemaAllOf
+        return super(AllOfKeywordTypeConverter, self).convert_type(schema_node)
+
 
 class AnyOfKeywordTypeConverter(KeywordTypeConverter):
     """
     Object converter that generates the ``anyOf`` keyword definition.
     """
+
+    def convert_type(self, schema_node):
+        # type: (colander.SchemaNode) -> OpenAPISchemaAnyOf
+        return super(AnyOfKeywordTypeConverter, self).convert_type(schema_node)
 
 
 class NotKeywordTypeConverter(KeywordTypeConverter):
@@ -2136,6 +2206,7 @@ class NotKeywordTypeConverter(KeywordTypeConverter):
     """
 
     def convert_type(self, schema_node):
+        # type: (colander.SchemaNode) -> OpenAPISchemaNot
         result = ObjectTypeConverter(self.dispatcher).convert_type(schema_node)
         result["additionalProperties"] = False
         return result
@@ -2147,6 +2218,7 @@ class VariableObjectTypeConverter(ObjectTypeConverter):
     """
 
     def convert_type(self, schema_node):
+        # type: (colander.SchemaNode) -> OpenAPISchema
         converted = super(VariableObjectTypeConverter, self).convert_type(schema_node)
         converted.setdefault("additionalProperties", {})
         if self.dispatcher.openapi_spec == 3:
@@ -2216,7 +2288,7 @@ class OAS3TypeConversionDispatcher(TypeConversionDispatcher):
         super(OAS3TypeConversionDispatcher, self).__init__(extended_converters, default_converter)
 
     def __call__(self, schema_node):
-        # type: (colander.SchemaNode) -> Dict[str, Any]
+        # type: (colander.SchemaNode) -> OpenAPISchema
         schema_type = schema_node.typ
         schema_type = type(schema_type)
 

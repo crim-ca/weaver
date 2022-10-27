@@ -59,10 +59,13 @@ from weaver.wps.utils import get_wps_url
 if TYPE_CHECKING:
     import datetime
     from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+    from typing_extensions import TypedDict
+
     from pymongo.collection import Collection
 
     from weaver.execute import AnyExecuteResponse
     from weaver.processes.types import AnyProcessType
+    from weaver.sort import AnySortType
     from weaver.status import AnyStatusSearch
     from weaver.store.base import DatetimeIntervalType, JobGroupCategory, JobSearchResult
     from weaver.typedefs import (
@@ -78,7 +81,18 @@ if TYPE_CHECKING:
 
     MongodbValue = Union[AnyValueType, datetime.datetime]
     MongodbAggregateValue = Union[MongodbValue, List[MongodbValue], Dict[str, AnyValueType, List[AnyValueType]]]
-    MongodbAggregateExpression = Dict[str, MongodbAggregateValue]
+    MongodbAggregateSortOrder = Dict[str, int]
+    MongodbAggregateSortExpression = TypedDict("MongodbAggregateSortExpression", {
+        "$sort": MongodbAggregateSortOrder,
+    }, total=True)
+    MongodbAggregateFilterExpression = TypedDict("MongodbAggregateFilterExpression", {
+        "$match": MongodbAggregateValue,
+    }, total=True)
+    MongodbAggregateExpression = Union[
+        Dict[str, MongodbAggregateValue],
+        MongodbAggregateFilterExpression,
+        MongodbAggregateSortExpression,
+    ]
     MongodbAggregateStep = Union[MongodbValue, MongodbAggregateExpression]
     MongodbAggregatePipeline = List[Dict[str, Union[str, Dict[str, MongodbAggregateStep]]]]
 
@@ -218,7 +232,7 @@ class ListingMixin(object):
 
     @staticmethod
     def _apply_sort_method(sort_field, sort_default, sort_allowed):
-        # type: (Optional[str], str, List[str]) -> MongodbAggregateExpression
+        # type: (Optional[AnySortType], AnySortType, List[AnySortType]) -> MongodbAggregateSortOrder
         sort = sort_field  # keep original sort field in case of error
         if sort is None:
             sort = sort_default
@@ -487,7 +501,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
                        visibility=None,     # type: Optional[AnyVisibility, List[AnyVisibility]]
                        page=None,           # type: Optional[int]
                        limit=None,          # type: Optional[int]
-                       sort=None,           # type: Optional[str]
+                       sort=None,           # type: Optional[AnySortType]
                        total=False,         # type: bool
                        revisions=False,     # type: bool
                        process=None,        # type: Optional[str]
@@ -867,7 +881,7 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
                   access=None,              # type: Optional[str]
                   notification_email=None,  # type: Optional[str]
                   status=None,              # type: Optional[AnyStatusSearch, List[AnyStatusSearch]]
-                  sort=None,                # type: Optional[str]
+                  sort=None,                # type: Optional[AnySortType]
                   page=0,                   # type: Optional[int]
                   limit=10,                 # type: Optional[int]
                   min_duration=None,        # type: Optional[int]
@@ -1160,7 +1174,7 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
         return True
 
 
-class MongodbQuoteStore(StoreQuotes, MongodbStore):
+class MongodbQuoteStore(StoreQuotes, MongodbStore, ListingMixin):
     """
     Registry for quotes.
 
@@ -1226,32 +1240,30 @@ class MongodbQuoteStore(StoreQuotes, MongodbStore):
         return quotes
 
     def find_quotes(self, process_id=None, page=0, limit=10, sort=None):
-        # type: (Optional[str], int, int, Optional[str]) -> Tuple[List[Quote], int]
+        # type: (Optional[str], int, int, Optional[AnySortType]) -> Tuple[List[Quote], int]
         """
         Finds all quotes in `MongoDB` storage matching search filters.
 
-        Returns a tuple of filtered ``items`` and their ``count``, where ``items`` can have paging and be limited
-        to a maximum per page, but ``count`` always indicate the `total` number of matches.
+        Returns a tuple of filtered ``items`` and their ``total``, where ``items`` can have paging and be limited
+        to a maximum per page, but ``total`` always indicate the `total` number of matches excluding paging.
         """
-        search_filters = {}
+        search_filters = {}  # type: MongodbAggregateExpression
 
         if isinstance(process_id, str):
             search_filters["process"] = process_id
 
-        if sort is None:
-            sort = Sort.ID
-        if sort not in SortMethods.QUOTE:
-            raise QuoteNotFound(f"Invalid sorting method: '{sort!s}'")
+        sort_fields = self._apply_sort_method(sort, Sort.ID, SortMethods.QUOTE)
+        search_pipeline = [{"$match": search_filters}, {"$sort": sort_fields}]
+        paging_pipeline = self._apply_paging_pipeline(page, limit)
+        pipeline = self._apply_total_result(search_pipeline, paging_pipeline)
 
-        sort_order = pymongo.ASCENDING
-        sort_criteria = [(sort, sort_order)]
-        found = self.collection.find(search_filters)
-        count = found.count()
-        items = [Quote(item) for item in list(found.skip(page * limit).limit(limit).sort(sort_criteria))]
-        return items, count
+        found = list(self.collection.aggregate(pipeline))
+        items = [Quote(item) for item in found[0]["items"]]
+        total = found[0]["total"]
+        return items, total
 
 
-class MongodbBillStore(StoreBills, MongodbStore):
+class MongodbBillStore(StoreBills, MongodbStore, ListingMixin):
     """
     Registry for bills.
 
@@ -1302,29 +1314,27 @@ class MongodbBillStore(StoreBills, MongodbStore):
         return bills
 
     def find_bills(self, quote_id=None, page=0, limit=10, sort=None):
-        # type: (Optional[str], int, int, Optional[str]) -> Tuple[List[Bill], int]
+        # type: (Optional[str], int, int, Optional[AnySortType]) -> Tuple[List[Bill], int]
         """
         Finds all bills in `MongoDB` storage matching search filters.
 
-        Returns a tuple of filtered ``items`` and their ``count``, where ``items`` can have paging and be limited
-        to a maximum per page, but ``count`` always indicate the `total` number of matches.
+        Returns a tuple of filtered ``items`` and their ``total``, where ``items`` can have paging and be limited
+        to a maximum per page, but ``total`` always indicate the `total` number of matches excluding paging.
         """
-        search_filters = {}
+        search_filters = {}  # type: MongodbAggregateExpression
 
         if isinstance(quote_id, str):
             search_filters["quote"] = quote_id
 
-        if sort is None:
-            sort = Sort.ID
-        if sort not in SortMethods.BILL:
-            raise BillNotFound(f"Invalid sorting method: '{sort!r}'")
+        sort_fields = self._apply_sort_method(sort, Sort.ID, SortMethods.BILL)
+        search_pipeline = [{"$match": search_filters}, {"$sort": sort_fields}]
+        paging_pipeline = self._apply_paging_pipeline(page, limit)
+        pipeline = self._apply_total_result(search_pipeline, paging_pipeline)
 
-        sort_order = pymongo.ASCENDING
-        sort_criteria = [(sort, sort_order)]
-        found = self.collection.find(search_filters)
-        count = found.count()
-        items = [Bill(item) for item in list(found.skip(page * limit).limit(limit).sort(sort_criteria))]
-        return items, count
+        found = list(self.collection.aggregate(pipeline))
+        items = [Bill(item) for item in found[0]["items"]]
+        total = found[0]["total"]
+        return items, total
 
 
 class MongodbVaultStore(StoreVault, MongodbStore):

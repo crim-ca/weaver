@@ -20,6 +20,7 @@ Changes:
 - Support the generation of external schema references (``$ref``) using the ``schema_ref`` attribute if provided
   in a ``colander.SchemaNode`` that does not provide an explicit object schema definition with properties.
 - Add Python typing definitions related to OpenAPI specification.
+- Add more validation of request arguments for improved security.
 
 Fixes:
 ------
@@ -37,6 +38,12 @@ Fixes:
   indicated as ``plain/text``.
 - Fix invalid resolution of ``builtin`` `Process` that could load the optional `JSON` or `YAML` payload file intended
   to provide additional `Process` definition details, instead of the expected `CWL` for the package definition.
+- Fix ``kombu`` package requirement to employ ``celery>=5.2`` with ``pymongo>=4``
+  (fixes `#386 <https://github.com/crim-ca/weaver/issues/386>`_,
+  relates to `celery/celery#7834 <https://github.com/celery/celery/pull/7834>`_,
+  relates to `celery/kombu#1536 <https://github.com/celery/kombu/pull/1536>`_).
+- Fix deprecated ``Cursor.count()`` call for ``Quote`` and ``Bill`` search with ``pymongo>=4``.
+- Fix unsupported `Process`-related queries including a tagged version when searching for `Job` items.
 
 .. _changes_4.25.0:
 
