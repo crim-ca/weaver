@@ -6,6 +6,7 @@ import warnings
 from typing import TYPE_CHECKING, overload
 
 import pymongo
+import pymongo.errors
 
 from weaver.database.base import DatabaseInterface
 from weaver.store.mongodb import (
