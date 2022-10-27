@@ -231,25 +231,30 @@ def test_href_inputs_not_uploaded_to_vault():
     inputs = {"source": {"href": "https://fake.domain.com/fakefile.zip"}}
     with mock.patch("weaver.cli.WeaverClient.upload", side_effect=mock_upload):
         result = WeaverClient()._update_files(inputs=inputs)
-    assert result is not mock_result
+    assert result is not mock_result, "WeaverCLient.upload should not be called since reference is not local"
     assert result == (inputs, {})
 
 
 @pytest.mark.cli
 def test_file_inputs_uploaded_to_vault():
-    fake_href = "/fake/href"
+    fake_href = "https://some-host.com/some-file.zip"
     fake_id = "fake_id"
     fake_token = "fake_token"
 
     output_body = {"file_href": fake_href, "file_id": fake_id, "access_token": fake_token}
-    expected_output = ({
-                           "source": {
-                               "format": {
-                                   "mediaType": "application/zip"},
-                               "href": fake_href}
-                       },
-                       {
-                           "X-Auth-Vault": f"token {fake_token}; id={fake_id}"})
+    expected_output = (
+        {
+            "source": {
+                "format": {
+                    "mediaType": ContentType.APP_ZIP
+                },
+                "href": fake_href
+            }
+        },
+        {
+            "X-Auth-Vault": f"token {fake_token}; id={fake_id}"
+        }
+    )
 
     mock_result = OperationResult(True, code=200, body=output_body)
 
@@ -274,4 +279,4 @@ def test_file_inputs_not_uploaded_to_vault():
         inputs = {"source": {"href": input_file.name}}
         with mock.patch("weaver.cli.WeaverClient.upload", side_effect=mock_upload):
             result = WeaverClient()._update_files(inputs=inputs)
-    assert result is mock_result
+    assert result is mock_result, "WeaverCLient.upload is expected to be called and should return a failed result."
