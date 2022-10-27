@@ -14,8 +14,8 @@ import colander
 import mock
 import pyramid.testing
 import pytest
-from parameterized import parameterized
 from dateutil import parser as date_parser
+from parameterized import parameterized
 
 from tests.functional.utils import JobUtils
 from tests.resources import load_example
