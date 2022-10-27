@@ -46,6 +46,8 @@ Fixes:
   (fixes `#386 <https://github.com/crim-ca/weaver/issues/386>`_,
   relates to `celery/celery#7834 <https://github.com/celery/celery/pull/7834>`_,
   relates to `celery/kombu#1536 <https://github.com/celery/kombu/pull/1536>`_).
+- Fix deprecated ``Cursor.count()`` call for ``Quote`` and ``Bill`` search with ``pymongo>=4``.
+- Fix unsupported `Process`-related queries including a tagged version when searching for `Job` items.
 
 .. _changes_4.25.0:
 
