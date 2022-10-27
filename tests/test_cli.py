@@ -199,8 +199,8 @@ def test_auth_handler_bearer():
     auth = BearerAuthHandler(identity=str(uuid.uuid4()))
     token = str(uuid.uuid4())
     with mock.patch(
-            "requests.Session.request",
-            side_effect=lambda *_, **__: mocked_auth_response("access_token", token)
+        "requests.Session.request",
+        side_effect=lambda *_, **__: mocked_auth_response("access_token", token)
     ):
         resp = auth(req)  # type: ignore
     assert "Authorization" in resp.headers and len(resp.headers["Authorization"])
@@ -212,8 +212,8 @@ def test_auth_handler_cookie():
     auth = CookieAuthHandler(identity=str(uuid.uuid4()))
     token = str(uuid.uuid4())
     with mock.patch(
-            "requests.Session.request",
-            side_effect=lambda *_, **__: mocked_auth_response("access_token", token)
+        "requests.Session.request",
+        side_effect=lambda *_, **__: mocked_auth_response("access_token", token)
     ):
         resp = auth(req)  # type: ignore
     assert "Authorization" not in resp.headers

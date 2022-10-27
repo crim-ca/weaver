@@ -970,8 +970,8 @@ class TestWeaverCLI(TestWeaverClientBase):
         )
         assert "usage: weaver deploy" in lines[0]
         assert (  # any first that disallows
-                lines[-1] == "weaver deploy: error: argument -T/--token: not allowed with argument -U/--username" or
-                lines[-1] == "weaver deploy: error: argument -T/--token: not allowed with argument -P/--password"
+            lines[-1] == "weaver deploy: error: argument -T/--token: not allowed with argument -U/--username" or
+            lines[-1] == "weaver deploy: error: argument -T/--token: not allowed with argument -P/--password"
         )
 
     def test_deploy_docker_auth_username_or_password_missing_invalid(self):
@@ -1089,7 +1089,7 @@ class TestWeaverCLI(TestWeaverClientBase):
                 "-u", self.url,
                 "-p", test_id,
                 "--body", json.dumps(payload),  # literal JSON string accepted for CLI
-                "--cwl", json.dumps(package),  # literal JSON string accepted for CLI
+                "--cwl", json.dumps(package),   # literal JSON string accepted for CLI
             ],
             trim=False,
             entrypoint=weaver_cli,
@@ -1538,7 +1538,7 @@ class TestWeaverCLI(TestWeaverClientBase):
                 "jobs",
                 "-u", self.url,
                 "-S", Status.SUCCEEDED,
-                "-D",  # when details active, each job lists its own links
+                "-D",   # when details active, each job lists its own links
                 "-nL",  # unless links are requested to be removed (top-most and nested ones)
             ],
             trim=False,
