@@ -713,16 +713,16 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
         assert resp.status_code == 404
         assert resp.content_type == ContentType.APP_JSON
 
-    def test_get_jobs_private_process_unauthorized_in_path(self):
+    def test_get_jobs_private_process_forbidden_access_in_path(self):
         path = sd.process_jobs_service.path.format(process_id=self.process_private.identifier)
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
-        assert resp.status_code == 401
+        assert resp.status_code == 403
         assert resp.content_type == ContentType.APP_JSON
 
     def test_get_jobs_private_process_not_returned_in_query(self):
         path = get_path_kvp(sd.jobs_service.path, process=self.process_private.identifier)
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
-        assert resp.status_code == 401
+        assert resp.status_code == 403
         assert resp.content_type == ContentType.APP_JSON
 
     def test_get_jobs_service_and_process_unknown_in_path(self):
@@ -737,22 +737,22 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
         assert resp.status_code == 404
         assert resp.content_type == ContentType.APP_JSON
 
-    def test_get_jobs_private_service_public_process_unauthorized_in_path(self):
+    def test_get_jobs_private_service_public_process_forbidden_access_in_path(self):
         path = sd.provider_jobs_service.path.format(provider_id=self.service_private.name,
                                                     process_id=self.process_public.identifier)
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
-        assert resp.status_code == 401
+        assert resp.status_code == 403
         assert resp.content_type == ContentType.APP_JSON
 
-    def test_get_jobs_private_service_public_process_unauthorized_in_query(self):
+    def test_get_jobs_private_service_public_process_forbidden_access_in_query(self):
         path = get_path_kvp(sd.jobs_service.path,
                             service=self.service_private.name,
                             process=self.process_public.identifier)
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
-        assert resp.status_code == 401
+        assert resp.status_code == 403
         assert resp.content_type == ContentType.APP_JSON
 
-    def test_get_jobs_public_service_private_process_unauthorized_in_query(self):
+    def test_get_jobs_public_service_private_process_forbidden_access_in_query(self):
         """
         NOTE:
             it is up to the remote service to hide private processes

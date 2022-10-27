@@ -220,7 +220,7 @@ class StringOneOf(colander.OneOf):
 
     def __init__(self, choices, delimiter=",", case_sensitive=True, **kwargs):
         # type: (Iterable[str], str, bool, Any) -> None
-        self._delim = delimiter
+        self.delimiter = delimiter
         if not case_sensitive:
             choices = OneOfCaseInsensitive(choices).choices
         super(StringOneOf, self).__init__(choices, **kwargs)
@@ -229,7 +229,7 @@ class StringOneOf(colander.OneOf):
         # type: (colander.SchemaNode, Any) -> None
         if not isinstance(value, str):
             super(StringOneOf, self).__call__(node, value)  # raise accordingly
-        for val in value.split(self._delim):
+        for val in value.split(self.delimiter):
             super(StringOneOf, self).__call__(node, val)  # raise accordingly
 
 

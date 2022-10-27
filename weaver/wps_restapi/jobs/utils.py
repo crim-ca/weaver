@@ -577,7 +577,7 @@ def validate_service_process(request):
             service = store.fetch_by_name(service_name, visibility=Visibility.PUBLIC)
         if process_name:
             item_type = "Process"
-            item_test = resolve_process_tag(request)
+            item_test = resolve_process_tag(request, process_query=not process_path)
             # local process
             if not service:
                 store = get_db(request).get_store(StoreProcesses)

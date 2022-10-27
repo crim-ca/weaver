@@ -1731,7 +1731,22 @@ class QuoteSortEnum(ExtendedSchemaNode):
     validator = OneOf(SortMethods.QUOTE)
 
 
-class JobTagsCommaSeparated(ExtendedSchemaNode):
+class ExpandCommaSeparated(ExtendedSchemaNode):
+    @staticmethod
+    def schema_type():
+        raise NotImplementedError
+
+    def deserialize(self, cstruct):
+        result = super(ExpandCommaSeparated, self).deserialize(cstruct)
+        if not isinstance(result, str) and result:
+            return result
+        validator = getattr(self, "validator", None)
+        if isinstance(validator, CommaSeparated) or (isinstance(validator, StringOneOf) and validator.delimiter == ","):
+            result = list(filter(lambda _res: bool(_res), (res.strip() for res in result.split(","))))
+        return result
+
+
+class JobTagsCommaSeparated(ExpandCommaSeparated):
     schema_type = String
     validator = CommaSeparated()
     default = None
@@ -1740,6 +1755,15 @@ class JobTagsCommaSeparated(ExtendedSchemaNode):
         "Comma-separated tags that can be used to filter jobs. "
         f"Only {validator.allow_chars} characters are permitted."
     )
+
+
+class JobGroupsCommaSeparated(ExpandCommaSeparated):
+    schema_type = String
+    default = None
+    example = "process,service"
+    missing = drop
+    description = "Comma-separated list of grouping fields with which to list jobs."
+    validator = StringOneOf(["process", "provider", "service", "status"], delimiter=",", case_sensitive=True)
 
 
 class LaunchJobQuerystring(ExtendedMappingSchema):
@@ -4711,11 +4735,7 @@ class GetJobsQueries(ExtendedMappingSchema):
     #   Items with default value are added if omitted, except 'default=null' which are removed after handling by alias.
     detail = ExtendedSchemaNode(QueryBoolean(), default=False, example=True, missing=drop,
                                 description="Provide job details instead of IDs.")
-    groups = ExtendedSchemaNode(
-        String(), default=None, example="process,service", missing=drop,
-        description="Comma-separated list of grouping fields with which to list jobs.",
-        validator=StringOneOf(["process", "provider", "service", "status"], delimiter=",", case_sensitive=True),
-    )
+    groups = JobGroupsCommaSeparated()
     page = ExtendedSchemaNode(Integer(allow_string=True), missing=0, default=0, validator=Range(min=0))
     limit = ExtendedSchemaNode(Integer(allow_string=True), missing=10, default=10, validator=Range(min=1, max=10000))
     min_duration = ExtendedSchemaNode(

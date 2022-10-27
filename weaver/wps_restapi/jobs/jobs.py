@@ -72,10 +72,8 @@ def get_queried_jobs(request):
     filters = {**params, "process": process, "service": service}
 
     detail = filters.pop("detail", False)
-    groups = filters.pop("groups", "").split(",") if filters.get("groups", False) else filters.pop("groups", None)
-
+    groups = filters.pop("groups", None)
     filters["status"] = filters["status"].split(",") if "status" in filters else None
-    filters["tags"] = list(filter(lambda s: s, filters["tags"].split(",") if filters.get("tags", False) else ""))
     filters["notification_email"] = (
         encrypt_email(filters["notification_email"], settings)
         if filters.get("notification_email", False) else None
@@ -91,6 +89,7 @@ def get_queried_jobs(request):
             "description": "Datetime at the start of the interval must be less than the datetime at the end."
         })
     filters["datetime_interval"] = dti
+    filters.pop("datetime", None)
     LOGGER.debug("Job search queries (processed):\n%s", repr_json(filters, indent=2))
 
     store = get_db(request).get_store(StoreJobs)
