@@ -25,7 +25,6 @@ from weaver.exceptions import (
     JobGone,
     JobInvalidParameter,
     JobNotFound,
-    MissingIdentifierValue,
     ProcessNotAccessible,
     ProcessNotFound,
     ServiceNotAccessible,
