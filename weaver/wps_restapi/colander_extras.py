@@ -51,6 +51,8 @@ complementary support of one-another features.
     of generated OpenAPI model definitions. If not explicitly provided, the
     value of ``title`` **WILL** default to the name of the schema node class.
 """
+import abc
+
 import inspect
 import re
 import uuid
@@ -86,7 +88,17 @@ if TYPE_CHECKING:
     from cornice import Service as CorniceService
     from pyramid.registry import Registry
 
-    from weaver.typedefs import JSON, OpenAPISchema, OpenAPISpecification, OpenAPISpecInfo, OpenAPISpecParameter
+    from weaver.typedefs import (
+        JSON,
+        OpenAPISchema,
+        OpenAPISchemaAllOf,
+        OpenAPISchemaAnyOf,
+        OpenAPISchemaOneOf,
+        OpenAPISchemaNot,
+        OpenAPISpecification,
+        OpenAPISpecInfo,
+        OpenAPISpecParameter
+    )
 
 # pylint: disable=C0209,consider-using-f-string
 
@@ -1213,6 +1225,41 @@ class ExtendedSchemaNode(DefaultSchemaNode, DropableSchemaNode, VariableSchemaNo
         return SortableMappingSchema._deserialize_impl(self, result)
 
 
+class ExpandStringList(colander.SchemaNode):
+    """
+    Utility that will automatically deserialize a string to its list representation using the validator delimiter.
+
+    .. seealso::
+        - :class:`CommaSeparated`
+        - :class:`StringOneOf`
+
+    In order to use this utility, it is important to place it first in the schema node class definition.
+
+    .. code-block::
+
+        class NewNodeSchema(ExpandStringList, ExtendedSchemaNode):
+            schema_type = String
+            validator = CommaSeparated()
+    """
+    DEFAULT_DELIMITER = ","
+
+    @staticmethod
+    @abc.abstractmethod
+    def schema_type():
+        raise NotImplementedError("Using SchemaNode for a field requires 'schema_type' definition.")
+
+    def deserialize(self, cstruct):
+        result = super(ExpandStringList, self).deserialize(cstruct)
+        if not isinstance(result, str) and result:
+            return result
+        validator = getattr(self, "validator", None)
+        if not validator:
+            return result
+        delimiter = getattr(validator, "delimiter", self.DEFAULT_DELIMITER)
+        result = list(filter(lambda _res: bool(_res), result.split(delimiter)))
+        return result
+
+
 class DropableSequenceSchema(DropableSchemaNode, colander.SequenceSchema):
     """
     Sequence schema that supports the dropable functionality.
@@ -2089,7 +2136,7 @@ class OneOfKeywordTypeConverter(KeywordTypeConverter):
     """
 
     def convert_type(self, schema_node):
-        # type: (OneOfKeywordSchema) -> Dict
+        # type: (OneOfKeywordSchema) -> OpenAPISchemaOneOf
         keyword = schema_node.get_keyword_name()
         one_of_obj = {
             keyword: []
@@ -2139,11 +2186,19 @@ class AllOfKeywordTypeConverter(KeywordTypeConverter):
     Object converter that generates the ``allOf`` keyword definition.
     """
 
+    def convert_type(self, schema_node):
+        # type: (colander.SchemaNode) -> OpenAPISchemaAllOf
+        return super(AllOfKeywordTypeConverter, self).convert_type(schema_node)
+
 
 class AnyOfKeywordTypeConverter(KeywordTypeConverter):
     """
     Object converter that generates the ``anyOf`` keyword definition.
     """
+
+    def convert_type(self, schema_node):
+        # type: (colander.SchemaNode) -> OpenAPISchemaAnyOf
+        return super(AnyOfKeywordTypeConverter, self).convert_type(schema_node)
 
 
 class NotKeywordTypeConverter(KeywordTypeConverter):
@@ -2152,6 +2207,7 @@ class NotKeywordTypeConverter(KeywordTypeConverter):
     """
 
     def convert_type(self, schema_node):
+        # type: (colander.SchemaNode) -> OpenAPISchemaNot
         result = ObjectTypeConverter(self.dispatcher).convert_type(schema_node)
         result["additionalProperties"] = False
         return result
@@ -2163,6 +2219,7 @@ class VariableObjectTypeConverter(ObjectTypeConverter):
     """
 
     def convert_type(self, schema_node):
+        # type: (colander.SchemaNode) -> OpenAPISchema
         converted = super(VariableObjectTypeConverter, self).convert_type(schema_node)
         converted.setdefault("additionalProperties", {})
         if self.dispatcher.openapi_spec == 3:
@@ -2232,7 +2289,7 @@ class OAS3TypeConversionDispatcher(TypeConversionDispatcher):
         super(OAS3TypeConversionDispatcher, self).__init__(extended_converters, default_converter)
 
     def __call__(self, schema_node):
-        # type: (colander.SchemaNode) -> Dict[str, Any]
+        # type: (colander.SchemaNode) -> OpenAPISchema
         schema_type = schema_node.typ
         schema_type = type(schema_type)
 

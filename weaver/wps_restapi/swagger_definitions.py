@@ -56,6 +56,7 @@ from weaver.wps_restapi.colander_extras import (
     BoundedRange,
     CommaSeparated,
     EmptyMappingSchema,
+    ExpandStringList,
     ExtendedBoolean as Boolean,
     ExtendedFloat as Float,
     ExtendedInteger as Integer,
@@ -1731,22 +1732,7 @@ class QuoteSortEnum(ExtendedSchemaNode):
     validator = OneOf(SortMethods.QUOTE)
 
 
-class ExpandCommaSeparated(ExtendedSchemaNode):
-    @staticmethod
-    def schema_type():
-        raise NotImplementedError
-
-    def deserialize(self, cstruct):
-        result = super(ExpandCommaSeparated, self).deserialize(cstruct)
-        if not isinstance(result, str) and result:
-            return result
-        validator = getattr(self, "validator", None)
-        if isinstance(validator, CommaSeparated) or (isinstance(validator, StringOneOf) and validator.delimiter == ","):
-            result = list(filter(lambda _res: bool(_res), (res.strip() for res in result.split(","))))
-        return result
-
-
-class JobTagsCommaSeparated(ExpandCommaSeparated):
+class JobTagsCommaSeparated(ExtendedSchemaNode, ExpandStringList):
     schema_type = String
     validator = CommaSeparated()
     default = None
@@ -1757,7 +1743,7 @@ class JobTagsCommaSeparated(ExpandCommaSeparated):
     )
 
 
-class JobGroupsCommaSeparated(ExpandCommaSeparated):
+class JobGroupsCommaSeparated(ExtendedSchemaNode, ExpandStringList):
     schema_type = String
     default = None
     example = "process,service"
