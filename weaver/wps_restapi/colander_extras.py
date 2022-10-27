@@ -728,8 +728,7 @@ class DropableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
     def schema_type():
         raise NotImplementedError("Using SchemaNode for a field requires 'schema_type' definition.")
 
-    # pylint: disable=W0222,signature-differs
-    def deserialize(self, cstruct):
+    def deserialize(self, cstruct):  # pylint: disable=W0222,signature-differs
         return ExtendedSchemaNode.deserialize(self, cstruct)  # noqa
 
     def _deserialize_impl(self, cstruct):
@@ -773,8 +772,7 @@ class DefaultSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
     def schema_type():
         raise NotImplementedError("Using SchemaNode for a field requires 'schema_type' definition.")
 
-    # pylint: disable=W0222,signature-differs
-    def deserialize(self, cstruct):
+    def deserialize(self, cstruct):  # pylint: disable=W0222,signature-differs
         return ExtendedSchemaNode.deserialize(self, cstruct)  # noqa
 
     def _deserialize_impl(self, cstruct):
@@ -963,8 +961,7 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
     def _get_sub_variable(self, subnodes):
         return [child for child in subnodes if getattr(child, self._variable, None)]
 
-    # pylint: disable=W0222,signature-differs
-    def deserialize(self, cstruct):
+    def deserialize(self, cstruct):  # pylint: disable=W0222,signature-differs
         return ExtendedSchemaNode.deserialize(self, cstruct)  # noqa
 
     @staticmethod
@@ -1098,8 +1095,7 @@ class SortableMappingSchema(ExtendedNodeInterface, ExtendedSchemaBase):
         super(SortableMappingSchema, self).__init__(*args, **kwargs)
         setattr(self, SortableMappingSchema._extension, True)
 
-    # pylint: disable=W0222,signature-differs
-    def deserialize(self, cstruct):
+    def deserialize(self, cstruct):  # pylint: disable=W0222,signature-differs
         return ExtendedSchemaNode.deserialize(self, cstruct)  # noqa
 
     @staticmethod
@@ -1248,7 +1244,7 @@ class ExpandStringList(colander.SchemaNode):
     def schema_type():
         raise NotImplementedError("Using SchemaNode for a field requires 'schema_type' definition.")
 
-    def deserialize(self, cstruct):
+    def deserialize(self, cstruct):  # pylint: disable=W0222,signature-differs
         result = super(ExpandStringList, self).deserialize(cstruct)
         if not isinstance(result, str) and result:
             return result
@@ -1575,8 +1571,7 @@ class KeywordMapper(ExtendedMappingSchema):
             return KeywordMapper.deserialize(node, cstruct)
         return ExtendedSchemaNode.deserialize(node, cstruct)
 
-    # pylint: disable=W0222,signature-differs
-    def deserialize(self, cstruct):
+    def deserialize(self, cstruct):  # pylint: disable=W0222,signature-differs
         if cstruct is colander.null:
             if self.required and not VariableSchemaNode.is_variable(self):
                 raise colander.Invalid(self, "Missing required field.")
