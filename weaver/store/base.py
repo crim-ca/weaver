@@ -12,6 +12,7 @@ if TYPE_CHECKING:
 
     from weaver.datatype import Bill, Job, Process, Quote, Service, VaultFile
     from weaver.execute import AnyExecuteResponse
+    from weaver.sort import AnySortType
     from weaver.status import AnyStatusSearch
     from weaver.typedefs import (
         AnyUUID,
@@ -92,7 +93,7 @@ class StoreProcesses(StoreInterface):
                        visibility=None,     # type: Optional[AnyVisibility, List[AnyVisibility]]
                        page=None,           # type: Optional[int]
                        limit=None,          # type: Optional[int]
-                       sort=None,           # type: Optional[str]
+                       sort=None,           # type: Optional[AnySortType]
                        total=False,         # type: bool
                        revisions=False,     # type: bool
                        process=None,        # type: Optional[str]
@@ -188,7 +189,7 @@ class StoreJobs(StoreInterface):
                   access=None,              # type: Optional[str]
                   notification_email=None,  # type: Optional[str]
                   status=None,              # type: Optional[AnyStatusSearch, List[AnyStatusSearch]]
-                  sort=None,                # type: Optional[str]
+                  sort=None,                # type: Optional[AnySortType]
                   page=0,                   # type: Optional[int]
                   limit=10,                 # type: Optional[int]
                   min_duration=None,        # type: Optional[int]
@@ -225,7 +226,7 @@ class StoreQuotes(StoreInterface):
 
     @abc.abstractmethod
     def find_quotes(self, process_id=None, page=0, limit=10, sort=None):
-        # type: (Optional[str], int, int, Optional[str]) -> Tuple[List[Quote], int]
+        # type: (Optional[str], int, int, Optional[AnySortType]) -> Tuple[List[Quote], int]
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -254,7 +255,7 @@ class StoreBills(StoreInterface):
 
     @abc.abstractmethod
     def find_bills(self, quote_id=None, page=0, limit=10, sort=None):
-        # type: (Optional[str], int, int, Optional[str]) -> Tuple[List[Bill], int]
+        # type: (Optional[str], int, int, Optional[AnySortType]) -> Tuple[List[Bill], int]
         raise NotImplementedError
 
 
