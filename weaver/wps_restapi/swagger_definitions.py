@@ -1732,7 +1732,7 @@ class QuoteSortEnum(ExtendedSchemaNode):
     validator = OneOf(SortMethods.QUOTE)
 
 
-class JobTagsCommaSeparated(ExtendedSchemaNode, ExpandStringList):
+class JobTagsCommaSeparated(ExpandStringList, ExtendedSchemaNode):
     schema_type = String
     validator = CommaSeparated()
     default = None
@@ -1743,7 +1743,7 @@ class JobTagsCommaSeparated(ExtendedSchemaNode, ExpandStringList):
     )
 
 
-class JobGroupsCommaSeparated(ExtendedSchemaNode, ExpandStringList):
+class JobGroupsCommaSeparated(ExpandStringList, ExtendedSchemaNode):
     schema_type = String
     default = None
     example = "process,service"
