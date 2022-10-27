@@ -186,7 +186,7 @@ def test_deploy_opensearch():
         def __init__(self, *args):
             pass
 
-        def get_store(self, *_):  # noqa: E811
+        def get_store(self, *_):
             return store
 
     def _get_mocked(req=None):
@@ -363,10 +363,10 @@ def sentinel2_inputs(unique_aoi_toi=True):
         inputs = inputs_non_unique_aoi_toi(sentinel_id)
 
     inputs[sentinel_id][0].data = COLLECTION_IDS["sentinel2"]
-    inputs[end_date][0].data = u"2018-01-31T23:59:59.999Z"
-    inputs[start_date][0].data = u"2018-01-30T00:00:00.000Z"
-    # inputs[aoi][0].data = u"POLYGON ((100 15, 104 15, 104 19, 100 19, 100 15))"
-    inputs[aoi][0].data = u"100.0, 15.0, 104.0, 19.0"
+    inputs[end_date][0].data = "2018-01-31T23:59:59.999Z"
+    inputs[start_date][0].data = "2018-01-30T00:00:00.000Z"
+    # inputs[aoi][0].data = "POLYGON ((100 15, 104 15, 104 19, 100 19, 100 15))"
+    inputs[aoi][0].data = "100.0, 15.0, 104.0, 19.0"
 
     eo_image_source_info = make_eo_image_source_info(sentinel_id, COLLECTION_IDS["sentinel2"])
     return inputs, eo_image_source_info
@@ -381,10 +381,10 @@ def probav_inputs(unique_aoi_toi=True):
         inputs = inputs_non_unique_aoi_toi(probav_id)
 
     inputs[probav_id][0].data = COLLECTION_IDS["probav"]
-    inputs[end_date][0].data = u"2018-01-31T23:59:59.999Z"
-    inputs[start_date][0].data = u"2018-01-30T00:00:00.000Z"
-    # inputs[aoi][0].data = u"POLYGON ((100 15, 104 15, 104 19, 100 19, 100 15))"
-    inputs[aoi][0].data = u"100.0, 15.0, 104.0, 19.0"
+    inputs[end_date][0].data = "2018-01-31T23:59:59.999Z"
+    inputs[start_date][0].data = "2018-01-30T00:00:00.000Z"
+    # inputs[aoi][0].data = "POLYGON ((100 15, 104 15, 104 19, 100 19, 100 15))"
+    inputs[aoi][0].data = "100.0, 15.0, 104.0, 19.0"
 
     eo_image_source_info = make_eo_image_source_info(
         probav_id, COLLECTION_IDS["probav"]
@@ -413,10 +413,10 @@ def deimos_inputs(unique_aoi_toi=True):
     inputs = inputs_unique_aoi_toi(deimos_id)
 
     inputs[deimos_id][0].data = COLLECTION_IDS["deimos"]
-    inputs[start_date][0].data = u"2008-01-01T00:00:00Z"
-    inputs[end_date][0].data = u"2009-01-01T00:00:00Z"
-    # inputs[aoi][0].data = u"MULTIPOINT ((-117 32), (-115 34))"
-    inputs[aoi][0].data = u"-117, 32, -115, 34"
+    inputs[start_date][0].data = "2008-01-01T00:00:00Z"
+    inputs[end_date][0].data = "2009-01-01T00:00:00Z"
+    # inputs[aoi][0].data = "MULTIPOINT ((-117 32), (-115 34))"
+    inputs[aoi][0].data = "-117, 32, -115, 34"
 
     eo_image_source_info = make_eo_image_source_info(deimos_id, COLLECTION_IDS["deimos"])
     return inputs, eo_image_source_info
@@ -433,7 +433,7 @@ def test_query_sentinel2():
     assert len(data["image-sentinel2"]) == inputs["image-sentinel2"][0].max_occurs
 
 
-@pytest.mark.xfail(reason="Cannot login to protected 'probav' opensearch endpoint.")
+@pytest.mark.xfail(reason="Cannot log in to protected 'probav' opensearch endpoint.")
 @pytest.mark.online
 @pytest.mark.testbed14
 def test_query_probav():
@@ -455,7 +455,7 @@ def test_query_deimos():
     assert len(data["image-deimos"]) == inputs["image-deimos"][0].max_occurs
 
 
-@pytest.mark.xfail(reason="Cannot login to protected 'probav' opensearch endpoint.")
+@pytest.mark.xfail(reason="Cannot log in to protected 'probav' opensearch endpoint.")
 @pytest.mark.online
 @pytest.mark.testbed14
 def test_query_non_unique():

@@ -258,7 +258,7 @@ def get_process_visibility(request):
     Get the visibility of a registered local process.
     """
     process = get_process(request=request)
-    return HTTPOk(json={u"value": process.visibility})
+    return HTTPOk(json={"value": process.visibility})
 
 
 @sd.process_visibility_service.put(tags=[sd.TAG_PROCESSES, sd.TAG_VISIBILITY], renderer=OutputFormat.JSON,
@@ -283,7 +283,7 @@ def set_process_visibility(request):
         if not process.mutable:
             raise HTTPForbidden("Cannot change the visibility of builtin process.")
         store.set_visibility(process_id, visibility)
-        return HTTPOk(json={u"value": visibility})
+        return HTTPOk(json={"value": visibility})
     except TypeError:
         raise HTTPBadRequest("Value of visibility must be a string.")
     except ValueError:
