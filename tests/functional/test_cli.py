@@ -1986,7 +1986,7 @@ class TestWeaverCLI(TestWeaverClientBase):
             tmp_http = f"{tmp_host}/{tmp_name_random}"
             stack_exec.enter_context(mocked_file_server(tmp_dir, tmp_host, self.settings))
             with tempfile.NamedTemporaryFile(mode="w", suffix=".json") as input_file:
-                with open(input_file.name, "w") as f:
+                with open(input_file.name, "w", encoding="utf-8") as f:
                     f.write(json.dumps({"inputs": [{"id": "file", "href": tmp_http}]}))
                 lines = mocked_sub_requests(
                     self.app, run_command,
