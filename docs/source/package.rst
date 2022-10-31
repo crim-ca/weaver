@@ -358,39 +358,139 @@ the :ref:`Deploy <proc_op_deploy>` request body with any of the following variat
 Inputs/Outputs Type
 -----------------------
 
-In the :term:`CWL` context, the ``type`` field indicates the type of :term:`I/O`. Available types are presented in the
-|cwl-io-type|_ portion of the specification.
+In the :term:`CWL` context, the ``type`` field indicates the type of :term:`I/O`.
+Available types are presented in the |cwl-io-type|_ portion of the :term:`CWL` specification.
 
+.. _warn-any:
 .. warning::
 
-    `Weaver` has two unsupported :term:`CWL` ``type``, namely ``Any`` and ``Directory``. This limitation is
-    **intentional** as :term:`WPS` does not offer equivalents. Furthermore, both of these types make the process
-    description too ambiguous. For instance, most processes expect remote file references, and providing a
-    ``Directory`` doesn't indicate an explicit reference to which files to retrieve during stage-in operation of
-    a :term:`Job` execution.
+    `Weaver` does not support :term:`CWL` ``type: Any``. This limitation is **intentional** in order to guarantee
+    proper resolution of :term:`CWL` types to their corresponding :term:`WPS` definitions. Furthermore, the ``Any``
+    type would make the :term:`Process` description too ambiguous.
 
+Type Correspondance
+~~~~~~~~~~~~~~~~~~~~
+
+A summary of applicable types is presented below.
+
+Those :term:`CWL` types can be mapped to :term:`WPS` and/or :term:`OAS` contexts in order to obtain corresponding
+:term:`I/O` definitions. However, not every type exists in each of those contexts. Therefore, some types will
+necessarily be simplified or converted to their best corresponding match when exact mapping cannot be accomplished.
+The simplification of types can happen when converting in any direction (:term:`CWL` <=> :term:`WPS` <=> :term:`OWS`).
+It all depends on which definitions that were provided are the more specific. For example, a :term:`WPS` ``dateTime``
+will be simplified to a generic :term:`CWL` ``string``, and into an :term:`OAS` ``string`` with ``format: "date-time"``.
+In this example, it would be important to provide the :term:`WPS` or :term:`OAS` definitions if the *date-time* portion
+was critical, since it could not be inferred only from :term:`CWL` ``string``.
+
+Further details regarding handling methods or important considerations for
+specific types will be presented in :ref:`cwl-type` and :ref:`cwl-dir` sections.
+
++----------------------+-------------------------+------------------------+--------------------------------------------+
+| :term:`CWL` ``type`` | :term:`WPS` data type   | :term:`OAS` type       | Description                                |
+|                      | and sub-type :sup:`(1)` |                        |                                            |
++======================+=========================+========================+============================================+
+| ``Any``              | |na|                    | |na|                   | Not supported. See :ref:`note <warn-any>`. |
++----------------------+-------------------------+------------------------+*-------------------------------------------+
+| ``null``             | |na|                    | |na|                   | Cannot be used by itself. |br|             |
+|                      |                         |                        | Represents optional :term:`I/O` when       |
+|                      |                         |                        | combined with other types :sup:`(2)`.      |
++----------------------+-------------------------+------------------------+--------------------------------------------+
+| ``boolean``          | ``Literal`` |br|        | ``boolean``            | Binary value.                              |
+|                      | (``bool``, ``boolean``) |                        |                                            |
++----------------------+-------------------------+------------------------+--------------------------------------------+
+| ``int``,             | ``Literal`` |br|        | ``integer``,           | Numeric whole value. |br|                  |
+| ``long``             | (``int``, ``integer``,  | ``number`` (format:    | Unless when explicit conversion between    |
+|                      | ``long``,               | ``int32``, ``int64``)  | contextes can accomplished, the generic    |
+|                      | ``positiveInteger``,    | :sup:`(3)`             | ``integer`` will be employed.              |
+|                      | ``nonNegativeInteger``) |                        |                                            |
++----------------------+-------------------------+------------------------+--------------------------------------------+
+| ``float``,           | ``Literal`` |br|        | ``number`` (format:    | Numeric floating-point value.              |
+| ``double``           | (``float``, ``double``, | ``float``, ``double``) | By default, ``float`` is used unless more  |
+|                      | ``scale``, ``angle``)   | :sup:`(3)`             | explicit context conversion can be         |
+|                      |                         |                        | accomplished :sup:`(4)`.                   |
++----------------------+-------------------------+------------------------+--------------------------------------------+
+| ``string``           | ``Literal`` |br|        | ``string`` (format:    | Generic string. Default employed if        |
+|                      | (``string``,  ``date``, | ``date``, ``time``,    | nothing more specific is resolved. |br|    |
+|                      | ``time``, ``dateTime``, | ``datetime``,          |                                            |
+|                      | ``anyURI``)             | ``date-time``,         | This type can be used to represent any     |
+|                      |                         | ``full-date``,         | :ref:`File Reference <file_ref_types>`     |
+|                      |                         | ``uri``, ``url``,      | as plain URL string without resolution.    |
+|                      |                         | etc.) :sup:`(5)`       |                                            |
++----------------------+-------------------------+------------------------+--------------------------------------------+
+| |na|                 | ``BoundingBox``         | :term:`JSON`           | Only partial support available. |br|       |
+|                      |                         | :sup:`(6)`             | See :ref:`note <bbox-note>`.               |
++----------------------+-------------------------+------------------------+--------------------------------------------+
+| ``File``             | ``Complex``             | :term:`JSON`           | :ref:`File Reference <file_ref_types>`     |
+|                      |                         | :sup:`(6)`             | with Media-Type validation and staging     |
+|                      |                         |                        | according to the applicable scheme.        |
++----------------------+-------------------------+------------------------+--------------------------------------------+
+| ``Directory``        | ``Complex``             | :term:`JSON`           | :ref:`Directory Reference <dir-type>`      |
+|                      |                         | :sup:`(6)`             | handled as nested ``Files`` to stage.      |
++----------------------+-------------------------+------------------------+--------------------------------------------+
+
+| :sup:`(1)` Resolution method according to critical fields defined in :ref:`cwl-type`.
+| :sup:`(2)` More details in :ref:`oas_basic_types` and :ref:`cwl-array-null-values` sections.
+| :sup:`(3)` Number is used in combination with ``format`` to find best match between integer and floating point values.
+  If not provided, it defaults to ``float`` to handle both cases.
+| :sup:`(4)` The ``float`` name is employed loosely to represent any *floating-point* value rather than
+  *single-precision* (16-bits). Its internal representation is *double-precision* (32-bits) given that the
+  implementation is in Python.
+| :sup:`(5)` Because ``string`` is the default, any ``format`` and ``pattern`` can be specified.
+  More specific types with these items can help apply additional validation, although not strictly enforced.
+| :sup:`(6)` Specific schema required as described in :ref:`oas_json_types`.
+
+.. _cwl-type:
+
+Type Resolution
+~~~~~~~~~~~~~~~
 
 In the :term:`WPS` context, three data types exist, namely ``Literal``, ``BoundingBox`` and ``Complex`` data.
 
 .. _bbox-note:
 .. note::
     As of the current version of `Weaver`, :term:`WPS` data type ``BoundingBox`` is not completely supported.
-    The schema definition exists in :term:`WPS` context but is not handled by any :term:`CWL` type conversion yet.
-    This feature is reflected by issue `#51 <https://github.com/crim-ca/weaver/issues/51>`_.
+    The schema definition exists in :term:`WPS` and :term:`OAS` contexts but is not handled by any :term:`CWL` type
+    conversion yet. This feature is reflected by issue `#51 <https://github.com/crim-ca/weaver/issues/51>`_.
     It is possible to use a ``Literal`` data of type ``string`` corresponding to :term:`WKT` [#]_, [#]_ in the meantime.
 
 .. [#] |wkt-example|_
 .. [#] |wkt-format|_
 
-As presented in the example of the previous section, :term:`I/O` in the :term:`WPS` context does not require an explicit
-indication of the type from one of ``Literal``, ``BoundingBox`` and ``Complex`` data. Instead, :term:`WPS` type is
+As presented in previous examples, :term:`I/O` in the :term:`WPS` context does not require an explicit indication of
+which data type from one of ``Literal``, ``BoundingBox`` and ``Complex`` to apply. Instead, :term:`WPS` type can be
 inferred using the matched API schema of the I/O. For instance, ``Complex`` I/O (e.g.: file reference) requires the
 ``formats`` field to distinguish it from a plain ``string``. Therefore, specifying either ``format`` in :term:`CWL`
 or ``formats`` in :term:`WPS` immediately provides all needed information for `Weaver` to understand that this I/O is
-expected to be a file reference. A combination of ``bbox`` and ``crs`` fields would otherwise indicate a ``BoundingBox``
-I/O (see :ref:`note <bbox-note>`). If none of the two previous schemas are matched, the I/O type resolution falls back
-to ``Literal`` data of ``string`` type. To employ another primitive data type such as ``Integer``, an explicit
-indication needs to be provided as follows.
+expected to be a file reference.
+
+.. code-block:: json
+    :caption: WPS Complex Data Type
+    :linenos:
+
+    {
+      "id": "input",
+      "formats": [
+        {"mediaType": "application/json", "default": true}
+      ]
+    }
+
+A combination of ``supportedCRS`` objects providing ``crs`` references would
+otherwise indicate a ``BoundingBox`` :term:`I/O` (see :ref:`note <bbox-note>`).
+
+.. code-block:: json
+    :caption: WPS BoundingBox Data Type
+    :linenos:
+
+    {
+      "id": "input",
+      "supportedCRS": [
+        {"crs": "http://www.opengis.net/def/crs/OGC/1.3/CRS84", "default": true}
+      ]
+    }
+
+If none of the two previous schemas are matched, the :term:`I/O` type resolution falls back
+to ``Literal`` data of ``string`` type. To employ another primitive data type such as ``Integer``,
+an explicit indication needs to be provided as follows.
 
 .. code-block:: json
     :caption: WPS Literal Data Type
@@ -404,16 +504,52 @@ indication needs to be provided as follows.
     }
 
 Obviously, the equivalent :term:`CWL` definition is simpler in this case (i.e.: only ``type: int`` is required).
-It is therefore *recommended* to take advantage of `Weaver`'s merging strategy in this case by providing only the
-details through the :term:`CWL` definition and have the corresponding :term:`WPS` I/O type automatically deduced by
+It is therefore *recommended* to take advantage of `Weaver`'s merging strategy during
+:ref:`Process Deployment <proc_op_deploy>` in this case by providing only the details through
+the :term:`CWL` definition and have the corresponding :term:`WPS` I/O type automatically deduced by
 the generated process. If desired, ``literalDataDomains`` can still be explicitly provided as above to ensure that
 it gets parsed as intended type.
+
+.. versionadded:: 4.16
 
 With more recent versions of `Weaver`, it is also possible to employ :term:`OpenAPI` schema definitions provided in
 the :term:`WPS` I/O to specify the explicit structure that applies to ``Literal``, ``BoundingBox`` and ``Complex``
 data types. When :term:`OpenAPI` schema are detected, they are also considered in the merging strategy along with
 other specifications provided in :term:`CWL` and :term:`WPS` contexts. More details about :term:`OAS` context is
-provided in :ref:`OpenAPI Schema` section.
+provided in :ref:`oas_io_schema` section.
+
+.. _cwl-dir:
+
+Directory Type
+~~~~~~~~~~~~~~
+
+.. versionchanged:: 4.27
+    Support of :term:`CWL` ``type: Directory`` added to `Weaver`.
+
+In order to map a ``Directory`` to the underlying :term:`WPS` :term:`Process` that do not natively offer this
+type of reference, a ``Complex`` "*pseudo-file*" using Media-Type ``application/directory`` is employed. For further
+validation that a ``Directory`` is properly parsed by `Weaver`, provided URL references must also end with a trailing
+slash (``/``) character.
+
+Note that, when using ``Directory`` type, very few format and content validation can be accomplished for individual
+files contained in that directory. The contents must therefore match the definitions expected by the application
+receiving it. No explicit validation is accomplished by `Weaver` to ensure if expected contents are available.
+
+When a ``Directory`` type is specified in the :term:`Process` definition, and that
+a :ref:`File Reference <file_ref_types>` is provided during :ref:`Execution <proc_op_execute>`, the reference
+pointed to as ``Directory`` must provide a listing of files. Those files can either be relative to the ``Directory``
+or other absolute :ref:`File Reference <file_ref_types>`. The applicable scheme to stage those files will be applied
+as needed based on resolved locations.
+
+The following ``Directory`` listing formats are supported.
+
++=========================
+| Listing Format
++-------------------
+| HTML Index
++----------------------
+|
+
 
 File Format
 -----------------------
@@ -553,6 +689,7 @@ matching type from provided values in the ``enum`` list.
 Note that ``enum`` such as these will also be applied on top of :ref:`Multiple and Optional Values` definitions
 presented next.
 
+.. _cwl-array-null-values:
 
 Multiple and Optional Values
 --------------------------------------------
@@ -626,14 +763,14 @@ this amount.
 
 .. _oas_io_schema:
 
-Inputs/Outputs Schema
------------------------
+Inputs/Outputs OpenAPI Schema
+------------------------------
 
 .. versionadded:: 4.16
 
-.. _oas_basic_definitions:
+.. _oas_basic_types:
 
-Basic Definitions
+Basic Type Definitions
 ~~~~~~~~~~~~~~~~~~~~~~
 
 Alternatively to parameters presented in previous sections, and employed for representing
@@ -807,7 +944,7 @@ It is important to consider that all :term:`OAS` ``schema`` that can be provided
 request or retrieved from a :ref:`Process Description <proc_op_describe>` only define the *expected value*
 representations of the :term:`I/O` data to be submitted for :ref:`Execution <proc_op_execute>` request.
 In other words, an :term:`I/O` typed as ``Complex`` that can be submitted using any of the supported
-:ref:`file_reference_types` to be forwarded to :term:`CWL` **SHOULD NOT** add any URI-related definition in ``schema``.
+:ref:`file_ref_types` to be forwarded to :term:`CWL` **SHOULD NOT** add any URI-related definition in ``schema``.
 It is implicit for every :term:`Process` that an :term:`I/O` of given supported :term:`Media-Types` can be submitted by
 reference using a link pointing to contents of such types. This implicit file reference interpretation serves multiple
 purposes.

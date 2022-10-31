@@ -676,7 +676,7 @@ its :ref:`Process Description <proc_op_describe>`. It is important to provide th
 applicable modes when :ref:`Deploying a Process <proc_op_deploy>` to allow it to run as desired. By default, `Weaver`
 will assume that deployed processes are only `asynchronous` to handle longer operations.
 
-.. versionchanged::
+.. versionchanged:: 4.15
     By default, every :ref:`proc_builtin` :term:`Process` can accept both modes.
     All previously deployed processes will only allow `asynchronous` execution, as only this one was supported.
     This should be reported in their ``jobControlOptions``.
@@ -831,7 +831,7 @@ Operations are accomplished in the following order for each individual step:
 .. seealso::
     :meth:`weaver.processes.wps_process_base.WpsProcessInterface.execute` for the implementation of operations order.
 
-.. _file_reference_types:
+.. _file_ref_types:
 
 File Reference Types
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1033,7 +1033,7 @@ combinations.
 File Reference Names
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-When processing any of the previous :ref:`file_reference_types`, the resulting name of the file after retrieval can
+When processing any of the previous :ref:`file_ref_types`, the resulting name of the file after retrieval can
 depend on the applicable scheme. In most cases, the file name is simply the last fragment of the path, whether it is
 an URL, an :term:`S3` bucket or plainly a file directory path. The following cases are exceptions.
 
@@ -1571,7 +1571,7 @@ the case of *core* implementations, the :term:`Process` should be already availa
 
 In more details, when an |exec-req-name|_ request is received, `Weaver` will analyse any file references in the
 specified inputs and try to match them against specified :term:`Data Source` configuration. When a match is found
-and that the corresponding :ref:`file_reference_types` indicates that the reference is located remotely in a known
+and that the corresponding :ref:`file_ref_types` indicates that the reference is located remotely in a known
 :term:`Data Source` provider that should take care of its processing, `Weaver` will attempt to |deploy-req-name|_
 the targeted :term:`Process` (and the underlying :term:`Application Package`) followed by its remote execution.
 It will then monitor the :term:`Job` until completion and retrieve results if the full operation was successful.
@@ -1587,14 +1587,14 @@ but are still available for use when requested.
 
 .. [#notedatasource]
     Configuration :term:`HYBRID` applies here in cases where `Weaver` acts as an :term:`EMS` for remote dispatch
-    of :term:`Process` execution based on applicable :ref:`file_reference_types`.
+    of :term:`Process` execution based on applicable :ref:`file_ref_types`.
 
 .. seealso::
     Specific details about configuration of :term:`Data Source` are provided in the :ref:`conf_data_sources` section.
 
 .. seealso::
     Details regarding :ref:`opensearch_data_source` are also relevant when resolving possible matches
-    of :term:`Data Source` provider when the applicable :ref:`file_reference_types` are detected.
+    of :term:`Data Source` provider when the applicable :ref:`file_ref_types` are detected.
 
 
 Workflow (Chaining Step Processes)

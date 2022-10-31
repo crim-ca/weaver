@@ -722,7 +722,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         """
         Test that directory complex type is resolved from CWL.
 
-        .. versionadded:: 4.26
+        .. versionadded:: 4.27
         """
         body = self.retrieve_payload("DirectoryListingProcess", "deploy", local=True)
         pkg = self.retrieve_payload("DirectoryListingProcess", "package", local=True)
@@ -2202,7 +2202,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         """
         Test that HTTP browsable directory-like structure retrieves children files recursively for the process.
 
-        .. versionadded:: 4.26
+        .. versionadded:: 4.27
         """
         body = self.retrieve_payload("DirectoryListingProcess", "deploy", local=True)
         pkg = self.retrieve_payload("DirectoryListingProcess", "package", local=True)
@@ -2267,7 +2267,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         """
         Test that HTTP returning JSON list of directory contents retrieves children files for the process.
 
-        .. versionadded:: 4.26
+        .. versionadded:: 4.27
         """
         body = self.retrieve_payload("DirectoryListingProcess", "deploy", local=True)
         pkg = self.retrieve_payload("DirectoryListingProcess", "package", local=True)
@@ -2339,7 +2339,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         """
         Test that directory pointing at a S3 bucket downloads all children files recursively for the process.
 
-        .. versionadded:: 4.26
+        .. versionadded:: 4.27
         """
         body = self.retrieve_payload("DirectoryListingProcess", "deploy", local=True)
         pkg = self.retrieve_payload("DirectoryListingProcess", "package", local=True)

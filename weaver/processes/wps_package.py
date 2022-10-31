@@ -1638,7 +1638,7 @@ class WpsPackage(Process):
         capabilities accordingly to view available files.
 
         .. seealso::
-            Documentation details of resolution based on schemes defined in :ref:`file_reference_types` section.
+            Documentation details of resolution based on schemes defined in :ref:`file_ref_types` section.
         """
         # NOTE:
         #   When running as EMS, must not call data/file methods if URL reference, otherwise contents
