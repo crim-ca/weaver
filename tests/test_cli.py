@@ -228,7 +228,7 @@ def test_href_inputs_not_uploaded_to_vault():
     def mock_upload(_href, *_, **__):
         return mock_result
 
-    inputs = {"source": {"href": "https://fake.domain.com/fakefile.zip"}}
+    inputs = {"file": {"href": "https://fake.domain.com/fakefile.zip"}}
     with mock.patch("weaver.cli.WeaverClient.upload", side_effect=mock_upload):
         result = WeaverClient()._update_files(inputs=inputs)
     assert result is not mock_result, "WeaverCLient.upload should not be called since reference is not local"
@@ -244,7 +244,7 @@ def test_file_inputs_uploaded_to_vault():
     output_body = {"file_href": fake_href, "file_id": fake_id, "access_token": fake_token}
     expected_output = (
         {
-            "source": {
+            "file": {
                 "format": {
                     "mediaType": ContentType.APP_ZIP
                 },
@@ -262,7 +262,7 @@ def test_file_inputs_uploaded_to_vault():
         return mock_result
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".zip") as input_file:
-        inputs = {"source": {"href": input_file.name}}
+        inputs = {"file": {"href": input_file.name}}
         with mock.patch("weaver.cli.WeaverClient.upload", side_effect=mock_upload):
             result = WeaverClient()._update_files(inputs=inputs)
     assert result == expected_output
@@ -276,7 +276,7 @@ def test_file_inputs_not_uploaded_to_vault():
         return mock_result
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".zip") as input_file:
-        inputs = {"source": {"href": input_file.name}}
+        inputs = {"file": {"href": input_file.name}}
         with mock.patch("weaver.cli.WeaverClient.upload", side_effect=mock_upload):
             result = WeaverClient()._update_files(inputs=inputs)
     assert result is mock_result, "WeaverCLient.upload is expected to be called and should return a failed result."
