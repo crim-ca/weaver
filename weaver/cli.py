@@ -933,14 +933,13 @@ class WeaverClient(object):
                     continue
                 if href.startswith("file://"):
                     href = href[7:]
-                if "://" not in href and not os.path.isfile(href):
+                if "://" in href or not os.path.isfile(href):
                     LOGGER.warning(
-                        "Ignoring potential local file reference since it does not exist. "
+                        "Ignoring potential file reference since it probably is a remote reference or does not exist. "
                         "Cannot upload to vault: [%s]", file
                     )
                     continue
-                if not href.startswith("/"):  # Check to prevent upload of external references (http, https, etc.)
-                    continue
+
                 fmt = data.get("format", {})
                 ctype = get_field(fmt, "mime_type", search_variations=True)
                 if not ctype:
