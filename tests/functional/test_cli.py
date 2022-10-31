@@ -1985,22 +1985,25 @@ class TestWeaverCLI(TestWeaverClientBase):
             tmp_host = "http://random-file-server.com"
             tmp_http = f"{tmp_host}/{tmp_name_random}"
             stack_exec.enter_context(mocked_file_server(tmp_dir, tmp_host, self.settings))
-            lines = mocked_sub_requests(
-                self.app, run_command,
-                [
-                    # "weaver",
-                    "execute",
-                    "-u", self.url,
-                    "-p", proc,
-                    "-M",
-                    "-T", 10,
-                    "-W", 1,
-                    "-I", f"file={tmp_http}",
-                ],
-                trim=False,
-                entrypoint=weaver_cli,
-                only_local=True,
-            )
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".json") as input_file:
+                with open(input_file.name, "w") as f:
+                    f.write(json.dumps({"inputs": [{"id": "file", "href": tmp_http}]}))
+                lines = mocked_sub_requests(
+                    self.app, run_command,
+                    [
+                        # "weaver",
+                        "execute",
+                        "-u", self.url,
+                        "-p", proc,
+                        "-M",
+                        "-T", 10,
+                        "-W", 1,
+                        "-I", f"{input_file.name}",
+                    ],
+                    trim=False,
+                    entrypoint=weaver_cli,
+                    only_local=True,
+                )
             assert any(f"\"status\": \"{Status.SUCCEEDED}\"" in line for line in lines)
 
 
