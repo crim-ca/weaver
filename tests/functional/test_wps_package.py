@@ -724,8 +724,8 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
 
         .. versionadded:: 4.26
         """
-        body = self.retrieve_payload("DirectoryProcess", "deploy", local=True)
-        pkg = self.retrieve_payload("DirectoryProcess", "package", local=True)
+        body = self.retrieve_payload("DirectoryListingProcess", "deploy", local=True)
+        pkg = self.retrieve_payload("DirectoryListingProcess", "package", local=True)
         # remove definitions in deploy body to evaluate auto-resolution from CWL 'type: Directory'
         body["processDescription"].pop("inputs")
         body["executionUnit"] = [{"unit": pkg}]
@@ -2204,8 +2204,8 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
 
         .. versionadded:: 4.26
         """
-        body = self.retrieve_payload("DirectoryProcess", "deploy", local=True)
-        pkg = self.retrieve_payload("DirectoryProcess", "package", local=True)
+        body = self.retrieve_payload("DirectoryListingProcess", "deploy", local=True)
+        pkg = self.retrieve_payload("DirectoryListingProcess", "package", local=True)
         body["executionUnit"] = [{"unit": pkg}]
         desc, _ = self.deploy_process(body, describe_schema=ProcessSchema.OGC)
         assert desc["inputs"]["input_dir"]["formats"][0]["mediaType"] == ContentType.APP_DIR
@@ -2240,7 +2240,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             }
             for mock_exec in mocked_execute_celery():
                 stack.enter_context(mock_exec)
-            proc_url = "/processes/DirectoryProcess/jobs"
+            proc_url = "/processes/DirectoryListingProcess/jobs"
             resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
                                        data=exec_body, headers=self.json_headers, only_local=True)
             assert resp.status_code in [200, 201], f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
@@ -2269,8 +2269,8 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
 
         .. versionadded:: 4.26
         """
-        body = self.retrieve_payload("DirectoryProcess", "deploy", local=True)
-        pkg = self.retrieve_payload("DirectoryProcess", "package", local=True)
+        body = self.retrieve_payload("DirectoryListingProcess", "deploy", local=True)
+        pkg = self.retrieve_payload("DirectoryListingProcess", "package", local=True)
         body["executionUnit"] = [{"unit": pkg}]
         desc, _ = self.deploy_process(body, describe_schema=ProcessSchema.OGC)
         assert desc["inputs"]["input_dir"]["formats"][0]["mediaType"] == ContentType.APP_DIR
@@ -2309,7 +2309,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             }
             for mock_exec in mocked_execute_celery():
                 stack.enter_context(mock_exec)
-            proc_url = "/processes/DirectoryProcess/jobs"
+            proc_url = "/processes/DirectoryListingProcess/jobs"
             resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
                                        data=exec_body, headers=self.json_headers, only_local=True)
             assert resp.status_code in [200, 201], f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
@@ -2341,8 +2341,8 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
 
         .. versionadded:: 4.26
         """
-        body = self.retrieve_payload("DirectoryProcess", "deploy", local=True)
-        pkg = self.retrieve_payload("DirectoryProcess", "package", local=True)
+        body = self.retrieve_payload("DirectoryListingProcess", "deploy", local=True)
+        pkg = self.retrieve_payload("DirectoryListingProcess", "package", local=True)
         body["executionUnit"] = [{"unit": pkg}]
         desc, _ = self.deploy_process(body, describe_schema=ProcessSchema.OGC)
         assert desc["inputs"]["input_dir"]["formats"][0]["mediaType"] == ContentType.APP_DIR
@@ -2371,7 +2371,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         with contextlib.ExitStack() as stack:
             for mock_exec in mocked_execute_celery():
                 stack.enter_context(mock_exec)
-            proc_url = "/processes/DirectoryProcess/jobs"
+            proc_url = "/processes/DirectoryListingProcess/jobs"
             resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
                                        data=exec_body, headers=self.json_headers, only_local=True)
             assert resp.status_code in [200, 201], f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"

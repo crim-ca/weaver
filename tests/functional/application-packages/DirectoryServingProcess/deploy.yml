@@ -1,0 +1,23 @@
+processDescription:
+  id: DirectoryServingProcess
+  title: Generate contents of an output directory from input file paths.
+  version: "0.0.1"
+  inputs:
+    - id: input_file_paths
+      literalDataDomains:
+        - dataType:
+            name: "String"
+      minOccurs: 1
+      maxOccurs: 100
+  outputs:
+    - id: output_dir
+      formats:
+        - mimeType: application/directory
+          default: true
+      minOccurs: 1
+      maxOccurs: 1
+  visibility: public
+executionUnit:
+  - test: DirectoryServingProcess.cwl
+immediateDeployment: true
+deploymentProfileName: "http://www.opengis.net/profiles/eoc/dockerizedApplication"

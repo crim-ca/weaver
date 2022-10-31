@@ -11,8 +11,8 @@ requirements:
       - entryname: script.sh
         entry: |
           set -x
-          echo "Input: $2"
-          echo "Output: $1"
+          echo "Input: $1"
+          echo "Output: $(runtime.outdir)/output.txt"
           find "$1" ! -type d -exec ls -lht {} + > output.txt
           cat output.txt
 inputs:

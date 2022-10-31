@@ -1,5 +1,5 @@
 processDescription:
-  id: DirectoryProcess
+  id: DirectoryListingProcess
   title: List contents of an input directory to the output text file.
   version: "0.0.1"
   inputs:
@@ -18,6 +18,6 @@ processDescription:
       maxOccurs: 1
   visibility: public
 executionUnit:
-  - test: DirectoryProcess.cwl
+  - test: DirectoryListingProcess.cwl
 immediateDeployment: true
 deploymentProfileName: "http://www.opengis.net/profiles/eoc/dockerizedApplication"
