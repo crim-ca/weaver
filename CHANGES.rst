@@ -16,7 +16,8 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Fix `cli._update_files` so there are no attempts to upload remote references to the vault.
+
 
 .. _changes_4.26.0:
 
