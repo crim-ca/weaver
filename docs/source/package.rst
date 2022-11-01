@@ -538,18 +538,44 @@ receiving it. No explicit validation is accomplished by `Weaver` to ensure if ex
 When a ``Directory`` type is specified in the :term:`Process` definition, and that
 a :ref:`File Reference <file_ref_types>` is provided during :ref:`Execution <proc_op_execute>`, the reference
 pointed to as ``Directory`` must provide a listing of files. Those files can either be relative to the ``Directory``
-or other absolute :ref:`File Reference <file_ref_types>`. The applicable scheme to stage those files will be applied
-as needed based on resolved locations.
+or other absolute :ref:`File Reference <file_ref_types>` locations. The applicable scheme to stage those files will
+be applied as needed based on resolved references. It is therefore possible to mix URL schemes between the listed
+references. For example, a ``Directory`` listing as :term:`JSON` obtained from a ``https://`` endpoint could provide
+multiple ``File`` locations from ``s3://`` buckets to stage for :ref:`Process Execution <proc_op_execute>`.
 
 The following ``Directory`` listing formats are supported.
 
-+=========================
-| Listing Format
-+-------------------
-| HTML Index
-+----------------------
-|
+.. table::
+    :class: code-table
+    :align: center
+    :widths: 70,30
 
+    +===========================================================+======================================================+
+    | Listing Format                                            | Description                                          |
+    +-----------------------------------------------------------+------------------------------------------------------+
+    | .. literalinclude:: ../examples/directory-listing.html    | A file index where each reference to be staged       |
+    |    :caption: HTML File Index                              | should be contained in a ``<a href="{ref}"/>`` tag.  |
+    |    :language: yaml                                        |                                                      |
+    |                                                           | The structure can be contained in a ``<table>``,     |
+    |                                                           | an HTML list (``<ol>``, ``<ul>``), plain list of     |
+    |                                                           | ``<a>`` hyperlinks, and can contain any amount of    |
+    |                                                           | CSS or nested HTML tags.                             |
+    +-----------------------------------------------------------+------------------------------------------------------+
+    | .. code-block:: json                                      | A :term:`JSON` body returned from an endpoint        |
+    |    :caption: JSON File List                               | obtained by ``GET`` request, which advertises the    |
+    |                                                           | corresponding ``Content-Type: application/json``     |
+    |    [                                                      | header. Each listed file to be staged should also    |
+    |      "https://example.com/base/dir/README.md",            | be accessible on provided endpoints.                 |
+    |      "https://example.com/base/dir/nested/image.png",     |                                                      |
+    |      "https://example.com/base/dir/nested/data.csv"       |                                                      |
+    |    ]                                                      |                                                      |
+    +-----------------------------------------------------------+------------------------------------------------------+
+    | .. literalinclude:: ../examples/directory-listing-s3.json | Any supported ``s3:://`` endpoint as detailed in     |
+    |    :caption: AWS S3 Bucket                                | |aws_s3_bucket_access|_ that provides a listing      |
+    |    :language: json                                        | of file objects to be staged. Proper access must be  |
+    |                                                           | granted as per :ref:`conf_s3_buckets` if the bucket  |
+    |                                                           | contents are not publicly accessible.                |
+    +-----------------------------------------------------------+------------------------------------------------------+
 
 File Format
 -----------------------

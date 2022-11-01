@@ -2200,7 +2200,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
 
     def test_execute_with_browsable_directory(self):
         """
-        Test that HTTP browsable directory-like structure retrieves children files recursively for the process.
+        Test that HTML browsable directory-like structure retrieves children files recursively for the process.
 
         .. versionadded:: 4.27
         """
