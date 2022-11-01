@@ -161,7 +161,7 @@ A :term:`Workflow` of multiple :term:`Process` references (possibly of distinct 
 .. note::
     Content definitions for :term:`CWL` :ref:`application-package` and/or the literal :term:`Process` body
     can be submitted using either a local file reference, an URL, or a literal string formatted as :term:`JSON`
-    or :temr:`YAML`. With the :ref:`Python Interface <client_commands>`, the definition can also be provided
+    or :term:`YAML`. With the :ref:`Python Interface <client_commands>`, the definition can also be provided
     with a :class:`dict` directly.
 
 Below is a sample :term:`Process` deployment using a basic Python script wrapped in a :term:`Docker` image to ensure

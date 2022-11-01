@@ -8,7 +8,7 @@ Application Package
 
 .. contents::
     :local:
-    :depth: 2
+    :depth: 3
 
 The :term:`Application Package` defines the internal script definition and configuration that will be executed by a
 :term:`Process`. This package is based on |CWL|_ (:term:`CWL`). Using the extensive |cwl-spec|_ as backbone for
@@ -376,7 +376,8 @@ A summary of applicable types is presented below.
 Those :term:`CWL` types can be mapped to :term:`WPS` and/or :term:`OAS` contexts in order to obtain corresponding
 :term:`I/O` definitions. However, not every type exists in each of those contexts. Therefore, some types will
 necessarily be simplified or converted to their best corresponding match when exact mapping cannot be accomplished.
-The simplification of types can happen when converting in any direction (:term:`CWL` <=> :term:`WPS` <=> :term:`OWS`).
+The simplification of types can happen when converting in any direction
+(:term:`CWL` |nbsp| |<=>| |nbsp| :term:`WPS` |nbsp| |<=>| |nbsp| :term:`OAS`).
 It all depends on which definitions that were provided are the more specific. For example, a :term:`WPS` ``dateTime``
 will be simplified to a generic :term:`CWL` ``string``, and into an :term:`OAS` ``string`` with ``format: "date-time"``.
 In this example, it would be important to provide the :term:`WPS` or :term:`OAS` definitions if the *date-time* portion
@@ -390,7 +391,7 @@ specific types will be presented in :ref:`cwl-type` and :ref:`cwl-dir` sections.
 |                      | and sub-type :sup:`(1)` |                        |                                            |
 +======================+=========================+========================+============================================+
 | ``Any``              | |na|                    | |na|                   | Not supported. See :ref:`note <warn-any>`. |
-+----------------------+-------------------------+------------------------+*-------------------------------------------+
++----------------------+-------------------------+------------------------+--------------------------------------------+
 | ``null``             | |na|                    | |na|                   | Cannot be used by itself. |br|             |
 |                      |                         |                        | Represents optional :term:`I/O` when       |
 |                      |                         |                        | combined with other types :sup:`(2)`.      |
@@ -399,22 +400,23 @@ specific types will be presented in :ref:`cwl-type` and :ref:`cwl-dir` sections.
 |                      | (``bool``, ``boolean``) |                        |                                            |
 +----------------------+-------------------------+------------------------+--------------------------------------------+
 | ``int``,             | ``Literal`` |br|        | ``integer``,           | Numeric whole value. |br|                  |
-| ``long``             | (``int``, ``integer``,  | ``number`` (format:    | Unless when explicit conversion between    |
-|                      | ``long``,               | ``int32``, ``int64``)  | contextes can accomplished, the generic    |
-|                      | ``positiveInteger``,    | :sup:`(3)`             | ``integer`` will be employed.              |
+| ``long``             | (``int``, ``integer``,  | ``number`` |br|        | Unless when explicit conversion between    |
+|                      | ``long``,               | (format: ``int32``,    | contextes can accomplished, the generic    |
+|                      | ``positiveInteger``,    | ``int64``) :sup:`(3)`  | ``integer`` will be employed.              |
 |                      | ``nonNegativeInteger``) |                        |                                            |
 +----------------------+-------------------------+------------------------+--------------------------------------------+
-| ``float``,           | ``Literal`` |br|        | ``number`` (format:    | Numeric floating-point value.              |
-| ``double``           | (``float``, ``double``, | ``float``, ``double``) | By default, ``float`` is used unless more  |
-|                      | ``scale``, ``angle``)   | :sup:`(3)`             | explicit context conversion can be         |
+| ``float``,           | ``Literal`` |br|        | ``number`` |br|        | Numeric floating-point value.              |
+| ``double``           | (``float``, ``double``, | (format: ``float``,    | By default, ``float`` is used unless more  |
+|                      | ``scale``, ``angle``)   | ``double``) :sup:`(3)` | explicit context conversion can be         |
 |                      |                         |                        | accomplished :sup:`(4)`.                   |
 +----------------------+-------------------------+------------------------+--------------------------------------------+
-| ``string``           | ``Literal`` |br|        | ``string`` (format:    | Generic string. Default employed if        |
-|                      | (``string``,  ``date``, | ``date``, ``time``,    | nothing more specific is resolved. |br|    |
-|                      | ``time``, ``dateTime``, | ``datetime``,          |                                            |
-|                      | ``anyURI``)             | ``date-time``,         | This type can be used to represent any     |
-|                      |                         | ``full-date``,         | :ref:`File Reference <file_ref_types>`     |
-|                      |                         | ``uri``, ``url``,      | as plain URL string without resolution.    |
+| ``string``           | ``Literal`` |br|        | ``string`` |br|        | Generic string. Default employed if        |
+|                      | (``string``,  ``date``, | (format: ``date``,     | nothing more specific is resolved. |br|    |
+|                      | ``time``, ``dateTime``, | ``time``,              |                                            |
+|                      | ``anyURI``)             | ``datetime``,          | This type can be used to represent any     |
+|                      |                         | ``date-time``,         | :ref:`File Reference <file_ref_types>`     |
+|                      |                         | ``full-date``,         | as plain URL string without resolution.    |
+|                      |                         | ``uri``, ``url``,      |                                            |
 |                      |                         | etc.) :sup:`(5)`       |                                            |
 +----------------------+-------------------------+------------------------+--------------------------------------------+
 | |na|                 | ``BoundingBox``         | :term:`JSON`           | Only partial support available. |br|       |
@@ -550,9 +552,9 @@ The following ``Directory`` listing formats are supported.
     :align: center
     :widths: 70,30
 
-    +===========================================================+======================================================+
-    | Listing Format                                            | Description                                          |
     +-----------------------------------------------------------+------------------------------------------------------+
+    | Listing Format                                            | Description                                          |
+    +===========================================================+======================================================+
     | .. literalinclude:: ../examples/directory-listing.html    | A file index where each reference to be staged       |
     |    :caption: HTML File Index                              | should be contained in a ``<a href="{ref}"/>`` tag.  |
     |    :language: yaml                                        |                                                      |
@@ -989,7 +991,7 @@ purposes.
    not be fetched by `Weaver`, and must be passed down as plain string URI directly without modification or
    interpretation to the underlying :term:`CWL` :term:`Application Package`.
 
-To summarize, strings with ``format: uri`` will **NOT** be considered as ``Complex`` :temr:`I/O` by `Weaver`. They will
+To summarize, strings with ``format: uri`` will **NOT** be considered as ``Complex`` :term:`I/O` by `Weaver`. They will
 be seen as any other string ``Literal``, but this allows a :term:`Process` describing its :term:`I/O` as an external URI
 reference. This can be useful for an application that handles itself the retrieval of the resource referred to by this
 URI. To represent supported formats of ``Complex`` file references, the ``schema`` should be represented using the
@@ -1061,3 +1063,8 @@ Below is a list of compatible elements.
     <br>
 
 .. |na| replace:: *n/a*
+
+.. |nbsp| unicode:: 0xA0
+   :trim:
+
+.. |<=>| unicode:: 0x21D4

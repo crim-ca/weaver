@@ -344,6 +344,7 @@ def get_exception_from_xml_status(xml):
     Expects the following :term:`XML` status response structure (``ows:Exception`` block can be at any level):
 
     .. code-block:: xml
+
         <ows:Exception exceptionCode="NoApplicableCode" locator="None">
           <ows:ExceptionText>Error message about the cause of the exception.</ows:ExceptionText>
         </ows:Exception>
