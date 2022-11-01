@@ -16,6 +16,18 @@ Changes:
   using the ``Content-Type: application/directory`` Media-Type and must hava a trailing slash (``/``) character.
 - Support `S3` file or directory references using *Access Point* and *Virtual-hosted–style* URIs (see AWS documentation
   `Methods for accessing a bucket <https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-bucket-intro.html>`_).
+
+Fixes:
+------
+- No change.
+
+.. _changes_4.26.0:
+
+`4.26.0 <https://github.com/crim-ca/weaver/tree/4.26.0>`_ (2022-10-31)
+========================================================================
+
+Changes:
+--------
 - Add more explicit ``PackageException`` error messages with contextual details when a `CWL` file reference cannot be
   resolved correctly.
 - Return ``Content-Type: application/vnd.oai.openapi+json; version=3.0`` for OpenAPI endpoint response referenced
