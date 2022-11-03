@@ -572,11 +572,13 @@ The following ``Directory`` listing formats are supported.
     |      "https://example.com/base/dir/nested/data.csv"       |                                                      |
     |    ]                                                      |                                                      |
     +-----------------------------------------------------------+------------------------------------------------------+
-    | .. literalinclude:: ../examples/directory-listing-s3.json | Any supported ``s3:://`` endpoint as detailed in     |
+    | .. literalinclude:: ../examples/directory-listing-s3.json | Any supported :term:`S3` endpoint as detailed in     |
     |    :caption: AWS S3 Bucket                                | |aws_s3_bucket_access|_ that provides a listing      |
     |    :language: json                                        | of file objects to be staged. Proper access must be  |
     |                                                           | granted as per :ref:`conf_s3_buckets` if the bucket  |
     |                                                           | contents are not publicly accessible.                |
+    |                                                           | More details about supported references can be found |
+    |                                                           | in :ref:`aws_s3_ref`.                                |
     +-----------------------------------------------------------+------------------------------------------------------+
 
 File Format

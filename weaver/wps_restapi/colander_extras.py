@@ -2107,6 +2107,17 @@ class NotKeywordSchema(KeywordMapper):
         return ExtendedMappingSchema.deserialize(self, cstruct)
 
 
+class ExtendedTypeConverter(TypeConverter):
+    def convert_type(self, schema_node):
+        # type: (colander.SchemaNode) -> OpenAPISchema
+        # base type converters expect raw pattern string
+        # undo the compiled pattern to allow conversion
+        pattern = getattr(schema_node, "pattern", None)
+        if isinstance(pattern, re.Pattern):
+            setattr(schema_node, "pattern", pattern.pattern)
+        return super(ExtendedTypeConverter, self).convert_type(schema_node)
+
+
 class KeywordTypeConverter(TypeConverter):
     """
     Generic keyword converter that builds schema with a list of sub-schemas under the keyword.
@@ -2250,7 +2261,7 @@ class DecimalTypeConverter(NumberTypeConverter):
 
 
 class MoneyTypeConverter(DecimalTypeConverter):
-    pattern = "^[0-9]+.[0-9]{2}$"
+    pattern = re.compile("^[0-9]+.[0-9]{2}$")
     convert_validator = ValidatorConversionDispatcher(
         convert_range_validator(colander.Range(min=0)),
         convert_regex_validator(colander.Regex(pattern, msg="Number must be formatted as currency decimal."))
@@ -2288,6 +2299,17 @@ class OAS3TypeConversionDispatcher(TypeConversionDispatcher):
         if custom_converters:
             extended_converters.update(custom_converters)
         super(OAS3TypeConversionDispatcher, self).__init__(extended_converters, default_converter)
+        self.extend_converters()
+
+    def extend_converters(self):
+        """
+        Extend base :class:`TypeConverter` derived classes to provide additional capabilities seamlessly.
+        """
+        for typ, cvt in self.converters.items():
+            if issubclass(cvt, TypeConverter) and not issubclass(cvt, ExtendedTypeConverter):
+                class Extended(ExtendedTypeConverter, cvt):
+                    __name__ = f"Extended{cvt}"
+                self.converters[typ] = Extended
 
     def __call__(self, schema_node):
         # type: (colander.SchemaNode) -> OpenAPISchema

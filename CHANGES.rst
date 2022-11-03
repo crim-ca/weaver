@@ -15,8 +15,13 @@ Changes:
 - Support `CWL` ``Directory`` type references (resolves `#466 <https://github.com/crim-ca/weaver/issues/466>`_).
   Those references correspond to `WPS` and `OGC API - Processes` ``href``
   using the ``Content-Type: application/directory`` Media-Type and must hava a trailing slash (``/``) character.
-- Support `S3` file or directory references using *Access Point* and *Virtual-hosted–style* URIs (see AWS documentation
+- Support `S3` file or directory references using *Access Point*, *Virtual-hosted–style* and *Outposts* URLs
+  (see AWS documentation
   `Methods for accessing a bucket <https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-bucket-intro.html>`_).
+- Apply more validation rules against expected `S3` file or directory reference formats.
+- Update documentation regarding handling of `S3` references (more formats supported) and ``Directory`` type.
+- Allow ``colander.SchemaNode`` (with extensions for `OpenAPI` schema converters) to provide validation ``pattern``
+  field directly with a compiled ``re.Pattern`` object.
 
 Fixes:
 ------

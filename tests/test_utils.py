@@ -6,6 +6,7 @@ import itertools
 import json
 import os
 import random
+import re
 import shutil
 import tempfile
 import uuid
@@ -45,6 +46,8 @@ from weaver.execute import ExecuteControlOption, ExecuteMode
 from weaver.formats import ContentType, repr_json
 from weaver.status import JOB_STATUS_CATEGORIES, STATUS_PYWPS_IDS, STATUS_PYWPS_MAP, Status, StatusCompliant, map_status
 from weaver.utils import (
+    AWS_S3_BUCKET_REFERENCE_PATTERN,
+    AWS_S3_REGIONS,
     NullType,
     OutputMethod,
     PathMatchingMethod,
@@ -83,7 +86,7 @@ if TYPE_CHECKING:
 
     from tests.utils import S3Scheme
 
-AWS_S3_REGION_SUBSET = {MOCK_AWS_REGION} | set(random.choices(RegionName.__args__, k=4))
+AWS_S3_REGION_SUBSET = {MOCK_AWS_REGION} | set(random.choices(AWS_S3_REGIONS, k=4))
 AWS_S3_REGION_NON_DEFAULT = list(AWS_S3_REGION_SUBSET - {MOCK_AWS_REGION})[0]
 
 # pylint: disable=R1732,W1514  # not using with open + encoding
@@ -1183,7 +1186,7 @@ def test_fetch_file_remote_s3_bucket(s3_scheme, s3_region):
         for region in AWS_S3_REGION_SUBSET
     ] + [
         (
-            f"https://access-111122223333.s3-accesspoint.amazonaws.com/test/",
+            f"https://access-111122223333.s3-accesspoint.{region}.amazonaws.com/test/",
             region, f"arn:aws:s3:{region}:111122223333:accesspoint/access/test/"
         )
         for region in AWS_S3_REGION_SUBSET
@@ -1225,10 +1228,38 @@ def test_resolve_s3_from_http(s3_url, expect_region, expect_url):
     f"https://s3.{AWS_S3_REGION_NON_DEFAULT}.amazonaws.com/bucket",  # missing trailing slash (dir reference)
     f"https://bucket.s3.{AWS_S3_REGION_NON_DEFAULT}.amazonaws.com",  # missing trailing slash (dir reference)
     f"https://123456789012.s3-accesspoint.{AWS_S3_REGION_NON_DEFAULT}.amazonaws.com",  # missing access-point
+    f"https://access-111122223333.s3-accesspoint.amazonaws.com/test/",  # missing region
 ])
 def test_resolve_s3_from_http_invalid(s3_url_invalid):
     with pytest.raises(ValueError, match=r"^Invalid AWS S3 reference format.*"):
         resolve_s3_from_http(s3_url_invalid)
+
+
+@pytest.mark.parametrize("s3_reference, valid", [
+    ("s3://", False),
+    ("s3://test", False),
+    ("s3://test/", False),
+    ("s3://test/file.txt", True),
+    ("s3://test/test/item", True),
+    ("s3://test/test/item/", True),
+    ("s3://-test/test/item/", False),
+    ("s3://_test/test/item/", False),
+    ("s3://.test/test/item/", False),
+    ("s3://test/test/item//", False),
+    ("s3://test/test/item//asm1112123-----....._____!xyz//", False),
+    ("s3://test/test/item/sm1112123-----....._____!xyz//", False),
+    ("s3://test/test/item/sm1112123-----....._____xyz//", False),
+    ("s3://test/test/item//asm1112123-----....._____!xyz/", False),
+    ("s3://test/test/item/sm1112123-----....._____!xyz/", False),
+    ("s3://test/test/item/sm111//2123-----....._____xyz/", False),
+    ("s3://test/test/item/sm1112123-----....._____xyz", True),
+    ("s3://test/test/item/sm1112123-----....._____xyz.txt", True),
+    ("s3://test/test/item/sm111/2123-----....._____xyz/", True),
+])
+def test_validate_s3_reference(s3_reference, valid):
+    # type: (str, bool) -> None
+    match = re.match(AWS_S3_BUCKET_REFERENCE_PATTERN, s3_reference)
+    assert bool(match) is valid
 
 
 def test_get_path_kvp():

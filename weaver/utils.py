@@ -33,6 +33,7 @@ from botocore.config import Config as S3Config
 from bs4 import BeautifulSoup
 from celery.app import Celery
 from jsonschema.validators import RefResolver as JsonSchemaRefResolver
+from mypy_boto3_s3.literals import RegionName
 from pyramid.config import Configurator
 from pyramid.exceptions import ConfigurationError
 from pyramid.httpexceptions import (
@@ -85,7 +86,6 @@ if TYPE_CHECKING:
     from typing_extensions import NotRequired, TypedDict, TypeGuard
 
     from mypy_boto3_s3.client import S3Client
-    from mypy_boto3_s3.literals import RegionName
 
     from weaver.execute import AnyExecuteControlOption, AnyExecuteMode
     from weaver.status import Status
@@ -190,13 +190,32 @@ SUPPORTED_FILE_SCHEMES = frozenset([
 FILE_NAME_QUOTE_PATTERN = re.compile(r"^\"?([\w\-.]+\.\w+)\"?$")  # extension required, permissive extra quotes
 FILE_NAME_LOOSE_PATTERN = re.compile(r"^[\w\-.]+$")  # no extension required
 
+AWS_S3_REGIONS = RegionName.__args__  # type: List[RegionName]
+AWS_S3_REGIONS_REGEX = "(" + "|".join(AWS_S3_REGIONS) + ")"
+# https://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html
+AWS_S3_ARN = "arn:aws:s3"
 # https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucketnamingrules.html
 # https://stackoverflow.com/questions/50480924/regex-for-s3-bucket-name
+AWS_S3_BUCKET_NAME_PATTERN = re.compile(r"(?!(^xn--|.+-s3alias$))[a-z0-9][a-z0-9-]{1,61}[a-z0-9]")  # lowercase only
+# Bucket ARN =
+# - arn:aws:s3:{Region}:{AccountId}:accesspoint/{AccessPointName}[/file-key]
+# - arn:aws:s3-outposts:{Region}:{AccountId}:outpost/{outpostId}/bucket/{Bucket}[/file-key]
+# - arn:aws:s3-outposts:{Region}:{AccountId}:outpost/{OutpostId}/accesspoint/{AccessPointName}[/file-key]
+AWS_S3_BUCKET_ARN_PATTERN = re.compile(
+    rf"(?P<arn>{AWS_S3_ARN}:s3(?:-outposts)?:"
+    rf"(?P<region>{AWS_S3_REGIONS_REGEX}):"
+    r"(?P<account_id>[a-z0-9]+:"
+    r"(?P<type_name>accesspoint|outpost)"
+    r"(?P<type_id>/[a-z0-9][a-z0-9-]+[a-z0-9])"
+)
 AWS_S3_BUCKET_REFERENCE_PATTERN = pattern = re.compile(
     r"^s3://"
-    r"(?!(^xn--|.+-s3alias$))[a-z0-9][a-z0-9-]{1,61}[a-z0-9]"  # bucket name
-    r"/"  # minimally a directory reference to refert to all bucket contents 
-    r"(?:/[\w.-]+)+/?"  # sub-directorties and or file-key path
+    r"(?P<bucket>"
+    rf"{AWS_S3_BUCKET_NAME_PATTERN.pattern}"
+    r"|"
+    rf"(?P<arn>{AWS_S3_BUCKET_ARN_PATTERN.pattern})"
+    r")"  # <bucket> end
+    r"(?P<path>(?:/[\w.-]+)+/?)"  # sub-directorties and or file-key path
     r"$"
 )
 
@@ -1841,19 +1860,30 @@ def resolve_s3_from_http(reference):
 
     .. code-block:: text
 
-        # Path-style URI
-        https://s3.{region-name}.amazonaws.com/{bucket}/[{dirs}/][{file-key}]
+        # Path-style URL
+        https://s3.{Region}.amazonaws.com/{Bucket}/[{dirs}/][{file-key}]
 
-        # Virtual-hosted–style URI
-        https://{bucket}.s3.{region-name}.amazonaws.com/[{dirs}/][{file-key}]
+        # Virtual-hosted–style URL
+        https://{Bucket}.s3.{Region}.amazonaws.com/[{dirs}/][{file-key}]
 
-        # Access-Point-style URI
-        https://{AccessPointName}-{AccountId}.s3-accesspoint.{region-name}.amazonaws.com/[{dirs}/][{file-key}]
+        # Access-Point-style URL
+        https://{AccessPointName}-{AccountId}.s3-accesspoint.{Region}.amazonaws.com/[{dirs}/][{file-key}]
+
+        # Outposts-style URL
+        https://{AccessPointName}-{AccountId}.{outpostID}.s3-outposts.{Region}.amazonaws.com/[{dirs}/][{file-key}]
 
     .. seealso::
+        References on formats:
+
+        - https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucketnamingrules.html
         - https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-bucket-intro.html
         - https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-access-points.html
-        - https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucketnamingrules.html
+        - https://docs.aws.amazon.com/AmazonS3/latest/userguide/S3onOutposts.html
+
+    .. seealso::
+        References on resolution:
+
+        - https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html
 
     :param reference: HTTP-S3 URL reference.
     :return: Updated S3 reference and applicable S3 Region name.
@@ -1868,15 +1898,32 @@ def resolve_s3_from_http(reference):
                 "Attempting to switch S3 region for proper resolution.",
                 reference, s3_region
             )
-            s3_host = urlparse(reference)
-            if ".s3-accesspoint." in s3_host.hostname:
-                s3_access_point, s3_region = reference.split(".s3-accesspoint.", 1)
+            s3_parsed = urlparse(reference)
+            s3_host = s3_parsed.hostname
+            s3_path = s3_parsed.path
+            if ".s3-outposts." in s3_host:
+                # boto3 wants:
+                # Bucket ARN =
+                #   - arn:aws:s3-outposts:{Region}:{AccountId}:outpost/{outpostId}/bucket/{Bucket}
+                #   - arn:aws:s3-outposts:{Region}:{AccountId}:outpost/{OutpostId}/accesspoint/{AccessPointName}
+                s3_outpost, s3_region = s3_host.split(".s3-outposts.", 1)
+                s3_access_point, s3_outpost_id = s3_outpost.rsplit(".", 1)
                 s3_access_name, s3_account = s3_access_point.rsplit("-", 1)
                 s3_region = s3_region.split(".amazonaws.com", 1)[0]
-                s3_ref = s3_host.path or "/"
-                s3_arn = f"arn:aws:s3:{s3_region}:{s3_account}:accesspoint/{s3_access_name}"
+                s3_ref = s3_path or "/"
+                s3_prefix = f"{AWS_S3_ARN}-outposts"
+                s3_arn = f"{s3_prefix}:{s3_region}:{s3_account}:outpost/{s3_outpost_id}/accesspoint/{s3_access_name}"
                 s3_reference = f"s3://{s3_arn}{s3_ref}"
-            elif ".s3." in s3_host.hostname:
+            elif ".s3-accesspoint." in s3_host:
+                # boto3 wants:
+                # Bucket ARN = arn:aws:s3:{Region}:{AccountId}:accesspoint/{AccessPointName}
+                s3_access_point, s3_region = s3_host.split(".s3-accesspoint.", 1)
+                s3_access_name, s3_account = s3_access_point.rsplit("-", 1)
+                s3_region = s3_region.split(".amazonaws.com", 1)[0]
+                s3_ref = s3_path or "/"
+                s3_arn = f"{AWS_S3_ARN}:{s3_region}:{s3_account}:accesspoint/{s3_access_name}"
+                s3_reference = f"s3://{s3_arn}{s3_ref}"
+            elif ".s3." in s3_host:
                 s3_bucket, s3_region = reference.split(".s3.", 1)
                 s3_region, s3_ref = s3_region.split(".amazonaws.com", 1)
                 s3_bucket = s3_bucket.rsplit("://", 1)[-1].strip("/")
@@ -1908,6 +1955,34 @@ def resolve_s3_from_http(reference):
                  "  Region:  [%s]",
                  reference, s3_reference, s3_region)
     return s3_reference, s3_region
+
+
+def resolve_s3_reference(s3_reference):
+    # type: (str) -> Tuple[str, str, Optional[RegionName]]
+    """
+    Resolve a reference of :term:`S3` scheme into the appropriate formats expected by :mod:`boto3`.
+
+    :param s3_reference: Reference with ``s3://`` scheme with an ARN or literal Bucket/Object path.
+    :return: Tuple of resolved Bucket name, Object path and S3 Region.
+    """
+    s3_ref = s3_reference[5:]
+    if s3_ref.startswith(AWS_S3_ARN):
+        s3_arn_match = re.match(AWS_S3_BUCKET_ARN_PATTERN, s3_ref)
+        if not s3_arn_match:
+            raise ValueError(f"Invalid AWS S3 ARN reference must have one of [accesspoint, outpost] target. "
+                             f"None could be found in [{s3_reference}].")
+        if s3_arn_match["type_name"] == "outpost":
+            parts = s3_arn_match["path"].split("/", 4)
+            bucket_name = s3_arn_match["bucket"] + "/".join(parts[:-2])
+            file_key = "/" + parts[-1]
+        else:
+            bucket_name = s3_arn_match["bucket"]
+            file_key = s3_arn_match["path"]
+        s3_region = s3_arn_match["region"]
+    else:
+        s3_region = None  # default or predefined by caller
+    bucket_name, file_key = s3_ref.split("/", 1)
+    return bucket_name, file_key, s3_region
 
 
 def resolve_s3_http_options(**request_kwargs):
@@ -2036,12 +2111,16 @@ def fetch_file(file_reference,                      # type: str
         LOGGER.debug("Fetch file resolved as S3 bucket reference.")
         s3_params = resolve_s3_http_options(**options["http"], **kwargs)
         s3_region = options["s3"].pop("region_name", None)
+        bucket_name, file_key, s3_region_ref = resolve_s3_reference(file_reference)
+        if s3_region and s3_region_ref and s3_region != s3_region_ref:
+            raise ValueError("Invalid AWS S3 reference. "
+                             f"Input region name [{s3_region}] mismatches reference region [{s3_region_ref}].")
+        s3_region = s3_region_ref or s3_region
         s3_client = boto3.client("s3", region_name=s3_region, **s3_params)  # type: S3Client
-        bucket_name, file_key = file_reference[5:].split("/", 1)
         s3_client.download_file(bucket_name, file_key, file_path, Callback=callback)
     elif file_reference.startswith("http"):
         # pseudo-http URL referring to S3 bucket, try to redirect to above S3 handling method if applicable
-        if file_reference.startswith("https://s3."):
+        if file_reference.startswith("https://s3.") or urlparse(file_reference).hostname.endswith(".amazonaws.com"):
             LOGGER.debug("Detected HTTP-like S3 bucket file reference. Retrying file fetching with S3 reference.")
             s3_ref, s3_region = resolve_s3_from_http(file_reference)
             option_kwargs.pop("s3_region", None)

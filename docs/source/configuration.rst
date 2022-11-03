@@ -117,7 +117,7 @@ they are optional and which default value or operation is applied in each situat
   | The *path* variant **SHOULD** start with ``/`` for appropriate concatenation with ``weaver.url``, although this is
     not strictly enforced.
 
-- | ``weaver.wps_output_s3_bucket = <s3-bucket>``
+- | ``weaver.wps_output_s3_bucket = <s3-bucket-name>``
   | (default: ``None``)
   |
   | AWS S3 bucket where to store WPS outputs. Used in conjunction with ``weaver.wps_output_s3_region``.
@@ -128,10 +128,10 @@ they are optional and which default value or operation is applied in each situat
 
 .. versionadded:: 1.13.0
 .. seealso::
-    `Configuration of AWS S3 Buckets`_
+    :ref:`conf_s3_buckets`
 
-- | ``weaver.wps_output_s3_region = <s3-region>``
-  | (default: ``None``)
+- | ``weaver.wps_output_s3_region = <s3-region-name>``
+  | (default: ``None``, any :term:`S3` |region| amongst :data:`mypy_boto3_s3.literals.RegionName`)
   |
   | AWS S3 region to employ for storing WPS outputs. Used in conjunction with ``weaver.wps_output_s3_bucket``.
   |
@@ -141,7 +141,7 @@ they are optional and which default value or operation is applied in each situat
 
 .. versionadded:: 1.13.0
 .. seealso::
-    `Configuration of AWS S3 Buckets`_
+    :ref:`conf_s3_buckets`
 
 - | ``weaver.wps_output_dir = <directory-path>``
   | (default: *path* ``/tmp``)
@@ -153,7 +153,7 @@ they are optional and which default value or operation is applied in each situat
     with the :term:`Job` ID.
   | This directory should be mapped to `Weaver`'s :term:`WPS` output URL to serve them externally as needed.
 
-.. versionchanged:: 4.3.0
+.. versionchanged:: 4.3
     The output directory could be nested under a *contextual directory* if requested during :term:`Job` submission.
     See :ref:`exec_output_location` and below ``weaver.wps_output_context`` parameter for more details.
 
@@ -269,46 +269,51 @@ they are optional and which default value or operation is applied in each situat
 Configuration of AWS S3 Buckets
 =======================================
 
-Any :term:`AWS` :term:`S3` bucket provided to `Weaver` needs to be accessible by the application, whether it is to fetch
-input files or to store output results. This can require from the server administrator to specify credentials by one of
-reference supported |aws-credentials|_ methodologies to provide necessary role and/or permissions. See also reference
-|aws-config|_ which list various options that will be considered when working with :term:`S3` buckets.
+Any :term:`AWS` :term:`S3` |bucket| provided to `Weaver` needs to be accessible by the application, whether it is to
+fetch input files or to store output results. This can require from the server administrator to specify credentials
+by one of reference supported |aws-credentials|_ methodologies to provide necessary role and/or permissions. See also
+reference |aws-config|_ which list various options that will be considered when working with :term:`S3` buckets.
 
 Note that `Weaver` expects the |aws-config|_ to define a *default profile* from which the :term:`AWS`
-client can infer which *region* it needs to connect to. The :term:`S3` bucket to store files should be defined by
-``weaver.wps_output_s3_bucket`` setting as presented in the previous section.
+client can infer which |region| it needs to connect to. The :term:`S3` bucket to store files should be
+defined with ``weaver.wps_output_s3_bucket`` setting as presented in the previous section.
 
 The :term:`S3` file and directory references for input and output in `Weaver` are expected to be formatted as one of
-the methods described in |aws_s3_bucket_access|_. The easiest and most common approach is to use a reference using
-the ``s3://`` scheme as follows:
+the methods described in |aws_s3_bucket_access|_ (more details about supported formats in :ref:`aws_s3_ref`).
+The easiest and most common approach is to use a reference using the ``s3://`` scheme as follows:
 
 .. code-block:: text
 
     s3://<bucket>/<file-key>
 
 This implicitly tells `Weaver` to employ the specified :term:`S3` bucket it was configured with as well as the
-automatically retrieved location (using the *default region*) from the |aws-config|_ of the application.
+automatically retrieved location (using the region from the *default profile*) in the |aws-config|_ of the application.
 
-Alternatively, the reference can be provided with the more explicit :term:`AWS` :term:`S3` link such as:
+Alternatively, the reference can be provided as input more explicitly with any of the supported :ref:`aws_s3_ref`.
+For example, the :term:`AWS` :term:`S3` link could be specified as follows.
 
 .. code-block:: text
 
-    https://s3.<region-name>.amazonaws.com/<bucket>/<file-key>
+    https://s3.{Region}.amazonaws.com/{Bucket}/{file-key}
 
-In this situation, `Weaver` will parse it as equivalent to the prior shorthand reference format, by substituting any
-appropriate details retrieved from the |aws-config|_ as needed to form the above HTTP URL variant. Then, `Weaver`
+In this situation, `Weaver` will parse it as equivalent to the prior shorthand ``s3://`` reference format, by
+substituting any appropriate details retrieved from the |aws-config|_ as needed to form the above HTTP URL variant.
+For example, an alternative |region| from the default could be specified. After resolution, `Weaver`
 will still attempt to fetch the file as *standard* HTTP reference by following the relevant |aws_s3_bucket_access|_.
 In each case, read access should be granted accordingly to the corresponding bucket, files and/or directories such
 that `Weaver` can stage them locally. For produced outputs, the write access must be granted.
 
-Finally, in the above references, ``file-key`` is used as *anything after* the bucket name. In other words, this
-value can contain any amount of ``/`` separators and details. For example, `Weaver` will store process output results
-to :term:`S3` using ``file-key`` as a combination of ``<WPS-UUID>/<output-id>.<ext>``, therefore forming the full
-:term:`Job` result file references as:
+In the above references, ``file-key`` is used as *anything after* the |bucket| name. In other words, this
+value can contain any amount of ``/`` separators and path elements. For example, if ``weaver.wps_output_s3_bucket`` is
+defined in the configuration, `Weaver` will store process output results to :term:`S3` using ``file-key`` as a
+combination of ``{WPS-UUID}/{output-id.ext}``, therefore forming the full :term:`Job` result file references as:
 
 .. code-block:: text
 
-    https://s3.<region-name>.amazonaws.com/<bucket>/<WPS-UUID>/<output-id>.<ext>
+    https://s3.{Region}.amazonaws.com/{Bucket}/{WPS-UUID}/{output-id.ext}
+
+    Region ::= weaver.wps_output_s3_region
+    Bucket ::= weaver.wps_output_s3_bucket
 
 .. note::
     Value of ``WPS-UUID`` can be retrieved from `Weaver` internal :term:`Job` storage
@@ -317,6 +322,9 @@ to :term:`S3` using ``file-key`` as a combination of ``<WPS-UUID>/<output-id>.<e
 
 .. note::
     The value of ``file-key`` also applies for :ref:`cwl-dir` references.
+
+.. |region| replace:: *Region*
+.. |bucket| replace:: *Bucket*
 
 .. _conf_data_sources:
 

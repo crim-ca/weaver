@@ -15,6 +15,10 @@
 .. _aws_s3_obj_key_names: https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-keys.html
 .. |aws_s3_bucket_access| replace:: AWS S3 Bucket Access Methods
 .. _aws_s3_bucket_access: https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-bucket-intro.html
+.. |aws_s3_access_points| replace:: AWS S3 Access Points
+.. _aws_s3_access_points: https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-access-points.html
+.. |aws_s3_outposts| replace:: AWS S3 Outposts
+.. _aws_s3_outposts: https://docs.aws.amazon.com/AmazonS3/latest/userguide/S3onOutposts.html
 .. |cwl| replace:: Common Workflow Language
 .. _cwl: `cwl-home`_
 .. |cwl-home| replace:: CWL Homepage
@@ -97,7 +101,7 @@
 .. _MongoDB: https://www.mongodb.com/
 .. |mongodb-docs| replace:: MongoDB official documentation
 .. _mongodb-docs: https://docs.mongodb.com/manual
-.. |media-types| replace:: Media Types
+.. |media-types| replace:: Media-Types
 .. _media-types: https://www.iana.org/assignments/media-types/media-types.xhtml
 
 .. Weaver Configurations

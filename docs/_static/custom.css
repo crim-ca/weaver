@@ -48,3 +48,22 @@ div[class^="highlight"] {
     max-width: 100%;
     overflow: visible;
 }
+
+/* add missing border when row spans more than one line */
+.rst-content table.docutils td:first-child,
+.rst-content table.docutils th:first-child,
+.rst-content table.field-list td:first-child,
+.rst-content table.field-list th:first-child,
+.wy-table td:first-child,
+.wy-table th:first-child {
+    border-left-width: 1px;
+    border-right-width: 1px;
+}
+
+/* avoid mismatching background color in
+   table rows that spans multiple lines, due to
+   alternating colors on individual odd/even rows
+ */
+#table-file-type-handling tr.row-even > td[rowspan] {
+  background-color: revert;
+}
