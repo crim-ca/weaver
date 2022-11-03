@@ -324,7 +324,7 @@ class SchemeURL(colander.Regex):
     """
 
     def __init__(self, schemes=None, path_pattern=None, msg=None, flags=re.IGNORECASE):
-        # type: (Optional[Iterable[str]], Optional[str], Optional[str], Optional[re.RegexFlag]) -> None
+        # type: (Optional[Iterable[str]], Union[None, str, re.Pattern], Optional[str], Optional[re.RegexFlag]) -> None
         if not schemes:
             schemes = [""]
         if not msg:
@@ -332,6 +332,8 @@ class SchemeURL(colander.Regex):
         regex_schemes = r"(?:" + "|".join(schemes) + r")"
         regex = colander.URL_REGEX.replace(r"(?:http|ftp)s?", regex_schemes)
         if path_pattern:
+            if isinstance(path_pattern, re.Pattern):
+                path_pattern = path_pattern.pattern
             regex = regex[:-1] + path_pattern + "$"
         super(SchemeURL, self).__init__(regex, msg=msg, flags=flags)
 
@@ -640,7 +642,7 @@ class ExtendedSchemaBase(colander.SchemaNode, metaclass=ExtendedSchemaMeta):
         if self.validator is None and isinstance(schema_type, colander.String):
             _format = kwargs.pop("format", getattr(self, "format", None))
             pattern = kwargs.pop("pattern", getattr(self, "pattern", None))
-            if isinstance(pattern, str):
+            if isinstance(pattern, (str, re.Pattern)):
                 self.validator = colander.Regex(pattern)
             elif isinstance(pattern, colander.Regex):
                 self.validator = pattern

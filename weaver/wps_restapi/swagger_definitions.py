@@ -15,12 +15,13 @@ on `Weaver`'s `ReadTheDocs` page.
 # pylint: disable=C0103,invalid-name
 import datetime
 import os
+import re
 from copy import copy
 from typing import TYPE_CHECKING
 
 import duration
 import yaml
-from colander import DateTime, Email, Length, Money, OneOf, Range, Regex, drop, null, required
+from colander import DateTime, Email, Length, Money, OneOf, Range, drop, null, required
 from dateutil import parser as date_parser
 
 from weaver import __meta__
@@ -49,6 +50,7 @@ from weaver.processes.constants import (
 from weaver.quotation.status import QuoteStatus
 from weaver.sort import Sort, SortMethods
 from weaver.status import JOB_STATUS_CODE_API, JOB_STATUS_SEARCH_API, Status
+from weaver.utils import AWS_S3_BUCKET_REFERENCE_PATTERN
 from weaver.visibility import Visibility
 from weaver.wps_restapi.colander_extras import (
     AllOfKeywordSchema,
@@ -297,14 +299,17 @@ class SLUG(ExtendedSchemaNode):
     schema_type = String
     description = "Slug name pattern."
     example = "some-object-slug-name"
-    pattern = r"^[A-Za-z0-9]+(?:(-|_)[A-Za-z0-9]+)*$"
+    pattern = re.compile(r"^[A-Za-z0-9]+(?:[-_][A-Za-z0-9]+)*$")
 
 
 class Tag(ExtendedSchemaNode):
     schema_type = String
-    description = "Identifier with optional tagged version forming an unique reference."
+    description = "Identifier with optional tagged version forming a unique reference."
     # ranges used to remove starting/ending ^$ characters
-    pattern = SLUG.pattern[:-1] + rf"(:{SemanticVersion(v_prefix=False, rc_suffix=False).pattern[1:-1]})?$"
+    pattern = re.compile(
+        rf"{SLUG.pattern.pattern[:-1]}"
+        rf"(:{SemanticVersion(v_prefix=False, rc_suffix=False).pattern[1:-1]})?$"
+    )
 
 
 class URL(ExtendedSchemaNode):
@@ -317,7 +322,7 @@ class MediaType(ExtendedSchemaNode):
     schema_type = String
     description = "IANA identifier of content and format."
     example = ContentType.APP_JSON
-    pattern = r"^\w+\/[-.\w]+(?:\+[-.\w]+)?(?:\;\s*.+)*$"
+    pattern = re.compile(r"^\w+\/[-.\w]+(?:\+[-.\w]+)?(?:\;\s*.+)*$")
 
 
 class QueryBoolean(Boolean):
@@ -342,25 +347,30 @@ class DateTimeInterval(ExtendedSchemaNode):
         "to get values with a specific date-time just pass the datetime. "
     )
     example = "2022-03-02T03:32:38.487000+00:00/.."
-    regex_datetime = r"(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d+)?(([+-]\d\d:\d\d)|Z)?)"
-    regex_interval_closed = fr"{regex_datetime}\/{regex_datetime}"
-    regex_interval_open_start = fr"\.\.\/{regex_datetime}"
-    regex_interval_open_end = fr"{regex_datetime}\/\.\."
+    regex_datetime = re.compile(r"(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d+)?(([+-]\d\d:\d\d)|Z)?)")
+    regex_interval_closed = re.compile(rf"{regex_datetime.pattern}\/{regex_datetime.pattern}")
+    regex_interval_open_start = re.compile(rf"\.\.\/{regex_datetime.pattern}")
+    regex_interval_open_end = re.compile(rf"{regex_datetime.pattern}\/\.\.")
+    pattern = re.compile(
+        rf"^{regex_datetime.pattern}"
+        rf"|{regex_interval_closed.pattern}"
+        rf"|{regex_interval_open_start.pattern}"
+        rf"|{regex_interval_open_end.pattern}"
+        r"$"
+    )
 
-    pattern = fr"^{regex_datetime}|{regex_interval_closed}|{regex_interval_open_start}|{regex_interval_open_end}$"
 
-
-class S3Bucket(ExtendedSchemaNode):
+class S3BucketReference(ExtendedSchemaNode):
     schema_type = String
-    description = "S3 bucket shorthand URL representation [s3://{bucket}/{job-uuid}/{output}.ext]"
-    pattern = r"^s3://\S+$"
+    description = "S3 bucket shorthand URL representation: 's3://{bucket}/[{dirs}/][{file-key}]'"
+    pattern = AWS_S3_BUCKET_REFERENCE_PATTERN
 
 
 class FileLocal(ExtendedSchemaNode):
     schema_type = String
     description = "Local file reference."
     format = "file"
-    validator = Regex(r"^(file://)?(?:/|[/?]\S+)$")
+    pattern = re.compile(r"^(file://)?(?:/|[/?]\S+)$")
 
 
 class FileURL(ExtendedSchemaNode):
@@ -374,7 +384,7 @@ class VaultReference(ExtendedSchemaNode):
     schema_type = String
     description = "Vault file reference."
     example = "vault://399dc5ac-ff66-48d9-9c02-b144a975abe4"
-    pattern = r"^vault://[a-f0-9]{8}(?:-?[a-f0-9]{4}){3}-?[a-f0-9]{12}$"
+    pattern = re.compile(r"^vault://[a-f0-9]{8}(?:-?[a-f0-9]{4}){3}-?[a-f0-9]{12}$")
 
 
 class ProcessURL(ExtendedSchemaNode):
@@ -388,7 +398,7 @@ class ReferenceURL(AnyOfKeywordSchema):
     _any_of = [
         FileURL(),
         FileLocal(),
-        S3Bucket(),
+        S3BucketReference(),
     ]
 
 
@@ -396,7 +406,7 @@ class ExecuteReferenceURL(AnyOfKeywordSchema):
     _any_of = [
         FileURL(),
         FileLocal(),
-        S3Bucket(),
+        S3BucketReference(),
         VaultReference(),
     ]
 
@@ -406,7 +416,7 @@ class UUID(ExtendedSchemaNode):
     description = "Unique identifier."
     example = "a9d14bf4-84e0-449a-bac8-16e598efe807"
     format = "uuid"
-    pattern = "^[a-f0-9]{8}(?:-?[a-f0-9]{4}){3}-?[a-f0-9]{12}$"
+    pattern = re.compile("^[a-f0-9]{8}(?:-?[a-f0-9]{4}){3}-?[a-f0-9]{12}$")
     title = "UUID"
 
 

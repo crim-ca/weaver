@@ -16,6 +16,7 @@ mock<4
 # AWS mock tests (against boto3)
 # (fix werkzeug>=2.2.2 dependency, see https://github.com/spulec/moto/issues/5341)
 moto>=4.0.8
+mypy_boto3_s3
 parameterized
 pluggy>=0.7
 # FIXME: bad interpolation of 'setup.cfg' for pytest 'log_format' (https://github.com/pytest-dev/pytest/issues/10019)

@@ -17,6 +17,7 @@ import mock
 import pytest
 import pytz
 import responses
+from mypy_boto3_s3.literals import RegionName
 from pyramid.httpexceptions import (
     HTTPConflict,
     HTTPCreated,
@@ -31,7 +32,8 @@ from requests import Response
 from requests.exceptions import HTTPError as RequestsHTTPError
 
 from tests.utils import (
-    mocked_aws_credentials,
+    MOCK_AWS_REGION,
+    mocked_aws_config,
     mocked_aws_s3,
     mocked_aws_s3_bucket_test_file,
     mocked_file_response,
@@ -69,6 +71,7 @@ from weaver.utils import (
     parse_prefer_header_execute_mode,
     pass_http_error,
     request_extra,
+    resolve_s3_from_http,
     retry_on_condition,
     str2bytes,
     xml_path_elements,
@@ -78,7 +81,10 @@ from weaver.utils import (
 if TYPE_CHECKING:
     from typing import List, Optional, Tuple, Type
 
-    from tests.utils import BucketLocationConstraintType, S3Scheme
+    from tests.utils import S3Scheme
+
+AWS_S3_REGION_SUBSET = {MOCK_AWS_REGION} | set(random.choices(RegionName.__args__, k=4))
+AWS_S3_REGION_NON_DEFAULT = list(AWS_S3_REGION_SUBSET - {MOCK_AWS_REGION})[0]
 
 # pylint: disable=R1732,W1514  # not using with open + encoding
 
@@ -1130,7 +1136,7 @@ def test_fetch_file_http_content_disposition_filename():
             shutil.rmtree(res_dir, ignore_errors=True)
 
 
-@mocked_aws_credentials
+@mocked_aws_config
 @mocked_aws_s3
 @pytest.mark.parametrize("s3_scheme, s3_region", [
     ("s3", "ca-central-1"),
@@ -1141,7 +1147,7 @@ def test_fetch_file_http_content_disposition_filename():
     ("https", "eu-west-1"),
 ])
 def test_fetch_file_remote_s3_bucket(s3_scheme, s3_region):
-    # type: (S3Scheme, BucketLocationConstraintType) -> None
+    # type: (S3Scheme, RegionName) -> None
     with tempfile.TemporaryDirectory() as tmpdir:
         test_file_name = "test-file.txt"
         test_file_data = "dummy file"
@@ -1155,6 +1161,74 @@ def test_fetch_file_remote_s3_bucket(s3_scheme, s3_region):
         assert os.path.isfile(result)
         with open(result, mode="r") as test_file:
             assert test_file.read() == test_file_data
+
+
+@mocked_aws_config(default_region=MOCK_AWS_REGION)  # check that URL can be different from default
+@mocked_aws_s3
+@pytest.mark.parametrize(
+    "s3_url, expect_region, expect_url", [
+        (f"https://s3.{region}.amazonaws.com/test/file.txt", region, "s3://test/file.txt")
+        for region in AWS_S3_REGION_SUBSET
+    ] + [
+        (f"https://s3.{region}.amazonaws.com/test/dir/nested/file.txt", region, "s3://test/dir/nested/file.txt")
+        for region in AWS_S3_REGION_SUBSET
+    ] + [
+        (f"https://test.s3.{region}.amazonaws.com/dir/nested/file.txt", region, "s3://test/dir/nested/file.txt")
+        for region in AWS_S3_REGION_SUBSET
+    ] + [
+        (f"https://test.s3.{region}.amazonaws.com/dir/only/", region, "s3://test/dir/only/")
+        for region in AWS_S3_REGION_SUBSET
+    ] + [
+        (f"https://s3.{region}.amazonaws.com/test/dir/only/", region, "s3://test/dir/only/")
+        for region in AWS_S3_REGION_SUBSET
+    ] + [
+        (
+            f"https://access-111122223333.s3-accesspoint.amazonaws.com/test/",
+            region, f"arn:aws:s3:{region}:111122223333:accesspoint/access/test/"
+        )
+        for region in AWS_S3_REGION_SUBSET
+    ] + [
+        (
+            f"https://test-location-123456789012.s3-accesspoint.{region}.amazonaws.com/dir/file.txt",
+            region, f"arn:aws:s3:{region}:123456789012:accesspoint/test-location/dir/file.txt"
+        )
+        for region in AWS_S3_REGION_SUBSET
+    ] + [
+        (
+            f"https://test-location-123456789012.s3-accesspoint.{region}.amazonaws.com",
+            region, f"arn:aws:s3:{region}:123456789012:accesspoint/test-location/"
+        )
+        for region in AWS_S3_REGION_SUBSET
+    ] + [
+        (
+            f"https://test-location-123456789012.s3-accesspoint.{region}.amazonaws.com/nested/dir/",
+            region, f"arn:aws:s3:{region}:123456789012:accesspoint/test-location/nested/dir/"
+        )
+        for region in AWS_S3_REGION_SUBSET
+    ]
+)
+def test_resolve_s3_from_http(s3_url, expect_region, expect_url):
+    # type: (str, RegionName, str) -> None
+    s3_location, s3_region = resolve_s3_from_http(s3_url)
+    assert s3_region == expect_region
+    assert s3_location == expect_url
+
+
+@mocked_aws_config
+@mocked_aws_s3
+@pytest.mark.parametrize("s3_url_invalid", [
+    f"https://s3.{MOCK_AWS_REGION}.amazonaws.com/",        # missing bucket and dir/file reference
+    f"https://s3.{MOCK_AWS_REGION}.amazonaws.com/bucket",  # missing trailing slash (dir reference)
+    f"https://bucket.s3.{MOCK_AWS_REGION}.amazonaws.com",  # missing trailing slash (dir reference)
+    f"https://123456789012.s3-accesspoint.{MOCK_AWS_REGION}.amazonaws.com",  # missing access-point
+    f"https://s3.{AWS_S3_REGION_NON_DEFAULT}.amazonaws.com/",        # missing bucket and dir/file reference
+    f"https://s3.{AWS_S3_REGION_NON_DEFAULT}.amazonaws.com/bucket",  # missing trailing slash (dir reference)
+    f"https://bucket.s3.{AWS_S3_REGION_NON_DEFAULT}.amazonaws.com",  # missing trailing slash (dir reference)
+    f"https://123456789012.s3-accesspoint.{AWS_S3_REGION_NON_DEFAULT}.amazonaws.com",  # missing access-point
+])
+def test_resolve_s3_from_http_invalid(s3_url_invalid):
+    with pytest.raises(ValueError, match=r"^Invalid AWS S3 reference format.*"):
+        resolve_s3_from_http(s3_url_invalid)
 
 
 def test_get_path_kvp():

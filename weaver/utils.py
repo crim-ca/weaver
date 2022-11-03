@@ -190,6 +190,16 @@ SUPPORTED_FILE_SCHEMES = frozenset([
 FILE_NAME_QUOTE_PATTERN = re.compile(r"^\"?([\w\-.]+\.\w+)\"?$")  # extension required, permissive extra quotes
 FILE_NAME_LOOSE_PATTERN = re.compile(r"^[\w\-.]+$")  # no extension required
 
+# https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucketnamingrules.html
+# https://stackoverflow.com/questions/50480924/regex-for-s3-bucket-name
+AWS_S3_BUCKET_REFERENCE_PATTERN = pattern = re.compile(
+    r"^s3://"
+    r"(?!(^xn--|.+-s3alias$))[a-z0-9][a-z0-9-]{1,61}[a-z0-9]"  # bucket name
+    r"/"  # minimally a directory reference to refert to all bucket contents 
+    r"(?:/[\w.-]+)+/?"  # sub-directorties and or file-key path
+    r"$"
+)
+
 
 class CaseInsensitive(str):
     __str = None
@@ -1841,8 +1851,9 @@ def resolve_s3_from_http(reference):
         https://{AccessPointName}-{AccountId}.s3-accesspoint.{region-name}.amazonaws.com/[{dirs}/][{file-key}]
 
     .. seealso::
-        - https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-access-points.html
         - https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-bucket-intro.html
+        - https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-access-points.html
+        - https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucketnamingrules.html
 
     :param reference: HTTP-S3 URL reference.
     :return: Updated S3 reference and applicable S3 Region name.
@@ -1863,13 +1874,14 @@ def resolve_s3_from_http(reference):
                 s3_access_name, s3_account = s3_access_point.rsplit("-", 1)
                 s3_region = s3_region.split(".amazonaws.com", 1)[0]
                 s3_ref = s3_host.path or "/"
-                s3_bucket = f"arn:aws:s3:{s3_region}:{s3_account}:accesspoint/{s3_access_name}"
-                s3_reference = f"s3://{s3_bucket}{s3_ref}"
+                s3_arn = f"arn:aws:s3:{s3_region}:{s3_account}:accesspoint/{s3_access_name}"
+                s3_reference = f"s3://{s3_arn}{s3_ref}"
             elif ".s3." in s3_host.hostname:
                 s3_bucket, s3_region = reference.split(".s3.", 1)
                 s3_region, s3_ref = s3_region.split(".amazonaws.com", 1)
+                s3_bucket = s3_bucket.rsplit("://", 1)[-1].strip("/")
                 s3_ref = s3_ref.lstrip("/")
-                s3_reference = f"s3://{s3_ref}"
+                s3_reference = f"s3://{s3_bucket}/{s3_ref}"
             else:
                 s3_region, s3_ref = reference.split("https://s3.")[-1].split(".amazonaws.com")
                 s3_ref = s3_ref.lstrip("/")
@@ -1878,10 +1890,18 @@ def resolve_s3_from_http(reference):
             s3_ref = reference.replace(s3_url, "")
             s3_ref = s3_ref.lstrip("/")
             s3_reference = f"s3://{s3_ref}"
-        if s3_reference == "s3://":
-            raise ValueError("No S3 bucket, region or file/directory reference was found.")
+        if not re.match(AWS_S3_BUCKET_REFERENCE_PATTERN, s3_reference):
+            raise ValueError("No S3 bucket, region or file/directory reference was "
+                             f"found from input reference [{reference}].")
     except (IndexError, TypeError, ValueError) as exc:
-        raise ValueError(f"Could not parse unknown AWS S3 reference format: [{reference!s}]") from exc
+        s3_valid_formats = [
+            "https://s3.{region-name}.amazonaws.com/{bucket}/[{dirs}/][{file-key}]",
+            "https://{bucket}.s3.{region-name}.amazonaws.com/[{dirs}/][{file-key}]",
+            "https://{AccessPointName}-{AccountId}.s3-accesspoint.{region-name}.amazonaws.com/[{dirs}/][{file-key}]",
+            "s3://{bucket}/[{dirs}/][{file-key}]  (**default AWS region**)" # not handled here, but provide valid option
+        ]
+        raise ValueError(f"Invalid AWS S3 reference format. Could not parse unknown: [{reference!s}]\n"
+                         f"Available formats:\n{repr_json(s3_valid_formats, indent=2)}") from exc
     LOGGER.debug("Adjusting HTTP reference to S3 URL style with resolved S3 Region:\n"
                  "  Initial: [%s]\n"
                  "  Updated: [%s]\n"

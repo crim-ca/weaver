@@ -26,7 +26,7 @@ from tests.functional.utils import ResourcesUtil, WpsConfigBase
 from tests.utils import (
     MOCK_AWS_REGION,
     MOCK_HTTP_REF,
-    mocked_aws_credentials,
+    mocked_aws_config,
     mocked_aws_s3,
     mocked_aws_s3_bucket_test_file,
     mocked_dismiss_process,
@@ -1771,7 +1771,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                     desc = resp.json.get("description")
                     assert "language" in desc and lang in desc, "Expected error description to indicate bad language"
 
-    @mocked_aws_credentials
+    @mocked_aws_config
     @mocked_aws_s3
     @mocked_http_file
     def test_execute_job_with_array_input(self):
@@ -2333,7 +2333,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             assert all(file.startswith(cwl_stage_dir) for file in output_listing)
             assert all(any(file.endswith(dir_file) for file in output_listing) for dir_file in expect_http_files)
 
-    @mocked_aws_credentials
+    @mocked_aws_config
     @mocked_aws_s3
     def test_execute_with_bucket_directory(self):
         """
@@ -2921,7 +2921,7 @@ class WpsPackageAppWithS3BucketTest(WpsConfigBase):
         }
         super(WpsPackageAppWithS3BucketTest, cls).setUpClass()
 
-    @mocked_aws_credentials
+    @mocked_aws_config
     @mocked_aws_s3
     def test_execute_application_package_process_with_bucket_results(self):
         """

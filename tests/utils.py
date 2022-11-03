@@ -63,7 +63,7 @@ if TYPE_CHECKING:
     from typing_extensions import Literal
 
     from mypy_boto3_s3.client import S3Client
-    from mypy_boto3_s3.literals import BucketLocationConstraintType
+    from mypy_boto3_s3.literals import BucketLocationConstraintType, RegionName
     from mypy_boto3_s3.type_defs import CreateBucketConfigurationTypeDef
     from owslib.wps import Process as ProcessOWSWPS
     from pywps.app import Process as ProcessPyWPS
@@ -102,7 +102,7 @@ if TYPE_CHECKING:
 
 LOGGER = logging.getLogger(".".join([__package__, __name__]))
 
-MOCK_AWS_REGION = "us-central-1"
+MOCK_AWS_REGION = "ca-central-1"  # type: RegionName
 MOCK_HTTP_REF = "http://localhost.mock"
 
 
@@ -1150,10 +1150,12 @@ def mocked_process_package():
     )
 
 
-def mocked_aws_credentials(test_func):
-    # type: (Callable[[..., *Any], Any]) -> Callable[[..., *Any], Any]
+def mocked_aws_config(_func=null,                       # type: Optional[Callable[[..., *Any], Any]]
+                      *,                                #
+                      default_region=MOCK_AWS_REGION,   # type: RegionName
+                      ):                                # type: (...) -> Callable[[..., *Any], Any]
     """
-    Mocked AWS Credentials for :py:mod:`moto`.
+    Mocked AWS configuration and credentials for :mod:`moto` and :mod:`boto3`.
 
     When using this fixture, ensures that if other mocks fail, at least credentials should be invalid to avoid
     mistakenly overriding real bucket files.
@@ -1162,26 +1164,32 @@ def mocked_aws_credentials(test_func):
         - :func:`mocked_aws_s3`
         - :func:`mocked_aws_s3_bucket_test_file`
     """
-    @functools.wraps(test_func)
-    def wrapped(*args, **kwargs):
-        # type: (*Any, **Any) -> Any
-        with mock.patch.dict(os.environ, {
-            "AWS_ACCESS_KEY_ID": "testing",
-            "AWS_SECRET_ACCESS_KEY": "testing",
-            "AWS_SECURITY_TOKEN": "testing",
-            "AWS_SESSION_TOKEN": "testing"
-        }):
-            return test_func(*args, **kwargs)
-    return wrapped
+    def decorator(test_func):
+        # type: (Callable[[..., *Any], Any]) -> Callable[[..., *Any], Any]
+        @functools.wraps(test_func)
+        def wrapped(*args, **kwargs):
+            # type: (*Any, **Any) -> Any
+            with mock.patch.dict(os.environ, {
+                "AWS_DEFAULT_REGION": default_region,
+                "AWS_ACCESS_KEY_ID": "testing",
+                "AWS_SECRET_ACCESS_KEY": "testing",
+                "AWS_SECURITY_TOKEN": "testing",
+                "AWS_SESSION_TOKEN": "testing"
+            }):
+                return test_func(*args, **kwargs)
+        return wrapped
+    if _func is not null and callable(_func):
+        return decorator(_func)
+    return decorator
 
 
 def mocked_aws_s3(test_func):
     # type: (Callable[[..., *Any], Any]) -> Callable[[..., *Any], Any]
     """
-    Mocked AWS S3 for :py:mod:`boto3` over mocked AWS credentials using :py:mod:`moto`.
+    Mocked AWS S3 for :mod:`boto3` over mocked AWS credentials using :mod:`moto`.
 
     .. seealso::
-        - :func:`mocked_aws_credentials`
+        - :func:`mocked_aws_config`
         - :func:`mocked_aws_s3_bucket_test_file`
     """
     @functools.wraps(test_func)
@@ -1211,7 +1219,7 @@ def mocked_aws_s3_bucket_test_file(bucket_name,                 # type: str
         towards real S3 bucket locations.
 
     .. seealso::
-        - :func:`mocked_aws_credentials`
+        - :func:`mocked_aws_config`
         - :func:`mocked_aws_s3`
     """
     import boto3
