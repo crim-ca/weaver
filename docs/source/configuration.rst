@@ -135,9 +135,9 @@ they are optional and which default value or operation is applied in each situat
   |
   | AWS S3 region to employ for storing WPS outputs. Used in conjunction with ``weaver.wps_output_s3_bucket``.
   |
-  | When this parameter is defined as well as ``weaver.wps_output_s3_bucket``, it is employed to define which `S3`
+  | When this parameter is defined as well as ``weaver.wps_output_s3_bucket``, it is employed to define which :term:`S3`
     to write output files to. If not defined but ``weaver.wps_output_s3_bucket`` is specified, `Weaver` attempt to
-    retrieve the region from the profile defined in `AWS` configuration files or environment variables.
+    retrieve the region from the profile defined in :term:`AWS` configuration files or environment variables.
 
 .. versionadded:: 1.13.0
 .. seealso::
@@ -269,51 +269,54 @@ they are optional and which default value or operation is applied in each situat
 Configuration of AWS S3 Buckets
 =======================================
 
-Any `AWS` `S3` bucket accessed by `Weaver` needs to be accessible by the application, whether it is to fetch input
-files or to store output results. This can require from the server administrator to specify credentials by one of
-reference |aws-cred-support|_ to provide necessary role and/or permissions. See also reference |aws-config|_ which
-list various options that will be considered when working with `S3` buckets.
+Any :term:`AWS` :term:`S3` bucket provided to `Weaver` needs to be accessible by the application, whether it is to fetch
+input files or to store output results. This can require from the server administrator to specify credentials by one of
+reference supported |aws-credentials|_ methodologies to provide necessary role and/or permissions. See also reference
+|aws-config|_ which list various options that will be considered when working with :term:`S3` buckets.
 
-.. |aws-cred-support| replace:: supported methodologies
-.. _aws-cred-support: `aws-credentials`_
-
-Note that `Weaver` expects the |aws-config|_ to define a *default profile* from which the AWS
-client can infer which *region* it needs to connect to. The `S3` bucket to store files should be defined by
+Note that `Weaver` expects the |aws-config|_ to define a *default profile* from which the :term:`AWS`
+client can infer which *region* it needs to connect to. The :term:`S3` bucket to store files should be defined by
 ``weaver.wps_output_s3_bucket`` setting as presented in the previous section.
 
-The `S3` file references for input and output in `Weaver` are expected to be formatted as:
+The :term:`S3` file and directory references for input and output in `Weaver` are expected to be formatted as one of
+the methods described in |aws_s3_bucket_access|_. The easiest and most common approach is to use a reference using
+the ``s3://`` scheme as follows:
 
 .. code-block:: text
 
     s3://<bucket>/<file-key>
 
-This implicitly tells `Weaver` to employ the `S3` bucket it was configured with as well as the automatically retrieved
-region from the `AWS` server configuration.
+This implicitly tells `Weaver` to employ the specified :term:`S3` bucket it was configured with as well as the
+automatically retrieved location (using the *default region*) from the |aws-config|_ of the application.
 
-Alternatively, the reference can be provided with the more explicit `AWS` `S3` link such as:
+Alternatively, the reference can be provided with the more explicit :term:`AWS` :term:`S3` link such as:
 
 .. code-block:: text
 
-    https://s3.[region-name.]amazonaws.com/<bucket>/<file-key>
+    https://s3.<region-name>.amazonaws.com/<bucket>/<file-key>
 
-In this situation, `Weaver` will parse it as equivalent to the prior shorthand reference format, as long as the `AWS`
-server configuration matches with all associated details from the HTTP URL variant. If this is not the case, `Weaver`
-will still attempt to fetch the file as *standard* HTTP reference, but read access should be granted accordingly to the
-corresponding bucket and file such that `Weaver` can access it.
+In this situation, `Weaver` will parse it as equivalent to the prior shorthand reference format, by substituting any
+appropriate details retrieved from the |aws-config|_ as needed to form the above HTTP URL variant. Then, `Weaver`
+will still attempt to fetch the file as *standard* HTTP reference by following the relevant |aws_s3_bucket_access|_.
+In each case, read access should be granted accordingly to the corresponding bucket, files and/or directories such
+that `Weaver` can stage them locally. For produced outputs, the write access must be granted.
 
-Finally, in the above references, ``file-key`` is used as *anything after* the bucket name. In other words, this value
-can contain any amount of ``/`` separators and details. For example, `Weaver` will store process output results to `S3`
-using ``file-key`` as a combination of ``<WPS-UUID>/<output-id>.<ext>``, therefore forming the full job result file
-references as:
+Finally, in the above references, ``file-key`` is used as *anything after* the bucket name. In other words, this
+value can contain any amount of ``/`` separators and details. For example, `Weaver` will store process output results
+to :term:`S3` using ``file-key`` as a combination of ``<WPS-UUID>/<output-id>.<ext>``, therefore forming the full
+:term:`Job` result file references as:
 
 .. code-block:: text
 
     https://s3.<region-name>.amazonaws.com/<bucket>/<WPS-UUID>/<output-id>.<ext>
 
+.. note::
+    Value of ``WPS-UUID`` can be retrieved from `Weaver` internal :term:`Job` storage
+    from :meth:`weaver.datatypes.Job.wps_id`. It refers to the :ref:`Process Execution <proc_op_execute>` identifier
+    that accomplished the :term:`WPS` request to run the :term:`Application Package`.
 
 .. note::
-    Value of ``WPS-UUID`` can be retrieved from `Weaver` internal job storage from :meth:`weaver.datatypes.Job.wps_id`.
-    It refers to the process execution identifier that accomplished the WPS request to run the `Application Package`.
+    The value of ``file-key`` also applies for :ref:`cwl-dir` references.
 
 .. _conf_data_sources:
 
