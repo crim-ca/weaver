@@ -7,6 +7,7 @@ import json
 import os
 import random
 import re
+import requests
 import shutil
 import tempfile
 import uuid
@@ -75,6 +76,7 @@ from weaver.utils import (
     pass_http_error,
     request_extra,
     resolve_s3_from_http,
+    resolve_s3_http_options,
     resolve_s3_reference,
     retry_on_condition,
     str2bytes,
@@ -83,7 +85,7 @@ from weaver.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import List, Optional, Tuple, Type
+    from typing import Any, Dict, List, Optional, Tuple, Type
 
     from tests.utils import S3Scheme
 
@@ -1165,6 +1167,70 @@ def test_fetch_file_remote_s3_bucket(s3_scheme, s3_region):
         assert os.path.isfile(result)
         with open(result, mode="r") as test_file:
             assert test_file.read() == test_file_data
+
+
+@pytest.mark.parametrize("options, parameters, configuration", [
+    (
+        {"timeout": 10},
+        {},
+        {"connect_timeout": 10, "read_timeout": 10},
+    ),
+    (
+        {"timeout": 10, "connect_timeout": 5},
+        {},
+        {"connect_timeout": 5, "read_timeout": 10},
+    ),
+    (
+        {"timeout": 10, "read_timeout": 5},
+        {},
+        {"connect_timeout": 10, "read_timeout": 5},
+    ),
+    (
+        {"timeout": 10, "connect_timeout": 5, "read_timeout": 20, "retries": 3},
+        {},
+        {"connect_timeout": 5, "read_timeout": 20, "retries": {"max_attempts": 3}},
+    ),
+    (
+        {"retry": 5},  # alt name
+        {},
+        {"retries": {"max_attempts": 5}},
+    ),
+    (
+        {"max_retries": 2},  # alt name
+        {},
+        {"retries": {"max_attempts": 2}},
+    ),
+    (
+        {"cert": "some.crt", "verify": True},
+        {"verify": True},
+        {"client_cert": "some.crt"},
+    ),
+    (
+        {"cert": ("some.crt", "some.pem")},
+        {},
+        {"client_cert": ("some.crt", "some.pem")},
+    ),
+    (
+        {"cert": None, "verify": False},
+        {"verify": False},
+        {"client_cert": None},
+    ),
+    (
+        {"headers": {"Content-Type": "ignore", "user-agent": "test"}},
+        {},
+        {"user_agent": "test"},
+    )
+])
+def test_resolve_s3_http_options(options, parameters, configuration):
+    # type: (Dict[str, Any], Dict[str, Any], Dict[str, Any]) -> None
+    params = resolve_s3_http_options(**options)
+    config = params.pop("config")
+    assert params == parameters
+    assert not isinstance(config, dict)
+    for cfg, val in configuration.items():
+        assert getattr(config, cfg) == val  # no None default because expected value
+    for cfg in parameters:
+        assert not hasattr(config, cfg)
 
 
 @mocked_aws_config(default_region=MOCK_AWS_REGION)  # check that URL can be different from default
