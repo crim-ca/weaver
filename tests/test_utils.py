@@ -7,7 +7,6 @@ import json
 import os
 import random
 import re
-import requests
 import shutil
 import tempfile
 import uuid
@@ -1236,7 +1235,8 @@ def test_resolve_s3_http_options(options, parameters, configuration):
 @mocked_aws_config(default_region=MOCK_AWS_REGION)  # check that URL can be different from default
 @mocked_aws_s3
 @pytest.mark.parametrize(
-    "s3_url, expect_region, expect_url", [
+    "s3_url, expect_region, expect_url",
+    [
         (f"https://s3.{region}.amazonaws.com/test/file.txt", region, "s3://test/file.txt")
         for region in AWS_S3_REGION_SUBSET
     ] + [
@@ -1295,7 +1295,7 @@ def test_resolve_s3_from_http(s3_url, expect_region, expect_url):
     f"https://s3.{AWS_S3_REGION_NON_DEFAULT}.amazonaws.com/bucket",  # missing trailing slash (dir reference)
     f"https://bucket.s3.{AWS_S3_REGION_NON_DEFAULT}.amazonaws.com",  # missing trailing slash (dir reference)
     f"https://123456789012.s3-accesspoint.{AWS_S3_REGION_NON_DEFAULT}.amazonaws.com",  # missing access-point
-    f"https://access-111122223333.s3-accesspoint.amazonaws.com/test/",  # missing region
+    "https://access-111122223333.s3-accesspoint.amazonaws.com/test/",  # missing region
 ])
 def test_resolve_s3_from_http_invalid(s3_url_invalid):
     with pytest.raises(ValueError, match=r"^Invalid AWS S3 reference format.*"):

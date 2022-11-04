@@ -190,7 +190,11 @@ SUPPORTED_FILE_SCHEMES = frozenset([
 FILE_NAME_QUOTE_PATTERN = re.compile(r"^\"?([\w\-.]+\.\w+)\"?$")  # extension required, permissive extra quotes
 FILE_NAME_LOOSE_PATTERN = re.compile(r"^[\w\-.]+$")  # no extension required
 
-AWS_S3_REGIONS = RegionName.__args__  # type: List[RegionName]
+if sys.version_info >= (3, 7):
+    _LITERAL_VALUES_ATTRIBUTE = "__args__"
+else:
+    _LITERAL_VALUES_ATTRIBUTE = "__values__"
+AWS_S3_REGIONS = list(getattr(RegionName, _LITERAL_VALUES_ATTRIBUTE))  # type: List[RegionName]
 AWS_S3_REGIONS_REGEX = "(" + "|".join(AWS_S3_REGIONS) + ")"
 # https://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html
 AWS_S3_ARN = "arn:aws:s3"
