@@ -202,20 +202,16 @@ AWS_S3_BUCKET_NAME_PATTERN = re.compile(r"(?!(^xn--|.+-s3alias$))[a-z0-9][a-z0-9
 # - arn:aws:s3-outposts:{Region}:{AccountId}:outpost/{outpostId}/bucket/{Bucket}[/file-key]
 # - arn:aws:s3-outposts:{Region}:{AccountId}:outpost/{OutpostId}/accesspoint/{AccessPointName}[/file-key]
 AWS_S3_BUCKET_ARN_PATTERN = re.compile(
-    rf"(?P<arn>{AWS_S3_ARN}:s3(?:-outposts)?:"
+    rf"(?P<arn>{AWS_S3_ARN}(?:-outposts)?):"
     rf"(?P<region>{AWS_S3_REGIONS_REGEX}):"
-    r"(?P<account_id>[a-z0-9]+:"
-    r"(?P<type_name>accesspoint|outpost)"
-    r"(?P<type_id>/[a-z0-9][a-z0-9-]+[a-z0-9])"
+    r"(?P<account_id>[a-z0-9]+):"
+    r"(?P<type_name>accesspoint|outpost)/"
+    r"(?P<type_id>[a-z0-9][a-z0-9-]+[a-z0-9])"
 )
-AWS_S3_BUCKET_REFERENCE_PATTERN = pattern = re.compile(
-    r"^s3://"
-    r"(?P<bucket>"
-    rf"{AWS_S3_BUCKET_NAME_PATTERN.pattern}"
-    r"|"
-    rf"(?P<arn>{AWS_S3_BUCKET_ARN_PATTERN.pattern})"
-    r")"  # <bucket> end
-    r"(?P<path>(?:/[\w.-]+)+/?)"  # sub-directorties and or file-key path
+AWS_S3_BUCKET_REFERENCE_PATTERN = re.compile(
+    r"^(?P<scheme>s3://)"
+    rf"(?P<bucket>{AWS_S3_BUCKET_NAME_PATTERN.pattern}|{AWS_S3_BUCKET_ARN_PATTERN.pattern})"
+    r"(?P<path>(?:/$|/[\w.-]+)+)"  # sub-dir and file-key path, minimally only dir trailing slash
     r"$"
 )
 
@@ -1942,10 +1938,10 @@ def resolve_s3_from_http(reference):
                              f"found from input reference [{reference}].")
     except (IndexError, TypeError, ValueError) as exc:
         s3_valid_formats = [
-            "https://s3.{region-name}.amazonaws.com/{bucket}/[{dirs}/][{file-key}]",
-            "https://{bucket}.s3.{region-name}.amazonaws.com/[{dirs}/][{file-key}]",
-            "https://{AccessPointName}-{AccountId}.s3-accesspoint.{region-name}.amazonaws.com/[{dirs}/][{file-key}]",
-            "s3://{bucket}/[{dirs}/][{file-key}]  (**default AWS region**)" # not handled here, but provide valid option
+            "https://s3.{Region}.amazonaws.com/{Bucket}/[{dirs}/][{file-key}]",
+            "https://{Bucket}.s3.{Region}.amazonaws.com/[{dirs}/][{file-key}]",
+            "https://{AccessPointName}-{AccountId}.s3-accesspoint.{Region}.amazonaws.com/[{dirs}/][{file-key}]",
+            "s3://{Bucket}/[{dirs}/][{file-key}]  (**default region**)"  # not parsed here, but show as valid option
         ]
         raise ValueError(f"Invalid AWS S3 reference format. Could not parse unknown: [{reference!s}]\n"
                          f"Available formats:\n{repr_json(s3_valid_formats, indent=2)}") from exc
@@ -1967,21 +1963,29 @@ def resolve_s3_reference(s3_reference):
     """
     s3_ref = s3_reference[5:]
     if s3_ref.startswith(AWS_S3_ARN):
-        s3_arn_match = re.match(AWS_S3_BUCKET_ARN_PATTERN, s3_ref)
+        s3_arn_match = re.match(AWS_S3_BUCKET_REFERENCE_PATTERN, s3_reference)
         if not s3_arn_match:
-            raise ValueError(f"Invalid AWS S3 ARN reference must have one of [accesspoint, outpost] target. "
-                             f"None could be found in [{s3_reference}].")
+            raise ValueError(
+                f"Invalid AWS S3 ARN reference must have one of [accesspoint, outpost] target. "
+                f"None could be found in [{s3_reference}]."
+            )
         if s3_arn_match["type_name"] == "outpost":
             parts = s3_arn_match["path"].split("/", 4)
-            bucket_name = s3_arn_match["bucket"] + "/".join(parts[:-2])
-            file_key = "/" + parts[-1]
-        else:
+            bucket_name = s3_arn_match["bucket"] + "/".join(parts[:3])
+            file_key = "/" + "/".join(parts[3:])
+        elif s3_arn_match["type_name"] == "accesspoint":
             bucket_name = s3_arn_match["bucket"]
             file_key = s3_arn_match["path"]
+        else:
+            raise ValueError(
+                "Invalid AWS S3 ARN reference must have one of [accesspoint, outpost] target. "
+                f"None could be found in [{s3_reference}]."
+            )
         s3_region = s3_arn_match["region"]
     else:
         s3_region = None  # default or predefined by caller
-    bucket_name, file_key = s3_ref.split("/", 1)
+        bucket_name, file_key = s3_ref.split("/", 1)
+        file_key = "/" + file_key
     return bucket_name, file_key, s3_region
 
 

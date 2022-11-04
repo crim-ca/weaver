@@ -75,6 +75,7 @@ from weaver.utils import (
     pass_http_error,
     request_extra,
     resolve_s3_from_http,
+    resolve_s3_reference,
     retry_on_condition,
     str2bytes,
     xml_path_elements,
@@ -1233,6 +1234,70 @@ def test_resolve_s3_from_http(s3_url, expect_region, expect_url):
 def test_resolve_s3_from_http_invalid(s3_url_invalid):
     with pytest.raises(ValueError, match=r"^Invalid AWS S3 reference format.*"):
         resolve_s3_from_http(s3_url_invalid)
+
+
+@pytest.mark.parametrize("s3_reference, expect_region, expect_bucket, expect_path", [
+    (
+        "s3://some-bucket/",
+        None,
+        "some-bucket",
+        "/"
+    ),
+    (
+        "s3://some-bucket/dir/",
+        None,
+        "some-bucket",
+        "/dir/"
+    ),
+    (
+        "s3://some-bucket/dir/file.txt",
+        None,
+        "some-bucket",
+        "/dir/file.txt"
+    ),
+    (
+        "s3://arn:aws:s3:ca-central-1:12345:accesspoint/location/",
+        "ca-central-1",
+        "arn:aws:s3:ca-central-1:12345:accesspoint/location",
+        "/"
+    ),
+    (
+        "s3://arn:aws:s3:ca-central-1:12345:accesspoint/location/file-key",
+        "ca-central-1",
+        "arn:aws:s3:ca-central-1:12345:accesspoint/location",
+        "/file-key"
+    ),
+    (
+        "s3://arn:aws:s3-outposts:ca-central-1:12345:outpost/11235/bucket/here/some-dir/some-file.txt",
+        "ca-central-1",
+        "arn:aws:s3-outposts:ca-central-1:12345:outpost/11235/bucket/here",
+        "/some-dir/some-file.txt"
+    ),
+    (
+        "s3://arn:aws:s3-outposts:us-east-2:12345:outpost/11235/accesspoint/thing/dir/stuff.txt",
+        "us-east-2",
+        "arn:aws:s3-outposts:us-east-2:12345:outpost/11235/accesspoint/thing",
+        "/dir/stuff.txt"
+    ),
+    (
+        "s3://arn:aws:s3-outposts:us-east-2:12345:outpost/11235/accesspoint/thing/much/nested/stuff.txt",
+        "us-east-2",
+        "arn:aws:s3-outposts:us-east-2:12345:outpost/11235/accesspoint/thing",
+        "/much/nested/stuff.txt"
+    ),
+    (
+        "s3://arn:aws:s3-outposts:us-east-2:12345:outpost/11235/accesspoint/thing/only-file.txt",
+        "us-east-2",
+        "arn:aws:s3-outposts:us-east-2:12345:outpost/11235/accesspoint/thing",
+        "/only-file.txt"
+    ),
+])
+def test_resolve_s3_reference(s3_reference, expect_region, expect_bucket, expect_path):
+    # type: (str, Optional[RegionName], str, str) -> None
+    s3_bucket, s3_path, s3_region = resolve_s3_reference(s3_reference)
+    assert s3_region == expect_region
+    assert s3_bucket == expect_bucket
+    assert s3_path == expect_path
 
 
 @pytest.mark.parametrize("s3_reference, valid", [
