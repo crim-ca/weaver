@@ -30,6 +30,7 @@ from weaver.formats import AcceptLanguage, ContentType, OutputFormat
 from weaver.owsexceptions import OWSMissingParameterValue
 from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_BUILTIN,
+    CWL_REQUIREMENT_CUDA,
     CWL_REQUIREMENT_APP_DOCKER,
     CWL_REQUIREMENT_APP_DOCKER_GPU,
     CWL_REQUIREMENT_APP_ESGF_CWT,
@@ -3613,6 +3614,40 @@ class RequirementClass(ExtendedSchemaNode):
     description = "CWL requirement class specification."
 
 
+class CudaRequirementSpecification(PermissiveMappingSchema):
+    cudaVersionMin = ExtendedSchemaNode(
+        String(),
+        example="11.4",
+        title="Cuda version minimum",
+        description="The minimum Cuda version required."
+    )
+    cudaComputeCapability = ExtendedSchemaNode(
+        String(),
+        example="3.0",
+        title="Cuda compute capability",
+        description="The compute capability supported by the GPU."
+    )
+    cudaDeviceCountMin = ExtendedSchemaNode(
+        Integer(),
+        example=1,
+        title="Cuda device count minimum",
+        description="The minimum amount of devices required."
+    )
+    cudaDeviceCountMax = ExtendedSchemaNode(
+        Integer(),
+        example=8,
+        title="Cuda device count maximum",
+        description="The maximum amount of devices required."
+    )
+
+
+class CudaRequirementMap(ExtendedMappingSchema):
+    CudaRequirement = CudaRequirementSpecification(
+        name=CWL_REQUIREMENT_CUDA,
+        title=CWL_REQUIREMENT_CUDA
+    )
+
+
 class DockerRequirementSpecification(PermissiveMappingSchema):
     dockerPull = ExtendedSchemaNode(
         String(),
@@ -3779,6 +3814,7 @@ class CWLRequirements(OneOfKeywordSchema):
 class CWLHintsMap(AnyOfKeywordSchema, PermissiveMappingSchema):
     _any_of = [
         BuiltinRequirementMap(missing=drop),
+        CudaRequirementMap(missing=drop),
         DockerRequirementMap(missing=drop),
         DockerGpuRequirementMap(missing=drop),
         InitialWorkDirRequirementMap(missing=drop),
