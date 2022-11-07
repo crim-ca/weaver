@@ -12,7 +12,8 @@ Changes
 
 Changes:
 --------
-- No change.
+- Support `CWL` definition for ``cwltool:CUDARequirement`` to request the use of a GPU, including support for using
+  Docker with a GPU.
 
 Fixes:
 ------
