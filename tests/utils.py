@@ -21,7 +21,6 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 # Note: do NOT import 'boto3' here otherwise 'moto' will not be able to mock it effectively
-import colander
 import mock
 import moto
 import pkg_resources
@@ -499,7 +498,7 @@ def mocked_sub_requests(app,                # type: TestApp
     """
     # pylint: disable=R1260,too-complex  # FIXME
 
-    from weaver.wps_restapi.swagger_definitions import FileLocal
+    from weaver.wps_restapi.swagger_definitions import FileLocal, ReferenceURL
     from requests.sessions import Session as RealSession
     real_request = RealSession.request
     real_signature = inspect.signature(real_request)
@@ -631,13 +630,16 @@ def mocked_sub_requests(app,                # type: TestApp
             return mocked_app_request(*req_args, **req_kwargs, session=self)
 
     # permit schema validation against 'mock' scheme during test only
-    mock_file_regex = mock.PropertyMock(return_value=colander.Regex(r"^((file|mock)://)?(?:/|[/?]\S+)$"))
+    class MockFile(FileLocal):
+        pattern = re.compile(FileLocal.pattern.pattern.replace("file", "mock"))
+
+    mock_reference = mock.PropertyMock(return_value=ReferenceURL._any_of + [MockFile()])
     with contextlib.ExitStack() as stack:
         stack.enter_context(mock.patch("requests.request", side_effect=mocked_app_request))
         stack.enter_context(mock.patch("requests.Session.request", new=TestSession.request))
         mocked_request = stack.enter_context(mock.patch("requests.sessions.Session.request", new=TestSession.request))
         mocked_request.__signature__ = real_signature  # replicate signature for 'request_extra' using it
-        stack.enter_context(mock.patch.object(FileLocal, "validator", new_callable=mock_file_regex))
+        stack.enter_context(mock.patch.object(ReferenceURL, "_any_of", new_callable=mock_reference))
         stack.enter_context(mock.patch.object(TestResponse, "json", new=TestResponseJsonCallable.json))
         if isinstance(method_function, str):
             req_url, req_func, kwargs = _parse_for_app_req(method_function, *args, **kwargs)  # type: ignore
