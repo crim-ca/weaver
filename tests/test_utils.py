@@ -1254,25 +1254,25 @@ def test_resolve_s3_http_options(options, parameters, configuration):
     ] + [
         (
             f"https://access-111122223333.s3-accesspoint.{region}.amazonaws.com/test/",
-            region, f"arn:aws:s3:{region}:111122223333:accesspoint/access/test/"
+            region, f"s3://arn:aws:s3:{region}:111122223333:accesspoint/access/test/"
         )
         for region in AWS_S3_REGION_SUBSET
     ] + [
         (
             f"https://test-location-123456789012.s3-accesspoint.{region}.amazonaws.com/dir/file.txt",
-            region, f"arn:aws:s3:{region}:123456789012:accesspoint/test-location/dir/file.txt"
+            region, f"s3://arn:aws:s3:{region}:123456789012:accesspoint/test-location/dir/file.txt"
         )
         for region in AWS_S3_REGION_SUBSET
     ] + [
         (
             f"https://test-location-123456789012.s3-accesspoint.{region}.amazonaws.com",
-            region, f"arn:aws:s3:{region}:123456789012:accesspoint/test-location/"
+            region, f"s3://arn:aws:s3:{region}:123456789012:accesspoint/test-location/"
         )
         for region in AWS_S3_REGION_SUBSET
     ] + [
         (
             f"https://test-location-123456789012.s3-accesspoint.{region}.amazonaws.com/nested/dir/",
-            region, f"arn:aws:s3:{region}:123456789012:accesspoint/test-location/nested/dir/"
+            region, f"s3://arn:aws:s3:{region}:123456789012:accesspoint/test-location/nested/dir/"
         )
         for region in AWS_S3_REGION_SUBSET
     ]
@@ -1313,13 +1313,13 @@ def test_resolve_s3_from_http_invalid(s3_url_invalid):
         "s3://some-bucket/dir/",
         None,
         "some-bucket",
-        "/dir/"
+        "dir/"
     ),
     (
         "s3://some-bucket/dir/file.txt",
         None,
         "some-bucket",
-        "/dir/file.txt"
+        "dir/file.txt"
     ),
     (
         "s3://arn:aws:s3:ca-central-1:12345:accesspoint/location/",
@@ -1331,31 +1331,31 @@ def test_resolve_s3_from_http_invalid(s3_url_invalid):
         "s3://arn:aws:s3:ca-central-1:12345:accesspoint/location/file-key",
         "ca-central-1",
         "arn:aws:s3:ca-central-1:12345:accesspoint/location",
-        "/file-key"
+        "file-key"
     ),
     (
         "s3://arn:aws:s3-outposts:ca-central-1:12345:outpost/11235/bucket/here/some-dir/some-file.txt",
         "ca-central-1",
         "arn:aws:s3-outposts:ca-central-1:12345:outpost/11235/bucket/here",
-        "/some-dir/some-file.txt"
+        "some-dir/some-file.txt"
     ),
     (
         "s3://arn:aws:s3-outposts:us-east-2:12345:outpost/11235/accesspoint/thing/dir/stuff.txt",
         "us-east-2",
         "arn:aws:s3-outposts:us-east-2:12345:outpost/11235/accesspoint/thing",
-        "/dir/stuff.txt"
+        "dir/stuff.txt"
     ),
     (
         "s3://arn:aws:s3-outposts:us-east-2:12345:outpost/11235/accesspoint/thing/much/nested/stuff.txt",
         "us-east-2",
         "arn:aws:s3-outposts:us-east-2:12345:outpost/11235/accesspoint/thing",
-        "/much/nested/stuff.txt"
+        "much/nested/stuff.txt"
     ),
     (
         "s3://arn:aws:s3-outposts:us-east-2:12345:outpost/11235/accesspoint/thing/only-file.txt",
         "us-east-2",
         "arn:aws:s3-outposts:us-east-2:12345:outpost/11235/accesspoint/thing",
-        "/only-file.txt"
+        "only-file.txt"
     ),
 ])
 def test_resolve_s3_reference(s3_reference, expect_region, expect_bucket, expect_path):
@@ -1369,13 +1369,16 @@ def test_resolve_s3_reference(s3_reference, expect_region, expect_bucket, expect
 @pytest.mark.parametrize("s3_reference, valid", [
     ("s3://", False),
     ("s3://test", False),
-    ("s3://test/", False),
+    ("s3://test/", True),
     ("s3://test/file.txt", True),
     ("s3://test/test/item", True),
     ("s3://test/test/item/", True),
     ("s3://-test/test/item/", False),
     ("s3://_test/test/item/", False),
     ("s3://.test/test/item/", False),
+    ("s3://test-/test/item/", False),
+    ("s3://test_/test/item/", False),
+    ("s3://test./test/item/", False),
     ("s3://test/test/item//", False),
     ("s3://test/test/item//asm1112123-----....._____!xyz//", False),
     ("s3://test/test/item/sm1112123-----....._____!xyz//", False),

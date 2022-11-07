@@ -1910,7 +1910,7 @@ def resolve_s3_from_http(reference):
                 s3_access_point, s3_outpost_id = s3_outpost.rsplit(".", 1)
                 s3_access_name, s3_account = s3_access_point.rsplit("-", 1)
                 s3_region = s3_region.split(".amazonaws.com", 1)[0]
-                s3_ref = s3_path or "/"
+                s3_ref = s3_path
                 s3_prefix = f"{AWS_S3_ARN}-outposts"
                 s3_arn = f"{s3_prefix}:{s3_region}:{s3_account}:outpost/{s3_outpost_id}/accesspoint/{s3_access_name}"
                 s3_reference = f"s3://{s3_arn}{s3_ref}"
@@ -1920,7 +1920,7 @@ def resolve_s3_from_http(reference):
                 s3_access_point, s3_region = s3_host.split(".s3-accesspoint.", 1)
                 s3_access_name, s3_account = s3_access_point.rsplit("-", 1)
                 s3_region = s3_region.split(".amazonaws.com", 1)[0]
-                s3_ref = s3_path or "/"
+                s3_ref = s3_path
                 s3_arn = f"{AWS_S3_ARN}:{s3_region}:{s3_account}:accesspoint/{s3_access_name}"
                 s3_reference = f"s3://{s3_arn}{s3_ref}"
             elif ".s3." in s3_host:
@@ -1937,7 +1937,7 @@ def resolve_s3_from_http(reference):
             s3_ref = reference.replace(s3_url, "")
             s3_ref = s3_ref.lstrip("/")
             s3_reference = f"s3://{s3_ref}"
-        if not re.match(AWS_S3_BUCKET_REFERENCE_PATTERN, s3_reference):
+        if not re.match(AWS_S3_BUCKET_REFERENCE_PATTERN, s3_reference) or not s3_ref:
             raise ValueError("No S3 bucket, region or file/directory reference was "
                              f"found from input reference [{reference}].")
     except (IndexError, TypeError, ValueError) as exc:
@@ -1976,7 +1976,7 @@ def resolve_s3_reference(s3_reference):
         if s3_arn_match["type_name"] == "outpost":
             parts = s3_arn_match["path"].split("/", 4)
             bucket_name = s3_arn_match["bucket"] + "/".join(parts[:3])
-            file_key = "/" + "/".join(parts[3:])
+            file_key = "/".join(parts[3:])
         elif s3_arn_match["type_name"] == "accesspoint":
             bucket_name = s3_arn_match["bucket"]
             file_key = s3_arn_match["path"]
@@ -1989,7 +1989,13 @@ def resolve_s3_reference(s3_reference):
     else:
         s3_region = None  # default or predefined by caller
         bucket_name, file_key = s3_ref.split("/", 1)
-        file_key = "/" + file_key
+    # files must always be relative without prefixed '/'
+    # directory should always contain the trailing '/'
+    if s3_reference.endswith("/"):
+        if not file_key.endswith("/"):
+            file_key += "/"
+    else:
+        file_key = file_key.lstrip("/")
     return bucket_name, file_key, s3_region
 
 
