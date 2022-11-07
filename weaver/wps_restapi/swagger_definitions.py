@@ -30,12 +30,12 @@ from weaver.formats import AcceptLanguage, ContentType, OutputFormat
 from weaver.owsexceptions import OWSMissingParameterValue
 from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_BUILTIN,
-    CWL_REQUIREMENT_CUDA,
     CWL_REQUIREMENT_APP_DOCKER,
     CWL_REQUIREMENT_APP_DOCKER_GPU,
     CWL_REQUIREMENT_APP_ESGF_CWT,
     CWL_REQUIREMENT_APP_OGC_API,
     CWL_REQUIREMENT_APP_WPS1,
+    CWL_REQUIREMENT_CUDA,
     CWL_REQUIREMENT_INIT_WORKDIR,
     OAS_COMPLEX_TYPES,
     OAS_DATA_TYPES,
