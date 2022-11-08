@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING
 import colander
 import pytest
 import yaml
+from parameterized import parameterized
 
 from tests import resources
 from tests.functional.utils import ResourcesUtil, WpsConfigBase
@@ -49,7 +50,12 @@ from weaver.formats import (
     get_cwl_file_format,
     repr_json
 )
-from weaver.processes.constants import CWL_REQUIREMENT_APP_DOCKER, CWL_REQUIREMENT_INIT_WORKDIR, ProcessSchema
+from weaver.processes.constants import (
+    CWL_REQUIREMENT_APP_DOCKER,
+    CWL_REQUIREMENT_INIT_WORKDIR,
+    CWL_REQUIREMENT_INLINE_JAVASCRIPT,
+    ProcessSchema
+)
 from weaver.processes.types import ProcessType
 from weaver.status import Status
 from weaver.utils import fetch_file, get_any_value, load_file
@@ -58,7 +64,7 @@ from weaver.wps.utils import get_wps_output_dir, map_wps_output_location
 if TYPE_CHECKING:
     from typing import List
 
-    from weaver.typedefs import JSON
+    from weaver.typedefs import JSON, CWL_AnyRequirements
 
 EDAM_PLAIN = EDAM_NAMESPACE + ":" + EDAM_MAPPING[ContentType.TEXT_PLAIN]
 OGC_NETCDF = OGC_NAMESPACE + ":" + OGC_MAPPING[ContentType.APP_NETCDF]
@@ -718,7 +724,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             "Additional detail only within WPS output", \
             "Additional details defined only in WPS matching CWL I/O by ID should be preserved."
 
-    def test_deploy_resolve_complex_io_format_directory(self):
+    def test_deploy_resolve_complex_io_format_directory_input(self):
         """
         Test that directory complex type is resolved from CWL.
 
@@ -732,6 +738,20 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         desc, _ = self.deploy_process(body, describe_schema=ProcessSchema.OGC)
         assert desc["inputs"]["input_dir"]["formats"][0]["mediaType"] == ContentType.APP_DIR
 
+    def test_deploy_resolve_complex_io_format_directory_output(self):
+        """
+        Test that directory complex type is resolved from CWL.
+
+        .. versionadded:: 4.27
+        """
+        body = self.retrieve_payload("DirectoryMergingProcess", "deploy", local=True)
+        pkg = self.retrieve_payload("DirectoryMergingProcess", "package", local=True)
+        # remove definitions in deploy body to evaluate auto-resolution from CWL 'type: Directory'
+        body["processDescription"].pop("outputs")
+        body["executionUnit"] = [{"unit": pkg}]
+        desc, _ = self.deploy_process(body, describe_schema=ProcessSchema.OGC)
+        assert desc["outputs"]["output_dir"]["formats"][0]["mediaType"] == ContentType.APP_DIR
+
     def test_deploy_merge_complex_io_format_references(self):
         """
         Test validates that known `WPS` I/O formats (i.e.: `MIME-type`) considered as valid, but not corresponding to
@@ -743,7 +763,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         """
         ns_json, type_json = get_cwl_file_format(ContentType.APP_JSON, must_exist=True)
         assert "iana" in ns_json  # just to make sure
-        # even if IANA media-type does not exist, it must still be well formed (type/sub-type)
+        # even if IANA media-type does not exist, it must still be well-formed (type/sub-type)
         # otherwise, schema 'MediaType' will raise because of invalid string pattern
         ct_not_exists = "application/x-ogc-dods"    # OpenDAP, still doesn't exist at moment of test creation
         ns_not_exists, _ = get_cwl_file_format(ct_not_exists, must_exist=False)
@@ -1049,9 +1069,15 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             process = self.process_store.fetch_by_id(self._testMethodName)
             assert process.type == ProcessType.APPLICATION
 
-    def test_deploy_block_unknown_processes(self):
+    @parameterized.expand([
+        # not allowed even if combined with another known and valid definition
+        {"UnknownRequirement": {}, CWL_REQUIREMENT_APP_DOCKER: {"dockerPull": "python:3.7-alpine"}},
+        {"UnknownRequirement": {}},
+    ])
+    def test_deploy_block_unknown_processes(self, requirements):
+        # type: (CWL_AnyRequirements) -> None
         """
-        Test to validates that any process that cannot be resolved against one of known
+        Test to validate that any process that cannot be resolved against one of known
         :py:data:`weaver.processes.constants.CWL_REQUIREMENT_APP_TYPES` is explicitly blocked.
         """
         cwl = {
@@ -1061,12 +1087,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             "inputs": {
                 "stringInput": "string"
             },
-            "requirements": {
-                CWL_REQUIREMENT_APP_DOCKER: {"dockerPull": "python:3.7-alpine"},
-                "InlineJavascriptRequirement": {},
-                "ResourceRequirement": {"ramMin": 10240, "coresMin": 3}
-
-            },
+            "requirements": requirements,
             "outputs": [],
         }
         body = {
@@ -1087,6 +1108,19 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             resp = mocked_sub_requests(self.app, "post_json", "/processes", data=body, timeout=5,
                                        headers=self.json_headers, only_local=True, expect_errors=True)
             assert resp.status_code == 422
+
+    def test_deploy_requirement_inline_javascript(self):
+        """
+        Test that CWL with ``InlineJavascriptRequirement`` definition is permitted.
+
+        .. versionadded:: 4.27
+        """
+        body = self.retrieve_payload("DirectoryMergingProcess", "deploy", local=True)
+        pkg = self.retrieve_payload("DirectoryMergingProcess", "package", local=True)
+        body["executionUnit"] = [{"unit": pkg}]
+        assert CWL_REQUIREMENT_INLINE_JAVASCRIPT in pkg["requirements"]
+        _, cwl = self.deploy_process(body, describe_schema=ProcessSchema.OGC)
+        assert CWL_REQUIREMENT_INLINE_JAVASCRIPT in cwl["requirements"]
 
     def test_deploy_merge_complex_io_with_multiple_formats_and_defaults(self):
         """

@@ -1,12 +1,15 @@
 processDescription:
-  id: DirectoryServingProcess
-  title: Generate contents of an output directory from input file paths.
+  id: DirectoryMergingProcess
+  title: Directory Merging Process
+  description: |
+    Merges input file path references into a single directory reference.
+    All files must have unique names in order to generate a flat directory listing.
   version: "0.0.1"
   inputs:
-    - id: input_file_paths
-      literalDataDomains:
-        - dataType:
-            name: "String"
+    - id: files
+      formats:
+        - mediaType: "*/*"
+          default: true
       minOccurs: 1
       maxOccurs: 100
   outputs:
@@ -18,6 +21,6 @@ processDescription:
       maxOccurs: 1
   visibility: public
 executionUnit:
-  - test: DirectoryServingProcess.cwl
+  - test: DirectoryMergingProcess.cwl
 immediateDeployment: true
 deploymentProfileName: "http://www.opengis.net/profiles/eoc/dockerizedApplication"

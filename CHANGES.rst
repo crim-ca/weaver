@@ -12,6 +12,7 @@ Changes
 
 Changes:
 --------
+- Support `CWL` ``InlineJavascriptRequirement`` for `Process` deployment to allow successful schema validation.
 - Support `CWL` ``Directory`` type references (resolves `#466 <https://github.com/crim-ca/weaver/issues/466>`_).
   Those references correspond to `WPS` and `OGC API - Processes` ``href``
   using the ``Content-Type: application/directory`` Media-Type and must hava a trailing slash (``/``) character.

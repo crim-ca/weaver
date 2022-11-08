@@ -34,7 +34,7 @@ from weaver.utils import fully_qualified_name, load_file
 from weaver.visibility import Visibility
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Iterable, Optional, Union
+    from typing import Any, Dict, Iterable, Optional, Tuple, Union
     from typing_extensions import Literal
 
     from weaver.typedefs import (
@@ -312,7 +312,7 @@ class WpsConfigBase(unittest.TestCase):
 
     @classmethod
     def deploy_process(cls, payload, process_id=None, describe_schema=ProcessSchema.OGC, mock_requests_only_local=True):
-        # type: (JSON, Optional[str], str, bool) -> JSON
+        # type: (JSON, Optional[str], str, bool) -> Tuple[JSON, CWL]
         """
         Deploys a process with :paramref:`payload`.
 
@@ -346,7 +346,7 @@ class WpsConfigBase(unittest.TestCase):
             resp = cls.app.get(info_path, headers=cls.json_headers)
             assert resp.status_code == 200
             info.append(deepcopy(resp.json))
-        return info
+        return info  # type: ignore
 
     def _try_get_logs(self, status_url):
         _resp = self.app.get(f"{status_url}/logs", headers=self.json_headers)

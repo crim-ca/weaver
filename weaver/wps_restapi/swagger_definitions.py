@@ -3680,6 +3680,23 @@ class InitialWorkDirRequirementClass(InitialWorkDirRequirementSpecification):
                               validator=OneOf([CWL_REQUIREMENT_INIT_WORKDIR]))
 
 
+class InlineJavascriptListing(ExtendedSequenceSchema):
+    listing = DirectoryListing()
+
+
+class InlineJavascriptRequirementSpecification(PermissiveMappingSchema):
+    listing = InlineJavascriptListing()
+
+
+class InlineJavascriptRequirementMap(ExtendedMappingSchema):
+    req = InlineJavascriptRequirementSpecification(name=CWL_REQUIREMENT_INIT_WORKDIR)
+
+
+class InlineJavascriptRequirementClass(InlineJavascriptRequirementSpecification):
+    _class = RequirementClass(example=CWL_REQUIREMENT_INIT_WORKDIR,
+                              validator=OneOf([CWL_REQUIREMENT_INIT_WORKDIR]))
+
+
 class BuiltinRequirementSpecification(PermissiveMappingSchema):
     title = CWL_REQUIREMENT_APP_BUILTIN
     description = (
@@ -3771,6 +3788,7 @@ class CWLRequirementsItem(OneOfKeywordSchema):
         DockerRequirementClass(missing=drop),
         DockerGpuRequirementClass(missing=drop),
         InitialWorkDirRequirementClass(missing=drop),
+        InlineJavascriptRequirementClass(missing=drop),
         UnknownRequirementClass(missing=drop),  # allows anything, must be last
     ]
 
