@@ -341,6 +341,8 @@ if TYPE_CHECKING:
     JobValueFormat = TypedDict("JobValueFormat", {
         "mime_type": NotRequired[str],
         "media_type": NotRequired[str],
+        "mimeType": NotRequired[str],
+        "mediaType": NotRequired[str],
         "encoding": NotRequired[str],
         "schema": NotRequired[str],
         "extension": NotRequired[str],
@@ -357,27 +359,31 @@ if TYPE_CHECKING:
     }, total=False)
     JobValueObject = Union[JobValueData, JobValueValue, JobValueFile]
     JobValueFileItem = TypedDict("JobValueFileItem", {
-        "id": str,
-        "href": Optional[str],
+        "id": Required[str],
+        "href": Required[str],
         "format": NotRequired[JobValueFormat],
     }, total=False)
     JobValueDataItem = TypedDict("JobValueDataItem", {
-        "id": str,
-        "data": AnyValueType,
+        "id": Required[str],
+        "data": Required[AnyValueType],
     }, total=False)
     JobValueValueItem = TypedDict("JobValueValueItem", {
-        "id": str,
-        "value": AnyValueType,
+        "id": Required[str],
+        "value": Required[AnyValueType],
     }, total=False)
-    JobValueItem = Union[JobValueDataItem, JobValueFileItem]
+    JobValueItem = Union[JobValueDataItem, JobValueFileItem, JobValueValueItem]
     JobExpectItem = TypedDict("JobExpectItem", {"id": str}, total=True)
-    JobInputs = List[Union[JobValueItem, Dict[str, AnyValueType]]]
-    JobOutputs = List[Union[JobExpectItem, Dict[str, AnyValueType]]]
+    JobInputItem = Union[JobValueItem, Dict[str, AnyValueType]]
+    JobInputs = List[JobInputItem]
+    JobOutputItem = Union[JobExpectItem, Dict[str, AnyValueType]]
+    JobOutputs = List[JobOutputItem]
     JobResults = List[JobValueItem]
     JobMonitorReference = Any  # typically a URI of the remote job status or an execution object/handler
 
-    ExecutionInputsMap = Dict[str, JobValueObject]  # when schema='weaver.processes.constants.ProcessSchema.OGC'
-    ExecutionInputsList = List[JobValueItem]        # when schema='weaver.processes.constants.ProcessSchema.OLD'
+    # when schema='weaver.processes.constants.ProcessSchema.OGC'
+    ExecutionInputsMap = Dict[str, Union[JobValueObject, List[JobValueObject]]]
+    # when schema='weaver.processes.constants.ProcessSchema.OLD'
+    ExecutionInputsList = List[JobValueItem]
     ExecutionInputs = Union[ExecutionInputsList, ExecutionInputsMap]
 
     ExecutionOutputObject = TypedDict("ExecutionOutputObject", {
@@ -700,6 +706,7 @@ if TYPE_CHECKING:
         "mediaType": Required[str],
         "encoding": NotRequired[Optional[str]],
         "schema": NotRequired[Union[str, OpenAPISchema]],
+        "default": NotRequired[bool],
     }, total=False)
     ProcessInputOutputItem = TypedDict("ProcessInputOutputItem", {
         "id": str,
@@ -708,7 +715,7 @@ if TYPE_CHECKING:
         "keywords": NotRequired[List[str]],
         "metadata": NotRequired[List[Metadata]],
         "schema": NotRequired[OpenAPISchema],
-        "format": NotRequired[FormatMediaType],
+        "formats": NotRequired[List[FormatMediaType]],
         "minOccurs": int,
         "maxOccurs": Union[int, Literal["unbounded"]],
     }, total=False)
@@ -748,8 +755,8 @@ if TYPE_CHECKING:
     }, total=True)
 
     ProcessExecution = TypedDict("ProcessExecution", {
-        "mode": AnyExecuteMode,
-        "response": AnyExecuteResponse,
-        "inputs": ExecutionInputs,
-        "outputs": ExecutionOutputs,
-    }, total=True)
+        "mode": NotRequired[AnyExecuteMode],
+        "response": NotRequired[AnyExecuteResponse],
+        "inputs": Required[ExecutionInputs],
+        "outputs": Required[ExecutionOutputs],
+    }, total=False)

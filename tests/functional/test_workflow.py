@@ -34,6 +34,7 @@ from tests.utils import (
 )
 from weaver import WEAVER_ROOT_DIR
 from weaver.config import WeaverConfiguration
+from weaver.execute import ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import ContentType
 from weaver.processes.utils import get_process_information
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory
@@ -46,7 +47,16 @@ if TYPE_CHECKING:
 
     from responses import RequestsMock
 
-    from weaver.typedefs import AnyRequestMethod, AnyResponseType, CookiesType, HeadersType, JSON, SettingsType
+    from weaver.typedefs import (
+        AnyRequestMethod,
+        AnyResponseType,
+        CookiesType,
+        ExecutionResults,
+        HeadersType,
+        ProcessDeployment,
+        ProcessExecution,
+        SettingsType
+    )
 
 
 class WorkflowProcesses(enum.Enum):
@@ -69,6 +79,8 @@ class WorkflowProcesses(enum.Enum):
     APP_DOCKER_COPY_IMAGES = "DockerCopyImages"
     APP_DOCKER_COPY_NESTED_OUTDIR = "DockerCopyNestedOutDir"
     APP_DOCKER_NETCDF_2_TEXT = "DockerNetCDF2Text"
+    APP_DIRECTORY_LISTING_PROCESS = "DirectoryListingProcess"
+    APP_DIRECTORY_MERGING_PROCESS = "DirectoryMergingProcess"
     APP_WPS1_DOCKER_NETCDF_2_TEXT = "WPS1DockerNetCDF2Text"
     APP_WPS1_JSON_ARRAY_2_NETCDF = "WPS1JsonArray2NetCDF"
     WORKFLOW_STACKER_SFS = "Workflow"
@@ -76,6 +88,7 @@ class WorkflowProcesses(enum.Enum):
     WORKFLOW_S2P = "WorkflowS2ProbaV"
     WORKFLOW_CHAIN_COPY = "WorkflowChainCopy"
     WORKFLOW_CUSTOM = "CustomWorkflow"
+    WORKFLOW_DIRECTORY_LISTING = "WorkflowDirectoryListing"
     WORKFLOW_FLOOD_DETECTION = "WorkflowFloodDetection"
     WORKFLOW_SUBSET_ICE_DAYS = "WorkflowSubsetIceDays"
     WORKFLOW_SUBSET_PICKER = "WorkflowSubsetPicker"
@@ -94,13 +107,17 @@ class ProcessInfo(object):
     Container to preserve details loaded from 'application-packages' definitions.
     """
 
-    def __init__(self, process_id, test_id=None, deploy_payload=None, execute_payload=None):
-        # type: (Union[str, WorkflowProcesses], Optional[str], Optional[JSON], Optional[JSON]) -> None
-        self.pid = WorkflowProcesses(process_id)
-        self.id = self.pid.value
-        self.test_id = test_id
-        self.deploy_payload = deploy_payload
-        self.execute_payload = execute_payload
+    def __init__(self,
+                 process_id,            # type: Union[str, WorkflowProcesses]
+                 test_id=None,          # type: Optional[str]
+                 deploy_payload=None,   # type: Optional[ProcessDeployment]
+                 execute_payload=None,  # type: Optional[ProcessExecution]
+                 ):                     # type: (...) -> None
+        self.pid = WorkflowProcesses(process_id)    # type: WorkflowProcesses
+        self.id = self.pid.value                    # type: Optional[str]  # noqa
+        self.test_id = test_id                      # type: Optional[str]
+        self.deploy_payload = deploy_payload        # type: Optional[ProcessDeployment]
+        self.execute_payload = execute_payload      # type: Optional[ProcessExecution]
 
 
 @pytest.mark.functional
@@ -478,7 +495,7 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
         :param process_id: identifier of the process to retrieve contents.
         :return: found content definitions.
         """
-        pid = process_id.value
+        pid = process_id.value  # type: str  # noqa
         deploy_payload = cls.retrieve_payload(pid, "deploy")
         deploy_id = get_any_id(get_process_information(deploy_payload))
         test_process_id = f"{cls.__name__}_{deploy_id}"
@@ -683,7 +700,8 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
                         test_application_ids,           # type: Iterable[WorkflowProcesses]
                         log_full_trace=False,           # type: bool
                         requests_mock_callback=None,    # type: Optional[Callable[[RequestsMock], None]]
-                        ):                              # type: (...) -> JSON
+                        override_execute_body=None,     # type: Optional[ProcessExecution]
+                        ):                              # type: (...) -> ExecutionResults
         """
         Main runner method that prepares and evaluates the full :term:`Workflow` execution and its step dependencies.
 
@@ -705,6 +723,8 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
             Flag to provide extensive trace logs of all request and response details for each operation.
         :param requests_mock_callback:
             Function to add further requests mock specifications as needed by the calling test case.
+        :param override_execute_body:
+            Alternate execution request content from the default one loaded from the referenced Workflow location.
         :returns: Response contents of the final :term:`Workflow` results for further validations if needed.
         """
 
@@ -752,8 +772,10 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
                     requests_mock_callback(mock_req)
 
             # execute workflow
-            execute_body = workflow_info.execute_payload
+            execute_body = override_execute_body or workflow_info.execute_payload
             execute_path = f"{process_path}/jobs"
+            self.assert_test(lambda: execute_body is not None,
+                             message="Cannot execute workflow without a request body!")
             resp = self.request("POST", execute_path, status=HTTPCreated.code,
                                 headers=self.headers, json=execute_body)
             self.assert_test(lambda: resp.json.get("status") in JOB_STATUS_CATEGORIES[StatusCategory.RUNNING],
@@ -855,12 +877,15 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
         WorkflowProcesses.APP_DOCKER_COPY_IMAGES,
         WorkflowProcesses.APP_DOCKER_COPY_NESTED_OUTDIR,
         WorkflowProcesses.APP_DOCKER_NETCDF_2_TEXT,
+        WorkflowProcesses.APP_DIRECTORY_LISTING_PROCESS,
+        WorkflowProcesses.APP_DIRECTORY_MERGING_PROCESS,
         WorkflowProcesses.APP_DOCKER_STAGE_IMAGES,
         WorkflowProcesses.APP_WPS1_DOCKER_NETCDF_2_TEXT,
         WorkflowProcesses.APP_WPS1_JSON_ARRAY_2_NETCDF,
     }
     WEAVER_TEST_WORKFLOW_SET = {
         WorkflowProcesses.WORKFLOW_CHAIN_COPY,
+        WorkflowProcesses.WORKFLOW_DIRECTORY_LISTING,
         WorkflowProcesses.WORKFLOW_STAGE_COPY_IMAGES,
         WorkflowProcesses.WORKFLOW_REST_SCATTER_COPY_NETCDF,
         WorkflowProcesses.WORKFLOW_REST_SELECT_COPY_NETCDF,
@@ -1106,3 +1131,51 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
             self.assert_test(lambda: output_data == "COPY:\nCOPY:\nDUMMY DATA",
                              message="Workflow output file with nested directory globs should contain "
                                      "two COPY prefixes, one added by each intermediate step of the Workflow.")
+
+    def test_workflow_directory_input_output_chaining(self):
+        """
+        Validate support of CWL Directory type as I/O across the full Workflow procedure.
+        """
+
+        with contextlib.ExitStack() as stack:
+            tmp_host = "https://mocked-file-server.com"
+            tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())
+            stack.enter_context(mocked_file_server(tmp_dir, tmp_host, settings=self.settings, mock_browse_index=True))
+            expect_http_files = [
+                "file1.txt",
+                "dir/file2.txt",
+                "dir/nested/file3.txt",
+                "dir/sub/other/file4.txt",
+            ]
+            for file in expect_http_files:
+                path = os.path.join(tmp_dir, file)
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                with open(path, mode="w", encoding="utf-8") as f:
+                    f.write(f"test data")
+
+            exec_body = {
+                "inputs": {
+                    "files": [
+                        {"href": f"{tmp_host}/{tmp_file}", "format": ContentType.TEXT_PLAIN}
+                        for tmp_file in expect_http_files
+                    ]
+                },
+                "outputs": {"output": {"transmissionMode": ExecuteTransmissionMode.REFERENCE}},
+                "response": ExecuteResponse.DOCUMENT,
+            }
+            results = self.workflow_runner(WorkflowProcesses.WORKFLOW_DIRECTORY_LISTING,
+                                           [WorkflowProcesses.APP_DIRECTORY_LISTING_PROCESS,
+                                            WorkflowProcesses.APP_DIRECTORY_MERGING_PROCESS],
+                                           override_execute_body=exec_body, log_full_trace=True)
+
+            stack.enter_context(mocked_wps_output(self.settings))  # allow retrieval of HTTP WPS output
+            stage_out_tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())  # different dir to avoid override
+            final_output = results.get("output", {}).get("href", "")
+            self.assert_test(lambda: final_output.startswith("http") and final_output.endswith("output.txt"),
+                             message="Could not find expected Workflow output file.")
+            output_path = fetch_file(final_output, stage_out_tmp_dir, settings=self.settings)
+            with open(output_path, mode="r", encoding="utf-8") as out_file:
+                output_data = out_file.read()
+            expected_data = "\n".join(expect_http_files)
+            self.assert_test(lambda: output_data == expected_data,
+                             message="Workflow output file expected to contain directory listing of input files.")

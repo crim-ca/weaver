@@ -312,7 +312,7 @@ class WpsConfigBase(unittest.TestCase):
 
     @classmethod
     def deploy_process(cls, payload, process_id=None, describe_schema=ProcessSchema.OGC, mock_requests_only_local=True):
-        # type: (JSON, Optional[str], str, bool) -> Tuple[JSON, CWL]
+        # type: (JSON, Optional[str], str, bool) -> Tuple[ProcessDescription, CWL]
         """
         Deploys a process with :paramref:`payload`.
 
