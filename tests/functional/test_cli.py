@@ -1964,8 +1964,8 @@ class TestWeaverCLI(TestWeaverClientBase):
 
     def test_execute_remote_input(self):
         """
-        Verify that, for an input file containing a remote file reference, there is no attempt to upload it
-        to the vault and that the process succeeds.
+        Verify that, for an input file containing a remote file reference, there is no attempt to upload it to the vault
+        and that the process succeeds.
         """
         proc = self.test_process["CatFile"]
         with contextlib.ExitStack() as stack_exec:
