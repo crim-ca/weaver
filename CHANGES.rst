@@ -14,6 +14,8 @@ Changes:
 --------
 - Support `CWL` definition for ``cwltool:CUDARequirement`` to request the use of a GPU, including support for using
   Docker with a GPU.
+- Support `CWL` definition for ``NetworkAccess`` to indicate whether a process requires outgoing IPv4/IPv6 network
+  access.
 
 Fixes:
 ------

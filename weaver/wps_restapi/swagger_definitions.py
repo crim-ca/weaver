@@ -37,6 +37,7 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_WPS1,
     CWL_REQUIREMENT_CUDA,
     CWL_REQUIREMENT_INIT_WORKDIR,
+    CWL_REQUIREMENT_NETWORK_ACCESS,
     OAS_COMPLEX_TYPES,
     OAS_DATA_TYPES,
     PACKAGE_ARRAY_BASE,
@@ -3648,6 +3649,22 @@ class CudaRequirementMap(ExtendedMappingSchema):
     )
 
 
+class NetworkAccessRequirementSpecification(PermissiveMappingSchema):
+    networkAccess = ExtendedSchemaNode(
+        Boolean(),
+        example=True,
+        title="Network Access",
+        description="Indicate whether a process requires outgoing IPv4/IPv6 network access."
+    )
+
+
+class NetworkAccessRequirementMap(ExtendedMappingSchema):
+    NetworkAccessRequirement = NetworkAccessRequirementSpecification(
+        name=CWL_REQUIREMENT_NETWORK_ACCESS,
+        title=CWL_REQUIREMENT_NETWORK_ACCESS
+    )
+
+
 class DockerRequirementSpecification(PermissiveMappingSchema):
     dockerPull = ExtendedSchemaNode(
         String(),
@@ -3818,6 +3835,7 @@ class CWLHintsMap(AnyOfKeywordSchema, PermissiveMappingSchema):
         DockerRequirementMap(missing=drop),
         DockerGpuRequirementMap(missing=drop),
         InitialWorkDirRequirementMap(missing=drop),
+        NetworkAccessRequirementMap(missing=drop),
         ESGF_CWT_RequirementMap(missing=drop),
         OGCAPIRequirementMap(missing=drop),
         WPS1RequirementMap(missing=drop),
