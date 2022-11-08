@@ -1151,7 +1151,7 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
                 path = os.path.join(tmp_dir, file)
                 os.makedirs(os.path.dirname(path), exist_ok=True)
                 with open(path, mode="w", encoding="utf-8") as f:
-                    f.write(f"test data")
+                    f.write("test data")
 
             exec_body = {
                 "inputs": {
