@@ -59,7 +59,7 @@ from weaver.processes.constants import (
 from weaver.processes.types import ProcessType
 from weaver.status import Status
 from weaver.utils import fetch_file, get_any_value, load_file
-from weaver.wps.utils import get_wps_output_dir, map_wps_output_location
+from weaver.wps.utils import get_wps_output_dir, get_wps_output_url, map_wps_output_location
 
 if TYPE_CHECKING:
     from typing import List
@@ -2238,8 +2238,9 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
 
         .. versionadded:: 4.27
         """
-        body = self.retrieve_payload("DirectoryListingProcess", "deploy", local=True)
-        pkg = self.retrieve_payload("DirectoryListingProcess", "package", local=True)
+        proc = "DirectoryListingProcess"
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        pkg = self.retrieve_payload(proc, "package", local=True)
         body["executionUnit"] = [{"unit": pkg}]
         desc, _ = self.deploy_process(body, describe_schema=ProcessSchema.OGC)
         assert desc["inputs"]["input_dir"]["formats"][0]["mediaType"] == ContentType.APP_DIR
@@ -2274,7 +2275,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             }
             for mock_exec in mocked_execute_celery():
                 stack.enter_context(mock_exec)
-            proc_url = "/processes/DirectoryListingProcess/jobs"
+            proc_url = f"/processes/{proc}/jobs"
             resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
                                        data=exec_body, headers=self.json_headers, only_local=True)
             assert resp.status_code in [200, 201], f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
@@ -2303,8 +2304,9 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
 
         .. versionadded:: 4.27
         """
-        body = self.retrieve_payload("DirectoryListingProcess", "deploy", local=True)
-        pkg = self.retrieve_payload("DirectoryListingProcess", "package", local=True)
+        proc = "DirectoryListingProcess"
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        pkg = self.retrieve_payload(proc, "package", local=True)
         body["executionUnit"] = [{"unit": pkg}]
         desc, _ = self.deploy_process(body, describe_schema=ProcessSchema.OGC)
         assert desc["inputs"]["input_dir"]["formats"][0]["mediaType"] == ContentType.APP_DIR
@@ -2343,7 +2345,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             }
             for mock_exec in mocked_execute_celery():
                 stack.enter_context(mock_exec)
-            proc_url = "/processes/DirectoryListingProcess/jobs"
+            proc_url = f"/processes/{proc}/jobs"
             resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
                                        data=exec_body, headers=self.json_headers, only_local=True)
             assert resp.status_code in [200, 201], f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
@@ -2375,8 +2377,9 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
 
         .. versionadded:: 4.27
         """
-        body = self.retrieve_payload("DirectoryListingProcess", "deploy", local=True)
-        pkg = self.retrieve_payload("DirectoryListingProcess", "package", local=True)
+        proc = "DirectoryListingProcess"
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        pkg = self.retrieve_payload(proc, "package", local=True)
         body["executionUnit"] = [{"unit": pkg}]
         desc, _ = self.deploy_process(body, describe_schema=ProcessSchema.OGC)
         assert desc["inputs"]["input_dir"]["formats"][0]["mediaType"] == ContentType.APP_DIR
@@ -2405,7 +2408,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         with contextlib.ExitStack() as stack:
             for mock_exec in mocked_execute_celery():
                 stack.enter_context(mock_exec)
-            proc_url = "/processes/DirectoryListingProcess/jobs"
+            proc_url = f"/processes/{proc}/jobs"
             resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
                                        data=exec_body, headers=self.json_headers, only_local=True)
             assert resp.status_code in [200, 201], f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
@@ -2427,6 +2430,69 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             assert len(output_listing) == len(expect_bucket_files)
             assert all(file.startswith(cwl_stage_dir) for file in output_listing)
             assert all(any(file.endswith(dir_file) for file in output_listing) for dir_file in expect_bucket_files)
+
+    def test_execute_with_directory_output(self):
+        """
+        Test that directory complex type is resolved from CWL and produces the expected output files.
+
+        .. versionadded:: 4.27
+        """
+        proc = "DirectoryMergingProcess"
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        pkg = self.retrieve_payload(proc, "package", local=True)
+        body["executionUnit"] = [{"unit": pkg}]
+        self.deploy_process(body, describe_schema=ProcessSchema.OGC)
+
+        with contextlib.ExitStack() as stack:
+            tmp_host = "https://mocked-file-server.com"  # must match in 'Execute_WorkflowSelectCopyNestedOutDir.json'
+            tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())
+            stack.enter_context(mocked_file_server(tmp_dir, tmp_host, settings=self.settings, mock_browse_index=True))
+            expect_http_files = [
+                "dir/file.txt",
+                "dir/sub/file.txt",
+                "dir/sub/nested/file.txt",
+                "dir/other/file.txt",
+            ]
+            for file in expect_http_files:
+                path = os.path.join(tmp_dir, file)
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                with open(path, mode="w", encoding="utf-8") as f:
+                    f.write("test data")
+
+            exec_body = {
+                "mode": ExecuteMode.ASYNC,
+                "response": ExecuteResponse.DOCUMENT,
+                "inputs": [
+                    {"id": "files", "href": os.path.join(tmp_host, http_file)} for http_file in expect_http_files
+                ],
+                "outputs": [
+                    {"id": "output_dir", "transmissionMode": ExecuteTransmissionMode.REFERENCE},
+                ]
+            }
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            proc_url = f"/processes/{proc}/jobs"
+            resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
+                                       data=exec_body, headers=self.json_headers, only_local=True)
+            assert resp.status_code in [200, 201], f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            status_url = resp.json["location"]
+            job_id = resp.json["jobID"]
+
+            results = self.monitor_job(status_url)
+            assert "output_dir" in results
+            wps_dir = get_wps_output_dir(self.settings)
+            wps_url = get_wps_output_url(self.settings)
+            out_dir = os.path.join(wps_dir, job_id, "output_dir")
+            out_url = os.path.join(wps_url, job_id, "output_dir") + "/"
+            assert results["output_dir"]["href"] == out_url
+            assert os.path.isdir(out_dir)
+            expect_out_files = {
+                # the process itself makes a flat list of input files, this is not a byproduct of dir-type output
+                os.path.isfile(os.path.join(out_dir, os.path.basename(file)))
+                for file in expect_http_files
+            }
+            output_dir_files = {os.path.join(root, file) for root, _, files in os.walk(out_dir) for file in files}
+            assert output_dir_files == expect_out_files
 
     # FIXME: create a real async test (threading/multiprocess) to evaluate this correctly
     def test_dismiss_job(self):

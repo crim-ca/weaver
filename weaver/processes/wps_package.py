@@ -75,12 +75,12 @@ from weaver.processes.constants import (
 )
 from weaver.processes.convert import (
     cwl2wps_io,
-    is_cwl_array_type,
     json2wps_field,
     json2wps_io,
     merge_package_io,
     normalize_ordered_io,
     ogcapi2cwl_process,
+    parse_cwl_array_type,
     wps2json_io,
     xml_wps2cwl
 )
@@ -1651,7 +1651,7 @@ class WpsPackage(Process):
             # process single occurrences
             input_i = input_occurs[0]
             # handle as reference/data
-            io_def = is_cwl_array_type(cwl_inputs_info[input_id])
+            io_def = parse_cwl_array_type(cwl_inputs_info[input_id])
             if isinstance(input_i, ComplexInput) or io_def.type in PACKAGE_COMPLEX_TYPES:
                 # extend array data that allow max_occur > 1
                 # drop invalid inputs returned as None

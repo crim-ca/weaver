@@ -843,10 +843,10 @@ def is_cwl_file_type(io_info):
     raise ValueError(f"Unknown parsing of CWL 'type' format ({type(io_type)!s}) [{io_type!s}] in [{io_info}]")
 
 
-def is_cwl_array_type(io_info, strict=True):
+def parse_cwl_array_type(io_info, strict=True):
     # type: (CWL_IO_Type, bool) -> CWLIODefinition
     """
-    Verifies if the specified I/O corresponds to one of various CWL array type definitions.
+    Parses the specified I/O for one of the various potential CWL array definitions.
 
     :param io_info: :term:`CWL` I/O definition to parse.
     :param strict: Indicates if only pure :term:`CWL` definition is allowed, or allow implicit data-type conversions.
@@ -869,7 +869,7 @@ def is_cwl_array_type(io_info, strict=True):
         Parameter ``io_item`` should correspond to field ``items`` of an array I/O definition.
         Simple pass-through if the array item is not an ``enum``.
         """
-        _def = is_cwl_enum_type({"type": _io_item})
+        _def = parse_cwl_enum_type({"type": _io_item})
         if _def.enum:
             LOGGER.debug("I/O [%s] parsed as 'array' with sub-item as 'enum'", io_info["name"])
             io_return.enum = True
@@ -930,10 +930,10 @@ def is_cwl_array_type(io_info, strict=True):
     return io_return
 
 
-def is_cwl_enum_type(io_info):
+def parse_cwl_enum_type(io_info):
     # type: (CWL_IO_Type) -> CWLIODefinition
     """
-    Verifies if the specified I/O corresponds to a CWL enum definition.
+    Parses the specified I/O for potential CWL enum definition.
 
     :returns: Updated :term:`CWL` I/O definition with applicable properties.
     :raises PackageTypeError: if the enum doesn't have the required parameters and valid format.
@@ -1140,8 +1140,8 @@ def get_cwl_io_type(io_info, strict=True):
                 typ = get_cwl_io_type_name(typ)
                 io_name = io_info["name"]
                 sub_type = {"type": typ, "name": f"{io_name}[{i}]"}  # type: CWL_IO_Type
-                array_io_def = is_cwl_array_type(sub_type, strict=strict)
-                enum_io_def = is_cwl_enum_type(sub_type)
+                array_io_def = parse_cwl_array_type(sub_type, strict=strict)
+                enum_io_def = parse_cwl_enum_type(sub_type)
                 # array base type more important than enum because later array conversion also handles allowed values
                 if array_io_def.array:
                     io_base_type = typ  # highest priority (can have sub-literal or sub-enum)
@@ -1165,14 +1165,14 @@ def get_cwl_io_type(io_info, strict=True):
     io_max_occurs = 1  # unless array after
 
     # convert array types
-    array_io_def = is_cwl_array_type(io_info, strict=strict)
+    array_io_def = parse_cwl_array_type(io_info, strict=strict)
     if array_io_def.array:
         LOGGER.debug("I/O parsed for 'array'")
         io_type = array_io_def.type
         io_max_occurs = PACKAGE_ARRAY_MAX_SIZE
 
     # convert enum types
-    enum_io_def = is_cwl_enum_type(io_info)
+    enum_io_def = parse_cwl_enum_type(io_info)
     is_enum = False
     if enum_io_def.enum:
         LOGGER.debug("I/O parsed for 'enum' from base")
