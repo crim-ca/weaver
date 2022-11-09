@@ -34,6 +34,7 @@ from pyramid.httpexceptions import HTTPOk, HTTPServiceUnavailable
 from pywps import Process
 from pywps.inout.basic import SOURCE_TYPE
 from pywps.inout.inputs import BoundingBoxInput, ComplexInput, LiteralInput
+from pywps.inout.outputs import ComplexOutput
 from pywps.inout.storage import STORE_TYPE, CachedStorage
 from pywps.inout.storage.file import FileStorageBuilder, FileStorage
 from pywps.inout.storage.s3 import S3StorageBuilder, S3Storage
@@ -90,6 +91,7 @@ from weaver.status import STATUS_PYWPS_IDS, Status, StatusCompliant, map_status
 from weaver.store.base import StoreJobs, StoreProcesses
 from weaver.utils import (
     SUPPORTED_FILE_SCHEMES,
+    Lazify,
     OutputMethod,
     adjust_directory_local,
     adjust_file_local,
@@ -127,7 +129,6 @@ if TYPE_CHECKING:
     from owslib.wps import WPSExecution
     from pywps.inout.formats import Format
     from pywps.inout.storage import StorageAbstract
-    from pywps.inout.outputs import ComplexOutput
     from pywps.response.execute import ExecuteResponse
 
     from weaver.datatype import Authentication, Job
@@ -890,8 +891,9 @@ class DirectoryNestedStorage(CachedStorage):
 
         :param storage: Storage implementation that is employed for storing files in a directory-like structure.
         """
-        super(DirectoryNestedStorage, self).__init__()
+        self.__dict__["_cache"] = {}
         self.__dict__["storage"] = storage
+        super(DirectoryNestedStorage, self).__init__()
 
     def __getattr__(self, item):
         # type: (str) -> Any
@@ -932,7 +934,15 @@ class DirectoryNestedStorage(CachedStorage):
             raise ValueError(f"Location is not a directory: [{root}]")
         files = list_directory_recursive(root)
         for file in files:
-            self.storage.store(file)
+            out_file = ComplexOutput(output.identifier, title=output.title)
+            out_file.storage = self.storage
+            out_file.file = file
+            out_file.uuid = os.path.join(str(output.uuid), os.path.basename(file))
+            _, out_path, out_url = self.storage.store(out_file)
+            LOGGER.debug("Stored file [%s] for reference [%s] under [%s] directory located in [%s] for reference [%s].",
+                         out_path, out_url, output.uuid,
+                         Lazify(lambda: self.location(output.uuid)),
+                         Lazify(lambda: self.url(output.uuid)))
         return self.type, path, self.url("")
 
     def write(self, data, destination, data_format=None):
@@ -954,12 +964,14 @@ class DirectoryNestedStorage(CachedStorage):
         raise NotImplementedError
 
     def url(self, destination):
+        # type: (str) -> str
         destination = destination.lstrip("/")  # avoid issues with prefix path join
         if destination in ["/", ""]:
             return self.storage.url("")
         return self.storage.url(destination)
 
     def location(self, destination):
+        # type: (str) -> Path
         destination = destination.lstrip("/")  # avoid issues with prefix path join
         if destination in ["/", ""]:
             return self.storage.location("")

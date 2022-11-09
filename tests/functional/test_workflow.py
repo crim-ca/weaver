@@ -1140,7 +1140,6 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
         with contextlib.ExitStack() as stack:
             tmp_host = "https://mocked-file-server.com"
             tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())
-            stack.enter_context(mocked_file_server(tmp_dir, tmp_host, settings=self.settings, mock_browse_index=True))
             expect_http_files = [
                 "file1.txt",
                 "dir/file2.txt",
@@ -1152,6 +1151,13 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
                 os.makedirs(os.path.dirname(path), exist_ok=True)
                 with open(path, mode="w", encoding="utf-8") as f:
                     f.write("test data")
+
+            def mock_tmp_input(requests_mock):
+                mocked_file_server(
+                    tmp_dir, tmp_host, self.settings,
+                    requests_mock=requests_mock,
+                    mock_browse_index=True
+                )
 
             exec_body = {
                 "inputs": {
@@ -1166,7 +1172,8 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
             results = self.workflow_runner(WorkflowProcesses.WORKFLOW_DIRECTORY_LISTING,
                                            [WorkflowProcesses.APP_DIRECTORY_LISTING_PROCESS,
                                             WorkflowProcesses.APP_DIRECTORY_MERGING_PROCESS],
-                                           override_execute_body=exec_body, log_full_trace=True)
+                                           override_execute_body=exec_body,
+                                           log_full_trace=True, requests_mock_callback=mock_tmp_input)
 
             stack.enter_context(mocked_wps_output(self.settings))  # allow retrieval of HTTP WPS output
             stage_out_tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())  # different dir to avoid override

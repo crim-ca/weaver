@@ -109,8 +109,9 @@ if TYPE_CHECKING:
         Literal,
         OpenAPISchema,
         Number,
+        Params,
         Path,
-        ReturnValue,
+        Return,
         SettingsType
     )
 
@@ -218,6 +219,25 @@ AWS_S3_BUCKET_REFERENCE_PATTERN = re.compile(
     r"(?P<path>(?:/$|/[\w.-]+)+)"  # sub-dir and file-key path, minimally only dir trailing slash
     r"$"
 )
+
+
+class Lazify(object):
+    """
+    Wraps the callable for evaluation only on explicit call or string representation.
+    """
+
+    def __init__(self, func):
+        # type: (Callable[[], Return]) -> None
+        if not callable(func):
+            raise ValueError("Invalid lazify operation. Input must be a callable.")
+        self.func = func
+
+    def __call__(self):
+        # type: () -> Return
+        return self.func()
+
+    def __str__(self):
+        return f"{self.func()!s}"
 
 
 class CaseInsensitive(str):
@@ -1501,11 +1521,11 @@ def get_request_options(method, url, settings):
 
 
 def retry_on_condition(operation,               # type: AnyCallableAnyArgs
-                       *args,                   # type: Any
+                       *args,                   # type: Params.args
                        condition=Exception,     # type: RetryCondition
                        retries=1,               # type: int
-                       **kwargs,                # type: Any
-                       ):                       # type: (...) -> ReturnValue
+                       **kwargs,                # type: Params.kwargs
+                       ):                       # type: (...) -> Return
     """
     Retries the operation call up to the amount of specified retries if the condition is encountered.
 

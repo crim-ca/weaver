@@ -37,7 +37,7 @@ LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from typing import Any, Callable, Type, Union
 
-    from weaver.typedefs import AnyCallableWrapped, ReturnValue
+    from weaver.typedefs import AnyCallableWrapped, Return
 
 
 class WeaverException(Exception):
@@ -414,7 +414,7 @@ def handle_known_exceptions(function):
 
     @functools.wraps(function)
     def wrapped(*_, **__):
-        # type: (Any, Any) -> Union[ReturnValue, OWSException]
+        # type: (Any, Any) -> Union[Return, OWSException]
         try:
             return function(*_, **__)
         except (WeaverException, OWSException, HTTPException) as exc:
@@ -466,10 +466,10 @@ def log_unhandled_exceptions(logger=LOGGER, message="Unhandled exception occurre
     known_exceptions = tuple(known_exceptions)
 
     def wrap(function):
-        # type: (Callable[[Any, Any], ReturnValue]) -> Callable
+        # type: (Callable[[Any, Any], Return]) -> Callable
         @functools.wraps(function)
         def call(*args, **kwargs):
-            # type: (Any, Any) -> ReturnValue
+            # type: (Any, Any) -> Return
             try:
                 # handle input arguments that are extended by various pyramid operations
                 if is_request:

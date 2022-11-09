@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Type, TypeVar, Union
 
     import psutil
-    from typing_extensions import Literal, NotRequired, Protocol, Required, TypeAlias, TypedDict
+    from typing_extensions import Literal, NotRequired, ParamSpec, Protocol, Required, TypeAlias, TypedDict
 
     if hasattr(os, "PathLike"):
         FileSystemPathType = Union[os.PathLike, str]
@@ -71,10 +71,11 @@ if TYPE_CHECKING:
 
     Path = Union[os.PathLike, str, bytes]
 
-    ReturnValue = TypeVar("ReturnValue")  # alias to identify the same return value as a decorated/wrapped function
+    Params = ParamSpec("Params")  # use with 'Callable[Params, Return]', 'Params.args' and 'Params.kwargs'
+    Return = TypeVar("Return")    # alias to identify the same return value as a decorated/wrapped function
     AnyCallable = TypeVar("AnyCallable", bound=Callable[..., Any])  # callable used for decorated/wrapped functions
-    AnyCallableWrapped = Callable[[..., Any], ReturnValue]
-    AnyCallableAnyArgs = Union[Callable[[], ReturnValue], Callable[[..., Any], ReturnValue]]
+    AnyCallableWrapped = Callable[Params, Return]
+    AnyCallableAnyArgs = Union[Callable[[], Return], Callable[[..., Any], Return]]
 
     # pylint: disable=C0103,invalid-name
     Number = Union[int, float]
