@@ -128,7 +128,6 @@ if TYPE_CHECKING:
     from cwltool.process import Process as ProcessCWL
     from owslib.wps import WPSExecution
     from pywps.inout.formats import Format
-    from pywps.inout.storage import StorageAbstract
     from pywps.response.execute import ExecuteResponse
 
     from weaver.datatype import Authentication, Job
@@ -1926,14 +1925,6 @@ class WpsPackage(Process):
         storage_type = STORE_TYPE.S3 if s3_bucket else STORE_TYPE.PATH
         storage = self.make_location_storage(storage_type, result_type)
         self.response.outputs[output_id]._storage = storage  # noqa: W0212
-        output_path = str(self.response.uuid)
-        output_prefix = os.path.join(self.job.context, output_path) if self.job.context else output_path
-        if s3_bucket:
-            storage.prefix = output_prefix
-        else:
-            storage.target = os.path.join(storage.target, output_prefix)
-            storage.output_url = os.path.join(storage.output_url, output_prefix)
-            os.makedirs(storage.target, exist_ok=True)  # pywps handles Job UUID dir creation, but not nested dirs
 
         # pywps will resolve file paths for us using its WPS request UUID
         os.makedirs(self.workdir, exist_ok=True)
@@ -1955,7 +1946,7 @@ class WpsPackage(Process):
         self.logger.info("Resolved WPS output [%s] as file reference: [%s]", output_id, result_wps)
 
     def make_location_storage(self, storage_type, location_type):
-        # type: (STORE_TYPE, PACKAGE_COMPLEX_TYPES) -> StorageAbstract
+        # type: (STORE_TYPE, PACKAGE_COMPLEX_TYPES) -> Union[FileStorage, S3Storage, DirectoryNestedStorage]
         """
         Generates the relevant storage implementation with requested types and references.
 
@@ -1964,17 +1955,29 @@ class WpsPackage(Process):
         :return: Storage implementation.
         """
         if location_type == PACKAGE_FILE_TYPE and storage_type == STORE_TYPE.PATH:
-            return FileStorageBuilder().build()
-        if location_type == PACKAGE_FILE_TYPE and storage_type == STORE_TYPE.S3:
-            return S3StorageBuilder().build()
-        if location_type == PACKAGE_DIRECTORY_TYPE and storage_type == STORE_TYPE.PATH:
-            return DirectoryNestedStorage(FileStorageBuilder().build())
-        if location_type == PACKAGE_DIRECTORY_TYPE and storage_type == STORE_TYPE.S3:
-            return DirectoryNestedStorage(S3StorageBuilder().build())
-        raise PackageExecutionError(
-            "Cannot resolve unknown location storage for "
-            f"(storage: {storage_type}, type: {location_type})."
-        )
+            storage = FileStorageBuilder().build()
+        elif location_type == PACKAGE_FILE_TYPE and storage_type == STORE_TYPE.S3:
+            storage = S3StorageBuilder().build()
+        elif location_type == PACKAGE_DIRECTORY_TYPE and storage_type == STORE_TYPE.PATH:
+            storage = DirectoryNestedStorage(FileStorageBuilder().build())
+        elif location_type == PACKAGE_DIRECTORY_TYPE and storage_type == STORE_TYPE.S3:
+            storage = DirectoryNestedStorage(S3StorageBuilder().build())
+        else:
+            raise PackageExecutionError(
+                "Cannot resolve unknown location storage for "
+                f"(storage: {storage_type}, type: {location_type})."
+            )
+
+        output_path = str(self.response.uuid)
+        output_prefix = os.path.join(self.job.context, output_path) if self.job.context else output_path
+        # pylint: disable=attribute-defined-outside-init  # references to nested storage dynamically created
+        if storage_type == STORE_TYPE.S3:
+            storage.prefix = output_prefix
+        else:
+            storage.target = os.path.join(storage.target, output_prefix)
+            storage.output_url = os.path.join(storage.output_url, output_prefix)
+            os.makedirs(storage.target, exist_ok=True)  # pywps handles Job UUID dir creation, but not nested dirs
+        return storage
 
     def make_tool(self, toolpath_object, loading_context):
         # type: (CWL_ToolPathObject, LoadingContext) -> ProcessCWL
