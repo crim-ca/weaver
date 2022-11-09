@@ -1586,7 +1586,7 @@ def retry_on_cache_error(func):
     """
     @functools.wraps(func)
     def wrapped(*args, **kwargs):
-        # type: (*Any, **Any) -> ReturnValue
+        # type: (*Any, **Any) -> Return
         try:
             return func(*args, **kwargs)
         except BeakerException as exc:
