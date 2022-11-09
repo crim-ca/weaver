@@ -45,6 +45,8 @@ if TYPE_CHECKING:
         JSON,
         ProcessDeployment,
         ProcessDescription,
+        ProcessDescriptionListing,
+        ProcessDescriptionMapping,
         ProcessExecution,
         SettingsType
     )
@@ -311,8 +313,20 @@ class WpsConfigBase(unittest.TestCase):
         return deepcopy(resp.json)
 
     @classmethod
+    @overload
     def deploy_process(cls, payload, process_id=None, describe_schema=ProcessSchema.OGC, mock_requests_only_local=True):
-        # type: (JSON, Optional[str], str, bool) -> Tuple[ProcessDescription, CWL]
+        # type: (JSON, Optional[str], Literal[ProcessSchema.OGC], bool) -> Tuple[ProcessDescriptionMapping, CWL]  # noqa
+        ...
+
+    @classmethod
+    @overload
+    def deploy_process(cls, payload, process_id=None, describe_schema=ProcessSchema.OGC, mock_requests_only_local=True):
+        # type: (JSON, Optional[str], Literal[ProcessSchema.OLD], bool) -> Tuple[ProcessDescriptionListing, CWL]  # noqa
+        ...
+
+    @classmethod
+    def deploy_process(cls, payload, process_id=None, describe_schema=ProcessSchema.OGC, mock_requests_only_local=True):
+        # type: (JSON, Optional[str], ProcessSchema, bool) -> Tuple[ProcessDescription, CWL]
         """
         Deploys a process with :paramref:`payload`.
 

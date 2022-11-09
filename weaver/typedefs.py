@@ -740,15 +740,17 @@ if TYPE_CHECKING:
     }, total=False)
     ProcessInputOutputMap = Dict[str, ProcessInputOutputItem]
     ProcessInputOutputList = List[ProcessInputOutputItem]
-    ProcessOffering = TypedDict("ProcessOffering", {
+    # Provide distinct types with mapping/listing representation of I/O to help annotation
+    # checkers resolve them more easily using less nested fields if specified explicitly
+    ProcessOfferingMapping = TypedDict("ProcessOfferingMapping", {
         "id": Required[str],
         "version": Optional[str],
         "title": NotRequired[str],
         "description": NotRequired[str],
         "keywords": NotRequired[List[str]],
         "metadata": NotRequired[List[Metadata]],
-        "inputs": Required[Union[ProcessInputOutputMap, ProcessInputOutputList]],
-        "outputs": Required[Union[ProcessInputOutputMap, ProcessInputOutputList]],
+        "inputs": Required[ProcessInputOutputMap],
+        "outputs": Required[ProcessInputOutputMap],
         "jobControlOptions": List[AnyExecuteControlOption],
         "outputTransmission": List[AnyExecuteControlOption],
         "deploymentProfile": str,
@@ -758,10 +760,37 @@ if TYPE_CHECKING:
         "links": List[Link],
         "visibility": NotRequired[AnyVisibility],
     }, total=False)
+    ProcessOfferingListing = TypedDict("ProcessOfferingListing", {
+        "id": Required[str],
+        "version": Optional[str],
+        "title": NotRequired[str],
+        "description": NotRequired[str],
+        "keywords": NotRequired[List[str]],
+        "metadata": NotRequired[List[Metadata]],
+        "inputs": Required[ProcessInputOutputList],
+        "outputs": Required[ProcessInputOutputList],
+        "jobControlOptions": List[AnyExecuteControlOption],
+        "outputTransmission": List[AnyExecuteControlOption],
+        "deploymentProfile": str,
+        "processDescriptionURL": NotRequired[str],
+        "processEndpointWPS1": NotRequired[str],
+        "executeEndpoint": NotRequired[str],
+        "links": List[Link],
+        "visibility": NotRequired[AnyVisibility],
+    }, total=False)
+    ProcessOffering = Union[ProcessOfferingMapping, ProcessOfferingListing]
+    ProcessDescriptionNestedMapping = TypedDict("ProcessDescriptionNestedMapping", {
+        "process": ProcessOfferingMapping,
+    }, total=False)
+    ProcessDescriptionNestedListing = TypedDict("ProcessDescriptionNestedListing", {
+        "process": ProcessOfferingListing,
+    }, total=False)
     ProcessDescriptionNested = TypedDict("ProcessDescriptionNested", {
         "process": ProcessOffering,
     }, total=False)
-    ProcessDescription = Union[ProcessOffering, ProcessDescriptionNested]
+    ProcessDescriptionMapping = Union[ProcessOfferingMapping, ProcessDescriptionNestedMapping]
+    ProcessDescriptionListing = Union[ProcessOfferingListing, ProcessDescriptionNestedListing]
+    ProcessDescription = Union[ProcessDescriptionMapping, ProcessDescriptionListing]
 
     ExecutionUnitItem = TypedDict("ExecutionUnitItem", {
         "unit": CWL

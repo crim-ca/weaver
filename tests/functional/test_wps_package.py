@@ -64,7 +64,7 @@ from weaver.wps.utils import get_wps_output_dir, map_wps_output_location
 if TYPE_CHECKING:
     from typing import List
 
-    from weaver.typedefs import JSON, CWL_AnyRequirements, ProcessOffering
+    from weaver.typedefs import JSON, CWL_AnyRequirements
 
 EDAM_PLAIN = EDAM_NAMESPACE + ":" + EDAM_MAPPING[ContentType.TEXT_PLAIN]
 OGC_NETCDF = OGC_NAMESPACE + ":" + OGC_MAPPING[ContentType.APP_NETCDF]
@@ -154,7 +154,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
 
         # even if deployed as OGC schema, OLD schema can be converted back
         desc = self.describe_process(self._testMethodName, ProcessSchema.OLD)
-        proc = desc["process"]  # type: ProcessOffering
+        proc = desc["process"]
         assert "inputs" in proc and isinstance(proc["inputs"], list) and len(proc["inputs"]) == 1
         assert "outputs" in proc and isinstance(proc["outputs"], list) and len(proc["outputs"]) == 1
         assert proc["inputs"][0]["id"] == "url"
@@ -568,7 +568,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             "executionUnit": [{"unit": cwl}],
         }
         desc, _ = self.deploy_process(body, describe_schema=ProcessSchema.OLD)
-        proc = desc["process"]  # type: ProcessOffering
+        proc = desc["process"]
 
         assert proc["id"] == self._testMethodName
         assert proc["title"] == "some title"
@@ -667,7 +667,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             "executionUnit": [{"unit": cwl}],
         }
         desc, pkg = self.deploy_process(body, describe_schema=ProcessSchema.OLD)
-        proc = desc["process"]  # type: ProcessOffering
+        proc = desc["process"]
 
         assert proc["id"] == self._testMethodName
         assert proc["title"] == "some title"
@@ -825,7 +825,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             }}],
         }
         desc, pkg = self.deploy_process(body, describe_schema=ProcessSchema.OLD)
-        proc = desc["process"]  # type: ProcessOffering
+        proc = desc["process"]
 
         assert proc["inputs"][0]["id"] == "wps_only_format_exists"
         assert len(proc["inputs"][0]["formats"]) == 1
@@ -949,7 +949,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             }]
         }
         desc, _ = self.deploy_process(body, describe_schema=ProcessSchema.OLD)
-        proc = desc["process"]  # type: ProcessOffering
+        proc = desc["process"]
         assert proc["inputs"][0]["id"] == "wps_format_mimeType"
         assert proc["inputs"][0]["formats"][0]["mediaType"] == ContentType.APP_JSON
         assert proc["inputs"][1]["id"] == "wps_format_mediaType"
@@ -1310,7 +1310,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             "executionUnit": [{"unit": cwl}],
         }
         desc, pkg = self.deploy_process(body, describe_schema=ProcessSchema.OLD)
-        proc = desc["process"]  # type: ProcessOffering
+        proc = desc["process"]
 
         # process description input validation
         assert proc["inputs"][0]["id"] == "single_value_single_format"
@@ -1552,7 +1552,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             "executionUnit": [{"unit": cwl}],
         }
         desc, pkg = self.deploy_process(body, describe_schema=ProcessSchema.OLD)
-        proc = desc["process"]  # type: ProcessOffering
+        proc = desc["process"]
 
         assert proc["inputs"][0]["id"] == "required_literal"
         assert proc["inputs"][0]["minOccurs"] == 1
@@ -1687,7 +1687,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             self.fail("MinOccurs/MaxOccurs values defined as valid int/str should not raise an invalid schema error")
 
         inputs = body["processDescription"]["inputs"]  # type: List[JSON]
-        proc = desc["process"]  # type: ProcessOffering
+        proc = desc["process"]
         assert isinstance(proc["inputs"], list)
         assert len(proc["inputs"]) == len(inputs)
         for i, process_input in enumerate(inputs):
@@ -2568,7 +2568,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             "executionUnit": [{"unit": cwl}],
         }
         desc, _ = self.deploy_process(body, describe_schema=ProcessSchema.OLD)
-        proc = desc["process"]  # type: ProcessOffering
+        proc = desc["process"]
         assert proc["id"] == self._testMethodName
         assert proc["title"] == "some title"
         assert proc["description"] == "this is a test"
@@ -2665,7 +2665,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             "executionUnit": [{"unit": cwl}],
         }
         desc, pkg = self.deploy_process(body, describe_schema=ProcessSchema.OLD)
-        proc = desc["process"]  # type: ProcessOffering
+        proc = desc["process"]
 
         assert proc["id"] == self._testMethodName
         assert proc["title"] == "some title"
@@ -2739,7 +2739,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         # basic contents validation
         assert "cwlVersion" in pkg
         assert "process" in desc
-        proc = desc["process"]  # type: ProcessOffering
+        proc = desc["process"]
         assert proc["id"] == self._testMethodName
 
         # package I/O validation
@@ -2826,7 +2826,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         # basic contents validation
         assert "cwlVersion" in pkg
         assert "process" in desc
-        proc = desc["process"]  # type: ProcessOffering
+        proc = desc["process"]
         assert proc["id"] == self._testMethodName
 
         # package I/O validation
