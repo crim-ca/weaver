@@ -1265,7 +1265,7 @@ def test_resolve_s3_http_options(options, parameters, configuration):
         for region in AWS_S3_REGION_SUBSET
     ] + [
         (
-            f"https://test-location-123456789012.s3-accesspoint.{region}.amazonaws.com",
+            f"https://test-location-123456789012.s3-accesspoint.{region}.amazonaws.com/",
             region, f"s3://arn:aws:s3:{region}:123456789012:accesspoint/test-location/"
         )
         for region in AWS_S3_REGION_SUBSET
