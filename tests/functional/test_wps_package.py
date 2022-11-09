@@ -1071,8 +1071,8 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
 
     @parameterized.expand([
         # not allowed even if combined with another known and valid definition
-        {"UnknownRequirement": {}, CWL_REQUIREMENT_APP_DOCKER: {"dockerPull": "python:3.7-alpine"}},
-        {"UnknownRequirement": {}},
+        ({"UnknownRequirement": {}, CWL_REQUIREMENT_APP_DOCKER: {"dockerPull": "python:3.7-alpine"}}, ),
+        ({"UnknownRequirement": {}}, ),
     ])
     def test_deploy_block_unknown_processes(self, requirements):
         # type: (CWL_AnyRequirements) -> None
@@ -2158,8 +2158,8 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                 ctx_dir = (wps_dir + "/" + ctx) if ctx else wps_dir
                 out_url = self.settings["weaver.wps_output_url"]
                 ctx_url = (out_url + "/" + ctx) if ctx else out_url
-                res_url = ctx_url + "/" + job_id + "/stdout.log"
-                res_path = os.path.join(ctx_dir, job_id, "stdout.log")
+                res_url = ctx_url + "/" + job_id + "/output/stdout.log"
+                res_path = os.path.join(ctx_dir, job_id, "output", "stdout.log")
                 assert results["output"]["href"] == res_url, f"Invalid output URL with context: {ctx}"
                 assert os.path.isfile(res_path), f"Invalid output path with context: {ctx}"
 
@@ -2221,7 +2221,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             self.monitor_job(status_url, timeout=5)
             wps_dir = get_wps_output_dir(self.settings)
             job_dir = os.path.join(wps_dir, job_id)
-            job_out = os.path.join(job_dir, "stdout.log")
+            job_out = os.path.join(job_dir, "output", "stdout.log")
             assert os.path.isfile(job_out), f"Invalid output file not found: [{job_out}]"
             with open(job_out, mode="r", encoding="utf-8") as out_fd:
                 out_data = out_fd.read()

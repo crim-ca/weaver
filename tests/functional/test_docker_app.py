@@ -78,7 +78,7 @@ class WpsPackageDockerAppTest(WpsConfigBase):
         # get generic details
         wps_uuid = str(self.job_store.fetch_by_id(job_id).wps_id)
         wps_out_url = self.settings["weaver.wps_output_url"]
-        wps_output = f"{wps_out_url}/{wps_uuid}/{self.out_file}"
+        wps_output = f"{wps_out_url}/{wps_uuid}/{self.out_key}/{self.out_file}"
 
         # --- validate /results path format ---
         assert len(result_payload) == 1
