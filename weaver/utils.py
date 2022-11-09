@@ -2727,14 +2727,14 @@ def adjust_directory_local(location,                            # type: Path
     return filtered
 
 
-def list_directory_recursive(directory):
-    # type: (Path) -> Iterator[Path]
+def list_directory_recursive(directory, relative=False):
+    # type: (Path, bool) -> Iterator[Path]
     """
-    Local directory listing of files recursively.
+    Obtain a flat list of files recursively contained within a local directory.
     """
     for path, _, files in os.walk(directory, followlinks=True):
         for file_name in files:
-            yield os.path.join(path, file_name)
+            yield file_name if relative else os.path.join(path, file_name)
 
 
 def fetch_directory(location,                           # type: str

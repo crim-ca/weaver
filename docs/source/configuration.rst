@@ -77,21 +77,21 @@ they are optional and which default value or operation is applied in each situat
     schema ``definitions`` section. The configuration setting is available to override this endpoint by another
     static URL location where the corresponding schemas can be found if desired.
 
-.. versionadded:: 4.0.0
+.. versionadded:: 4.0
 
 - | ``weaver.cwl_euid = <int>`` [:class:`int`, *experimental*]
   | (default: ``None``, auto-resolved by :term:`CWL` with effective machine user)
   |
   | Define the effective machine user ID to be used for running the :term:`Application Package`.
 
-.. versionadded:: 1.9.0
+.. versionadded:: 1.9
 
 - | ``weaver.cwl_egid = <int>`` [:class:`int`, *experimental*]
   | (default: ``None``, auto-resolved by :term:`CWL` with the group of the effective user)
   |
   | Define the effective machine group ID to be used for running the :term:`Application Package`.
 
-.. versionadded:: 1.9.0
+.. versionadded:: 1.9
 
 - | ``weaver.wps = true|false`` [:class:`bool`-like]
   | (default: ``true``)
@@ -126,7 +126,7 @@ they are optional and which default value or operation is applied in each situat
     to that location. If no bucket is specified, the outputs fall back to using the location specified by
     ``weaver.wps_output_dir``.
 
-.. versionadded:: 1.13.0
+.. versionadded:: 1.13
 .. seealso::
     :ref:`conf_s3_buckets`
 
@@ -139,7 +139,7 @@ they are optional and which default value or operation is applied in each situat
     to write output files to. If not defined but ``weaver.wps_output_s3_bucket`` is specified, `Weaver` attempt to
     retrieve the region from the profile defined in :term:`AWS` configuration files or environment variables.
 
-.. versionadded:: 1.13.0
+.. versionadded:: 1.13
 .. seealso::
     :ref:`conf_s3_buckets`
 
@@ -166,7 +166,13 @@ they are optional and which default value or operation is applied in each situat
     When not defined, ``X-WPS-Output-Context`` header can still take effect, but omitting it will store results
     directly under ``weaver.wps_output_dir`` instead of default *context* location.
 
-.. versionadded:: 4.3.0
+.. versionadded:: 4.3
+
+.. versionchanged:: 4.27
+    Nesting of the *context* directory from ``X-WPS-Output-Context`` or ``weaver.wps_output_dir`` will
+    also take effect when storing :term:`Job` results under :term:`S3` when ``weaver.wps_output_s3_bucket``
+    and ``weaver.wps_output_s3_region`` are also defined. Previous versions applied the *context* directory
+    only for local storage using the other :term:`WPS` output settings.
 
 .. seealso::
     See :ref:`exec_output_location` for more details about this feature and implications of this setting.
@@ -229,7 +235,7 @@ they are optional and which default value or operation is applied in each situat
     completion if an email was provided in the :ref:`Execute <proc_op_execute>` request body
     (see also: :ref:`Email Notification`).
 
-.. versionadded:: 4.15.0
+.. versionadded:: 4.15
 
 - | ``weaver.exec_sync_max_wait = <int>`` [:class:`int`, seconds]
   | (default: ``20``)
@@ -239,7 +245,7 @@ they are optional and which default value or operation is applied in each situat
   | See :ref:`proc_exec_mode` for more details on the feature and how to employ it.
   | Ensure `Celery`_ worker is configured as specified below.
 
-.. versionadded:: 4.15.0
+.. versionadded:: 4.15
 
 - | ``weaver.quote_sync_max_wait = <int>`` [:class:`int`, seconds]
   | (default: ``20``)
@@ -369,7 +375,7 @@ Please refer to `wps_processes.yml.example`_ for explicit format, keywords suppo
     the remote resource at that point in time, and will not update if the reference changes. On the other hand, their
     listing and description offering will not require the remote service to be available at all time until execution.
 
-.. versionadded:: 1.14.0
+.. versionadded:: 1.14
     When references are specified using ``providers`` section instead of ``processes``, the registration
     only saves the remote WPS provider endpoint to dynamically populate WPS processes on demand.
 
@@ -400,7 +406,7 @@ Please refer to `wps_processes.yml.example`_ for explicit format, keywords suppo
 Configuration of CWL Processes
 =======================================
 
-.. versionadded:: 4.19.0
+.. versionadded:: 4.19
 
 Although `Weaver` supports :ref:`Deployment <proc_op_deploy>` and dynamic management of :term:`Process` definitions
 while the web application is running, it is sometime more convenient for service providers to offer a set of predefined
@@ -453,7 +459,7 @@ in an identical definition as if it was :ref:`Deployed <proc_op_deploy>` using :
 Configuration of Request Options
 =======================================
 
-.. versionadded:: 1.8.0
+.. versionadded:: 1.8
 
 It is possible to define :term:`Request Options` that consist of additional arguments that will be passed down to
 :func:`weaver.utils.request_extra`, which essentially call a traditional request using :mod:`requests` module, but
@@ -496,7 +502,7 @@ etc. on a per-request basis, leave other requests unaffected and generally more 
 Configuration of File Vault
 =======================================
 
-.. versionadded:: 4.9.0
+.. versionadded:: 4.9
 
 Configuration of the :term:`Vault` is required in order to obtain access to its functionalities
 and to enable its :term:`API` endpoints. This feature is notably employed to push local files to a remote `Weaver`

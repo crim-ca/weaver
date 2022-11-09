@@ -1291,7 +1291,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
         """
         Test handling of invalid UUID reference to search job.
 
-        .. versionchanged:: 4.6.0
+        .. versionchanged:: 4.6
             Jobs must explicitly use an :class:`uuid.UUID` object to search.
             Any value provided in path parameter that does not correspond to such definition raises a bad request.
         """

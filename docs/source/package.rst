@@ -156,7 +156,7 @@ whenever required for launching new :term:`Job` executions.
     according to their needs. To resolve such cases, the |update-token-req|_ request or an entire re-deployment
     of the :term:`Process` could be accomplished, whichever is more convenient for them.
 
-.. versionadded:: 4.5.0
+.. versionadded:: 4.5
     Specification and handling of the ``X-Auth-Docker`` header for providing an authentication token.
 
 CWL Workflow

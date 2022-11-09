@@ -32,10 +32,11 @@ from cwltool.context import LoadingContext, RuntimeContext
 from cwltool.factory import Factory as CWLFactory, WorkflowStatus as CWLException
 from pyramid.httpexceptions import HTTPOk, HTTPServiceUnavailable
 from pywps import Process
-from pywps.inout import BoundingBoxInput, ComplexInput, LiteralInput
 from pywps.inout.basic import SOURCE_TYPE
-from pywps.inout.storage.file import FileStorageBuilder
-from pywps.inout.storage.s3 import S3StorageBuilder
+from pywps.inout.inputs import BoundingBoxInput, ComplexInput, LiteralInput
+from pywps.inout.storage import STORE_TYPE, CachedStorage
+from pywps.inout.storage.file import FileStorageBuilder, FileStorage
+from pywps.inout.storage.s3 import S3StorageBuilder, S3Storage
 from requests.structures import CaseInsensitiveDict
 
 from weaver.config import WeaverConfiguration, WeaverFeature, get_weaver_configuration
@@ -89,6 +90,9 @@ from weaver.status import STATUS_PYWPS_IDS, Status, StatusCompliant, map_status
 from weaver.store.base import StoreJobs, StoreProcesses
 from weaver.utils import (
     SUPPORTED_FILE_SCHEMES,
+    OutputMethod,
+    adjust_directory_local,
+    adjust_file_local,
     bytes2str,
     fetch_directory,
     fetch_file,
@@ -100,6 +104,7 @@ from weaver.utils import (
     get_log_fmt,
     get_sane_name,
     get_settings,
+    list_directory_recursive,
     request_extra,
     setup_loggers
 )
@@ -115,11 +120,14 @@ from weaver.wps.utils import get_wps_output_dir, get_wps_output_url, map_wps_out
 from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Deque, Dict, List, Optional, Tuple, Type, Union
+    from typing import Any, AnyStr, Callable, Deque, Dict, List, Optional, Tuple, Type, Union
 
     from cwltool.factory import Callable as CWLFactoryCallable
     from cwltool.process import Process as ProcessCWL
     from owslib.wps import WPSExecution
+    from pywps.inout.formats import Format
+    from pywps.inout.storage import StorageAbstract
+    from pywps.inout.outputs import ComplexOutput
     from pywps.response.execute import ExecuteResponse
 
     from weaver.datatype import Authentication, Job
@@ -150,6 +158,7 @@ if TYPE_CHECKING:
         JSON,
         Literal,
         Number,
+        Path,
         ValueType
     )
     from weaver.wps.service import WorkerRequest
@@ -867,6 +876,94 @@ def get_process_definition(process_offering, reference=None, package=None, data_
         "auth": auth_requirements
     })
     return process_offering
+
+
+class DirectoryNestedStorage(CachedStorage):
+    """
+    Generates a nested storage for a directory where each contained file will be managed by the storage.
+    """
+
+    def __init__(self, storage):
+        # type: (Union[FileStorage, S3Storage]) -> None
+        """
+        Initializes the storage.
+
+        :param storage: Storage implementation that is employed for storing files in a directory-like structure.
+        """
+        super(DirectoryNestedStorage, self).__init__()
+        self.__dict__["storage"] = storage
+
+    def __getattr__(self, item):
+        # type: (str) -> Any
+        return getattr(self.storage, item)
+
+    def __setattr__(self, key, value):
+        # type: (str, Any) -> None
+        """
+        Setting a property on this storage applies it on the nested file storage.
+        """
+        if key in self.__dict__:
+            object.__setattr__(self, key, value)
+        else:
+            setattr(self.storage, key, value)
+
+    @property
+    def type(self):
+        # type: () -> STORE_TYPE
+        return STORE_TYPE.PATH if isinstance(self.storage, FileStorage) else STORE_TYPE.S3
+
+    def _do_store(self, output):
+        # type: (ComplexOutput) -> Tuple[STORE_TYPE, Path, str]
+        """
+        Store all files contained in a directory recursively.
+
+        .. note::
+            This is called from :meth:`CachedStorage.store` only if not already in storage using cached output ID.
+        """
+        path = None
+        if isinstance(self.storage, FileStorage):
+            path = self.storage.target.rstrip("/") + "/"
+        if isinstance(self.storage, S3Storage):
+            path = self.storage.prefix.rstrip("/") + "/"
+        if not path:
+            raise NotImplementedError
+        root = output.file
+        if not os.path.isdir(root):
+            raise ValueError(f"Location is not a directory: [{root}]")
+        files = list_directory_recursive(root)
+        for file in files:
+            self.storage.store(file)
+        return self.type, path, self.url("")
+
+    def write(self, data, destination, data_format=None):
+        # type: (AnyStr, str, Optional[Format]) -> str
+        destination = destination.lstrip("/")  # avoid issues with prefix path join
+        if destination != "" and not destination.endswith("/"):
+            return self.storage.write(data, destination, data_format=data_format)
+        if isinstance(self.storage, FileStorage):
+            os.makedirs(self.storage.target, exist_ok=True)
+            return self.url(destination)
+        if isinstance(self.storage, S3Storage):
+            path = self.storage.prefix.rstrip("/") + "/" + destination
+            args = {
+                "ContentLength": 0,
+                "ContentType": ContentType.APP_DIR,
+            }
+            # create a bucket object that represents the dir
+            return self.storage.uploadData("", path, args)
+        raise NotImplementedError
+
+    def url(self, destination):
+        destination = destination.lstrip("/")  # avoid issues with prefix path join
+        if destination in ["/", ""]:
+            return self.storage.url("")
+        return self.storage.url(destination)
+
+    def location(self, destination):
+        destination = destination.lstrip("/")  # avoid issues with prefix path join
+        if destination in ["/", ""]:
+            return self.storage.location("")
+        return self.storage.location(destination)
 
 
 class WpsPackage(Process):
@@ -1786,8 +1883,13 @@ class WpsPackage(Process):
             - :func:`weaver.wps.load_pywps_config`
         """
         s3_bucket = self.settings.get("weaver.wps_output_s3_bucket")
-        result_loc = cwl_result[output_id]["location"].replace("file://", "")
+        result_loc = cwl_result[output_id]["location"].replace("file://", "").rstrip("/")
         result_path = os.path.split(result_loc)[-1]
+        result_type = cwl_result[output_id].get("class", PACKAGE_FILE_TYPE)
+        result_is_dir = result_type == PACKAGE_DIRECTORY_TYPE
+        if result_is_dir and not result_path.endswith("/"):
+            result_path += "/"
+            result_loc += "/"
 
         # PyWPS internally sets a new FileStorage (default) inplace when generating the JSON definition of the output.
         # This is done such that the generated XML status document in WPS response can obtain the output URL location.
@@ -1808,18 +1910,18 @@ class WpsPackage(Process):
         #   - pywps.inout.outputs.ComplexOutput.storage.store()
         # But, setter "pywps.inout.basic.ComplexOutput.storage" doesn't override predefined 'storage'.
         # Therefore, preemptively override "ComplexOutput._storage" to whichever location according to use case.
+        # Override builder per output to allow distinct S3/LocalFile for it and XML status that should remain local.
+        storage_type = STORE_TYPE.S3 if s3_bucket else STORE_TYPE.PATH
+        storage = self.make_location_storage(storage_type, result_type)
+        self.response.outputs[output_id]._storage = storage  # noqa: W0212
+        output_path = str(self.response.uuid)
+        output_prefix = os.path.join(self.job.context, output_path) if self.job.context else output_path
         if s3_bucket:
-            # when 'url' is directly enforced, 'ComplexOutput.json' will use it instead of 'file' from temp workdir
-            # override builder only here so that only results are uploaded to S3, and not XML status
-            # using this storage builder, other settings (bucket, region, etc.) are retrieved from PyWPS server config
-            self.response.outputs[output_id]._storage = S3StorageBuilder().build()  # noqa: W0212
-            self.response.outputs[output_id].storage.prefix = str(self.response.uuid)  # job UUID
-        elif self.job.context:
-            storage = FileStorageBuilder().build()
-            storage.target = os.path.join(storage.target, self.job.context)
-            storage.output_url = os.path.join(storage.output_url, self.job.context)
-            os.makedirs(storage.target, exist_ok=True)  # pywps handles UUID-dir creation, but not nested context-dir
-            self.response.outputs[output_id]._storage = storage  # noqa: W0212
+            storage.prefix = output_prefix
+        else:
+            storage.target = os.path.join(storage.target, output_prefix)
+            storage.output_url = os.path.join(storage.output_url, output_prefix)
+            os.makedirs(storage.target, exist_ok=True)  # pywps handles Job UUID dir creation, but not nested dirs
 
         # pywps will resolve file paths for us using its WPS request UUID
         os.makedirs(self.workdir, exist_ok=True)
@@ -1827,12 +1929,40 @@ class WpsPackage(Process):
 
         if os.path.realpath(result_loc) != os.path.realpath(result_wps):
             self.logger.info("Moving [%s]: [%s] -> [%s]", output_id, result_loc, result_wps)
-            shutil.move(result_loc, result_wps)
+            if result_is_dir:
+                adjust_directory_local(result_loc, self.workdir, OutputMethod.MOVE)
+            else:
+                adjust_file_local(result_loc, self.workdir, OutputMethod.MOVE)
         # params 'as_reference + file' triggers 'ComplexOutput.json' to map the WPS-output URL from the WPS workdir
         self.response.outputs[output_id].as_reference = True
         self.response.outputs[output_id].file = result_wps
+        # Since each output has its own storage already prefixed by '[Context/]JobID/', avoid JobID nesting another dir.
+        # Instead, let it create a dir matching the output ID to get '[Context/]JobID/OutputID/[file(s).ext]'
+        self.response.outputs[output_id].uuid = output_id
 
         self.logger.info("Resolved WPS output [%s] as file reference: [%s]", output_id, result_wps)
+
+    def make_location_storage(self, storage_type, location_type):
+        # type: (STORE_TYPE, PACKAGE_COMPLEX_TYPES) -> StorageAbstract
+        """
+        Generates the relevant storage implementation with requested types and references.
+
+        :param storage_type: Where to store the outputs.
+        :param location_type: Type of output as defined by CWL package type.
+        :return: Storage implementation.
+        """
+        if location_type == PACKAGE_FILE_TYPE and storage_type == STORE_TYPE.PATH:
+            return FileStorageBuilder().build()
+        if location_type == PACKAGE_FILE_TYPE and storage_type == STORE_TYPE.S3:
+            return S3StorageBuilder().build()
+        if location_type == PACKAGE_DIRECTORY_TYPE and storage_type == STORE_TYPE.PATH:
+            return DirectoryNestedStorage(FileStorageBuilder().build())
+        if location_type == PACKAGE_DIRECTORY_TYPE and storage_type == STORE_TYPE.S3:
+            return DirectoryNestedStorage(S3StorageBuilder().build())
+        raise PackageExecutionError(
+            "Cannot resolve unknown location storage for "
+            f"(storage: {storage_type}, type: {location_type})."
+        )
 
     def make_tool(self, toolpath_object, loading_context):
         # type: (CWL_ToolPathObject, LoadingContext) -> ProcessCWL

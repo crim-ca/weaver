@@ -172,11 +172,6 @@ if TYPE_CHECKING:
     CWL_RequirementsDict = Dict[CWL_RequirementNames, Dict[str, str]]   # {'<req>': {<param>: <val>}}
     CWL_RequirementsList = List[CWL_Requirement]       # [{'class': <req>, <param>: <val>}]
     CWL_AnyRequirements = Union[CWL_RequirementsDict, CWL_RequirementsList]
-    # results from CWL execution
-    CWL_ResultFile = TypedDict("CWL_ResultFile", {"location": str}, total=False)
-    CWL_ResultValue = Union[AnyValueType, List[AnyValueType]]
-    CWL_ResultEntry = Union[Dict[str, CWL_ResultValue], CWL_ResultFile, List[CWL_ResultFile]]
-    CWL_Results = Dict[str, CWL_ResultEntry]
     CWL_Class = Literal["CommandLineTool", "ExpressionTool", "Workflow"]
     CWL_WorkflowStep = TypedDict("CWL_WorkflowStep", {
         "run": str,
@@ -232,33 +227,56 @@ if TYPE_CHECKING:
 
     # CWL runtime
     CWL_RuntimeLiteral = Union[str, float, int]
+    CWL_RuntimeLiteralItem = Union[CWL_RuntimeLiteral, List[CWL_RuntimeLiteral]]
     CWL_RuntimeLiteralObject = TypedDict("CWL_RuntimeLiteralObject", {
         "id": str,
-        "value": CWL_RuntimeLiteral,
+        "value": CWL_RuntimeLiteralItem,
     }, total=False)
     CWL_RuntimeInputFile = TypedDict("CWL_RuntimeInputFile", {
         "id": NotRequired[str],
-        "class": str,
-        "location": str,
+        "class": Required[Literal["File"]],
+        "location": Required[str],
         "format": NotRequired[Optional[str]],
-        "basename": str,
-        "nameroot": str,
-        "nameext": str,
+        "basename": NotRequired[str],
+        "nameroot": NotRequired[str],
+        "nameext": NotRequired[str],
     }, total=False)
     CWL_RuntimeOutputFile = TypedDict("CWL_RuntimeOutputFile", {
-        "class": str,
-        "location": str,
+        "class": Required[Literal["File"]],
+        "location": Required[str],
         "format": NotRequired[Optional[str]],
-        "basename": str,
-        "nameroot": str,
-        "nameext": str,
+        "basename": NotRequired[str],
+        "nameroot": NotRequired[str],
+        "nameext": NotRequired[str],
         "checksum": NotRequired[str],
-        "size": NotRequired[str],
+        "size": NotRequired[int],
     }, total=False)
-    CWL_RuntimeInput = Union[CWL_RuntimeLiteral, CWL_RuntimeInputFile]
+    CWL_RuntimeInputDirectory = TypedDict("CWL_RuntimeInputDirectory", {
+        "id": NotRequired[str],
+        "class": Required[Literal["Directory"]],
+        "location": Required[str],
+        "format": NotRequired[Optional[str]],
+        "nameroot": NotRequired[str],
+        "nameext": NotRequired[str],
+        "basename": NotRequired[str],
+        "listing": List[CWL_RuntimeInputFile],
+    }, total=False)
+    CWL_RuntimeOutputDirectory = TypedDict("CWL_RuntimeOutputDirectory", {
+        "class": Required[Literal["Directory"]],
+        "location": Required[str],
+        "format": NotRequired[Optional[str]],
+        "basename": NotRequired[str],
+        "nameroot": NotRequired[str],
+        "nameext": NotRequired[str],
+        "checksum": NotRequired[str],
+        "size": NotRequired[Literal[0]],
+        "listing": List[CWL_RuntimeOutputFile],
+    }, total=False)
+    CWL_RuntimeInput = Union[CWL_RuntimeLiteralItem, CWL_RuntimeInputFile, CWL_RuntimeInputDirectory]
     CWL_RuntimeInputsMap = Dict[str, CWL_RuntimeInput]
-    CWL_RuntimeInputList = List[Union[CWL_RuntimeLiteralObject, CWL_RuntimeInputFile]]
-    CWL_RuntimeOutput = Union[CWL_RuntimeLiteral, CWL_RuntimeOutputFile]
+    CWL_RuntimeInputList = List[Union[CWL_RuntimeLiteralObject, CWL_RuntimeInputFile, CWL_RuntimeInputDirectory]]
+    CWL_RuntimeOutput = Union[CWL_RuntimeLiteral, CWL_RuntimeOutputFile, CWL_RuntimeOutputDirectory]
+    CWL_Results = Dict[str, CWL_RuntimeOutput]
 
     # OWSLib Execution
     # inputs of OWSLib are either a string (any literal type, bbox or complex file)

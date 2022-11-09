@@ -458,7 +458,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
 
         Omitted ``default`` field in formats during deployment must only add them later on during process description.
 
-        .. versionchanged:: 4.11.0
+        .. versionchanged:: 4.11
             Previously, ``default: False`` would be added automatically *during deployment parsing*
             (from :mod:`colander` deserialization) when omitted in the submitted payload.
             This caused comparison between submitted ``inputs`` and ``outputs`` against their parsed counterparts
@@ -2167,7 +2167,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         """
         Verify that remote HTTP files providing valid ``Content-Disposition`` header will be fetched with ``filename``.
 
-        .. versionadded:: 4.4.0
+        .. versionadded:: 4.4
         """
         cwl = {
             "cwlVersion": "v1.0",

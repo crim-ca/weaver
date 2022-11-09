@@ -1410,7 +1410,7 @@ the configured :term:`WPS` output directory.
     Header ``X-WPS-Output-Context`` is ignored when using `S3` buckets for output location since they are stored
     individually per :term:`Job` UUID, and hold no relevant *context* location. See also :ref:`conf_s3_buckets`.
 
-.. versionadded:: 4.3.0
+.. versionadded:: 4.3
     Addition of the ``X-WPS-Output-Context`` header.
 
 Email Notification

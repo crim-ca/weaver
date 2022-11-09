@@ -91,7 +91,7 @@ def test_format_variations():
     """
     Test format parsing for deployment payload.
 
-    .. versionchanged:: 4.11.0
+    .. versionchanged:: 4.11
         Omitted field ``default: False`` not added automatically *during deployment* anymore.
         It remains there if provided though, and will be added once again during process description parsing.
 

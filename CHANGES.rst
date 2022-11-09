@@ -20,7 +20,13 @@ Changes:
   (see AWS documentation
   `Methods for accessing a bucket <https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-bucket-intro.html>`_).
 - Apply more validation rules against expected `S3` file or directory reference formats.
-- Update documentation regarding handling of `S3` references (more formats supported) and ``Directory`` type.
+- Update documentation regarding handling of `S3` references (more formats supported) and ``Directory`` type references.
+- Support ``weaver.wps_output_context`` setting and ``X-WPS-Output-Context`` request header resolution in combination
+  with `S3` bucket location employed for storing `Job` outputs.
+- Nest every complex `Job` output (regardless if stored on local `WPS` outputs or on `S3`, and whether the output is
+  of ``File`` or ``Directory`` type) under its corresponding output ID collected from the `Process` definition to avoid
+  potential name conflicts in storage location, especially in the case of multiple output IDs that could be aggregated
+  with various files and listing of directory contents.
 - Allow ``colander.SchemaNode`` (with extensions for `OpenAPI` schema converters) to provide validation ``pattern``
   field directly with a compiled ``re.Pattern`` object.
 
