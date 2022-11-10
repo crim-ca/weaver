@@ -219,3 +219,64 @@ def test_auth_handler_cookie():
     assert "Authorization" not in resp.headers
     assert "Cookie" in resp.headers and len(resp.headers["Cookie"])
     assert resp.headers["Cookie"] == token
+
+
+@pytest.mark.cli
+def test_href_inputs_not_uploaded_to_vault():
+    mock_result = OperationResult(False, code=500)
+
+    def mock_upload(_href, *_, **__):
+        return mock_result
+
+    inputs = {"file": {"href": "https://fake.domain.com/fakefile.zip"}}
+    with mock.patch("weaver.cli.WeaverClient.upload", side_effect=mock_upload):
+        result = WeaverClient()._update_files(inputs=inputs)
+    assert result is not mock_result, "WeaverCLient.upload should not be called since reference is not local"
+    assert result == (inputs, {})
+
+
+@pytest.mark.cli
+def test_file_inputs_uploaded_to_vault():
+    fake_href = "https://some-host.com/some-file.zip"
+    fake_id = "fake_id"
+    fake_token = "fake_token"
+
+    output_body = {"file_href": fake_href, "file_id": fake_id, "access_token": fake_token}
+    expected_output = (
+        {
+            "file": {
+                "format": {
+                    "mediaType": ContentType.APP_ZIP
+                },
+                "href": fake_href
+            }
+        },
+        {
+            "X-Auth-Vault": f"token {fake_token}; id={fake_id}"
+        }
+    )
+
+    mock_result = OperationResult(True, code=200, body=output_body)
+
+    def mock_upload(_href, *_, **__):
+        return mock_result
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".zip") as input_file:
+        inputs = {"file": {"href": input_file.name}}
+        with mock.patch("weaver.cli.WeaverClient.upload", side_effect=mock_upload):
+            result = WeaverClient()._update_files(inputs=inputs)
+    assert result == expected_output
+
+
+@pytest.mark.cli
+def test_file_inputs_not_uploaded_to_vault():
+    mock_result = OperationResult(False, code=500)  # Simulate a problem with vault upload
+
+    def mock_upload(_href, *_, **__):
+        return mock_result
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".zip") as input_file:
+        inputs = {"file": {"href": input_file.name}}
+        with mock.patch("weaver.cli.WeaverClient.upload", side_effect=mock_upload):
+            result = WeaverClient()._update_files(inputs=inputs)
+    assert result is mock_result, "WeaverCLient.upload is expected to be called and should return a failed result."
