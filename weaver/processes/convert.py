@@ -93,7 +93,7 @@ from weaver.wps.utils import get_wps_client
 from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Type, Union
+    from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional, Tuple, Type, Union
     from urllib.parse import ParseResult
 
     from pywps.app import WPSRequest
@@ -820,26 +820,32 @@ def ogcapi2cwl_process(payload, reference):
     return cwl_package, payload_copy
 
 
-def is_cwl_file_type(io_info):
-    # type: (CWL_IO_Type) -> bool
+def is_cwl_complex_type(io_info, complex_types=PACKAGE_COMPLEX_TYPES):
+    # type: (CWL_IO_Type, Iterable[CWL_IO_ComplexType]) -> bool
     """
-    Identifies if the provided `CWL` input/output corresponds to one, many or potentially a ``File`` type(s).
+    Identifies if the provided :term:`CWL` input/output corresponds to one, many or a potential `Complex` type(s).
 
-    When multiple distinct *atomic* types are allowed for a given I/O (e.g.: ``[string, File]``) and that one of them
-    is a ``File``, the result will be ``True`` even if other types are not ``Files``.
-    Potential ``File`` when other base type is ``"null"`` will also return ``True``.
+    When multiple distinct *atomic* types are allowed for a given I/O (e.g.: ``type: [string, File]``) and that one
+    of them is one of the considered `Complex` type, the result will be ``True`` even if other types are not `Complex`.
+    Similarly, optional `Complex` types combined with ``"null"`` will also return ``True``.
+
+    :param io_info: I/O to verify for complex type.
+    :param complex_types:
+        Complex types to consider.
+        By default, any type between :term:`CWL` ``File`` and ``Directory`` are valid.
+        The operation can be limited to one or the other if needed to identify a specific one.
     """
     io_type = io_info.get("type")
     if not io_type:
         raise ValueError(f"Missing CWL 'type' definition: [{io_info!s}]")
     if isinstance(io_type, str):
-        return io_type == PACKAGE_FILE_TYPE
+        return io_type in complex_types
     if isinstance(io_type, dict):
         if io_type["type"] == PACKAGE_ARRAY_BASE:
-            return io_type["items"] == PACKAGE_FILE_TYPE
-        return io_type["type"] == PACKAGE_FILE_TYPE
+            return io_type["items"] in complex_types
+        return io_type["type"] in complex_types
     if isinstance(io_type, list):
-        return any(typ == PACKAGE_FILE_TYPE or is_cwl_file_type({"type": typ}) for typ in io_type)
+        return any(typ in complex_types or is_cwl_complex_type({"type": typ}, complex_types) for typ in io_type)
     raise ValueError(f"Unknown parsing of CWL 'type' format ({type(io_type)!s}) [{io_type!s}] in [{io_info}]")
 
 

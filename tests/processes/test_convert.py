@@ -42,7 +42,7 @@ from weaver.processes.convert import (
     cwl2wps_io,
     get_cwl_io_type,
     get_io_type_category,
-    is_cwl_file_type,
+    is_cwl_complex_type,
     json2wps_allowed_values,
     json2wps_datatype,
     merge_io_formats,
@@ -685,31 +685,31 @@ def test_parse_cwl_enum_type_int():
     assert res.symbols == [1, 2, 3]
 
 
-def test_is_cwl_file_type_guaranteed_file():
+def test_is_cwl_complex_type_guaranteed_file():
     io_info = {
         "name": "test",
         "type": "File"
     }
-    assert is_cwl_file_type(io_info)
+    assert is_cwl_complex_type(io_info)
 
 
-def test_is_cwl_file_type_potential_file():
+def test_is_cwl_complex_type_potential_file():
     io_info = {
         "name": "test",
         "type": ["null", "File"]
     }
-    assert is_cwl_file_type(io_info)
+    assert is_cwl_complex_type(io_info)
 
 
-def test_is_cwl_file_type_file_array():
+def test_is_cwl_complex_type_file_array():
     io_info = {
         "name": "test",
         "type": {"type": "array", "items": "File"}
     }
-    assert is_cwl_file_type(io_info)
+    assert is_cwl_complex_type(io_info)
 
 
-def test_is_cwl_file_type_none_one_or_many_files():
+def test_is_cwl_complex_type_none_one_or_many_files():
     io_info = {
         "name": "test",
         "type": [
@@ -718,7 +718,7 @@ def test_is_cwl_file_type_none_one_or_many_files():
             {"type": "array", "items": "File"}
         ]
     }
-    assert is_cwl_file_type(io_info)
+    assert is_cwl_complex_type(io_info)
 
 
 @pytest.mark.parametrize("test_type", [
@@ -732,9 +732,9 @@ def test_is_cwl_file_type_none_one_or_many_files():
     {"type": "array", "items": "int"},
     ["null", {"type": "array", "items": "string"}],
 ])
-def test_is_cwl_file_type_not_files(test_type):
+def test_is_cwl_complex_type_not_files(test_type):
     io_info = {"name": f"test", "type": test_type}
-    assert not is_cwl_file_type(io_info)
+    assert not is_cwl_complex_type(io_info)
 
 
 def assert_formats_equal_any_order(format_result, format_expect):

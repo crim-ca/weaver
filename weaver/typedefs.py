@@ -223,7 +223,7 @@ if TYPE_CHECKING:
 
     # CWL loading
     CWL_WorkflowInputs = Dict[str, AnyValueType]    # mapping of ID:value (any type)
-    CWL_ExpectedOutputs = Dict[str, AnyValueType]   # mapping of ID:pattern (File only)
+    CWL_ExpectedOutputs = Dict[str, AnyValueType]   # mapping of ID:glob-pattern (File/Directory only)
     JobProcessDefinitionCallback = Callable[[str, Dict[str, str], Dict[str, Any]], WpsProcessInterface]
 
     # CWL runtime

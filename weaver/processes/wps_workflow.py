@@ -20,7 +20,7 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_ESGF_CWT,
     CWL_REQUIREMENT_APP_WPS1
 )
-from weaver.processes.convert import is_cwl_file_type
+from weaver.processes.convert import is_cwl_complex_type
 from weaver.utils import get_settings
 from weaver.wps.utils import get_wps_output_dir
 
@@ -218,15 +218,9 @@ class WpsWorkflowJob(CommandLineJob):
         builder.pathmapper = self.pathmapper
 
         self.wps_process = wps_process  # type: WpsProcessInterface
-        self.expected_outputs = {}      # type: CWL_ExpectedOutputs  # {id: file-pattern}
+        self.expected_outputs = {}      # type: CWL_ExpectedOutputs  # {id: glob-pattern}
         for output in expected_outputs:
-            # TODO Should we support something else?
-            if is_cwl_file_type(output):
-                # Expecting output to look like this
-                # output = {"id": "file:///tmp/random_path/process_name#output_id,
-                #           "type": "File",
-                #           "outputBinding": {"glob": output_name }
-                #          }
+            if is_cwl_complex_type(output):
                 output_id = shortname(output["id"])
                 output_glob = output["outputBinding"]["glob"].split("/")[-1]
                 self.expected_outputs[output_id] = (
