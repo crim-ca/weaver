@@ -932,11 +932,14 @@ class DirectoryNestedStorage(CachedStorage):
         if not os.path.isdir(root):
             raise ValueError(f"Location is not a directory: [{root}]")
         files = list_directory_recursive(root)
+        root = root.rstrip("/") + "/"
         for file in files:
-            out_file = ComplexOutput(output.identifier, title=output.title)
+            out_file_path_rel = file.split(root, 1)[-1]
+            out_cache_key = os.path.join(str(output.uuid), out_file_path_rel)
+            out_file = ComplexOutput(out_cache_key, title=output.title)
             out_file.storage = self.storage
             out_file.file = file
-            out_file.uuid = os.path.join(str(output.uuid), os.path.basename(file))
+            out_file.uuid = output.uuid  # forward base directory auto-generated when storing file
             _, out_path, out_url = self.storage.store(out_file)
             LOGGER.debug("Stored file [%s] for reference [%s] under [%s] directory located in [%s] for reference [%s].",
                          out_path, out_url, output.uuid,
@@ -1764,7 +1767,7 @@ class WpsPackage(Process):
         #       - https://github.com/crim-ca/weaver/issues/91
         #   since href is already handled (pulled and staged locally), use it directly to avoid double fetch with CWL
         #   validate using the internal '_file' instead of 'file' otherwise we trigger the fetch
-        #   normally, file should be pulled an this check should fail
+        #   normally, file should be pulled and this check should fail
         input_definition_file = input_definition._iohandler._file  # noqa: W0212
         if input_definition_file and os.path.isfile(input_definition_file):
             input_location = input_definition_file
