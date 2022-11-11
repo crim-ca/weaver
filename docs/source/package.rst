@@ -520,6 +520,7 @@ data types. When :term:`OpenAPI` schema are detected, they are also considered i
 other specifications provided in :term:`CWL` and :term:`WPS` contexts. More details about :term:`OAS` context is
 provided in :ref:`oas_io_schema` section.
 
+.. _dir_ref_type:
 .. _cwl-dir:
 
 Directory Type
@@ -533,9 +534,10 @@ type of reference, a ``Complex`` "*pseudo-file*" using Media-Type ``application/
 validation that a ``Directory`` is properly parsed by `Weaver`, provided URL references must also end with a trailing
 slash (``/``) character.
 
-Note that, when using ``Directory`` type, very few format and content validation can be accomplished for individual
-files contained in that directory. The contents must therefore match the definitions expected by the application
-receiving it. No explicit validation is accomplished by `Weaver` to ensure if expected contents are available.
+.. warning::
+    Note that, when using ``Directory`` type, very few format and content validation can be accomplished for individual
+    files contained in that directory. The contents must therefore match the definitions expected by the application
+    receiving it. No explicit validation is accomplished by `Weaver` to ensure if expected contents are available.
 
 When a ``Directory`` type is specified in the :term:`Process` definition, and that
 a :ref:`File Reference <file_ref_types>` is provided during :ref:`Execution <proc_op_execute>`, the reference
@@ -563,14 +565,11 @@ The following ``Directory`` listing formats are supported.
     |                                                           | ``<a>`` hyperlinks, and can contain any amount of    |
     |                                                           | CSS or nested HTML tags.                             |
     +-----------------------------------------------------------+------------------------------------------------------+
-    | .. code-block:: json                                      | A :term:`JSON` body returned from an endpoint        |
+    | .. literalinclude:: ../examples/directory-listing.json    | A :term:`JSON` body returned from an endpoint        |
     |    :caption: JSON File List                               | obtained by ``GET`` request, which advertises the    |
-    |                                                           | corresponding ``Content-Type: application/json``     |
-    |    [                                                      | header. Each listed file to be staged should also    |
-    |      "https://example.com/base/dir/README.md",            | be accessible on provided endpoints.                 |
-    |      "https://example.com/base/dir/nested/image.png",     |                                                      |
-    |      "https://example.com/base/dir/nested/data.csv"       |                                                      |
-    |    ]                                                      |                                                      |
+    |    :language: json                                        | corresponding ``Content-Type: application/json``     |
+    |                                                           | header. Each listed file to be staged should also    |
+    |                                                           | be accessible on provided endpoints.                 |
     +-----------------------------------------------------------+------------------------------------------------------+
     | .. literalinclude:: ../examples/directory-listing-s3.json | Any supported :term:`S3` endpoint as detailed in     |
     |    :caption: AWS S3 Bucket                                | |aws_s3_bucket_access|_ that provides a listing      |

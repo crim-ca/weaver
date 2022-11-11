@@ -3,7 +3,7 @@ beaker
 beautifulsoup4
 # AWS support (S3 buckets)
 boto3
-boto3-stubs-lite[s3]
+boto3-stubs[s3]
 # windows fixes until
 # https://github.com/celery/billiard/issues/260
 # https://github.com/celery/billiard/issues/313
