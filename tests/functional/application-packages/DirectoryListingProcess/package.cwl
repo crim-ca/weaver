@@ -13,7 +13,7 @@ requirements:
           set -x
           echo "Input: $1"
           echo "Output: $(runtime.outdir)/output.txt"
-          find "$1" ! -type d -exec ls -lht {} + > output.txt
+          find "$1" ! -type d -exec ls -lh {} + > output.txt
           cat output.txt
 inputs:
   input_dir:

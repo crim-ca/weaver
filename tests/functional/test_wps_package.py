@@ -2488,9 +2488,9 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             assert os.path.isdir(out_dir)
             expect_out_files = {
                 # the process itself makes a flat list of input files, this is not a byproduct of dir-type output
-                os.path.isfile(os.path.join(out_dir, os.path.basename(file)))
-                for file in expect_http_files
+                os.path.join(out_dir, os.path.basename(file)) for file in expect_http_files
             }
+            assert all(os.path.isfile(file) for file in expect_out_files)
             output_dir_files = {os.path.join(root, file) for root, _, files in os.walk(out_dir) for file in files}
             assert output_dir_files == expect_out_files
 

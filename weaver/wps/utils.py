@@ -194,13 +194,17 @@ def map_wps_output_location(reference, container, url=False, exists=True, file_s
 
     :param reference: Local file path or file URL to be mapped.
     :param container: Retrieve application settings.
-    :param url: Perform URL mapping (local path -> URL endpoint), or map to local path (URL -> local path).
+    :param url: Perform URL mapping (``True``: local path -> URL endpoint, ``False``: URL endpoint -> local path).
     :param exists: Ensure that the mapped file exists, otherwise don't map it (otherwise ``None``).
     :param file_scheme:
         Ensure that the 'file://' scheme is applied to resulting local file location when mapped from WPS output URL.
         When in 'reverse' mode, 'file://' is always removed if present to form a potential local file path.
     :returns: Mapped reference that corresponds to the local/URL WPS output location.
     """
+    def ref_exists(ref):
+        # type: (str) -> bool
+        return os.path.isdir(ref) if ref.endswith("/") else os.path.isfile(ref)
+
     settings = get_settings(container)
     wps_out_dir = get_wps_output_dir(settings)
     wps_out_url = get_wps_output_url(settings)
@@ -208,11 +212,11 @@ def map_wps_output_location(reference, container, url=False, exists=True, file_s
         reference = reference[7:]
     if url and reference.startswith(wps_out_dir):
         wps_out_ref = reference.replace(wps_out_dir, wps_out_url, 1)
-        if not exists or os.path.isfile(reference):
+        if not exists or ref_exists(reference):
             return wps_out_ref
     elif not url and reference.startswith(wps_out_url):
         wps_out_ref = reference.replace(wps_out_url, wps_out_dir, 1)
-        if not exists or os.path.isfile(wps_out_ref):
+        if not exists or ref_exists(wps_out_ref):
             if file_scheme:
                 return "file://" + wps_out_ref
             return wps_out_ref

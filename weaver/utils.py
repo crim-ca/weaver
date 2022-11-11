@@ -237,6 +237,7 @@ class Lazify(object):
         return self.func()
 
     def __str__(self):
+        # type: () -> str
         return f"{self.func()!s}"
 
 
@@ -1819,7 +1820,7 @@ def download_file_http(file_reference, file_outdir, settings=None, callback=None
 
     LOGGER.debug("Fetch file resolved as remote URL reference.")
     request_kwargs.pop("stream", None)
-    resp = request_extra("get", file_reference, stream=True, retries=3, settings=settings, **request_kwargs)
+    resp = request_extra("GET", file_reference, stream=True, retries=3, settings=settings, **request_kwargs)
     if resp.status_code >= 400:
         # pragma: no cover
         # use method since response object does not derive from Exception, therefore cannot be raised directly
@@ -2107,6 +2108,7 @@ def fetch_file(file_reference,                      # type: str
     Requests will consider ``weaver.request_options`` when using ``http(s)://`` scheme.
 
     .. seealso::
+        - :func:`fetch_reference`
         - :func:`resolve_scheme_options`
         - :func:`adjust_file_local`
         - :func:`download_file_http`
@@ -2765,12 +2767,13 @@ def fetch_directory(location,                           # type: str
                     exclude=None,                       # type: Optional[List[str]]
                     matcher=PathMatchingMethod.GLOB,    # type: PathMatchingMethod
                     settings=None,                      # type: Optional[AnySettingsContainer]
-                    **option_kwargs,                    # type: Any
+                    **option_kwargs,                    # type: Any  # Union[SchemeOptions, RequestOptions]
                     ):                                  # type: (...) -> List[str]
     """
     Fetches all files that can be listed from a directory in local or remote location.
 
     .. seealso::
+        - :func:`fetch_reference`
         - :func:`resolve_scheme_options`
         - :func:`adjust_directory_local`
         - :func:`download_files_html`
@@ -2846,6 +2849,81 @@ def fetch_directory(location,                           # type: str
     return listing
 
 
+@overload
+def fetch_reference(reference,                          # type: str
+                    out_dir,                            # type: Path
+                    *,                                  # force named keyword arguments after
+                    out_listing=False,                  # type: Literal[False]
+                    out_method=OutputMethod.AUTO,       # type: OutputMethod
+                    settings=None,                      # type: Optional[AnySettingsContainer]
+                    **option_kwargs,                    # type: Any  # Union[SchemeOptions, RequestOptions]
+                    ):                                  # type: (...) -> str
+    ...
+
+
+@overload
+def fetch_reference(reference,                          # type: str
+                    out_dir,                            # type: Path
+                    *,                                  # force named keyword arguments after
+                    out_listing=False,                  # type: Literal[True]
+                    out_method=OutputMethod.AUTO,       # type: OutputMethod
+                    settings=None,                      # type: Optional[AnySettingsContainer]
+                    **option_kwargs,                    # type: Any  # Union[SchemeOptions, RequestOptions]
+                    ):                                  # type: (...) -> List[str]
+    ...
+
+
+def fetch_reference(reference,                          # type: str
+                    out_dir,                            # type: Path
+                    *,                                  # force named keyword arguments after
+                    out_listing=False,                  # type: bool
+                    out_method=OutputMethod.AUTO,       # type: OutputMethod
+                    settings=None,                      # type: Optional[AnySettingsContainer]
+                    **option_kwargs,                    # type: Any  # Union[SchemeOptions, RequestOptions]
+                    ):                                  # type: (...) -> Union[str, List[str]]
+    """
+    Fetches the single file or nested directory files from a local or remote location.
+
+    The appropriate method depends on the format of the location.
+    If conditions from :ref:`cwl-dir` are met, the reference will be considered a ``Directory``.
+    In every other situation, a single ``File`` reference will be considered.
+
+    .. seealso::
+        See the relevant handling methods below for other optional arguments.
+
+        - :func:`fetch_file`
+        - :func:`fetch_directory`
+
+    :param reference:
+        Local filesystem path (optionally prefixed with ``file://``), ``s3://`` bucket location or ``http(s)://``
+        remote URL file or directory reference. Reference ``https://s3.[...]`` are also considered as ``s3://``.
+    :param out_dir: Output local directory path under which to place the fetched file or directory.
+    :param out_listing:
+        Request that the complete file listing of the directory reference is returned.
+        Otherwise, return the local directory reference itself.
+        In the event of a file reference as input, the returned path will always be the fetched file itself, but it
+        will be contained within a single-item list if listing was ``True`` for consistency in the returned type with
+        the corresponding call for a directory reference.
+    :param settings: Additional request-related settings from the application configuration (notably request-options).
+    :param out_method:
+        Method employed to handle the generation of the output file or directory.
+        Only applicable when the reference is local. Remote location always generates a local copy.
+    :param option_kwargs:
+        Additional keywords to forward to the relevant handling method by scheme.
+        Keywords should be defined as ``{scheme}_{option}`` with one of the known :data:`SUPPORTED_FILE_SCHEMES`.
+        If not prefixed by any scheme, the option will apply to all handling methods (if applicable).
+    :return: Path of the local copy of the fetched file, the directory, or the listing of the directory files.
+    :raises HTTPException: applicable HTTP-based exception if any occurred during the operation.
+    :raises ValueError: when the reference scheme cannot be identified.
+    """
+    if reference.endswith("/"):
+        path = fetch_directory(reference, out_dir, out_method=out_method, settings=settings, **option_kwargs)
+        path = path if out_listing else (os.path.realpath(out_dir) + "/")
+    else:
+        path = fetch_file(reference, out_dir, out_method=out_method, settings=settings, **option_kwargs)
+    return [path] if out_listing and isinstance(path, str) else path
+
+
 def load_file(file_path, text=False):
     # type: (str, bool) -> Union[JSON, str]
     """
@@ -2862,7 +2940,7 @@ def load_file(file_path, text=False):
         if is_remote_file(file_path):
             settings = get_settings()
             headers = {"Accept": ContentType.TEXT_PLAIN}
-            cwl_resp = request_extra("get", file_path, headers=headers, settings=settings)
+            cwl_resp = request_extra("GET", file_path, headers=headers, settings=settings)
             return cwl_resp.content if text else yaml.safe_load(cwl_resp.content)
         with open(file_path, mode="r", encoding="utf-8") as f:
             return f.read() if text else yaml.safe_load(f)

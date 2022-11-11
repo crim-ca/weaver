@@ -91,7 +91,6 @@ from weaver.status import STATUS_PYWPS_IDS, Status, StatusCompliant, map_status
 from weaver.store.base import StoreJobs, StoreProcesses
 from weaver.utils import (
     SUPPORTED_FILE_SCHEMES,
-    Lazify,
     OutputMethod,
     adjust_directory_local,
     adjust_file_local,
@@ -921,18 +920,13 @@ class DirectoryNestedStorage(CachedStorage):
         .. note::
             This is called from :meth:`CachedStorage.store` only if not already in storage using cached output ID.
         """
-        path = None
-        if isinstance(self.storage, FileStorage):
-            path = self.storage.target.rstrip("/") + "/"
-        if isinstance(self.storage, S3Storage):
-            path = self.storage.prefix.rstrip("/") + "/"
-        if not path:
-            raise NotImplementedError
         root = output.file
         if not os.path.isdir(root):
             raise ValueError(f"Location is not a directory: [{root}]")
         files = list_directory_recursive(root)
         root = root.rstrip("/") + "/"
+        dir_path = self.location(output.identifier) + "/"
+        url_path = self.url(output.identifier) + "/"
         for file in files:
             out_file_path_rel = file.split(root, 1)[-1]
             out_cache_key = os.path.join(str(output.uuid), out_file_path_rel)
@@ -942,10 +936,8 @@ class DirectoryNestedStorage(CachedStorage):
             out_file.uuid = output.uuid  # forward base directory auto-generated when storing file
             _, out_path, out_url = self.storage.store(out_file)
             LOGGER.debug("Stored file [%s] for reference [%s] under [%s] directory located in [%s] for reference [%s].",
-                         out_path, out_url, output.uuid,
-                         Lazify(lambda: self.location(output.uuid)),
-                         Lazify(lambda: self.url(output.uuid)))
-        return self.type, path, self.url("")
+                         out_path, out_url, output.uuid, dir_path, url_path)
+        return self.type, dir_path, url_path
 
     def write(self, data, destination, data_format=None):
         # type: (AnyStr, str, Optional[Format]) -> str
@@ -1610,8 +1602,8 @@ class WpsPackage(Process):
             self.update_status("Package complete.", PACKAGE_PROGRESS_DONE, Status.SUCCEEDED)
         return self.response
 
-    def must_fetch(self, input_ref):
-        # type: (str) -> bool
+    def must_fetch(self, input_ref, input_type):
+        # type: (str, PACKAGE_COMPLEX_TYPES) -> bool
         """
         Figures out if file reference should be fetched immediately for local execution.
 
@@ -1619,7 +1611,8 @@ class WpsPackage(Process):
         S3 are handled here to avoid error on remote WPS not supporting it.
 
         .. seealso::
-            - :ref:`File Reference Types`
+            - :ref:`file_ref_types`
+            - :ref:`dir_ref_type`
         """
         if self.remote_execution or self.package_type == ProcessType.WORKFLOW:
             return False
@@ -1628,22 +1621,25 @@ class WpsPackage(Process):
             if input_ref.startswith("s3://"):
                 return True
             return False
-        return not os.path.isfile(input_ref)
+        if input_type == PACKAGE_FILE_TYPE:
+            return not os.path.isfile(input_ref)
+        # fetch if destination directory was created in advance but not yet populated with its contents
+        return not os.path.isdir(input_ref) or not os.listdir(input_ref)
 
     def make_inputs(self,
                     wps_inputs,         # type: Dict[str, Deque[WPS_Input_Type]]
                     cwl_inputs_info,    # type: Dict[str, CWL_Input_Type]
                     ):                  # type: (...) -> Dict[str, ValueType]
         """
-        Converts WPS input values to corresponding CWL input values for processing by CWL package instance.
+        Converts :term:`WPS` input values to corresponding :term:`CWL` input values for processing by the package.
 
-        The WPS inputs must correspond to :mod:`pywps` definitions.
-        Multiple values are adapted to arrays as needed.
-        WPS ``Complex`` types (files) are converted to appropriate locations based on data or reference specification.
+        The :term:`WPS` inputs must correspond to :mod:`pywps` definitions.
+        Multiple values (repeated objects with corresponding IDs) are adapted to arrays as needed.
+        All :term:`WPS` `Complex` types are converted to appropriate locations based on data or reference specification.
 
-        :param wps_inputs: actual WPS inputs parsed from execution request
-        :param cwl_inputs_info: expected CWL input definitions for mapping
-        :return: CWL input values
+        :param wps_inputs: Actual :term:`WPS` inputs parsed from execution request.
+        :param cwl_inputs_info: Expected CWL input definitions for mapping.
+        :return: :term:`CWL` input values.
         """
         cwl_inputs = {}
         for input_id in wps_inputs:
@@ -1761,7 +1757,7 @@ class WpsPackage(Process):
             input_location = input_definition.url
         # FIXME: PyWPS bug
         #   Calling 'file' method fetches it, and it is always called by the package itself
-        #   during type validation if the MODE is anything else than disabled.
+        #   during type validation if the MODE is anything else than disabled (MODE.NONE).
         #   MODE.SIMPLE is needed minimally to check MIME-TYPE of input against supported formats.
         #       - https://github.com/geopython/pywps/issues/526
         #       - https://github.com/crim-ca/weaver/issues/91
@@ -1770,7 +1766,12 @@ class WpsPackage(Process):
         #   normally, file should be pulled and this check should fail
         input_definition_file = input_definition._iohandler._file  # noqa: W0212
         if input_definition_file and os.path.isfile(input_definition_file):
-            input_location = input_definition_file
+            # Because storage handlers assume files, a directory (pseudo-file with trailing '/' unknown to PyWPS)
+            # could be mistakenly generated as an empty file. Wipe it in this case to ensure proper resolution.
+            if input_type == PACKAGE_DIRECTORY_TYPE and os.stat(input_definition_file).st_size == 0:
+                os.remove(input_definition_file)
+            else:
+                input_location = input_definition_file
         # if source type is data, we actually need to call 'data' (without fetch of remote file, already fetched)
         # value of 'file' in this case points to a local file path where the wanted link was dumped as raw data
         if input_definition.source_type == SOURCE_TYPE.DATA:
@@ -1792,7 +1793,7 @@ class WpsPackage(Process):
         #   Patch with a combination of available detection methods to be safe:
         #   - The 'file' attribute gets resolved to the process '{workdir}/input' temporary file.
         #     This 'file' is instead named 'input_{uuid}' when it is actually resolved to real input href/data contents.
-        #     The IO handler better reports 'None' in its internal '_file' attribute.
+        #     The IO handler reports 'None' more reliably with its internal '_file' attribute.
         #   - For even more robustness, verify that erroneous 'data' matches the 'default format'.
         #     The media-type should match and 'default' argument should True since it resolve with '_default' argument.
         default_format_def = getattr(input_definition, "_default", None)
@@ -1816,7 +1817,7 @@ class WpsPackage(Process):
             input_definition
         )
 
-        if self.must_fetch(input_location):
+        if self.must_fetch(input_location, input_type):
             self.logger.info("%s input (%s) ATTEMPT fetch: [%s]", input_type, input_id, input_location)
             if input_type == PACKAGE_FILE_TYPE:
                 input_location = fetch_file(input_location, input_definition.workdir,
@@ -1855,7 +1856,6 @@ class WpsPackage(Process):
         Maps `CWL` result outputs to corresponding `WPS` outputs.
         """
         for output_id in self.request.outputs:  # iterate over original WPS outputs, extra such as logs are dropped
-            # TODO: adjust output for glob patterns (https://github.com/crim-ca/weaver/issues/24)
             if isinstance(cwl_result[output_id], list) and not isinstance(self.response.outputs[output_id], list):
                 if len(cwl_result[output_id]) > 1:
                     self.logger.warning(

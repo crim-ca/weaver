@@ -12,11 +12,12 @@ from weaver.base import Constants
 from weaver.exceptions import PackageExecutionError
 from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import ContentType, repr_json
-from weaver.processes.constants import OpenSearchField
+from weaver.processes.constants import PACKAGE_DIRECTORY_TYPE, PACKAGE_FILE_TYPE, OpenSearchField
 from weaver.processes.utils import map_progress
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.utils import (
-    fetch_file,
+    OutputMethod,
+    fetch_reference,
     fully_qualified_name,
     get_any_id,
     get_any_message,
@@ -291,26 +292,29 @@ class WpsProcessInterface(abc.ABC):
                                  headers=headers, cookies=cookies, **kwargs)
         return response
 
-    def host_file(self, file_path):
+    def host_reference(self, reference):
+        # type: (str) -> str
         """
-        Hosts an intermediate file between :term:`Workflow` steps for processes that require external or remote access.
+        Hosts an intermediate reference between :term:`Workflow` steps for processes that require remote access.
 
-        :param file_path: Intermediate file location (local path expected).
-        :return: Hosted temporary HTTP file location.
+        :param reference: Intermediate file or directory location (local path expected).
+        :return: Hosted temporary HTTP file or directory location.
         """
         wps_out_url = get_wps_output_url(self.settings)
         wps_out_dir = get_wps_output_dir(self.settings)
-        file_path = os.path.realpath(file_path.replace("file://", ""))  # in case CWL->WPS outputs link was made
-        if file_path.startswith(wps_out_dir):
-            file_href = file_path.replace(wps_out_dir, wps_out_url, 1)
-            LOGGER.debug("Hosting file [%s] skipped since already on WPS outputs as [%s]", file_path, file_href)
+        ref_path = os.path.realpath(reference.replace("file://", ""))  # in case CWL->WPS outputs link was made
+        ref_path += "/" if reference.endswith("/") else ""
+        if reference.startswith(wps_out_dir):
+            ref_href = ref_path.replace(wps_out_dir, wps_out_url, 1)
+            LOGGER.debug("Hosting file [%s] skipped since already on WPS outputs as [%s]", reference, ref_href)
         else:
             tmp_out_dir = tempfile.mkdtemp(dir=wps_out_dir)
-            file_link = fetch_file(file_path, tmp_out_dir, settings=self.settings, link=True)
-            file_href = file_link.replace(wps_out_dir, wps_out_url, 1)
+            ref_link = fetch_reference(ref_path, tmp_out_dir, out_listing=False,
+                                       settings=self.settings, out_method=OutputMethod.LINK)
+            ref_href = ref_link.replace(wps_out_dir, wps_out_url, 1)
             self.temp_staging.add(tmp_out_dir)
-            LOGGER.debug("Hosting file [%s] as [%s] on [%s]", file_path, file_link, file_href)
-        return file_href
+            LOGGER.debug("Hosting file [%s] as [%s] on [%s]", reference, ref_link, ref_href)
+        return ref_href
 
     def stage_results(self, results, expected_outputs, out_dir):
         # type: (JobResults, CWL_ExpectedOutputs, str) -> None
@@ -360,19 +364,19 @@ class WpsProcessInterface(abc.ABC):
                 #   Because CWL expects the file to be in specified 'out_dir', make a link for it to be found
                 #   even though the file is stored in the full job output location instead (already staged by step).
                 map_path = map_wps_output_location(value, self.settings)
-                as_link = False
+                out_method = OutputMethod.COPY
                 if map_path:
                     LOGGER.info("Detected result [%s] from [%s] as local reference to this instance. "
                                 "Skipping fetch and using local copy in output destination: [%s]",
                                 res_id, value, dst_path)
                     LOGGER.debug("Mapped result [%s] to local reference: [%s]", value, map_path)
                     src_path = map_path
-                    as_link = True
+                    out_method = OutputMethod.LINK
                 else:
                     LOGGER.info("Fetching result [%s] from [%s] to CWL output destination: [%s]",
                                 res_id, value, dst_path)
                     src_path = value
-                fetch_file(src_path, cwl_out_dir, settings=self.settings, link=as_link)
+                fetch_reference(src_path, cwl_out_dir, out_method=out_method, settings=self.settings)
 
     def stage_inputs(self, workflow_inputs):
         # type: (CWL_WorkflowInputs) -> JobInputs
@@ -386,6 +390,11 @@ class WpsProcessInterface(abc.ABC):
             for workflow_input_value_item in workflow_input_value:
                 if isinstance(workflow_input_value_item, dict) and "location" in workflow_input_value_item:
                     location = workflow_input_value_item["location"]
+                    # if the location came from a collected output resolved by cwltool from a previous Workflow step
+                    # obtained directory type does not contain the expected trailing slash for Weaver reference checks
+                    input_class = workflow_input_value_item.get("class", PACKAGE_FILE_TYPE)
+                    if input_class == PACKAGE_DIRECTORY_TYPE:
+                        location = location.rstrip("/") + "/"
                     execute_body_inputs.append({"id": workflow_input_key, "href": location})
                 else:
                     execute_body_inputs.append({"id": workflow_input_key, "data": workflow_input_value_item})
@@ -398,7 +407,7 @@ class WpsProcessInterface(abc.ABC):
                     exec_input["href"] = f"file{exec_href}"
                     LOGGER.debug("OpenSearch intermediate input [%s] : [%s]", exec_input["id"], exec_input["href"])
                 elif exec_input["href"].startswith("file://"):
-                    exec_input["href"] = self.host_file(exec_input["href"])
+                    exec_input["href"] = self.host_reference(exec_input["href"])
                     LOGGER.debug("Hosting intermediate input [%s] : [%s]", exec_input["id"], exec_input["href"])
         return execute_body_inputs
 

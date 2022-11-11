@@ -998,6 +998,7 @@ def mocked_wps_output(settings,                 # type: SettingsType
                       *,                        # force named keyword arguments after
                       mock_get=True,            # type: bool
                       mock_head=True,           # type: bool
+                      mock_browse_index=False,  # type: bool
                       headers_override=None,    # type: Optional[AnyHeadersContainer]
                       requests_mock=None,       # type: Optional[responses.RequestsMock]
                       ):                        # type: (...) -> Union[responses.RequestsMock, MockPatch]
@@ -1017,6 +1018,7 @@ def mocked_wps_output(settings,                 # type: SettingsType
     :param settings: Application settings to retrieve WPS output configuration.
     :param mock_get: Whether to mock HTTP GET methods received on WPS output URL.
     :param mock_head: Whether to mock HTTP HEAD methods received on WPS output URL.
+    :param mock_browse_index: Whether to mock an ``index.html`` with file listing when requests point to a directory.
     :param headers_override: Override specified headers in produced response.
     :param requests_mock: Previously defined request mock instance to extend with new definitions.
     :return: Mocked response that would normally be obtained by a file server hosting WPS output directory.
@@ -1027,6 +1029,7 @@ def mocked_wps_output(settings,                 # type: SettingsType
         wps_dir, wps_url, settings,
         mock_get=mock_get,
         mock_head=mock_head,
+        mock_browse_index=mock_browse_index,
         headers_override=headers_override,
         requests_mock=requests_mock,
     )

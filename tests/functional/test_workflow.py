@@ -48,6 +48,7 @@ if TYPE_CHECKING:
     from responses import RequestsMock
 
     from weaver.typedefs import (
+        AnyLogLevel,
         AnyRequestMethod,
         AnyResponseType,
         CookiesType,
@@ -330,13 +331,16 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
         return val
 
     @classmethod
-    def log(cls, message, *args, exception=False):
+    def log(cls, message, *args, level=None, exception=False, traceback=False):
+        # type: (str, *Any, Optional[AnyLogLevel], bool, bool) -> None
         if cls.logger_enabled:
             if exception:
                 # also prints traceback of the exception
-                cls.logger.exception(message, *args)
+                cls.logger.exception(message, *args, stack_info=traceback)
             else:
-                cls.logger.log(cls.logger_level, message, *args)
+                if level is None:
+                    level = cls.logger_level
+                cls.logger.log(level, message, *args, stack_info=traceback)
         if exception:
             raise RuntimeError(message)
 
@@ -555,7 +559,8 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
         try:
             assert assert_test(), message
         except AssertionError:
-            cls.log("%s%s:\n%s\n", cls.logger_separator_calls, title, message, exception=True)
+            cls.log("%s%s:\n%s\n", cls.logger_separator_calls, title, message,
+                    level=logging.ERROR, exception=True, traceback=True)
 
     @classmethod
     def is_local(cls):
@@ -1156,7 +1161,16 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
                 mocked_file_server(
                     tmp_dir, tmp_host, self.settings,
                     requests_mock=requests_mock,
-                    mock_browse_index=True
+                    mock_head=True,
+                    mock_get=True,
+                    mock_browse_index=True,
+                )
+                mocked_wps_output(
+                    self.settings,
+                    requests_mock=requests_mock,
+                    mock_head=True,
+                    mock_get=True,
+                    mock_browse_index=True,
                 )
 
             exec_body = {
@@ -1173,7 +1187,8 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
                                            [WorkflowProcesses.APP_DIRECTORY_LISTING_PROCESS,
                                             WorkflowProcesses.APP_DIRECTORY_MERGING_PROCESS],
                                            override_execute_body=exec_body,
-                                           log_full_trace=True, requests_mock_callback=mock_tmp_input)
+                                           log_full_trace=True,
+                                           requests_mock_callback=mock_tmp_input)
 
             stack.enter_context(mocked_wps_output(self.settings))  # allow retrieval of HTTP WPS output
             stage_out_tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())  # different dir to avoid override
@@ -1183,6 +1198,22 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
             output_path = fetch_file(final_output, stage_out_tmp_dir, settings=self.settings)
             with open(output_path, mode="r", encoding="utf-8") as out_file:
                 output_data = out_file.read()
-            expected_data = "\n".join(expect_http_files)
-            self.assert_test(lambda: output_data == expected_data,
-                             message="Workflow output file expected to contain directory listing of input files.")
+            # data should be a sorted literal string listing for the files with permissions and other stat metadata
+            # only the file names should remain (not nested dirs), as per the directory listing package definition
+            # perform initial check that output from 'ls' is found
+            output_lines = list(filter(lambda _line: bool(_line), output_data.split("\n")))
+            self.assert_test(
+                lambda: (
+                    len(output_lines) == len(expect_http_files) and
+                    all(line.startswith("-rw-rw-r-- ") for line in output_lines) and
+                    all(" /var/lib/cwl/stg" in line for line in output_lines)
+                ),
+                message="Workflow output file expected to contain single file with raw string listing of "
+                        "input files chained from generated output directory listing of the first step."
+            )
+            # check that all expected files made it through the listing/directory input/output chaining between steps
+            output_files = "\n".join(os.path.join(*line.rsplit("/", 2)[-2:]) for line in output_lines)
+            expect_files = "\n".join(os.path.join("input_dir", os.path.split(file)[-1]) for file in expect_http_files)
+            self.assert_test(lambda: output_files == expect_files,
+                             message="Workflow output file expected to contain single file with raw string listing of "
+                                     "input files chained from generated output directory listing of the first step.")

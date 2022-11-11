@@ -221,13 +221,8 @@ if TYPE_CHECKING:
     except (AttributeError, ImportError, NameError):
         CWL_ToolPathObject = CWL
 
-    # CWL loading
-    CWL_WorkflowInputs = Dict[str, AnyValueType]    # mapping of ID:value (any type)
-    CWL_ExpectedOutputs = Dict[str, AnyValueType]   # mapping of ID:glob-pattern (File/Directory only)
-    JobProcessDefinitionCallback = Callable[[str, Dict[str, str], Dict[str, Any]], WpsProcessInterface]
-
     # CWL runtime
-    CWL_RuntimeLiteral = Union[str, float, int]
+    CWL_RuntimeLiteral = AnyValueType
     CWL_RuntimeLiteralItem = Union[CWL_RuntimeLiteral, List[CWL_RuntimeLiteral]]
     CWL_RuntimeLiteralObject = TypedDict("CWL_RuntimeLiteralObject", {
         "id": str,
@@ -278,6 +273,11 @@ if TYPE_CHECKING:
     CWL_RuntimeInputList = List[Union[CWL_RuntimeLiteralObject, CWL_RuntimeInputFile, CWL_RuntimeInputDirectory]]
     CWL_RuntimeOutput = Union[CWL_RuntimeLiteral, CWL_RuntimeOutputFile, CWL_RuntimeOutputDirectory]
     CWL_Results = Dict[str, CWL_RuntimeOutput]
+
+    # CWL loading
+    CWL_WorkflowInputs = CWL_RuntimeInputsMap   # mapping of ID:value (any type)
+    CWL_ExpectedOutputs = Dict[str, str]        # mapping of ID:glob-pattern (File/Directory only)
+    JobProcessDefinitionCallback = Callable[[str, Dict[str, str], Dict[str, Any]], WpsProcessInterface]
 
     # OWSLib Execution
     # inputs of OWSLib are either a string (any literal type, bbox or complex file)

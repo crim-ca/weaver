@@ -34,8 +34,9 @@ from weaver.processes.wps_package import get_process_definition
 from weaver.sort import Sort, SortMethods
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.utils import (
+    OutputMethod,
     copy_doc,
-    fetch_file,
+    fetch_reference,
     fully_qualified_name,
     get_any_id,
     get_any_value,
@@ -1444,12 +1445,13 @@ class WeaverClient(object):
                 is_list = False
             for i, item in enumerate(value):
                 if "href" in item:
-                    file_path = fetch_file(item["href"], out_dir, link=False, auth=auth)
+                    ref_path = fetch_reference(item["href"], out_dir, auth=auth,
+                                               out_method=OutputMethod.COPY, out_listing=False)
                     if is_list:
-                        outputs[output][i]["path"] = file_path
+                        outputs[output][i]["path"] = ref_path
                         outputs[output][i]["source"] = "body"
                     else:
-                        outputs[output]["path"] = file_path
+                        outputs[output]["path"] = ref_path
                         outputs[output]["source"] = "body"
 
         # download links from headers
@@ -1462,8 +1464,9 @@ class WeaverClient(object):
             rel = params["rel"][0].split(".")
             output = rel[0]
             is_array = len(rel) > 1 and str.isnumeric(rel[1])
-            file_path = fetch_file(href, out_dir, link=False, auth=auth)
-            value = {"href": href, "type": ctype, "path": file_path, "source": "link"}
+            ref_path = fetch_reference(href, out_dir, auth=auth,
+                                       out_method=OutputMethod.COPY, out_listing=False)
+            value = {"href": href, "type": ctype, "path": ref_path, "source": "link"}
             if output in outputs:
                 if isinstance(outputs[output], dict):  # in case 'rel="<output>.<index"' was not employed
                     outputs[output] = [outputs[output], value]

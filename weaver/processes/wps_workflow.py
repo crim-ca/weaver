@@ -188,8 +188,9 @@ class WpsWorkflow(command_line_tool.CommandLineTool):
             step :term:`Process` outputs were generated locally.
         """
         if "outputBinding" in schema and "glob" in schema["outputBinding"]:
+            # in case of Directory collection with '<dir>/', use '.' because cwltool replaces it by the outdir
             glob = schema["outputBinding"]["glob"]
-            glob = os.path.split(glob)[-1]
+            glob = os.path.split(glob)[-1] or "."
             schema["outputBinding"]["glob"] = glob
         output = super(WpsWorkflow, self).collect_output(
             schema,
@@ -222,12 +223,20 @@ class WpsWorkflowJob(CommandLineJob):
         for output in expected_outputs:
             if is_cwl_complex_type(output):
                 output_id = shortname(output["id"])
-                output_glob = output["outputBinding"]["glob"].split("/")[-1]
-                self.expected_outputs[output_id] = (
-                    output_id + "/" + output_glob
-                    if self.wps_process.stage_output_id_nested else
-                    output_glob
-                )
+                glob_spec = output["outputBinding"]["glob"]
+                glob_list = isinstance(glob_spec, list)
+                out_globs = set()
+                # When applications run by themselves, their output glob could be very
+                # deeply nested to retrieve files under specific directory structures.
+                # However, as Workflow step, those outputs would already have been collected
+                # on the step output dir. The Workflow only needs the last part of the glob
+                # to collect the staged out files without the nested directory hierarchy.
+                for glob in glob_spec if glob_list else [glob_spec]:
+                    # in case of Directory collection with '<dir>/', use '.' because cwltool replaces it by the outdir
+                    out_glob = glob.split("/")[-1] or "."
+                    out_glob = (output_id + "/" + out_glob) if self.wps_process.stage_output_id_nested else out_glob
+                    out_globs.add(out_glob)
+                self.expected_outputs[output_id] = out_globs if glob_list else list(out_globs)[0]
 
     # pylint: disable=W0221,W0237 # naming using python like arguments
     def _execute(self,
