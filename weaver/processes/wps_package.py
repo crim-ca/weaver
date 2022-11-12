@@ -36,8 +36,8 @@ from pywps.inout.basic import SOURCE_TYPE
 from pywps.inout.inputs import BoundingBoxInput, ComplexInput, LiteralInput
 from pywps.inout.outputs import ComplexOutput
 from pywps.inout.storage import STORE_TYPE, CachedStorage
-from pywps.inout.storage.file import FileStorageBuilder, FileStorage
-from pywps.inout.storage.s3 import S3StorageBuilder, S3Storage
+from pywps.inout.storage.file import FileStorage, FileStorageBuilder
+from pywps.inout.storage.s3 import S3Storage, S3StorageBuilder
 from requests.structures import CaseInsensitiveDict
 
 from weaver.config import WeaverConfiguration, WeaverFeature, get_weaver_configuration
