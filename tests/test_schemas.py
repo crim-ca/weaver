@@ -30,61 +30,59 @@ def test_process_id_schemas():
             pytest.fail(f"Expected process ID to be raised as invalid: (test: {i}, id: {_id})")
 
 
-def test_url_schemes():
-    file_url = sd.ReferenceURL()
-    href_url = sd.URL()
-    test_file_valid = [
-        "https://s3.region-name.amazonaws.com/bucket/file-key.txt",
-        "https://s3.amazonaws.com/bucket/file-key.txt",
-        "s3://bucket/5ca1093e-523d-4294-892d-d52d4819ef29/file-key.txt",
-        "s3://bucket/file-key.txt"
-        "file:///local-file/location.txt",
-        "/local-file/location.txt",
-    ]
-    test_href_valid = [
-        "http://some-location.org/example",
-        "http://localhost:4002/processes",
-        "https://some-location.org/somewhere_with_underscores",
-        "https://some-location.org/somewhere/very/deep.txt",
-        "https://some-location.org/somewhere/without/extension",
-    ]
+@pytest.mark.parametrize("url, schema, valid", [
+    # valid references
+    ("https://s3.region-name.amazonaws.com/bucket/file-key.txt", sd.ReferenceURL(), True),
+    ("https://s3.amazonaws.com/bucket/file-key.txt", sd.ReferenceURL(), True),
+    ("s3://bucket/5ca1093e-523d-4294-892d-d52d4819ef29/file-key.txt", sd.ReferenceURL(), True),
+    ("s3://bucket/file-key.txt", sd.ReferenceURL(), True),
+    ("file:///local-file/location.txt", sd.ReferenceURL(), True),
+    ("/local-file/location.txt", sd.ReferenceURL(), True),
+    ("http://some-location.org/example", sd.URL(), True),
+    ("http://localhost:4002/processes", sd.URL(), True),
+    ("https://some-location.org/somewhere_with_underscores", sd.URL(), True),
+    ("https://some-location.org/somewhere/very/deep.txt", sd.URL(), True),
+    ("https://some-location.org/somewhere/without/extension", sd.URL(), True),
     # following are invalid because they are plain URL
     # they are valid only when specialized to FileURL
-    test_href_invalid_file_valid = [
-        "s3://remote-bucket"
-    ]
+    ("s3://remote-bucket/", sd.URL(), False),
+    ("s3://remote-bucket/", sd.ReferenceURL(), True),
     # following are always invalid because incorrectly formatted
-    test_href_invalid_always = [
-        "file:/missing/slash.txt",
-        "file://missing/slash.txt",
-        "file:////too/many/slash.txt",
-        "missing/first/slash.txt",
-    ]
-
-    url = None
-    try:
-        for url in test_href_valid:
-            assert href_url.deserialize(url) == url
-        for url in test_file_valid:
-            assert file_url.deserialize(url) == url
-        for url in test_href_invalid_file_valid:
-            assert file_url.deserialize(url) == url
-    except colander.Invalid as invalid:
-        pytest.fail(f"Raised invalid URL when expected to be valid for '{invalid.node}' with [{url}]")
-    for url in test_href_invalid_file_valid:
+    ("file:/missing/slash.txt", sd.URL(), False),
+    ("file:/missing/slash.txt", sd.ReferenceURL(), False),
+    ("file://missing/slash.txt", sd.URL(), False),
+    ("file://missing/slash.txt", sd.ReferenceURL(), False),
+    ("file:///too/many//slash.txt", sd.URL(), False),
+    ("file:///too/many//slash.txt", sd.ReferenceURL(), False),
+    ("file:////too/many/slash.txt", sd.URL(), False),
+    ("file:////too/many/slash.txt", sd.ReferenceURL(), False),
+    ("http:///too.com/many/slash.txt", sd.URL(), False),
+    ("http:///too.com/many/slash.txt", sd.ReferenceURL(), False),
+    ("http://too.com//many/slash.txt", sd.URL(), False),
+    ("http://too.com//many/slash.txt", sd.ReferenceURL(), False),
+    ("http://too.com/many//slash.txt", sd.URL(), False),
+    ("http://too.com/many//slash.txt", sd.ReferenceURL(), False),
+    ("missing/first/slash.txt", sd.URL(), False),
+    ("missing/first/slash.txt", sd.ReferenceURL(), False),
+    ("s3://missing-dir-file-key-slash", sd.URL(), False),
+    ("s3://missing-dir-file-key-slash", sd.ReferenceURL(), False),
+])
+def test_url_schemes(url, schema, valid):
+    if valid:
         try:
-            href_url.deserialize(url)
+            assert schema.deserialize(url) == url
+        except colander.Invalid as invalid:
+            pytest.fail(f"Raised invalid URL when expected to be valid for '{invalid.node}' with [{url}]")
+    else:
+        try:
+            schema.deserialize(url)
         except colander.Invalid:
             pass
         else:
-            pytest.fail(f"Expected URL to be raised as invalid for non-file reference: [{url}]")
-    for url in test_href_invalid_always:
-        try:
-            href_url.deserialize(url)
-        except colander.Invalid:
-            pass
-        else:
-            pytest.fail(f"Expected URL to be raised as invalid for incorrectly formatted reference: [{url}]")
+            pytest.fail(
+                f"Expected URL to be raised as invalid for '{schema.__class__}' with "
+                f"invalid format or non-file reference: [{url}]"
+            )
 
 
 def test_format_variations():

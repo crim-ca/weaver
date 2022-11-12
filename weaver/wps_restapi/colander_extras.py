@@ -69,6 +69,7 @@ from cornice_swagger.converters.parameters import (
 )
 from cornice_swagger.converters.schema import (
     STRING_FORMATTERS,
+    BaseStringTypeConverter,
     NumberTypeConverter,
     ObjectTypeConverter,
     TypeConversionDispatcher,
@@ -110,6 +111,17 @@ LITERAL_SCHEMA_TYPES = frozenset([
     colander.DateTime,
     # colander.Enum,  # not supported but could be (literal int/str inferred from Python Enum object)
 ])
+
+# patch URL with negative look-ahead to invalidate following // after scheme
+URL_REGEX = colander.URL_REGEX.replace(r"://)?", r"://)?(?!//)")
+URL = colander.Regex(URL_REGEX, msg=colander._("Must be a URL"), flags=re.IGNORECASE)
+URI_REGEX = colander.URI_REGEX.replace(r"://", r"://(?!//)")
+FILE_URI = colander.Regex(URI_REGEX, msg=colander._("Must be a file:// URI scheme"), flags=re.IGNORECASE)
+STRING_FORMATTERS.update({
+    "uri": {"converter": BaseStringTypeConverter, "validator": URL},
+    "url": {"converter": BaseStringTypeConverter, "validator": URL},
+    "file": {"converter": BaseStringTypeConverter, "validator": FILE_URI},
+})
 
 
 def _make_node_instance(schema_node_or_class):
@@ -161,7 +173,7 @@ def _get_schema_type(schema_node, check=False):
 def _get_node_name(schema_node, schema_name=False):
     # type: (colander.SchemaNode, bool) -> str
     """
-    Obtains the name of the node with best available value.
+    Obtains the name of the node with the best available value.
 
     :param schema_node: node for which to retrieve the name.
     :param schema_name:
@@ -321,6 +333,7 @@ class SchemeURL(colander.Regex):
     .. seealso::
         :class:`colander.url` [remote http(s)/ftp(s)]
         :class:`colander.file_uri` [local file://]
+        :data:`URL`
     """
 
     def __init__(self, schemes=None, path_pattern=None, msg=None, flags=re.IGNORECASE):
@@ -330,7 +343,8 @@ class SchemeURL(colander.Regex):
         if not msg:
             msg = colander._(f"Must be a URL matching one of schemes {schemes}")  # noqa
         regex_schemes = r"(?:" + "|".join(schemes) + r")"
-        regex = colander.URL_REGEX.replace(r"(?:http|ftp)s?", regex_schemes)
+        regex = URL_REGEX.replace(r"(?:http|ftp)s?", regex_schemes)
+
         if path_pattern:
             if isinstance(path_pattern, re.Pattern):
                 path_pattern = path_pattern.pattern

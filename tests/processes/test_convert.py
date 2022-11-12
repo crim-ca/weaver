@@ -356,7 +356,7 @@ def test_cwl2wps_io_null_or_array_of_enums():
     ]
 ])
 def test_cwl2wps_io_raise_mixed_types(test_type):
-    io_info = {"name": f"test", "type": test_type}
+    io_info = {"name": "test", "type": test_type}
     with pytest.raises(PackageTypeError):
         cwl2wps_io(io_info, WPS_INPUT)
 
@@ -733,7 +733,7 @@ def test_is_cwl_complex_type_none_one_or_many_files():
     ["null", {"type": "array", "items": "string"}],
 ])
 def test_is_cwl_complex_type_not_files(test_type):
-    io_info = {"name": f"test", "type": test_type}
+    io_info = {"name": "test", "type": test_type}
     assert not is_cwl_complex_type(io_info)
 
 
