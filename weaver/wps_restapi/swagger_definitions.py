@@ -385,7 +385,7 @@ class VaultReference(ExtendedSchemaNode):
     schema_type = String
     description = "Vault file reference."
     example = "vault://399dc5ac-ff66-48d9-9c02-b144a975abe4"
-    pattern = re.compile(rf"^vault://{NO_DOUBLE_SLASH_PATTERN}[a-f0-9]{8}(?:-?[a-f0-9]{4}){3}-?[a-f0-9]{12}$")
+    pattern = re.compile(r"^vault://[a-f0-9]{8}(?:-?[a-f0-9]{4}){3}-?[a-f0-9]{12}$")
 
 
 class ProcessURL(ExtendedSchemaNode):
