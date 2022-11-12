@@ -63,7 +63,7 @@ def test_parse_inputs_from_file():
         inputs.append(_inputs)
         return mock_result
 
-    with mock.patch("weaver.cli.WeaverClient._update_files", side_effect=parsed_inputs):
+    with mock.patch("weaver.cli.WeaverClient._upload_files", side_effect=parsed_inputs):
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json") as input_json:
             json.dump({"inputs": {"input1": "data"}}, input_json)
             input_json.flush()
@@ -89,7 +89,7 @@ def test_parse_inputs_with_media_type():
         weaver_cli(*args)
         return 0
 
-    with mock.patch("weaver.cli.WeaverClient._update_files", side_effect=parsed_inputs):
+    with mock.patch("weaver.cli.WeaverClient._upload_files", side_effect=parsed_inputs):
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yml") as input_yaml:
             yaml.safe_dump({"info": {"data": "yaml"}}, input_yaml)
             input_yaml.flush()
@@ -116,7 +116,7 @@ def test_parse_inputs_with_media_type():
     inputs.clear()
     schema_json = "http://schema.org/random.json"
     schema_xml = "http://schema.org/other.xml"
-    with mock.patch("weaver.cli.WeaverClient._update_files", side_effect=parsed_inputs):
+    with mock.patch("weaver.cli.WeaverClient._upload_files", side_effect=parsed_inputs):
         with ExitStack() as stack:
             input_yaml = stack.enter_context(tempfile.NamedTemporaryFile(mode="w", suffix=".yml"))
             yaml.safe_dump({"info": {"data": "yaml"}}, input_yaml)
@@ -230,7 +230,7 @@ def test_href_inputs_not_uploaded_to_vault():
 
     inputs = {"file": {"href": "https://fake.domain.com/fakefile.zip"}}
     with mock.patch("weaver.cli.WeaverClient.upload", side_effect=mock_upload):
-        result = WeaverClient()._update_files(inputs=inputs)
+        result = WeaverClient()._upload_files(inputs=inputs)
     assert result is not mock_result, "WeaverCLient.upload should not be called since reference is not local"
     assert result == (inputs, {})
 
@@ -264,7 +264,7 @@ def test_file_inputs_uploaded_to_vault():
     with tempfile.NamedTemporaryFile(mode="w", suffix=".zip") as input_file:
         inputs = {"file": {"href": input_file.name}}
         with mock.patch("weaver.cli.WeaverClient.upload", side_effect=mock_upload):
-            result = WeaverClient()._update_files(inputs=inputs)
+            result = WeaverClient()._upload_files(inputs=inputs)
     assert result == expected_output
 
 
@@ -278,5 +278,5 @@ def test_file_inputs_not_uploaded_to_vault():
     with tempfile.NamedTemporaryFile(mode="w", suffix=".zip") as input_file:
         inputs = {"file": {"href": input_file.name}}
         with mock.patch("weaver.cli.WeaverClient.upload", side_effect=mock_upload):
-            result = WeaverClient()._update_files(inputs=inputs)
+            result = WeaverClient()._upload_files(inputs=inputs)
     assert result is mock_result, "WeaverCLient.upload is expected to be called and should return a failed result."

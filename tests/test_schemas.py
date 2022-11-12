@@ -107,9 +107,9 @@ def test_url_schemes(url, schema, valid):
         {"mediaType": ContentType.APP_JSON}),
     (
         {"mediaType": ContentType.APP_JSON,
-         "schema":  f"https://www.iana.org/assignments/media-types/{ContentType.APP_JSON}"},
+         "schema": f"https://www.iana.org/assignments/media-types/{ContentType.APP_JSON}"},
         {"mediaType": ContentType.APP_JSON,
-         "schema":  f"https://www.iana.org/assignments/media-types/{ContentType.APP_JSON}"}),
+         "schema": f"https://www.iana.org/assignments/media-types/{ContentType.APP_JSON}"}),
 ])
 def test_format_variations(test_format, result):
     """

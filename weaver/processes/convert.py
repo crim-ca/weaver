@@ -845,7 +845,11 @@ def is_cwl_complex_type(io_info, complex_types=PACKAGE_COMPLEX_TYPES):
             return io_type["items"] in complex_types
         return io_type["type"] in complex_types
     if isinstance(io_type, list):
-        return any(typ in complex_types or is_cwl_complex_type({"type": typ}, complex_types) for typ in io_type)
+        return any(
+            (isinstance(typ, str) and typ in complex_types) or
+            is_cwl_complex_type({"type": typ}, complex_types)
+            for typ in io_type
+        )
     raise ValueError(f"Unknown parsing of CWL 'type' format ({type(io_type)!s}) [{io_type!s}] in [{io_info}]")
 
 
