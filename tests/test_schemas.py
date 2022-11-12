@@ -8,26 +8,24 @@ from weaver.formats import ContentType
 from weaver.wps_restapi import swagger_definitions as sd
 
 
-def test_process_id_schemas():
-    test_valid_ids = [
-        "valid-slug-id",
-        "valid_underscores",
-        "valid_lower-and_CAP_MiXeD"
-    ]
-    test_invalid_ids = [
-        "not valid to have spaces",
-        "not-valid-!!!-characters",
-        "not-valid/separators"
-    ]
-    for _id in test_valid_ids:
-        assert sd.ProcessIdentifier().deserialize(_id) == _id
-    for i, _id in enumerate(test_invalid_ids):
+@pytest.mark.parametrize("pid, valid", [
+    ("valid-slug-id", True),
+    ("valid_underscores", True),
+    ("valid_lower-and_CAP_MiXeD", True),
+    ("not valid to have spaces", False),
+    ("not-valid-!!!-characters", False),
+    ("not-valid/separators", False),
+])
+def test_process_id_schemas(pid, valid):
+    if valid:
+        assert sd.ProcessIdentifier().deserialize(pid) == pid
+    else:
         try:
-            sd.ProcessIdentifier().deserialize(_id)
+            sd.ProcessIdentifier().deserialize(pid)
         except colander.Invalid:
             pass
         else:
-            pytest.fail(f"Expected process ID to be raised as invalid: (test: {i}, id: {_id})")
+            pytest.fail(f"Expected process ID to be raised as invalid: (id: {pid})")
 
 
 @pytest.mark.parametrize("url, schema, valid", [
@@ -85,7 +83,35 @@ def test_url_schemes(url, schema, valid):
             )
 
 
-def test_format_variations():
+@pytest.mark.parametrize("test_format, result", [
+    (
+        {"mimeType": ContentType.APP_JSON},
+        {"mimeType": ContentType.APP_JSON}),
+    (
+        {"mediaType": ContentType.APP_JSON},
+        {"mediaType": ContentType.APP_JSON}),
+    (
+        {"mediaType": ContentType.APP_JSON, "maximumMegabytes": 200},
+        {"mediaType": ContentType.APP_JSON, "maximumMegabytes": 200}),
+    (
+        {"mediaType": ContentType.APP_JSON, "maximumMegabytes": None},
+        {"mediaType": ContentType.APP_JSON}),
+    (
+        {"mediaType": ContentType.APP_JSON, "default": False},
+        {"mediaType": ContentType.APP_JSON, "default": False}),
+    (
+        {"mediaType": ContentType.APP_JSON, "default": True},
+        {"mediaType": ContentType.APP_JSON, "default": True}),
+    (
+        {"mediaType": ContentType.APP_JSON, "schema": None},
+        {"mediaType": ContentType.APP_JSON}),
+    (
+        {"mediaType": ContentType.APP_JSON,
+         "schema":  f"https://www.iana.org/assignments/media-types/{ContentType.APP_JSON}"},
+        {"mediaType": ContentType.APP_JSON,
+         "schema":  f"https://www.iana.org/assignments/media-types/{ContentType.APP_JSON}"}),
+])
+def test_format_variations(test_format, result):
     """
     Test format parsing for deployment payload.
 
@@ -98,35 +124,7 @@ def test_format_variations():
         :func:`tests.functional.test_wps_package.WpsPackageAppTest.test_deploy_process_io_no_format_default`.
     """
     format_schema = sd.DeploymentFormat()
-    schema = f"https://www.iana.org/assignments/media-types/{ContentType.APP_JSON}"
-    test_valid_fmt_deploy = [
-        (
-            {"mimeType": ContentType.APP_JSON},
-            {"mimeType": ContentType.APP_JSON}),
-        (
-            {"mediaType": ContentType.APP_JSON},
-            {"mediaType": ContentType.APP_JSON}),
-        (
-            {"mediaType": ContentType.APP_JSON, "maximumMegabytes": 200},
-            {"mediaType": ContentType.APP_JSON, "maximumMegabytes": 200}),
-        (
-            {"mediaType": ContentType.APP_JSON, "maximumMegabytes": None},
-            {"mediaType": ContentType.APP_JSON}),
-        (
-            {"mediaType": ContentType.APP_JSON, "default": False},
-            {"mediaType": ContentType.APP_JSON, "default": False}),
-        (
-            {"mediaType": ContentType.APP_JSON, "default": True},
-            {"mediaType": ContentType.APP_JSON, "default": True}),
-        (
-            {"mediaType": ContentType.APP_JSON, "schema": None},
-            {"mediaType": ContentType.APP_JSON}),
-        (
-            {"mediaType": ContentType.APP_JSON, "schema": schema},
-            {"mediaType": ContentType.APP_JSON, "schema": schema}),
-    ]
-    for fmt, res in test_valid_fmt_deploy:
-        try:
-            assert format_schema.deserialize(fmt) == res
-        except colander.Invalid:
-            pytest.fail(f"Expected format to be valid: [{fmt}]")
+    try:
+        assert format_schema.deserialize(test_format) == result
+    except colander.Invalid:
+        pytest.fail(f"Expected format to be valid: [{test_format}]")

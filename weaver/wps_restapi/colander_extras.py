@@ -113,7 +113,8 @@ LITERAL_SCHEMA_TYPES = frozenset([
 ])
 
 # patch URL with negative look-ahead to invalidate following // after scheme
-URL_REGEX = colander.URL_REGEX.replace(r"://)?", r"://)?(?!//)")
+NO_DOUBLE_SLASH_PATTERN = r"(?!.*//.*$)"
+URL_REGEX = colander.URL_REGEX.replace(r"://)?", rf"://)?{NO_DOUBLE_SLASH_PATTERN}")
 URL = colander.Regex(URL_REGEX, msg=colander._("Must be a URL"), flags=re.IGNORECASE)
 URI_REGEX = colander.URI_REGEX.replace(r"://", r"://(?!//)")
 FILE_URI = colander.Regex(URI_REGEX, msg=colander._("Must be a file:// URI scheme"), flags=re.IGNORECASE)

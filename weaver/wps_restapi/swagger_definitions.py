@@ -53,6 +53,7 @@ from weaver.status import JOB_STATUS_CODE_API, JOB_STATUS_SEARCH_API, Status
 from weaver.utils import AWS_S3_BUCKET_REFERENCE_PATTERN
 from weaver.visibility import Visibility
 from weaver.wps_restapi.colander_extras import (
+    NO_DOUBLE_SLASH_PATTERN,
     AllOfKeywordSchema,
     AnyOfKeywordSchema,
     BoundedRange,
@@ -370,7 +371,7 @@ class FileLocal(ExtendedSchemaNode):
     schema_type = String
     description = "Local file reference."
     format = "file"
-    pattern = re.compile(r"^(file://)?(?!//)(?:/|[/?]\S+)$")
+    pattern = re.compile(rf"^(file://)?{NO_DOUBLE_SLASH_PATTERN}(?:/|[/?]\S+)$")
 
 
 class FileURL(ExtendedSchemaNode):
@@ -384,7 +385,7 @@ class VaultReference(ExtendedSchemaNode):
     schema_type = String
     description = "Vault file reference."
     example = "vault://399dc5ac-ff66-48d9-9c02-b144a975abe4"
-    pattern = re.compile(r"^vault://(?!//)[a-f0-9]{8}(?:-?[a-f0-9]{4}){3}-?[a-f0-9]{12}$")
+    pattern = re.compile(rf"^vault://{NO_DOUBLE_SLASH_PATTERN}[a-f0-9]{8}(?:-?[a-f0-9]{4}){3}-?[a-f0-9]{12}$")
 
 
 class ProcessURL(ExtendedSchemaNode):
