@@ -1256,6 +1256,8 @@ class WpsPackage(Process):
         cwl_outdir = os.path.join(wps_workdir, "cwltool_out_")
         res_req = get_application_requirement(self.package, CWL_REQUIREMENT_RESOURCE, default={}, validate=False)
         runtime_params = {
+            # provide name reference to inject the value in log entries by cwltool
+            "name": self.identifier,
             # force explicit staging if write needed (InitialWorkDirRequirement in CWL package)
             # protect input paths that can be re-used to avoid potential in-place modifications
             "no_read_only": False,
@@ -1599,7 +1601,7 @@ class WpsPackage(Process):
             self.update_status(error_msg, self.percent, Status.FAILED)
             raise
         else:
-            self.update_status("Package complete.", PACKAGE_PROGRESS_DONE, Status.SUCCEEDED)
+            self.update_status("Package operations complete.", PACKAGE_PROGRESS_DONE, Status.SUCCEEDED)
         return self.response
 
     def must_fetch(self, input_ref, input_type):

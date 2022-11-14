@@ -38,7 +38,7 @@ from weaver.execute import ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import ContentType
 from weaver.processes.utils import get_process_information
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory
-from weaver.utils import fetch_file, get_any_id, get_weaver_url, make_dirs, now, request_extra
+from weaver.utils import fetch_file, generate_diff, get_any_id, get_weaver_url, make_dirs, now, request_extra
 from weaver.visibility import Visibility
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
@@ -136,10 +136,26 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
     cookies = {}                    # type: CookiesType
     app = None                      # type: Optional[WebTestApp]
     logger_result_dir = None        # type: Optional[str]
+    logger_character_calls = "-"    # type: str
+    logger_character_steps = "="    # type: str
+    logger_character_tests = "*"    # type: str
+    logger_character_cases = "#"    # type: str
     logger_separator_calls = ""     # type: str
+    """
+    Used between function calls (same request or operation).
+    """
     logger_separator_steps = ""     # type: str
+    """
+    Used between overall test steps (between requests).
+    """
     logger_separator_tests = ""     # type: str
+    """
+    Used between various test runs (each test_* method).
+    """
     logger_separator_cases = ""     # type: str
+    """
+    Used between various TestCase runs.
+    """
     logger_level = logging.INFO     # type: int
     logger_enabled = True           # type: bool
     logger = None                   # type: Optional[logging.Logger]
@@ -178,11 +194,15 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
         cls.logger_result_dir = cls.get_option("WEAVER_TEST_LOGGER_RESULT_DIR", os.path.join(WEAVER_ROOT_DIR))
         cls.logger_json_indent = cls.get_option("WEAVER_TEST_LOGGER_JSON_INDENT", cls.logger_json_indent)
         cls.logger_field_indent = cls.get_option("WEAVER_TEST_LOGGER_FIELD_INDENT", cls.logger_field_indent)
+        cls.logger_character_calls = cls.get_option("WEAVER_TEST_LOGGER_CHARACTER_CALLS", cls.logger_character_calls)
+        cls.logger_character_steps = cls.get_option("WEAVER_TEST_LOGGER_CHARACTER_STEPS", cls.logger_character_steps)
+        cls.logger_character_tests = cls.get_option("WEAVER_TEST_LOGGER_CHARACTER_TESTS", cls.logger_character_tests)
+        cls.logger_character_cases = cls.get_option("WEAVER_TEST_LOGGER_CHARACTER_CASES", cls.logger_character_cases)
+        cls.setup_logger()  # on top of other logging setup, defines default "line separators" using above characters
         cls.logger_separator_calls = cls.get_option("WEAVER_TEST_LOGGER_SEPARATOR_CALLS", cls.logger_separator_calls)
         cls.logger_separator_steps = cls.get_option("WEAVER_TEST_LOGGER_SEPARATOR_STEPS", cls.logger_separator_steps)
         cls.logger_separator_tests = cls.get_option("WEAVER_TEST_LOGGER_SEPARATOR_TESTS", cls.logger_separator_tests)
         cls.logger_separator_cases = cls.get_option("WEAVER_TEST_LOGGER_SEPARATOR_CASES", cls.logger_separator_cases)
-        cls.setup_logger()
         cls.log("%sStart of '%s': %s\n%s",
                 cls.logger_separator_cases, cls.current_case_name(), now(), cls.logger_separator_cases)
 
@@ -314,10 +334,10 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
             log_file.setFormatter(log_fmt)
             log_term = logging.StreamHandler()
             log_term.setFormatter(log_fmt)
-            cls.logger_separator_calls = "-" * 80 + "\n"  # used between function calls (of same request)
-            cls.logger_separator_steps = "=" * 80 + "\n"  # used between overall test steps (between requests)
-            cls.logger_separator_tests = "*" * 80 + "\n"  # used between various test runs (each test_* method)
-            cls.logger_separator_cases = "#" * 80 + "\n"  # used between various TestCase runs
+            cls.logger_separator_calls = cls.logger_character_calls * 80 + "\n"
+            cls.logger_separator_steps = cls.logger_character_steps * 80 + "\n"
+            cls.logger_separator_tests = cls.logger_character_tests * 80 + "\n"
+            cls.logger_separator_cases = cls.logger_character_cases * 80 + "\n"
             cls.logger = logging.getLogger(cls.__name__)
             cls.logger.setLevel(cls.logger_level)
             cls.logger.addHandler(log_file)
@@ -1210,6 +1230,10 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
                 ),
                 message="Workflow output file expected to contain single file with raw string listing of "
                         "input files chained from generated output directory listing of the first step."
+                        "\nDiff:"
+                        f"\n{self.logger_separator_calls}\n"
+                        f"{generate_diff(output_lines, expect_http_files)}"
+                        f"\n{self.logger_separator_calls}"
             )
             # check that all expected files made it through the listing/directory input/output chaining between steps
             output_files = "\n".join(os.path.join(*line.rsplit("/", 2)[-2:]) for line in output_lines)

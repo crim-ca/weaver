@@ -4,7 +4,6 @@ import fnmatch
 import functools
 import importlib.util
 import inspect
-import json
 import logging
 import os
 import posixpath
@@ -3142,8 +3141,8 @@ def transform_json(json_data,               # type: Dict[str, JSON]
     return json_data
 
 
-def generate_diff(val, ref, val_name="Test", ref_name="Reference"):
-    # type: (Any, Any, str, str) -> str
+def generate_diff(val, ref, val_name="Test", ref_name="Reference", val_show=False, ref_show=False, json=True, indent=2):
+    # type: (Any, Any, str, str, bool, bool, bool, Optional[int]) -> str
     """
     Generates a line-by-line diff result of the test value against the reference value.
 
@@ -3154,16 +3153,29 @@ def generate_diff(val, ref, val_name="Test", ref_name="Reference"):
     :param ref: Reference input value.
     :param val_name: Name to apply in diff for test input value.
     :param ref_name: Name to apply in diff for reference input value.
+    :param val_show: Whether to include full contents of test value.
+    :param ref_show: Whether to include full contents of reference value.
+    :param json: Whether to consider contents as :term:`JSON` for diff evaluation.
+    :param indent: Indentation to employ when using :term:`JSON` contents.
     :returns: Formatted multiline diff,
     """
-    try:
-        val = json.dumps(val, sort_keys=True, indent=2, ensure_ascii=False)
-    except Exception:  # noqa
+    import json as _json
+    if json:
+        try:
+            val = _json.dumps(val, sort_keys=True, indent=indent, ensure_ascii=False)
+        except Exception:  # noqa
+            val = str(val)
+        try:
+            ref = _json.dumps(ref, sort_keys=True, indent=indent, ensure_ascii=False)
+        except Exception:  # noqa
+            ref = str(ref)
+    else:
         val = str(val)
-    try:
-        ref = json.dumps(ref, sort_keys=True, indent=2, ensure_ascii=False)
-    except Exception:  # noqa
         ref = str(ref)
+    if val_show:
+        val_name += f"\n\n{val}"
+    if ref_show:
+        ref_name += f"\n\n{ref}"
     val = val.splitlines()
     ref = ref.splitlines()
     return "\n".join(difflib.context_diff(val, ref, fromfile=val_name, tofile=ref_name))
