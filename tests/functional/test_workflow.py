@@ -1222,10 +1222,11 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
             # only the file names should remain (not nested dirs), as per the directory listing package definition
             # perform initial check that output from 'ls' is found
             output_lines = list(filter(lambda _line: bool(_line), output_data.split("\n")))
+            pattern_perms = re.compile(r"^-rw-[r-][w-]-r-- .*$")  # group perms variable on different platforms
             self.assert_test(
                 lambda: (
                     len(output_lines) == len(expect_http_files) and
-                    all(line.startswith("-rw-rw-r-- ") for line in output_lines) and
+                    all(re.match(pattern_perms, line) for line in output_lines) and
                     all(" /var/lib/cwl/stg" in line for line in output_lines)
                 ),
                 message="Workflow output file expected to contain single file with raw string listing of "
