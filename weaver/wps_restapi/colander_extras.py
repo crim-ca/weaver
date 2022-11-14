@@ -99,6 +99,11 @@ if TYPE_CHECKING:
         OpenAPISpecParameter
     )
 
+try:
+    RegexPattern = re.Pattern
+except AttributeError:  # Python 3.6 backport
+    RegexPattern = type(re.compile("_"))
+
 # pylint: disable=C0209,consider-using-f-string
 
 
@@ -347,7 +352,7 @@ class SchemeURL(colander.Regex):
         regex = URL_REGEX.replace(r"(?:http|ftp)s?", regex_schemes)
 
         if path_pattern:
-            if isinstance(path_pattern, re.Pattern):
+            if isinstance(path_pattern, RegexPattern):
                 path_pattern = path_pattern.pattern
             regex = regex[:-1] + path_pattern + "$"
         super(SchemeURL, self).__init__(regex, msg=msg, flags=flags)
