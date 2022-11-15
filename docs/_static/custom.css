@@ -65,5 +65,5 @@ div[class^="highlight"] {
    alternating colors on individual odd/even rows
  */
 #table-file-type-handling tr.row-even > td[rowspan] {
-  background-color: revert;
+    background-color: revert;
 }
