@@ -343,7 +343,7 @@ class SchemeURL(colander.Regex):
     """
 
     def __init__(self, schemes=None, path_pattern=None, msg=None, flags=re.IGNORECASE):
-        # type: (Optional[Iterable[str]], Union[None, str, re.Pattern], Optional[str], Optional[re.RegexFlag]) -> None
+        # type: (Optional[Iterable[str]], Union[None, str, RegexPattern], Optional[str], Optional[re.RegexFlag]) -> None
         if not schemes:
             schemes = [""]
         if not msg:
@@ -662,7 +662,7 @@ class ExtendedSchemaBase(colander.SchemaNode, metaclass=ExtendedSchemaMeta):
         if self.validator is None and isinstance(schema_type, colander.String):
             _format = kwargs.pop("format", getattr(self, "format", None))
             pattern = kwargs.pop("pattern", getattr(self, "pattern", None))
-            if isinstance(pattern, (str, re.Pattern)):
+            if isinstance(pattern, (str, RegexPattern)):
                 self.validator = colander.Regex(pattern)
             elif isinstance(pattern, colander.Regex):
                 self.validator = pattern
@@ -2133,7 +2133,7 @@ class ExtendedTypeConverter(TypeConverter):
         # base type converters expect raw pattern string
         # undo the compiled pattern to allow conversion
         pattern = getattr(schema_node, "pattern", None)
-        if isinstance(pattern, re.Pattern):
+        if isinstance(pattern, RegexPattern):
             setattr(schema_node, "pattern", pattern.pattern)
         return super(ExtendedTypeConverter, self).convert_type(schema_node)
 
