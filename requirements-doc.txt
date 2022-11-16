@@ -1,3 +1,4 @@
+-r requirements-sys.txt
 # these are doc-only requirements
 # we actually need to install all requirements during docs build because of OpenAPI generation
 # (see 'docs/source/conf.py')
