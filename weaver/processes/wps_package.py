@@ -12,6 +12,7 @@ generate :term:`ADES`/:term:`EMS` deployable :term:`Application Package`.
     - :mod:`weaver.wps_restapi.api` conformance details
 """
 
+import copy
 import json
 import logging
 import os
@@ -52,7 +53,7 @@ from weaver.exceptions import (
     PackageTypeError,
     PayloadNotFound
 )
-from weaver.formats import ContentType, get_cwl_file_format, repr_json
+from weaver.formats import ContentType, get_content_type, get_cwl_file_format, get_format, repr_json
 from weaver.processes import opensearch
 from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_BUILTIN,
@@ -74,6 +75,7 @@ from weaver.processes.constants import (
     WPS_OUTPUT
 )
 from weaver.processes.convert import (
+    DEFAULT_FORMAT,
     cwl2wps_io,
     json2wps_field,
     json2wps_io,
@@ -912,6 +914,15 @@ class DirectoryNestedStorage(CachedStorage):
         # type: () -> STORE_TYPE
         return STORE_TYPE.PATH if isinstance(self.storage, FileStorage) else STORE_TYPE.S3
 
+    def _patch_destination(self, destination):
+        # type: (str) -> str
+        destination = destination.lstrip("/")  # avoid issues with prefix path join
+        # file storage already does the target-dir/output-dir join
+        # however, s3 storage does not...
+        if isinstance(self.storage, S3Storage):
+            return os.path.join(self.prefix, destination)
+        return destination
+
     def _do_store(self, output):
         # type: (ComplexOutput) -> Tuple[STORE_TYPE, Path, str]
         """
@@ -925,30 +936,49 @@ class DirectoryNestedStorage(CachedStorage):
             raise ValueError(f"Location is not a directory: [{root}]")
         files = list_directory_recursive(root)
         root = root.rstrip("/") + "/"
-        dir_path = self.location(output.identifier) + "/"
-        url_path = self.url(output.identifier) + "/"
+        loc_path = self.location(output.identifier) + "/"  # local directory or S3 location
+        url_path = self.url(output.identifier) + "/"       # HTTP output or same S3 location
+        default_support = [DEFAULT_FORMAT] + [get_format(ctype) for ctype in [ContentType.ANY, ContentType.TEXT_PLAIN]]
         for file in files:
             out_file_path_rel = file.split(root, 1)[-1]
-            out_cache_key = os.path.join(str(output.uuid), out_file_path_rel)
-            out_file = ComplexOutput(out_cache_key, title=output.title)
-            out_file.storage = self.storage
+            out_cache_key = self._patch_destination(os.path.join(str(output.uuid), out_file_path_rel))
+            out_ext = os.path.splitext(out_file_path_rel)[-1]
+            out_ctype = get_content_type(out_ext)  # attempt guessing more specific format
+            out_fmt = get_format(out_ctype)
+            out_fmts = default_support + ([out_fmt] if out_fmt else [])
+            out_file = ComplexOutput(out_cache_key, title=output.title, data_format=out_fmt, supported_formats=out_fmts)
             out_file.file = file
             out_file.uuid = output.uuid  # forward base directory auto-generated when storing file
-            _, out_path, out_url = self.storage.store(out_file)
+            # create a copy in case the storage is used by many dirs, avoid concurrent read/write of distinct prefixes
+            dir_storage = copy.copy(self.storage)
+            if isinstance(dir_storage, S3Storage):
+                # patch S3 nested prefix under current directory
+                # S3 storage methods use only the file name to generate the bucket object key
+                # to preserve the nested output dir definition, it must be pushed as prefix
+                dir_storage.prefix = os.path.dirname(out_cache_key)
+            out_file.storage = dir_storage
+            out_type, out_path, out_url = dir_storage.store(out_file)
+            self._cache[out_cache_key] = (out_type, out_path, out_url)  # propagate up for direct reference as needed
             LOGGER.debug("Stored file [%s] for reference [%s] under [%s] directory located in [%s] for reference [%s].",
-                         out_path, out_url, output.uuid, dir_path, url_path)
-        return self.type, dir_path, url_path
+                         out_path, out_url, output.uuid, loc_path, url_path)
+        return self.type, loc_path, url_path
 
     def write(self, data, destination, data_format=None):
         # type: (AnyStr, str, Optional[Format]) -> str
-        destination = destination.lstrip("/")  # avoid issues with prefix path join
+        """
+        Write data representing the directory itself or dispatch call to base storage for any other file contents.
+
+        When the directory itself is targeted, upload an empty bucket object for S3 base storage, or makes the
+        directory structure for base file storage.
+        """
+        dest_patched = self._patch_destination(destination)
         if destination != "" and not destination.endswith("/"):
-            return self.storage.write(data, destination, data_format=data_format)
+            return self.storage.write(data, dest_patched, data_format=data_format)
         if isinstance(self.storage, FileStorage):
             os.makedirs(self.storage.target, exist_ok=True)
-            return self.url(destination)
+            return self.url(dest_patched)
         if isinstance(self.storage, S3Storage):
-            path = self.storage.prefix.rstrip("/") + "/" + destination
+            path = dest_patched.rstrip("/") + "/"
             args = {
                 "ContentLength": 0,
                 "ContentType": ContentType.APP_DIR,
@@ -959,14 +989,14 @@ class DirectoryNestedStorage(CachedStorage):
 
     def url(self, destination):
         # type: (str) -> str
-        destination = destination.lstrip("/")  # avoid issues with prefix path join
+        destination = self._patch_destination(destination)
         if destination in ["/", ""]:
             return self.storage.url("")
         return self.storage.url(destination)
 
     def location(self, destination):
         # type: (str) -> Path
-        destination = destination.lstrip("/")  # avoid issues with prefix path join
+        destination = self._patch_destination(destination)
         if destination in ["/", ""]:
             return self.storage.location("")
         return self.storage.location(destination)
@@ -1973,8 +2003,8 @@ class WpsPackage(Process):
                 f"(storage: {storage_type}, type: {location_type})."
             )
 
-        output_path = str(self.response.uuid)
-        output_prefix = os.path.join(self.job.context, output_path) if self.job.context else output_path
+        output_job_id = str(self.response.uuid)
+        output_prefix = os.path.join(self.job.context, output_job_id) if self.job.context else output_job_id
         # pylint: disable=attribute-defined-outside-init  # references to nested storage dynamically created
         if storage_type == STORE_TYPE.S3:
             storage.prefix = output_prefix

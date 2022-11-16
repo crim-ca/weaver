@@ -17,6 +17,7 @@ from copy import deepcopy
 from inspect import cleandoc
 from typing import TYPE_CHECKING
 
+import boto3
 import colander
 import pytest
 import yaml
@@ -2447,13 +2448,16 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             tmp_host = "https://mocked-file-server.com"  # must match in 'Execute_WorkflowSelectCopyNestedOutDir.json'
             tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())
             stack.enter_context(mocked_file_server(tmp_dir, tmp_host, settings=self.settings, mock_browse_index=True))
-            expect_http_files = [
-                "dir/file.txt",
-                "dir/sub/file.txt",
-                "dir/sub/nested/file.txt",
-                "dir/other/file.txt",
+            input_http_files = [
+                # NOTE:
+                #   base names must differ to have >1 file in output dir listing because of flat list generated
+                #   see the process shell script definition
+                "dir/file1.txt",
+                "dir/sub/file2.txt",
+                "dir/sub/nested/file3.txt",
+                "dir/other/file4.txt",
             ]
-            for file in expect_http_files:
+            for file in input_http_files:
                 path = os.path.join(tmp_dir, file)
                 os.makedirs(os.path.dirname(path), exist_ok=True)
                 with open(path, mode="w", encoding="utf-8") as f:
@@ -2463,7 +2467,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                 "mode": ExecuteMode.ASYNC,
                 "response": ExecuteResponse.DOCUMENT,
                 "inputs": [
-                    {"id": "files", "href": os.path.join(tmp_host, http_file)} for http_file in expect_http_files
+                    {"id": "files", "href": os.path.join(tmp_host, http_file)} for http_file in input_http_files
                 ],
                 "outputs": [
                     {"id": "output_dir", "transmissionMode": ExecuteTransmissionMode.REFERENCE},
@@ -2488,7 +2492,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             assert os.path.isdir(out_dir)
             expect_out_files = {
                 # the process itself makes a flat list of input files, this is not a byproduct of dir-type output
-                os.path.join(out_dir, os.path.basename(file)) for file in expect_http_files
+                os.path.join(out_dir, os.path.basename(file)) for file in input_http_files
             }
             assert all(os.path.isfile(file) for file in expect_out_files)
             output_dir_files = {os.path.join(root, file) for root, _, files in os.walk(out_dir) for file in files}
@@ -3002,7 +3006,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
 
 
 @pytest.mark.functional
-class WpsPackageAppWithS3BucketTest(WpsConfigBase):
+class WpsPackageAppWithS3BucketTest(WpsConfigBase, ResourcesUtil):
     """
     Test with output results uploaded to S3 bucket.
     """
@@ -3122,11 +3126,7 @@ class WpsPackageAppWithS3BucketTest(WpsConfigBase):
             # validation on results path
             assert results[out_key]["href"] in output_ref_any
 
-        # FIXME:
-        #   can validate manually that files exists in output bucket, but cannot seem to retrieve it here
-        #   problem due to fixture setup or moto limitation via boto3.resource interface used by pywps?
         # check that outputs are indeed stored in S3 buckets
-        import boto3
         mocked_s3 = boto3.client("s3", region_name=MOCK_AWS_REGION)
         resp_json = mocked_s3.list_objects_v2(Bucket=output_bucket)
         bucket_file_keys = [obj["Key"] for obj in resp_json["Contents"]]
@@ -3150,3 +3150,119 @@ class WpsPackageAppWithS3BucketTest(WpsConfigBase):
         Process with :term:`OpenAPI` I/O definitions validates the schema of the submitted :term:`JSON` data.
         """
         raise NotImplementedError
+
+    @mocked_aws_config
+    @mocked_aws_s3
+    def test_execute_with_directory_output(self):
+        """
+        Test that directory complex type is resolved from CWL and produces the expected output files in an AWS bucket.
+
+        .. versionadded:: 4.27
+        """
+        proc = "DirectoryMergingProcess"
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        pkg = self.retrieve_payload(proc, "package", local=True)
+        body["executionUnit"] = [{"unit": pkg}]
+        self.deploy_process(body, describe_schema=ProcessSchema.OGC)
+
+        with contextlib.ExitStack() as stack:
+            tmp_host = "https://mocked-file-server.com"  # must match in 'Execute_WorkflowSelectCopyNestedOutDir.json'
+            tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())
+            stack.enter_context(mocked_file_server(tmp_dir, tmp_host, settings=self.settings, mock_browse_index=True))
+            input_http_files = [
+                # NOTE:
+                #   base names must differ to have >1 file in output dir listing because of flat list generated
+                #   see the process shell script definition
+                "dir/file1.txt",
+                "dir/sub/file2.txt",
+                # see if auto-detected Media-Type from extensions
+                # they should be uploaded along with bucket object file-keys
+                "dir/sub/nested/file3.json",
+                "dir/other/file4.yml",
+            ]
+            expect_media_types = {
+                "file1.txt": ContentType.TEXT_PLAIN,
+                "file2.txt": ContentType.TEXT_PLAIN,
+                "file3.json": ContentType.APP_JSON,
+                "file4.yml": ContentType.APP_YAML,
+            }
+            for file in input_http_files:
+                path = os.path.join(tmp_dir, file)
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                with open(path, mode="w", encoding="utf-8") as f:
+                    f.write("test data")
+
+            output_id = "output_dir"
+            exec_body = {
+                "mode": ExecuteMode.ASYNC,
+                "response": ExecuteResponse.DOCUMENT,
+                "inputs": [
+                    {"id": "files", "href": os.path.join(tmp_host, http_file)} for http_file in input_http_files
+                ],
+                "outputs": [
+                    {"id": output_id, "transmissionMode": ExecuteTransmissionMode.REFERENCE},
+                ]
+            }
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            proc_url = f"/processes/{proc}/jobs"
+            resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
+                                       data=exec_body, headers=self.json_headers, only_local=True)
+            assert resp.status_code in [200, 201], f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            status_url = resp.json["location"]
+            job_id = resp.json["jobID"]
+
+            results = self.monitor_job(status_url)
+
+            # check that outputs are S3 bucket references
+            output_bucket = self.settings["weaver.wps_output_s3_bucket"]
+            output_loc = results["output_dir"]["href"]
+            output_ref = f"{output_bucket}/{job_id}/{output_id}/"
+            output_key_base = f"{job_id}/{output_id}/"
+            output_ref_abbrev = f"s3://{output_ref}"
+            output_ref_full = f"https://s3.{MOCK_AWS_REGION}.amazonaws.com/{output_ref}"
+            output_ref_any = [output_ref_abbrev, output_ref_full]  # allow any variant weaver can parse
+            # validation on outputs path
+            assert output_loc in output_ref_any
+
+            # check that outputs are indeed stored in S3 buckets
+            mocked_s3 = boto3.client("s3", region_name=MOCK_AWS_REGION)
+            resp_json = mocked_s3.list_objects_v2(Bucket=output_bucket)
+            bucket_file_info = {obj["Key"]: obj for obj in resp_json["Contents"]}
+            expect_out_files = {
+                # the process itself makes a flat list of input files, this is not a byproduct of dir-type output
+                os.path.join(output_key_base, os.path.basename(file)) for file in input_http_files
+            }
+            expect_out_dirs = {output_ref_abbrev}
+            assert resp_json["Name"] == output_bucket
+            assert not any(out_dir in bucket_file_info for out_dir in expect_out_dirs)
+            assert all(out_file in bucket_file_info for out_file in expect_out_files)
+            assert len(set(bucket_file_info) - expect_out_files) == 0, "No extra files expected."
+
+            # validate that common file extensions could be detected and auto-populated the Content-Type
+            # (information not available in 'list_objects_v2', so fetch each file individually
+            bucket_file_media_types = {}
+            for out_file in expect_out_files:
+                out_info = mocked_s3.head_object(Bucket=output_bucket, Key=out_file)
+                out_key = os.path.basename(out_file)
+                bucket_file_media_types[out_key] = out_info["ContentType"]
+            assert bucket_file_media_types == expect_media_types
+
+            # check that outputs are NOT copied locally, but that XML status does exist
+            # counter validate path with file always present to ensure outputs are not 'missing' because of wrong dir
+            wps_uuid = str(self.job_store.fetch_by_id(job_id).wps_id)
+            wps_outdir = self.settings["weaver.wps_output_dir"]
+            bad_out_dirs = {output_id}
+            bad_out_files = {os.path.basename(file) for file in input_http_files}
+            for out_dir in bad_out_dirs:
+                assert not os.path.exists(os.path.join(wps_outdir, out_dir))
+                assert not os.path.exists(os.path.join(wps_outdir, job_id, out_dir))
+                assert not os.path.exists(os.path.join(wps_outdir, wps_uuid, out_dir))
+            for out_file in bad_out_files:
+                assert not os.path.exists(os.path.join(wps_outdir, out_file))
+                assert not os.path.exists(os.path.join(wps_outdir, job_id, out_file))
+                assert not os.path.exists(os.path.join(wps_outdir, wps_uuid, out_file))
+                assert not os.path.exists(os.path.join(wps_outdir, output_id, out_file))
+                assert not os.path.exists(os.path.join(wps_outdir, job_id, output_id, out_file))
+                assert not os.path.exists(os.path.join(wps_outdir, wps_uuid, output_id, out_file))
+            assert os.path.isfile(os.path.join(wps_outdir, f"{job_id}.xml"))
