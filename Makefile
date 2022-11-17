@@ -69,10 +69,10 @@ PYTHON_VERSION_PATCH := $(shell echo $(PYTHON_VERSION) | cut -f 3 -d '.' | cut -
 PIP_USE_FEATURE := `python -c '\
 	import pip; \
 	try: \
-		from packaging.version import Version as LooseVersion \
+		from packaging.version import Version \
 	except ImportError: \
-		from distutils.version import LooseVersion \
-	print(LooseVersion(pip.__version__) < LooseVersion("21.0"))'`
+		from distutils.version import LooseVersion as Version \
+	print(Version(pip.__version__) < Version("21.0"))'`
 PIP_XARGS ?=
 ifeq ("$(PIP_USE_FEATURE)", "True")
   PIP_XARGS := --use-feature=2020-resolver $(PIP_XARGS)

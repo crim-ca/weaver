@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     import psutil
     from typing_extensions import Literal, NotRequired, Protocol, TypeAlias, TypedDict
 
-    from weaver.compat import LooseVersion
+    from weaver.compat import Version
 
     if hasattr(os, "PathLike"):
         FileSystemPathType = Union[os.PathLike, str]
@@ -79,7 +79,7 @@ if TYPE_CHECKING:
     AnyValueType = Optional[ValueType]  # avoid naming ambiguity with PyWPS AnyValue
     AnyKey = Union[str, int]
     AnyUUID = Union[str, uuid.UUID]
-    AnyVersion = Union[LooseVersion, Number, str, Tuple[int, ...], List[int]]
+    AnyVersion = Union[Version, Number, str, Tuple[int, ...], List[int]]
     # add more levels of explicit definitions than necessary to simulate JSON recursive structure better than 'Any'
     # amount of repeated equivalent definition makes typing analysis 'work well enough' for most use cases
     _JSON: TypeAlias = "JSON"

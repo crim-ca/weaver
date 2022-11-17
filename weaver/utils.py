@@ -50,7 +50,7 @@ from werkzeug.wrappers import Request as WerkzeugRequest
 from yaml.scanner import ScannerError
 
 from weaver.base import Constants
-from weaver.compat import LooseVersion
+from weaver.compat import Version
 from weaver.execute import ExecuteControlOption, ExecuteMode
 from weaver.formats import ContentType, get_content_type
 from weaver.status import map_status
@@ -604,14 +604,14 @@ class VersionLevel(Constants):
 
 
 class VersionFormat(Constants):
-    OBJECT = "object"  # LooseVersion
+    OBJECT = "object"  # Version
     STRING = "string"  # "x.y.z"
     PARTS = "parts"    # tuple/list
 
 
 @overload
 def as_version_major_minor_patch(version, version_format):
-    # type: (AnyVersion, Literal[VersionFormat.OBJECT]) -> LooseVersion
+    # type: (AnyVersion, Literal[VersionFormat.OBJECT]) -> Version
     ...
 
 
@@ -639,7 +639,7 @@ def as_version_major_minor_patch(version, version_format=VersionFormat.PARTS):
     Generates a ``MAJOR.MINOR.PATCH`` version with padded with zeros for any missing parts.
     """
     if isinstance(version, (str, float, int)):
-        ver_parts = list(LooseVersion(str(version)).version)
+        ver_parts = list(Version(str(version)).version)
     elif isinstance(version, (list, tuple)):
         ver_parts = [int(part) for part in version]
     else:
@@ -650,7 +650,7 @@ def as_version_major_minor_patch(version, version_format=VersionFormat.PARTS):
         ver_str = ".".join(str(part) for part in ver_tuple)
         if version_format == VersionFormat.STRING:
             return ver_str
-        return LooseVersion(ver_str)
+        return Version(ver_str)
     return ver_tuple
 
 
