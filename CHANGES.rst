@@ -12,6 +12,20 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- Fix ``cli._update_files`` so there are no attempts to upload remote references to the vault.
+
+
+.. _changes_4.26.0:
+
+`4.26.0 <https://github.com/crim-ca/weaver/tree/4.26.0>`_ (2022-10-31)
+========================================================================
+
+Changes:
+--------
 - Add more explicit ``PackageException`` error messages with contextual details when a `CWL` file reference cannot be
   resolved correctly.
 - Return ``Content-Type: application/vnd.oai.openapi+json; version=3.0`` for OpenAPI endpoint response referenced
