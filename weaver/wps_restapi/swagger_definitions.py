@@ -3620,23 +3620,29 @@ class CudaRequirementSpecification(PermissiveMappingSchema):
         String(),
         example="11.4",
         title="Cuda version minimum",
-        description="The minimum Cuda version required."
+        description="The minimum Cuda version required.",
+        validator=SemanticVersion(regex=r"^\d+\.\d+$")
     )
     cudaComputeCapability = ExtendedSchemaNode(
         String(),
         example="3.0",
         title="Cuda compute capability",
-        description="The compute capability supported by the GPU."
+        description="The compute capability supported by the GPU.",
+        validator=SemanticVersion(regex=r"^\d+\.\d+$")
     )
     cudaDeviceCountMin = ExtendedSchemaNode(
         Integer(),
         example=1,
+        default=1,
+        validator=Range(min=1),
         title="Cuda device count minimum",
         description="The minimum amount of devices required."
     )
     cudaDeviceCountMax = ExtendedSchemaNode(
         Integer(),
         example=8,
+        default=1,
+        validator=Range(min=1),
         title="Cuda device count maximum",
         description="The maximum amount of devices required."
     )
@@ -3647,6 +3653,10 @@ class CudaRequirementMap(ExtendedMappingSchema):
         name=CWL_REQUIREMENT_CUDA,
         title=CWL_REQUIREMENT_CUDA
     )
+
+
+class CudaRequirementClass(CudaRequirementSpecification):
+    _class = RequirementClass(example=CWL_REQUIREMENT_CUDA, validator=OneOf([CWL_REQUIREMENT_CUDA]))
 
 
 class NetworkAccessRequirementSpecification(PermissiveMappingSchema):
@@ -3663,6 +3673,10 @@ class NetworkAccessRequirementMap(ExtendedMappingSchema):
         name=CWL_REQUIREMENT_NETWORK_ACCESS,
         title=CWL_REQUIREMENT_NETWORK_ACCESS
     )
+
+
+class NetworkAccessRequirementClass(NetworkAccessRequirementSpecification):
+    _class = RequirementClass(example=CWL_REQUIREMENT_NETWORK_ACCESS, validator=OneOf([CWL_REQUIREMENT_NETWORK_ACCESS]))
 
 
 class DockerRequirementSpecification(PermissiveMappingSchema):
@@ -3804,6 +3818,7 @@ class CWLRequirementsMap(AnyOfKeywordSchema):
         DockerRequirementMap(missing=drop),
         DockerGpuRequirementMap(missing=drop),
         InitialWorkDirRequirementMap(missing=drop),
+        NetworkAccessRequirementMap(missing=drop),
         PermissiveMappingSchema(missing=drop),
     ]
 
@@ -3813,6 +3828,7 @@ class CWLRequirementsItem(OneOfKeywordSchema):
         DockerRequirementClass(missing=drop),
         DockerGpuRequirementClass(missing=drop),
         InitialWorkDirRequirementClass(missing=drop),
+        NetworkAccessRequirementClass(missing=drop),
         UnknownRequirementClass(missing=drop),  # allows anything, must be last
     ]
 
@@ -3848,9 +3864,11 @@ class CWLHintsItem(OneOfKeywordSchema, PermissiveMappingSchema):
     discriminator = "class"
     _one_of = [
         BuiltinRequirementClass(missing=drop),
+        CudaRequirementClass(missing=drop),
         DockerRequirementClass(missing=drop),
         DockerGpuRequirementClass(missing=drop),
         InitialWorkDirRequirementClass(missing=drop),
+        NetworkAccessRequirementClass(missing=drop),
         ESGF_CWT_RequirementClass(missing=drop),
         OGCAPIRequirementClass(missing=drop),
         WPS1RequirementClass(missing=drop),

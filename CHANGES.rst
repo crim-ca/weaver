@@ -13,7 +13,7 @@ Changes
 Changes:
 --------
 - Support `CWL` definition for ``cwltool:CUDARequirement`` to request the use of a GPU, including support for using
-  Docker with a GPU.
+  Docker with a GPU (resolves `#104 <https://github.com/crim-ca/weaver/issues/104>`_).
 - Support `CWL` definition for ``NetworkAccess`` to indicate whether a process requires outgoing IPv4/IPv6 network
   access.
 
