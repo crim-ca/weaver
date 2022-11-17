@@ -1,5 +1,4 @@
 import unittest
-from distutils.version import LooseVersion
 
 import owslib
 import pyramid.testing
@@ -14,6 +13,7 @@ from tests.utils import (
     setup_mongodb_processstore,
     setup_mongodb_servicestore
 )
+from weaver.compat import LooseVersion
 from weaver.config import WeaverConfiguration
 from weaver.datatype import Service
 from weaver.execute import ExecuteControlOption, ExecuteTransmissionMode

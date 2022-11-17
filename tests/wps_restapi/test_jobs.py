@@ -7,7 +7,6 @@ import tempfile
 import unittest
 import warnings
 from datetime import date
-from distutils.version import LooseVersion
 from typing import TYPE_CHECKING
 
 import colander
@@ -31,6 +30,7 @@ from tests.utils import (
     setup_mongodb_processstore,
     setup_mongodb_servicestore
 )
+from weaver.compat import LooseVersion
 from weaver.datatype import Job, Service
 from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import ContentType

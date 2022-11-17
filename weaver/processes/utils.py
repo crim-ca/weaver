@@ -4,7 +4,6 @@ import os
 import pathlib
 import warnings
 from copy import deepcopy
-from distutils.version import LooseVersion
 from typing import TYPE_CHECKING
 from urllib.parse import parse_qs, urlparse
 
@@ -22,6 +21,7 @@ from pyramid.httpexceptions import (
 )
 from pyramid.settings import asbool
 
+from weaver.compat import LooseVersion
 from weaver.config import (
     WEAVER_CONFIG_DIR,
     WEAVER_DEFAULT_WPS_PROCESSES_CONFIG,

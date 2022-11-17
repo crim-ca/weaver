@@ -9,11 +9,12 @@ if TYPE_CHECKING:
     import typing
     import uuid
     from datetime import datetime
-    from distutils.version import LooseVersion
     from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Type, TypeVar, Union
 
     import psutil
     from typing_extensions import Literal, NotRequired, Protocol, TypeAlias, TypedDict
+
+    from weaver.compat import LooseVersion
 
     if hasattr(os, "PathLike"):
         FileSystemPathType = Union[os.PathLike, str]

@@ -15,7 +15,6 @@ import time
 import warnings
 from copy import deepcopy
 from datetime import datetime
-from distutils.version import LooseVersion
 from typing import TYPE_CHECKING, overload
 from urllib.parse import ParseResult, unquote, urlparse, urlunsplit
 
@@ -51,6 +50,7 @@ from werkzeug.wrappers import Request as WerkzeugRequest
 from yaml.scanner import ScannerError
 
 from weaver.base import Constants
+from weaver.compat import LooseVersion
 from weaver.execute import ExecuteControlOption, ExecuteMode
 from weaver.formats import ContentType, get_content_type
 from weaver.status import map_status
