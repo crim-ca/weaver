@@ -874,7 +874,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         """
         Test to validate ``mimeType`` is replaced by ``mediaType`` for all descriptions.
 
-        Also we validate that processes that use ``mimeType`` or ``mediaType`` can be deployed successfully.
+        Also, we validate that processes that use ``mimeType`` or ``mediaType`` can be deployed successfully.
         """
         ns_json, type_json = get_cwl_file_format(ContentType.APP_JSON)
         namespaces = dict(list(ns_json.items()))
@@ -2201,7 +2201,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             tmp_path = mocked_reference_test_file(tmp_file.name, "", "random data")
             tmp_http = map_wps_output_location(tmp_path, self.settings, url=True, exists=True)
             assert tmp_http is None, "Failed setup of test file. Must not be available on WPS output location."
-            tmp_host = "http://random-file-server.com"
+            tmp_host = "https://random-file-server.com"
             tmp_http = f"{tmp_host}/{tmp_name_random}"
             headers.update({"Content-Disposition": f"filename=\"{tmp_name_target}\""})
             stack_exec.enter_context(mocked_file_server(tmp_dir, tmp_host, self.settings, headers_override=headers))

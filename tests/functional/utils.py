@@ -391,7 +391,7 @@ class WpsConfigBase(unittest.TestCase):
             Monitor until the requested status is reached (default: when job is completed).
             If no value is specified and :paramref:`expect_failed` is enabled, completion status will be a failure.
             Otherwise, the successful status is used instead. Explicit intermediate status can be requested instead.
-            Whichever status is specified or defaulted, failed/succeeded statuses will break-out of the monitoring loop,
+            Whichever status is specified or defaulted, failed/succeeded statuses will break out of the monitoring loop,
             since no more status change is possible.
         :param expect_failed:
             If enabled, allow failing status to during status validation.

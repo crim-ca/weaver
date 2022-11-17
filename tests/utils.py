@@ -55,7 +55,7 @@ from weaver.utils import (
     str2bytes
 )
 from weaver.warning import MissingParameterWarning, UnsupportedOperationWarning
-from weaver.wps.utils import get_wps_output_dir, get_wps_output_url
+from weaver.wps.utils import get_wps_output_dir, get_wps_output_url, load_pywps_config
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Type, TypeVar, Union
@@ -137,8 +137,8 @@ def ignore_wps_warnings(func):
     """
     Wrapper that eliminates WPS related warnings during testing logging.
 
-    **NOTE**:
-        Wrapper should be applied on method (not directly on :class:`unittest.TestCase`
+    .. note::
+        Wrapper should be applied on method (not directly on :class:`unittest.TestCase`)
         as it can disable the whole test suite.
     """
     warn_msg_regex = ["Parameter 'request*", "Parameter 'service*", "Request type '*", "Service '*"]
@@ -229,6 +229,7 @@ def setup_config_with_pywps(config):
     settings["weaver.wps_configured"] = False
     os.environ.pop("PYWPS_CONFIG", None)
     config.include("weaver.wps")
+    load_pywps_config(config)
     return config
 
 
