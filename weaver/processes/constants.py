@@ -83,14 +83,18 @@ Set of :term:`CWL` requirements that correspond to remote execution of an :term:
 """
 
 # FIXME: convert to 'Constants' class
+CWL_REQUIREMENT_CUDA = "cwltool:CUDARequirement"
 CWL_REQUIREMENT_ENV_VAR = "EnvVarRequirement"
 CWL_REQUIREMENT_INIT_WORKDIR = "InitialWorkDirRequirement"
+CWL_REQUIREMENT_NETWORK_ACCESS = "NetworkAccess"
 CWL_REQUIREMENT_RESOURCE = "ResourceRequirement"
 CWL_REQUIREMENT_SCATTER = "ScatterFeatureRequirement"
 
 CWL_REQUIREMENT_FEATURES = frozenset([
+    CWL_REQUIREMENT_CUDA,
     CWL_REQUIREMENT_ENV_VAR,
     CWL_REQUIREMENT_INIT_WORKDIR,
+    CWL_REQUIREMENT_NETWORK_ACCESS,
     CWL_REQUIREMENT_RESOURCE,   # FIXME: perform pre-check on job submit? (https://github.com/crim-ca/weaver/issues/138)
     CWL_REQUIREMENT_SCATTER,
 ])

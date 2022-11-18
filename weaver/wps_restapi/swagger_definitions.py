@@ -35,7 +35,9 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_ESGF_CWT,
     CWL_REQUIREMENT_APP_OGC_API,
     CWL_REQUIREMENT_APP_WPS1,
+    CWL_REQUIREMENT_CUDA,
     CWL_REQUIREMENT_INIT_WORKDIR,
+    CWL_REQUIREMENT_NETWORK_ACCESS,
     OAS_COMPLEX_TYPES,
     OAS_DATA_TYPES,
     PACKAGE_ARRAY_BASE,
@@ -3613,6 +3615,70 @@ class RequirementClass(ExtendedSchemaNode):
     description = "CWL requirement class specification."
 
 
+class CudaRequirementSpecification(PermissiveMappingSchema):
+    cudaVersionMin = ExtendedSchemaNode(
+        String(),
+        example="11.4",
+        title="Cuda version minimum",
+        description="The minimum Cuda version required.",
+        validator=SemanticVersion(regex=r"^\d+\.\d+$")
+    )
+    cudaComputeCapability = ExtendedSchemaNode(
+        String(),
+        example="3.0",
+        title="Cuda compute capability",
+        description="The compute capability supported by the GPU.",
+        validator=SemanticVersion(regex=r"^\d+\.\d+$")
+    )
+    cudaDeviceCountMin = ExtendedSchemaNode(
+        Integer(),
+        example=1,
+        default=1,
+        validator=Range(min=1),
+        title="Cuda device count minimum",
+        description="The minimum amount of devices required."
+    )
+    cudaDeviceCountMax = ExtendedSchemaNode(
+        Integer(),
+        example=8,
+        default=1,
+        validator=Range(min=1),
+        title="Cuda device count maximum",
+        description="The maximum amount of devices required."
+    )
+
+
+class CudaRequirementMap(ExtendedMappingSchema):
+    CudaRequirement = CudaRequirementSpecification(
+        name=CWL_REQUIREMENT_CUDA,
+        title=CWL_REQUIREMENT_CUDA
+    )
+
+
+class CudaRequirementClass(CudaRequirementSpecification):
+    _class = RequirementClass(example=CWL_REQUIREMENT_CUDA, validator=OneOf([CWL_REQUIREMENT_CUDA]))
+
+
+class NetworkAccessRequirementSpecification(PermissiveMappingSchema):
+    networkAccess = ExtendedSchemaNode(
+        Boolean(),
+        example=True,
+        title="Network Access",
+        description="Indicate whether a process requires outgoing IPv4/IPv6 network access."
+    )
+
+
+class NetworkAccessRequirementMap(ExtendedMappingSchema):
+    NetworkAccessRequirement = NetworkAccessRequirementSpecification(
+        name=CWL_REQUIREMENT_NETWORK_ACCESS,
+        title=CWL_REQUIREMENT_NETWORK_ACCESS
+    )
+
+
+class NetworkAccessRequirementClass(NetworkAccessRequirementSpecification):
+    _class = RequirementClass(example=CWL_REQUIREMENT_NETWORK_ACCESS, validator=OneOf([CWL_REQUIREMENT_NETWORK_ACCESS]))
+
+
 class DockerRequirementSpecification(PermissiveMappingSchema):
     dockerPull = ExtendedSchemaNode(
         String(),
@@ -3752,6 +3818,7 @@ class CWLRequirementsMap(AnyOfKeywordSchema):
         DockerRequirementMap(missing=drop),
         DockerGpuRequirementMap(missing=drop),
         InitialWorkDirRequirementMap(missing=drop),
+        NetworkAccessRequirementMap(missing=drop),
         PermissiveMappingSchema(missing=drop),
     ]
 
@@ -3761,6 +3828,7 @@ class CWLRequirementsItem(OneOfKeywordSchema):
         DockerRequirementClass(missing=drop),
         DockerGpuRequirementClass(missing=drop),
         InitialWorkDirRequirementClass(missing=drop),
+        NetworkAccessRequirementClass(missing=drop),
         UnknownRequirementClass(missing=drop),  # allows anything, must be last
     ]
 
@@ -3779,9 +3847,11 @@ class CWLRequirements(OneOfKeywordSchema):
 class CWLHintsMap(AnyOfKeywordSchema, PermissiveMappingSchema):
     _any_of = [
         BuiltinRequirementMap(missing=drop),
+        CudaRequirementMap(missing=drop),
         DockerRequirementMap(missing=drop),
         DockerGpuRequirementMap(missing=drop),
         InitialWorkDirRequirementMap(missing=drop),
+        NetworkAccessRequirementMap(missing=drop),
         ESGF_CWT_RequirementMap(missing=drop),
         OGCAPIRequirementMap(missing=drop),
         WPS1RequirementMap(missing=drop),
@@ -3794,9 +3864,11 @@ class CWLHintsItem(OneOfKeywordSchema, PermissiveMappingSchema):
     discriminator = "class"
     _one_of = [
         BuiltinRequirementClass(missing=drop),
+        CudaRequirementClass(missing=drop),
         DockerRequirementClass(missing=drop),
         DockerGpuRequirementClass(missing=drop),
         InitialWorkDirRequirementClass(missing=drop),
+        NetworkAccessRequirementClass(missing=drop),
         ESGF_CWT_RequirementClass(missing=drop),
         OGCAPIRequirementClass(missing=drop),
         WPS1RequirementClass(missing=drop),
