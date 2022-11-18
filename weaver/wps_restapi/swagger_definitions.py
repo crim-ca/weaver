@@ -3846,6 +3846,7 @@ class CWLRequirementsMap(AnyOfKeywordSchema):
         DockerRequirementMap(missing=drop),
         DockerGpuRequirementMap(missing=drop),
         InitialWorkDirRequirementMap(missing=drop),
+        InlineJavascriptRequirementMap(missing=drop),
         NetworkAccessRequirementMap(missing=drop),
         PermissiveMappingSchema(missing=drop),
     ]
@@ -3880,6 +3881,7 @@ class CWLHintsMap(AnyOfKeywordSchema, PermissiveMappingSchema):
         DockerRequirementMap(missing=drop),
         DockerGpuRequirementMap(missing=drop),
         InitialWorkDirRequirementMap(missing=drop),
+        InlineJavascriptRequirementMap(missing=drop),
         NetworkAccessRequirementMap(missing=drop),
         ESGF_CWT_RequirementMap(missing=drop),
         OGCAPIRequirementMap(missing=drop),
@@ -3897,6 +3899,7 @@ class CWLHintsItem(OneOfKeywordSchema, PermissiveMappingSchema):
         DockerRequirementClass(missing=drop),
         DockerGpuRequirementClass(missing=drop),
         InitialWorkDirRequirementClass(missing=drop),
+        InlineJavascriptRequirementClass(missing=drop),
         NetworkAccessRequirementClass(missing=drop),
         ESGF_CWT_RequirementClass(missing=drop),
         OGCAPIRequirementClass(missing=drop),
