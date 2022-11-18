@@ -38,6 +38,7 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_WPS1,
     CWL_REQUIREMENT_CUDA,
     CWL_REQUIREMENT_INIT_WORKDIR,
+    CWL_REQUIREMENT_INLINE_JAVASCRIPT,
     CWL_REQUIREMENT_NETWORK_ACCESS,
     OAS_COMPLEX_TYPES,
     OAS_DATA_TYPES,
@@ -3756,12 +3757,12 @@ class InlineJavascriptRequirementSpecification(PermissiveMappingSchema):
 
 
 class InlineJavascriptRequirementMap(ExtendedMappingSchema):
-    req = InlineJavascriptRequirementSpecification(name=CWL_REQUIREMENT_INIT_WORKDIR)
+    req = InlineJavascriptRequirementSpecification(name=CWL_REQUIREMENT_INLINE_JAVASCRIPT)
 
 
 class InlineJavascriptRequirementClass(InlineJavascriptRequirementSpecification):
-    _class = RequirementClass(example=CWL_REQUIREMENT_INIT_WORKDIR,
-                              validator=OneOf([CWL_REQUIREMENT_INIT_WORKDIR]))
+    _class = RequirementClass(example=CWL_REQUIREMENT_INLINE_JAVASCRIPT,
+                              validator=OneOf([CWL_REQUIREMENT_INLINE_JAVASCRIPT]))
 
 
 class BuiltinRequirementSpecification(PermissiveMappingSchema):
