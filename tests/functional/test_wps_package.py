@@ -37,7 +37,8 @@ from tests.utils import (
     mocked_http_file,
     mocked_reference_test_file,
     mocked_sub_requests,
-    mocked_wps_output
+    mocked_wps_output,
+    setup_aws_s3_bucket
 )
 from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import (
@@ -3009,9 +3010,23 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
 class WpsPackageAppWithS3BucketTest(WpsConfigBase, ResourcesUtil):
     """
     Test with output results uploaded to S3 bucket.
+
+    .. warning::
+        Every test must setup the WPS-output S3 bucket. This is due to how :mod:`unittest` method contexts are handled
+        by :mod:`pywps` as individual test functions, which recreates a new :mod:`moto` mock each time. Therefore, any
+        progress within the "session" operations such as remembering the creation of a bucket is undone after each test.
+
+    .. seealso::
+        Below decorators apply. Call order matters since following ones employs configurations from previous ones.
+
+        - :func:`mocked_aws_config`
+        - :func:`mocked_aws_s3`
+        - :func:`setup_aws_s3_bucket`
     """
 
     @classmethod
+    @mocked_aws_config
+    @mocked_aws_s3  # avoid error on setup of output S3 bucket under PyWPS config
     def setUpClass(cls):
         cls.settings = {
             "weaver.wps": True,
@@ -3027,6 +3042,7 @@ class WpsPackageAppWithS3BucketTest(WpsConfigBase, ResourcesUtil):
 
     @mocked_aws_config
     @mocked_aws_s3
+    @setup_aws_s3_bucket(bucket="wps-output-test-bucket")
     def test_execute_application_package_process_with_bucket_results(self):
         """
         Test validates:
@@ -3153,6 +3169,7 @@ class WpsPackageAppWithS3BucketTest(WpsConfigBase, ResourcesUtil):
 
     @mocked_aws_config
     @mocked_aws_s3
+    @setup_aws_s3_bucket(bucket="wps-output-test-bucket")
     def test_execute_with_directory_output(self):
         """
         Test that directory complex type is resolved from CWL and produces the expected output files in an AWS bucket.

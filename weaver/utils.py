@@ -1871,7 +1871,7 @@ def download_file_http(file_reference, file_outdir, settings=None, callback=None
     return file_path
 
 
-def validate_s3(*, bucket, region):
+def validate_s3(*, region, bucket):
     # type: (Any, str, str) -> None
     """
     Validate patterns and allowed values for :term:`AWS` :term:`S3` client configuration.
@@ -1879,8 +1879,8 @@ def validate_s3(*, bucket, region):
     if not re.match(AWS_S3_REGIONS_REGEX, region):
         raise ValueError(f"Invalid AWS S3 Region format for: [{region!s}]\n")
     if not re.match(AWS_S3_BUCKET_NAME_PATTERN, bucket):
-        raise ValueError(f"Invalid AWS S3 Bucket format for: [{region!s}]\n")
-    LOGGER.debug("All valid AWS S3 parameters: [Bucket=%s, Region=%s]", bucket, region)
+        raise ValueError(f"Invalid AWS S3 Bucket format for: [{bucket!s}]\n")
+    LOGGER.debug("All valid AWS S3 parameters: [Region=%s, Bucket=%s]", region, bucket)
 
 
 def resolve_s3_from_http(reference):

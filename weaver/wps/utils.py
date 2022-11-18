@@ -473,18 +473,18 @@ def load_pywps_config(container, config=None):
         from botocore.exceptions import ClientError
         s3 = boto3.client("s3")
         s3_region = settings.get("weaver.wps_output_s3_region", s3.meta.region_name)
-        LOGGER.info("Validating that AWS S3 [Bucket=%s, Region=%s] exists or creating it.", s3_bucket, s3_region)
+        LOGGER.info("Validating that AWS S3 [Region=%s, Bucket=%s] exists or creating it.", s3_region, s3_bucket)
         validate_s3(region=s3_region, bucket=s3_bucket)
         try:
             s3.create_bucket(Bucket=s3_bucket,
                              CreateBucketConfiguration={"LocationConstraint": s3_region})  # type: ignore
-            LOGGER.info("AWS S3 bucket [Bucket=%s, Region=%s] for WPS output created.", s3_bucket, s3_region)
+            LOGGER.info("AWS S3 bucket [Region=%s, Bucket=%s] for WPS output created.", s3_region, s3_bucket)
         except ClientError as exc:
             if exc.response.get("Error", {}).get("Code") != "BucketAlreadyExists":
-                LOGGER.error("Failed setup of AWS S3 bucket [Bucket=%s, Region=%s] for WPS output: [%s]",
-                             s3_bucket, s3_region, exc)
+                LOGGER.error("Failed setup of AWS S3 bucket [Region=%s, Bucket=%s] for WPS output: [%s]",
+                             s3_region, s3_bucket, exc)
                 raise
-            LOGGER.info("AWS S3 bucket [Bucket=%s, Region=%s] for WPS output already exists.", s3_bucket, s3_region)
+            LOGGER.info("AWS S3 bucket [Region=%s, Bucket=%s] for WPS output already exists.", s3_region, s3_bucket)
         pywps_config.CONFIG.set("s3", "region", s3_region)
         pywps_config.CONFIG.set("s3", "bucket", s3_bucket)
         pywps_config.CONFIG.set("s3", "public", "false")  # don't automatically push results as publicly accessible

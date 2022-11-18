@@ -18,7 +18,7 @@ import uuid
 import warnings
 from configparser import ConfigParser
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, overload
 
 # Note: do NOT import 'boto3' here otherwise 'moto' will not be able to mock it effectively
 import mock
@@ -44,6 +44,7 @@ from weaver.datatype import Service
 from weaver.formats import ContentType
 from weaver.store.mongodb import MongodbJobStore, MongodbProcessStore, MongodbServiceStore
 from weaver.utils import (
+    AWS_S3_REGIONS,
     bytes2str,
     fetch_file,
     get_header,
@@ -1157,7 +1158,7 @@ def mocked_process_package():
 
 
 def mocked_aws_config(_func=null,                       # type: Optional[Callable[[..., *Any], Any]]
-                      *,                                #
+                      *,                                # force named keyword arguments after
                       default_region=MOCK_AWS_REGION,   # type: RegionName
                       ):                                # type: (...) -> Callable[[..., *Any], Any]
     """
@@ -1170,18 +1171,30 @@ def mocked_aws_config(_func=null,                       # type: Optional[Callabl
         - :func:`mocked_aws_s3`
         - :func:`mocked_aws_s3_bucket_test_file`
     """
+    from weaver.utils import validate_s3 as real_validate_s3
+
+    def mock_validate_s3(*, region, bucket):
+        # type: (Any, str, str) -> None
+        if region == MOCK_AWS_REGION:
+            region = AWS_S3_REGIONS[0]  # any valid for temporarily passing check
+        real_validate_s3(region=region, bucket=bucket)
+
     def decorator(test_func):
         # type: (Callable[[..., *Any], Any]) -> Callable[[..., *Any], Any]
         @functools.wraps(test_func)
         def wrapped(*args, **kwargs):
             # type: (*Any, **Any) -> Any
-            with mock.patch.dict(os.environ, {
-                "AWS_DEFAULT_REGION": default_region,
-                "AWS_ACCESS_KEY_ID": "testing",
-                "AWS_SECRET_ACCESS_KEY": "testing",
-                "AWS_SECURITY_TOKEN": "testing",
-                "AWS_SESSION_TOKEN": "testing"
-            }):
+
+            with contextlib.ExitStack() as stack:
+                stack.enter_context(mock.patch.dict(os.environ, {
+                    "AWS_DEFAULT_REGION": default_region,
+                    "AWS_ACCESS_KEY_ID": "testing",
+                    "AWS_SECRET_ACCESS_KEY": "testing",
+                    "AWS_SECURITY_TOKEN": "testing",
+                    "AWS_SESSION_TOKEN": "testing"
+                }))
+                stack.enter_context(mock.patch("weaver.utils.validate_s3", side_effect=mock_validate_s3))
+                stack.enter_context(mock.patch("weaver.wps.utils.validate_s3", side_effect=mock_validate_s3))
                 return test_func(*args, **kwargs)
         return wrapped
     if _func is not null and callable(_func):
@@ -1206,6 +1219,53 @@ def mocked_aws_s3(test_func):
     return wrapped
 
 
+@overload
+def setup_aws_s3_bucket(__func=null, *, region=MOCK_AWS_REGION, bucket="", client=True):
+    # type: (Any, Any, BucketLocationConstraintType, str, Literal[True]) -> S3Client
+    ...
+
+
+@overload
+def setup_aws_s3_bucket(__func=null, *, region=MOCK_AWS_REGION, bucket="", client=False):
+    # type: (Any, Any, BucketLocationConstraintType, str, Literal[False]) -> Callable[[...], Any]
+    ...
+
+
+def setup_aws_s3_bucket(__func=null,              # type: Optional[Callable[[..., *Any], Any]]
+                        *,                        # force named keyword arguments after
+                        region=MOCK_AWS_REGION,   # type: BucketLocationConstraintType
+                        bucket="",                # type: str
+                        client=False,             # type: bool
+                        ):                        # type: (...) -> Union[Callable[[...], Any], S3Client]
+    import boto3
+    from botocore.exceptions import ClientError
+
+    def setup():
+        s3 = boto3.client("s3", region_name=region)   # type: S3Client
+        s3_location = {"LocationConstraint": region}  # type: CreateBucketConfigurationTypeDef
+        try:
+            s3.create_bucket(Bucket=bucket, CreateBucketConfiguration=s3_location)
+        except ClientError as exc:
+            if exc.response["Error"]["Code"] not in ["BucketAlreadyExists", "BucketAlreadyOwnedByYou"]:
+                raise
+        return s3
+
+    if client:
+        return setup()
+
+    def decorate(func):
+        # type: (Callable[[...], Any]) -> Callable[[...], Any]
+        @functools.wraps(func)
+        def wrapped(*args, **kwargs):
+            setup()
+            return func(*args, **kwargs)
+        return wrapped
+
+    if callable(__func):  # without () call
+        return decorate(__func)
+    return decorate       # with parameters
+
+
 def mocked_aws_s3_bucket_test_file(bucket_name,                 # type: str
                                    file_name,                   # type: str
                                    file_content="mock",         # type: str
@@ -1213,11 +1273,15 @@ def mocked_aws_s3_bucket_test_file(bucket_name,                 # type: str
                                    s3_scheme="s3",              # type: S3Scheme
                                    ):                           # type: (...) -> str
     """
-    Mock a test file as if retrieved from an AWS-S3 bucket reference.
+    Mock a test file as if retrieved from an :term:`AWS` term:`S3` bucket reference.
 
     Generates a test file reference from dummy data that will be uploaded to the specified S3 bucket name using the
     provided file key. The S3 interface employed is completely dependent of the wrapping context. For instance,
     calling this function with :func:`mocked_aws_s3` decorator will effectively employ the mocked S3 interface.
+
+    .. note::
+        Any applicable :term:`AWS` term:`S3` mock should have been applied before calling this function.
+        This function does not itself configure the mocking mechanism.
 
     .. warning::
         Make sure to employ the same :paramref:`s3_region` across calls when referring to the
@@ -1228,17 +1292,7 @@ def mocked_aws_s3_bucket_test_file(bucket_name,                 # type: str
         - :func:`mocked_aws_config`
         - :func:`mocked_aws_s3`
     """
-    import boto3
-    from botocore.exceptions import ClientError
-
-    s3 = boto3.client("s3", region_name=s3_region)      # type: S3Client
-    s3_location = {"LocationConstraint": s3_region}     # type: CreateBucketConfigurationTypeDef
-    try:
-        s3.create_bucket(Bucket=bucket_name, CreateBucketConfiguration=s3_location)
-    except ClientError as exc:
-        if exc.response["Error"]["Code"] not in ["BucketAlreadyExists", "BucketAlreadyOwnedByYou"]:
-            raise
-
+    s3 = setup_aws_s3_bucket(region=s3_region, bucket=bucket_name, client=True)
     with tempfile.NamedTemporaryFile(mode="w") as tmp_file:
         tmp_file.write(file_content)
         tmp_file.flush()
