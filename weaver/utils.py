@@ -193,7 +193,7 @@ FILE_NAME_LOOSE_PATTERN = re.compile(r"^[\w\-.]+$")  # no extension required
 if sys.version_info >= (3, 7):
     _LITERAL_VALUES_ATTRIBUTE = "__args__"
 else:
-    _LITERAL_VALUES_ATTRIBUTE = "__values__"
+    _LITERAL_VALUES_ATTRIBUTE = "__values__"  # pragma: no cover
 AWS_S3_REGIONS = list(getattr(RegionName, _LITERAL_VALUES_ATTRIBUTE))  # type: List[RegionName]
 AWS_S3_REGIONS_REGEX = "(" + "|".join(AWS_S3_REGIONS) + ")"
 # https://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html
@@ -218,26 +218,6 @@ AWS_S3_BUCKET_REFERENCE_PATTERN = re.compile(
     r"(?P<path>(?:/$|/[\w.-]+)+)"  # sub-dir and file-key path, minimally only dir trailing slash
     r"$"
 )
-
-
-class Lazify(object):
-    """
-    Wraps the callable for evaluation only on explicit call or string representation.
-    """
-
-    def __init__(self, func):
-        # type: (Callable[[], Return]) -> None
-        if not callable(func):
-            raise ValueError("Invalid lazify operation. Input must be a callable.")
-        self.func = func
-
-    def __call__(self):
-        # type: () -> Return
-        return self.func()
-
-    def __str__(self):
-        # type: () -> str
-        return f"{self.func()!s}"
 
 
 class CaseInsensitive(str):
