@@ -27,6 +27,9 @@ Changes:
 --------
 - Replace deprecated ``best_match`` methods for ``Accept`` and ``Accept-Language`` HTTP headers by their respective
   implementation with ``acceptable_offers`` and ``lookup`` methods better aligned with :rfc:`7231` specification.
+- Add ``Lazify`` utility class for holding a string with delayed computation and caching that returns its representation
+  on-demand during formatting or other string operations to reduce the impact of its long generation. This can be used
+  with a callable returning a string representation that can be discarded without invocation on inactive logging levels.
 
 Fixes:
 ------
