@@ -1170,6 +1170,12 @@ def test_fetch_file_remote_s3_bucket(s3_scheme, s3_region):
             assert test_file.read() == test_file_data
 
 
+def test_fetch_file_unknown_scheme():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with pytest.raises(ValueError):
+            fetch_file("unknown://random.location.com/dir/file.txt", tmpdir)
+
+
 @pytest.mark.parametrize("options, parameters, configuration", [
     (
         {"timeout": 10},
