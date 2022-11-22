@@ -1413,6 +1413,10 @@ def test_validate_s3_reference(s3_reference, valid):
                 "sxyz-",
                 "sxyz.",
                 "abc_def",
+                "abc..def",  # adjacent not allowed
+                # specific case disallowed
+                "bucket-s3alias",
+                "xn--bucket",
             ],
             # invalid region combinations
             [
@@ -1432,7 +1436,9 @@ def test_validate_s3_reference(s3_reference, valid):
                 "bucket1",
                 "1bucket",
                 "bucket-test",
+                "bucket--test",
                 "bucket.test",
+                "bucket.test.2",
             ],
             # valid region combinations
             AWS_S3_REGION_SUBSET,

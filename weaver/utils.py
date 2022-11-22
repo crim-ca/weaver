@@ -200,7 +200,15 @@ AWS_S3_REGIONS_REGEX = "(" + "|".join(AWS_S3_REGIONS) + ")"
 AWS_S3_ARN = "arn:aws:s3"
 # https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucketnamingrules.html
 # https://stackoverflow.com/questions/50480924/regex-for-s3-bucket-name
-AWS_S3_BUCKET_NAME_PATTERN = re.compile(r"^(?!(^xn--|.+-s3alias$))[a-z0-9][a-z0-9-.]{1,61}[a-z0-9]$")  # lowercase only
+AWS_S3_BUCKET_NAME_PATTERN = re.compile(
+    r"^"
+    r"(?!(^xn--|.+-s3alias$))"  # prefix/suffix disallowed by reserved AWS use for other bucket access point variations
+    # lowercase only allowed, in range (min=3, max=63) characters
+    r"[a-z0-9]"  # only alphanumeric start
+    r"(?:(\.(?!\.))|[a-z0-9-]){1,61}"  # alphanumeric with dash/dot allowed, but repeated dots disallowed
+    r"[a-z0-9]"  # only alphanumeric end
+    r"$"
+)
 # Bucket ARN =
 # - arn:aws:s3:{Region}:{AccountId}:accesspoint/{AccessPointName}[/file-key]
 # - arn:aws:s3-outposts:{Region}:{AccountId}:outpost/{outpostId}/bucket/{Bucket}[/file-key]
