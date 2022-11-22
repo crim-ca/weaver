@@ -1682,7 +1682,9 @@ class OneOfKeywordSchema(KeywordMapper):
 
     As a shortcut, the OpenAPI keyword ``discriminator`` can be provided to try matching as a last resort.
 
-    For example::
+    For example:
+
+    .. code-block:: python
 
         class Animal(ExtendedMappingSchema):
             name = ExtendedSchemaNode(String())
@@ -1698,6 +1700,16 @@ class OneOfKeywordSchema(KeywordMapper):
             [...]   # many **OPTIONAL** fields
 
         # With the discriminator keyword, following is possible
+        # (each schema must provide the same property name)
+        class SomeAnimal(OneOfMappingSchema):
+            discriminator = "type"
+            _one_of = [
+                Cat(),
+                Dog(),
+            ]
+
+        # If more specific mapping resolutions than 1-to-1 by name are needed,
+        # an explicit dictionary can be specified instead.
         class SomeAnimal(OneOfMappingSchema):
             discriminator = {
                 "propertyName": "type",     # correspond to 'type' of 'Animal'

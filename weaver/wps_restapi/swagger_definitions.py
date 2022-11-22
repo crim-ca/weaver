@@ -3727,12 +3727,14 @@ class DockerGpuRequirementClass(DockerGpuRequirementSpecification):
     _class = RequirementClass(example=CWL_REQUIREMENT_APP_DOCKER_GPU, validator=OneOf([CWL_REQUIREMENT_APP_DOCKER_GPU]))
 
 
-class DirectoryListing(PermissiveMappingSchema):
+class DirectoryListingItem(PermissiveMappingSchema):
     entry = ExtendedSchemaNode(String(), missing=drop)
+    entryname = ExtendedSchemaNode(String(), missing=drop)
+    writable = ExtendedSchemaNode(Boolean(), missing=drop)
 
 
 class InitialWorkDirListing(ExtendedSequenceSchema):
-    listing = DirectoryListing()
+    item = DirectoryListingItem()
 
 
 class InitialWorkDirRequirementSpecification(PermissiveMappingSchema):
@@ -3748,12 +3750,21 @@ class InitialWorkDirRequirementClass(InitialWorkDirRequirementSpecification):
                               validator=OneOf([CWL_REQUIREMENT_INIT_WORKDIR]))
 
 
-class InlineJavascriptListing(ExtendedSequenceSchema):
-    listing = DirectoryListing()
+class InlineJavascriptLibraries(ExtendedSequenceSchema):
+    description = (
+        "Additional code fragments that will also be inserted before executing the expression code. "
+        "Allows for function definitions that may be called from CWL expressions."
+    )
+    exp_lib = ExtendedSchemaNode(String(), missing=drop)
 
 
 class InlineJavascriptRequirementSpecification(PermissiveMappingSchema):
-    listing = InlineJavascriptListing()
+    description = (
+        "Indicates that the workflow platform must support inline Javascript expressions. "
+        "If this requirement is not present, the workflow platform must not perform expression interpolation. "
+        "https://www.commonwl.org/v1.2/CommandLineTool.html#InlineJavascriptRequirement"
+    )
+    expressionLib = InlineJavascriptLibraries(missing=drop)
 
 
 class InlineJavascriptRequirementMap(ExtendedMappingSchema):
@@ -3854,6 +3865,9 @@ class CWLRequirementsMap(AnyOfKeywordSchema):
 
 
 class CWLRequirementsItem(OneOfKeywordSchema):
+    # in case there is any conflict between definitions,
+    # the class field can be used to discriminate which one is expected.
+    discriminator = "class"
     _one_of = [
         DockerRequirementClass(missing=drop),
         DockerGpuRequirementClass(missing=drop),
