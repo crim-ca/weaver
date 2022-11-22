@@ -79,6 +79,7 @@ from weaver.utils import (
     resolve_s3_reference,
     retry_on_condition,
     str2bytes,
+    validate_s3,
     xml_path_elements,
     xml_strip_ns
 )
@@ -88,8 +89,9 @@ if TYPE_CHECKING:
 
     from tests.utils import S3Scheme
 
-AWS_S3_REGION_SUBSET = {MOCK_AWS_REGION} | set(random.choices(AWS_S3_REGIONS, k=4))
-AWS_S3_REGION_NON_DEFAULT = list(AWS_S3_REGION_SUBSET - {MOCK_AWS_REGION})[0]
+AWS_S3_REGION_SUBSET = set(random.choices(AWS_S3_REGIONS, k=4))
+AWS_S3_REGION_SUBSET_WITH_MOCK = {MOCK_AWS_REGION} | AWS_S3_REGION_SUBSET
+AWS_S3_REGION_NON_DEFAULT = list(AWS_S3_REGION_SUBSET_WITH_MOCK - {MOCK_AWS_REGION})[0]
 
 # pylint: disable=R1732,W1514  # not using with open + encoding
 
@@ -1238,43 +1240,43 @@ def test_resolve_s3_http_options(options, parameters, configuration):
     "s3_url, expect_region, expect_url",
     [
         (f"https://s3.{region}.amazonaws.com/test/file.txt", region, "s3://test/file.txt")
-        for region in AWS_S3_REGION_SUBSET
+        for region in AWS_S3_REGION_SUBSET_WITH_MOCK
     ] + [
         (f"https://s3.{region}.amazonaws.com/test/dir/nested/file.txt", region, "s3://test/dir/nested/file.txt")
-        for region in AWS_S3_REGION_SUBSET
+        for region in AWS_S3_REGION_SUBSET_WITH_MOCK
     ] + [
         (f"https://test.s3.{region}.amazonaws.com/dir/nested/file.txt", region, "s3://test/dir/nested/file.txt")
-        for region in AWS_S3_REGION_SUBSET
+        for region in AWS_S3_REGION_SUBSET_WITH_MOCK
     ] + [
         (f"https://test.s3.{region}.amazonaws.com/dir/only/", region, "s3://test/dir/only/")
-        for region in AWS_S3_REGION_SUBSET
+        for region in AWS_S3_REGION_SUBSET_WITH_MOCK
     ] + [
         (f"https://s3.{region}.amazonaws.com/test/dir/only/", region, "s3://test/dir/only/")
-        for region in AWS_S3_REGION_SUBSET
+        for region in AWS_S3_REGION_SUBSET_WITH_MOCK
     ] + [
         (
             f"https://access-111122223333.s3-accesspoint.{region}.amazonaws.com/test/",
             region, f"s3://arn:aws:s3:{region}:111122223333:accesspoint/access/test/"
         )
-        for region in AWS_S3_REGION_SUBSET
+        for region in AWS_S3_REGION_SUBSET_WITH_MOCK
     ] + [
         (
             f"https://test-location-123456789012.s3-accesspoint.{region}.amazonaws.com/dir/file.txt",
             region, f"s3://arn:aws:s3:{region}:123456789012:accesspoint/test-location/dir/file.txt"
         )
-        for region in AWS_S3_REGION_SUBSET
+        for region in AWS_S3_REGION_SUBSET_WITH_MOCK
     ] + [
         (
             f"https://test-location-123456789012.s3-accesspoint.{region}.amazonaws.com/",
             region, f"s3://arn:aws:s3:{region}:123456789012:accesspoint/test-location/"
         )
-        for region in AWS_S3_REGION_SUBSET
+        for region in AWS_S3_REGION_SUBSET_WITH_MOCK
     ] + [
         (
             f"https://test-location-123456789012.s3-accesspoint.{region}.amazonaws.com/nested/dir/",
             region, f"s3://arn:aws:s3:{region}:123456789012:accesspoint/test-location/nested/dir/"
         )
-        for region in AWS_S3_REGION_SUBSET
+        for region in AWS_S3_REGION_SUBSET_WITH_MOCK
     ]
 )
 def test_resolve_s3_from_http(s3_url, expect_region, expect_url):
@@ -1394,6 +1396,61 @@ def test_validate_s3_reference(s3_reference, valid):
     # type: (str, bool) -> None
     match = re.match(AWS_S3_BUCKET_REFERENCE_PATTERN, s3_reference)
     assert bool(match) is valid
+
+
+@pytest.mark.parametrize(
+    "combo",
+    itertools.chain(
+        # invalid combinations
+        itertools.product(
+            # invalid bucket combinations
+            [
+                "a123--..__!xyz",
+                "as!xyz",
+                "sxyz-",
+                "-sxyz",
+                ".sxyz",
+                "sxyz-",
+                "sxyz.",
+                "abc_def",
+            ],
+            # invalid region combinations
+            [
+                "abc",
+                "-us-east-1",
+                "1us-east-1",
+                "us-east-123",
+                # add valid region to check bucket invalid still triggers
+                AWS_S3_REGION_NON_DEFAULT,
+            ],
+            [False],
+        ),
+        # valid combinations
+        itertools.product(
+            # valid bucket combinations
+            [
+                "bucket1",
+                "1bucket",
+                "bucket-test",
+                "bucket.test",
+            ],
+            # valid region combinations
+            AWS_S3_REGION_SUBSET,
+            [True],
+        )
+    )
+)
+def test_validate_s3_parameters(combo):
+    # type: (Tuple[str, str, bool]) -> None
+    bucket, region, valid = combo
+    try:
+        validate_s3(region=region, bucket=bucket)
+    except ValueError as exc:
+        if valid:
+            pytest.fail(f"Raised exception not expected for [{combo}]. {exc}")
+    else:
+        if not valid:
+            pytest.fail(f"Not raised expected exception for [{combo}]. (ValueError)")
 
 
 def test_get_path_kvp():

@@ -200,21 +200,23 @@ AWS_S3_REGIONS_REGEX = "(" + "|".join(AWS_S3_REGIONS) + ")"
 AWS_S3_ARN = "arn:aws:s3"
 # https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucketnamingrules.html
 # https://stackoverflow.com/questions/50480924/regex-for-s3-bucket-name
-AWS_S3_BUCKET_NAME_PATTERN = re.compile(r"(?!(^xn--|.+-s3alias$))[a-z0-9][a-z0-9-]{1,61}[a-z0-9]")  # lowercase only
+AWS_S3_BUCKET_NAME_PATTERN = re.compile(r"^(?!(^xn--|.+-s3alias$))[a-z0-9][a-z0-9-.]{1,61}[a-z0-9]$")  # lowercase only
 # Bucket ARN =
 # - arn:aws:s3:{Region}:{AccountId}:accesspoint/{AccessPointName}[/file-key]
 # - arn:aws:s3-outposts:{Region}:{AccountId}:outpost/{outpostId}/bucket/{Bucket}[/file-key]
 # - arn:aws:s3-outposts:{Region}:{AccountId}:outpost/{OutpostId}/accesspoint/{AccessPointName}[/file-key]
 AWS_S3_BUCKET_ARN_PATTERN = re.compile(
+    r"^"
     rf"(?P<arn>{AWS_S3_ARN}(?:-outposts)?):"
     rf"(?P<region>{AWS_S3_REGIONS_REGEX}):"
     r"(?P<account_id>[a-z0-9]+):"
     r"(?P<type_name>accesspoint|outpost)/"
     r"(?P<type_id>[a-z0-9][a-z0-9-]+[a-z0-9])"
+    r"$"
 )
 AWS_S3_BUCKET_REFERENCE_PATTERN = re.compile(
     r"^(?P<scheme>s3://)"
-    rf"(?P<bucket>{AWS_S3_BUCKET_NAME_PATTERN.pattern}|{AWS_S3_BUCKET_ARN_PATTERN.pattern})"
+    rf"(?P<bucket>{AWS_S3_BUCKET_NAME_PATTERN.pattern[1:-1]}|{AWS_S3_BUCKET_ARN_PATTERN.pattern[1:-1]})"
     r"(?P<path>(?:/$|/[\w.-]+)+)"  # sub-dir and file-key path, minimally only dir trailing slash
     r"$"
 )
@@ -243,7 +245,7 @@ class CaseInsensitive(str):
         return self.__str.casefold() == str(other).casefold()
 
 
-NUMBER_PATTERN = re.compile(r"^(?P<number>[+-]?[0-9]+[.]?[0-9]*([e][+-]?[0-9]+)?)\s*(?P<unit>.*)$")
+NUMBER_PATTERN = re.compile(r"^(?P<number>[+-]?[0-9]+[.]?[0-9]*(e[+-]?[0-9]+)?)\s*(?P<unit>.*)$")
 UNIT_SI_POWER_UP = [CaseInsensitive("k"), "M", "G", "T", "P", "E", "Z", "Y"]  # allow upper 'K' often used
 UNIT_SI_POWER_DOWN = ["m", "µ", "n", "p", "f", "a", "z", "y"]
 UNIT_BIN_POWER = ["Ki", "Mi", "Gi", "Ti", "Pi", "Ei", "Zi", "Yi"]
@@ -1856,10 +1858,10 @@ def validate_s3(*, region, bucket):
     """
     Validate patterns and allowed values for :term:`AWS` :term:`S3` client configuration.
     """
-    if not re.match(AWS_S3_REGIONS_REGEX, region):
-        raise ValueError(f"Invalid AWS S3 Region format for: [{region!s}]\n")
+    if not re.match(AWS_S3_REGIONS_REGEX, region) or region not in AWS_S3_REGIONS:
+        raise ValueError(f"Invalid AWS S3 Region format or value for: [{region!s}]\n")
     if not re.match(AWS_S3_BUCKET_NAME_PATTERN, bucket):
-        raise ValueError(f"Invalid AWS S3 Bucket format for: [{bucket!s}]\n")
+        raise ValueError(f"Invalid AWS S3 Bucket format or value for: [{bucket!s}]\n")
     LOGGER.debug("All valid AWS S3 parameters: [Region=%s, Bucket=%s]", region, bucket)
 
 
