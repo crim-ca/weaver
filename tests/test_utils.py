@@ -1277,6 +1277,13 @@ def test_resolve_s3_http_options(options, parameters, configuration):
             region, f"s3://arn:aws:s3:{region}:123456789012:accesspoint/test-location/nested/dir/"
         )
         for region in AWS_S3_REGION_SUBSET_WITH_MOCK
+    ] + [
+        (
+            f"https://test-location-123456789012.outpost-123.s3-outposts.{region}.amazonaws.com/nested/dir/",
+            region,
+            f"s3://arn:aws:s3-outposts:{region}:123456789012:outpost/outpost-123/accesspoint/test-location/nested/dir/"
+        )
+        for region in AWS_S3_REGION_SUBSET_WITH_MOCK
     ]
 )
 def test_resolve_s3_from_http(s3_url, expect_region, expect_url):

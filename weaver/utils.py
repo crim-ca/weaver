@@ -211,7 +211,7 @@ AWS_S3_BUCKET_NAME_PATTERN = re.compile(
 )
 # Bucket ARN =
 # - arn:aws:s3:{Region}:{AccountId}:accesspoint/{AccessPointName}[/file-key]
-# - arn:aws:s3-outposts:{Region}:{AccountId}:outpost/{outpostId}/bucket/{Bucket}[/file-key]
+# - arn:aws:s3-outposts:{Region}:{AccountId}:outpost/{OutpostId}/bucket/{Bucket}[/file-key]
 # - arn:aws:s3-outposts:{Region}:{AccountId}:outpost/{OutpostId}/accesspoint/{AccessPointName}[/file-key]
 AWS_S3_BUCKET_ARN_PATTERN = re.compile(
     r"^"
@@ -1926,7 +1926,7 @@ def resolve_s3_from_http(reference):
             if ".s3-outposts." in s3_host:
                 # boto3 wants:
                 # Bucket ARN =
-                #   - arn:aws:s3-outposts:{Region}:{AccountId}:outpost/{outpostId}/bucket/{Bucket}
+                #   - arn:aws:s3-outposts:{Region}:{AccountId}:outpost/{OutpostId}/bucket/{Bucket}
                 #   - arn:aws:s3-outposts:{Region}:{AccountId}:outpost/{OutpostId}/accesspoint/{AccessPointName}
                 s3_outpost, s3_region = s3_host.split(".s3-outposts.", 1)
                 s3_access_point, s3_outpost_id = s3_outpost.rsplit(".", 1)
