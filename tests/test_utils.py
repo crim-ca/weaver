@@ -87,7 +87,10 @@ from weaver.utils import (
 if TYPE_CHECKING:
     from typing import Any, Dict, List, Optional, Tuple, Type
 
+    from responses import _Body as BodyType  # noqa: W0212
+
     from tests.utils import S3Scheme
+    from weaver.typedefs import AnyRequestType, HeadersType
 
 AWS_S3_REGION_SUBSET = set(random.choices(AWS_S3_REGIONS, k=4))
 AWS_S3_REGION_SUBSET_WITH_MOCK = {MOCK_AWS_REGION} | AWS_S3_REGION_SUBSET
@@ -637,6 +640,78 @@ def test_fetch_directory_html(include_dir_heading,       # type: bool
         )
 
 
+def test_fetch_directory_json():
+    with contextlib.ExitStack() as stack:
+        tmp_host = "https://mocked-file-server.com"
+        tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())
+        test_http_dir_files = [
+            "main.txt",
+            "dir/file.txt",
+            "dir/sub/file.tmp",
+            "dir/sub/nested/file.cfg",
+            "dir/other/meta.txt",
+            "another/info.txt",
+            "another/nested/data.txt",
+        ]
+        test_dir_files = setup_test_file_hierarchy(test_http_dir_files, tmp_dir)
+
+        def mock_json_dir(request):
+            # type: (AnyRequestType) -> Tuple[int, HeadersType, BodyType]
+            _dir = request.path_url.split("?")[0].lstrip("/")
+            _files = [
+                os.path.join(tmp_host, _file)
+                for _file in test_http_dir_files
+                if _file.startswith(_dir)
+            ]
+            return 200, {"Content-Type": ContentType.APP_JSON}, json.dumps(_files)
+
+        req_mock = responses.RequestsMock(assert_all_requests_are_fired=False)
+        req_mock.add_callback(responses.GET, f"{tmp_host}/dir/?f=json", callback=mock_json_dir)
+        stack.enter_context(mocked_file_server(
+            tmp_dir, tmp_host,
+            settings={},
+            mock_browse_index=True,
+            requests_mock=req_mock,
+        ))
+
+        out_dir = stack.enter_context(tempfile.TemporaryDirectory())
+        out_files = fetch_directory(f"{tmp_host}/dir/?f=json", out_dir)
+        expect_files = filter(lambda _f: _f.startswith("dir/"), test_http_dir_files)
+        expect_files = [os.path.join(out_dir, file.split("/", 1)[-1]) for file in expect_files]
+        assert list(out_files) == sorted(expect_files), (
+            f"Out dir: [{out_dir}], Test dir:\n{repr_json(test_dir_files, indent=2)}"
+        )
+
+
+@pytest.mark.parametrize("invalid_json_listing", [
+    {},
+    [],
+    {"file": "https://somewhere.com/test.txt"},
+    [{"file": "https://somewhere.com/test.txt"}],
+])
+def test_fetch_directory_json_invalid_listing(invalid_json_listing):
+    with contextlib.ExitStack() as stack:
+        tmp_host = "https://mocked-file-server.com"
+        tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())
+
+        def mock_json_dir(__request):
+            # type: (AnyRequestType) -> Tuple[int, HeadersType, BodyType]
+            return 200, {"Content-Type": ContentType.APP_JSON}, json.dumps(invalid_json_listing)
+
+        req_mock = responses.RequestsMock(assert_all_requests_are_fired=False)
+        req_mock.add_callback(responses.GET, f"{tmp_host}/dir/?f=json", callback=mock_json_dir)
+        stack.enter_context(mocked_file_server(
+            tmp_dir, tmp_host,
+            settings={},
+            mock_browse_index=True,
+            requests_mock=req_mock,
+        ))
+        out_dir = stack.enter_context(tempfile.TemporaryDirectory())
+
+        with pytest.raises(ValueError):  # error expected since JSON response is not a list of files
+            fetch_directory(f"{tmp_host}/dir/?f=json", out_dir)
+
+
 class TemporaryLinkableDirectory(tempfile.TemporaryDirectory):
     # avoids error in case the temp dir was replaced by a link
     def cleanup(self) -> None:
@@ -928,6 +1003,22 @@ def test_fetch_directory_raise_missing_trailing_slash():
     with tempfile.TemporaryDirectory() as tmp_dir:  # make sure missing dir is not the error
         with pytest.raises(ValueError):
             fetch_directory(f"file://{tmp_dir}", "/tmp")  # input location with no trailing slash
+
+
+def test_fetch_directory_unknown_scheme():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with pytest.raises(ValueError):
+            fetch_directory("unknown://random.location.com/dir/", tmpdir)
+
+
+def test_fetch_directory_unknown_content_type():
+    dir_http = "https://random.location.com/dir/"
+    req_mock = responses.RequestsMock(assert_all_requests_are_fired=False)
+    req_mock.add_callback(responses.GET, dir_http, callback=lambda _: (200, {"Content-Type": "application/random"}, ""))
+    with req_mock:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with pytest.raises(ValueError):
+                fetch_directory("https://random.location.com/dir/", tmpdir)
 
 
 @pytest.mark.parametrize("source_link, out_method, result_link", [

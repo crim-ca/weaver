@@ -2467,7 +2467,7 @@ def download_files_url(file_references,                     # type: Iterable[str
     # The include/exclude patterns will have to match them exactly in the even they don't share the same base URL.
     # However, in the event they have the same URL, patterns could refer to their relative path only to that URL.
     # Adjust patterns accordingly to allow filter against forbidden/include/exclude with relative paths.
-    base_url = base_url.rstrip("/") + "/"
+    base_url = get_url_without_query(base_url).rstrip("/") + "/"
     include = [incl.replace(base_url, "", 1) if incl.startswith(base_url) else incl for incl in include or []]
     exclude = [excl.replace(base_url, "", 1) if excl.startswith(base_url) else excl for excl in exclude or []]
     file_references = (path for path in file_references if not path.endswith("/"))
@@ -2800,7 +2800,7 @@ def fetch_directory(location,                           # type: str
         If not prefixed by any scheme, the option will apply to all handling methods (if applicable).
     :returns: File locations retrieved from directory listing.
     """
-    if not location.endswith("/"):
+    if not get_url_without_query(location).endswith("/"):
         raise ValueError(f"Invalid directory location [{location}] must have a trailing slash.")
     LOGGER.debug("Fetching directory reference: [%s] using options:\n%s", location, repr_json(option_kwargs))
     if location.startswith("s3://"):
