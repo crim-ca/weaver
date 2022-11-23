@@ -101,7 +101,7 @@ if TYPE_CHECKING:
 
 try:
     RegexPattern = re.Pattern
-except AttributeError:  # Python 3.6 backport
+except AttributeError:  # Python 3.6 backport  # pragma: no cover
     RegexPattern = type(re.compile("_"))
 
 # pylint: disable=C0209,consider-using-f-string
