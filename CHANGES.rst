@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_4.27.0:
+
+`4.27.0 <https://github.com/crim-ca/weaver/tree/4.27.0>`_ (2022-11-22)
+========================================================================
+
+Changes:
+--------
 - Support `CWL` ``InlineJavascriptRequirement`` for `Process` deployment to allow successful schema validation.
 - Support `CWL` ``Directory`` type references (resolves `#466 <https://github.com/crim-ca/weaver/issues/466>`_).
   Those references correspond to `WPS` and `OGC API - Processes` ``href``
