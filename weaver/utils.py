@@ -17,7 +17,6 @@ import warnings
 from concurrent.futures import ALL_COMPLETED, CancelledError, ThreadPoolExecutor, as_completed, wait as wait_until
 from copy import deepcopy
 from datetime import datetime
-from distutils.version import LooseVersion
 from typing import TYPE_CHECKING, overload
 from urllib.parse import ParseResult, unquote, urlparse, urlunsplit
 
@@ -55,14 +54,14 @@ from webob.headers import EnvironHeaders, ResponseHeaders
 from werkzeug.wrappers import Request as WerkzeugRequest
 from yaml.scanner import ScannerError
 
-import xml_util
 from weaver.base import Constants, ExtendedEnum
+from weaver.compat import Version
 from weaver.exceptions import WeaverException
 from weaver.execute import ExecuteControlOption, ExecuteMode
 from weaver.formats import ContentType, get_content_type, repr_json
 from weaver.status import map_status
 from weaver.warning import TimeZoneInfoAlreadySetWarning
-from weaver.xml_util import XML
+from weaver.xml_util import HTML_TREE_BUILDER, XML
 
 if TYPE_CHECKING:
     from types import FrameType
@@ -704,7 +703,7 @@ def is_valid_url(url):
     # type: (Optional[str]) -> TypeGuard[str]
     try:
         return bool(urlparse(url).scheme)
-    except Exception:  # noqa: W0703 # nosec: B110
+    except (TypeError, ValueError):
         return False
 
 
@@ -715,14 +714,14 @@ class VersionLevel(Constants):
 
 
 class VersionFormat(Constants):
-    OBJECT = "object"  # LooseVersion
+    OBJECT = "object"  # Version
     STRING = "string"  # "x.y.z"
     PARTS = "parts"    # tuple/list
 
 
 @overload
 def as_version_major_minor_patch(version, version_format):
-    # type: (AnyVersion, Literal[VersionFormat.OBJECT]) -> LooseVersion
+    # type: (AnyVersion, Literal[VersionFormat.OBJECT]) -> Version
     ...
 
 
@@ -750,7 +749,7 @@ def as_version_major_minor_patch(version, version_format=VersionFormat.PARTS):
     Generates a ``MAJOR.MINOR.PATCH`` version with padded with zeros for any missing parts.
     """
     if isinstance(version, (str, float, int)):
-        ver_parts = list(LooseVersion(str(version)).version)
+        ver_parts = list(Version(str(version)).version)
     elif isinstance(version, (list, tuple)):
         ver_parts = [int(part) for part in version]
     else:
@@ -761,7 +760,7 @@ def as_version_major_minor_patch(version, version_format=VersionFormat.PARTS):
         ver_str = ".".join(str(part) for part in ver_tuple)
         if version_format == VersionFormat.STRING:
             return ver_str
-        return LooseVersion(ver_str)
+        return Version(ver_str)
     return ver_tuple
 
 
@@ -870,7 +869,7 @@ def as_int(value, default):
     """
     try:
         return int(value)
-    except Exception:  # noqa: W0703 # nosec: B110
+    except (OverflowError, TypeError, ValueError):
         pass
     return default
 
@@ -1132,13 +1131,13 @@ def pass_http_error(exception, expected_http_error):
     """
     Silently ignore a raised HTTP error that matches the specified error code of the reference exception class.
 
-    Given an `HTTPError` of any type (:mod:`pyramid`, :mod:`requests`), ignores the exception if the actual
+    Given an :class:`HTTPError` of any type (:mod:`pyramid`, :mod:`requests`), ignores the exception if the actual
     error matches the status code. Other exceptions are re-raised.
     This is equivalent to capturing a specific ``Exception`` within an ``except`` block and calling ``pass`` to drop it.
 
-    :param exception: any `Exception` instance ("object" from a `try..except exception as "object"` block).
-    :param expected_http_error: single or list of specific pyramid `HTTPError` to handle and ignore.
-    :raise exception: if it doesn't match the status code or is not an `HTTPError` of any module.
+    :param exception: Any :class:`Exception` instance.
+    :param expected_http_error: Single or list of specific pyramid `HTTPError` to handle and ignore.
+    :raise exception: If it doesn't match the status code or is not an `HTTPError` of any module.
     """
     if not hasattr(expected_http_error, "__iter__"):
         expected_http_error = [expected_http_error]
@@ -1421,8 +1420,8 @@ def get_ssl_verify_option(method, url, settings, request_options=None):
 
     :param method: request method (GET, POST, etc.).
     :param url: request URL.
-    :param settings: application setting container with pre-loaded *request options* specifications.
-    :param request_options: pre-processed *request options* for method/URL to avoid re-parsing the settings.
+    :param settings: application setting container with preloaded *request options* specifications.
+    :param request_options: preprocessed *request options* for method/URL to avoid parsing the settings again.
     :returns: SSL ``verify`` option to be passed down to some ``request`` function.
     """
     if not settings:
@@ -2582,13 +2581,12 @@ def download_files_html(html_data,                          # type: str
             _scheme = _url.split("://")[0]
             _opts = options.get(_scheme, {})  # type: ignore
             _resp = request_extra("GET", _url, settings=settings, **_opts, **kwargs)
-            ctype = get_header("Content-Type", _resp.headers, default=ContentType.TEXT_HTML)
-            if _resp.status_code != 200 or not any(
-                _type in ctype for _type in [ContentType.TEXT_HTML] + list(ContentType.ANY_XML)
-            ):
+            _ctype = get_header("Content-Type", _resp.headers, default=ContentType.TEXT_HTML)
+            _xml_like_ctypes = [ContentType.TEXT_HTML] + list(ContentType.ANY_XML)
+            if _resp.status_code != 200 or not any(_type in _ctype for _type in _xml_like_ctypes):
                 return []
             _data = _resp.text
-        _html = BeautifulSoup(_data, builder=xml_util.HTML_TREE_BUILDER)
+        _html = BeautifulSoup(_data, builder=HTML_TREE_BUILDER)
         _href = (_ref.get("href") for _ref in _html.find_all("a", recursive=True))
         _href = filter_directory_forbidden(_href)  # preemptively remove forbidden items, avoid access/download attempts
         for _ref in _href:

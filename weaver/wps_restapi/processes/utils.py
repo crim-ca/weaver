@@ -6,6 +6,7 @@ import colander
 from pyramid.httpexceptions import HTTPBadRequest
 from pyramid.settings import asbool
 
+from weaver.compat import InvalidVersion
 from weaver.config import WeaverFeature, get_weaver_configuration
 from weaver.database import get_db
 from weaver.formats import ContentType
@@ -92,7 +93,10 @@ def get_processes_filtered_by_valid_schemas(request):
     invalid_processes_ids = []
     for process in processes:  # type: Process
         try:
-            valid_processes.append(process.summary(revision=with_revisions))
+            try:
+                valid_processes.append(process.summary(revision=with_revisions))
+            except (InvalidVersion, ValueError) as exc:
+                raise colander.Invalid(sd.ProcessSummary, value=None, msg=str(exc))
         except colander.Invalid as invalid:
             process_ref = process.tag if with_revisions else process.identifier
             LOGGER.debug("Invalid process [%s] because:\n%s", process_ref, invalid)

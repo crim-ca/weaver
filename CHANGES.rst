@@ -16,6 +16,10 @@ Changes:
 
 Fixes:
 ------
+- Fix ``distutils.version.LooseVersion`` marked for deprecation for upcoming versions.
+  Use ``packaging.version.Version`` substitute whenever possible, but preserve backward
+  compatibility with ``distutils`` in case of older Python not supporting it.
+- Fix ``cli._update_files`` so there are no attempts to upload remote references to the `Vault`.
 - No change.
 
 .. _changes_4.27.0:
@@ -50,7 +54,6 @@ Changes:
 Fixes:
 ------
 - Fix ``cli._update_files`` so there are no attempts to upload remote references to the vault.
-
 
 .. _changes_4.26.0:
 

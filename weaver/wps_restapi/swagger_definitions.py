@@ -445,7 +445,6 @@ class ProcessIdentifierTag(AnyOfKeywordSchema):
 
 
 class Version(ExtendedSchemaNode):
-    # note: internally use LooseVersion, so don't be too strict about pattern
     schema_type = String
     description = "Version string."
     example = "1.2.3"

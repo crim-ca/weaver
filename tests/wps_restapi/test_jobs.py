@@ -7,7 +7,6 @@ import tempfile
 import unittest
 import warnings
 from datetime import date
-from distutils.version import LooseVersion
 from typing import TYPE_CHECKING
 
 import colander
@@ -31,6 +30,7 @@ from tests.utils import (
     setup_mongodb_processstore,
     setup_mongodb_servicestore
 )
+from weaver.compat import Version
 from weaver.datatype import Job, Service
 from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import ContentType
@@ -208,7 +208,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
 
     def get_job_request_auth_mock(self, user_id):
         is_admin = self.user_admin_id == user_id
-        if LooseVersion(get_module_version("pyramid")) >= LooseVersion("2"):
+        if Version(get_module_version("pyramid")) >= Version("2"):
             authn_policy_class = "pyramid.security.SecurityAPIMixin"
             authz_policy_class = "pyramid.security.SecurityAPIMixin"
         else:
