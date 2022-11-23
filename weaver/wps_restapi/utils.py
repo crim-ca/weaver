@@ -20,7 +20,7 @@ from weaver.utils import get_header, get_settings, get_weaver_url
 from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, Optional, Union
+    from typing import Any, Dict, Optional, Union
 
     from weaver.formats import ContentType
     from weaver.typedefs import (
@@ -30,7 +30,8 @@ if TYPE_CHECKING:
         AnyRequestType,
         AnySettingsContainer,
         HeadersType,
-        ReturnValue
+        Params,
+        Return
     )
 
 LOGGER = logging.getLogger(__name__)
@@ -144,7 +145,7 @@ def get_schema_ref(schema, container=None, ref_type="$schema", ref_name=True):
 
 
 def handle_schema_validation(schema=None):
-    # type: (Optional[colander.SchemaNode]) -> Callable
+    # type: (Optional[colander.SchemaNode]) -> AnyCallableWrapped
     """
     Convert a schema validation error into an HTTP error with error details about the failure.
 
@@ -154,7 +155,7 @@ def handle_schema_validation(schema=None):
     def decorator(func):  # type: (AnyCallableWrapped) -> AnyCallableWrapped
         @functools.wraps(func)
         def wrapped(*args, **kwargs):
-            # type: (*Any, **Any) -> ReturnValue
+            # type: (Params.args, Params.kwargs) -> Return
             try:
                 return func(*args, **kwargs)
             except colander.Invalid as ex:

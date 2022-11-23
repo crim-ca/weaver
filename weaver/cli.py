@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 import yaml
+from pyramid.httpexceptions import HTTPNotImplemented
 from requests.auth import AuthBase, HTTPBasicAuth
 from requests.structures import CaseInsensitiveDict
 from webob.headers import ResponseHeaders
@@ -34,13 +35,15 @@ from weaver.processes.wps_package import get_process_definition
 from weaver.sort import Sort, SortMethods
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.utils import (
+    OutputMethod,
     copy_doc,
-    fetch_file,
+    fetch_reference,
     fully_qualified_name,
     get_any_id,
     get_any_value,
     get_file_headers,
     get_header,
+    get_sane_name,
     import_target,
     load_file,
     null,
@@ -903,7 +906,7 @@ class WeaverClient(object):
             return OperationResult(False, f"Failed inputs parsing with error: [{exc!s}].", inputs)
         return values
 
-    def _update_files(self, inputs, url=None):
+    def _upload_files(self, inputs, url=None):
         # type: (ExecutionInputsMap, Optional[str]) -> Union[Tuple[ExecutionInputsMap, HeadersType], OperationResult]
         """
         Replaces local file paths by references uploaded to the :term:`Vault`.
@@ -933,6 +936,12 @@ class WeaverClient(object):
                     continue
                 if href.startswith("file://"):
                     href = href[7:]
+                if os.path.isdir(href):
+                    return OperationResult(
+                        message=f"Cannot upload local directory to vault: [{file}]. Aborting operation.",
+                        title="Directory upload not implemented.",
+                        code=HTTPNotImplemented.code,
+                    )
                 if not os.path.isfile(href):  # Case for remote files (ex. http links)
                     if "://" not in href:
                         LOGGER.warning(
@@ -1041,7 +1050,7 @@ class WeaverClient(object):
         values = self._parse_inputs(inputs)
         if isinstance(values, OperationResult):
             return values
-        result = self._update_files(values, url=base)
+        result = self._upload_files(values, url=base)
         if isinstance(result, OperationResult):
             return result
         values, auth_headers = result
@@ -1141,6 +1150,12 @@ class WeaverClient(object):
             scheme = file_path.split("://", 1)[0]
             return OperationResult(False, "Scheme not supported for local file reference.", {"file_scheme": scheme})
         file_path = os.path.abspath(os.path.expanduser(file_path))
+        if os.path.isdir(file_path):
+            return OperationResult(
+                message=f"Cannot upload local directory to vault: [{file_path}]. Aborting operation.",
+                title="Directory upload not implemented.",
+                code=HTTPNotImplemented.code,
+            )
         if not os.path.isfile(file_path):
             return OperationResult(False, "Resolved local file reference does not exist.", {"file_path": file_path})
         LOGGER.debug("Processing file for vault upload: [%s]", file_path)
@@ -1438,18 +1453,24 @@ class WeaverClient(object):
         # download outputs from body content
         LOGGER.debug("%s outputs in results content.", "Processing" if len(outputs) else "No")
         for output, value in outputs.items():
+            # nest each output under its own directory to avoid conflicting names
+            # in case of many files across outputs that do guarantee uniqueness
+            out_id = get_sane_name(output, min_len=1, assert_invalid=False)
+            out_path = os.path.join(out_dir, out_id)
             is_list = True
             if not isinstance(value, list):
                 value = [value]
                 is_list = False
             for i, item in enumerate(value):
                 if "href" in item:
-                    file_path = fetch_file(item["href"], out_dir, link=False, auth=auth)
+                    os.makedirs(out_path, exist_ok=True)
+                    ref_path = fetch_reference(item["href"], out_path, auth=auth,
+                                               out_method=OutputMethod.COPY, out_listing=False)
                     if is_list:
-                        outputs[output][i]["path"] = file_path
+                        outputs[output][i]["path"] = ref_path
                         outputs[output][i]["source"] = "body"
                     else:
-                        outputs[output]["path"] = file_path
+                        outputs[output]["path"] = ref_path
                         outputs[output]["source"] = "body"
 
         # download links from headers
@@ -1462,8 +1483,9 @@ class WeaverClient(object):
             rel = params["rel"][0].split(".")
             output = rel[0]
             is_array = len(rel) > 1 and str.isnumeric(rel[1])
-            file_path = fetch_file(href, out_dir, link=False, auth=auth)
-            value = {"href": href, "type": ctype, "path": file_path, "source": "link"}
+            ref_path = fetch_reference(href, out_dir, auth=auth,
+                                       out_method=OutputMethod.COPY, out_listing=False)
+            value = {"href": href, "type": ctype, "path": ref_path, "source": "link"}
             if output in outputs:
                 if isinstance(outputs[output], dict):  # in case 'rel="<output>.<index"' was not employed
                     outputs[output] = [outputs[output], value]
@@ -2337,12 +2359,12 @@ def make_parser():
             specified as follows: ``number:int=1`` while a floating point number would be: ``number:float=1.23``.
 
             File references (``href``) should be specified using ``File`` as the type (i.e.: ``input:File=http://...``).
-            Note that ``File`` in this case is expected to be an URL location where the file can be download from.
+            Note that ``File`` in this case is expected to be an URL location where the file can be downloaded from.
             When a local file is supplied, Weaver will automatically convert it to a remote Vault File in order to
             upload it at the specified URL location and make it available for the remote process.
 
             Inputs with multiplicity (``maxOccurs > 1``) can be specified using semicolon (``;``) separated values
-            after a single input ID. Note that this is not the same as an single-value array-like input, which should
+            after a single input ID. Note that this is not the same as a single-value array-like input, which should
             use comma (``,``) separated values instead.
             The type of an element-wise item of this input can also be provided (i.e.: ``multiInput:int=1;2;3``).
             Alternatively, the same input ID can be repeated over many ``-I`` options each providing an element of the

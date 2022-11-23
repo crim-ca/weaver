@@ -83,14 +83,20 @@ Set of :term:`CWL` requirements that correspond to remote execution of an :term:
 """
 
 # FIXME: convert to 'Constants' class
+CWL_REQUIREMENT_CUDA = "cwltool:CUDARequirement"
 CWL_REQUIREMENT_ENV_VAR = "EnvVarRequirement"
 CWL_REQUIREMENT_INIT_WORKDIR = "InitialWorkDirRequirement"
+CWL_REQUIREMENT_INLINE_JAVASCRIPT = "InlineJavascriptRequirement"
+CWL_REQUIREMENT_NETWORK_ACCESS = "NetworkAccess"
 CWL_REQUIREMENT_RESOURCE = "ResourceRequirement"
 CWL_REQUIREMENT_SCATTER = "ScatterFeatureRequirement"
 
 CWL_REQUIREMENT_FEATURES = frozenset([
+    CWL_REQUIREMENT_CUDA,
     CWL_REQUIREMENT_ENV_VAR,
     CWL_REQUIREMENT_INIT_WORKDIR,
+    CWL_REQUIREMENT_INLINE_JAVASCRIPT,
+    CWL_REQUIREMENT_NETWORK_ACCESS,
     CWL_REQUIREMENT_RESOURCE,   # FIXME: perform pre-check on job submit? (https://github.com/crim-ca/weaver/issues/138)
     CWL_REQUIREMENT_SCATTER,
 ])
@@ -111,7 +117,9 @@ Set of all :term:`CWL` requirements or hints that are supported for deployment o
 PACKAGE_EXTENSIONS = frozenset(["yaml", "yml", "json", "cwl", "job"])
 PACKAGE_SIMPLE_TYPES = frozenset(["string", "boolean", "float", "int", "integer", "long", "double"])
 PACKAGE_LITERAL_TYPES = frozenset(PACKAGE_SIMPLE_TYPES | {"null", "Any"})
-PACKAGE_COMPLEX_TYPES = frozenset(["File"])  # FIXME: type "Directory" not supported
+PACKAGE_FILE_TYPE = "File"
+PACKAGE_DIRECTORY_TYPE = "Directory"
+PACKAGE_COMPLEX_TYPES = frozenset([PACKAGE_FILE_TYPE, PACKAGE_DIRECTORY_TYPE])
 PACKAGE_ENUM_BASE = "enum"
 PACKAGE_CUSTOM_TYPES = frozenset([PACKAGE_ENUM_BASE])  # can be anything, but support "enum" which is more common
 PACKAGE_ARRAY_BASE = "array"

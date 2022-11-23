@@ -20,6 +20,40 @@ Fixes:
   Use ``packaging.version.Version`` substitute whenever possible, but preserve backward
   compatibility with ``distutils`` in case of older Python not supporting it.
 - Fix ``cli._update_files`` so there are no attempts to upload remote references to the `Vault`.
+- No change.
+
+.. _changes_4.27.0:
+
+`4.27.0 <https://github.com/crim-ca/weaver/tree/4.27.0>`_ (2022-11-22)
+========================================================================
+
+Changes:
+--------
+- Support `CWL` ``InlineJavascriptRequirement`` for `Process` deployment to allow successful schema validation.
+- Support `CWL` ``Directory`` type references (resolves `#466 <https://github.com/crim-ca/weaver/issues/466>`_).
+  Those references correspond to `WPS` and `OGC API - Processes` ``href``
+  using the ``Content-Type: application/directory`` Media-Type and must hava a trailing slash (``/``) character.
+- Support `S3` file or directory references using *Access Point*, *Virtual-hosted–style* and *Outposts* URLs
+  (see AWS documentation
+  `Methods for accessing a bucket <https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-bucket-intro.html>`_).
+- Apply more validation rules against expected `S3` file or directory reference formats.
+- Update documentation regarding handling of `S3` references (more formats supported) and ``Directory`` type references.
+- Support ``weaver.wps_output_context`` setting and ``X-WPS-Output-Context`` request header resolution in combination
+  with `S3` bucket location employed for storing `Job` outputs.
+- Nest every complex `Job` output (regardless if stored on local `WPS` outputs or on `S3`, and whether the output is
+  of ``File`` or ``Directory`` type) under its corresponding output ID collected from the `Process` definition to avoid
+  potential name conflicts in storage location, especially in the case of multiple output IDs that could be aggregated
+  with various files and listing of directory contents.
+- Allow ``colander.SchemaNode`` (with extensions for `OpenAPI` schema converters) to provide validation ``pattern``
+  field directly with a compiled ``re.Pattern`` object.
+- Support `CWL` definition for ``cwltool:CUDARequirement`` to request the use of a GPU, including support for using
+  Docker with a GPU (resolves `#104 <https://github.com/crim-ca/weaver/issues/104>`_).
+- Support `CWL` definition for ``NetworkAccess`` to indicate whether a process requires outgoing IPv4/IPv6 network
+  access.
+
+Fixes:
+------
+- Fix ``cli._update_files`` so there are no attempts to upload remote references to the vault.
 
 .. _changes_4.26.0:
 

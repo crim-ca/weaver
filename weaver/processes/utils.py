@@ -84,6 +84,7 @@ if TYPE_CHECKING:
         FileSystemPathType,
         JSON,
         Literal,
+        ProcessDeployment,
         PyramidRequest,
         NotRequired,
         Number,
@@ -182,7 +183,7 @@ def get_process_information(process_description):
 @log_unhandled_exceptions(logger=LOGGER, message="Unhandled error occurred during parsing of deploy payload.",
                           is_request=False)
 def _check_deploy(payload):
-    # type: (JSON) -> JSON
+    # type: (JSON) -> Union[ProcessDeployment, CWL]
     """
     Validate minimum deploy payload field requirements with exception handling.
     """
@@ -206,7 +207,7 @@ def _check_deploy(payload):
                 message = f"Process deployment {io_type} definition is invalid."
                 # try raising sub-schema to have specific reason
                 d_io = io_schema(name=io_type).deserialize(p_io)
-                # Raise directly if we where not able to detect the cause, but there is something incorrectly dropped.
+                # Raise directly if we were unable to detect the cause, but there is something incorrectly dropped.
                 # Only raise if indirect vs direct deserialize differ such that auto-resolved defaults omitted from
                 # submitted process I/O or unknowns fields that were correctly ignored don't cause false-positive diffs.
                 if r_io != d_io:
@@ -1003,12 +1004,12 @@ def register_wps_processes_from_config(container, wps_processes_file_path=None):
     meaning they will be fetched on the provider each time a request refers to them, keeping their definition
     up-to-date with the remote server.
 
-    .. versionadded:: 1.14.0
+    .. versionadded:: 1.14
         When references are specified using ``providers`` section instead of ``processes``, the registration
         only saves the remote WPS provider endpoint to dynamically populate :term:`WPS` processes on demand.
         Previous behavior was to register each :term:`WPS` process individually with ID ``[service]_[process]``.
 
-    .. versionchanged:: 4.19.0
+    .. versionchanged:: 4.19
         Parameter position are inverted.
         If :paramref:`wps_processes_file_path` is explicitly provided, it is used directly without considering settings.
         Otherwise, automatically employ the definition in setting: ``weaver.wps_processes_file``.
@@ -1131,7 +1132,7 @@ def register_cwl_processes_from_config(container):
     """
     Load multiple :term:`CWL` definitions from a directory to register corresponding :term:`Process`.
 
-    .. versionadded:: 4.19.0
+    .. versionadded:: 4.19
 
     Each individual :term:`CWL` definition must fully describe a :term:`Process` by itself. Therefore, an ``id`` must
     be available in the file to indicate the target deployment reference. In case of conflict, the existing database

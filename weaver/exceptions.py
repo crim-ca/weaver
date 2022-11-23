@@ -37,7 +37,7 @@ LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from typing import Any, Callable, Type, Union
 
-    from weaver.typedefs import AnyCallableWrapped, ReturnValue
+    from weaver.typedefs import AnyCallableWrapped, Return
 
 
 class WeaverException(Exception):
@@ -102,7 +102,7 @@ class ServiceNotAccessible(HTTPForbidden, OWSAccessForbidden, ServiceException):
 
 class ServiceNotFound(HTTPNotFound, OWSNotFound, ServiceException):
     """
-    Error related to non existent service definition.
+    Error related to non-existent service definition.
 
     Error indicating that an OWS service could not be read from the
     storage backend by an instance of :class:`weaver.store.ServiceStore`.
@@ -136,7 +136,7 @@ class ProcessNotAccessible(HTTPForbidden, OWSAccessForbidden, ProcessException):
 
 class ProcessNotFound(HTTPNotFound, OWSNotFound, ProcessException):
     """
-    Error related to a non existent process definition.
+    Error related to a non-existent process definition.
 
     Error indicating that a local WPS process could not be read from the
     storage backend by an instance of :class:`weaver.store.ProcessStore`.
@@ -170,7 +170,7 @@ class JobException(WeaverException):
 
 class JobNotFound(HTTPNotFound, OWSNotFound, JobException):
     """
-    Error related to a non existing job definition.
+    Error related to a non-existent job definition.
 
     Error indicating that a job could not be read from the
     storage backend by an instance of :class:`weaver.store.JobStore`.
@@ -264,7 +264,7 @@ class PackageExecutionError(HTTPInternalServerError, OWSNoApplicableCode, Packag
 
 class PackageNotFound(HTTPNotFound, OWSNotFound, PackageException):
     """
-    Error related to a non existent package definition.
+    Error related to a non-existent package definition.
 
     Error indicating that an instance of :class:`weaver.processes.wps_package.WpsPackage`
     could not properly retrieve the package definition using provided references.
@@ -273,7 +273,7 @@ class PackageNotFound(HTTPNotFound, OWSNotFound, PackageException):
 
 class PayloadNotFound(HTTPNotFound, OWSNotFound, PackageException):
     """
-    Error related to a non existent deployment payload definition.
+    Error related to a non-existent deployment payload definition.
 
     Error indicating that an instance of :class:`weaver.processes.wps_package.WpsPackage`
     could not properly retrieve the package deploy payload using provided references.
@@ -289,7 +289,7 @@ class QuoteException(WeaverException):
 
 class QuoteNotFound(HTTPNotFound, OWSNotFound, QuoteException):
     """
-    Error related to a non existent quote definition.
+    Error related to a non-existent quote definition.
 
     Error indicating that a quote could not be read from the
     storage backend by an instance of :class:`weaver.store.QuoteStore`.
@@ -329,7 +329,7 @@ class BillException(WeaverException):
 
 class BillNotFound(HTTPNotFound, OWSNotFound, BillException):
     """
-    Error related to a non existent bill definition.
+    Error related to a non-existent bill definition.
 
     Error indicating that a bill could not be read from the
     storage backend by an instance of :class:`weaver.store.BillStore`.
@@ -363,7 +363,7 @@ class VaultFileException(WeaverException):
 
 class VaultFileNotFound(HTTPNotFound, OWSNotFound, VaultFileException):
     """
-    Error related to a non existent vault file definition.
+    Error related to a non-existent vault file definition.
 
     Error indicating that a vault file could not be read from the
     storage backend by an instance of :class:`weaver.store.VaultStore`.
@@ -404,7 +404,7 @@ def handle_known_exceptions(function):
 
     The decorator simply returns the known exception such that :func:`weaver.tweens.ows_response_tween` can later
     handle it appropriately. Exceptions derived from :exc:`weaver.owsexceptions.OWSException` are employed since
-    they themselves have base references to :mod:`pywps.exceptions` classes that the service can understand.
+    they, themselves, already have base references to :mod:`pywps.exceptions` classes that the service can understand.
 
     .. warning::
         In :mod:`pywps`, ``HTTPException`` refers to :exc:`werkzeug.exceptions.HTTPException` while in
@@ -414,7 +414,7 @@ def handle_known_exceptions(function):
 
     @functools.wraps(function)
     def wrapped(*_, **__):
-        # type: (Any, Any) -> Union[ReturnValue, OWSException]
+        # type: (Any, Any) -> Union[Return, OWSException]
         try:
             return function(*_, **__)
         except (WeaverException, OWSException, HTTPException) as exc:
@@ -466,10 +466,10 @@ def log_unhandled_exceptions(logger=LOGGER, message="Unhandled exception occurre
     known_exceptions = tuple(known_exceptions)
 
     def wrap(function):
-        # type: (Callable[[Any, Any], ReturnValue]) -> Callable
+        # type: (Callable[[Any, Any], Return]) -> Callable
         @functools.wraps(function)
         def call(*args, **kwargs):
-            # type: (Any, Any) -> ReturnValue
+            # type: (Any, Any) -> Return
             try:
                 # handle input arguments that are extended by various pyramid operations
                 if is_request:

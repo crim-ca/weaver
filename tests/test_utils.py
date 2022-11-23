@@ -2,20 +2,23 @@
 
 import contextlib
 import inspect
+import itertools
 import json
 import os
 import random
+import re
 import shutil
 import tempfile
 import uuid
 from datetime import datetime
-from typing import Type
+from typing import TYPE_CHECKING
 from urllib.parse import quote, urlparse
 
 import mock
 import pytest
 import pytz
 import responses
+from mypy_boto3_s3.literals import RegionName
 from pyramid.httpexceptions import (
     HTTPConflict,
     HTTPCreated,
@@ -29,17 +32,30 @@ from pywps.response.status import WPS_STATUS
 from requests import Response
 from requests.exceptions import HTTPError as RequestsHTTPError
 
-from tests.utils import mocked_aws_credentials, mocked_aws_s3, mocked_aws_s3_bucket_test_file, mocked_file_response
+from tests.utils import (
+    MOCK_AWS_REGION,
+    mocked_aws_config,
+    mocked_aws_s3,
+    mocked_aws_s3_bucket_test_file,
+    mocked_file_response,
+    mocked_file_server,
+    setup_test_file_hierarchy
+)
 from weaver import xml_util
 from weaver.execute import ExecuteControlOption, ExecuteMode
-from weaver.formats import ContentType
+from weaver.formats import ContentType, repr_json
 from weaver.status import JOB_STATUS_CATEGORIES, STATUS_PYWPS_IDS, STATUS_PYWPS_MAP, Status, StatusCompliant, map_status
 from weaver.utils import (
+    AWS_S3_BUCKET_REFERENCE_PATTERN,
+    AWS_S3_REGIONS,
     NullType,
+    OutputMethod,
+    PathMatchingMethod,
     VersionLevel,
     apply_number_with_unit,
     assert_sane_name,
     bytes2str,
+    fetch_directory,
     fetch_file,
     get_any_value,
     get_base_url,
@@ -58,11 +74,27 @@ from weaver.utils import (
     parse_prefer_header_execute_mode,
     pass_http_error,
     request_extra,
+    resolve_s3_from_http,
+    resolve_s3_http_options,
+    resolve_s3_reference,
     retry_on_condition,
     str2bytes,
+    validate_s3,
     xml_path_elements,
     xml_strip_ns
 )
+
+if TYPE_CHECKING:
+    from typing import Any, Dict, List, Optional, Tuple, Type
+
+    from responses import _Body as BodyType  # noqa: W0212
+
+    from tests.utils import S3Scheme
+    from weaver.typedefs import AnyRequestType, HeadersType
+
+AWS_S3_REGION_SUBSET = set(random.choices(AWS_S3_REGIONS, k=4))
+AWS_S3_REGION_SUBSET_WITH_MOCK = {MOCK_AWS_REGION} | AWS_S3_REGION_SUBSET
+AWS_S3_REGION_NON_DEFAULT = list(AWS_S3_REGION_SUBSET_WITH_MOCK - {MOCK_AWS_REGION})[0]
 
 # pylint: disable=R1732,W1514  # not using with open + encoding
 
@@ -565,17 +597,458 @@ def test_request_extra_zero_values():
     assert sleep_counter["called_count"] == 3  # first direct call doesn't have any sleep from retry
 
 
-def test_fetch_file_local_links():
+@pytest.mark.parametrize(
+    "include_dir_heading,include_separators,include_code_format,include_table_format,include_modified_date",
+    itertools.product((True, False), repeat=5)
+)
+def test_fetch_directory_html(include_dir_heading,       # type: bool
+                              include_separators,        # type: bool
+                              include_code_format,       # type: bool
+                              include_table_format,      # type: bool
+                              include_modified_date,     # type: bool
+                              ):                         # type: (...) -> None
+    with contextlib.ExitStack() as stack:
+        tmp_host = "https://mocked-file-server.com"  # must match in 'Execute_WorkflowSelectCopyNestedOutDir.json'
+        tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())
+        stack.enter_context(mocked_file_server(
+            tmp_dir, tmp_host,
+            settings={},
+            mock_browse_index=True,
+            include_dir_heading=include_dir_heading,
+            include_separators=include_separators,
+            include_code_format=include_code_format,
+            include_table_format=include_table_format,
+            include_modified_date=include_modified_date,
+        ))
+        test_http_dir_files = [
+            "main.txt",
+            "dir/file.txt",
+            "dir/sub/file.tmp",
+            "dir/sub/nested/file.cfg",
+            "dir/other/meta.txt",
+            "another/info.txt",
+            "another/nested/data.txt",
+        ]
+        test_dir_files = setup_test_file_hierarchy(test_http_dir_files, tmp_dir)
+
+        out_dir = stack.enter_context(tempfile.TemporaryDirectory())
+        out_files = fetch_directory(f"{tmp_host}/dir/", out_dir)
+        expect_files = filter(lambda _f: _f.startswith("dir/"), test_http_dir_files)
+        expect_files = [os.path.join(out_dir, file.split("/", 1)[-1]) for file in expect_files]
+        assert list(out_files) == sorted(expect_files), (
+            f"Out dir: [{out_dir}], Test dir:\n{repr_json(test_dir_files, indent=2)}"
+        )
+
+
+def test_fetch_directory_json():
+    with contextlib.ExitStack() as stack:
+        tmp_host = "https://mocked-file-server.com"
+        tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())
+        test_http_dir_files = [
+            "main.txt",
+            "dir/file.txt",
+            "dir/sub/file.tmp",
+            "dir/sub/nested/file.cfg",
+            "dir/other/meta.txt",
+            "another/info.txt",
+            "another/nested/data.txt",
+        ]
+        test_dir_files = setup_test_file_hierarchy(test_http_dir_files, tmp_dir)
+
+        def mock_json_dir(request):
+            # type: (AnyRequestType) -> Tuple[int, HeadersType, BodyType]
+            _dir = request.path_url.split("?")[0].lstrip("/")
+            _files = [
+                os.path.join(tmp_host, _file)
+                for _file in test_http_dir_files
+                if _file.startswith(_dir)
+            ]
+            return 200, {"Content-Type": ContentType.APP_JSON}, json.dumps(_files)
+
+        req_mock = responses.RequestsMock(assert_all_requests_are_fired=False)
+        req_mock.add_callback(responses.GET, f"{tmp_host}/dir/?f=json", callback=mock_json_dir)
+        stack.enter_context(mocked_file_server(
+            tmp_dir, tmp_host,
+            settings={},
+            mock_browse_index=True,
+            requests_mock=req_mock,
+        ))
+
+        out_dir = stack.enter_context(tempfile.TemporaryDirectory())
+        out_files = fetch_directory(f"{tmp_host}/dir/?f=json", out_dir)
+        expect_files = filter(lambda _f: _f.startswith("dir/"), test_http_dir_files)
+        expect_files = [os.path.join(out_dir, file.split("/", 1)[-1]) for file in expect_files]
+        assert list(out_files) == sorted(expect_files), (
+            f"Out dir: [{out_dir}], Test dir:\n{repr_json(test_dir_files, indent=2)}"
+        )
+
+
+@pytest.mark.parametrize("invalid_json_listing", [
+    {},
+    [],
+    {"file": "https://somewhere.com/test.txt"},
+    [{"file": "https://somewhere.com/test.txt"}],
+])
+def test_fetch_directory_json_invalid_listing(invalid_json_listing):
+    with contextlib.ExitStack() as stack:
+        tmp_host = "https://mocked-file-server.com"
+        tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())
+
+        def mock_json_dir(__request):
+            # type: (AnyRequestType) -> Tuple[int, HeadersType, BodyType]
+            return 200, {"Content-Type": ContentType.APP_JSON}, json.dumps(invalid_json_listing)
+
+        req_mock = responses.RequestsMock(assert_all_requests_are_fired=False)
+        req_mock.add_callback(responses.GET, f"{tmp_host}/dir/?f=json", callback=mock_json_dir)
+        stack.enter_context(mocked_file_server(
+            tmp_dir, tmp_host,
+            settings={},
+            mock_browse_index=True,
+            requests_mock=req_mock,
+        ))
+        out_dir = stack.enter_context(tempfile.TemporaryDirectory())
+
+        with pytest.raises(ValueError):  # error expected since JSON response is not a list of files
+            fetch_directory(f"{tmp_host}/dir/?f=json", out_dir)
+
+
+class TemporaryLinkableDirectory(tempfile.TemporaryDirectory):
+    # avoids error in case the temp dir was replaced by a link
+    def cleanup(self) -> None:
+        try:
+            super(TemporaryLinkableDirectory, self).cleanup()
+        except OSError:
+            if not os.path.islink(self.name):
+                raise
+            os.remove(self.name)
+
+
+# expect_files[i] = (Path, IsLink)
+@pytest.mark.parametrize("listing_dir,out_method,include,exclude,matcher,expect_files", [
+    ("dir/", OutputMethod.LINK, None, None, PathMatchingMethod.REGEX, [
+        ("dir/", True),
+        ("dir/file.txt", False),
+        ("dir/sub/file.tmp", False),
+        ("dir/sub/nested/file.cfg", False),
+        ("dir/other/meta.txt", False),
+        ("dir/other/link.lnk", True),
+    ]),
+    ("dir/", OutputMethod.COPY, None, None, PathMatchingMethod.REGEX, [
+        ("dir/", False),
+        ("dir/file.txt", False),
+        ("dir/sub/file.tmp", False),
+        ("dir/sub/nested/file.cfg", False),
+        ("dir/other/meta.txt", False),
+        ("dir/other/link.lnk", False),
+    ]),
+    ("dir/", OutputMethod.MOVE, None, None, PathMatchingMethod.REGEX, [
+        ("dir/", False),
+        ("dir/file.txt", False),
+        ("dir/sub/file.tmp", False),
+        ("dir/sub/nested/file.cfg", False),
+        ("dir/other/meta.txt", False),
+        ("dir/other/link.lnk", True),
+    ]),
+    ("dir/", OutputMethod.AUTO, None, None, PathMatchingMethod.REGEX, [
+        ("dir/", False),
+        ("dir/file.txt", False),
+        ("dir/sub/file.tmp", False),
+        ("dir/sub/nested/file.cfg", False),
+        ("dir/other/meta.txt", False),
+        ("dir/other/link.lnk", True),
+    ]),
+    ("another/", OutputMethod.LINK, None, None, PathMatchingMethod.REGEX, [
+        ("another/", True),
+        ("another/info.txt", False),
+        ("another/nested/data.txt", False),
+        ("another/nested/link.txt", True),
+        ("another/link-dir/", True),
+        ("another/link-dir/file.txt", False),
+        ("another/link-dir/sub/file.tmp", False),
+        ("another/link-dir/sub/nested/file.cfg", False),
+        ("another/link-dir/other/meta.txt", False),
+        ("another/link-dir/other/link.lnk", True),
+    ]),
+    ("another/", OutputMethod.COPY, None, None, PathMatchingMethod.REGEX, [
+        ("another/", False),
+        ("another/info.txt", False),
+        ("another/nested/data.txt", False),
+        ("another/nested/link.txt", False),
+        ("another/link-dir/", False),
+        ("another/link-dir/file.txt", False),
+        ("another/link-dir/sub/file.tmp", False),
+        ("another/link-dir/sub/nested/file.cfg", False),
+        ("another/link-dir/other/meta.txt", False),
+        ("another/link-dir/other/link.lnk", False),
+    ]),
+    ("another/", OutputMethod.MOVE, None, None, PathMatchingMethod.REGEX, [
+        ("another/", False),
+        ("another/info.txt", False),
+        ("another/nested/data.txt", False),
+        ("another/nested/link.txt", True),
+        ("another/link-dir/", True),
+        ("another/link-dir/file.txt", False),
+        ("another/link-dir/sub/file.tmp", False),
+        ("another/link-dir/sub/nested/file.cfg", False),
+        ("another/link-dir/other/meta.txt", False),
+        ("another/link-dir/other/link.lnk", True),
+    ]),
+    ("another/", OutputMethod.AUTO, None, None, PathMatchingMethod.REGEX, [
+        ("another/", False),
+        ("another/info.txt", False),
+        ("another/nested/data.txt", False),
+        ("another/nested/link.txt", True),
+        ("another/link-dir/", True),
+        ("another/link-dir/file.txt", False),
+        ("another/link-dir/sub/file.tmp", False),
+        ("another/link-dir/sub/nested/file.cfg", False),
+        ("another/link-dir/other/meta.txt", False),
+        ("another/link-dir/other/link.lnk", True),
+    ]),
+    ("link/", OutputMethod.LINK, None, None, PathMatchingMethod.REGEX, [
+        ("link/", True),
+        ("link/another/", True),
+        ("link/another/info.txt", False),
+        ("link/another/nested/data.txt", False),
+        ("link/another/nested/link.txt", True),
+        ("link/another/link-dir/", True),
+        ("link/another/link-dir/file.txt", False),
+        ("link/another/link-dir/sub/file.tmp", False),
+        ("link/another/link-dir/sub/nested/file.cfg", False),
+        ("link/another/link-dir/other/meta.txt", False),
+        ("link/another/link-dir/other/link.lnk", True),
+    ]),
+    ("link/", OutputMethod.COPY, None, None, PathMatchingMethod.REGEX, [
+        ("link/", False),
+        ("link/another/", False),
+        ("link/another/info.txt", False),
+        ("link/another/nested/data.txt", False),
+        ("link/another/nested/link.txt", False),
+        ("link/another/link-dir/", False),
+        ("link/another/link-dir/file.txt", False),
+        ("link/another/link-dir/sub/file.tmp", False),
+        ("link/another/link-dir/sub/nested/file.cfg", False),
+        ("link/another/link-dir/other/meta.txt", False),
+        ("link/another/link-dir/other/link.lnk", False),
+    ]),
+    ("link/", OutputMethod.MOVE, None, None, PathMatchingMethod.REGEX, [
+        ("link/", False),
+        ("link/another/", True),
+        ("link/another/info.txt", False),
+        ("link/another/nested/data.txt", False),
+        ("link/another/nested/link.txt", True),
+        ("link/another/link-dir/", True),
+        ("link/another/link-dir/file.txt", False),
+        ("link/another/link-dir/sub/file.tmp", False),
+        ("link/another/link-dir/sub/nested/file.cfg", False),
+        ("link/another/link-dir/other/meta.txt", False),
+        ("link/another/link-dir/other/link.lnk", True),
+    ]),
+    ("link/", OutputMethod.AUTO, None, None, PathMatchingMethod.REGEX, [
+        ("link/", False),
+        ("link/another/", True),
+        ("link/another/info.txt", False),
+        ("link/another/nested/data.txt", False),
+        ("link/another/nested/link.txt", True),
+        ("link/another/link-dir/", True),
+        ("link/another/link-dir/file.txt", False),
+        ("link/another/link-dir/sub/file.tmp", False),
+        ("link/another/link-dir/sub/nested/file.cfg", False),
+        ("link/another/link-dir/other/meta.txt", False),
+        ("link/another/link-dir/other/link.lnk", True),
+    ]),
+])
+def test_fetch_directory_local(listing_dir,     # type: str
+                               out_method,      # type: OutputMethod
+                               include,         # type: Optional[List[str]]
+                               exclude,         # type: Optional[List[str]]
+                               matcher,         # type: PathMatchingMethod
+                               expect_files,    # type: List[Tuple[str, bool]]
+                               ):               # type: (...) -> None
+    with contextlib.ExitStack() as stack:
+        tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())
+        test_dir_files = [
+            ("main.txt", None),
+            ("dir/file.txt", None),
+            ("dir/sub/file.tmp", None),
+            ("dir/sub/nested/file.cfg", None),
+            ("dir/other/meta.txt", None),
+            ("dir/other/link.lnk", "main.txt"),
+            ("another/info.txt", None),
+            ("another/nested/data.txt", None),
+            ("another/nested/link.txt", "dir/file.txt"),
+            ("another/link-dir/", "dir/"),
+            ("link/another/", "another/"),
+        ]
+        test_dir_files = setup_test_file_hierarchy(test_dir_files, tmp_dir)
+
+        # test
+        out_dir = stack.enter_context(TemporaryLinkableDirectory())  # must exist, but can be replaced by link if needed
+        out_files = fetch_directory(f"file://{tmp_dir}/{listing_dir}", out_dir,
+                                    out_method=out_method, include=include, exclude=exclude, matcher=matcher)
+        out_files = [(out, os.path.islink(out)) for out in out_files]
+        # get dirs only for link checks, they are not expected from output listing
+        expect_dirs = [path for path in expect_files if path[0].endswith("/")]
+        # add the original relative dirs without the out dir path adjustment to help debug/compare results,
+        # since the requested sub-dir location will not be nested as the input anymore (subset is extracted)
+        expect_dirs = [(os.path.join(out_dir, path[0].split("/", 1)[-1]), path[1], path[0]) for path in expect_dirs]
+        expect_files = [file for file in expect_files if not file[0].endswith("/")]
+        expect_files = [(os.path.join(out_dir, file[0].split("/", 1)[-1]), file[1]) for file in expect_files]
+        assert list(out_files) == sorted(expect_files), (
+            f"Out dir: [{out_dir}], Test dir:\n{repr_json(test_dir_files, indent=2)}"
+        )
+        out_dirs = [(path[0], os.path.islink(path[0].rstrip("/")), path[2]) for path in expect_dirs]
+        assert out_dirs == expect_dirs, f"Out dir: [{out_dir}], Test dir:\n{repr_json(test_dir_files, indent=2)}"
+
+
+@pytest.mark.parametrize("listing_dir,include,exclude,matcher,expect_files", [
+    ("dir/", None, None, PathMatchingMethod.REGEX, [
+        "dir/file.txt",
+        "dir/sub/file.tmp",
+        "dir/sub/nested/file.cfg",
+        "dir/other/meta.txt",
+    ]),
+    ("dir/", None, [r".*/.*\.txt"], PathMatchingMethod.REGEX, [
+        # 'dir/file.txt' becomes 'file.txt' (at root of out-dir) after resolution with 'dir/' listing
+        # since the exclude pattern has a '/' in it, it is not matched with relative path resolution
+        "dir/file.txt",
+        "dir/sub/file.tmp",
+        "dir/sub/nested/file.cfg",
+    ]),
+    ("dir/", None, [r"*/*.txt"], PathMatchingMethod.GLOB, [
+        # 'dir/file.txt' becomes 'file.txt' (at root of out-dir) after resolution with 'dir/' listing
+        # since the exclude pattern has a '/' in it, it is not matched with relative path resolution
+        "dir/file.txt",
+        "dir/sub/file.tmp",
+        "dir/sub/nested/file.cfg",
+    ]),
+    ("dir/", None, [r".*\.txt"], PathMatchingMethod.REGEX, [
+        "dir/sub/file.tmp",
+        "dir/sub/nested/file.cfg",
+    ]),
+    ("dir/", None, [r"*.txt"], PathMatchingMethod.GLOB, [
+        "dir/sub/file.tmp",
+        "dir/sub/nested/file.cfg",
+    ]),
+    ("dir/", [r".*/.*\.txt"], None, PathMatchingMethod.REGEX, [
+        # adding include does not 'force' only those to be matched, only to "add back" excluded
+        "dir/file.txt",
+        "dir/sub/file.tmp",
+        "dir/sub/nested/file.cfg",
+        "dir/other/meta.txt",
+    ]),
+    ("dir/", [r"*/*.txt"], None, PathMatchingMethod.GLOB, [
+        # adding include does not 'force' only those to be matched, only to "add back" excluded
+        "dir/file.txt",
+        "dir/sub/file.tmp",
+        "dir/sub/nested/file.cfg",
+        "dir/other/meta.txt",
+    ]),
+    ("dir/", [r".*\.txt"], None, PathMatchingMethod.REGEX, [
+        "dir/file.txt",
+        "dir/sub/file.tmp",
+        "dir/sub/nested/file.cfg",
+        "dir/other/meta.txt",
+    ]),
+    ("dir/", [r"*.txt"], None, PathMatchingMethod.GLOB, [
+        "dir/file.txt",
+        "dir/sub/file.tmp",
+        "dir/sub/nested/file.cfg",
+        "dir/other/meta.txt",
+    ]),
+    ("dir/", [r".*file\.txt"], [r".*\.txt"], PathMatchingMethod.REGEX, [
+        "dir/file.txt",  # initially excluded, but the added back due to include
+        "dir/sub/file.tmp",
+        "dir/sub/nested/file.cfg",
+    ]),
+    ("dir/", [r"*file.txt"], [r"*.txt"], PathMatchingMethod.GLOB, [
+        "dir/file.txt",  # initially excluded, but the added back due to include
+        "dir/sub/file.tmp",
+        "dir/sub/nested/file.cfg",
+    ]),
+    ("", None, [r"dir/.*", r".*info\..*"], PathMatchingMethod.REGEX, [
+        "main.txt",
+        "another/nested/data.txt",
+    ]),
+    ("", None, [r"dir/*", r"*info.*"], PathMatchingMethod.GLOB, [
+        "main.txt",
+        "another/nested/data.txt",
+    ]),
+])
+def test_fetch_directory_filters(listing_dir, include, exclude, matcher, expect_files):
+    # type: (str, Optional[List[str]], Optional[List[str]], PathMatchingMethod, List[str]) -> None
+    with contextlib.ExitStack() as stack:
+        tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())
+        test_dir_files = [
+            "main.txt",
+            "dir/file.txt",
+            "dir/sub/file.tmp",
+            "dir/sub/nested/file.cfg",
+            "dir/other/meta.txt",
+            "another/info.txt",
+            "another/nested/data.txt",
+        ]
+        test_dir_files = setup_test_file_hierarchy(test_dir_files, tmp_dir)
+
+        out_dir = stack.enter_context(tempfile.TemporaryDirectory())
+        out_files = fetch_directory(f"file://{tmp_dir}/{listing_dir}", out_dir,
+                                    include=include, exclude=exclude, matcher=matcher)
+        expect_files = [os.path.join(out_dir, file.split("/", 1)[-1] if listing_dir else file) for file in expect_files]
+        assert list(out_files) == sorted(expect_files), (
+            f"Out dir: [{out_dir}], Test dir:\n{repr_json(test_dir_files, indent=2)}"
+        )
+
+
+def test_fetch_directory_raise_missing_trailing_slash():
+    with tempfile.TemporaryDirectory() as tmp_dir:  # make sure missing dir is not the error
+        with pytest.raises(ValueError):
+            fetch_directory(f"file://{tmp_dir}", "/tmp")  # input location with no trailing slash
+
+
+def test_fetch_directory_unknown_scheme():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with pytest.raises(ValueError):
+            fetch_directory("unknown://random.location.com/dir/", tmpdir)
+
+
+def test_fetch_directory_unknown_content_type():
+    dir_http = "https://random.location.com/dir/"
+    req_mock = responses.RequestsMock(assert_all_requests_are_fired=False)
+    req_mock.add_callback(responses.GET, dir_http, callback=lambda _: (200, {"Content-Type": "application/random"}, ""))
+    with req_mock:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with pytest.raises(ValueError):
+                fetch_directory("https://random.location.com/dir/", tmpdir)
+
+
+@pytest.mark.parametrize("source_link, out_method, result_link", [
+    (False, OutputMethod.LINK, True),
+    (False, OutputMethod.COPY, False),
+    (False, OutputMethod.MOVE, False),
+    (False, OutputMethod.AUTO, False),
+    (True, OutputMethod.LINK, True),
+    (True, OutputMethod.COPY, False),
+    (True, OutputMethod.MOVE, False),
+    (True, OutputMethod.AUTO, True),
+])
+def test_fetch_file_local_links(source_link, out_method, result_link):
+    # type: (bool, OutputMethod, bool) -> None
     """
     Test handling of symbolic links by function :func:`weaver.utils.fetch_file` for local files.
+
+    .. note::
+        Because :attr:`OutputMethod.MOVE` is expected to "remove" the original temporary file, an :class:`OSError` is
+        generated when :func:`tempfile.NamedTemporaryFile` attempts to delete it when closed on ``with`` exit, since
+        it does not exist anymore (it was moved). Avoid the error by manually performing any necessary cleanup.
     """
+    tmp_file = None
     tmp_dir = tempfile.gettempdir()
     src_dir = os.path.join(tmp_dir, str(uuid.uuid4()))
     dst_dir = os.path.join(tmp_dir, str(uuid.uuid4()))
     try:
         make_dirs(src_dir, exist_ok=True)
         make_dirs(dst_dir, exist_ok=True)
-        with tempfile.NamedTemporaryFile(dir=src_dir, mode="w", suffix=".json") as tmp_json:
+        with tempfile.NamedTemporaryFile(dir=src_dir, mode="w", suffix=".json", delete=False) as tmp_json:
             tmp_data = {"message": "fetch-file-link"}
             tmp_json.write(json.dumps(tmp_data))
             tmp_json.seek(0)
@@ -584,34 +1057,35 @@ def test_fetch_file_local_links():
             tmp_link = os.path.join(tmp_path, "link.json")
             os.symlink(tmp_file, tmp_link)
             dst_path = os.path.join(dst_dir, tmp_name)
-            for src_path, as_link, result_link in [
-                (tmp_file, True, True),
-                (tmp_file, False, False),
-                (tmp_file, None, False),
-                (tmp_link, True, True),
-                (tmp_link, False, False),
-                (tmp_link, None, True),
-            ]:
-                if os.path.exists(dst_path):
-                    os.remove(dst_path)
-                fetch_file(src_path, dst_dir, link=as_link)
-                assert os.path.isfile(dst_path), (
-                    f"File [{tmp_file}] should be accessible under [{dst_path}]. "
-                    f"Failed with: {(src_path, as_link, result_link)}"
-                )
-                if result_link:
-                    assert os.path.islink(dst_path), "Result is not a link when it is expected to be one."
-                else:
-                    assert not os.path.islink(dst_path), "Result is a link when it is expected not to be one."
-                assert json.load(open(dst_path)) == tmp_data, "File should be properly copied/referenced from original"
+            src_path = tmp_link if source_link else tmp_file
+            if os.path.exists(dst_path):
+                os.remove(dst_path)
+            fetch_file(src_path, dst_dir, out_method=out_method)
+            assert os.path.isfile(dst_path), (
+                f"File [{tmp_file}] should be accessible under [{dst_path}]. "
+                f"Failed with: {(src_path, out_method, result_link)}"
+            )
+            if result_link:
+                assert os.path.islink(dst_path), "Result is not a link when it is expected to be one."
+            else:
+                assert not os.path.islink(dst_path), "Result is a link when it is expected not to be one."
+            exists = os.path.exists(src_path)
+            assert not exists if out_method == OutputMethod.MOVE else exists
+            with open(dst_path, mode="r", encoding="utf-8") as dst_file:
+                dst_data = json.load(dst_file)
+            assert dst_data == tmp_data, "File should be properly copied/referenced from original"
     except OSError as exc:
         pytest.fail(f"Unexpected error raised during test: [{exc!s}]")
     finally:
         shutil.rmtree(src_dir, ignore_errors=True)
         shutil.rmtree(dst_dir, ignore_errors=True)
+        if tmp_file and os.path.isfile(tmp_file) or os.path.islink(tmp_file):
+            os.remove(tmp_file)
 
 
-def test_fetch_file_local_with_protocol():
+@pytest.mark.parametrize("protocol", ["", "file://"])
+def test_fetch_file_local_with_protocol(protocol):
+    # type: (str) -> None
     """
     Test function :func:`weaver.utils.fetch_file` when the reference is a pre-fetched local file.
     """
@@ -625,11 +1099,10 @@ def test_fetch_file_local_with_protocol():
         res_path = os.path.join(res_dir, tmp_name)
         try:
             make_dirs(res_dir, exist_ok=True)
-            for protocol in ["", "file://"]:
-                tmp_path = protocol + tmp_json.name
-                fetch_file(tmp_path, res_dir)
-                assert os.path.isfile(res_path), f"File [{tmp_path}] should be accessible under [{res_path}]"
-                assert json.load(open(res_path)) == tmp_data, "File should be properly copied/referenced from original"
+            tmp_path = protocol + tmp_json.name
+            fetch_file(tmp_path, res_dir)
+            assert os.path.isfile(res_path), f"File [{tmp_path}] should be accessible under [{res_path}]"
+            assert json.load(open(res_path)) == tmp_data, "File should be properly copied/referenced from original"
         except Exception:
             raise
         finally:
@@ -761,19 +1234,333 @@ def test_fetch_file_http_content_disposition_filename():
             shutil.rmtree(res_dir, ignore_errors=True)
 
 
-@mocked_aws_credentials
+@mocked_aws_config
 @mocked_aws_s3
-def test_fetch_file_remote_s3_bucket():
+@pytest.mark.parametrize("s3_scheme, s3_region", [
+    ("s3", "ca-central-1"),
+    ("s3", "us-east-2"),
+    ("s3", "eu-west-1"),
+    ("https", "ca-central-1"),
+    ("https", "us-east-2"),
+    ("https", "eu-west-1"),
+])
+def test_fetch_file_remote_s3_bucket(s3_scheme, s3_region):
+    # type: (S3Scheme, RegionName) -> None
     with tempfile.TemporaryDirectory() as tmpdir:
         test_file_name = "test-file.txt"
         test_file_data = "dummy file"
         test_bucket_name = "test-fake-bucket"
-        test_bucket_ref = mocked_aws_s3_bucket_test_file(test_bucket_name, test_file_name, test_file_data)
+        test_bucket_ref = mocked_aws_s3_bucket_test_file(
+            test_bucket_name, test_file_name, test_file_data,
+            s3_region=s3_region, s3_scheme=s3_scheme
+        )
         result = fetch_file(test_bucket_ref, tmpdir)
         assert result == os.path.join(tmpdir, test_file_name)
         assert os.path.isfile(result)
         with open(result, mode="r") as test_file:
             assert test_file.read() == test_file_data
+
+
+def test_fetch_file_unknown_scheme():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with pytest.raises(ValueError):
+            fetch_file("unknown://random.location.com/dir/file.txt", tmpdir)
+
+
+@pytest.mark.parametrize("options, parameters, configuration", [
+    (
+        {"timeout": 10},
+        {},
+        {"connect_timeout": 10, "read_timeout": 10},
+    ),
+    (
+        {"timeout": 10, "connect_timeout": 5},
+        {},
+        {"connect_timeout": 5, "read_timeout": 10},
+    ),
+    (
+        {"timeout": 10, "read_timeout": 5},
+        {},
+        {"connect_timeout": 10, "read_timeout": 5},
+    ),
+    (
+        {"timeout": 10, "connect_timeout": 5, "read_timeout": 20, "retries": 3},
+        {},
+        {"connect_timeout": 5, "read_timeout": 20, "retries": {"max_attempts": 3}},
+    ),
+    (
+        {"retry": 5},  # alt name
+        {},
+        {"retries": {"max_attempts": 5}},
+    ),
+    (
+        {"max_retries": 2},  # alt name
+        {},
+        {"retries": {"max_attempts": 2}},
+    ),
+    (
+        {"cert": "some.crt", "verify": True},
+        {"verify": True},
+        {"client_cert": "some.crt"},
+    ),
+    (
+        {"cert": ("some.crt", "some.pem")},
+        {},
+        {"client_cert": ("some.crt", "some.pem")},
+    ),
+    (
+        {"cert": None, "verify": False},
+        {"verify": False},
+        {"client_cert": None},
+    ),
+    (
+        {"headers": {"Content-Type": "ignore", "user-agent": "test"}},
+        {},
+        {"user_agent": "test"},
+    )
+])
+def test_resolve_s3_http_options(options, parameters, configuration):
+    # type: (Dict[str, Any], Dict[str, Any], Dict[str, Any]) -> None
+    params = resolve_s3_http_options(**options)
+    config = params.pop("config")
+    assert params == parameters
+    assert not isinstance(config, dict)
+    for cfg, val in configuration.items():
+        assert getattr(config, cfg) == val  # no None default because expected value
+    for cfg in parameters:
+        assert not hasattr(config, cfg)
+
+
+@mocked_aws_config(default_region=MOCK_AWS_REGION)  # check that URL can be different from default
+@mocked_aws_s3
+@pytest.mark.parametrize(
+    "s3_url, expect_region, expect_url",
+    [
+        (f"https://s3.{region}.amazonaws.com/test/file.txt", region, "s3://test/file.txt")
+        for region in AWS_S3_REGION_SUBSET_WITH_MOCK
+    ] + [
+        (f"https://s3.{region}.amazonaws.com/test/dir/nested/file.txt", region, "s3://test/dir/nested/file.txt")
+        for region in AWS_S3_REGION_SUBSET_WITH_MOCK
+    ] + [
+        (f"https://test.s3.{region}.amazonaws.com/dir/nested/file.txt", region, "s3://test/dir/nested/file.txt")
+        for region in AWS_S3_REGION_SUBSET_WITH_MOCK
+    ] + [
+        (f"https://test.s3.{region}.amazonaws.com/dir/only/", region, "s3://test/dir/only/")
+        for region in AWS_S3_REGION_SUBSET_WITH_MOCK
+    ] + [
+        (f"https://s3.{region}.amazonaws.com/test/dir/only/", region, "s3://test/dir/only/")
+        for region in AWS_S3_REGION_SUBSET_WITH_MOCK
+    ] + [
+        (
+            f"https://access-111122223333.s3-accesspoint.{region}.amazonaws.com/test/",
+            region, f"s3://arn:aws:s3:{region}:111122223333:accesspoint/access/test/"
+        )
+        for region in AWS_S3_REGION_SUBSET_WITH_MOCK
+    ] + [
+        (
+            f"https://test-location-123456789012.s3-accesspoint.{region}.amazonaws.com/dir/file.txt",
+            region, f"s3://arn:aws:s3:{region}:123456789012:accesspoint/test-location/dir/file.txt"
+        )
+        for region in AWS_S3_REGION_SUBSET_WITH_MOCK
+    ] + [
+        (
+            f"https://test-location-123456789012.s3-accesspoint.{region}.amazonaws.com/",
+            region, f"s3://arn:aws:s3:{region}:123456789012:accesspoint/test-location/"
+        )
+        for region in AWS_S3_REGION_SUBSET_WITH_MOCK
+    ] + [
+        (
+            f"https://test-location-123456789012.s3-accesspoint.{region}.amazonaws.com/nested/dir/",
+            region, f"s3://arn:aws:s3:{region}:123456789012:accesspoint/test-location/nested/dir/"
+        )
+        for region in AWS_S3_REGION_SUBSET_WITH_MOCK
+    ] + [
+        (
+            f"https://test-location-123456789012.outpost-123.s3-outposts.{region}.amazonaws.com/nested/dir/",
+            region,
+            f"s3://arn:aws:s3-outposts:{region}:123456789012:outpost/outpost-123/accesspoint/test-location/nested/dir/"
+        )
+        for region in AWS_S3_REGION_SUBSET_WITH_MOCK
+    ]
+)
+def test_resolve_s3_from_http(s3_url, expect_region, expect_url):
+    # type: (str, RegionName, str) -> None
+    s3_location, s3_region = resolve_s3_from_http(s3_url)
+    assert s3_region == expect_region
+    assert s3_location == expect_url
+
+
+@mocked_aws_config
+@mocked_aws_s3
+@pytest.mark.parametrize("s3_url_invalid", [
+    f"https://s3.{MOCK_AWS_REGION}.amazonaws.com/",        # missing bucket and dir/file reference
+    f"https://s3.{MOCK_AWS_REGION}.amazonaws.com/bucket",  # missing trailing slash (dir reference)
+    f"https://bucket.s3.{MOCK_AWS_REGION}.amazonaws.com",  # missing trailing slash (dir reference)
+    f"https://123456789012.s3-accesspoint.{MOCK_AWS_REGION}.amazonaws.com",  # missing access-point
+    f"https://s3.{AWS_S3_REGION_NON_DEFAULT}.amazonaws.com/",        # missing bucket and dir/file reference
+    f"https://s3.{AWS_S3_REGION_NON_DEFAULT}.amazonaws.com/bucket",  # missing trailing slash (dir reference)
+    f"https://bucket.s3.{AWS_S3_REGION_NON_DEFAULT}.amazonaws.com",  # missing trailing slash (dir reference)
+    f"https://123456789012.s3-accesspoint.{AWS_S3_REGION_NON_DEFAULT}.amazonaws.com",  # missing access-point
+    "https://access-111122223333.s3-accesspoint.amazonaws.com/test/",  # missing region
+])
+def test_resolve_s3_from_http_invalid(s3_url_invalid):
+    with pytest.raises(ValueError, match=r"^Invalid AWS S3 reference format.*"):
+        resolve_s3_from_http(s3_url_invalid)
+
+
+@pytest.mark.parametrize("s3_reference, expect_region, expect_bucket, expect_path", [
+    (
+        "s3://some-bucket/",
+        None,
+        "some-bucket",
+        "/"
+    ),
+    (
+        "s3://some-bucket/dir/",
+        None,
+        "some-bucket",
+        "dir/"
+    ),
+    (
+        "s3://some-bucket/dir/file.txt",
+        None,
+        "some-bucket",
+        "dir/file.txt"
+    ),
+    (
+        "s3://arn:aws:s3:ca-central-1:12345:accesspoint/location/",
+        "ca-central-1",
+        "arn:aws:s3:ca-central-1:12345:accesspoint/location",
+        "/"
+    ),
+    (
+        "s3://arn:aws:s3:ca-central-1:12345:accesspoint/location/file-key",
+        "ca-central-1",
+        "arn:aws:s3:ca-central-1:12345:accesspoint/location",
+        "file-key"
+    ),
+    (
+        "s3://arn:aws:s3-outposts:ca-central-1:12345:outpost/11235/bucket/here/some-dir/some-file.txt",
+        "ca-central-1",
+        "arn:aws:s3-outposts:ca-central-1:12345:outpost/11235/bucket/here",
+        "some-dir/some-file.txt"
+    ),
+    (
+        "s3://arn:aws:s3-outposts:us-east-2:12345:outpost/11235/accesspoint/thing/dir/stuff.txt",
+        "us-east-2",
+        "arn:aws:s3-outposts:us-east-2:12345:outpost/11235/accesspoint/thing",
+        "dir/stuff.txt"
+    ),
+    (
+        "s3://arn:aws:s3-outposts:us-east-2:12345:outpost/11235/accesspoint/thing/much/nested/stuff.txt",
+        "us-east-2",
+        "arn:aws:s3-outposts:us-east-2:12345:outpost/11235/accesspoint/thing",
+        "much/nested/stuff.txt"
+    ),
+    (
+        "s3://arn:aws:s3-outposts:us-east-2:12345:outpost/11235/accesspoint/thing/only-file.txt",
+        "us-east-2",
+        "arn:aws:s3-outposts:us-east-2:12345:outpost/11235/accesspoint/thing",
+        "only-file.txt"
+    ),
+])
+def test_resolve_s3_reference(s3_reference, expect_region, expect_bucket, expect_path):
+    # type: (str, Optional[RegionName], str, str) -> None
+    s3_bucket, s3_path, s3_region = resolve_s3_reference(s3_reference)
+    assert s3_region == expect_region
+    assert s3_bucket == expect_bucket
+    assert s3_path == expect_path
+
+
+@pytest.mark.parametrize("s3_reference, valid", [
+    ("s3://", False),
+    ("s3://test", False),
+    ("s3://test/", True),
+    ("s3://test/file.txt", True),
+    ("s3://test/test/item", True),
+    ("s3://test/test/item/", True),
+    ("s3://-test/test/item/", False),
+    ("s3://_test/test/item/", False),
+    ("s3://.test/test/item/", False),
+    ("s3://test-/test/item/", False),
+    ("s3://test_/test/item/", False),
+    ("s3://test./test/item/", False),
+    ("s3://test/test/item//", False),
+    ("s3://test/test/item//asm1112123-----....._____!xyz//", False),
+    ("s3://test/test/item/sm1112123-----....._____!xyz//", False),
+    ("s3://test/test/item/sm1112123-----....._____xyz//", False),
+    ("s3://test/test/item//asm1112123-----....._____!xyz/", False),
+    ("s3://test/test/item/sm1112123-----....._____!xyz/", False),
+    ("s3://test/test/item/sm111//2123-----....._____xyz/", False),
+    ("s3://test/test/item/sm1112123-----....._____xyz", True),
+    ("s3://test/test/item/sm1112123-----....._____xyz.txt", True),
+    ("s3://test/test/item/sm111/2123-----....._____xyz/", True),
+])
+def test_validate_s3_reference(s3_reference, valid):
+    # type: (str, bool) -> None
+    match = re.match(AWS_S3_BUCKET_REFERENCE_PATTERN, s3_reference)
+    assert bool(match) is valid
+
+
+@pytest.mark.parametrize(
+    "combo",
+    itertools.chain(
+        # invalid combinations
+        itertools.product(
+            # invalid bucket combinations
+            [
+                "a123--..__!xyz",
+                "as!xyz",
+                "sxyz-",
+                "-sxyz",
+                ".sxyz",
+                "sxyz-",
+                "sxyz.",
+                "abc_def",
+                "abc..def",  # adjacent not allowed
+                # specific case disallowed
+                "bucket-s3alias",
+                "xn--bucket",
+            ],
+            # invalid region combinations
+            [
+                "abc",
+                "-us-east-1",
+                "1us-east-1",
+                "us-east-123",
+                # add valid region to check bucket invalid still triggers
+                AWS_S3_REGION_NON_DEFAULT,
+            ],
+            [False],
+        ),
+        # valid combinations
+        itertools.product(
+            # valid bucket combinations
+            [
+                "bucket1",
+                "1bucket",
+                "bucket-test",
+                "bucket--test",
+                "bucket.test",
+                "bucket.test.2",
+            ],
+            # valid region combinations
+            AWS_S3_REGION_SUBSET,
+            [True],
+        )
+    )
+)
+def test_validate_s3_parameters(combo):
+    # type: (Tuple[str, str, bool]) -> None
+    bucket, region, valid = combo
+    try:
+        validate_s3(region=region, bucket=bucket)
+    except ValueError as exc:
+        if valid:
+            pytest.fail(f"Raised exception not expected for [{combo}]. {exc}")
+    else:
+        if not valid:
+            pytest.fail(f"Not raised expected exception for [{combo}]. (ValueError)")
 
 
 def test_get_path_kvp():

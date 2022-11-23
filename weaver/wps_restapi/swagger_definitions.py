@@ -15,12 +15,13 @@ on `Weaver`'s `ReadTheDocs` page.
 # pylint: disable=C0103,invalid-name
 import datetime
 import os
+import re
 from copy import copy
 from typing import TYPE_CHECKING
 
 import duration
 import yaml
-from colander import DateTime, Email, Length, Money, OneOf, Range, Regex, drop, null, required
+from colander import DateTime, Email, Length, Money, OneOf, Range, drop, null, required
 from dateutil import parser as date_parser
 
 from weaver import __meta__
@@ -35,7 +36,10 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_ESGF_CWT,
     CWL_REQUIREMENT_APP_OGC_API,
     CWL_REQUIREMENT_APP_WPS1,
+    CWL_REQUIREMENT_CUDA,
     CWL_REQUIREMENT_INIT_WORKDIR,
+    CWL_REQUIREMENT_INLINE_JAVASCRIPT,
+    CWL_REQUIREMENT_NETWORK_ACCESS,
     OAS_COMPLEX_TYPES,
     OAS_DATA_TYPES,
     PACKAGE_ARRAY_BASE,
@@ -49,8 +53,10 @@ from weaver.processes.constants import (
 from weaver.quotation.status import QuoteStatus
 from weaver.sort import Sort, SortMethods
 from weaver.status import JOB_STATUS_CODE_API, JOB_STATUS_SEARCH_API, Status
+from weaver.utils import AWS_S3_BUCKET_REFERENCE_PATTERN
 from weaver.visibility import Visibility
 from weaver.wps_restapi.colander_extras import (
+    NO_DOUBLE_SLASH_PATTERN,
     AllOfKeywordSchema,
     AnyOfKeywordSchema,
     BoundedRange,
@@ -297,14 +303,17 @@ class SLUG(ExtendedSchemaNode):
     schema_type = String
     description = "Slug name pattern."
     example = "some-object-slug-name"
-    pattern = r"^[A-Za-z0-9]+(?:(-|_)[A-Za-z0-9]+)*$"
+    pattern = re.compile(r"^[A-Za-z0-9]+(?:[-_][A-Za-z0-9]+)*$")
 
 
 class Tag(ExtendedSchemaNode):
     schema_type = String
-    description = "Identifier with optional tagged version forming an unique reference."
+    description = "Identifier with optional tagged version forming a unique reference."
     # ranges used to remove starting/ending ^$ characters
-    pattern = SLUG.pattern[:-1] + rf"(:{SemanticVersion(v_prefix=False, rc_suffix=False).pattern[1:-1]})?$"
+    pattern = re.compile(
+        rf"{SLUG.pattern.pattern[:-1]}"
+        rf"(:{SemanticVersion(v_prefix=False, rc_suffix=False).pattern[1:-1]})?$"
+    )
 
 
 class URL(ExtendedSchemaNode):
@@ -317,7 +326,7 @@ class MediaType(ExtendedSchemaNode):
     schema_type = String
     description = "IANA identifier of content and format."
     example = ContentType.APP_JSON
-    pattern = r"^\w+\/[-.\w]+(?:\+[-.\w]+)?(?:\;\s*.+)*$"
+    pattern = re.compile(r"^\w+\/[-.\w]+(?:\+[-.\w]+)?(?:\;\s*.+)*$")
 
 
 class QueryBoolean(Boolean):
@@ -342,25 +351,30 @@ class DateTimeInterval(ExtendedSchemaNode):
         "to get values with a specific date-time just pass the datetime. "
     )
     example = "2022-03-02T03:32:38.487000+00:00/.."
-    regex_datetime = r"(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d+)?(([+-]\d\d:\d\d)|Z)?)"
-    regex_interval_closed = fr"{regex_datetime}\/{regex_datetime}"
-    regex_interval_open_start = fr"\.\.\/{regex_datetime}"
-    regex_interval_open_end = fr"{regex_datetime}\/\.\."
+    regex_datetime = re.compile(r"(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d+)?(([+-]\d\d:\d\d)|Z)?)")
+    regex_interval_closed = re.compile(rf"{regex_datetime.pattern}\/{regex_datetime.pattern}")
+    regex_interval_open_start = re.compile(rf"\.\.\/{regex_datetime.pattern}")
+    regex_interval_open_end = re.compile(rf"{regex_datetime.pattern}\/\.\.")
+    pattern = re.compile(
+        rf"^{regex_datetime.pattern}"
+        rf"|{regex_interval_closed.pattern}"
+        rf"|{regex_interval_open_start.pattern}"
+        rf"|{regex_interval_open_end.pattern}"
+        r"$"
+    )
 
-    pattern = fr"^{regex_datetime}|{regex_interval_closed}|{regex_interval_open_start}|{regex_interval_open_end}$"
 
-
-class S3Bucket(ExtendedSchemaNode):
+class S3BucketReference(ExtendedSchemaNode):
     schema_type = String
-    description = "S3 bucket shorthand URL representation [s3://{bucket}/{job-uuid}/{output}.ext]"
-    pattern = r"^s3://\S+$"
+    description = "S3 bucket shorthand URL representation: 's3://{bucket}/[{dirs}/][{file-key}]'"
+    pattern = AWS_S3_BUCKET_REFERENCE_PATTERN
 
 
 class FileLocal(ExtendedSchemaNode):
     schema_type = String
     description = "Local file reference."
     format = "file"
-    validator = Regex(r"^(file://)?(?:/|[/?]\S+)$")
+    pattern = re.compile(rf"^(file://)?{NO_DOUBLE_SLASH_PATTERN}(?:/|[/?]\S+)$")
 
 
 class FileURL(ExtendedSchemaNode):
@@ -374,7 +388,7 @@ class VaultReference(ExtendedSchemaNode):
     schema_type = String
     description = "Vault file reference."
     example = "vault://399dc5ac-ff66-48d9-9c02-b144a975abe4"
-    pattern = r"^vault://[a-f0-9]{8}(?:-?[a-f0-9]{4}){3}-?[a-f0-9]{12}$"
+    pattern = re.compile(r"^vault://[a-f0-9]{8}(?:-?[a-f0-9]{4}){3}-?[a-f0-9]{12}$")
 
 
 class ProcessURL(ExtendedSchemaNode):
@@ -388,7 +402,7 @@ class ReferenceURL(AnyOfKeywordSchema):
     _any_of = [
         FileURL(),
         FileLocal(),
-        S3Bucket(),
+        S3BucketReference(),
     ]
 
 
@@ -396,7 +410,7 @@ class ExecuteReferenceURL(AnyOfKeywordSchema):
     _any_of = [
         FileURL(),
         FileLocal(),
-        S3Bucket(),
+        S3BucketReference(),
         VaultReference(),
     ]
 
@@ -406,7 +420,7 @@ class UUID(ExtendedSchemaNode):
     description = "Unique identifier."
     example = "a9d14bf4-84e0-449a-bac8-16e598efe807"
     format = "uuid"
-    pattern = "^[a-f0-9]{8}(?:-?[a-f0-9]{4}){3}-?[a-f0-9]{12}$"
+    pattern = re.compile("^[a-f0-9]{8}(?:-?[a-f0-9]{4}){3}-?[a-f0-9]{12}$")
     title = "UUID"
 
 
@@ -696,7 +710,7 @@ class Link(LinkRelationship, LinkBase):
 class MetadataValue(NotKeywordSchema, ValueLanguage, MetadataBase):
     _not = [
         # make sure value metadata does not allow 'rel' and 'hreflang' reserved for link reference
-        # explicitly refuse them such that when an href/rel link is provided, only link details are possible
+        # explicitly refuse them such that when a href/rel link is provided, only link details are possible
         LinkRelationship(description="Field 'rel' must refer to a link reference with 'href'."),
         LinkLanguage(description="Field 'hreflang' must refer to a link reference with 'href'."),
     ]
@@ -771,27 +785,27 @@ class Format(ExtendedMappingSchema):
     schema = FormatSchema(missing=drop)
 
 
-class DeployFormatDefaultMimeType(FormatMimeType):
+class FormatDefaultMimeType(FormatMimeType):
     description = (
         "Format for process input are assumed plain/text if the media-type was omitted and is not one of the known "
         "formats by this instance. When executing a job, the best match against supported formats by the process "
-        "definition will be used to run the process, and will fallback to the default as last resort."
+        "definition will be used to run the process, and will fall back to the default as last resort."
     )
     # NOTE:
     # The default is overridden from FormatMimeType since the FormatSelection 'oneOf' always fails,
-    # due to the 'default' value which is always generated and it causes the presence of both Format and FormatMimeType
+    # due to the 'default' value which is always generated, and it causes the presence of both Format and FormatMimeType
     mimeType = MediaType(example=ContentType.APP_JSON)
 
 
-class DeployFormatDefault(Format):
+class FormatDefaultMediaType(Format):
     description = (
         "Format for process input are assumed plain/text if the media-type was omitted and is not one of the known "
         "formats by this instance. When executing a job, the best match against supported formats by the process "
-        "definition will be used to run the process, and will fallback to the default as last resort."
+        "definition will be used to run the process, and will fall back to the default as last resort."
     )
     # NOTE:
     # The default is overridden from Format since the FormatSelection 'oneOf' always fails,
-    # due to the 'default' value which is always generated and it causes the presence of both Format and FormatMimeType
+    # due to the 'default' value which is always generated, and it causes the presence of both Format and FormatMimeType
     mediaType = MediaType(example=ContentType.APP_JSON)
 
 
@@ -800,15 +814,15 @@ class FormatSelection(OneOfKeywordSchema):
     Validation against ``mimeType`` or ``mediaType`` format.
 
     .. seealso::
-        - :class:`DeployFormatDefault`
-        - :class:`DeployFormatDefaultMimeType`
+        - :class:`FormatDefaultMediaType`
+        - :class:`FormatDefaultMimeType`
 
     .. note::
         Format are validated to be retro-compatible with pre-existing/deployed/remote processes.
     """
     _one_of = [
-        DeployFormatDefault(),
-        DeployFormatDefaultMimeType()
+        FormatDefaultMediaType(),
+        FormatDefaultMimeType()
     ]
 
 
@@ -1204,7 +1218,7 @@ class DeployMinMaxOccurs(ExtendedMappingSchema):
     maxOccurs = MaxOccursDefinition(default=null, missing=null)
 
 
-# does not inherit from 'DescriptionLinks' because other 'ProcessDescription<>' schema depend from this without 'links'
+# does not inherit from 'DescriptionLinks' because other 'ProcessDescription<>' schema depend on this without 'links'
 class ProcessDescriptionType(DescriptionBase, DescriptionExtra):
     id = ProcessIdentifierTag()
     version = Version(missing=None, default=None, example="1.2.3")
@@ -2981,7 +2995,7 @@ class ProcessDeploymentProfile(ExtendedMappingSchema):
 
 class Process(
     # following are like 'ProcessSummary',
-    # except without 'ProcessControl' and 'DescriptionLinks' that are outside of nested 'process'
+    # except without 'ProcessControl' and 'DescriptionLinks' that are outside the nested 'process'
     ProcessDescriptionType, DescriptionMeta,
     # following are additional fields only in description, just like for OGC-API ProcessDescription
     ProcessContext, ProcessVisibility, ProcessLocations
@@ -3309,7 +3323,7 @@ class ExecuteInputReference(Reference):
 
 
 class ExecuteInputFile(AnyOfKeywordSchema):
-    _any_of = [
+    _any_of = [                   # 'href' required for both to provide file link/reference
         ExecuteInputFileLink(),   # 'OGC' schema with 'type: <MediaType>'
         ExecuteInputReference(),  # 'OLD' schema with 'format: {mimeType|mediaType: <MediaType>}'
     ]
@@ -3367,8 +3381,8 @@ class ExecuteInputInlineOrRefData(OneOfKeywordSchema):
     schema_ref = f"{OGC_API_SCHEMA_CORE}/inlineOrRefData.yaml"
     _one_of = [
         ExecuteInputInlineValue(),     # <inline-literal>
-        ExecuteInputQualifiedValue(),  # {"value": <anything>}
-        ExecuteInputFile(),  # 'href' with either 'type' (OGC) or 'format' (OLD)
+        ExecuteInputQualifiedValue(),  # {"value": <anything>, "mediaType": "<>", "schema": <OAS link or object>}
+        ExecuteInputFile(),            # 'href' with either 'type' (OGC) or 'format' (OLD)
         # FIXME: other types here, 'bbox+crs', 'collection', 'nested process', etc.
     ]
 
@@ -3612,6 +3626,70 @@ class RequirementClass(ExtendedSchemaNode):
     description = "CWL requirement class specification."
 
 
+class CudaRequirementSpecification(PermissiveMappingSchema):
+    cudaVersionMin = ExtendedSchemaNode(
+        String(),
+        example="11.4",
+        title="Cuda version minimum",
+        description="The minimum Cuda version required.",
+        validator=SemanticVersion(regex=r"^\d+\.\d+$")
+    )
+    cudaComputeCapability = ExtendedSchemaNode(
+        String(),
+        example="3.0",
+        title="Cuda compute capability",
+        description="The compute capability supported by the GPU.",
+        validator=SemanticVersion(regex=r"^\d+\.\d+$")
+    )
+    cudaDeviceCountMin = ExtendedSchemaNode(
+        Integer(),
+        example=1,
+        default=1,
+        validator=Range(min=1),
+        title="Cuda device count minimum",
+        description="The minimum amount of devices required."
+    )
+    cudaDeviceCountMax = ExtendedSchemaNode(
+        Integer(),
+        example=8,
+        default=1,
+        validator=Range(min=1),
+        title="Cuda device count maximum",
+        description="The maximum amount of devices required."
+    )
+
+
+class CudaRequirementMap(ExtendedMappingSchema):
+    CudaRequirement = CudaRequirementSpecification(
+        name=CWL_REQUIREMENT_CUDA,
+        title=CWL_REQUIREMENT_CUDA
+    )
+
+
+class CudaRequirementClass(CudaRequirementSpecification):
+    _class = RequirementClass(example=CWL_REQUIREMENT_CUDA, validator=OneOf([CWL_REQUIREMENT_CUDA]))
+
+
+class NetworkAccessRequirementSpecification(PermissiveMappingSchema):
+    networkAccess = ExtendedSchemaNode(
+        Boolean(),
+        example=True,
+        title="Network Access",
+        description="Indicate whether a process requires outgoing IPv4/IPv6 network access."
+    )
+
+
+class NetworkAccessRequirementMap(ExtendedMappingSchema):
+    NetworkAccessRequirement = NetworkAccessRequirementSpecification(
+        name=CWL_REQUIREMENT_NETWORK_ACCESS,
+        title=CWL_REQUIREMENT_NETWORK_ACCESS
+    )
+
+
+class NetworkAccessRequirementClass(NetworkAccessRequirementSpecification):
+    _class = RequirementClass(example=CWL_REQUIREMENT_NETWORK_ACCESS, validator=OneOf([CWL_REQUIREMENT_NETWORK_ACCESS]))
+
+
 class DockerRequirementSpecification(PermissiveMappingSchema):
     dockerPull = ExtendedSchemaNode(
         String(),
@@ -3648,12 +3726,14 @@ class DockerGpuRequirementClass(DockerGpuRequirementSpecification):
     _class = RequirementClass(example=CWL_REQUIREMENT_APP_DOCKER_GPU, validator=OneOf([CWL_REQUIREMENT_APP_DOCKER_GPU]))
 
 
-class DirectoryListing(PermissiveMappingSchema):
+class DirectoryListingItem(PermissiveMappingSchema):
     entry = ExtendedSchemaNode(String(), missing=drop)
+    entryname = ExtendedSchemaNode(String(), missing=drop)
+    writable = ExtendedSchemaNode(Boolean(), missing=drop)
 
 
 class InitialWorkDirListing(ExtendedSequenceSchema):
-    listing = DirectoryListing()
+    item = DirectoryListingItem()
 
 
 class InitialWorkDirRequirementSpecification(PermissiveMappingSchema):
@@ -3667,6 +3747,32 @@ class InitialWorkDirRequirementMap(ExtendedMappingSchema):
 class InitialWorkDirRequirementClass(InitialWorkDirRequirementSpecification):
     _class = RequirementClass(example=CWL_REQUIREMENT_INIT_WORKDIR,
                               validator=OneOf([CWL_REQUIREMENT_INIT_WORKDIR]))
+
+
+class InlineJavascriptLibraries(ExtendedSequenceSchema):
+    description = (
+        "Additional code fragments that will also be inserted before executing the expression code. "
+        "Allows for function definitions that may be called from CWL expressions."
+    )
+    exp_lib = ExtendedSchemaNode(String(), missing=drop)
+
+
+class InlineJavascriptRequirementSpecification(PermissiveMappingSchema):
+    description = (
+        "Indicates that the workflow platform must support inline Javascript expressions. "
+        "If this requirement is not present, the workflow platform must not perform expression interpolation. "
+        "https://www.commonwl.org/v1.2/CommandLineTool.html#InlineJavascriptRequirement"
+    )
+    expressionLib = InlineJavascriptLibraries(missing=drop)
+
+
+class InlineJavascriptRequirementMap(ExtendedMappingSchema):
+    req = InlineJavascriptRequirementSpecification(name=CWL_REQUIREMENT_INLINE_JAVASCRIPT)
+
+
+class InlineJavascriptRequirementClass(InlineJavascriptRequirementSpecification):
+    _class = RequirementClass(example=CWL_REQUIREMENT_INLINE_JAVASCRIPT,
+                              validator=OneOf([CWL_REQUIREMENT_INLINE_JAVASCRIPT]))
 
 
 class BuiltinRequirementSpecification(PermissiveMappingSchema):
@@ -3751,15 +3857,22 @@ class CWLRequirementsMap(AnyOfKeywordSchema):
         DockerRequirementMap(missing=drop),
         DockerGpuRequirementMap(missing=drop),
         InitialWorkDirRequirementMap(missing=drop),
+        InlineJavascriptRequirementMap(missing=drop),
+        NetworkAccessRequirementMap(missing=drop),
         PermissiveMappingSchema(missing=drop),
     ]
 
 
 class CWLRequirementsItem(OneOfKeywordSchema):
+    # in case there is any conflict between definitions,
+    # the class field can be used to discriminate which one is expected.
+    discriminator = "class"
     _one_of = [
         DockerRequirementClass(missing=drop),
         DockerGpuRequirementClass(missing=drop),
         InitialWorkDirRequirementClass(missing=drop),
+        InlineJavascriptRequirementClass(missing=drop),
+        NetworkAccessRequirementClass(missing=drop),
         UnknownRequirementClass(missing=drop),  # allows anything, must be last
     ]
 
@@ -3778,9 +3891,12 @@ class CWLRequirements(OneOfKeywordSchema):
 class CWLHintsMap(AnyOfKeywordSchema, PermissiveMappingSchema):
     _any_of = [
         BuiltinRequirementMap(missing=drop),
+        CudaRequirementMap(missing=drop),
         DockerRequirementMap(missing=drop),
         DockerGpuRequirementMap(missing=drop),
         InitialWorkDirRequirementMap(missing=drop),
+        InlineJavascriptRequirementMap(missing=drop),
+        NetworkAccessRequirementMap(missing=drop),
         ESGF_CWT_RequirementMap(missing=drop),
         OGCAPIRequirementMap(missing=drop),
         WPS1RequirementMap(missing=drop),
@@ -3793,9 +3909,12 @@ class CWLHintsItem(OneOfKeywordSchema, PermissiveMappingSchema):
     discriminator = "class"
     _one_of = [
         BuiltinRequirementClass(missing=drop),
+        CudaRequirementClass(missing=drop),
         DockerRequirementClass(missing=drop),
         DockerGpuRequirementClass(missing=drop),
         InitialWorkDirRequirementClass(missing=drop),
+        InlineJavascriptRequirementClass(missing=drop),
+        NetworkAccessRequirementClass(missing=drop),
         ESGF_CWT_RequirementClass(missing=drop),
         OGCAPIRequirementClass(missing=drop),
         WPS1RequirementClass(missing=drop),

@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Type, TypeVar, Union
 
     import psutil
-    from typing_extensions import Literal, NotRequired, Protocol, TypeAlias, TypedDict
+    from typing_extensions import Literal, NotRequired, ParamSpec, Protocol, Required, TypeAlias, TypedDict
 
     from weaver.compat import Version
 
@@ -34,7 +34,7 @@ if TYPE_CHECKING:
             pass
     if MemoryInfo is Any:
         if TypedDict is Dict:
-            MemoryInfo = Dict
+            MemoryInfo = Dict[str, int]
         else:
             MemoryInfo = TypedDict("MemoryInfo", {
                 "rss": int,
@@ -63,15 +63,20 @@ if TYPE_CHECKING:
     from webtest.response import TestResponse
     from werkzeug.wrappers import Request as WerkzeugRequest
 
+    from weaver.execute import AnyExecuteControlOption, AnyExecuteMode, AnyExecuteResponse, AnyExecuteTransmissionMode
     from weaver.processes.constants import CWL_RequirementNames
     from weaver.processes.wps_process_base import WpsProcessInterface
     from weaver.datatype import Process
     from weaver.status import AnyStatusType
+    from weaver.visibility import AnyVisibility
 
-    ReturnValue = TypeVar("ReturnValue")  # alias to identify the same return value as a decorated/wrapped function
+    Path = Union[os.PathLike, str, bytes]
+
+    Params = ParamSpec("Params")  # use with 'Callable[Params, Return]', 'Params.args' and 'Params.kwargs'
+    Return = TypeVar("Return")    # alias to identify the same return value as a decorated/wrapped function
     AnyCallable = TypeVar("AnyCallable", bound=Callable[..., Any])  # callable used for decorated/wrapped functions
-    AnyCallableWrapped = Callable[[..., Any], ReturnValue]
-    AnyCallableAnyArgs = Union[Callable[[], ReturnValue], Callable[[..., Any], ReturnValue]]
+    AnyCallableWrapped = Callable[Params, Return]
+    AnyCallableAnyArgs = Union[Callable[[], Return], Callable[[..., Any], Return]]
 
     # pylint: disable=C0103,invalid-name
     Number = Union[int, float]
@@ -85,24 +90,27 @@ if TYPE_CHECKING:
     _JSON: TypeAlias = "JSON"
     _JsonObjectItemAlias: TypeAlias = "_JsonObjectItem"
     _JsonListItemAlias: TypeAlias = "_JsonListItem"
-    _JsonObjectItem = Dict[str, Union[_JSON, _JsonObjectItemAlias, _JsonListItemAlias]]
-    _JsonListItem = List[Union[AnyValueType, _JsonObjectItem, _JsonListItemAlias]]
-    _JsonItem = Union[AnyValueType, _JsonObjectItem, _JsonListItem, _JSON]
-    JSON = Union[Dict[str, _JsonItem], List[_JsonItem], AnyValueType]
+    _JsonObjectItem = Dict[str, Union[AnyValueType, _JSON, _JsonObjectItemAlias, _JsonListItemAlias]]
+    _JsonListItem = List[Union[AnyValueType, _JSON, _JsonObjectItem, _JsonListItemAlias]]
+    _JsonItem = Union[AnyValueType, _JSON, _JsonObjectItem, _JsonListItem]
+    JSON = Union[Dict[str, Union[_JSON, _JsonItem]], List[Union[_JSON, _JsonItem]], AnyValueType]
 
     Link = TypedDict("Link", {
-        "rel": str,
         "title": str,
-        "href": str,
+        "rel": Required[str],
+        "href": Required[str],
         "hreflang": NotRequired[str],
         "type": NotRequired[str],  # IANA Media-Type
     }, total=False)
     Metadata = TypedDict("Metadata", {
         "title": str,
         "role": str,  # URL
+        "href": str,
+        "hreflang": str,
+        "rel": str,
         "value": str,
         "lang": NotRequired[str],
-        "type": NotRequired[str],  # FIXME: relevant?
+        "type": NotRequired[str],
     }, total=False)
 
     LogLevelStr = Literal[
@@ -166,11 +174,6 @@ if TYPE_CHECKING:
     CWL_RequirementsDict = Dict[CWL_RequirementNames, Dict[str, str]]   # {'<req>': {<param>: <val>}}
     CWL_RequirementsList = List[CWL_Requirement]       # [{'class': <req>, <param>: <val>}]
     CWL_AnyRequirements = Union[CWL_RequirementsDict, CWL_RequirementsList]
-    # results from CWL execution
-    CWL_ResultFile = TypedDict("CWL_ResultFile", {"location": str}, total=False)
-    CWL_ResultValue = Union[AnyValueType, List[AnyValueType]]
-    CWL_ResultEntry = Union[Dict[str, CWL_ResultValue], CWL_ResultFile, List[CWL_ResultFile]]
-    CWL_Results = Dict[str, CWL_ResultEntry]
     CWL_Class = Literal["CommandLineTool", "ExpressionTool", "Workflow"]
     CWL_WorkflowStep = TypedDict("CWL_WorkflowStep", {
         "run": str,
@@ -185,8 +188,8 @@ if TYPE_CHECKING:
     _CWL = "CWL"  # type: TypeAlias
     CWL_Graph = List[_CWL]
     CWL = TypedDict("CWL", {
-        "cwlVersion": str,
-        "class": CWL_Class,
+        "cwlVersion": Required[str],
+        "class": Required[CWL_Class],
         "label": str,
         "doc": str,
         "id": NotRequired[str],
@@ -219,40 +222,63 @@ if TYPE_CHECKING:
     except (AttributeError, ImportError, NameError):
         CWL_ToolPathObject = CWL
 
-    # CWL loading
-    CWL_WorkflowInputs = Dict[str, AnyValueType]    # mapping of ID:value (any type)
-    CWL_ExpectedOutputs = Dict[str, AnyValueType]   # mapping of ID:pattern (File only)
-    JobProcessDefinitionCallback = Callable[[str, Dict[str, str], Dict[str, Any]], WpsProcessInterface]
-
     # CWL runtime
-    CWL_RuntimeLiteral = Union[str, float, int]
+    CWL_RuntimeLiteral = AnyValueType
+    CWL_RuntimeLiteralItem = Union[CWL_RuntimeLiteral, List[CWL_RuntimeLiteral]]
     CWL_RuntimeLiteralObject = TypedDict("CWL_RuntimeLiteralObject", {
         "id": str,
-        "value": CWL_RuntimeLiteral,
+        "value": CWL_RuntimeLiteralItem,
     }, total=False)
     CWL_RuntimeInputFile = TypedDict("CWL_RuntimeInputFile", {
         "id": NotRequired[str],
-        "class": str,
-        "location": str,
+        "class": Required[Literal["File"]],
+        "location": Required[str],
         "format": NotRequired[Optional[str]],
-        "basename": str,
-        "nameroot": str,
-        "nameext": str,
+        "basename": NotRequired[str],
+        "nameroot": NotRequired[str],
+        "nameext": NotRequired[str],
     }, total=False)
     CWL_RuntimeOutputFile = TypedDict("CWL_RuntimeOutputFile", {
-        "class": str,
-        "location": str,
+        "class": Required[Literal["File"]],
+        "location": Required[str],
         "format": NotRequired[Optional[str]],
-        "basename": str,
-        "nameroot": str,
-        "nameext": str,
+        "basename": NotRequired[str],
+        "nameroot": NotRequired[str],
+        "nameext": NotRequired[str],
         "checksum": NotRequired[str],
-        "size": NotRequired[str],
+        "size": NotRequired[int],
     }, total=False)
-    CWL_RuntimeInput = Union[CWL_RuntimeLiteral, CWL_RuntimeInputFile]
+    CWL_RuntimeInputDirectory = TypedDict("CWL_RuntimeInputDirectory", {
+        "id": NotRequired[str],
+        "class": Required[Literal["Directory"]],
+        "location": Required[str],
+        "format": NotRequired[Optional[str]],
+        "nameroot": NotRequired[str],
+        "nameext": NotRequired[str],
+        "basename": NotRequired[str],
+        "listing": List[CWL_RuntimeInputFile],
+    }, total=False)
+    CWL_RuntimeOutputDirectory = TypedDict("CWL_RuntimeOutputDirectory", {
+        "class": Required[Literal["Directory"]],
+        "location": Required[str],
+        "format": NotRequired[Optional[str]],
+        "basename": NotRequired[str],
+        "nameroot": NotRequired[str],
+        "nameext": NotRequired[str],
+        "checksum": NotRequired[str],
+        "size": NotRequired[Literal[0]],
+        "listing": List[CWL_RuntimeOutputFile],
+    }, total=False)
+    CWL_RuntimeInput = Union[CWL_RuntimeLiteralItem, CWL_RuntimeInputFile, CWL_RuntimeInputDirectory]
     CWL_RuntimeInputsMap = Dict[str, CWL_RuntimeInput]
-    CWL_RuntimeInputList = List[Union[CWL_RuntimeLiteralObject, CWL_RuntimeInputFile]]
-    CWL_RuntimeOutput = Union[CWL_RuntimeLiteral, CWL_RuntimeOutputFile]
+    CWL_RuntimeInputList = List[Union[CWL_RuntimeLiteralObject, CWL_RuntimeInputFile, CWL_RuntimeInputDirectory]]
+    CWL_RuntimeOutput = Union[CWL_RuntimeLiteral, CWL_RuntimeOutputFile, CWL_RuntimeOutputDirectory]
+    CWL_Results = Dict[str, CWL_RuntimeOutput]
+
+    # CWL loading
+    CWL_WorkflowInputs = CWL_RuntimeInputsMap   # mapping of ID:value (any type)
+    CWL_ExpectedOutputs = Dict[str, str]        # mapping of ID:glob-pattern (File/Directory only)
+    JobProcessDefinitionCallback = Callable[[str, Dict[str, str], Dict[str, Any]], WpsProcessInterface]
 
     # OWSLib Execution
     # inputs of OWSLib are either a string (any literal type, bbox or complex file)
@@ -335,6 +361,8 @@ if TYPE_CHECKING:
     JobValueFormat = TypedDict("JobValueFormat", {
         "mime_type": NotRequired[str],
         "media_type": NotRequired[str],
+        "mimeType": NotRequired[str],
+        "mediaType": NotRequired[str],
         "encoding": NotRequired[str],
         "schema": NotRequired[str],
         "extension": NotRequired[str],
@@ -351,27 +379,31 @@ if TYPE_CHECKING:
     }, total=False)
     JobValueObject = Union[JobValueData, JobValueValue, JobValueFile]
     JobValueFileItem = TypedDict("JobValueFileItem", {
-        "id": str,
-        "href": Optional[str],
-        "format": Optional[JobValueFormat],
+        "id": Required[str],
+        "href": Required[str],
+        "format": NotRequired[JobValueFormat],
     }, total=False)
     JobValueDataItem = TypedDict("JobValueDataItem", {
-        "id": str,
-        "data": AnyValueType,
+        "id": Required[str],
+        "data": Required[AnyValueType],
     }, total=False)
     JobValueValueItem = TypedDict("JobValueValueItem", {
-        "id": str,
-        "value": AnyValueType,
+        "id": Required[str],
+        "value": Required[AnyValueType],
     }, total=False)
-    JobValueItem = Union[JobValueDataItem, JobValueFileItem]
+    JobValueItem = Union[JobValueDataItem, JobValueFileItem, JobValueValueItem]
     JobExpectItem = TypedDict("JobExpectItem", {"id": str}, total=True)
-    JobInputs = List[Union[JobValueItem, Dict[str, AnyValueType]]]
-    JobOutputs = List[Union[JobExpectItem, Dict[str, AnyValueType]]]
+    JobInputItem = Union[JobValueItem, Dict[str, AnyValueType]]
+    JobInputs = List[JobInputItem]
+    JobOutputItem = Union[JobExpectItem, Dict[str, AnyValueType]]
+    JobOutputs = List[JobOutputItem]
     JobResults = List[JobValueItem]
-    JobMonitorReference = Any  # typically an URI of the remote job status or an execution object/handler
+    JobMonitorReference = Any  # typically a URI of the remote job status or an execution object/handler
 
-    ExecutionInputsMap = Dict[str, JobValueObject]  # when schema='weaver.processes.constants.ProcessSchema.OGC'
-    ExecutionInputsList = List[JobValueItem]        # when schema='weaver.processes.constants.ProcessSchema.OLD'
+    # when schema='weaver.processes.constants.ProcessSchema.OGC'
+    ExecutionInputsMap = Dict[str, Union[JobValueObject, List[JobValueObject]]]
+    # when schema='weaver.processes.constants.ProcessSchema.OLD'
+    ExecutionInputsList = List[JobValueItem]
     ExecutionInputs = Union[ExecutionInputsList, ExecutionInputsMap]
 
     ExecutionOutputObject = TypedDict("ExecutionOutputObject", {
@@ -379,7 +411,8 @@ if TYPE_CHECKING:
     }, total=False)
     ExecutionOutputItem = TypedDict("ExecutionOutputItem", {
         "id": str,
-        "transmissionMode": str
+        "transmissionMode": AnyExecuteTransmissionMode,
+        "format": NotRequired[JobValueFormat],
     }, total=False)
     ExecutionOutputsList = List[ExecutionOutputItem]
     ExecutionOutputsMap = Dict[str, ExecutionOutputObject]
@@ -483,10 +516,11 @@ if TYPE_CHECKING:
         "properties": NotRequired[Dict[str, _OpenAPISchemaProperty]],
         "additionalProperties": NotRequired[Union[bool, Dict[str, Union[_OpenAPISchema, OpenAPISchemaReference]]]],
     }, total=False)
-    OpenAPISchemaObject = TypedDict("OpenAPISchemaObject", {
+    _OpenAPISchemaObject = TypedDict("_OpenAPISchemaObject", {
         "type": Literal["object"],
         "properties": Dict[str, OpenAPISchemaProperty],
     }, total=False)
+    OpenAPISchemaObject = Union[_OpenAPISchemaObject, OpenAPISchemaProperty]
     OpenAPISchemaArray = TypedDict("OpenAPISchemaArray", {
         "type": Literal["array"],
         "items": _OpenAPISchema,
@@ -510,12 +544,12 @@ if TYPE_CHECKING:
         OpenAPISchemaNot,
     ]
     OpenAPISchema = Union[
+        OpenAPISchemaMetadata,
         OpenAPISchemaObject,
         OpenAPISchemaArray,
         OpenAPISchemaKeyword,
         OpenAPISchemaProperty,
         OpenAPISchemaReference,
-        OpenAPISchemaMetadata,
     ]
     OpenAPISpecLicence = TypedDict("OpenAPISpecLicence", {
         "name": str,
@@ -687,3 +721,91 @@ if TYPE_CHECKING:
         "responses": NotRequired[Dict[str, OpenAPISpecResponse]],    # Swagger 2.0, OpenAPI 3.0: 'components/responses'
         "externalDocs": NotRequired[OpenAPISpecExternalDocs],
     }, total=True)
+
+    FormatMediaType = TypedDict("FormatMediaType", {
+        "mediaType": Required[str],
+        "encoding": NotRequired[Optional[str]],
+        "schema": NotRequired[Union[str, OpenAPISchema]],
+        "default": NotRequired[bool],
+    }, total=False)
+    ProcessInputOutputItem = TypedDict("ProcessInputOutputItem", {
+        "id": str,
+        "title": NotRequired[str],
+        "description": NotRequired[str],
+        "keywords": NotRequired[List[str]],
+        "metadata": NotRequired[List[Metadata]],
+        "schema": NotRequired[OpenAPISchema],
+        "formats": NotRequired[List[FormatMediaType]],
+        "minOccurs": int,
+        "maxOccurs": Union[int, Literal["unbounded"]],
+    }, total=False)
+    ProcessInputOutputMap = Dict[str, ProcessInputOutputItem]
+    ProcessInputOutputList = List[ProcessInputOutputItem]
+    # Provide distinct types with mapping/listing representation of I/O to help annotation
+    # checkers resolve them more easily using less nested fields if specified explicitly
+    ProcessOfferingMapping = TypedDict("ProcessOfferingMapping", {
+        "id": Required[str],
+        "version": Optional[str],
+        "title": NotRequired[str],
+        "description": NotRequired[str],
+        "keywords": NotRequired[List[str]],
+        "metadata": NotRequired[List[Metadata]],
+        "inputs": Required[ProcessInputOutputMap],
+        "outputs": Required[ProcessInputOutputMap],
+        "jobControlOptions": List[AnyExecuteControlOption],
+        "outputTransmission": List[AnyExecuteControlOption],
+        "deploymentProfile": str,
+        "processDescriptionURL": NotRequired[str],
+        "processEndpointWPS1": NotRequired[str],
+        "executeEndpoint": NotRequired[str],
+        "links": List[Link],
+        "visibility": NotRequired[AnyVisibility],
+    }, total=False)
+    ProcessOfferingListing = TypedDict("ProcessOfferingListing", {
+        "id": Required[str],
+        "version": Optional[str],
+        "title": NotRequired[str],
+        "description": NotRequired[str],
+        "keywords": NotRequired[List[str]],
+        "metadata": NotRequired[List[Metadata]],
+        "inputs": Required[ProcessInputOutputList],
+        "outputs": Required[ProcessInputOutputList],
+        "jobControlOptions": List[AnyExecuteControlOption],
+        "outputTransmission": List[AnyExecuteControlOption],
+        "deploymentProfile": str,
+        "processDescriptionURL": NotRequired[str],
+        "processEndpointWPS1": NotRequired[str],
+        "executeEndpoint": NotRequired[str],
+        "links": List[Link],
+        "visibility": NotRequired[AnyVisibility],
+    }, total=False)
+    ProcessOffering = Union[ProcessOfferingMapping, ProcessOfferingListing]
+    ProcessDescriptionNestedMapping = TypedDict("ProcessDescriptionNestedMapping", {
+        "process": ProcessOfferingMapping,
+    }, total=False)
+    ProcessDescriptionNestedListing = TypedDict("ProcessDescriptionNestedListing", {
+        "process": ProcessOfferingListing,
+    }, total=False)
+    ProcessDescriptionNested = TypedDict("ProcessDescriptionNested", {
+        "process": ProcessOffering,
+    }, total=False)
+    ProcessDescriptionMapping = Union[ProcessOfferingMapping, ProcessDescriptionNestedMapping]
+    ProcessDescriptionListing = Union[ProcessOfferingListing, ProcessDescriptionNestedListing]
+    ProcessDescription = Union[ProcessDescriptionMapping, ProcessDescriptionListing]
+
+    ExecutionUnitItem = TypedDict("ExecutionUnitItem", {
+        "unit": CWL
+    }, total=True)
+    ProcessDeployment = TypedDict("ProcessDeployment", {
+        "processDescription": ProcessDescription,
+        "executionUnit": List[Union[ExecutionUnitItem, Link]],
+        "immediateDeployment": NotRequired[bool],
+        "deploymentProfileName": str,
+    }, total=True)
+
+    ProcessExecution = TypedDict("ProcessExecution", {
+        "mode": NotRequired[AnyExecuteMode],
+        "response": NotRequired[AnyExecuteResponse],
+        "inputs": Required[ExecutionInputs],
+        "outputs": Required[ExecutionOutputs],
+    }, total=False)

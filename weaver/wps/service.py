@@ -330,7 +330,7 @@ class WorkerService(ServiceWPS):
             self.dispatched_processes[worker_process_id] = remote_process
 
         wps_response = super(WorkerService, self).execute(worker_process_id, wps_request, job.uuid)
-        # re-enable creation of status file so we can find it since we disabled 'status' earlier for sync execution
+        # re-enable creation of status file, so we can find it since we disabled 'status' earlier for sync execution
         wps_response.store_status_file = True
         # update execution status with actual status file and apply required references
         execution = check_wps_status(location=wps_response.process.status_location, settings=self.settings)

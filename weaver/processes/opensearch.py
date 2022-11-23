@@ -18,7 +18,7 @@ from weaver.processes.utils import get_process_information
 from weaver.utils import get_any_id, request_extra
 
 if TYPE_CHECKING:
-    from typing import Deque, Dict, Iterable, List, Optional, Tuple
+    from typing import Deque, Dict, Iterable, Iterator, List, Optional, Tuple
 
     from weaver.processes.convert import WPS_Input_Type, JSON_IO_Type
     from weaver.typedefs import AnySettingsContainer, DataSourceOpenSearch, JSON
@@ -256,7 +256,7 @@ class OpenSearchQuery(object):
         return []
 
     def _query_features_paginated(self, params):
-        # type: (JSON) -> Iterable[JSON, str]
+        # type: (JSON) -> Iterator[JSON, str]
         """
         Iterates over paginated results until all features are retrieved.
 
@@ -289,7 +289,7 @@ class OpenSearchQuery(object):
             start_index += n_received_features
 
     def query_datasets(self, params, accept_schemes, accept_mime_types):
-        # type: (JSON, List[str], List[str]) -> Iterable[str]
+        # type: (JSON, List[str], List[str]) -> Iterator[str]
         """
         Query the specified datasets.
 

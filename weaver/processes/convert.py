@@ -53,8 +53,11 @@ from weaver.processes.constants import (
     PACKAGE_ARRAY_ITEMS,
     PACKAGE_ARRAY_MAX_SIZE,
     PACKAGE_ARRAY_TYPES,
+    PACKAGE_COMPLEX_TYPES,
     PACKAGE_CUSTOM_TYPES,
+    PACKAGE_DIRECTORY_TYPE,
     PACKAGE_ENUM_BASE,
+    PACKAGE_FILE_TYPE,
     PACKAGE_LITERAL_TYPES,
     WPS_BOUNDINGBOX,
     WPS_COMPLEX,
@@ -90,7 +93,7 @@ from weaver.wps.utils import get_wps_client
 from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
+    from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional, Tuple, Type, Union
     from urllib.parse import ParseResult
 
     from pywps.app import WPSRequest
@@ -109,7 +112,6 @@ if TYPE_CHECKING:
         AnySettingsContainer,
         AnyValueType,
         CWL,
-        CWL_IO_BaseType,
         CWL_IO_ComplexType,
         CWL_IO_EnumSymbols,
         CWL_IO_FileValue,
@@ -126,9 +128,10 @@ if TYPE_CHECKING:
         NotRequired,
         OpenAPISchema,
         OpenAPISchemaArray,
+        OpenAPISchemaKeyword,
         OpenAPISchemaObject,
         OpenAPISchemaProperty,
-        OpenAPISchemaKeyword,
+        OpenAPISchemaReference,
         TypedDict
     )
     from weaver.wps_restapi.constants import JobInputsOutputsSchemaType
@@ -213,7 +216,7 @@ INPUT_VALUE_TYPE_MAPPING = {
     "bool": bool,
     "boolean": bool,
     "file": unquote,
-    "File": unquote,
+    PACKAGE_FILE_TYPE: unquote,
     "float": float,
     "int": int,
     "integer": int,
@@ -469,7 +472,7 @@ def get_io_type_category(io_info):
         io_info = copy.deepcopy(io_info)
         io_info.setdefault("name", "dontcare")
         io_def = get_cwl_io_type(io_info, strict=False)
-        return WPS_COMPLEX if io_def.type in [null, "File", "Directory"] else WPS_LITERAL
+        return WPS_COMPLEX if io_def.type in [null, PACKAGE_FILE_TYPE, PACKAGE_DIRECTORY_TYPE] else WPS_LITERAL
     io_fmt = get_field(io_info, "supported_formats", search_variations=True)
     return WPS_LITERAL if io_fmt is null else WPS_COMPLEX
 
@@ -497,7 +500,7 @@ def _convert_any2cwl_io_complex(cwl_io, cwl_ns, wps_io, io_select):
     """
     cwl_io_fmt = None
     cwl_io_ext = ContentType.ANY
-    cwl_io["type"] = "File"
+    cwl_io["type"] = PACKAGE_FILE_TYPE
     cwl_id = cwl_io["id"]
 
     # inputs are allowed to define multiple 'supported' formats
@@ -788,7 +791,7 @@ def ogcapi2cwl_process(payload, reference):
         # if no CWL could be resolved, generate I/O from process
         io_ns = {}  # type: Dict[str, str]
         for io_select in ["input", "output"]:
-            io_holder = f"{io_select}s"
+            io_holder = f"{io_select}s"  # type: Literal["inputs", "outputs"]  # noqa
             io_struct = copy.deepcopy(process_info.get(io_holder, {}))
             io_struct = normalize_ordered_io(io_struct)
             cwl_pkg[io_holder] = {}  # type: Dict[str, CWL_IO_Type]
@@ -811,57 +814,62 @@ def ogcapi2cwl_process(payload, reference):
             }
         }
     }
-    cwl_package.update(cwl_pkg)
+    cwl_package.update(cwl_pkg)  # type: ignore
     payload_copy["executionUnit"] = [{"unit": cwl_package}]
     payload_copy["deploymentProfile"] = "http://www.opengis.net/profiles/eoc/ogcapiApplication"
     return cwl_package, payload_copy
 
 
-def is_cwl_file_type(io_info):
-    # type: (CWL_IO_Type) -> bool
+def is_cwl_complex_type(io_info, complex_types=PACKAGE_COMPLEX_TYPES):
+    # type: (CWL_IO_Type, Iterable[CWL_IO_ComplexType]) -> bool
     """
-    Identifies if the provided `CWL` input/output corresponds to one, many or potentially a ``File`` type(s).
+    Identifies if the provided :term:`CWL` input/output corresponds to one, many or a potential `Complex` type(s).
 
-    When multiple distinct *atomic* types are allowed for a given I/O (e.g.: ``[string, File]``) and that one of them
-    is a ``File``, the result will be ``True`` even if other types are not ``Files``.
-    Potential ``File`` when other base type is ``"null"`` will also return ``True``.
+    When multiple distinct *atomic* types are allowed for a given I/O (e.g.: ``type: [string, File]``) and that one
+    of them is one of the considered `Complex` type, the result will be ``True`` even if other types are not `Complex`.
+    Similarly, optional `Complex` types combined with ``"null"`` will also return ``True``.
+
+    :param io_info: I/O to verify for complex type.
+    :param complex_types:
+        Complex types to consider.
+        By default, any type between :term:`CWL` ``File`` and ``Directory`` are valid.
+        The operation can be limited to one or the other if needed to identify a specific one.
     """
     io_type = io_info.get("type")
     if not io_type:
         raise ValueError(f"Missing CWL 'type' definition: [{io_info!s}]")
     if isinstance(io_type, str):
-        return io_type == "File"
+        return io_type in complex_types
     if isinstance(io_type, dict):
         if io_type["type"] == PACKAGE_ARRAY_BASE:
-            return io_type["items"] == "File"
-        return io_type["type"] == "File"
+            return io_type["items"] in complex_types
+        return io_type["type"] in complex_types
     if isinstance(io_type, list):
-        return any(typ == "File" or is_cwl_file_type({"type": typ}) for typ in io_type)
+        return any(
+            (isinstance(typ, str) and typ in complex_types) or
+            is_cwl_complex_type({"type": typ}, complex_types)
+            for typ in io_type
+        )
     raise ValueError(f"Unknown parsing of CWL 'type' format ({type(io_type)!s}) [{io_type!s}] in [{io_info}]")
 
 
-def is_cwl_array_type(io_info, strict=True):
-    # type: (CWL_IO_Type, bool) -> Tuple[bool, str, MODE, Optional[Union[Type[AnyValue], CWL_IO_EnumSymbols]]]
+def parse_cwl_array_type(io_info, strict=True):
+    # type: (CWL_IO_Type, bool) -> CWLIODefinition
     """
-    Verifies if the specified I/O corresponds to one of various CWL array type definitions.
+    Parses the specified I/O for one of the various potential CWL array definitions.
 
     :param io_info: :term:`CWL` I/O definition to parse.
     :param strict: Indicates if only pure :term:`CWL` definition is allowed, or allow implicit data-type conversions.
-    :returns:
-        ``tuple(is_array, io_type, io_mode, io_allow)`` where:
-        - ``is_array``: specifies if the I/O is of array type.
-        - ``io_type``: array element type if ``is_array`` is True, type of ``io_info`` otherwise.
-        - ``io_mode``: validation mode to be applied if sub-element requires it, defaults to ``MODE.NONE``.
-        - ``io_allow``: validation values to be applied if sub-element requires it, defaults to ``AnyValue``.
+    :returns: Updated :term:`CWL` I/O definition with applicable properties.
     :raises PackageTypeError: if the array element doesn't have the required values and valid format.
     """
     # use mapping to allow sub-function updates
-    io_return = {
-        "array": False,
-        "allow": AnyValue,
-        "type": get_cwl_io_type_name(io_info["type"]),
-        "mode": MODE.NONE,
-    }
+    io_return = CWLIODefinition(
+        array=False,
+        symbols=AnyValue,
+        type=get_cwl_io_type_name(io_info["type"]),
+        mode=MODE.NONE,
+    )
 
     def _update_if_sub_enum(_io_item):
         # type: (CWL_IO_Type) -> bool
@@ -871,75 +879,94 @@ def is_cwl_array_type(io_info, strict=True):
         Parameter ``io_item`` should correspond to field ``items`` of an array I/O definition.
         Simple pass-through if the array item is not an ``enum``.
         """
-        _is_enum, _enum_type, _enum_mode, _enum_allow = is_cwl_enum_type({"type": _io_item})  # noqa: typing
-        if _is_enum:
+        _def = parse_cwl_enum_type({"type": _io_item})
+        if _def.enum:
             LOGGER.debug("I/O [%s] parsed as 'array' with sub-item as 'enum'", io_info["name"])
-            io_return["type"] = _enum_type
-            io_return["mode"] = _enum_mode
-            io_return["allow"] = _enum_allow  # type: ignore
-        return _is_enum
+            io_return.enum = True
+            io_return.type = _def.type
+            io_return.mode = _def.mode
+            io_return.symbols = _def.symbols
+        return _def.enum
 
     # optional I/O could be an array of '["null", "<type>"]' with "<type>" being any of the formats parsed after
     # is it the literal representation instead of the shorthand with '?'
     if isinstance(io_info["type"], list) and any(sub_type == "null" for sub_type in io_info["type"]):
         # we can ignore the optional indication in this case because it doesn't impact following parsing
-        io_return["type"] = list(filter(lambda sub_type: sub_type != "null", io_info["type"]))[0]
+        io_return.type = list(filter(lambda sub_type: sub_type != "null", io_info["type"]))[0]
 
     # array type conversion when defined as '{"type": "array", "items": "<type>"}'
     # validate against 'Hashable' instead of 'dict' since 'OrderedDict'/'CommentedMap' can fail 'isinstance()'
     if (
-        not isinstance(io_return["type"], str)
-        and not isinstance(io_return["type"], Hashable)
-        and "items" in io_return["type"]
-        and "type" in io_return["type"]
+        not isinstance(io_return.type, str)
+        and not isinstance(io_return.type, Hashable)
+        and "items" in io_return.type
+        and "type" in io_return.type
     ):
-        io_type = dict(io_return["type"])  # make hashable to allow comparison
+        io_type = dict(io_return.type)  # make hashable to allow comparison
         if io_type["type"] != PACKAGE_ARRAY_BASE:
             raise PackageTypeError(f"Unsupported I/O 'array' definition: '{io_info!r}'.")
         # parse enum in case we got an array of allowed symbols
         io_items = get_cwl_io_type_name(io_type["items"])
         is_enum = _update_if_sub_enum(io_items)
         if not is_enum:
-            io_return["type"] = io_items
-        io_type = get_cwl_io_type_name(io_return["type"])
+            io_return.type = io_items
+        io_type = get_cwl_io_type_name(io_return.type)
         if io_type not in PACKAGE_ARRAY_ITEMS:  # includes Complex, so implicit literal-only check possible
             io_type = any2cwl_literal_datatype(io_type)
             if strict or io_type not in PACKAGE_ARRAY_ITEMS:
                 raise PackageTypeError(f"Unsupported I/O 'array' definition: '{io_info!r}'.")
-            io_return["type"] = io_type
+            io_return.type = io_type
         LOGGER.debug("I/O [%s] parsed as 'array' with nested dict notation", io_info["name"])
-        io_return["array"] = True
+        io_return.array = True
     # array type conversion when defined as string '<type>[]'
-    elif isinstance(io_return["type"], str) and get_cwl_io_type_name(io_return["type"]) in PACKAGE_ARRAY_TYPES:
-        io_return["type"] = get_cwl_io_type_name(io_return["type"][:-2])  # remove '[]'
-        if io_return["type"] in PACKAGE_CUSTOM_TYPES:
+    elif isinstance(io_return.type, str) and get_cwl_io_type_name(io_return.type) in PACKAGE_ARRAY_TYPES:
+        io_return.type = get_cwl_io_type_name(io_return.type[:-2])  # remove '[]'
+        if io_return.type in PACKAGE_CUSTOM_TYPES:
             # parse 'enum[]' for array of allowed symbols, provide expected structure for sub-item parsing
             io_item = deepcopy(io_info)
-            io_item["type"] = io_return["type"]  # override corrected type without '[]'
+            io_item["type"] = io_return.type  # override corrected type without '[]'
             _update_if_sub_enum(io_item)
-        if io_return["type"] not in PACKAGE_ARRAY_ITEMS:
+        if io_return.type not in PACKAGE_ARRAY_ITEMS:
             raise PackageTypeError(f"Unsupported I/O 'array' definition: '{io_info!r}'.")
         LOGGER.debug("I/O [%s] parsed as 'array' with shorthand '[]' notation", io_info["name"])
-        io_return["array"] = True
-    return io_return["array"], io_return["type"], io_return["mode"], io_return["allow"]
+        io_return.array = True
+
+    # in case the I/O was not an array parsed with one of the above conditions,
+    # still check for enum to be consistant in returned definition if one was provided
+    try:
+        _update_if_sub_enum(io_info)
+    except PackageTypeError:
+        pass
+    return io_return
 
 
-def is_cwl_enum_type(io_info):
-    # type: (CWL_IO_Type) -> Tuple[bool, str, int, Optional[CWL_IO_EnumSymbols]]
+def parse_cwl_enum_type(io_info):
+    # type: (CWL_IO_Type) -> CWLIODefinition
     """
-    Verifies if the specified I/O corresponds to a CWL enum definition.
+    Parses the specified I/O for potential CWL enum definition.
 
-    :returns:
-        ``tuple(is_enum, io_type, io_allow)`` where:
-        - ``is_enum``: specifies if the I/O is of enum type.
-        - ``io_type``: enum base type if ``is_enum=True``, type of ``io_info`` otherwise.
-        - ``io_mode``: validation mode to be applied if input requires it, defaults to ``MODE.NONE``.
-        - ``io_allow``: validation values of the enum.
+    :returns: Updated :term:`CWL` I/O definition with applicable properties.
     :raises PackageTypeError: if the enum doesn't have the required parameters and valid format.
     """
     io_type = get_cwl_io_type_name(io_info["type"])
-    if not isinstance(io_type, dict) or "type" not in io_type or io_type["type"] not in PACKAGE_CUSTOM_TYPES:
-        return False, io_type, MODE.NONE, None
+    if not isinstance(io_type, dict) or "type" not in io_type:
+        io_def = CWLIODefinition(
+            type=io_type,
+            enum=False,
+            mode=MODE.NONE,
+        )
+        return io_def
+    if isinstance(io_type, dict) and "type" in io_type and (
+        isinstance(io_type["type"], str) and io_type["type"] not in PACKAGE_CUSTOM_TYPES or
+        isinstance(io_type["type"], list)
+    ):
+        io_type = io_type["type"] if isinstance(io_type["type"], str) else PACKAGE_ARRAY_BASE
+        io_def = CWLIODefinition(
+            type=io_type,
+            enum=False,
+            mode=MODE.NONE,
+        )
+        return io_def
 
     if "symbols" not in io_type:
         raise PackageTypeError(f"Unsupported I/O 'enum' definition missing 'symbols': '{io_info!r}'.")
@@ -963,7 +990,13 @@ def is_cwl_enum_type(io_info):
             f"Unsupported I/O 'enum' base type: `{type(first_allow)!s}`, from definition: `{io_info!r}`."
         )
 
-    return True, io_type, MODE.SIMPLE, io_allow  # allowed value validator mode must be set for input
+    io_def = CWLIODefinition(
+        type=io_type,  # type: ignore
+        enum=True,
+        mode=MODE.SIMPLE,  # allowed value validator mode must be set for input
+        symbols=io_allow,
+    )
+    return io_def
 
 
 def get_cwl_io_type_name(io_type):
@@ -980,22 +1013,95 @@ def get_cwl_io_type_name(io_type):
 
 
 @dataclass
-class CWLIODefinition:
+class CWLIODefinition(object):
     """
     Utility :term:`CWL` I/O definition to contain metadata from parsing results.
 
     .. seealso::
         :func:`weaver.processes.convert.get_cwl_io_type`
     """
+
+    # provide dataclass conversions for 'tuple()', 'list()', 'dict()'
+
+    def keys(self):
+        # type: () -> List[str]
+        fields = getattr(self, "__dataclass_fields__")
+        return list(fields)
+
+    def __getitem__(self, key):
+        # type: (str) -> Any
+        return getattr(self, key)
+
+    def __iter__(self):
+        # type: () -> Iterator[Any]
+        for key in self.keys():
+            value = self[key]
+            yield value
+
+    # --- FIELDS ---
+
     name: str = ""
+    """
+    Name (or identifier) or the I/O.
+    """
+
     type: "Union[CWL_IO_LiteralType, CWL_IO_ComplexType]" = None
+    """
+    Type of the :term:`CWL` I/O.
+
+    If :attr:`enum` is ``True``, represents the enum base type.
+    If :attr:`array` is ``True``, represents the item type.
+    """
+
     null: bool = False
+    """
+    Indicates if the I/O is nullable.
+
+    This is obtained from a type composed of ``"null"`` and something else,
+    or using the shorthand ``{type}?`` notation.
+    """
+
     min_occurs: int = 1
+    """
+    Minimum number of occurrences allowed.
+
+    When :attr:`null` is ``True``, it is equal to ``0``.
+    Otherwise, it is greater or equal to ``1``.
+    If greater than ``1``, :attr:`array` should be ``True``.
+    """
+
     max_occurs: int = 1
+    """
+    Maximum number of occurrences allowed.
+
+    Applies only when :attr:`array` is ``True``. Otherwise, always equal to ``1``.
+    Can take the value :data:`PACKAGE_ARRAY_MAX_SIZE` to represent ``"unbounded"`` occurrences.
+    """
+
     array: bool = False
+    """
+    Specifies if the I/O is of array type.
+    """
+
     enum: bool = False
-    symbols: "Union[CWL_IO_EnumSymbols, AnyValue]" = AnyValue
+    """
+    Specifies if the I/O is of enum type.
+    """
+
+    symbols: "Union[CWL_IO_EnumSymbols, AnyValue, Type[AnyValue]]" = AnyValue
+    """
+    Specifies the allowed values when the definition is marked as :attr:`enum`.
+    When not overriden by literal values, it uses the default :class:`AnyValue`.
+    """
+
     mode: MODE = MODE.NONE
+    """
+    Validation mode to be applied if I/O requires it.
+
+    Defaults to :attr:`MODE.NONE`. Indicates how strict the validation must be.
+    Usually applies when an enum must only allow a specific set of symbols.
+    Can also be used with Media-Types in more advanced validation use case with :mod:`pywps`.
+    """
 
 
 def get_cwl_io_type(io_info, strict=True):
@@ -1020,6 +1126,8 @@ def get_cwl_io_type(io_info, strict=True):
     """
     io_type = get_cwl_io_type_name(io_info["type"])
     is_null = False
+    io_mode = MODE.NONE
+    io_allow = AnyValue
 
     # parse multi-definition
     if isinstance(io_type, list):
@@ -1038,19 +1146,19 @@ def get_cwl_io_type(io_info, strict=True):
             # check that many sub-type definitions all match same base type (no conflicting literals)
             io_type_many = set()
             io_base_type = None
-            for i, typ in enumerate(io_type):
+            for i, typ in enumerate(io_type, start=int(is_null)):
                 typ = get_cwl_io_type_name(typ)
                 io_name = io_info["name"]
                 sub_type = {"type": typ, "name": f"{io_name}[{i}]"}  # type: CWL_IO_Type
-                is_array, array_elem, _, _ = is_cwl_array_type(sub_type, strict=strict)
-                is_enum, enum_type, _, _ = is_cwl_enum_type(sub_type)
+                array_io_def = parse_cwl_array_type(sub_type, strict=strict)
+                enum_io_def = parse_cwl_enum_type(sub_type)
                 # array base type more important than enum because later array conversion also handles allowed values
-                if is_array:
+                if array_io_def.array:
                     io_base_type = typ  # highest priority (can have sub-literal or sub-enum)
-                    io_type_many.add(array_elem)
-                elif is_enum:
-                    io_base_type = io_base_type if io_base_type is not None else enum_type  # less priority
-                    io_type_many.add(enum_type)
+                    io_type_many.add(array_io_def.type)
+                elif enum_io_def.enum:
+                    io_base_type = io_base_type if io_base_type is not None else enum_io_def.type  # less priority
+                    io_type_many.add(enum_io_def.type)
                 else:
                     io_base_type = io_base_type if io_base_type is not None else typ  # less priority
                     io_type_many.add(typ)  # literal base type by itself (not array/enum)
@@ -1067,27 +1175,35 @@ def get_cwl_io_type(io_info, strict=True):
     io_max_occurs = 1  # unless array after
 
     # convert array types
-    is_array, array_elem, io_mode, io_allow = is_cwl_array_type(io_info, strict=strict)
-    if is_array:
+    array_io_def = parse_cwl_array_type(io_info, strict=strict)
+    if array_io_def.array:
         LOGGER.debug("I/O parsed for 'array'")
-        io_type = array_elem
+        io_type = array_io_def.type
         io_max_occurs = PACKAGE_ARRAY_MAX_SIZE
 
     # convert enum types
-    is_enum, enum_type, enum_mode, enum_allow = is_cwl_enum_type(io_info)
-    if is_enum:
-        LOGGER.debug("I/O parsed for 'enum'")
-        io_type = enum_type
-        io_allow = enum_allow
-        io_mode = enum_mode
+    enum_io_def = parse_cwl_enum_type(io_info)
+    is_enum = False
+    if enum_io_def.enum:
+        LOGGER.debug("I/O parsed for 'enum' from base")
+        io_type = enum_io_def.type
+        io_allow = enum_io_def.symbols
+        io_mode = enum_io_def.mode
+        is_enum = True
+    elif array_io_def.enum:
+        LOGGER.debug("I/O parsed for 'enum' from array")
+        io_type = array_io_def.type
+        io_allow = array_io_def.symbols
+        io_mode = array_io_def.mode
+        is_enum = True
 
     # debug info for unhandled types conversion
     if not isinstance(io_type, str):
-        LOGGER.debug("is_array:      [%s]", repr(is_array))
-        LOGGER.debug("array_elem:    [%s]", repr(array_elem))
-        LOGGER.debug("is_enum:       [%s]", repr(is_enum))
-        LOGGER.debug("enum_type:     [%s]", repr(enum_type))
-        LOGGER.debug("enum_allow:    [%s]", repr(enum_allow))
+        LOGGER.debug("is_array:      [%s]", repr(array_io_def.array))
+        LOGGER.debug("array_elem:    [%s]", repr(array_io_def.type))
+        LOGGER.debug("is_enum:       [%s]", repr(enum_io_def.enum))
+        LOGGER.debug("enum_type:     [%s]", repr(enum_io_def.type))
+        LOGGER.debug("enum_allow:    [%s]", repr(enum_io_def.symbols))
         LOGGER.debug("io_info:       [%s]", repr(io_info))
         LOGGER.debug("io_type:       [%s]", repr(io_type))
         LOGGER.debug("type(io_type): [%s]", type(io_type))
@@ -1101,14 +1217,15 @@ def get_cwl_io_type(io_info, strict=True):
         io_min_occurs = 0
         is_null = True
 
-    io_type = any2cwl_literal_datatype(io_type)
+    if io_type not in PACKAGE_COMPLEX_TYPES:
+        io_type = any2cwl_literal_datatype(io_type)
     io_def = CWLIODefinition(
         name=io_name,
         type=io_type,
         null=is_null,
         min_occurs=io_min_occurs,
         max_occurs=io_max_occurs,
-        array=is_array,
+        array=array_io_def.array,
         enum=is_enum,
         symbols=io_allow,
         mode=io_mode,
@@ -1200,12 +1317,15 @@ def cwl2wps_io(io_info, io_select):
         else:
             # we need to minimally add 1 format, otherwise empty list is evaluated as None by pywps
             # when "supported_formats" is None, the process's json property raises because of it cannot iterate formats
-            kw["supported_formats"] = [DEFAULT_FORMAT]
+            if io_def.type == PACKAGE_FILE_TYPE:
+                kw["supported_formats"] = [DEFAULT_FORMAT]
+            if io_def.type == PACKAGE_DIRECTORY_TYPE:
+                kw["supported_formats"] = [get_format(ContentType.APP_DIR)]
             kw["mode"] = MODE.NONE  # don't validate anything as default is only raw text
         if is_output:
-            if io_def.type == "Directory":
+            if io_def.type == PACKAGE_DIRECTORY_TYPE:
                 kw["as_reference"] = True
-            if io_def.type == "File":
+            if io_def.type == PACKAGE_FILE_TYPE:
                 has_contents = io_info.get("contents") is not None
                 kw["as_reference"] = not has_contents
         else:
@@ -1247,14 +1367,14 @@ def cwl2json_input_values(data, schema=ProcessSchema.OGC):
     inputs = {}
     for input_id, input_value in data.items():
         # single file
-        if isinstance(input_value, dict) and input_value.get("class") == "File":
+        if isinstance(input_value, dict) and input_value.get("class") == PACKAGE_FILE_TYPE:
             inputs[input_id] = _get_file_input(input_value)
         # single literal value
         elif isinstance(input_value, (str, int, float, bool)):
             inputs[input_id] = {"value": input_value}
         # multiple files
         elif isinstance(input_value, list) and all(
-            isinstance(val, dict) and val.get("class") == "File" for val in input_value
+            isinstance(val, dict) and val.get("class") == PACKAGE_FILE_TYPE for val in input_value
         ):
             inputs[input_id] = [_get_file_input(val) for val in input_value]
         # multiple literal values
@@ -1461,7 +1581,7 @@ def repr2json_input_values(inputs):
         arr_val = str_val.split(";")
         convert = INPUT_VALUE_TYPE_MAPPING[map_typ]
         arr_val = [repr2json_input_params(val, convert) for val in arr_val]
-        if map_typ.capitalize() == "File":
+        if map_typ.capitalize() == PACKAGE_FILE_TYPE:
             val_key = "href"
             for val in arr_val:
                 ref = val["data"]
@@ -1711,7 +1831,7 @@ def json2oas_io_bbox(io_info, io_hint=null):
         "properties": {
             "crs": crs_schema,
             "bbox": {
-                "type": "array",
+                "type": PACKAGE_ARRAY_BASE,
                 "items": "number",
                 "oneOf": [
                     {"minItems": 4, "maxItems": 4},
@@ -1719,7 +1839,7 @@ def json2oas_io_bbox(io_info, io_hint=null):
                 ]
             },
         }
-    }
+    }  # type: OpenAPISchemaObject
     if isinstance(io_hint, dict):
         if "$ref" in io_hint:
             item_schema["$id"] = io_hint["$ref"]
@@ -1903,7 +2023,7 @@ def json2oas_io(io_info, io_hint=null):
     # because specified single-value/objects *MUST* be provided, optional can be represented only by zero-length array
     if isinstance(min_occurs, int) and (min_occurs == 0 or min_occurs > 1):
         io_schema = {
-            "type": "array",
+            "type": PACKAGE_ARRAY_BASE,
             "items": item_schema,
             "minItems": min_occurs,
         }
@@ -1912,7 +2032,7 @@ def json2oas_io(io_info, io_hint=null):
     elif max_occurs == 1 or max_occurs is null:  # assume unspecified is default=1
         io_schema = item_schema
     else:
-        array_schema = {"type": "array", "items": item_schema}
+        array_schema = {"type": PACKAGE_ARRAY_BASE, "items": item_schema}
         if isinstance(min_occurs, int):
             array_schema["minItems"] = min_occurs
         if isinstance(max_occurs, int):
@@ -2220,7 +2340,7 @@ def oas2json_io(io_info):
                 if io_ctype and ContentType.APP_JSON in io_ctype:
                     io_formats[0]["schema"] = io_info["$id"]
     if io_type is null or io_json is null:
-        LOGGER.debug("Unknown OpenAPI to JSON I/O resolution for schema: %s", repr_json(io_info))
+        LOGGER.debug("Unknown OpenAPI to JSON I/O resolution for schema:\n%s", repr_json(io_info))
         return null
 
     # default literal value can help resolve as last resort if specific type cannot be inferred
@@ -2267,7 +2387,7 @@ def oas_resolve_remote(io_info):
             # Then update the first level of references that we can potentially work with to resolve conversion type.
             # No need to resolve more since this is guaranteed to be 'complex' type.
             # We must use the resolver right away in case the remote $ref are relative to the same root $ref.
-            for keyword in OAS_KEYWORD_TYPES:
+            for keyword in OAS_KEYWORD_TYPES:  # type: Literal["oneOf", "anyOf", "allOf", "not"]
                 if keyword in io_info:
                     if isinstance(io_info[keyword], list):  # all keywords except 'not'
                         for i, schema in enumerate(list(io_info[keyword])):
@@ -2276,7 +2396,8 @@ def oas_resolve_remote(io_info):
                                 schema["$id"] = ref_id
                                 io_info[keyword][i] = schema  # noqa
                     elif "$ref" in io_info[keyword]:  # only 'not' keyword
-                        ref_schema = io_info[keyword]["$ref"]
+                        io_keyword = io_info[keyword]  # type: OpenAPISchemaReference  # noqa
+                        ref_schema = io_keyword["$ref"]
                         ref_id, schema = resolver.resolve(ref_schema)
                         schema["$id"] = ref_id
                         io_info[keyword] = schema

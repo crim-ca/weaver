@@ -1,3 +1,4 @@
+import datetime
 import json
 import logging
 import os
@@ -19,7 +20,7 @@ from weaver.base import Constants, classproperty
 if TYPE_CHECKING:
     from typing import Any, Dict, List, Optional, Tuple, Union
 
-    from weaver.base import PropertyDataType
+    from weaver.base import PropertyDataTypeT
     from weaver.typedefs import JSON, AnyRequestType
 
 LOGGER = logging.getLogger(__name__)
@@ -43,6 +44,7 @@ class ContentType(Constants):
         <type> "/" [x- | <tree> "."] <subtype> ["+" suffix] *[";" parameter=value]
     """
 
+    APP_DIR = "application/directory"
     APP_CWL = "application/cwl"
     APP_CWL_JSON = "application/cwl+json"
     APP_CWL_YAML = "application/cwl+yaml"
@@ -130,10 +132,10 @@ class OutputFormat(Constants):
 
     @classmethod
     def get(cls,                    # pylint: disable=W0221,W0237  # arguments differ/renamed
-            format_or_version,      # type: Union[str, AnyOutputFormat, PropertyDataType]
+            format_or_version,      # type: Union[str, AnyOutputFormat, PropertyDataTypeT]
             default=JSON,           # type: AnyOutputFormat
             allow_version=True,     # type: bool
-            ):                      # type: (...) ->  Union[AnyOutputFormat, PropertyDataType]
+            ):                      # type: (...) ->  Union[AnyOutputFormat, PropertyDataTypeT]
         """
         Resolve the applicable output format.
 
@@ -205,7 +207,8 @@ _CONTENT_TYPE_EXTENSION_OVERRIDES = {
     ContentType.APP_TAR_GZ: ".tar.gz",
     ContentType.APP_YAML: ".yml",
     ContentType.IMAGE_TIFF: ".tif",  # common alternate to .tiff
-    ContentType.ANY: ".*",   # any for glob
+    ContentType.ANY: ".*",      # any for glob
+    ContentType.APP_DIR: "/",   # force href to finish with explicit '/' to mark directory
     ContentType.APP_OCTET_STREAM: "",
     ContentType.APP_FORM: "",
     ContentType.MULTI_PART_FORM: "",
@@ -441,6 +444,8 @@ def get_extension(mime_type, dot=True):
 
     fmt = _CONTENT_TYPE_FORMAT_MAPPING.get(mime_type)
     if fmt:
+        if not fmt.extension.startswith("."):
+            return fmt.extension
         return _handle_dot(fmt.extension)
     ext = _CONTENT_TYPE_EXTENSION_MAPPING.get(mime_type)
     if ext:
@@ -463,11 +468,15 @@ def get_content_type(extension, charset=None, default=None):
     :param default: Default Content-Type to return if no extension is matched.
     :return: Matched or default Content-Type.
     """
+    ctype = None
     if not extension:
         return default
     if not extension.startswith("."):
-        extension = f".{extension}"
-    ctype = _EXTENSION_CONTENT_TYPES_MAPPING.get(extension)
+        ctype = _EXTENSION_CONTENT_TYPES_MAPPING.get(extension)
+        if not ctype:
+            extension = f".{extension}"
+    if not ctype:
+        ctype = _EXTENSION_CONTENT_TYPES_MAPPING.get(extension)
     if not ctype:
         return default
     return add_content_type_charset(ctype, charset)
@@ -718,6 +727,13 @@ def guess_target_format(request, default=ContentType.APP_JSON):
     return content_type
 
 
+def json_default_handler(obj):
+    # type: (Any) -> Union[JSON, str, None]
+    if isinstance(obj, (datetime.date, datetime.datetime)):
+        return obj.isoformat()
+    raise TypeError(f"Type {type(obj)} not serializable.")
+
+
 def repr_json(data, force_string=True, ensure_ascii=False, indent=2, **kwargs):
     # type: (Any, bool, bool, Optional[int], **Any) -> Union[JSON, str, None]
     """
@@ -727,8 +743,11 @@ def repr_json(data, force_string=True, ensure_ascii=False, indent=2, **kwargs):
     """
     if data is None:
         return None
+    default = kwargs.pop("default", None)
+    if default is None:
+        default = json_default_handler
     try:
-        data_str = json.dumps(data, indent=indent, ensure_ascii=ensure_ascii, **kwargs)
+        data_str = json.dumps(data, indent=indent, ensure_ascii=ensure_ascii, default=default, **kwargs)
         return data_str if force_string else data
     except Exception:  # noqa: W0703 # nosec: B110
         return str(data)

@@ -1,3 +1,5 @@
+import datetime
+import inspect
 import os
 
 import mock
@@ -20,6 +22,11 @@ def test_get_extension():
     assert f.get_extension("application/unknown") == ".unknown"
 
 
+def test_get_extension_directory():
+    assert f.get_extension(f.ContentType.APP_DIR, dot=True) == "/"
+    assert f.get_extension(f.ContentType.APP_DIR, dot=False) == "/"
+
+
 def test_get_extension_glob_any():
     assert f.get_extension(f.ContentType.ANY) == ".*"
 
@@ -30,6 +37,10 @@ def test_get_content_type():
     assert f.get_content_type(".tiff") == f.ContentType.IMAGE_TIFF
     assert f.get_content_type(".yml") == f.ContentType.APP_YAML
     assert f.get_content_type(".yaml") == f.ContentType.APP_YAML
+
+
+def test_get_content_type_directory():
+    assert f.get_content_type("/") == f.ContentType.APP_DIR
 
 
 def test_get_content_type_extra_parameters():
@@ -278,3 +289,28 @@ def test_clean_mime_type_format_default():
     assert f.clean_mime_type_format("", suffix_subtype=False, strip_parameters=True) is None
     assert f.clean_mime_type_format("", suffix_subtype=True, strip_parameters=False) is None
     assert f.clean_mime_type_format("", suffix_subtype=True, strip_parameters=True) is None
+
+
+def test_repr_json_default_string():
+    obj_ref = object()
+    values = {"test": obj_ref}
+    expect = f"{{'test': {str(obj_ref)}}}"
+    result = f.repr_json(values)
+    assert result == expect
+
+
+def test_repr_json_handle_datetime():
+    values = {
+        "date": datetime.datetime(2022, 6, 12, 11, 55, 44),
+        "number": 123,
+        "none": None
+    }
+    expect = inspect.cleandoc("""
+        {
+          "date": "2022-06-12T11:55:44",
+          "number": 123,
+          "none": null
+        }
+    """)
+    result = f.repr_json(values)
+    assert result == expect
