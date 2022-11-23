@@ -240,8 +240,8 @@ class WpsProviderTest(WpsConfigBase):
             results = self.monitor_job(status_url)
             wps_dir = self.settings["weaver.wps_output_dir"]
             wps_url = self.settings["weaver.wps_output_url"]
-            output_url = f"{wps_url}/{job_id}/output.txt"
-            output_path = f"{wps_dir}/{job_id}/output.txt"
+            output_url = f"{wps_url}/{job_id}/output/output.txt"
+            output_path = f"{wps_dir}/{job_id}/output/output.txt"
             assert results["output"]["format"]["mediaType"] == ContentType.TEXT_PLAIN
             assert results["output"]["href"] == output_url
             with open(output_path, mode="r", encoding="utf-8") as out_file:

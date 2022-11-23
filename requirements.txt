@@ -1,8 +1,10 @@
 -r requirements-sys.txt
 alembic
 beaker
+beautifulsoup4
 # AWS support (S3 buckets)
 boto3
+boto3-stubs[s3]
 # windows fixes until
 # https://github.com/celery/billiard/issues/260
 # https://github.com/celery/billiard/issues/313
@@ -53,6 +55,7 @@ jsonschema>=3.0.1
 kombu>=5.3.0b2,<6; python_version >= "3.7"
 lxml
 mako
+mypy_boto3_s3
 # esgf-compute-api (cwt) needs oauthlib but doesn't add it in their requirements
 oauthlib
 owslib==0.27.2

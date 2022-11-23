@@ -29,7 +29,8 @@ from weaver.utils import (
     is_uuid,
     make_dirs,
     request_extra,
-    retry_on_cache_error
+    retry_on_cache_error,
+    validate_s3
 )
 from weaver.wps_restapi import swagger_definitions as sd
 
@@ -177,7 +178,7 @@ def get_wps_local_status_location(url_status_location, container, must_exist=Tru
             if found or not must_exist:
                 out_path = out_path_join
     if not found and must_exist:
-        out_path_join = os.path.join(dir_path, out_path[1:] if out_path.startswith("/") else out_path)
+        out_path_join = os.path.join(dir_path, out_path.lstrip("/"))
         if not os.path.isfile(out_path_join):
             LOGGER.debug("Could not map WPS status reference [%s] to input local file path [%s].",
                          url_status_location, out_path)
@@ -194,13 +195,17 @@ def map_wps_output_location(reference, container, url=False, exists=True, file_s
 
     :param reference: Local file path or file URL to be mapped.
     :param container: Retrieve application settings.
-    :param url: Perform URL mapping (local path -> URL endpoint), or map to local path (URL -> local path).
+    :param url: Perform URL mapping (``True``: local path -> URL endpoint, ``False``: URL endpoint -> local path).
     :param exists: Ensure that the mapped file exists, otherwise don't map it (otherwise ``None``).
     :param file_scheme:
         Ensure that the 'file://' scheme is applied to resulting local file location when mapped from WPS output URL.
         When in 'reverse' mode, 'file://' is always removed if present to form a potential local file path.
     :returns: Mapped reference that corresponds to the local/URL WPS output location.
     """
+    def ref_exists(ref):
+        # type: (str) -> bool
+        return os.path.isdir(ref) if ref.endswith("/") else os.path.isfile(ref)
+
     settings = get_settings(container)
     wps_out_dir = get_wps_output_dir(settings)
     wps_out_url = get_wps_output_url(settings)
@@ -208,11 +213,11 @@ def map_wps_output_location(reference, container, url=False, exists=True, file_s
         reference = reference[7:]
     if url and reference.startswith(wps_out_dir):
         wps_out_ref = reference.replace(wps_out_dir, wps_out_url, 1)
-        if not exists or os.path.isfile(reference):
+        if not exists or ref_exists(reference):
             return wps_out_ref
     elif not url and reference.startswith(wps_out_url):
         wps_out_ref = reference.replace(wps_out_url, wps_out_dir, 1)
-        if not exists or os.path.isfile(wps_out_ref):
+        if not exists or ref_exists(wps_out_ref):
             if file_scheme:
                 return "file://" + wps_out_ref
             return wps_out_ref
@@ -344,6 +349,7 @@ def get_exception_from_xml_status(xml):
     Expects the following :term:`XML` status response structure (``ows:Exception`` block can be at any level):
 
     .. code-block:: xml
+
         <ows:Exception exceptionCode="NoApplicableCode" locator="None">
           <ows:ExceptionText>Error message about the cause of the exception.</ows:ExceptionText>
         </ows:Exception>
@@ -368,7 +374,7 @@ def get_exception_from_xml_status(xml):
         if ows_exc_txt is None:
             ows_exc_txt = ows_exc_xml.xpath("//ows:ExceptionText", namespaces=xml.nsmap)[0]
         ows_exc_msg = ows_exc_txt.text
-        ows_exc_loc = ows_exc_xml.attrib.get("locator") or ows_exc_xml.attrib.get("locater")  # some WPS have typo
+        ows_exc_loc = ows_exc_xml.attrib.get("locator") or ows_exc_xml.attrib.get("locater")  # noqa # WPS can have typo
         ows_exc_code = ows_exc_xml.attrib["exceptionCode"]
         for ows_exc_name in dir(owsexceptions):
             ows_exc_cls = getattr(owsexceptions, ows_exc_name)
@@ -437,7 +443,7 @@ def load_pywps_config(container, config=None):
     output_dir = get_wps_output_dir(settings)
     make_dirs(output_dir, exist_ok=True)
     # find output url from app config (path/url) or wps config (url only)
-    # note: needs to be configured even when using S3 bucket since XML status is provided locally
+    # note: needs to be configured even when using AWS S3 bucket since XML status is provided locally
     if "weaver.wps_output_url" not in settings:
         output_path = settings.get("weaver.wps_output_path", "").rstrip("/")
         if output_path and isinstance(output_path, str):
@@ -450,7 +456,7 @@ def load_pywps_config(container, config=None):
         make_dirs(settings["weaver.wps_workdir"], exist_ok=True)
         pywps_config.CONFIG.set("server", "workdir", settings["weaver.wps_workdir"])
 
-    # configure S3 bucket if requested, storage of all process outputs
+    # configure AWS S3 bucket if requested, storage of all process outputs
     # note:
     #   credentials and default profile are picked up automatically by 'boto3' from local AWS configs or env vars
     #   region can also be picked from there unless explicitly provided by weaver config
@@ -462,20 +468,23 @@ def load_pywps_config(container, config=None):
     pywps_config.CONFIG.set("server", "storagetype", "file")
     # pywps_config.CONFIG.set("server", "storagetype", "s3")
     if s3_bucket:
-        LOGGER.debug("Updating WPS S3 bucket configuration.")
+        LOGGER.debug("Updating WPS AWS S3 bucket configuration.")
         import boto3
         from botocore.exceptions import ClientError
         s3 = boto3.client("s3")
         s3_region = settings.get("weaver.wps_output_s3_region", s3.meta.region_name)
-        LOGGER.info("Validating that S3 [Bucket=%s, Region=%s] exists or creating it.", s3_bucket, s3_region)
+        LOGGER.info("Validating that AWS S3 [Region=%s, Bucket=%s] exists or creating it.", s3_region, s3_bucket)
+        validate_s3(region=s3_region, bucket=s3_bucket)
         try:
-            s3.create_bucket(Bucket=s3_bucket, CreateBucketConfiguration={"LocationConstraint": s3_region})
-            LOGGER.info("S3 bucket for WPS output created.")
+            s3.create_bucket(Bucket=s3_bucket,
+                             CreateBucketConfiguration={"LocationConstraint": s3_region})  # type: ignore
+            LOGGER.info("AWS S3 bucket [Region=%s, Bucket=%s] for WPS output created.", s3_region, s3_bucket)
         except ClientError as exc:
             if exc.response.get("Error", {}).get("Code") != "BucketAlreadyExists":
-                LOGGER.error("Failed setup of S3 bucket for WPS output: [%s]", exc)
+                LOGGER.error("Failed setup of AWS S3 bucket [Region=%s, Bucket=%s] for WPS output: [%s]",
+                             s3_region, s3_bucket, exc)
                 raise
-            LOGGER.info("S3 bucket for WPS output already exists.")
+            LOGGER.info("AWS S3 bucket [Region=%s, Bucket=%s] for WPS output already exists.", s3_region, s3_bucket)
         pywps_config.CONFIG.set("s3", "region", s3_region)
         pywps_config.CONFIG.set("s3", "bucket", s3_bucket)
         pywps_config.CONFIG.set("s3", "public", "false")  # don't automatically push results as publicly accessible

@@ -69,6 +69,7 @@ from cornice_swagger.converters.parameters import (
 )
 from cornice_swagger.converters.schema import (
     STRING_FORMATTERS,
+    BaseStringTypeConverter,
     NumberTypeConverter,
     ObjectTypeConverter,
     TypeConversionDispatcher,
@@ -98,6 +99,11 @@ if TYPE_CHECKING:
         OpenAPISpecParameter
     )
 
+try:
+    RegexPattern = re.Pattern
+except AttributeError:  # Python 3.6 backport  # pragma: no cover
+    RegexPattern = type(re.compile("_"))
+
 # pylint: disable=C0209,consider-using-f-string
 
 
@@ -110,6 +116,18 @@ LITERAL_SCHEMA_TYPES = frozenset([
     colander.DateTime,
     # colander.Enum,  # not supported but could be (literal int/str inferred from Python Enum object)
 ])
+
+# patch URL with negative look-ahead to invalidate following // after scheme
+NO_DOUBLE_SLASH_PATTERN = r"(?!.*//.*$)"
+URL_REGEX = colander.URL_REGEX.replace(r"://)?", rf"://)?{NO_DOUBLE_SLASH_PATTERN}")
+URL = colander.Regex(URL_REGEX, msg=colander._("Must be a URL"), flags=re.IGNORECASE)
+URI_REGEX = colander.URI_REGEX.replace(r"://", r"://(?!//)")
+FILE_URI = colander.Regex(URI_REGEX, msg=colander._("Must be a file:// URI scheme"), flags=re.IGNORECASE)
+STRING_FORMATTERS.update({
+    "uri": {"converter": BaseStringTypeConverter, "validator": URL},
+    "url": {"converter": BaseStringTypeConverter, "validator": URL},
+    "file": {"converter": BaseStringTypeConverter, "validator": FILE_URI},
+})
 
 
 def _make_node_instance(schema_node_or_class):
@@ -161,7 +179,7 @@ def _get_schema_type(schema_node, check=False):
 def _get_node_name(schema_node, schema_name=False):
     # type: (colander.SchemaNode, bool) -> str
     """
-    Obtains the name of the node with best available value.
+    Obtains the name of the node with the best available value.
 
     :param schema_node: node for which to retrieve the name.
     :param schema_name:
@@ -321,17 +339,21 @@ class SchemeURL(colander.Regex):
     .. seealso::
         :class:`colander.url` [remote http(s)/ftp(s)]
         :class:`colander.file_uri` [local file://]
+        :data:`URL`
     """
 
     def __init__(self, schemes=None, path_pattern=None, msg=None, flags=re.IGNORECASE):
-        # type: (Optional[Iterable[str]], Optional[str], Optional[str], Optional[re.RegexFlag]) -> None
+        # type: (Optional[Iterable[str]], Union[None, str, RegexPattern], Optional[str], Optional[re.RegexFlag]) -> None
         if not schemes:
             schemes = [""]
         if not msg:
             msg = colander._(f"Must be a URL matching one of schemes {schemes}")  # noqa
         regex_schemes = r"(?:" + "|".join(schemes) + r")"
-        regex = colander.URL_REGEX.replace(r"(?:http|ftp)s?", regex_schemes)
+        regex = URL_REGEX.replace(r"(?:http|ftp)s?", regex_schemes)
+
         if path_pattern:
+            if isinstance(path_pattern, RegexPattern):
+                path_pattern = path_pattern.pattern
             regex = regex[:-1] + path_pattern + "$"
         super(SchemeURL, self).__init__(regex, msg=msg, flags=flags)
 
@@ -640,7 +662,7 @@ class ExtendedSchemaBase(colander.SchemaNode, metaclass=ExtendedSchemaMeta):
         if self.validator is None and isinstance(schema_type, colander.String):
             _format = kwargs.pop("format", getattr(self, "format", None))
             pattern = kwargs.pop("pattern", getattr(self, "pattern", None))
-            if isinstance(pattern, str):
+            if isinstance(pattern, (str, RegexPattern)):
                 self.validator = colander.Regex(pattern)
             elif isinstance(pattern, colander.Regex):
                 self.validator = pattern
@@ -1660,7 +1682,9 @@ class OneOfKeywordSchema(KeywordMapper):
 
     As a shortcut, the OpenAPI keyword ``discriminator`` can be provided to try matching as a last resort.
 
-    For example::
+    For example:
+
+    .. code-block:: python
 
         class Animal(ExtendedMappingSchema):
             name = ExtendedSchemaNode(String())
@@ -1676,6 +1700,16 @@ class OneOfKeywordSchema(KeywordMapper):
             [...]   # many **OPTIONAL** fields
 
         # With the discriminator keyword, following is possible
+        # (each schema must provide the same property name)
+        class SomeAnimal(OneOfMappingSchema):
+            discriminator = "type"
+            _one_of = [
+                Cat(),
+                Dog(),
+            ]
+
+        # If more specific mapping resolutions than 1-to-1 by name are needed,
+        # an explicit dictionary can be specified instead.
         class SomeAnimal(OneOfMappingSchema):
             discriminator = {
                 "propertyName": "type",     # correspond to 'type' of 'Animal'
@@ -2105,6 +2139,17 @@ class NotKeywordSchema(KeywordMapper):
         return ExtendedMappingSchema.deserialize(self, cstruct)
 
 
+class ExtendedTypeConverter(TypeConverter):
+    def convert_type(self, schema_node):
+        # type: (colander.SchemaNode) -> OpenAPISchema
+        # base type converters expect raw pattern string
+        # undo the compiled pattern to allow conversion
+        pattern = getattr(schema_node, "pattern", None)
+        if isinstance(pattern, RegexPattern):
+            setattr(schema_node, "pattern", pattern.pattern)
+        return super(ExtendedTypeConverter, self).convert_type(schema_node)
+
+
 class KeywordTypeConverter(TypeConverter):
     """
     Generic keyword converter that builds schema with a list of sub-schemas under the keyword.
@@ -2248,7 +2293,7 @@ class DecimalTypeConverter(NumberTypeConverter):
 
 
 class MoneyTypeConverter(DecimalTypeConverter):
-    pattern = "^[0-9]+.[0-9]{2}$"
+    pattern = re.compile("^[0-9]+.[0-9]{2}$")
     convert_validator = ValidatorConversionDispatcher(
         convert_range_validator(colander.Range(min=0)),
         convert_regex_validator(colander.Regex(pattern, msg="Number must be formatted as currency decimal."))
@@ -2286,6 +2331,17 @@ class OAS3TypeConversionDispatcher(TypeConversionDispatcher):
         if custom_converters:
             extended_converters.update(custom_converters)
         super(OAS3TypeConversionDispatcher, self).__init__(extended_converters, default_converter)
+        self.extend_converters()
+
+    def extend_converters(self):
+        """
+        Extend base :class:`TypeConverter` derived classes to provide additional capabilities seamlessly.
+        """
+        for typ, cvt in self.converters.items():
+            if issubclass(cvt, TypeConverter) and not issubclass(cvt, ExtendedTypeConverter):
+                class Extended(ExtendedTypeConverter, cvt):
+                    __name__ = f"Extended{cvt}"
+                self.converters[typ] = Extended
 
     def __call__(self, schema_node):
         # type: (colander.SchemaNode) -> OpenAPISchema

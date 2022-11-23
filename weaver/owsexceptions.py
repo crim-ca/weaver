@@ -30,7 +30,6 @@ from webob.acceptparse import create_accept_header
 from zope.interface import implementer
 
 from weaver.formats import ContentType
-from weaver.utils import clean_json_text_body
 from weaver.warning import MissingParameterWarning, UnsupportedOperationWarning
 
 if TYPE_CHECKING:
@@ -112,6 +111,8 @@ class OWSException(Response, Exception):
     @staticmethod
     def json_formatter(status, body, title, environ):  # noqa
         # type: (str, str, str, SettingsType) -> JSON
+        from weaver.utils import clean_json_text_body
+
         body = clean_json_text_body(body)   # message/description
         code = int(status.split()[0])       # HTTP status code
         body = {"description": body, "code": title}     # title is the string OGC 'code'

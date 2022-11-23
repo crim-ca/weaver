@@ -8,6 +8,7 @@ Local test web application is employed to run operations by mocking external req
     - :mod:`tests.processes.wps_package`.
 """
 import contextlib
+import copy
 import json
 import logging
 import os
@@ -16,16 +17,18 @@ from copy import deepcopy
 from inspect import cleandoc
 from typing import TYPE_CHECKING
 
+import boto3
 import colander
 import pytest
 import yaml
+from parameterized import parameterized
 
 from tests import resources
 from tests.functional.utils import ResourcesUtil, WpsConfigBase
 from tests.utils import (
     MOCK_AWS_REGION,
     MOCK_HTTP_REF,
-    mocked_aws_credentials,
+    mocked_aws_config,
     mocked_aws_s3,
     mocked_aws_s3_bucket_test_file,
     mocked_dismiss_process,
@@ -34,7 +37,8 @@ from tests.utils import (
     mocked_http_file,
     mocked_reference_test_file,
     mocked_sub_requests,
-    mocked_wps_output
+    mocked_wps_output,
+    setup_aws_s3_bucket
 )
 from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import (
@@ -45,18 +49,24 @@ from weaver.formats import (
     OGC_NAMESPACE,
     AcceptLanguage,
     ContentType,
-    get_cwl_file_format
+    get_cwl_file_format,
+    repr_json
 )
-from weaver.processes.constants import CWL_REQUIREMENT_APP_DOCKER, CWL_REQUIREMENT_INIT_WORKDIR, ProcessSchema
+from weaver.processes.constants import (
+    CWL_REQUIREMENT_APP_DOCKER,
+    CWL_REQUIREMENT_INIT_WORKDIR,
+    CWL_REQUIREMENT_INLINE_JAVASCRIPT,
+    ProcessSchema
+)
 from weaver.processes.types import ProcessType
 from weaver.status import Status
-from weaver.utils import get_any_value
-from weaver.wps.utils import get_wps_output_dir, map_wps_output_location
+from weaver.utils import fetch_file, get_any_value, load_file
+from weaver.wps.utils import get_wps_output_dir, get_wps_output_url, map_wps_output_location
 
 if TYPE_CHECKING:
     from typing import List
 
-    from weaver.typedefs import JSON
+    from weaver.typedefs import JSON, CWL_AnyRequirements
 
 EDAM_PLAIN = EDAM_NAMESPACE + ":" + EDAM_MAPPING[ContentType.TEXT_PLAIN]
 OGC_NETCDF = OGC_NAMESPACE + ":" + OGC_MAPPING[ContentType.APP_NETCDF]
@@ -83,7 +93,7 @@ LOGGER = logging.getLogger(__name__)
 @pytest.mark.functional
 class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
     @classmethod
-    def setUpClass(cls):
+    def setUpClass(cls) -> None:
         cls.settings = {
             "weaver.wps": True,
             "weaver.wps_path": "/ows/wps",
@@ -93,6 +103,9 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             "weaver.wps_output_dir": "/tmp/weaver-test/wps-outputs",  # nosec: B108 # don't care hardcoded for test
         }
         super(WpsPackageAppTest, cls).setUpClass()
+
+    def setUp(self) -> None:
+        self.process_store.clear_processes()
 
     @classmethod
     def request(cls, method, url, *args, **kwargs):
@@ -447,7 +460,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
 
         Omitted ``default`` field in formats during deployment must only add them later on during process description.
 
-        .. versionchanged:: 4.11.0
+        .. versionchanged:: 4.11
             Previously, ``default: False`` would be added automatically *during deployment parsing*
             (from :mod:`colander` deserialization) when omitted in the submitted payload.
             This caused comparison between submitted ``inputs`` and ``outputs`` against their parsed counterparts
@@ -713,6 +726,34 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             "Additional detail only within WPS output", \
             "Additional details defined only in WPS matching CWL I/O by ID should be preserved."
 
+    def test_deploy_resolve_complex_io_format_directory_input(self):
+        """
+        Test that directory complex type is resolved from CWL.
+
+        .. versionadded:: 4.27
+        """
+        body = self.retrieve_payload("DirectoryListingProcess", "deploy", local=True)
+        pkg = self.retrieve_payload("DirectoryListingProcess", "package", local=True)
+        # remove definitions in deploy body to evaluate auto-resolution from CWL 'type: Directory'
+        body["processDescription"].pop("inputs")
+        body["executionUnit"] = [{"unit": pkg}]
+        desc, _ = self.deploy_process(body, describe_schema=ProcessSchema.OGC)
+        assert desc["inputs"]["input_dir"]["formats"][0]["mediaType"] == ContentType.APP_DIR
+
+    def test_deploy_resolve_complex_io_format_directory_output(self):
+        """
+        Test that directory complex type is resolved from CWL.
+
+        .. versionadded:: 4.27
+        """
+        body = self.retrieve_payload("DirectoryMergingProcess", "deploy", local=True)
+        pkg = self.retrieve_payload("DirectoryMergingProcess", "package", local=True)
+        # remove definitions in deploy body to evaluate auto-resolution from CWL 'type: Directory'
+        body["processDescription"].pop("outputs")
+        body["executionUnit"] = [{"unit": pkg}]
+        desc, _ = self.deploy_process(body, describe_schema=ProcessSchema.OGC)
+        assert desc["outputs"]["output_dir"]["formats"][0]["mediaType"] == ContentType.APP_DIR
+
     def test_deploy_merge_complex_io_format_references(self):
         """
         Test validates that known `WPS` I/O formats (i.e.: `MIME-type`) considered as valid, but not corresponding to
@@ -724,7 +765,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         """
         ns_json, type_json = get_cwl_file_format(ContentType.APP_JSON, must_exist=True)
         assert "iana" in ns_json  # just to make sure
-        # even if IANA media-type does not exist, it must still be well formed (type/sub-type)
+        # even if IANA media-type does not exist, it must still be well-formed (type/sub-type)
         # otherwise, schema 'MediaType' will raise because of invalid string pattern
         ct_not_exists = "application/x-ogc-dods"    # OpenDAP, still doesn't exist at moment of test creation
         ns_not_exists, _ = get_cwl_file_format(ct_not_exists, must_exist=False)
@@ -834,7 +875,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         """
         Test to validate ``mimeType`` is replaced by ``mediaType`` for all descriptions.
 
-        Also we validate that processes that use ``mimeType`` or ``mediaType`` can be deployed successfully.
+        Also, we validate that processes that use ``mimeType`` or ``mediaType`` can be deployed successfully.
         """
         ns_json, type_json = get_cwl_file_format(ContentType.APP_JSON)
         namespaces = dict(list(ns_json.items()))
@@ -1030,9 +1071,15 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             process = self.process_store.fetch_by_id(self._testMethodName)
             assert process.type == ProcessType.APPLICATION
 
-    def test_deploy_block_unknown_processes(self):
+    @parameterized.expand([
+        # not allowed even if combined with another known and valid definition
+        ({"UnknownRequirement": {}, CWL_REQUIREMENT_APP_DOCKER: {"dockerPull": "python:3.7-alpine"}}, ),
+        ({"UnknownRequirement": {}}, ),
+    ])
+    def test_deploy_block_unknown_processes(self, requirements):
+        # type: (CWL_AnyRequirements) -> None
         """
-        Test to validates that any process that cannot be resolved against one of known
+        Test to validate that any process that cannot be resolved against one of known
         :py:data:`weaver.processes.constants.CWL_REQUIREMENT_APP_TYPES` is explicitly blocked.
         """
         cwl = {
@@ -1042,12 +1089,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             "inputs": {
                 "stringInput": "string"
             },
-            "requirements": {
-                CWL_REQUIREMENT_APP_DOCKER: {"dockerPull": "python:3.7-alpine"},
-                "InlineJavascriptRequirement": {},
-                "ResourceRequirement": {"ramMin": 10240, "coresMin": 3}
-
-            },
+            "requirements": requirements,
             "outputs": [],
         }
         body = {
@@ -1068,6 +1110,19 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             resp = mocked_sub_requests(self.app, "post_json", "/processes", data=body, timeout=5,
                                        headers=self.json_headers, only_local=True, expect_errors=True)
             assert resp.status_code == 422
+
+    def test_deploy_requirement_inline_javascript(self):
+        """
+        Test that CWL with ``InlineJavascriptRequirement`` definition is permitted.
+
+        .. versionadded:: 4.27
+        """
+        body = self.retrieve_payload("DirectoryMergingProcess", "deploy", local=True)
+        pkg = self.retrieve_payload("DirectoryMergingProcess", "package", local=True)
+        body["executionUnit"] = [{"unit": pkg}]
+        assert CWL_REQUIREMENT_INLINE_JAVASCRIPT in pkg["requirements"]
+        _, cwl = self.deploy_process(body, describe_schema=ProcessSchema.OGC)
+        assert CWL_REQUIREMENT_INLINE_JAVASCRIPT in cwl["requirements"]
 
     def test_deploy_merge_complex_io_with_multiple_formats_and_defaults(self):
         """
@@ -1752,7 +1807,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                     desc = resp.json.get("description")
                     assert "language" in desc and lang in desc, "Expected error description to indicate bad language"
 
-    @mocked_aws_credentials
+    @mocked_aws_config
     @mocked_aws_s3
     @mocked_http_file
     def test_execute_job_with_array_input(self):
@@ -2105,8 +2160,8 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                 ctx_dir = (wps_dir + "/" + ctx) if ctx else wps_dir
                 out_url = self.settings["weaver.wps_output_url"]
                 ctx_url = (out_url + "/" + ctx) if ctx else out_url
-                res_url = ctx_url + "/" + job_id + "/stdout.log"
-                res_path = os.path.join(ctx_dir, job_id, "stdout.log")
+                res_url = ctx_url + "/" + job_id + "/output/stdout.log"
+                res_path = os.path.join(ctx_dir, job_id, "output", "stdout.log")
                 assert results["output"]["href"] == res_url, f"Invalid output URL with context: {ctx}"
                 assert os.path.isfile(res_path), f"Invalid output path with context: {ctx}"
 
@@ -2114,7 +2169,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         """
         Verify that remote HTTP files providing valid ``Content-Disposition`` header will be fetched with ``filename``.
 
-        .. versionadded:: 4.4.0
+        .. versionadded:: 4.4
         """
         cwl = {
             "cwlVersion": "v1.0",
@@ -2147,7 +2202,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             tmp_path = mocked_reference_test_file(tmp_file.name, "", "random data")
             tmp_http = map_wps_output_location(tmp_path, self.settings, url=True, exists=True)
             assert tmp_http is None, "Failed setup of test file. Must not be available on WPS output location."
-            tmp_host = "http://random-file-server.com"
+            tmp_host = "https://random-file-server.com"
             tmp_http = f"{tmp_host}/{tmp_name_random}"
             headers.update({"Content-Disposition": f"filename=\"{tmp_name_target}\""})
             stack_exec.enter_context(mocked_file_server(tmp_dir, tmp_host, self.settings, headers_override=headers))
@@ -2168,7 +2223,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             self.monitor_job(status_url, timeout=5)
             wps_dir = get_wps_output_dir(self.settings)
             job_dir = os.path.join(wps_dir, job_id)
-            job_out = os.path.join(job_dir, "stdout.log")
+            job_out = os.path.join(job_dir, "output", "stdout.log")
             assert os.path.isfile(job_out), f"Invalid output file not found: [{job_out}]"
             with open(job_out, mode="r", encoding="utf-8") as out_fd:
                 out_data = out_fd.read()
@@ -2178,6 +2233,271 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                 f"Expected: [{tmp_name_target}]\n"
                 f"Original: [{tmp_name_random}]"
             )
+
+    def test_execute_with_browsable_directory(self):
+        """
+        Test that HTML browsable directory-like structure retrieves children files recursively for the process.
+
+        .. versionadded:: 4.27
+        """
+        proc = "DirectoryListingProcess"
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        pkg = self.retrieve_payload(proc, "package", local=True)
+        body["executionUnit"] = [{"unit": pkg}]
+        desc, _ = self.deploy_process(body, describe_schema=ProcessSchema.OGC)
+        assert desc["inputs"]["input_dir"]["formats"][0]["mediaType"] == ContentType.APP_DIR
+
+        with contextlib.ExitStack() as stack:
+            tmp_host = "https://mocked-file-server.com"  # must match in 'Execute_WorkflowSelectCopyNestedOutDir.json'
+            tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())
+            stack.enter_context(mocked_file_server(tmp_dir, tmp_host, settings=self.settings, mock_browse_index=True))
+            test_http_dir = f"{tmp_host}/dir/"
+            test_http_dir_files = [
+                "dir/file.txt",
+                "dir/sub/file.txt",
+                "dir/sub/nested/file.txt",
+                "other/file.txt",
+                "root.file.txt"
+            ]
+            for file in test_http_dir_files:
+                path = os.path.join(tmp_dir, file)
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                with open(path, mode="w", encoding="utf-8") as f:
+                    f.write("test data")
+
+            exec_body = {
+                "mode": ExecuteMode.ASYNC,
+                "response": ExecuteResponse.DOCUMENT,
+                "inputs": [
+                    {"id": "input_dir", "href": test_http_dir},
+                ],
+                "outputs": [
+                    {"id": "output_file", "transmissionMode": ExecuteTransmissionMode.REFERENCE},
+                ]
+            }
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            proc_url = f"/processes/{proc}/jobs"
+            resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
+                                       data=exec_body, headers=self.json_headers, only_local=True)
+            assert resp.status_code in [200, 201], f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            status_url = resp.json["location"]
+
+            results = self.monitor_job(status_url)
+            assert "output_file" in results
+            stack.enter_context(mocked_wps_output(self.settings))
+            tmpdir = stack.enter_context(tempfile.TemporaryDirectory())
+            output_file = fetch_file(results["output_file"]["href"], tmpdir, settings=self.settings)
+            output_data = load_file(output_file, text=True)
+
+            # because files under dir are fetched and mounted in stage dir, random sub-dir from CWL is generated
+            # ignore this part of the paths for testing invariant results
+            # ignore prefixed file metadata generated by the process listing
+            cwl_stage_dir = "/var/lib/cwl/"  # /stg<UUID>/<expected-files>
+            output_listing = [file.rsplit(" ")[-1] for file in output_data.split("\n") if file]
+            expect_http_files = [file for file in test_http_dir_files if file.startswith("dir/")]
+            assert len(output_listing) == len(expect_http_files)
+            assert all(file.startswith(cwl_stage_dir) for file in output_listing)
+            assert all(any(file.endswith(dir_file) for file in output_listing) for dir_file in expect_http_files)
+
+    def test_execute_with_json_listing_directory(self):
+        """
+        Test that HTTP returning JSON list of directory contents retrieves children files for the process.
+
+        .. versionadded:: 4.27
+        """
+        proc = "DirectoryListingProcess"
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        pkg = self.retrieve_payload(proc, "package", local=True)
+        body["executionUnit"] = [{"unit": pkg}]
+        desc, _ = self.deploy_process(body, describe_schema=ProcessSchema.OGC)
+        assert desc["inputs"]["input_dir"]["formats"][0]["mediaType"] == ContentType.APP_DIR
+
+        with contextlib.ExitStack() as stack:
+            tmp_host = "https://mocked-file-server.com"  # must match in 'Execute_WorkflowSelectCopyNestedOutDir.json'
+            tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())
+            stack.enter_context(mocked_file_server(tmp_dir, tmp_host, settings=self.settings, mock_browse_index=True))
+            test_http_dir = f"{tmp_host}/dir/"
+            expect_http_files = [
+                "dir/file.txt",
+                "dir/sub/file.txt",
+                "dir/sub/nested/file.txt",
+                "dir/other/file.txt",
+            ]
+            for file in expect_http_files:
+                path = os.path.join(tmp_dir, file)
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                with open(path, mode="w", encoding="utf-8") as f:
+                    f.write("test data")
+
+            # make last reference explicit (full URL) to valide it resolves correct as well
+            # other references are relative to the initial URL and should resolve them accordingly
+            test_http_dir_files = copy.deepcopy(expect_http_files)
+            test_http_dir_files[-1] = test_http_dir + test_http_dir_files[-1]
+
+            exec_body = {
+                "mode": ExecuteMode.ASYNC,
+                "response": ExecuteResponse.DOCUMENT,
+                "inputs": [
+                    {"id": "input_dir", "href": test_http_dir},
+                ],
+                "outputs": [
+                    {"id": "output_file", "transmissionMode": ExecuteTransmissionMode.REFERENCE},
+                ]
+            }
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            proc_url = f"/processes/{proc}/jobs"
+            resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
+                                       data=exec_body, headers=self.json_headers, only_local=True)
+            assert resp.status_code in [200, 201], f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            status_url = resp.json["location"]
+
+            results = self.monitor_job(status_url)
+            assert "output_file" in results
+            stack.enter_context(mocked_wps_output(self.settings))
+            tmpdir = stack.enter_context(tempfile.TemporaryDirectory())
+            output_file = fetch_file(results["output_file"]["href"], tmpdir, settings=self.settings)
+            output_data = load_file(output_file, text=True)
+
+            # because files under dir are fetched and mounted in stage dir, random sub-dir from CWL is generated
+            # ignore this part of the paths for testing invariant results
+            # ignore prefixed file metadata generated by the process listing
+            cwl_stage_dir = "/var/lib/cwl/"  # /stg<UUID>/<expected-files>
+            output_listing = [file.rsplit(" ")[-1] for file in output_data.split("\n") if file]
+            assert len(output_listing) == len(expect_http_files), (
+                f"Output: {repr_json(output_listing)}\nExpect: {repr_json(expect_http_files)}"
+            )
+            assert all(file.startswith(cwl_stage_dir) for file in output_listing)
+            assert all(any(file.endswith(dir_file) for file in output_listing) for dir_file in expect_http_files)
+
+    @mocked_aws_config
+    @mocked_aws_s3
+    def test_execute_with_bucket_directory(self):
+        """
+        Test that directory pointing at a S3 bucket downloads all children files recursively for the process.
+
+        .. versionadded:: 4.27
+        """
+        proc = "DirectoryListingProcess"
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        pkg = self.retrieve_payload(proc, "package", local=True)
+        body["executionUnit"] = [{"unit": pkg}]
+        desc, _ = self.deploy_process(body, describe_schema=ProcessSchema.OGC)
+        assert desc["inputs"]["input_dir"]["formats"][0]["mediaType"] == ContentType.APP_DIR
+
+        test_bucket_files = [
+            "dir/file.txt",
+            "dir/sub/file.txt",
+            "dir/sub/nested/file.txt",
+            "other/file.txt",
+            "root.file.txt"
+        ]
+        test_bucket_ref = "wps-process-test-bucket"
+        for file in test_bucket_files:
+            mocked_aws_s3_bucket_test_file(test_bucket_ref, file)
+        test_bucket_dir = f"s3://{test_bucket_ref}/dir/"
+        exec_body = {
+            "mode": ExecuteMode.ASYNC,
+            "response": ExecuteResponse.DOCUMENT,
+            "inputs": [
+                {"id": "input_dir", "href": test_bucket_dir},
+            ],
+            "outputs": [
+                {"id": "output_file", "transmissionMode": ExecuteTransmissionMode.REFERENCE},
+            ]
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            proc_url = f"/processes/{proc}/jobs"
+            resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
+                                       data=exec_body, headers=self.json_headers, only_local=True)
+            assert resp.status_code in [200, 201], f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            status_url = resp.json["location"]
+
+            results = self.monitor_job(status_url)
+            assert "output_file" in results
+            stack.enter_context(mocked_wps_output(self.settings))
+            tmpdir = stack.enter_context(tempfile.TemporaryDirectory())
+            output_file = fetch_file(results["output_file"]["href"], tmpdir, settings=self.settings)
+            output_data = load_file(output_file, text=True)
+
+            # because files under dir are fetched and mounted in stage dir, random sub-dir from CWL is generated
+            # ignore this part of the paths for testing invariant results
+            # ignore prefixed file metadata generated by the process listing
+            cwl_stage_dir = "/var/lib/cwl/"  # /stg<UUID>/<expected-files>
+            output_listing = [file.rsplit(" ")[-1] for file in output_data.split("\n") if file]
+            expect_bucket_files = [file for file in test_bucket_files if file.startswith("dir/")]
+            assert len(output_listing) == len(expect_bucket_files)
+            assert all(file.startswith(cwl_stage_dir) for file in output_listing)
+            assert all(any(file.endswith(dir_file) for file in output_listing) for dir_file in expect_bucket_files)
+
+    def test_execute_with_directory_output(self):
+        """
+        Test that directory complex type is resolved from CWL and produces the expected output files.
+
+        .. versionadded:: 4.27
+        """
+        proc = "DirectoryMergingProcess"
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        pkg = self.retrieve_payload(proc, "package", local=True)
+        body["executionUnit"] = [{"unit": pkg}]
+        self.deploy_process(body, describe_schema=ProcessSchema.OGC)
+
+        with contextlib.ExitStack() as stack:
+            tmp_host = "https://mocked-file-server.com"  # must match in 'Execute_WorkflowSelectCopyNestedOutDir.json'
+            tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())
+            stack.enter_context(mocked_file_server(tmp_dir, tmp_host, settings=self.settings, mock_browse_index=True))
+            input_http_files = [
+                # NOTE:
+                #   base names must differ to have >1 file in output dir listing because of flat list generated
+                #   see the process shell script definition
+                "dir/file1.txt",
+                "dir/sub/file2.txt",
+                "dir/sub/nested/file3.txt",
+                "dir/other/file4.txt",
+            ]
+            for file in input_http_files:
+                path = os.path.join(tmp_dir, file)
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                with open(path, mode="w", encoding="utf-8") as f:
+                    f.write("test data")
+
+            exec_body = {
+                "mode": ExecuteMode.ASYNC,
+                "response": ExecuteResponse.DOCUMENT,
+                "inputs": [
+                    {"id": "files", "href": os.path.join(tmp_host, http_file)} for http_file in input_http_files
+                ],
+                "outputs": [
+                    {"id": "output_dir", "transmissionMode": ExecuteTransmissionMode.REFERENCE},
+                ]
+            }
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            proc_url = f"/processes/{proc}/jobs"
+            resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
+                                       data=exec_body, headers=self.json_headers, only_local=True)
+            assert resp.status_code in [200, 201], f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            status_url = resp.json["location"]
+            job_id = resp.json["jobID"]
+
+            results = self.monitor_job(status_url)
+            assert "output_dir" in results
+            wps_dir = get_wps_output_dir(self.settings)
+            wps_url = get_wps_output_url(self.settings)
+            out_dir = os.path.join(wps_dir, job_id, "output_dir")
+            out_url = os.path.join(wps_url, job_id, "output_dir") + "/"
+            assert results["output_dir"]["href"] == out_url
+            assert os.path.isdir(out_dir)
+            expect_out_files = {
+                # the process itself makes a flat list of input files, this is not a byproduct of dir-type output
+                os.path.join(out_dir, os.path.basename(file)) for file in input_http_files
+            }
+            assert all(os.path.isfile(file) for file in expect_out_files)
+            output_dir_files = {os.path.join(root, file) for root, _, files in os.walk(out_dir) for file in files}
+            assert output_dir_files == expect_out_files
 
     # FIXME: create a real async test (threading/multiprocess) to evaluate this correctly
     def test_dismiss_job(self):
@@ -2687,8 +3007,26 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
 
 
 @pytest.mark.functional
-class WpsPackageAppWithS3BucketTest(WpsConfigBase):
+class WpsPackageAppWithS3BucketTest(WpsConfigBase, ResourcesUtil):
+    """
+    Test with output results uploaded to S3 bucket.
+
+    .. warning::
+        Every test must setup the WPS-output S3 bucket. This is due to how :mod:`unittest` method contexts are handled
+        by :mod:`pywps` as individual test functions, which recreates a new :mod:`moto` mock each time. Therefore, any
+        progress within the "session" operations such as remembering the creation of a bucket is undone after each test.
+
+    .. seealso::
+        Below decorators apply. Call order matters since following ones employs configurations from previous ones.
+
+        - :func:`mocked_aws_config`
+        - :func:`mocked_aws_s3`
+        - :func:`setup_aws_s3_bucket`
+    """
+
     @classmethod
+    @mocked_aws_config
+    @mocked_aws_s3  # avoid error on setup of output S3 bucket under PyWPS config
     def setUpClass(cls):
         cls.settings = {
             "weaver.wps": True,
@@ -2702,9 +3040,10 @@ class WpsPackageAppWithS3BucketTest(WpsConfigBase):
         }
         super(WpsPackageAppWithS3BucketTest, cls).setUpClass()
 
-    @mocked_aws_credentials
+    @mocked_aws_config
     @mocked_aws_s3
-    def test_execute_application_package_process_with_bucket(self):
+    @setup_aws_s3_bucket(bucket="wps-output-test-bucket")
+    def test_execute_application_package_process_with_bucket_results(self):
         """
         Test validates:
 
@@ -2803,11 +3142,7 @@ class WpsPackageAppWithS3BucketTest(WpsConfigBase):
             # validation on results path
             assert results[out_key]["href"] in output_ref_any
 
-        # FIXME:
-        #   can validate manually that files exists in output bucket, but cannot seem to retrieve it here
-        #   problem due to fixture setup or moto limitation via boto3.resource interface used by pywps?
         # check that outputs are indeed stored in S3 buckets
-        import boto3
         mocked_s3 = boto3.client("s3", region_name=MOCK_AWS_REGION)
         resp_json = mocked_s3.list_objects_v2(Bucket=output_bucket)
         bucket_file_keys = [obj["Key"] for obj in resp_json["Contents"]]
@@ -2831,3 +3166,120 @@ class WpsPackageAppWithS3BucketTest(WpsConfigBase):
         Process with :term:`OpenAPI` I/O definitions validates the schema of the submitted :term:`JSON` data.
         """
         raise NotImplementedError
+
+    @mocked_aws_config
+    @mocked_aws_s3
+    @setup_aws_s3_bucket(bucket="wps-output-test-bucket")
+    def test_execute_with_directory_output(self):
+        """
+        Test that directory complex type is resolved from CWL and produces the expected output files in an AWS bucket.
+
+        .. versionadded:: 4.27
+        """
+        proc = "DirectoryMergingProcess"
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        pkg = self.retrieve_payload(proc, "package", local=True)
+        body["executionUnit"] = [{"unit": pkg}]
+        self.deploy_process(body, describe_schema=ProcessSchema.OGC)
+
+        with contextlib.ExitStack() as stack:
+            tmp_host = "https://mocked-file-server.com"  # must match in 'Execute_WorkflowSelectCopyNestedOutDir.json'
+            tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())
+            stack.enter_context(mocked_file_server(tmp_dir, tmp_host, settings=self.settings, mock_browse_index=True))
+            input_http_files = [
+                # NOTE:
+                #   base names must differ to have >1 file in output dir listing because of flat list generated
+                #   see the process shell script definition
+                "dir/file1.txt",
+                "dir/sub/file2.txt",
+                # see if auto-detected Media-Type from extensions
+                # they should be uploaded along with bucket object file-keys
+                "dir/sub/nested/file3.json",
+                "dir/other/file4.yml",
+            ]
+            expect_media_types = {
+                "file1.txt": ContentType.TEXT_PLAIN,
+                "file2.txt": ContentType.TEXT_PLAIN,
+                "file3.json": ContentType.APP_JSON,
+                "file4.yml": ContentType.APP_YAML,
+            }
+            for file in input_http_files:
+                path = os.path.join(tmp_dir, file)
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                with open(path, mode="w", encoding="utf-8") as f:
+                    f.write("test data")
+
+            output_id = "output_dir"
+            exec_body = {
+                "mode": ExecuteMode.ASYNC,
+                "response": ExecuteResponse.DOCUMENT,
+                "inputs": [
+                    {"id": "files", "href": os.path.join(tmp_host, http_file)} for http_file in input_http_files
+                ],
+                "outputs": [
+                    {"id": output_id, "transmissionMode": ExecuteTransmissionMode.REFERENCE},
+                ]
+            }
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            proc_url = f"/processes/{proc}/jobs"
+            resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
+                                       data=exec_body, headers=self.json_headers, only_local=True)
+            assert resp.status_code in [200, 201], f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            status_url = resp.json["location"]
+            job_id = resp.json["jobID"]
+
+            results = self.monitor_job(status_url)
+
+            # check that outputs are S3 bucket references
+            output_bucket = self.settings["weaver.wps_output_s3_bucket"]
+            output_loc = results["output_dir"]["href"]
+            output_ref = f"{output_bucket}/{job_id}/{output_id}/"
+            output_key_base = f"{job_id}/{output_id}/"
+            output_ref_abbrev = f"s3://{output_ref}"
+            output_ref_full = f"https://s3.{MOCK_AWS_REGION}.amazonaws.com/{output_ref}"
+            output_ref_any = [output_ref_abbrev, output_ref_full]  # allow any variant weaver can parse
+            # validation on outputs path
+            assert output_loc in output_ref_any
+
+            # check that outputs are indeed stored in S3 buckets
+            mocked_s3 = boto3.client("s3", region_name=MOCK_AWS_REGION)
+            resp_json = mocked_s3.list_objects_v2(Bucket=output_bucket)
+            bucket_file_info = {obj["Key"]: obj for obj in resp_json["Contents"]}
+            expect_out_files = {
+                # the process itself makes a flat list of input files, this is not a byproduct of dir-type output
+                os.path.join(output_key_base, os.path.basename(file)) for file in input_http_files
+            }
+            expect_out_dirs = {output_ref_abbrev}
+            assert resp_json["Name"] == output_bucket
+            assert not any(out_dir in bucket_file_info for out_dir in expect_out_dirs)
+            assert all(out_file in bucket_file_info for out_file in expect_out_files)
+            assert len(set(bucket_file_info) - expect_out_files) == 0, "No extra files expected."
+
+            # validate that common file extensions could be detected and auto-populated the Content-Type
+            # (information not available in 'list_objects_v2', so fetch each file individually
+            bucket_file_media_types = {}
+            for out_file in expect_out_files:
+                out_info = mocked_s3.head_object(Bucket=output_bucket, Key=out_file)
+                out_key = os.path.basename(out_file)
+                bucket_file_media_types[out_key] = out_info["ContentType"]
+            assert bucket_file_media_types == expect_media_types
+
+            # check that outputs are NOT copied locally, but that XML status does exist
+            # counter validate path with file always present to ensure outputs are not 'missing' because of wrong dir
+            wps_uuid = str(self.job_store.fetch_by_id(job_id).wps_id)
+            wps_outdir = self.settings["weaver.wps_output_dir"]
+            bad_out_dirs = {output_id}
+            bad_out_files = {os.path.basename(file) for file in input_http_files}
+            for out_dir in bad_out_dirs:
+                assert not os.path.exists(os.path.join(wps_outdir, out_dir))
+                assert not os.path.exists(os.path.join(wps_outdir, job_id, out_dir))
+                assert not os.path.exists(os.path.join(wps_outdir, wps_uuid, out_dir))
+            for out_file in bad_out_files:
+                assert not os.path.exists(os.path.join(wps_outdir, out_file))
+                assert not os.path.exists(os.path.join(wps_outdir, job_id, out_file))
+                assert not os.path.exists(os.path.join(wps_outdir, wps_uuid, out_file))
+                assert not os.path.exists(os.path.join(wps_outdir, output_id, out_file))
+                assert not os.path.exists(os.path.join(wps_outdir, job_id, output_id, out_file))
+                assert not os.path.exists(os.path.join(wps_outdir, wps_uuid, output_id, out_file))
+            assert os.path.isfile(os.path.join(wps_outdir, f"{job_id}.xml"))

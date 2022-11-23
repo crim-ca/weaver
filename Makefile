@@ -469,7 +469,7 @@ CHECKS := $(addprefix check-, $(CHECKS))
 # items that should not install python dev packages should be added here instead
 # they must provide their own target/only + with dependency install variants
 CHECKS_NO_PY := css md
-CHECKS_NO_PY := $(addprefix fix-, $(CHECKS_NO_PY))
+CHECKS_NO_PY := $(addprefix check-, $(CHECKS_NO_PY))
 CHECKS_ALL := $(CHECKS) $(CHECKS_NO_PY)
 
 $(CHECKS): check-%: install-dev check-%-only
@@ -482,7 +482,7 @@ mkdir-reports:
 check: check-all    ## alias for 'check-all' target
 
 .PHONY: check-only
-check-only: $(addsuffix -only, $(CHECKS))
+check-only: $(addsuffix -only, $(CHECKS_ALL))
 
 .PHONY: check-all
 check-all: install-dev $(CHECKS_ALL) 	## check all code linters

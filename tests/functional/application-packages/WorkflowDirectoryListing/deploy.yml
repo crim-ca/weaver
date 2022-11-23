@@ -1,0 +1,23 @@
+processDescription:
+  id: WorkflowDirectoryListing
+  title: Obtain directory listing from provided file references.
+  version: "0.0.1"
+  inputs:
+    - id: files
+      formats:
+        - mediaType: "*/*"
+          default: true
+      minOccurs: 1
+      maxOccurs: 100
+  outputs:
+    - id: listing
+      formats:
+        - mimeType: text/plain
+          default: true
+      minOccurs: 1
+      maxOccurs: 1
+  visibility: public
+executionUnit:
+  - test: WorkflowDirectoryListing.cwl
+immediateDeployment: true
+deploymentProfileName: "http://www.opengis.net/profiles/eoc/workflow"

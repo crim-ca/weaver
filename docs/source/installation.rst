@@ -76,7 +76,7 @@ Please refer to :ref:`Configuration` and :ref:`Running` sections for following s
 Database Migration
 =====================
 
-.. versionadded:: 4.3.0
+.. versionadded:: 4.3
 
 Previous versions of `Weaver` did not require any specific version of `MongoDB`_.
 Features were working using version as early as ``mongo==3.4`` if not even older.

@@ -676,7 +676,7 @@ its :ref:`Process Description <proc_op_describe>`. It is important to provide th
 applicable modes when :ref:`Deploying a Process <proc_op_deploy>` to allow it to run as desired. By default, `Weaver`
 will assume that deployed processes are only `asynchronous` to handle longer operations.
 
-.. versionchanged::
+.. versionchanged:: 4.15
     By default, every :ref:`proc_builtin` :term:`Process` can accept both modes.
     All previously deployed processes will only allow `asynchronous` execution, as only this one was supported.
     This should be reported in their ``jobControlOptions``.
@@ -831,30 +831,35 @@ Operations are accomplished in the following order for each individual step:
 .. seealso::
     :meth:`weaver.processes.wps_process_base.WpsProcessInterface.execute` for the implementation of operations order.
 
-.. _file_reference_types:
+.. _file_ref_types:
 
 File Reference Types
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Most inputs can be categorized into two of the most commonly employed types, namely ``LiteralData`` and ``ComplexData``.
-The former represents basic values such as integers or strings, while the other represents a file reference.
-Files in `Weaver` (and :term:`WPS` in general) can be specified with any ``formats`` as |media-types|_.
+The former represents basic values such as integers or strings, while the other represents a ``File`` or ``Directory``
+reference. Files in `Weaver` (and :term:`WPS` in general) can be specified with any ``formats`` as |media-types|_.
 
 .. seealso::
     - :ref:`cwl-wps-mapping`
 
-As for *standard* :term:`WPS`, remote file references are *usually* limited to ``http(s)`` scheme, unless the process
-takes an input string and parses the unusual reference from the literal data to process it by itself. On the other hand,
-`Weaver` supports all following reference schemes.
+As for *standard* :term:`WPS`, only remote ``File`` references are *usually* handled and limited to ``http(s)`` scheme,
+unless the process takes a ``LiteralData`` input string and parses the unusual reference from its value to process it
+by itself. On the other hand, `Weaver` supports all following reference schemes.
 
 - |http_scheme|
 - |file_scheme|
+- |s3_scheme|
 - |os_scheme| [experimental]
-- |s3_scheme| [experimental]
+
+.. note::
+    Handling of ``Directory`` type for above references is specific to `Weaver`.
+    Directories require specific ``formats`` and naming conditions as described in :ref:`cwl-dir`.
+    Remote :term:`WPS` could support it but their expected behaviour is undefined.
 
 The method in which `Weaver` will handle such references depends on its configuration, in other words, whether it is
-running as :term:`ADES` or :term:`EMS` (see: :ref:`Configuration`), as well as depending on some other :term:`CWL`
-package requirements. These use-cases are described below.
+running as :term:`ADES`, :term:`EMS` or :term:`HYBRID` (see: :ref:`Configuration`), as well as depending on some other
+:term:`CWL` package requirements. These use-cases are described below.
 
 .. warning::
     Missing schemes in URL reference are considered identical as if ``file://`` was used. In most cases, if not always,
@@ -893,76 +898,86 @@ accessible by the remote :term:`WPS` process.
     each step because `Weaver` cannot assume any of the remote :term:`Provider` is able to communicate with each other,
     according to potential :term:`Request Options` or :term:`Data Source` only configured for access by `Weaver`.
 
-When using :term:`S3` references, `Weaver` will attempt to retrieve the file using server |aws-config|_ and
-|aws-credentials|_. Provided that the corresponding :term:`S3` bucket can be accessed by the running `Weaver`
-application, it will fetch the file and store it locally temporarily for :term:`CWL` execution.
+When using :term:`AWS` :term:`S3` references, `Weaver` will attempt to retrieve the files using server |aws-config|_
+and |aws-credentials|_. Provided that the corresponding :term:`S3` bucket can be accessed by the running `Weaver`
+application, it will fetch the files and stage them locally temporarily for :term:`CWL` execution.
 
 .. note::
     When using :term:`S3` buckets, authorization are handled through typical :term:`AWS` credentials and role
-    permissions. This means that :term:`AWS` access must be granted to the application in order to allow it fetching
-    the file. There are also different formats of :term:`S3` reference formats handled by `Weaver`.
-    Please refer to :ref:`Configuration of AWS S3 Buckets` for more details.
+    permissions. This means that :term:`AWS` access must be granted to the application in order to allow it
+    fetching files. Please refer to :ref:`Configuration of AWS S3 Buckets` for more details.
+
+.. important::
+    Different formats for :term:`AWS` :term:`S3` references are handled by `Weaver` (see :ref:`aws_s3_ref`).
+    They can be formed with generic |s3_scheme| and specific |http_scheme| with some reference to *Amazon AWS* endpoint.
+    When a reference with |http_scheme|-like scheme refers to an :term:`S3` bucket, it will be converted accordingly and
+    handled as any other |s3_scheme| reference. In the below :ref:`table-file-type-handling`, these special HTTP-like
+    URLs should be understood as part of the |s3_scheme| category.
 
 When using :term:`OpenSearch` references, additional parameters are necessary to handle retrieval of specific file URL.
 Please refer to :ref:`OpenSearch Data Source` for more details.
 
 Following table summarize the default behaviour of input file reference handling of different situations when received
-as input argument of process execution. For simplification, keyword *<any>* is used to indicate that any other value in
+as input argument of process execution. For simplification, keyword |any| is used to indicate that any other value in
 the corresponding column can be substituted for a given row when applied with conditions of other columns, which results
 to same operational behaviour. Elements that behave similarly are also presented together in rows to reduce displayed
 combinations.
 
-+-----------+-------------------------------------------+---------------+-------------------------------------------+
-| |cfg|     | Process Type                              | File Scheme   | Applied Operation                         |
-+===========+===========================================+===============+===========================================+
-| |any|     | |any|                                     | |os_scheme|   | Query and re-process [#openseach]_        |
-+-----------+-------------------------------------------+---------------+-------------------------------------------+
-| |ADES|    | - `WPS-1/2`_                              | |file_scheme| | Convert to |http_scheme| [#file2http]_    |
-|           | - `ESGF-CWT`_                             +---------------+-------------------------------------------+
-|           | - `WPS-REST`_ (remote) [#wps3]_           | |http_scheme| | Nothing (unmodified)                      |
-|           | - :ref:`proc_remote_provider`             +---------------+-------------------------------------------+
-|           |                                           | |s3_scheme|   | Fetch and convert to |http_scheme| [#s3]_ |
-|           |                                           +---------------+-------------------------------------------+
-|           |                                           | |vault_ref|   | Convert to |http_scheme| [#vault2http]_   |
-|           +-------------------------------------------+---------------+-------------------------------------------+
-|           | - `WPS-REST`_ (`CWL`) [#wps3]_            | |file_scheme| | Nothing (file already local)              |
-|           |                                           +---------------+-------------------------------------------+
-|           |                                           | |http_scheme| | Fetch and convert to |file_scheme|        |
-|           |                                           +---------------+                                           |
-|           |                                           | |s3_scheme|   |                                           |
-|           |                                           +---------------+-------------------------------------------+
-|           |                                           | |vault_ref|   | Convert to |file_scheme|                  |
-+-----------+-------------------------------------------+---------------+-------------------------------------------+
-| |EMS|     | - |any| (types listed above for |ADES|)   | |file_scheme| | Convert to |http_scheme| [#file2http]_    |
-|           | - `Workflow`_ (`CWL`) [#wf]_              +---------------+-------------------------------------------+
-|           |                                           | |http_scheme| | Nothing (unmodified, step will handle it) |
-|           |                                           +---------------+                                           |
-|           |                                           | |s3_scheme|   |                                           |
-|           |                                           +---------------+                                           |
-|           |                                           | |vault_ref|   |                                           |
-+-----------+-------------------------------------------+---------------+-------------------------------------------+
-| |HYBRID|  | - `WPS-1/2`_                              | |file_scheme| | Convert to |http_scheme| [#file2http]_    |
-|           | - `ESGF-CWT`_                             +---------------+-------------------------------------------+
-|           | - `WPS-REST`_ (remote) [#wps3]_           | |http_scheme| | Nothing (unmodified)                      |
-|           | - :ref:`proc_remote_provider`             +---------------+-------------------------------------------+
-|           |                                           | |s3_scheme|   | Fetch and convert to |http_scheme| [#s3]_ |
-|           | *Note*: |HYBRID| assumes |ADES| role      +---------------+-------------------------------------------+
-|           | (remote processes)                        | |vault_ref|   | Convert to |http_scheme| [#vault2http]_   |
-|           +-------------------------------------------+---------------+-------------------------------------------+
-|           | - `WPS-REST`_ (`CWL`) [#wps3]_            | |file_scheme| | Nothing (unmodified)                      |
-|           |                                           +---------------+-------------------------------------------+
-|           |                                           | |http_scheme| | Fetch and convert to |file_scheme|        |
-|           | *Note*: |HYBRID| assumes |ADES| role      +---------------+-------------------------------------------+
-|           | (local processes)                         | |vault_ref|   | Convert to |file_scheme| [#vault2file]_   |
-|           +-------------------------------------------+---------------+-------------------------------------------+
-|           | - `Workflow`_ (`CWL`) [#wf]_              | |file_scheme| | Convert to |http_scheme| [#file2http]_    |
-|           |                                           +---------------+-------------------------------------------+
-|           |                                           | |http_scheme| | Nothing (unmodified, step will handle it) |
-|           |                                           +---------------+                                           |
-|           |                                           | |s3_scheme|   |                                           |
-|           |                                           +---------------+                                           |
-|           | *Note*: |HYBRID| assumes |EMS| role       | |vault_ref|   |                                           |
-+-----------+-------------------------------------------+---------------+-------------------------------------------+
+.. table:: Summary of File Type Handling Methods
+    :name: table-file-type-handling
+    :align: center
+
+    +-----------+-----------------------------------------+---------------+-------------------------------------------+
+    | |cfg|     | Process Type                            | File Scheme   | Applied Operation                         |
+    +===========+=========================================+===============+===========================================+
+    | |any|     | |any|                                   | |os_scheme|   | Query and re-process [#openseach]_        |
+    +-----------+-----------------------------------------+---------------+-------------------------------------------+
+    | |ADES|    | - `WPS-1/2`_                            | |file_scheme| | Convert to |http_scheme| [#file2http]_    |
+    |           | - `ESGF-CWT`_                           +---------------+-------------------------------------------+
+    |           | - `WPS-REST`_ (remote) [#wps3]_         | |http_scheme| | Nothing (unmodified)                      |
+    |           | - :ref:`proc_remote_provider`           +---------------+-------------------------------------------+
+    |           |                                         | |s3_scheme|   | Fetch and convert to |http_scheme| [#s3]_ |
+    |           |                                         +---------------+-------------------------------------------+
+    |           |                                         | |vault_ref|   | Convert to |http_scheme| [#vault2http]_   |
+    |           +-----------------------------------------+---------------+-------------------------------------------+
+    |           | - `WPS-REST`_ (`CWL`) [#wps3]_          | |file_scheme| | Nothing (file already local)              |
+    |           |                                         +---------------+-------------------------------------------+
+    |           |                                         | |http_scheme| | Fetch and convert to |file_scheme|        |
+    |           |                                         +---------------+                                           |
+    |           |                                         | |s3_scheme|   |                                           |
+    |           |                                         +---------------+-------------------------------------------+
+    |           |                                         | |vault_ref|   | Convert to |file_scheme|                  |
+    +-----------+-----------------------------------------+---------------+-------------------------------------------+
+    | |EMS|     | - |any| (types listed above for |ADES|) | |file_scheme| | Convert to |http_scheme| [#file2http]_    |
+    |           | - `Workflow`_ (`CWL`) [#wf]_            +---------------+-------------------------------------------+
+    |           |                                         | |http_scheme| | Nothing (unmodified, step will handle it) |
+    |           |                                         +---------------+                                           |
+    |           |                                         | |s3_scheme|   |                                           |
+    |           |                                         +---------------+                                           |
+    |           |                                         | |vault_ref|   |                                           |
+    +-----------+-----------------------------------------+---------------+-------------------------------------------+
+    | |HYBRID|  | - `WPS-1/2`_                            | |file_scheme| | Convert to |http_scheme| [#file2http]_    |
+    |           | - `ESGF-CWT`_                           +---------------+-------------------------------------------+
+    |           | - `WPS-REST`_ (remote) [#wps3]_         | |http_scheme| | Nothing (unmodified)                      |
+    |           | - :ref:`proc_remote_provider`           +---------------+-------------------------------------------+
+    |           |                                         | |s3_scheme|   | Fetch and convert to |http_scheme| [#s3]_ |
+    |           | *Note*: |HYBRID| assumes |ADES| role    +---------------+-------------------------------------------+
+    |           | (remote processes)                      | |vault_ref|   | Convert to |http_scheme| [#vault2http]_   |
+    |           +-----------------------------------------+---------------+-------------------------------------------+
+    |           | - `WPS-REST`_ (`CWL`) [#wps3]_          | |file_scheme| | Nothing (unmodified)                      |
+    |           |                                         +---------------+-------------------------------------------+
+    |           |                                         | |http_scheme| | Fetch and convert to |file_scheme|        |
+    |           | *Note*: |HYBRID| assumes |ADES| role    +---------------+-------------------------------------------+
+    |           | (local processes)                       | |vault_ref|   | Convert to |file_scheme| [#vault2file]_   |
+    |           +-----------------------------------------+---------------+-------------------------------------------+
+    |           | - `Workflow`_ (`CWL`) [#wf]_            | |file_scheme| | Convert to |http_scheme| [#file2http]_    |
+    |           |                                         +---------------+-------------------------------------------+
+    |           |                                         | |http_scheme| | Nothing (unmodified, step will handle it) |
+    |           |                                         +---------------+                                           |
+    |           |                                         | |s3_scheme|   |                                           |
+    |           |                                         +---------------+                                           |
+    |           | *Note*: |HYBRID| assumes |EMS| role     | |vault_ref|   |                                           |
+    +-----------+-----------------------------------------+---------------+-------------------------------------------+
 
 .. |any| replace:: *<any>*
 .. |cfg| replace:: Configuration
@@ -1033,11 +1048,11 @@ combinations.
 File Reference Names
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-When processing any of the previous :ref:`file_reference_types`, the resulting name of the file after retrieval can
+When processing any of the previous :ref:`file_ref_types`, the resulting name of the file after retrieval can
 depend on the applicable scheme. In most cases, the file name is simply the last fragment of the path, whether it is
 an URL, an :term:`S3` bucket or plainly a file directory path. The following cases are exceptions.
 
-.. versionchanged:: 4.4.0
+.. versionchanged:: 4.4
     When using |http_scheme| references, the ``Content-Disposition`` header can be provided with ``filename``
     and/or ``filename*`` as specified by :rfc:`2183`, :rfc:`5987` and :rfc:`6266` specifications in order to define a
     staging file name. Note that `Weaver` takes this name only as a suggestion as will ignore the preferred name if it
@@ -1045,6 +1060,10 @@ an URL, an :term:`S3` bucket or plainly a file directory path. The following cas
     characters and separators such as dash (``-``), underscores (``_``) or dots (``.``) should be employed to limit
     chances of errors. If none of the suggested names are valid, `Weaver` falls back to the typical last fragment of
     the URL as file name.
+
+.. versionadded:: 4.27
+    References using any scheme can refer to a ``Directory``. Do do so, they must respect definitions in :ref:`cwl-dir`.
+    When provided, all retrievable contents under that directory will be recursively staged.
 
 When using |s3_scheme| references (or equivalent |http_scheme| referring to :term:`S3` bucket), the staged file names
 will depend on the stored object names within the bucket. In that regard, naming conventions from :term:`AWS` should be
@@ -1129,6 +1148,67 @@ In summary, the access token can be provided by itself by omitting the :term:`Va
 if a single file is referenced across all inputs within the :ref:`Execute <proc_op_execute>` request.
 Otherwise, multiple :term:`Vault` references all require to specify both their respective access token
 and UUID in a comma separated list.
+
+.. _aws_s3_ref:
+
+AWS S3 Bucket References
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+File and directory references to :term:`AWS` :term:`S3` items can be defined using one of the below formats.
+They can either use the |http_scheme| or |s3_scheme|, whichever one is deemed more appropriate by the user.
+The relevant reference format according to the location where the |bucket| is hosted and can be accessed from
+must be employed.
+
+.. code-block:: text
+    :caption: HTTP Path-style URI
+
+    https://s3.{Region}.amazonaws.com/{Bucket}/[{dirs}/][{file-key}]
+
+.. code-block:: text
+    :caption: HTTP Virtual-hosted–style URI
+
+    https://{Bucket}.s3.{Region}.amazonaws.com/[{dirs}/][{file-key}]
+
+.. code-block:: text
+    :caption: HTTP Access-Point-style URI
+
+    https://{AccessPointName}-{AccountId}.s3-accesspoint.{Region}.amazonaws.com/[{dirs}/][{file-key}]
+
+.. code-block:: text
+    :caption: HTTP Outposts-style URI
+
+    https://{AccessPointName}-{AccountId}.{outpostID}.s3-outposts.{Region}.amazonaws.com/[{dirs}/][{file-key}]
+
+.. code-block:: text
+    :caption: S3 Default Region URI
+
+    s3://{Bucket}/[{dirs}/][{file-key}]
+
+.. code-block:: text
+    :caption: S3 Access-Point-style ARN
+
+    arn:aws:s3:{Region}:{AccountId}:accesspoint/{AccessPointName}/[{dirs}/][{file-key}]
+
+.. code-block:: text
+    :caption: S3 Outposts-style ARN
+
+    arn:aws:s3-outposts:{Region}:{AccountId}:outpost/{OutpostId}/accesspoint/{AccessPointName}/[{dirs}/][{file-key}]
+
+.. warning::
+    Using the |s3_scheme| with a |bucket| name directly (without |arn|) implies that the *default profile* from
+    the configuration will be used (see :ref:`conf_s3_buckets`).
+
+.. seealso::
+    Following external resources can be employed for more details on the :term:`AWS` :term:`S3` service,
+    nomenclature and requirements.
+
+    - |aws_s3_bucket_names|_
+    - |aws_s3_bucket_access|_
+    - |aws_s3_access_points|_
+    - |aws_s3_outposts|_
+
+.. |arn| replace:: *ARN*
+.. |bucket| replace:: *Bucket*
 
 .. _opensearch_data_source:
 
@@ -1330,7 +1410,7 @@ the configured :term:`WPS` output directory.
     Header ``X-WPS-Output-Context`` is ignored when using `S3` buckets for output location since they are stored
     individually per :term:`Job` UUID, and hold no relevant *context* location. See also :ref:`conf_s3_buckets`.
 
-.. versionadded:: 4.3.0
+.. versionadded:: 4.3
     Addition of the ``X-WPS-Output-Context`` header.
 
 Email Notification
@@ -1571,7 +1651,7 @@ the case of *core* implementations, the :term:`Process` should be already availa
 
 In more details, when an |exec-req-name|_ request is received, `Weaver` will analyse any file references in the
 specified inputs and try to match them against specified :term:`Data Source` configuration. When a match is found
-and that the corresponding :ref:`file_reference_types` indicates that the reference is located remotely in a known
+and that the corresponding :ref:`file_ref_types` indicates that the reference is located remotely in a known
 :term:`Data Source` provider that should take care of its processing, `Weaver` will attempt to |deploy-req-name|_
 the targeted :term:`Process` (and the underlying :term:`Application Package`) followed by its remote execution.
 It will then monitor the :term:`Job` until completion and retrieve results if the full operation was successful.
@@ -1587,14 +1667,14 @@ but are still available for use when requested.
 
 .. [#notedatasource]
     Configuration :term:`HYBRID` applies here in cases where `Weaver` acts as an :term:`EMS` for remote dispatch
-    of :term:`Process` execution based on applicable :ref:`file_reference_types`.
+    of :term:`Process` execution based on applicable :ref:`file_ref_types`.
 
 .. seealso::
     Specific details about configuration of :term:`Data Source` are provided in the :ref:`conf_data_sources` section.
 
 .. seealso::
     Details regarding :ref:`opensearch_data_source` are also relevant when resolving possible matches
-    of :term:`Data Source` provider when the applicable :ref:`file_reference_types` are detected.
+    of :term:`Data Source` provider when the applicable :ref:`file_ref_types` are detected.
 
 
 Workflow (Chaining Step Processes)

@@ -1956,7 +1956,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         """
         Validate execution against missing parameters.
 
-        .. versionchanged:: 4.15.0
+        .. versionchanged:: 4.15
             Multiple parameters are not **required** anymore because the alternative with ``Prefer`` header
             for :term:`OGC API - Processes` compliance is permitted. When the values are specified through,
             they should still be validated to provide relevant error details to the user.

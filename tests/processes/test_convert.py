@@ -42,14 +42,14 @@ from weaver.processes.convert import (
     cwl2wps_io,
     get_cwl_io_type,
     get_io_type_category,
-    is_cwl_array_type,
-    is_cwl_enum_type,
-    is_cwl_file_type,
+    is_cwl_complex_type,
     json2wps_allowed_values,
     json2wps_datatype,
     merge_io_formats,
     normalize_ordered_io,
     ogcapi2cwl_process,
+    parse_cwl_array_type,
+    parse_cwl_enum_type,
     repr2json_input_values,
     set_field,
     wps2json_io
@@ -74,24 +74,30 @@ class ObjectWithEqProperty(object):
         return self.some_property == other.some_property
 
 
-def test_are_different_and_set_both_set():
-    assert _are_different_and_set(1, 2) is True
-    assert _are_different_and_set(1, 1) is False
-    assert _are_different_and_set({"a": 1}, {"a": 2}) is True
-    assert _are_different_and_set({"a": 1}, {"a": 1}) is False
-    assert _are_different_and_set({"a": 1, "b": 2}, {"a": 1}) is True
-    assert _are_different_and_set(ObjectWithEqProperty(), ObjectWithEqProperty()) is False
-    assert _are_different_and_set(ObjectWithEqProperty("a"), ObjectWithEqProperty("b")) is True
+@pytest.mark.parametrize("value1, value2, expect", [
+    (1, 2, True),
+    (1, 1, False),
+    ({"a": 1}, {"a": 2}, True),
+    ({"a": 1}, {"a": 1}, False),
+    ({"a": 1, "b": 2}, {"a": 1}, True),
+    (ObjectWithEqProperty(), ObjectWithEqProperty(), False),
+    (ObjectWithEqProperty("a"), ObjectWithEqProperty("b"), True),
+])
+def test_are_different_and_set_both_set(value1, value2, expect):
+    assert _are_different_and_set(value1, value2) is expect
 
 
-def test_are_different_and_set_similar_str_formats():
+@pytest.mark.parametrize("value1, value2, expect", [
     # pylint: disable=W1406,redundant-u-string-prefix  # left for readability
-    assert _are_different_and_set(b"something", u"something") is False
-    assert _are_different_and_set(u"something", u"something") is False
-    assert _are_different_and_set(b"something", b"something") is False
-    assert _are_different_and_set(b"something", u"else") is True
-    assert _are_different_and_set(u"something", u"else") is True
-    assert _are_different_and_set(b"something", b"else") is True
+    (b"something", u"something", False),
+    (u"something", u"something", False),
+    (b"something", b"something", False),
+    (b"something", u"else", True),
+    (u"something", u"else", True),
+    (b"something", b"else", True),
+])
+def test_are_different_and_set_similar_str_formats(value1, value2, expect):
+    assert _are_different_and_set(value1, value2) is expect
 
 
 def test_are_different_and_set_both_null():
@@ -259,57 +265,55 @@ def test_any2cwl_io_from_oas():
     assert cwl_ns == OGC_NAMESPACE_DEFINITION
 
 
-def test_json2wps_datatype():
-    test_cases = [
-        ("float",   {"type": WPS_LITERAL, "data_type": "float"}),                       # noqa: E241
-        ("integer", {"type": WPS_LITERAL, "data_type": "integer"}),                     # noqa: E241
-        ("integer", {"type": WPS_LITERAL, "data_type": "int"}),                         # noqa: E241
-        ("boolean", {"type": WPS_LITERAL, "data_type": "boolean"}),                     # noqa: E241
-        ("boolean", {"type": WPS_LITERAL, "data_type": "bool"}),                        # noqa: E241
-        ("string",  {"type": WPS_LITERAL, "data_type": "string"}),                      # noqa: E241
-        ("float",   {"type": WPS_LITERAL, "default": 1.0}),                             # noqa: E241
-        ("integer", {"type": WPS_LITERAL, "default": 1}),                               # noqa: E241
-        ("boolean", {"type": WPS_LITERAL, "default": True}),                            # noqa: E241
-        ("string",  {"type": WPS_LITERAL, "default": "1"}),                             # noqa: E241
-        ("float",   {"type": WPS_LITERAL, "supported_values": [1.0, 2.0]}),             # noqa: E241
-        ("integer", {"type": WPS_LITERAL, "supported_values": [1, 2]}),                 # noqa: E241
-        ("boolean", {"type": WPS_LITERAL, "supported_values": [True, False]}),          # noqa: E241
-        ("string",  {"type": WPS_LITERAL, "supported_values": ["yes", "no"]}),          # noqa: E241
-        ("float",   {"data_type": "float"}),                                            # noqa: E241
-        ("integer", {"data_type": "integer"}),                                          # noqa: E241
-        ("integer", {"data_type": "int"}),                                              # noqa: E241
-        ("boolean", {"data_type": "boolean"}),                                          # noqa: E241
-        ("boolean", {"data_type": "bool"}),                                             # noqa: E241
-        ("string",  {"data_type": "string"}),                                           # noqa: E241
-    ]
-
-    for expect, test_io in test_cases:
-        copy_io = deepcopy(test_io)  # can get modified by function
-        assert json2wps_datatype(test_io) == expect, f"Failed for [{copy_io}]"
+@pytest.mark.parametrize("expect, test_io", [
+    ("float",   {"type": WPS_LITERAL, "data_type": "float"}),                       # noqa: E241
+    ("integer", {"type": WPS_LITERAL, "data_type": "integer"}),                     # noqa: E241
+    ("integer", {"type": WPS_LITERAL, "data_type": "int"}),                         # noqa: E241
+    ("boolean", {"type": WPS_LITERAL, "data_type": "boolean"}),                     # noqa: E241
+    ("boolean", {"type": WPS_LITERAL, "data_type": "bool"}),                        # noqa: E241
+    ("string",  {"type": WPS_LITERAL, "data_type": "string"}),                      # noqa: E241
+    ("float",   {"type": WPS_LITERAL, "default": 1.0}),                             # noqa: E241
+    ("integer", {"type": WPS_LITERAL, "default": 1}),                               # noqa: E241
+    ("boolean", {"type": WPS_LITERAL, "default": True}),                            # noqa: E241
+    ("string",  {"type": WPS_LITERAL, "default": "1"}),                             # noqa: E241
+    ("float",   {"type": WPS_LITERAL, "supported_values": [1.0, 2.0]}),             # noqa: E241
+    ("integer", {"type": WPS_LITERAL, "supported_values": [1, 2]}),                 # noqa: E241
+    ("boolean", {"type": WPS_LITERAL, "supported_values": [True, False]}),          # noqa: E241
+    ("string",  {"type": WPS_LITERAL, "supported_values": ["yes", "no"]}),          # noqa: E241
+    ("float",   {"data_type": "float"}),                                            # noqa: E241
+    ("integer", {"data_type": "integer"}),                                          # noqa: E241
+    ("integer", {"data_type": "int"}),                                              # noqa: E241
+    ("boolean", {"data_type": "boolean"}),                                          # noqa: E241
+    ("boolean", {"data_type": "bool"}),                                             # noqa: E241
+    ("string",  {"data_type": "string"}),                                           # noqa: E241
+])
+def test_json2wps_datatype(expect, test_io):
+    copy_io = deepcopy(test_io)  # can get modified by function
+    assert json2wps_datatype(test_io) == expect, f"Failed for [{copy_io}]"
 
 
-def test_json2wps_allowed_values():
-    for i, (values, expect) in enumerate([
-        ({"allowedvalues": [1, 2, 3]},
-         [AllowedValue(value=1), AllowedValue(value=2), AllowedValue(value=3)]),
-        ({"allowedvalues": ["A", "B"]},
-         [AllowedValue(value="A"), AllowedValue(value="B")]),
-        ({"allowedvalues": [{"closure": "open", "minimum": 1, "maximum": 5}]},
-         [AllowedValue(minval=1, maxval=5, range_closure="open")]),
-        ({"allowedvalues": [{"closure": "open-closed", "minimum": 0, "maximum": 6, "spacing": 2}]},
-         [AllowedValue(minval=0, maxval=6, spacing=2, range_closure="open-closed")]),
-        ({"literalDataDomains": [{"valueDefinition": [1, 2, 3]}]},
-         [AllowedValue(value=1), AllowedValue(value=2), AllowedValue(value=3)]),
-        ({"literalDataDomains": [{"valueDefinition": ["A", "B"]}]},
-         [AllowedValue(value="A"), AllowedValue(value="B")]),
-        ({"literalDataDomains": [{"valueDefinition": [{"closure": "open", "minimum": 1, "maximum": 5}]}]},
-         [AllowedValue(minval=1, maxval=5, range_closure="open")]),
-        ({"literalDataDomains": [
-            {"valueDefinition": [{"closure": "open-closed", "minimum": 0, "maximum": 6, "spacing": 2}]}]},
-         [AllowedValue(minval=0, maxval=6, spacing=2, range_closure="open-closed")]),
-    ]):
-        result = json2wps_allowed_values(values)
-        assert result == expect, f"Failed test {i}"
+@pytest.mark.parametrize("values, expect", [
+    ({"allowedvalues": [1, 2, 3]},
+     [AllowedValue(value=1), AllowedValue(value=2), AllowedValue(value=3)]),
+    ({"allowedvalues": ["A", "B"]},
+     [AllowedValue(value="A"), AllowedValue(value="B")]),
+    ({"allowedvalues": [{"closure": "open", "minimum": 1, "maximum": 5}]},
+     [AllowedValue(minval=1, maxval=5, range_closure="open")]),
+    ({"allowedvalues": [{"closure": "open-closed", "minimum": 0, "maximum": 6, "spacing": 2}]},
+     [AllowedValue(minval=0, maxval=6, spacing=2, range_closure="open-closed")]),
+    ({"literalDataDomains": [{"valueDefinition": [1, 2, 3]}]},
+     [AllowedValue(value=1), AllowedValue(value=2), AllowedValue(value=3)]),
+    ({"literalDataDomains": [{"valueDefinition": ["A", "B"]}]},
+     [AllowedValue(value="A"), AllowedValue(value="B")]),
+    ({"literalDataDomains": [{"valueDefinition": [{"closure": "open", "minimum": 1, "maximum": 5}]}]},
+     [AllowedValue(minval=1, maxval=5, range_closure="open")]),
+    ({"literalDataDomains": [
+        {"valueDefinition": [{"closure": "open-closed", "minimum": 0, "maximum": 6, "spacing": 2}]}]},
+     [AllowedValue(minval=0, maxval=6, spacing=2, range_closure="open-closed")]),
+])
+def test_json2wps_allowed_values(values, expect):
+    result = json2wps_allowed_values(values)
+    assert result == expect
 
 
 def test_cwl2wps_io_null_or_array_of_enums():
@@ -334,26 +338,27 @@ def test_cwl2wps_io_null_or_array_of_enums():
     assert wps_io.allowed_values == [AllowedValue(value=val) for val in allowed_values]
 
 
-def test_cwl2wps_io_raise_mixed_types():
-    io_type1 = ["string", "int"]
-    io_type2 = [
+@pytest.mark.parametrize("test_type", [
+    ["string", "int"],
+    [
         "int",
-        {"type": "array", "items": "string"}
-    ]
-    io_type3 = [
+        {"type": "array", "items": "string"},
+    ],
+    [
         {"type": "enum", "symbols": ["1", "2"]},  # symbols as literal strings != int literal
         "null",
         "int"
-    ]
-    io_type4 = [
+    ],
+    [
         "null",
         {"type": "enum", "symbols": ["1", "2"]},  # symbols as literal strings != int items
         {"type": "array", "items": "int"}
     ]
-    for i, test_type in enumerate([io_type1, io_type2, io_type3, io_type4]):
-        io_info = {"name": f"test-{i}", "type": test_type}
-        with pytest.raises(PackageTypeError):
-            cwl2wps_io(io_info, WPS_INPUT)
+])
+def test_cwl2wps_io_raise_mixed_types(test_type):
+    io_info = {"name": "test", "type": test_type}
+    with pytest.raises(PackageTypeError):
+        cwl2wps_io(io_info, WPS_INPUT)
 
 
 def test_cwl2wps_io_record_format():
@@ -377,19 +382,22 @@ def test_cwl2wps_io_record_format():
     assert wps_io.supported_formats[0].mime_type == ContentType.APP_JSON
 
 
-@pytest.mark.parametrize("io_type, io_info", [
-    (WPS_LITERAL, {"type": WPS_LITERAL}),
-    (WPS_COMPLEX, {"type": WPS_COMPLEX}),
-    (WPS_BOUNDINGBOX, {"type": WPS_BOUNDINGBOX}),
-] + [
-    (WPS_LITERAL, {"type": _type}) for _type in WPS_LITERAL_DATA_TYPES
-] + [
-    (WPS_COMPLEX, {"type": _type}) for _type in WPS_COMPLEX_TYPES
-] + [
-    (WPS_LITERAL, {"type": ["null", _type]}) for _type in WPS_LITERAL_DATA_TYPES
-] + [
-    (WPS_LITERAL, {"type": {"type": "array", "items": _type}}) for _type in WPS_LITERAL_DATA_TYPES
-])
+@pytest.mark.parametrize(
+    "io_type, io_info",
+    [
+        (WPS_LITERAL, {"type": WPS_LITERAL}),
+        (WPS_COMPLEX, {"type": WPS_COMPLEX}),
+        (WPS_BOUNDINGBOX, {"type": WPS_BOUNDINGBOX}),
+    ] + [
+        (WPS_LITERAL, {"type": _type}) for _type in WPS_LITERAL_DATA_TYPES
+    ] + [
+        (WPS_COMPLEX, {"type": _type}) for _type in WPS_COMPLEX_TYPES
+    ] + [
+        (WPS_LITERAL, {"type": ["null", _type]}) for _type in WPS_LITERAL_DATA_TYPES
+    ] + [
+        (WPS_LITERAL, {"type": {"type": "array", "items": _type}}) for _type in WPS_LITERAL_DATA_TYPES
+    ]
+)
 def test_get_io_type_category(io_type, io_info):
     assert get_io_type_category(io_info) == io_type, f"Testing: {io_info}"
 
@@ -416,7 +424,7 @@ def test_get_cwl_io_type(io_info, io_def):
     assert io_res == io_def
 
 
-def test_is_cwl_array_type_explicit_invalid_item():
+def test_parse_cwl_array_type_explicit_invalid_item():
     io_info = {
         "name": "test",
         "type": {
@@ -425,10 +433,10 @@ def test_is_cwl_array_type_explicit_invalid_item():
         }
     }
     with pytest.raises(PackageTypeError):
-        is_cwl_array_type(io_info)
+        parse_cwl_array_type(io_info)
 
 
-def test_is_cwl_array_type_shorthand_invalid_item():
+def test_parse_cwl_array_type_shorthand_invalid_item():
     """
     In case of shorthand syntax, because type is only a string, it shouldn't raise.
 
@@ -439,41 +447,43 @@ def test_is_cwl_array_type_shorthand_invalid_item():
         "type": "unknown[]"
     }
     try:
-        res = is_cwl_array_type(io_info)
-        assert res[0] is False
-        assert res[1] == "unknown[]"
-        assert res[2] == MODE.NONE
-        assert res[3] == AnyValue
+        res = parse_cwl_array_type(io_info)
+        assert res.array is False
+        assert res.enum is False
+        assert res.type == "unknown[]"
+        assert res.mode == MODE.NONE
+        assert res.symbols == AnyValue
     except PackageTypeError:
         pytest.fail("should not raise an error in this case")
 
 
-def test_is_cwl_array_type_not_array():
+def test_parse_cwl_array_type_not_array():
     io_info = {
         "name": "test",
         "type": "float",
     }
-    res = is_cwl_array_type(io_info)
-    assert res[0] is False
-    assert res[1] == "float"
-    assert res[2] == MODE.NONE
-    assert res[3] == AnyValue
+    res = parse_cwl_array_type(io_info)
+    assert res.array is False
+    assert res.type == "float"
+    assert res.mode == MODE.NONE
+    assert res.symbols == AnyValue
 
 
-def test_is_cwl_array_type_simple_enum():
+def test_parse_cwl_array_type_simple_enum():
     io_info = {
         "name": "test",
         "type": "enum",
         "symbols": ["a", "b", "c"]
     }
-    res = is_cwl_array_type(io_info)
-    assert res[0] is False
-    assert res[1] == "enum"
-    assert res[2] == MODE.NONE
-    assert res[3] == AnyValue
+    res = parse_cwl_array_type(io_info)
+    assert res.array is False
+    assert res.enum is True
+    assert res.type == "string"
+    assert res.mode == MODE.SIMPLE
+    assert res.symbols == ["a", "b", "c"]
 
 
-def test_is_cwl_array_type_explicit_base():
+def test_parse_cwl_array_type_explicit_base():
     io_info = {
         "name": "test",
         "type": {
@@ -481,14 +491,15 @@ def test_is_cwl_array_type_explicit_base():
             "items": "string"
         }
     }
-    res = is_cwl_array_type(io_info)
-    assert res[0] is True
-    assert res[1] == "string"
-    assert res[2] == MODE.NONE
-    assert res[3] == AnyValue
+    res = parse_cwl_array_type(io_info)
+    assert res.array is True
+    assert res.enum is False
+    assert res.type == "string"
+    assert res.mode == MODE.NONE
+    assert res.symbols == AnyValue
 
 
-def test_is_cwl_array_type_explicit_enum():
+def test_parse_cwl_array_type_explicit_enum():
     io_info = {
         "name": "test",
         "type": {
@@ -499,64 +510,69 @@ def test_is_cwl_array_type_explicit_enum():
             }
         }
     }
-    res = is_cwl_array_type(io_info)
-    assert res[0] is True
-    assert res[1] == "string"
-    assert res[2] == MODE.SIMPLE
-    assert res[3] == ["a", "b", "c"]
+    res = parse_cwl_array_type(io_info)
+    assert res.array is True
+    assert res.enum is True
+    assert res.type == "string"
+    assert res.mode == MODE.SIMPLE
+    assert res.symbols == ["a", "b", "c"]
 
 
-def test_is_cwl_array_type_shorthand_base():
+def test_parse_cwl_array_type_shorthand_base():
     io_info = {
         "name": "test",
         "type": "string[]",
     }
-    res = is_cwl_array_type(io_info)
-    assert res[0] is True
-    assert res[1] == "string"
-    assert res[2] == MODE.NONE
-    assert res[3] == AnyValue
+    res = parse_cwl_array_type(io_info)
+    assert res.array is True
+    assert res.enum is False
+    assert res.type == "string"
+    assert res.mode == MODE.NONE
+    assert res.symbols == AnyValue
 
 
-def test_is_cwl_array_type_shorthand_enum():
+def test_parse_cwl_array_type_shorthand_enum():
     io_info = {
         "name": "test",
         "type": "enum[]",
         "symbols": ["a", "b", "c"]
     }
-    res = is_cwl_array_type(io_info)
-    assert res[0] is True
-    assert res[1] == "string"
-    assert res[2] == MODE.SIMPLE
-    assert res[3] == ["a", "b", "c"]
+    res = parse_cwl_array_type(io_info)
+    assert res.array is True
+    assert res.enum is True
+    assert res.type == "string"
+    assert res.mode == MODE.SIMPLE
+    assert res.symbols == ["a", "b", "c"]
 
 
-def test_is_cwl_array_type_explicit_optional_not_array():
+def test_parse_cwl_array_type_explicit_optional_not_array():
     io_info = {
         "name": "test",
         "type": ["null", "float"],
     }
-    res = is_cwl_array_type(io_info)
-    assert res[0] is False
-    assert res[1] == "float"
-    assert res[2] == MODE.NONE
-    assert res[3] == AnyValue
+    res = parse_cwl_array_type(io_info)
+    assert res.array is False
+    assert res.enum is False
+    assert res.type == "float"
+    assert res.mode == MODE.NONE
+    assert res.symbols == AnyValue
 
 
-def test_is_cwl_array_type_explicit_optional_simple_enum():
+def test_parse_cwl_array_type_explicit_optional_simple_enum():
     io_info = {
         "name": "test",
         "type": ["null", "enum"],
         "symbols": ["a", "b", "c"]
     }
-    res = is_cwl_array_type(io_info)
-    assert res[0] is False
-    assert res[1] == "enum"
-    assert res[2] == MODE.NONE
-    assert res[3] == AnyValue
+    res = parse_cwl_array_type(io_info)
+    assert res.array is False
+    assert res.enum is False
+    assert res.type == "enum"
+    assert res.mode == MODE.NONE
+    assert res.symbols == AnyValue
 
 
-def test_is_cwl_array_type_explicit_optional_explicit_base():
+def test_parse_cwl_array_type_explicit_optional_explicit_base():
     io_info = {
         "name": "test",
         "type": [
@@ -564,14 +580,15 @@ def test_is_cwl_array_type_explicit_optional_explicit_base():
             {"type": "array", "items": "string"}
         ]
     }
-    res = is_cwl_array_type(io_info)
-    assert res[0] is True
-    assert res[1] == "string"
-    assert res[2] == MODE.NONE
-    assert res[3] == AnyValue
+    res = parse_cwl_array_type(io_info)
+    assert res.array is True
+    assert res.enum is False
+    assert res.type == "string"
+    assert res.mode == MODE.NONE
+    assert res.symbols == AnyValue
 
 
-def test_is_cwl_array_type_explicit_optional_explicit_enum():
+def test_parse_cwl_array_type_explicit_optional_explicit_enum():
     io_info = {
         "name": "test",
         "type": [
@@ -585,39 +602,42 @@ def test_is_cwl_array_type_explicit_optional_explicit_enum():
             }
         ]
     }
-    res = is_cwl_array_type(io_info)
-    assert res[0] is True
-    assert res[1] == "string"
-    assert res[2] == MODE.SIMPLE
-    assert res[3] == ["a", "b", "c"]
+    res = parse_cwl_array_type(io_info)
+    assert res.array is True
+    assert res.enum is True
+    assert res.type == "string"
+    assert res.mode == MODE.SIMPLE
+    assert res.symbols == ["a", "b", "c"]
 
 
-def test_is_cwl_array_type_explicit_optional_shorthand_base():
+def test_parse_cwl_array_type_explicit_optional_shorthand_base():
     io_info = {
         "name": "test",
         "type": ["null", "string[]"]
     }
-    res = is_cwl_array_type(io_info)
-    assert res[0] is True
-    assert res[1] == "string"
-    assert res[2] == MODE.NONE
-    assert res[3] == AnyValue
+    res = parse_cwl_array_type(io_info)
+    assert res.array is True
+    assert res.enum is False
+    assert res.type == "string"
+    assert res.mode == MODE.NONE
+    assert res.symbols == AnyValue
 
 
-def test_is_cwl_array_type_explicit_optional_shorthand_enum():
+def test_parse_cwl_array_type_explicit_optional_shorthand_enum():
     io_info = {
         "name": "test",
         "type": ["null", "enum[]"],
         "symbols": ["a", "b", "c"]
     }
-    res = is_cwl_array_type(io_info)
-    assert res[0] is True
-    assert res[1] == "string"
-    assert res[2] == MODE.SIMPLE
-    assert res[3] == ["a", "b", "c"]
+    res = parse_cwl_array_type(io_info)
+    assert res.array is True
+    assert res.enum is True
+    assert res.type == "string"
+    assert res.mode == MODE.SIMPLE
+    assert res.symbols == ["a", "b", "c"]
 
 
-def test_is_cwl_enum_type_string():
+def test_parse_cwl_enum_type_string():
     io_info = {
         "name": "test",
         "type": {
@@ -625,14 +645,15 @@ def test_is_cwl_enum_type_string():
             "symbols": ["a", "b", "c"]
         }
     }
-    res = is_cwl_enum_type(io_info)
-    assert res[0] is True
-    assert res[1] == "string"
-    assert res[2] == MODE.SIMPLE
-    assert res[3] == ["a", "b", "c"]
+    res = parse_cwl_enum_type(io_info)
+    assert res.array is False
+    assert res.enum is True
+    assert res.type == "string"
+    assert res.mode == MODE.SIMPLE
+    assert res.symbols == ["a", "b", "c"]
 
 
-def test_is_cwl_enum_type_float():
+def test_parse_cwl_enum_type_float():
     io_info = {
         "name": "test",
         "type": {
@@ -640,14 +661,15 @@ def test_is_cwl_enum_type_float():
             "symbols": [1.9, 2.8, 3.7]
         }
     }
-    res = is_cwl_enum_type(io_info)
-    assert res[0] is True
-    assert res[1] == "float"
-    assert res[2] == MODE.SIMPLE
-    assert res[3] == [1.9, 2.8, 3.7]
+    res = parse_cwl_enum_type(io_info)
+    assert res.array is False
+    assert res.enum is True
+    assert res.type == "float"
+    assert res.mode == MODE.SIMPLE
+    assert res.symbols == [1.9, 2.8, 3.7]
 
 
-def test_is_cwl_enum_type_int():
+def test_parse_cwl_enum_type_int():
     io_info = {
         "name": "test",
         "type": {
@@ -655,38 +677,39 @@ def test_is_cwl_enum_type_int():
             "symbols": [1, 2, 3]
         }
     }
-    res = is_cwl_enum_type(io_info)
-    assert res[0] is True
-    assert res[1] == "int"
-    assert res[2] == MODE.SIMPLE
-    assert res[3] == [1, 2, 3]
+    res = parse_cwl_enum_type(io_info)
+    assert res.array is False
+    assert res.enum is True
+    assert res.type == "int"
+    assert res.mode == MODE.SIMPLE
+    assert res.symbols == [1, 2, 3]
 
 
-def test_is_cwl_file_type_guaranteed_file():
+def test_is_cwl_complex_type_guaranteed_file():
     io_info = {
         "name": "test",
         "type": "File"
     }
-    assert is_cwl_file_type(io_info)
+    assert is_cwl_complex_type(io_info)
 
 
-def test_is_cwl_file_type_potential_file():
+def test_is_cwl_complex_type_potential_file():
     io_info = {
         "name": "test",
         "type": ["null", "File"]
     }
-    assert is_cwl_file_type(io_info)
+    assert is_cwl_complex_type(io_info)
 
 
-def test_is_cwl_file_type_file_array():
+def test_is_cwl_complex_type_file_array():
     io_info = {
         "name": "test",
         "type": {"type": "array", "items": "File"}
     }
-    assert is_cwl_file_type(io_info)
+    assert is_cwl_complex_type(io_info)
 
 
-def test_is_cwl_file_type_none_one_or_many_files():
+def test_is_cwl_complex_type_none_one_or_many_files():
     io_info = {
         "name": "test",
         "type": [
@@ -695,24 +718,23 @@ def test_is_cwl_file_type_none_one_or_many_files():
             {"type": "array", "items": "File"}
         ]
     }
-    assert is_cwl_file_type(io_info)
+    assert is_cwl_complex_type(io_info)
 
 
-def test_is_cwl_file_type_not_files():
-    test_types = [
-        "int",
-        "string",
-        "float",
-        ["null", "string"],
-        {"type": "enum", "symbols": [1, 2]},
-        {"type": "enum", "symbols": ["A", "B"]},
-        {"type": "array", "items": "string"},
-        {"type": "array", "items": "int"},
-        ["null", {"type": "array", "items": "string"}],
-    ]
-    for i, io_type in enumerate(test_types):
-        io_info = {"name": f"test-{i}", "type": io_type}
-        assert not is_cwl_file_type(io_info), f"Test [{i}]: {io_info}"
+@pytest.mark.parametrize("test_type", [
+    "int",
+    "string",
+    "float",
+    ["null", "string"],
+    {"type": "enum", "symbols": [1, 2]},
+    {"type": "enum", "symbols": ["A", "B"]},
+    {"type": "array", "items": "string"},
+    {"type": "array", "items": "int"},
+    ["null", {"type": "array", "items": "string"}],
+])
+def test_is_cwl_complex_type_not_files(test_type):
+    io_info = {"name": "test", "type": test_type}
+    assert not is_cwl_complex_type(io_info)
 
 
 def assert_formats_equal_any_order(format_result, format_expect):
