@@ -61,7 +61,7 @@ from weaver.execute import ExecuteControlOption, ExecuteMode
 from weaver.formats import ContentType, get_content_type, repr_json
 from weaver.status import map_status
 from weaver.warning import TimeZoneInfoAlreadySetWarning
-from weaver.xml_util import XML
+from weaver.xml_util import HTML_TREE_BUILDER, XML
 
 if TYPE_CHECKING:
     from types import FrameType
@@ -2587,7 +2587,7 @@ def download_files_html(html_data,                          # type: str
             ):
                 return []
             _data = _resp.text
-        _html = BeautifulSoup(_data, builder=xml_util.HTML_TREE_BUILDER)
+        _html = BeautifulSoup(_data, builder=HTML_TREE_BUILDER)
         _href = (_ref.get("href") for _ref in _html.find_all("a", recursive=True))
         _href = filter_directory_forbidden(_href)  # preemptively remove forbidden items, avoid access/download attempts
         for _ref in _href:
