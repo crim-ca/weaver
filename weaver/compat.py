@@ -1,8 +1,7 @@
 from typing import Tuple, Union
 
-# pylint: disable=unused-import
 try:
-    from packaging.version import _Version, InvalidVersion, Version as PackageVersion  # noqa
+    from packaging.version import InvalidVersion, Version as PackageVersion  # pylint: disable=unused-import
 
     class Version(PackageVersion):
         @property
