@@ -19,11 +19,11 @@ Glossary
           queries in the context of :term:`EOImage` inputs.
 
     Application Package
-        General term that refers to *"what and how the :term:`Process` will execute"*. Application Packages provide
-        the core details about the execution methodology of the underlying operation the :term:`Process` provides, and
-        are therefore always contained within a :term:`Process` definition. This is more specifically represented
-        by a :term:`CWL` specification in the case of `Weaver` implementation, but could technically be defined by
-        another similar approach. See :ref:`Application Package` section for all relevant details.
+        General term that refers to *"what and how to execute"* the :term:`Process`. Application Packages provide the
+        core details about the execution methodology of the underlying operation that defines the :term:`Process`, and
+        are therefore always contained within a :ref:`Process Description <proc_op_describe>`. This is more specifically
+        represented by a :term:`CWL` specification in the case of `Weaver` implementation, but could technically be
+        defined by another similar approach. See the :ref:`Application Package` section for all relevant details.
 
     AWS
         Amazon Web Services

@@ -68,7 +68,7 @@ jobs:
           - os: ubuntu-latest
             python-version: "3.10"
             allow-failure: false
-            test-case: check-only
+            test-case: check-all
           # documentation build
           - os: ubuntu-latest
             python-version: "3.10"

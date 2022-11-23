@@ -2,7 +2,6 @@
 Utility methods for various TestCase setup operations.
 """
 import contextlib
-import datetime
 import functools
 import importlib
 import inspect
@@ -18,11 +17,10 @@ import tempfile
 import uuid
 import warnings
 from configparser import ConfigParser
-from inspect import isclass
-from typing import TYPE_CHECKING
+from datetime import datetime
+from typing import TYPE_CHECKING, overload
 
 # Note: do NOT import 'boto3' here otherwise 'moto' will not be able to mock it effectively
-import colander
 import mock
 import moto
 import pkg_resources
@@ -46,6 +44,7 @@ from weaver.datatype import Service
 from weaver.formats import ContentType
 from weaver.store.mongodb import MongodbJobStore, MongodbProcessStore, MongodbServiceStore
 from weaver.utils import (
+    AWS_S3_REGIONS,
     bytes2str,
     fetch_file,
     get_header,
@@ -57,14 +56,18 @@ from weaver.utils import (
     str2bytes
 )
 from weaver.warning import MissingParameterWarning, UnsupportedOperationWarning
-from weaver.wps.utils import get_wps_output_dir, get_wps_output_url
+from weaver.wps.utils import get_wps_output_dir, get_wps_output_url, load_pywps_config
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Type, TypeVar, Union
+    from typing_extensions import Literal
 
-    import botocore.client  # noqa
+    from mypy_boto3_s3.client import S3Client
+    from mypy_boto3_s3.literals import BucketLocationConstraintType, RegionName
+    from mypy_boto3_s3.type_defs import CreateBucketConfigurationTypeDef
     from owslib.wps import Process as ProcessOWSWPS
     from pywps.app import Process as ProcessPyWPS
+    from responses import _Body as BodyType  # noqa: W0212
 
     from weaver.typedefs import (
         JSON,
@@ -72,21 +75,34 @@ if TYPE_CHECKING:
         AnyRequestMethod,
         AnyRequestType,
         AnyResponseType,
+        HeadersType,
+        Path,
         SettingsType
     )
 
+    S3Scheme = Literal["s3", "https"]
+
     # pylint: disable=C0103,invalid-name,E1101,no-member
-    MockPatch = mock._patch  # noqa
+    MockPatch = mock._patch  # noqa: W0212
 
     # [WPS1-URL, GetCapPathXML, [DescribePathXML], [ExecutePathXML]]
     MockConfigWPS1 = Sequence[str, str, Optional[Sequence[str]], Optional[Sequence[str]]]
     MockReturnType = TypeVar("MockReturnType")
+    MockHttpMethod = Union[
+        responses.HEAD,
+        responses.GET,
+        responses.POST,
+        responses.PATCH,
+        responses.PUT,
+        responses.DELETE,
+        responses.OPTIONS,
+    ]
 
     CommandType = Callable[[Union[str, Tuple[str]]], int]
 
 LOGGER = logging.getLogger(".".join([__package__, __name__]))
 
-MOCK_AWS_REGION = "us-central-1"
+MOCK_AWS_REGION = "ca-central-1"  # type: RegionName
 MOCK_HTTP_REF = "http://localhost.mock"
 
 
@@ -106,7 +122,7 @@ def ignore_warning_regex(func, warning_message_regex, warning_categories=Depreca
     if not isinstance(warning_categories, list):
         warning_categories = [warning_categories]
     for warn in warning_categories:
-        if not isclass(warn) or not issubclass(warn, Warning):
+        if not inspect.isclass(warn) or not issubclass(warn, Warning):
             raise NotImplementedError("Argument 'warning_categories' must be one or multiple subclass(es) of Warning.")
 
     def do_test(self, *args, **kwargs):
@@ -122,8 +138,8 @@ def ignore_wps_warnings(func):
     """
     Wrapper that eliminates WPS related warnings during testing logging.
 
-    **NOTE**:
-        Wrapper should be applied on method (not directly on :class:`unittest.TestCase`
+    .. note::
+        Wrapper should be applied on method (not directly on :class:`unittest.TestCase`)
         as it can disable the whole test suite.
     """
     warn_msg_regex = ["Parameter 'request*", "Parameter 'service*", "Request type '*", "Service '*"]
@@ -214,6 +230,7 @@ def setup_config_with_pywps(config):
     settings["weaver.wps_configured"] = False
     os.environ.pop("PYWPS_CONFIG", None)
     config.include("weaver.wps")
+    load_pywps_config(config)
     return config
 
 
@@ -483,7 +500,7 @@ def mocked_sub_requests(app,                # type: TestApp
     """
     # pylint: disable=R1260,too-complex  # FIXME
 
-    from weaver.wps_restapi.swagger_definitions import FileLocal
+    from weaver.wps_restapi.swagger_definitions import FileLocal, ReferenceURL
     from requests.sessions import Session as RealSession
     real_request = RealSession.request
     real_signature = inspect.signature(real_request)
@@ -615,13 +632,16 @@ def mocked_sub_requests(app,                # type: TestApp
             return mocked_app_request(*req_args, **req_kwargs, session=self)
 
     # permit schema validation against 'mock' scheme during test only
-    mock_file_regex = mock.PropertyMock(return_value=colander.Regex(r"^((file|mock)://)?(?:/|[/?]\S+)$"))
+    class MockFile(FileLocal):
+        pattern = re.compile(FileLocal.pattern.pattern.replace("file", "mock"))
+
+    mock_reference = mock.PropertyMock(return_value=ReferenceURL._any_of + [MockFile()])
     with contextlib.ExitStack() as stack:
         stack.enter_context(mock.patch("requests.request", side_effect=mocked_app_request))
         stack.enter_context(mock.patch("requests.Session.request", new=TestSession.request))
         mocked_request = stack.enter_context(mock.patch("requests.sessions.Session.request", new=TestSession.request))
         mocked_request.__signature__ = real_signature  # replicate signature for 'request_extra' using it
-        stack.enter_context(mock.patch.object(FileLocal, "validator", new_callable=mock_file_regex))
+        stack.enter_context(mock.patch.object(ReferenceURL, "_any_of", new_callable=mock_reference))
         stack.enter_context(mock.patch.object(TestResponse, "json", new=TestResponseJsonCallable.json))
         if isinstance(method_function, str):
             req_url, req_func, kwargs = _parse_for_app_req(method_function, *args, **kwargs)  # type: ignore
@@ -759,14 +779,16 @@ def mocked_remote_server_requests_wps1(server_configs,          # type: Union[Mo
             all_request.add((responses.GET, getcap_with_proc_id_url + version_query, get_cap_xml))
 
     def apply_mocks(_mock_resp, _requests):
+        # type: (responses.RequestsMock, Iterable[Tuple[MockHttpMethod, str, str]]) -> None
         xml_header = {"Content-Type": ContentType.APP_XML}
         for meth, url, body in _requests:
             _mock_resp.add(meth, url, body=body, headers=xml_header)
 
     def mocked_remote_server_wrapper(test):
-        # type: (Callable) -> Callable
+        # type: (Callable[[..., Any], Any]) -> Callable[[..., Any], Any]
         @functools.wraps(test)
         def mock_requests_wps1(*args, **kwargs):
+            # type: (*Any, **Any) -> Any
             """
             Mock ``requests`` responses fetching ``test_server_wps`` WPS reference.
             """
@@ -787,14 +809,92 @@ def mocked_remote_server_requests_wps1(server_configs,          # type: Union[Mo
     return mocked_remote_server_wrapper
 
 
-def mocked_file_server(directory,               # type: str
-                       url,                     # type: str
-                       settings,                # type: SettingsType
-                       mock_get=True,           # type: bool
-                       mock_head=True,          # type: bool
-                       headers_override=None,   # type: Optional[AnyHeadersContainer]
-                       requests_mock=None,      # type: Optional[responses.RequestsMock]
-                       ):                       # type: (...) -> responses.RequestsMock
+def mocked_dir_listing(local_directory,             # type: str
+                       directory_path,              # type: str
+                       *,                           # force named keyword arguments after
+                       include_dir_heading=True,    # type: bool
+                       include_separators=True,     # type: bool
+                       include_code_format=True,    # type: bool
+                       include_table_format=True,   # type: bool
+                       include_modified_date=True,  # type: bool
+                       ):                           # type: (...) -> str
+    """
+    Generate the requested HTML directory listing.
+
+    The listing can intentionally apply additional HTML formatting tags and file metadata to ensure any parser that
+    should operate on such listing variations is able to extract expected results independently of their presence.
+
+    If :paramref:`include_code_format` and :paramref:`include_table_format` are used simultaneously, the file and
+    directory references contained within the table cells will each be wrapped to use the text code representation.
+
+    :param local_directory: Real directory location to emulate HTML listing.
+    :param directory_path: Relative base directory to be represented by the served HTML listing.
+    :param include_dir_heading: Add HTML tags with the relative directory displayed as page heading.
+    :param include_separators: Add HTML tags to place visual separators between various elements.
+    :param include_code_format: Add HTML tags wrapping the listing in a code-formatted text.
+    :param include_table_format: Add HTML tags wrapping the listing in a table.
+    :param include_modified_date: Add the file/directory modified date detail next to each item.
+    :returns: Mocked HTML listing representation of the directory contents.
+    """
+    dir_files = os.listdir(local_directory)
+    dir_files = [".."] + sorted(dir_files)  # most indexes provide the parent relative link to allow browsing upward
+    dir_files = [f"{path}/" if os.path.isdir(os.path.join(local_directory, path)) else path for path in dir_files]
+    ref_files = [
+        ("<tr><td>" if include_table_format else "") +
+        ("<pre>" if include_table_format and include_code_format else "") +
+        f"<a href=\"{href}\">{href}</a>\t\t\t" +
+        ("</pre>" if include_table_format and include_code_format else "") +
+        ("</td><td>" if include_table_format and include_modified_date else "") +
+        (
+            f"{str(datetime.fromtimestamp(os.stat(os.path.join(local_directory, href)).st_mtime)).rsplit(':', 1)[0]}"
+            if include_modified_date else ""
+        ) +
+        ("</td></tr>" if include_table_format else "")
+        for href in dir_files
+    ]
+    dir_refs = "\n" + "\n".join(ref_files)
+    dir_base = directory_path if directory_path.startswith("/") else f"/{directory_path}"
+    dir_base = dir_base if dir_base.endswith("/") else f"{dir_base}/"
+    dir_title = f"<h1>Index of {dir_base}</h1>" if include_dir_heading else ""
+    if include_table_format:
+        dir_pre = "<table>"
+        dir_post = "</tbody></table>"
+        if include_modified_date:
+            dir_mid = "<thead><th>Content</th><th>Modified</th></thead><tbody>"
+        else:
+            dir_mid = "<thead><th>Content</th></thead><tbody>"
+    else:
+        dir_pre = "<pre>" if include_code_format else ""
+        dir_mid = ""
+        dir_post = "</pre>" if include_code_format else ""
+    dir_sep = "<hr>" if include_separators else ""
+    dir_html = inspect.cleandoc(f"""
+    <html>
+        <body>
+            {dir_title}
+            {dir_sep if dir_title else ""}
+            {dir_pre}
+            {dir_mid}
+            {dir_refs}
+            {dir_post}
+            {dir_sep}
+        </body>
+    </html>
+    """)
+    return dir_html
+
+
+def mocked_file_server(directory,                   # type: str
+                       url,                         # type: str
+                       settings,                    # type: SettingsType
+                       *,                           # force named keyword arguments after
+                       mock_get=True,               # type: bool
+                       mock_head=True,              # type: bool
+                       mock_browse_index=False,     # type: bool
+                       headers_override=None,       # type: Optional[AnyHeadersContainer]
+                       requests_mock=None,          # type: Optional[responses.RequestsMock]
+                       **directory_listing_kwargs,  # type: bool
+                       ):                           # type: (...) -> responses.RequestsMock
     """
     Mocks a file server endpoint hosting some local directory files.
 
@@ -809,13 +909,15 @@ def mocked_file_server(directory,               # type: str
         refer to distinct endpoints that will not cause conflicting request patching configurations.
 
     .. seealso::
-        For WPS output directory/endpoint, consider using :func:`mocked_wps_output` instead.
+        - For WPS output directory/endpoint, consider using :func:`mocked_wps_output` instead.
+        - For applicable directory listing arguments, see :func:`mocked_dir_listing`.
 
     :param directory: Path of the directory to mock as file server resources.
     :param url: HTTP URL to mock as file server endpoint.
     :param settings: Application settings to retrieve requests options.
     :param mock_get: Whether to mock HTTP GET methods received on WPS output URL.
     :param mock_head: Whether to mock HTTP HEAD methods received on WPS output URL.
+    :param mock_browse_index: Whether to mock an ``index.html`` with file listing when requests point to a directory.
     :param headers_override: Override specified headers in produced response.
     :param requests_mock: Previously defined request mock instance to extend with new definitions.
     :return: Mocked response that would normally be obtained by a file server hosting WPS output directory.
@@ -828,7 +930,7 @@ def mocked_file_server(directory,               # type: str
     )
 
     def request_callback(request):
-        # type: (AnyRequestType) -> Tuple[int, Dict[str, str], str]
+        # type: (AnyRequestType) -> Tuple[int, HeadersType, BodyType]
         """
         Operation called when the file-server URL is matched against incoming requests that have been mocked.
         """
@@ -842,10 +944,10 @@ def mocked_file_server(directory,               # type: str
                 mime_type, encoding = mimetypes.guess_type(file_path)
                 headers.update({
                     "Server": "mocked_wps_output",
-                    "Date": str(datetime.datetime.utcnow()),
+                    "Date": str(datetime.utcnow()),
                     "Content-Type": mime_type or ContentType.TEXT_PLAIN,
                     "Content-Encoding": encoding or "",
-                    "Last-Modified": str(datetime.datetime.fromtimestamp(os.stat(file_path).st_mtime))
+                    "Last-Modified": str(datetime.fromtimestamp(os.stat(file_path).st_mtime))
                 })
                 if request.method == "HEAD":
                     headers.pop("Content-Length", None)
@@ -860,18 +962,45 @@ def mocked_file_server(directory,               # type: str
             return 405, {}, ""
         return 404, {}, ""
 
+    def browse_callback(request):
+        # type: (AnyRequestType) -> Tuple[int, HeadersType, BodyType]
+        if mock_head and request.method == "HEAD":
+            return 200, {"Content-Type": ContentType.TEXT_HTML}, ""
+        elif mock_get and request.method == "GET":
+            dir_path = request.url.replace(url, directory, 1).split(directory, 1)[-1]
+            if dir_path.endswith("index.html"):
+                dir_path = dir_path.rsplit("/", 1)[0]
+            dir_list = os.path.join(directory, dir_path.lstrip("/"))
+            dir_html = mocked_dir_listing(dir_list, dir_path, **directory_listing_kwargs)
+            headers = {"Content-Type": ContentType.TEXT_HTML, "Content-Length": str(len(dir_html))}
+            return 200, headers, dir_html
+        return 405, {}, ""
+
     mock_req = requests_mock or responses.RequestsMock(assert_all_requests_are_fired=False)
-    any_file_url = re.compile(fr"{url}/[\w\-_/.]+")  # match any sub-directory/file structure
+    if mock_browse_index:
+        # match any sub-directory/file structure, except ones ending with dir/index
+        any_file_url = re.compile(fr"^{url}/[\w\-_/.]+(?<!/)(?<!index\.html)$")
+    else:
+        # match any sub-directory/file structure
+        any_file_url = re.compile(fr"^{url}/[\w\-_/.]+$")
+    # match any sub-dirs structure, but must end by / or index.html
+    browse_dir_url = re.compile(fr"^{url}/(([\w\-_.]+/)+)?(index\.html)?$")
     if mock_get:
         mock_req.add_callback(responses.GET, any_file_url, callback=request_callback)
+        if mock_browse_index:
+            mock_req.add_callback(responses.GET, browse_dir_url, callback=browse_callback)
     if mock_head:
         mock_req.add_callback(responses.HEAD, any_file_url, callback=request_callback)
+        if mock_browse_index:
+            mock_req.add_callback(responses.HEAD, browse_dir_url, callback=browse_callback)
     return mock_req
 
 
 def mocked_wps_output(settings,                 # type: SettingsType
+                      *,                        # force named keyword arguments after
                       mock_get=True,            # type: bool
                       mock_head=True,           # type: bool
+                      mock_browse_index=False,  # type: bool
                       headers_override=None,    # type: Optional[AnyHeadersContainer]
                       requests_mock=None,       # type: Optional[responses.RequestsMock]
                       ):                        # type: (...) -> Union[responses.RequestsMock, MockPatch]
@@ -891,13 +1020,21 @@ def mocked_wps_output(settings,                 # type: SettingsType
     :param settings: Application settings to retrieve WPS output configuration.
     :param mock_get: Whether to mock HTTP GET methods received on WPS output URL.
     :param mock_head: Whether to mock HTTP HEAD methods received on WPS output URL.
+    :param mock_browse_index: Whether to mock an ``index.html`` with file listing when requests point to a directory.
     :param headers_override: Override specified headers in produced response.
     :param requests_mock: Previously defined request mock instance to extend with new definitions.
     :return: Mocked response that would normally be obtained by a file server hosting WPS output directory.
     """
     wps_url = get_wps_output_url(settings)
     wps_dir = get_wps_output_dir(settings)
-    return mocked_file_server(wps_dir, wps_url, settings, mock_get, mock_head, headers_override, requests_mock)
+    return mocked_file_server(
+        wps_dir, wps_url, settings,
+        mock_get=mock_get,
+        mock_head=mock_head,
+        mock_browse_index=mock_browse_index,
+        headers_override=headers_override,
+        requests_mock=requests_mock,
+    )
 
 
 def mocked_execute_celery(celery_task="weaver.processes.execution.execute_process", func_execute_task=None):
@@ -1020,65 +1157,150 @@ def mocked_process_package():
     )
 
 
-def mocked_aws_credentials(test_func):
-    # type: (Callable[[...], Any]) -> Callable
+def mocked_aws_config(_func=null,                       # type: Optional[Callable[[..., *Any], Any]]
+                      *,                                # force named keyword arguments after
+                      default_region=MOCK_AWS_REGION,   # type: RegionName
+                      ):                                # type: (...) -> Callable[[..., *Any], Any]
     """
-    Mocked AWS Credentials for :py:mod:`moto`.
+    Mocked AWS configuration and credentials for :mod:`moto` and :mod:`boto3`.
 
     When using this fixture, ensures that if other mocks fail, at least credentials should be invalid to avoid
     mistakenly overriding real bucket files.
+
+    .. seealso::
+        - :func:`mocked_aws_s3`
+        - :func:`mocked_aws_s3_bucket_test_file`
     """
-    def wrapped(*args, **kwargs):
-        with mock.patch.dict(os.environ, {
-            "AWS_ACCESS_KEY_ID": "testing",
-            "AWS_SECRET_ACCESS_KEY": "testing",
-            "AWS_SECURITY_TOKEN": "testing",
-            "AWS_SESSION_TOKEN": "testing"
-        }):
-            return test_func(*args, **kwargs)
-    return wrapped
+    from weaver.utils import validate_s3 as real_validate_s3
+
+    def mock_validate_s3(*, region, bucket):
+        # type: (Any, str, str) -> None
+        if region == MOCK_AWS_REGION:
+            region = AWS_S3_REGIONS[0]  # any valid for temporarily passing check
+        real_validate_s3(region=region, bucket=bucket)
+
+    def decorator(test_func):
+        # type: (Callable[[..., *Any], Any]) -> Callable[[..., *Any], Any]
+        @functools.wraps(test_func)
+        def wrapped(*args, **kwargs):
+            # type: (*Any, **Any) -> Any
+
+            with contextlib.ExitStack() as stack:
+                stack.enter_context(mock.patch.dict(os.environ, {
+                    "AWS_DEFAULT_REGION": default_region,
+                    "AWS_ACCESS_KEY_ID": "testing",
+                    "AWS_SECRET_ACCESS_KEY": "testing",
+                    "AWS_SECURITY_TOKEN": "testing",
+                    "AWS_SESSION_TOKEN": "testing"
+                }))
+                stack.enter_context(mock.patch("weaver.utils.validate_s3", side_effect=mock_validate_s3))
+                stack.enter_context(mock.patch("weaver.wps.utils.validate_s3", side_effect=mock_validate_s3))
+                return test_func(*args, **kwargs)
+        return wrapped
+    if _func is not null and callable(_func):
+        return decorator(_func)
+    return decorator
 
 
 def mocked_aws_s3(test_func):
-    # type: (Callable[[...], Any]) -> Callable
+    # type: (Callable[[..., *Any], Any]) -> Callable[[..., *Any], Any]
     """
-    Mocked AWS S3 bucket for :py:mod:`boto3` over mocked AWS credentials using :py:mod:`moto`.
+    Mocked AWS S3 for :mod:`boto3` over mocked AWS credentials using :mod:`moto`.
 
-    .. warning::
-        Make sure to employ the same :py:data:`MOCK_AWS_REGION` otherwise mock will not work and S3 operations will
-        attempt writing to real bucket.
+    .. seealso::
+        - :func:`mocked_aws_config`
+        - :func:`mocked_aws_s3_bucket_test_file`
     """
+    @functools.wraps(test_func)
     def wrapped(*args, **kwargs):
+        # type: (*Any, **Any) -> Any
         with moto.mock_s3():
             return test_func(*args, **kwargs)
     return wrapped
 
 
-def mocked_aws_s3_bucket_test_file(bucket_name, file_name, file_content="mock"):
-    # type: (str, str, str) -> str
+@overload
+def setup_aws_s3_bucket(__func=null, *, region=MOCK_AWS_REGION, bucket="", client=True):
+    # type: (Any, Any, BucketLocationConstraintType, str, Literal[True]) -> S3Client
+    ...
+
+
+@overload
+def setup_aws_s3_bucket(__func=null, *, region=MOCK_AWS_REGION, bucket="", client=False):
+    # type: (Any, Any, BucketLocationConstraintType, str, Literal[False]) -> Callable[[...], Any]
+    ...
+
+
+def setup_aws_s3_bucket(__func=null,              # type: Optional[Callable[[..., *Any], Any]]
+                        *,                        # force named keyword arguments after
+                        region=MOCK_AWS_REGION,   # type: BucketLocationConstraintType
+                        bucket="",                # type: str
+                        client=False,             # type: bool
+                        ):                        # type: (...) -> Union[Callable[[...], Any], S3Client]
+    import boto3
+    from botocore.exceptions import ClientError
+
+    def setup():
+        s3 = boto3.client("s3", region_name=region)   # type: S3Client
+        s3_location = {"LocationConstraint": region}  # type: CreateBucketConfigurationTypeDef
+        try:
+            s3.create_bucket(Bucket=bucket, CreateBucketConfiguration=s3_location)
+        except ClientError as exc:
+            if exc.response["Error"]["Code"] not in ["BucketAlreadyExists", "BucketAlreadyOwnedByYou"]:
+                raise
+        return s3
+
+    if client:
+        return setup()
+
+    def decorate(func):
+        # type: (Callable[[...], Any]) -> Callable[[...], Any]
+        @functools.wraps(func)
+        def wrapped(*args, **kwargs):
+            setup()
+            return func(*args, **kwargs)
+        return wrapped
+
+    if callable(__func):  # without () call
+        return decorate(__func)
+    return decorate       # with parameters
+
+
+def mocked_aws_s3_bucket_test_file(bucket_name,                 # type: str
+                                   file_name,                   # type: str
+                                   file_content="mock",         # type: str
+                                   s3_region=MOCK_AWS_REGION,   # type: BucketLocationConstraintType
+                                   s3_scheme="s3",              # type: S3Scheme
+                                   ):                           # type: (...) -> str
     """
-    Mock a test file as if retrieved from an AWS-S3 bucket reference.
+    Mock a test file as if retrieved from an :term:`AWS` term:`S3` bucket reference.
 
     Generates a test file reference from dummy data that will be uploaded to the specified S3 bucket name using the
     provided file key. The S3 interface employed is completely dependent of the wrapping context. For instance,
     calling this function with :func:`mocked_aws_s3` decorator will effectively employ the mocked S3 interface.
 
+    .. note::
+        Any applicable :term:`AWS` term:`S3` mock should have been applied before calling this function.
+        This function does not itself configure the mocking mechanism.
+
+    .. warning::
+        Make sure to employ the same :paramref:`s3_region` across calls when referring to the
+        same :paramref:`bucket_name`. Otherwise, mock could fail and S3 operations could be attempted
+        towards real S3 bucket locations.
+
     .. seealso::
+        - :func:`mocked_aws_config`
         - :func:`mocked_aws_s3`
     """
-    import boto3
-    if not MOCK_AWS_REGION:
-        s3 = boto3.client("s3")
-        s3.create_bucket(Bucket=bucket_name)
-    else:
-        s3 = boto3.client("s3", region_name=MOCK_AWS_REGION)
-        s3_location = {"LocationConstraint": MOCK_AWS_REGION}
-        s3.create_bucket(Bucket=bucket_name, CreateBucketConfiguration=s3_location)
+    s3 = setup_aws_s3_bucket(region=s3_region, bucket=bucket_name, client=True)
     with tempfile.NamedTemporaryFile(mode="w") as tmp_file:
         tmp_file.write(file_content)
         tmp_file.flush()
         s3.upload_file(Bucket=bucket_name, Filename=tmp_file.name, Key=file_name)
-    return f"s3://{bucket_name}/{file_name}"
+    s3_prefix = ""
+    if s3_scheme == "https":
+        s3_prefix = f"s3.{s3_region}.amazonaws.com/"
+    return f"{s3_scheme}://{s3_prefix}{bucket_name}/{file_name}"
 
 
 def mocked_http_file(test_func):
@@ -1093,12 +1315,14 @@ def mocked_http_file(test_func):
         - :func:`mocked_reference_test_file`
     """
     def mocked_file_request(file_reference, file_outdir, **kwargs):
+        # type: (str, str, **Any) -> str
         if file_reference and file_reference.startswith(MOCK_HTTP_REF):
             file_reference = file_reference.replace(MOCK_HTTP_REF, "")
         file_path = fetch_file(file_reference, file_outdir, **kwargs)
         return file_path
 
     def wrapped(*args, **kwargs):
+        # type: (*Any, **Any) -> Any
         with mock.patch("weaver.processes.wps_package.fetch_file", side_effect=mocked_file_request):
             return test_func(*args, **kwargs)
     return wrapped
@@ -1130,3 +1354,64 @@ def mocked_reference_test_file(file_name_or_path, href_type, file_content="mock"
         path = f"{href_prefix}{path}"
         href_type = None if "://" in path else href_type
     return f"{href_type}://{path}" if href_type else path
+
+
+def setup_test_file_hierarchy(test_paths, test_root_dir, test_data="data"):
+    # type: (Iterable[Union[Path, Tuple[Path, Optional[Path]]]], Path, str) -> List[Path]
+    """
+    Creates all requested files and directories, either directly or as system links to another file or directory.
+
+    All files and directories should be relative paths, which will be created under :paramref:`test_root_dir`.
+
+    Directory creations are requested by terminating the path with a ``/``. Similarly, directory links should have
+    a ``/`` character at the end. Mismatching file/directory link source and corresponding target is not explicitly
+    prohibited, just could yield unexpected outcomes.
+
+    Any nested file or directory definition that contains any missing parent directories on the file system will
+    have their complete parent directories hierarchy created immediately. If alternate link definitions are needed,
+    they should be specified beforehand. Files and directories paths are resolved and created in the specified order.
+
+    When any link is specified (using a tuple of source to target paths), the target location that it refers to must
+    exist before the file or directory link creation is attempted. If the target is ``None`` or empty, it will be
+    considered a plain file or directory reference as if provided directly instead of the tuple form.
+
+    :param test_paths: Paths to files, directories, or links to a file or directory to be generated.
+    :param test_root_dir: Base directory under which to create all requested elements.
+    :param test_data: Data written to created files when applicable.
+    :returns: Exhaustive listing of files and directories hierarchy under the root directory.
+    """
+    for test_item in test_paths:
+        file_path, link_target = test_item if isinstance(test_item, tuple) else (test_item, None)
+        dir_path, file_path = os.path.split(file_path)
+        # resolve paths
+        if link_target:
+            link_target = os.path.join(test_root_dir, link_target)
+        if dir_path:
+            dir_path = os.path.join(test_root_dir, dir_path)
+            if file_path:
+                file_path = os.path.join(dir_path, file_path)
+        else:
+            file_path = os.path.join(test_root_dir, file_path)
+        # create file reference
+        if file_path:
+            if dir_path:
+                os.makedirs(dir_path, exist_ok=True)
+            if link_target:
+                parent_dir = os.path.split(file_path)[0]
+                os.makedirs(parent_dir, exist_ok=True)
+                os.symlink(link_target, file_path)
+            else:
+                with open(file_path, mode="w", encoding="utf-8") as f:
+                    f.write(test_data)
+        # create dir reference
+        elif link_target and dir_path:
+            parent_dir = os.path.split(dir_path)[0]
+            os.makedirs(parent_dir, exist_ok=True)
+            os.symlink(link_target.rstrip("/"), dir_path, target_is_directory=True)
+        elif dir_path:
+            os.makedirs(dir_path, exist_ok=True)
+    listing = []
+    for path, dirs, files in os.walk(test_root_dir):
+        listing.extend((os.path.join(path, dir_path) + "/" for dir_path in dirs))
+        listing.extend((os.path.join(path, file_name) for file_name in files))
+    return sorted(listing)

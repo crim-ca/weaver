@@ -1,0 +1,39 @@
+{
+  "ResponseMetadata": {
+    "RequestId": "vpiM5RBkJ3O68CnD5fO42d887Jh49Cf8bhA6nw7ZTHIuGRVccDQM",
+    "HTTPStatusCode": 200,
+    "HTTPHeaders": {
+      "x-amzn-requestid": "vpiM5RBkJ3O68CnD5fO42d887Jh49Cf8bhA6nw7ZTHIuGRVccDQM"
+    },
+    "RetryAttempts": 0
+  },
+  "IsTruncated": false,
+  "Contents": [
+    {
+      "Key": "dir/file.txt",
+      "LastModified": "2022-11-01T04:25:42+00:00",
+      "ETag": "\"17404a596cbd0d1e6c7d23fcd845ab82\"",
+      "Size": 4,
+      "StorageClass": "STANDARD"
+    },
+    {
+      "Key": "dir/sub/file.txt",
+      "LastModified": "2022-11-01T04:25:42+00:00",
+      "ETag": "\"17404a596cbd0d1e6c7d23fcd845ab82\"",
+      "Size": 4,
+      "StorageClass": "STANDARD"
+    },
+    {
+      "Key": "dir/sub/nested/file.txt",
+      "LastModified": "2022-11-01T04:25:42+00:00",
+      "ETag": "\"17404a596cbd0d1e6c7d23fcd845ab82\"",
+      "Size": 4,
+      "StorageClass": "STANDARD"
+    }
+  ],
+  "Name": "wps-process-test-bucket",
+  "Prefix": "dir/",
+  "MaxKeys": 1000,
+  "EncodingType": "url",
+  "KeyCount": 3
+}

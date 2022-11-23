@@ -4,7 +4,7 @@ import time
 import unittest
 from collections import OrderedDict
 from copy import deepcopy
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, overload
 from urllib.parse import urlparse
 
 import pyramid.testing
@@ -34,10 +34,22 @@ from weaver.utils import fully_qualified_name, load_file
 from weaver.visibility import Visibility
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Iterable, Optional, Union
+    from typing import Any, Dict, Iterable, Optional, Tuple, Union
     from typing_extensions import Literal
 
-    from weaver.typedefs import AnyRequestMethod, AnyResponseType, AnyUUID, JSON, SettingsType
+    from weaver.typedefs import (
+        AnyRequestMethod,
+        AnyResponseType,
+        AnyUUID,
+        CWL,
+        JSON,
+        ProcessDeployment,
+        ProcessDescription,
+        ProcessDescriptionListing,
+        ProcessDescriptionMapping,
+        ProcessExecution,
+        SettingsType
+    )
 
     ReferenceType = Literal["deploy", "describe", "execute", "package"]
 
@@ -51,6 +63,66 @@ class ResourcesUtil(object):
 
         Can be left undefined (not overridden) if ``local=True`` is used.
         """
+
+    @classmethod
+    @overload
+    def retrieve_payload(cls,
+                         process,           # type: str
+                         ref_type=None,     # type: Literal["deploy"]
+                         ref_name=None,     # type: Optional[str]
+                         ref_found=False,   # type: Literal[False]
+                         location=None,     # type: Optional[str]
+                         local=False,       # type: bool
+                         ):                 # type: (...) -> Union[ProcessDeployment, Dict[str, JSON]]
+        ...
+
+    @classmethod
+    @overload
+    def retrieve_payload(cls,
+                         process,           # type: str
+                         ref_type=None,     # type: Literal["describe"]
+                         ref_name=None,     # type: Optional[str]
+                         ref_found=False,   # type: Literal[False]
+                         location=None,     # type: Optional[str]
+                         local=False,       # type: bool
+                         ):                 # type: (...) -> Union[ProcessDescription, Dict[str, JSON]]
+        ...
+
+    @classmethod
+    @overload
+    def retrieve_payload(cls,
+                         process,           # type: str
+                         ref_type=None,     # type: Literal["execute"]
+                         ref_name=None,     # type: Optional[str]
+                         ref_found=False,   # type: Literal[False]
+                         location=None,     # type: Optional[str]
+                         local=False,       # type: bool
+                         ):                 # type: (...) -> Union[ProcessExecution, Dict[str, JSON]]
+        ...
+
+    @classmethod
+    @overload
+    def retrieve_payload(cls,
+                         process,           # type: str
+                         ref_type=None,     # type: Literal["package"]
+                         ref_name=None,     # type: Optional[str]
+                         ref_found=False,   # type: Literal[False]
+                         location=None,     # type: Optional[str]
+                         local=False,       # type: bool
+                         ):                 # type: (...) -> CWL
+        ...
+
+    @classmethod
+    @overload
+    def retrieve_payload(cls,
+                         process,           # type: str
+                         ref_type=None,     # type: ReferenceType
+                         ref_name=None,     # type: Optional[str]
+                         ref_found=False,   # type: Literal[True]
+                         location=None,     # type: Optional[str]
+                         local=False,       # type: bool
+                         ):                 # type: (...) -> str
+        ...
 
     @classmethod
     def retrieve_payload(cls, process, ref_type=None, ref_name=None, ref_found=False, location=None, local=False):
@@ -241,8 +313,20 @@ class WpsConfigBase(unittest.TestCase):
         return deepcopy(resp.json)
 
     @classmethod
+    @overload
     def deploy_process(cls, payload, process_id=None, describe_schema=ProcessSchema.OGC, mock_requests_only_local=True):
-        # type: (JSON, Optional[str], str, bool) -> JSON
+        # type: (JSON, Optional[str], Literal[ProcessSchema.OGC], bool) -> Tuple[ProcessDescriptionMapping, CWL]  # noqa
+        ...
+
+    @classmethod
+    @overload
+    def deploy_process(cls, payload, process_id=None, describe_schema=ProcessSchema.OGC, mock_requests_only_local=True):
+        # type: (JSON, Optional[str], Literal[ProcessSchema.OLD], bool) -> Tuple[ProcessDescriptionListing, CWL]  # noqa
+        ...
+
+    @classmethod
+    def deploy_process(cls, payload, process_id=None, describe_schema=ProcessSchema.OGC, mock_requests_only_local=True):
+        # type: (JSON, Optional[str], ProcessSchema, bool) -> Tuple[ProcessDescription, CWL]
         """
         Deploys a process with :paramref:`payload`.
 
@@ -276,7 +360,7 @@ class WpsConfigBase(unittest.TestCase):
             resp = cls.app.get(info_path, headers=cls.json_headers)
             assert resp.status_code == 200
             info.append(deepcopy(resp.json))
-        return info
+        return info  # type: ignore
 
     def _try_get_logs(self, status_url):
         _resp = self.app.get(f"{status_url}/logs", headers=self.json_headers)
@@ -307,7 +391,7 @@ class WpsConfigBase(unittest.TestCase):
             Monitor until the requested status is reached (default: when job is completed).
             If no value is specified and :paramref:`expect_failed` is enabled, completion status will be a failure.
             Otherwise, the successful status is used instead. Explicit intermediate status can be requested instead.
-            Whichever status is specified or defaulted, failed/succeeded statuses will break-out of the monitoring loop,
+            Whichever status is specified or defaulted, failed/succeeded statuses will break out of the monitoring loop,
             since no more status change is possible.
         :param expect_failed:
             If enabled, allow failing status to during status validation.

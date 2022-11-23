@@ -12,6 +12,7 @@ generate :term:`ADES`/:term:`EMS` deployable :term:`Application Package`.
     - :mod:`weaver.wps_restapi.api` conformance details
 """
 
+import copy
 import json
 import logging
 import os
@@ -32,10 +33,12 @@ from cwltool.context import LoadingContext, RuntimeContext
 from cwltool.factory import Factory as CWLFactory, WorkflowStatus as CWLException
 from pyramid.httpexceptions import HTTPOk, HTTPServiceUnavailable
 from pywps import Process
-from pywps.inout import BoundingBoxInput, ComplexInput, LiteralInput
 from pywps.inout.basic import SOURCE_TYPE
-from pywps.inout.storage.file import FileStorageBuilder
-from pywps.inout.storage.s3 import S3StorageBuilder
+from pywps.inout.inputs import BoundingBoxInput, ComplexInput, LiteralInput
+from pywps.inout.outputs import ComplexOutput
+from pywps.inout.storage import STORE_TYPE, CachedStorage
+from pywps.inout.storage.file import FileStorage, FileStorageBuilder
+from pywps.inout.storage.s3 import S3Storage, S3StorageBuilder
 from requests.structures import CaseInsensitiveDict
 
 from weaver.config import WeaverConfiguration, WeaverFeature, get_weaver_configuration
@@ -50,7 +53,7 @@ from weaver.exceptions import (
     PackageTypeError,
     PayloadNotFound
 )
-from weaver.formats import ContentType, get_cwl_file_format, repr_json
+from weaver.formats import ContentType, get_content_type, get_cwl_file_format, get_format, repr_json
 from weaver.processes import opensearch
 from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_BUILTIN,
@@ -64,18 +67,22 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_ENV_VAR,
     CWL_REQUIREMENT_RESOURCE,
     CWL_REQUIREMENTS_SUPPORTED,
+    PACKAGE_COMPLEX_TYPES,
+    PACKAGE_DIRECTORY_TYPE,
     PACKAGE_EXTENSIONS,
+    PACKAGE_FILE_TYPE,
     WPS_INPUT,
     WPS_OUTPUT
 )
 from weaver.processes.convert import (
+    DEFAULT_FORMAT,
     cwl2wps_io,
-    is_cwl_array_type,
     json2wps_field,
     json2wps_io,
     merge_package_io,
     normalize_ordered_io,
     ogcapi2cwl_process,
+    parse_cwl_array_type,
     wps2json_io,
     xml_wps2cwl
 )
@@ -86,7 +93,11 @@ from weaver.status import STATUS_PYWPS_IDS, Status, StatusCompliant, map_status
 from weaver.store.base import StoreJobs, StoreProcesses
 from weaver.utils import (
     SUPPORTED_FILE_SCHEMES,
+    OutputMethod,
+    adjust_directory_local,
+    adjust_file_local,
     bytes2str,
+    fetch_directory,
     fetch_file,
     fully_qualified_name,
     get_any_id,
@@ -96,6 +107,7 @@ from weaver.utils import (
     get_log_fmt,
     get_sane_name,
     get_settings,
+    list_directory_recursive,
     request_extra,
     setup_loggers
 )
@@ -111,11 +123,12 @@ from weaver.wps.utils import get_wps_output_dir, get_wps_output_url, map_wps_out
 from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Deque, Dict, List, Optional, Tuple, Type, Union
+    from typing import Any, AnyStr, Callable, Deque, Dict, List, Optional, Tuple, Type, Union
 
     from cwltool.factory import Callable as CWLFactoryCallable
     from cwltool.process import Process as ProcessCWL
     from owslib.wps import WPSExecution
+    from pywps.inout.formats import Format
     from pywps.response.execute import ExecuteResponse
 
     from weaver.datatype import Authentication, Job
@@ -133,6 +146,7 @@ if TYPE_CHECKING:
         AnyValueType,
         CWL,
         CWL_AnyRequirements,
+        CWL_IO_ComplexType,
         CWL_Requirement,
         CWL_RequirementsDict,
         CWL_RequirementNames,
@@ -145,6 +159,7 @@ if TYPE_CHECKING:
         JSON,
         Literal,
         Number,
+        Path,
         ValueType
     )
     from weaver.wps.service import WorkerRequest
@@ -864,6 +879,129 @@ def get_process_definition(process_offering, reference=None, package=None, data_
     return process_offering
 
 
+class DirectoryNestedStorage(CachedStorage):
+    """
+    Generates a nested storage for a directory where each contained file will be managed by the storage.
+    """
+
+    def __init__(self, storage):
+        # type: (Union[FileStorage, S3Storage]) -> None
+        """
+        Initializes the storage.
+
+        :param storage: Storage implementation that is employed for storing files in a directory-like structure.
+        """
+        self.__dict__["_cache"] = {}
+        self.__dict__["storage"] = storage
+        super(DirectoryNestedStorage, self).__init__()
+
+    def __getattr__(self, item):
+        # type: (str) -> Any
+        return getattr(self.storage, item)
+
+    def __setattr__(self, key, value):
+        # type: (str, Any) -> None
+        """
+        Setting a property on this storage applies it on the nested file storage.
+        """
+        if key in self.__dict__:
+            object.__setattr__(self, key, value)
+        else:
+            setattr(self.storage, key, value)
+
+    @property
+    def type(self):
+        # type: () -> STORE_TYPE
+        return STORE_TYPE.PATH if isinstance(self.storage, FileStorage) else STORE_TYPE.S3
+
+    def _patch_destination(self, destination):
+        # type: (str) -> str
+        destination = destination.lstrip("/")  # avoid issues with prefix path join
+        # file storage already does the target-dir/output-dir join
+        # however, s3 storage does not...
+        if isinstance(self.storage, S3Storage):
+            return os.path.join(self.prefix, destination)
+        return destination
+
+    def _do_store(self, output):
+        # type: (ComplexOutput) -> Tuple[STORE_TYPE, Path, str]
+        """
+        Store all files contained in a directory recursively.
+
+        .. note::
+            This is called from :meth:`CachedStorage.store` only if not already in storage using cached output ID.
+        """
+        root = output.file
+        if not os.path.isdir(root):
+            raise ValueError(f"Location is not a directory: [{root}]")
+        files = list_directory_recursive(root)
+        root = root.rstrip("/") + "/"
+        loc_path = self.location(output.identifier) + "/"  # local directory or S3 location
+        url_path = self.url(output.identifier) + "/"       # HTTP output or same S3 location
+        default_support = [DEFAULT_FORMAT] + [get_format(ctype) for ctype in [ContentType.ANY, ContentType.TEXT_PLAIN]]
+        for file in files:
+            out_file_path_rel = file.split(root, 1)[-1]
+            out_cache_key = self._patch_destination(os.path.join(str(output.uuid), out_file_path_rel))
+            out_ext = os.path.splitext(out_file_path_rel)[-1]
+            out_ctype = get_content_type(out_ext)  # attempt guessing more specific format
+            out_fmt = get_format(out_ctype)
+            out_fmts = default_support + ([out_fmt] if out_fmt else [])
+            out_file = ComplexOutput(out_cache_key, title=output.title, data_format=out_fmt, supported_formats=out_fmts)
+            out_file.file = file
+            out_file.uuid = output.uuid  # forward base directory auto-generated when storing file
+            # create a copy in case the storage is used by many dirs, avoid concurrent read/write of distinct prefixes
+            dir_storage = copy.copy(self.storage)
+            if isinstance(dir_storage, S3Storage):
+                # patch S3 nested prefix under current directory
+                # S3 storage methods use only the file name to generate the bucket object key
+                # to preserve the nested output dir definition, it must be pushed as prefix
+                dir_storage.prefix = os.path.dirname(out_cache_key)
+            out_file.storage = dir_storage
+            out_type, out_path, out_url = dir_storage.store(out_file)
+            self._cache[out_cache_key] = (out_type, out_path, out_url)  # propagate up for direct reference as needed
+            LOGGER.debug("Stored file [%s] for reference [%s] under [%s] directory located in [%s] for reference [%s].",
+                         out_path, out_url, output.uuid, loc_path, url_path)
+        return self.type, loc_path, url_path
+
+    def write(self, data, destination, data_format=None):
+        # type: (AnyStr, str, Optional[Format]) -> str
+        """
+        Write data representing the directory itself or dispatch call to base storage for any other file contents.
+
+        When the directory itself is targeted, upload an empty bucket object for S3 base storage, or makes the
+        directory structure for base file storage.
+        """
+        dest_patched = self._patch_destination(destination)
+        if destination != "" and not destination.endswith("/"):
+            return self.storage.write(data, dest_patched, data_format=data_format)
+        if isinstance(self.storage, FileStorage):
+            os.makedirs(self.storage.target, exist_ok=True)
+            return self.url(dest_patched)
+        if isinstance(self.storage, S3Storage):
+            path = dest_patched.rstrip("/") + "/"
+            args = {
+                "ContentLength": 0,
+                "ContentType": ContentType.APP_DIR,
+            }
+            # create a bucket object that represents the dir
+            return self.storage.uploadData("", path, args)
+        raise NotImplementedError
+
+    def url(self, destination):
+        # type: (str) -> str
+        destination = self._patch_destination(destination)
+        if destination in ["/", ""]:
+            return self.storage.url("")
+        return self.storage.url(destination)
+
+    def location(self, destination):
+        # type: (str) -> Path
+        destination = self._patch_destination(destination)
+        if destination in ["/", ""]:
+            return self.storage.location("")
+        return self.storage.location(destination)
+
+
 class WpsPackage(Process):
 
     def __init__(self, package=None, payload=None, **kw):
@@ -1148,6 +1286,8 @@ class WpsPackage(Process):
         cwl_outdir = os.path.join(wps_workdir, "cwltool_out_")
         res_req = get_application_requirement(self.package, CWL_REQUIREMENT_RESOURCE, default={}, validate=False)
         runtime_params = {
+            # provide name reference to inject the value in log entries by cwltool
+            "name": self.identifier,
             # force explicit staging if write needed (InitialWorkDirRequirement in CWL package)
             # protect input paths that can be re-used to avoid potential in-place modifications
             "no_read_only": False,
@@ -1491,11 +1631,11 @@ class WpsPackage(Process):
             self.update_status(error_msg, self.percent, Status.FAILED)
             raise
         else:
-            self.update_status("Package complete.", PACKAGE_PROGRESS_DONE, Status.SUCCEEDED)
+            self.update_status("Package operations complete.", PACKAGE_PROGRESS_DONE, Status.SUCCEEDED)
         return self.response
 
-    def must_fetch(self, input_ref):
-        # type: (str) -> bool
+    def must_fetch(self, input_ref, input_type):
+        # type: (str, PACKAGE_COMPLEX_TYPES) -> bool
         """
         Figures out if file reference should be fetched immediately for local execution.
 
@@ -1503,7 +1643,8 @@ class WpsPackage(Process):
         S3 are handled here to avoid error on remote WPS not supporting it.
 
         .. seealso::
-            - :ref:`File Reference Types`
+            - :ref:`file_ref_types`
+            - :ref:`dir_ref_type`
         """
         if self.remote_execution or self.package_type == ProcessType.WORKFLOW:
             return False
@@ -1512,22 +1653,25 @@ class WpsPackage(Process):
             if input_ref.startswith("s3://"):
                 return True
             return False
-        return not os.path.isfile(input_ref)
+        if input_type == PACKAGE_FILE_TYPE:
+            return not os.path.isfile(input_ref)
+        # fetch if destination directory was created in advance but not yet populated with its contents
+        return not os.path.isdir(input_ref) or not os.listdir(input_ref)
 
     def make_inputs(self,
                     wps_inputs,         # type: Dict[str, Deque[WPS_Input_Type]]
                     cwl_inputs_info,    # type: Dict[str, CWL_Input_Type]
                     ):                  # type: (...) -> Dict[str, ValueType]
         """
-        Converts WPS input values to corresponding CWL input values for processing by CWL package instance.
+        Converts :term:`WPS` input values to corresponding :term:`CWL` input values for processing by the package.
 
-        The WPS inputs must correspond to :mod:`pywps` definitions.
-        Multiple values are adapted to arrays as needed.
-        WPS ``Complex`` types (files) are converted to appropriate locations based on data or reference specification.
+        The :term:`WPS` inputs must correspond to :mod:`pywps` definitions.
+        Multiple values (repeated objects with corresponding IDs) are adapted to arrays as needed.
+        All :term:`WPS` `Complex` types are converted to appropriate locations based on data or reference specification.
 
-        :param wps_inputs: actual WPS inputs parsed from execution request
-        :param cwl_inputs_info: expected CWL input definitions for mapping
-        :return: CWL input values
+        :param wps_inputs: Actual :term:`WPS` inputs parsed from execution request.
+        :param cwl_inputs_info: Expected CWL input definitions for mapping.
+        :return: :term:`CWL` input values.
         """
         cwl_inputs = {}
         for input_id in wps_inputs:
@@ -1538,20 +1682,20 @@ class WpsPackage(Process):
             # process single occurrences
             input_i = input_occurs[0]
             # handle as reference/data
-            is_array, elem_type, _, _ = is_cwl_array_type(cwl_inputs_info[input_id])
-            if isinstance(input_i, ComplexInput) or elem_type == "File":
+            io_def = parse_cwl_array_type(cwl_inputs_info[input_id])
+            if isinstance(input_i, ComplexInput) or io_def.type in PACKAGE_COMPLEX_TYPES:
                 # extend array data that allow max_occur > 1
                 # drop invalid inputs returned as None
-                if is_array:
-                    input_href = [self.make_location_input(elem_type, input_def) for input_def in input_occurs]
+                if io_def.array:
+                    input_href = [self.make_location_input(io_def.type, input_def) for input_def in input_occurs]
                     input_href = [cwl_input for cwl_input in input_href if cwl_input is not None]
                 else:
-                    input_href = self.make_location_input(elem_type, input_i)
+                    input_href = self.make_location_input(io_def.type, input_i)
                 if input_href:
                     cwl_inputs[input_id] = input_href
             elif isinstance(input_i, (LiteralInput, BoundingBoxInput)):
                 # extend array data that allow max_occur > 1
-                if is_array:
+                if io_def.array:
                     input_data = [i.url if i.as_reference else i.data for i in input_occurs]
                 else:
                     input_data = input_i.url if input_i.as_reference else input_i.data
@@ -1560,83 +1704,22 @@ class WpsPackage(Process):
                 raise PackageTypeError(f"Undefined package input for execution: {type(input_i)}.")
         return cwl_inputs
 
-    def make_location_input(self, input_type, input_definition):
-        # type: (str, ComplexInput) -> Optional[JSON]
+    def make_location_input_security_check(self, input_scheme, input_type, input_id, input_location, input_definition):
+        # type: (str, CWL_IO_ComplexType, str, str, ComplexInput) -> str
         """
-        Generates the JSON content required to specify a `CWL` ``File`` input definition from a location.
+        Perform security access validation of the reference, and resolve it afterwards if accessible.
 
-        If the input reference corresponds to an HTTP URL that is detected as matching the local WPS output endpoint,
-        implicitly convert the reference to the local WPS output directory to avoid useless download of available file.
-        Since that endpoint could be protected though, perform a minimal HEAD request to validate its accessibility.
-        Otherwise, this operation could incorrectly grant unauthorized access to protected files by forging the URL.
+        Auto-map local file if possible to avoid useless download from current server.
+        Resolve :term:`Vault` reference with local file stored after decryption.
 
-        If the process requires ``OpenSearch`` references that should be preserved as is, scheme defined by
-        :py:data:`weaver.processes.constants.OpenSearchField.LOCAL_FILE_SCHEME` prefix instead of ``http(s)://``
-        is expected.
-
-        Any other variant of file reference will be fetched as applicable by the relevant schemes.
-
-        .. seealso::
-            Documentation details of resolution based on schemes defined in :ref:`file_reference_types` section.
+        :returns: Updated file location if any resolution occurred.
         """
-        # NOTE:
-        #   When running as EMS, must not call data/file methods if URL reference, otherwise contents
-        #   get fetched automatically by PyWPS objects.
-        input_location = None
-        # cannot rely only on 'as_reference' as often it is not provided by the request although it's an href
-        if input_definition.as_reference:
-            input_location = input_definition.url
-        # FIXME: PyWPS bug
-        #   Calling 'file' method fetches it, and it is always called by the package itself
-        #   during type validation if the MODE is anything else than disabled.
-        #   MODE.SIMPLE is needed minimally to check MIME-TYPE of input against supported formats.
-        #       - https://github.com/geopython/pywps/issues/526
-        #       - https://github.com/crim-ca/weaver/issues/91
-        #   since href is already handled (pulled and staged locally), use it directly to avoid double fetch with CWL
-        #   validate using the internal '_file' instead of 'file' otherwise we trigger the fetch
-        #   normally, file should be pulled an this check should fail
-        input_definition_file = input_definition._iohandler._file  # noqa: W0212
-        if input_definition_file and os.path.isfile(input_definition_file):
-            input_location = input_definition_file
-        # if source type is data, we actually need to call 'data' (without fetch of remote file, already fetched)
-        # value of 'file' in this case points to a local file path where the wanted link was dumped as raw data
-        if input_definition.source_type == SOURCE_TYPE.DATA:
-            input_location = input_definition.data
-        input_scheme = None
-        if not input_location:
-            url = getattr(input_definition, "url")
-            if isinstance(url, str):
-                input_scheme = urlparse(url).scheme
-            if input_scheme and input_scheme in SUPPORTED_FILE_SCHEMES:
-                input_location = url
-            else:
-                # last option, could not resolve 'lazily' so will fetch data if needed
-                input_location = input_definition.data
-                input_scheme = None
-        # FIXME: PyWPS bug (https://github.com/geopython/pywps/issues/633)
-        #   Optional File inputs receive 'data' content that correspond to 'default format' definition if not provided.
-        #   This is invalid since input is not provided, it should not be there at all (default format != default data).
-        #   Patch with a combination of available detection methods to be safe:
-        #   - The 'file' attribute gets resolved to the process '{workdir}/input' temporary file.
-        #     This 'file' is instead named 'input_{uuid}' when it is actually resolved to real input href/data contents.
-        #     The IO handler better reports 'None' in its internal '_file' attribute.
-        #   - For even more robustness, verify that erroneous 'data' matches the 'default format'.
-        #     The media-type should match and 'default' argument should True since it resolve with '_default' argument.
-        default_format_def = getattr(input_definition, "_default", None)
-        if (
-            isinstance(default_format_def, dict) and
-            input_location == default_format_def and
-            input_definition_file is None and
-            # input_definition.size == 0 and  # not reliable, sometimes fails because 'data' is dict instead of str
-            default_format_def.get("default") is True and
-            any(default_format_def.get("mimeType") == fmt.mime_type and fmt.mime_type is not None
-                for fmt in input_definition.supported_formats)
-        ):
-            self.logger.debug("File input (%s) DROPPED. Detected default format as data.", input_definition.identifier)
-            return None
-
-        # auto-map local file if possible after security check
         if input_scheme == "vault":
+            if input_type != PACKAGE_FILE_TYPE:
+                raise PackageExecutionError(
+                    f"Vault reference must be a file, but resolved [{input_type}] type "
+                    f"instead for input [{input_id}] from location [{input_location}]."
+                )
             vault_id = bytes2str(urlparse(input_location).hostname)
             input_url = get_vault_url(vault_id, self.settings)
             resp = request_extra("HEAD", input_url, settings=self.settings, headers=self.auth)
@@ -1660,7 +1743,7 @@ class WpsPackage(Process):
                                   "by HTTP [%s] Detail:\n%s", input_location,
                                   resp.status_code, repr_json(resp.text, indent=2))
                 raise PackageAuthenticationError(
-                    f"Input {input_definition.identifier} with Vault reference [{vault_id}] is not accessible."
+                    f"Input {input_id} with Vault reference [{vault_id}] is not accessible."
                 )
         else:
             input_local_ref = map_wps_output_location(input_location, self.settings)
@@ -1671,13 +1754,126 @@ class WpsPackage(Process):
                                       "matching local WPS outputs [%s]. Skipping fetch using direct reference.",
                                       input_location, input_local_ref)
                     input_location = input_local_ref
+        return input_location
 
-        if self.must_fetch(input_location):
-            self.logger.info("File input (%s) ATTEMPT fetch: [%s]", input_definition.identifier, input_location)
-            input_location = fetch_file(input_location, input_definition.workdir,
-                                        settings=self.settings, headers=self.auth)
+    def make_location_input(self, input_type, input_definition):
+        # type: (CWL_IO_ComplexType, ComplexInput) -> Optional[JSON]
+        """
+        Generates the JSON content required to specify a `CWL` ``File`` or ``Directory`` input from a location.
+
+        If the input reference corresponds to an HTTP URL that is detected as matching the local WPS output endpoint,
+        implicitly convert the reference to the local WPS output directory to avoid useless download of available file.
+        Since that endpoint could be protected though, perform a minimal HEAD request to validate its accessibility.
+        Otherwise, this operation could incorrectly grant unauthorized access to protected files by forging the URL.
+
+        If the process requires ``OpenSearch`` references that should be preserved as is, scheme defined by
+        :py:data:`weaver.processes.constants.OpenSearchField.LOCAL_FILE_SCHEME` prefix instead of ``http(s)://``
+        is expected.
+
+        Any other variant of file reference will be fetched as applicable by the relevant schemes.
+
+        If the reference corresponds to a ``Directory``, all files that can be located in it will be fetched as
+        applicable by the relevant scheme of the reference. It is up to the remote location to provide listing
+        capabilities accordingly to view available files.
+
+        .. seealso::
+            Documentation details of resolution based on schemes defined in :ref:`file_ref_types` section.
+        """
+        # NOTE:
+        #   When running as EMS, must not call data/file methods if URL reference, otherwise contents
+        #   get fetched automatically by PyWPS objects.
+        input_location = None
+        input_id = input_definition.identifier
+        # cannot rely only on 'as_reference' as often it is not provided by the request, although it's an href
+        if input_definition.as_reference:
+            input_location = input_definition.url
+        # FIXME: PyWPS bug
+        #   Calling 'file' method fetches it, and it is always called by the package itself
+        #   during type validation if the MODE is anything else than disabled (MODE.NONE).
+        #   MODE.SIMPLE is needed minimally to check MIME-TYPE of input against supported formats.
+        #       - https://github.com/geopython/pywps/issues/526
+        #       - https://github.com/crim-ca/weaver/issues/91
+        #   since href is already handled (pulled and staged locally), use it directly to avoid double fetch with CWL
+        #   validate using the internal '_file' instead of 'file' otherwise we trigger the fetch
+        #   normally, file should be pulled and this check should fail
+        input_definition_file = input_definition._iohandler._file  # noqa: W0212
+        if input_definition_file and os.path.isfile(input_definition_file):
+            # Because storage handlers assume files, a directory (pseudo-file with trailing '/' unknown to PyWPS)
+            # could be mistakenly generated as an empty file. Wipe it in this case to ensure proper resolution.
+            if input_type == PACKAGE_DIRECTORY_TYPE and os.stat(input_definition_file).st_size == 0:
+                os.remove(input_definition_file)
+            else:
+                input_location = input_definition_file
+        # if source type is data, we actually need to call 'data' (without fetch of remote file, already fetched)
+        # value of 'file' in this case points to a local file path where the wanted link was dumped as raw data
+        if input_definition.source_type == SOURCE_TYPE.DATA:
+            input_location = input_definition.data
+        input_scheme = None
+        if not input_location:
+            url = getattr(input_definition, "url")
+            if isinstance(url, str):
+                input_scheme = urlparse(url).scheme
+            if input_scheme and input_scheme in SUPPORTED_FILE_SCHEMES:
+                input_location = url
+            else:
+                # last option, could not resolve 'lazily' so will fetch data if needed
+                input_location = input_definition.data
+                input_scheme = None
+        # FIXME: PyWPS bug (https://github.com/geopython/pywps/issues/633)
+        #   Optional File inputs receive 'data' content that correspond to 'default format' definition if not provided.
+        #   This is invalid since input is not provided, it should not be there at all (default format != default data).
+        #   Patch with a combination of available detection methods to be safe:
+        #   - The 'file' attribute gets resolved to the process '{workdir}/input' temporary file.
+        #     This 'file' is instead named 'input_{uuid}' when it is actually resolved to real input href/data contents.
+        #     The IO handler reports 'None' more reliably with its internal '_file' attribute.
+        #   - For even more robustness, verify that erroneous 'data' matches the 'default format'.
+        #     The media-type should match and 'default' argument should True since it resolve with '_default' argument.
+        default_format_def = getattr(input_definition, "_default", None)
+        if (
+            isinstance(default_format_def, dict) and
+            input_location == default_format_def and
+            input_definition_file is None and
+            # input_definition.size == 0 and  # not reliable, sometimes fails because 'data' is dict instead of str
+            default_format_def.get("default") is True and
+            any(default_format_def.get("mimeType") == fmt.mime_type and fmt.mime_type is not None
+                for fmt in input_definition.supported_formats)
+        ):
+            self.logger.debug("%s input (%s) DROPPED. Detected default format as data.", input_type, input_id)
+            return None
+
+        input_location = self.make_location_input_security_check(
+            input_scheme,
+            input_type,
+            input_id,
+            input_location,
+            input_definition
+        )
+
+        if self.must_fetch(input_location, input_type):
+            self.logger.info("%s input (%s) ATTEMPT fetch: [%s]", input_type, input_id, input_location)
+            if input_type == PACKAGE_FILE_TYPE:
+                input_location = fetch_file(input_location, input_definition.workdir,
+                                            settings=self.settings, headers=self.auth)
+            elif input_type == PACKAGE_DIRECTORY_TYPE:
+                # Because a directory reference can contain multiple sub-dir definitions,
+                # avoid possible conflicts with other inputs by nesting them under the ID.
+                # This also ensures that each directory input can work with a clean staging directory.
+                out_dir = os.path.join(input_definition.workdir, input_definition.identifier)
+                locations = fetch_directory(input_location, out_dir,
+                                            settings=self.settings, headers=self.auth)
+                if not locations:
+                    raise PackageExecutionError(
+                        f"Directory reference resolution method for input [{input_id}] "
+                        f"from location [{input_location}] did not produce any staged file."
+                    )
+                input_location = out_dir
+            else:
+                raise PackageExecutionError(
+                    f"Unknown reference staging resolution method for [{input_type}] type "
+                    f"specified for input [{input_id}] from location [{input_location}]."
+                )
         else:
-            self.logger.info("File input (%s) SKIPPED fetch: [%s]", input_definition.identifier, input_location)
+            self.logger.info("%s input (%s) SKIPPED fetch: [%s]", input_type, input_id, input_location)
 
         location = {"location": input_location, "class": input_type}
         if input_definition.data_format is not None and input_definition.data_format.mime_type:
@@ -1692,7 +1888,6 @@ class WpsPackage(Process):
         Maps `CWL` result outputs to corresponding `WPS` outputs.
         """
         for output_id in self.request.outputs:  # iterate over original WPS outputs, extra such as logs are dropped
-            # TODO: adjust output for glob patterns (https://github.com/crim-ca/weaver/issues/24)
             if isinstance(cwl_result[output_id], list) and not isinstance(self.response.outputs[output_id], list):
                 if len(cwl_result[output_id]) > 1:
                     self.logger.warning(
@@ -1734,8 +1929,13 @@ class WpsPackage(Process):
             - :func:`weaver.wps.load_pywps_config`
         """
         s3_bucket = self.settings.get("weaver.wps_output_s3_bucket")
-        result_loc = cwl_result[output_id]["location"].replace("file://", "")
+        result_loc = cwl_result[output_id]["location"].replace("file://", "").rstrip("/")
         result_path = os.path.split(result_loc)[-1]
+        result_type = cwl_result[output_id].get("class", PACKAGE_FILE_TYPE)
+        result_is_dir = result_type == PACKAGE_DIRECTORY_TYPE
+        if result_is_dir and not result_path.endswith("/"):
+            result_path += "/"
+            result_loc += "/"
 
         # PyWPS internally sets a new FileStorage (default) inplace when generating the JSON definition of the output.
         # This is done such that the generated XML status document in WPS response can obtain the output URL location.
@@ -1756,18 +1956,10 @@ class WpsPackage(Process):
         #   - pywps.inout.outputs.ComplexOutput.storage.store()
         # But, setter "pywps.inout.basic.ComplexOutput.storage" doesn't override predefined 'storage'.
         # Therefore, preemptively override "ComplexOutput._storage" to whichever location according to use case.
-        if s3_bucket:
-            # when 'url' is directly enforced, 'ComplexOutput.json' will use it instead of 'file' from temp workdir
-            # override builder only here so that only results are uploaded to S3, and not XML status
-            # using this storage builder, other settings (bucket, region, etc.) are retrieved from PyWPS server config
-            self.response.outputs[output_id]._storage = S3StorageBuilder().build()  # noqa: W0212
-            self.response.outputs[output_id].storage.prefix = str(self.response.uuid)  # job UUID
-        elif self.job.context:
-            storage = FileStorageBuilder().build()
-            storage.target = os.path.join(storage.target, self.job.context)
-            storage.output_url = os.path.join(storage.output_url, self.job.context)
-            os.makedirs(storage.target, exist_ok=True)  # pywps handles UUID-dir creation, but not nested context-dir
-            self.response.outputs[output_id]._storage = storage  # noqa: W0212
+        # Override builder per output to allow distinct S3/LocalFile for it and XML status that should remain local.
+        storage_type = STORE_TYPE.S3 if s3_bucket else STORE_TYPE.PATH
+        storage = self.make_location_storage(storage_type, result_type)
+        self.response.outputs[output_id]._storage = storage  # noqa: W0212
 
         # pywps will resolve file paths for us using its WPS request UUID
         os.makedirs(self.workdir, exist_ok=True)
@@ -1775,12 +1967,52 @@ class WpsPackage(Process):
 
         if os.path.realpath(result_loc) != os.path.realpath(result_wps):
             self.logger.info("Moving [%s]: [%s] -> [%s]", output_id, result_loc, result_wps)
-            shutil.move(result_loc, result_wps)
+            if result_is_dir:
+                adjust_directory_local(result_loc, self.workdir, OutputMethod.MOVE)
+            else:
+                adjust_file_local(result_loc, self.workdir, OutputMethod.MOVE)
         # params 'as_reference + file' triggers 'ComplexOutput.json' to map the WPS-output URL from the WPS workdir
         self.response.outputs[output_id].as_reference = True
         self.response.outputs[output_id].file = result_wps
+        # Since each output has its own storage already prefixed by '[Context/]JobID/', avoid JobID nesting another dir.
+        # Instead, let it create a dir matching the output ID to get '[Context/]JobID/OutputID/[file(s).ext]'
+        self.response.outputs[output_id].uuid = output_id
 
         self.logger.info("Resolved WPS output [%s] as file reference: [%s]", output_id, result_wps)
+
+    def make_location_storage(self, storage_type, location_type):
+        # type: (STORE_TYPE, PACKAGE_COMPLEX_TYPES) -> Union[FileStorage, S3Storage, DirectoryNestedStorage]
+        """
+        Generates the relevant storage implementation with requested types and references.
+
+        :param storage_type: Where to store the outputs.
+        :param location_type: Type of output as defined by CWL package type.
+        :return: Storage implementation.
+        """
+        if location_type == PACKAGE_FILE_TYPE and storage_type == STORE_TYPE.PATH:
+            storage = FileStorageBuilder().build()
+        elif location_type == PACKAGE_FILE_TYPE and storage_type == STORE_TYPE.S3:
+            storage = S3StorageBuilder().build()
+        elif location_type == PACKAGE_DIRECTORY_TYPE and storage_type == STORE_TYPE.PATH:
+            storage = DirectoryNestedStorage(FileStorageBuilder().build())
+        elif location_type == PACKAGE_DIRECTORY_TYPE and storage_type == STORE_TYPE.S3:
+            storage = DirectoryNestedStorage(S3StorageBuilder().build())
+        else:
+            raise PackageExecutionError(
+                "Cannot resolve unknown location storage for "
+                f"(storage: {storage_type}, type: {location_type})."
+            )
+
+        output_job_id = str(self.response.uuid)
+        output_prefix = os.path.join(self.job.context, output_job_id) if self.job.context else output_job_id
+        # pylint: disable=attribute-defined-outside-init  # references to nested storage dynamically created
+        if storage_type == STORE_TYPE.S3:
+            storage.prefix = output_prefix
+        else:
+            storage.target = os.path.join(storage.target, output_prefix)
+            storage.output_url = os.path.join(storage.output_url, output_prefix)
+            os.makedirs(storage.target, exist_ok=True)  # pywps handles Job UUID dir creation, but not nested dirs
+        return storage
 
     def make_tool(self, toolpath_object, loading_context):
         # type: (CWL_ToolPathObject, LoadingContext) -> ProcessCWL

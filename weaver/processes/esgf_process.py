@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Optional
 
 import cwt  # noqa  # package: esgf-compute-api
 
+from weaver.processes.constants import PACKAGE_FILE_TYPE
 from weaver.processes.wps1_process import Wps1Process
 from weaver.status import Status
 from weaver.utils import fetch_file
@@ -146,7 +147,7 @@ class ESGFProcess(Wps1Process):
             files = [files]
 
         for cwl_file in files:
-            if not cwl_file["class"] == "File":
+            if not cwl_file["class"] == PACKAGE_FILE_TYPE:
                 raise ValueError(f"Input named '{InputNames.FILES}' must have a class named 'File'")
             location = cwl_file["location"]
             if not location.startswith("http"):
