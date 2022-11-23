@@ -14,7 +14,7 @@ try:
         def patch(self):
             return self.micro
 
-except ImportError:
+except ImportError:  # pragma: no cover  # for backward compatibility
     from distutils.version import LooseVersion as BaseVersion  # pylint: disable=deprecated-module
 
     InvalidVersion = ValueError
