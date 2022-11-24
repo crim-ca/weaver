@@ -135,7 +135,7 @@ def register_builtin_processes(container):
     for process_id, process_data in builtin_apps_mapping.items():
         process_path = process_data["package"]
         process_desc = process_data["payload"]
-        process_info = get_process_definition(process_desc, package=None, reference=process_path)
+        process_info = get_process_definition(process_desc, package=None, reference=process_path, builtin=True)
         process_url = "/".join([restapi_url, "processes", process_id])
         process_package = _get_builtin_package(process_id, process_info["package"])
         process_abstract = _get_builtin_metadata(process_id, process_path, "__doc__", clean=True)

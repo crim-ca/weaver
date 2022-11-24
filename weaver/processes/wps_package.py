@@ -349,8 +349,8 @@ def _update_package_compatibility(package):
     package_original = copy.deepcopy(package)
     package_type = _get_package_type(package)
     if package_type == ProcessType.APPLICATION:
-        docker_req = get_application_requirement(package)
-        if docker_req["class"].endwith(CWL_REQUIREMENT_APP_DOCKER_GPU):
+        docker_req = get_application_requirement(package, validate=False, required=False)
+        if docker_req["class"].endswith(CWL_REQUIREMENT_APP_DOCKER_GPU):
             # backup original for later compare and find requirements of interest
             # requirements unrelated to update must be preserved in same locations and formats to preserve behavior
             r_original = package.get("requirements", {})
@@ -649,6 +649,10 @@ def _generate_process_with_cwl_from_reference(reference, process_hint=None):
     The resulting :term:`Process` and its :term:`CWL` will correspond to a remote instance to which execution should
     be dispatched and monitored, except if the reference was directly a :term:`CWL` file.
 
+    .. warning::
+        Only conversion of the reference into a potential :term:`CWL` definition is accomplished by this function.
+        Further validations must still be applied to ensure the loaded definition is valid and meets all requirements.
+
     .. seealso::
         - :class:`weaver.processes.ogc_api_process.OGCAPIRemoteProcess`
         - :class:`weaver.processes.wps1_process.Wps1Process`
@@ -749,6 +753,7 @@ def get_application_requirement(package,        # type: CWL
                                 search=None,    # type: Optional[CWL_RequirementNames]
                                 default=null,   # type: Optional[Union[CWL_Requirement, Default]]
                                 validate=True,  # type: bool
+                                required=True,  # type: bool
                                 ):              # type: (...) -> Union[CWL_Requirement, Default]
     """
     Retrieves a requirement or hint from the :term:`CWL` package definition.
@@ -772,6 +777,7 @@ def get_application_requirement(package,        # type: CWL
     :param search: Specific requirement/hint name to search and retrieve the definition if available.
     :param default: Default value to return if no match was found. If ``None``, returns an empty ``{"class": ""}``.
     :param validate: Validate supported requirements/hints definition while extracting requested one.
+    :param required: Validation will fail if no supported requirements/hints definition could be found.
     :returns: dictionary that minimally has ``class`` field, and optionally other parameters from that requirement.
     """
     # package can define requirements and/or hints,
@@ -794,11 +800,11 @@ def get_application_requirement(package,        # type: CWL
 
     if validate:
         cwl_supported_reqs = list(CWL_REQUIREMENTS_SUPPORTED)
-        if not all(item.get("class") in cwl_supported_reqs for item in all_hints):
+        if required and not all_hints or not all(item.get("class") in cwl_supported_reqs for item in all_hints):
             raise PackageTypeError(
                 f"Invalid package requirement. One supported requirement within {cwl_supported_reqs} is needed."
                 f"If a script execution is required for this application, the '{CWL_REQUIREMENT_APP_DOCKER}' "
-                f"definition can be used to provide a suitable environment. "
+                "definition can be used to provide a suitable environment. "
                 f"Refer to {sd.DOC_URL}/package.html#script-application for examples."
             )
 
@@ -897,8 +903,13 @@ def get_process_identifier(process_info, package):
     return process_id
 
 
-def get_process_definition(process_offering, reference=None, package=None, data_source=None, headers=None):
-    # type: (JSON, Optional[str], Optional[CWL], Optional[str], Optional[AnyHeadersContainer]) -> JSON
+def get_process_definition(process_offering,    # type: JSON
+                           reference=None,      # type: Optional[str]
+                           package=None,        # type: Optional[CWL]
+                           data_source=None,    # type: Optional[str]
+                           headers=None,        # type: Optional[AnyHeadersContainer]
+                           builtin=False,       # type: bool
+                           ):                   # type: (...) -> JSON
     """
     Resolve the process definition considering corresponding metadata from the offering, package and references.
 
@@ -906,11 +917,12 @@ def get_process_definition(process_offering, reference=None, package=None, data_
     and a package definition passed by ``reference`` or ``package`` `CWL` content.
     The returned process information can be used later on to load an instance of :class:`weaver.wps_package.WpsPackage`.
 
-    :param process_offering: `WPS REST-API` (`WPS-3`) process offering as `JSON`.
-    :param reference: URL to `CWL` package definition, `WPS-1 DescribeProcess` endpoint or `WPS-3 Process` endpoint.
-    :param package: literal `CWL` package definition (`YAML` or `JSON` format).
-    :param data_source: where to resolve process IDs (default: localhost if ``None``).
+    :param process_offering: `WPS REST-API` (`WPS-3`) process offering as :term:`JSON`.
+    :param reference: URL to :term:`CWL` package, `WPS-1 DescribeProcess` endpoint or `WPS-3 Process` endpoint.
+    :param package: Literal :term:`CWL` package definition (`YAML` or `JSON` format).
+    :param data_source: Where to resolve process IDs (default: localhost if ``None``).
     :param headers: Request headers provided during deployment to retrieve details such as authentication tokens.
+    :param builtin: Indicate if the package is expected to be a :data:`CWL_REQUIREMENT_APP_BUILTIN` definition.
     :return: Updated process definition with resolved/merged information from ``package``/``reference``.
     """
 
@@ -968,7 +980,7 @@ def get_process_definition(process_offering, reference=None, package=None, data_
     )
 
     app_requirement = try_or_raise_package_error(
-        lambda: get_application_requirement(package),
+        lambda: get_application_requirement(package, validate=True, required=not builtin),
         reason="Validate requirements and hints",
     )
 

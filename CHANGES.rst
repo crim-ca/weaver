@@ -17,7 +17,7 @@ Changes:
 - Deprecate ``DockerGpuRequirement``, with attempts to auto-convert it into corresponding ``DockerRequirement``
   combined with  ``cwltool:CUDARequirement`` definitions. If this conversion does not work transparently for the user,
   explicit `CWL` updates with those definitions should be made.
-- Ensure validation check that exactly one `CWL` requirement or hint is provided to represent the application type.
+- Ensure that validation check finds exactly one provided `CWL` requirement or hint to represent the application type.
   In case of missing requirement, the reported error will contain a documentation link to guide the user in adjusting
   its `Application Package` accordingly.
 

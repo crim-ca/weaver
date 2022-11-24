@@ -398,8 +398,8 @@ def ows2json_output_data(output, process_description, container=None):
     if output.reference:
         json_output["reference"] = output.reference
 
-        # Handle special case where we have a reference to a json array containing dataset reference
-        # Avoid reference to reference by fetching directly the dataset references
+        # Handle special case where we have a reference to a json array containing dataset reference.
+        # Avoid reference to reference by fetching directly the dataset references.
         json_array = _get_multi_json_references(output, container)
         if json_array and all(str(ref).startswith("http") for ref in json_array):
             json_output["data"] = json_array
@@ -2262,7 +2262,7 @@ def oas2json_io_file(io_info, io_href=null):
 def oas2json_io_measure(io_info):
     # type: (OpenAPISchemaObject) -> Union[JSON_IO_TypedInfo, Type[null]]
     """
-    Convert an unit of measure (``UoM``) I/O definition by :term:`OpenAPI` schema into :term:`JSON` representation.
+    Convert a unit of measure (``UoM``) I/O definition by :term:`OpenAPI` schema into :term:`JSON` representation.
 
     This conversion projects an object (normally complex type) into a literal type, considering that other provided
     parameters are all metadata information.
@@ -2739,8 +2739,8 @@ def wps2json_io(io_wps, forced_fields=False):
         for io_format in io_wps_json["formats"]:
             transform_json(io_format, rename=rename, replace_values=replace_values, replace_func=replace_func)
 
-        # set 'default' format if it matches perfectly, or if only mime-type matches and it is the only available one
-        # (this avoid 'encoding' possibly not matching due to CWL not providing this information)
+        # set 'default' format if it matches perfectly, or if only mime-type matches, and it is the only available one
+        # (this avoids 'encoding' possibly not matching due to CWL not providing this information)
         io_default = get_field(io_wps_json, "default", search_variations=True)
         for io_format in io_wps_json["formats"]:
             io_format["default"] = (io_default != null and is_equal_formats(io_format, io_default))
@@ -2890,7 +2890,7 @@ def _are_different_and_set(item1, item2):
     Compares two value representations and returns ``True`` only if both are not ``null``, are of same ``type`` and
     of different representative value. By "representative", we consider here the visual representation of byte/unicode
     strings rather than literal values to support XML/JSON and Python 2/3 implementations.
-    Other non string-like types are verified with literal (usual) equality method.
+    Other non-string-like types are verified with literal (usual) equality method.
     """
     if item1 is null or item2 is null:
         return False
@@ -2946,7 +2946,7 @@ def normalize_ordered_io(io_section, order_hints=None):
     of parsers. This is merely *cosmetic* adjustments to ease readability of I/O to avoid always shuffling their order
     across multiple :term:`Application Package` and :term:`Process` reporting formats.
 
-    The important result of this function is to provide the I/O as a consistent list of objects so it is less
+    The important result of this function is to provide the I/O as a consistent list of objects, so it is less
     cumbersome to compare/merge/iterate over the elements with all functions that will follow.
 
     .. note::
@@ -2956,7 +2956,7 @@ def normalize_ordered_io(io_section, order_hints=None):
 
     :param io_section: Definition contained under the ``inputs`` or ``outputs`` fields.
     :param order_hints: Optional/partial I/O definitions hinting an order to sort unsorted-dict I/O.
-    :returns: I/O specified as list of dictionary definitions with preserved order (as best as possible).
+    :returns: I/O specified as list of dictionary definitions with preserved order (as good as possible).
     """
     if isinstance(io_section, list):
         return io_section
