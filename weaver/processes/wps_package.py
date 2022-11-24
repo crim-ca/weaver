@@ -21,7 +21,7 @@ import sys
 import tempfile
 import time
 import uuid
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, overload
 from urllib.parse import parse_qsl, urlparse
 
 import colander
@@ -49,6 +49,7 @@ from weaver.exceptions import (
     PackageException,
     PackageExecutionError,
     PackageNotFound,
+    PackageParsingError,
     PackageRegistrationError,
     PackageTypeError,
     PayloadNotFound
@@ -58,12 +59,14 @@ from weaver.processes import opensearch
 from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_BUILTIN,
     CWL_REQUIREMENT_APP_DOCKER,
+    CWL_REQUIREMENT_APP_DOCKER_GPU,
     CWL_REQUIREMENT_APP_ESGF_CWT,
     CWL_REQUIREMENT_APP_LOCAL,
     CWL_REQUIREMENT_APP_OGC_API,
     CWL_REQUIREMENT_APP_REMOTE,
     CWL_REQUIREMENT_APP_TYPES,
     CWL_REQUIREMENT_APP_WPS1,
+    CWL_REQUIREMENT_CUDA,
     CWL_REQUIREMENT_ENV_VAR,
     CWL_REQUIREMENT_RESOURCE,
     CWL_REQUIREMENTS_SUPPORTED,
@@ -100,6 +103,7 @@ from weaver.utils import (
     fetch_directory,
     fetch_file,
     fully_qualified_name,
+    generate_diff,
     get_any_id,
     get_header,
     get_job_log_msg,
@@ -108,6 +112,7 @@ from weaver.utils import (
     get_sane_name,
     get_settings,
     list_directory_recursive,
+    null,
     request_extra,
     setup_loggers
 )
@@ -150,12 +155,12 @@ if TYPE_CHECKING:
         CWL_Requirement,
         CWL_RequirementsDict,
         CWL_RequirementNames,
-        CWL_RequirementsList,
         CWL_Results,
         CWL_ToolPathObject,
         CWL_WorkflowStepPackage,
         CWL_WorkflowStepPackageMap,
         CWL_WorkflowStepReference,
+        Default,
         JSON,
         Literal,
         Number,
@@ -315,22 +320,110 @@ def _get_package_type(package_dict):
     return ProcessType.WORKFLOW if package_dict.get("class").lower() == "workflow" else ProcessType.APPLICATION
 
 
-def _get_package_requirements_as_class_list(requirements):
-    # type: (CWL_AnyRequirements) -> CWL_RequirementsList
+def _get_package_requirements_normalized(requirements, as_dict=False):
+    # type: (CWL_AnyRequirements, bool) -> CWL_AnyRequirements
     """
-    Converts `CWL` package ``requirements`` or ``hints`` into list representation.
+    Converts :term:`CWL` package ``requirements`` or ``hints`` into :class:`list` or :class:`dict` representation.
 
-    Uniformization `CWL` requirements into the list representation, whether the input definitions where
-    provided using the dictionary definition as ``{"<req-class>": {<params>}}`` or
-    the list of dictionary requirements ``[{<req-class+params>}]`` each with a ``class`` key.
+    Uniformization of :term:`CWL` ``requirements`` or ``hints`` into the :class:`list` representation (default)
+    or as :class:`dict` if requested, whether the input definitions where provided using the dictionary definition
+    as ``{"<req-class>": {<params>}}`` or  the list of dictionary requirements ``[{<req-class + params>}]``
+    each with a ``class`` key.
     """
     if isinstance(requirements, dict):
+        if as_dict:
+            return {req: dict(params) for req, params in requirements.items()}  # ensure literals instead of dict-like
         reqs = []
         for req in requirements:
             reqs.append({"class": req})
             reqs[-1].update(requirements[req] or {})
         return reqs
     return [dict(req) for req in requirements]  # ensure list-of-dict instead of sequence of dict-like
+
+
+def _update_package_compatibility(package):
+    # type: (CWL) -> CWL
+    """
+    Update a :term:`CWL` package with backward compatibility changes if applicable.
+    """
+    package_original = copy.deepcopy(package)
+    package_type = _get_package_type(package)
+    if package_type == ProcessType.APPLICATION:
+        docker_req = get_application_requirement(package)
+        if docker_req["class"].endwith(CWL_REQUIREMENT_APP_DOCKER_GPU):
+            # backup original for later compare and find requirements of interest
+            # requirements unrelated to update must be preserved in same locations and formats to preserve behavior
+            r_original = package.get("requirements", {})
+            h_original = package.get("hints", {})
+            r_list = _get_package_requirements_normalized(r_original)
+            h_list = _get_package_requirements_normalized(h_original)
+            r_no_docker = list(filter(lambda _req: not _req["class"].endswith(CWL_REQUIREMENT_APP_DOCKER_GPU), r_list))
+            h_no_docker = list(filter(lambda _req: not _req["class"].endswith(CWL_REQUIREMENT_APP_DOCKER_GPU), h_list))
+            r_cuda = list(filter(lambda _req: _req["class"].endswith(CWL_REQUIREMENT_CUDA), r_list))
+            h_cuda = list(filter(lambda _req: _req["class"].endswith(CWL_REQUIREMENT_CUDA), h_list))
+            docker_req["class"] = CWL_REQUIREMENT_APP_DOCKER  # GPU to official Docker requirement
+            cuda_req = r_cuda or h_cuda
+            cuda_found = bool(cuda_req)
+            if not cuda_req:  # if CUDA no explicitly provided along the older GPU requirement, define default
+                cuda_req = {
+                    "class": CWL_REQUIREMENT_CUDA,
+                    # use older minimal version/capability to allow more chances to match any available GPU
+                    # if this causes an issue for an actual application, it must provide it explicitly anyway
+                    "cudaVersionMin": "10.0",
+                    "cudaComputeCapability": "3.0",
+                    # use minimum defaults
+                    "cudaDeviceCountMin": 1,
+                    "cudaDeviceCountMax": 1,
+                }
+            # apply the change to the relevant list where it was originally found
+            if r_list == r_no_docker and h_list != h_no_docker:
+                h_list = h_no_docker + ([docker_req] if cuda_found else [docker_req, cuda_req])
+            elif r_list != r_no_docker and h_list == h_no_docker:
+                r_list = r_no_docker + ([docker_req] if cuda_found else [docker_req, cuda_req])
+            else:
+                raise PackageParsingError(
+                    f"Expected to find a unique '{CWL_REQUIREMENT_APP_DOCKER_GPU}' definition in CWL "
+                    "requirements or hints, but could not resolve it between mapping and listing representations."
+                )
+            # revert list conversion if necessary
+            r_list = _get_package_requirements_normalized(r_list, as_dict=isinstance(r_original, dict))
+            h_list = _get_package_requirements_normalized(h_list, as_dict=isinstance(h_original, dict))
+            if r_list:
+                package["requirements"] = r_list
+            if h_list:
+                package["hints"] = h_list
+            LOGGER.warning(
+                "CWL package definition updated using '%s' backward-compatibility definition.\n%s",
+                CWL_REQUIREMENT_APP_DOCKER_GPU,
+                generate_diff(package_original, package, val_name="Original CWL", ref_name="Updated CWL")
+            )
+    return package
+
+
+@overload
+def _load_package_content(package_dict,                             # type: CWL
+                          package_name=PACKAGE_DEFAULT_FILE_NAME,   # type: str
+                          data_source=None,                         # type: Optional[str]
+                          only_dump_file=False,                     # type: Literal[True]
+                          tmp_dir=None,                             # type: Optional[str]
+                          loading_context=None,                     # type: Optional[LoadingContext]
+                          runtime_context=None,                     # type: Optional[RuntimeContext]
+                          process_offering=None,                    # type: Optional[JSON]
+                          ):                                        # type: (...) -> None
+    ...
+
+
+@overload
+def _load_package_content(package_dict,                             # type: CWL
+                          package_name=PACKAGE_DEFAULT_FILE_NAME,   # type: str
+                          data_source=None,                         # type: Optional[str]
+                          only_dump_file=False,                     # type: Literal[False]
+                          tmp_dir=None,                             # type: Optional[str]
+                          loading_context=None,                     # type: Optional[LoadingContext]
+                          runtime_context=None,                     # type: Optional[RuntimeContext]
+                          process_offering=None,                    # type: Optional[JSON]
+                          ):  # type: (...) -> Tuple[CWLFactoryCallable, str, CWL_WorkflowStepPackageMap]
+    ...
 
 
 def _load_package_content(package_dict,                             # type: CWL
@@ -343,34 +436,37 @@ def _load_package_content(package_dict,                             # type: CWL
                           process_offering=None,                    # type: Optional[JSON]
                           ):  # type: (...) -> Optional[Tuple[CWLFactoryCallable, str, CWL_WorkflowStepPackageMap]]
     """
-    Loads `CWL` package definition using various contextual resources.
+    Loads :term:`CWL` package definition using various contextual resources.
 
     Following operations are accomplished to validate the package:
 
-    - Starts by resolving any intermediate sub-packages steps if the parent package is a `Workflow` (CWL class),
+    - Starts by resolving any intermediate sub-packages steps if the parent package is a :term:`Workflow`
       in order to recursively generate and validate their process and package, potentially using remote reference.
-      Each of those operations are applied to every step.
+      Each of the following operations are applied to every step individually.
     - Package I/O are reordered using any reference process offering hints if provided to generate consistent results.
+    - Perform backward compatibility checks and conversions to the package if applicable.
     - The resulting package definition is dumped to a temporary JSON file, to validate the content can be serialized.
-    - Optionally, the `CWL` factory is employed to create the application runner, validating any provided loading and
-      runtime contexts, and considering all Workflow steps if applicable, or the single application otherwise.
+    - Optionally, the :term:`CWL` factory is employed to create the application runner, validating any provided loading
+      and runtime contexts, and considering all resolved :term:`Workflow` steps if applicable, or the atomic application
+      otherwise.
 
-    :param package_dict: package content representation as a json dictionary.
-    :param package_name: name to use to create the package file.
-    :param data_source: identifier of the data source to map to specific ADES, or map to localhost if ``None``.
-    :param only_dump_file: specify if the :class:`CWLFactoryCallable` should be validated and returned.
-    :param tmp_dir: location of the temporary directory to dump files (deleted on exit).
-    :param loading_context: cwltool context used to create the cwl package (required if ``only_dump_file=False``)
-    :param runtime_context: cwltool context used to execute the cwl package (required if ``only_dump_file=False``)
-    :param process_offering: JSON body of the process description payload (used as I/O hint ordering)
+    :param package_dict: Package content representation as a dictionary.
+    :param package_name: Name to use to create the package file and :term:`CWL` identifiers.
+    :param data_source:
+        Identifier of the :term:`Data Source` to map to specific :term:`ADES`, or map to ``localhost`` if ``None``.
+    :param only_dump_file: Specify if the :class:`CWLFactoryCallable` should be validated and returned.
+    :param tmp_dir: Location of the temporary directory to dump files (deleted on exit).
+    :param loading_context: :mod:`cwltool` context used to create the :term:`CWL` package.
+    :param runtime_context: :mod:`cwltool` context used to execute the :term:`CWL` package.
+    :param process_offering: :term:`JSON` body of the process description payload (used as I/O hint ordering).
     :returns:
         If :paramref:`only_dump_file` is ``True``, returns ``None``.
-        Otherwise, tuple of:
+        Otherwise, :class:`tuple` of:
 
         - Instance of :class:`CWLFactoryCallable`
         - Package type (:attr:`ProcessType.WORKFLOW` or :attr:`ProcessType.APPLICATION`)
-        - Package sub-steps definitions if package is of type :attr:`ProcessType.WORKFLOW`. Otherwise, empty mapping.
-          Mapping of each step name contains their respective package ID and definition that must be run.
+        - Package sub-steps definitions if package represents a :attr:`ProcessType.WORKFLOW`. Otherwise, empty mapping.
+          Mapping of each step name contains their respective package ID and :term:`CWL` definition that must be run.
 
     .. warning::
         Specified :paramref:`tmp_dir` will be deleted on exit.
@@ -380,6 +476,7 @@ def _load_package_content(package_dict,                             # type: CWL
     tmp_json_cwl = os.path.join(tmp_dir, package_name)
 
     # for workflows, retrieve each 'sub-package' file
+    package_dict = _update_package_compatibility(package_dict)
     package_type = _get_package_type(package_dict)
     workflow_steps = get_package_workflow_steps(package_dict)
     step_packages = {}
@@ -648,19 +745,28 @@ def _generate_process_with_cwl_from_reference(reference, process_hint=None):
     return cwl_package, process_info
 
 
-def get_application_requirement(package, search=None, default=None, validate=True):
-    # type: (CWL, Optional[CWL_RequirementNames], Optional[Any], bool) -> Union[CWL_Requirement, Any]
+def get_application_requirement(package,        # type: CWL
+                                search=None,    # type: Optional[CWL_RequirementNames]
+                                default=null,   # type: Optional[Union[CWL_Requirement, Default]]
+                                validate=True,  # type: bool
+                                ):              # type: (...) -> Union[CWL_Requirement, Default]
     """
     Retrieves a requirement or hint from the :term:`CWL` package definition.
 
-    If no filter is specified (default), retrieve the *principal* requirement that allows mapping to the appropriate
-    :term:`Process` implementation. Obtains the first item in :term:`CWL` package ``requirements`` or ``hints``
-    that corresponds to a `Weaver`-specific application type as defined in :py:data:`CWL_REQUIREMENT_APP_TYPES`.
-    If a filter is provided, this specific requirement or hint is looked for instead.
-    Regardless of the applied filter, only a unique item can be matched across requirements/hints containers, and
-    within a same container in case of listing representation to avoid ambiguity. When requirements/hints validation
-    is enabled, all requirements must also be defined amongst :data:`CWL_REQUIREMENTS_SUPPORTED` for the :term:`CWL`
-    package to be considered valid.
+    If no :paramref:`search` filter is specified (default), retrieve the *principal* requirement that allows
+    mapping to the appropriate :term:`Process` implementation. The *principal* requirement can be extracted
+    for an :term:`Application Package` of type :data:`ProcessType.APPLICATION` because only one is permitted
+    simultaneously amongst :data:`CWL_REQUIREMENT_APP_TYPES`.
+
+    If a :paramref:`search` filter is provided, this specific requirement or hint is looked for instead.
+    Regardless of the applied filter, only a unique item can be matched across ``requirements``/``hints`` mapping
+    and/or listing representations.
+
+    When :paramref:`validate` is enabled, all ``requirements`` and ``hints`` must also be defined
+    within :data:`CWL_REQUIREMENTS_SUPPORTED` for the :term:`CWL` package to be considered valid.
+
+    When :paramref:`convert` is enabled, any backward compatibility definitions will be converted to their
+    corresponding definition.
 
     :param package: CWL definition to parse.
     :param search: Specific requirement/hint name to search and retrieve the definition if available.
@@ -673,7 +779,7 @@ def get_application_requirement(package, search=None, default=None, validate=Tru
     # workflow can have multiple, but they are not explicitly handled
     reqs = package.get("requirements", {})
     hints = package.get("hints", {})
-    all_hints = _get_package_requirements_as_class_list(reqs) + _get_package_requirements_as_class_list(hints)
+    all_hints = _get_package_requirements_normalized(reqs) + _get_package_requirements_normalized(hints)
     if search:
         app_hints = list(filter(lambda h: h["class"] == search, all_hints))
     else:
@@ -681,15 +787,20 @@ def get_application_requirement(package, search=None, default=None, validate=Tru
     if len(app_hints) > 1:
         raise PackageTypeError(
             f"Package 'requirements' and/or 'hints' define too many conflicting values: {list(app_hints)}, "
-            f"only one permitted amongst {list(CWL_REQUIREMENT_APP_TYPES)}."
+            f"only one requirement is permitted amongst {list(CWL_REQUIREMENT_APP_TYPES)}."
         )
-    req_default = default if default is not None else {"class": ""}
+    req_default = default if default is not null else {"class": ""}
     requirement = app_hints[0] if app_hints else req_default
 
     if validate:
         cwl_supported_reqs = list(CWL_REQUIREMENTS_SUPPORTED)
         if not all(item.get("class") in cwl_supported_reqs for item in all_hints):
-            raise PackageTypeError(f"Invalid requirement, the requirements supported are {cwl_supported_reqs}")
+            raise PackageTypeError(
+                f"Invalid package requirement. One supported requirement within {cwl_supported_reqs} is needed."
+                f"If a script execution is required for this application, the '{CWL_REQUIREMENT_APP_DOCKER}' "
+                f"definition can be used to provide a suitable environment. "
+                f"Refer to {sd.DOC_URL}/package.html#script-application for examples."
+            )
 
     return requirement
 
@@ -825,7 +936,8 @@ def get_process_definition(process_offering, reference=None, package=None, data_
     if reference:
         package, process_info = try_or_raise_package_error(
             lambda: _generate_process_with_cwl_from_reference(reference, process_info),
-            reason="Loading package from reference")
+            reason="Loading package from reference",
+        )
         process_info.update(process_offering)   # override upstream details
     if not isinstance(package, dict):
         raise PackageRegistrationError("Cannot decode process package contents.")
@@ -835,29 +947,34 @@ def get_process_definition(process_offering, reference=None, package=None, data_
     LOGGER.debug("Using data source: '%s'", data_source)
     package_factory, process_type, _ = try_or_raise_package_error(
         lambda: _load_package_content(package, data_source=data_source, process_offering=process_info),
-        reason="Loading package content")
+        reason="Loading package content",
+    )
 
     package_inputs, package_outputs = try_or_raise_package_error(
         lambda: _get_package_inputs_outputs(package_factory),
-        reason="Definition of package/process inputs/outputs")
+        reason="Definition of package/process inputs/outputs",
+    )
     process_inputs = process_info.get("inputs", [])
     process_outputs = process_info.get("outputs", [])
 
     try_or_raise_package_error(
         lambda: _update_package_metadata(process_info, package),
-        reason="Metadata update")
+        reason="Metadata update",
+    )
 
     process_inputs, process_outputs = try_or_raise_package_error(
         lambda: _merge_package_inputs_outputs(process_inputs, package_inputs, process_outputs, package_outputs),
-        reason="Merging of inputs/outputs")
+        reason="Merging of inputs/outputs",
+    )
 
     app_requirement = try_or_raise_package_error(
         lambda: get_application_requirement(package),
-        reason="Validate requirements and hints")
+        reason="Validate requirements and hints",
+    )
 
     auth_requirements = try_or_raise_package_error(
         lambda: get_auth_requirements(app_requirement, headers),
-        reason="Obtaining authentication requirements"
+        reason="Obtaining authentication requirements",
     )
 
     # obtain any retrieved process id if not already provided from upstream process offering, and clean it
@@ -874,7 +991,7 @@ def get_process_definition(process_offering, reference=None, package=None, data_
         "type": process_type,
         "inputs": process_inputs,
         "outputs": process_outputs,
-        "auth": auth_requirements
+        "auth": auth_requirements,
     })
     return process_offering
 
@@ -1328,7 +1445,7 @@ class WpsPackage(Process):
                 if req_cls != CWL_REQUIREMENT_APP_DOCKER:
                     continue
                 # remove build-related parameters because we forbid this in our case
-                # remove output directory since we must explicitly defined it to match with WPS
+                # remove output directory since we must explicitly define it to match with WPS
                 for req_rm in ["dockerFile", "dockerOutputDirectory"]:
                     is_rm = req_def.pop(req_rm, None)
                     if is_rm:
@@ -2056,7 +2173,7 @@ class WpsPackage(Process):
                           input_value is one of `input_object` or `array [input_object]`
                           input_object is one of `string` or `dict {class: File, location: string}`
                           in our case input are expected to be File object
-        :param tool: Whole `CWL` config including hints requirement
+        :param tool: Whole :term:`CWL` config including hints and requirements
                      (see: :py:data:`weaver.processes.constants.CWL_REQUIREMENT_APP_TYPES`)
         """
 

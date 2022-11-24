@@ -105,7 +105,7 @@ Problem connecting workflow steps together
 
 .. seealso::
 
-    - :ref:`CWL Workflow`
+    - :ref:`app_pkg_workflow`
     - :ref:`Output File Format`
 
 

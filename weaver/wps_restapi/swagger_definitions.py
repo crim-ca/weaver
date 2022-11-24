@@ -14,6 +14,7 @@ on `Weaver`'s `ReadTheDocs` page.
 """
 # pylint: disable=C0103,invalid-name
 import datetime
+import inspect
 import os
 import re
 from copy import copy
@@ -40,6 +41,7 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_INIT_WORKDIR,
     CWL_REQUIREMENT_INLINE_JAVASCRIPT,
     CWL_REQUIREMENT_NETWORK_ACCESS,
+    CWL_REQUIREMENT_RESOURCE,
     OAS_COMPLEX_TYPES,
     OAS_DATA_TYPES,
     PACKAGE_ARRAY_BASE,
@@ -2165,7 +2167,7 @@ class OWSContactInfo(ExtendedMappingSchema, OWSNamespace):
 class OWSServiceContact(ExtendedMappingSchema, OWSNamespace):
     name = "ServiceContact"
     individual = OWSString(name="IndividualName", title="OWSIndividualName", example="John Smith", missing=drop)
-    position = OWSString(name="PositionName", title="OWSPositionName", example="One Man Team", missing=drop)
+    position = OWSString(name="PositionName", title="OWSPositionName", example="One-Man Team", missing=drop)
     contact = OWSContactInfo(missing=drop, default={})
 
 
@@ -3145,7 +3147,7 @@ class JobStatusInfo(ExtendedMappingSchema):
                                         description="Timestamp when the job will be canceled if not yet completed.")
     estimatedCompletion = ExtendedSchemaNode(DateTime(), missing=drop)
     nextPoll = ExtendedSchemaNode(DateTime(), missing=drop,
-                                  description="Timestamp when the job will prompted for updated status details.")
+                                  description="Timestamp when the job will be prompted for updated status details.")
     percentCompleted = NumberType(example=0, validator=Range(min=0, max=100),
                                   description="Completion percentage of the job as indicated by the process.")
     progress = ExtendedSchemaNode(Integer(), example=100, validator=Range(0, 100),
@@ -3458,7 +3460,7 @@ class ExecuteInputOutputs(ExtendedMappingSchema):
             "Defines which outputs to be obtained from the execution (filtered or all), "
             "as well as the reporting method for each output according to 'transmissionMode', "
             "the 'response' type, and the execution 'mode' provided "
-            "(see for more details: https://pavics-weaver.readthedocs.io/en/latest/processes.html#execution-body)."
+            f"(see for more details: {DOC_URL}/processes.html#execution-body)."
         ),
         default={}
     )
@@ -3478,7 +3480,7 @@ class Execute(ExecuteInputOutputs):
         description=(
             "Desired execution mode specified directly. This is intended for backward compatibility support. "
             "To obtain more control over execution mode selection, employ the official Prefer header instead "
-            "(see for more details: https://pavics-weaver.readthedocs.io/en/latest/processes.html#execution-mode)."
+            f"(see for more details: {DOC_URL}/processes.html#execution-mode)."
         ),
         validator=OneOf(ExecuteMode.values())
     )
@@ -3487,7 +3489,7 @@ class Execute(ExecuteInputOutputs):
         default=ExecuteResponse.DOCUMENT,
         description=(
             "Indicates the desired representation format of the response. "
-            "(see for more details: https://pavics-weaver.readthedocs.io/en/latest/processes.html#execution-body)."
+            f"(see for more details: {DOC_URL}/processes.html#execution-body)."
         ),
         validator=OneOf(ExecuteResponse.values())
     )
@@ -3618,6 +3620,15 @@ class CWLClass(ExtendedSchemaNode):
     )
 
 
+class CWLExpression(ExtendedSchemaNode):
+    # https://www.commonwl.org/v1.2/CommandLineTool.html#Expression
+    schema_type = String
+    description = (
+        f"When combined with '{CWL_REQUIREMENT_INLINE_JAVASCRIPT}', "
+        "this field allows runtime parameter references."
+    )
+
+
 class RequirementClass(ExtendedSchemaNode):
     # in this case it is ok to use 'name' because target fields receiving it will
     # never be able to be named 'class' because of Python reserved keyword
@@ -3627,47 +3638,84 @@ class RequirementClass(ExtendedSchemaNode):
     description = "CWL requirement class specification."
 
 
-class CudaRequirementSpecification(PermissiveMappingSchema):
+class CUDAComputeCapability(ExtendedSchemaNode):
+    schema_type = String
+    example = "3.0"
+    title = "CUDA compute capability"
+    description = "The compute capability supported by the GPU hardware."
+    validator = SemanticVersion(regex=r"^\d+\.\d+$")
+
+
+class CUDAComputeCapabilityArray(ExtendedSequenceSchema):
+    item = CUDAComputeCapability()
+    validator = Length(min=1)
+
+
+class CUDAComputeCapabilitySchema(OneOfKeywordSchema):
+    # https://github.com/common-workflow-language/cwltool/blob/67a180/cwltool/extensions.yml#L178
+    title = CUDAComputeCapability.title
+    description = inspect.cleandoc("""
+        The compute capability supported by the GPU hardware.
+        
+        * If this is a single value, it defines only the minimum
+          compute capability.  GPUs with higher capability are also
+          accepted.
+        * If it is an array value, then only select GPUs with compute
+          capabilities that explicitly appear in the array.
+          
+        See https://docs.nvidia.com/deploy/cuda-compatibility/#faq and
+        https://docs.nvidia.com/cuda/cuda-c-best-practices-guide/index.html#cuda-compute-capability for details.
+    """)
+    _one_of = [
+        CUDAComputeCapability,
+        CUDAComputeCapabilityArray,
+    ]
+
+
+class CUDARequirementSpecification(PermissiveMappingSchema):
+    # https://github.com/common-workflow-language/cwltool/blob/67a180/cwltool/extensions.yml#L178
     cudaVersionMin = ExtendedSchemaNode(
         String(),
         example="11.4",
-        title="Cuda version minimum",
-        description="The minimum Cuda version required.",
-        validator=SemanticVersion(regex=r"^\d+\.\d+$")
+        title="CUDA version minimum",
+        description=inspect.cleandoc("""
+            The minimum CUDA version required to run the software. This corresponds to a CUDA SDK release.
+            
+            When run in a container, the container image should provide the CUDA runtime, and the host
+            driver is injected into the container.  In this case, because CUDA drivers are backwards compatible,
+            it is possible to use an older SDK with a newer driver across major versions.
+            
+            See https://docs.nvidia.com/deploy/cuda-compatibility/ for details.
+        """),
+        validator=SemanticVersion(regex=r"^\d+\.\d+$"),
     )
-    cudaComputeCapability = ExtendedSchemaNode(
-        String(),
-        example="3.0",
-        title="Cuda compute capability",
-        description="The compute capability supported by the GPU.",
-        validator=SemanticVersion(regex=r"^\d+\.\d+$")
-    )
+    cudaComputeCapability = CUDAComputeCapabilitySchema()
     cudaDeviceCountMin = ExtendedSchemaNode(
         Integer(),
         example=1,
         default=1,
         validator=Range(min=1),
-        title="Cuda device count minimum",
-        description="The minimum amount of devices required."
+        title="CUDA device count minimum",
+        description="The minimum amount of devices required.",
     )
     cudaDeviceCountMax = ExtendedSchemaNode(
         Integer(),
         example=8,
         default=1,
         validator=Range(min=1),
-        title="Cuda device count maximum",
-        description="The maximum amount of devices required."
+        title="CUDA device count maximum",
+        description="The maximum amount of devices required.",
     )
 
 
-class CudaRequirementMap(ExtendedMappingSchema):
-    CudaRequirement = CudaRequirementSpecification(
+class CUDARequirementMap(ExtendedMappingSchema):
+    CUDARequirement = CUDARequirementSpecification(
         name=CWL_REQUIREMENT_CUDA,
-        title=CWL_REQUIREMENT_CUDA
+        title=CWL_REQUIREMENT_CUDA,
     )
 
 
-class CudaRequirementClass(CudaRequirementSpecification):
+class CUDARequirementClass(CUDARequirementSpecification):
     _class = RequirementClass(example=CWL_REQUIREMENT_CUDA, validator=OneOf([CWL_REQUIREMENT_CUDA]))
 
 
@@ -3676,19 +3724,136 @@ class NetworkAccessRequirementSpecification(PermissiveMappingSchema):
         Boolean(),
         example=True,
         title="Network Access",
-        description="Indicate whether a process requires outgoing IPv4/IPv6 network access."
+        description="Indicate whether a process requires outgoing IPv4/IPv6 network access.",
     )
 
 
 class NetworkAccessRequirementMap(ExtendedMappingSchema):
     NetworkAccessRequirement = NetworkAccessRequirementSpecification(
         name=CWL_REQUIREMENT_NETWORK_ACCESS,
-        title=CWL_REQUIREMENT_NETWORK_ACCESS
+        title=CWL_REQUIREMENT_NETWORK_ACCESS,
     )
 
 
 class NetworkAccessRequirementClass(NetworkAccessRequirementSpecification):
     _class = RequirementClass(example=CWL_REQUIREMENT_NETWORK_ACCESS, validator=OneOf([CWL_REQUIREMENT_NETWORK_ACCESS]))
+
+
+class ResourceRequirementValue(OneOfKeywordSchema):
+    _one_of = [
+        ExtendedSchemaNode(Float(), validator=BoundedRange(min=0.0, exclusive_min=True)),
+        ExtendedSchemaNode(Integer(), validator=Range(min=1)),
+        CWLExpression,
+    ]
+
+
+class ResourceRequirementSpecification(PermissiveMappingSchema):
+    # descriptions extracted from: https://www.commonwl.org/v1.2/CommandLineTool.html#ResourceRequirement
+    coresMin = ResourceRequirementValue(
+        missing=drop,
+        default=1,
+        title="Minimum reserved number of CPU cores.",
+        description=inspect.cleandoc("""
+            Minimum reserved number of CPU cores.
+            
+            May be a fractional value to indicate to a scheduling algorithm that one core can be allocated
+            to multiple jobs. For example, a value of 0.25 indicates that up to 4 jobs may run in parallel
+            on 1 core. A value of 1.25 means that up to 3 jobs can run on a 4 core system (4/1.25 ≈ 3).
+            
+            Processes can only share a core allocation if the sum of each of their 'ramMax', 'tmpdirMax', 
+            and 'outdirMax' requests also do not exceed the capacity of the node.
+            
+            Processes sharing a core must have the same level of isolation (typically a container or VM)
+            that they would normally.
+            
+            The reported number of CPU cores reserved for the process, which is available to expressions on the
+            'CommandLineTool' as 'runtime.cores', must be a non-zero integer, and may be calculated by rounding up
+            the cores request to the next whole number.
+            
+            Scheduling systems may allocate fractional CPU resources by setting quotas or scheduling weights.
+            Scheduling systems that do not support fractional CPUs may round up the request to the next whole number.
+        """),
+    )
+    coresMax = ResourceRequirementValue(
+        missing=drop,
+        title="Maximum reserved number of CPU cores.",
+        description=(
+            "Maximum reserved number of CPU cores. "
+            "See 'coresMin' for discussion about fractional CPU requests."
+        ),
+    )
+    ramMin = ResourceRequirementValue(
+        missing=drop,
+        default=256,
+        title="Minimum reserved RAM in mebibytes.",
+        description=inspect.cleandoc("""
+            Minimum reserved RAM in mebibytes (2**20).
+            
+            May be a fractional value. If so, the actual RAM request must be rounded up to the next whole number.
+            The reported amount of RAM reserved for the process, which is available to expressions on the
+            'CommandLineTool' as 'runtime.ram', must be a non-zero integer.
+        """),
+    )
+    ramMax = ResourceRequirementValue(
+        missing=drop,
+        title="Maximum reserved RAM in mebibytes.",
+        description=(
+            "Maximum reserved RAM in mebibytes (2**20). "
+            "See 'ramMin' for discussion about fractional RAM requests."
+        ),
+    )
+    tmpdirMin = ResourceRequirementValue(
+        missing=drop,
+        default=1024,
+        title="Minimum reserved filesystem based storage for the designated temporary directory in mebibytes.",
+        description=inspect.cleandoc("""
+            Minimum reserved filesystem based storage for the designated temporary directory in mebibytes (2**20).
+            
+            May be a fractional value. If so, the actual storage request must be rounded up to the next whole number.
+            The reported amount of storage reserved for the process, which is available to expressions on the
+            'CommandLineTool' as 'runtime.tmpdirSize', must be a non-zero integer.
+        """),
+    )
+    tmpdirMax = ResourceRequirementValue(
+        missing=drop,
+        title="Maximum reserved filesystem based storage for the designated temporary directory in mebibytes.",
+        description=(
+            "Maximum reserved filesystem based storage for the designated temporary directory in mebibytes (2**20). "
+            "See 'tmpdirMin' for discussion about fractional storage requests."
+        ),
+    )
+    outdirMin = ResourceRequirementValue(
+        missing=drop,
+        default=1024,
+        title="Minimum reserved filesystem based storage for the designated output directory in mebibytes.",
+        description=inspect.cleandoc("""
+            Minimum reserved filesystem based storage for the designated output directory in mebibytes (2**20).
+
+            May be a fractional value. If so, the actual storage request must be rounded up to the next whole number.
+            The reported amount of storage reserved for the process, which is available to expressions on the
+            'CommandLineTool' as runtime.outdirSize, must be a non-zero integer.
+        """),
+    )
+    outdirMax = ResourceRequirementValue(
+        missing=drop,
+        default=1,
+        title="Maximum reserved filesystem based storage for the designated output directory in mebibytes.",
+        description=(
+            "Maximum reserved filesystem based storage for the designated output directory in mebibytes (2**20). "
+            "See 'outdirMin' for discussion about fractional storage requests."
+        ),
+    )
+
+
+class ResourceRequirementMap(ExtendedMappingSchema):
+    ResourceRequirement = ResourceRequirementSpecification(
+        name=CWL_REQUIREMENT_RESOURCE,
+        title=CWL_REQUIREMENT_RESOURCE,
+    )
+
+
+class ResourceRequirementClass(ResourceRequirementSpecification):
+    _class = RequirementClass(example=CWL_REQUIREMENT_RESOURCE, validator=OneOf([CWL_REQUIREMENT_RESOURCE]))
 
 
 class DockerRequirementSpecification(PermissiveMappingSchema):
@@ -3712,17 +3877,24 @@ class DockerRequirementClass(DockerRequirementSpecification):
 
 
 class DockerGpuRequirementSpecification(DockerRequirementSpecification):
+    deprecated = True
     description = (
         "Docker requirement with GPU-enabled support (https://github.com/NVIDIA/nvidia-docker). "
-        "The instance must have the NVIDIA toolkit installed to use this feature."
+        "The instance must have the NVIDIA toolkit installed to use this feature. "
+        "\nWARNING:\n"
+        "This requirement is specific to Weaver and is preserved only for backward compatibility. "
+        f"Prefer the combined use of official '{CWL_REQUIREMENT_APP_DOCKER}' and '{CWL_REQUIREMENT_CUDA}' "
+        "for better support of GPU capabilities and portability to other CWL-supported platforms."
     )
 
 
 class DockerGpuRequirementMap(ExtendedMappingSchema):
+    deprecated = True
     req = DockerGpuRequirementSpecification(name=CWL_REQUIREMENT_APP_DOCKER_GPU)
 
 
 class DockerGpuRequirementClass(DockerGpuRequirementSpecification):
+    deprecated = True
     title = CWL_REQUIREMENT_APP_DOCKER_GPU
     _class = RequirementClass(example=CWL_REQUIREMENT_APP_DOCKER_GPU, validator=OneOf([CWL_REQUIREMENT_APP_DOCKER_GPU]))
 
@@ -3849,6 +4021,10 @@ class WPS1RequirementClass(WPS1RequirementSpecification):
     _class = RequirementClass(example=CWL_REQUIREMENT_APP_WPS1, validator=OneOf([CWL_REQUIREMENT_APP_WPS1]))
 
 
+class UnknownRequirementMap(PermissiveMappingSchema):
+    description = "Generic schema to allow alternative CWL requirements/hints not explicitly defined in schemas."
+
+
 class UnknownRequirementClass(PermissiveMappingSchema):
     _class = RequirementClass(example="UnknownRequirement")
 
@@ -3860,7 +4036,8 @@ class CWLRequirementsMap(AnyOfKeywordSchema):
         InitialWorkDirRequirementMap(missing=drop),
         InlineJavascriptRequirementMap(missing=drop),
         NetworkAccessRequirementMap(missing=drop),
-        PermissiveMappingSchema(missing=drop),
+        ResourceRequirementMap(missing=drop),
+        UnknownRequirementMap(missing=drop),  # allows anything, must be last
     ]
 
 
@@ -3874,6 +4051,7 @@ class CWLRequirementsItem(OneOfKeywordSchema):
         InitialWorkDirRequirementClass(missing=drop),
         InlineJavascriptRequirementClass(missing=drop),
         NetworkAccessRequirementClass(missing=drop),
+        ResourceRequirementClass(missing=drop),
         UnknownRequirementClass(missing=drop),  # allows anything, must be last
     ]
 
@@ -3892,15 +4070,17 @@ class CWLRequirements(OneOfKeywordSchema):
 class CWLHintsMap(AnyOfKeywordSchema, PermissiveMappingSchema):
     _any_of = [
         BuiltinRequirementMap(missing=drop),
-        CudaRequirementMap(missing=drop),
+        CUDARequirementMap(missing=drop),
         DockerRequirementMap(missing=drop),
         DockerGpuRequirementMap(missing=drop),
         InitialWorkDirRequirementMap(missing=drop),
         InlineJavascriptRequirementMap(missing=drop),
         NetworkAccessRequirementMap(missing=drop),
+        ResourceRequirementMap(missing=drop),
         ESGF_CWT_RequirementMap(missing=drop),
         OGCAPIRequirementMap(missing=drop),
         WPS1RequirementMap(missing=drop),
+        UnknownRequirementMap(missing=drop),  # allows anything, must be last
     ]
 
 
@@ -3910,12 +4090,13 @@ class CWLHintsItem(OneOfKeywordSchema, PermissiveMappingSchema):
     discriminator = "class"
     _one_of = [
         BuiltinRequirementClass(missing=drop),
-        CudaRequirementClass(missing=drop),
+        CUDARequirementClass(missing=drop),
         DockerRequirementClass(missing=drop),
         DockerGpuRequirementClass(missing=drop),
         InitialWorkDirRequirementClass(missing=drop),
         InlineJavascriptRequirementClass(missing=drop),
         NetworkAccessRequirementClass(missing=drop),
+        ResourceRequirementClass(missing=drop),
         ESGF_CWT_RequirementClass(missing=drop),
         OGCAPIRequirementClass(missing=drop),
         WPS1RequirementClass(missing=drop),
@@ -4047,7 +4228,7 @@ class CWLInputsDefinition(OneOfKeywordSchema):
 
 class OutputBinding(PermissiveMappingSchema):
     glob = ExtendedSchemaNode(String(), missing=drop,
-                              description="Glob pattern the will find the output on disk or mounted docker volume.")
+                              description="Glob pattern to find the output on disk or mounted docker volume.")
 
 
 class CWLOutputObject(PermissiveMappingSchema):
@@ -4823,7 +5004,7 @@ class PostProcessJobsEndpointXML(LocalProcessPath):
     body = WPSExecutePost(
         # very important to override 'name' in this case
         # original schema uses it to specify the XML class name
-        # in this context, it is used to defined the 'in' location of this schema to form 'requestBody' in OpenAPI
+        # in this context, it is used to define the 'in' location of this schema to form 'requestBody' in OpenAPI
         name="body",
         examples={
             "ExecuteXML": {
@@ -5115,7 +5296,7 @@ class BadRequestResponseSchema(ExtendedMappingSchema):
 
 
 class ConflictRequestResponseSchema(ExtendedMappingSchema):
-    description = "Conflict between the affected entity an another existing definition."
+    description = "Conflict between the affected entity and another existing definition."
     header = ResponseHeaders()
     body = ErrorJsonResponseBodySchema()
 

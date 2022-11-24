@@ -1075,6 +1075,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         # not allowed even if combined with another known and valid definition
         ({"UnknownRequirement": {}, CWL_REQUIREMENT_APP_DOCKER: {"dockerPull": "python:3.7-alpine"}}, ),
         ({"UnknownRequirement": {}}, ),
+        ({}, ),  # no requirement (i.e.: simple shell script) also invalid
     ])
     def test_deploy_block_unknown_processes(self, requirements):
         # type: (CWL_AnyRequirements) -> None

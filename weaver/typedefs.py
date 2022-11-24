@@ -71,6 +71,7 @@ if TYPE_CHECKING:
 
     Path = Union[os.PathLike, str, bytes]
 
+    Default = TypeVar("Default")  # used for return value that is employed from a provided default value
     Params = ParamSpec("Params")  # use with 'Callable[Params, Return]', 'Params.args' and 'Params.kwargs'
     Return = TypeVar("Return")    # alias to identify the same return value as a decorated/wrapped function
     AnyCallable = TypeVar("AnyCallable", bound=Callable[..., Any])  # callable used for decorated/wrapped functions
@@ -166,11 +167,11 @@ if TYPE_CHECKING:
 
     # 'requirements' includes 'hints'
     CWL_Requirement = TypedDict("CWL_Requirement", {
-        "class": CWL_RequirementNames,  # type: ignore
+        "class": Required[CWL_RequirementNames],
         "provider": NotRequired[str],
         "process": NotRequired[str],
     }, total=False)
-    CWL_RequirementsDict = Dict[CWL_RequirementNames, Dict[str, str]]   # {'<req>': {<param>: <val>}}
+    CWL_RequirementsDict = Dict[CWL_RequirementNames, Dict[str, ValueType]]   # {'<req>': {<param>: <val>}}
     CWL_RequirementsList = List[CWL_Requirement]       # [{'class': <req>, <param>: <val>}]
     CWL_AnyRequirements = Union[CWL_RequirementsDict, CWL_RequirementsList]
     CWL_Class = Literal["CommandLineTool", "ExpressionTool", "Workflow"]

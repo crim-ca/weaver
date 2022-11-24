@@ -235,6 +235,15 @@ class PackageTypeError(HTTPUnprocessableEntity, PackageException):
     """
 
 
+class PackageParsingError(HTTPUnprocessableEntity, PackageException):
+    """
+    Error related to parsing of a package definition.
+
+    Error indicating that a :term:`CWL` package could not be properly parsed
+    according to expected structures or unresolved definitions.
+    """
+
+
 class PackageRegistrationError(HTTPInternalServerError, OWSNoApplicableCode, PackageException):
     """
     Error related to a registration issue for a package.

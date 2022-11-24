@@ -180,7 +180,8 @@ Glossary
         input/output chaining between operations.
 
         .. seealso::
-            Refer to :ref:`proc_workflow`, :ref:`proc_workflow_ops` and :ref:`CWL Workflow` sections for more details.
+            Refer to :ref:`proc_workflow`, :ref:`proc_workflow_ops` and :ref:`app_pkg_workflow`
+            sections for more details.
 
     WPS
         | Web Processing Service.

@@ -52,10 +52,7 @@ CWL_REQUIREMENT_APP_WPS1 = "WPS1Requirement"
 CWL_REQUIREMENT_APP_TYPES = frozenset([
     CWL_REQUIREMENT_APP_BUILTIN,
     CWL_REQUIREMENT_APP_DOCKER,
-    # FIXME: properly support GPU execution
-    #   - https://github.com/crim-ca/weaver/issues/104
-    #   - https://github.com/crim-ca/weaver/issues/138
-    # CWL_REQUIREMENT_APP_DOCKER_GPU,
+    CWL_REQUIREMENT_APP_DOCKER_GPU,  # backward compatibility, use 'DockerRequirement+cwltool:CUDARequirement' instead
     CWL_REQUIREMENT_APP_ESGF_CWT,
     CWL_REQUIREMENT_APP_OGC_API,
     CWL_REQUIREMENT_APP_WPS1,
@@ -67,6 +64,7 @@ Set of :term:`CWL` requirements consisting of known :term:`Application Package` 
 CWL_REQUIREMENT_APP_LOCAL = frozenset([
     CWL_REQUIREMENT_APP_BUILTIN,
     CWL_REQUIREMENT_APP_DOCKER,
+    CWL_REQUIREMENT_APP_DOCKER_GPU,
 ])
 """
 Set of :term:`CWL` requirements that correspond to local execution of an :term:`Application Package`.
@@ -184,8 +182,11 @@ if TYPE_CHECKING:
         CWL_REQUIREMENT_APP_ESGF_CWT,
         CWL_REQUIREMENT_APP_OGC_API,
         CWL_REQUIREMENT_APP_WPS1,
+        CWL_REQUIREMENT_CUDA,
         CWL_REQUIREMENT_ENV_VAR,
         CWL_REQUIREMENT_INIT_WORKDIR,
+        CWL_REQUIREMENT_INLINE_JAVASCRIPT,
+        CWL_REQUIREMENT_NETWORK_ACCESS,
         CWL_REQUIREMENT_RESOURCE,
         CWL_REQUIREMENT_SCATTER,
     ]

@@ -1,3 +1,4 @@
+#!/usr/bin/env cwl-runner
 cwlVersion: v1.0
 class: CommandLineTool
 baseCommand: cat
@@ -13,4 +14,5 @@ outputs:
   - id: output
     type: File
     outputBinding:
-      glob: stdout.log
+      glob: output.txt
+stdout: output.txt

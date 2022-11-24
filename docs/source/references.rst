@@ -36,6 +36,14 @@
 .. _cwl-workdir-ex: https://www.commonwl.org/user_guide/15-staging/
 .. |cwl-docker-req| replace:: DockerRequirement
 .. _cwl-docker-req: https://www.commonwl.org/v1.1/CommandLineTool.html#DockerRequirement
+.. FIXME apply official CWL specification location
+.. https://github.com/common-workflow-language/cwl-v1.2/issues/212
+.. |cwl-cuda-req| replace:: cwltool:CUDARequirement
+.. _cwl-cuda-req: https://doc.arvados.org/v2.4/user/cwl/cwl-extensions.html#CUDARequirement
+.. |cwl-resource-req| replace:: ResourceRequirement
+.. _cwl-resource-req: https://www.commonwl.org/v1.2/CommandLineTool.html#ResourceRequirement
+.. |cwl-network-req| replace:: NetworkAccess
+.. _cwl-network-req: https://www.commonwl.org/v1.2/CommandLineTool.html#NetworkAccess
 .. |cwl-io-map| replace:: CWL Mapping
 .. _cwl-io-map: https://www.commonwl.org/v1.1/CommandLineTool.html#map
 .. |cwl-io-type| replace:: CWLType Symbols

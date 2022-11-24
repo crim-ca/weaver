@@ -1044,11 +1044,11 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             stack.enter_context(mocked_wps_output(self.settings))
             network_access_requirement = {"networkAccess": True}
             docker_requirement = {"dockerPull": "python:3.7-alpine"}
-            for type in ["hints", "requirements"]:
+            for req_type in ["hints", "requirements"]:
                 cwl = {
                     "class": "CommandLineTool",
                     "cwlVersion": "v1.2",
-                    type: {
+                    req_type: {
                         "NetworkAccess": network_access_requirement,
                         "DockerRequirement": docker_requirement
                     },
@@ -1063,7 +1063,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                     }
                 }
 
-                p_id = "test-network-access-" + type
+                p_id = "test-network-access-" + req_type
                 body = {
                     "processDescription": {"process": {"id": p_id}},
                     "executionUnit": [{"unit": cwl}],
@@ -1073,8 +1073,8 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                 pkg = self.get_application_package(p_id)
                 assert desc["deploymentProfile"] == "http://www.opengis.net/profiles/eoc/dockerizedApplication"
                 assert desc["process"]["id"] == p_id
-                assert pkg[type]["NetworkAccess"] == network_access_requirement
-                assert pkg[type]["DockerRequirement"] == docker_requirement
+                assert pkg[req_type]["NetworkAccess"] == network_access_requirement
+                assert pkg[req_type]["DockerRequirement"] == docker_requirement
 
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,

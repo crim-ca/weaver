@@ -238,8 +238,8 @@ Workflow
 Processes categorized as :term:`Workflow` are very similar to `WPS-REST`_ processes. From the API standpoint, they
 actually look exactly the same as an atomic process when calling :ref:`DescribeProcess <proc_op_describe>`
 or :ref:`Execute <proc_op_execute>` requests.
-The difference lies within the referenced :ref:`Application Package` which uses a :ref:`CWL Workflow` instead of
-typical :ref:`CWL CommandLineTool`, and therefore, modifies how the :term:`Process` is internally executed.
+The difference lies within the referenced :ref:`Application Package` which uses a :ref:`app_pkg_workflow` instead of
+typical :ref:`app_pkg_cmd`, and therefore, modifies how the :term:`Process` is internally executed.
 
 For :term:`Workflow` processes to be deploy-able and executable, it is **mandatory** that `Weaver` is configured as
 :term:`EMS` or :term:`HYBRID` (see: :ref:`Configuration Settings`). This requirement is due to the nature
@@ -1035,7 +1035,7 @@ combinations.
 .. [#wf]
     Workflows are only available on :term:`EMS` and :term:`HYBRID` instances. Since they chain processes,
     no fetch is needed as the sub-step process will do it instead as needed. See :ref:`Workflow` process as well
-    as :ref:`CWL Workflow` for more details.
+    as :ref:`app_pkg_workflow` for more details.
 
 .. todo::
     method to indicate explicit fetch to override these? (https://github.com/crim-ca/weaver/issues/183)
@@ -1684,6 +1684,6 @@ Workflow (Chaining Step Processes)
 
 .. seealso::
 
-    - :ref:`CWL Workflow`
+    - :ref:`app_pkg_workflow`
     - :ref:`proc_workflow_ops`
     - :ref:`Workflow` process type
