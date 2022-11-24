@@ -67,6 +67,7 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_TYPES,
     CWL_REQUIREMENT_APP_WPS1,
     CWL_REQUIREMENT_CUDA,
+    CWL_REQUIREMENT_CUDA_DEFAULT_PARAMETERS,
     CWL_REQUIREMENT_ENV_VAR,
     CWL_REQUIREMENT_RESOURCE,
     CWL_REQUIREMENTS_SUPPORTED,
@@ -338,7 +339,10 @@ def _get_package_requirements_normalized(requirements, as_dict=False):
             reqs.append({"class": req})
             reqs[-1].update(requirements[req] or {})
         return reqs
-    return [dict(req) for req in requirements]  # ensure list-of-dict instead of sequence of dict-like
+    reqs = [dict(req) for req in requirements]  # ensure list-of-dict instead of sequence of dict-like
+    if as_dict:
+        return {req.pop("class"): req for req in reqs}
+    return reqs
 
 
 def _update_package_compatibility(package):
@@ -365,16 +369,8 @@ def _update_package_compatibility(package):
             cuda_req = r_cuda or h_cuda
             cuda_found = bool(cuda_req)
             if not cuda_req:  # if CUDA no explicitly provided along the older GPU requirement, define default
-                cuda_req = {
-                    "class": CWL_REQUIREMENT_CUDA,
-                    # use older minimal version/capability to allow more chances to match any available GPU
-                    # if this causes an issue for an actual application, it must provide it explicitly anyway
-                    "cudaVersionMin": "10.0",
-                    "cudaComputeCapability": "3.0",
-                    # use minimum defaults
-                    "cudaDeviceCountMin": 1,
-                    "cudaDeviceCountMax": 1,
-                }
+                cuda_req = CWL_REQUIREMENT_CUDA_DEFAULT_PARAMETERS.copy()
+                cuda_req["class"] = CWL_REQUIREMENT_CUDA
             # apply the change to the relevant list where it was originally found
             if r_list == r_no_docker and h_list != h_no_docker:
                 h_list = h_no_docker + ([docker_req] if cuda_found else [docker_req, cuda_req])
@@ -799,7 +795,7 @@ def get_application_requirement(package,        # type: CWL
     requirement = app_hints[0] if app_hints else req_default
 
     if validate:
-        cwl_supported_reqs = list(CWL_REQUIREMENTS_SUPPORTED)
+        cwl_supported_reqs = sorted(list(CWL_REQUIREMENTS_SUPPORTED))
         if required and not all_hints or not all(item.get("class") in cwl_supported_reqs for item in all_hints):
             raise PackageTypeError(
                 f"Invalid package requirement. One supported requirement within {cwl_supported_reqs} is needed."

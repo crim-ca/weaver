@@ -4658,6 +4658,7 @@ class ExecutionUnitList(ExtendedSequenceSchema):
         title="ExecutionUnit",
         description="Definition of the Application Package to execute."
     )
+    validator = Length(min=1, max=1)
 
 
 class ProcessDeploymentWithContext(ProcessDeployment):

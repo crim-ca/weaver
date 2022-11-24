@@ -1,4 +1,5 @@
 import sys
+from types import MappingProxyType
 from typing import TYPE_CHECKING
 
 from weaver.base import Constants
@@ -44,7 +45,7 @@ class OpenSearchField(Constants):
 # CWL package (requirements/hints) corresponding to `ProcessType.APPLICATION`
 CWL_REQUIREMENT_APP_BUILTIN = "BuiltinRequirement"
 CWL_REQUIREMENT_APP_DOCKER = "DockerRequirement"
-CWL_REQUIREMENT_APP_DOCKER_GPU = "DockerGpuRequirement"
+CWL_REQUIREMENT_APP_DOCKER_GPU = "DockerGpuRequirement"  # backward compatibility
 CWL_REQUIREMENT_APP_ESGF_CWT = "ESGF-CWTRequirement"
 CWL_REQUIREMENT_APP_OGC_API = "OGCAPIRequirement"
 CWL_REQUIREMENT_APP_WPS1 = "WPS1Requirement"
@@ -78,6 +79,19 @@ CWL_REQUIREMENT_APP_REMOTE = frozenset([
 ])
 """
 Set of :term:`CWL` requirements that correspond to remote execution of an :term:`Application Package`.
+"""
+
+CWL_REQUIREMENT_CUDA_DEFAULT_PARAMETERS = MappingProxyType({
+    # use older minimal version/capability to allow more chances to match any available GPU
+    # if this causes an issue for an actual application, it must provide it explicitly anyway
+    "cudaVersionMin": "10.0",
+    "cudaComputeCapability": "3.0",
+    # use minimum defaults, single GPU
+    "cudaDeviceCountMin": 1,
+    "cudaDeviceCountMax": 1,
+})
+"""
+Parameters employed by default for updating :data:`CWL_REQUIREMENT_APP_DOCKER_GPU` into :data:`CWL_REQUIREMENT_CUDA`.
 """
 
 # FIXME: convert to 'Constants' class

@@ -7,6 +7,7 @@ import json
 import tempfile
 from collections import OrderedDict
 from copy import deepcopy
+from typing import TYPE_CHECKING
 
 import pytest
 import yaml
@@ -17,6 +18,7 @@ from pywps.inout.literaltypes import AllowedValue, AnyValue
 from pywps.inout.outputs import ComplexOutput
 from pywps.validator.mode import MODE
 
+from tests.utils import assert_equal_any_order
 from weaver.exceptions import PackageTypeError
 from weaver.formats import IANA_NAMESPACE_DEFINITION, OGC_MAPPING, OGC_NAMESPACE_DEFINITION, ContentType
 from weaver.processes.constants import (
@@ -55,6 +57,9 @@ from weaver.processes.convert import (
     wps2json_io
 )
 from weaver.utils import null
+
+if TYPE_CHECKING:
+    from typing import List
 
 
 class ObjectWithEqProperty(object):
@@ -737,16 +742,6 @@ def test_is_cwl_complex_type_not_files(test_type):
     assert not is_cwl_complex_type(io_info)
 
 
-def assert_formats_equal_any_order(format_result, format_expect):
-    assert len(format_result) == len(format_expect), "Expected formats sizes mismatch"
-    for r_fmt in format_result:
-        for e_fmt in format_expect:
-            if r_fmt.json == e_fmt.json:
-                format_expect.remove(e_fmt)
-                break
-    assert not format_expect, f"Not all expected formats matched {[fmt.json for fmt in format_expect]}"
-
-
 def test_wps2json_io_default_format():
     # must create object with matching data/supported formats or error otherwise
     wps_io = ComplexInput("test", "", supported_formats=[DEFAULT_FORMAT], data_format=DEFAULT_FORMAT)
@@ -786,6 +781,13 @@ def test_merge_io_formats_no_wps():
     assert isinstance(res_fmt, list)
     assert len(res_fmt) == 1
     assert res_fmt[0] is DEFAULT_FORMAT
+
+
+def assert_formats_equal_any_order(result_formats, expect_formats):
+    # type: (List[Format], List[Format]) -> None
+    assert_equal_any_order(result_formats, expect_formats,
+                           comparer=lambda res, exp: res.json == exp.json,
+                           formatter=lambda fmt: str(fmt.json))
 
 
 def test_merge_io_formats_with_wps_and_default_cwl():

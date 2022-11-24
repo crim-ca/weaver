@@ -29,6 +29,7 @@ from weaver.database import get_db
 from weaver.datatype import Job
 from weaver.formats import ContentType
 from weaver.processes.constants import ProcessSchema
+from weaver.processes.wps_package import get_application_requirement
 from weaver.status import Status
 from weaver.utils import fully_qualified_name, load_file
 from weaver.visibility import Visibility
@@ -314,19 +315,34 @@ class WpsConfigBase(unittest.TestCase):
 
     @classmethod
     @overload
-    def deploy_process(cls, payload, process_id=None, describe_schema=ProcessSchema.OGC, mock_requests_only_local=True):
-        # type: (JSON, Optional[str], Literal[ProcessSchema.OGC], bool) -> Tuple[ProcessDescriptionMapping, CWL]  # noqa
+    def deploy_process(cls,
+                       payload,                             # type: JSON
+                       process_id=None,                     # type: Optional[str]
+                       describe_schema=ProcessSchema.OGC,   # type: Literal[ProcessSchema.OGC]  # noqa
+                       mock_requests_only_local=True,       # type: bool
+                       add_package_requirement=True,        # type: bool
+                       ):                                   # type: (...) -> Tuple[ProcessDescriptionMapping, CWL]
         ...
 
     @classmethod
     @overload
-    def deploy_process(cls, payload, process_id=None, describe_schema=ProcessSchema.OGC, mock_requests_only_local=True):
-        # type: (JSON, Optional[str], Literal[ProcessSchema.OLD], bool) -> Tuple[ProcessDescriptionListing, CWL]  # noqa
+    def deploy_process(cls,
+                       payload,                             # type: JSON
+                       process_id=None,                     # type: Optional[str]
+                       describe_schema=ProcessSchema.OGC,   # type: Literal[ProcessSchema.OLD]  # noqa
+                       mock_requests_only_local=True,       # type: bool
+                       add_package_requirement=True,        # type: bool
+                       ):                                   # type: (...) -> Tuple[ProcessDescriptionListing, CWL]
         ...
 
     @classmethod
-    def deploy_process(cls, payload, process_id=None, describe_schema=ProcessSchema.OGC, mock_requests_only_local=True):
-        # type: (JSON, Optional[str], ProcessSchema, bool) -> Tuple[ProcessDescription, CWL]
+    def deploy_process(cls,
+                       payload,                             # type: JSON
+                       process_id=None,                     # type: Optional[str]
+                       describe_schema=ProcessSchema.OGC,   # type: ProcessSchema
+                       mock_requests_only_local=True,       # type: bool
+                       add_package_requirement=True,        # type: bool
+                       ):                                   # type: (...) -> Tuple[ProcessDescription, CWL]
         """
         Deploys a process with :paramref:`payload`.
 
@@ -348,6 +364,16 @@ class WpsConfigBase(unittest.TestCase):
                 exec_unit = load_file(os.path.join(WEAVER_ROOT_DIR, exec_href))
                 exec_list[0]["unit"] = exec_unit
                 exec_list[0].pop("href")
+            exec_unit = exec_list[0].get("unit")  # type: CWL
+            if exec_unit and add_package_requirement:
+                app_req = get_application_requirement(exec_unit, validate=False, required=False)
+                if not app_req["class"]:
+                    exec_unit.setdefault("requirements", {})
+                    reqs = exec_unit["requirements"]
+                    if isinstance(reqs, list):
+                        reqs.append({"class": "DockerRequirement", "dockerPull": "alpine:latest"})
+                    else:
+                        reqs.update({"DockerRequirement": {"dockerPull": "alpine:latest"}})
         resp = mocked_sub_requests(cls.app, "post_json", "/processes",
                                    data=payload, headers=cls.json_headers, only_local=mock_requests_only_local)
         assert resp.status_code == 201, f"Expected successful deployment.\nError:\n{resp.text}"

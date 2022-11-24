@@ -18,8 +18,8 @@ Changes:
   combined with  ``cwltool:CUDARequirement`` definitions. If this conversion does not work transparently for the user,
   explicit `CWL` updates with those definitions should be made.
 - Ensure that validation check finds exactly one provided `CWL` requirement or hint to represent the application type.
-  In case of missing requirement, the reported error will contain a documentation link to guide the user in adjusting
-  its `Application Package` accordingly.
+  In case of missing requirement, the `Process` deployment will fail with a reported error that contains a documentation
+  link to guide the user in adjusting its `Application Package` accordingly.
 
 Fixes:
 ------
