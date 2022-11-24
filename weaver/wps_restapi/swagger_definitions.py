@@ -3656,13 +3656,13 @@ class CUDAComputeCapabilitySchema(OneOfKeywordSchema):
     title = CUDAComputeCapability.title
     description = inspect.cleandoc("""
         The compute capability supported by the GPU hardware.
-        
+
         * If this is a single value, it defines only the minimum
           compute capability.  GPUs with higher capability are also
           accepted.
         * If it is an array value, then only select GPUs with compute
           capabilities that explicitly appear in the array.
-          
+
         See https://docs.nvidia.com/deploy/cuda-compatibility/#faq and
         https://docs.nvidia.com/cuda/cuda-c-best-practices-guide/index.html#cuda-compute-capability for details.
     """)
@@ -3680,11 +3680,11 @@ class CUDARequirementSpecification(PermissiveMappingSchema):
         title="CUDA version minimum",
         description=inspect.cleandoc("""
             The minimum CUDA version required to run the software. This corresponds to a CUDA SDK release.
-            
+
             When run in a container, the container image should provide the CUDA runtime, and the host
             driver is injected into the container.  In this case, because CUDA drivers are backwards compatible,
             it is possible to use an older SDK with a newer driver across major versions.
-            
+
             See https://docs.nvidia.com/deploy/cuda-compatibility/ for details.
         """),
         validator=SemanticVersion(regex=r"^\d+\.\d+$"),
@@ -3755,21 +3755,21 @@ class ResourceRequirementSpecification(PermissiveMappingSchema):
         title="Minimum reserved number of CPU cores.",
         description=inspect.cleandoc("""
             Minimum reserved number of CPU cores.
-            
+
             May be a fractional value to indicate to a scheduling algorithm that one core can be allocated
             to multiple jobs. For example, a value of 0.25 indicates that up to 4 jobs may run in parallel
             on 1 core. A value of 1.25 means that up to 3 jobs can run on a 4 core system (4/1.25 ≈ 3).
-            
+
             Processes can only share a core allocation if the sum of each of their 'ramMax', 'tmpdirMax', 
             and 'outdirMax' requests also do not exceed the capacity of the node.
-            
+
             Processes sharing a core must have the same level of isolation (typically a container or VM)
             that they would normally.
-            
+
             The reported number of CPU cores reserved for the process, which is available to expressions on the
             'CommandLineTool' as 'runtime.cores', must be a non-zero integer, and may be calculated by rounding up
             the cores request to the next whole number.
-            
+
             Scheduling systems may allocate fractional CPU resources by setting quotas or scheduling weights.
             Scheduling systems that do not support fractional CPUs may round up the request to the next whole number.
         """),
@@ -3788,7 +3788,7 @@ class ResourceRequirementSpecification(PermissiveMappingSchema):
         title="Minimum reserved RAM in mebibytes.",
         description=inspect.cleandoc("""
             Minimum reserved RAM in mebibytes (2**20).
-            
+
             May be a fractional value. If so, the actual RAM request must be rounded up to the next whole number.
             The reported amount of RAM reserved for the process, which is available to expressions on the
             'CommandLineTool' as 'runtime.ram', must be a non-zero integer.
@@ -3808,7 +3808,7 @@ class ResourceRequirementSpecification(PermissiveMappingSchema):
         title="Minimum reserved filesystem based storage for the designated temporary directory in mebibytes.",
         description=inspect.cleandoc("""
             Minimum reserved filesystem based storage for the designated temporary directory in mebibytes (2**20).
-            
+
             May be a fractional value. If so, the actual storage request must be rounded up to the next whole number.
             The reported amount of storage reserved for the process, which is available to expressions on the
             'CommandLineTool' as 'runtime.tmpdirSize', must be a non-zero integer.
