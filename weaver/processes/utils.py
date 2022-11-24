@@ -4,7 +4,6 @@ import os
 import pathlib
 import warnings
 from copy import deepcopy
-from distutils.version import LooseVersion
 from typing import TYPE_CHECKING
 from urllib.parse import parse_qs, urlparse
 
@@ -22,6 +21,7 @@ from pyramid.httpexceptions import (
 )
 from pyramid.settings import asbool
 
+from weaver.compat import Version
 from weaver.config import (
     WEAVER_CONFIG_DIR,
     WEAVER_DEFAULT_WPS_PROCESSES_CONFIG,
@@ -900,7 +900,7 @@ def register_wps_processes_static(service_url, service_name, service_visibility,
 
     LOGGER.info("Fetching WPS-1: [%s]", service_url)
     wps = get_wps_client(service_url, container)
-    if LooseVersion(wps.version) >= LooseVersion("2.0"):
+    if Version(wps.version) >= Version("2.0"):
         LOGGER.warning("Invalid WPS-1 provider, version was [%s]", wps.version)
         return
     wps_processes = [wps.describeprocess(p) for p in service_processes] or wps.processes

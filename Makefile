@@ -68,8 +68,11 @@ PYTHON_VERSION_MINOR := $(shell echo $(PYTHON_VERSION) | cut -f 2 -d '.')
 PYTHON_VERSION_PATCH := $(shell echo $(PYTHON_VERSION) | cut -f 3 -d '.' | cut -f 1 -d ' ')
 PIP_USE_FEATURE := `python -c '\
 	import pip; \
-	from distutils.version import LooseVersion; \
-	print(LooseVersion(pip.__version__) < LooseVersion("21.0"))'`
+	try: \
+		from packaging.version import Version \
+	except ImportError: \
+		from distutils.version import LooseVersion as Version \
+	print(Version(pip.__version__) < Version("21.0"))'`
 PIP_XARGS ?=
 ifeq ("$(PIP_USE_FEATURE)", "True")
   PIP_XARGS := --use-feature=2020-resolver $(PIP_XARGS)
