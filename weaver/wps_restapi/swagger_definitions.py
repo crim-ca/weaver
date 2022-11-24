@@ -3759,7 +3759,7 @@ class ResourceRequirementSpecification(PermissiveMappingSchema):
             to multiple jobs. For example, a value of 0.25 indicates that up to 4 jobs may run in parallel
             on 1 core. A value of 1.25 means that up to 3 jobs can run on a 4 core system (4/1.25 ≈ 3).
 
-            Processes can only share a core allocation if the sum of each of their 'ramMax', 'tmpdirMax', 
+            Processes can only share a core allocation if the sum of each of their 'ramMax', 'tmpdirMax',
             and 'outdirMax' requests also do not exceed the capacity of the node.
 
             Processes sharing a core must have the same level of isolation (typically a container or VM)
