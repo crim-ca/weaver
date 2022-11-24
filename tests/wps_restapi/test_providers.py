@@ -1,5 +1,4 @@
 import unittest
-from distutils.version import LooseVersion
 
 import owslib
 import pyramid.testing
@@ -14,6 +13,7 @@ from tests.utils import (
     setup_mongodb_processstore,
     setup_mongodb_servicestore
 )
+from weaver.compat import Version
 from weaver.config import WeaverConfiguration
 from weaver.datatype import Service
 from weaver.execute import ExecuteControlOption, ExecuteTransmissionMode
@@ -290,7 +290,7 @@ class WpsRestApiProvidersTest(WpsProviderBase):
             remote_processes.append(process["id"])
         assert resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID in remote_processes
 
-    @pytest.mark.xfail(condition=LooseVersion(owslib.__version__) <= LooseVersion("0.25.0"),
+    @pytest.mark.xfail(condition=Version(owslib.__version__) <= Version("0.25.0"),
                        reason="OWSLib fix for retrieval of processVersion from DescribeProcess not yet available "
                               "(https://github.com/geopython/OWSLib/pull/794)")
     @mocked_remote_server_requests_wps1([
@@ -602,7 +602,7 @@ class WpsRestApiProvidersTest(WpsProviderBase):
         assert outputs[1]["formats"][0]["default"] is True
         assert "maximumMegabytes" not in outputs[1]["formats"][0]  # never applies, even with OWSLib update
 
-    @pytest.mark.xfail(condition=LooseVersion(owslib.__version__) <= LooseVersion("0.25.0"),
+    @pytest.mark.xfail(condition=Version(owslib.__version__) <= Version("0.25.0"),
                        reason="OWSLib fix for retrieval of maximumMegabytes from ComplexData not yet available "
                               "(https://github.com/geopython/OWSLib/pull/796)")
     @mocked_remote_server_requests_wps1([
