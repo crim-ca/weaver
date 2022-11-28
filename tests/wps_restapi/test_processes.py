@@ -753,7 +753,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         process = self.process_store.fetch_by_id(proc_id)
         assert process.auth is not None
         assert process.auth.type == AuthenticationTypes.DOCKER
-        assert process.auth.token == token
+        assert process.auth.token == token  # noqa
         assert process.auth.docker == docker
 
     def test_deploy_process_CWL_direct_raised_missing_id(self):
@@ -884,7 +884,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             stack.enter_context(mocked_wps_output(self.settings))
             out_dir = self.settings["weaver.wps_output_dir"]
             out_url = self.settings["weaver.wps_output_url"]
-            assert out_url.startswith("http"), "test can run only if reference is a HTTP reference"  # sanity check
+            assert out_url.startswith("http"), "test can run only if reference is an HTTP reference"  # sanity check
             tmp_dir = stack.enter_context(tempfile.TemporaryDirectory(dir=out_dir))
             tmp_file = os.path.join(tmp_dir, "docker-python.cwl")
             tmp_href = tmp_file.replace(out_dir, out_url, 1)
@@ -926,7 +926,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             stack.enter_context(mocked_wps_output(self.settings))
             out_dir = self.settings["weaver.wps_output_dir"]
             out_url = self.settings["weaver.wps_output_url"]
-            assert out_url.startswith("http"), "test can run only if reference is a HTTP reference"  # sanity check
+            assert out_url.startswith("http"), "test can run only if reference is an HTTP reference"  # sanity check
             tmp_dir = stack.enter_context(tempfile.TemporaryDirectory(dir=out_dir))
             tmp_file = os.path.join(tmp_dir, "docker-python.cwl")
             tmp_href = tmp_file.replace(out_dir, out_url, 1)
@@ -1086,7 +1086,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             stack.enter_context(mocked_wps_output(self.settings))
             out_dir = self.settings["weaver.wps_output_dir"]
             out_url = self.settings["weaver.wps_output_url"]
-            assert out_url.startswith("http"), "test can run only if reference is a HTTP reference"  # sanity check
+            assert out_url.startswith("http"), "test can run only if reference is an HTTP reference"  # sanity check
             tmp_dir = stack.enter_context(tempfile.TemporaryDirectory(dir=out_dir))
             tmp_file = os.path.join(tmp_dir, "wps1.cwl")
             tmp_href = tmp_file.replace(out_dir, out_url, 1)
@@ -1174,7 +1174,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             stack.enter_context(mocked_wps_output(self.settings))
             wps_dir = self.settings["weaver.wps_output_dir"]
             wps_url = self.settings["weaver.wps_output_url"]
-            assert wps_url.startswith("http"), "test can run only if reference is a HTTP reference"  # sanity check
+            assert wps_url.startswith("http"), "test can run only if reference is an HTTP reference"  # sanity check
             tmp_file = stack.enter_context(tempfile.NamedTemporaryFile(dir=wps_dir, mode="w", suffix=".cwl"))
             tmp_http = tmp_file.name.replace(wps_dir, wps_url, 1)
             json.dump(cwl, tmp_file)
@@ -1761,7 +1761,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         body = resp.json
         assert body["processSummary"]["title"] == data["processDescription"]["process"]["title"], (
             "Even though MAJOR update for CWL is accomplished, other fields that usually correspond to MINOR changes "
-            "should also applied at the same time since the operation replaces the new process definition (PUT)."
+            "should also be applied at the same time since the operation replaces the new process definition (PUT)."
         )
         assert (
             "description" not in body["processSummary"] or  # if undefined, dropped from body
@@ -2037,7 +2037,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             execute_mock_data_tests.append((mock_execute, data_execute))
 
         # apply modifications for testing
-        execute_mock_data_tests[0][1].pop("inputs")  # no inputs is valid (although can be required for WPS process)
+        execute_mock_data_tests[0][1].pop("inputs")  # no inputs valid (although it can be required for WPS process)
         execute_mock_data_tests[0][1]["outputs"][0].pop("transmissionMode")  # should resolve to default value
 
         for mock_execute, data_execute in execute_mock_data_tests:
