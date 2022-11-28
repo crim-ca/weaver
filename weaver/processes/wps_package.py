@@ -795,13 +795,23 @@ def get_application_requirement(package,        # type: CWL
     requirement = app_hints[0] if app_hints else req_default
 
     if validate:
+        all_classes = sorted(list(set(item.get("class") for item in all_hints)))
+        if required:
+            cwl_impl_type_reqs = sorted(list(CWL_REQUIREMENT_APP_TYPES))
+            if not all_classes or not any(cls in cwl_impl_type_reqs for cls in all_classes):
+                raise PackageTypeError(
+                    f"Invalid package requirement. One supported requirement amongst {cwl_impl_type_reqs} is expected. "
+                    f"Detected package specification {all_classes} did not provide any of the mandatory requirements. "
+                    f"If a script definition is indented for this application, the '{CWL_REQUIREMENT_APP_DOCKER}' "
+                    "requirement can be used to provide a suitable execution environment with needed dependencies. "
+                    f"Refer to '{sd.DOC_URL}/package.html#script-application' for examples."
+                )
         cwl_supported_reqs = sorted(list(CWL_REQUIREMENTS_SUPPORTED))
-        if required and not all_hints or not all(item.get("class") in cwl_supported_reqs for item in all_hints):
+        cwl_invalid_reqs = sorted(filter(lambda cls: cls not in cwl_supported_reqs, all_classes))
+        if cwl_invalid_reqs:
             raise PackageTypeError(
-                f"Invalid package requirement. One supported requirement within {cwl_supported_reqs} is needed."
-                f"If a script execution is required for this application, the '{CWL_REQUIREMENT_APP_DOCKER}' "
-                "definition can be used to provide a suitable environment. "
-                f"Refer to {sd.DOC_URL}/package.html#script-application for examples."
+                f"Invalid package requirement. Unknown requirement detected: {cwl_invalid_reqs}. "
+                f"Expected requirements and hints must be amongst the following definitions {cwl_supported_reqs}."
             )
 
     return requirement

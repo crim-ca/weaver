@@ -525,7 +525,7 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
         test_process_id = f"{cls.__name__}_{deploy_id}"
         execute_payload = cls.retrieve_payload(pid, "execute")
 
-        # replace derived reference (local only, remote must used full 'href' references)
+        # replace derived reference (local only, remote must be used full 'href' references)
         test_app_pkg = deploy_payload.get("executionUnit", [{}])[0].pop("test", None)
         if test_app_pkg:
             unit_app_pkg = cls.retrieve_payload(pid, "package")
@@ -889,7 +889,7 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
                     if resp.status_code == 200 and isinstance(resp.json, list):
                         step_logs = tab_n.join(resp.json)
                         msg += f"\nStep process logs [JobID: {job_id}]" + tab_n + step_logs
-        except Exception:
+        except Exception:  # noqa
             return "Could not retrieve job logs."
         return msg
 

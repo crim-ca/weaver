@@ -1150,8 +1150,17 @@ def mocked_process_package():
     """
     Provides mocks that bypasses execution when calling :module:`weaver.processes.wps_package` functions.
     """
+    from weaver.processes.wps_package import get_application_requirement as real_get_application_requirement
+
+    def mock_get_app_req(package, **kwargs):
+        if package.get("class") == "test":
+            kwargs["required"] = False
+            kwargs["validate"] = False
+        return real_get_application_requirement(package, **kwargs)
+
     return (
         mock.patch("weaver.processes.utils.load_package_file", return_value={"class": "test"}),
+        mock.patch("weaver.processes.wps_package.get_application_requirement", side_effect=mock_get_app_req),
         mock.patch("weaver.processes.wps_package.load_package_file", return_value={"class": "test"}),
         mock.patch("weaver.processes.wps_package._load_package_content", return_value=(None, "test", None)),
         mock.patch("weaver.processes.wps_package._get_package_inputs_outputs", return_value=(None, None)),

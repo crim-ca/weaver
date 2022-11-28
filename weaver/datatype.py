@@ -2088,7 +2088,7 @@ class Process(Base):
         base = "http://www.opengis.net/profiles/eoc/"
         pkg = self.package or {}
         cls = str(pkg.get("class", "")).lower()
-        req = get_application_requirement(pkg).get("class")
+        req = get_application_requirement(pkg, required=False).get("class")
         typ = self.type
 
         if cls == ProcessType.WORKFLOW:

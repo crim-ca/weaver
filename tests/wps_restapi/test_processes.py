@@ -783,21 +783,8 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                                   process_id="test-direct-cwl-json",    # type: str
                                   version=None,                         # type: Optional[AnyVersion]
                                   ):                                    # type: (...) -> Tuple[CWL, JSON]
-        cwl_core = {
-            "id": process_id,
-            "class": "CommandLineTool",
-            "baseCommand": ["python3", "-V"],
-            "inputs": {},
-            "outputs": {
-                "output": {
-                    "type": "File",
-                    "outputBinding": {
-                        "glob": "stdout.log"
-                    },
-                }
-            },
-        }
         cwl = {}
+        cwl_core = self.get_cwl_docker_python_version(cwl_version=None, process_id=process_id)
         cwl_base = {"cwlVersion": "v1.0"}
         cwl.update(cwl_base)
         if version:
@@ -857,10 +844,14 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert "Longer than maximum length 1" in error
 
     @staticmethod
-    def get_cwl_docker_python_version():
-        # type: () -> CWL
-        return {
-            "cwlVersion": "v1.0",
+    def get_cwl_docker_python_version(cwl_version="v1.0", process_id=None):
+        # type: (Optional[str], Optional[str]) -> CWL
+        cwl = {}
+        if cwl_version:
+            cwl["cwlVersion"] = cwl_version
+        if process_id:
+            cwl["id"] = process_id
+        cwl.update({
             "class": "CommandLineTool",
             "requirements": {
                 CWL_REQUIREMENT_APP_DOCKER: {
@@ -877,7 +868,8 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                     },
                 }
             },
-        }
+        })
+        return cwl
 
     def test_deploy_process_CWL_DockerRequirement_href(self):
         with contextlib.ExitStack() as stack:

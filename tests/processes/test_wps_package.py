@@ -56,6 +56,9 @@ class MockWpsPackage(WpsPackage):
     def status_location(self, value):
         pass
 
+    def setup_docker_image(self):
+        return None
+
 
 class MockWpsRequest(WorkerRequest):
     def __init__(self, process_id=None, with_message_input=True):
@@ -102,6 +105,7 @@ class MockProcess(Process):
             "cwlVersion": "v1.0",
             "class": "CommandLineTool",
             "baseCommand": shell_command,
+            "requirements": {"DockerRequirement": {"dockerPull": "alpine:latest"}},
             "inputs": {},
             "outputs": {}
         }
@@ -165,7 +169,7 @@ def test_stdout_stderr_logging_for_commandline_tool_success(caplog):
         # cwltool call with reference to the command and stdout/stderr redirects
         assert re.match(
             r".*"
-            rf"cwltool.*job {process.id}.*\$ echo \\\n"
+            rf"cwltool:job.* \[job {process.id}\].*echo \\\n"
             r"\s+'Dummy message' \> [\w\-/\.]+/stdout\.log 2\> [\w\-/\.]+/stderr\.log\n"
             r".*",
             log_data,
@@ -246,9 +250,7 @@ def test_stdout_stderr_logging_for_commandline_tool_exception(caplog):
         with open(expect_log, mode="r", encoding="utf-8") as file:
             job_err = file.read()
         log_err = stderr.getvalue() + "\n" + caplog.text + "\n" + job_err
-        assert "Could not retrieve any internal application log." in log_err, (
-            "Since command did not run, nothing captured is expected"
-        )
+        assert "Package completed with errors." in log_err
         assert "Traceback (most recent call last):" in log_err
         assert "weaver.processes.wps_package|mock-process" in log_err
     else:
