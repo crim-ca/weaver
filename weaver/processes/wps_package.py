@@ -318,7 +318,7 @@ def _get_process_payload(process_url):
 
 def _get_package_type(package_dict):
     # type: (CWL) -> Literal[ProcessType.APPLICATION, ProcessType.WORKFLOW]
-    return ProcessType.WORKFLOW if package_dict.get("class").lower() == "workflow" else ProcessType.APPLICATION
+    return ProcessType.WORKFLOW if package_dict.get("class", "").lower() == "workflow" else ProcessType.APPLICATION
 
 
 def _get_package_requirements_normalized(requirements, as_dict=False):
