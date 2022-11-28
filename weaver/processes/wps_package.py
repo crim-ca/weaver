@@ -757,7 +757,8 @@ def get_application_requirement(package,        # type: CWL
     If no :paramref:`search` filter is specified (default), retrieve the *principal* requirement that allows
     mapping to the appropriate :term:`Process` implementation. The *principal* requirement can be extracted
     for an :term:`Application Package` of type :data:`ProcessType.APPLICATION` because only one is permitted
-    simultaneously amongst :data:`CWL_REQUIREMENT_APP_TYPES`.
+    simultaneously amongst :data:`CWL_REQUIREMENT_APP_TYPES`. If the :term:`CWL` is not of type
+    :data:`ProcessType.APPLICATION`, the requirement check is skipped regardless of :paramref:`required`.
 
     If a :paramref:`search` filter is provided, this specific requirement or hint is looked for instead.
     Regardless of the applied filter, only a unique item can be matched across ``requirements``/``hints`` mapping
@@ -796,7 +797,8 @@ def get_application_requirement(package,        # type: CWL
 
     if validate:
         all_classes = sorted(list(set(item.get("class") for item in all_hints)))
-        if required:
+        app_required = _get_package_type(package) == ProcessType.APPLICATION
+        if required and app_required:
             cwl_impl_type_reqs = sorted(list(CWL_REQUIREMENT_APP_TYPES))
             if not all_classes or not any(cls in cwl_impl_type_reqs for cls in all_classes):
                 raise PackageTypeError(

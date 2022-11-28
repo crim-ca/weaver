@@ -362,6 +362,11 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
                     level = cls.logger_level
                 cls.logger.log(level, message, *args, stack_info=traceback)
         if exception:
+            if "%" in message and args:
+                try:
+                    message = message % args
+                except TypeError:  # error on insufficient/over-specified format string arguments
+                    message += f"\nArguments could not be formatted into message: {args}"
             raise RuntimeError(message)
 
     @classmethod
