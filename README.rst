@@ -5,6 +5,9 @@ Weaver
 **Implementations**
 
 * |ogc-proc-long|
+* |wps|
+* |esgf| processes
+* |cwl| for |ogc-apppkg|_
 * |ems| for Workflows
 * |ades|
 
@@ -108,7 +111,7 @@ the application definition provided by |cwl| configuration. It can then directly
 a registered process |ogc-apppkg|_ with received inputs from a WPS request to expose output results for a
 following `ADES` in a `EMS` workflow execution chain.
 
-`Weaver` **extends** |ogc-proc-api|_ by providing additional functionalities such as more detailed job logs
+`Weaver` **extends** |ogc-api-proc|_ by providing additional functionalities such as more detailed job logs
 endpoints, adding more process management and search request options than required by the standard, and supporting
 *remote providers* registration for dynamic process definitions, to name a few.
 Because of this, not all features offered in `Weaver` are guaranteed to be applicable on other similarly
@@ -283,9 +286,9 @@ It is part of `PAVICS`_ and `Birdhouse`_ ecosystems and is available within the 
 .. |wps| replace:: `Web Processing Services` (WPS)
 .. |ogc| replace:: Open Geospatial Consortium
 .. _ogc: https://www.ogc.org/
-.. |ogc-proc-api| replace:: `OGC API - Processes`
-.. _ogc-proc-api: https://github.com/opengeospatial/ogcapi-processes
-.. |ogc-proc-long| replace:: |ogc-proc-api|_ (WPS-REST bindings)
+.. |ogc-api-proc| replace:: `OGC API - Processes`
+.. _ogc-api-proc: https://github.com/opengeospatial/ogcapi-processes
+.. |ogc-proc-long| replace:: |ogc-api-proc|_ (WPS-REST bindings)
 .. |ogc-tb14| replace:: OGC Testbed-14
 .. _ogc-tb14: https://www.ogc.org/projects/initiatives/testbed14
 .. |ogc-tb14-platform-er| replace:: ADES & EMS Results and Best Practices Engineering Report

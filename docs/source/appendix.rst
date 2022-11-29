@@ -194,6 +194,10 @@ Glossary
     WPS-REST
         Alias employed to refer to :term:`OGC API - Processes` endpoints for corresponding :term:`WPS` definitions.
 
+    WPS-T
+        Alias employed to refer to older revisions of :term:`OGC API - Processes` standard.
+        The name referred to :term:`WPS` *Transactional* operations introduced by the RESTful API.
+
     XML
         | Extensible Markup Language
         | Alternative representation of some data object provided by the application. Requires appropriate ``Accept``
@@ -219,5 +223,5 @@ Useful Links
 - |iana-link|_
 - |oas|_
 - |ogc|_ (:term:`OGC`)
-- |ogc-proc-api|_
+- |ogc-api-proc|_
 - |weaver-issues|_

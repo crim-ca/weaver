@@ -30,8 +30,9 @@ definition available with |pkg-req|_ request.
 .. note::
 
     The package request is a `Weaver`-specific implementation, and therefore, is not necessarily available on other
-    :term:`ADES`/:term:`EMS` implementation as this feature is not part of |ogc-proc-api|_ specification.
+    :term:`ADES`/:term:`EMS` implementation as this feature is not part of |ogc-api-proc|_ specification.
 
+.. _app_pkg_types:
 
 Typical CWL Package Definition
 ===========================================
@@ -223,19 +224,63 @@ second task could be delayed until the first task is completed, therefore avoidi
 
 .. _app_pkg_remote:
 .. _app_pkg_wps1:
-.. _app_pkg_ogc-api:
-.. _app_pkg_esgf-cwt:
+.. _app_pkg_ogc_api:
+.. _app_pkg_esgf_cwt:
 
 Remote Applications
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. todo::
-    - WPS1Requirement
-    - OGCAPIRequirement
-    - ESGF-CWTRequirement
+To define an application that refers to a :ref:`proc_remote_provider`, an :ref:`proc_wps_12`, an :ref:`proc_ogc_api`
+or an :ref:`proc_esgf_cwt` endpoint, the corresponding `Weaver`-specific :term:`CWL`-like requirements must be employed
+to indicate the URL where that remote resource is accessible. Once deployed, the contained :term:`CWL`
+package and the resulting :term:`Process` will be exposed as a :ref:`proc_ogc_api` resource.
+
+Upon reception of a :ref:`Process Execution <proc_op_execute>` request, `Weaver` will take care of resolving
+the indicated process URL from the :term:`CWL` requirement and will dispatch the execution to the resource
+after applying any relevant I/O, parameter and Media-Type conversion to align with the target server standard
+for submitting the :term:`Job` requests.
+
+Below are examples of the corresponding :term:`CWL` requirements employed for each type of remote application.
+
+.. code-block:: yaml
+    :caption: WPS-1/2 Package Definition
+
+    cwlVersion: "v1.0"
+    class: CommandLineTool
+    hints:
+      WPS1Requirement:
+        provider: "https://example.com/ows/wps/catalog"
+        process: "getpoint"
+
+.. code-block:: yaml
+    :caption: OGC API Package Definition
+
+    cwlVersion: "v1.0"
+    class: CommandLineTool
+    hints:
+      OGCAPIRequirement:
+        process: "https://example.com/ogcapi/processes/getpoint"
+
+.. code-block:: json
+    :caption: ESGF-CWT Package Definition
+
+    {
+      "cwlVersion": "v1.0",
+      "class": "CommandLineTool",
+      "hints": {
+        "ESGF-CWTRequirement": {
+          "provider": "https://edas.nccs.nasa.gov/wps/cwt",
+          "process": "xarray.subset"
+        }
+      }
+    }
 
 
-
+.. seealso::
+    - :ref:`proc_remote_provider`
+    - :ref:`proc_wps_12`
+    - :ref:`proc_ogc_api`
+    - :ref:`proc_esgf_cwt`
 
 .. _app_pkg_workflow:
 

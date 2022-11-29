@@ -214,7 +214,7 @@ they are optional and which default value or operation is applied in each situat
   | (default: *path* ``/``)
   |
   | Endpoint that will be employed as prefix to refer to WPS-REST requests
-  | (including but not limited to |ogc-proc-api|_ schemas).
+  | (including but not limited to |ogc-api-proc|_ schemas).
   |
   | It can either be the explicit *full URL* to use or the *path* relative to ``weaver.url``.
   | Setting ``weaver.wps_restapi_path`` is ignored if its URL equivalent is defined.

@@ -2031,7 +2031,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                                 except Exception as exc:
                                     print(exc)
                                     raise
-                                """)
+                            """)
                         }
                     ]
                 }
