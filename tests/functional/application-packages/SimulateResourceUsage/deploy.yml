@@ -1,0 +1,15 @@
+# YAML representation supported by WeaverClient
+processDescription:
+  id: SimulateResourceUsage
+  title: Gradually allocate RAM to simulate a process load.
+  version: "1.0"
+  keywords:
+    - test
+jobControlOptions:
+  - async-execute
+outputTransmission:
+  - reference
+executionUnit:
+  # note: This does not work by itself! The test suite injects the file dynamically.
+  - href: "tests/functional/application-packages/SimulateResourceUsage/package.cwl"
+deploymentProfileName: "http://www.opengis.net/profiles/eoc/dockerizedApplication"

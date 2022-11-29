@@ -12,6 +12,8 @@ Changes
 
 Changes:
 --------
+- Add `Job` log message size checks to better control what gets logged during the `Application Package` execution to
+  avoid large documents causing problems when attempting save them to storage database.
 - Update documentation with examples for ``cwltool:CUDARequirement``, ``ResourceRequirement`` and ``NetworkAccess``.
 - Improve schema definition of ``ResourceRequirement``.
 - Deprecate ``DockerGpuRequirement``, with attempts to auto-convert it into corresponding ``DockerRequirement``
@@ -27,7 +29,6 @@ Fixes:
   Use ``packaging.version.Version`` substitute whenever possible, but preserve backward
   compatibility with ``distutils`` in case of older Python not supporting it.
 - Fix ``cli._update_files`` so there are no attempts to upload remote references to the `Vault`.
-- No change.
 
 .. _changes_4.27.0:
 

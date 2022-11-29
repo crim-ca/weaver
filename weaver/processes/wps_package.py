@@ -1440,9 +1440,10 @@ class WpsPackage(Process):
             # when process is a docker image, memory monitoring information is obtained with CID file
             # this file is only generated when the below command is explicitly None (not even when '')
             "user_space_docker_cmd": None,
-            # if 'ResourceRequirement' is specified to limit RAM usage, below must be added to ensure it is applied
+            # if 'ResourceRequirement' is specified to limit RAM/CPU usage, below must be added to ensure it is applied
             # but don't enable it otherwise, since some defaults are applied which could break existing processes
             "strict_memory_limit": bool(res_req),
+            "strict_cpu_limit": bool(res_req),
         }
         return runtime_params
 

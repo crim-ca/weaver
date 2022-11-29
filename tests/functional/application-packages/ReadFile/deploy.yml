@@ -19,5 +19,5 @@ outputTransmission:
   - reference
 executionUnit:
   # note: This does not work by itself! The test suite injects the file dynamically.
-  - href: "tests/functional/application-packages/CatValue/cat.cwl"
+  - href: "tests/functional/application-packages/ReadValue/package.cwl"
 deploymentProfileName: "http://www.opengis.net/profiles/eoc/dockerizedApplication"

@@ -1,0 +1,4 @@
+ram_amount: 4
+ram_chunks: 16
+time_duration: 1
+time_interval: 0.25
