@@ -2509,7 +2509,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         # FIXME: ensure ResourceRequirements are effective (https://github.com/crim-ca/weaver/issues/138)
         # (True, 48, 96, 4, 2, 0.25, 0.25, {CWL_REQUIREMENT_RESOURCE: {"ramMax": 2}}),      # FIXME: hangs forever
         # (True, 48, 96, 4, 2, 0.25, 0.25, {CWL_REQUIREMENT_RESOURCE: {"outdirMax": 2}}),   # FIXME: not failing
-        (True, 48, 96, 4, 2, 0.25, 0.25, {CWL_REQUIREMENT_RESOURCE: {"outdirMax": 16}}),
+        (False, 48, 96, 4, 2, 0.25, 0.25, {CWL_REQUIREMENT_RESOURCE: {"outdirMax": 16}}),
     ])
     def test_execute_with_resource_requirement(self,
                                                expect_fail,             # type: bool
