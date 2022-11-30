@@ -530,7 +530,7 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
         test_process_id = f"{cls.__name__}_{deploy_id}"
         execute_payload = cls.retrieve_payload(pid, "execute")
 
-        # replace derived reference (local only, remote must be used full 'href' references)
+        # replace derived reference (local only, remote must use the full 'href' references)
         test_app_pkg = deploy_payload.get("executionUnit", [{}])[0].pop("test", None)
         if test_app_pkg:
             unit_app_pkg = cls.retrieve_payload(pid, "package")

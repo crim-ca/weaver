@@ -3763,7 +3763,7 @@ class ResourceRequirementSpecification(PermissiveMappingSchema):
             and 'outdirMax' requests also do not exceed the capacity of the node.
 
             Processes sharing a core must have the same level of isolation (typically a container or VM)
-            that they would normally.
+            that they would normally have.
 
             The reported number of CPU cores reserved for the process, which is available to expressions on the
             'CommandLineTool' as 'runtime.cores', must be a non-zero integer, and may be calculated by rounding up
