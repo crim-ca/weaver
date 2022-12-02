@@ -19,7 +19,6 @@ import cwltool.process
 import mock
 import pytest
 
-from tests.resources import load_resource
 from tests.utils import assert_equal_any_order
 from weaver.datatype import Process
 from weaver.exceptions import PackageExecutionError
