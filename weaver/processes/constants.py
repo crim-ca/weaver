@@ -41,6 +41,14 @@ class OpenSearchField(Constants):
     LOCAL_FILE_SCHEME = "opensearchfile"  # must be a valid url scheme parsable by urlparse
 
 
+CWL_NAMESPACE_ID = "cwl"
+CWL_NAMESPACE_URL = "https://w3id.org/cwl/cwl#"
+CWL_NAMESPACE = MappingProxyType({CWL_NAMESPACE_ID: CWL_NAMESPACE_URL})
+
+CWL_TOOL_NAMESPACE_ID = "cwltool"
+CWL_TOOL_NAMESPACE_URL = "http://commonwl.org/cwltool#"
+CWL_TOOL_NAMESPACE = MappingProxyType({CWL_TOOL_NAMESPACE_ID: CWL_TOOL_NAMESPACE_URL})
+
 # FIXME: convert to 'Constants' class
 # CWL package (requirements/hints) corresponding to `ProcessType.APPLICATION`
 CWL_REQUIREMENT_APP_BUILTIN = "BuiltinRequirement"
@@ -95,7 +103,8 @@ Parameters employed by default for updating :data:`CWL_REQUIREMENT_APP_DOCKER_GP
 """
 
 # FIXME: convert to 'Constants' class
-CWL_REQUIREMENT_CUDA = "cwltool:CUDARequirement"
+CWL_REQUIREMENT_CUDA = f"{CWL_TOOL_NAMESPACE_ID}:CUDARequirement"
+CWL_REQUIREMENT_CUDA_NAMESPACE = CWL_TOOL_NAMESPACE
 CWL_REQUIREMENT_ENV_VAR = "EnvVarRequirement"
 CWL_REQUIREMENT_INIT_WORKDIR = "InitialWorkDirRequirement"
 CWL_REQUIREMENT_INLINE_JAVASCRIPT = "InlineJavascriptRequirement"

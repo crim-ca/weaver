@@ -12,6 +12,8 @@ Changes
 
 Changes:
 --------
+- Update to latest ``cwltool==3.1.20221201130942`` to provide ``v1.2`` extension definitions.
+- Add `CWL` extensions activation for specific features supported by `Weaver` for more adequate schema validation.
 - Add `Job` log message size checks to better control what gets logged during the `Application Package` execution to
   avoid large documents causing problems when attempting save them to storage database.
 - Update documentation with examples for ``cwltool:CUDARequirement``, ``ResourceRequirement`` and ``NetworkAccess``.

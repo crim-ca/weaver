@@ -34,7 +34,7 @@ cryptography
 # use cwltool gpu-enabled support until integrated within the original tool
 # (https://github.com/common-workflow-language/common-workflow-language/issues/587)
 ### git+https://github.com/crim-ca/cwltool@docker-gpu#egg=cwltool; python_version >= "3"
-cwltool==3.1.20220913185150
+cwltool==3.1.20221201130942
 # defused required for json2xml
 defusedxml
 docker
