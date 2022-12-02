@@ -457,9 +457,10 @@ def _load_supported_schemas():
         )
         schema["$graph"] = extensions_imports + extensions_supported
 
-        schema_data = yaml.safe_dump(schema["$graph"], encoding="utf-8")
-        use_custom_schema(version, CWL_TOOL_NAMESPACE_URL, schema_data)
-        PACKAGE_SCHEMA_CACHE[version] = (CWL_TOOL_NAMESPACE_URL, schema_data)
+        schema_data = bytes2str(yaml.safe_dump(schema["$graph"], encoding="utf-8", sort_keys=False))
+        schema_base = CWL_TOOL_NAMESPACE_URL.split("#", 1)[0]
+        use_custom_schema(version, schema_base, schema_data)
+        PACKAGE_SCHEMA_CACHE[version] = (schema_base, schema_data)
 
 
 @overload

@@ -416,8 +416,16 @@ def test_cwl_extension_requirements_no_error():
 
     # default behaviour without loading supported extensions should fail validation
     with mock.patch("weaver.processes.wps_package._load_supported_schemas", side_effect=lambda: None):
-        with pytest.raises(cwltool.process.ValidationException):
+        with pytest.raises(cwltool.process.ValidationException) as exc_info:
             _load_package_content(cwl, "test")
+        message = str(exc_info.value)
+        assert all(
+            info in message for info in [
+                "checking field `requirements`",
+                "Field `class` contains undefined reference to",
+                CWL_REQUIREMENT_CUDA.split(":", 1)[-1],
+            ]
+        ), "Validation failure should have been caused by missing CWL CUDA extension schema, not something else."
 
     # no error expected after when supported schema extensions are applied
     _load_package_content(cwl, "test")
@@ -429,3 +437,13 @@ def test_cwl_extension_requirements_no_error():
             "run": copy.deepcopy(cwl),
         }
     }
+    with pytest.raises(cwltool.process.ValidationException) as exc_info:
+        _load_package_content(cwl, "test")
+    message = str(exc_info.value)
+    assert all(
+        info in message for info in [
+            "checking field `requirements`",
+            "Field `class` contains undefined reference to",
+            "ProcessGenerator",
+        ]
+    ), "Validation failure should have been caused by unsupported CWL extension schema, not something else."
