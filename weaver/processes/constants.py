@@ -103,23 +103,38 @@ Parameters employed by default for updating :data:`CWL_REQUIREMENT_APP_DOCKER_GP
 """
 
 # FIXME: convert to 'Constants' class
+# NOTE: depending on the 'cwlVersion' of the document, some items are extensions or native to the standard specification
 CWL_REQUIREMENT_CUDA = f"{CWL_TOOL_NAMESPACE_ID}:CUDARequirement"
 CWL_REQUIREMENT_CUDA_NAMESPACE = CWL_TOOL_NAMESPACE
 CWL_REQUIREMENT_ENV_VAR = "EnvVarRequirement"
 CWL_REQUIREMENT_INIT_WORKDIR = "InitialWorkDirRequirement"
 CWL_REQUIREMENT_INLINE_JAVASCRIPT = "InlineJavascriptRequirement"
+CWL_REQUIREMENT_INPLACE_UPDATE = "InplaceUpdateRequirement"
+CWL_REQUIREMENT_LOAD_LISTING = "LoadListingRequirement"
+CWL_REQUIREMENT_MPI = "MPIRequirement"  # no implication yet
 CWL_REQUIREMENT_NETWORK_ACCESS = "NetworkAccess"
+CWL_REQUIREMENT_PROCESS_GENERATOR = "ProcessGenerator"
 CWL_REQUIREMENT_RESOURCE = "ResourceRequirement"
 CWL_REQUIREMENT_SCATTER = "ScatterFeatureRequirement"
+CWL_REQUIREMENT_SECRETS = "Secrets"
+CWL_REQUIREMENT_TIME_LIMIT = "TimeLimit"
+CWL_REQUIREMENT_WORK_REUSE = "WorkReuse"  # default is to reuse, employed to explicitly disable
 
 CWL_REQUIREMENT_FEATURES = frozenset([
     CWL_REQUIREMENT_CUDA,
     CWL_REQUIREMENT_ENV_VAR,
     CWL_REQUIREMENT_INIT_WORKDIR,
+    CWL_REQUIREMENT_INPLACE_UPDATE,
     CWL_REQUIREMENT_INLINE_JAVASCRIPT,
+    CWL_REQUIREMENT_LOAD_LISTING,
+    # CWL_REQUIREMENT_MPI,  # no implication yet
     CWL_REQUIREMENT_NETWORK_ACCESS,
-    CWL_REQUIREMENT_RESOURCE,   # FIXME: perform pre-check on job submit? (https://github.com/crim-ca/weaver/issues/138)
+    # CWL_REQUIREMENT_PROCESS_GENERATOR,  # explicitly unsupported, works against Weaver's behavior
+    CWL_REQUIREMENT_RESOURCE,  # FIXME: perform pre-check on job submit? (https://github.com/crim-ca/weaver/issues/138)
     CWL_REQUIREMENT_SCATTER,
+    # CWL_REQUIREMENT_SECRETS,  # FIXME: support CWL Secrets (https://github.com/crim-ca/weaver/issues/511)
+    CWL_REQUIREMENT_TIME_LIMIT,
+    CWL_REQUIREMENT_WORK_REUSE,  # allow it, but makes sense only for Workflow steps if cwltool handles it by itself
 ])
 """
 Set of :term:`CWL` requirements that corresponds to extra functionalities not completely defining
@@ -209,9 +224,15 @@ if TYPE_CHECKING:
         CWL_REQUIREMENT_ENV_VAR,
         CWL_REQUIREMENT_INIT_WORKDIR,
         CWL_REQUIREMENT_INLINE_JAVASCRIPT,
+        CWL_REQUIREMENT_INPLACE_UPDATE,
+        CWL_REQUIREMENT_LOAD_LISTING,
+        CWL_REQUIREMENT_MPI,
         CWL_REQUIREMENT_NETWORK_ACCESS,
         CWL_REQUIREMENT_RESOURCE,
         CWL_REQUIREMENT_SCATTER,
+        CWL_REQUIREMENT_SECRETS,
+        CWL_REQUIREMENT_TIME_LIMIT,
+        CWL_REQUIREMENT_WORK_REUSE,
     ]
     ProcessSchemaType = Literal[ProcessSchema.OGC, ProcessSchema.OLD]
     WPS_ComplexType = Literal[WPS_COMPLEX, WPS_COMPLEX_DATA, WPS_REFERENCE]

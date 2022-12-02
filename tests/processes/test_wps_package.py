@@ -28,6 +28,7 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_CUDA,
     CWL_REQUIREMENT_CUDA_DEFAULT_PARAMETERS,
     CWL_REQUIREMENT_CUDA_NAMESPACE,
+    CWL_REQUIREMENT_PROCESS_GENERATOR
 )
 from weaver.processes.wps_package import WpsPackage, _load_package_content, _update_package_compatibility
 from weaver.wps.service import WorkerRequest
@@ -432,7 +433,7 @@ def test_cwl_extension_requirements_no_error():
 
     # test unsupported schema extension to ensure still disallowed
     cwl["requirements"] = {
-        "ProcessGenerator": {
+        CWL_REQUIREMENT_PROCESS_GENERATOR: {
             "class": "CommandLineTool",
             "run": copy.deepcopy(cwl),
         }
@@ -444,6 +445,6 @@ def test_cwl_extension_requirements_no_error():
         info in message for info in [
             "checking field `requirements`",
             "Field `class` contains undefined reference to",
-            "ProcessGenerator",
+            CWL_REQUIREMENT_PROCESS_GENERATOR,
         ]
     ), "Validation failure should have been caused by unsupported CWL extension schema, not something else."

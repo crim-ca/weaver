@@ -40,8 +40,15 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_CUDA,
     CWL_REQUIREMENT_INIT_WORKDIR,
     CWL_REQUIREMENT_INLINE_JAVASCRIPT,
+    CWL_REQUIREMENT_INPLACE_UPDATE,
+    CWL_REQUIREMENT_LOAD_LISTING,
+    # CWL_REQUIREMENT_MPI,
     CWL_REQUIREMENT_NETWORK_ACCESS,
     CWL_REQUIREMENT_RESOURCE,
+    CWL_REQUIREMENT_SCATTER,
+    # CWL_REQUIREMENT_SECRETS,
+    CWL_REQUIREMENT_TIME_LIMIT,
+    CWL_REQUIREMENT_WORK_REUSE,
     OAS_COMPLEX_TYPES,
     OAS_DATA_TYPES,
     PACKAGE_ARRAY_BASE,
@@ -52,6 +59,8 @@ from weaver.processes.constants import (
     WPS_LITERAL_DATA_TYPES,
     ProcessSchema
 )
+
+
 from weaver.quotation.status import QuoteStatus
 from weaver.sort import Sort, SortMethods
 from weaver.status import JOB_STATUS_CODE_API, JOB_STATUS_SEARCH_API, Status
@@ -107,13 +116,14 @@ API_DOCS = {
 }
 DOC_URL = f"{__meta__.__documentation_url__}/en/latest"
 
-CWL_VERSION = "v1.1"
+CWL_VERSION = "v1.2"
 CWL_REPO_URL = "https://github.com/common-workflow-language"
 CWL_BASE_URL = "https://www.commonwl.org"
 CWL_SPEC_URL = f"{CWL_BASE_URL}/#Specification"
 CWL_USER_GUIDE_URL = f"{CWL_BASE_URL}/user_guide"
-CWL_CMD_TOOL_URL = f"{CWL_BASE_URL}/{CWL_VERSION}/CommandLineTool.html"
-CWL_WORKFLOW_URL = f"{CWL_BASE_URL}/{CWL_VERSION}/Workflow.html"
+CWL_DOC_BASE_URL = f"{CWL_BASE_URL}/{CWL_VERSION}"
+CWL_CMD_TOOL_URL = f"{CWL_DOC_BASE_URL}/CommandLineTool.html"
+CWL_WORKFLOW_URL = f"{CWL_DOC_BASE_URL}/Workflow.html"
 CWL_DOC_MESSAGE = (
     "Note that multiple formats are supported and not all specification variants or parameters "
     f"are presented here. Please refer to official CWL documentation for more details ({CWL_BASE_URL})."
@@ -3620,11 +3630,11 @@ class CWLClass(ExtendedSchemaNode):
 
 
 class CWLExpression(ExtendedSchemaNode):
-    # https://www.commonwl.org/v1.2/CommandLineTool.html#Expression
     schema_type = String
     description = (
         f"When combined with '{CWL_REQUIREMENT_INLINE_JAVASCRIPT}', "
-        "this field allows runtime parameter references."
+        "this field allows runtime parameter references "
+        f"(see also: {CWL_CMD_TOOL_URL}#Expression)."
     )
 
 
@@ -3747,7 +3757,10 @@ class ResourceRequirementValue(OneOfKeywordSchema):
 
 
 class ResourceRequirementSpecification(PermissiveMappingSchema):
-    # descriptions extracted from: https://www.commonwl.org/v1.2/CommandLineTool.html#ResourceRequirement
+    description = (
+        "Specify basic hardware resource requirements "
+        f"(see also: {CWL_CMD_TOOL_URL}#{CWL_REQUIREMENT_RESOURCE})."
+    )
     coresMin = ResourceRequirementValue(
         missing=drop,
         default=1,
@@ -3932,8 +3945,8 @@ class InlineJavascriptLibraries(ExtendedSequenceSchema):
 class InlineJavascriptRequirementSpecification(PermissiveMappingSchema):
     description = (
         "Indicates that the workflow platform must support inline Javascript expressions. "
-        "If this requirement is not present, the workflow platform must not perform expression interpolation. "
-        "https://www.commonwl.org/v1.2/CommandLineTool.html#InlineJavascriptRequirement"
+        "If this requirement is not present, the workflow platform must not perform expression interpolation "
+        f"(see also: {CWL_CMD_TOOL_URL}#{CWL_REQUIREMENT_INLINE_JAVASCRIPT})."
     )
     expressionLib = InlineJavascriptLibraries(missing=drop)
 
@@ -3945,6 +3958,55 @@ class InlineJavascriptRequirementMap(ExtendedMappingSchema):
 class InlineJavascriptRequirementClass(InlineJavascriptRequirementSpecification):
     _class = RequirementClass(example=CWL_REQUIREMENT_INLINE_JAVASCRIPT,
                               validator=OneOf([CWL_REQUIREMENT_INLINE_JAVASCRIPT]))
+
+
+class InplaceUpdateRequirementSpecification(PermissiveMappingSchema):
+    description = (
+        "If 'inplaceUpdate' is true, then an implementation supporting this feature may permit tools to directly"
+        f"update files with 'writable: true' in '{CWL_REQUIREMENT_INIT_WORKDIR}'. That is, as an optimization, "
+        f"files may be destructively modified in place as opposed to copied and updated "
+        f"(see also: {CWL_CMD_TOOL_URL}#{CWL_REQUIREMENT_INPLACE_UPDATE})."
+    )
+    inplaceUpdate = ExtendedSchemaNode(Boolean())
+
+
+class InplaceUpdateRequirementMap(ExtendedMappingSchema):
+    req = InplaceUpdateRequirementSpecification(name=CWL_REQUIREMENT_INPLACE_UPDATE)
+
+
+class InplaceUpdateRequirementClass(InplaceUpdateRequirementSpecification):
+    _class = RequirementClass(example=CWL_REQUIREMENT_INPLACE_UPDATE,
+                              validator=OneOf([CWL_REQUIREMENT_INPLACE_UPDATE]))
+
+
+class LoadListingEnum(ExtendedSchemaNode):
+    schema_type = String
+    title = "LoadListingEnum"
+    validator = OneOf(["no_listing", "shallow_listing", "deep_listing"])
+
+
+class LoadListingRequirementSpecification(PermissiveMappingSchema):
+    description = (
+        "Specify the desired behavior for loading the listing field of a 'Directory' object for use by expressions "
+        f"(see also: {CWL_CMD_TOOL_URL}#{CWL_REQUIREMENT_LOAD_LISTING})."
+    )
+    loadListing = LoadListingEnum()
+
+
+class LoadListingRequirementMap(ExtendedMappingSchema):
+    req = LoadListingRequirementSpecification(name=CWL_REQUIREMENT_LOAD_LISTING)
+
+
+class LoadListingRequirementClass(LoadListingRequirementSpecification):
+    _class = RequirementClass(example=CWL_REQUIREMENT_LOAD_LISTING,
+                              validator=OneOf([CWL_REQUIREMENT_LOAD_LISTING]))
+
+
+CWL_REQUIREMENT_SCATTER
+CWL_REQUIREMENT_TIME_LIMIT
+CWL_REQUIREMENT_WORK_REUSE
+
+
 
 
 class BuiltinRequirementSpecification(PermissiveMappingSchema):
@@ -4034,8 +4096,13 @@ class CWLRequirementsMap(AnyOfKeywordSchema):
         DockerGpuRequirementMap(missing=drop),
         InitialWorkDirRequirementMap(missing=drop),
         InlineJavascriptRequirementMap(missing=drop),
+        InplaceUpdateRequirementMap(missing=drop),
+        LoadListingRequirementMap(missing=drop),
         NetworkAccessRequirementMap(missing=drop),
         ResourceRequirementMap(missing=drop),
+        ScatterFeatureRequirementMap(missing=drop),
+        TimeLimitRequirementMap(missing=drop),
+        WorkReuseRequirementMap(missing=drop),
         UnknownRequirementMap(missing=drop),  # allows anything, must be last
     ]
 
@@ -4049,8 +4116,13 @@ class CWLRequirementsItem(OneOfKeywordSchema):
         DockerGpuRequirementClass(missing=drop),
         InitialWorkDirRequirementClass(missing=drop),
         InlineJavascriptRequirementClass(missing=drop),
+        InplaceUpdateRequirementClass(missing=drop),
+        LoadListingRequirementClass(missing=drop),
         NetworkAccessRequirementClass(missing=drop),
         ResourceRequirementClass(missing=drop),
+        ScatterFeatureRequirementClass(missing=drop),
+        TimeLimitRequirementClass(missing=drop),
+        WorkReuseRequirementClass(missing=drop),
         UnknownRequirementClass(missing=drop),  # allows anything, must be last
     ]
 
@@ -4074,8 +4146,13 @@ class CWLHintsMap(AnyOfKeywordSchema, PermissiveMappingSchema):
         DockerGpuRequirementMap(missing=drop),
         InitialWorkDirRequirementMap(missing=drop),
         InlineJavascriptRequirementMap(missing=drop),
+        InplaceUpdateRequirementMap(missing=drop),
+        LoadListingRequirementMap(missing=drop),
         NetworkAccessRequirementMap(missing=drop),
         ResourceRequirementMap(missing=drop),
+        ScatterFeatureRequirementMap(missing=drop),
+        TimeLimitRequirementMap(missing=drop),
+        WorkReuseRequirementMap(missing=drop),
         ESGF_CWT_RequirementMap(missing=drop),
         OGCAPIRequirementMap(missing=drop),
         WPS1RequirementMap(missing=drop),
@@ -4094,8 +4171,13 @@ class CWLHintsItem(OneOfKeywordSchema, PermissiveMappingSchema):
         DockerGpuRequirementClass(missing=drop),
         InitialWorkDirRequirementClass(missing=drop),
         InlineJavascriptRequirementClass(missing=drop),
+        InplaceUpdateRequirementClass(missing=drop),
+        LoadListingRequirementClass(missing=drop),
         NetworkAccessRequirementClass(missing=drop),
         ResourceRequirementClass(missing=drop),
+        ScatterFeatureRequirementClass(missing=drop),
+        TimeLimitRequirementClass(missing=drop),
+        WorkReuseRequirementClass(missing=drop),
         ESGF_CWT_RequirementClass(missing=drop),
         OGCAPIRequirementClass(missing=drop),
         WPS1RequirementClass(missing=drop),
