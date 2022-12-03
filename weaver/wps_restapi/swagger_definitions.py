@@ -3757,10 +3757,10 @@ class ResourceRequirementValue(OneOfKeywordSchema):
 
 
 class ResourceRequirementSpecification(PermissiveMappingSchema):
-    description = (
-        "Specify basic hardware resource requirements "
-        f"(see also: {CWL_CMD_TOOL_URL}#{CWL_REQUIREMENT_RESOURCE})."
-    )
+    description = inspect.cleandoc(f"""
+        Specify basic hardware resource requirements
+        (see also: {CWL_CMD_TOOL_URL}#{CWL_REQUIREMENT_RESOURCE}).
+    """)
     coresMin = ResourceRequirementValue(
         missing=drop,
         default=1,
@@ -3789,10 +3789,10 @@ class ResourceRequirementSpecification(PermissiveMappingSchema):
     coresMax = ResourceRequirementValue(
         missing=drop,
         title="Maximum reserved number of CPU cores.",
-        description=(
-            "Maximum reserved number of CPU cores. "
-            "See 'coresMin' for discussion about fractional CPU requests."
-        ),
+        description=inspect.cleandoc("""
+            Maximum reserved number of CPU cores.
+            See 'coresMin' for discussion about fractional CPU requests.
+        """),
     )
     ramMin = ResourceRequirementValue(
         missing=drop,
@@ -3809,10 +3809,10 @@ class ResourceRequirementSpecification(PermissiveMappingSchema):
     ramMax = ResourceRequirementValue(
         missing=drop,
         title="Maximum reserved RAM in mebibytes.",
-        description=(
-            "Maximum reserved RAM in mebibytes (2**20). "
-            "See 'ramMin' for discussion about fractional RAM requests."
-        ),
+        description=inspect.cleandoc("""
+            Maximum reserved RAM in mebibytes (2**20).
+            See 'ramMin' for discussion about fractional RAM requests.
+        """),
     )
     tmpdirMin = ResourceRequirementValue(
         missing=drop,
@@ -3829,10 +3829,10 @@ class ResourceRequirementSpecification(PermissiveMappingSchema):
     tmpdirMax = ResourceRequirementValue(
         missing=drop,
         title="Maximum reserved filesystem based storage for the designated temporary directory in mebibytes.",
-        description=(
-            "Maximum reserved filesystem based storage for the designated temporary directory in mebibytes (2**20). "
-            "See 'tmpdirMin' for discussion about fractional storage requests."
-        ),
+        description=inspect.cleandoc("""
+            Maximum reserved filesystem based storage for the designated temporary directory in mebibytes (2**20).
+            See 'tmpdirMin' for discussion about fractional storage requests.
+        """),
     )
     outdirMin = ResourceRequirementValue(
         missing=drop,
@@ -3850,10 +3850,10 @@ class ResourceRequirementSpecification(PermissiveMappingSchema):
         missing=drop,
         default=1,
         title="Maximum reserved filesystem based storage for the designated output directory in mebibytes.",
-        description=(
-            "Maximum reserved filesystem based storage for the designated output directory in mebibytes (2**20). "
-            "See 'outdirMin' for discussion about fractional storage requests."
-        ),
+        description=inspect.cleandoc("""
+            Maximum reserved filesystem based storage for the designated output directory in mebibytes (2**20).
+            See 'outdirMin' for discussion about fractional storage requests.
+        """),
     )
 
 
@@ -3890,14 +3890,15 @@ class DockerRequirementClass(DockerRequirementSpecification):
 
 class DockerGpuRequirementSpecification(DockerRequirementSpecification):
     deprecated = True
-    description = (
-        "Docker requirement with GPU-enabled support (https://github.com/NVIDIA/nvidia-docker). "
-        "The instance must have the NVIDIA toolkit installed to use this feature. "
-        "\nWARNING:\n"
-        "This requirement is specific to Weaver and is preserved only for backward compatibility. "
-        f"Prefer the combined use of official '{CWL_REQUIREMENT_APP_DOCKER}' and '{CWL_REQUIREMENT_CUDA}' "
-        "for better support of GPU capabilities and portability to other CWL-supported platforms."
-    )
+    description = inspect.cleandoc(f"""
+        Docker requirement with GPU-enabled support (https://github.com/NVIDIA/nvidia-docker).
+        The instance must have the NVIDIA toolkit installed to use this feature.
+
+        WARNING:
+        This requirement is specific to Weaver and is preserved only for backward compatibility.
+        Prefer the combined use of official '{CWL_REQUIREMENT_APP_DOCKER}' and '{CWL_REQUIREMENT_CUDA}'
+        for better support of GPU capabilities and portability to other CWL-supported platforms.
+    """)
 
 
 class DockerGpuRequirementMap(ExtendedMappingSchema):
@@ -3935,19 +3936,19 @@ class InitialWorkDirRequirementClass(InitialWorkDirRequirementSpecification):
 
 
 class InlineJavascriptLibraries(ExtendedSequenceSchema):
-    description = (
-        "Additional code fragments that will also be inserted before executing the expression code. "
-        "Allows for function definitions that may be called from CWL expressions."
-    )
+    description = inspect.cleandoc("""
+        Additional code fragments that will also be inserted before executing the expression code.
+        Allows for function definitions that may be called from CWL expressions.
+    """)
     exp_lib = ExtendedSchemaNode(String(), missing=drop)
 
 
 class InlineJavascriptRequirementSpecification(PermissiveMappingSchema):
-    description = (
-        "Indicates that the workflow platform must support inline Javascript expressions. "
-        "If this requirement is not present, the workflow platform must not perform expression interpolation "
-        f"(see also: {CWL_CMD_TOOL_URL}#{CWL_REQUIREMENT_INLINE_JAVASCRIPT})."
-    )
+    description = inspect.cleandoc(f"""
+        Indicates that the workflow platform must support inline Javascript expressions.
+        If this requirement is not present, the workflow platform must not perform expression interpolation
+        (see also: {CWL_CMD_TOOL_URL}#{CWL_REQUIREMENT_INLINE_JAVASCRIPT}).
+    """)
     expressionLib = InlineJavascriptLibraries(missing=drop)
 
 
@@ -3961,12 +3962,12 @@ class InlineJavascriptRequirementClass(InlineJavascriptRequirementSpecification)
 
 
 class InplaceUpdateRequirementSpecification(PermissiveMappingSchema):
-    description = (
-        "If 'inplaceUpdate' is true, then an implementation supporting this feature may permit tools to directly"
-        f"update files with 'writable: true' in '{CWL_REQUIREMENT_INIT_WORKDIR}'. That is, as an optimization, "
-        f"files may be destructively modified in place as opposed to copied and updated "
-        f"(see also: {CWL_CMD_TOOL_URL}#{CWL_REQUIREMENT_INPLACE_UPDATE})."
-    )
+    description = inspect.cleandoc(f"""
+        If 'inplaceUpdate' is true, then an implementation supporting this feature may permit tools to directly
+        update files with 'writable: true' in '{CWL_REQUIREMENT_INIT_WORKDIR}'. That is, as an optimization,
+        files may be destructively modified in place as opposed to copied and updated
+        (see also: {CWL_CMD_TOOL_URL}#{CWL_REQUIREMENT_INPLACE_UPDATE}).
+    """)
     inplaceUpdate = ExtendedSchemaNode(Boolean())
 
 
@@ -4002,11 +4003,134 @@ class LoadListingRequirementClass(LoadListingRequirementSpecification):
                               validator=OneOf([CWL_REQUIREMENT_LOAD_LISTING]))
 
 
-CWL_REQUIREMENT_SCATTER
-CWL_REQUIREMENT_TIME_LIMIT
-CWL_REQUIREMENT_WORK_REUSE
+class IdentifierArray(ExtendedSequenceSchema):
+    item = AnyIdentifier()
 
 
+class ScatterIdentifiersSchema(OneOfKeywordSchema):
+    title = "Scatter"
+    description = inspect.cleandoc("""
+        The scatter field specifies one or more input parameters which will be scattered.
+        An input parameter may be listed more than once. The declared type of each input parameter implicitly
+        becomes an array of items of the input parameter type. If a parameter is listed more than once, it
+        becomes a nested array. As a result, upstream parameters which are connected to scattered parameters
+        must be arrays.
+
+        All output parameter types are also implicitly wrapped in arrays. Each job in the scatter results in an
+        entry in the output array.
+
+        If any scattered parameter runtime value is an empty array, all outputs are set to empty arrays and
+        no work is done for the step, according to applicable scattering rules.
+    """)
+    _one_of = [
+        AnyIdentifier(),
+        IdentifierArray(validator=Length(min=1)),
+    ]
+
+
+class ScatterFeatureRequirementSpecification(PermissiveMappingSchema):
+    description = inspect.cleandoc(f"""
+        A 'scatter' operation specifies that the associated Workflow step should execute separately over a list of
+        input elements. Each job making up a scatter operation is independent and may be executed concurrently
+        (see also: {CWL_WORKFLOW_URL}#WorkflowStep).
+    """)
+    scatter = ScatterIdentifiersSchema()
+    scatterMethod = ExtendedSchemaNode(
+        String(),
+        validator=OneOf(["dotproduct", "nested_crossproduct", "flat_crossproduct"]),
+        default="dotproduct",
+        missing=drop,
+        description=inspect.cleandoc("""
+            If 'scatter' declares more than one input parameter, 'scatterMethod' describes how to decompose the
+            input into a discrete set of jobs.
+            
+            - dotproduct: specifies that each of the input arrays are aligned and one element taken from each array
+              to construct each job. It is an error if all input arrays are not the same length.
+            
+            - nested_crossproduct: specifies the Cartesian product of the inputs, producing a job for every
+              combination of the scattered inputs. The output must be nested arrays for each level of scattering,
+              in the order that the input arrays are listed in the 'scatter' field.
+            
+            - flat_crossproduct: specifies the Cartesian product of the inputs, producing a job for every combination
+              of the scattered inputs. The output arrays must be flattened to a single level, but otherwise listed in
+              the order that the input arrays are listed in the 'scatter' field.
+        """)
+    )
+
+
+class ScatterFeatureRequirementMap(ExtendedMappingSchema):
+    req = ScatterFeatureRequirementSpecification(name=CWL_REQUIREMENT_SCATTER)
+
+
+class ScatterFeatureRequirementClass(ScatterFeatureRequirementSpecification):
+    _class = RequirementClass(example=CWL_REQUIREMENT_SCATTER, validator=OneOf([CWL_REQUIREMENT_SCATTER]))
+
+
+class TimeLimitValue(OneOfKeywordSchema):
+    _one_of = [
+        ExtendedSchemaNode(Float(), validator=Range(min=0.0)),
+        ExtendedSchemaNode(Integer(), validator=Range(min=0)),
+        CWLExpression,
+    ]
+
+
+class ToolTimeLimitRequirementSpecification(PermissiveMappingSchema):
+    description = inspect.cleandoc("""
+        Set an upper limit on the execution time of a CommandLineTool.
+        A CommandLineTool whose execution duration exceeds the time limit may be preemptively terminated
+        and considered failed. May also be used by batch systems to make scheduling decisions.
+        The execution duration excludes external operations, such as staging of files, pulling a docker image etc.,
+        and only counts wall-time for the execution of the command line itself.
+    """)
+    timelimit = TimeLimitValue(
+        description=inspect.cleandoc("""
+            The time limit, in seconds.
+            A time limit of zero means no time limit.
+            Negative time limits are an error.
+        """)
+    )
+
+
+class ToolTimeLimitRequirementMap(ExtendedMappingSchema):
+    req = ToolTimeLimitRequirementSpecification(name=CWL_REQUIREMENT_TIME_LIMIT)
+
+
+class ToolTimeLimitRequirementClass(ToolTimeLimitRequirementSpecification):
+    _class = RequirementClass(example=CWL_REQUIREMENT_TIME_LIMIT, validator=OneOf([CWL_REQUIREMENT_TIME_LIMIT]))
+
+
+class EnableReuseValue(OneOfKeywordSchema):
+    _one_of = [
+        ExtendedSchemaNode(Boolean(allow_string=False)),
+        CWLExpression,
+    ]
+
+
+class WorkReuseRequirementSpecification(PermissiveMappingSchema):
+    description = inspect.cleandoc(f"""
+        For implementations that support reusing output from past work
+        (on the assumption that same code and same input produce same results),
+        control whether to enable or disable the reuse behavior for a particular tool or step
+        (to accommodate situations where that assumption is incorrect).
+        A reused step is not executed but instead returns the same output as the original execution.
+        
+        If '{CWL_REQUIREMENT_WORK_REUSE}' is not specified, correct tools should assume it is enabled by default.
+    """)
+    enableReuse = EnableReuseValue(
+        description=inspect.cleandoc(f"""
+            Indicates if reuse is enabled for this tool.
+            Can be an expression when combined with '{CWL_REQUIREMENT_INLINE_JAVASCRIPT}'
+            (see also: {CWL_CMD_TOOL_URL}#Expression).
+        """)
+    )
+
+
+class WorkReuseRequirementMap(ExtendedMappingSchema):
+    req = WorkReuseRequirementSpecification(name=CWL_REQUIREMENT_WORK_REUSE)
+
+
+class WorkReuseRequirementClass(WorkReuseRequirementSpecification):
+    _class = RequirementClass(example=CWL_REQUIREMENT_WORK_REUSE, validator=OneOf([CWL_REQUIREMENT_WORK_REUSE]))
 
 
 class BuiltinRequirementSpecification(PermissiveMappingSchema):

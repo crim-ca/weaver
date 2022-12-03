@@ -117,7 +117,7 @@ CWL_REQUIREMENT_PROCESS_GENERATOR = "ProcessGenerator"
 CWL_REQUIREMENT_RESOURCE = "ResourceRequirement"
 CWL_REQUIREMENT_SCATTER = "ScatterFeatureRequirement"
 CWL_REQUIREMENT_SECRETS = "Secrets"
-CWL_REQUIREMENT_TIME_LIMIT = "TimeLimit"
+CWL_REQUIREMENT_TIME_LIMIT = "ToolTimeLimit"
 CWL_REQUIREMENT_WORK_REUSE = "WorkReuse"  # default is to reuse, employed to explicitly disable
 
 CWL_REQUIREMENT_FEATURES = frozenset([
