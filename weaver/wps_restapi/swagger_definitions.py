@@ -4225,7 +4225,7 @@ class CWLRequirementsMap(AnyOfKeywordSchema):
         NetworkAccessRequirementMap(missing=drop),
         ResourceRequirementMap(missing=drop),
         ScatterFeatureRequirementMap(missing=drop),
-        TimeLimitRequirementMap(missing=drop),
+        ToolTimeLimitRequirementMap(missing=drop),
         WorkReuseRequirementMap(missing=drop),
         UnknownRequirementMap(missing=drop),  # allows anything, must be last
     ]
@@ -4245,7 +4245,7 @@ class CWLRequirementsItem(OneOfKeywordSchema):
         NetworkAccessRequirementClass(missing=drop),
         ResourceRequirementClass(missing=drop),
         ScatterFeatureRequirementClass(missing=drop),
-        TimeLimitRequirementClass(missing=drop),
+        ToolTimeLimitRequirementClass(missing=drop),
         WorkReuseRequirementClass(missing=drop),
         UnknownRequirementClass(missing=drop),  # allows anything, must be last
     ]
@@ -4275,7 +4275,7 @@ class CWLHintsMap(AnyOfKeywordSchema, PermissiveMappingSchema):
         NetworkAccessRequirementMap(missing=drop),
         ResourceRequirementMap(missing=drop),
         ScatterFeatureRequirementMap(missing=drop),
-        TimeLimitRequirementMap(missing=drop),
+        ToolTimeLimitRequirementMap(missing=drop),
         WorkReuseRequirementMap(missing=drop),
         ESGF_CWT_RequirementMap(missing=drop),
         OGCAPIRequirementMap(missing=drop),
@@ -4300,7 +4300,7 @@ class CWLHintsItem(OneOfKeywordSchema, PermissiveMappingSchema):
         NetworkAccessRequirementClass(missing=drop),
         ResourceRequirementClass(missing=drop),
         ScatterFeatureRequirementClass(missing=drop),
-        TimeLimitRequirementClass(missing=drop),
+        ToolTimeLimitRequirementClass(missing=drop),
         WorkReuseRequirementClass(missing=drop),
         ESGF_CWT_RequirementClass(missing=drop),
         OGCAPIRequirementClass(missing=drop),
