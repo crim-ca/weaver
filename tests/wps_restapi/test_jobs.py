@@ -693,7 +693,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
         self.assert_equal_with_jobs_diffs(invert_jobs, expect_jobs, invert=True)
 
     def test_get_jobs_process_in_path_detail(self):
-        path = sd.process_jobs_service.path.format(process_id=self.job_info[0].process) + "?detail=true"
+        path = f"{sd.process_jobs_service.path.format(process_id=self.job_info[0].process)}?detail=true"
         resp = self.app.get(path, headers=self.json_headers)
         self.check_basic_jobs_info(resp)
         result_jobs = [job["jobID"] for job in resp.json["jobs"]]
@@ -1128,7 +1128,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
 
         Value of ``datetime_before`` represents a bad open range datetime interval.
         """
-        datetime_before = "./" + self.datetime_interval[3]
+        datetime_before = f"./{self.datetime_interval[3]}"
         path = get_path_kvp(sd.jobs_service.path, datetime=datetime_before)
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 400
@@ -1362,8 +1362,8 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
         wps_out_dir = self.settings["weaver.wps_output_dir"]
         job_id_str = str(job_success.id)
         job_out_dir = os.path.join(wps_out_dir, job_id_str)
-        job_out_log = os.path.join(wps_out_dir, job_id_str + ".log")
-        job_out_xml = os.path.join(wps_out_dir, job_id_str + ".xml")
+        job_out_log = os.path.join(wps_out_dir, f"{job_id_str}.log")
+        job_out_xml = os.path.join(wps_out_dir, f"{job_id_str}.xml")
         os.makedirs(job_out_dir, exist_ok=True)
         try:
             with contextlib.ExitStack() as stack:

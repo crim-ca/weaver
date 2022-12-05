@@ -59,7 +59,7 @@ VAULT_FAKE_UUID2 = str(uuid.uuid4())
     (f"token {VAULT_FAKE_TOKEN}; id={VAULT_FAKE_UUID1},token {VAULT_FAKE_TOKEN}; id={VAULT_FAKE_UUID2}", False,
      {VAULT_FAKE_UUID1: VAULT_FAKE_TOKEN, VAULT_FAKE_UUID2: VAULT_FAKE_TOKEN}),
     (f"token {VAULT_FAKE_TOKEN}; id={VAULT_FAKE_UUID1},token {VAULT_FAKE_TOKEN[:-3]}123; id={VAULT_FAKE_UUID2}", False,
-     {VAULT_FAKE_UUID1: VAULT_FAKE_TOKEN, VAULT_FAKE_UUID2: VAULT_FAKE_TOKEN[:-3] + "123"}),
+     {VAULT_FAKE_UUID1: VAULT_FAKE_TOKEN, VAULT_FAKE_UUID2: f"{VAULT_FAKE_TOKEN[:-3]}123"}),
     # many tokens for endpoint expecting only one fails immediately regardless of contents
     # use valid format to make sure it fails because of the multi-token aspect
     (f"token {VAULT_FAKE_TOKEN}; id={VAULT_FAKE_UUID1},token {VAULT_FAKE_TOKEN}; id={VAULT_FAKE_UUID2}", True,

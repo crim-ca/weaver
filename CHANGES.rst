@@ -12,6 +12,9 @@ Changes
 
 Changes:
 --------
+- Update Docker images to use more recent Python 3.10 by default instead of Python 3.7.
+  All CI pipeline, tests and validation checks are also performed with Python 3.10.
+  Unit and functional tests remain evaluated for all Python versions since 3.6 up to 3.11.
 - Add `Job` log message size checks to better control what gets logged during the `Application Package` execution to
   avoid large documents causing problems when attempting save them to storage database.
 - Update documentation with examples for ``cwltool:CUDARequirement``, ``ResourceRequirement`` and ``NetworkAccess``.
@@ -25,6 +28,7 @@ Changes:
 
 Fixes:
 ------
+- Fix CI failing setup of Python 3.6 not available on Ubuntu 22.04 (latest).
 - Fix ``distutils.version.LooseVersion`` marked for deprecation for upcoming versions.
   Use ``packaging.version.Version`` substitute whenever possible, but preserve backward
   compatibility with ``distutils`` in case of older Python not supporting it.

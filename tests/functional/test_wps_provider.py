@@ -34,7 +34,7 @@ class WpsProviderTest(WpsConfigBase):
         # NOTE: important otherwise cannot execute "remote" provider (default local only)
         "weaver.configuration": WeaverConfiguration.HYBRID,
         "weaver.wps_output_dir": "/tmp",  # nosec: B108 # don't care hardcoded for test
-        "weaver.wps_output_url": resources.TEST_REMOTE_SERVER_URL + "/wps-outputs"
+        "weaver.wps_output_url": f"{resources.TEST_REMOTE_SERVER_URL}/wps-outputs"
     }
 
     @classmethod
@@ -138,8 +138,8 @@ class WpsProviderTest(WpsConfigBase):
         proc_wps1_url = processes["ncdump"]["processEndpointWPS1"]
         proc_exec_url = processes["ncdump"]["executeEndpoint"]
         assert proc_wps1_url.startswith(resources.TEST_REMOTE_SERVER_URL)
-        assert proc_desc_url == self.app_url + path + "/ncdump"
-        assert proc_exec_url == self.app_url + path + "/ncdump/jobs"
+        assert proc_desc_url == f"{self.app_url + path}/ncdump"
+        assert proc_exec_url == f"{self.app_url + path}/ncdump/jobs"
 
         # validate process description
         resp = self.app.get(proc_desc_url, headers=self.json_headers)
@@ -200,8 +200,8 @@ class WpsProviderTest(WpsConfigBase):
             "inputs": [{"id": "dataset", "href": exec_file}],
             "outputs": [{"id": "output", "transmissionMode": ExecuteTransmissionMode.VALUE}]
         }
-        status_url = resources.TEST_REMOTE_SERVER_URL + "/status.xml"
-        output_url = resources.TEST_REMOTE_SERVER_URL + "/output.txt"
+        status_url = f"{resources.TEST_REMOTE_SERVER_URL}/status.xml"
+        output_url = f"{resources.TEST_REMOTE_SERVER_URL}/output.txt"
         with open(resources.TEST_HUMMINGBIRD_STATUS_WPS1_XML, mode="r", encoding="utf-8") as status_file:
             status = status_file.read().format(
                 TEST_SERVER_URL=resources.TEST_REMOTE_SERVER_URL,
@@ -236,7 +236,7 @@ class WpsProviderTest(WpsConfigBase):
 
             status_url = resp.json["location"]
             job_id = resp.json["jobID"]
-            assert status_url == proc_exec_url + "/" + job_id
+            assert status_url == f"{proc_exec_url}/{job_id}"
             results = self.monitor_job(status_url)
             wps_dir = self.settings["weaver.wps_output_dir"]
             wps_url = self.settings["weaver.wps_output_url"]

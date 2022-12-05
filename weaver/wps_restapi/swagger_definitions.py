@@ -94,7 +94,7 @@ if TYPE_CHECKING:
     ViewInfo = TypedDict("ViewInfo", {"name": str, "pattern": str})
 
 
-WEAVER_CONFIG_REMOTE_LIST = "[" + ", ".join(WeaverFeature.REMOTE) + "]"
+WEAVER_CONFIG_REMOTE_LIST = f"[{', '.join(WeaverFeature.REMOTE)}]"
 
 API_TITLE = "Weaver REST API"
 API_INFO = {
@@ -243,26 +243,26 @@ api_conformance_service = Service(name="api_conformance", path="/conformance")
 openapi_json_service = Service(name="openapi_json", path="/json")
 
 quotes_service = Service(name="quotes", path="/quotations")
-quote_service = Service(name="quote", path=quotes_service.path + "/{quote_id}")
+quote_service = Service(name="quote", path=f"{quotes_service.path}/{{quote_id}}")
 bills_service = Service(name="bills", path="/bills")
-bill_service = Service(name="bill", path=bills_service.path + "/{bill_id}")
+bill_service = Service(name="bill", path=f"{bills_service.path}/{{bill_id}}")
 
 jobs_service = Service(name="jobs", path="/jobs")
-job_service = Service(name="job", path=jobs_service.path + "/{job_id}")
-job_results_service = Service(name="job_results", path=job_service.path + "/results")
-job_exceptions_service = Service(name="job_exceptions", path=job_service.path + "/exceptions")
-job_outputs_service = Service(name="job_outputs", path=job_service.path + "/outputs")
-job_inputs_service = Service(name="job_inputs", path=job_service.path + "/inputs")
-job_logs_service = Service(name="job_logs", path=job_service.path + "/logs")
-job_stats_service = Service(name="job_stats", path=job_service.path + "/statistics")
+job_service = Service(name="job", path=f"{jobs_service.path}/{{job_id}}")
+job_results_service = Service(name="job_results", path=f"{job_service.path}/results")
+job_exceptions_service = Service(name="job_exceptions", path=f"{job_service.path}/exceptions")
+job_outputs_service = Service(name="job_outputs", path=f"{job_service.path}/outputs")
+job_inputs_service = Service(name="job_inputs", path=f"{job_service.path}/inputs")
+job_logs_service = Service(name="job_logs", path=f"{job_service.path}/logs")
+job_stats_service = Service(name="job_stats", path=f"{job_service.path}/statistics")
 
 processes_service = Service(name="processes", path="/processes")
-process_service = Service(name="process", path=processes_service.path + "/{process_id}")
+process_service = Service(name="process", path=f"{processes_service.path}/{{process_id}}")
 process_quotes_service = Service(name="process_quotes", path=process_service.path + quotes_service.path)
 process_quote_service = Service(name="process_quote", path=process_service.path + quote_service.path)
-process_visibility_service = Service(name="process_visibility", path=process_service.path + "/visibility")
-process_package_service = Service(name="process_package", path=process_service.path + "/package")
-process_payload_service = Service(name="process_payload", path=process_service.path + "/payload")
+process_visibility_service = Service(name="process_visibility", path=f"{process_service.path}/visibility")
+process_package_service = Service(name="process_package", path=f"{process_service.path}/package")
+process_payload_service = Service(name="process_payload", path=f"{process_service.path}/payload")
 process_jobs_service = Service(name="process_jobs", path=process_service.path + jobs_service.path)
 process_job_service = Service(name="process_job", path=process_service.path + job_service.path)
 process_results_service = Service(name="process_results", path=process_service.path + job_results_service.path)
@@ -271,10 +271,10 @@ process_outputs_service = Service(name="process_outputs", path=process_service.p
 process_exceptions_service = Service(name="process_exceptions", path=process_service.path + job_exceptions_service.path)
 process_logs_service = Service(name="process_logs", path=process_service.path + job_logs_service.path)
 process_stats_service = Service(name="process_stats", path=process_service.path + job_stats_service.path)
-process_execution_service = Service(name="process_execution", path=process_service.path + "/execution")
+process_execution_service = Service(name="process_execution", path=f"{process_service.path}/execution")
 
 providers_service = Service(name="providers", path="/providers")
-provider_service = Service(name="provider", path=providers_service.path + "/{provider_id}")
+provider_service = Service(name="provider", path=f"{providers_service.path}/{{provider_id}}")
 provider_processes_service = Service(name="provider_processes", path=provider_service.path + processes_service.path)
 provider_process_service = Service(name="provider_process", path=provider_service.path + process_service.path)
 provider_jobs_service = Service(name="provider_jobs", path=provider_service.path + process_jobs_service.path)
@@ -286,15 +286,15 @@ provider_logs_service = Service(name="provider_logs", path=provider_service.path
 provider_stats_service = Service(name="provider_stats", path=provider_service.path + process_stats_service.path)
 provider_exceptions_service = Service(name="provider_exceptions",
                                       path=provider_service.path + process_exceptions_service.path)
-provider_execution_service = Service(name="provider_execution", path=provider_process_service.path + "/execution")
+provider_execution_service = Service(name="provider_execution", path=f"{provider_process_service.path}/execution")
 
 # backward compatibility deprecated routes
-job_result_service = Service(name="job_result", path=job_service.path + "/result")
+job_result_service = Service(name="job_result", path=f"{job_service.path}/result")
 process_result_service = Service(name="process_result", path=process_service.path + job_result_service.path)
 provider_result_service = Service(name="provider_result", path=provider_service.path + process_result_service.path)
 
 vault_service = Service(name="vault", path="/vault")
-vault_file_service = Service(name="vault_file", path=vault_service.path + "/{file_id}")
+vault_file_service = Service(name="vault_file", path=f"{vault_service.path}/{{file_id}}")
 
 #########################################################
 # Generic schemas
@@ -4210,7 +4210,7 @@ class CWLInputItem(CWLInputObject):
 
 
 class CWLInputList(ExtendedSequenceSchema):
-    input = CWLInputItem(title="Input", description="Input specification. " + CWL_DOC_MESSAGE)
+    input = CWLInputItem(title="Input", description=f"Input specification. {CWL_DOC_MESSAGE}")
 
 
 class CWLInputEmpty(EmptyMappingSchema):
@@ -4259,7 +4259,7 @@ class CWLOutputItem(CWLOutputObject):
 
 
 class CWLOutputList(ExtendedSequenceSchema):
-    input = CWLOutputItem(description="Output specification. " + CWL_DOC_MESSAGE)
+    input = CWLOutputItem(description=f"Output specification. {CWL_DOC_MESSAGE}")
 
 
 class CWLOutputsDefinition(OneOfKeywordSchema):
@@ -4359,7 +4359,7 @@ class CWL(CWLBase, CWLApp):
 
 
 class Unit(ExtendedMappingSchema):
-    unit = CWL(description="Execution unit definition as CWL package specification. " + CWL_DOC_MESSAGE)
+    unit = CWL(description=f"Execution unit definition as CWL package specification. {CWL_DOC_MESSAGE}")
 
 
 class UndeploymentResult(ExtendedMappingSchema):
@@ -5803,7 +5803,7 @@ class VaultFileUploadedBodySchema(ExtendedMappingSchema):
 
 class VaultFileUploadedHeaders(ResponseHeaders):
     location = URL(name="Location", description="File download location.",
-                   example="https://localhost:4002" + vault_file_service.path.format(file_id=VaultFileID.example))
+                   example=f"https://localhost:4002{vault_file_service.path.format(file_id=VaultFileID.example)}")
 
 
 class OkVaultFileUploadedResponse(ExtendedMappingSchema):

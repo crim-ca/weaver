@@ -114,7 +114,7 @@ def get_wps_output_url(container, load=True):
 
     Searches directly in settings, then `weaver.wps_cfg` file, or finally, uses the default values if not found.
     """
-    wps_output_default = get_weaver_url(container) + "/wpsoutputs"
+    wps_output_default = f"{get_weaver_url(container)}/wpsoutputs"
     wps_output_config = _get_settings_or_wps_config(
         container, "weaver.wps_output_url", "server", "outputurl", wps_output_default, "WPS output url", load
     )
@@ -219,7 +219,7 @@ def map_wps_output_location(reference, container, url=False, exists=True, file_s
         wps_out_ref = reference.replace(wps_out_url, wps_out_dir, 1)
         if not exists or ref_exists(wps_out_ref):
             if file_scheme:
-                return "file://" + wps_out_ref
+                return f"file://{wps_out_ref}"
             return wps_out_ref
     return None
 

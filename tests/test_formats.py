@@ -14,7 +14,7 @@ from weaver import formats as f
 
 def test_get_extension():
     assert f.get_extension(f.ContentType.APP_JSON) == ".json"  # basic
-    assert f.get_extension(f.ContentType.APP_JSON + "; charset=UTF-8") == ".json"  # ignore extra parameters
+    assert f.get_extension(f"{f.ContentType.APP_JSON}; charset=UTF-8") == ".json"  # ignore extra parameters
     assert f.get_extension(f.ContentType.APP_GEOJSON) == ".geojson"      # pywps <4.4 definition
     assert f.get_extension(f.ContentType.APP_VDN_GEOJSON) == ".geojson"  # pywps>=4.4 definition
     assert f.get_extension(f.ContentType.IMAGE_GEOTIFF) == ".tiff"  # pywps definition
@@ -52,7 +52,7 @@ def test_get_content_type_extra_parameters():
 
 def test_get_format():
     assert f.get_format(f.ContentType.APP_JSON) == Format(f.ContentType.APP_JSON)  # basic
-    assert f.get_format(f.ContentType.APP_JSON + "; charset=UTF-8") == Format(f.ContentType.APP_JSON)
+    assert f.get_format(f"{f.ContentType.APP_JSON}; charset=UTF-8") == Format(f.ContentType.APP_JSON)
     assert f.get_format(f.ContentType.APP_GEOJSON) == Format(f.ContentType.APP_GEOJSON)  # pywps vendor MIME-type
     assert f.get_format(f.ContentType.APP_NETCDF).encoding == "base64"  # extra encoding data available
 
@@ -247,8 +247,8 @@ def test_clean_mime_type_format_ogc():
 def test_clean_mime_type_format_io_remove_extra_parameters():
     test_input_formats = [
         (f.ContentType.APP_JSON, f.ContentType.APP_JSON),
-        (f.ContentType.APP_JSON, f.ContentType.APP_JSON + "; charset=UTF-8"),
-        (f.ContentType.APP_XML, f.ContentType.APP_XML + "; charset=UTF-8; version=1.0"),
+        (f.ContentType.APP_JSON, f"{f.ContentType.APP_JSON}; charset=UTF-8"),
+        (f.ContentType.APP_XML, f"{f.ContentType.APP_XML}; charset=UTF-8; version=1.0"),
         ("application/vnd.api+json", "application/vnd.api+json; charset=UTF-8"),
         ("application/vnd.api+json", "application/vnd.api+json"),
     ]
@@ -260,10 +260,10 @@ def test_clean_mime_type_format_io_remove_extra_parameters():
 def test_clean_mime_type_format_io_strip_base_type():
     test_input_formats = [
         (f.ContentType.APP_JSON, f.ContentType.APP_JSON),
-        (f.ContentType.APP_JSON + "; charset=UTF-8", f.ContentType.APP_JSON + "; charset=UTF-8"),
-        (f.ContentType.APP_XML + "; charset=UTF-8; version=1.0",
-         f.ContentType.APP_XML + "; charset=UTF-8; version=1.0"),
-        (f.ContentType.APP_JSON + "; charset=UTF-8", "application/vnd.api+json; charset=UTF-8"),
+        (f"{f.ContentType.APP_JSON}; charset=UTF-8", f"{f.ContentType.APP_JSON}; charset=UTF-8"),
+        (f"{f.ContentType.APP_XML}; charset=UTF-8; version=1.0",
+         f"{f.ContentType.APP_XML}; charset=UTF-8; version=1.0"),
+        (f"{f.ContentType.APP_JSON}; charset=UTF-8", "application/vnd.api+json; charset=UTF-8"),
         (f.ContentType.APP_JSON, "application/vnd.api+json"),
     ]
     for expect_fmt, test_fmt in test_input_formats:
@@ -274,8 +274,8 @@ def test_clean_mime_type_format_io_strip_base_type():
 def test_clean_mime_type_format_io_strip_base_and_remove_parameters():
     test_input_formats = [
         (f.ContentType.APP_JSON, f.ContentType.APP_JSON),
-        (f.ContentType.APP_JSON, f.ContentType.APP_JSON + "; charset=UTF-8"),
-        (f.ContentType.APP_XML, f.ContentType.APP_XML + "; charset=UTF-8; version=1.0"),
+        (f.ContentType.APP_JSON, f"{f.ContentType.APP_JSON}; charset=UTF-8"),
+        (f.ContentType.APP_XML, f"{f.ContentType.APP_XML}; charset=UTF-8; version=1.0"),
         (f.ContentType.APP_JSON, "application/vnd.api+json; charset=UTF-8"),
         (f.ContentType.APP_JSON, "application/vnd.api+json"),
     ]

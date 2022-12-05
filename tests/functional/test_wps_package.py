@@ -70,12 +70,12 @@ if TYPE_CHECKING:
 
     from weaver.typedefs import JSON, CWL_AnyRequirements, CWL_RequirementsDict, Number
 
-EDAM_PLAIN = EDAM_NAMESPACE + ":" + EDAM_MAPPING[ContentType.TEXT_PLAIN]
-OGC_NETCDF = OGC_NAMESPACE + ":" + OGC_MAPPING[ContentType.APP_NETCDF]
+EDAM_PLAIN = f"{EDAM_NAMESPACE}:{EDAM_MAPPING[ContentType.TEXT_PLAIN]}"
+OGC_NETCDF = f"{OGC_NAMESPACE}:{OGC_MAPPING[ContentType.APP_NETCDF]}"
 # note: x-tar cannot be mapped during CWL format resolution (not official schema),
 #       it remains explicit tar definition in WPS context
-IANA_TAR = IANA_NAMESPACE + ":" + ContentType.APP_TAR  # noqa # pylint: disable=unused-variable
-IANA_ZIP = IANA_NAMESPACE + ":" + ContentType.APP_ZIP  # noqa # pylint: disable=unused-variable
+IANA_TAR = f"{IANA_NAMESPACE}:{ContentType.APP_TAR}"  # noqa # pylint: disable=unused-variable
+IANA_ZIP = f"{IANA_NAMESPACE}:{ContentType.APP_ZIP}"  # noqa # pylint: disable=unused-variable
 
 KNOWN_PROCESS_DESCRIPTION_FIELDS = {
     "id", "title", "description", "mutable", "version", "keywords", "metadata", "inputs", "outputs",
@@ -2160,10 +2160,10 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                 job_id = resp.json["jobID"]
                 results = self.monitor_job(status_url, timeout=5)
                 wps_dir = self.settings["weaver.wps_output_dir"]
-                ctx_dir = (wps_dir + "/" + ctx) if ctx else wps_dir
+                ctx_dir = f"{wps_dir}/{ctx}" if ctx else wps_dir
                 out_url = self.settings["weaver.wps_output_url"]
-                ctx_url = (out_url + "/" + ctx) if ctx else out_url
-                res_url = ctx_url + "/" + job_id + "/output/stdout.log"
+                ctx_url = f"{out_url}/{ctx}" if ctx else out_url
+                res_url = f"{ctx_url}/{job_id}/output/stdout.log"
                 res_path = os.path.join(ctx_dir, job_id, "output", "stdout.log")
                 assert results["output"]["href"] == res_url, f"Invalid output URL with context: {ctx}"
                 assert os.path.isfile(res_path), f"Invalid output path with context: {ctx}"
@@ -2491,7 +2491,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             wps_dir = get_wps_output_dir(self.settings)
             wps_url = get_wps_output_url(self.settings)
             out_dir = os.path.join(wps_dir, job_id, "output_dir")
-            out_url = os.path.join(wps_url, job_id, "output_dir") + "/"
+            out_url = f"{os.path.join(wps_url, job_id, 'output_dir')}/"
             assert results["output_dir"]["href"] == out_url
             assert os.path.isdir(out_dir)
             expect_out_files = {

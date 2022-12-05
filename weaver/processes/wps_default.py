@@ -36,5 +36,5 @@ class HelloWPS(Process):
     def _handler(self, request, response):  # noqa
         response.update_status("saying hello...", 0)
         LOGGER.debug("HOME=[%s], Current Dir=[%s]", os.environ.get("HOME"), os.path.abspath(os.curdir))
-        response.outputs["output"].data = "Hello " + request.inputs["name"][0].data
+        response.outputs["output"].data = f"Hello {request.inputs['name'][0].data}"
         return response

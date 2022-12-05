@@ -10,7 +10,7 @@ LONG_DESCRIPTION = None
 if all(os.path.isfile(os.path.join(CUR_DIR, f)) for f in ["README.rst", "CHANGES.rst"]):
     README = open(os.path.join(CUR_DIR, "README.rst")).read()
     CHANGES = open(os.path.join(CUR_DIR, "CHANGES.rst")).read()
-    LONG_DESCRIPTION = README + "\n\n" + CHANGES
+    LONG_DESCRIPTION = f"{README}\n\n{CHANGES}"
 
 # ensure that 'weaver' directory can be found for metadata import
 sys.path.insert(0, CUR_DIR)
@@ -91,6 +91,7 @@ setup(
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
         "Framework :: Pyramid",
         "Topic :: Internet :: WWW/HTTP",
         "Topic :: Internet :: WWW/HTTP :: WSGI :: Application",

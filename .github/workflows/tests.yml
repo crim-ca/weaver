@@ -42,51 +42,51 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        python-version: ["3.7", "3.8", "3.9"]
+        python-version: ["3.7", "3.8", "3.9", "3.10"]
         allow-failure: [false]
         test-case: [test-unit-only, test-func-only]
         include:
           # end-of-life python
-          - os: ubuntu-latest
-            python-version: 3.6
+          - os: ubuntu-20.04
+            python-version: "3.6"
             allow-failure: true
             test-case: test-unit-only
-          - os: ubuntu-latest
-            python-version: 3.6
+          - os: ubuntu-20.04
+            python-version: "3.6"
             allow-failure: true
             test-case: test-func-only
           # experimental python
           - os: ubuntu-latest
-            python-version: "3.10"
+            python-version: "3.11"
             allow-failure: true
             test-case: test-unit-only
           - os: ubuntu-latest
-            python-version: "3.10"
+            python-version: "3.11"
             allow-failure: true
             test-case: test-func-only
           # linter tests
           - os: ubuntu-latest
-            python-version: 3.7
+            python-version: "3.10"
             allow-failure: false
             test-case: check-all
           # documentation build
           - os: ubuntu-latest
-            python-version: 3.7
+            python-version: "3.10"
             allow-failure: false
             test-case: docs
           # coverage test
           - os: ubuntu-latest
-            python-version: 3.7
+            python-version: "3.10"
             allow-failure: false
             test-case: test-coverage-only
           # smoke test of Docker image
           - os: ubuntu-latest
-            python-version: 3.7  # doesn't matter which one (in docker), but match default of repo
+            python-version: "3.10"  # doesn't matter which one (in docker), but match default of repo
             allow-failure: false
             test-case: test-docker
           # EMS end-2-end Workflow tests
           - os: ubuntu-latest
-            python-version: 3.7
+            python-version: "3.10"
             allow-failure: true
             test-case: test-workflow-only
     steps:
@@ -98,7 +98,7 @@ jobs:
         if: ${{ matrix.test-case != 'test-docker' }}
         uses: actions/setup-python@v2
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "${{ matrix.python-version }}"
       - name: Parse Python Version
         id: python-semver
         run: |

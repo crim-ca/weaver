@@ -165,7 +165,7 @@ class ResourcesUtil(object):
             if ref_name:
                 for var_loc in var_locations:
                     if "." not in ref_name:
-                        ref_name = ref_name + ".json"  # will still retry extensions
+                        ref_name = f"{ref_name}.json"  # will still retry extensions
                     locations.extend([
                         f"{var_loc}/{ref_name}",
                         f"{var_loc}/{process}/{ref_name}",

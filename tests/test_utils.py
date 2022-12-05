@@ -335,7 +335,7 @@ def get_status_variations(status_value):
     return [status_value.lower(),
             status_value.upper(),
             status_value.capitalize(),
-            "Process" + status_value.capitalize()]
+            f"Process{status_value.capitalize()}"]
 
 
 def test_map_status_ogc_compliant():
@@ -1122,7 +1122,7 @@ def test_fetch_file_remote_with_request():
         tmp_json.write(json.dumps(tmp_data))
         tmp_json.seek(0)
         tmp_name = os.path.split(tmp_json.name)[-1]
-        tmp_http = "http://weaver.mock" + tmp_json.name
+        tmp_http = f"http://weaver.mock{tmp_json.name}"
         tmp_retry = 2
 
         # share in below mocked_request, 'nonlocal' back compatible with Python 2
@@ -1750,7 +1750,7 @@ def test_retry_on_condition(errors, raises, conditions, retries):
     def run_test(*args, **kwargs):
         test_errors.clear()
         test_errors.extend(errors)
-        test_case = " (operation " + ("with" if args and kwargs else "without") + " args)"
+        test_case = f" (operation {'with' if args and kwargs else 'without'} args)"
         result = None
         try:
             if args and kwargs:
@@ -1758,12 +1758,12 @@ def test_retry_on_condition(errors, raises, conditions, retries):
             else:
                 result = retry_on_condition(function_no_args, condition=conditions, retries=retries)
         except Exception as exc:
-            assert raises is not None, "Expected no unhandled error raised" + test_case
-            assert isinstance(exc, raises), "Expected specific error to be raised" + test_case
+            assert raises is not None, f"Expected no unhandled error raised{test_case}"
+            assert isinstance(exc, raises), f"Expected specific error to be raised{test_case}"
         if raises is None:
-            assert result == "OK", "Expected to succeed after retries" + test_case
+            assert result == "OK", f"Expected to succeed after retries{test_case}"
         else:
-            assert result is None, "Expected failure following raised error" + test_case
+            assert result is None, f"Expected failure following raised error{test_case}"
 
     run_test()
     run_test(1, keyword="test")

@@ -51,7 +51,7 @@ def test_wps3_process_step_io_data_or_href():
             if method == "PUT":
                 test_reached_parse_inputs = True  # last operation before parsing I/O is setting visibility
             return resp
-        if method == "POST" and url.endswith(test_process + "/jobs"):
+        if method == "POST" and url.endswith(f"{test_process}/jobs"):
             # actual evaluation of intended handling of CWL inputs conversion to WPS-3 execute request
             assert kwargs.get("json", {}).get("inputs") == expected_wps_inputs
             raise TestDoneEarlyExit("Expected exception raised to skip executed job status monitoring")

@@ -394,7 +394,7 @@ class WpsProcessInterface(abc.ABC):
                     # obtained directory type does not contain the expected trailing slash for Weaver reference checks
                     input_class = workflow_input_value_item.get("class", PACKAGE_FILE_TYPE)
                     if input_class == PACKAGE_DIRECTORY_TYPE:
-                        location = location.rstrip("/") + "/"
+                        location = f"{location.rstrip('/')}/"
                     execute_body_inputs.append({"id": workflow_input_key, "href": location})
                 else:
                     execute_body_inputs.append({"id": workflow_input_key, "data": workflow_input_value_item})
@@ -515,7 +515,7 @@ class OGCAPIRemoteProcessBase(WpsProcessInterface, abc.ABC):
         Obtains produced output results from successful job status ID.
         """
         # use '/results' endpoint instead of '/outputs' to ensure support with other
-        result_url = monitor_reference + "/results"
+        result_url = f"{monitor_reference}/results"
         response = self.make_request(method="GET", url=result_url, retry=True)
         response.raise_for_status()
         contents = response.json()

@@ -121,7 +121,7 @@ def test_transform_execute_parameters_wps():
     )
 
     mocked_query = ["file:///something.SAFE"]
-    files_inputs = [make_input("files", "opensearch" + m) for m in mocked_query]
+    files_inputs = [make_input("files", f"opensearch{m}") for m in mocked_query]
 
     expected = dict(
         [

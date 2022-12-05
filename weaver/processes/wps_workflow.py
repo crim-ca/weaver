@@ -234,7 +234,7 @@ class WpsWorkflowJob(CommandLineJob):
                 for glob in glob_spec if glob_list else [glob_spec]:
                     # in case of Directory collection with '<dir>/', use '.' because cwltool replaces it by the outdir
                     out_glob = glob.split("/")[-1] or "."
-                    out_glob = (output_id + "/" + out_glob) if self.wps_process.stage_output_id_nested else out_glob
+                    out_glob = f"{output_id}/{out_glob}" if self.wps_process.stage_output_id_nested else out_glob
                     out_globs.add(out_glob)
                 self.expected_outputs[output_id] = out_globs if glob_list else list(out_globs)[0]
 
