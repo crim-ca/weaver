@@ -26,7 +26,7 @@ cffi
 colander
 cornice
 #cornice_swagger>=0.7.0
-git+https://github.com/fmigneault/cornice.ext.swagger.git@openapi-3#egg=cornice-swagger
+cornice-swagger @ git+https://github.com/fmigneault/cornice.ext.swagger.git@openapi-3
 cryptography
 # FIXME: properly support GPU execution
 #   - https://github.com/crim-ca/weaver/issues/104
@@ -39,7 +39,7 @@ cwltool==3.1.20221201130942
 defusedxml
 docker
 duration
-git+https://github.com/ESGF/esgf-compute-api.git@v2.3.7#egg=esgf-compute-api
+esgf-compute-api @ git+https://github.com/ESGF/esgf-compute-api.git@v2.3.7
 # gunicorn >20 breaks some config.ini loading parameters (paste)
 # it is also only available for Python >=3.5
 # use pserve to continue supporting config.ini with paste settings
