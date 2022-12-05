@@ -33,7 +33,7 @@ for each process.
     :widths: 20,80
 
     * - dependencies
-      - | |py_ver| |requires| |pyup|
+      - | |py_ver| |deps| |pyup|
     * - build status
       - | |readthedocs| |docker_build_mode| |docker_build_status|
     * - tests status
@@ -53,12 +53,12 @@ for each process.
     :alt: Latest Tagged Version
     :target: https://github.com/crim-ca/weaver/tree/4.27.0
 
-.. |requires| image:: https://requires.io/github/crim-ca/weaver/requirements.svg?branch=master
-    :alt: Requirements Status
-    :target: https://requires.io/github/crim-ca/weaver/requirements/?branch=master
+.. |deps| image:: https://img.shields.io/librariesio/github/crim-ca/weaver
+    :alt: Libraries.io Dependencies Status
+    :target: https://libraries.io/github/crim-ca/weaver
 
 .. |pyup| image:: https://pyup.io/repos/github/crim-ca/weaver/shield.svg
-    :alt: Dependencies Status
+    :alt: PyUp Dependencies Status
     :target: https://pyup.io/account/repos/github/crim-ca/weaver/
 
 .. |github_latest| image:: https://img.shields.io/github/workflow/status/crim-ca/weaver/Tests/master?label=master
