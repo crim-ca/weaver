@@ -430,8 +430,9 @@ def _load_supported_schemas():
             LOGGER.debug("Reusing cached CWL %s schema extensions.", version)
             continue
         LOGGER.debug("Loading CWL %s schema extensions...", version)
-        loader = get_loader("cwltool")  # type: importlib.abc.ResourceReader  # noqa
-        r_file = loader.open_resource(ext_version_file)
+        loader = get_loader("cwltool")
+        reader = loader.get_resource_reader()  # type: importlib.abc.ResourceReader  # noqa
+        r_file = reader.open_resource(ext_version_file)
         schema = yaml.safe_load(r_file)
 
         extensions = schema["$graph"]
