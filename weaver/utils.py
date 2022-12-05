@@ -2938,7 +2938,7 @@ def fetch_reference(reference,                          # type: str
     """
     if reference.endswith("/"):
         path = fetch_directory(reference, out_dir, out_method=out_method, settings=settings, **option_kwargs)
-        path = path if out_listing else (f"{os.path.realpath(out_dir)}/")
+        path = path if out_listing else f"{os.path.realpath(out_dir)}/"
     else:
         path = fetch_file(reference, out_dir, out_method=out_method, settings=settings, **option_kwargs)
     return [path] if out_listing and isinstance(path, str) else path
