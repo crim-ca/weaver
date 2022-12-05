@@ -12,6 +12,9 @@ Changes
 
 Changes:
 --------
+- Update Docker images to use more recent Python 3.10 by default instead of Python 3.7.
+  All CI pipeline, tests and validation checks are also performed with Python 3.10.
+  Unit and functional tests remain evaluated for all Python versions since 3.6 (legacy) up to 3.11 (experimental).
 - Update to latest ``cwltool==3.1.20221201130942`` to provide ``v1.2`` extension definitions.
 - Add `CWL` extensions activation for specific features supported by `Weaver` for more adequate schema validation.
 - Add `Job` log message size checks to better control what gets logged during the `Application Package` execution to
@@ -27,6 +30,7 @@ Changes:
 
 Fixes:
 ------
+- Fix CI failing setup of Python 3.6 not available on Ubuntu 22.04 (latest).
 - Fix ``distutils.version.LooseVersion`` marked for deprecation for upcoming versions.
   Use ``packaging.version.Version`` substitute whenever possible, but preserve backward
   compatibility with ``distutils`` in case of older Python not supporting it.

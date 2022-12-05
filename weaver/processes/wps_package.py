@@ -203,7 +203,7 @@ PACKAGE_SCHEMA_CACHE = {}  # type: Dict[str, Tuple[str, str]]
 
 def get_status_location_log_path(status_location, out_dir=None):
     # type: (str, Optional[str]) -> str
-    log_path = os.path.splitext(status_location)[0] + ".log"
+    log_path = f"{os.path.splitext(status_location)[0]}.log"
     return os.path.join(out_dir, os.path.split(log_path)[-1]) if out_dir else log_path
 
 
@@ -691,7 +691,7 @@ def _patch_wps_process_description_url(reference, process_hint):
         if process_id and params.get("request", "").lower() == "getcapabilities":
             params["request"] = "DescribeProcess"
         query = "&".join([f"{key}={val}" for key, val in params.items()])
-        reference = url + "?" + query
+        reference = f"{url}?{query}"
     return reference
 
 
@@ -1140,9 +1140,9 @@ class DirectoryNestedStorage(CachedStorage):
         if not os.path.isdir(root):
             raise ValueError(f"Location is not a directory: [{root}]")
         files = list_directory_recursive(root)
-        root = root.rstrip("/") + "/"
-        loc_path = self.location(output.identifier) + "/"  # local directory or S3 location
-        url_path = self.url(output.identifier) + "/"       # HTTP output or same S3 location
+        root = f"{root.rstrip('/')}/"
+        loc_path = f"{self.location(output.identifier)}/"  # local directory or S3 location
+        url_path = f"{self.url(output.identifier)}/"       # HTTP output or same S3 location
         default_support = [DEFAULT_FORMAT] + [get_format(ctype) for ctype in [ContentType.ANY, ContentType.TEXT_PLAIN]]
         for file in files:
             out_file_path_rel = file.split(root, 1)[-1]
@@ -1183,7 +1183,7 @@ class DirectoryNestedStorage(CachedStorage):
             os.makedirs(self.storage.target, exist_ok=True)
             return self.url(dest_patched)
         if isinstance(self.storage, S3Storage):
-            path = dest_patched.rstrip("/") + "/"
+            path = f"{dest_patched.rstrip('/')}/"
             args = {
                 "ContentLength": 0,
                 "ContentType": ContentType.APP_DIR,
@@ -1564,7 +1564,7 @@ class WpsPackage(Process):
                 req_env = req_items.get(CWL_REQUIREMENT_ENV_VAR)
             active_python_path = os.path.join(sys.exec_prefix, "bin")
             env_path = os.getenv("PATH") or ""
-            env_path = ":" + env_path if env_path else ""
+            env_path = f":{env_path}" if env_path else ""
             env_path = f"{active_python_path}{env_path}"
             req_env["envDef"].update({"PATH": env_path})
             if self.package.get("baseCommand") == "python":

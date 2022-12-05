@@ -223,7 +223,7 @@ def get_job_list_links(job_total, filters, request):
          "type": ContentType.APP_JSON, "title": "Complete job listing (no filtering queries applied)."},
         {"href": base_url + sd.jobs_service.path, "rel": "search",
          "type": ContentType.APP_JSON, "title": "Generic query endpoint to search for jobs."},
-        {"href": job_path + "?detail=false", "rel": "preview",
+        {"href": f"{job_path}?detail=false", "rel": "preview",
          "type": ContentType.APP_JSON, "title": "Job listing summary (UUID and count only)."},
         {"href": job_path, "rel": "http://www.opengis.net/def/rel/ogc/1.0/job-list",
          "type": ContentType.APP_JSON, "title": "List of registered jobs."},
@@ -292,7 +292,7 @@ def make_result_link(result_id, result, job_id, settings):
             enc = "UTF-8"
             out = get_wps_output_dir(settings)
             val = get_any_value(value, data=True, file=False)
-            loc = os.path.join(job_id, result_id + suffix + ".txt")
+            loc = os.path.join(job_id, f"{result_id + suffix}.txt")
             url = f"{wps_url}/{loc}"
             path = os.path.join(out, loc)
             with open(path, mode="w", encoding=enc) as out_file:
@@ -335,7 +335,7 @@ def get_results(job,                                # type: Job
     settings = get_settings(container)
     wps_url = get_wps_output_url(settings)
     if not wps_url.endswith("/"):
-        wps_url = wps_url + "/"
+        wps_url = f"{wps_url}/"
     schema = JobInputsOutputsSchema.get(str(schema).lower(), default=JobInputsOutputsSchema.OLD)
     strict = schema.endswith("+strict")
     schema = schema.split("+")[0]
@@ -710,8 +710,8 @@ def dismiss_job_task(job, container):
 
     wps_out_dir = get_wps_output_dir(container)
     job_out_dir = os.path.join(wps_out_dir, str(job.id))
-    job_out_log = os.path.join(wps_out_dir, str(job.id) + ".log")
-    job_out_xml = os.path.join(wps_out_dir, str(job.id) + ".xml")
+    job_out_log = os.path.join(wps_out_dir, f"{str(job.id)}.log")
+    job_out_xml = os.path.join(wps_out_dir, f"{str(job.id)}.xml")
     if os.path.isdir(job_out_dir):
         LOGGER.debug("Job [%s] dismiss operation: Removing output results.", job.id)
         shutil.rmtree(job_out_dir, onerror=lambda func, path, _exc: LOGGER.warning(

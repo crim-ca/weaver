@@ -155,7 +155,7 @@ class RebasedApiRoutesTestCase(unittest.TestCase):
     def setUpClass(cls):
         cls.proxy_path = "/weaver-proxy"
         cls.app_host = "localhost"
-        cls.app_base_url = "http://" + cls.app_host
+        cls.app_base_url = f"http://{cls.app_host}"
         cls.app_proxy_url = cls.app_base_url + cls.proxy_path
         cls.app_proxy_json = cls.proxy_path + sd.openapi_json_service.path
         cls.app_proxy_ui = cls.proxy_path + sd.api_swagger_ui_service.path
@@ -176,7 +176,7 @@ class RebasedApiRoutesTestCase(unittest.TestCase):
         test_app = get_test_weaver_app(config=config)
 
         config = pyramid.testing.setUp(settings={})
-        config.add_route(name="proxy", path=self.proxy_path, pattern=self.proxy_path + "/{remain:.*}")
+        config.add_route(name="proxy", path=self.proxy_path, pattern=f"{self.proxy_path}/{{remain:.*}}")
         config.add_view(self.redirect_api_view, route_name="proxy")
         redirect_app = WebTestApp(config.make_wsgi_app())
 

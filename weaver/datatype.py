@@ -1242,7 +1242,7 @@ class Job(Base):
         base_url = get_wps_restapi_base_url(settings)
         job_url = self._job_url(base_url)  # full URL
         job_path = base_url + sd.job_service.path.format(job_id=self.id)
-        job_exec = job_url.rsplit("/", 1)[0] + "/execution"
+        job_exec = f"{job_url.rsplit('/', 1)[0]}/execution"
         job_list = base_url + sd.jobs_service.path
         job_links = [
             {"href": job_url, "rel": "status", "title": "Job status."},  # OGC
@@ -1253,27 +1253,27 @@ class Job(Base):
              "title": "List of submitted jobs."},
             {"href": job_exec, "rel": "http://www.opengis.net/def/rel/ogc/1.0/execute",
              "title": "New job submission endpoint for the corresponding process."},
-            {"href": job_url + "/inputs", "rel": "inputs",  # unofficial
+            {"href": f"{job_url}/inputs", "rel": "inputs",  # unofficial
              "title": "Submitted job inputs for process execution."}
         ]
         if self.status in JOB_STATUS_CATEGORIES[StatusCategory.FINISHED]:
             job_status = map_status(self.status)
             if job_status == Status.SUCCEEDED:
                 job_links.extend([
-                    {"href": job_url + "/outputs", "rel": "outputs",  # unofficial
+                    {"href": f"{job_url}/outputs", "rel": "outputs",  # unofficial
                      "title": "Job outputs of successful process execution (extended outputs with metadata)."},
-                    {"href": job_url + "/results", "rel": "http://www.opengis.net/def/rel/ogc/1.0/results",
+                    {"href": f"{job_url}/results", "rel": "http://www.opengis.net/def/rel/ogc/1.0/results",
                      "title": "Job results of successful process execution (direct output values mapping)."},
-                    {"href": job_url + "/statistics", "rel": "statistics",  # unofficial
+                    {"href": f"{job_url}/statistics", "rel": "statistics",  # unofficial
                      "title": "Job statistics collected following process execution."},
                 ])
             else:
                 job_links.append({
-                    "href": job_url + "/exceptions", "rel": "http://www.opengis.net/def/rel/ogc/1.0/exceptions",
+                    "href": f"{job_url}/exceptions", "rel": "http://www.opengis.net/def/rel/ogc/1.0/exceptions",
                     "title": "List of job exceptions if applicable in case of failing job."
                 })
         job_links.append({
-            "href": job_url + "/logs", "rel": "logs",  # unofficial
+            "href": f"{job_url}/logs", "rel": "logs",  # unofficial
             "title": "List of collected job logs during process execution."
         })
         if self_link in ["status", "inputs", "outputs", "results", "logs", "exceptions"]:
@@ -1563,7 +1563,7 @@ class DockerAuthentication(Authentication):
             registry = self.DOCKER_REGISTRY_DEFAULT_URI
         # otherwise, resolve the possible confusion between nested URI/paths vs nested repository/project
         elif groups["reg_path"]:
-            image = groups["reg_path"] + "/" + groups["image"]
+            image = f"{groups['reg_path']}/{groups['image']}"
         LOGGER.debug("Resolved Docker image/registry from link: [%s, %s]", registry, image)
         self["image"] = image
         self["registry"] = registry
@@ -2116,13 +2116,13 @@ class Process(Base):
         typ = self.type
 
         if cls == ProcessType.WORKFLOW:
-            profile = base + "workflow"
+            profile = f"{base}workflow"
         elif ProcessType.is_wps(typ):
-            profile = base + "wpsApplication"
+            profile = f"{base}wpsApplication"
         elif typ == ProcessType.OGC_API or req == CWL_REQUIREMENT_APP_OGC_API:
-            profile = base + "ogcapiApplication"
+            profile = f"{base}ogcapiApplication"
         elif typ == ProcessType.APPLICATION or req == CWL_REQUIREMENT_APP_DOCKER:
-            profile = base + "dockerizedApplication"
+            profile = f"{base}dockerizedApplication"
         else:
             profile = base + typ
         return profile
@@ -2317,8 +2317,8 @@ class Process(Base):
         proc_desc = self.href(container)
         proc_list = proc_desc.rsplit("/", 1)[0]
         jobs_list = proc_desc + sd.jobs_service.path
-        proc_exec = proc_desc + "/execution"
-        proc_self = (proc_list + "/" + self.tag) if self.version else proc_desc
+        proc_exec = f"{proc_desc}/execution"
+        proc_self = f"{proc_list}/{self.tag}" if self.version else proc_desc
         links = [
             {"href": proc_self, "rel": "self", "title": "Current process description."},
             {"href": proc_desc, "rel": "process-meta", "title": "Process definition."},
@@ -2355,7 +2355,7 @@ class Process(Base):
         if self.service:
             api_base_url = proc_list.rsplit("/", 1)[0]
             wps_base_url = self.processEndpointWPS1.split("?")[0]
-            wps_get_caps = wps_base_url + "?service=WPS&request=GetCapabilities&version=1.0.0"
+            wps_get_caps = f"{wps_base_url}?service=WPS&request=GetCapabilities&version=1.0.0"
             wps_links = [
                 {"href": api_base_url, "rel": "service", "title": "Provider service description."},
                 {"href": api_base_url, "rel": "service-meta", "title": "Provider service definition."},

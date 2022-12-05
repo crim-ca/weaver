@@ -341,7 +341,7 @@ class TestWeaverClient(TestWeaverClientBase):
     def test_undeploy(self):
         # deploy a new process to leave the test one available
         other_payload = copy.deepcopy(self.test_payload["Echo"])
-        other_process = self.test_process["Echo"] + "-other"
+        other_process = f"{self.test_process['Echo']}-other"
         self.deploy_process(other_payload, process_id=other_process)
 
         result = mocked_sub_requests(self.app, self.client.undeploy, other_process)
@@ -2039,8 +2039,8 @@ class TestWeaverClientAuthBase(TestWeaverClientBase):
             return resp
 
         config = setup_config_from_settings(cls.settings)
-        config.add_route(name="auth", pattern=cls.auth_path + "/")  # matcher requires extra slash auto-added
-        config.add_route(name="proxy", pattern=cls.proxy_path + "/.*")
+        config.add_route(name="auth", pattern=f"{cls.auth_path}/")  # matcher requires extra slash auto-added
+        config.add_route(name="proxy", pattern=f"{cls.proxy_path}/.*")
         config.add_view(auth_view, name="auth")
         config.add_view(proxy_view, name="proxy")
         cls.auth_app = WebTestApp(config.make_wsgi_app())

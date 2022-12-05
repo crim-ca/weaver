@@ -366,6 +366,6 @@ def redirect_job_result(request):
     """
     Deprecated job result endpoint that is now returned by corresponding outputs path with added links.
     """
-    location = request.url.rsplit("/", 1)[0] + "/outputs"
+    location = f"{request.url.rsplit('/', 1)[0]}/outputs"
     LOGGER.warning("Deprecated route redirection [%s] -> [%s]", request.url, location)
     return HTTPPermanentRedirect(comment="deprecated", location=location)

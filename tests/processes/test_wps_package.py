@@ -147,7 +147,7 @@ def test_stdout_stderr_logging_for_commandline_tool_success(caplog):
         wps_package_instance.settings = {}
         wps_package_instance.mock_status_location = xml_file.name
         wps_package_instance.set_workdir(workdir)
-        expect_log = os.path.splitext(wps_package_instance.mock_status_location)[0] + ".log"
+        expect_log = f"{os.path.splitext(wps_package_instance.mock_status_location)[0]}.log"
 
         # ExecuteResponse mock
         wps_request = MockWpsRequest(process_id=process.id)
@@ -159,7 +159,7 @@ def test_stdout_stderr_logging_for_commandline_tool_success(caplog):
             wps_package_instance._handler(wps_request, wps_response)
         with open(expect_log, mode="r", encoding="utf-8") as file:
             job_log = file.read()
-        log_data = stdout.getvalue() + "\n" + caplog.text + "\n" + job_log
+        log_data = f"{stdout.getvalue()}\n{caplog.text}\n{job_log}"
 
         # captured log portion added by the injected stdout/stderr logs
         assert re.match(
@@ -212,7 +212,7 @@ def test_stdout_stderr_logging_for_commandline_tool_failure(caplog):
         assert "Failed package execution" in exception.args[0]
         assert "Missing required input parameter 'message'" in exception.args[0]
         # depending on debug/command-line & pytest config, captured logs can be 'hijacked' or not, use any active one
-        log_err = stderr.getvalue() + "\n" + caplog.text
+        log_err = f"{stderr.getvalue()}\n{caplog.text}"
         assert "Could not retrieve any internal application log." not in log_err, (
             "Since tool did not reach execution, not captured logged is expected."
         )
@@ -239,7 +239,7 @@ def test_stdout_stderr_logging_for_commandline_tool_exception(caplog):
     wps_package_instance.settings = {}
     wps_package_instance.mock_status_location = xml_file.name
     wps_package_instance.set_workdir(workdir)
-    expect_log = os.path.splitext(wps_package_instance.mock_status_location)[0] + ".log"
+    expect_log = f"{os.path.splitext(wps_package_instance.mock_status_location)[0]}.log"
 
     # ExecuteResponse mock
     wps_request = MockWpsRequest(process_id=process["id"])
@@ -254,7 +254,7 @@ def test_stdout_stderr_logging_for_commandline_tool_exception(caplog):
         # depending on debug/command-line & pytest config, captured logs can be 'hijacked' or not, use any active one
         with open(expect_log, mode="r", encoding="utf-8") as file:
             job_err = file.read()
-        log_err = stderr.getvalue() + "\n" + caplog.text + "\n" + job_err
+        log_err = f"{stderr.getvalue()}\n{caplog.text}\n{job_err}"
         assert "Package completed with errors." in log_err
         assert "Traceback (most recent call last):" in log_err
         assert "weaver.processes.wps_package|mock-process" in log_err

@@ -2367,7 +2367,7 @@ def oas_resolve_remote(io_info):
     io_href = get_field(io_info, "$ref", search_variations=False, pop_found=True)
     if isinstance(io_href, str):
         # first encountered reference should be full-uri to allow us knowing where to look for
-        if not any(io_href.startswith(scheme + "://") for scheme in ["http", "https", "s3"]):
+        if not any(io_href.startswith(f"{scheme}://") for scheme in ["http", "https", "s3"]):
             raise ValueError(f"External OpenAPI schema reference [{io_href}] must be absolue.")
         if not any(io_href.endswith(extension) for extension in [".yaml", ".yml", ".json"]):
             raise ValueError(f"External OpenAPI schema reference [{io_href}] must be formatted as JSON or YAML.")
@@ -2375,7 +2375,7 @@ def oas_resolve_remote(io_info):
             # use resolver which will handle all intricacies of loading remote schema into a local dict definition
             # this way, no need to handle other external, relative, absolute, etc. nested '$ref' locations
             # note: '$ref' are still loaded on the first level only to avoid recursive schemas breaking on load
-            io_base = io_href.rsplit("/", 1)[0] + "/"
+            io_base = f"{io_href.rsplit('/', 1)[0]}/"
             resolver = SchemaRefResolver(base_uri=io_base, referrer=io_info)
             io_resolved = resolver.resolve_from_url(io_href)
             # In case the input schema was the result of a 'allOf' merge,

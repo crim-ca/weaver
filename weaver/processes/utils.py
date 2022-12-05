@@ -1198,7 +1198,7 @@ def register_cwl_processes_from_config(container):
                 LOGGER.info("Requested immediate CWL registration failure with 'weaver.cwl_processes_register_error'.")
                 LOGGER.error(msg)
                 raise
-            warnings.warn(msg + " Skipping definition.", RuntimeWarning)
+            warnings.warn(f"{msg} Skipping definition.", RuntimeWarning)
             continue
     if register_count and register_count == register_total:
         LOGGER.info("Successfully registered %s processes from CWL files.", register_total)

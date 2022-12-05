@@ -107,8 +107,8 @@ def get_weaver_config_file(file_path, default_config_file, generate_default_from
     if os.path.isfile(default_path):
         LOGGER.info("Resolved default configuration file: [%s]", default_path)
         return default_path
-    example_file = default_config_file + ".example"
-    example_path = default_path + ".example"
+    example_file = f"{default_config_file}.example"
+    example_path = f"{default_path}.example"
     LOGGER.warning("Could not find default configuration file: [%s]. ", file_path)
     if not generate_default_from_example:
         LOGGER.warning("Default file generation from default disabled. No file returned.")

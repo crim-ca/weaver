@@ -194,7 +194,7 @@ if sys.version_info >= (3, 7):
 else:
     _LITERAL_VALUES_ATTRIBUTE = "__values__"  # pragma: no cover
 AWS_S3_REGIONS = list(getattr(RegionName, _LITERAL_VALUES_ATTRIBUTE))  # type: List[RegionName]
-AWS_S3_REGIONS_REGEX = "(" + "|".join(AWS_S3_REGIONS) + ")"
+AWS_S3_REGIONS_REGEX = f"({'|'.join(AWS_S3_REGIONS)})"
 # https://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html
 AWS_S3_ARN = "arn:aws:s3"
 # https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucketnamingrules.html
@@ -1221,7 +1221,7 @@ def get_path_kvp(path, sep=",", **params):
         return str(_v)
 
     kvp = [f"{k}={_value(v)}" for k, v in params.items()]
-    return path + "?" + "&".join(kvp)
+    return f"{path}?{'&'.join(kvp)}"
 
 
 def get_log_fmt():
@@ -1499,7 +1499,7 @@ def get_request_options(method, url, settings):
             req_regex.extend(aslist(req_url))
         req_regex = ",".join(req_regex)
         if not url.endswith("/"):
-            url = url + "/"  # allow 'domain.com' match since 'urlmatch' requires slash in 'domain.com/*'
+            url = f"{url}/"  # allow 'domain.com' match since 'urlmatch' requires slash in 'domain.com/*'
         if not urlmatch(req_regex, url, path_required=False):
             continue
         req_opts = deepcopy(req_opts)
@@ -2355,7 +2355,7 @@ def download_files_s3(location,                         # type: str
     s3_region = options["s3"].pop("region_name", None)
     s3_client = boto3.client("s3", region_name=s3_region, **s3_params)  # type: S3Client
     bucket_name, dir_key = location[5:].split("/", 1)
-    base_url = s3_client.meta.endpoint_url.rstrip("/") + "/"
+    base_url = f"{s3_client.meta.endpoint_url.rstrip('/')}/"
 
     # adjust patterns with full paths to ensure they still work with retrieved relative S3 keys
     include = [incl.replace(base_url, "", 1) if incl.startswith(base_url) else incl for incl in include or []]
@@ -2466,7 +2466,7 @@ def download_files_url(file_references,                     # type: Iterable[str
     # The include/exclude patterns will have to match them exactly in the even they don't share the same base URL.
     # However, in the event they have the same URL, patterns could refer to their relative path only to that URL.
     # Adjust patterns accordingly to allow filter against forbidden/include/exclude with relative paths.
-    base_url = get_url_without_query(base_url).rstrip("/") + "/"
+    base_url = f"{get_url_without_query(base_url).rstrip('/')}/"
     include = [incl.replace(base_url, "", 1) if incl.startswith(base_url) else incl for incl in include or []]
     exclude = [excl.replace(base_url, "", 1) if excl.startswith(base_url) else excl for excl in exclude or []]
     file_references = (path for path in file_references if not path.endswith("/"))
@@ -2674,8 +2674,8 @@ def adjust_directory_local(location,                            # type: Path
 
     loc_dir = os.path.realpath(location)
     out_dir = os.path.realpath(out_dir) if os.path.isdir(out_dir) else out_dir
-    loc_dir = loc_dir.rstrip("/") + "/"
-    out_dir = out_dir.rstrip("/") + "/"
+    loc_dir = f"{loc_dir.rstrip('/')}/"
+    out_dir = f"{out_dir.rstrip('/')}/"
     listing = list_directory_recursive(loc_dir)
     # Use relative paths to filter items to ensure forbidden or include/exclude patterns match
     # the provided definitions as expected, since patterns more often do not use the full path.
@@ -2917,7 +2917,7 @@ def fetch_reference(reference,                          # type: str
     """
     if reference.endswith("/"):
         path = fetch_directory(reference, out_dir, out_method=out_method, settings=settings, **option_kwargs)
-        path = path if out_listing else (os.path.realpath(out_dir) + "/")
+        path = path if out_listing else (f"{os.path.realpath(out_dir)}/")
     else:
         path = fetch_file(reference, out_dir, out_method=out_method, settings=settings, **option_kwargs)
     return [path] if out_listing and isinstance(path, str) else path
@@ -3052,7 +3052,7 @@ def clean_json_text_body(body, remove_newlines=True, remove_indents=True):
 
     if remove_newlines:
         body_parts = [p.strip() for p in body.split("\n") if p != ""]               # remove new line and extra spaces
-        body_parts = [p + "." if not p.endswith(".") else p for p in body_parts]    # add terminating dot per sentence
+        body_parts = [f"{p}." if not p.endswith(".") else p for p in body_parts]    # add terminating dot per sentence
         body_parts = [p[0].upper() + p[1:] for p in body_parts if len(p)]           # capitalize first word
         body_clean = " ".join(p for p in body_parts if p)
     else:

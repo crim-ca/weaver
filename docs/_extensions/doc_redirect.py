@@ -94,7 +94,7 @@ def generate_redirects(app):
             len(html_path.split(os.path.sep)) - 1)
         to_path = to_path_prefix + to_path.replace(in_suffix, ".html")
         if not to_path.endswith(".html"):
-            to_path = to_path + ".html"
+            to_path = f"{to_path}.html"
         LOGGER.debug("RST  [%s] -> [%s]", rst_path, to_path)
         LOGGER.debug("HTML [%s] -> [%s]", html_path, to_path)
 

@@ -172,7 +172,7 @@ class BuiltinAppTest(WpsConfigBase):
         job_url = resp.json["location"]
         results = self.monitor_job(job_url)
 
-        output_url = job_url + "/outputs"
+        output_url = f"{job_url}/outputs"
         resp = self.app.get(output_url, headers=self.json_headers)
         assert resp.status_code == 200, f"Error job outputs:\n{resp.json}"
         outputs = resp.json
@@ -214,7 +214,7 @@ class BuiltinAppTest(WpsConfigBase):
 
         # even though results are requested by Link reference,
         # Weaver still offers them with document on outputs endpoint
-        output_url = job_url + "/outputs"
+        output_url = f"{job_url}/outputs"
         resp = self.app.get(output_url, headers=self.json_headers)
         assert resp.status_code == 200, f"Error job outputs:\n{resp.text}"
         outputs = resp.json
@@ -258,7 +258,7 @@ class BuiltinAppTest(WpsConfigBase):
 
         # even though results are requested by raw data,
         # Weaver still offers them with document on outputs endpoint
-        output_url = job_url + "/outputs"
+        output_url = f"{job_url}/outputs"
         resp = self.app.get(output_url, headers=self.json_headers)
         assert resp.status_code == 200, f"Error job outputs:\n{resp.text}"
         outputs = resp.json
@@ -356,7 +356,7 @@ class BuiltinAppTest(WpsConfigBase):
         assert resp.content_type == ContentType.APP_JSON
         results = resp.json
 
-        output_url = job_url + "/outputs"
+        output_url = f"{job_url}/outputs"
         resp = self.app.get(output_url, headers=self.json_headers)
         assert resp.status_code == 200, f"Error job outputs:\n{resp.json}"
         outputs = resp.json

@@ -73,7 +73,7 @@ def _get_builtin_metadata(process_id, process_path, meta_field, clean=False):
     """
     Retrieves the ``builtin`` process ``meta_field`` from its definition if it exists.
     """
-    py_file = os.path.splitext(process_path)[0] + ".py"
+    py_file = f"{os.path.splitext(process_path)[0]}.py"
     if os.path.isfile(py_file):
         try:
             mod = import_module(f"{__name__}.{process_id}")

@@ -78,7 +78,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         pyramid.testing.tearDown()
 
     def fully_qualified_test_process_name(self):
-        return (fully_qualified_name(self) + "-" + self._testMethodName).replace(".", "-")
+        return (f"{fully_qualified_name(self)}-{self._testMethodName}").replace(".", "-")
 
     def setUp(self):
         # rebuild clean db on each test
@@ -192,7 +192,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert resp.json["total"] == total
 
         base_url = self.settings["weaver.url"]
-        proc_url = base_url + "/processes"
+        proc_url = f"{base_url}/processes"
         assert len(resp.json["processes"]) == limit
         assert "links" in resp.json
         links = get_links(resp.json["links"])
@@ -414,13 +414,13 @@ class WpsRestApiProcessesTest(unittest.TestCase):
     def test_get_processes_with_providers_error_servers(self, mock_responses):
         # register service reachable but returning invalid XML
         invalid_id = "test-provider-process-listing-invalid"
-        invalid_url = resources.TEST_REMOTE_SERVER_URL + "/invalid"
+        invalid_url = f"{resources.TEST_REMOTE_SERVER_URL}/invalid"
         invalid_data = "<xml> not a wps </xml>"
         mocked_remote_server_requests_wps1([invalid_url, invalid_data, []], mock_responses, data=True)
 
         # register a provider that doesn't have any responding server
         missing_id = "test-provider-process-listing-missing"
-        missing_url = resources.TEST_REMOTE_SERVER_URL + "/does-not-exist"
+        missing_url = f"{resources.TEST_REMOTE_SERVER_URL}/does-not-exist"
 
         valid_id = "test-provider-process-listing-valid"
         self.service_store.clear_services()
@@ -567,7 +567,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             assert isinstance(resp.json["deploymentDone"], bool) and resp.json["deploymentDone"]
 
     def test_deploy_process_bad_name(self):
-        process_name = self.fully_qualified_test_process_name() + "..."
+        process_name = f"{self.fully_qualified_test_process_name()}..."
         process_data = self.get_process_deploy_template(process_name)
         package_mock = mocked_process_package()
 
@@ -722,7 +722,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         if provider_url.endswith("/"):
             valid_urls = [provider_url, provider_url[:-1]]
         else:
-            valid_urls = [provider_url, provider_url + "/"]
+            valid_urls = [provider_url, f"{provider_url}/"]
         assert cwl["hints"][CWL_REQUIREMENT_APP_WPS1]["provider"] in valid_urls
 
     def test_deploy_process_CWL_DockerRequirement_auth_header_format(self):
@@ -1055,7 +1055,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                     }
                 }
 
-                p_id = "test-network-access-" + req_type
+                p_id = f"test-network-access-{req_type}"
                 body = {
                     "processDescription": {"process": {"id": p_id}},
                     "executionUnit": [{"unit": cwl}],
@@ -1891,7 +1891,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert resp.content_type == ContentType.APP_JSON
 
     def test_delete_process_bad_name(self):
-        name = self.fully_qualified_test_process_name() + "..."
+        name = f"{self.fully_qualified_test_process_name()}..."
         path = f"/processes/{name}"
         resp = self.app.delete_json(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 400, f"Error: {resp.text}"

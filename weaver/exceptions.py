@@ -496,7 +496,7 @@ def log_unhandled_exceptions(logger=LOGGER, message="Unhandled exception occurre
                     if force or not isinstance(exc, known_exceptions):
                         setattr(exception, handle, True)    # mark as handled
                         setattr(exception, "cause", exc)    # make original exception available through new one raised
-                        logger.exception("%s%s[%r]", message, (" " if message else "") + "Exception: ", exc)
+                        logger.exception("%s%s[%r]", message, f"{' ' if message else ''}Exception: ", exc)
                         raise exception(message)
                 raise exc
         return call
