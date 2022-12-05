@@ -1,4 +1,4 @@
-FROM python:3.7-slim
+FROM python:3.10-slim
 LABEL description.short="Weaver Base"
 LABEL description.long="Workflow Execution Management Service (EMS); Application, Deployment and Execution Service (ADES)"
 LABEL maintainer="Francis Charette-Migneault <francis.charette-migneault@crim.ca>"
