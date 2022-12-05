@@ -993,22 +993,26 @@ def import_target(target, default_root=None):
     return getattr(mod, target, None)
 
 
-def load_module_resource_file(module, file_path):
+def open_module_resource_file(module, file_path):
     # type: (Union[str, ModuleType], str) -> IO[bytes]
     """
-    Loads a resource (data file) from an installed module.
+    Opens a resource (data file) from an installed module.
 
     :returns: File stream handler to read contents as needed.
     """
     loader = get_loader(module)
-    # Python <=3.6, no 'get_resource_reader' on loader
+    # Python <=3.6, no 'get_resource_reader' or 'open_resource' on loader/reader
     # Python >=3.10, no 'open_resource' directly on loader
     # Python 3.7-3.9, both permitted in combination
     try:
-        reader = loader.get_resource_reader()  # type: importlib.abc.ResourceReader  # noqa
+        try:
+            reader = loader.get_resource_reader()  # type: importlib.abc.ResourceReader  # noqa
+        except AttributeError:
+            reader = loader  # noqa
+        return reader.open_resource(file_path)
     except AttributeError:
-        reader = loader  # noqa
-    return reader.open_resource(file_path)
+        path = os.path.join(module.__path__[0], file_path)
+        return open(path, mode="r", encoding="utf-8")
 
 
 def now(tz_name=None):

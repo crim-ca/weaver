@@ -116,8 +116,8 @@ from weaver.utils import (
     get_sane_name,
     get_settings,
     list_directory_recursive,
-    load_module_resource_file,
     null,
+    open_module_resource_file,
     request_extra,
     setup_loggers
 )
@@ -429,8 +429,8 @@ def _load_supported_schemas():
             LOGGER.debug("Reusing cached CWL %s schema extensions.", version)
             continue
         LOGGER.debug("Loading CWL %s schema extensions...", version)
-        r_file = load_module_resource_file(cwltool, ext_version_file)
-        schema = yaml.safe_load(r_file)
+        with open_module_resource_file(cwltool, ext_version_file) as r_file:
+            schema = yaml.safe_load(r_file)
 
         extensions = schema["$graph"]
         extensions_supported = []
