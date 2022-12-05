@@ -380,7 +380,7 @@ class WeaverClient(object):
 
     @staticmethod
     def _parse_url(url):
-        parsed = urlparse("http://" + url if not url.startswith("http") else url)
+        parsed = urlparse(f"http://{url}" if not url.startswith("http") else url)
         parsed_netloc_path = f"{parsed.netloc}{parsed.path}".replace("//", "/")
         parsed_url = f"{parsed.scheme}://{parsed_netloc_path}"
         return parsed_url.rsplit("/", 1)[0] if parsed_url.endswith("/") else parsed_url
@@ -1700,7 +1700,7 @@ def add_shared_options(parser):
         description="Parameters to obtain access to a protected service using a request authentication handler."
     )
     auth_handlers = "".join([
-        fully_qualified_name(handler) + "\n"
+        f"{fully_qualified_name(handler)}\n"
         for handler in [BasicAuthHandler, BearerAuthHandler, CookieAuthHandler]
     ])
     auth_grp.add_argument(
@@ -1978,7 +1978,7 @@ class ParagraphFormatter(argparse.HelpFormatter):
             found = []
             for i in range(2, len(grp), 2):
                 found.append(grp[i].strip())
-            return grp[0] + "( " + " ".join(found) + " )]"
+            return f"{grp[0]}( {' '.join(found)} )]"
 
         text = re.sub(search, replace, text)
         if self.help_mode != mode:
@@ -2118,7 +2118,7 @@ class WeaverArgumentParser(ArgumentParserFixedRequiredArgs, SubArgumentParserFix
     def format_help(self):
         # type: () -> str
         self.help_mode = True
-        text = super(WeaverArgumentParser, self).format_help() + "\n"
+        text = f"{super(WeaverArgumentParser, self).format_help()}\n"
         for fmt in self._formatters:
             text = fmt(text)
         self.help_mode = False

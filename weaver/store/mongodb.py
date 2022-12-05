@@ -595,7 +595,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         search = {"identifier": sane_name}
         if version:
             version = as_version_major_minor_patch(version, VersionFormat.STRING)  # make sure it is padded
-            sane_tag = sane_name + ":" + version
+            sane_tag = f"{sane_name}:{version}"
             search = {"$or": [{"identifier": sane_tag}, {"identifier": sane_name, "version": version}]}
         return search, version
 
@@ -650,7 +650,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         version = as_version_major_minor_patch(version, VersionFormat.STRING)
         # update ID to allow direct fetch by ID using tagged version
         # this also clears the unique ID index requirement
-        new_name = sane_name + ":" + version
+        new_name = f"{sane_name}:{version}"
         process = self.collection.find_one_and_update(
             filter={"identifier": sane_name},
             update={"$set": {"identifier": new_name, "version": version}},
@@ -975,7 +975,7 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
         if has_provider:
             groups.remove("provider")
             groups.append("service")
-        group_categories = {field: "$" + field for field in groups}  # fields that can generate groups
+        group_categories = {field: f"${field}" for field in groups}  # fields that can generate groups
         group_pipeline = [{
             "$group": {
                 "_id": group_categories,        # grouping categories to aggregate corresponding jobs

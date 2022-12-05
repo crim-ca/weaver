@@ -348,13 +348,13 @@ class SchemeURL(colander.Regex):
             schemes = [""]
         if not msg:
             msg = colander._(f"Must be a URL matching one of schemes {schemes}")  # noqa
-        regex_schemes = r"(?:" + "|".join(schemes) + r")"
+        regex_schemes = f"(?:{'|'.join(schemes)})"
         regex = URL_REGEX.replace(r"(?:http|ftp)s?", regex_schemes)
 
         if path_pattern:
             if isinstance(path_pattern, RegexPattern):
                 path_pattern = path_pattern.pattern
-            regex = regex[:-1] + path_pattern + "$"
+            regex = f"{regex[:-1] + path_pattern}$"
         super(SchemeURL, self).__init__(regex, msg=msg, flags=flags)
 
 
@@ -374,13 +374,7 @@ class SemanticVersion(colander.Regex):
             v_prefix = "v" if v_prefix else ""
             rc_suffix = r"(\.[a-zA-Z0-9\-_]+)*" if rc_suffix else ""
             self.pattern = (
-                r"^"
-                + v_prefix +
-                r"\d+"      # major
-                r"(\.\d+"   # minor
-                r"(\.\d+"   # patch
-                + rc_suffix +
-                r")*)*$"
+                f"^{v_prefix}\\d+(\\.\\d+(\\.\\d+{rc_suffix})*)*$"
             )
         super(SemanticVersion, self).__init__(regex=self.pattern, *args, **kwargs)
 
@@ -1592,7 +1586,7 @@ class KeywordMapper(ExtendedMappingSchema):
             # pass down the parent name for reference, but with an index to distinguish from it
             # distinction is also important such that generated schema definitions in OpenAPI don't override each other
             sub_name = _get_node_name(node, schema_name=True) or str(index)
-            node.name = _get_node_name(self, schema_name=True) + "." + sub_name
+            node.name = f"{_get_node_name(self, schema_name=True)}.{sub_name}"
         if isinstance(node, KeywordMapper):
             return KeywordMapper.deserialize(node, cstruct)
         return ExtendedSchemaNode.deserialize(node, cstruct)
@@ -2202,9 +2196,9 @@ class OneOfKeywordTypeConverter(KeywordTypeConverter):
                 item_title = _get_node_name(item_obj, schema_name=True)
                 # NOTE: to avoid potential conflict of schema reference definitions with other existing ones,
                 #       use an invalid character that cannot exist in Python class name defining the schema titles
-                one_of_title = schema_title + "." + item_title
-                shared_title = schema_title + ".Shared"
-                obj_req_title = item_title + ".AllOf"
+                one_of_title = f"{schema_title}.{item_title}"
+                shared_title = f"{schema_title}.Shared"
+                obj_req_title = f"{item_title}.AllOf"
                 # fields that are shared across all the oneOf sub-items
                 # pass down the original title of that object to refer to that schema reference
                 obj_shared = ExtendedMappingSchema(title=shared_title)

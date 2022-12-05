@@ -85,7 +85,7 @@ class ESGFProcess(Wps1Process):
 
         for dim_name in dimensions_names:
             for param, v in workflow_inputs.items():
-                if param.startswith(dim_name + "_"):
+                if param.startswith(f"{dim_name}_"):
                     param_split = param.split("_", 1)[1]
                     grouped_inputs[dim_name][param_split] = v
 
@@ -162,7 +162,7 @@ class ESGFProcess(Wps1Process):
         Get all netcdf files from the cwl inputs.
         """
         if InputNames.VARIABLE not in workflow_inputs:
-            raise ValueError("Missing required input " + InputNames.VARIABLE)
+            raise ValueError(f"Missing required input {InputNames.VARIABLE}")
         return workflow_inputs[InputNames.VARIABLE]
 
     def _run_process(self, api_key, inputs, domain=None):
@@ -201,7 +201,7 @@ class ESGFProcess(Wps1Process):
 
                 status_history.add(status)
 
-                message = "ESGF status: " + status
+                message = f"ESGF status: {status}"
                 self.update_status(message, status_percent, Status.RUNNING)
 
         update_history()

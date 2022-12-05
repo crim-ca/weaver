@@ -99,8 +99,8 @@ class WpsRestApiProvidersTest(WpsProviderBase):
         self.register_provider()
 
         # register service reachable but returning invalid XML
-        invalid_id = self.remote_provider_name + "-invalid"
-        invalid_url = resources.TEST_REMOTE_SERVER_URL + "/invalid"
+        invalid_id = f"{self.remote_provider_name}-invalid"
+        invalid_url = f"{resources.TEST_REMOTE_SERVER_URL}/invalid"
         with open(resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML, mode="r", encoding="utf-8") as xml:
             # inject badly formatted XML in otherwise valid GetCapabilities response
             # following causes 'wps.provider' to be 'None', which raises during metadata link generation (no check)
@@ -114,8 +114,8 @@ class WpsRestApiProvidersTest(WpsProviderBase):
         self.service_store.save_service(Service(name=invalid_id, url=invalid_url))
 
         # register service reachable wit invalid XML but can be recovered since it does not impact structure directly
-        recover_id = self.remote_provider_name + "-recover"
-        recover_url = resources.TEST_REMOTE_SERVER_URL + "/recover"
+        recover_id = f"{self.remote_provider_name}-recover"
+        recover_url = f"{resources.TEST_REMOTE_SERVER_URL}/recover"
         with open(resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML, mode="r", encoding="utf-8") as xml:
             # inject badly formatted XML in otherwise valid GetCapabilities response
             # following causes 'wps.processes' to be unresolvable, but service definition itself works
@@ -130,9 +130,9 @@ class WpsRestApiProvidersTest(WpsProviderBase):
 
         # register service unreachable (eg: was reachable at some point but stopped responding)
         # must store directly since registration will attempt to check it with failing request
-        unresponsive_id = self.remote_provider_name + "-unresponsive"
-        unresponsive_url = resources.TEST_REMOTE_SERVER_URL + "/unresponsive"
-        unresponsive_caps = unresponsive_url + "?service=WPS&request=GetCapabilities&version=1.0.0"
+        unresponsive_id = f"{self.remote_provider_name}-unresponsive"
+        unresponsive_url = f"{resources.TEST_REMOTE_SERVER_URL}/unresponsive"
+        unresponsive_caps = f"{unresponsive_url}?service=WPS&request=GetCapabilities&version=1.0.0"
         self.service_store.save_service(Service(name=unresponsive_id, url=unresponsive_caps))
 
         resp = self.app.get("/providers?check=False", headers=self.json_headers)
@@ -175,8 +175,8 @@ class WpsRestApiProvidersTest(WpsProviderBase):
         """
         Test registration of a service that is reachable but returning invalid XML GetCapabilities schema.
         """
-        invalid_id = self.remote_provider_name + "-invalid"
-        invalid_url = resources.TEST_REMOTE_SERVER_URL + "/invalid"
+        invalid_id = f"{self.remote_provider_name}-invalid"
+        invalid_url = f"{resources.TEST_REMOTE_SERVER_URL}/invalid"
         with open(resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML, mode="r", encoding="utf-8") as xml:
             # inject badly formatted XML in otherwise valid GetCapabilities response
             # following causes 'wps.provider' to be 'None', which raises during metadata link generation (no check)
@@ -196,8 +196,8 @@ class WpsRestApiProvidersTest(WpsProviderBase):
         """
         Test registration of a service that is unreachable (cannot obtain XML GetCapabilities because no response).
         """
-        unresponsive_id = self.remote_provider_name + "-unresponsive"
-        unresponsive_url = resources.TEST_REMOTE_SERVER_URL + "/unresponsive"
+        unresponsive_id = f"{self.remote_provider_name}-unresponsive"
+        unresponsive_url = f"{resources.TEST_REMOTE_SERVER_URL}/unresponsive"
         resp = self.register_provider(clear=True, error=True, data={"id": unresponsive_id, "url": unresponsive_url})
         assert resp.status_code == 422, "Unprocessable response expected for invalid XML"
         assert unresponsive_id in resp.json["description"]
@@ -224,8 +224,8 @@ class WpsRestApiProvidersTest(WpsProviderBase):
             - Other test that validates end-to-end definition of recoverable XML provider process.
               :class:`tests.functional.test_wps_provider.WpsProviderTest.test_register_finch_with_invalid_escape_chars`
         """
-        recover_id = self.remote_provider_name + "-recover"
-        recover_url = resources.TEST_REMOTE_SERVER_URL + "/recover"
+        recover_id = f"{self.remote_provider_name}-recover"
+        recover_url = f"{resources.TEST_REMOTE_SERVER_URL}/recover"
         with open(resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML, mode="r", encoding="utf-8") as xml:
             # inject badly formatted XML in otherwise valid GetCapabilities response
             # following causes 'wps.processes' to be unresolvable, but service definition itself works

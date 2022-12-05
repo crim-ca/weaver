@@ -252,7 +252,7 @@ _CONTENT_TYPE_LOCALS_MISSING = [
 ]
 _CONTENT_TYPE_LOCALS_MISSING = sorted(
     [
-        (ctype, "." + re_ext["ext"])
+        (ctype, f".{re_ext['ext']}")
         for ctype, re_ext in _CONTENT_TYPE_LOCALS_MISSING if re_ext
     ],
     key=lambda typ: typ[0]
@@ -453,7 +453,7 @@ def get_extension(mime_type, dot=True):
     ctype = clean_mime_type_format(mime_type, strip_parameters=True)
     if not ctype:
         return ""
-    ext_default = "." + ctype.split("/")[-1].replace("x-", "")
+    ext_default = f".{ctype.split('/')[-1].replace('x-', '')}"
     ext = _CONTENT_TYPE_EXTENSION_MAPPING.get(ctype, ext_default)
     return _handle_dot(ext)
 
@@ -495,7 +495,7 @@ def add_content_type_charset(content_type, charset):
     if charset and "charset=" in content_type:
         return re.sub(r"charset\=[A-Za-z0-9\_\-]+", f"charset={charset}", content_type)
     # make sure to never include by mistake if the represented type cannot be characters
-    if charset and any(content_type.startswith(_type + "/") for _type in _CONTENT_TYPE_CHAR_TYPES):
+    if charset and any(content_type.startswith(f"{_type}/") for _type in _CONTENT_TYPE_CHAR_TYPES):
         return f"{content_type}; charset={charset}"
     return content_type
 
@@ -669,8 +669,8 @@ def clean_mime_type_format(mime_type, suffix_subtype=False, strip_parameters=Fal
             mime_type = mime_type.replace(v, "")
             break
     for v in FORMAT_NAMESPACE_DEFINITIONS:
-        if mime_type.startswith(v + ":"):
-            mime_type = mime_type.replace(v + ":", "")
+        if mime_type.startswith(f"{v}:"):
+            mime_type = mime_type.replace(f"{v}:", "")
             break
     search = True
     for _map in [EDAM_MAPPING, OGC_MAPPING, OPENGIS_MAPPING]:
