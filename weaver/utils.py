@@ -17,6 +17,7 @@ import warnings
 from concurrent.futures import ALL_COMPLETED, CancelledError, ThreadPoolExecutor, as_completed, wait as wait_until
 from copy import deepcopy
 from datetime import datetime
+from pkgutil import get_loader
 from typing import TYPE_CHECKING, overload
 from urllib.parse import ParseResult, unquote, urlparse, urlunsplit
 
@@ -64,13 +65,15 @@ from weaver.warning import TimeZoneInfoAlreadySetWarning
 from weaver.xml_util import HTML_TREE_BUILDER, XML
 
 if TYPE_CHECKING:
-    from types import FrameType
+    import importlib.abc
+    from types import FrameType, ModuleType
     from typing import (
         Any,
         AnyStr,
         Callable,
         Dict,
         List,
+        IO,
         Iterable,
         Iterator,
         MutableMapping,
@@ -988,6 +991,24 @@ def import_target(target, default_root=None):
     mod = importlib.util.module_from_spec(mod_spec)
     mod_spec.loader.exec_module(mod)
     return getattr(mod, target, None)
+
+
+def load_module_resource_file(module, file_path):
+    # type: (Union[str, ModuleType], str) -> IO[bytes]
+    """
+    Loads a resource (data file) from an installed module.
+
+    :returns: File stream handler to read contents as needed.
+    """
+    loader = get_loader(module)
+    # Python <=3.6, no 'get_resource_reader' on loader
+    # Python >=3.10, no 'open_resource' directly on loader
+    # Python 3.7-3.9, both permitted in combination
+    try:
+        reader = loader.get_resource_reader()  # type: importlib.abc.ResourceReader  # noqa
+    except AttributeError:
+        reader = loader  # noqa
+    return reader.open_resource(file_path)
 
 
 def now(tz_name=None):

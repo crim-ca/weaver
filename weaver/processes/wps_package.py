@@ -21,7 +21,6 @@ import sys
 import tempfile
 import time
 import uuid
-from pkgutil import get_loader
 from typing import TYPE_CHECKING, overload
 from urllib.parse import parse_qsl, urlparse
 
@@ -117,6 +116,7 @@ from weaver.utils import (
     get_sane_name,
     get_settings,
     list_directory_recursive,
+    load_module_resource_file,
     null,
     request_extra,
     setup_loggers
@@ -133,7 +133,6 @@ from weaver.wps.utils import get_wps_output_dir, get_wps_output_url, map_wps_out
 from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
-    import importlib.abc
     from typing import Any, AnyStr, Callable, Deque, Dict, List, Optional, Tuple, Type, Union
 
     from cwltool.factory import Callable as CWLFactoryCallable
@@ -430,9 +429,7 @@ def _load_supported_schemas():
             LOGGER.debug("Reusing cached CWL %s schema extensions.", version)
             continue
         LOGGER.debug("Loading CWL %s schema extensions...", version)
-        loader = get_loader("cwltool")
-        reader = loader.get_resource_reader()  # type: importlib.abc.ResourceReader  # noqa
-        r_file = reader.open_resource(ext_version_file)
+        r_file = load_module_resource_file(cwltool, ext_version_file)
         schema = yaml.safe_load(r_file)
 
         extensions = schema["$graph"]
