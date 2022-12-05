@@ -42,11 +42,9 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_INLINE_JAVASCRIPT,
     CWL_REQUIREMENT_INPLACE_UPDATE,
     CWL_REQUIREMENT_LOAD_LISTING,
-    # CWL_REQUIREMENT_MPI,
     CWL_REQUIREMENT_NETWORK_ACCESS,
     CWL_REQUIREMENT_RESOURCE,
     CWL_REQUIREMENT_SCATTER,
-    # CWL_REQUIREMENT_SECRETS,
     CWL_REQUIREMENT_TIME_LIMIT,
     CWL_REQUIREMENT_WORK_REUSE,
     OAS_COMPLEX_TYPES,
@@ -59,8 +57,6 @@ from weaver.processes.constants import (
     WPS_LITERAL_DATA_TYPES,
     ProcessSchema
 )
-
-
 from weaver.quotation.status import QuoteStatus
 from weaver.sort import Sort, SortMethods
 from weaver.status import JOB_STATUS_CODE_API, JOB_STATUS_SEARCH_API, Status
@@ -4043,14 +4039,14 @@ class ScatterFeatureRequirementSpecification(PermissiveMappingSchema):
         description=inspect.cleandoc("""
             If 'scatter' declares more than one input parameter, 'scatterMethod' describes how to decompose the
             input into a discrete set of jobs.
-            
+
             - dotproduct: specifies that each of the input arrays are aligned and one element taken from each array
               to construct each job. It is an error if all input arrays are not the same length.
-            
+
             - nested_crossproduct: specifies the Cartesian product of the inputs, producing a job for every
               combination of the scattered inputs. The output must be nested arrays for each level of scattering,
               in the order that the input arrays are listed in the 'scatter' field.
-            
+
             - flat_crossproduct: specifies the Cartesian product of the inputs, producing a job for every combination
               of the scattered inputs. The output arrays must be flattened to a single level, but otherwise listed in
               the order that the input arrays are listed in the 'scatter' field.
@@ -4113,7 +4109,7 @@ class WorkReuseRequirementSpecification(PermissiveMappingSchema):
         control whether to enable or disable the reuse behavior for a particular tool or step
         (to accommodate situations where that assumption is incorrect).
         A reused step is not executed but instead returns the same output as the original execution.
-        
+
         If '{CWL_REQUIREMENT_WORK_REUSE}' is not specified, correct tools should assume it is enabled by default.
     """)
     enableReuse = EnableReuseValue(
