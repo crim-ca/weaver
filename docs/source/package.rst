@@ -30,11 +30,14 @@ definition available with |pkg-req|_ request.
 .. note::
 
     The package request is a `Weaver`-specific implementation, and therefore, is not necessarily available on other
-    :term:`ADES`/:term:`EMS` implementation as this feature is not part of |ogc-proc-api|_ specification.
+    :term:`ADES`/:term:`EMS` implementation as this feature is not part of |ogc-api-proc|_ specification.
 
+.. _app_pkg_types:
 
 Typical CWL Package Definition
 ===========================================
+
+.. _app_pkg_cmd:
 
 CWL CommandLineTool
 ------------------------
@@ -46,7 +49,7 @@ Following :term:`CWL` package definition represents the :py:mod:`weaver.processe
     :linenos:
 
 The first main components is the ``class: CommandLineTool`` that tells `Weaver` it will be an *atomic* process
-(contrarily to `CWL Workflow`_ presented later).
+(contrarily to :ref:`app_pkg_workflow` presented later).
 
 The other important sections are ``inputs`` and ``outputs``. These define which parameters will be expected and
 produced by the described application. `Weaver` supports most formats and types as specified by |cwl-spec|_.
@@ -158,6 +161,128 @@ whenever required for launching new :term:`Job` executions.
 
 .. versionadded:: 4.5
     Specification and handling of the ``X-Auth-Docker`` header for providing an authentication token.
+
+.. _app_pkg_resources:
+
+GPU and Resource dependant Applications
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When an :term:`Application Package` requires GPU or any other minimal set of hardware capabilities, such as in the
+case of machine learning or high-performance computing tasks, the submitted :term:`CWL` must explicitly indicate
+those requirements to ensure they can be met for performing its execution. Similarly, an :term:`Application Package`
+that must obtain external access to remote contents must not assume that the connection would be available, and
+must therefore request network access. Below are examples where such requirements are demonstrated and how to
+define them.
+
+.. literalinclude:: ../examples/requirement-cuda.cwl
+    :language: yaml
+    :caption: Sample CWL definition with CUDA capabilities
+    :name: example_app_pkg_cuda
+
+.. literalinclude:: ../examples/requirement-resources.cwl
+    :language: yaml
+    :caption: Sample CWL definition with computing resources
+    :name: example_app_pkg_resources
+
+.. literalinclude:: ../examples/requirement-network.cwl
+    :language: yaml
+    :caption: Sample CWL definition with network access
+    :name: example_app_pkg_network
+
+Above requirements can be combined in any fashion as needed. They can also be combined with any other requirements
+employed to define the core components of the application.
+
+Whenever possible, requirements should be provided with values that best match the minimum and maximum amount of
+resources that the :term:`Application Package` operation requires. More precisely, over-requesting resources should
+be avoided as this could lead to failing :term:`Job` execution if the server or worker node processing it deems it
+cannot fulfill the requirements because they are too broad to obtain proper resource assignation, because it has
+insufficient computing resources, or simply for rate-limiting/fair-share reasons.
+
+Although definitions such as |cwl-resource-req|_ and |cwl-cuda-req|_ are usually applied for atomic operations,
+they can also become relevant in the context of :ref:`app_pkg_workflow` execution. Effectively, providing the
+required hardware capabilities for each atomic application can allow the :term:`Workflow` engine to better schedule
+:term:`Job` steps. For example, if two computationally heavy steps happened to have no restriction for parallelization
+based on the :term:`Workflow` steps definition alone, but that running both of them simultaneously on the same machine
+would necessarily end up causing an ``OutOfMemory`` error due to insufficient resources, those requirements could help
+preemptively let the engine know to wait until *reserved* resources become available. As a result, execution of the
+second task could be delayed until the first task is completed, therefore avoiding the error.
+
+.. versionadded:: 4.17
+    Support of |cwl-resource-req|_.
+
+.. versionadded:: 4.27
+    Support of |cwl-network-req|_ and |cwl-cuda-req|_.
+
+.. versionchanged::
+    Deprecated ``DockerGpuRequirement``.
+
+.. warning::
+    Any :term:`Application Package` that was making use of ``DockerGpuRequirement`` should be updated to employ
+    the official |cwl-docker-req|_ in combination with |cwl-cuda-req|_. For backward compatibility, any detected
+    ``DockerGpuRequirement`` definition will be updated automatically with a minimalistic |cwl-cuda-req|_ definition
+    using a very lax set of CUDA capabilities. It is recommended to provide specific configurations for your needs.
+
+.. _app_pkg_remote:
+.. _app_pkg_wps1:
+.. _app_pkg_ogc_api:
+.. _app_pkg_esgf_cwt:
+
+Remote Applications
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+To define an application that refers to a :ref:`proc_remote_provider`, an :ref:`proc_wps_12`, an :ref:`proc_ogc_api`
+or an :ref:`proc_esgf_cwt` endpoint, the corresponding `Weaver`-specific :term:`CWL`-like requirements must be employed
+to indicate the URL where that remote resource is accessible. Once deployed, the contained :term:`CWL`
+package and the resulting :term:`Process` will be exposed as a :ref:`proc_ogc_api` resource.
+
+Upon reception of a :ref:`Process Execution <proc_op_execute>` request, `Weaver` will take care of resolving
+the indicated process URL from the :term:`CWL` requirement and will dispatch the execution to the resource
+after applying any relevant I/O, parameter and Media-Type conversion to align with the target server standard
+for submitting the :term:`Job` requests.
+
+Below are examples of the corresponding :term:`CWL` requirements employed for each type of remote application.
+
+.. code-block:: yaml
+    :caption: WPS-1/2 Package Definition
+
+    cwlVersion: "v1.0"
+    class: CommandLineTool
+    hints:
+      WPS1Requirement:
+        provider: "https://example.com/ows/wps/catalog"
+        process: "getpoint"
+
+.. code-block:: yaml
+    :caption: OGC API Package Definition
+
+    cwlVersion: "v1.0"
+    class: CommandLineTool
+    hints:
+      OGCAPIRequirement:
+        process: "https://example.com/ogcapi/processes/getpoint"
+
+.. code-block:: json
+    :caption: ESGF-CWT Package Definition
+
+    {
+      "cwlVersion": "v1.0",
+      "class": "CommandLineTool",
+      "hints": {
+        "ESGF-CWTRequirement": {
+          "provider": "https://edas.nccs.nasa.gov/wps/cwt",
+          "process": "xarray.subset"
+        }
+      }
+    }
+
+
+.. seealso::
+    - :ref:`proc_remote_provider`
+    - :ref:`proc_wps_12`
+    - :ref:`proc_ogc_api`
+    - :ref:`proc_esgf_cwt`
+
+.. _app_pkg_workflow:
 
 CWL Workflow
 ------------------------
@@ -671,10 +796,10 @@ validate the full process integrity before it can be executed, this means that o
 permitted in its context (providing many will raise a validation error when parsing the :term:`CWL` definition).
 
 To ensure compatibility with multiple *supported formats* outputs of :term:`WPS`, any output that has more that one
-format will have its ``format`` field dropped in the corresponding :term:`CWL` definition. Without any ``format`` on
-the :term:`CWL` side, the validation process will ignore this specification and will effectively accept any type of
-file. This will not break any execution operation with :term:`CWL`, but it will remove the additional validation layer
-of the format (which especially deteriorates process resolution when chaining processes inside a :ref:`CWL Workflow`).
+format will have its ``format`` field dropped in the corresponding :term:`CWL` definition. Without any ``format`` on the
+:term:`CWL` side, the validation process will ignore this specification and will effectively accept any type of file.
+This will not break any execution operation with :term:`CWL`, but it will remove the additional validation layer of the
+format (which especially deteriorates process resolution when chaining processes inside a :ref:`app_pkg_workflow`).
 
 If the :term:`WPS` output only specifies a single MIME-type, then the equivalent format (after being resolved to a valid
 ontology) will be preserved on the :term:`CWL` side since the result is ensured to be the unique one provided. For this

@@ -753,7 +753,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         process = self.process_store.fetch_by_id(proc_id)
         assert process.auth is not None
         assert process.auth.type == AuthenticationTypes.DOCKER
-        assert process.auth.token == token
+        assert process.auth.token == token  # noqa
         assert process.auth.docker == docker
 
     def test_deploy_process_CWL_direct_raised_missing_id(self):
@@ -783,21 +783,8 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                                   process_id="test-direct-cwl-json",    # type: str
                                   version=None,                         # type: Optional[AnyVersion]
                                   ):                                    # type: (...) -> Tuple[CWL, JSON]
-        cwl_core = {
-            "id": process_id,
-            "class": "CommandLineTool",
-            "baseCommand": ["python3", "-V"],
-            "inputs": {},
-            "outputs": {
-                "output": {
-                    "type": "File",
-                    "outputBinding": {
-                        "glob": "stdout.log"
-                    },
-                }
-            },
-        }
         cwl = {}
+        cwl_core = self.get_cwl_docker_python_version(cwl_version=None, process_id=process_id)
         cwl_base = {"cwlVersion": "v1.0"}
         cwl.update(cwl_base)
         if version:
@@ -857,10 +844,14 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert "Longer than maximum length 1" in error
 
     @staticmethod
-    def get_cwl_docker_python_version():
-        # type: () -> CWL
-        return {
-            "cwlVersion": "v1.0",
+    def get_cwl_docker_python_version(cwl_version="v1.0", process_id=None):
+        # type: (Optional[str], Optional[str]) -> CWL
+        cwl = {}
+        if cwl_version:
+            cwl["cwlVersion"] = cwl_version
+        if process_id:
+            cwl["id"] = process_id
+        cwl.update({
             "class": "CommandLineTool",
             "requirements": {
                 CWL_REQUIREMENT_APP_DOCKER: {
@@ -877,14 +868,15 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                     },
                 }
             },
-        }
+        })
+        return cwl
 
     def test_deploy_process_CWL_DockerRequirement_href(self):
         with contextlib.ExitStack() as stack:
             stack.enter_context(mocked_wps_output(self.settings))
             out_dir = self.settings["weaver.wps_output_dir"]
             out_url = self.settings["weaver.wps_output_url"]
-            assert out_url.startswith("http"), "test can run only if reference is a HTTP reference"  # sanity check
+            assert out_url.startswith("http"), "test can run only if reference is an HTTP reference"  # sanity check
             tmp_dir = stack.enter_context(tempfile.TemporaryDirectory(dir=out_dir))
             tmp_file = os.path.join(tmp_dir, "docker-python.cwl")
             tmp_href = tmp_file.replace(out_dir, out_url, 1)
@@ -926,7 +918,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             stack.enter_context(mocked_wps_output(self.settings))
             out_dir = self.settings["weaver.wps_output_dir"]
             out_url = self.settings["weaver.wps_output_url"]
-            assert out_url.startswith("http"), "test can run only if reference is a HTTP reference"  # sanity check
+            assert out_url.startswith("http"), "test can run only if reference is an HTTP reference"  # sanity check
             tmp_dir = stack.enter_context(tempfile.TemporaryDirectory(dir=out_dir))
             tmp_file = os.path.join(tmp_dir, "docker-python.cwl")
             tmp_href = tmp_file.replace(out_dir, out_url, 1)
@@ -1044,11 +1036,11 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             stack.enter_context(mocked_wps_output(self.settings))
             network_access_requirement = {"networkAccess": True}
             docker_requirement = {"dockerPull": "python:3.7-alpine"}
-            for type in ["hints", "requirements"]:
+            for req_type in ["hints", "requirements"]:
                 cwl = {
                     "class": "CommandLineTool",
                     "cwlVersion": "v1.2",
-                    type: {
+                    req_type: {
                         "NetworkAccess": network_access_requirement,
                         "DockerRequirement": docker_requirement
                     },
@@ -1063,7 +1055,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                     }
                 }
 
-                p_id = "test-network-access-" + type
+                p_id = "test-network-access-" + req_type
                 body = {
                     "processDescription": {"process": {"id": p_id}},
                     "executionUnit": [{"unit": cwl}],
@@ -1073,8 +1065,8 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                 pkg = self.get_application_package(p_id)
                 assert desc["deploymentProfile"] == "http://www.opengis.net/profiles/eoc/dockerizedApplication"
                 assert desc["process"]["id"] == p_id
-                assert pkg[type]["NetworkAccess"] == network_access_requirement
-                assert pkg[type]["DockerRequirement"] == docker_requirement
+                assert pkg[req_type]["NetworkAccess"] == network_access_requirement
+                assert pkg[req_type]["DockerRequirement"] == docker_requirement
 
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
@@ -1086,7 +1078,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             stack.enter_context(mocked_wps_output(self.settings))
             out_dir = self.settings["weaver.wps_output_dir"]
             out_url = self.settings["weaver.wps_output_url"]
-            assert out_url.startswith("http"), "test can run only if reference is a HTTP reference"  # sanity check
+            assert out_url.startswith("http"), "test can run only if reference is an HTTP reference"  # sanity check
             tmp_dir = stack.enter_context(tempfile.TemporaryDirectory(dir=out_dir))
             tmp_file = os.path.join(tmp_dir, "wps1.cwl")
             tmp_href = tmp_file.replace(out_dir, out_url, 1)
@@ -1174,7 +1166,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             stack.enter_context(mocked_wps_output(self.settings))
             wps_dir = self.settings["weaver.wps_output_dir"]
             wps_url = self.settings["weaver.wps_output_url"]
-            assert wps_url.startswith("http"), "test can run only if reference is a HTTP reference"  # sanity check
+            assert wps_url.startswith("http"), "test can run only if reference is an HTTP reference"  # sanity check
             tmp_file = stack.enter_context(tempfile.NamedTemporaryFile(dir=wps_dir, mode="w", suffix=".cwl"))
             tmp_http = tmp_file.name.replace(wps_dir, wps_url, 1)
             json.dump(cwl, tmp_file)
@@ -1761,7 +1753,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         body = resp.json
         assert body["processSummary"]["title"] == data["processDescription"]["process"]["title"], (
             "Even though MAJOR update for CWL is accomplished, other fields that usually correspond to MINOR changes "
-            "should also applied at the same time since the operation replaces the new process definition (PUT)."
+            "should also be applied at the same time since the operation replaces the new process definition (PUT)."
         )
         assert (
             "description" not in body["processSummary"] or  # if undefined, dropped from body
@@ -2037,7 +2029,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             execute_mock_data_tests.append((mock_execute, data_execute))
 
         # apply modifications for testing
-        execute_mock_data_tests[0][1].pop("inputs")  # no inputs is valid (although can be required for WPS process)
+        execute_mock_data_tests[0][1].pop("inputs")  # no inputs valid (although it can be required for WPS process)
         execute_mock_data_tests[0][1]["outputs"][0].pop("transmissionMode")  # should resolve to default value
 
         for mock_execute, data_execute in execute_mock_data_tests:

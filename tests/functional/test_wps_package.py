@@ -12,6 +12,7 @@ import copy
 import json
 import logging
 import os
+import shutil
 import tempfile
 from copy import deepcopy
 from inspect import cleandoc
@@ -56,6 +57,7 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_DOCKER,
     CWL_REQUIREMENT_INIT_WORKDIR,
     CWL_REQUIREMENT_INLINE_JAVASCRIPT,
+    CWL_REQUIREMENT_RESOURCE,
     ProcessSchema
 )
 from weaver.processes.types import ProcessType
@@ -66,7 +68,7 @@ from weaver.wps.utils import get_wps_output_dir, get_wps_output_url, map_wps_out
 if TYPE_CHECKING:
     from typing import List
 
-    from weaver.typedefs import JSON, CWL_AnyRequirements
+    from weaver.typedefs import JSON, CWL_AnyRequirements, CWL_RequirementsDict, Number
 
 EDAM_PLAIN = EDAM_NAMESPACE + ":" + EDAM_MAPPING[ContentType.TEXT_PLAIN]
 OGC_NETCDF = OGC_NAMESPACE + ":" + OGC_MAPPING[ContentType.APP_NETCDF]
@@ -1075,6 +1077,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         # not allowed even if combined with another known and valid definition
         ({"UnknownRequirement": {}, CWL_REQUIREMENT_APP_DOCKER: {"dockerPull": "python:3.7-alpine"}}, ),
         ({"UnknownRequirement": {}}, ),
+        ({}, ),  # no requirement (i.e.: simple shell script) also invalid
     ])
     def test_deploy_block_unknown_processes(self, requirements):
         # type: (CWL_AnyRequirements) -> None
@@ -2028,7 +2031,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                                 except Exception as exc:
                                     print(exc)
                                     raise
-                                """)
+                            """)
                         }
                     ]
                 }
@@ -2498,6 +2501,106 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             assert all(os.path.isfile(file) for file in expect_out_files)
             output_dir_files = {os.path.join(root, file) for root, _, files in os.walk(out_dir) for file in files}
             assert output_dir_files == expect_out_files
+
+    @parameterized.expand([
+        # all values in MiB / seconds accordingly
+        (False, 48, 96, 16, 3, 0.25, 0.25, {}),
+        (False, 48, 36, 4, 4, 0.25, 0.25, {CWL_REQUIREMENT_RESOURCE: {"ramMax": 52}}),
+        # FIXME: ensure ResourceRequirements are effective (https://github.com/crim-ca/weaver/issues/138)
+        # (True, 48, 96, 4, 2, 0.25, 0.25, {CWL_REQUIREMENT_RESOURCE: {"ramMax": 2}}),      # FIXME: hangs forever
+        # (True, 48, 96, 4, 2, 0.25, 0.25, {CWL_REQUIREMENT_RESOURCE: {"outdirMax": 2}}),   # FIXME: not failing
+        (False, 48, 12, 4, 2, 0.25, 0.25, {CWL_REQUIREMENT_RESOURCE: {"outdirMax": 16}}),
+    ])
+    def test_execute_with_resource_requirement(self,
+                                               expect_fail,             # type: bool
+                                               expect_ram_min_mb,       # type: int
+                                               expect_size_min_mb,      # type: int
+                                               ram_chunks_mb,           # type: int
+                                               ram_amount_mb,           # type: int
+                                               time_duration_s,         # type: Number
+                                               time_interval_s,         # type: Number
+                                               resource_requirement,    # type: CWL_RequirementsDict
+                                               ):                       # type: (...) -> None
+        """
+        Test that :data:`CWL_REQUIREMENT_RESOURCE` are considered for :term:`Process` execution.
+
+        .. note::
+            This test also conveniently serves for testing how large :term:`Job` logs are handled by the storage.
+            Because of the large output produced and captured in the logs, saving them directly to the database
+            is not supported. The :term:`Job` should therefore filter problematic entries to the log.
+        """
+        proc = "SimulateResourceUsage"
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        pkg = self.retrieve_payload(proc, "package", local=True)
+        pkg["requirements"].update(resource_requirement)
+        body["executionUnit"] = [{"unit": pkg}]
+        self.deploy_process(body, describe_schema=ProcessSchema.OGC)
+
+        exec_body = {
+            "mode": ExecuteMode.ASYNC,
+            "response": ExecuteResponse.DOCUMENT,
+            "inputs": {
+                "ram_chunks": ram_chunks_mb,
+                "ram_amount": ram_amount_mb,
+                "time_duration": time_duration_s,
+                "time_interval": time_interval_s,
+            },
+            "outputs": [{"id": "output", "transmissionMode": ExecuteTransmissionMode.REFERENCE}]
+        }
+        out_dir = None
+        try:
+            with contextlib.ExitStack() as stack:
+                for mock_exec in mocked_execute_celery():
+                    stack.enter_context(mock_exec)
+                proc_url = f"/processes/{proc}/jobs"
+                resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
+                                           data=exec_body, headers=self.json_headers, only_local=True)
+                assert resp.status_code in [200, 201], f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+                status_url = resp.json["location"]
+                job_id = resp.json["jobID"]
+                wps_dir = get_wps_output_dir(self.settings)
+                out_dir = os.path.join(wps_dir, job_id, "output")
+
+                results = self.monitor_job(status_url, expect_failed=expect_fail)
+                assert "output" in results
+                out_log = os.path.join(out_dir, "stdout.log")
+                assert os.path.isfile(out_log)
+                assert os.stat(out_log).st_size >= expect_size_min_mb * 2**20
+                with open(out_log, mode="r", encoding="utf-8") as out_file:
+                    output = (line for line in out_file.readlines() if line[0] != "\0")
+                output = list(output)
+                assert all(
+                    any(f"Allocating {i} x {ram_chunks_mb} MiB" in line for line in output)
+                    for i in range(1, ram_amount_mb + 1)
+                )
+
+                log_url = f"{status_url}/logs"
+                log_resp = mocked_sub_requests(self.app, "get", log_url, timeout=5,
+                                               headers=self.json_headers, only_local=True)
+                job_logs = log_resp.json
+                assert all(
+                    any(f"Allocating {i} x {ram_chunks_mb} MiB" in line for line in job_logs)
+                    for i in range(1, ram_amount_mb + 1)
+                )
+                assert all(
+                    any(
+                        f"<message clipped due to large dimension ({i * ram_chunks_mb:.2f} MiB)>"
+                        in line for line in job_logs
+                    )
+                    for i in range(1, ram_amount_mb + 1)
+                )
+
+                stat_url = f"{status_url}/statistics"
+                stat_resp = mocked_sub_requests(self.app, "get", stat_url, timeout=5,
+                                                headers=self.json_headers, only_local=True)
+                job_stats = stat_resp.json
+                assert all(
+                    job_stats["process"][mem] > expect_ram_min_mb
+                    for mem in ["rssBytes", "ussBytes", "vmsBytes"]
+                )
+        finally:
+            if out_dir:
+                shutil.rmtree(out_dir, ignore_errors=True)
 
     # FIXME: create a real async test (threading/multiprocess) to evaluate this correctly
     def test_dismiss_job(self):

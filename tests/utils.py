@@ -100,6 +100,8 @@ if TYPE_CHECKING:
 
     CommandType = Callable[[Union[str, Tuple[str]]], int]
 
+    CompareType = TypeVar("CompareType")
+
 LOGGER = logging.getLogger(".".join([__package__, __name__]))
 
 MOCK_AWS_REGION = "ca-central-1"  # type: RegionName
@@ -1148,8 +1150,17 @@ def mocked_process_package():
     """
     Provides mocks that bypasses execution when calling :module:`weaver.processes.wps_package` functions.
     """
+    from weaver.processes.wps_package import get_application_requirement as real_get_application_requirement
+
+    def mock_get_app_req(package, **kwargs):
+        if package.get("class") == "test":
+            kwargs["required"] = False
+            kwargs["validate"] = False
+        return real_get_application_requirement(package, **kwargs)
+
     return (
         mock.patch("weaver.processes.utils.load_package_file", return_value={"class": "test"}),
+        mock.patch("weaver.processes.wps_package.get_application_requirement", side_effect=mock_get_app_req),
         mock.patch("weaver.processes.wps_package.load_package_file", return_value={"class": "test"}),
         mock.patch("weaver.processes.wps_package._load_package_content", return_value=(None, "test", None)),
         mock.patch("weaver.processes.wps_package._get_package_inputs_outputs", return_value=(None, None)),
@@ -1415,3 +1426,26 @@ def setup_test_file_hierarchy(test_paths, test_root_dir, test_data="data"):
         listing.extend((os.path.join(path, dir_path) + "/" for dir_path in dirs))
         listing.extend((os.path.join(path, file_name) for file_name in files))
     return sorted(listing)
+
+
+def assert_equal_any_order(result,          # type: Iterable[Any]
+                           expect,          # type: Iterable[Any]
+                           comparer=None,   # type: Optional[Callable[[CompareType, CompareType], bool]]
+                           formatter=str,   # type: Optional[Callable[[CompareType], str]]
+                           ):               # type: (...) -> None
+    if not callable(comparer):
+        def comparer(_res, _exp):  # pylint: disable=E0102
+            return _res == _exp
+
+    assert type(result) == type(expect), "Expected types mismatch between iterable containers."  # pylint: disable=C0123
+    # in case of exhaustible iterators, compute them to get a copy once
+    # also use the copy to remove items such that all must be matched
+    result = list(result)
+    expect = list(expect)
+    assert len(result) == len(expect), "Expected items sizes mismatch between iterable containers."
+    for res in result:
+        for exp in expect:
+            if comparer(res, exp):
+                expect.remove(exp)
+                break
+    assert not expect, f"Not all expected items matched {[formatter(exp) for exp in expect]}"

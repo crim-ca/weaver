@@ -17,18 +17,16 @@ Type of Processes
 `Weaver` supports multiple type of processes, as listed below.
 Each one of them are accessible through the same API interface, but they have different implications.
 
-- `Builtin`_
-- `WPS-1/2`_
-- `WPS-REST`_ (a.k.a.: WPS-3, |ogc-proc-api|_)
-- `ESGF-CWT`_
-- `Workflow`_
-- `Remote Provider`_
-
+- :ref:`proc_builtin`
+- :ref:`proc_wps_12`
+- :ref:`OGC API - Processes <proc_ogc_api>` (formerly known as :term:`WPS-REST`, :term:`WPS-T` or `WPS-3`)
+- :ref:`proc_esgf_cwt`
+- :ref:`proc_workflow`
+- :ref:`proc_remote_provider`
 
 .. seealso::
     Section |examples|_ provides multiple concrete use cases of :ref:`Deploy <proc_op_deploy>`
     and :ref:`Execute <proc_op_execute>` request payloads for diverse set of applications.
-
 
 .. _proc_builtin:
 
@@ -63,10 +61,11 @@ WPS-1/2
 -------
 
 This kind of process corresponds to a *traditional* :term:`WPS` :term:`XML` or :term:`JSON` endpoint
-(depending of supported version) prior to `WPS-REST`_ specification. When the `WPS-REST`_ process is deployed
-in `Weaver` using an URL reference to an WPS-1/2 process, `Weaver` parses and converts the :term:`XML` or :term:`JSON`
-body of the response and registers the process locally using this definition. This allows a remote server offering
-limited functionalities (e.g.: no REST bindings supported) to provide them through `Weaver`.
+(depending of supported version) prior to :ref:`proc_wps_rest` specification. When an |ogc-api-proc|_ description is
+deployed in `Weaver` using an URL reference to an WPS-1/2 process through the use of a :ref:`app_pkg_wps` requirement,
+`Weaver` parses and converts the :term:`XML` or :term:`JSON` body of the :term:`WPS` response and registers the process
+locally. This allows a remote server offering limited functionalities (e.g.: no REST bindings supported)
+to provide them through `Weaver`.
 
 A minimal :ref:`Deploy <proc_op_deploy>` request body for this kind of process could be as follows:
 
@@ -103,18 +102,22 @@ Please refer to :ref:`Configuration of WPS Processes` section for more details o
 .. seealso::
     - `Remote Provider`_
 
+.. _proc_ogc_api:
 .. _proc_wps_rest:
 
-WPS-REST
---------
+OGC API - Processes (WPS-REST, WPS-T, WPS-3)
+--------------------------------------------
 
 This :term:`Process` type is the main component of `Weaver`. All other types are converted to this one either
-through some parsing (e.g.: `WPS-1/2`_) or with some requirement indicators (e.g.: `Builtin`_, `Workflow`_) for
-special handling.
+through some parsing (e.g.: :ref:`proc_wps_12`) or with some requirement indicators
+(e.g.: :ref:`proc_builtin`, :ref:`proc_workflow`) for
+special handling. The represented :term:`Process` is aligned with |ogc-api-proc|_ specifications.
 
 When deploying one such :term:`Process` directly, it is expected to have a definition specified
-with a :term:`CWL` `Application Package`_.
-This is most of the time employed to wrap an operations packaged in a reference :term:`Docker` image.
+with a :term:`CWL` `Application Package`_, which provides resources about one of the described :ref:`app_pkg_types`.
+
+This is most of the time employed to wrap operations packaged in a reference :term:`Docker` image, but it can also
+wrap :ref:`app_pkg_remote` to be executed on another server (i.e.: :term:`ADES`).
 The reference package can be provided in multiple ways as presented below.
 
 .. note::
@@ -198,48 +201,24 @@ Where the referenced file hosted at ``"https://remote-file-server.com/my-package
 ESGF-CWT
 ----------
 
-For *traditional* WPS-1 process type, Weaver adds default values to :term:`CWL` definition. As we can see in
-:mod:`weaver/processes/wps_package.py`, the following default values for the :term:`CWL` package are:
+For :term:`ESGF-CWT` processes, the ``ESGF-CWTRequirement`` hint must be used.
+For an example :term:`CWL` using this definition, see :ref:`app_pkg_esgf_cwt` section.
 
-.. code-block:: python
-
-    cwl_package = OrderedDict([
-        ("cwlVersion", "v1.0"),
-        ("class", "CommandLineTool"),
-        ("hints", {
-            CWL_REQUIREMENT_APP_WPS1: {
-                "provider": get_url_without_query(wps_service_url),
-                "process": process_id,
-            }}),
-    ])
-
-In :term:`ESGF-CWT` processes, ``ESGF-CWTRequirement`` hint must be used instead of usual ``WPS1Requirement``, contained
-in the :py:data:`weaver.processes.constants.CWL_REQUIREMENT_APP_WPS1` variable. The handling of this technicality is
-handled in :mod:`weaver/processes/wps_package.py`. We can define :term:`ESGF-CWT` processes using this syntax:
-
-.. code-block:: json
-
-    {
-      "cwlVersion": "v1.0",
-      "class": "CommandLineTool",
-      "hints": {
-        "ESGF-CWTRequirement": {
-          "provider": "https://edas.nccs.nasa.gov/wps/cwt",
-          "process": "xarray.subset"
-        }
-      }
-    }
+This kind of :term:`Process` allows for remote :ref:`Execution <proc_op_execute>` and
+:ref:`Monitoring <proc_op_monitor>` of a :term:`Job` dispatched to an instance that
+implements |esgf-cwt-git|_ part of the |esgf|_.
+Using `Weaver`, this :term:`Process` automatically obtains an :ref:`proc_ogc_api` representation.
 
 .. _proc_workflow:
 
 Workflow
 ----------
 
-Processes categorized as :term:`Workflow` are very similar to `WPS-REST`_ processes. From the API standpoint, they
-actually look exactly the same as an atomic process when calling :ref:`DescribeProcess <proc_op_describe>`
+Processes categorized as :term:`Workflow` are very similar to :ref:`proc_wps_rest` processes. From the API standpoint,
+they actually look exactly the same as an atomic process when calling :ref:`DescribeProcess <proc_op_describe>`
 or :ref:`Execute <proc_op_execute>` requests.
-The difference lies within the referenced :ref:`Application Package` which uses a :ref:`CWL Workflow` instead of
-typical :ref:`CWL CommandLineTool`, and therefore, modifies how the :term:`Process` is internally executed.
+The difference lies within the referenced :ref:`Application Package` which uses a :ref:`app_pkg_workflow` instead of
+typical :ref:`app_pkg_cmd`, and therefore, modifies how the :term:`Process` is internally executed.
 
 For :term:`Workflow` processes to be deploy-able and executable, it is **mandatory** that `Weaver` is configured as
 :term:`EMS` or :term:`HYBRID` (see: :ref:`Configuration Settings`). This requirement is due to the nature
@@ -292,21 +271,21 @@ responses, the parsing operation accomplished by `Weaver` makes theses services 
 allows the user to use it as a central hub to keep references to all his remotely accessible services and dispatch
 :term:`Job` executions from a common location.
 
-A *remote provider* differs from previously presented `WPS-1/2`_ processes such that the underlying processes of the
-service are not registered locally. For example, if a remote service has two WPS processes, only top-level service URL
-will be registered locally (in `Weaver`'s database) and the application will have no explicit knowledge of these remote
-processes until requested. When calling :term:`Process`-specific requests
+A *remote provider* differs from previously presented :ref:`proc_wps_12` processes such that the underlying processes
+of the service are not registered locally. For example, if a remote service has two WPS processes, only top-level
+service URL will be registered locally (in `Weaver`'s database) and the application will have no explicit knowledge
+of these remote processes until requested. When calling :term:`Process`-specific requests
 (e.g.: :ref:`DescribeProcess <proc_op_describe>` or :ref:`Execute <proc_op_execute>`), `Weaver` will re-send the
 corresponding request (with appropriate interface conversion) directly to the remote :term:`Provider` each time and
-return the result accordingly. On the other hand, a `WPS-1/2`_ reference would be parsed and saved locally with the
-response *at the time of deployment*. This means that a deployed `WPS-1/2`_ reference would act as a *snapshot* of the
-reference :term:`Process` (which could become out-of-sync), while `Remote Provider`_ will dynamically update according
-to the re-fetched response from the remote service each time, always keeping the obtained description in sync with the
-remote :term:`Provider`. If our example remote service was extended to have a third :term:`WPS` process, it would
-immediately and transparently be reflected in :ref:`GetCapabilities <proc_op_getcap>`
+return the result accordingly. On the other hand, a :ref:`proc_wps_12` reference would be parsed and saved locally with
+the response *at the time of deployment*. This means that a deployed :ref:`proc_wps_12` reference would act as
+a *snapshot* of the reference :term:`Process` (which could become out-of-sync), while :ref:`proc_remote_provider` will
+dynamically update according to the re-fetched response from the remote service each time, always keeping the obtained
+description in sync with the remote :term:`Provider`. If our example remote service was extended to have a third
+:term:`WPS` process, it would immediately and transparently be reflected in :ref:`GetCapabilities <proc_op_getcap>`
 and :ref:`DescribeProcess <proc_op_describe>` retrieved by `Weaver` on `Providers`_-scoped requests without any change
-to the registered :term:`Provider` definition. This would not be the case for the `WPS-1/2`_ reference that would need
-a manual update (i.e.: deploy the third :term:`Process` to register it in `Weaver`).
+to the registered :term:`Provider` definition. This would not be the case for the :ref:`proc_wps_12` reference that
+would need a manual update (i.e.: deploy the third :term:`Process` to register it in `Weaver`).
 
 
 .. _`Providers`: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Providers
@@ -340,7 +319,7 @@ following request (`DescribeProviderProcess`_):
 
 .. warning::
 
-    API requests scoped under `Providers`_ are `Weaver`-specific implementation. These are not part of |ogc-proc-api|_
+    API requests scoped under `Providers`_ are `Weaver`-specific implementation. These are not part of |ogc-api-proc|_
     specification.
 
 
@@ -382,11 +361,12 @@ result in this process to become available for following steps.
 After deployment and visibility preconditions have been met, the corresponding process should become available
 through :ref:`DescribeProcess <proc_op_describe>` requests and other routes that depend on an existing process.
 
-Note that when a process is deployed using the `WPS-REST`_ interface, it also becomes available through the `WPS-1/2`_
-interface with the same identifier and definition. Because of compatibility limitations, some parameters in the
-`WPS-1/2`_ side might not be perfectly mapped to the equivalent or adjusted `WPS-REST`_ interface, although this
-concerns mostly only new features such as :term:`Job` status monitoring. For most traditional use cases, properties
-are mapped between the two interfaces, but it is recommended to use the `WPS-REST`_ one because of the added features.
+Note that when a process is deployed using the :ref:`proc_wps_rest` interface, it also becomes available through the
+:ref:`proc_wps_12` interface with the same identifier and definition. Because of compatibility limitations, some
+parameters in the :ref:`proc_wps_12` side might not be perfectly mapped to the equivalent or adjusted
+:ref:`proc_wps_rest` interface, although this concerns mostly only new features such as :term:`Job` status monitoring.
+For most traditional use cases, properties are mapped between the two interfaces, but it is recommended to use the
+:ref:`proc_wps_rest` one because of the added features.
 
 .. seealso::
     Please refer to :ref:`application-package` chapter for any additional parameters that can be
@@ -877,8 +857,9 @@ In this case, it becomes the responsibility of this remote instance to handle th
 avoids potential problems such as if `Weaver` as :term:`EMS` doesn't have authorized access to a link that only the
 target :term:`ADES` would have access to.
 
-When :term:`CWL` package defines ``WPS1Requirement`` under ``hints`` for corresponding `WPS-1/2`_ remote processes
-being monitored by `Weaver`, it will skip fetching of |http_scheme|-based references since that would otherwise lead
+When :term:`CWL` package defines ``WPS1Requirement`` under ``hints`` for corresponding :ref:`proc_wps_12` remote
+processes being monitored by `Weaver` (see also :ref:`app_pkg_wps1`),
+it will skip fetching of |http_scheme|-based references since that would otherwise lead
 to useless double downloads (one on `Weaver` and the other on the :term:`WPS` side). It is the same in situation for
 ``ESGF-CWTRequirement`` employed for `ESGF-CWT`_ processes. Because these processes do not always support :term:`S3`
 buckets, and because `Weaver` supports many variants of :term:`S3` reference formats, it will first fetch the :term:`S3`
@@ -927,57 +908,57 @@ combinations.
     :name: table-file-type-handling
     :align: center
 
-    +-----------+-----------------------------------------+---------------+-------------------------------------------+
-    | |cfg|     | Process Type                            | File Scheme   | Applied Operation                         |
-    +===========+=========================================+===============+===========================================+
-    | |any|     | |any|                                   | |os_scheme|   | Query and re-process [#openseach]_        |
-    +-----------+-----------------------------------------+---------------+-------------------------------------------+
-    | |ADES|    | - `WPS-1/2`_                            | |file_scheme| | Convert to |http_scheme| [#file2http]_    |
-    |           | - `ESGF-CWT`_                           +---------------+-------------------------------------------+
-    |           | - `WPS-REST`_ (remote) [#wps3]_         | |http_scheme| | Nothing (unmodified)                      |
-    |           | - :ref:`proc_remote_provider`           +---------------+-------------------------------------------+
-    |           |                                         | |s3_scheme|   | Fetch and convert to |http_scheme| [#s3]_ |
-    |           |                                         +---------------+-------------------------------------------+
-    |           |                                         | |vault_ref|   | Convert to |http_scheme| [#vault2http]_   |
-    |           +-----------------------------------------+---------------+-------------------------------------------+
-    |           | - `WPS-REST`_ (`CWL`) [#wps3]_          | |file_scheme| | Nothing (file already local)              |
-    |           |                                         +---------------+-------------------------------------------+
-    |           |                                         | |http_scheme| | Fetch and convert to |file_scheme|        |
-    |           |                                         +---------------+                                           |
-    |           |                                         | |s3_scheme|   |                                           |
-    |           |                                         +---------------+-------------------------------------------+
-    |           |                                         | |vault_ref|   | Convert to |file_scheme|                  |
-    +-----------+-----------------------------------------+---------------+-------------------------------------------+
-    | |EMS|     | - |any| (types listed above for |ADES|) | |file_scheme| | Convert to |http_scheme| [#file2http]_    |
-    |           | - `Workflow`_ (`CWL`) [#wf]_            +---------------+-------------------------------------------+
-    |           |                                         | |http_scheme| | Nothing (unmodified, step will handle it) |
-    |           |                                         +---------------+                                           |
-    |           |                                         | |s3_scheme|   |                                           |
-    |           |                                         +---------------+                                           |
-    |           |                                         | |vault_ref|   |                                           |
-    +-----------+-----------------------------------------+---------------+-------------------------------------------+
-    | |HYBRID|  | - `WPS-1/2`_                            | |file_scheme| | Convert to |http_scheme| [#file2http]_    |
-    |           | - `ESGF-CWT`_                           +---------------+-------------------------------------------+
-    |           | - `WPS-REST`_ (remote) [#wps3]_         | |http_scheme| | Nothing (unmodified)                      |
-    |           | - :ref:`proc_remote_provider`           +---------------+-------------------------------------------+
-    |           |                                         | |s3_scheme|   | Fetch and convert to |http_scheme| [#s3]_ |
-    |           | *Note*: |HYBRID| assumes |ADES| role    +---------------+-------------------------------------------+
-    |           | (remote processes)                      | |vault_ref|   | Convert to |http_scheme| [#vault2http]_   |
-    |           +-----------------------------------------+---------------+-------------------------------------------+
-    |           | - `WPS-REST`_ (`CWL`) [#wps3]_          | |file_scheme| | Nothing (unmodified)                      |
-    |           |                                         +---------------+-------------------------------------------+
-    |           |                                         | |http_scheme| | Fetch and convert to |file_scheme|        |
-    |           | *Note*: |HYBRID| assumes |ADES| role    +---------------+-------------------------------------------+
-    |           | (local processes)                       | |vault_ref|   | Convert to |file_scheme| [#vault2file]_   |
-    |           +-----------------------------------------+---------------+-------------------------------------------+
-    |           | - `Workflow`_ (`CWL`) [#wf]_            | |file_scheme| | Convert to |http_scheme| [#file2http]_    |
-    |           |                                         +---------------+-------------------------------------------+
-    |           |                                         | |http_scheme| | Nothing (unmodified, step will handle it) |
-    |           |                                         +---------------+                                           |
-    |           |                                         | |s3_scheme|   |                                           |
-    |           |                                         +---------------+                                           |
-    |           | *Note*: |HYBRID| assumes |EMS| role     | |vault_ref|   |                                           |
-    +-----------+-----------------------------------------+---------------+-------------------------------------------+
+    +-----------+------------------------------------------+---------------+-------------------------------------------+
+    | |cfg|     | Process Type                             | File Scheme   | Applied Operation                         |
+    +===========+==========================================+===============+===========================================+
+    | |any|     | |any|                                    | |os_scheme|   | Query and re-process [#openseach]_        |
+    +-----------+------------------------------------------+---------------+-------------------------------------------+
+    | |ADES|    | - :ref:`proc_wps_12`                     | |file_scheme| | Convert to |http_scheme| [#file2http]_    |
+    |           | - :ref:`proc_esgf_cwt`                   +---------------+-------------------------------------------+
+    |           | - :ref:`proc_wps_rest` (remote) [#wps3]_ | |http_scheme| | Nothing (unmodified)                      |
+    |           | - :ref:`proc_remote_provider`            +---------------+-------------------------------------------+
+    |           |                                          | |s3_scheme|   | Fetch and convert to |http_scheme| [#s3]_ |
+    |           |                                          +---------------+-------------------------------------------+
+    |           |                                          | |vault_ref|   | Convert to |http_scheme| [#vault2http]_   |
+    |           +------------------------------------------+---------------+-------------------------------------------+
+    |           | - :ref:`proc_wps_rest` (`CWL`) [#wps3]_  | |file_scheme| | Nothing (file already local)              |
+    |           |                                          +---------------+-------------------------------------------+
+    |           |                                          | |http_scheme| | Fetch and convert to |file_scheme|        |
+    |           |                                          +---------------+                                           |
+    |           |                                          | |s3_scheme|   |                                           |
+    |           |                                          +---------------+-------------------------------------------+
+    |           |                                          | |vault_ref|   | Convert to |file_scheme|                  |
+    +-----------+------------------------------------------+---------------+-------------------------------------------+
+    | |EMS|     | - |any| (types listed above for |ADES|)  | |file_scheme| | Convert to |http_scheme| [#file2http]_    |
+    |           | - :ref:`proc_workflow` (`CWL`) [#wf]_    +---------------+-------------------------------------------+
+    |           |                                          | |http_scheme| | Nothing (unmodified, step will handle it) |
+    |           |                                          +---------------+                                           |
+    |           |                                          | |s3_scheme|   |                                           |
+    |           |                                          +---------------+                                           |
+    |           |                                          | |vault_ref|   |                                           |
+    +-----------+------------------------------------------+---------------+-------------------------------------------+
+    | |HYBRID|  | - :ref:`proc_wps_12`                     | |file_scheme| | Convert to |http_scheme| [#file2http]_    |
+    |           | - :ref:`proc_esgf_cwt`                   +---------------+-------------------------------------------+
+    |           | - :ref:`proc_wps_rest` (remote) [#wps3]_ | |http_scheme| | Nothing (unmodified)                      |
+    |           | - :ref:`proc_remote_provider`            +---------------+-------------------------------------------+
+    |           |                                          | |s3_scheme|   | Fetch and convert to |http_scheme| [#s3]_ |
+    |           | *Note*: |HYBRID| assumes |ADES| role     +---------------+-------------------------------------------+
+    |           | (remote processes)                       | |vault_ref|   | Convert to |http_scheme| [#vault2http]_   |
+    |           +------------------------------------------+---------------+-------------------------------------------+
+    |           | - :ref:`proc_wps_rest` (`CWL`) [#wps3]_  | |file_scheme| | Nothing (unmodified)                      |
+    |           |                                          +---------------+-------------------------------------------+
+    |           |                                          | |http_scheme| | Fetch and convert to |file_scheme|        |
+    |           | *Note*: |HYBRID| assumes |ADES| role     +---------------+-------------------------------------------+
+    |           | (local processes)                        | |vault_ref|   | Convert to |file_scheme| [#vault2file]_   |
+    |           +------------------------------------------+---------------+-------------------------------------------+
+    |           | - :ref:`proc_workflow` (`CWL`) [#wf]_    | |file_scheme| | Convert to |http_scheme| [#file2http]_    |
+    |           |                                          +---------------+-------------------------------------------+
+    |           |                                          | |http_scheme| | Nothing (unmodified, step will handle it) |
+    |           |                                          +---------------+                                           |
+    |           |                                          | |s3_scheme|   |                                           |
+    |           |                                          +---------------+                                           |
+    |           | *Note*: |HYBRID| assumes |EMS| role      | |vault_ref|   |                                           |
+    +-----------+------------------------------------------+---------------+-------------------------------------------+
 
 .. |any| replace:: *<any>*
 .. |cfg| replace:: Configuration
@@ -1009,12 +990,12 @@ combinations.
     where `Weaver` is hosted or another service takes care of this task.
 
 .. [#wps3]
-    When the process refers to a remote :ref:`WPS-REST` process (i.e.: remote :term:`WPS` instance that supports
+    When the process refers to a remote :ref:`proc_wps_rest` process (i.e.: remote :term:`WPS` instance that supports
     REST bindings but that is not necessarily an :term:`ADES`), `Weaver` simply *wraps* and monitors its remote
     execution, therefore files are handled just as for any other type of remote :term:`WPS`-like servers. When the
     process contains an actual :term:`CWL` :ref:`Application Package` that defines a ``CommandLineTool`` class
     (including applications with :term:`Docker` image requirement), files are fetched as it will be executed locally.
-    See :ref:`CWL CommandLineTool`, :ref:`WPS-REST` and :ref:`Remote Provider` for further details.
+    See :ref:`CWL CommandLineTool`, :ref:`proc_wps_rest` and :ref:`Remote Provider` for further details.
 
 .. [#s3]
     When an |s3_scheme| file is fetched, is gets downloaded to a temporary |file_scheme| location, which is **NOT**
@@ -1022,9 +1003,9 @@ combinations.
     support :term:`S3` references, only then the file gets converted as in [#file2http]_.
 
 .. [#vault2file]
-    When a |vault_ref| file is specified, the local :ref:`WPS-REST` process can make use of it directly. The file is
-    therefore retrieved from the :term:`Vault` using the provided UUID and access token to be passed to the application.
-    See :ref:`file_vault_inputs` and :ref:`vault_upload` for more details.
+    When a |vault_ref| file is specified, the local :ref:`proc_wps_rest` process can make use of it directly.
+    The file is therefore retrieved from the :term:`Vault` using the provided UUID and access token to be passed
+    to the application. See :ref:`file_vault_inputs` and :ref:`vault_upload` for more details.
 
 .. [#vault2http]
     When a |vault_ref| file is specified, the remote process needs to access it using the hosted :term:`Vault` endpoint.
@@ -1035,7 +1016,7 @@ combinations.
 .. [#wf]
     Workflows are only available on :term:`EMS` and :term:`HYBRID` instances. Since they chain processes,
     no fetch is needed as the sub-step process will do it instead as needed. See :ref:`Workflow` process as well
-    as :ref:`CWL Workflow` for more details.
+    as :ref:`app_pkg_workflow` for more details.
 
 .. todo::
     method to indicate explicit fetch to override these? (https://github.com/crim-ca/weaver/issues/183)
@@ -1521,7 +1502,7 @@ and/or ``logging`` operation for scripts or :term:`Docker` images executed throu
 
 .. note::
     :term:`Job` logs and exceptions are a `Weaver`-specific implementation.
-    They are not part of traditional |ogc-proc-api|_.
+    They are not part of traditional |ogc-api-proc|_.
 
 A minimalistic example of logging output is presented below. This can be retrieved using |log-req|_ request, at any
 moment during :term:`Job` execution (with logs up to that point in time) or after its completion (for full output).
@@ -1684,6 +1665,6 @@ Workflow (Chaining Step Processes)
 
 .. seealso::
 
-    - :ref:`CWL Workflow`
+    - :ref:`app_pkg_workflow`
     - :ref:`proc_workflow_ops`
     - :ref:`Workflow` process type

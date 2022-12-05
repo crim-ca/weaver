@@ -1144,7 +1144,7 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
             # duration is not directly stored in the database (as it can change), it must be computed inplace
             duration_field = {
                 "$addFields": {
-                    "duration": {  # becomes 'null' if cannot be computed (e.g.: not started)
+                    "duration": {  # becomes 'null' if it cannot be computed (e.g.: not started)
                         "$dateDiff": {
                             # compute the same way as Job.duration
                             "startDate": "$started",

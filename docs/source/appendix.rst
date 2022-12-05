@@ -180,7 +180,8 @@ Glossary
         input/output chaining between operations.
 
         .. seealso::
-            Refer to :ref:`proc_workflow`, :ref:`proc_workflow_ops` and :ref:`CWL Workflow` sections for more details.
+            Refer to :ref:`proc_workflow`, :ref:`proc_workflow_ops` and :ref:`app_pkg_workflow`
+            sections for more details.
 
     WPS
         | Web Processing Service.
@@ -192,6 +193,10 @@ Glossary
 
     WPS-REST
         Alias employed to refer to :term:`OGC API - Processes` endpoints for corresponding :term:`WPS` definitions.
+
+    WPS-T
+        Alias employed to refer to older revisions of :term:`OGC API - Processes` standard.
+        The name referred to :term:`WPS` *Transactional* operations introduced by the RESTful API.
 
     XML
         | Extensible Markup Language
@@ -218,5 +223,5 @@ Useful Links
 - |iana-link|_
 - |oas|_
 - |ogc|_ (:term:`OGC`)
-- |ogc-proc-api|_
+- |ogc-api-proc|_
 - |weaver-issues|_

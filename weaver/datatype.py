@@ -44,6 +44,7 @@ from weaver.store.base import StoreProcesses
 from weaver.utils import localize_datetime  # for backward compatibility of previously saved jobs not time-locale-aware
 from weaver.utils import (
     VersionFormat,
+    apply_number_with_unit,
     as_version_major_minor_patch,
     extend_instance,
     fully_qualified_name,
@@ -378,7 +379,7 @@ class Service(Base):
         try:
             _wps = self.get("_wps")
             if _wps is None:
-                # client retrieval could also be cached if recently fetched an not yet invalidated
+                # client retrieval could also be cached if recently fetched and not yet invalidated
                 self["_wps"] = _wps = get_wps_client(self.url, container=container, **kwargs)
             return _wps
         except (OWSServiceException, xml_util.ParseError) as exc:
@@ -579,7 +580,7 @@ class Service(Base):
                 meth = "HEAD"
                 url = self.url
             # - allow 500 for services that incorrectly handle invalid request params, but at least respond
-            #   (should be acceptable in this case because the 'ping' request is not necessarily well formed)
+            #   (should be acceptable in this case because the 'ping' request is not necessarily well-formed)
             # - allow 400/405 for bad request/method directly reported by the service for the same reasons
             # - enforce quick timeout (but don't allow 408 code) to avoid long pending connexions that never resolve
             allowed_codes = [200, 400, 405, 500]
@@ -620,27 +621,38 @@ class Job(Base):
         if not isinstance(self.id, (str, uuid.UUID)):
             raise TypeError(f"Type 'str' or 'UUID' is required for '{self.__name__}.id'")
 
-    def _get_log_msg(self, msg=None, status=None, progress=None):
-        # type: (Optional[str], Optional[AnyStatusType], Optional[Number]) -> str
-        if not msg:
-            msg = self.status_message
+    @staticmethod
+    def _get_message(message, size_limit=None):
+        # type: (str, Optional[int]) -> str
+        msg_len = len(message)
+        size_limit = size_limit if isinstance(size_limit, int) and size_limit > 0 else 1024**2
+        if len(message) > size_limit:
+            msg_size = apply_number_with_unit(msg_len, binary=True, decimals=2)
+            return f"<message clipped due to large dimension ({msg_size})>"
+        return message
+
+    def _get_log_msg(self, msg=None, status=None, progress=None, size_limit=None):
+        # type: (Optional[str], Optional[AnyStatusType], Optional[Number], Optional[int]) -> str
+        msg = self._get_message(msg or self.status_message, size_limit=size_limit)
         status = map_status(status or self.status)
         progress = max(0, min(100, progress or self.progress))
         return get_job_log_msg(duration=self.duration_str, progress=progress, status=status, message=msg)
 
     @staticmethod
-    def _get_err_msg(error):
-        # type: (WPSException) -> str
-        return f"{error.text} - code={error.code} - locator={error.locator}"
+    def _get_err_msg(error, size_limit=None):
+        # type: (WPSException, Optional[int]) -> str
+        error_msg = Job._get_message(error.text, size_limit=size_limit)
+        return f"{error_msg} - code={error.code} - locator={error.locator}"
 
     def save_log(self,
-                 errors=None,       # type: Optional[Union[str, Exception, WPSException, List[WPSException]]]
-                 logger=None,       # type: Optional[Logger]
-                 message=None,      # type: Optional[str]
-                 level=INFO,        # type: AnyLogLevel
-                 status=None,       # type: Optional[AnyStatusType]
-                 progress=None,     # type: Optional[Number]
-                 ):                 # type: (...) -> None
+                 errors=None,           # type: Optional[Union[str, Exception, WPSException, List[WPSException]]]
+                 logger=None,           # type: Optional[Logger]
+                 message=None,          # type: Optional[str]
+                 level=INFO,            # type: AnyLogLevel
+                 status=None,           # type: Optional[AnyStatusType]
+                 progress=None,         # type: Optional[Number]
+                 size_limit=None,       # type: Optional[int]
+                 ):                     # type: (...) -> None
         """
         Logs the specified error and/or message, and adds the log entry to the complete job log.
 
@@ -661,6 +673,10 @@ class Job(Base):
         :param progress:
             Override progress applied in the logged message entry, but does not set it to the job object.
             Uses the current :attr:`Job.progress` value if not specified.
+        :param size_limit:
+            Log message entries that individually exceed the limit will be clipped with a generic message.
+            The parameter is provided for convenience, but take note that setting a too large value could cause the
+            complete :term:`Job` to fail saving to the database if its total size exceeds the document limit.
 
         .. note::
             The job object is updated with the log but still requires to be pushed to database to actually persist it.
@@ -668,22 +684,30 @@ class Job(Base):
         if isinstance(errors, WPSException):
             errors = [errors]
         elif isinstance(errors, Exception):
-            errors = str(errors)
+            errors = self._get_message(str(errors), size_limit=size_limit)
         if isinstance(errors, str):
-            log_msg = [(ERROR, self._get_log_msg(message, status=status, progress=progress))]
+            log_msg = [(ERROR, self._get_log_msg(message, status=status, progress=progress, size_limit=size_limit))]
             self.exceptions.append(errors)
         elif isinstance(errors, list):
             log_msg = [
-                (ERROR, self._get_log_msg(self._get_err_msg(error), status=status, progress=progress))
+                (
+                    ERROR,
+                    self._get_log_msg(
+                        self._get_err_msg(error, size_limit=size_limit),
+                        status=status,
+                        progress=progress,
+                        size_limit=size_limit,
+                    )
+                )
                 for error in errors
             ]
             self.exceptions.extend([{
                 "Code": error.code,
                 "Locator": error.locator,
-                "Text": error.text
+                "Text": self._get_message(error.text, size_limit=size_limit),
             } for error in errors])
         else:
-            log_msg = [(level, self._get_log_msg(message, status=status, progress=progress))]
+            log_msg = [(level, self._get_log_msg(message, status=status, progress=progress, size_limit=size_limit))]
         for lvl, msg in log_msg:
             fmt_msg = get_log_fmt() % dict(asctime=now().strftime(get_log_date_fmt()),
                                            levelname=getLevelName(lvl),
@@ -1574,7 +1598,7 @@ class DockerAuthentication(Authentication):
     def registry(self):
         # type: () -> str
         """
-        Obtains the registry entry that must used for ``docker login {registry}``.
+        Obtains the registry entry that must be used for ``docker login {registry}``.
         """
         return dict.__getitem__(self, "registry")
 
@@ -1847,7 +1871,7 @@ class Process(Base):
     def tag(self):
         # type: () -> str
         """
-        Full identifier including the version for an unique reference.
+        Full identifier including the version for a unique reference.
         """
         proc_id = self.split_version(self.id)[0]
         # bw-compat, if no version available, no update was applied (single deploy)
@@ -2088,7 +2112,7 @@ class Process(Base):
         base = "http://www.opengis.net/profiles/eoc/"
         pkg = self.package or {}
         cls = str(pkg.get("class", "")).lower()
-        req = get_application_requirement(pkg).get("class")
+        req = get_application_requirement(pkg, required=False).get("class")
         typ = self.type
 
         if cls == ProcessType.WORKFLOW:
@@ -2648,7 +2672,7 @@ class Quote(Base):
             (value == QuoteStatus.SUBMITTED and prev != QuoteStatus.SUBMITTED) or
             (value == QuoteStatus.PROCESSING and prev == QuoteStatus.COMPLETED)
         ):
-            LOGGER.error("Cannot revert back to previous quote status (%s => %s)", value, self.status)
+            LOGGER.error("Cannot revert to previous quote status (%s => %s)", value, self.status)
             LOGGER.debug(traceback.extract_stack())
             return
         self["status"] = value

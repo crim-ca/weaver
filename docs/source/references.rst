@@ -36,6 +36,14 @@
 .. _cwl-workdir-ex: https://www.commonwl.org/user_guide/15-staging/
 .. |cwl-docker-req| replace:: DockerRequirement
 .. _cwl-docker-req: https://www.commonwl.org/v1.1/CommandLineTool.html#DockerRequirement
+.. FIXME apply official CWL specification location
+.. https://github.com/common-workflow-language/cwl-v1.2/issues/212
+.. |cwl-cuda-req| replace:: cwltool:CUDARequirement
+.. _cwl-cuda-req: https://doc.arvados.org/v2.4/user/cwl/cwl-extensions.html#CUDARequirement
+.. |cwl-resource-req| replace:: ResourceRequirement
+.. _cwl-resource-req: https://www.commonwl.org/v1.2/CommandLineTool.html#ResourceRequirement
+.. |cwl-network-req| replace:: NetworkAccess
+.. _cwl-network-req: https://www.commonwl.org/v1.2/CommandLineTool.html#NetworkAccess
 .. |cwl-io-map| replace:: CWL Mapping
 .. _cwl-io-map: https://www.commonwl.org/v1.1/CommandLineTool.html#map
 .. |cwl-io-type| replace:: CWLType Symbols
@@ -60,8 +68,8 @@
 .. _ogc: https://www.ogc.org/
 .. |ogc-home| replace:: |ogc| Homepage
 .. _ogc-home: `ogc`_
-.. |ogc-proc-api| replace:: OGC API - Processes
-.. _ogc-proc-api: https://github.com/opengeospatial/ogcapi-processes
+.. |ogc-api-proc| replace:: OGC API - Processes
+.. _ogc-api-proc: https://github.com/opengeospatial/ogcapi-processes
 .. |ogc-exec-sync-responses| replace:: OGC API - Processes, Responses (sync)
 .. _ogc-exec-sync-responses: https://docs.ogc.org/is/18-062r2/18-062r2.html#sc_execute_response
 .. |ogc-exec-async-responses| replace:: OGC API - Processes, Responses (async)
