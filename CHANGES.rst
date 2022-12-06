@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_4.28.0:
+
+`4.28.0 <https://github.com/crim-ca/weaver/tree/4.28.0>`_ (2022-12-06)
+========================================================================
+
+Changes:
+--------
 - Update Docker images to use more recent Python 3.10 by default instead of Python 3.7.
   All CI pipeline, tests and validation checks are also performed with Python 3.10.
   Unit and functional tests remain evaluated for all Python versions since 3.6 (legacy) up to 3.11 (experimental).
