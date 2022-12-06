@@ -397,8 +397,8 @@ def test_cwl_extension_requirements_no_error():
     """
     Validate that specific :term:`CWL` extensions supported by Weaver can be loaded.
 
-    When initialized, the :term:`CWL` factory will validate the document requirement references by resoling the against
-    registered definitions to ensure they are all correctly formatted and provide all necessary details.
+    When initialized, the :term:`CWL` factory will validate the document requirement references by resoling against
+    the registered definitions to ensure they are all correctly formatted and provide all necessary details.
 
     By default, only the "base" schemas for the specified ``cwlVersion`` in the :term:`CWL` document are employed.
     Extensions supported by Weaver will raise a validation error.
