@@ -14,7 +14,9 @@ Changes:
 --------
 - Update Docker images to use more recent Python 3.10 by default instead of Python 3.7.
   All CI pipeline, tests and validation checks are also performed with Python 3.10.
-  Unit and functional tests remain evaluated for all Python versions since 3.6 up to 3.11.
+  Unit and functional tests remain evaluated for all Python versions since 3.6 (legacy) up to 3.11 (experimental).
+- Update to latest ``cwltool==3.1.20221201130942`` to provide ``v1.2`` extension definitions.
+- Add `CWL` extensions activation for specific features supported by `Weaver` for more adequate schema validation.
 - Add `Job` log message size checks to better control what gets logged during the `Application Package` execution to
   avoid large documents causing problems when attempting save them to storage database.
 - Update documentation with examples for ``cwltool:CUDARequirement``, ``ResourceRequirement`` and ``NetworkAccess``.

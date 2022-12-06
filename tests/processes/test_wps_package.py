@@ -5,6 +5,7 @@ Unit tests of functions within :mod:`weaver.processes.wps_package`.
     - :mod:`tests.functional.wps_package`.
 """
 import contextlib
+import copy
 import io
 import logging
 import os
@@ -14,6 +15,8 @@ import sys
 import tempfile
 from typing import TYPE_CHECKING
 
+import cwltool.process
+import mock
 import pytest
 
 from tests.utils import assert_equal_any_order
@@ -23,9 +26,12 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_DOCKER,
     CWL_REQUIREMENT_APP_DOCKER_GPU,
     CWL_REQUIREMENT_CUDA,
-    CWL_REQUIREMENT_CUDA_DEFAULT_PARAMETERS
+    CWL_REQUIREMENT_CUDA_DEFAULT_PARAMETERS,
+    CWL_REQUIREMENT_CUDA_NAMESPACE,
+    CWL_REQUIREMENT_PROCESS_GENERATOR,
+    CWL_REQUIREMENT_TIME_LIMIT
 )
-from weaver.processes.wps_package import WpsPackage, _update_package_compatibility
+from weaver.processes.wps_package import WpsPackage, _load_package_content, _update_package_compatibility
 from weaver.wps.service import WorkerRequest
 
 if TYPE_CHECKING:
@@ -385,3 +391,89 @@ def test_update_package_compatibility(original, expected):
     expected = _combine(cwl_base, expected)
     test_cwl = _update_package_compatibility(original)
     assert_equal_requirements_any_order(test_cwl, expected)
+
+
+def test_cwl_extension_requirements_no_error():
+    """
+    Validate that specific :term:`CWL` extensions supported by Weaver can be loaded.
+
+    When initialized, the :term:`CWL` factory will validate the document requirement references by resoling against
+    the registered definitions to ensure they are all correctly formatted and provide all necessary details.
+
+    By default, only the "base" schemas for the specified ``cwlVersion`` in the :term:`CWL` document are employed.
+    Extensions supported by Weaver will raise a validation error.
+
+    This test ensures that known extensions such as :data:`CWL_REQUIREMENT_CUDA` will be resolved without error.
+    Unknown or unsupported definitions should however continue raising the validation error.
+    """
+    cwl = {
+        "cwlVersion": "v1.2",
+        "class": "CommandLineTool",
+        "baseCommand": ["echo", "test"],
+        "inputs": {},
+        "outputs": {},
+        "requirements": {CWL_REQUIREMENT_CUDA: dict(CWL_REQUIREMENT_CUDA_DEFAULT_PARAMETERS)},
+        "$namespaces": dict(CWL_REQUIREMENT_CUDA_NAMESPACE)
+    }
+
+    # default behaviour without loading supported extensions should fail validation
+    with mock.patch("weaver.processes.wps_package._load_supported_schemas", side_effect=lambda: None):
+        # mock caches to ensure that previous tests did not already perform schema registration,
+        # making the "unknown" extensions for below test to actually be defined and valid in advance
+        with mock.patch.dict("weaver.processes.wps_package.PACKAGE_SCHEMA_CACHE", {}, clear=True):
+            with mock.patch.dict("cwltool.process.SCHEMA_CACHE", {}, clear=True):
+                cwltool.process.use_standard_schema("v1.2")  # enforce standard CWL without any extension
+
+                with pytest.raises(cwltool.process.ValidationException) as exc_info:
+                    _load_package_content(cwl, "test")
+                message = str(exc_info.value)
+                assert all(
+                    info in message for info in [
+                        "checking field `requirements`",
+                        "Field `class` contains undefined reference to",
+                        CWL_REQUIREMENT_CUDA.split(":", 1)[-1],
+                    ]
+                ), "Validation error should have been caused by missing CWL CUDA extension schema, not something else."
+
+    # no error expected after when supported schema extensions are applied
+    # here we reset the caches again to ensure the standard schema are overridden by the custom selection of extensions
+    with mock.patch.dict("weaver.processes.wps_package.PACKAGE_SCHEMA_CACHE", {}, clear=True):
+        with mock.patch.dict("cwltool.process.SCHEMA_CACHE", {}, clear=True):
+            _load_package_content(cwl, "test")
+
+    # even though the extensions are now enabled,
+    # validation should allow them only for the relevant versions where they are applicable
+    cwl_old = copy.deepcopy(cwl)
+    cwl_old["cwlVersion"] = "v1.0"
+    cwl_old["requirements"] = {
+        # note: 'TimeLimit' (v1.0) renamed to 'ToolTimeLimit' (v1.1 and beyond)
+        CWL_REQUIREMENT_TIME_LIMIT: {"timelimit": 10}
+    }
+    with pytest.raises(cwltool.process.ValidationException) as exc_info:
+        _load_package_content(cwl_old, "test")
+    message = str(exc_info.value)
+    assert all(
+        info in message for info in [
+            "checking field `requirements`",
+            "Field `class` contains undefined reference to",
+            CWL_REQUIREMENT_TIME_LIMIT.split(":", 1)[-1],
+        ]
+    ), "Validation error should have been caused by missing CWL ToolTimeLimit extension schema, not something else."
+
+    # test unsupported schema extension to ensure still disallowed
+    cwl["requirements"] = {
+        CWL_REQUIREMENT_PROCESS_GENERATOR: {
+            "class": "CommandLineTool",
+            "run": copy.deepcopy(cwl),
+        }
+    }
+    with pytest.raises(cwltool.process.ValidationException) as exc_info:
+        _load_package_content(cwl, "test")
+    message = str(exc_info.value)
+    assert all(
+        info in message for info in [
+            "checking field `requirements`",
+            "Field `class` contains undefined reference to",
+            CWL_REQUIREMENT_PROCESS_GENERATOR,
+        ]
+    ), "Validation failure should have been caused by unsupported CWL extension schema, not something else."

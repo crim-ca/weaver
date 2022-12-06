@@ -31,6 +31,7 @@ import docker
 import yaml
 from cwltool.context import LoadingContext, RuntimeContext
 from cwltool.factory import Factory as CWLFactory, WorkflowStatus as CWLException
+from cwltool.process import use_custom_schema
 from pyramid.httpexceptions import HTTPOk, HTTPServiceUnavailable
 from pywps import Process
 from pywps.inout.basic import SOURCE_TYPE
@@ -68,9 +69,11 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_WPS1,
     CWL_REQUIREMENT_CUDA,
     CWL_REQUIREMENT_CUDA_DEFAULT_PARAMETERS,
+    CWL_REQUIREMENT_CUDA_NAMESPACE,
     CWL_REQUIREMENT_ENV_VAR,
     CWL_REQUIREMENT_RESOURCE,
     CWL_REQUIREMENTS_SUPPORTED,
+    CWL_TOOL_NAMESPACE_URL,
     PACKAGE_COMPLEX_TYPES,
     PACKAGE_DIRECTORY_TYPE,
     PACKAGE_EXTENSIONS,
@@ -114,6 +117,7 @@ from weaver.utils import (
     get_settings,
     list_directory_recursive,
     null,
+    open_module_resource_file,
     request_extra,
     setup_loggers
 )
@@ -192,6 +196,8 @@ PACKAGE_PROGRESS_CWL_RUN = 10
 PACKAGE_PROGRESS_CWL_DONE = 95
 PACKAGE_PROGRESS_PREP_OUT = 98
 PACKAGE_PROGRESS_DONE = 100
+
+PACKAGE_SCHEMA_CACHE = {}  # type: Dict[str, Tuple[str, str]]
 
 
 def get_status_location_log_path(status_location, out_dir=None):
@@ -388,12 +394,71 @@ def _update_package_compatibility(package):
                 package["requirements"] = r_list
             if h_list:
                 package["hints"] = h_list
+            package.setdefault("$namespaces", {})
+            package["$namespaces"].update(CWL_REQUIREMENT_CUDA_NAMESPACE.copy())
             LOGGER.warning(
                 "CWL package definition updated using '%s' backward-compatibility definition.\n%s",
                 CWL_REQUIREMENT_APP_DOCKER_GPU,
                 generate_diff(package_original, package, val_name="Original CWL", ref_name="Updated CWL")
             )
     return package
+
+
+def _load_supported_schemas():
+    """
+    Loads :term:`CWL` schemas supported by `Weaver` to avoid validation errors when provided in requirements.
+
+    Use a similar strategy as :func:`cwltool.main.setup_schema`, but skipping the :term:`CLI` context and limiting
+    loaded schema definitions to those that `Weaver` allows. Drops extensions that could cause misbehaving
+    functionalities when other :term:`Process` types than :term:`CWL`-based :term:`Application Package` are used.
+
+    This operation must be called before the :class:`CWLFactory` attempts loading and validating a :term:`CWL` document.
+    """
+    schema_supported = [name.rsplit(":", 1)[-1] for name in CWL_REQUIREMENTS_SUPPORTED]
+
+    # explicitly omit dev versions, only released versions allowed
+    extension_resources = {
+        "v1.0": "extensions.yml",
+        "v1.1": "extensions-v1.1.yml",
+        "v1.2": "extensions-v1.2.yml",
+    }
+    for version, ext_version_file in extension_resources.items():
+        # use our own cache on top of cwltool cache to distinguish between 'v1.x' names
+        # pointing at "CWL standard", "cwltool-flavored extensions" or "weaver-flavored extensions"
+        if version in PACKAGE_SCHEMA_CACHE:
+            LOGGER.debug("Reusing cached CWL %s schema extensions.", version)
+            continue
+        LOGGER.debug("Loading CWL %s schema extensions...", version)
+        with open_module_resource_file(cwltool, ext_version_file) as r_file:
+            schema = yaml.safe_load(r_file)
+
+        extensions = schema["$graph"]
+        extensions_supported = []
+        extensions_imports = []
+        extensions_enabled = set()
+        extensions_dropped = set()
+        for ext in extensions:
+            if "name" not in ext and "$import" in ext:
+                extensions_imports.append(ext)
+                continue
+            ext_name = ext["name"]
+            if ext_name in schema_supported:
+                extensions_enabled.add(ext_name)
+                extensions_supported.append(ext)
+            else:
+                extensions_dropped.add(ext_name)
+        extensions_enabled = sorted(list(extensions_enabled))
+        extensions_dropped = sorted(list(extensions_dropped))
+        LOGGER.debug(
+            "Configuring CWL %s schema extensions:\n  Enabled: %s\n  Dropped: %s",
+            version, extensions_enabled, extensions_dropped,
+        )
+        schema["$graph"] = extensions_imports + extensions_supported
+
+        schema_data = bytes2str(yaml.safe_dump(schema, encoding="utf-8", sort_keys=False))
+        schema_base = CWL_TOOL_NAMESPACE_URL.split("#", 1)[0]
+        use_custom_schema(version, schema_base, schema_data)
+        PACKAGE_SCHEMA_CACHE[version] = (schema_base, schema_data)
 
 
 @overload
@@ -498,6 +563,7 @@ def _load_package_content(package_dict,                             # type: CWL
     if only_dump_file:
         return
 
+    _load_supported_schemas()
     factory = CWLFactory(loading_context=loading_context, runtime_context=runtime_context)
     package = factory.make(tmp_json_cwl)  # type: CWLFactoryCallable
     shutil.rmtree(tmp_dir)
