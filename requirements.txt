@@ -55,6 +55,9 @@ jsonschema>=3.0.1
 kombu>=5.3.0b2,<6; python_version >= "3.7"
 lxml
 mako
+# force use of later mistune (https://github.com/common-workflow-language/schema_salad/pull/619#issuecomment-1346025607)
+# employed by cwltool -> schema-salad -> mistune
+mistune>=2.0.3,<2.1
 mypy_boto3_s3
 # esgf-compute-api (cwt) needs oauthlib but doesn't add it in their requirements
 oauthlib
@@ -81,7 +84,9 @@ rdflib>=5  # pyup: ignore
 requests
 requests_file
 ruamel.yaml>=0.16
-schema-salad>=8.2,<9
+# force use of later mistune (https://github.com/common-workflow-language/schema_salad/pull/619#issuecomment-1346025607)
+# employed by cwltool -> schema-salad -> mistune
+schema-salad>=8.3.20221209165047,<9
 shapely
 simplejson
 urlmatch
