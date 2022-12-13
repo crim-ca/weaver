@@ -1163,23 +1163,25 @@ def test_fetch_file_http_content_disposition_filename():
         tmp_json.seek(0)
 
         tmp_random = "123456"
+        tmp_default = f"{tmp_random}.json"
+        tmp_txt_ext = f"{tmp_random}.txt"
         tmp_normal = "spécial.json"
         tmp_escape = quote(tmp_normal)  # % characters
+        tmp_ascii = "special.json"
         tmp_name = os.path.split(tmp_json.name)[-1]
         tmp_http = f"http://weaver.mock/{tmp_random}"  # pseudo endpoint where file name is not directly visible
 
         def mock_response(__request, test_headers):
-            test_headers.update({
-                "Content-Type": ContentType.APP_JSON,
-                "Content-Length": str(len(tmp_text))
-            })
+            # type: (AnyRequestType, HeadersType) -> Tuple[int, HeadersType, str]
+            test_headers["Content-Length"] = str(len(tmp_text))
+            test_headers.setdefault("Content-Type", ContentType.APP_JSON)
             return 200, headers, tmp_text
 
         res_dir = os.path.join(tmp_dir, str(uuid.uuid4()))
         req_mock = stack.enter_context(responses.RequestsMock())
         try:
             make_dirs(res_dir, exist_ok=True)
-            for target, headers in [
+            for i, (target, headers) in enumerate([
                 (tmp_name, {
                     "Content-Disposition": f"attachment; filename=\"{tmp_name}\";filename*=UTF-8''{tmp_name}"
                 }),
@@ -1192,40 +1194,96 @@ def test_fetch_file_http_content_disposition_filename():
                 (tmp_name, {
                     "Content-Disposition": f"attachment; filename={tmp_name}"
                 }),
-                (tmp_normal, {
+                (tmp_ascii, {  # valid character, but normalized UTF-8 into ASCII equivalent (e.g.: no accent)
                     "Content-Disposition": f"attachment; filename=\"{tmp_normal}\";filename*=UTF-8''{tmp_escape}"
                 }),
-                (tmp_normal, {  # disallowed escape character in 'filename', but 'filename*' is valid and used first
+                (tmp_ascii, {  # disallowed escape character in 'filename', but 'filename*' is valid and used first
                     "Content-Disposition": f"attachment; filename=\"{tmp_escape}\";filename*=UTF-8''{tmp_normal}"
                 }),
-                (tmp_random, {  # disallowed escape character in 'filename', reject since no alternative
+                (tmp_ascii, {  # disallowed escape character in 'filename' (ASCII-only), reject since no alternative
+                    "Content-Disposition": f"attachment; filename=\"{tmp_normal}\""
+                }),
+                (tmp_default, {  # disallowed escape character in 'filename' (ASCII-only), reject since no alternative
                     "Content-Disposition": f"attachment; filename=\"{tmp_escape}\""
                 }),
-                (tmp_random, {  # empty header
+                (tmp_default, {  # disallowed character
+                    "Content-Disposition": "attachment; filename*=UTF-8''火"
+                }),
+                ("fire.txt", {
+                    "Content-Disposition": "attachment; filename=\"fire.txt\"; filename*=UTF-8''火.txt"
+                }),
+                (tmp_txt_ext, {  # disallowed character and missing extension, but use extension by content-type
+                    "Content-Type": ContentType.TEXT_PLAIN,
+                    "Content-Disposition": "attachment; filename=\"fire\"; filename*=UTF-8''火"
+                }),
+                (tmp_default, {  # disallowed character and missing extension even if partial characters allowed
+                    "Content-Disposition": "attachment; filename*=UTF-8''large_火"
+                }),
+                (tmp_default, {  # disallowed character
+                    "Content-Disposition": "attachment; filename*=UTF-8''large_火.txt"
+                }),
+                (tmp_txt_ext, {  # disallowed character and missing extension even if partial characters allowed
+                    "Content-Type": ContentType.TEXT_PLAIN,
+                    "Content-Disposition": "attachment; filename*=UTF-8''large_火"
+                }),
+                (tmp_txt_ext, {  # disallowed character
+                    "Content-Type": ContentType.TEXT_PLAIN,
+                    "Content-Disposition": "attachment; filename*=UTF-8''large_火.txt"
+                }),
+                (tmp_default, {  # disallowed character
+                    "Content-Disposition": f"attachment; filename=\"{quote('火')}\""
+                }),
+                (tmp_default, {  # disallowed character
+                    "Content-Disposition": f"attachment; filename=\"{quote('火')}.txt\""
+                }),
+                (tmp_default, {  # disallowed character
+                    "Content-Disposition": f"attachment; filename=\"large_{quote('火')}.txt\""
+                }),
+                (tmp_default, {  # disallowed character
+                    "Content-Type": ContentType.APP_JSON,
+                    "Content-Disposition": "attachment; filename=\"large_火\""
+                }),
+                (tmp_default, {  # valid characters, but missing extension
+                    "Content-Type": ContentType.APP_JSON,
+                    "Content-Disposition": "attachment; filename=\"simple\""
+                }),
+                (tmp_default, {  # valid characters, but missing extension
+                    "Content-Type": ContentType.APP_JSON,
+                    "Content-Disposition": "attachment; filename=UTF-8''simple"
+                }),
+                (tmp_default, {  # valid characters, but missing extension
+                    "Content-Type": ContentType.APP_JSON,
+                    "Content-Disposition": "attachment; filename=\"simple\"; filename=UTF-8''simple"
+                }),
+                ("simple.txt", {  # valid characters, extension takes precedence over content-type
+                    "Content-Type": ContentType.APP_JSON,
+                    "Content-Disposition": "attachment; filename=\"simple.txt\""
+                }),
+                (tmp_default, {  # empty header
                     "Content-Disposition": ""
                 }),
-                (tmp_random, {  # missing header
+                (tmp_default, {  # missing header
                 }),
-                (tmp_random, {  # missing filename
+                (tmp_default, {  # missing filename
                     "Content-Disposition": "attachment"
                 }),
-                (tmp_random, {  # invalid filename
+                (tmp_default, {  # invalid filename
                     "Content-Disposition": "attachment; filename*=UTF-8''exec%20'echo%20test'"
                 }),
-                (tmp_random, {  # invalid encoding
+                (tmp_default, {  # invalid encoding
                     "Content-Disposition": "attachment; filename*=random''%47%4F%4F%44.json"
                 }),
                 ("GOOD.json", {  # valid encoding and allowed characters after escape
                     "Content-Disposition": "attachment; filename*=UTF-8''%47%4F%4F%44.json"
                 })
-            ]:
+            ]):
                 req_mock.remove("GET", tmp_http)  # reset previous iter
                 req_mock.add_callback("GET", tmp_http, callback=lambda req: mock_response(req, headers))
                 try:
                     res_path = fetch_file(tmp_http, res_dir)
                 except Exception as exc:
-                    raise AssertionError(f"Unexpected exception when testing with: [{headers}]. Exception: [{exc}]")
-                assert res_path == os.path.join(res_dir, target), f"Not expected name when testing with: [{headers}]"
+                    raise AssertionError(f"Unexpected exception for test [{i}] with: [{headers}]. Exception: [{exc}]")
+                assert res_path == os.path.join(res_dir, target), f"Not expected name for test [{i}] with: [{headers}]"
                 assert os.path.isfile(res_path), f"File [{tmp_http}] should be accessible under [{res_path}]"
                 assert json.load(open(res_path)) == tmp_data, "File should be properly generated from HTTP reference"
         except Exception:
