@@ -52,6 +52,7 @@ from requests.structures import CaseInsensitiveDict
 from requests_file import FileAdapter
 from urlmatch import urlmatch
 from webob.headers import EnvironHeaders, ResponseHeaders
+from werkzeug.utils import secure_filename
 from werkzeug.wrappers import Request as WerkzeugRequest
 from yaml.scanner import ScannerError
 
@@ -1870,6 +1871,7 @@ def download_file_http(file_reference, file_outdir, settings=None, callback=None
         file_name = urlparse(file_reference).path.split("/")[-1]
         LOGGER.debug("Using default file name from URL path fragment: [%s]", file_name)
 
+    file_name = secure_filename(file_name)
     if not FILE_NAME_LOOSE_PATTERN.match(file_name):
         raise ValueError(f"Invalid file name [{file_name!s}] resolved from URL [{file_reference}]. Aborting download.")
 
@@ -2162,12 +2164,13 @@ def fetch_file(file_reference,                      # type: str
         file_reference = file_reference[7:]
     file_href = file_reference
     file_name = os.path.basename(os.path.realpath(file_reference))  # resolve any different name to use the original
+    file_name = secure_filename(file_name)
     file_path = os.path.join(file_outdir, file_name)
     LOGGER.debug("Fetching file reference: [%s] using options:\n%s", file_href, repr_json(option_kwargs))
     options, kwargs = resolve_scheme_options(**option_kwargs)
     if os.path.isfile(file_reference):
         LOGGER.debug("Fetch file resolved as local reference.")
-        adjust_file_local(file_href, file_outdir, out_method)
+        file_path = adjust_file_local(file_href, file_outdir, out_method)
     elif file_reference.startswith("s3://"):
         LOGGER.debug("Fetch file resolved as S3 bucket reference.")
         s3_params = resolve_s3_http_options(**options["http"], **kwargs)
@@ -2208,7 +2211,7 @@ def fetch_file(file_reference,                      # type: str
 
 
 def adjust_file_local(file_reference, file_outdir, out_method):
-    # type: (str, str, OutputMethod) -> None
+    # type: (str, str, OutputMethod) -> str
     """
     Adjusts the input file reference to the output location with the requested handling method.
 
@@ -2239,9 +2242,11 @@ def adjust_file_local(file_reference, file_outdir, out_method):
     :param file_reference: Original location of the file.
     :param file_outdir: Target directory of the file.
     :param out_method: Method employed to handle the generation of the output file.
+    :returns: Output file location.
     """
     file_loc = os.path.realpath(file_reference)
     file_name = os.path.basename(file_loc)  # resolve any different name to use the original
+    file_name = secure_filename(file_name)
     file_path = os.path.join(file_outdir, file_name)
     if out_method == OutputMethod.MOVE and os.path.isfile(file_path):
         LOGGER.debug("Reference [%s] cannot be moved to path [%s] (already exists)", file_reference, file_path)
@@ -2267,6 +2272,7 @@ def adjust_file_local(file_reference, file_outdir, out_method):
             shutil.copyfile(file_reference, file_path)
     else:
         LOGGER.debug("File as local reference has no action to take, file already exists: [%s]", file_path)
+    return file_path
 
 
 def filter_directory_forbidden(listing):
