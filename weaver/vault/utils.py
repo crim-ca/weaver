@@ -231,7 +231,7 @@ def get_authorized_file(file_id, auth_token, container=None):
 
     db = get_db(container)
     vault = db.get_store(StoreVault)
-    file = vault.get_file(file_id, nothrow=True)  # don't indicate if not found if unauthorized
+    file = vault.get_file(file_id, nothrow=True)  # don't indicate if not found when unauthorized
     if not VaultFile.authorized(file, token):
         raise HTTPForbidden(json={
             "code": "InvalidHeaderValue",
@@ -252,7 +252,7 @@ def get_authorized_file(file_id, auth_token, container=None):
 def decrypt_from_vault(vault_file, path, out_dir=None, delete_encrypted=False):
     # type: (VaultFile, str, Optional[str], bool) -> str
     """
-    Decrypts a :term:`Vault` file and removes its encrypted version.
+    Decrypts a :term:`Vault` file and optionally removes its encrypted version.
 
     :param vault_file: Reference file in :term:`Vault`.
     :param path: Expected location of the encrypted file.
@@ -260,10 +260,9 @@ def decrypt_from_vault(vault_file, path, out_dir=None, delete_encrypted=False):
     :param delete_encrypted: Delete original encrypted file after decryption for output.
     :return: Output location of the decrypted file.
     """
-    # temp file to hold decrypted contents, but don't deleted here
     ext = os.path.splitext(path)[-1]
     with tempfile.NamedTemporaryFile(suffix=ext, mode="w+b", delete=False, dir=out_dir) as out_file:
-        with open(path, "r+b") as vault_fd:
+        with open(path, mode="r+b") as vault_fd:
             data = vault_file.decrypt(vault_fd)
         out_file.write(data.getbuffer())  # noqa
         out_file.flush()

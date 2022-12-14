@@ -52,6 +52,7 @@ from requests.structures import CaseInsensitiveDict
 from requests_file import FileAdapter
 from urlmatch import urlmatch
 from webob.headers import EnvironHeaders, ResponseHeaders
+from werkzeug.utils import secure_filename
 from werkzeug.wrappers import Request as WerkzeugRequest
 from yaml.scanner import ScannerError
 
@@ -59,7 +60,7 @@ from weaver.base import Constants, ExtendedEnum
 from weaver.compat import Version
 from weaver.exceptions import WeaverException
 from weaver.execute import ExecuteControlOption, ExecuteMode
-from weaver.formats import ContentType, get_content_type, repr_json
+from weaver.formats import ContentType, get_content_type, get_extension, repr_json
 from weaver.status import map_status
 from weaver.warning import TimeZoneInfoAlreadySetWarning
 from weaver.xml_util import HTML_TREE_BUILDER, XML
@@ -1843,6 +1844,8 @@ def download_file_http(file_reference, file_outdir, settings=None, callback=None
 
     # resolve preferred file name or default to last fragment of request path
     file_name = None
+    content_type = get_header("Content-Type", resp.headers, default=ContentType.TEXT_PLAIN)
+    content_type_ext = get_extension(content_type) or ".txt"
     content_disposition = get_header("Content-Disposition", resp.headers)
     if content_disposition:
         LOGGER.debug("Detected Content-Disposition, looking for preferred file name...")
@@ -1857,22 +1860,33 @@ def download_file_http(file_reference, file_outdir, settings=None, callback=None
                 file_name_star = None
 
         # security validation, remove any nested path and abort if any invalid characters
-        try:
-            file_name_maybe = (file_name_star or file_name_param or "").split("/")[-1].strip().replace(" ", "_")
-            file_name_maybe = FILE_NAME_QUOTE_PATTERN.match(file_name_maybe)[1]
-            if file_name_maybe and (3 < len(file_name_maybe) < 256):
-                file_name = file_name_maybe
-                LOGGER.debug("Using validated Content-Disposition preferred file name: [%s]", file_name)
-        except (IndexError, TypeError):
-            LOGGER.debug("Discarding Content-Disposition preferred file name due to failed validation.")
+        for file_name_var in [file_name_star, file_name_param]:
+            try:
+                file_name_maybe = (file_name_var or "").rsplit("/", 1)[-1].strip().replace(" ", "_")
+                file_name_maybe = FILE_NAME_QUOTE_PATTERN.match(file_name_maybe)[1]
+                file_name_secure, file_ext_secure = os.path.splitext(secure_filename(file_name_maybe))
+                if (
+                    file_name_maybe and file_name_secure and file_ext_secure and  # characters with ASCII equivalents
+                    (3 < len(file_name_maybe) < 256) and  # ensure minimal length respected
+                    len(file_name_maybe) == len(f"{file_name_secure}{file_ext_secure}")  # skip if dropped characters
+                ):
+                    file_name = file_name_maybe
+                    LOGGER.debug("Using validated Content-Disposition preferred file name: [%s]", file_name)
+                    break
+            except (IndexError, TypeError):
+                LOGGER.debug("Discarding Content-Disposition preferred file name due to failed validation.")
 
     if not file_name:
         file_name = urlparse(file_reference).path.split("/")[-1]
         LOGGER.debug("Using default file name from URL path fragment: [%s]", file_name)
 
-    if not FILE_NAME_LOOSE_PATTERN.match(file_name):
+    file_name, file_ext = os.path.splitext(file_name)
+    file_name = secure_filename(file_name)
+    file_ext = f".{secure_filename(file_ext)}" if file_ext else f".{secure_filename(content_type_ext)}"
+    if not FILE_NAME_LOOSE_PATTERN.match(file_name) or not FILE_NAME_LOOSE_PATTERN.match(file_ext):
         raise ValueError(f"Invalid file name [{file_name!s}] resolved from URL [{file_reference}]. Aborting download.")
 
+    file_name = f"{file_name}{file_ext}"
     file_path = os.path.join(file_outdir, file_name)
     with open(file_path, "wb") as file:  # pylint: disable=W1514
         # NOTE:
@@ -2162,12 +2176,13 @@ def fetch_file(file_reference,                      # type: str
         file_reference = file_reference[7:]
     file_href = file_reference
     file_name = os.path.basename(os.path.realpath(file_reference))  # resolve any different name to use the original
+    file_name = secure_filename(file_name)
     file_path = os.path.join(file_outdir, file_name)
     LOGGER.debug("Fetching file reference: [%s] using options:\n%s", file_href, repr_json(option_kwargs))
     options, kwargs = resolve_scheme_options(**option_kwargs)
     if os.path.isfile(file_reference):
         LOGGER.debug("Fetch file resolved as local reference.")
-        adjust_file_local(file_href, file_outdir, out_method)
+        file_path = adjust_file_local(file_href, file_outdir, out_method)
     elif file_reference.startswith("s3://"):
         LOGGER.debug("Fetch file resolved as S3 bucket reference.")
         s3_params = resolve_s3_http_options(**options["http"], **kwargs)
@@ -2208,7 +2223,7 @@ def fetch_file(file_reference,                      # type: str
 
 
 def adjust_file_local(file_reference, file_outdir, out_method):
-    # type: (str, str, OutputMethod) -> None
+    # type: (str, str, OutputMethod) -> str
     """
     Adjusts the input file reference to the output location with the requested handling method.
 
@@ -2239,9 +2254,11 @@ def adjust_file_local(file_reference, file_outdir, out_method):
     :param file_reference: Original location of the file.
     :param file_outdir: Target directory of the file.
     :param out_method: Method employed to handle the generation of the output file.
+    :returns: Output file location.
     """
     file_loc = os.path.realpath(file_reference)
     file_name = os.path.basename(file_loc)  # resolve any different name to use the original
+    file_name = secure_filename(file_name)
     file_path = os.path.join(file_outdir, file_name)
     if out_method == OutputMethod.MOVE and os.path.isfile(file_path):
         LOGGER.debug("Reference [%s] cannot be moved to path [%s] (already exists)", file_reference, file_path)
@@ -2267,6 +2284,7 @@ def adjust_file_local(file_reference, file_outdir, out_method):
             shutil.copyfile(file_reference, file_path)
     else:
         LOGGER.debug("File as local reference has no action to take, file already exists: [%s]", file_path)
+    return file_path
 
 
 def filter_directory_forbidden(listing):

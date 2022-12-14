@@ -292,7 +292,7 @@ def make_result_link(result_id, result, job_id, settings):
             enc = "UTF-8"
             out = get_wps_output_dir(settings)
             val = get_any_value(value, data=True, file=False)
-            loc = os.path.join(job_id, f"{result_id + suffix}.txt")
+            loc = os.path.join(str(job_id), f"{result_id}{suffix}.txt")
             url = f"{wps_url}/{loc}"
             path = os.path.join(out, loc)
             with open(path, mode="w", encoding=enc) as out_file:
