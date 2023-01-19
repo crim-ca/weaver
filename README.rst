@@ -61,11 +61,11 @@ for each process.
     :alt: PyUp Dependencies Status
     :target: https://pyup.io/account/repos/github/crim-ca/weaver/
 
-.. |github_latest| image:: https://img.shields.io/github/workflow/status/crim-ca/weaver/Tests/master?label=master
+.. |github_latest| image:: https://img.shields.io/github/actions/workflow/status/crim-ca/weaver/tests.yml?label=master&branch=master
     :alt: Github Actions CI Build Status (master branch)
     :target: https://github.com/crim-ca/weaver/actions?query=workflow%3ATests+branch%3Amaster
 
-.. |github_tagged| image:: https://img.shields.io/github/workflow/status/crim-ca/weaver/Tests/4.28.0?label=4.28.0
+.. |github_tagged| image:: https://img.shields.io/github/actions/workflow/status/crim-ca/weaver/tests.yml?label=4.28.0&branch=4.28.0
     :alt: Github Actions CI Build Status (latest tag)
     :target: https://github.com/crim-ca/weaver/actions?query=workflow%3ATests+branch%3A4.28.0
 
