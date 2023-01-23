@@ -18,6 +18,8 @@ Fixes:
 ------
 - Fix dynamic regex definitions for schema validation with ``colander>=2`` that modifies ``URL_REGEX`` pattern
   (relates to `Pylons/colander#352 <https://github.com/Pylons/colander/pull/352>`_).
+- Fix invalid default results from ``colander`` schemas with ``missing=drop|required`` and ``default`` parameters when
+  combined with ``cornice`` OpenAPI schemas. Pin ``colander<2`` to avoid problems with latest changes.
 
 .. _changes_4.28.0:
 

@@ -23,7 +23,7 @@ celery[mongodb]>=5.2.2,<6; sys_platform != "win32" and python_version >= "3.7"
 # FIXME: drop support? more recent versions not avilable for end-of-life python
 celery[mongodb]>=5.1,<5.2; sys_platform != "win32" and python_version <= "3.6"  # rq.filter: >=5.1,<5.2 # pyup: ignore
 cffi
-colander
+colander<2
 cornice
 #cornice_swagger>=0.7.0
 cornice-swagger @ git+https://github.com/fmigneault/cornice.ext.swagger.git@openapi-3
