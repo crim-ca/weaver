@@ -1322,7 +1322,7 @@ class Job(Base):
             "estimatedCompletion": None,
             "percentCompleted": self.progress,
             # new name as per OGC-API, enforced integer
-            # https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/statusInfo.yaml
+            # https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/statusInfo.yaml
             "progress": int(self.progress),
             "links": self.links(settings, self_link=self_link)
         }
