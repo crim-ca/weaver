@@ -382,7 +382,6 @@ class SemanticVersion(colander.Regex):
 
 
 class ExtendedBoolean(colander.Boolean):
-
     def __init__(self, *args, true_choices=None, false_choices=None, allow_string=False, **kwargs):
         # type: (Any, Optional[Iterable[str]], Optional[Iterable[str]], bool, Any) -> None
         """

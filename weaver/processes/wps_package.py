@@ -1206,7 +1206,6 @@ class DirectoryNestedStorage(CachedStorage):
 
 
 class WpsPackage(Process):
-
     def __init__(self, package=None, payload=None, **kw):
         # type: (CWL, Optional[JSON], **Any) -> None
         """

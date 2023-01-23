@@ -2017,7 +2017,6 @@ class TestWeaverClientAuthBase(TestWeaverClientBase):
 
     @classmethod
     def setup_auth_app(cls):
-
         def auth_view(request):
             # type: (AnyRequestType) -> AnyResponseType
             token = str(uuid.uuid4())
@@ -2057,7 +2056,6 @@ class TestWeaverClientAuthBase(TestWeaverClientBase):
 
 
 class TestWeaverCLIAuthHandler(TestWeaverClientAuthBase):
-
     def test_describe_auth(self):
         # prints formatted JSON ProcessDescription over many lines
         proc = self.test_process["Echo"]
