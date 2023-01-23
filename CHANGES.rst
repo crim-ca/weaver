@@ -16,7 +16,9 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Fix missing ``sphinx_autodoc_typehints[type_comment]`` extras due to renamed definition without leading ``s`` by
+  pinning ``1.19`` as the minimum version
+  (relates to `tox-dev/sphinx-autodoc-typehints#263 <https://github.com/tox-dev/sphinx-autodoc-typehints/issues/263>`_).
 
 .. _changes_4.28.0:
 
