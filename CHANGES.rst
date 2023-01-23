@@ -16,7 +16,8 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Fix dynamic regex definitions for schema validation with ``colander>=2`` that modifies ``URL_REGEX`` pattern
+  (relates to `Pylons/colander#352 <https://github.com/Pylons/colander/pull/352>`_).
 
 .. _changes_4.28.0:
 
