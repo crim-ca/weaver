@@ -177,7 +177,7 @@ def map_status(wps_status, compliant=StatusCompliant.OGC):
             job_status = Status.FAILED
 
     # FIXME: new official status is 'successful', but this breaks everywhere (tests, local/remote execute, etc.)
-    #        https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/statusCode.yaml
+    #   https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/statusCode.yaml
     if job_status == Status.SUCCESSFUL:
         job_status = Status.SUCCEEDED
 
