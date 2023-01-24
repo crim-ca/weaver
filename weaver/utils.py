@@ -1811,6 +1811,22 @@ def request_extra(method,                       # type: AnyRequestMethod
     return err
 
 
+def get_secure_filename(file_name):
+    # type: (str) -> str
+    """
+    Obtain a secure file name.
+
+    Preserves leading and trailing underscores contrary to :func:`secure_filename`.
+    """
+    new_name = file_name.lstrip("_")
+    prefix = "_" * (len(file_name) - len(new_name))
+    file_name = new_name
+    new_name = file_name.rstrip("_")
+    suffix = "_" * (len(file_name) - len(new_name))
+    file_name = new_name
+    return f"{prefix}{secure_filename(file_name)}{suffix}"
+
+
 def download_file_http(file_reference, file_outdir, settings=None, callback=None, **request_kwargs):
     # type: (str, str, Optional[AnySettingsContainer], Optional[Callable[[str], None]], **Any) -> str
     """
@@ -1864,7 +1880,7 @@ def download_file_http(file_reference, file_outdir, settings=None, callback=None
             try:
                 file_name_maybe = (file_name_var or "").rsplit("/", 1)[-1].strip().replace(" ", "_")
                 file_name_maybe = FILE_NAME_QUOTE_PATTERN.match(file_name_maybe)[1]
-                file_name_secure, file_ext_secure = os.path.splitext(secure_filename(file_name_maybe))
+                file_name_secure, file_ext_secure = os.path.splitext(get_secure_filename(file_name_maybe))
                 if (
                     file_name_maybe and file_name_secure and file_ext_secure and  # characters with ASCII equivalents
                     (3 < len(file_name_maybe) < 256) and  # ensure minimal length respected
@@ -1881,8 +1897,8 @@ def download_file_http(file_reference, file_outdir, settings=None, callback=None
         LOGGER.debug("Using default file name from URL path fragment: [%s]", file_name)
 
     file_name, file_ext = os.path.splitext(file_name)
-    file_name = secure_filename(file_name)
-    file_ext = f".{secure_filename(file_ext)}" if file_ext else f".{secure_filename(content_type_ext)}"
+    file_name = get_secure_filename(file_name)
+    file_ext = f".{get_secure_filename(file_ext)}" if file_ext else f".{get_secure_filename(content_type_ext)}"
     if not FILE_NAME_LOOSE_PATTERN.match(file_name) or not FILE_NAME_LOOSE_PATTERN.match(file_ext):
         raise ValueError(f"Invalid file name [{file_name!s}] resolved from URL [{file_reference}]. Aborting download.")
 
@@ -2176,7 +2192,7 @@ def fetch_file(file_reference,                      # type: str
         file_reference = file_reference[7:]
     file_href = file_reference
     file_name = os.path.basename(os.path.realpath(file_reference))  # resolve any different name to use the original
-    file_name = secure_filename(file_name)
+    file_name = get_secure_filename(file_name)
     file_path = os.path.join(file_outdir, file_name)
     LOGGER.debug("Fetching file reference: [%s] using options:\n%s", file_href, repr_json(option_kwargs))
     options, kwargs = resolve_scheme_options(**option_kwargs)
@@ -2258,7 +2274,7 @@ def adjust_file_local(file_reference, file_outdir, out_method):
     """
     file_loc = os.path.realpath(file_reference)
     file_name = os.path.basename(file_loc)  # resolve any different name to use the original
-    file_name = secure_filename(file_name)
+    file_name = get_secure_filename(file_name)
     file_path = os.path.join(file_outdir, file_name)
     if out_method == OutputMethod.MOVE and os.path.isfile(file_path):
         LOGGER.debug("Reference [%s] cannot be moved to path [%s] (already exists)", file_reference, file_path)
