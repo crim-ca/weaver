@@ -11,5 +11,7 @@ sphinx-autoapi>=1.7.0
 sphinx-paramlinks>=0.4.1
 # adds redoc OpenAPI directly served on readthedocs
 sphinxcontrib-redoc>=1.6.0
-sphinx_autodoc_typehints[type_comment]>=1.19
+# extras renamed in 1.19 (see https://github.com/tox-dev/sphinx-autodoc-typehints/issues/263)
+sphinx_autodoc_typehints[type_comments]<1.19; python_version >= "3.6"
+sphinx_autodoc_typehints[type_comment]>=1.19; python_version >= "3.7"
 sphinx_rtd_theme>=0.5.1
