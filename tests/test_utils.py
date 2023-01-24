@@ -1168,7 +1168,8 @@ def test_fetch_file_http_content_disposition_filename():
         tmp_normal = "spécial.json"
         tmp_escape = quote(tmp_normal)  # % characters
         tmp_ascii = "special.json"
-        tmp_name = os.path.split(tmp_json.name)[-1]
+        tmp_file = os.path.split(tmp_json.name)[-1]
+        tmp_name, tmp_ext = tmp_file.rsplit(".", 1)
         tmp_http = f"http://weaver.mock/{tmp_random}"  # pseudo endpoint where file name is not directly visible
 
         def mock_response(__request, test_headers):
@@ -1182,17 +1183,30 @@ def test_fetch_file_http_content_disposition_filename():
         try:
             make_dirs(res_dir, exist_ok=True)
             for i, (target, headers) in enumerate([
-                (tmp_name, {
-                    "Content-Disposition": f"attachment; filename=\"{tmp_name}\";filename*=UTF-8''{tmp_name}"
+                (tmp_file, {
+                    "Content-Disposition": f"attachment; filename=\"{tmp_file}\";filename*=UTF-8''{tmp_file}"
                 }),
-                (tmp_name, {  # unusual spacing/order does not matter
-                    "Content-Disposition": f" filename*=UTF-8''{tmp_name};   filename=\"{tmp_name}\";attachment;"
+                (tmp_file, {  # unusual spacing/order does not matter
+                    "Content-Disposition": f" filename*=UTF-8''{tmp_file};   filename=\"{tmp_file}\";attachment;"
                 }),
-                (tmp_name, {
-                    "Content-Disposition": f"attachment; filename=\"{tmp_name}\""
+                (tmp_file, {
+                    "Content-Disposition": f"attachment; filename=\"{tmp_file}\""
                 }),
-                (tmp_name, {
-                    "Content-Disposition": f"attachment; filename={tmp_name}"
+                (tmp_file, {
+                    "Content-Disposition": f"attachment; filename={tmp_file}"
+                }),
+                # Special cases where 'werkzeug.utils.secure_filename' called within the fetch function
+                # normally drops any leading or trailing underscores, although they are perfectly valid.
+                # Tests would sporadically fail if not added explicitly depending on whether the temporary
+                # file created by 'tempfile.NamedTemporaryFile' used a name with trailing underscore or not.
+                (f"{tmp_name}_.{tmp_ext}", {
+                    "Content-Disposition": f"attachment; filename={tmp_name}_.{tmp_ext}"
+                }),
+                (f"_{tmp_name}.{tmp_ext}", {
+                    "Content-Disposition": f"attachment; filename=_{tmp_name}.{tmp_ext}"
+                }),
+                (f"__{tmp_name}__.{tmp_ext}", {
+                    "Content-Disposition": f"attachment; filename=__{tmp_name}__.{tmp_ext}"
                 }),
                 (tmp_ascii, {  # valid character, but normalized UTF-8 into ASCII equivalent (e.g.: no accent)
                     "Content-Disposition": f"attachment; filename=\"{tmp_normal}\";filename*=UTF-8''{tmp_escape}"
