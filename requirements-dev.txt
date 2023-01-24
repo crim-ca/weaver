@@ -9,7 +9,7 @@ bump2version
 codacy-coverage
 coverage
 doc8>=0.8.1
-docformatter>=1.5.0     # add support of config file
+docformatter==1.5.0     # add support of config file
 flake8<6  # FIXME: false positive redefinition (https://github.com/PyCQA/pyflakes/issues/757)
 flynt
 isort>=4.3.21,<5

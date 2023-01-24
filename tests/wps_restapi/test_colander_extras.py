@@ -751,54 +751,54 @@ def test_invalid_schema_mismatch_default_validator():
         pytest.fail("Erroneous schema must raise immediately if default doesn't conform to its own validator.")
 
 
-def test_schema_default_missing_validator_combinations():
+@pytest.mark.parametrize("test_case", [
+    (Mapping, {}, colander.Invalid),                    # required but missing
+    (Mapping, {"test": None}, colander.Invalid),        # wrong value schema-type
+    (Mapping, {"test": "random"}, {"test": "random"}),  # uses the value as is if provided because no validator
+    (Default, {}, {"test": "test"}),                    # default+required adds the value if omitted
+    (Default, {"test": None}, {"test": "test"}),        # default+required sets the value if null
+    (Default, {"test": "random"}, {"test": "random"}),  # default+required uses the value as is if provided
+    (Missing, {}, {}),                                  # missing only drops the value if omitted
+    (Missing, {"test": None}, {}),
+    (Missing, {"test": "random"}, {"test": "random"}),
+    (DefaultMissing, {}, {"test": "test"}),             # default+missing ignores drops and sets omitted value
+    (DefaultMissing, {"test": None}, {}),
+    (DefaultMissing, {"test": "random"}, {"test": "random"}),
+    (Validator, {}, colander.Invalid),
+    (Validator, {"test": None}, colander.Invalid),
+    (Validator, {"test": "bad"}, colander.Invalid),
+    (Validator, {"test": "test"}, {"test": "test"}),
+    (DefaultValidator, {}, {"test": "test"}),
+    (DefaultValidator, {"test": None}, {"test": "test"}),
+    (DefaultValidator, {"test": "bad"}, colander.Invalid),
+    (DefaultValidator, {"test": "test"}, {"test": "test"}),
+    (DefaultMissingValidator, {}, {"test": "test"}),    # default+missing ignores drop and sets default if omitted
+    (DefaultMissingValidator, {"test": None}, {}),
+    # (DefaultMissingValidator, {"test": "bad"}, {}),
+    (DefaultMissingValidator, {"test": "bad"}, colander.Invalid),
+    (DefaultMissingValidator, {"test": "test"}, {"test": "test"}),
+    (MissingValidator, {}, {}),
+    (MissingValidator, {"test": None}, {}),
+    # (MissingValidator, {"test": "bad"}, {}),
+    (MissingValidator, {"test": "bad"}, colander.Invalid),
+    (MissingValidator, {"test": "test"}, {"test": "test"}),
+    (DefaultDropRequired, {}, {}),
+    (DefaultDropRequired, {"test": None}, {}),
+    (DefaultDropRequired, {"test": "bad"}, {}),
+    (DefaultDropRequired, {"test": "test"}, {"test": "test"}),
+    (DefaultDropValidator, {}, {}),
+    (DefaultDropValidator, {"test": None}, {}),
+    (DefaultDropValidator, {"test": "bad"}, {}),
+    (DefaultDropValidator, {"test": "test"}, {"test": "test"}),
+])
+def test_schema_default_missing_validator_combinations(test_case):
     """
     Validate resulting deserialization of mappings according to parameter combinations and parsed data.
 
     .. seealso::
         :func:`test_schema_default_missing_validator_openapi`
     """
-    test_schemas = [
-        (Mapping, {}, colander.Invalid),                    # required but missing
-        (Mapping, {"test": None}, colander.Invalid),        # wrong value schema-type
-        (Mapping, {"test": "random"}, {"test": "random"}),  # uses the value as is if provided because no validator
-        (Default, {}, {"test": "test"}),                    # default+required adds the value if omitted
-        (Default, {"test": None}, {"test": "test"}),        # default+required sets the value if null
-        (Default, {"test": "random"}, {"test": "random"}),  # default+required uses the value as is if provided
-        (Missing, {}, {}),                                  # missing only drops the value if omitted
-        (Missing, {"test": None}, {}),
-        (Missing, {"test": "random"}, {"test": "random"}),
-        (DefaultMissing, {}, {"test": "test"}),             # default+missing ignores drops and sets omitted value
-        (DefaultMissing, {"test": None}, {}),
-        (DefaultMissing, {"test": "random"}, {"test": "random"}),
-        (Validator, {}, colander.Invalid),
-        (Validator, {"test": None}, colander.Invalid),
-        (Validator, {"test": "bad"}, colander.Invalid),
-        (Validator, {"test": "test"}, {"test": "test"}),
-        (DefaultValidator, {}, {"test": "test"}),
-        (DefaultValidator, {"test": None}, {"test": "test"}),
-        (DefaultValidator, {"test": "bad"}, colander.Invalid),
-        (DefaultValidator, {"test": "test"}, {"test": "test"}),
-        (DefaultMissingValidator, {}, {"test": "test"}),    # default+missing ignores drop and sets default if omitted
-        (DefaultMissingValidator, {"test": None}, {}),
-        # (DefaultMissingValidator, {"test": "bad"}, {}),
-        (DefaultMissingValidator, {"test": "bad"}, colander.Invalid),
-        (DefaultMissingValidator, {"test": "test"}, {"test": "test"}),
-        (MissingValidator, {}, {}),
-        (MissingValidator, {"test": None}, {}),
-        # (MissingValidator, {"test": "bad"}, {}),
-        (MissingValidator, {"test": "bad"}, colander.Invalid),
-        (MissingValidator, {"test": "test"}, {"test": "test"}),
-        (DefaultDropRequired, {}, {}),
-        (DefaultDropRequired, {"test": None}, {}),
-        (DefaultDropRequired, {"test": "bad"}, {}),
-        (DefaultDropRequired, {"test": "test"}, {"test": "test"}),
-        (DefaultDropValidator, {}, {}),
-        (DefaultDropValidator, {"test": None}, {}),
-        (DefaultDropValidator, {"test": "bad"}, {}),
-        (DefaultDropValidator, {"test": "test"}, {"test": "test"}),
-    ]
-    evaluate_test_cases(test_schemas)
+    evaluate_test_cases([test_case])
 
 
 def test_schema_default_missing_validator_openapi():

@@ -15,7 +15,6 @@ from weaver.wps_restapi import swagger_definitions as sd
 
 
 class GenericApiRoutesTestCase(unittest.TestCase):
-
     @classmethod
     def setUpClass(cls):
         cls.testapp = get_test_weaver_app(settings={"weaver.wps": True, "weaver.wps_restapi": True})

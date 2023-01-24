@@ -17,7 +17,8 @@ if TYPE_CHECKING:
     from weaver.typedefs import DataSourceConfig
 
 DATA_SOURCES = {}  # type: DataSourceConfig
-"""Data sources configuration.
+"""
+Data sources configuration.
 
 Unless explicitly overridden, the configuration will be loaded from file as specified by``weaver.data_sources`` setting.
 Following JSON schema format is expected (corresponding YAML also supported):
