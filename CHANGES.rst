@@ -20,6 +20,8 @@ Fixes:
   (relates to `Pylons/colander#352 <https://github.com/Pylons/colander/pull/352>`_).
 - Fix invalid default results from ``colander`` schemas with ``missing=drop|required`` and ``default`` parameters when
   combined with ``cornice`` OpenAPI schemas. Pin ``colander<2`` to avoid problems with latest changes.
+- Fix ``secure_filename`` causing valid names with leading or trailing underscores to be incorrectly unresolved
+  because they get stripped out by the operation.
 
 .. _changes_4.28.0:
 
