@@ -16,6 +16,9 @@ Changes:
 
 Fixes:
 ------
+- Fix missing ``sphinx_autodoc_typehints[type_comment]`` extras due to renamed definition without leading ``s`` by
+  pinning ``1.19`` as the minimum version
+  (relates to `tox-dev/sphinx-autodoc-typehints#263 <https://github.com/tox-dev/sphinx-autodoc-typehints/issues/263>`_).
 - Fix dynamic regex definitions for schema validation with ``colander>=2`` that modifies ``URL_REGEX`` pattern
   (relates to `Pylons/colander#352 <https://github.com/Pylons/colander/pull/352>`_).
 - Fix invalid default results from ``colander`` schemas with ``missing=drop|required`` and ``default`` parameters when
