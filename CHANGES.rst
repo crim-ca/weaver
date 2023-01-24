@@ -19,6 +19,10 @@ Fixes:
 - Fix missing ``sphinx_autodoc_typehints[type_comment]`` extras due to renamed definition without leading ``s`` by
   pinning ``1.19`` as the minimum version
   (relates to `tox-dev/sphinx-autodoc-typehints#263 <https://github.com/tox-dev/sphinx-autodoc-typehints/issues/263>`_).
+- Fix dynamic regex definitions for schema validation with ``colander>=2`` that modifies ``URL_REGEX`` pattern
+  (relates to `Pylons/colander#352 <https://github.com/Pylons/colander/pull/352>`_).
+- Fix invalid default results from ``colander`` schemas with ``missing=drop|required`` and ``default`` parameters when
+  combined with ``cornice`` OpenAPI schemas. Pin ``colander<2`` to avoid problems with latest changes.
 
 .. _changes_4.28.0:
 
@@ -1095,7 +1099,7 @@ Changes:
   (relates to `#157 <https://github.com/crim-ca/weaver/issues/157>`_)
   Only utilities are added, not all routes provide the information yet.
 - Add validation of ``schema`` field under ``Format`` schema (as per `opengeospatial/ogcapi-processes schema format.yml
-  <https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/format.yaml>`_) such that only
+  <https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/format.yaml>`_) such that only
   URL formatted strings are allowed, or alternatively an explicit JSON definition. Previous definitions that would
   indicate an empty string schema are dropped since ``schema`` is optional.
 - Block unknown and ``builtin`` process types during deployment from the API

@@ -36,7 +36,7 @@ JOB_STATUS_CATEGORIES = {
     #   OGC compliant (new): [accepted, running, successful, failed, dismissed]
     #   PyWPS uses:          [Accepted, Started, Succeeded, Failed, Paused, Exception]
     #   OWSLib users:        [Accepted, Running, Succeeded, Failed, Paused] (with 'Process' in front)
-    # https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/statusCode.yaml
+    # https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/statusCode.yaml
     # http://docs.opengeospatial.org/is/14-065/14-065.html#17
 
     # corresponding statuses are aligned vertically for 'COMPLIANT' groups
@@ -177,7 +177,7 @@ def map_status(wps_status, compliant=StatusCompliant.OGC):
             job_status = Status.FAILED
 
     # FIXME: new official status is 'successful', but this breaks everywhere (tests, local/remote execute, etc.)
-    #        https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/statusCode.yaml
+    #   https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/statusCode.yaml
     if job_status == Status.SUCCESSFUL:
         job_status = Status.SUCCEEDED
 

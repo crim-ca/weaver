@@ -755,7 +755,7 @@ class LandingPage(ExtendedMappingSchema):
 
 
 # sub-schema within:
-#   https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/format.yaml
+#   https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/format.yaml
 class FormatSchema(OneOfKeywordSchema):
     _one_of = [
         # pointer to a file or JSON schema relative item (as in OpenAPI definitions)
@@ -1273,7 +1273,7 @@ class BoundingBoxInputType(ExtendedMappingSchema):
 
 
 # FIXME: support byte/binary type (string + format:byte) ?
-#   https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/binaryInputValue.yaml
+#   https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/binaryInputValue.yaml
 class AnyLiteralType(OneOfKeywordSchema):
     """
     Submitted values that correspond to literal data.
@@ -3311,7 +3311,7 @@ class ExecuteInputListValues(ExtendedSequenceSchema):
 
 # same as 'ExecuteInputReference', but using 'OGC' schema with 'type' field
 # Defined as:
-#   https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/link.yaml
+#   https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/link.yaml
 # But explicitly in the context of an execution input, rather than any other link (eg: metadata)
 class ExecuteInputFileLink(Link):  # for other metadata (title, hreflang, etc.)
     schema_ref = f"{OGC_API_SCHEMA_CORE}/link.yaml"
@@ -3337,7 +3337,7 @@ class ExecuteInputFile(AnyOfKeywordSchema):
     ]
 
 
-# https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/inputValueNoObject.yaml
+# https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/inputValueNoObject.yaml
 # Any literal value directly provided inline in input mapping.
 #
 #   {"inputs": {"<id>": <literal-data>}}
@@ -3345,9 +3345,9 @@ class ExecuteInputFile(AnyOfKeywordSchema):
 # Excludes objects to avoid conflict with later object mapping and {"value": <data>} definitions.
 # Excludes array literals that will be defined separately with allowed array of any item within this schema.
 # FIXME: does not support byte/binary type (string + format:byte) - see also: 'AnyLiteralType'
-#   https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/binaryInputValue.yaml
+#   https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/binaryInputValue.yaml
 # FIXME: does not support bbox
-#   https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/bbox.yaml
+#   https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/bbox.yaml
 class ExecuteInputInlineValue(OneOfKeywordSchema):
     description = "Execute input value provided inline."
     _one_of = [
@@ -3358,7 +3358,7 @@ class ExecuteInputInlineValue(OneOfKeywordSchema):
     ]
 
 
-# https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/inputValue.yaml
+# https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/inputValue.yaml
 #
 #   oneOf:
 #     - $ref: "inputValueNoObject.yaml"
@@ -3372,13 +3372,13 @@ class ExecuteInputObjectData(OneOfKeywordSchema):
     ]
 
 
-# https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/qualifiedInputValue.yaml
+# https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/qualifiedInputValue.yaml
 class ExecuteInputQualifiedValue(Format):
     schema_ref = f"{OGC_API_SCHEMA_CORE}/qualifiedInputValue.yaml"
     value = ExecuteInputObjectData()    # can be anything, including literal value, array of them, nested object
 
 
-# https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/inlineOrRefData.yaml
+# https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/inlineOrRefData.yaml
 #
 #   oneOf:
 #     - $ref: "inputValueNoObject.yaml"     # in OGC-API spec, includes a generic array
@@ -3408,7 +3408,7 @@ class ExecuteInputData(OneOfKeywordSchema):
     ]
 
 
-# https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/execute.yaml
+# https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/execute.yaml
 #
 #   inputs:
 #     additionalProperties:           # this is the below 'variable=<input-id>'

@@ -354,7 +354,9 @@ class SchemeURL(colander.Regex):
         if path_pattern:
             if isinstance(path_pattern, RegexPattern):
                 path_pattern = path_pattern.pattern
-            regex = f"{regex[:-1] + path_pattern}$"
+            # depending colander version: $ end-of-line, \Z end-of-string (before \n if any), or \z end-of-string (\0)
+            index = -2 if regex.lower().endswith(r"\z") else -1 if regex.endswith("$") else 0
+            regex = rf"{regex[:index] + path_pattern}\Z"
         super(SchemeURL, self).__init__(regex, msg=msg, flags=flags)
 
 
@@ -380,7 +382,6 @@ class SemanticVersion(colander.Regex):
 
 
 class ExtendedBoolean(colander.Boolean):
-
     def __init__(self, *args, true_choices=None, false_choices=None, allow_string=False, **kwargs):
         # type: (Any, Optional[Iterable[str]], Optional[Iterable[str]], bool, Any) -> None
         """
