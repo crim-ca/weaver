@@ -25,6 +25,9 @@ Fixes:
   combined with ``cornice`` OpenAPI schemas. Pin ``colander<2`` to avoid problems with latest changes.
 - Fix ``secure_filename`` causing valid names with leading or trailing underscores to be incorrectly unresolved
   because they get stripped out by the operation.
+- Fix ``input-location`` definition for ``PACKAGE_DIRECTORY_TYPE`` input in
+  ``weaver.processes.wps_package.WpsPackage.make_location_input``, which caused the wrong directory being given to
+  the cwl application.
 
 .. _changes_4.28.0:
 

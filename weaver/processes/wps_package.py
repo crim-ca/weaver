@@ -2069,7 +2069,8 @@ class WpsPackage(Process):
                         f"Directory reference resolution method for input [{input_id}] "
                         f"from location [{input_location}] did not produce any staged file."
                     )
-                input_location = out_dir
+                input_directory_name = os.path.basename(os.path.normpath(input_definition.url))
+                input_location = os.path.join(out_dir, input_directory_name)
             else:
                 raise PackageExecutionError(
                     f"Unknown reference staging resolution method for [{input_type}] type "
