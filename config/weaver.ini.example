@@ -74,6 +74,11 @@ weaver.request_options =
 weaver.exec_sync_max_wait = 20
 weaver.quote_sync_max_wait = 20
 
+# --- Weaver Quotation settings ---
+# enable support of quotation extension
+# https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/quotation
+weaver.quotation = true
+
 # --- Weaver CWL settings ---
 # NOTE: [experimental]
 # enforce provided effective user/group identifiers for Application Package execution

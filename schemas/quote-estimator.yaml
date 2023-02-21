@@ -1,0 +1,363 @@
+---
+$id: https://github.com/crim-ca/weaver/schemas/quote-estimator.yaml
+$schema: http://json-schema.org/draft-07/schema#
+title: Parameters
+description: |
+  Definitions employed to compute a quote estimation for a given process.
+  
+  The specific hyper-parameters for estimating the quote must be provided.
+  Any estimator definition should be obtained from relevant data analysis of previous execution
+  runs of the process or any desired constant value based on business logic for using this process.
+  
+  The general formulas applied are:
+    
+    DURATION_ESTIMATE = duration_rate x ( duration_estimator([input_features]) | duration_constant )
+    MEMORY_ESTIMATE   = memory_rate   x ( memory_estimator([input_features])   | memory_constant   )
+    STORAGE_ESTIMATE  = storage_rate  x ( storage_estimator([input_features])  | storage_constant  )
+    CPU_USE_ESTIMATE  = cpu_rate      x ( cpu_estimator([input_features])      | cpu_constant      )
+    GPU_USE_ESTIMATE  = gpu_rate      x ( gpu_estimator([input_features])      | gpu_constant      )
+    <CUSTOM>_ESTIMATE = [custom]_rate x ( <custom>_estimator([input_features]) | <custom>_constant )
+    
+    QUOTE_COST        = flat_rate
+                      + DURATION_ESTIMATE
+                      + MEMORY_ESTIMATE
+                      + STORAGE_ESTIMATE
+                      + CPU_USE_ESTIMATE
+                      + GPU_USE_ESTIMATE
+                      + [<CUSTOM>_ESTIMATE ...]
+  
+  Where each 'Estimator' can be a distinct ONNX model that takes the specified input features of the process,
+  which should themselves be mapped onto the actual process input definitions, to predict the relevant value.
+  Using 'Estimator' models, it is possible to approximate future process execution and resources requirements
+  based on submitted inputs for the quote. The 'Constant' definitions can also be used for resources that are
+  known to be invariant to input features. A set of common rates and estimator names are offered, but any custom
+  evaluation can be performed as long as their property names finish with the respective naming convention.
+  
+  Using the 'Constant' definitions, it is also possible to employ a similar formulation as during the estimation
+  for evaluating the *real* process execution cost. In this case, the utility should be called by replacing all
+  instances of the 'Estimator' definitions by the corresponding *real* value obtained by the process following 
+  its execution. Using the same rates as during the quote estimation, the total cost can be calculated.
+  
+  Example:
+  ========
+  
+    Assuming a process that takes a single file with an estimated running cost that depends only on the duration.
+    The 
+    
+    Quote Estimation:
+    -----------------
+  
+      config:
+        flat_rate: 10 ($)
+        duration_rate: 0.01 ($/s)
+        duration_estimator: LinearRegression(<duration> = -1E-6 * <input-size> ^ -2 + 3E-6 * <input-size> + 125)
+      inputs:
+        - data:  # input ID
+            size: 209715200 (200 MiB)
+    
+      DURATION_ESTIMATE (s) = 5E-4 * [ (1E-5 * (200 * 2^20) ^ 2 + 3E-4 * (200 * 2^20) + 125) ] = 754.1456 s
+      QUOTE_COST = 10 + 0.01 * 754.1456 = 17.54 $
+  
+    Real Execution Cost:
+    --------------------
+  
+      config:
+        flat_rate: 10 ($)
+        duration_rate: 0.01 ($/s)
+        duration_estimator: 739 s  [monitored duration after the real execution completed]
+      inputs:
+        - data:  # input ID
+            size: 209715200 (200 MiB)  [should be the same input as during quote estimation]
+  
+      TOTAL = 10 + 0.01 * 739 = 17.39 $
+
+type: object
+additionalProperties: false
+required:
+  - config
+  - inputs
+properties:
+  $schema:
+    type: string
+    enum:
+      - "https://github.com/crim-ca/weaver/schemas/quote-estimator.yaml"
+  config:
+    $ref: "#/definitions/Configuration"
+  inputs:
+    $ref: "#/definitions/Inputs"
+  outputs:
+    $ref: "#/definitions/Outputs"
+definitions:
+  Configuration:
+    description: |
+      Defines the hyper-parameters employed for estimating a quote for a process according to provide inputs.
+    type: object
+    minProperties: 1
+    properties:
+      flat_rate:
+        description: Flat cost applied to every estimation ($).
+        $ref: "#/definitions/Constant"
+      duration_rate:
+        description: Ratio of the cost of execution time per second ($/s).
+        $ref: "#/definitions/Constant"
+      duration_estimator:
+        description: An estimator that provides the total duration (seconds) for the process job execution.
+        $ref: "#/definitions/Estimator"
+      memory_rate:
+        description: Ratio of the cost of memory per used byte ($/b).
+        $ref: "#/definitions/Constant"
+      memory_estimator:
+        description: An estimator that provides the memory usage (bytes) for the process job execution.
+        $ref: "#/definitions/Estimator"
+      storage_rate:
+        description: Ratio of the cost of storage per used byte ($/b).
+        $ref: "#/definitions/Constant"
+      storage_estimator:
+        description: An estimator that provides the storage requirements (bytes) for the process job execution.
+        $ref: "#/definitions/Estimator"
+      cpu_rate:
+        description: Ratio of the cost of a CPU per used quantity ($/unit).
+        $ref: "#/definitions/Constant"
+      cpu_estimator:
+        description: An estimator that provides the CPU usage requirements (amount) for the process job execution.
+        $ref: "#/definitions/Estimator"
+      gpu_rate:
+        description: Ratio of the cost of a GPU per used quantity ($/unit).
+        $ref: "#/definitions/Constant"
+      gpu_estimator:
+        description: An estimator that provides the GPU usage requirements (amount) for the process job execution.
+        $ref: "#/definitions/Estimator"
+    patternProperties:
+      "^[A-Za-z_-][A-Za-z0-9_-]*_rate$":
+        description: Ratio of the cost of a custom criteria.
+        $ref: "#/definitions/Constant"
+      "^[A-Za-z_-][A-Za-z0-9_-]*_estimator$":
+        description: An estimator that provides the custom criteria evaluation for the process job execution.
+        $ref: "#/definitions/Estimator"
+    additionalProperties: false
+  Estimator:
+    summary: Estimator configuration.
+    description: |
+      The estimator should output a single numeric value.
+      This value can be provided literally (constant), or predicted by an arbitrary model.
+      When using a model the input features should correspond to the specified 'inputs' of the configuration.
+    oneOf:
+      - $ref: "#/definitions/EstimatorModel"
+      - $ref: "#/definitions/Constant"
+  EstimatorModel:
+    title: Estimator Model
+    summary: Model definition to compute an estimation.
+    type: object
+    additionalProperties: false
+    required:
+      - model
+    properties:
+      model:
+        summary: Model in ONNX format and represented in JSON.
+        $ref: "#/definitions/ModelONNX"
+      inputs:
+        summary: Mapping of model input names or indices to corresponding process input identifiers.
+        description: |
+          Mapping of model input names or indices to corresponding process input identifiers.
+          The process literal/complex input IDs should correspond to the values/files
+          passed to the application for its execution and specified for 'Parameters.inputs'.
+          The model input names/indices correspond to the internal ONNX 'graph.input' definitions of the estimator.
+          This mapping is used to indicate which subset of input parameters from the process should be used as input
+          for the model inference. Process inputs can be repeated over multiple model inputs if needed.
+          If omitted, process inputs will all be passed to the model as one-to-one mapping, and must match IDs exactly.
+          Otherwise, corresponding process inputs will be passed down to the relevant model input feature vector 
+          unless dropped using a null mapping value. In such case, that process input will be ignored for the 
+          estimation from this model inference.
+        type: object
+        additionalProperties:
+          oneOf:
+            - type: string
+            - type: integer
+              minimum: 0
+            - type: "null"
+      output:
+        description: |
+          Name or index of the model output to employ as estimation value
+          in case model inference produces more than one prediction.
+          Automatically selects the first item if not specified.
+          This output must produce a unique floating point value.
+        oneOf:
+          - type: string
+          - type: integer
+            minimum: 0
+        default: 0
+  ModelONNX:
+    summary: Model in ONNX format and represented in JSON.
+    description: |
+      The model should be converted to ONNX.
+      For scikit-learn models, this can be achieved using https://github.com/onnx/sklearn-onnx.
+      Then, the obtained ONNX node can be converted to JSON using https://github.com/PINTO0309/onnx2json.
+      Other implementations than scikit-learn models should be supported with the standard ONNX format, 
+      but they have not been tested extensively.
+    type: object
+    required:
+      - irVersion
+      - producerName
+      - producerVersion
+      - graph
+    additionalProperties: true
+    properties:
+      irVersion:
+        type: string
+        pattern: "[0-9]+"
+      producerName:
+        type: string
+        examples:
+          - skl2onnx
+      producerVersion:
+        type: string
+        pattern: "[0-9]+(\\.[0-9]+)*"
+      modelVersion:
+        type: string
+        pattern: "[0-9]+"
+        default: "0"
+      domain:
+        type: string
+        default: ""
+      docString:
+        type: string
+        default: ""
+      graph:
+        description: ONNX definition of the model nodes.
+        type: object
+        additionalProperties: true
+  Constant:
+    summary: A constant value.
+    description: |
+      Can be employed as alternative to an estimator model for a shorter definition.
+      The numeric value is used directly in the same manner as the output of an estimator.
+    type: number
+    default: 0.0
+  InputFeature:
+    description: |
+      Input details that are used as features for an estimator model.
+    oneOf:
+      - type: number
+      - type: string
+      - type: boolean
+      - $ref: "#/definitions/InputFeatureLiteral"
+      - $ref: "#/definitions/InputFeatureComplex"
+      - type: array
+        items:
+          oneOf:
+            - type: number
+            - type: string
+            - type: boolean
+        minItems: 1
+      - type: array
+        items:
+          $ref: "#/definitions/InputFeatureLiteral"
+        minItems: 1
+      - type: array
+        items:
+          $ref: "#/definitions/InputFeatureComplex"
+        minItems: 1
+  InputFeatureLiteral:
+    title: InputFeatureLiteral
+    description: Feature employed when the provided process input is resolved as a literal value.
+    type: object
+    additionalProperties: false  # differentiate between size/value
+    required:
+      - value
+    properties:
+      value:
+        oneOf:
+          - type: number
+          - type: string
+          - type: boolean
+      weight:
+        type: number
+        default: 1.0
+      length:
+        description: Multiplicative factor in case the input of the process is an array.
+        type: integer
+        default: 1
+  InputFeatureComplex:
+    title: InputFeatureComplex
+    description: Feature employed when the provided process input is resolved as a file or directory descriptor.
+    type: object
+    additionalProperties: false  # differentiate between size/value
+    required:
+      - size
+    properties:
+      size:
+        description: Size in bytes of the contents.
+        type: integer
+      weight:
+        type: number
+        default: 1.0
+      length:
+        description: Multiplicative factor in case the input of the process is an array.
+        type: integer
+        default: 1
+  Inputs:
+    title: Inputs
+    description: |
+      Inputs that will be used as features for the estimators.
+      An array is required for loading the feature vector and weights in the same order as expected by estimators.
+      The length of the array should match exactly the dimensionality of the estimators input features.
+    type: object
+    additionalProperties:
+      $ref: "#/definitions/InputFeature"
+  OutputFeature:
+    description: |
+      Estimated output details using input features, and employed as input features for subsequent quote estimations.
+    oneOf:
+      - $ref: "#/definitions/OutputFeatureLiteral"
+      - $ref: "#/definitions/OutputFeatureComplex"
+  OutputFeatureLiteral:
+    description: Feature produced by an estimator for a process output literal value.
+    type: object
+    additionalProperties: false  # differentiate between size/value
+    required:
+      - value
+    properties:
+      value:
+        description: This estimator should generate a single value that corresponds to the expected process output.
+        $ref: "#/definitions/Estimator"
+      weight:
+        oneOf:
+          - $ref: "#/definitions/Estimator"
+          - type: number
+            default: 1.0
+      length:
+        description: Multiplicative factor in case the output of the process is an array.
+        oneOf:
+          - $ref: "#/definitions/Estimator"
+          - type: integer
+            default: 1
+  OutputFeatureComplex:
+    description: Feature produced by an estimator for a process output file or directory descriptor.
+    type: object
+    additionalProperties: false  # differentiate between size/value
+    required:
+      - size
+    properties:
+      size:
+        description: Size in bytes of the contents.
+        $ref: "#/definitions/Estimator"
+      weight:
+        oneOf:
+          - $ref: "#/definitions/Estimator"
+          - type: number
+            default: 1.0
+      length:
+        description: Multiplicative factor in case the output of the process is an array.
+        oneOf:
+          - $ref: "#/definitions/Estimator"
+          - type: integer
+            default: 1
+  Outputs:
+    description: |
+      Output estimators that can generate input features for subsequent process quote estimations in a workflow chain.
+      These estimators will receive the input features and should provide expected result features from the execution.
+      The format of the output features must correspond to the expected output types of the process.
+      Not required if the estimated quote is only needed for the atomic process.
+    type: object
+    additionalProperties:
+      $ref: "#/definitions/OutputFeature"

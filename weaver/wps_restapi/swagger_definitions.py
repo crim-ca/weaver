@@ -21,11 +21,12 @@ from copy import copy
 from typing import TYPE_CHECKING
 
 import duration
+import jsonschema
 import yaml
 from colander import DateTime, Email, Length, Money, OneOf, Range, drop, null, required
 from dateutil import parser as date_parser
 
-from weaver import __meta__
+from weaver import WEAVER_SCHEMA_DIR, __meta__
 from weaver.config import WeaverFeature
 from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import AcceptLanguage, ContentType, OutputFormat
@@ -60,7 +61,7 @@ from weaver.processes.constants import (
 from weaver.quotation.status import QuoteStatus
 from weaver.sort import Sort, SortMethods
 from weaver.status import JOB_STATUS_CODE_API, JOB_STATUS_SEARCH_API, Status
-from weaver.utils import AWS_S3_BUCKET_REFERENCE_PATTERN
+from weaver.utils import AWS_S3_BUCKET_REFERENCE_PATTERN, load_file
 from weaver.visibility import Visibility
 from weaver.wps_restapi.colander_extras import (
     NO_DOUBLE_SLASH_PATTERN,
@@ -94,7 +95,7 @@ from weaver.wps_restapi.patches import ServiceOnlyExplicitGetHead as Service  # 
 if TYPE_CHECKING:
     from typing import Any, Union
 
-    from weaver.typedefs import DatetimeIntervalType, SettingsType, TypedDict
+    from weaver.typedefs import JSON, DatetimeIntervalType, SettingsType, TypedDict
 
     ViewInfo = TypedDict("ViewInfo", {"name": str, "pattern": str})
 
@@ -142,6 +143,8 @@ OGC_API_EXAMPLES_EXT_DEPLOY = f"{OGC_API_SCHEMA_BASE}/extensions/deploy_replace_
 OGC_API_SCHEMA_EXT_BILL = f"{OGC_API_SCHEMA_BASE}/extensions/billing/standard/openapi/schemas"
 OGC_API_SCHEMA_EXT_QUOTE = f"{OGC_API_SCHEMA_BASE}/extensions/quotation/standard/openapi/schemas"
 OGC_API_SCHEMA_EXT_WORKFLOW = f"{OGC_API_SCHEMA_BASE}/extensions/workflows/standard/openapi/schemas"
+
+WEAVER_SCHEMA_URL = "https://github.com/crim-ca/weaver/schemas"
 
 DATETIME_INTERVAL_CLOSED_SYMBOL = "/"
 DATETIME_INTERVAL_OPEN_START_SYMBOL = "../"
@@ -266,6 +269,7 @@ processes_service = Service(name="processes", path="/processes")
 process_service = Service(name="process", path=f"{processes_service.path}/{{process_id}}")
 process_quotes_service = Service(name="process_quotes", path=process_service.path + quotes_service.path)
 process_quote_service = Service(name="process_quote", path=process_service.path + quote_service.path)
+process_estimator_service = Service(name="process_estimator_service", path=f"{process_service.path}/estimator")
 process_visibility_service = Service(name="process_visibility", path=f"{process_service.path}/visibility")
 process_package_service = Service(name="process_package", path=f"{process_service.path}/package")
 process_payload_service = Service(name="process_payload", path=f"{process_service.path}/payload")
@@ -787,7 +791,7 @@ class Format(ExtendedMappingSchema):
     """
     Used to respect ``mediaType`` field as suggested per `OGC-API`.
     """
-    schema_ref = f"{OGC_API_SCHEMA_CORE}/format.yaml"
+    _schema = f"{OGC_API_SCHEMA_CORE}/format.yaml"
     mediaType = MediaType(default=ContentType.TEXT_PLAIN, example=ContentType.APP_JSON)
     encoding = ExtendedSchemaNode(String(), missing=drop)
     schema = FormatSchema(missing=drop)
@@ -872,7 +876,7 @@ class ResultFormat(FormatDescription):
     """
     Format employed for reference results respecting 'OGC API - Processes' schemas.
     """
-    schema_ref = f"{OGC_API_SCHEMA_CORE}/formatDescription.yaml"
+    _schema = f"{OGC_API_SCHEMA_CORE}/formatDescription.yaml"
     mediaType = MediaType(String())
     encoding = ExtendedSchemaNode(String(), missing=drop)
     schema = FormatSchema(missing=drop)
@@ -1018,7 +1022,7 @@ class InputOutputDescriptionMeta(ExtendedMappingSchema):
 
 
 class ReferenceOAS(ExtendedMappingSchema):
-    schema_ref = f"{OGC_API_SCHEMA_CORE}/reference.yaml"
+    _schema = f"{OGC_API_SCHEMA_CORE}/reference.yaml"
     _ref = ReferenceURL(name="$ref", description="External OpenAPI schema reference.")
 
 
@@ -1170,7 +1174,7 @@ class DefinitionOAS(AnyOfKeywordSchema):
 
 class OAS(OneOfKeywordSchema):
     description = "OpenAPI schema definition."
-    schema_ref = f"{OGC_API_SCHEMA_CORE}/schema.yaml"
+    _schema = f"{OGC_API_SCHEMA_CORE}/schema.yaml"
     _one_of = [
         ReferenceOAS(),
         DefinitionOAS(),
@@ -1318,7 +1322,7 @@ class LiteralReference(ExtendedMappingSchema):
 
 # https://github.com/opengeospatial/ogcapi-processes/blob/e6893b/extensions/workflows/openapi/workflows.yaml#L1707-L1716
 class NameReferenceType(ExtendedMappingSchema):
-    schema_ref = f"{OGC_API_SCHEMA_CORE}/nameReferenceType.yaml"
+    _schema = f"{OGC_API_SCHEMA_CORE}/nameReferenceType.yaml"
     name = ExtendedSchemaNode(String())
     reference = ExecuteReferenceURL(missing=drop, description="Reference URL to schema definition of the named entity.")
 
@@ -1670,7 +1674,7 @@ class DeployOutputTypeAny(OneOfKeywordSchema):
 
 
 class JobExecuteModeEnum(ExtendedSchemaNode):
-    schema_ref = f"{OGC_API_SCHEMA_CORE}/execute.yaml"
+    _schema = f"{OGC_API_SCHEMA_CORE}/execute.yaml"
     schema_type = String
     title = "JobExecuteMode"
     # no default to enforce required input as per OGC-API schemas
@@ -1688,7 +1692,7 @@ class JobControlOptionsEnum(ExtendedSchemaNode):
 
 
 class JobResponseOptionsEnum(ExtendedSchemaNode):
-    schema_ref = f"{OGC_API_SCHEMA_CORE}/execute.yaml"
+    _schema = f"{OGC_API_SCHEMA_CORE}/execute.yaml"
     schema_type = String
     title = "JobResponseOptions"
     # no default to enforce required input as per OGC-API schemas
@@ -1789,6 +1793,14 @@ class JobAccess(VisibilityValue):
 
 class VisibilitySchema(ExtendedMappingSchema):
     value = VisibilityValue()
+
+
+class QuoteEstimatorSchema(ExtendedMappingSchema):
+    _schema = f"{WEAVER_SCHEMA_URL}/quote-estimator.yaml"
+    description = "Quote Estimator Parameters"
+
+    def deserialize(self, cstruct):
+        return validate_node_schema(self, cstruct)
 
 
 #########################################################
@@ -2012,14 +2024,14 @@ class WPSOperationGetNoContent(ExtendedMappingSchema):
 
 
 class WPSOperationPost(ExtendedMappingSchema):
-    schema_ref = "http://schemas.opengis.net/wps/1.0.0/common/RequestBaseType.xsd"
+    _schema = "http://schemas.opengis.net/wps/1.0.0/common/RequestBaseType.xsd"
     accepted_versions = OWSAcceptVersions(missing=drop, default="1.0.0")
     language = OWSLanguageAttribute(missing=drop)
     service = OWSService()
 
 
 class WPSGetCapabilitiesPost(WPSOperationPost, WPSNamespace):
-    schema_ref = "http://schemas.opengis.net/wps/1.0.0/wpsGetCapabilities_request.xsd"
+    _schema = "http://schemas.opengis.net/wps/1.0.0/wpsGetCapabilities_request.xsd"
     name = "GetCapabilities"
     title = "GetCapabilities"
 
@@ -2061,7 +2073,7 @@ class OWSMetadata(ExtendedSequenceSchema, OWSNamespace):
 
 
 class WPSDescribeProcessPost(WPSOperationPost, WPSNamespace):
-    schema_ref = "http://schemas.opengis.net/wps/1.0.0/wpsDescribeProcess_request.xsd"
+    _schema = "http://schemas.opengis.net/wps/1.0.0/wpsDescribeProcess_request.xsd"
     name = "DescribeProcess"
     title = "DescribeProcess"
     identifier = OWSIdentifierList(
@@ -2078,7 +2090,7 @@ class WPSExecuteDataInputs(ExtendedMappingSchema, WPSNamespace):
 
 
 class WPSExecutePost(WPSOperationPost, WPSNamespace):
-    schema_ref = "http://schemas.opengis.net/wps/1.0.0/wpsExecute_request.xsd"
+    _schema = "http://schemas.opengis.net/wps/1.0.0/wpsExecute_request.xsd"
     name = "Execute"
     title = "Execute"
     identifier = OWSIdentifier(description="Identifier of the process to execute with data inputs.")
@@ -2186,7 +2198,7 @@ class OWSServiceProvider(ExtendedMappingSchema, OWSNamespace):
 
 
 class WPSDescriptionType(ExtendedMappingSchema, OWSNamespace):
-    schema_ref = "http://schemas.opengis.net/wps/1.0.0/common/DescriptionType.xsd"
+    _schema = "http://schemas.opengis.net/wps/1.0.0/common/DescriptionType.xsd"
     name = "DescriptionType"
     _title = OWSTitle(description="Title of the service.", example="Weaver")
     abstract = OWSAbstract(description="Detail about the service.", example="Weaver WPS example schema.", missing=drop)
@@ -2280,14 +2292,14 @@ class WPSLanguageSpecification(ExtendedMappingSchema, WPSNamespace):
 
 
 class WPSResponseBaseType(PermissiveMappingSchema, WPSNamespace):
-    schema_ref = "http://schemas.opengis.net/wps/1.0.0/common/ResponseBaseType.xsd"
+    _schema = "http://schemas.opengis.net/wps/1.0.0/common/ResponseBaseType.xsd"
     service = WPSServiceAttribute()
     version = WPSVersionAttribute()
     lang = WPSLanguageAttribute()
 
 
 class WPSProcessVersion(ExtendedSchemaNode, WPSNamespace):
-    schema_ref = "http://schemas.opengis.net/wps/1.0.0/common/ProcessVersion.xsd"
+    _schema = "http://schemas.opengis.net/wps/1.0.0/common/ProcessVersion.xsd"
     schema_type = String
     description = "Release version of this Process."
     name = "processVersion"
@@ -2409,7 +2421,7 @@ class ProcessOutputs(ExtendedSequenceSchema, WPSNamespace):
 
 
 class WPSGetCapabilities(WPSResponseBaseType):
-    schema_ref = "http://schemas.opengis.net/wps/1.0.0/wpsGetCapabilities_response.xsd"
+    _schema = "http://schemas.opengis.net/wps/1.0.0/wpsGetCapabilities_response.xsd"
     name = "Capabilities"
     title = "Capabilities"  # not to be confused by 'GetCapabilities' used for request
     svc = OWSServiceIdentification()
@@ -2436,7 +2448,7 @@ class WPSProcessDescriptionList(ExtendedSequenceSchema, WPSNamespace):
 
 
 class WPSDescribeProcess(WPSResponseBaseType):
-    schema_ref = "http://schemas.opengis.net/wps/1.0.0/wpsDescribeProcess_response.xsd"
+    _schema = "http://schemas.opengis.net/wps/1.0.0/wpsDescribeProcess_response.xsd"
     name = "DescribeProcess"
     title = "DescribeProcess"
     process = WPSProcessDescriptionList()
@@ -2551,7 +2563,7 @@ class WPSProcessOutputs(ExtendedSequenceSchema, WPSNamespace):
 
 
 class WPSExecuteResponse(WPSResponseBaseType, WPSProcessVersion):
-    schema_ref = "http://schemas.opengis.net/wps/1.0.0/wpsExecute_response.xsd"
+    _schema = "http://schemas.opengis.net/wps/1.0.0/wpsExecute_response.xsd"
     name = "ExecuteResponse"
     title = "ExecuteResponse"  # not to be confused by 'Execute' used for request
     location = WPSStatusLocationAttribute()
@@ -2666,6 +2678,22 @@ class ProcessPackageEndpoint(LocalProcessPath):
 
 
 class ProcessPayloadEndpoint(LocalProcessPath):
+    header = RequestHeaders()
+    querystring = LocalProcessQuery()
+
+
+class ProcessQuoteEstimatorGetEndpoint(LocalProcessPath):
+    header = RequestHeaders()
+    querystring = LocalProcessQuery()
+
+
+class ProcessQuoteEstimatorPutEndpoint(LocalProcessPath):
+    header = RequestHeaders()
+    querystring = LocalProcessQuery()
+    body = QuoteEstimatorSchema()
+
+
+class ProcessQuoteEstimatorDeleteEndpoint(LocalProcessPath):
     header = RequestHeaders()
     querystring = LocalProcessQuery()
 
@@ -3110,7 +3138,7 @@ class DurationISO(ExtendedSchemaNode):
         - https://json-schema.org/draft/2019-09/json-schema-validation.html#rfc.section.7.3.1
         - :rfc:`3339#appendix-A`
     """
-    schema_ref = "https://json-schema.org/draft/2019-09/json-schema-validation.html#rfc.section.7.3.1"
+    _schema = "https://json-schema.org/draft/2019-09/json-schema-validation.html#rfc.section.7.3.1"
     schema_type = String
     description = "ISO-8601 representation of the duration."
     example = "P[n]Y[n]M[n]DT[n]H[n]M[n]S"
@@ -3314,7 +3342,7 @@ class ExecuteInputListValues(ExtendedSequenceSchema):
 #   https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/link.yaml
 # But explicitly in the context of an execution input, rather than any other link (eg: metadata)
 class ExecuteInputFileLink(Link):  # for other metadata (title, hreflang, etc.)
-    schema_ref = f"{OGC_API_SCHEMA_CORE}/link.yaml"
+    _schema = f"{OGC_API_SCHEMA_CORE}/link.yaml"
     href = ExecuteReferenceURL(  # not just a plain 'URL' like 'Link' has (extended with s3, vault, etc.)
         description="Location of the file reference."
     )
@@ -3364,7 +3392,7 @@ class ExecuteInputInlineValue(OneOfKeywordSchema):
 #     - $ref: "inputValueNoObject.yaml"
 #     - type: object
 class ExecuteInputObjectData(OneOfKeywordSchema):
-    schema_ref = f"{OGC_API_SCHEMA_CORE}/inputValue.yaml"
+    _schema = f"{OGC_API_SCHEMA_CORE}/inputValue.yaml"
     description = "Data value of any schema "
     _one_of = [
         ExecuteInputInlineValue(),
@@ -3374,7 +3402,7 @@ class ExecuteInputObjectData(OneOfKeywordSchema):
 
 # https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/qualifiedInputValue.yaml
 class ExecuteInputQualifiedValue(Format):
-    schema_ref = f"{OGC_API_SCHEMA_CORE}/qualifiedInputValue.yaml"
+    _schema = f"{OGC_API_SCHEMA_CORE}/qualifiedInputValue.yaml"
     value = ExecuteInputObjectData()    # can be anything, including literal value, array of them, nested object
 
 
@@ -3386,7 +3414,7 @@ class ExecuteInputQualifiedValue(Format):
 #     - $ref: "link.yaml"
 #
 class ExecuteInputInlineOrRefData(OneOfKeywordSchema):
-    schema_ref = f"{OGC_API_SCHEMA_CORE}/inlineOrRefData.yaml"
+    _schema = f"{OGC_API_SCHEMA_CORE}/inlineOrRefData.yaml"
     _one_of = [
         ExecuteInputInlineValue(),     # <inline-literal>
         ExecuteInputQualifiedValue(),  # {"value": <anything>, "mediaType": "<>", "schema": <OAS link or object>}
@@ -3419,7 +3447,7 @@ class ExecuteInputData(OneOfKeywordSchema):
 #           $ref: "inlineOrRefData.yaml"
 #
 class ExecuteInputMapAdditionalProperties(ExtendedMappingSchema):
-    schema_ref = f"{OGC_API_SCHEMA_CORE}/execute.yaml"
+    _schema = f"{OGC_API_SCHEMA_CORE}/execute.yaml"
     input_id = ExecuteInputData(variable="{input-id}", title="ExecuteInputValue",
                                 description="Received mapping input value definition during job submission.")
 
@@ -3458,7 +3486,7 @@ class ExecuteInputOutputs(ExtendedMappingSchema):
     #   - 'tests.wps_restapi.test_colander_extras.test_oneof_variable_dict_or_list'
     #
     # OGC 'execute.yaml' also does not enforce any required item.
-    schema_ref = f"{OGC_API_SCHEMA_CORE}/execute.yaml"
+    _schema = f"{OGC_API_SCHEMA_CORE}/execute.yaml"
     inputs = ExecuteInputValues(default={}, description="Values submitted for execution.")
     outputs = ExecuteOutputSpec(
         description=(
@@ -4686,7 +4714,7 @@ class ResultReferenceList(ExtendedSequenceSchema):
 
 
 class ResultData(OneOfKeywordSchema):
-    schema_ref = f"{OGC_API_SCHEMA_CORE}/result.yaml"
+    _schema = f"{OGC_API_SCHEMA_CORE}/result.yaml"
     _one_of = [
         # must place formatted value first since both value/format fields are simultaneously required
         # other classes require only one of the two, and therefore are more permissive during schema validation
@@ -4808,7 +4836,7 @@ class FrontpageSchema(ExtendedMappingSchema):
 
 class OpenAPISpecSchema(ExtendedMappingSchema):
     # "http://json-schema.org/draft-04/schema#"
-    schema_ref = "https://spec.openapis.org/oas/3.0/schema/2021-09-28"
+    _schema = "https://spec.openapis.org/oas/3.0/schema/2021-09-28"
 
 
 class SwaggerUISpecSchema(ExtendedMappingSchema):
@@ -4906,7 +4934,7 @@ class DeployProcessDescription(NotKeywordSchema, ProcessDeployment, ProcessContr
     _not = [
         Reference()  # avoid conflict with deploy by href
     ]
-    schema_ref = f"{OGC_API_SCHEMA_CORE}/process.yaml"
+    _schema = f"{OGC_API_SCHEMA_CORE}/process.yaml"
     description = "Process description fields directly provided."
 
 
@@ -4936,7 +4964,7 @@ class DeployParameters(ExtendedMappingSchema):
 
 class DeployOGCAppPackage(NotKeywordSchema, ExecutionUnitDefinition, DeployParameters):
     description = "Deployment using standard OGC Application Package definition."
-    schema_ref = f"{OGC_API_SCHEMA_EXT_DEPLOY}/ogcapppkg.yaml"
+    _schema = f"{OGC_API_SCHEMA_EXT_DEPLOY}/ogcapppkg.yaml"
     _not = [
         CWLBase()
     ]
@@ -5478,7 +5506,7 @@ class ErrorCause(OneOfKeywordSchema):
 
 
 class ErrorJsonResponseBodySchema(ExtendedMappingSchema):
-    schema_ref = f"{OGC_API_SCHEMA_CORE}/exception.yaml"
+    _schema = f"{OGC_API_SCHEMA_CORE}/exception.yaml"
     description = "JSON schema for exceptions based on RFC 7807"
     type = OWSErrorCode()
     title = ExtendedSchemaNode(String(), description="Short description of the error.", missing=drop)
@@ -6566,3 +6594,15 @@ def datetime_interval_parser(datetime_interval):
         parsed_datetime["match"] = date_parser.parse(datetime_interval)
 
     return parsed_datetime
+
+
+def validate_node_schema(schema_node, cstruct):
+    # type: (ExtendedMappingSchema, JSON) -> JSON
+    """
+    Validate a schema node defined against a reference schema within :data:`WEAVER_SCHEMA_DIR`.
+    """
+    ref = schema_node._schema.replace(WEAVER_SCHEMA_URL, WEAVER_SCHEMA_DIR)
+    schema = load_file(ref)
+    schema_node.deserialize(cstruct)
+    jsonschema.validate(cstruct, schema)
+    return cstruct

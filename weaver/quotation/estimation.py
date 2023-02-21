@@ -3,24 +3,46 @@ import random
 import time
 from typing import TYPE_CHECKING
 
+import colander
 from pyramid_celery import celery_app as app
 
 from weaver.database import get_db
 from weaver.exceptions import QuoteEstimationError
+from weaver.owsexceptions import OWSInvalidParameterValue
 from weaver.processes.types import ProcessType
 from weaver.processes.wps_package import get_package_workflow_steps, get_process_location
 from weaver.quotation.status import QuoteStatus
 from weaver.store.base import StoreProcesses, StoreQuotes
 from weaver.utils import fully_qualified_name, get_settings, request_extra, wait_secs
+from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
     from celery.app.task import Task
 
     from weaver.datatype import Process, Quote
     from weaver.quotation.status import AnyQuoteStatus
-    from weaver.typedefs import AnyUUID
+    from weaver.typedefs import AnyUUID, JSON
 
 LOGGER = logging.getLogger(__name__)
+
+
+def get_estimator(process):
+    # type: (Process) -> JSON
+    pass
+
+
+def validate_estimator(estimator):
+    # type: (JSON) -> JSON
+    try:
+        estimator_config = sd.QuoteEstimatorSchema().deserialize(estimator)
+    except colander.Invalid as exc:
+        raise OWSInvalidParameterValue(json={
+            "title": "InvalidParameterValue",
+            "cause": f"Invalid schema: [{exc.msg!s}]",
+            "error": exc.__class__.__name__,
+            "value": exc.value
+        })
+    return estimator_config
 
 
 def estimate_process_quote(quote, process):
@@ -38,6 +60,12 @@ def estimate_process_quote(quote, process):
     # TODO: replace by some fancy ml technique or something?
     quote.seconds = int(random.uniform(5, 60) * 60 + random.uniform(5, 60))  # nosec: B311
     quote.price = float(random.uniform(0, 100) * quote.seconds)              # nosec: B311
+
+
+    # FIXME: convert currency
+    # to consider API limits, use some form of load-balancing between:
+    # - https://docs.openexchangerates.org/reference/convert
+    # - https://currencylayer.com/documentation ("Currency Conversion Endpoint" section)
     quote.currency = "CAD"
 
     return quote

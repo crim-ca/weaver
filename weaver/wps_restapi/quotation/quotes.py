@@ -12,8 +12,9 @@ from weaver.exceptions import ProcessNotFound, QuoteNotFound, log_unhandled_exce
 from weaver.execute import ExecuteMode
 from weaver.formats import OutputFormat
 from weaver.owsexceptions import OWSMissingParameterValue
+from weaver.processes.utils import get_process
 from weaver.processes.types import ProcessType
-from weaver.quotation.estimation import process_quote_estimator
+from weaver.quotation.estimation import get_estimator, process_quote_estimator, validate_estimator
 from weaver.sort import Sort
 from weaver.store.base import StoreBills, StoreProcesses, StoreQuotes
 from weaver.utils import as_int, get_header, get_settings, parse_prefer_header_execute_mode
@@ -38,23 +39,7 @@ def request_quote(request):
     """
     settings = get_settings(request)
     weaver_config = get_weaver_configuration(settings)
-
-    if weaver_config not in WeaverFeature.QUOTING:
-        raise HTTPBadRequest(f"Unsupported quoting request for configuration '{weaver_config}'.")
-
-    process_id = request.matchdict.get("process_id")
-    process_store = get_db(request).get_store(StoreProcesses)
-    try:
-        process = process_store.fetch_by_id(process_id)  # type: Process
-    except ProcessNotFound:
-        raise ProcessNotFound(json={
-            "title": "NoSuchProcess",
-            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/no-such-process",
-            "detail": "Process with specified reference identifier does not exist.",
-            "status": ProcessNotFound.code,
-            "cause": str(process_id)
-        })
-
+    process = get_process(request=request, settings=settings)
     if (
         (process.type not in [ProcessType.APPLICATION, ProcessType.WORKFLOW]) or
         (process.type == ProcessType.WORKFLOW and weaver_config not in WeaverFeature.REMOTE)
@@ -79,7 +64,7 @@ def request_quote(request):
     quote_store = get_db(request).get_store(StoreQuotes)
     quote_user = request.authenticated_userid
     quote_info = {
-        "process": process_id,
+        "process": process.id,
         "processParameters": process_params,
         "user": quote_user
     }
@@ -116,6 +101,51 @@ def request_quote(request):
     headers = {"Location": quote.href(settings)}
     headers.update(applied)
     return HTTPAccepted(headers=headers, json=data)
+
+
+@sd.process_estimator_service.get(tags=[sd.TAG_BILL_QUOTE, sd.TAG_PROCESSES], renderer=OutputFormat.JSON,
+                                  schema=sd.ProcessQuoteEstimatorGetEndpoint(),
+                                  response_schemas=sd.get_estimator_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
+def get_quote_estimator(request):
+    # type: (PyramidRequest) -> AnyViewResponse
+    """
+    Get the process quote estimator configuration.
+    """
+    process = get_process(request=request)
+    estimator_config = get_estimator(process)
+    return HTTPOk(json=estimator_config)
+
+
+@sd.process_estimator_service.put(tags=[sd.TAG_BILL_QUOTE, sd.TAG_PROCESSES], renderer=OutputFormat.JSON,
+                                  schema=sd.ProcessQuoteEstimatorPutEndpoint(),
+                                  response_schemas=sd.put_estimator_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
+def update_quote_estimator(request):
+    # type: (PyramidRequest) -> AnyViewResponse
+    """
+    Replace the process quote estimator configuration.
+    """
+    estimator_config = validate_estimator(request.json)
+    store = get_db(request).get_store(StoreProcesses)
+    process = get_process(request=request, store=store)
+    store.set_estimator(process, estimator_config)
+    return HTTPOk(json={"message": "Process quote estimator updated."})
+
+
+@sd.process_estimator_service.delete(tags=[sd.TAG_BILL_QUOTE, sd.TAG_PROCESSES], renderer=OutputFormat.JSON,
+                                     schema=sd.ProcessQuoteEstimatorDeleteEndpoint(),
+                                     response_schemas=sd.delete_estimator_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
+def delete_quote_estimator(request):
+    # type: (PyramidRequest) -> AnyViewResponse
+    """
+    Reset the process quote estimator configuration to the default values.
+    """
+    store = get_db(request).get_store(StoreProcesses)
+    process = get_process(request=request, store=store)
+    store.set_estimator(process, {})
+    return HTTPOk(json={"message": "Process quote estimator deleted. Defaults will be used."})
 
 
 @sd.process_quotes_service.get(tags=[sd.TAG_BILL_QUOTE, sd.TAG_PROCESSES], renderer=OutputFormat.JSON,

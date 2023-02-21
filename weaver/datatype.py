@@ -2199,6 +2199,20 @@ class Process(Base):
         return Process._recursive_replace(obj, 1, 0)
 
     @property
+    def estimator(self):
+        # type: () -> JSON
+        return self.get("estimator") or {}
+
+    @estimator.setter
+    def estimator(self, estimator):
+        # type: (Optional[JSON]) -> None
+        if not isinstance(estimator, dict) or estimator is None:
+            raise ValueError(
+                f"Estimator value '{estimator}' is not valid for '{self.__name__}.estimator'. Must be JSON."
+            )
+        self["estimator"] = estimator
+
+    @property
     def visibility(self):
         # type: () -> Visibility
         return Visibility.get(self.get("visibility"), Visibility.PRIVATE)
@@ -2873,7 +2887,7 @@ class Quote(Base):
         links = [
             {"href": quote_url, "rel": "self", "title": "Quote details."},
             {"href": proc_href, "rel": "process-meta", "title": "Process description."},
-            {"href": exec_href, "rel": "quoted-execution", "title": "Process execution using quote submission."},
+            {"href": exec_href, "rel": "quotation", "title": "Process execution using quote submission."},
         ]
         return links
 

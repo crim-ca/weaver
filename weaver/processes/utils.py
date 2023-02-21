@@ -105,8 +105,8 @@ if TYPE_CHECKING:
 # FIXME:
 #   https://github.com/crim-ca/weaver/issues/215
 #   define common Exception classes that won't require this type of conversion
-def get_process(process_id=None, request=None, settings=None, revision=True):
-    # type: (Optional[str], Optional[PyramidRequest], Optional[SettingsType], bool) -> Process
+def get_process(process_id=None, request=None, settings=None, store=None, revision=True):
+    # type: (Optional[str], Optional[PyramidRequest], Optional[SettingsType], Optional[StoreProcesses], bool) -> Process
     """
     Obtain the specified process and validate information, returning appropriate HTTP error if invalid.
 
@@ -125,11 +125,12 @@ def get_process(process_id=None, request=None, settings=None, revision=True):
     :param request: When no explicit ID specified, try to find information from the request.
     :param settings:
         Application settings for database connection. Can be guessed from local thread or request object if not given.
+    :param store: Database process store reference.
     :param revision:
         When parsing the :term:`Process` ID (either explicit or from request), indicate if any tagged revision
         specifier should be used or dropped.
     """
-    store = get_db(settings or request).get_store(StoreProcesses)
+    store = store or get_db(settings or request).get_store(StoreProcesses)
     try:
         if process_id is None and request is not None:
             process_id = resolve_process_tag(request)

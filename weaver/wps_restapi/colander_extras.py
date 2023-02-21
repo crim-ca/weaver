@@ -1349,10 +1349,44 @@ class VariableMappingSchema(VariableSchemaNode, colander.MappingSchema):
     schema_type = colander.MappingSchema.schema_type
 
 
+class SchemaRefMappingSchema(SortableMappingSchema, colander.MappingSchema):
+    """
+    Mapping schema that supports auto-insertion of JSON-schema references provided in the definition.
+
+    When the :class:`colander.MappingSchema` defines ``_schema = "<URL>"`` or ``_id = "<URL>"`` with a valid URL,
+    all validations will automatically insert the corresponding ``$schema`` or ``$id`` field with this URL to the
+    deserialized JSON result.
+    """
+    def __init__(self, *args, **kwargs):
+        super(SchemaRefMappingSchema, self).__init__(*args, **kwargs)
+
+        for schema_key in ["_schema", "_id"]:  # reverse order to match sort first insertion method
+            schema_field = f"${schema_key[1:]}"
+            schema_ref = getattr(self, schema_key, None)
+            if isinstance(schema_ref, str) and URL.match_object.match(schema_ref):
+                schema = ExtendedSchemaNode(
+                    colander.String(),
+                    name=schema_field,
+                    title=schema_field,
+                    missing=schema_ref,
+                    default=schema_ref,
+                    validator=colander.OneOf([schema_ref])
+                )
+                self.add(schema)
+                if schema_field not in self._sort_first:
+                    self._sort_first = [schema_field] + list(self._sort_first)
+
+    @staticmethod
+    @abstractmethod
+    def schema_type():
+        raise NotImplementedError("Using SchemaNode for a field requires 'schema_type' definition.")
+
+
 class ExtendedMappingSchema(
     DefaultSchemaNode,
     DropableSchemaNode,
     VariableSchemaNode,
+    SchemaRefMappingSchema,
     SortableMappingSchema,
     colander.MappingSchema
 ):
@@ -1368,6 +1402,7 @@ class ExtendedMappingSchema(
         - :class:`VariableSchemaNode`
         - :class:`ExtendedSchemaNode`
         - :class:`ExtendedSequenceSchema`
+        - :class:`SchemaRefMappingSchema`
         - :class:`SortableMappingSchema`
         - :class:`PermissiveMappingSchema`
     """

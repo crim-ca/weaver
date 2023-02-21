@@ -329,7 +329,8 @@ if TYPE_CHECKING:
     AnyAcceptLanguageHeader = Union[AcceptLanguageNoHeader, AcceptLanguageValidHeader, AcceptLanguageInvalidHeader]
 
     AnyProcess = Union[Process, ProcessOWS, ProcessWPS, JSON]
-    AnyProcessClass = Union[Type[Process], Type[ProcessWPS]]
+    AnyProcessRef = Union[Process, str]
+    AnyProcessClass = Union[Type[Process], Type[ProcessWPS], Type[str]]
 
     # update_status(message, progress, status, *args, **kwargs)
     UpdateStatusPartialFunction = TypeVar(

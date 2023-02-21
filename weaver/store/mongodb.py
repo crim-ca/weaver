@@ -71,11 +71,13 @@ if TYPE_CHECKING:
     from weaver.typedefs import (
         AnyProcess,
         AnyProcessClass,
+        AnyProcessRef,
         AnyUUID,
         AnyValueType,
         AnyVersion,
         ExecutionInputs,
-        ExecutionOutputs
+        ExecutionOutputs,
+        JSON
     )
     from weaver.visibility import AnyVisibility
 
@@ -419,20 +421,26 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         :return: retrieved field if the type was supported.
         :raises ProcessInstanceError: invalid process type.
         """
-        if isinstance(process, Process):
-            if islambda(function_dict):
-                return function_dict()
-            return function_dict[Process]()
-        elif isinstance(process, ProcessWPS):
-            if islambda(function_dict):
-                return function_dict()
-            return function_dict[ProcessWPS]()
-        else:
+        is_call = islambda(function_dict)
+        if (
+            (is_call and not isinstance(process, (Process, ProcessWPS, str)))
+            or (isinstance(function_dict, dict) and type(process) not in function_dict)
+        ):
             raise ProcessInstanceError(f"Unsupported process type '{fully_qualified_name(process)}'")
+        if is_call:
+            return function_dict()
+        return function_dict[type(process)]()  # noqa
 
     def _get_process_id(self, process):
-        # type: (AnyProcess) -> str
-        return self._get_process_field(process, lambda: process.identifier)
+        # type: (Union[AnyProcessRef, AnyProcess]) -> str
+        return self._get_process_field(
+            process,
+            {
+                Process: lambda: process.identifier,
+                ProcessWPS: lambda: process.identifier,
+                str: lambda: process,
+            }
+        )
 
     def _get_process_type(self, process):
         # type: (AnyProcess) -> AnyProcessType
@@ -456,7 +464,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         return url
 
     def save_process(self, process, overwrite=True):
-        # type: (Union[Process, ProcessWPS], bool) -> Process
+        # type: (Union[AnyProcessRef, Process, ProcessWPS], bool) -> Process
         """
         Stores a process in storage.
 
@@ -600,7 +608,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         return search, version
 
     def fetch_by_id(self, process_id, visibility=None):
-        # type: (str, Optional[AnyVisibility]) -> Process
+        # type: (AnyProcessRef, Optional[AnyVisibility]) -> Process
         """
         Get process for given :paramref:`process_id` from storage, optionally filtered by :paramref:`visibility`.
 
@@ -610,6 +618,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         :param visibility: One value amongst :py:mod:`weaver.visibility`.
         :return: An instance of :class:`weaver.datatype.Process`.
         """
+        process_id = self._get_process_id(process_id)
         search, version = self._get_revision_search(process_id)
         process = self.collection.find_one(search)
         if not process:
@@ -622,10 +631,11 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         return process
 
     def find_versions(self, process_id, version_format=VersionFormat.OBJECT):
-        # type: (str, VersionFormat) -> List[AnyVersion]
+        # type: (AnyProcessRef, VersionFormat) -> List[AnyVersion]
         """
         Retrieves all existing versions of a given process.
         """
+        process_id = self._get_process_id(process_id)
         process_id = Process.split_version(process_id)[0]  # version never needed to fetch all revisions
         sane_name = get_sane_name(process_id, **self.sane_name_config)
         version_name = rf"^{sane_name}(:[0-9]+\.[0-9]+.[0-9]+)?$"
@@ -637,7 +647,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         return [as_version_major_minor_patch(ver["version"], version_format) for ver in versions]
 
     def update_version(self, process_id, version):
-        # type: (str, AnyVersion) -> Process
+        # type: (AnyProcessRef, AnyVersion) -> Process
         """
         Updates the specified (latest) process ID to become an older revision.
 
@@ -646,6 +656,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
 
         :returns: Updated process definition with older revision.
         """
+        process_id = self._get_process_id(process_id)
         sane_name = get_sane_name(process_id, **self.sane_name_config)
         version = as_version_major_minor_patch(version, VersionFormat.STRING)
         # update ID to allow direct fetch by ID using tagged version
@@ -662,7 +673,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         return process
 
     def revert_latest(self, process_id):
-        # type: (str) -> Process
+        # type: (AnyProcessRef) -> Process
         """
         Makes the specified (older) revision process the new latest revision.
 
@@ -674,6 +685,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
 
         :returns: Updated process definition with older revision.
         """
+        process_id = self._get_process_id(process_id)
         search, version = self._get_revision_search(process_id)
         if not version:
             raise ProcessNotFound(f"Process '{process_id}' missing version part to revert as latest.")
@@ -688,8 +700,25 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         process = Process(process)
         return process
 
+    def get_estimator(self, process_id):
+        # type: (AnyProcessRef) -> JSON
+        """
+        Get `estimator` of a process.
+        """
+        process = self.fetch_by_id(process_id)
+        return process.estimator
+
+    def set_estimator(self, process_id, estimator):
+        # type: (AnyProcessRef, JSON) -> None
+        """
+        Set `estimator` of a process.
+        """
+        process = self.fetch_by_id(process_id)
+        process.estimator = estimator
+        self.save_process(process, overwrite=True)
+
     def get_visibility(self, process_id):
-        # type: (str) -> Visibility
+        # type: (AnyProcessRef) -> Visibility
         """
         Get `visibility` of a process.
 
@@ -699,7 +728,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         return process.visibility
 
     def set_visibility(self, process_id, visibility):
-        # type: (str, AnyVisibility) -> None
+        # type: (AnyProcessRef, AnyVisibility) -> None
         """
         Set `visibility` of a process.
 
