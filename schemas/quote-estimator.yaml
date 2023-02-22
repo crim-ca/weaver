@@ -41,34 +41,36 @@ description: |
   Example:
   ========
   
-    Assuming a process that takes a single file with an estimated running cost that depends only on the duration.
-    The 
+    Assumes a process that takes a single file with an estimated running cost that depends only on the duration.
+    The first operation is computed before the execution to obtain an estimated quote to run the process. After,
+    the quote was agreed and its execution was completed, the real cost of operation can be computed using the 
+    corresponding formulation.
     
     Quote Estimation:
     -----------------
-  
+    
       config:
         flat_rate: 10 ($)
         duration_rate: 0.01 ($/s)
         duration_estimator: LinearRegression(<duration> = -1E-6 * <input-size> ^ -2 + 3E-6 * <input-size> + 125)
       inputs:
-        - data:  # input ID
-            size: 209715200 (200 MiB)
-    
+        data:  # input ID
+          size: 209715200 (200 MiB)
+      
       DURATION_ESTIMATE (s) = 5E-4 * [ (1E-5 * (200 * 2^20) ^ 2 + 3E-4 * (200 * 2^20) + 125) ] = 754.1456 s
       QUOTE_COST = 10 + 0.01 * 754.1456 = 17.54 $
   
     Real Execution Cost:
     --------------------
-  
+    
       config:
         flat_rate: 10 ($)
         duration_rate: 0.01 ($/s)
         duration_estimator: 739 s  [monitored duration after the real execution completed]
       inputs:
-        - data:  # input ID
-            size: 209715200 (200 MiB)  [should be the same input as during quote estimation]
-  
+        data:  # input ID
+          size: 209715200 (200 MiB)  [should be the same input as during quote estimation]
+      
       TOTAL = 10 + 0.01 * 739 = 17.39 $
 
 type: object
@@ -81,6 +83,8 @@ properties:
     type: string
     enum:
       - "https://github.com/crim-ca/weaver/schemas/quote-estimator.yaml"
+      - "https://github.com/crim-ca/weaver/blob/master/schemas/quote-estimator.yaml"
+      - "https://raw.githubusercontent.com/crim-ca/weaver/master/schemas/quote-estimator.yaml"
   config:
     $ref: "#/definitions/Configuration"
   inputs:
@@ -299,8 +303,9 @@ definitions:
     title: Inputs
     description: |
       Inputs that will be used as features for the estimators.
-      An array is required for loading the feature vector and weights in the same order as expected by estimators.
-      The length of the array should match exactly the dimensionality of the estimators input features.
+      To obtain the array required for loading the feature vector and weights expected by estimators,
+      the IDs (keys) of these inputs can be mapped to specific model input names.
+      All inputs will be used for the estimator model if no mapping is specified.
     type: object
     additionalProperties:
       $ref: "#/definitions/InputFeature"

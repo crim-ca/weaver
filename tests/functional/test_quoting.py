@@ -75,7 +75,7 @@ class WpsQuotationTest(WpsConfigBase):
     def test_quote_atomic_process(self, mocked_estimate):
         with contextlib.ExitStack() as stack_quote:
             for mock_quote in mocked_execute_celery(
-                celery_task="weaver.quotation.estimation.process_quote_estimator"
+                celery_task="weaver.quotation.estimation.execute_quote_estimator"
             ):
                 stack_quote.enter_context(mock_quote)
 
@@ -112,7 +112,7 @@ class WpsQuotationTest(WpsConfigBase):
     def test_quote_workflow_process(self, mocked_estimate):
         with contextlib.ExitStack() as stack_quote:
             for mock_quote in mocked_execute_celery(
-                celery_task="weaver.quotation.estimation.process_quote_estimator"
+                celery_task="weaver.quotation.estimation.execute_quote_estimator"
             ):
                 stack_quote.enter_context(mock_quote)
 

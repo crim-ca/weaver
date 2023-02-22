@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 from urllib.parse import parse_qs, urlparse
 
 import colander
+import docker
 import yaml
 from pyramid.httpexceptions import (
     HTTPBadRequest,
@@ -30,7 +31,7 @@ from weaver.config import (
     get_weaver_configuration
 )
 from weaver.database import get_db
-from weaver.datatype import Process, Service
+from weaver.datatype import DockerAuthentication, Process, Service
 from weaver.exceptions import (
     InvalidIdentifierValue,
     MissingIdentifierValue,
@@ -72,7 +73,10 @@ from weaver.wps_restapi.utils import get_wps_restapi_base_url, parse_content
 
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
+    from logging import Logger
     from typing import Any, List, Optional, Tuple, Union
+
+    from docker.client import DockerClient
 
     from weaver.typedefs import (
         AnyHeadersContainer,
@@ -1206,3 +1210,51 @@ def register_cwl_processes_from_config(container):
     elif register_count != register_total:
         LOGGER.warning("Partial registration of CWL processes, only %s/%s succeeded.", register_count, register_total)
     return register_count
+
+
+def pull_docker(docker_auth, logger=LOGGER):
+    # type: (DockerAuthentication, Logger) -> Optional[DockerClient]
+    """
+    Pulls the referenced Docker image to local cache from an optionally secured registry.
+
+    If the Docker image is already available locally, simply validates it.
+    Authentication are applied as necessary using the provided parameters.
+
+    :param docker_auth: Docker reference with optional authentication parameters.
+    :param logger: Alternative logger reference to log status messages about the operation.
+    :returns: Docker client to perform further operations with the retrieved or validated image. None if failed.
+    """
+    client = None
+    image = None
+    try:
+        # load from env is the same as CLI call
+        client = docker.from_env()
+        # following login does not update '~/.docker/config.json' by design, but can use it if available
+        # session remains active only within the client
+        # Note:
+        #   Force re-auth to ensure credentials are validated against remote registry and API Status is returned.
+        #   This way, even if the auth were pre-resolved, we make sure they are still valid.
+        #   This is important mostly because Docker images could still be present in cache, so pull doesn't occur.
+        # Warning:
+        #   Without re-auth, plain credentials resolved from auth config are returned in body instead!
+        #   With re-auth, body *could* contain an identity token depending on auth method.
+        if docker_auth.credentials:
+            logger.debug("Retrieving image from Docker registry or cache.")
+            body = client.login(reauth=True, **docker_auth.credentials)
+            if body.get("Status") != "Login Succeeded":
+                logger.debug("Failed authentication to Docker private registry.")
+                return None
+        else:
+            logger.warning("Expecting public access for image in Docker registry.")
+        logger.debug("Retrieving image from Docker registry or cache.")
+        # docker client pulls all available images when no tag, provide the default to limit
+        tag = docker_auth.tag or "latest"
+        image = client.images.pull(docker_auth.repository, tag)  # actual pull or resolved from cache
+    except Exception as exc:  # noqa: W0703 # nosec: B110  # do not let anything up to avoid leaking auths
+        logger.debug("Unhandled exception [%s] during Docker registry authentication or image retrieval.",
+                     exc.__class__.__name__, exc_info=False)  # only class name to help debug, but no contents
+    if not image or docker_auth.docker not in image.tags:
+        logger.debug("Failed authorization or could not retrieve Docker image from private registry.")
+        return None
+    logger.debug("Docker image retrieved.")
+    return client

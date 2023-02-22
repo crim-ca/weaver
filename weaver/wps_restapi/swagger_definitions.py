@@ -144,7 +144,8 @@ OGC_API_SCHEMA_EXT_BILL = f"{OGC_API_SCHEMA_BASE}/extensions/billing/standard/op
 OGC_API_SCHEMA_EXT_QUOTE = f"{OGC_API_SCHEMA_BASE}/extensions/quotation/standard/openapi/schemas"
 OGC_API_SCHEMA_EXT_WORKFLOW = f"{OGC_API_SCHEMA_BASE}/extensions/workflows/standard/openapi/schemas"
 
-WEAVER_SCHEMA_URL = "https://github.com/crim-ca/weaver/schemas"
+WEAVER_SCHEMA_VERSION = "master"
+WEAVER_SCHEMA_URL = f"https://raw.githubusercontent.com/crim-ca/weaver/{WEAVER_SCHEMA_VERSION}/schemas"
 
 DATETIME_INTERVAL_CLOSED_SYMBOL = "/"
 DATETIME_INTERVAL_OPEN_START_SYMBOL = "../"
@@ -1795,12 +1796,48 @@ class VisibilitySchema(ExtendedMappingSchema):
     value = VisibilityValue()
 
 
-class QuoteEstimatorSchema(ExtendedMappingSchema):
-    _schema = f"{WEAVER_SCHEMA_URL}/quote-estimator.yaml"
-    description = "Quote Estimator Parameters"
+class QuoteEstimatorConfigurationSchema(ExtendedMappingSchema):
+    _schema = f"{WEAVER_SCHEMA_URL}/quote-estimator.yaml#/definitions/Configuration"
+    description = "Quote Estimator Configuration"
 
     def deserialize(self, cstruct):
         return validate_node_schema(self, cstruct)
+
+
+class QuoteEstimatorWeightedParameterSchema(ExtendedMappingSchema):
+    # NOTE:
+    #   value/size parameters omitted since they will be provided at runtime by the
+    #   quote estimation job obtained from submitted body in 'QuoteProcessParametersSchema'
+    weight = ExtendedSchemaNode(
+        Float(),
+        default=1.0,
+        missing=drop,
+        description="Weight attributed to this parameter when submitted for quote estimation.",
+    )
+
+
+class QuoteEstimatorInputParametersSchema(ExtendedMappingSchema):
+    description = "Parametrization of inputs for quote estimation."
+    input_id = QuoteEstimatorWeightedParameterSchema(
+        variable="{input-id}",
+        title="QuoteEstimatorInputParameters",
+        description="Mapping of input definitions for quote estimation.",
+    )
+
+
+class QuoteEstimatorOutputParametersSchema(ExtendedMappingSchema):
+    description = "Parametrization of outputs for quote estimation."
+    output_id = QuoteEstimatorWeightedParameterSchema(
+        variable="{output-id}",
+        title="QuoteEstimatorOutputParameters",
+        description="Mapping of output definitions for quote estimation.",
+    )
+
+
+class QuoteEstimatorSchema(ExtendedMappingSchema):
+    config = QuoteEstimatorConfigurationSchema()
+    inputs = QuoteEstimatorInputParametersSchema(missing=drop, default={})
+    outputs = QuoteEstimatorOutputParametersSchema(missing=drop, default={})
 
 
 #########################################################
@@ -5591,7 +5628,7 @@ class OkGetSwaggerJSONResponse(ExtendedMappingSchema):
     examples = {
         "OpenAPI Schema": {
             "summary": "OpenAPI specification of this API.",
-            "value": {"$ref": OpenAPISpecSchema.schema_ref},
+            "value": {"$ref": OpenAPISpecSchema._schema},
         }
     }
 
@@ -6600,9 +6637,19 @@ def validate_node_schema(schema_node, cstruct):
     # type: (ExtendedMappingSchema, JSON) -> JSON
     """
     Validate a schema node defined against a reference schema within :data:`WEAVER_SCHEMA_DIR`.
+
+    If the reference contains an anchor (e.g.: ``#/definitions/Def``), the sub-schema of that
+    reference will be used for validation against the data structure.
     """
-    ref = schema_node._schema.replace(WEAVER_SCHEMA_URL, WEAVER_SCHEMA_DIR)
-    schema = load_file(ref)
     schema_node.deserialize(cstruct)
+    schema_file = schema_node._schema.replace(WEAVER_SCHEMA_URL, WEAVER_SCHEMA_DIR)
+    schema_path = []
+    if "#" in schema_file:
+        schema_file, schema_ref = schema_file.split("#", 1)
+        schema_path = [ref for ref in schema_ref.split("/") if ref]
+    schema = load_file(schema_file)
+    if schema_path:
+        for part in schema_path:
+            schema = schema[part]
     jsonschema.validate(cstruct, schema)
     return cstruct

@@ -68,7 +68,6 @@ weaver.ssl_verify = true
 weaver.request_options =
 
 # --- Weaver Execution settings ---
-
 # maximum wait time allowed for Prefer header to run Job/Quote synchronously
 # over this limit, they will automatically fallback to asynchronous execution/estimation
 weaver.exec_sync_max_wait = 20
@@ -78,6 +77,10 @@ weaver.quote_sync_max_wait = 20
 # enable support of quotation extension
 # https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/quotation
 weaver.quotation = true
+# parameters to accomplish quote estimation
+weaver.quotation_docker_image = registry.gitlab.com/crim.ca/clients/cubewerx/quote-estimator:0.2.0
+weaver.quotation_docker_username =
+weaver.quotation_docker_password =
 
 # --- Weaver CWL settings ---
 # NOTE: [experimental]

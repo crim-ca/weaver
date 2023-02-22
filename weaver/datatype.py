@@ -63,6 +63,7 @@ from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, IO, Iterator, List, Optional, Tuple, Union
+    from typing_extensions import TypeAlias
 
     from owslib.wps import WebProcessingService
 
@@ -74,6 +75,7 @@ if TYPE_CHECKING:
     from weaver.typedefs import (
         AnyLogLevel,
         AnyProcess,
+        AnyProcessRef,
         AnyRequestType,
         AnySettingsContainer,
         AnyUUID,
@@ -91,7 +93,9 @@ if TYPE_CHECKING:
     from weaver.visibility import AnyVisibility
 
     AnyParams = Dict[str, Any]
-    AnyAuthentication = Union["Authentication", "DockerAuthentication"]
+    _Authentication: TypeAlias = "Authentication"
+    _DockerAuthentication: TypeAlias = "DockerAuthentication"
+    AnyAuthentication = Union[_Authentication, _DockerAuthentication]
 
 LOGGER = getLogger(__name__)
 
@@ -1377,14 +1381,21 @@ class Authentication(Base):
     Authentication details to store details required for process operations.
     """
 
-    def __init__(self, auth_scheme, auth_token, auth_link, **kwargs):
-        # type: (str, str, Optional[str], **Any) -> None
+    def __init__(self, auth_scheme, auth_token=None, auth_username=None, auth_password=None, auth_link=None, **kwargs):
+        # type: (str, Optional[str], Optional[str], Optional[str], Optional[str], **Any) -> None
         super(Authentication, self).__init__(**kwargs)
         # ensure values are provided and of valid format
+        if auth_token and (auth_username or auth_password):
+            raise ValueError(
+                "Cannot initialize Authentication method with token and username/password credentials simultaneously."
+            )
+        if not auth_token and auth_username and auth_password:
+            auth = self.from_credentials(auth_username, auth_password, auth_link=auth_link, **kwargs)
+            auth_scheme, auth_token = auth.scheme, auth.token
         self.scheme = auth_scheme
         if auth_link:
             self.link = auth_link
-        self.token = auth_token
+        self.token = auth_token or ""
         self.setdefault("id", uuid.uuid4())
 
     @property
@@ -1451,6 +1462,15 @@ class Authentication(Base):
         }
 
     @classmethod
+    def from_credentials(cls, username, password, **params):
+        # type: (str, str, **Any) -> AnyAuthentication
+        token = base64.b64encode(f"{username}:{password}".encode("utf-8")).decode("utf-8")
+        params.setdefault("auth_type", cls.type)
+        params["auth_scheme"] = "Basic"
+        params["auth_token"] = token
+        return cls.from_params(**params)
+
+    @classmethod
     def from_params(cls, **params):
         # type: (**Any) -> AnyAuthentication
         """
@@ -1461,7 +1481,8 @@ class Authentication(Base):
                 params[f"auth_{param}"] = params[param]
         auth_type = params.pop("auth_type", None)
         params.pop("type", None)  # remove type that must be enforced by specialized class property
-        auth_cls = list(filter(lambda auth: auth_type == auth.type.value, [DockerAuthentication, VaultFile]))
+        auth_known = [DockerAuthentication, VaultFile]
+        auth_cls = list(filter(lambda auth: auth_type in [auth.type, auth.type.value], auth_known))
         if not auth_cls:
             raise TypeError(f"Unknown authentication type: {auth_type!s}")
         auth_obj = auth_cls[0](**params)
@@ -1534,15 +1555,16 @@ class DockerAuthentication(Authentication):
 
     # NOTE:
     #   Specific parameter names are important for reload from database using 'Authentication.from_params'
-    def __init__(self, auth_scheme, auth_token, auth_link, **kwargs):
-        # type: (str, str, str, **Any) -> None
+    def __init__(self, auth_link, auth_scheme="Basic", auth_token=None, **kwargs):
+        # type: (str, str, Optional[str], **Any) -> None
         """
         Initialize the authentication reference for pulling a Docker image from a protected registry.
 
-        :param auth_scheme: Authentication scheme (Basic, Bearer, etc.)
-        :param auth_token: Applied token or credentials according to specified scheme.
         :param auth_link: Fully qualified Docker registry image link (``{registry-url}/{image}:{label}``).
-        :param kwargs: Additional parameters for loading contents already parsed from database.
+        :param auth_scheme: Authentication scheme (Basic, Bearer, etc.) if required.
+        :param kwargs:
+            Additional parameters including authentication token, username/password credentials according
+            to specified scheme, and other definitions to load contents already parsed from database.
         """
         matches = re.match(self.DOCKER_LINK_REGEX, auth_link)
         if not matches:
@@ -1571,7 +1593,7 @@ class DockerAuthentication(Authentication):
         self["image"] = image
         self["registry"] = registry
         super(DockerAuthentication, self).__init__(
-            auth_scheme, auth_token, auth_link=auth_link, **kwargs
+            auth_scheme, auth_token=auth_token, auth_link=auth_link, **kwargs
         )
 
     @property
@@ -2719,7 +2741,9 @@ class Quote(Base):
 
     @process.setter
     def process(self, process):
-        # type: (str) -> None
+        # type: (AnyProcessRef) -> None
+        if isinstance(process, Process):
+            process = process.tag
         if not isinstance(process, str) or not len(process):
             raise ValueError(f"Field '{self.__name__}.process' must be a string.")
         self["process"] = process

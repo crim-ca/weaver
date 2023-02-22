@@ -323,7 +323,7 @@ class QuoteInstanceError(HTTPInternalServerError, OWSNoApplicableCode, QuoteExce
     """
 
 
-class QuoteEstimationError(QuoteException, ValueError):
+class QuoteEstimationError(QuoteException, OWSNoApplicableCode, ValueError):
     """
     Error related to a quote that occurred during its estimation.
     """

@@ -158,6 +158,31 @@ def test_auth_docker_image_from_parent_params():
         assert field not in auth
 
 
+def test_auth_docker_image_from_credentials():
+    registry = "registry.gitlab.com"
+    image = "crim.ca/category/group/project:1.2.3"
+    link = f"{registry}/{image}"
+    usr, pwd = "random", "12345"  # nosec
+    auth_docker = DockerAuthentication(link, auth_username=usr, auth_password=pwd)
+    assert auth_docker.link == link
+    assert auth_docker.token
+    assert usr not in auth_docker.token and pwd not in auth_docker.token
+    assert auth_docker.credentials["username"] == usr
+    assert auth_docker.credentials["password"] == pwd
+    assert auth_docker.credentials["registry"] == registry
+
+
+def test_auth_docker_image_public():
+    registry = "registry.gitlab.com"
+    image = "crim.ca/category/group/project:1.2.3"
+    link = f"{registry}/{image}"
+    auth_docker = DockerAuthentication(link)
+    assert auth_docker.link == link
+    assert auth_docker.registry == registry
+    assert not auth_docker.token
+    assert not auth_docker.credentials
+
+
 def test_process_io_schema_ignore_uri():
     """
     Process with ``schema`` field under I/O definition that is not an :term:`OAS` object must not fail I/O resolution.

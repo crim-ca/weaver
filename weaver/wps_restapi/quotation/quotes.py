@@ -8,13 +8,17 @@ from pyramid.httpexceptions import HTTPAccepted, HTTPBadRequest, HTTPCreated, HT
 from weaver.config import WeaverFeature, get_weaver_configuration
 from weaver.database import get_db
 from weaver.datatype import Bill, Quote
-from weaver.exceptions import ProcessNotFound, QuoteNotFound, log_unhandled_exceptions
+from weaver.exceptions import QuoteNotFound, log_unhandled_exceptions
 from weaver.execute import ExecuteMode
 from weaver.formats import OutputFormat
 from weaver.owsexceptions import OWSMissingParameterValue
 from weaver.processes.utils import get_process
 from weaver.processes.types import ProcessType
-from weaver.quotation.estimation import get_estimator, process_quote_estimator, validate_estimator
+from weaver.quotation.estimation import (
+    execute_quote_estimator,
+    get_quote_estimator_config,
+    validate_quote_estimator_config
+)
 from weaver.sort import Sort
 from weaver.store.base import StoreBills, StoreProcesses, StoreQuotes
 from weaver.utils import as_int, get_header, get_settings, parse_prefer_header_execute_mode
@@ -22,8 +26,6 @@ from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.processes.processes import submit_local_job
 
 if TYPE_CHECKING:
-    from weaver.datatype import Process
-
     from weaver.typedefs import AnyViewResponse, PyramidRequest
 
 LOGGER = logging.getLogger(__name__)
@@ -73,7 +75,7 @@ def request_quote(request):
     max_wait = as_int(settings.get("weaver.quote_sync_max_wait"), default=20)
     mode, wait, applied = parse_prefer_header_execute_mode(request.headers, process.jobControlOptions, max_wait)
 
-    result = process_quote_estimator.delay(quote.id)
+    result = execute_quote_estimator.delay(quote.id)
     LOGGER.debug("Celery pending task [%s] for quote [%s].", result.id, quote.id)
     if mode == ExecuteMode.SYNC and wait:
         LOGGER.debug("Celery task requested as sync if it completes before (wait=%ss)", wait)
@@ -113,7 +115,7 @@ def get_quote_estimator(request):
     Get the process quote estimator configuration.
     """
     process = get_process(request=request)
-    estimator_config = get_estimator(process)
+    estimator_config = get_quote_estimator_config(process)
     return HTTPOk(json=estimator_config)
 
 
@@ -126,7 +128,7 @@ def update_quote_estimator(request):
     """
     Replace the process quote estimator configuration.
     """
-    estimator_config = validate_estimator(request.json)
+    estimator_config = validate_quote_estimator_config(request.json)
     store = get_db(request).get_store(StoreProcesses)
     process = get_process(request=request, store=store)
     store.set_estimator(process, estimator_config)
