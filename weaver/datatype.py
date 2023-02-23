@@ -88,6 +88,7 @@ if TYPE_CHECKING:
         Link,
         Metadata,
         QuoteProcessParameters,
+        QuoteProcessResults,
         Statistics
     )
     from weaver.visibility import AnyVisibility
@@ -2809,7 +2810,25 @@ class Quote(Base):
             raise TypeError("Invalid process parameters for quote submission.")
         self["parameters"] = data
 
-    processParameters = parameters  # noqa  # backward compatible alias
+    processParameters = inputs = parameters  # noqa  # backward compatible alias
+
+    @property
+    def results(self):
+        # type: () -> QuoteProcessResults
+        """
+        Process execution results following quote estimation.
+        """
+        return self.get("results") or {}
+
+    @results.setter
+    def results(self, data):
+        # type: (QuoteProcessResults) -> None
+        try:
+            sd.QuoteProcessResults().deserialize(data)
+        except colander.Invalid:
+            LOGGER.error("Invalid process results for quote submission.\n%s", repr_json(data, indent=2))
+            raise TypeError("Invalid process results for quote submission.")
+        self["results"] = data
 
     @property
     def price(self):
@@ -2868,6 +2887,7 @@ class Quote(Base):
             "created": self.created,
             "expire": self.expire,
             "seconds": self.seconds,
+            "results": self.results,
             "parameters": self.parameters,
         }
 

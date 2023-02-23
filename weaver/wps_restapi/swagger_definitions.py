@@ -13,6 +13,7 @@ The definitions are also employed to generate the `OpenAPI` definitions reported
 on `Weaver`'s `ReadTheDocs` page.
 """
 # pylint: disable=C0103,invalid-name
+import colander
 import datetime
 import inspect
 import os
@@ -1296,7 +1297,7 @@ class AnyLiteralType(OneOfKeywordSchema):
     ]
 
 
-class NumberType(OneOfKeywordSchema):
+class Number(OneOfKeywordSchema):
     """
     Represents a literal number, integer or float.
     """
@@ -1314,6 +1315,22 @@ class NumericType(OneOfKeywordSchema):
         ExtendedSchemaNode(Float()),
         ExtendedSchemaNode(Integer()),
         ExtendedSchemaNode(String(), pattern="^[0-9]+$"),
+    ]
+
+
+class Decimal(ExtendedSchemaNode):
+    schema_type = colander.Decimal
+    format = "decimal"
+
+
+class PositiveNumber(AnyOfKeywordSchema):
+    """
+    Represents a literal number, integer or float, of positive value.
+    """
+    _any_of = [
+        Decimal(validator=Range(min=0.0)),
+        ExtendedSchemaNode(Float(), validator=Range(min=0.0)),
+        ExtendedSchemaNode(Integer(), validator=Range(min=0)),
     ]
 
 
@@ -3211,15 +3228,15 @@ class JobStatusInfo(ExtendedMappingSchema):
     duration = Duration(missing=drop, description="Duration since the start of the process execution.")
     runningDuration = DurationISO(missing=drop,
                                   description="Duration in ISO-8601 format since the start of the process execution.")
-    runningSeconds = NumberType(missing=drop,
-                                description="Duration in seconds since the start of the process execution.")
+    runningSeconds = Number(missing=drop,
+                            description="Duration in seconds since the start of the process execution.")
     expirationDate = ExtendedSchemaNode(DateTime(), missing=drop,
                                         description="Timestamp when the job will be canceled if not yet completed.")
     estimatedCompletion = ExtendedSchemaNode(DateTime(), missing=drop)
     nextPoll = ExtendedSchemaNode(DateTime(), missing=drop,
                                   description="Timestamp when the job will be prompted for updated status details.")
-    percentCompleted = NumberType(example=0, validator=Range(min=0, max=100),
-                                  description="Completion percentage of the job as indicated by the process.")
+    percentCompleted = Number(example=0, validator=Range(min=0, max=100),
+                              description="Completion percentage of the job as indicated by the process.")
     progress = ExtendedSchemaNode(Integer(), example=100, validator=Range(0, 100),
                                   description="Completion progress of the job (alias to 'percentCompleted').")
     links = LinkList(missing=drop)
@@ -3595,6 +3612,29 @@ class QuoteProcessParameters(PermissiveMappingSchema, ExecuteInputOutputs):
     )
 
 
+class QuoteEstimateValue(PermissiveMappingSchema):
+    description = "Details of an estimated value, with it attributed rate and resulting cost."
+    estimate = PositiveNumber(default=0, missing=None)
+    rate = PositiveNumber(default=0, missing=None)
+    cost = PositiveNumber(default=0, missing=0.0)
+
+
+class QuoteProcessResults(PermissiveMappingSchema):
+    description = (
+        "Results of the quote estimation. "
+        "Will be empty until completed. "
+        "Contents may vary according to the estimation methodology. "
+        "Each category provides details about its contribution toward the total."
+    )
+    flat = QuoteEstimateValue(missing=drop)
+    memory = QuoteEstimateValue(missing=drop)
+    storage = QuoteEstimateValue(missing=drop)
+    duration = QuoteEstimateValue(missing=drop)
+    cpu = QuoteEstimateValue(missing=drop)
+    gpu = QuoteEstimateValue(missing=drop)
+    total = PositiveNumber(default=0.0)
+
+
 class UserIdSchema(OneOfKeywordSchema):
     _one_of = [
         ExtendedSchemaNode(String(), missing=drop),
@@ -3616,6 +3656,7 @@ class StepQuotation(PartialQuoteSchema):
     estimatedDuration = DurationISO(missing=drop,
                                     description="Estimated duration of process execution in ISO-8601 format.")
     processParameters = QuoteProcessParameters(title="QuoteProcessParameters")
+    results = QuoteProcessResults(title="QuoteProcessResults", default={})
 
 
 class StepQuotationList(ExtendedSequenceSchema):

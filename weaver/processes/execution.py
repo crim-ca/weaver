@@ -585,7 +585,7 @@ def submit_job(request, reference, tags=None):
         raise TypeError("Invalid process or service reference to execute job.")
     queries = sd.LaunchJobQuerystring().deserialize(request.params)
     tags = queries.get("tags", "").split(",") + tags
-    user = request.authenticated_userid
+    user = request.authenticated_userid  # FIXME: consider other methods to provide the user
     headers = dict(request.headers)
     settings = get_settings(request)
     return submit_job_handler(json_body, settings, service_url, provider_id, process_id, is_workflow, is_local,
@@ -689,3 +689,24 @@ def submit_job_handler(payload,             # type: JSON
     }
     resp = get_job_submission_response(body, resp_headers)
     return resp
+
+
+def validate_process_io(process, payload):  # FIXME: implement
+    # type: (Process, JSON) -> None
+    """
+    Preemptively verify submitted parameters for execution against expected process definition.
+
+    Verify missing inputs or obvious type mismatches, but nothing too over-complicated. The ideas behind this
+    function is to avoid unnecessary assignation of :mod:`celery` worker and :term:`Docker` resources that would
+    be guaranteed to fail as soon as the process execution started.
+
+    This function is **NOT** intended to catch all erroneous inputs, nor validate their values.
+    For example, out-of-range values or unreachable file reference URLs are not guaranteed.
+    However, basic checks such as unacceptable types or cardinality can be performed.
+    Assumes that schema pre-validation was accomplished to minimally guarantee that the structure is valid.
+
+    :param process: Process description that provides expected inputs and outputs.
+    :param payload: Submitted job execution body.
+    :returns: None
+    :raises HTTPException: Corresponding error for detected invalid combination of inputs or outputs.
+    """

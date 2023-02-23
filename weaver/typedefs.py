@@ -443,6 +443,15 @@ if TYPE_CHECKING:
         "inputs": JobInputs,
         "outputs": JobOutputs,
     })
+    QuoteProcessResults = TypedDict("QuoteProcessResults", {
+        "flat": NotRequired[Number],
+        "memory": NotRequired[Number],
+        "storage": NotRequired[Number],
+        "duration": NotRequired[Number],
+        "cpu": NotRequired[Number],
+        "gpu": NotRequired[Number],
+        "total": NotRequired[Number],
+    }, total=False)
 
     # job execution statistics
     ApplicationStatistics = TypedDict("ApplicationStatistics", {

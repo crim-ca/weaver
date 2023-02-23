@@ -9,9 +9,9 @@ from weaver.config import WeaverFeature, get_weaver_configuration
 from weaver.database import get_db
 from weaver.datatype import Bill, Quote
 from weaver.exceptions import QuoteNotFound, log_unhandled_exceptions
-from weaver.execute import ExecuteMode
+from weaver.execute import ExecuteMode, validate_process_io
 from weaver.formats import OutputFormat
-from weaver.owsexceptions import OWSMissingParameterValue
+from weaver.owsexceptions import OWSInvalidParameterValue
 from weaver.processes.utils import get_process
 from weaver.processes.types import ProcessType
 from weaver.quotation.estimation import (
@@ -56,15 +56,17 @@ def request_quote(request):
     try:
         process_params = sd.QuoteProcessParametersSchema().deserialize(request.json)
     except colander.Invalid as exc:
-        raise OWSMissingParameterValue(json={
-            "title": "MissingParameterValue",
+        raise OWSInvalidParameterValue(json={
+            "title": "InvalidParameterValue",
             "cause": f"Invalid schema: [{exc.msg!s}]",
             "error": exc.__class__.__name__,
             "value": exc.value
         })
 
+    validate_process_io(process, process_params)
+
     quote_store = get_db(request).get_store(StoreQuotes)
-    quote_user = request.authenticated_userid
+    quote_user = request.authenticated_userid  # FIXME: consider other methods to provide the user
     quote_info = {
         "process": process.id,
         "processParameters": process_params,

@@ -1,6 +1,9 @@
+import copy
 import json
 import logging
+import tempfile
 import time
+import yaml
 from typing import TYPE_CHECKING
 
 import colander
@@ -15,7 +18,7 @@ from weaver.processes.wps_package import get_package_workflow_steps, get_process
 from weaver.processes.utils import pull_docker
 from weaver.quotation.status import QuoteStatus
 from weaver.store.base import StoreProcesses, StoreQuotes
-from weaver.utils import fully_qualified_name, get_settings, request_extra, wait_secs
+from weaver.utils import fully_qualified_name, get_any_id, get_any_value, get_settings, request_extra, wait_secs
 from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
@@ -65,6 +68,31 @@ def validate_quote_estimator_config(estimator):
     return estimator_config
 
 
+def prepare_quote_estimator_config(quote, process):
+    # type: (Quote, Process) -> JSON
+    """
+    Retrieves submitted quote input parameters and prepares them for the estimation using the process configuration.
+
+    All submitted inputs are made available to the estimator(s).
+    It is up to them to employ relevant inputs based on the quote estimation configuration applicable for this process.
+
+    According to the ``quote-estimator`` schema, complex inputs must provide the file size, while literals provide the
+    values directly. Weights are retrieved from the process configuration, but must be joined along inputs definition.
+
+    .. seealso::
+        https://github.com/crim-ca/weaver/blob/master/schemas/quote-estimator.yaml
+    """
+    quotation_inputs = normalize_ordered_io(quote.parameters)
+    estimator_config = copy.deepcopy(process.estimator)
+    process.inputs
+    estimator_inputs = estimator_config.get("inputs", {})
+    for input_param in quotation_inputs:
+        input_id = get_any_id(input_param)
+        input_val = get_any_value(input_param)
+        estimator_inputs.setdefault(input_id, {"weight": 1.0})
+        estimator_inputs[input_id]
+
+
 def estimate_process_quote(quote, process, settings=None):
     # type: (Quote, Process, Optional[AnySettingsContainer]) -> Quote
     """
@@ -93,17 +121,16 @@ def estimate_process_quote(quote, process, settings=None):
         raise QuoteEstimationError("Unable to retrieve quote estimator Docker image reference from settings.")
 
     try:
-        estimator_config = process.estimator
-        estimator_inputs = normalize_ordered_io(quote.parameters)
-        for input_param in quote.parameters:
-            if input_param
-
-        out_quote_json = docker_client.containers.run(
-            docker_ref.image,
-            ["--json", "--detail"],
-            auto_remove=True,
-            remove=True,
-        )
+        quote_config = prepare_quote_estimator_config(quote, process)
+        with tempfile.NamedTemporaryFile(suffix=".yaml", encoding="utf-8") as quote_file:
+            yaml.safe_dump(quote_config, quote_file, indent=2, sort_keys=False, encoding="utf-8", allow_unicode=True)
+            out_quote_json = docker_client.containers.run(
+                docker_ref.image,
+                ["--json", "--detail", "--config", "/tmp/quote-config.yaml"],
+                volumes={quote_file.name: {"bind": "/tmp/quote-config.yaml", "mode": "ro"}},
+                auto_remove=True,
+                remove=True,
+            )
         quote_result = json.loads(out_quote_json)
     except Exception as exc:
         err = "Docker execution failed to retrieve quote estimation."
@@ -116,10 +143,9 @@ def estimate_process_quote(quote, process, settings=None):
     # - https://currencylayer.com/documentation ("Currency Conversion Endpoint" section)
     quote.currency = "CAD"
 
-    quote.seconds = int(quote_result.get("duration", 0))
+    quote.seconds = int(quote_result.get("duration", {}).get("estimate", 0))
     quote.price = float(quote_result.get("total", 0))
     quote.process = process
-
     return quote
 
 
@@ -216,7 +242,6 @@ def execute_quote_estimator(task, quote_id):
             quote = estimate_workflow_quote(quote, process, settings=settings)
         else:
             quote = estimate_process_quote(quote, process, settings=settings)
-
         quote.detail = "Quote processing complete."
         quote.status = QuoteStatus.COMPLETED
         LOGGER.info("Quote estimation complete [%s]. Task: [%s]", quote.id, task_id)
