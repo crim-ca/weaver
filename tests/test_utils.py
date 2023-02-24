@@ -634,7 +634,7 @@ def test_fetch_directory_html(include_dir_heading,       # type: bool
         out_dir = stack.enter_context(tempfile.TemporaryDirectory())
         out_files = fetch_directory(f"{tmp_host}/dir/", out_dir)
         expect_files = filter(lambda _f: _f.startswith("dir/"), test_http_dir_files)
-        expect_files = [os.path.join(out_dir, file.split("/", 1)[-1]) for file in expect_files]
+        expect_files = [os.path.join(out_dir, file) for file in expect_files]
         assert list(out_files) == sorted(expect_files), (
             f"Out dir: [{out_dir}], Test dir:\n{repr_json(test_dir_files, indent=2)}"
         )

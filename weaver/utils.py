@@ -2872,6 +2872,14 @@ def fetch_directory(location,                           # type: str
                                     include=include, exclude=exclude,
                                     settings=settings, **option_kwargs)
     elif location.startswith("http://") or location.startswith("https://"):
+        # Next two lines are added to match behavior of `download_files_s3` and replicate input directory name
+        # in output location
+        input_directory_name = os.path.basename(os.path.normpath(location))
+        out_dir = os.path.join(out_dir, input_directory_name)
+        # This is to filter out request parameters from the input location and prevent them
+        # from being used as a directory
+        if "?" in out_dir:
+            out_dir = out_dir.split("?")[0]
         LOGGER.debug("Fetch directory resolved as remote HTTP reference. Will attempt listing contents.")
         resp = request_extra("GET", location)
         if resp.status_code != 200:

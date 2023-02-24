@@ -1243,7 +1243,7 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
             )
             # check that all expected files made it through the listing/directory input/output chaining between steps
             output_files = "\n".join(os.path.join(*line.rsplit("/", 2)[-2:]) for line in output_lines)
-            expect_files = "\n".join(os.path.join("input_dir", os.path.split(file)[-1]) for file in expect_http_files)
+            expect_files = "\n".join(os.path.join("output_dir", os.path.split(file)[-1]) for file in expect_http_files)
             self.assert_test(lambda: output_files == expect_files,
                              message="Workflow output file expected to contain single file with raw string listing of "
                                      "input files chained from generated output directory listing of the first step.")
