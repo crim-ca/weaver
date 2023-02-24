@@ -12,7 +12,9 @@ Changes
 
 Changes:
 --------
-- No change.
+- Fix `http` directory download to match implemented `AWS S3` directory download in `weaver.utils.fetch_directory`,
+  so both types replicate the input directory's top level folder, which is necessary when downloading
+  multiple directories for the same input source.
 
 Fixes:
 ------
