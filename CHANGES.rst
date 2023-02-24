@@ -12,9 +12,7 @@ Changes
 
 Changes:
 --------
-- Fix ``http`` directory download to match implemented ``AWS S3`` directory download in ``weaver.utils.fetch_directory``,
-  so both types replicate the input directory's top level folder, which is necessary when downloading
-  multiple directories for the same input source.
+- No change.
 
 Fixes:
 ------
@@ -29,7 +27,10 @@ Fixes:
   because they get stripped out by the operation.
 - Fix ``input-location`` definition for ``PACKAGE_DIRECTORY_TYPE`` input in
   ``weaver.processes.wps_package.WpsPackage.make_location_input``, which caused the wrong directory being given to
-  the cwl application.
+  the ``CWL`` application.
+- Fix ``http`` directory download to match implemented ``AWS S3`` directory download in ``weaver.utils.fetch_directory``,
+  so both types replicate the input directory's top level folder, which is necessary when downloading
+  multiple directories for the same input source.
 
 .. _changes_4.28.0:
 
