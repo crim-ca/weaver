@@ -488,7 +488,7 @@ def _save_deploy_process(process, override, container):
         db = get_db(container)
         store = db.get_store(StoreProcesses)
         new_process = store.save_process(process, overwrite=override)
-        process_summary = new_process.summary()
+        process_summary = new_process.summary(container=container)
     except ProcessRegistrationError as exc:
         raise HTTPConflict(json={
             "type": "ProcessRegistrationError",

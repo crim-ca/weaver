@@ -157,13 +157,16 @@ def get_provider_processes(request):
     Retrieve available provider processes (GetCapabilities).
     """
     detail = asbool(request.params.get("detail", True))
+    with_links = asbool(request.params.get("links", True)) and detail
     provider_id = request.matchdict.get("provider_id")
     store = get_db(request).get_store(StoreServices)
     service = store.fetch_by_name(provider_id)
     processes = service.processes(request)
-    processes = [p.summary() if detail else p.id for p in processes]
+    processes = [p.summary(links=with_links, container=request) if detail else p.id for p in processes]
     links = get_process_list_links(request, paging={}, total=None, provider=service)
-    return HTTPOk(json={"processes": processes, "links": links})
+    body = {"processes": processes, "links": links}
+    body = sd.ProcessesListing().deserialize(body)
+    return HTTPOk(json=body)
 
 
 @check_provider_requirements

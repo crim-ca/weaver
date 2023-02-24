@@ -94,6 +94,7 @@ from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional, Tuple, Type, Union
+    from typing_extensions import Literal, NotRequired, Required, TypedDict
     from urllib.parse import ParseResult
 
     from pywps.app import WPSRequest
@@ -124,15 +125,12 @@ if TYPE_CHECKING:
         ExecutionOutputs,
         JobValueFile,
         JSON,
-        Literal,
-        NotRequired,
         OpenAPISchema,
         OpenAPISchemaArray,
         OpenAPISchemaKeyword,
         OpenAPISchemaObject,
         OpenAPISchemaProperty,
-        OpenAPISchemaReference,
-        TypedDict
+        OpenAPISchemaReference
     )
     from weaver.wps_restapi.constants import JobInputsOutputsSchemaType
 
@@ -146,13 +144,26 @@ if TYPE_CHECKING:
     OWS_Input_Type = Union[OWS_Input_Base, BoundingBox, BoundingBoxDataInput, ComplexDataInput]
     OWS_Output_Type = Union[OWS_Output_Base, BoundingBox, BoundingBoxDataInput, ComplexData]
     OWS_IO_Type = Union[OWS_Input_Type, OWS_Output_Type]
-    JSON_IO_Type = JSON
+    JSON_Format = TypedDict("JSON_Format", {
+        "mime_type": Required[str],
+        "encoding": NotRequired[Optional[str]],
+        "schema": NotRequired[Optional[str]],
+        "maximumMegabytes": NotRequired[Optional[int]],
+        "default": NotRequired[bool],
+    }, total=True)
+    JSON_IO_TypeBase = TypedDict("JSON_IO_TypeBase", {
+        "id": Required[str],
+        "type": Required[str],
+        "identifier": NotRequired[str],
+    }, total=False)
+    JSON_IO_Type = Union[JSON, JSON_IO_TypeBase]
     JSON_IO_TypedInfo = TypedDict("JSON_IO_TypedInfo", {
         "type": WPS_DataType,
-        "data_type": Optional[str],
-        "data_uom": Optional[bool],
+        "data_type": NotRequired[Optional[str]],
+        "data_uom": NotRequired[Optional[bool]],
         "minOccurs": NotRequired[int],
         "maxOccurs": NotRequired[int],
+        "supported_formats": NotRequired[List[JSON_Format]],
     }, total=False)
     JSON_IO_ListOrMap = Union[List[JSON], Dict[str, Union[JSON, str]]]
     CWL_IO_Type = Union[CWL_Input_Type, CWL_Output_Type]
@@ -162,6 +173,7 @@ if TYPE_CHECKING:
     ANY_Metadata_Type = Union[OWS_Metadata, WPS_Metadata, Dict[str, str]]
     DataInputType = TypedDict("DataInputType", {
         "data": Union[float, int, bool, str],
+        "format": NotRequired[JSON_Format],
         # ** any other params
     }, total=False)
 
@@ -2825,12 +2837,13 @@ def wps2json_job_payload(wps_request, wps_process):
 def get_field(io_object,
               field,
               search_variations=False,
+              extra_variations=None,
               only_variations=False,
               pop_found=False,
               key=False,
               default=null,
               ):
-    # type: (Union[JSON, object], str, bool, bool, bool, bool, Any) -> Any
+    # type: (Union[JSON, object], str, bool, Optional[List[str]], bool, bool, bool, Any) -> Any
     """
     Gets a field by name from various I/O object types.
 
@@ -2847,6 +2860,7 @@ def get_field(io_object,
     :param io_object: Any I/O representation, either as a class instance or JSON container.
     :param field: Name of the field to look for, either as property or key name based on input object type.
     :param search_variations: If enabled, search for all variations to the field name to attempt search until matched.
+    :param extra_variations: Additional field names to consider as search variations, with priority over field mapping.
     :param only_variations: If enabled, skip the first 'basic' field and start search directly with field variations.
     :param pop_found: If enabled, whenever a match is found by field or variations, remove that entry from the object.
     :param key: If enabled, whenever a match is found by field or variations, return matched key instead of the value.
@@ -2864,8 +2878,10 @@ def get_field(io_object,
             value = getattr(io_object, field, null)
             if value is not null:
                 return field if key else value
-    if search_variations and field in WPS_FIELD_MAPPING:
-        for var in WPS_FIELD_MAPPING[field]:
+    variations = extra_variations or []
+    if search_variations or variations:
+        variations += WPS_FIELD_MAPPING.get(field, [])
+        for var in variations:
             value = get_field(io_object, var, search_variations=False, only_variations=False, pop_found=pop_found)
             if value is not null:
                 return var if key else value
@@ -2935,8 +2951,8 @@ def is_equal_formats(format1, format2):
     return False
 
 
-def normalize_ordered_io(io_section, order_hints=None):
-    # type: (JSON_IO_ListOrMap, Optional[JSON_IO_ListOrMap]) -> List[JSON]
+def normalize_ordered_io(io_section, order_hints=None, literal_value_key="type", literal_value_types=(str, )):
+    # type: (JSON_IO_ListOrMap, Optional[JSON_IO_ListOrMap], Literal["type", "value"], Tuple[Type, ...]) -> List[JSON]
     """
     Reorders and converts I/O from any representation (:class:`dict` or :class:`list`) considering given ordering hints.
 
@@ -2959,13 +2975,21 @@ def normalize_ordered_io(io_section, order_hints=None):
         Prior to Python 3.7 or CPython 3.5, preserved order is not guaranteed for *builtin* :class:`dict`.
         In this case the :paramref:`order_hints` is required to ensure same order.
 
+    When normalizing inputs into objects, any literal value detected within the normalized list will be converted into
+    consistent JSON objects. The objects will minimally contain the I/O ``id`` and the applicable literal value key.
+
     :param io_section: Definition contained under the ``inputs`` or ``outputs`` fields.
     :param order_hints: Optional/partial I/O definitions hinting an order to sort unsorted-dict I/O.
+    :param literal_value_key:
+        Key to employ when converting literal I/O values into a JSON definition.
+        For :term:`Process` descriptions, :term:`Application Package` and other definitions, ``"type"`` is
+        usually indented. For execution I/O
+    :param literal_value_types:
     :returns: I/O specified as list of dictionary definitions with preserved order (as good as possible).
     """
     if isinstance(io_section, list):
         return io_section
-    io_list = []
+    io_list = []  # type: List[JSON]
     io_dict = OrderedDict()
     if isinstance(io_section, dict) and not isinstance(io_section, OrderedDict) and order_hints and len(order_hints):
         # convert the hints themselves to list if they are provided as mapping
@@ -2990,8 +3014,8 @@ def normalize_ordered_io(io_section, order_hints=None):
         # I/O value can be a literal type string or dictionary with more details at this point
         # make it always detailed dictionary to avoid problems for later parsing
         # this is also required to make the list, since all list items must have a matching type
-        if isinstance(io_value, str):
-            io_list.append({"type": io_value})
+        if isinstance(io_value, literal_value_types):
+            io_list.append({literal_value_key: io_value})
         else:
             io_list.append(io_value)
         io_list[-1]["id"] = io_id

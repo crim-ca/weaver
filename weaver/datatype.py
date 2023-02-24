@@ -77,6 +77,7 @@ if TYPE_CHECKING:
         AnyProcess,
         AnyProcessRef,
         AnyRequestType,
+        AnyServiceRef,
         AnySettingsContainer,
         AnyUUID,
         AnyVersion,
@@ -2504,16 +2505,20 @@ class Process(Base):
         # process fields directly at root + I/O as mappings
         return sd.ProcessDescriptionOGC().deserialize(process)
 
-    def summary(self, revision=False):
-        # type: (bool) -> JSON
+    def summary(self, revision=False, links=True, container=None):
+        # type: (bool, bool, Optional[AnySettingsContainer]) -> JSON
         """
         Obtains the JSON serializable summary representation of the process.
 
         :param revision: Replace the process identifier by the complete tag representation.
+        :param links: Include process links in summary.
+        :param container: Application settings or database container to retrieve links and avoid reconnections.
         """
         data = self.dict()
         if revision:
             data["id"] = self.tag
+        if links:
+            data["links"] = self.links(container=container)
         return sd.ProcessSummary().deserialize(data)
 
     @staticmethod

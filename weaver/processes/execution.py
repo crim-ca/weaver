@@ -16,12 +16,12 @@ from pyramid_celery import celery_app as app
 from weaver.database import get_db
 from weaver.datatype import Process, Service
 from weaver.execute import ExecuteControlOption, ExecuteMode
-from weaver.formats import AcceptLanguage, ContentType
+from weaver.formats import AcceptLanguage, ContentType, clean_mime_type_format
 from weaver.notify import encrypt_email, notify_job_complete
-from weaver.owsexceptions import OWSNoApplicableCode
+from weaver.owsexceptions import OWSInvalidParameterValue, OWSNoApplicableCode
 from weaver.processes import wps_package
 from weaver.processes.constants import WPS_COMPLEX_DATA
-from weaver.processes.convert import get_field, ows2json_output_data
+from weaver.processes.convert import get_field, normalize_ordered_io, ows2json_output_data
 from weaver.processes.types import ProcessType
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.store.base import StoreJobs, StoreProcesses
@@ -70,10 +70,13 @@ if TYPE_CHECKING:
     from weaver.typedefs import (
         JSON,
         AnyAcceptLanguageHeader,
+        AnyProcessRef,
         AnyResponseType,
+        AnyServiceRef,
         CeleryResult,
         HeadersType,
         HeaderCookiesType,
+        ProcessExecution,
         SettingsType,
         Statistics
     )
@@ -592,11 +595,11 @@ def submit_job(request, reference, tags=None):
                               visibility, language=lang, headers=headers, tags=tags, user=user, context=context)
 
 
-def submit_job_handler(payload,             # type: JSON
+def submit_job_handler(payload,             # type: ProcessExecution
                        settings,            # type: SettingsType
                        service_url,         # type: str
-                       provider_id=None,    # type: Optional[str]
-                       process_id=None,     # type: str
+                       provider=None,       # type: Optional[AnyServiceRef]
+                       process=None,        # type: AnyProcessRef
                        is_workflow=False,   # type: bool
                        is_local=True,       # type: bool
                        visibility=None,     # type: Optional[AnyVisibility]
@@ -617,21 +620,33 @@ def submit_job_handler(payload,             # type: JSON
         raise HTTPBadRequest(f"Invalid schema: [{ex!s}]")
 
     db = get_db(settings)
+
+    # non-local is only a reference, no actual process object to validate
+    provider_id = provider.id if isinstance(provider, Service) else provider
+    if process and is_local and not isinstance(process, Process):
+        proc_store = db.get_store(StoreProcesses)
+        process = proc_store.fetch_by_id(process)
+    if process and is_local:
+        validate_process_io(process, json_body)
+    else:
+        LOGGER.warning(
+            "Skipping validation of execution parameters for remote process [%s] on provider [%s]",
+            process, provider_id
+        )
+
     headers = headers or {}
     if is_local:
-        proc_store = db.get_store(StoreProcesses)
-        process = proc_store.fetch_by_id(process_id)
         job_ctl_opts = process.jobControlOptions
     else:
         job_ctl_opts = ExecuteControlOption.values()
     max_wait = as_int(settings.get("weaver.exec_sync_max_wait"), default=20)
     mode, wait, applied = parse_prefer_header_execute_mode(headers, job_ctl_opts, max_wait)
-    get_header("prefer", headers, pop=True)
+    get_header("prefer", headers, pop=True)  # don't care about value, just ensure removed with any header container
     if not applied:  # whatever returned is a default, consider 'mode' in body as alternative
         is_execute_async = ExecuteMode.get(json_body.get("mode")) != ExecuteMode.SYNC   # convert auto to async
     else:
         # as per https://datatracker.ietf.org/doc/html/rfc7240#section-2
-        # Prefer header not resolve as valid still proces
+        # Prefer header not resolved with a valid value should still resume without error
         is_execute_async = mode != ExecuteMode.SYNC
     exec_resp = json_body.get("response")
 
@@ -639,7 +654,7 @@ def submit_job_handler(payload,             # type: JSON
     encrypted_email = encrypt_email(notification_email, settings) if notification_email else None
 
     store = db.get_store(StoreJobs)  # type: StoreJobs
-    job = store.save_job(task_id=Status.ACCEPTED, process=process_id, service=provider_id,
+    job = store.save_job(task_id=Status.ACCEPTED, process=process, service=provider_id,
                          inputs=json_body.get("inputs"), outputs=json_body.get("outputs"),
                          is_local=is_local, is_workflow=is_workflow, access=visibility, user_id=user, context=context,
                          execute_async=is_execute_async, execute_response=exec_resp,
@@ -692,7 +707,7 @@ def submit_job_handler(payload,             # type: JSON
 
 
 def validate_process_io(process, payload):  # FIXME: implement
-    # type: (Process, JSON) -> None
+    # type: (Process, ProcessExecution) -> None
     """
     Preemptively verify submitted parameters for execution against expected process definition.
 
@@ -710,3 +725,71 @@ def validate_process_io(process, payload):  # FIXME: implement
     :returns: None
     :raises HTTPException: Corresponding error for detected invalid combination of inputs or outputs.
     """
+    payload_inputs = normalize_ordered_io(payload.get("inputs", {}), literal_value_key="value")
+    payload_outputs = normalize_ordered_io(payload.get("outputs", {}), literal_value_key="value")
+
+    for io_type, io_payload, io_process in [
+        ("inputs", payload_inputs, process.inputs),
+        ("outputs", payload_outputs, process.outputs),
+    ]:
+        io_payload_set = {get_any_id(io_info) for io_info in io_payload}  # can have repeated IDs (list representation)
+        io_process_map = {get_any_id(io_info): io_info for io_info in io_process}  # guaranteed unique IDs
+        unknown_ids = set(io_payload_set) - set(io_process_map)
+        if unknown_ids:
+            raise OWSInvalidParameterValue(json={
+                "code": "InvalidParameterValue",
+                "name": io_type,
+                "description": f"Submitted execution {io_type} contain unknown identifiers to the process description.",
+                "value": list(unknown_ids),
+            })
+        for io_id, io_proc in io_process_map.items():
+            io_name = f"{io_type}.{io_id}"
+            io_exec = list(filter(lambda _io: get_any_id(_io) == io_id, io_payload))
+            io_format = io_proc.get("formats", [])
+            # validate format if more strict supported Media-Types are specified
+            # requested format must match with the supported ones by the process
+            # ignore explict any or default plain text representation always available
+            if io_format:
+                io_ctypes = {
+                    # field 'type' as Content-Type is only valid in execute payload
+                    # during process description, it is used as the data/value type
+                    get_field(io_fmt, "mime_type", extra_variations=["type"])
+                    for io_fmt in io_exec
+                }
+                io_ctypes = [ctype for ctype in io_ctypes if ctype]
+                io_accept = [
+                    clean_mime_type_format(get_field(io_fmt, "mime_type"), strip_parameters=True)
+                    for io_fmt in io_format
+                ]
+                io_accept = [ctype for ctype in io_accept if ctype]
+                any_types = [ContentType.ANY, ContentType.TEXT_PLAIN]
+                io_accept += any_types
+                if not all(io_fmt in io_accept for io_fmt in io_ctypes):
+                    raise OWSInvalidParameterValue(json={
+                        "code": "InvalidParameterValue",
+                        "name": io_name,
+                        "description": (
+                            f"Submitted '{io_name}' requested Content-Types that do not respect"
+                            "supported formats specified by the process description."
+                        ),
+                        "value": {
+                            "supportedFormats": io_accept,
+                            "executionFormats": io_ctypes,
+                        }
+                    })
+
+            if io_type == "inputs":
+                io_min = io_proc["minOccurs"]
+                io_max = io_proc["maxOccurs"]
+                io_len = len(io_exec)
+                if io_len < io_min or (isinstance(io_max, int) and io_len > io_max):
+                    raise OWSInvalidParameterValue(json={
+                        "code": "InvalidParameterValue",
+                        "name": io_name,
+                        "description": f"Submitted '{io_name}' does not respect process description cardinality.",
+                        "value": {
+                            "minOccurs": io_min,
+                            "maxOccurs": io_max,
+                            "occurrences": io_len,
+                        }
+                    })

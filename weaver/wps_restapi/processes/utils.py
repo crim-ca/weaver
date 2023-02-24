@@ -58,8 +58,8 @@ def resolve_process_tag(request, process_query=False):
     return process_id
 
 
-def get_processes_filtered_by_valid_schemas(request):
-    # type: (PyramidRequest) -> Tuple[List[JSON], List[str], Dict[str, Optional[int]], bool, int]
+def get_processes_filtered_by_valid_schemas(request, detail=True):
+    # type: (PyramidRequest, bool) -> Tuple[List[JSON], List[str], Dict[str, Optional[int]], bool, int]
     """
     Validates the processes summary schemas and returns them into valid/invalid lists.
 
@@ -71,6 +71,7 @@ def get_processes_filtered_by_valid_schemas(request):
         with_providers = asbool(request.params.get("providers", False))
     revisions_param = sd.ProcessRevisionsQuery(unknown="ignore").deserialize(request.params)
     with_revisions = revisions_param.get("revisions")
+    with_links = asbool(request.params.get("links", False)) and detail
     paging_query = sd.ProcessPagingQuery()
     paging_value = {param.name: param.default for param in paging_query.children}
     paging_names = set(paging_value)
@@ -94,7 +95,7 @@ def get_processes_filtered_by_valid_schemas(request):
     for process in processes:  # type: Process
         try:
             try:
-                valid_processes.append(process.summary(revision=with_revisions))
+                valid_processes.append(process.summary(revision=with_revisions, links=with_links, container=request))
             except (InvalidVersion, ValueError) as exc:
                 raise colander.Invalid(sd.ProcessSummary, value=None, msg=str(exc))
         except colander.Invalid as invalid:

@@ -1816,7 +1816,7 @@ class VisibilitySchema(ExtendedMappingSchema):
 
 
 class QuoteEstimatorConfigurationSchema(ExtendedMappingSchema):
-    _schema = f"{WEAVER_SCHEMA_URL}/quote-estimator.yaml#/definitions/Configuration"
+    _schema = f"{WEAVER_SCHEMA_URL}/quotation/quote-estimator.yaml#/definitions/Configuration"
     description = "Quote Estimator Configuration"
 
     def deserialize(self, cstruct):
@@ -1854,6 +1854,8 @@ class QuoteEstimatorOutputParametersSchema(ExtendedMappingSchema):
 
 
 class QuoteEstimatorSchema(ExtendedMappingSchema):
+    _schema = f"{WEAVER_SCHEMA_URL}/quotation/quote-estimator.yaml"
+    description = "Configuration of the quote estimation algorithm for a given process."
     config = QuoteEstimatorConfigurationSchema()
     inputs = QuoteEstimatorInputParametersSchema(missing=drop, default={})
     outputs = QuoteEstimatorOutputParametersSchema(missing=drop, default={})
@@ -3044,6 +3046,7 @@ class ProcessSummary(
     """
     Summary process definition.
     """
+    _schema = f"{OGC_API_SCHEMA_CORE}/processSummary.yaml"
     _sort_first = PROCESS_DESCRIPTION_FIELD_FIRST
     _sort_after = PROCESS_DESCRIPTION_FIELD_AFTER
 
@@ -3132,6 +3135,7 @@ class ProcessDescriptionOGC(
     inputs = DescribeInputTypeMap(description="Inputs definition of the process.", missing=drop, default={})
     outputs = DescribeOutputTypeMap(description="Outputs definition of the process.")
 
+    _schema = f"{OGC_API_SCHEMA_CORE}/process.yaml"
     _sort_first = PROCESS_DESCRIPTION_FIELD_FIRST
     _sort_after = PROCESS_DESCRIPTION_FIELD_AFTER
 
@@ -3170,6 +3174,7 @@ class ProcessDeployment(ProcessSummary, ProcessContext, ProcessDeployMeta):
                     f"overrides (see '{DOC_URL}/package.html#correspondence-between-cwl-and-wps-fields')")
     visibility = VisibilityValue(missing=drop)
 
+    _schema = f"{OGC_API_SCHEMA_EXT_DEPLOY}/processSummary.yaml"
     _sort_first = PROCESS_DESCRIPTION_FIELD_FIRST
     _sort_after = PROCESS_DESCRIPTION_FIELD_AFTER
 
@@ -3622,6 +3627,7 @@ class QuoteEstimateValue(PermissiveMappingSchema):
 
 
 class QuoteProcessResults(PermissiveMappingSchema):
+    _schema = f"{WEAVER_SCHEMA_URL}/quotation/quote-estimation-result.yaml"
     description = (
         "Results of the quote estimation. "
         "Will be empty until completed. "
@@ -5514,6 +5520,13 @@ class ProcessDetailQuery(ExtendedMappingSchema):
     )
 
 
+class ProcessLinksQuery(ExtendedMappingSchema):
+    links = ExtendedSchemaNode(
+        QueryBoolean(), example=True, default=True, missing=drop,
+        description="Return summary details with included links for each process."
+    )
+
+
 class ProcessRevisionsQuery(ExtendedMappingSchema):
     process = ProcessIdentifier(missing=drop, description=(
         "Process ID (excluding version) for which to filter results. "
@@ -5529,7 +5542,7 @@ class ProcessRevisionsQuery(ExtendedMappingSchema):
     )
 
 
-class ProviderProcessesQuery(ProcessPagingQuery, ProcessDetailQuery):
+class ProviderProcessesQuery(ProcessPagingQuery, ProcessDetailQuery, ProcessLinksQuery):
     pass
 
 
@@ -5720,7 +5733,7 @@ class OkGetProviderProcessesSchema(ExtendedMappingSchema):
     body = ProviderProcessesSchema()
 
 
-class GetProcessesQuery(ProcessPagingQuery, ProcessDetailQuery, ProcessRevisionsQuery):
+class GetProcessesQuery(ProcessPagingQuery, ProcessDetailQuery, ProcessLinksQuery, ProcessRevisionsQuery):
     providers = ExtendedSchemaNode(
         QueryBoolean(), example=True, default=False, missing=drop,
         description="List local processes as well as all sub-processes of all registered providers. "
@@ -5741,6 +5754,7 @@ class GetProcessesEndpoint(ExtendedMappingSchema):
 
 
 class ProviderProcessesListing(ProcessCollection):
+    _schema = f"{OGC_API_SCHEMA_CORE}/processList.yaml"
     _sort_first = ["id", "processes"]
     id = ProviderNameSchema()
 
@@ -5753,18 +5767,26 @@ class ProvidersProcessesCollection(ExtendedMappingSchema):
     providers = ProviderProcessesList(missing=drop)
 
 
+class ProcessListingLinks(ExtendedMappingSchema):
+    links = LinkList(missing=drop)
+
+
 class ProcessListingMetadata(ExtendedMappingSchema):
     description = "Metadata relative to the listed processes."
     page = ExtendedSchemaNode(Integer(), misisng=drop, default=None, validator=Range(min=0))
     limit = ExtendedSchemaNode(Integer(), missing=drop, default=None, validator=Range(min=1))
     total = ExtendedSchemaNode(Integer(), description="Total number of local processes, or also including all "
                                                       "remote processes across providers if requested.")
-    links = LinkList(missing=drop)
 
 
-class MultiProcessesListing(DescriptionSchema, ProcessCollection, ProvidersProcessesCollection, ProcessListingMetadata):
+class ProcessesListing(ProcessCollection, ProcessListingLinks):
+    _schema = f"{OGC_API_SCHEMA_CORE}/processList.yaml"
     _sort_first = PROCESSES_LISTING_FIELD_FIRST
     _sort_after = PROCESSES_LISTING_FIELD_AFTER
+
+
+class MultiProcessesListing(DescriptionSchema, ProcessesListing, ProvidersProcessesCollection, ProcessListingMetadata):
+    pass
 
 
 class OkGetProcessesListResponse(ExtendedMappingSchema):
@@ -6048,6 +6070,21 @@ class OkGetQuoteInfoResponse(ExtendedMappingSchema):
 class OkGetQuoteListResponse(ExtendedMappingSchema):
     header = ResponseHeaders()
     body = QuotationListSchema()
+
+
+class OkGetEstimatorResponse(ExtendedMappingSchema):
+    header = ResponseHeaders()
+    body = QuoteEstimatorSchema()
+
+
+class OkPutEstimatorResponse(ExtendedMappingSchema):
+    header = ResponseHeaders()
+    body = DescriptionSchema()
+
+
+class OkDeleteEstimatorResponse(ExtendedMappingSchema):
+    header = ResponseHeaders()
+    body = DescriptionSchema()
 
 
 class OkGetBillDetailResponse(ExtendedMappingSchema):
@@ -6558,6 +6595,18 @@ post_quotes_responses = {
 }
 post_quote_responses = {
     "201": CreatedQuoteExecuteResponse(description="success"),
+    "500": InternalServerErrorResponseSchema(),
+}
+get_process_quote_estimator_responses = {
+    "200": OkGetEstimatorResponse(description="success"),
+    "500": InternalServerErrorResponseSchema(),
+}
+put_process_quote_estimator_responses = {
+    "200": OkPutEstimatorResponse(description="success"),
+    "500": InternalServerErrorResponseSchema(),
+}
+delete_process_quote_estimator_responses = {
+    "204": OkDeleteEstimatorResponse(description="success"),
     "500": InternalServerErrorResponseSchema(),
 }
 get_bill_list_responses = {

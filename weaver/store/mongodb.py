@@ -72,6 +72,7 @@ if TYPE_CHECKING:
         AnyProcess,
         AnyProcessClass,
         AnyProcessRef,
+        AnyServiceRef,
         AnyUUID,
         AnyValueType,
         AnyVersion,
@@ -765,8 +766,8 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
 
     def save_job(self,
                  task_id,                   # type: AnyUUID
-                 process,                   # type: str
-                 service=None,              # type: Optional[str]
+                 process,                   # type: AnyProcessRef
+                 service=None,              # type: Optional[AnyServiceRef]
                  inputs=None,               # type: Optional[ExecutionInputs]
                  outputs=None,              # type: Optional[ExecutionOutputs]
                  is_workflow=False,         # type: bool
@@ -798,6 +799,8 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
             if not access:
                 access = Visibility.PRIVATE
 
+            process = process.tag if isinstance(process, Process) else process
+            service = service.id if isinstance(service, Service) else service
             new_job = Job({
                 "task_id": task_id,
                 "user_id": user_id,

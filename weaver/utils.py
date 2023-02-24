@@ -614,13 +614,13 @@ def parse_prefer_header_execute_mode(
     :param header_container: Request headers to retrieve preference, if any available.
     :param supported_modes:
         Execute modes that are permitted for the operation that received the ``Prefer`` header.
-        Resolved mode will respect this constrain following specification requirements of :term:`OGC API - Processes`.
+        Resolved mode will respect this constraint following specification requirements of :term:`OGC API - Processes`.
     :param wait_max:
         Maximum wait time enforced by the server. If requested wait time is greater, ``wait`` preference will not be
-        applied and will fallback to asynchronous response.
+        applied and will fall back to asynchronous response.
     :return:
         Tuple of resolved execution mode, wait time if specified, and header of applied preferences if possible.
-        Maximum wait time indicates duration until synchronous response should fallback to asynchronous response.
+        Maximum wait time indicates duration until synchronous response should fall back to asynchronous response.
     :raises HTTPBadRequest: If contents of ``Prefer`` are not valid.
     """
 

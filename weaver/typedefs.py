@@ -67,7 +67,7 @@ if TYPE_CHECKING:
     from weaver.execute import AnyExecuteControlOption, AnyExecuteMode, AnyExecuteResponse, AnyExecuteTransmissionMode
     from weaver.processes.constants import CWL_RequirementNames
     from weaver.processes.wps_process_base import WpsProcessInterface
-    from weaver.datatype import Process
+    from weaver.datatype import Process, Service
     from weaver.status import AnyStatusType
     from weaver.visibility import AnyVisibility
 
@@ -331,6 +331,7 @@ if TYPE_CHECKING:
     AnyProcess = Union[Process, ProcessOWS, ProcessWPS, JSON]
     AnyProcessRef = Union[Process, str]
     AnyProcessClass = Union[Type[Process], Type[ProcessWPS], Type[str]]
+    AnyServiceRef = Union[Service, str]
 
     # update_status(message, progress, status, *args, **kwargs)
     UpdateStatusPartialFunction = TypeVar(
@@ -822,4 +823,5 @@ if TYPE_CHECKING:
         "response": NotRequired[AnyExecuteResponse],
         "inputs": Required[ExecutionInputs],
         "outputs": Required[ExecutionOutputs],
+        "notification_email": NotRequired[str],
     }, total=False)

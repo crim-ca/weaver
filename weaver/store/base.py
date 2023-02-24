@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from weaver.status import AnyStatusSearch
     from weaver.typedefs import (
         AnyProcessRef,
+        AnyServiceRef,
         AnyUUID,
         AnyVersion,
         ExecutionInputs,
@@ -149,8 +150,8 @@ class StoreJobs(StoreInterface):
     @abc.abstractmethod
     def save_job(self,
                  task_id,                   # type: str
-                 process,                   # type: str
-                 service=None,              # type: Optional[str]
+                 process,                   # type: AnyProcessRef
+                 service=None,              # type: Optional[AnyServiceRef]
                  inputs=None,               # type: Optional[ExecutionInputs]
                  outputs=None,              # type: Optional[ExecutionOutputs]
                  is_workflow=False,         # type: bool

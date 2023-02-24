@@ -12,7 +12,32 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add ``weaver.quotation = true|false`` setting that allows control over the activation of all endpoints and operations
+  related to the `OGC API - Processes` |ogc-proc-ext-billing-short|_ and |ogc-proc-ext-quotation-short|_ extensions.
+- Add support to configure a quotation estimation algorithm for each respective `Process` with new requests
+  using ``GET``, ``PUT``, ``DELETE`` methods on ``/processes/{processID}/estimator`` endpoint. The configured
+  algorithm is provided by a reference `Docker` image defined by ``weaver.quotation_docker_[...]`` settings.
+  The algorithm itself expects an highly customisable configuration to estimate quotation parameters based on
+  conceptual categories, as defined by the |quote-estimator|_ schema optionally using versatile `ONNX`_ definitions.
+  The `Docker` operation should return a JSON matching the |quote-estimation-result|_ schema, which is parsed and
+  included in the produced `Quote` based on provided `Process` execution parameters.
+- Add `Process` execution I/O pre-validation against the `Process` description before submitting the `Job` to avoid
+  uncessary allocation of computing resources for erroneous cases that can easily be detected in advance.
+- Add ``$schema`` references to source `OGC API - Processes` or other schema registries for applicable content
+  definitions in responses.
+- Add ``links`` request query parameter to ``/processes`` and ``/providers/{providerID}/processes`` listing to
+  provide control over reporting of ``links`` for each `Process` summary item. By default ``link=true`` and
+  automatically disable it when ``detail=false`` is specified.
+
+.. |ogc-proc-ext-billing-short| replace:: Billing
+.. _ogc-proc-exc-billing-short: https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/billing
+.. |ogc-proc-ext-quotation-short| replace:: Quotation
+.. _ogc-proc-exc-quotation-short: https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/quotation
+.. |quote-estimator| replace:: Quote Estimator
+.. _quote-estimator: ./schemas/quotation/quote-estimator.yaml
+.. |quote-estimation-result| replace:: Quote Estimation Result
+.. _quote-estimation-result: ./schemas/quotation/quote-estimation-result.yaml
+.. _ONNX: https://onnx.ai/
 
 Fixes:
 ------

@@ -78,7 +78,7 @@ def get_processes(request):
     try:
         # get local processes and filter according to schema validity
         # (previously deployed process schemas can become invalid because of modified schema definitions
-        results = get_processes_filtered_by_valid_schemas(request)
+        results = get_processes_filtered_by_valid_schemas(request, detail=detail)
         processes, invalid_processes, paging, with_providers, total_processes = results
         if invalid_processes:
             raise HTTPServiceUnavailable(

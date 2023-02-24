@@ -9,9 +9,10 @@ from weaver.config import WeaverFeature, get_weaver_configuration
 from weaver.database import get_db
 from weaver.datatype import Bill, Quote
 from weaver.exceptions import QuoteNotFound, log_unhandled_exceptions
-from weaver.execute import ExecuteMode, validate_process_io
+from weaver.execute import ExecuteMode
 from weaver.formats import OutputFormat
 from weaver.owsexceptions import OWSInvalidParameterValue
+from weaver.processes.execution import validate_process_io
 from weaver.processes.utils import get_process
 from weaver.processes.types import ProcessType
 from weaver.quotation.estimation import (
@@ -109,9 +110,9 @@ def request_quote(request):
 
 @sd.process_estimator_service.get(tags=[sd.TAG_BILL_QUOTE, sd.TAG_PROCESSES], renderer=OutputFormat.JSON,
                                   schema=sd.ProcessQuoteEstimatorGetEndpoint(),
-                                  response_schemas=sd.get_estimator_responses)
+                                  response_schemas=sd.get_process_quote_estimator_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
-def get_quote_estimator(request):
+def get_process_quote_estimator(request):
     # type: (PyramidRequest) -> AnyViewResponse
     """
     Get the process quote estimator configuration.
@@ -123,9 +124,9 @@ def get_quote_estimator(request):
 
 @sd.process_estimator_service.put(tags=[sd.TAG_BILL_QUOTE, sd.TAG_PROCESSES], renderer=OutputFormat.JSON,
                                   schema=sd.ProcessQuoteEstimatorPutEndpoint(),
-                                  response_schemas=sd.put_estimator_responses)
+                                  response_schemas=sd.put_process_quote_estimator_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
-def update_quote_estimator(request):
+def update_process_quote_estimator(request):
     # type: (PyramidRequest) -> AnyViewResponse
     """
     Replace the process quote estimator configuration.
@@ -134,14 +135,14 @@ def update_quote_estimator(request):
     store = get_db(request).get_store(StoreProcesses)
     process = get_process(request=request, store=store)
     store.set_estimator(process, estimator_config)
-    return HTTPOk(json={"message": "Process quote estimator updated."})
+    return HTTPOk(json={"description": "Process quote estimator updated."})
 
 
 @sd.process_estimator_service.delete(tags=[sd.TAG_BILL_QUOTE, sd.TAG_PROCESSES], renderer=OutputFormat.JSON,
                                      schema=sd.ProcessQuoteEstimatorDeleteEndpoint(),
-                                     response_schemas=sd.delete_estimator_responses)
+                                     response_schemas=sd.delete_process_quote_estimator_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
-def delete_quote_estimator(request):
+def delete_process_quote_estimator(request):
     # type: (PyramidRequest) -> AnyViewResponse
     """
     Reset the process quote estimator configuration to the default values.
@@ -149,7 +150,7 @@ def delete_quote_estimator(request):
     store = get_db(request).get_store(StoreProcesses)
     process = get_process(request=request, store=store)
     store.set_estimator(process, {})
-    return HTTPOk(json={"message": "Process quote estimator deleted. Defaults will be used."})
+    return HTTPOk(json={"description": "Process quote estimator deleted. Defaults will be used."})
 
 
 @sd.process_quotes_service.get(tags=[sd.TAG_BILL_QUOTE, sd.TAG_PROCESSES], renderer=OutputFormat.JSON,
