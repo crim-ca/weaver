@@ -191,7 +191,10 @@ class TestWeaverClient(TestWeaverClientBase):
         result = self.process_listing_op(self.client.processes, with_providers=True)
         assert len(result.body["processes"]) > 0, "Local processes should be reported as well along with providers."
         assert "providers" in result.body
-        assert result.body["providers"] == [
+        providers = result.body["providers"]
+        for prov in providers:
+            prov.pop("$schema", None)
+        assert providers == [
             {"id": prov1.name, "processes": resources.TEST_EMU_WPS1_PROCESSES},
             {"id": prov2.name, "processes": resources.TEST_HUMMINGBIRD_WPS1_PROCESSES},
             {"id": prov3.name, "processes": resources.TEST_REMOTE_SERVER_WPS1_PROCESSES},
