@@ -5,7 +5,7 @@ Weaver
 **Implementations**
 
 * |ogc-proc-long|
-* |wps|
+* |wps-long|
 * |esgf| processes
 * |cwl| for |ogc-apppkg|_
 * |ems| for Workflows
@@ -211,10 +211,24 @@ For convenience, following tags are also available:
 
 Following links correspond to existing servers with `Weaver` configured as *EMS*/*ADES* instances respectively.
 
-- HYBRID Server: https://service.crim.ca/
-- ADES Test server: https://ogc-ades.crim.ca/weaver/
-- EMS Test server: https://ogc-ems.crim.ca/weaver/
-- EMS Extra server: https://ogc.crim.ca/ems/
+.. list-table::
+    :header-rows: 1
+
+    * - Status
+      - Description
+      - Entrypoint
+    * - <span style="color:green">**active**</span>
+      - HYBRID Server
+      - https://service.crim.ca/
+    * - <span style="color:grey">**deprecated**</span>
+      - ADES Test server
+      - https://ogc-ades.crim.ca/weaver/
+    * - <span style="color:grey">**deprecated**</span>
+      - EMS Test server
+      - https://ogc-ems.crim.ca/weaver/
+    * - <span style="color:grey">**deprecated**</span>
+      - EMS Extra server
+      - https://ogc.crim.ca/weaver/
 
 .. note::
     The test servers will **not** necessarily be up-to-date with the *latest* version.
@@ -261,6 +275,9 @@ standards in the context of natural resources applications. The advancements are
 
 Developments are continued in |ogc-tb16|_ to improve methodologies in order to provide better
 interoperable geospatial data processing in the areas of Earth Observation Application Packages.
+Findings and recommendations are presented in the |ogc-tb16-data-access-proc-er|_.
+
+.. fixme: deploy from ipynb, add |ogc-tb16-ipynb-er| (https://github.com/crim-ca/weaver/issues/63)
 
 Videos and more functionalities were introduced in `Weaver` following |ogc-eo-apps-pilot|_.
 Corresponding developments are reported in the |ogc-eo-apps-pilot-er|_.
@@ -283,24 +300,30 @@ It is part of `PAVICS`_ and `Birdhouse`_ ecosystems and is available within the 
 .. _`Earth System Grid Federation`: https://esgf.llnl.gov/
 .. |ems| replace:: `Execution Management Service` (EMS)
 .. |ades| replace:: `Application, Deployment and Execution Service` (ADES)
-.. |wps| replace:: `Web Processing Services` (WPS)
+.. |wps| replace:: `Web Processing Services`
+.. _wps: https://www.ogc.org/standard/wps/
+.. |wps-long| replace:: |wps|_ (WPS)
 .. |ogc| replace:: Open Geospatial Consortium
 .. _ogc: https://www.ogc.org/
 .. |ogc-api-proc| replace:: `OGC API - Processes`
 .. _ogc-api-proc: https://github.com/opengeospatial/ogcapi-processes
 .. |ogc-proc-long| replace:: |ogc-api-proc|_ (WPS-REST bindings)
 .. |ogc-tb14| replace:: OGC Testbed-14
-.. _ogc-tb14: https://www.ogc.org/projects/initiatives/testbed14
+.. _ogc-tb14: https://www.ogc.org/initiatives/testbed-14/
 .. |ogc-tb14-platform-er| replace:: ADES & EMS Results and Best Practices Engineering Report
 .. _ogc-tb14-platform-er: http://docs.opengeospatial.org/per/18-050r1.html
 .. |ogc-tb15-ml| replace:: OGC Testbed-15 - ML Thread
-.. _ogc-tb15-ml: https://www.ogc.org/projects/initiatives/testbed15#MachineLearning
+.. _ogc-tb15-ml: https://www.ogc.org/initiatives/testbed-15/#MachineLearning
 .. |ogc-tb15-ml-er| replace:: OGC Testbed-15: Machine Learning Engineering Report
 .. _ogc-tb15-ml-er: http://docs.opengeospatial.org/per/19-027r2.html
 .. |ogc-tb16| replace:: OGC Testbed-16
-.. _ogc-tb16: https://www.ogc.org/projects/initiatives/t-16
+.. _ogc-tb16: https://www.ogc.org/initiatives/t-16/
+.. |ogc-tb16-data-access-proc-er| replace:: OGC Testbed-16: Data Access and Processing Engineering Report
+.. _ogc-tb16-data-access-proc-er: http://docs.opengeospatial.org/per/20-016.html
+.. |ogc-tb16-ipynb-er| replace:: OGC Testbed-16: Earth Observation Application Packages with Jupyter Notebooks Engineering Report
+.. _ogc-tb16-ipynb-er: http://docs.opengeospatial.org/per/20-035.html
 .. |ogc-eo-apps-pilot| replace:: OGC Earth Observation Applications Pilot
-.. _ogc-eo-apps-pilot: https://www.ogc.org/eoapps
+.. _ogc-eo-apps-pilot: https://www.ogc.org/initiatives/eoa-pilot/
 .. |ogc-eo-apps-pilot-er| replace:: OGC Earth Observation Applications Pilot: CRIM Engineering Report
 .. _ogc-eo-apps-pilot-er: http://docs.opengeospatial.org/per/20-045.html
 .. |ogc-best-practices-eo-apppkg| replace:: OGC Best Practice for Earth Observation Application Package

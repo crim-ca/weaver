@@ -757,8 +757,8 @@ Changes:
   a full-fledged ``Deploy`` HTTP request, and other recurrent tasks such as ``Execute`` requests followed by `Job`
   monitoring and results retrieval once completed successfully
   (resolves `#363 <https://github.com/crim-ca/weaver/issues/363>`_,
-  resolves `DAC-198 <https://www.crim.ca/jira/browse/DAC-198>`_,
-  relates to `DAC-203 <https://www.crim.ca/jira/browse/DAC-203>`_).
+  resolves `DAC-198 <https://crim-ca.atlassian.net/jira/software/c/projects/DAC/issues/DAC-198>`_,
+  relates to `DAC-203 <https://crim-ca.atlassian.net/jira/software/c/projects/DAC/issues/DAC-203>`_).
 - Added ``weaver`` command installation to ``setup.py`` script.
 - Added auto-documentation utilities for new ``weaver`` CLI (argparse parameter definitions) and provide relevant
   references in new chapter in Sphinx documentation.
