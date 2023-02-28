@@ -481,7 +481,7 @@ def get_cookie_headers(header_container, cookie_header_name="Cookie"):
     try:
         cookie = get_header(cookie_header_name, header_container)
         if cookie:
-            return dict(Cookie=get_header(cookie_header_name, header_container))
+            return {"Cookie": get_header(cookie_header_name, header_container)}
         return {}
     except KeyError:  # No cookie
         return {}

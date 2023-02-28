@@ -2749,7 +2749,8 @@ def wps2json_io(io_wps, forced_fields=False):
             io_single_fmt_mime_type = get_field(io_wps_json["formats"][0], "mime_type", search_variations=True)
             if io_default:
                 io_default_mime_type = get_field(io_default, "mime_type", search_variations=True)
-                io_wps_json["formats"][0]["default"] = (io_default_mime_type == io_single_fmt_mime_type)
+                io_fmt_is_default = (io_default_mime_type == io_single_fmt_mime_type)  # pylint: disable=C0325
+                io_wps_json["formats"][0]["default"] = io_fmt_is_default
             elif DEFAULT_FORMAT.mime_type == io_single_fmt_mime_type:
                 io_supported = get_field(io_wps, "supported_formats", default=[DEFAULT_FORMAT])
                 io_missing = get_field(io_supported[0], DEFAULT_FORMAT_MISSING, default=False)
