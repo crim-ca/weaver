@@ -44,7 +44,7 @@ esgf-compute-api @ git+https://github.com/ESGF/esgf-compute-api.git@v2.3.7
 # it is also only available for Python >=3.5
 # use pserve to continue supporting config.ini with paste settings
 gunicorn>=20.0.4
-json2xml<3.19.0; python_version <= "3.6"
+json2xml<3.19.0; python_version <= "3.6"  # pyup: ignore
 # reduced dependencies contrains to let packages update to latest (https://github.com/vinitkumar/json2xml/issues/157)
 json2xml>=3.20.0; python_version >= "3.7"
 jsonschema>=3.0.1
