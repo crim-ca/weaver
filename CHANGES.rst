@@ -22,12 +22,16 @@ Changes:
   The `Docker` operation should return a JSON matching the |quote-estimation-result|_ schema, which is parsed and
   included in the produced `Quote` based on provided `Process` execution parameters.
 - Add `Process` execution I/O pre-validation against the `Process` description before submitting the `Job` to avoid
-  uncessary allocation of computing resources for erroneous cases that can easily be detected in advance.
+  unnecessary allocation of computing resources for erroneous cases that can easily be detected in advance.
 - Add ``$schema`` references to source `OGC API - Processes` or other schema registries for applicable content
   definitions in responses.
+- Add missing `OGC API - Processes` schema references with published definitions
+  under ``https://schemas.opengis.net/ogcapi/processes/part1/1.0/`` when applicable.
 - Add ``links`` request query parameter to ``/processes`` and ``/providers/{providerID}/processes`` listing to
   provide control over reporting of ``links`` for each `Process` summary item. By default ``link=true`` and
   automatically disable it when ``detail=false`` is specified.
+- Add missing ``405`` response schema for all `OpenAPI` endpoints as handled by the API when the requested HTTP method
+  is not applicable for the given path.
 
 .. |ogc-proc-ext-billing-short| replace:: Billing
 .. _ogc-proc-exc-billing-short: https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/billing
@@ -41,7 +45,10 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Fix schema meta fields (``title``, ``summary``, ``description``, etc.) not being rendered in `OpenAPI` output for
+  keyword schemas (``allOf````anyOf``, ``oneOf``, ``not``).
+- Fix schema definitions not being rendered in `OpenAPI` into the requested order
+  by ``_sort_first`` and ``_sort_after`` control attributes.
 
 .. _changes_4.29.0:
 

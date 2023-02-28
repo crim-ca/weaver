@@ -132,6 +132,7 @@ IO_INFO_IDS = (
     "{what} specifications, this is the value that will be used to associate them together."
 )
 
+# development references
 OGC_API_REPO_URL = "https://github.com/opengeospatial/ogcapi-processes"
 OGC_API_SCHEMA_URL = "https://raw.githubusercontent.com/opengeospatial/ogcapi-processes"
 OGC_API_SCHEMA_VERSION = "master"
@@ -146,6 +147,13 @@ OGC_API_EXAMPLES_EXT_DEPLOY = f"{OGC_API_SCHEMA_BASE}/extensions/deploy_replace_
 OGC_API_SCHEMA_EXT_BILL = f"{OGC_API_SCHEMA_BASE}/extensions/billing/standard/openapi/schemas"
 OGC_API_SCHEMA_EXT_QUOTE = f"{OGC_API_SCHEMA_BASE}/extensions/quotation/standard/openapi/schemas"
 OGC_API_SCHEMA_EXT_WORKFLOW = f"{OGC_API_SCHEMA_BASE}/extensions/workflows/standard/openapi/schemas"
+
+# official/published references
+OGC_API_PROC_PART1 = "https://schemas.opengis.net/ogcapi/processes/part1/1.0"
+OGC_API_PROC_PART1_SCHEMAS = f"{OGC_API_PROC_PART1}/openapi/schemas"
+OGC_API_PROC_PART1_RESPONSES = f"{OGC_API_PROC_PART1}/openapi/responses"
+OGC_API_PROC_PART1_PARAMETERS = f"{OGC_API_PROC_PART1}/openapi/parameters"
+OGC_API_PROC_PART1_EXAMPLES = f"{OGC_API_PROC_PART1}/examples"
 
 WEAVER_SCHEMA_VERSION = "master"
 WEAVER_SCHEMA_URL = f"https://raw.githubusercontent.com/crim-ca/weaver/{WEAVER_SCHEMA_VERSION}/schemas"
@@ -358,6 +366,7 @@ class QueryBoolean(Boolean):
 
 
 class DateTimeInterval(ExtendedSchemaNode):
+    _schema = f"{OGC_API_PROC_PART1_PARAMETERS}/datetime.yaml"
     schema_type = String
     description = (
         "DateTime format against OGC API - Processes, "
@@ -457,7 +466,14 @@ class ProcessIdentifier(AnyOfKeywordSchema):
 
 class ProcessIdentifierTag(AnyOfKeywordSchema):
     description = "Process identifier with optional revision tag."
+    _schema = f"{OGC_API_PROC_PART1_PARAMETERS}/processIdPathParam.yaml"
     _any_of = [Tag] + ProcessIdentifier._any_of  # type: ignore  # noqa: W0212
+
+
+class JobID(UUID):
+    _schema = f"{OGC_API_PROC_PART1_PARAMETERS}/jobId.yaml"
+    description = "ID of the job."
+    example = "a9d14bf4-84e0-449a-bac8-16e598efe807"
 
 
 class Version(ExtendedSchemaNode):
@@ -759,6 +775,7 @@ class LinkList(ExtendedSequenceSchema):
 
 
 class LandingPage(ExtendedMappingSchema):
+    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/landingPage.yaml"
     links = LinkList()
 
 
@@ -795,7 +812,7 @@ class Format(ExtendedMappingSchema):
     """
     Used to respect ``mediaType`` field as suggested per `OGC-API`.
     """
-    _schema = f"{OGC_API_SCHEMA_CORE}/format.yaml"
+    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/format.yaml"
     mediaType = MediaType(default=ContentType.TEXT_PLAIN, example=ContentType.APP_JSON)
     encoding = ExtendedSchemaNode(String(), missing=drop)
     schema = FormatSchema(missing=drop)
@@ -880,7 +897,7 @@ class ResultFormat(FormatDescription):
     """
     Format employed for reference results respecting 'OGC API - Processes' schemas.
     """
-    _schema = f"{OGC_API_SCHEMA_CORE}/formatDescription.yaml"
+    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/format.yaml"
     mediaType = MediaType(String())
     encoding = ExtendedSchemaNode(String(), missing=drop)
     schema = FormatSchema(missing=drop)
@@ -1026,7 +1043,7 @@ class InputOutputDescriptionMeta(ExtendedMappingSchema):
 
 
 class ReferenceOAS(ExtendedMappingSchema):
-    _schema = f"{OGC_API_SCHEMA_CORE}/reference.yaml"
+    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/reference.yaml"
     _ref = ReferenceURL(name="$ref", description="External OpenAPI schema reference.")
 
 
@@ -1178,7 +1195,7 @@ class DefinitionOAS(AnyOfKeywordSchema):
 
 class OAS(OneOfKeywordSchema):
     description = "OpenAPI schema definition."
-    # _schema = f"{OGC_API_SCHEMA_CORE}/schema.yaml"  # definition used by OAP, but JSON-schema is more accurate
+    # _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/schema.yaml"  # definition used by OAP, but JSON-schema is more accurate
     _schema = "http://json-schema.org/draft-07/schema#"
     _one_of = [
         ReferenceOAS(),
@@ -1343,7 +1360,7 @@ class LiteralReference(ExtendedMappingSchema):
 
 # https://github.com/opengeospatial/ogcapi-processes/blob/e6893b/extensions/workflows/openapi/workflows.yaml#L1707-L1716
 class NameReferenceType(ExtendedMappingSchema):
-    _schema = f"{OGC_API_SCHEMA_CORE}/nameReferenceType.yaml"
+    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/nameReferenceType.yaml"
     name = ExtendedSchemaNode(String())
     reference = ExecuteReferenceURL(missing=drop, description="Reference URL to schema definition of the named entity.")
 
@@ -1706,7 +1723,7 @@ class JobExecuteModeEnum(ExtendedSchemaNode):
 
 
 class JobControlOptionsEnum(ExtendedSchemaNode):
-    _schema = f"{OGC_API_SCHEMA_CORE}/jobControlOptions.yaml"
+    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/jobControlOptions.yaml"
     schema_type = String
     title = "JobControlOptions"
     default = ExecuteControlOption.ASYNC
@@ -1726,7 +1743,7 @@ class JobResponseOptionsEnum(ExtendedSchemaNode):
 
 
 class TransmissionModeEnum(ExtendedSchemaNode):
-    _schema = f"{OGC_API_SCHEMA_CORE}/transmissionMode.yaml"
+    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/transmissionMode.yaml"
     schema_type = String
     title = "TransmissionMode"
     default = ExecuteTransmissionMode.VALUE
@@ -1735,6 +1752,7 @@ class TransmissionModeEnum(ExtendedSchemaNode):
 
 
 class JobStatusEnum(ExtendedSchemaNode):
+    _schema = f"{OGC_API_PROC_PART1_PARAMETERS}/status.yaml"  # subset of this implementation
     schema_type = String
     title = "JobStatus"
     default = Status.ACCEPTED
@@ -1751,6 +1769,7 @@ class JobStatusSearchEnum(ExtendedSchemaNode):
 
 
 class JobTypeEnum(ExtendedSchemaNode):
+    _schema = f"{OGC_API_PROC_PART1_PARAMETERS}/type.yaml"  # subset of this implementation
     schema_type = String
     title = "JobType"
     default = null
@@ -3082,7 +3101,8 @@ class ProcessPagingQuery(ExtendedMappingSchema):
     sort = ProcessSortEnum(missing=drop)
     # if page is omitted but limit provided, use reasonable zero by default
     page = ExtendedSchemaNode(Integer(allow_string=True), missing=0, default=0, validator=Range(min=0))
-    limit = ExtendedSchemaNode(Integer(allow_string=True), missing=None, default=None, validator=Range(min=1))
+    limit = ExtendedSchemaNode(Integer(allow_string=True), missing=None, default=None, validator=Range(min=1),
+                               schema=f"{OGC_API_PROC_PART1_PARAMETERS}/limit.yaml")
 
 
 class ProcessVisibility(ExtendedMappingSchema):
@@ -3140,7 +3160,7 @@ class ProcessDescriptionOGC(
     inputs = DescribeInputTypeMap(description="Inputs definition of the process.", missing=drop, default={})
     outputs = DescribeOutputTypeMap(description="Outputs definition of the process.")
 
-    _schema = f"{OGC_API_SCHEMA_CORE}/process.yaml"
+    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/process.yaml"
     _sort_first = PROCESS_DESCRIPTION_FIELD_FIRST
     _sort_after = PROCESS_DESCRIPTION_FIELD_AFTER
 
@@ -3217,7 +3237,8 @@ class DurationISO(ExtendedSchemaNode):
 
 
 class JobStatusInfo(ExtendedMappingSchema):
-    jobID = UUID(example="a9d14bf4-84e0-449a-bac8-16e598efe807", description="ID of the job.")
+    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/statusInfo.yaml"
+    jobID = JobID()
     processID = ProcessIdentifierTag(missing=None, default=None,
                                      description="Process identifier corresponding to the job execution.")
     providerID = ProcessIdentifier(missing=None, default=None,
@@ -3268,7 +3289,7 @@ class JobCollection(ExtendedSequenceSchema):
 
 
 class CreatedJobStatusSchema(DescriptionSchema):
-    jobID = UUID(description="Unique identifier of the created job for execution.")
+    jobID = JobID(description="Unique identifier of the created job for execution.")
     processID = ProcessIdentifierTag(description="Identifier of the process that will be executed.")
     providerID = AnyIdentifier(description="Remote provider identifier if applicable.", missing=drop)
     status = ExtendedSchemaNode(String(), example=Status.ACCEPTED)
@@ -3280,8 +3301,10 @@ class CreatedQuotedJobStatusSchema(CreatedJobStatusSchema):
 
 
 class GetPagingJobsSchema(ExtendedMappingSchema):
+    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/jobList.yaml"  # technically, no 'links' yet, but added after by oneOf
     jobs = JobCollection()
-    limit = ExtendedSchemaNode(Integer(), missing=10, default=10, validator=Range(min=1, max=10000))
+    limit = ExtendedSchemaNode(Integer(), missing=10, default=10, validator=Range(min=1, max=10000),
+                               schema=f"{OGC_API_PROC_PART1_PARAMETERS}/limit.yaml")
     page = ExtendedSchemaNode(Integer(), validator=Range(min=0))
 
 
@@ -3311,7 +3334,7 @@ class GetQueriedJobsSchema(OneOfKeywordSchema):
     ]
     total = ExtendedSchemaNode(Integer(),
                                description="Total number of matched jobs regardless of grouping or paging result.")
-    links = LinkList(missing=drop)
+    links = LinkList()  # required by OGC schema
 
     _sort_first = JOBS_LISTING_FIELD_FIRST
     _sort_after = JOBS_LISTING_FIELD_AFTER
@@ -3319,7 +3342,7 @@ class GetQueriedJobsSchema(OneOfKeywordSchema):
 
 class DismissedJobSchema(ExtendedMappingSchema):
     status = JobStatusEnum()
-    jobID = UUID(description="ID of the job.")
+    jobID = JobID()
     message = ExtendedSchemaNode(String(), example="Job dismissed.")
     percentCompleted = ExtendedSchemaNode(Integer(), example=0)
 
@@ -3407,7 +3430,7 @@ class ExecuteInputListValues(ExtendedSequenceSchema):
 #   https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/link.yaml
 # But explicitly in the context of an execution input, rather than any other link (eg: metadata)
 class ExecuteInputFileLink(Link):  # for other metadata (title, hreflang, etc.)
-    _schema = f"{OGC_API_SCHEMA_CORE}/link.yaml"
+    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/link.yaml"
     href = ExecuteReferenceURL(  # not just a plain 'URL' like 'Link' has (extended with s3, vault, etc.)
         description="Location of the file reference."
     )
@@ -3457,7 +3480,7 @@ class ExecuteInputInlineValue(OneOfKeywordSchema):
 #     - $ref: "inputValueNoObject.yaml"
 #     - type: object
 class ExecuteInputObjectData(OneOfKeywordSchema):
-    _schema = f"{OGC_API_SCHEMA_CORE}/inputValue.yaml"
+    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/inputValue.yaml"
     description = "Data value of any schema "
     _one_of = [
         ExecuteInputInlineValue(),
@@ -3467,7 +3490,7 @@ class ExecuteInputObjectData(OneOfKeywordSchema):
 
 # https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/qualifiedInputValue.yaml
 class ExecuteInputQualifiedValue(Format):
-    _schema = f"{OGC_API_SCHEMA_CORE}/qualifiedInputValue.yaml"
+    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/qualifiedInputValue.yaml"
     value = ExecuteInputObjectData()    # can be anything, including literal value, array of them, nested object
 
 
@@ -3479,7 +3502,7 @@ class ExecuteInputQualifiedValue(Format):
 #     - $ref: "link.yaml"
 #
 class ExecuteInputInlineOrRefData(OneOfKeywordSchema):
-    _schema = f"{OGC_API_SCHEMA_CORE}/inlineOrRefData.yaml"
+    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/inlineOrRefData.yaml"
     _one_of = [
         ExecuteInputInlineValue(),     # <inline-literal>
         ExecuteInputQualifiedValue(),  # {"value": <anything>, "mediaType": "<>", "schema": <OAS link or object>}
@@ -3562,7 +3585,7 @@ class ExecuteInputOutputs(ExtendedMappingSchema):
 
 class Execute(ExecuteInputOutputs):
     # OGC 'execute.yaml' does not enforce any required item
-    _schema = f"{OGC_API_SCHEMA_CORE}/execute.yaml"
+    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/execute.yaml"
     examples = {
         "ExecuteJSON": {
             "summary": "Execute a process job using REST JSON payload with OGC API schema.",
@@ -3743,6 +3766,7 @@ class CWLClass(ExtendedSchemaNode):
 
 class CWLExpression(ExtendedSchemaNode):
     schema_type = String
+    title = "CWLExpression"
     description = (
         f"When combined with '{CWL_REQUIREMENT_INLINE_JAVASCRIPT}', "
         "this field allows runtime parameter references "
@@ -3876,7 +3900,8 @@ class ResourceRequirementSpecification(PermissiveMappingSchema):
     coresMin = ResourceRequirementValue(
         missing=drop,
         default=1,
-        title="Minimum reserved number of CPU cores.",
+        title="ResourceCoresMinimum",
+        summary="Minimum reserved number of CPU cores.",
         description=inspect.cleandoc("""
             Minimum reserved number of CPU cores.
 
@@ -3900,7 +3925,8 @@ class ResourceRequirementSpecification(PermissiveMappingSchema):
     )
     coresMax = ResourceRequirementValue(
         missing=drop,
-        title="Maximum reserved number of CPU cores.",
+        title="ResourceCoresMaximum",
+        summary="Maximum reserved number of CPU cores.",
         description=inspect.cleandoc("""
             Maximum reserved number of CPU cores.
             See 'coresMin' for discussion about fractional CPU requests.
@@ -3909,7 +3935,8 @@ class ResourceRequirementSpecification(PermissiveMappingSchema):
     ramMin = ResourceRequirementValue(
         missing=drop,
         default=256,
-        title="Minimum reserved RAM in mebibytes.",
+        title="ResourceRAMMinimum",
+        summary="Minimum reserved RAM in mebibytes.",
         description=inspect.cleandoc("""
             Minimum reserved RAM in mebibytes (2**20).
 
@@ -3920,7 +3947,8 @@ class ResourceRequirementSpecification(PermissiveMappingSchema):
     )
     ramMax = ResourceRequirementValue(
         missing=drop,
-        title="Maximum reserved RAM in mebibytes.",
+        title="ResourceRAMMaximum",
+        summary="Maximum reserved RAM in mebibytes.",
         description=inspect.cleandoc("""
             Maximum reserved RAM in mebibytes (2**20).
             See 'ramMin' for discussion about fractional RAM requests.
@@ -3929,7 +3957,8 @@ class ResourceRequirementSpecification(PermissiveMappingSchema):
     tmpdirMin = ResourceRequirementValue(
         missing=drop,
         default=1024,
-        title="Minimum reserved filesystem based storage for the designated temporary directory in mebibytes.",
+        title="ResourceTmpDirMinimum",
+        summary="Minimum reserved filesystem based storage for the designated temporary directory in mebibytes.",
         description=inspect.cleandoc("""
             Minimum reserved filesystem based storage for the designated temporary directory in mebibytes (2**20).
 
@@ -3940,7 +3969,8 @@ class ResourceRequirementSpecification(PermissiveMappingSchema):
     )
     tmpdirMax = ResourceRequirementValue(
         missing=drop,
-        title="Maximum reserved filesystem based storage for the designated temporary directory in mebibytes.",
+        title="ResourceTmpDirMaximum",
+        summary="Maximum reserved filesystem based storage for the designated temporary directory in mebibytes.",
         description=inspect.cleandoc("""
             Maximum reserved filesystem based storage for the designated temporary directory in mebibytes (2**20).
             See 'tmpdirMin' for discussion about fractional storage requests.
@@ -3949,7 +3979,8 @@ class ResourceRequirementSpecification(PermissiveMappingSchema):
     outdirMin = ResourceRequirementValue(
         missing=drop,
         default=1024,
-        title="Minimum reserved filesystem based storage for the designated output directory in mebibytes.",
+        title="ResourceOutDirMinimum",
+        summary="Minimum reserved filesystem based storage for the designated output directory in mebibytes.",
         description=inspect.cleandoc("""
             Minimum reserved filesystem based storage for the designated output directory in mebibytes (2**20).
 
@@ -3961,7 +3992,8 @@ class ResourceRequirementSpecification(PermissiveMappingSchema):
     outdirMax = ResourceRequirementValue(
         missing=drop,
         default=1,
-        title="Maximum reserved filesystem based storage for the designated output directory in mebibytes.",
+        title="ResourceOutDirMaximum",
+        summary="Maximum reserved filesystem based storage for the designated output directory in mebibytes.",
         description=inspect.cleandoc("""
             Maximum reserved filesystem based storage for the designated output directory in mebibytes (2**20).
             See 'outdirMin' for discussion about fractional storage requests.
@@ -4802,7 +4834,7 @@ class ResultReferenceList(ExtendedSequenceSchema):
 
 
 class ResultData(OneOfKeywordSchema):
-    _schema = f"{OGC_API_SCHEMA_CORE}/result.yaml"
+    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/result.yaml"
     _one_of = [
         # must place formatted value first since both value/format fields are simultaneously required
         # other classes require only one of the two, and therefore are more permissive during schema validation
@@ -4819,7 +4851,7 @@ class Result(ExtendedMappingSchema):
     """
     Result outputs obtained from a successful process job execution.
     """
-    example_ref = f"{OGC_API_EXAMPLES_CORE}/json/Result.json"
+    example_ref = f"{OGC_API_PROC_PART1_SCHEMAS}/result.yaml"
     output_id = ResultData(
         variable="{output-id}", title="ResultData",
         description=(
@@ -4916,7 +4948,7 @@ class FrontpageParameters(ExtendedSequenceSchema):
     parameter = FrontpageParameterSchema()
 
 
-class FrontpageSchema(ExtendedMappingSchema):
+class FrontpageSchema(LandingPage, DescriptionSchema):
     message = ExtendedSchemaNode(String(), default="Weaver Information", example="Weaver Information")
     configuration = ExtendedSchemaNode(String(), default="default", example="default")
     parameters = FrontpageParameters()
@@ -5022,7 +5054,7 @@ class DeployProcessDescription(NotKeywordSchema, ProcessDeployment, ProcessContr
     _not = [
         Reference()  # avoid conflict with deploy by href
     ]
-    _schema = f"{OGC_API_SCHEMA_CORE}/process.yaml"
+    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/process.yaml"
     description = "Process description fields directly provided."
 
 
@@ -5341,17 +5373,21 @@ class GetJobsQueries(ExtendedMappingSchema):
                                 description="Provide job details instead of IDs.")
     groups = JobGroupsCommaSeparated()
     page = ExtendedSchemaNode(Integer(allow_string=True), missing=0, default=0, validator=Range(min=0))
-    limit = ExtendedSchemaNode(Integer(allow_string=True), missing=10, default=10, validator=Range(min=1, max=10000))
+    limit = ExtendedSchemaNode(Integer(allow_string=True), missing=10, default=10, validator=Range(min=1, max=10000),
+                               schema=f"{OGC_API_PROC_PART1_PARAMETERS}/limit.yaml")
     min_duration = ExtendedSchemaNode(
         Integer(allow_string=True), name="minDuration", missing=drop, default=null, validator=Range(min=0),
+        schema=f"{OGC_API_PROC_PART1_PARAMETERS}/minDuration.yaml",
         description="Minimal duration (seconds) between started time and current/finished time of jobs to find.")
     max_duration = ExtendedSchemaNode(
         Integer(allow_string=True), name="maxDuration", missing=drop, default=null, validator=Range(min=0),
+        schema=f"{OGC_API_PROC_PART1_PARAMETERS}/maxDuration.yaml",
         description="Maximum duration (seconds) between started time and current/finished time of jobs to find.")
     datetime = DateTimeInterval(missing=drop, default=None)
     status = JobStatusSearchEnum(description="One of more comma-separated statuses to filter jobs.",
                                  missing=drop, default=None)
     processID = ProcessIdentifierTag(missing=drop, default=null,
+                                     schema=f"{OGC_API_PROC_PART1_PARAMETERS}/processIdQueryParam.yaml",
                                      description="Alias to 'process' for OGC-API compliance.")
     process = ProcessIdentifierTag(missing=drop, default=None,
                                    description="Identifier and optional version tag of the process to filter search.")
@@ -5445,7 +5481,8 @@ class ProcessQuoteEndpoint(LocalProcessPath, QuotePath):
 
 class GetQuotesQueries(ExtendedMappingSchema):
     page = ExtendedSchemaNode(Integer(), missing=drop, default=0)
-    limit = ExtendedSchemaNode(Integer(), missing=10, default=10, validator=Range(min=1, max=10000))
+    limit = ExtendedSchemaNode(Integer(), missing=10, default=10, validator=Range(min=1, max=10000),
+                               schema=f"{OGC_API_PROC_PART1_PARAMETERS}/limit.yaml")
     process = AnyIdentifier(missing=None)
     sort = QuoteSortEnum(missing=drop)
 
@@ -5601,12 +5638,12 @@ class ErrorCause(OneOfKeywordSchema):
 
 
 class ErrorJsonResponseBodySchema(ExtendedMappingSchema):
-    _schema = f"{OGC_API_SCHEMA_CORE}/exception.yaml"
+    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/exception.yaml"
     description = "JSON schema for exceptions based on RFC 7807"
     type = OWSErrorCode()
     title = ExtendedSchemaNode(String(), description="Short description of the error.", missing=drop)
     detail = ExtendedSchemaNode(String(), description="Detail about the error cause.", missing=drop)
-    status = ExtendedSchemaNode(Integer(), description="Error status code.", example=400)
+    status = ExtendedSchemaNode(Integer(), description="Error status code.", example=500)
     cause = ErrorCause(missing=drop)
     value = ErrorCause(missing=drop)
     error = ErrorDetail(missing=drop)
@@ -5614,43 +5651,62 @@ class ErrorJsonResponseBodySchema(ExtendedMappingSchema):
     exception = OWSExceptionResponse(missing=drop)
 
 
-class BadRequestResponseSchema(ExtendedMappingSchema):
+class ServerErrorBaseResponseSchema(ExtendedMappingSchema):
+    _schema = f"{OGC_API_PROC_PART1_RESPONSES}/ServerError.yaml"
+
+
+class BadRequestResponseSchema(ServerErrorBaseResponseSchema):
     description = "Incorrectly formed request contents."
     header = ResponseHeaders()
     body = ErrorJsonResponseBodySchema()
 
 
-class ConflictRequestResponseSchema(ExtendedMappingSchema):
+class ConflictRequestResponseSchema(ServerErrorBaseResponseSchema):
     description = "Conflict between the affected entity and another existing definition."
     header = ResponseHeaders()
     body = ErrorJsonResponseBodySchema()
 
 
-class UnprocessableEntityResponseSchema(ExtendedMappingSchema):
+class UnprocessableEntityResponseSchema(ServerErrorBaseResponseSchema):
     description = "Wrong format of given parameters."
     header = ResponseHeaders()
     body = ErrorJsonResponseBodySchema()
 
 
-class UnsupportedMediaTypeResponseSchema(ExtendedMappingSchema):
+class UnsupportedMediaTypeResponseSchema(ServerErrorBaseResponseSchema):
+    _schema = f"{OGC_API_PROC_PART1_RESPONSES}/NotSupported.yaml"
     description = "Media-Type not supported for this request."
     header = ResponseHeaders()
     body = ErrorJsonResponseBodySchema()
 
 
-class ForbiddenProcessAccessResponseSchema(ExtendedMappingSchema):
+class MethodNotAllowedErrorResponseSchema(ServerErrorBaseResponseSchema):
+    _schema = f"{OGC_API_PROC_PART1_RESPONSES}/NotAllowed.yaml"
+    description = "HTTP method not allowed for requested path."
+    header = ResponseHeaders()
+    body = ErrorJsonResponseBodySchema()
+
+
+class NotFoundResponseSchema(ServerErrorBaseResponseSchema):
+    _schema = f"{OGC_API_PROC_PART1_RESPONSES}/NotFound.yaml"
+    description = "Requested resource could not be found."
+    header = ResponseHeaders()
+    body = ErrorJsonResponseBodySchema()
+
+
+class ForbiddenProcessAccessResponseSchema(ServerErrorBaseResponseSchema):
     description = "Referenced process is not accessible."
     header = ResponseHeaders()
     body = ErrorJsonResponseBodySchema()
 
 
-class ForbiddenProviderAccessResponseSchema(ExtendedMappingSchema):
+class ForbiddenProviderAccessResponseSchema(ServerErrorBaseResponseSchema):
     description = "Referenced provider is not accessible."
     header = ResponseHeaders()
     body = ErrorJsonResponseBodySchema()
 
 
-class ForbiddenProviderLocalResponseSchema(ExtendedMappingSchema):
+class ForbiddenProviderLocalResponseSchema(ServerErrorBaseResponseSchema):
     description = (
         "Provider operation is not allowed on local-only Weaver instance. "
         f"Applies only when application configuration is not within: {WEAVER_CONFIG_REMOTE_LIST}"
@@ -5659,13 +5715,14 @@ class ForbiddenProviderLocalResponseSchema(ExtendedMappingSchema):
     body = ErrorJsonResponseBodySchema()
 
 
-class InternalServerErrorResponseSchema(ExtendedMappingSchema):
+class InternalServerErrorResponseSchema(ServerErrorBaseResponseSchema):
     description = "Unhandled internal server error."
     header = ResponseHeaders()
     body = ErrorJsonResponseBodySchema()
 
 
 class OkGetFrontpageResponse(ExtendedMappingSchema):
+    _schema = f"{OGC_API_PROC_PART1_RESPONSES}/LandingPage.yaml"
     header = ResponseHeaders()
     body = FrontpageSchema()
 
@@ -5756,7 +5813,7 @@ class GetProcessesEndpoint(ExtendedMappingSchema):
 
 
 class ProviderProcessesListing(ProcessCollection):
-    _schema = f"{OGC_API_SCHEMA_CORE}/processList.yaml"
+    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/processList.yaml"
     _sort_first = ["id", "processes"]
     id = ProviderNameSchema()
 
@@ -5776,13 +5833,14 @@ class ProcessListingLinks(ExtendedMappingSchema):
 class ProcessListingMetadata(ExtendedMappingSchema):
     description = "Metadata relative to the listed processes."
     page = ExtendedSchemaNode(Integer(), misisng=drop, default=None, validator=Range(min=0))
-    limit = ExtendedSchemaNode(Integer(), missing=drop, default=None, validator=Range(min=1))
+    limit = ExtendedSchemaNode(Integer(), missing=drop, default=None, validator=Range(min=1),
+                               schema=f"{OGC_API_PROC_PART1_PARAMETERS}/limit.yaml")
     total = ExtendedSchemaNode(Integer(), description="Total number of local processes, or also including all "
                                                       "remote processes across providers if requested.")
 
 
 class ProcessesListing(ProcessCollection, ProcessListingLinks):
-    _schema = f"{OGC_API_SCHEMA_CORE}/processList.yaml"
+    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/processList.yaml"
     _sort_first = PROCESSES_LISTING_FIELD_FIRST
     _sort_after = PROCESSES_LISTING_FIELD_AFTER
 
@@ -5792,6 +5850,7 @@ class MultiProcessesListing(DescriptionSchema, ProcessesListing, ProvidersProces
 
 
 class OkGetProcessesListResponse(ExtendedMappingSchema):
+    _schema = f"{OGC_API_PROC_PART1_RESPONSES}/ProcessList.yaml"
     description = "Listing of available processes successful."
     header = ResponseHeaders()
     body = MultiProcessesListing()
@@ -5828,7 +5887,7 @@ class BadRequestGetProcessInfoResponse(ExtendedMappingSchema):
     body = NoContent()
 
 
-class NotFoundProcessResponse(ExtendedMappingSchema):
+class NotFoundProcessResponse(NotFoundResponseSchema):
     description = "Process with specified reference identifier does not exist."
     examples = {
         "ProcessNotFound": {
@@ -5975,6 +6034,7 @@ class OkDismissJobResponse(ExtendedMappingSchema):
 
 
 class OkGetJobStatusResponse(ExtendedMappingSchema):
+    _schema = f"{OGC_API_PROC_PART1_RESPONSES}/Status.yaml"
     header = ResponseHeaders()
     body = JobStatusInfo()
 
@@ -5985,7 +6045,7 @@ class InvalidJobResponseSchema(ExtendedMappingSchema):
     body = ErrorJsonResponseBodySchema()
 
 
-class NotFoundJobResponseSchema(ExtendedMappingSchema):
+class NotFoundJobResponseSchema(NotFoundResponseSchema):
     description = "Job reference UUID cannot be found."
     examples = {
         "JobNotFound": {
@@ -6024,6 +6084,7 @@ class RedirectResultResponse(ExtendedMappingSchema):
 
 
 class OkGetJobResultsResponse(ExtendedMappingSchema):
+    _schema = f"{OGC_API_PROC_PART1_RESPONSES}/Results.yaml"
     header = ResponseHeaders()
     body = Result()
 
@@ -6067,6 +6128,12 @@ class AcceptedQuoteResponse(ExtendedMappingSchema):
 class OkGetQuoteInfoResponse(ExtendedMappingSchema):
     header = ResponseHeaders()
     body = QuoteSchema()
+
+
+class NotFoundQuoteResponse(NotFoundResponseSchema):
+    description = "Quote with specified reference identifier does not exist."
+    header = ResponseHeaders()
+    body = ErrorJsonResponseBodySchema()
 
 
 class OkGetQuoteListResponse(ExtendedMappingSchema):
@@ -6229,26 +6296,32 @@ class GoneVaultFileDownloadResponse(ExtendedMappingSchema):
 
 get_api_frontpage_responses = {
     "200": OkGetFrontpageResponse(description="success"),
+    "405": MethodNotAllowedErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_openapi_json_responses = {
     "200": OkGetSwaggerJSONResponse(description="success"),
+    "405": MethodNotAllowedErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_api_swagger_ui_responses = {
     "200": OkGetSwaggerUIResponse(description="success"),
+    "405": MethodNotAllowedErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_api_redoc_ui_responses = {
     "200": OkGetRedocUIResponse(description="success"),
+    "405": MethodNotAllowedErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_api_versions_responses = {
     "200": OkGetVersionsResponse(description="success"),
+    "405": MethodNotAllowedErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_api_conformance_responses = {
     "200": OkGetConformanceResponse(description="success"),
+    "405": MethodNotAllowedErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_processes_responses = {
@@ -6271,6 +6344,7 @@ get_processes_responses = {
         }
     }),
     "400": BadRequestResponseSchema(description="Error in case of invalid listing query parameters."),
+    "405": MethodNotAllowedErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 post_processes_responses = {
@@ -6281,6 +6355,7 @@ post_processes_responses = {
         }
     }),
     "400": BadRequestResponseSchema(description="Unable to parse process definition"),
+    "405": MethodNotAllowedErrorResponseSchema(),
     "409": ConflictRequestResponseSchema(description="Process with same ID already exists."),
     "415": UnsupportedMediaTypeResponseSchema(description="Unsupported Media-Type for process deployment."),
     "422": UnprocessableEntityResponseSchema(description="Invalid schema for process definition."),
@@ -6289,12 +6364,14 @@ post_processes_responses = {
 put_process_responses = copy(post_processes_responses)
 put_process_responses.update({
     "404": NotFoundProcessResponse(description="Process to update could not be found."),
+    "405": MethodNotAllowedErrorResponseSchema(),
     "409": ConflictRequestResponseSchema(description="Process with same ID or version already exists."),
 })
 patch_process_responses = {
     "200": OkPatchProcessResponse(),
     "400": BadRequestGetProcessInfoResponse(description="Unable to parse process definition"),
     "404": NotFoundProcessResponse(description="Process to update could not be found."),
+    "405": MethodNotAllowedErrorResponseSchema(),
     "409": ConflictRequestResponseSchema(description="Process with same ID or version already exists."),
     "422": UnprocessableEntityResponseSchema(description="Invalid schema for process definition."),
     "500": InternalServerErrorResponseSchema(),
@@ -6318,6 +6395,7 @@ get_process_responses = {
     }),
     "400": BadRequestGetProcessInfoResponse(),
     "404": NotFoundProcessResponse(),
+    "405": MethodNotAllowedErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_process_package_responses = {
@@ -6328,6 +6406,8 @@ get_process_package_responses = {
         }
     }),
     "403": ForbiddenProcessAccessResponseSchema(),
+    "404": NotFoundProcessResponse(),
+    "405": MethodNotAllowedErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_process_payload_responses = {
@@ -6338,16 +6418,21 @@ get_process_payload_responses = {
         }
     }),
     "403": ForbiddenProcessAccessResponseSchema(),
+    "404": NotFoundProcessResponse(),
+    "405": MethodNotAllowedErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_process_visibility_responses = {
     "200": OkGetProcessVisibilitySchema(description="success"),
     "403": ForbiddenProcessAccessResponseSchema(),
+    "405": MethodNotAllowedErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 put_process_visibility_responses = {
     "200": OkPutProcessVisibilitySchema(description="success"),
     "403": ForbiddenVisibilityUpdateResponseSchema(),
+    "404": NotFoundProcessResponse(),
+    "405": MethodNotAllowedErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 delete_process_responses = {
@@ -6358,6 +6443,8 @@ delete_process_responses = {
         }
     }),
     "403": ForbiddenProcessAccessResponseSchema(),
+    "404": NotFoundProcessResponse(),
+    "405": MethodNotAllowedErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_providers_list_responses = {
@@ -6372,6 +6459,7 @@ get_providers_list_responses = {
         }
     }),
     "403": ForbiddenProviderAccessResponseSchema(),
+    "405": MethodNotAllowedErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_provider_responses = {
@@ -6382,17 +6470,20 @@ get_provider_responses = {
         }
     }),
     "403": ForbiddenProviderAccessResponseSchema(),
+    "405": MethodNotAllowedErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 delete_provider_responses = {
     "204": NoContentDeleteProviderSchema(description="success"),
     "403": ForbiddenProviderAccessResponseSchema(),
+    "405": MethodNotAllowedErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
     "501": NotImplementedDeleteProviderResponse(),
 }
 get_provider_processes_responses = {
     "200": OkGetProviderProcessesSchema(description="success"),
     "403": ForbiddenProviderAccessResponseSchema(),
+    "405": MethodNotAllowedErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_provider_process_responses = {
@@ -6403,12 +6494,14 @@ get_provider_process_responses = {
         }
     }),
     "403": ForbiddenProviderAccessResponseSchema(),
+    "405": MethodNotAllowedErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 post_provider_responses = {
     "201": CreatedPostProvider(description="success"),
     "400": ExtendedMappingSchema(description=OWSMissingParameterValue.description),
     "403": ForbiddenProviderAccessResponseSchema(),
+    "405": MethodNotAllowedErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
     "501": NotImplementedPostProviderResponse(),
 }
@@ -6418,6 +6511,7 @@ post_provider_process_job_responses = {
     "204": NoContentJobResultsResponse(description="success"),
     "400": FailedSyncJobResponse(),
     "403": ForbiddenProviderAccessResponseSchema(),
+    "405": MethodNotAllowedErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 post_process_jobs_responses = {
@@ -6426,6 +6520,7 @@ post_process_jobs_responses = {
     "204": NoContentJobResultsResponse(description="success"),
     "400": FailedSyncJobResponse(),
     "403": ForbiddenProviderAccessResponseSchema(),
+    "405": MethodNotAllowedErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_all_jobs_responses = {
@@ -6436,12 +6531,14 @@ get_all_jobs_responses = {
         }
     }),
     "400": BadRequestResponseSchema(description="Error in case of invalid search query parameters."),
+    "405": MethodNotAllowedErrorResponseSchema(),
     "422": UnprocessableEntityResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 delete_jobs_responses = {
     "200": OkBatchDismissJobsResponseSchema(description="success"),
     "400": BadRequestResponseSchema(),
+    "405": MethodNotAllowedErrorResponseSchema(),
     "422": UnprocessableEntityResponseSchema(),
 }
 get_prov_all_jobs_responses = copy(get_all_jobs_responses)
@@ -6461,6 +6558,7 @@ get_single_job_status_responses = {
     }),
     "400": InvalidJobResponseSchema(),
     "404": NotFoundJobResponseSchema(),
+    "405": MethodNotAllowedErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_prov_single_job_status_responses = copy(get_single_job_status_responses)
@@ -6476,6 +6574,7 @@ delete_job_responses = {
     }),
     "400": InvalidJobResponseSchema(),
     "404": NotFoundJobResponseSchema(),
+    "405": MethodNotAllowedErrorResponseSchema(),
     "410": GoneJobResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
@@ -6492,6 +6591,7 @@ get_job_inputs_responses = {
     }),
     "400": InvalidJobResponseSchema(),
     "404": NotFoundJobResponseSchema(),
+    "405": MethodNotAllowedErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_prov_inputs_responses = copy(get_job_inputs_responses)
@@ -6507,6 +6607,7 @@ get_job_outputs_responses = {
     }),
     "400": InvalidJobResponseSchema(),
     "404": NotFoundJobResponseSchema(),
+    "405": MethodNotAllowedErrorResponseSchema(),
     "410": GoneJobResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
@@ -6527,6 +6628,7 @@ get_job_results_responses = {
     "204": NoContentJobResultsResponse(description="success"),
     "400": InvalidJobResponseSchema(),
     "404": NotFoundJobResponseSchema(),
+    "405": MethodNotAllowedErrorResponseSchema(),
     "410": GoneJobResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
@@ -6543,6 +6645,7 @@ get_exceptions_responses = {
     }),
     "400": InvalidJobResponseSchema(),
     "404": NotFoundJobResponseSchema(),
+    "405": MethodNotAllowedErrorResponseSchema(),
     "410": GoneJobResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
@@ -6559,6 +6662,7 @@ get_logs_responses = {
     }),
     "400": InvalidJobResponseSchema(),
     "404": NotFoundJobResponseSchema(),
+    "405": MethodNotAllowedErrorResponseSchema(),
     "410": GoneJobResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
@@ -6575,6 +6679,7 @@ get_stats_responses = {
     }),
     "400": InvalidJobResponseSchema(),
     "404": NotFoundJobResponseSchema(),
+    "405": MethodNotAllowedErrorResponseSchema(),
     "410": GoneJobResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
@@ -6584,39 +6689,52 @@ get_prov_stats_responses.update({
 })
 get_quote_list_responses = {
     "200": OkGetQuoteListResponse(description="success"),
+    "405": MethodNotAllowedErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_quote_responses = {
     "200": OkGetQuoteInfoResponse(description="success"),
+    "404": NotFoundQuoteResponse(),
+    "405": MethodNotAllowedErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 post_quotes_responses = {
     "201": CreatedQuoteResponse(),
     "202": AcceptedQuoteResponse(),
+    "405": MethodNotAllowedErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 post_quote_responses = {
     "201": CreatedQuoteExecuteResponse(description="success"),
+    "405": MethodNotAllowedErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_process_quote_estimator_responses = {
     "200": OkGetEstimatorResponse(description="success"),
+    "404": NotFoundProcessResponse(),
+    "405": MethodNotAllowedErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 put_process_quote_estimator_responses = {
     "200": OkPutEstimatorResponse(description="success"),
+    "404": NotFoundProcessResponse(),
+    "405": MethodNotAllowedErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 delete_process_quote_estimator_responses = {
     "204": OkDeleteEstimatorResponse(description="success"),
+    "404": NotFoundProcessResponse(),
+    "405": MethodNotAllowedErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_bill_list_responses = {
     "200": OkGetBillListResponse(description="success"),
+    "405": MethodNotAllowedErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_bill_responses = {
     "200": OkGetBillDetailResponse(description="success"),
+    "405": MethodNotAllowedErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 post_vault_responses = {
@@ -6627,6 +6745,7 @@ post_vault_responses = {
         }
     }),
     "400": BadRequestVaultFileUploadResponse(),
+    "405": MethodNotAllowedErrorResponseSchema(),
     "422": UnprocessableEntityVaultFileUploadResponse(),
     "500": InternalServerErrorResponseSchema(),
 }
@@ -6639,6 +6758,7 @@ head_vault_file_responses = {
     }),
     "400": BadRequestVaultFileAccessResponse(),
     "403": ForbiddenVaultFileDownloadResponse(),
+    "405": MethodNotAllowedErrorResponseSchema(),
     "410": GoneVaultFileDownloadResponse(),
     "500": InternalServerErrorResponseSchema(),
 }
@@ -6646,6 +6766,7 @@ get_vault_file_responses = {
     "200": OkVaultFileDownloadResponse(description="success"),
     "400": BadRequestVaultFileAccessResponse(),
     "403": ForbiddenVaultFileDownloadResponse(),
+    "405": MethodNotAllowedErrorResponseSchema(),
     "410": GoneVaultFileDownloadResponse(),
     "500": InternalServerErrorResponseSchema(),
 }
@@ -6678,6 +6799,7 @@ wps_responses = {
             "value": EXAMPLES["wps_access_forbidden_response.xml"],
         }
     }),
+    "405": ErrorWPSResponse(),
     "500": ErrorWPSResponse(),
 }
 

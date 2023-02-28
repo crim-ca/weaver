@@ -373,7 +373,10 @@ class TestWeaverClient(TestWeaverClientBase):
         assert "output" in result.body["outputs"]
         assert result.body["outputs"]["output"]["title"] == "output"
         assert result.body["outputs"]["output"]["description"] == "Output file with echo message."
-        assert result.body["outputs"]["output"]["formats"] == [{"default": True, "mediaType": ContentType.TEXT_PLAIN}]
+        output_formats = result.body["outputs"]["output"]["formats"]
+        for out_fmt in output_formats:
+            out_fmt.pop("$schema", None)
+        assert output_formats == [{"default": True, "mediaType": ContentType.TEXT_PLAIN}]
         assert "undefined" not in result.message, "CLI should not have confused process description as response detail."
         assert result.body["description"] == (
             "Dummy process that simply echo's back the input message for testing purposes."

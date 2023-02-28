@@ -81,7 +81,7 @@ from cornice_swagger.converters.schema import (
 from cornice_swagger.swagger import CorniceSwagger, DefinitionHandler, ParameterHandler, ResponseHandler
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Iterable, Optional, Sequence, Type, Union
+    from typing import Any, Dict, Iterable, List, Optional, Sequence, Type, Union
     from typing_extensions import Literal
 
     from cornice import Service as CorniceService
@@ -1172,11 +1172,19 @@ class SchemaRefMappingSchema(ExtendedNodeInterface, ExtendedSchemaBase):
     When the :class:`colander.MappingSchema` defines ``_schema = "<URL>"`` or ``_id = "<URL>"`` with a valid URL,
     all validations will automatically insert the corresponding ``$schema`` or ``$id`` field with this URL to the
     deserialized JSON result.
+
+    Alternatively, the parameters ``schema`` and ``id`` can be passed as keyword arguments when instantiating the
+    schema node.
     """
     _extension = "_ext_schema_ref"
     _ext_schema_fields = ["_schema", "_id"]
 
     def __init__(self, *args, **kwargs):
+        for schema_key in SchemaRefMappingSchema._ext_schema_fields:
+            schema_field = schema_key[1:]
+            schema_ref = kwargs.pop(schema_field, None)
+            if self._is_schema_ref(schema_ref):
+                setattr(self, schema_key, schema_ref)
         super(SchemaRefMappingSchema, self).__init__(*args, **kwargs)
         setattr(self, SchemaRefMappingSchema._extension, True)
 
@@ -1186,6 +1194,11 @@ class SchemaRefMappingSchema(ExtendedNodeInterface, ExtendedSchemaBase):
             sort_after = getattr(self, "_sort_after", [])
             if schema_field not in sort_first + sort_after:
                 setattr(self, "_sort_first", [schema_field] + list(sort_first))
+
+    @staticmethod
+    def _is_schema_ref(schema_ref):
+        # type: (Any) -> bool
+        return isinstance(schema_ref, str) and URL.match_object.match(schema_ref)
 
     def _deserialize_impl(self, cstruct):  # pylint: disable=W0222,signature-differs
         if not isinstance(cstruct, dict):
@@ -1197,7 +1210,7 @@ class SchemaRefMappingSchema(ExtendedNodeInterface, ExtendedSchemaBase):
         for schema_key in SchemaRefMappingSchema._ext_schema_fields:
             schema_field = f"${schema_key[1:]}"
             schema_ref = getattr(self, schema_key, None)
-            if isinstance(schema_ref, str) and URL.match_object.match(schema_ref):
+            if self._is_schema_ref(schema_ref):
                 schema = ExtendedSchemaNode(
                     colander.String(),
                     name=schema_field,
@@ -2208,7 +2221,13 @@ class ExtendedTypeConverter(TypeConverter):
         pattern = getattr(schema_node, "pattern", None)
         if isinstance(pattern, RegexPattern):
             setattr(schema_node, "pattern", pattern.pattern)
-        return super(ExtendedTypeConverter, self).convert_type(schema_node)
+        result = super(ExtendedTypeConverter, self).convert_type(schema_node)
+        if isinstance(schema_node, SortableMappingSchema) and result.get("type") == "object":
+            props = result.get("properties", {})
+            if props:
+                props = schema_node._order_deserialize(props, schema_node._sort_first, schema_node._sort_after)
+                result["properties"] = props
+        return result
 
 
 class KeywordTypeConverter(TypeConverter):
@@ -2218,9 +2237,11 @@ class KeywordTypeConverter(TypeConverter):
 
     def convert_type(self, schema_node):
         keyword = schema_node.get_keyword_name()
-        keyword_schema = {
+        keyword_schema = super(KeywordTypeConverter, self).convert_type(schema_node)
+        keyword_schema.pop("type", None)
+        keyword_schema.update({
             keyword: []
-        }
+        })
 
         for item_schema in schema_node.get_keyword_items():
             obj_instance = _make_node_instance(item_schema)
@@ -2243,9 +2264,11 @@ class OneOfKeywordTypeConverter(KeywordTypeConverter):
     def convert_type(self, schema_node):
         # type: (OneOfKeywordSchema) -> OpenAPISchemaOneOf
         keyword = schema_node.get_keyword_name()
-        one_of_obj = {
+        one_of_obj = super(KeywordTypeConverter, self).convert_type(schema_node)
+        one_of_obj.pop("type", None)
+        one_of_obj.update({
             keyword: []
-        }
+        })
 
         for item_schema in schema_node.get_keyword_items():
             item_obj = _make_node_instance(item_schema)
@@ -2313,12 +2336,18 @@ class NotKeywordTypeConverter(KeywordTypeConverter):
 
     def convert_type(self, schema_node):
         # type: (colander.SchemaNode) -> OpenAPISchemaNot
-        result = ObjectTypeConverter(self.dispatcher).convert_type(schema_node)
+        result = ExtendedObjectTypeConverter(self.dispatcher).convert_type(schema_node)
         result["additionalProperties"] = False
         return result
 
 
-class VariableObjectTypeConverter(ObjectTypeConverter):
+class ExtendedObjectTypeConverter(ExtendedTypeConverter, ObjectTypeConverter):
+    """
+    Object convert for mapping type with extended capabilities.
+    """
+
+
+class VariableObjectTypeConverter(ExtendedObjectTypeConverter):
     """
     Object convertor with ``additionalProperties`` for each ``properties`` marked as :class:`VariableSchemaNode`.
     """
@@ -2551,6 +2580,25 @@ class OAS3DefinitionHandler(DefinitionHandler):
                     schema.pop(param)
                 schema["$ref"] = schema_ref
         return schema_ret
+
+    def _process_items(self,
+                       schema,      # type: Dict[str, Any]
+                       list_type,   # type: Literal["oneOf", "allOf", "anyOf", "not"]
+                       item_list,   # type: List[Dict[str, Any]]
+                       depth,       # type: int
+                       base_name,   # type: str
+                       ):           # type: (...) -> Dict[str, Any]
+        """
+        Generates recursive schema definitions with JSON ref pointers for nested keyword objects.
+
+        Contrary to the original implementation, preserves additional metadata like the object title, description, etc.
+        """
+        schema_ref = super(OAS3DefinitionHandler, self)._process_items(schema, list_type, item_list, depth, base_name)
+        schema_def = self.definition_registry[base_name]
+        schema_meta = schema.copy()
+        schema_meta.pop(list_type)  # don't undo refs generated by processing
+        schema_def.update(schema_meta)
+        return schema_ref
 
 
 class OAS3ParameterHandler(ParameterHandler):
