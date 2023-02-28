@@ -1191,6 +1191,11 @@ class TestWeaverCLI(TestWeaverClientBase):
             out_cwl_fmt = {"default": False, "mediaType": io_fmt}
             out_oas_fmt = {"default": True, "mediaType": ContentType.APP_JSON}
             out_any_fmt = [out_cwl_fmt, out_oas_fmt]
+            # ignore schema specifications for comparison only of contents
+            in_schema.pop("$schema", None)
+            out_schema.pop("$schema", None)
+            for out_fmt in out_formats:
+                out_fmt.pop("$schema", None)
             # if any of the below definitions don't include user-provided information,
             # CLI did not combine it as intended prior to sending deployment request
             assert in_schema == in_oas  # injected by user provided process description

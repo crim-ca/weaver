@@ -799,7 +799,7 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
             if not access:
                 access = Visibility.PRIVATE
 
-            process = process.tag if isinstance(process, Process) else process
+            process = process.id if isinstance(process, Process) else process
             service = service.id if isinstance(service, Service) else service
             new_job = Job({
                 "task_id": task_id,

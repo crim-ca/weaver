@@ -1178,7 +1178,8 @@ class DefinitionOAS(AnyOfKeywordSchema):
 
 class OAS(OneOfKeywordSchema):
     description = "OpenAPI schema definition."
-    _schema = f"{OGC_API_SCHEMA_CORE}/schema.yaml"
+    # _schema = f"{OGC_API_SCHEMA_CORE}/schema.yaml"  # definition used by OAP, but JSON-schema is more accurate
+    _schema = "http://json-schema.org/draft-07/schema#"
     _one_of = [
         ReferenceOAS(),
         DefinitionOAS(),
@@ -1694,7 +1695,8 @@ class DeployOutputTypeAny(OneOfKeywordSchema):
 
 
 class JobExecuteModeEnum(ExtendedSchemaNode):
-    _schema = f"{OGC_API_SCHEMA_CORE}/execute.yaml"
+    # _schema: none available by itself, legacy parameter that was directly embedded in 'execute.yaml'
+    # (https://github.com/opengeospatial/ogcapi-processes/blob/1.0-draft.5/core/openapi/schemas/execute.yaml)
     schema_type = String
     title = "JobExecuteMode"
     # no default to enforce required input as per OGC-API schemas
@@ -1704,6 +1706,7 @@ class JobExecuteModeEnum(ExtendedSchemaNode):
 
 
 class JobControlOptionsEnum(ExtendedSchemaNode):
+    _schema = f"{OGC_API_SCHEMA_CORE}/jobControlOptions.yaml"
     schema_type = String
     title = "JobControlOptions"
     default = ExecuteControlOption.ASYNC
@@ -1712,7 +1715,8 @@ class JobControlOptionsEnum(ExtendedSchemaNode):
 
 
 class JobResponseOptionsEnum(ExtendedSchemaNode):
-    _schema = f"{OGC_API_SCHEMA_CORE}/execute.yaml"
+    # _schema: none available by itself, legacy parameter that was directly embedded in 'execute.yaml'
+    # (https://github.com/opengeospatial/ogcapi-processes/blob/1.0-draft.6/core/openapi/schemas/execute.yaml)
     schema_type = String
     title = "JobResponseOptions"
     # no default to enforce required input as per OGC-API schemas
@@ -1722,6 +1726,7 @@ class JobResponseOptionsEnum(ExtendedSchemaNode):
 
 
 class TransmissionModeEnum(ExtendedSchemaNode):
+    _schema = f"{OGC_API_SCHEMA_CORE}/transmissionMode.yaml"
     schema_type = String
     title = "TransmissionMode"
     default = ExecuteTransmissionMode.VALUE
@@ -3199,7 +3204,6 @@ class DurationISO(ExtendedSchemaNode):
         - https://json-schema.org/draft/2019-09/json-schema-validation.html#rfc.section.7.3.1
         - :rfc:`3339#appendix-A`
     """
-    _schema = "https://json-schema.org/draft/2019-09/json-schema-validation.html#rfc.section.7.3.1"
     schema_type = String
     description = "ISO-8601 representation of the duration."
     example = "P[n]Y[n]M[n]DT[n]H[n]M[n]S"
@@ -3508,7 +3512,6 @@ class ExecuteInputData(OneOfKeywordSchema):
 #           $ref: "inlineOrRefData.yaml"
 #
 class ExecuteInputMapAdditionalProperties(ExtendedMappingSchema):
-    _schema = f"{OGC_API_SCHEMA_CORE}/execute.yaml"
     input_id = ExecuteInputData(variable="{input-id}", title="ExecuteInputValue",
                                 description="Received mapping input value definition during job submission.")
 
@@ -3545,9 +3548,6 @@ class ExecuteInputOutputs(ExtendedMappingSchema):
     #   - 'tests.wps_restapi.test_providers.WpsRestApiProcessesTest.test_execute_process_no_error_not_required_params'
     #   - 'tests.wps_restapi.test_providers.WpsRestApiProcessesTest.test_get_provider_process_no_inputs'
     #   - 'tests.wps_restapi.test_colander_extras.test_oneof_variable_dict_or_list'
-    #
-    # OGC 'execute.yaml' also does not enforce any required item.
-    _schema = f"{OGC_API_SCHEMA_CORE}/execute.yaml"
     inputs = ExecuteInputValues(default={}, description="Values submitted for execution.")
     outputs = ExecuteOutputSpec(
         description=(
@@ -3561,6 +3561,8 @@ class ExecuteInputOutputs(ExtendedMappingSchema):
 
 
 class Execute(ExecuteInputOutputs):
+    # OGC 'execute.yaml' does not enforce any required item
+    _schema = f"{OGC_API_SCHEMA_CORE}/execute.yaml"
     examples = {
         "ExecuteJSON": {
             "summary": "Execute a process job using REST JSON payload with OGC API schema.",

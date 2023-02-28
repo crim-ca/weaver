@@ -706,7 +706,7 @@ def submit_job_handler(payload,             # type: ProcessExecution
     return resp
 
 
-def validate_process_io(process, payload):  # FIXME: implement
+def validate_process_io(process, payload):
     # type: (Process, ProcessExecution) -> None
     """
     Preemptively verify submitted parameters for execution against expected process definition.
@@ -753,15 +753,31 @@ def validate_process_io(process, payload):  # FIXME: implement
                 io_ctypes = {
                     # field 'type' as Content-Type is only valid in execute payload
                     # during process description, it is used as the data/value type
-                    get_field(io_fmt, "mime_type", extra_variations=["type"])
+                    get_field(io_fmt, "mime_type", extra_variations=["type"], default="")
                     for io_fmt in io_exec
                 }
                 io_ctypes = [ctype for ctype in io_ctypes if ctype]
-                io_accept = [
-                    clean_mime_type_format(get_field(io_fmt, "mime_type"), strip_parameters=True)
+                io_accept = {
+                    get_field(io_fmt, "mime_type", search_variations=True, default="")
                     for io_fmt in io_format
-                ]
-                io_accept = [ctype for ctype in io_accept if ctype]
+                }
+                io_accept = [clean_mime_type_format(ctype, strip_parameters=True) for ctype in io_accept if ctype]
+                # no format specified explicitly must ensure that the process description has one by default
+                if not io_ctypes:
+                    io_default = any(get_field(io_fmt, "default", default=False) for io_fmt in io_format)
+                    if not io_default:
+                        raise OWSInvalidParameterValue(json={
+                            "code": "InvalidParameterValue",
+                            "name": io_name,
+                            "description": (
+                                f"Submitted '{io_name}' requires explicit Content-Type specification to"
+                                "respect process description that defines no default format."
+                            ),
+                            "value": {
+                                "supportedFormats": list(io_accept),
+                                "executionFormats": None,
+                            }
+                        })
                 any_types = [ContentType.ANY, ContentType.TEXT_PLAIN]
                 io_accept += any_types
                 if not all(io_fmt in io_accept for io_fmt in io_ctypes):
@@ -773,8 +789,8 @@ def validate_process_io(process, payload):  # FIXME: implement
                             "supported formats specified by the process description."
                         ),
                         "value": {
-                            "supportedFormats": io_accept,
-                            "executionFormats": io_ctypes,
+                            "supportedFormats": list(io_accept),
+                            "executionFormats": list(io_ctypes),
                         }
                     })
 

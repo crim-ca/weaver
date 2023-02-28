@@ -350,6 +350,7 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
     )
     payload_copy = deepcopy(payload)
     payload = _check_deploy(payload)
+    payload.pop("$schema", None)
 
     # validate identifier naming for unsupported characters
     process_desc = payload.get("processDescription", {})  # empty possible if CWL directly passed
@@ -454,8 +455,10 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
     # don't leave them there as they would be seen as if the 'Process' class generated the field
     if "links" in process_info:
         process_info["additional_links"] = process_info.pop("links")
+    # remove schema to avoid later deserialization error if different, but remaining content is valid
+    # also, avoid storing this field in the process object, regenerate it as needed during responses
+    process_info.pop("$schema", None)
 
-    # FIXME: handle colander invalid directly in tween (https://github.com/crim-ca/weaver/issues/112)
     try:
         process = Process(process_info)  # if 'version' was provided in deploy info, it will be added as hint here
         if isinstance(overwrite, Process):

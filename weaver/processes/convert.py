@@ -2466,6 +2466,7 @@ def json2wps_field(field_info, field_category):
     elif field_category == "supported_formats":
         fmt = None
         field_info = field_info.copy()
+        field_info.pop("$schema", None)
         # pywps doesn't allow 'default' field in init, remove if found, but preserve it indirectly
         default = get_field(field_info, "default", search_variations=False, pop_found=True)
         if isinstance(field_info, dict):

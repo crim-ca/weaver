@@ -1165,6 +1165,58 @@ class SortableMappingSchema(ExtendedNodeInterface, ExtendedSchemaBase):
         return result
 
 
+class SchemaRefMappingSchema(ExtendedNodeInterface, ExtendedSchemaBase):
+    """
+    Mapping schema that supports auto-insertion of JSON-schema references provided in the definition.
+
+    When the :class:`colander.MappingSchema` defines ``_schema = "<URL>"`` or ``_id = "<URL>"`` with a valid URL,
+    all validations will automatically insert the corresponding ``$schema`` or ``$id`` field with this URL to the
+    deserialized JSON result.
+    """
+    _extension = "_ext_schema_ref"
+    _ext_schema_fields = ["_schema", "_id"]
+
+    def __init__(self, *args, **kwargs):
+        super(SchemaRefMappingSchema, self).__init__(*args, **kwargs)
+        setattr(self, SchemaRefMappingSchema._extension, True)
+
+        for schema_key in SchemaRefMappingSchema._ext_schema_fields:
+            schema_field = f"${schema_key[1:]}"
+            sort_first = getattr(self, "_sort_first", [])
+            sort_after = getattr(self, "_sort_after", [])
+            if schema_field not in sort_first + sort_after:
+                setattr(self, "_sort_first", [schema_field] + list(sort_first))
+
+    def _deserialize_impl(self, cstruct):  # pylint: disable=W0222,signature-differs
+        if not isinstance(cstruct, dict):
+            return cstruct
+        if not getattr(self, SchemaRefMappingSchema._extension, False):
+            return cstruct
+
+        schema_result = {}
+        for schema_key in SchemaRefMappingSchema._ext_schema_fields:
+            schema_field = f"${schema_key[1:]}"
+            schema_ref = getattr(self, schema_key, None)
+            if isinstance(schema_ref, str) and URL.match_object.match(schema_ref):
+                schema = ExtendedSchemaNode(
+                    colander.String(),
+                    name=schema_field,
+                    title=schema_field,
+                    missing=schema_ref,
+                    default=schema_ref,
+                    validator=colander.OneOf([schema_ref])
+                )
+                schema_result[schema_field] = schema.deserialize(cstruct.get(schema_field))
+
+        schema_result.update(cstruct)
+        return schema_result
+
+    @staticmethod
+    @abstractmethod
+    def schema_type():
+        raise NotImplementedError("Using SchemaNode for a field requires 'schema_type' definition.")
+
+
 class ExtendedSchemaNode(DefaultSchemaNode, DropableSchemaNode, VariableSchemaNode, ExtendedSchemaBase):
     """
     Base schema node with support of extended functionalities.
@@ -1181,17 +1233,26 @@ class ExtendedSchemaNode(DefaultSchemaNode, DropableSchemaNode, VariableSchemaNo
         - :class:`VariableSchemaNode`
     """
     _extension = "_ext_combined"
+    _ext_first = [
+        DropableSchemaNode,
+        DefaultSchemaNode,
+        VariableSchemaNode,
+    ]  # type: Iterable[Type[ExtendedNodeInterface]]
+    _ext_after = [
+        SchemaRefMappingSchema,
+        SortableMappingSchema,
+    ]  # type: Iterable[Type[ExtendedNodeInterface]]
 
     @staticmethod
     @abstractmethod
     def schema_type():
         raise NotImplementedError("Using SchemaNode for a field requires 'schema_type' definition.")
 
-    def _deserialize_extensions(self, cstruct):
+    def _deserialize_extensions(self, cstruct, extensions):
         result = cstruct
         # process extensions to infer alternative parameter/property values
         # node extensions order is important as they can impact the following ones
-        for node in [DropableSchemaNode, DefaultSchemaNode, VariableSchemaNode]:  # type: Type[ExtendedNodeInterface]
+        for node in extensions:  # type: Type[ExtendedNodeInterface]
             # important not to break if result is 'colander.null' since Dropable and Default
             # schema node implementations can substitute it with their appropriate value
             if result is colander.drop:
@@ -1202,7 +1263,7 @@ class ExtendedSchemaNode(DefaultSchemaNode, DropableSchemaNode, VariableSchemaNo
 
     def deserialize(self, cstruct):
         schema_type = _get_schema_type(self)
-        result = ExtendedSchemaNode._deserialize_extensions(self, cstruct)
+        result = ExtendedSchemaNode._deserialize_extensions(self, cstruct, ExtendedSchemaNode._ext_first)
 
         try:
             # process usual base operation with extended result
@@ -1239,7 +1300,8 @@ class ExtendedSchemaNode(DefaultSchemaNode, DropableSchemaNode, VariableSchemaNo
         if result is colander.null and self.missing is colander.required:
             raise colander.Invalid(node=self, msg=self.missing_msg)
 
-        return SortableMappingSchema._deserialize_impl(self, result)
+        result = ExtendedSchemaNode._deserialize_extensions(self, result, ExtendedSchemaNode._ext_after)
+        return result
 
 
 class ExpandStringList(colander.SchemaNode):
@@ -1349,46 +1411,13 @@ class VariableMappingSchema(VariableSchemaNode, colander.MappingSchema):
     schema_type = colander.MappingSchema.schema_type
 
 
-class SchemaRefMappingSchema(SortableMappingSchema, colander.MappingSchema):
-    """
-    Mapping schema that supports auto-insertion of JSON-schema references provided in the definition.
-
-    When the :class:`colander.MappingSchema` defines ``_schema = "<URL>"`` or ``_id = "<URL>"`` with a valid URL,
-    all validations will automatically insert the corresponding ``$schema`` or ``$id`` field with this URL to the
-    deserialized JSON result.
-    """
-    def __init__(self, *args, **kwargs):
-        super(SchemaRefMappingSchema, self).__init__(*args, **kwargs)
-
-        for schema_key in ["_schema", "_id"]:  # reverse order to match sort first insertion method
-            schema_field = f"${schema_key[1:]}"
-            schema_ref = getattr(self, schema_key, None)
-            if isinstance(schema_ref, str) and URL.match_object.match(schema_ref):
-                schema = ExtendedSchemaNode(
-                    colander.String(),
-                    name=schema_field,
-                    title=schema_field,
-                    missing=schema_ref,
-                    default=schema_ref,
-                    validator=colander.OneOf([schema_ref])
-                )
-                self.add(schema)
-                if schema_field not in self._sort_first:
-                    self._sort_first = [schema_field] + list(self._sort_first)
-
-    @staticmethod
-    @abstractmethod
-    def schema_type():
-        raise NotImplementedError("Using SchemaNode for a field requires 'schema_type' definition.")
-
-
 class ExtendedMappingSchema(
     DefaultSchemaNode,
     DropableSchemaNode,
     VariableSchemaNode,
     SchemaRefMappingSchema,
     SortableMappingSchema,
-    colander.MappingSchema
+    colander.MappingSchema,
 ):
     """
     Combines multiple extensions of :class:`colander.MappingSchema` handle their corresponding keywords.
@@ -1638,7 +1667,9 @@ class KeywordMapper(ExtendedMappingSchema):
             # otherwise, only null/drop/default are to be processed
             # since nested keyword schemas are not necessarily mappings, deserialize only extended features
             # using 'ExtendedSchemaNode.deserialize' would raise "not a mapping" if nested schemas is something else
-            return ExtendedSchemaNode._deserialize_extensions(self, cstruct)
+            cstruct = ExtendedSchemaNode._deserialize_extensions(self, cstruct, ExtendedSchemaNode._ext_first)
+            cstruct = ExtendedSchemaNode._deserialize_extensions(self, cstruct, ExtendedSchemaNode._ext_after)
+            return cstruct
 
         # first process the keyword subnodes
         result = self._deserialize_keyword(cstruct)

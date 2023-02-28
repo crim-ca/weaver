@@ -2031,7 +2031,6 @@ class Process(Base):
                 mime_type = get_field(fmt, "mime_type", pop_found=True, search_variations=True)
                 if mime_type is not null:
                     fmt["mediaType"] = mime_type
-
             output_desc = get_field(_output, "abstract", search_variations=True, pop_found=True)
             if output_desc:
                 _output["description"] = output_desc

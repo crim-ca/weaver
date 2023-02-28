@@ -107,7 +107,7 @@ def test_auth_docker_image_registry_format():
     token = str(uuid.uuid4())
     for docker_input, docker_ref, docker_registry, docker_image in valid_references:
         try:
-            auth = DockerAuthentication("Basic", token, docker_input)
+            auth = DockerAuthentication(docker_input, "Basic", token)
             assert auth.token == token, f"Testing: [{docker_input}]"
             assert auth.registry == docker_registry, f"Testing: [{docker_input}]"
             assert auth.image == docker_image, f"Testing: [{docker_input}]"
@@ -150,7 +150,7 @@ def test_auth_docker_image_from_parent_params():
     assert auth.registry == registry
 
     # not extra fields remaining
-    auth_docker = DockerAuthentication(scheme, token, link)
+    auth_docker = DockerAuthentication(link, scheme, token)
     auth_docker.id = auth.id  # noqa  # randomly generated for both, must be passed down
     assert auth == auth_docker
     assert dict(auth_docker) == dict(auth_docker)
