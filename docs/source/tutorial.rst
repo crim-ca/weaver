@@ -15,12 +15,12 @@ Using the WPS application included in Weaver
 Install `Weaver` (see: `Installation`_) and make sure all required components
 are started and running (see: `Configuration`_).
 
-Then, execute the desired `WPS`_ or `WPS-REST`_ request according to desired operation mode and version.
+Then, execute the desired `WPS`_ or |ogc-proc-long| request according to desired operation mode and version.
 
 For all following examples, ``${WEAVER_URL}`` is used to specify your application URL endpoint configuration.
 By default, this value should be ``localhost:4001``.
 
-.. _WPS: https://www.opengeospatial.org/standards/wps
+.. _WPS: https://www.ogc.org/standard/wps/
 .. _WPS-REST: https://github.com/opengeospatial/wps-rest-binding
 
 .. note::

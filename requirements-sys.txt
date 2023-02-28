@@ -1,4 +1,4 @@
-pip>=20.2.2; python_version <= "3.6"
+pip>=20.2.2; python_version <= "3.6"  # pyup: ignore
 pip>=22.0.4; python_version >= "3.7"
-setuptools<58; python_version <= "3.6"
+setuptools<58; python_version <= "3.6"  # pyup: ignore
 setuptools>=65.5.1; python_version >= "3.7"

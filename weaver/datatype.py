@@ -709,10 +709,13 @@ class Job(Base):
         else:
             log_msg = [(level, self._get_log_msg(message, status=status, progress=progress, size_limit=size_limit))]
         for lvl, msg in log_msg:
-            fmt_msg = get_log_fmt() % dict(asctime=now().strftime(get_log_date_fmt()),
-                                           levelname=getLevelName(lvl),
-                                           name=self.__name__,
-                                           message=msg)
+            fmt_data = {
+                "asctime": now().strftime(get_log_date_fmt()),
+                "levelname": getLevelName(lvl),
+                "name": self.__name__,
+                "message": msg,
+            }
+            fmt_msg = get_log_fmt() % fmt_data
             if len(self.logs) == 0 or self.logs[-1] != fmt_msg:
                 self.logs.append(fmt_msg)
                 if logger:
@@ -2600,7 +2603,7 @@ class Process(Base):
         if self.type == ProcessType.WPS_LOCAL:
             process_key = self.identifier
         if process_key not in process_map:
-            ProcessInstanceError(f"Unknown process '{process_key}' in mapping.")
+            raise ProcessInstanceError(f"Unknown process '{process_key}' in mapping.")
         return process_map[process_key](**self.params_wps)
 
 

@@ -917,7 +917,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
                 self.check_basic_jobs_info(resp)
                 job_expect = [job.id for job in expected_jobs]
                 job_result = resp.json["jobs"]
-                test_values = dict(path=path, access=access, user_id=user_id)
+                test_values = {"path": path, "access": access, "user_id": user_id}
                 self.assert_equal_with_jobs_diffs(job_result, job_expect, test_values, index=i)
 
     def test_jobs_list_with_limit_api(self):

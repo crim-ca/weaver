@@ -13,11 +13,26 @@ from weaver.store.mongodb import MongodbServiceStore
 
 class MongodbServiceStoreTestCase(unittest.TestCase):
     def setUp(self):
-        self.service = dict(name="loving_flamingo", url="http://somewhere.over.the/ocean", type="wps",
-                            public=False, auth="token")
-        self.service_public = dict(name="open_pingu", url="http://somewhere.in.the/deep_ocean", type="wps",
-                                   public=True, auth="token")
-        self.service_special = dict(url="http://wonderload", name="A special Name", type="wps", auth="token")
+        self.service = {
+            "name": "loving_flamingo",
+            "url": "http://somewhere.over.the/ocean",
+            "type": "wps",
+            "public": False,
+            "auth": "token",
+        }
+        self.service_public = {
+            "name": "open_pingu",
+            "url": "http://somewhere.in.the/deep_ocean",
+            "type": "wps",
+            "public": True,
+            "auth": "token",
+        }
+        self.service_special = {
+            "url": "http://wonderload",
+            "name": "A special Name",
+            "type": "wps",
+            "auth": "token",
+        }
         self.sane_name_config = {"assert_invalid": False}
 
     def test_fetch_by_name(self):
