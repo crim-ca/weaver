@@ -423,6 +423,7 @@ def _load_supported_schemas():
         "v1.1": "extensions-v1.1.yml",
         "v1.2": "extensions-v1.2.yml",
     }
+    extensions_weaver = []
     for version, ext_version_file in extension_resources.items():
         # use our own cache on top of cwltool cache to distinguish between 'v1.x' names
         # pointing at "CWL standard", "cwltool-flavored extensions" or "weaver-flavored extensions"
@@ -433,7 +434,15 @@ def _load_supported_schemas():
         with open_module_resource_file(cwltool, ext_version_file) as r_file:
             schema = yaml.safe_load(r_file)
 
-        extensions = schema["$graph"]
+        if extensions_weaver:
+            LOGGER.debug("Reusing cached Weaver schema extensions.")
+        else:
+            LOGGER.debug("Loading Weaver schema extensions...")
+            with open_module_resource_file("weaver", "schemas/cwl/weaver-extensions.yml") as r_file:
+                weaver_schema = yaml.safe_load(r_file)
+            extensions_weaver = weaver_schema["$graph"]
+
+        extensions = schema["$graph"] + extensions_weaver
         extensions_supported = []
         extensions_imports = []
         extensions_enabled = set()

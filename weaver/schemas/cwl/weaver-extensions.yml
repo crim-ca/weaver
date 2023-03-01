@@ -1,0 +1,58 @@
+$namespaces:
+  cwl: "https://w3id.org/cwl/cwl#"
+  weaver: "http://crim.ca/weaver#"
+$graph:
+
+- name: weaver:WPS1Requirement
+  type: record
+  extends: cwl:ProcessRequirement
+  inVocab: false
+  fields:
+    class:
+      type:
+        type: enum
+        symbols: [WPS1Requirement]
+      doc: "Always 'WPS1Requirement'"
+      jsonldPredicate:
+        "_id": "weaver:WPS1Requirement"
+    process:
+      name: ProcessIdentifier
+      type: string
+    provider:
+      name: ProviderEndpoint
+      type: string
+
+- name: weaver:OGCAPIRequirement
+  type: record
+  extends: cwl:ProcessRequirement
+  inVocab: false
+  fields:
+    class:
+      type:
+        type: enum
+        symbols: [OGCAPIRequirement]
+      doc: "Always 'OGCAPIRequirement'"
+      jsonldPredicate:
+        "_id": "weaver:OGCAPIRequirement"
+    process:
+      name: ProcessEndpoint
+      type: string
+
+- name: weaver:ESGF-CWTRequirement
+  type: record
+  extends: cwl:ProcessRequirement
+  inVocab: false
+  fields:
+    class:
+      type:
+        type: enum
+        symbols: [ESGF-CWTRequirement]
+      doc: "Always 'ESGF-CWTRequirement'"
+      jsonldPredicate:
+        "_id": "weaver:ESGF-CWTRequirement"
+    process:
+      name: ProcessIdentifier
+      type: string
+    provider:
+      name: ProviderEndpoint
+      type: string
