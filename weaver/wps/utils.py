@@ -433,7 +433,7 @@ def load_pywps_config(container, config=None):
 
     # set accepted languages aligned with values provided by REST API endpoints
     # otherwise, execute request could fail due to languages considered not supported
-    languages = ", ".join(AcceptLanguage.values())
+    languages = ", ".join(AcceptLanguage.offers())
     LOGGER.debug("Setting WPS languages: [%s]", languages)
     pywps_config.CONFIG.set("server", "language", languages)
 

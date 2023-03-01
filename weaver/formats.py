@@ -37,6 +37,9 @@ class AcceptLanguage(Constants):
     @classmethod
     def offers(cls):
         # type: () -> List[str]
+        """
+        Languages offered by the application.
+        """
         languages = AcceptLanguage.values()
         languages += list({lang.split("-")[0] for lang in languages})
         return languages
