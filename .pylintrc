@@ -568,4 +568,4 @@ min-public-methods=0
 
 # Exceptions that will emit a warning when being caught. Defaults to
 # "BaseException, Exception".
-overgeneral-exceptions=BaseException
+overgeneral-exceptions=builtins.BaseException

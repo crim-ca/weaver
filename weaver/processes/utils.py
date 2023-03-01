@@ -641,13 +641,13 @@ def _apply_process_metadata(process, update_data):  # pylint: disable=R1260,too-
     patch_update_fields = [
         "title",
         "description",
-        dict(source="keywords", method="append", unique=True),
-        dict(source="metadata", method="append"),
-        dict(source="links", method="append", target="additional_links"),
+        {"source": "keywords", "method": "append", "unique": True},
+        {"source": "metadata", "method": "append"},
+        {"source": "links", "method": "append", "target": "additional_links"},
     ]
     minor_update_fields = [
-        dict(source="jobControlOptions", method="override", unique=True),
-        dict(source="outputTransmission", method="override", unique=True),
+        {"source": "jobControlOptions", "method": "override", "unique": True},
+        {"source": "outputTransmission", "method": "override", "unique": True},
         "visibility",
     ]
     update_level = VersionLevel.PATCH  # metadata only, elevate to MINOR if corresponding fields changed
@@ -731,7 +731,7 @@ def _apply_process_metadata(process, update_data):  # pylint: disable=R1260,too-
                 any_update_inputs |= _apply_change(input_data, input_def, input_name, patch_update_fields)
 
             # early exit if nothing was updated when fields were specified expecting something to be applied
-            # avoid potentially indicating that update was accomplished when it would not be
+            # avoids potentially indicating that update was accomplished when it would not be
             if not any_update_inputs:
                 raise HTTPBadRequest(json={
                     "type": "InvalidParameterValue",

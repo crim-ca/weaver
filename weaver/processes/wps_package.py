@@ -405,6 +405,7 @@ def _update_package_compatibility(package):
 
 
 def _load_supported_schemas():
+    # type: () -> None
     """
     Loads :term:`CWL` schemas supported by `Weaver` to avoid validation errors when provided in requirements.
 
@@ -1833,8 +1834,7 @@ class WpsPackage(Process):
             error_msg = f"Package completed with errors. Server logs: [{self.log_file}], Available at: [{log_url}]"
             self.update_status(error_msg, self.percent, Status.FAILED)
             raise
-        else:
-            self.update_status("Package operations complete.", PACKAGE_PROGRESS_DONE, Status.SUCCEEDED)
+        self.update_status("Package operations complete.", PACKAGE_PROGRESS_DONE, Status.SUCCEEDED)
         return self.response
 
     def must_fetch(self, input_ref, input_type):

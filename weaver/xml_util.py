@@ -84,13 +84,13 @@ def _lxml_tree_parser_maker(**parser_kwargs):
 
         etree.XMLParser(target=self, strip_cdata=False, recover=True, encoding=encoding)
     """
-    parser_kwargs.update(dict(
-        no_network=True,
-        remove_pis=True,
-        huge_tree=False,
-        strip_cdata=True,
-        recover=True,
-    ))
+    parser_kwargs.update({
+        "no_network": True,
+        "remove_pis": True,
+        "huge_tree": False,
+        "strip_cdata": True,
+        "recover": True,
+    })
     return lxml_etree.HTMLParser(**parser_kwargs)
 
 
