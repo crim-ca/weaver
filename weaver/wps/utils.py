@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 from beaker.cache import cache_region
+from owslib.util import Authentication
 from owslib.wps import WebProcessingService, WPSExecution
 from pyramid.httpexceptions import HTTPNotFound, HTTPOk, HTTPUnprocessableEntity
 from pywps import configuration as pywps_config
@@ -38,7 +39,7 @@ LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from typing import Dict, Union, Optional
 
-    from weaver.typedefs import AnyRequestType, AnySettingsContainer, HeadersType, ProcessOWS
+    from weaver.typedefs import AnyAcceptLanguageHeader, AnyRequestType, AnySettingsContainer, HeadersType, ProcessOWS
 
 
 def _get_settings_or_wps_config(container,                  # type: AnySettingsContainer
@@ -235,8 +236,10 @@ def _describe_process_cached(self, identifier, xml=None):
 def _get_wps_client_cached(url, headers, verify, language):
     # type: (str, HeadersType, bool, Optional[str]) -> WebProcessingService
     LOGGER.debug("Request WPS GetCapabilities to [%s]", url)
+    # FIXME: provide other authentication attributes from Cookie/Headers, auth_delegate available for advanced auth
+    auth = Authentication(verify=verify)
     # cannot preset language because capabilities must be fetched to find best match
-    wps = WebProcessingService(url=url, headers=headers, verify=verify, timeout=5)
+    wps = WebProcessingService(url=url, headers=headers, auth=auth, timeout=5)
     set_wps_language(wps, accept_language=language)
     setattr(wps, "describeprocess_method", wps.describeprocess)  # backup real method, them override with cached
     setattr(wps, "describeprocess", lambda *_, **__: _describe_process_cached(wps, *_, **__))
@@ -522,7 +525,7 @@ def set_wps_language(wps, accept_language=None, request=None):
     :returns: language that has been set, or ``None`` if no match could be found.
     """
     if not accept_language and request and hasattr(request, "accept_language"):
-        accept_language = request.accept_language.header_value
+        accept_language = request.accept_language  # type: AnyAcceptLanguageHeader
 
     if not accept_language:
         return
@@ -531,8 +534,11 @@ def set_wps_language(wps, accept_language=None, request=None):
         # owslib version doesn't support setting a language
         return
 
-    supported_languages = wps.languages.supported or AcceptLanguage.values()
-    language = create_accept_language_header(accept_language).best_match(supported_languages)
+    if isinstance(accept_language, str):
+        accept_language = create_accept_language_header(accept_language)  # type: AnyAcceptLanguageHeader
+
+    supported_languages = wps.languages.supported or AcceptLanguage.offers()
+    language = accept_language.lookup(supported_languages, default="") or None
     if language:
         wps.language = language
     return language

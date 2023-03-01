@@ -108,47 +108,6 @@ MOCK_AWS_REGION = "ca-central-1"  # type: RegionName
 MOCK_HTTP_REF = "http://localhost.mock"
 
 
-def ignore_warning_regex(func, warning_message_regex, warning_categories=DeprecationWarning):
-    # type: (Callable, Union[str, List[str]], Union[Type[Warning], List[Type[Warning]]]) -> Callable
-    """
-    Wrapper that eliminates any warning matching ``warning_regex`` during testing logging.
-
-    .. note::
-        Wrapper should be applied on method (not directly on :class:`unittest.TestCase`
-        as it can disable the whole test suite.
-    """
-    if isinstance(warning_message_regex, str):
-        warning_message_regex = [warning_message_regex]
-    if not isinstance(warning_message_regex, list):
-        raise NotImplementedError("Argument 'warning_message_regex' must be a string or a list of string.")
-    if not isinstance(warning_categories, list):
-        warning_categories = [warning_categories]
-    for warn in warning_categories:
-        if not inspect.isclass(warn) or not issubclass(warn, Warning):
-            raise NotImplementedError("Argument 'warning_categories' must be one or multiple subclass(es) of Warning.")
-
-    def do_test(self, *args, **kwargs):
-        with warnings.catch_warnings():
-            for warn_cat in warning_categories:
-                for msg_regex in warning_message_regex:
-                    warnings.filterwarnings(action="ignore", message=msg_regex, category=warn_cat)
-            func(self, *args, **kwargs)
-    return do_test
-
-
-def ignore_wps_warnings(func):
-    """
-    Wrapper that eliminates WPS related warnings during testing logging.
-
-    .. note::
-        Wrapper should be applied on method (not directly on :class:`unittest.TestCase`)
-        as it can disable the whole test suite.
-    """
-    warn_msg_regex = ["Parameter 'request*", "Parameter 'service*", "Request type '*", "Service '*"]
-    warn_categories = [MissingParameterWarning, UnsupportedOperationWarning]
-    return ignore_warning_regex(func, warn_msg_regex, warn_categories)
-
-
 def get_settings_from_config_ini(config_ini_path=None, ini_section_name="app:main"):
     # type: (Optional[str], str) -> SettingsType
     parser = ConfigParser()

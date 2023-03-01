@@ -405,6 +405,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert set(prov["processes"]) == {"pavicstestdocs", "test-remote-process-wps1"}
         assert resp.json["total"] == total + 2, "Grand total of local+remote processes should be reported."
 
+    @pytest.mark.filterwarnings("ignore::weaver.warning.NonBreakingExceptionWarning")  # unresponsive services
     # register valid server here, and another invalid within test
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,

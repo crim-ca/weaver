@@ -12,7 +12,7 @@ from urllib.parse import quote
 import mock
 import pytest
 import yaml
-from webtest import TestRequest
+from webtest import TestRequest as WebTestRequest  # avoid pytest collect warning
 
 from tests.utils import MockedResponse, run_command
 from weaver.cli import (
@@ -187,7 +187,7 @@ def mocked_auth_response(token_name, token_value, *_, **__):
 
 
 def test_auth_handler_basic():
-    req = TestRequest({})
+    req = WebTestRequest({})
     auth = BasicAuthHandler(username="test", password=str(uuid.uuid4()))
     resp = auth(req)  # type: ignore
     assert "Authorization" in resp.headers and len(resp.headers["Authorization"])
@@ -195,7 +195,7 @@ def test_auth_handler_basic():
 
 
 def test_auth_handler_bearer():
-    req = TestRequest({})
+    req = WebTestRequest({})
     auth = BearerAuthHandler(identity=str(uuid.uuid4()))
     token = str(uuid.uuid4())
     with mock.patch(
@@ -208,7 +208,7 @@ def test_auth_handler_bearer():
 
 
 def test_auth_handler_cookie():
-    req = TestRequest({})
+    req = WebTestRequest({})
     auth = CookieAuthHandler(identity=str(uuid.uuid4()))
     token = str(uuid.uuid4())
     with mock.patch(
