@@ -13,6 +13,7 @@ import sys
 import tempfile
 import threading
 import time
+import uuid
 import warnings
 from concurrent.futures import ALL_COMPLETED, CancelledError, ThreadPoolExecutor, as_completed, wait as wait_until
 from copy import deepcopy
@@ -1827,6 +1828,17 @@ def get_secure_filename(file_name):
     return f"{prefix}{secure_filename(file_name)}{suffix}"
 
 
+def get_secure_directory_name(location):
+    location_list = location.split("/")
+    for list_element in reversed(location_list):
+        potential_directory_name = get_secure_filename(list_element)
+        if potential_directory_name:
+            return potential_directory_name
+    # If no potential secured directory name is found, a random one is generated
+    unique_directory_name = str(uuid.uuid4())
+    return unique_directory_name
+
+
 def download_file_http(file_reference, file_outdir, settings=None, callback=None, **request_kwargs):
     # type: (str, str, Optional[AnySettingsContainer], Optional[Callable[[str], None]], **Any) -> str
     """
@@ -2857,7 +2869,8 @@ def fetch_directory(location,                           # type: str
         If not prefixed by any scheme, the option will apply to all handling methods (if applicable).
     :returns: File locations retrieved from directory listing.
     """
-    if not get_url_without_query(location).endswith("/"):
+    location_without_query = get_url_without_query(location)
+    if not location_without_query.endswith("/"):
         raise ValueError(f"Invalid directory location [{location}] must have a trailing slash.")
     LOGGER.debug("Fetching directory reference: [%s] using options:\n%s", location, repr_json(option_kwargs))
     if location.startswith("s3://"):
@@ -2874,12 +2887,8 @@ def fetch_directory(location,                           # type: str
     elif location.startswith("http://") or location.startswith("https://"):
         # Next two lines are added to match behavior of `download_files_s3` and replicate input directory name
         # in output location
-        input_directory_name = os.path.basename(os.path.normpath(location))
-        out_dir = os.path.join(out_dir, input_directory_name)
-        # This is to filter out request parameters from the input location and prevent them
-        # from being used as a directory
-        if "?" in out_dir:
-            out_dir = out_dir.split("?")[0]
+        loc_path = get_secure_directory_name(location_without_query)
+        out_dir = os.path.join(out_dir, loc_path)
         LOGGER.debug("Fetch directory resolved as remote HTTP reference. Will attempt listing contents.")
         resp = request_extra("GET", location)
         if resp.status_code != 200:
