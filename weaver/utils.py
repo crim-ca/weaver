@@ -1831,11 +1831,11 @@ def get_secure_filename(file_name):
 def get_secure_directory_name(location):
     # type: (str) -> str
     """
-        Obtain a secure directory name from a full path location.
+    Obtain a secure directory name from a full path location.
 
-        Takes a location path and finds the first secure base name available from path.
-        If no secure base name is found, a random UUID value will be returned.
-        """
+    Takes a location path and finds the first secure base name available from path.
+    If no secure base name is found, a random UUID value will be returned.
+    """
     location_list = location.split("/")
     for list_element in reversed(location_list):
         potential_directory_name = get_secure_filename(list_element)
