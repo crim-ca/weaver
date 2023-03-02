@@ -58,6 +58,7 @@ if TYPE_CHECKING:
     from requests import PreparedRequest, Request as RequestsRequest
     from requests.models import Response as RequestsResponse
     from requests.structures import CaseInsensitiveDict
+    from webob.acceptparse import AcceptLanguageNoHeader, AcceptLanguageValidHeader, AcceptLanguageInvalidHeader
     from webob.headers import ResponseHeaders, EnvironHeaders
     from webob.response import Response as WebobResponse
     from webtest.response import TestResponse
@@ -324,6 +325,8 @@ if TYPE_CHECKING:
     ]
     AnyRequestMethod = Union[RequestMethod, str]
     HTTPValid = Union[HTTPSuccessful, HTTPRedirection]
+
+    AnyAcceptLanguageHeader = Union[AcceptLanguageNoHeader, AcceptLanguageValidHeader, AcceptLanguageInvalidHeader]
 
     AnyProcess = Union[Process, ProcessOWS, ProcessWPS, JSON]
     AnyProcessClass = Union[Type[Process], Type[ProcessWPS]]

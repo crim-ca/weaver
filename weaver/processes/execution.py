@@ -69,6 +69,7 @@ if TYPE_CHECKING:
     from weaver.status import StatusType
     from weaver.typedefs import (
         JSON,
+        AnyAcceptLanguageHeader,
         AnyResponseType,
         CeleryResult,
         HeadersType,
@@ -565,9 +566,12 @@ def submit_job(request, reference, tags=None):
         is_workflow = reference.type == ProcessType.WORKFLOW
         is_local = True
         tags += "local"
-        support_lang = AcceptLanguage.values()
-        if lang and request.accept_language.best_match(support_lang) is None:
+        support_lang = AcceptLanguage.offers()
+        accepts_lang = request.accept_language  # type: AnyAcceptLanguageHeader
+        matched_lang = accepts_lang.lookup(support_lang, default="") or None
+        if lang and not matched_lang:
             raise HTTPNotAcceptable(f"Requested language [{lang}] not in supported languages [{sorted(support_lang)}].")
+        lang = matched_lang
     elif isinstance(reference, Service):
         service_url = reference.url
         provider_id = reference.id

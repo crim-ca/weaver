@@ -12,7 +12,8 @@ Changes
 
 Changes:
 --------
-- No change.
+- Replace deprecated ``best_match`` methods for ``Accept`` and ``Accept-Language`` HTTP headers by their respective
+  implementation with ``acceptable_offers`` and ``lookup`` methods better aligned with :rfc:`7231` specification.
 
 Fixes:
 ------
@@ -25,6 +26,8 @@ Fixes:
   combined with ``cornice`` OpenAPI schemas. Pin ``colander<2`` to avoid problems with latest changes.
 - Fix ``secure_filename`` causing valid names with leading or trailing underscores to be incorrectly unresolved
   because they get stripped out by the operation.
+- Fix deprecation warnings from :mod:`webob` and :mod:`owslib`.
+- Fix filtered warnings for expected cases during tests.
 
 .. _changes_4.28.0:
 
