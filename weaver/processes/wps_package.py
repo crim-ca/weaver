@@ -58,6 +58,7 @@ from weaver.exceptions import (
 from weaver.formats import ContentType, get_content_type, get_cwl_file_format, get_format, repr_json
 from weaver.processes import opensearch
 from weaver.processes.constants import (
+    CWL_NAMESPACE_WEAVER,
     CWL_REQUIREMENT_APP_BUILTIN,
     CWL_REQUIREMENT_APP_DOCKER,
     CWL_REQUIREMENT_APP_DOCKER_GPU,
@@ -66,6 +67,7 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_OGC_API,
     CWL_REQUIREMENT_APP_REMOTE,
     CWL_REQUIREMENT_APP_TYPES,
+    CWL_REQUIREMENT_APP_WEAVER,
     CWL_REQUIREMENT_APP_WPS1,
     CWL_REQUIREMENT_CUDA,
     CWL_REQUIREMENT_CUDA_DEFAULT_PARAMETERS,
@@ -359,8 +361,8 @@ def _update_package_compatibility(package):
     package_original = copy.deepcopy(package)
     package_type = _get_package_type(package)
     if package_type == ProcessType.APPLICATION:
-        docker_req = get_application_requirement(package, validate=False, required=False)
-        if docker_req["class"].endswith(CWL_REQUIREMENT_APP_DOCKER_GPU):
+        app_pkg_req = get_application_requirement(package, validate=False, required=False)
+        if app_pkg_req["class"].endswith(CWL_REQUIREMENT_APP_DOCKER_GPU):
             # backup original for later compare and find requirements of interest
             # requirements unrelated to update must be preserved in same locations and formats to preserve behavior
             r_original = package.get("requirements", {})
@@ -371,17 +373,17 @@ def _update_package_compatibility(package):
             h_no_docker = list(filter(lambda _req: not _req["class"].endswith(CWL_REQUIREMENT_APP_DOCKER_GPU), h_list))
             r_cuda = list(filter(lambda _req: _req["class"].endswith(CWL_REQUIREMENT_CUDA), r_list))
             h_cuda = list(filter(lambda _req: _req["class"].endswith(CWL_REQUIREMENT_CUDA), h_list))
-            docker_req["class"] = CWL_REQUIREMENT_APP_DOCKER  # GPU to official Docker requirement
+            app_pkg_req["class"] = CWL_REQUIREMENT_APP_DOCKER  # GPU to official Docker requirement
             cuda_req = r_cuda or h_cuda
             cuda_found = bool(cuda_req)
-            if not cuda_req:  # if CUDA no explicitly provided along the older GPU requirement, define default
+            if not cuda_req:  # if CUDA not explicitly provided along the older GPU requirement, define default
                 cuda_req = CWL_REQUIREMENT_CUDA_DEFAULT_PARAMETERS.copy()
                 cuda_req["class"] = CWL_REQUIREMENT_CUDA
             # apply the change to the relevant list where it was originally found
             if r_list == r_no_docker and h_list != h_no_docker:
-                h_list = h_no_docker + ([docker_req] if cuda_found else [docker_req, cuda_req])
+                h_list = h_no_docker + ([app_pkg_req] if cuda_found else [app_pkg_req, cuda_req])
             elif r_list != r_no_docker and h_list == h_no_docker:
-                r_list = r_no_docker + ([docker_req] if cuda_found else [docker_req, cuda_req])
+                r_list = r_no_docker + ([app_pkg_req] if cuda_found else [app_pkg_req, cuda_req])
             else:
                 raise PackageParsingError(
                     f"Expected to find a unique '{CWL_REQUIREMENT_APP_DOCKER_GPU}' definition in CWL "
@@ -397,8 +399,32 @@ def _update_package_compatibility(package):
             package.setdefault("$namespaces", {})
             package["$namespaces"].update(CWL_REQUIREMENT_CUDA_NAMESPACE.copy())
             LOGGER.warning(
-                "CWL package definition updated using '%s' backward-compatibility definition.\n%s",
+                "CWL package definition updated using '%s' backward-compatibility definition. "
+                "Consider updating the Application Package with relevant changes to avoid this warning.\n%s",
                 CWL_REQUIREMENT_APP_DOCKER_GPU,
+                generate_diff(package_original, package, val_name="Original CWL", ref_name="Updated CWL")
+            )
+        # weaver-specific requirements extensions with namespaced specification
+        elif (
+            not app_pkg_req["class"].startswith(f"{list(CWL_NAMESPACE_WEAVER)[0]}:")
+            and any(app_pkg_req["class"].endswith(req) for req in CWL_REQUIREMENT_APP_WEAVER)
+        ):
+            weaver_hint = app_pkg_req["class"]
+            weaver_req = f"{list(CWL_NAMESPACE_WEAVER)[0]}:{weaver_hint}"
+            app_pkg_hints = package.get("hints", [])  # don't need to check requirements (would not have worked anyway)
+            if isinstance(app_pkg_hints, dict):
+                hint = app_pkg_hints.pop(weaver_hint)
+                app_pkg_hints[weaver_req] = hint
+            else:
+                for hint in app_pkg_hints:
+                    if hint["class"] == weaver_hint:
+                        hint["class"] = weaver_req
+                        break
+            package["$namespaces"].update(CWL_NAMESPACE_WEAVER)
+            LOGGER.warning(
+                "CWL package definition with '%s' updated using namespaced '%s' definition. "
+                "Consider updating the Application Package with relevant changes to avoid this warning.\n%s",
+                weaver_hint, weaver_req,
                 generate_diff(package_original, package, val_name="Original CWL", ref_name="Updated CWL")
             )
     return package
@@ -441,6 +467,8 @@ def _load_supported_schemas():
             with open_module_resource_file("weaver", "schemas/cwl/weaver-extensions.yml") as r_file:
                 weaver_schema = yaml.safe_load(r_file)
             extensions_weaver = weaver_schema["$graph"]
+            schema.setdefault("$namespaces", {})
+            schema["$namespaces"].update(weaver_schema.get("$namespaces", {}))
 
         extensions = schema["$graph"] + extensions_weaver
         extensions_supported = []

@@ -4,6 +4,7 @@ import contextlib
 import copy
 import json
 import os
+import re
 import tempfile
 import unittest
 import uuid
@@ -55,6 +56,19 @@ if TYPE_CHECKING:
     from weaver.typedefs import CWL, JSON, AnyHeadersContainer, AnyVersion, SettingsType
 
 
+@pytest.yield_fixture(name="assert_cwl_no_warn_unknown_wps1")
+def fixture_cwl_no_warn_unknown_wps1(caplog):
+    # type: (pytest.LogCaptureFixture) -> None
+    raise "NOT WORKING YET"  # FIXME
+    yield caplog
+    warn_hint = re.compile(rf"Unknown hint .*{CWL_REQUIREMENT_APP_WPS1}", re.MULTILINE)
+    warn_records = [rec.msg for rec in filter(lambda _rec: warn_hint.match(_rec), caplog.records)]
+    warn_message = "\n".join(warn_records)
+    assert not warn_records, (
+        f"Expected no warning from resolved Weaver-specific Application Package requirement, got:\n{warn_message}",
+    )
+
+
 # pylint: disable=C0103,invalid-name
 class WpsRestApiProcessesTest(unittest.TestCase):
     remote_server = None    # type: str
@@ -78,7 +92,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         pyramid.testing.tearDown()
 
     def fully_qualified_test_process_name(self):
-        return (f"{fully_qualified_name(self)}-{self._testMethodName}").replace(".", "-")
+        return f"{fully_qualified_name(self)}-{self._testMethodName}".replace(".", "-")
 
     def setUp(self):
         # rebuild clean db on each test
@@ -716,15 +730,16 @@ class WpsRestApiProcessesTest(unittest.TestCase):
 
     def validate_wps1_package(self, process_id, provider_url):
         cwl = self.get_application_package(process_id)
-        assert "hints" in cwl and CWL_REQUIREMENT_APP_WPS1 in cwl["hints"]
-        assert "process" in cwl["hints"][CWL_REQUIREMENT_APP_WPS1]
-        assert "provider" in cwl["hints"][CWL_REQUIREMENT_APP_WPS1]
-        assert cwl["hints"][CWL_REQUIREMENT_APP_WPS1]["process"] == process_id
+        assert "hints" in cwl and any(hint.endswith(CWL_REQUIREMENT_APP_WPS1) for hint in cwl["hints"])
+        hint = cwl["hints"].get(CWL_REQUIREMENT_APP_WPS1) or cwl["hints"].get(f"weaver:{CWL_REQUIREMENT_APP_WPS1}")
+        assert "process" in hint
+        assert "provider" in hint
+        assert hint["process"] == process_id
         if provider_url.endswith("/"):
             valid_urls = [provider_url, provider_url[:-1]]
         else:
             valid_urls = [provider_url, f"{provider_url}/"]
-        assert cwl["hints"][CWL_REQUIREMENT_APP_WPS1]["provider"] in valid_urls
+        assert hint["provider"] in valid_urls
 
     def test_deploy_process_CWL_DockerRequirement_auth_header_format(self):
         """
@@ -1127,6 +1142,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                 resources.TEST_REMOTE_SERVER_URL
             )
 
+    @pytest.mark.usefixtures("assert_cwl_no_warn_unknown_wps1")
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
         resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,

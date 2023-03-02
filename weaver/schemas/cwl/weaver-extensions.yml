@@ -16,10 +16,10 @@ $graph:
       jsonldPredicate:
         "_id": "weaver:WPS1Requirement"
     process:
-      name: ProcessIdentifier
+      name: weaver:ProcessIdentifier
       type: string
     provider:
-      name: ProviderEndpoint
+      name: weaver:ProviderEndpoint
       type: string
 
 - name: weaver:OGCAPIRequirement
@@ -35,7 +35,7 @@ $graph:
       jsonldPredicate:
         "_id": "weaver:OGCAPIRequirement"
     process:
-      name: ProcessEndpoint
+      name: weaver:ProcessEndpoint
       type: string
 
 - name: weaver:ESGF-CWTRequirement
@@ -51,8 +51,8 @@ $graph:
       jsonldPredicate:
         "_id": "weaver:ESGF-CWTRequirement"
     process:
-      name: ProcessIdentifier
+      name: weaver:ProcessIdentifier
       type: string
     provider:
-      name: ProviderEndpoint
+      name: weaver:ProviderEndpoint
       type: string

@@ -58,6 +58,23 @@ CWL_REQUIREMENT_APP_ESGF_CWT = "ESGF-CWTRequirement"
 CWL_REQUIREMENT_APP_OGC_API = "OGCAPIRequirement"
 CWL_REQUIREMENT_APP_WPS1 = "WPS1Requirement"
 
+CWL_REQUIREMENT_APP_WEAVER = frozenset([
+    CWL_REQUIREMENT_APP_BUILTIN,
+    CWL_REQUIREMENT_APP_ESGF_CWT,
+    CWL_REQUIREMENT_APP_OGC_API,
+    CWL_REQUIREMENT_APP_WPS1,
+])
+"""
+Set of :term:`CWL` requirements defined by `Weaver` for an :term:`Application Package` implementation.
+"""
+
+CWL_NAMESPACE_WEAVER = {
+    "weaver": "http://crim.ca/weaver#"
+}
+"""
+Namespace used to reference :term:`CWL` definitions provided by `Weaver`. 
+"""
+
 CWL_REQUIREMENT_APP_TYPES = frozenset([
     CWL_REQUIREMENT_APP_BUILTIN,
     CWL_REQUIREMENT_APP_DOCKER,
@@ -65,6 +82,9 @@ CWL_REQUIREMENT_APP_TYPES = frozenset([
     CWL_REQUIREMENT_APP_ESGF_CWT,
     CWL_REQUIREMENT_APP_OGC_API,
     CWL_REQUIREMENT_APP_WPS1,
+] + [
+    f"{list(CWL_NAMESPACE_WEAVER)[0]}:{_req}"
+    for _req in CWL_REQUIREMENT_APP_WEAVER
 ])
 """
 Set of :term:`CWL` requirements consisting of known :term:`Application Package` by this `Weaver` instance.
