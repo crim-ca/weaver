@@ -1,11 +1,11 @@
 import json
-import pytest
 import unittest
 from urllib.parse import urlparse
 
 import colander
 import mock
 import pyramid.testing
+import pytest
 from pyramid.httpexceptions import HTTPForbidden, HTTPFound, HTTPUnauthorized
 from webtest import TestApp as WebTestApp
 
