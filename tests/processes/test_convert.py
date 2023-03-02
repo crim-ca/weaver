@@ -1030,6 +1030,9 @@ def test_convert_input_values_schema_from_old():
         {"id": "test10", "value": "more"},
         {"id": "test11", "href": "/data/file1.txt", "format": {"mediaType": "text/plain"}},
         {"id": "test11", "href": "/data/file2.txt", "format": {"mediaType": "text/plain"}},
+        {"id": "test12", "href": "/data/file1.txt", "format": {"mediaType": "text/plain"}},
+        {"id": "test12", "href": "/data/file2.txt", "format": {"mediaType": "text/plain"}},
+        {"id": "test12", "href": "/data/file3.txt", "format": {"mediaType": "text/plain"}},
     ]
     inputs_ogc = {
         "test1": "data",
@@ -1045,6 +1048,11 @@ def test_convert_input_values_schema_from_old():
         "test11": [
             {"href": "/data/file1.txt", "format": {"mediaType": "text/plain"}},
             {"href": "/data/file2.txt", "format": {"mediaType": "text/plain"}}
+        ],
+        "test12": [
+            {"href": "/data/file1.txt", "format": {"mediaType": "text/plain"}},
+            {"href": "/data/file2.txt", "format": {"mediaType": "text/plain"}},
+            {"href": "/data/file3.txt", "format": {"mediaType": "text/plain"}}
         ]
     }
     assert convert_input_values_schema(inputs_old, ProcessSchema.OLD) == inputs_old
@@ -1066,6 +1074,11 @@ def test_convert_input_values_schema_from_ogc():
         "test11": [
             {"href": "/data/file1.txt", "format": {"mediaType": "text/plain"}},
             {"href": "/data/file2.txt", "format": {"mediaType": "text/plain"}}
+        ],
+        "test12": [
+            {"href": "/data/file1.txt", "format": {"mediaType": "text/plain"}},
+            {"href": "/data/file2.txt", "format": {"mediaType": "text/plain"}},
+            {"href": "/data/file3.txt", "format": {"mediaType": "text/plain"}}
         ]
     }
     inputs_old = [
@@ -1085,6 +1098,9 @@ def test_convert_input_values_schema_from_ogc():
         {"id": "test10", "value": "more"},
         {"id": "test11", "href": "/data/file1.txt", "format": {"mediaType": "text/plain"}},
         {"id": "test11", "href": "/data/file2.txt", "format": {"mediaType": "text/plain"}},
+        {"id": "test12", "href": "/data/file1.txt", "format": {"mediaType": "text/plain"}},
+        {"id": "test12", "href": "/data/file2.txt", "format": {"mediaType": "text/plain"}},
+        {"id": "test12", "href": "/data/file3.txt", "format": {"mediaType": "text/plain"}},
     ]
     assert convert_input_values_schema(inputs_ogc, ProcessSchema.OGC) == inputs_ogc
     assert convert_input_values_schema(inputs_ogc, ProcessSchema.OLD) == inputs_old
