@@ -21,7 +21,7 @@ class GenericApiRoutesTestCase(unittest.TestCase):
         cls.testapp = get_test_weaver_app(settings={"weaver.wps": True, "weaver.wps_restapi": True})
         cls.json_headers = {"Accept": ContentType.APP_JSON, "Content-Type": ContentType.APP_JSON}
 
-    @pytest.mark.filterwarnings("ignore::.*raw\.githubusercontent\.com:urllib3.exceptions.InsecureRequestWarning")
+    @pytest.mark.filterwarnings("ignore::urllib3.exceptions.InsecureRequestWarning")
     def test_frontpage_format(self):
         resp = self.testapp.get(sd.api_frontpage_service.path, headers=self.json_headers)
         assert resp.status_code == 200
