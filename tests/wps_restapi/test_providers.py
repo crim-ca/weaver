@@ -86,6 +86,7 @@ class WpsRestApiProvidersTest(WpsProviderBase):
         body = resp.json
         assert "providers" in body and len(body["providers"]) == 0
 
+    @pytest.mark.filterwarnings("ignore::weaver.warning.NonBreakingExceptionWarning")
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
         resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
@@ -166,6 +167,7 @@ class WpsRestApiProvidersTest(WpsProviderBase):
         assert resp.status_code == 200, "Valid service and recoverable XML should result in valid response"
         assert len(resp.json["providers"]) == 2
 
+    @pytest.mark.filterwarnings("ignore::weaver.warning.NonBreakingExceptionWarning")
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
         resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
@@ -192,6 +194,7 @@ class WpsRestApiProvidersTest(WpsProviderBase):
         assert "attribute" in resp.json["cause"]
         assert resp.json["error"] == "AttributeError", "Expected service to have trouble parsing metadata"
 
+    @pytest.mark.filterwarnings("ignore::weaver.warning.NonBreakingExceptionWarning")
     def test_register_provider_unresponsive(self):
         """
         Test registration of a service that is unreachable (cannot obtain XML GetCapabilities because no response).

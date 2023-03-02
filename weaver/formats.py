@@ -34,6 +34,16 @@ class AcceptLanguage(Constants):
     FR_CA = "fr-CA"
     EN_US = "en-US"
 
+    @classmethod
+    def offers(cls):
+        # type: () -> List[str]
+        """
+        Languages offered by the application.
+        """
+        languages = AcceptLanguage.values()
+        languages += list({lang.split("-")[0] for lang in languages})
+        return languages
+
 
 class ContentType(Constants):
     """
