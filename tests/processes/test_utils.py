@@ -100,6 +100,7 @@ def test_register_wps_processes_from_config_empty():
             pytest.fail("File with empty 'providers' and 'processes' sections should not raise any error")
 
 
+@pytest.mark.filterwarnings("ignore:.*configuration file for WPS-1 providers.*empty.*:RuntimeWarning")
 def test_register_wps_processes_from_config_omitted():
     with mock.patch("weaver.processes.utils.register_wps_processes_static") as mocked_static:
         with mock.patch("weaver.processes.utils.register_wps_processes_dynamic") as mocked_dynamic:
@@ -274,6 +275,7 @@ def test_register_cwl_processes_from_config_dir_no_cwl():
         assert register_cwl_processes_from_config(settings) == 0
 
 
+@pytest.mark.filterwarnings("ignore:.*Skipping definition.*:RuntimeWarning")
 def test_register_cwl_processes_from_config_load_recursive():
     from weaver.processes.utils import load_package_file as real_load_pkg_file
 
@@ -367,6 +369,7 @@ def test_register_cwl_processes_from_config_load_recursive():
             assert call.args[0] == cwl_ordered[order], f"Expected CWL does not match load order at position: {i}"
 
 
+@pytest.mark.filterwarnings("ignore:.*Skipping definition.*:RuntimeWarning")
 def test_register_cwl_processes_from_config_error_handling():
     from weaver.processes.utils import load_package_file as real_load_pkg_file
 

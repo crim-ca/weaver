@@ -12,7 +12,8 @@ Changes
 
 Changes:
 --------
-- No change.
+- Replace deprecated ``best_match`` methods for ``Accept`` and ``Accept-Language`` HTTP headers by their respective
+  implementation with ``acceptable_offers`` and ``lookup`` methods better aligned with :rfc:`7231` specification.
 
 Fixes:
 ------
@@ -31,6 +32,8 @@ Fixes:
 - Fix ``http`` directory download to match implemented `AWS S3` directory download in ``weaver.utils.fetch_directory``,
   so both types replicate the input directory's top level folder, which is necessary when downloading
   multiple directories for the same input source.
+- Fix deprecation warnings from :mod:`webob` and :mod:`owslib`.
+- Fix filtered warnings for expected cases during tests.
 
 .. _changes_4.28.0:
 

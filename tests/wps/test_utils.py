@@ -23,7 +23,9 @@ from weaver.wps.utils import (
 )
 
 
-@pytest.mark.parametrize("xml_file,ows_exception", [
+@pytest.mark.filterwarnings("ignore::weaver.warning.MissingParameterWarning")
+@pytest.mark.filterwarnings("ignore::weaver.warning.UnsupportedOperationWarning")
+@pytest.mark.parametrize("xml_file, ows_exception", [
     ("wps_missing_parameter_response.xml", OWSMissingParameterValue),   # 'ows:ExceptionReport' directly at root
     ("wps_access_forbidden_response.xml", OWSAccessForbidden),          # 'ExceptionReport' at root (default ns is ows)
     ("wps_execute_failed_response.xml", OWSNoApplicableCode),           # 'ows:ExceptionReport' nested in Execute failed
@@ -71,13 +73,18 @@ def test_get_exception_from_xml_not_xml_input():
 
 def test_set_wps_language():
     wps = mock.Mock()
-    languages = mock.Mock()
-    wps.languages = languages
-    languages.default = AcceptLanguage.EN_US
-    languages.supported = [AcceptLanguage.EN_US, AcceptLanguage.FR_CA]
+    wps.languages.default = AcceptLanguage.EN_US
+    wps.languages.supported = [AcceptLanguage.EN_US, AcceptLanguage.FR_CA]
 
     set_wps_language(wps, "ru, fr;q=0.5")
+    assert isinstance(wps.language, mock.Mock)  # no match
+
+    set_wps_language(wps, "en, fr;q=0.5, fr-CA;q=0.1")
     assert wps.language == AcceptLanguage.FR_CA
+
+    wps.languages.supported = ["fr", AcceptLanguage.FR_CA]
+    set_wps_language(wps, "en, fr;q=0.5, fr-CA;q=0.1")
+    assert wps.language == "fr"
 
 
 def test_get_wps_client_headers_preserved():

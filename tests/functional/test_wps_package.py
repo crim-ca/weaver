@@ -1790,9 +1790,18 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                 stack_exec.enter_context(mock_exec)
             proc_url = f"/processes/{self._testMethodName}/jobs"
 
+            # combinations of (test, expect)
+            # where 'expect' can be success/fail or explicit language expected on success
+            partial_matches = [("fr-CH", "fr")]  # 'fr' only is offered, so it can be matched as smaller subset
+            quality_matches = [("de-CH;q=1, de;q=0.5, en;q=0.1", "en")]  # match english even if at the lowest quality
             valid_languages = [(lang, True) for lang in AcceptLanguage.values()]
-            wrong_languages = [(lang, False) for lang in ["ru", "fr-CH"]]
-            for lang, accept in valid_languages + wrong_languages:
+            wrong_languages = [(lang, False) for lang in ["ru", "it", "zh", "es", "es-MX"]]
+            for lang, accept in valid_languages + wrong_languages + partial_matches + quality_matches:
+                if isinstance(accept, str):
+                    result_lang = accept
+                    accept = True
+                else:
+                    result_lang = lang
                 headers["Accept-Language"] = lang
                 resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5, expect_errors=not accept,
                                            data=exec_body, headers=headers, only_local=True)
@@ -1800,13 +1809,16 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                 if accept:  # must execute until completion with success
                     assert code in [200, 201], f"Failed with: [{code}]\nReason:\n{resp.json}"
                     status_url = resp.json.get("location")
-                    self.monitor_job(status_url, timeout=5, return_status=True)  # wait until success
+                    try:
+                        self.monitor_job(status_url, timeout=5, return_status=True)  # wait until success
+                    except AssertionError as exc:
+                        raise AssertionError(f"Failed execution for Accept-Language: [{lang}]") from exc
                     job_id = resp.json.get("jobID")
                     job = self.job_store.fetch_by_id(job_id)
-                    assert job.accept_language == lang
+                    assert job.accept_language == result_lang
                 else:
                     # job not even created
-                    assert code == 406, "Error code should indicate not acceptable header"
+                    assert code == 406, f"Error code should indicate not acceptable header for: [{lang}]"
                     desc = resp.json.get("description")
                     assert "language" in desc and lang in desc, "Expected error description to indicate bad language"
 

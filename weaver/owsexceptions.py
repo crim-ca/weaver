@@ -126,11 +126,12 @@ class OWSException(Response, Exception):
             accept = create_accept_header(accept_value)
 
             # Attempt to match XML or JSON, if those don't match, we will fall back to defaulting to JSON
-            #   since browsers add HTML automatically and it is closer to XML, we 'allow' it only to catch this
-            #   explicit case and fallback to JSON manually
-            match = accept.best_match([ContentType.TEXT_HTML, ContentType.APP_JSON,
-                                       ContentType.TEXT_XML, ContentType.APP_XML],
-                                      default_match=ContentType.APP_JSON)
+            # since browsers add HTML automatically, and it is closer to XML, we 'allow' it only to catch this
+            # explicit case and fallback to JSON manually
+            matches = accept.acceptable_offers([ContentType.TEXT_HTML, ContentType.APP_JSON,
+                                                ContentType.TEXT_XML, ContentType.APP_XML])
+            match = matches[0] if matches else ContentType.APP_JSON
+
             if match == ContentType.TEXT_HTML:
                 match = ContentType.APP_JSON
 
