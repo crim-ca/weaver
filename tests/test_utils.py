@@ -62,6 +62,7 @@ from weaver.utils import (
     get_path_kvp,
     get_request_options,
     get_sane_name,
+    get_secure_directory_name,
     get_ssl_verify_option,
     get_url_without_query,
     is_update_version,
@@ -598,6 +599,33 @@ def test_request_extra_zero_values():
 
 
 @pytest.mark.parametrize(
+    "location,expected",
+    [
+        ("https://mocked-file-server.com/dir/", "dir"),
+        ("https://mocked-file-server.com/dir/sub/", "sub"),
+        ("https://mocked-file-server.com/dir/../", "dir"),
+        ("https://mocked-file-server.com/dir/../../", "dir"),
+        ("https://mocked-file-server.com/../", "mocked-file-server.com",)
+    ]
+)
+def test_get_secure_directory_name(location, expected):
+    result = get_secure_directory_name(location)
+    assert result == expected
+
+
+def test_get_secure_directory_name_uuid():
+    invalid_location = "/../../"
+    fake_uuid = "fe9c497e-811f-4bf8-b1a8-63005cea8e99"
+
+    def mock_uuid():
+        return fake_uuid
+
+    with mock.patch("uuid.uuid4", side_effect=mock_uuid):
+        result = get_secure_directory_name(invalid_location)
+        assert result == fake_uuid
+
+
+@pytest.mark.parametrize(
     "include_dir_heading,include_separators,include_code_format,include_table_format,include_modified_date",
     itertools.product((True, False), repeat=5)
 )
@@ -634,7 +662,30 @@ def test_fetch_directory_html(include_dir_heading,       # type: bool
         out_dir = stack.enter_context(tempfile.TemporaryDirectory())
         out_files = fetch_directory(f"{tmp_host}/dir/", out_dir)
         expect_files = filter(lambda _f: _f.startswith("dir/"), test_http_dir_files)
-        expect_files = [os.path.join(out_dir, file.split("/", 1)[-1]) for file in expect_files]
+        expect_files = [os.path.join(out_dir, file) for file in expect_files]
+        assert list(out_files) == sorted(expect_files), (
+            f"Out dir: [{out_dir}], Test dir:\n{repr_json(test_dir_files, indent=2)}"
+        )
+
+
+def test_fetch_directory_host_html():
+    with contextlib.ExitStack() as stack:
+        tmp_host = "https://mocked-file-server.com"  # must match in 'Execute_WorkflowSelectCopyNestedOutDir.json'
+        tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())
+        stack.enter_context(mocked_file_server(tmp_dir, tmp_host, settings={}, mock_browse_index=True))
+        test_http_dir_files = [
+            "main.txt",
+            "dir/file.txt",
+            "dir/sub/file.tmp",
+            "dir/sub/nested/file.cfg",
+            "dir/other/meta.txt",
+            "another/info.txt",
+            "another/nested/data.txt",
+        ]
+        test_dir_files = setup_test_file_hierarchy(test_http_dir_files, tmp_dir)
+        out_dir = stack.enter_context(tempfile.TemporaryDirectory())
+        out_files = fetch_directory(f"{tmp_host}/", out_dir)
+        expect_files = [os.path.join(out_dir, f"mocked-file-server.com/{file}") for file in test_http_dir_files]
         assert list(out_files) == sorted(expect_files), (
             f"Out dir: [{out_dir}], Test dir:\n{repr_json(test_dir_files, indent=2)}"
         )
@@ -677,7 +728,7 @@ def test_fetch_directory_json():
         out_dir = stack.enter_context(tempfile.TemporaryDirectory())
         out_files = fetch_directory(f"{tmp_host}/dir/?f=json", out_dir)
         expect_files = filter(lambda _f: _f.startswith("dir/"), test_http_dir_files)
-        expect_files = [os.path.join(out_dir, file.split("/", 1)[-1]) for file in expect_files]
+        expect_files = [os.path.join(out_dir, file) for file in expect_files]
         assert list(out_files) == sorted(expect_files), (
             f"Out dir: [{out_dir}], Test dir:\n{repr_json(test_dir_files, indent=2)}"
         )
