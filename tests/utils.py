@@ -15,7 +15,6 @@ import subprocess  # nosec: B404
 import sys
 import tempfile
 import uuid
-import warnings
 from configparser import ConfigParser
 from datetime import datetime
 from typing import TYPE_CHECKING, overload
@@ -55,11 +54,10 @@ from weaver.utils import (
     request_extra,
     str2bytes
 )
-from weaver.warning import MissingParameterWarning, UnsupportedOperationWarning
 from weaver.wps.utils import get_wps_output_dir, get_wps_output_url, load_pywps_config
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Type, TypeVar, Union
+    from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, TypeVar, Union
     from typing_extensions import Literal
 
     from mypy_boto3_s3.client import S3Client
