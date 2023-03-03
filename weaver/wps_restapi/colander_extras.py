@@ -872,8 +872,8 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
                 var = RequiredDict(variable="const")  # 'const' could clash with other below
                 const = RequiredDict(String())
 
-        Using ``<const>`` instead would ensure that no override occurs as it is a syntax error
-        to write ``<const> = RequiredDict(String())`` in the class definition, but this value
+        Using ``{const}`` instead would ensure that no override occurs as it is a syntax error
+        to write ``{const} = RequiredDict(String())`` in the class definition, but this value
         can still be used to create the internal mapping to evaluate sub-schemas without name
         clashes. As a plus, it also helps giving an indication that *any key* is accepted.
 

@@ -58,7 +58,9 @@ from weaver.exceptions import (
 from weaver.formats import ContentType, get_content_type, get_cwl_file_format, get_format, repr_json
 from weaver.processes import opensearch
 from weaver.processes.constants import (
+    CWL_NAMESPACE_CWLTOOL_URL,
     CWL_NAMESPACE_WEAVER,
+    CWL_NAMESPACE_WEAVER_DEFINITION,
     CWL_REQUIREMENT_APP_BUILTIN,
     CWL_REQUIREMENT_APP_DOCKER,
     CWL_REQUIREMENT_APP_DOCKER_GPU,
@@ -70,12 +72,12 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_WEAVER,
     CWL_REQUIREMENT_APP_WPS1,
     CWL_REQUIREMENT_CUDA,
+    CWL_REQUIREMENT_CUDA_NAME,
     CWL_REQUIREMENT_CUDA_DEFAULT_PARAMETERS,
     CWL_REQUIREMENT_CUDA_NAMESPACE,
     CWL_REQUIREMENT_ENV_VAR,
     CWL_REQUIREMENT_RESOURCE,
     CWL_REQUIREMENTS_SUPPORTED,
-    CWL_TOOL_NAMESPACE_URL,
     PACKAGE_COMPLEX_TYPES,
     PACKAGE_DIRECTORY_TYPE,
     PACKAGE_EXTENSIONS,
@@ -353,6 +355,59 @@ def _get_package_requirements_normalized(requirements, as_dict=False):
     return reqs
 
 
+def _patch_cuda_requirement(package, app_pkg_req, patch_requirement):
+    # type: (CWL, CWL_Requirement, Literal[CWL_REQUIREMENT_APP_DOCKER_GPU, CWL_REQUIREMENT_CUDA_NAME]) -> CWL
+    """
+    Updates legacy :term:`CWL` definitions for combinations of `CUDA` and `Docker` requirements and/or hints.
+    """
+    # backup original for later compare and find requirements of interest
+    # requirements unrelated to update must remain in same locations and formats to preserve behavior
+    r_original = package.get("requirements", {})
+    h_original = package.get("hints", {})
+    r_list = _get_package_requirements_normalized(r_original)
+    h_list = _get_package_requirements_normalized(h_original)
+    search_reqs = {patch_requirement, CWL_REQUIREMENT_CUDA_NAME}
+    r_no_patched = list(filter(lambda _req: not _req["class"].endswith(patch_requirement), r_list))
+    h_no_patched = list(filter(lambda _req: not _req["class"].endswith(patch_requirement), h_list))
+    r_other = list(filter(lambda _req: not any(_req["class"].endswith(name) for name in search_reqs), r_no_patched))
+    h_other = list(filter(lambda _req: not any(_req["class"].endswith(name) for name in search_reqs), h_no_patched))
+    r_cuda = list(filter(lambda _req: _req["class"].endswith(CWL_REQUIREMENT_CUDA_NAME), r_list))
+    h_cuda = list(filter(lambda _req: _req["class"].endswith(CWL_REQUIREMENT_CUDA_NAME), h_list))
+    if patch_requirement.endswith(CWL_REQUIREMENT_APP_DOCKER_GPU):
+        app_pkg_req["class"] = CWL_REQUIREMENT_APP_DOCKER  # GPU to official Docker requirement (preserve other params)
+    else:
+        app_pkg_req = {}  # updating only namespaced CUDA requirement, no application pacakge requirement
+    if (r_cuda and h_cuda) or len(r_cuda) > 1 or len(h_cuda) > 1:
+        h_cuda = [] if r_cuda else h_cuda
+        LOGGER.warning(
+            "Detected multiple CUDA requirements/hints employed simultaneously. "
+            "Will keep only the first definition, with prioritized requirements over hints. "
+            "Remaining items will be ignored."
+        )
+    cuda_req = r_cuda or h_cuda
+    cuda_found = bool(cuda_req)
+    # if CUDA not explicitly provided along the older GPU requirement, define default, otherwise reuse
+    cuda_req = CWL_REQUIREMENT_CUDA_DEFAULT_PARAMETERS.copy() if not cuda_req else cuda_req[0]
+    cuda_req["class"] = CWL_REQUIREMENT_CUDA  # force always with namespace
+    r_app_pkg = [app_pkg_req] if app_pkg_req and r_list != r_other and h_list == h_no_patched else []
+    h_app_pkg = [app_pkg_req] if app_pkg_req and h_list != h_other and r_list == r_no_patched else []
+    if not cuda_found:  # apply default in same place as the application requirement
+        r_cuda = [cuda_req] if r_app_pkg else []
+        h_cuda = [cuda_req] if h_app_pkg else []
+    r_list = r_app_pkg + r_cuda + r_other
+    h_list = h_app_pkg + h_cuda + h_other
+    # revert list conversion if necessary
+    r_list = _get_package_requirements_normalized(r_list, as_dict=isinstance(r_original, dict))
+    h_list = _get_package_requirements_normalized(h_list, as_dict=isinstance(h_original, dict))
+    if r_list:
+        package["requirements"] = r_list
+    if h_list:
+        package["hints"] = h_list
+    package.setdefault("$namespaces", {})
+    package["$namespaces"].update(CWL_REQUIREMENT_CUDA_NAMESPACE.copy())
+    return package
+
+
 def _update_package_compatibility(package):
     # type: (CWL) -> CWL
     """
@@ -363,54 +418,35 @@ def _update_package_compatibility(package):
     if package_type == ProcessType.APPLICATION:
         app_pkg_req = get_application_requirement(package, validate=False, required=False)
         if app_pkg_req["class"].endswith(CWL_REQUIREMENT_APP_DOCKER_GPU):
-            # backup original for later compare and find requirements of interest
-            # requirements unrelated to update must be preserved in same locations and formats to preserve behavior
-            r_original = package.get("requirements", {})
-            h_original = package.get("hints", {})
-            r_list = _get_package_requirements_normalized(r_original)
-            h_list = _get_package_requirements_normalized(h_original)
-            r_no_docker = list(filter(lambda _req: not _req["class"].endswith(CWL_REQUIREMENT_APP_DOCKER_GPU), r_list))
-            h_no_docker = list(filter(lambda _req: not _req["class"].endswith(CWL_REQUIREMENT_APP_DOCKER_GPU), h_list))
-            r_cuda = list(filter(lambda _req: _req["class"].endswith(CWL_REQUIREMENT_CUDA), r_list))
-            h_cuda = list(filter(lambda _req: _req["class"].endswith(CWL_REQUIREMENT_CUDA), h_list))
-            app_pkg_req["class"] = CWL_REQUIREMENT_APP_DOCKER  # GPU to official Docker requirement
-            cuda_req = r_cuda or h_cuda
-            cuda_found = bool(cuda_req)
-            if not cuda_req:  # if CUDA not explicitly provided along the older GPU requirement, define default
-                cuda_req = CWL_REQUIREMENT_CUDA_DEFAULT_PARAMETERS.copy()
-                cuda_req["class"] = CWL_REQUIREMENT_CUDA
-            # apply the change to the relevant list where it was originally found
-            if r_list == r_no_docker and h_list != h_no_docker:
-                h_list = h_no_docker + ([app_pkg_req] if cuda_found else [app_pkg_req, cuda_req])
-            elif r_list != r_no_docker and h_list == h_no_docker:
-                r_list = r_no_docker + ([app_pkg_req] if cuda_found else [app_pkg_req, cuda_req])
-            else:
-                raise PackageParsingError(
-                    f"Expected to find a unique '{CWL_REQUIREMENT_APP_DOCKER_GPU}' definition in CWL "
-                    "requirements or hints, but could not resolve it between mapping and listing representations."
-                )
-            # revert list conversion if necessary
-            r_list = _get_package_requirements_normalized(r_list, as_dict=isinstance(r_original, dict))
-            h_list = _get_package_requirements_normalized(h_list, as_dict=isinstance(h_original, dict))
-            if r_list:
-                package["requirements"] = r_list
-            if h_list:
-                package["hints"] = h_list
-            package.setdefault("$namespaces", {})
-            package["$namespaces"].update(CWL_REQUIREMENT_CUDA_NAMESPACE.copy())
+            _patch_cuda_requirement(package, app_pkg_req, CWL_REQUIREMENT_APP_DOCKER_GPU)
             LOGGER.warning(
                 "CWL package definition updated using '%s' backward-compatibility definition. "
                 "Consider updating the Application Package with relevant changes to avoid this warning.\n%s",
                 CWL_REQUIREMENT_APP_DOCKER_GPU,
                 generate_diff(package_original, package, val_name="Original CWL", ref_name="Updated CWL")
             )
+        # CUDA requirement missing cwltool-specific namespace
+        # This is not considered an Application Package requirement for a process by itself.
+        # Therefore, all requirements/hints must be checked as 'get_application_requirement' will not return it.
+        elif any(
+            req["class"] == CWL_REQUIREMENT_CUDA_NAME for req in
+            _get_package_requirements_normalized(package.get("requirements", [])) +
+            _get_package_requirements_normalized(package.get("hints", []))
+        ):
+            _patch_cuda_requirement(package, app_pkg_req, CWL_REQUIREMENT_CUDA_NAME)
+            LOGGER.warning(
+                "CWL package definition with '%s' updated using namespaced '%s' definition. "
+                "Consider updating the Application Package with relevant changes to avoid this warning.\n%s",
+                CWL_REQUIREMENT_CUDA_NAME, CWL_REQUIREMENT_CUDA,
+                generate_diff(package_original, package, val_name="Original CWL", ref_name="Updated CWL")
+            )
         # weaver-specific requirements extensions with namespaced specification
         elif (
-            not app_pkg_req["class"].startswith(f"{list(CWL_NAMESPACE_WEAVER)[0]}:")
+            not app_pkg_req["class"].startswith(f"{CWL_NAMESPACE_WEAVER}:")
             and any(app_pkg_req["class"].endswith(req) for req in CWL_REQUIREMENT_APP_WEAVER)
         ):
             weaver_hint = app_pkg_req["class"]
-            weaver_req = f"{list(CWL_NAMESPACE_WEAVER)[0]}:{weaver_hint}"
+            weaver_req = f"{CWL_NAMESPACE_WEAVER}:{weaver_hint}"
             app_pkg_hints = package.get("hints", [])  # don't need to check requirements (would not have worked anyway)
             if isinstance(app_pkg_hints, dict):
                 hint = app_pkg_hints.pop(weaver_hint)
@@ -420,7 +456,7 @@ def _update_package_compatibility(package):
                     if hint["class"] == weaver_hint:
                         hint["class"] = weaver_req
                         break
-            package["$namespaces"].update(CWL_NAMESPACE_WEAVER)
+            package["$namespaces"].update(CWL_NAMESPACE_WEAVER_DEFINITION)
             LOGGER.warning(
                 "CWL package definition with '%s' updated using namespaced '%s' definition. "
                 "Consider updating the Application Package with relevant changes to avoid this warning.\n%s",
@@ -441,8 +477,6 @@ def _load_supported_schemas():
 
     This operation must be called before the :class:`CWLFactory` attempts loading and validating a :term:`CWL` document.
     """
-    schema_supported = [name.rsplit(":", 1)[-1] for name in CWL_REQUIREMENTS_SUPPORTED]
-
     # explicitly omit dev versions, only released versions allowed
     extension_resources = {
         "v1.0": "extensions.yml",
@@ -470,17 +504,17 @@ def _load_supported_schemas():
             schema.setdefault("$namespaces", {})
             schema["$namespaces"].update(weaver_schema.get("$namespaces", {}))
 
-        extensions = schema["$graph"] + extensions_weaver
+        extensions_cwl = schema["$graph"]
         extensions_supported = []
         extensions_imports = []
         extensions_enabled = set()
         extensions_dropped = set()
-        for ext in extensions:
+        for ext in extensions_cwl + extensions_weaver:
             if "name" not in ext and "$import" in ext:
                 extensions_imports.append(ext)
                 continue
             ext_name = ext["name"]
-            if ext_name in schema_supported:
+            if ext_name in CWL_REQUIREMENTS_SUPPORTED:
                 extensions_enabled.add(ext_name)
                 extensions_supported.append(ext)
             else:
@@ -494,7 +528,7 @@ def _load_supported_schemas():
         schema["$graph"] = extensions_imports + extensions_supported
 
         schema_data = bytes2str(yaml.safe_dump(schema, encoding="utf-8", sort_keys=False))
-        schema_base = CWL_TOOL_NAMESPACE_URL.split("#", 1)[0]
+        schema_base = CWL_NAMESPACE_CWLTOOL_URL.split("#", 1)[0]
         use_custom_schema(version, schema_base, schema_data)
         PACKAGE_SCHEMA_CACHE[version] = (schema_base, schema_data)
 

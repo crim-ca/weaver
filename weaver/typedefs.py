@@ -192,8 +192,8 @@ if TYPE_CHECKING:
     CWL = TypedDict("CWL", {
         "cwlVersion": Required[str],
         "class": Required[CWL_Class],
-        "label": str,
-        "doc": str,
+        "label": NotRequired[str],
+        "doc": NotRequired[str],
         "id": NotRequired[str],
         "intent": NotRequired[str],
         "s:keywords": List[str],

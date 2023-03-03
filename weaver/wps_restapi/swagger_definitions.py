@@ -28,9 +28,29 @@ from dateutil import parser as date_parser
 from weaver import __meta__
 from weaver.config import WeaverFeature
 from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
-from weaver.formats import AcceptLanguage, ContentType, OutputFormat
+from weaver.formats import (
+    EDAM_NAMESPACE,
+    EDAM_NAMESPACE_URL,
+    IANA_NAMESPACE,
+    IANA_NAMESPACE_URL,
+    OGC_NAMESPACE,
+    OGC_NAMESPACE_URL,
+    OPENGIS_NAMESPACE,
+    OPENGIS_NAMESPACE_URL,
+    AcceptLanguage,
+    ContentType,
+    OutputFormat
+)
 from weaver.owsexceptions import OWSMissingParameterValue
 from weaver.processes.constants import (
+    CWL_NAMESPACE,
+    CWL_NAMESPACE_URL,
+    CWL_NAMESPACE_CWLTOOL,
+    CWL_NAMESPACE_CWLTOOL_URL,
+    CWL_NAMESPACE_SCHEMA,
+    CWL_NAMESPACE_SCHEMA_URL,
+    CWL_NAMESPACE_WEAVER,
+    CWL_NAMESPACE_WEAVER_URL,
     CWL_REQUIREMENT_APP_BUILTIN,
     CWL_REQUIREMENT_APP_DOCKER,
     CWL_REQUIREMENT_APP_DOCKER_GPU,
@@ -4510,6 +4530,77 @@ class CWLBase(ExtendedMappingSchema):
     cwlVersion = CWLVersion()
 
 
+class CWLNamespaces(ExtendedMappingSchema):
+    name = "$namespaces"
+    title = "CWL Namespaces Mapping"
+    cwl = URL(
+        missing=drop,
+        name=CWL_NAMESPACE,
+        validator=OneOf([CWL_NAMESPACE_URL]),
+    )
+    cwltool = URL(
+        missing=drop,
+        name=CWL_NAMESPACE_CWLTOOL,
+        validator=OneOf([CWL_NAMESPACE_CWLTOOL_URL]),
+    )
+    edam = URL(
+        missing=drop,
+        name=EDAM_NAMESPACE,
+        validator=OneOf([EDAM_NAMESPACE_URL]),
+    )
+    iana = URL(
+        missing=drop,
+        name=IANA_NAMESPACE,
+        validator=OneOf([IANA_NAMESPACE_URL]),
+    )
+    ogc = URL(
+        missing=drop,
+        name=OGC_NAMESPACE,
+        validator=OneOf([OGC_NAMESPACE_URL]),
+    )
+    opengis = URL(
+        missing=drop,
+        name=OPENGIS_NAMESPACE,
+        validator=OneOf([OPENGIS_NAMESPACE_URL]),
+    )
+    s = URL(
+        missing=drop,
+        name=CWL_NAMESPACE_SCHEMA,
+        validator=OneOf([CWL_NAMESPACE_SCHEMA_URL]),
+    )
+    weaver = URL(
+        missing=drop,
+        name=CWL_NAMESPACE_WEAVER,
+        validator=OneOf([CWL_NAMESPACE_WEAVER_URL]),
+    )
+    var = URL(variable="{namespace}", missing=drop)
+
+
+class CWLSchemas(ExtendedSequenceSchema):
+    name = "$schemas"
+    url = URL(title="CWLSchemaURL", description="Schema reference for the CWL definition.")
+
+
+class CWLMetadata(ExtendedMappingSchema):
+    _id = ExtendedSchemaNode(String(), name="id", missing=drop)
+    label = ExtendedSchemaNode(String(), missing=drop)
+    doc = ExtendedSchemaNode(String(), missing=drop)
+    intent = ExtendedSchemaNode(String(), missing=drop)
+    author = ExtendedSchemaNode(
+        String(),
+        name=f"{CWL_NAMESPACE_SCHEMA}:author",
+        missing=drop,
+        description="Author of the Application Package.",
+    )
+    keywords = KeywordList(
+        name=f"{CWL_NAMESPACE_SCHEMA}:keywords",
+        missing=drop,
+        description="Keywords applied to the Application Package.",
+    )
+    namespaces = CWLNamespaces(missing=drop)
+    schemas = CWLSchemas(missing=drop)
+
+
 class CWLScatterMulti(ExtendedSequenceSchema):
     id = CWLIdentifier("")
 
@@ -4556,8 +4647,9 @@ class CWLApp(PermissiveMappingSchema):
     scatterMethod = CWLScatterMethod(missing=drop)
 
 
-class CWL(CWLBase, CWLApp):
-    _sort_first = ["cwlVersion", "id", "class"]
+class CWL(CWLBase, CWLMetadata, CWLApp):
+    _sort_first = ["cwlVersion", "class", "id", "version", "label", "doc", "intent"]
+    _sort_after = ["requirements", "hints", "inputs", "outputs", "steps", "$graph", "$namespaces", "$schemas"]
 
 
 class Unit(ExtendedMappingSchema):
@@ -4993,11 +5085,10 @@ class UpdateVersion(ExtendedMappingSchema):
 
 
 class DeployCWLGraph(CWLBase, CWLGraphBase, UpdateVersion):
-    _sort_first = ["cwlVersion", "version", "$graph"]
+    pass
 
 
 class DeployCWL(NotKeywordSchema, CWL, UpdateVersion):
-    _sort_first = ["cwlVersion", "version", "id", "class"]
     _not = [
         CWLGraphBase()
     ]

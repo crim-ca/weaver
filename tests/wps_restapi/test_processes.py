@@ -59,11 +59,17 @@ if TYPE_CHECKING:
 @pytest.yield_fixture(name="assert_cwl_no_warn_unknown_wps1")
 def fixture_cwl_no_warn_unknown_wps1(caplog):
     # type: (pytest.LogCaptureFixture) -> None
-    raise "NOT WORKING YET"  # FIXME
+    """
+    Looks for a warning related to unknown :data:`CWL_REQUIREMENT_APP_WPS1` requirement thrown by :mod:`cwltool`.
+
+    If the `Weaver`-specific requirement was properly registered in the :term:`CWL` schema extensions,
+    this warning should not occur as it would be validated against a known definition.
+    """
     yield caplog
-    warn_hint = re.compile(rf"Unknown hint .*{CWL_REQUIREMENT_APP_WPS1}", re.MULTILINE)
-    warn_records = [rec.msg for rec in filter(lambda _rec: warn_hint.match(_rec), caplog.records)]
-    warn_message = "\n".join(warn_records)
+    log_records = caplog.get_records(when="call")
+    warn_hint = re.compile(rf".*unknown hint .*{CWL_REQUIREMENT_APP_WPS1}.*", re.IGNORECASE)
+    warn_records = list(filter(lambda _rec: isinstance(_rec.msg, str) and warn_hint.match(_rec.msg), log_records))
+    warn_message = "\n".join([_rec.msg for _rec in warn_records])
     assert not warn_records, (
         f"Expected no warning from resolved Weaver-specific Application Package requirement, got:\n{warn_message}",
     )

@@ -46,6 +46,7 @@ from weaver.utils import (
     AWS_S3_REGIONS,
     bytes2str,
     fetch_file,
+    generate_diff,
     get_header,
     get_path_kvp,
     get_url_without_query,
@@ -1389,6 +1390,7 @@ def assert_equal_any_order(result,          # type: Iterable[Any]
                            expect,          # type: Iterable[Any]
                            comparer=None,   # type: Optional[Callable[[CompareType, CompareType], bool]]
                            formatter=str,   # type: Optional[Callable[[CompareType], str]]
+                           diff=False,      # type: bool
                            ):               # type: (...) -> None
     if not callable(comparer):
         def comparer(_res, _exp):  # pylint: disable=E0102
@@ -1399,10 +1401,16 @@ def assert_equal_any_order(result,          # type: Iterable[Any]
     # also use the copy to remove items such that all must be matched
     result = list(result)
     expect = list(expect)
-    assert len(result) == len(expect), "Expected items sizes mismatch between iterable containers."
+    assert len(result) == len(expect), (
+        "Expected items sizes mismatch between iterable containers." +
+        ("\n" + generate_diff(result, expect) if diff else "")
+    )
     for res in result:
         for exp in expect:
             if comparer(res, exp):
                 expect.remove(exp)
                 break
-    assert not expect, f"Not all expected items matched {[formatter(exp) for exp in expect]}"
+    assert not expect, (
+        f"Not all expected items matched {[formatter(exp) for exp in expect]}" +
+        ("\n" + generate_diff(result, expect) if diff else "")
+    )

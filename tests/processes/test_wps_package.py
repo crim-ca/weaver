@@ -26,6 +26,7 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_DOCKER,
     CWL_REQUIREMENT_APP_DOCKER_GPU,
     CWL_REQUIREMENT_CUDA,
+    CWL_REQUIREMENT_CUDA_NAME,
     CWL_REQUIREMENT_CUDA_DEFAULT_PARAMETERS,
     CWL_REQUIREMENT_CUDA_NAMESPACE,
     CWL_REQUIREMENT_PROCESS_GENERATOR,
@@ -36,11 +37,12 @@ from weaver.wps.service import WorkerRequest
 
 if TYPE_CHECKING:
     from typing import Dict, TypeVar
+    from typing_extensions import Literal
+
+    from weaver.typedefs import CWL
 
     KT = TypeVar("KT")
     VT_co = TypeVar("VT_co", covariant=True)
-
-    from weaver.typedefs import CWL
 
 # pylint: disable=R1729  # ignore non-generator representation employed for displaying test log results
 
@@ -270,13 +272,14 @@ def _combine(dict1, dict2):
     return dict1
 
 
-def assert_equal_requirements_any_order(result, expected):
-    for field in ["hints", "requirements"]:
+def assert_equal_requirements_any_order(result, expected, diff=False):
+    # type: (CWL, CWL, bool) -> None
+    for field in ["hints", "requirements"]:  # type: Literal["hints", "requirements"]
         if field in expected:
             if isinstance(expected[field], dict):
                 assert result[field] == expected[field]
             else:
-                assert_equal_any_order(result[field], expected[field])
+                assert_equal_any_order(result[field], expected[field], diff=diff)
         else:
             assert field not in result
 
@@ -382,7 +385,138 @@ def assert_equal_requirements_any_order(result, expected):
     (
         {"hints": [_combine({"class": CWL_REQUIREMENT_CUDA}, {"custom": 1, "cudaDeviceCountMin": 8})]},
         {"hints": [_combine({"class": CWL_REQUIREMENT_CUDA}, {"custom": 1, "cudaDeviceCountMin": 8})]},
-    )
+    ),
+    # cases for CUDA+DockerGPU, using the non-namespaced CUDA requirement, should fix both
+    (
+        {"requirements": {CWL_REQUIREMENT_APP_DOCKER: {"dockerPull": "python:3.7-alpine"},
+                          CWL_REQUIREMENT_CUDA_NAME: {"custom": 1, "cudaVersionMin": "11.0", "cudaDeviceCountMin": 8}}},
+        {"requirements": {CWL_REQUIREMENT_APP_DOCKER: {"dockerPull": "python:3.7-alpine"},
+                          CWL_REQUIREMENT_CUDA: {"custom": 1, "cudaVersionMin": "11.0", "cudaDeviceCountMin": 8}}},
+    ),
+    (
+        {"requirements": [{"class": CWL_REQUIREMENT_APP_DOCKER, "dockerPull": "python:3.7-alpine"},
+                          _combine({"class": CWL_REQUIREMENT_CUDA_NAME},
+                                   {"custom": 1, "cudaVersionMin": "11.0", "cudaDeviceCountMin": 8})]},
+        {"requirements": [{"class": CWL_REQUIREMENT_APP_DOCKER, "dockerPull": "python:3.7-alpine"},
+                          _combine({"class": CWL_REQUIREMENT_CUDA},
+                                   {"custom": 1, "cudaVersionMin": "11.0", "cudaDeviceCountMin": 8})]},
+    ),
+    (
+        {"hints": {CWL_REQUIREMENT_APP_DOCKER: {"dockerPull": "python:3.7-alpine"},
+                   CWL_REQUIREMENT_CUDA_NAME: {"custom": 1, "cudaVersionMin": "11.0", "cudaDeviceCountMin": 8}}},
+        {"hints": {CWL_REQUIREMENT_APP_DOCKER: {"dockerPull": "python:3.7-alpine"},
+                   CWL_REQUIREMENT_CUDA: {"custom": 1, "cudaVersionMin": "11.0", "cudaDeviceCountMin": 8}}},
+    ),
+    (
+        {"hints": [{"class": CWL_REQUIREMENT_APP_DOCKER, "dockerPull": "python:3.7-alpine"},
+                   _combine({"class": CWL_REQUIREMENT_CUDA_NAME},
+                            {"custom": 1, "cudaVersionMin": "11.0", "cudaDeviceCountMin": 8})]},
+        {"hints": [{"class": CWL_REQUIREMENT_APP_DOCKER, "dockerPull": "python:3.7-alpine"},
+                   _combine({"class": CWL_REQUIREMENT_CUDA},
+                            {"custom": 1, "cudaVersionMin": "11.0", "cudaDeviceCountMin": 8})]},
+    ),
+    (
+        {"requirements": {CWL_REQUIREMENT_APP_DOCKER: {"dockerPull": "python:3.7-alpine"}},
+         "hints": {CWL_REQUIREMENT_CUDA_NAME: {"custom": 1, "cudaVersionMin": "11.0", "cudaDeviceCountMin": 8}}},
+        {"requirements": {CWL_REQUIREMENT_APP_DOCKER: {"dockerPull": "python:3.7-alpine"}},
+         "hints": {CWL_REQUIREMENT_CUDA: {"custom": 1, "cudaVersionMin": "11.0", "cudaDeviceCountMin": 8}}},
+    ),
+    (
+        {"hints": {CWL_REQUIREMENT_APP_DOCKER: {"dockerPull": "python:3.7-alpine"}},
+         "requirements": {CWL_REQUIREMENT_CUDA_NAME: {"custom": 1, "cudaVersionMin": "11.0", "cudaDeviceCountMin": 8}}},
+        {"hints": {CWL_REQUIREMENT_APP_DOCKER: {"dockerPull": "python:3.7-alpine"}},
+         "requirements": {CWL_REQUIREMENT_CUDA: {"custom": 1, "cudaVersionMin": "11.0", "cudaDeviceCountMin": 8}}},
+    ),
+    (
+        {"requirements": [{"class": CWL_REQUIREMENT_APP_DOCKER, "dockerPull": "python:3.7-alpine"}],
+         "hints": [_combine({"class": CWL_REQUIREMENT_CUDA_NAME},
+                            {"custom": 1, "cudaVersionMin": "11.0", "cudaDeviceCountMin": 8})]},
+        {"requirements": [{"class": CWL_REQUIREMENT_APP_DOCKER, "dockerPull": "python:3.7-alpine"}],
+         "hints": [_combine({"class": CWL_REQUIREMENT_CUDA},
+                            {"custom": 1, "cudaVersionMin": "11.0", "cudaDeviceCountMin": 8})]},
+    ),
+    (
+        {"hints": [{"class": CWL_REQUIREMENT_APP_DOCKER, "dockerPull": "python:3.7-alpine"}],
+         "requirements": [_combine({"class": CWL_REQUIREMENT_CUDA_NAME},
+                                   {"custom": 1, "cudaVersionMin": "11.0", "cudaDeviceCountMin": 8})]},
+        {"hints": [{"class": CWL_REQUIREMENT_APP_DOCKER, "dockerPull": "python:3.7-alpine"}],
+         "requirements": [_combine({"class": CWL_REQUIREMENT_CUDA},
+                                   {"custom": 1, "cudaVersionMin": "11.0", "cudaDeviceCountMin": 8})]},
+    ),
+    # cases for CUDA+Docker, but using the non-namespaced CUDA requirement, should fix CUDA only
+    (
+        {"requirements": {CWL_REQUIREMENT_APP_DOCKER_GPU: {"dockerPull": "python:3.7-alpine"},
+                          CWL_REQUIREMENT_CUDA_NAME: {"custom": 1, "cudaVersionMin": "11.0", "cudaDeviceCountMin": 8}}},
+        {"requirements": {CWL_REQUIREMENT_APP_DOCKER: {"dockerPull": "python:3.7-alpine"},
+                          CWL_REQUIREMENT_CUDA: {"custom": 1, "cudaVersionMin": "11.0", "cudaDeviceCountMin": 8}}},
+    ),
+    (
+        {"requirements": [{"class": CWL_REQUIREMENT_APP_DOCKER_GPU, "dockerPull": "python:3.7-alpine"},
+                          _combine({"class": CWL_REQUIREMENT_CUDA_NAME},
+                                   {"custom": 1, "cudaVersionMin": "11.0", "cudaDeviceCountMin": 8})]},
+        {"requirements": [{"class": CWL_REQUIREMENT_APP_DOCKER, "dockerPull": "python:3.7-alpine"},
+                          _combine({"class": CWL_REQUIREMENT_CUDA},
+                                   {"custom": 1, "cudaVersionMin": "11.0", "cudaDeviceCountMin": 8})]},
+    ),
+    (
+        {"hints": {CWL_REQUIREMENT_APP_DOCKER_GPU: {"dockerPull": "python:3.7-alpine"},
+                   CWL_REQUIREMENT_CUDA_NAME: {"custom": 1, "cudaVersionMin": "11.0", "cudaDeviceCountMin": 8}}},
+        {"hints": {CWL_REQUIREMENT_APP_DOCKER: {"dockerPull": "python:3.7-alpine"},
+                   CWL_REQUIREMENT_CUDA: {"custom": 1, "cudaVersionMin": "11.0", "cudaDeviceCountMin": 8}}},
+    ),
+    (
+        {"hints": [{"class": CWL_REQUIREMENT_APP_DOCKER_GPU, "dockerPull": "python:3.7-alpine"},
+                   _combine({"class": CWL_REQUIREMENT_CUDA_NAME},
+                            {"custom": 1, "cudaVersionMin": "11.0", "cudaDeviceCountMin": 8})]},
+        {"hints": [{"class": CWL_REQUIREMENT_APP_DOCKER, "dockerPull": "python:3.7-alpine"},
+                   _combine({"class": CWL_REQUIREMENT_CUDA},
+                            {"custom": 1, "cudaVersionMin": "11.0", "cudaDeviceCountMin": 8})]},
+    ),
+    (
+        {"requirements": {CWL_REQUIREMENT_APP_DOCKER_GPU: {"dockerPull": "python:3.7-alpine"}},
+         "hints": {CWL_REQUIREMENT_CUDA_NAME: {"custom": 1, "cudaVersionMin": "11.0", "cudaDeviceCountMin": 8}}},
+        {"requirements": {CWL_REQUIREMENT_APP_DOCKER: {"dockerPull": "python:3.7-alpine"}},
+         "hints": {CWL_REQUIREMENT_CUDA: {"custom": 1, "cudaVersionMin": "11.0", "cudaDeviceCountMin": 8}}},
+    ),
+    (
+        {"hints": {CWL_REQUIREMENT_APP_DOCKER_GPU: {"dockerPull": "python:3.7-alpine"}},
+         "requirements": {CWL_REQUIREMENT_CUDA_NAME: {"custom": 1, "cudaVersionMin": "11.0", "cudaDeviceCountMin": 8}}},
+        {"hints": {CWL_REQUIREMENT_APP_DOCKER: {"dockerPull": "python:3.7-alpine"}},
+         "requirements": {CWL_REQUIREMENT_CUDA: {"custom": 1, "cudaVersionMin": "11.0", "cudaDeviceCountMin": 8}}},
+    ),
+    (
+        {"requirements": [{"class": CWL_REQUIREMENT_APP_DOCKER_GPU, "dockerPull": "python:3.7-alpine"}],
+         "hints": [_combine({"class": CWL_REQUIREMENT_CUDA_NAME},
+                            {"custom": 1, "cudaVersionMin": "11.0", "cudaDeviceCountMin": 8})]},
+        {"requirements": [{"class": CWL_REQUIREMENT_APP_DOCKER, "dockerPull": "python:3.7-alpine"}],
+         "hints": [_combine({"class": CWL_REQUIREMENT_CUDA},
+                            {"custom": 1, "cudaVersionMin": "11.0", "cudaDeviceCountMin": 8})]},
+    ),
+    (
+        {"hints": [{"class": CWL_REQUIREMENT_APP_DOCKER_GPU, "dockerPull": "python:3.7-alpine"}],
+         "requirements": [_combine({"class": CWL_REQUIREMENT_CUDA_NAME},
+                                   {"custom": 1, "cudaVersionMin": "11.0", "cudaDeviceCountMin": 8})]},
+        {"hints": [{"class": CWL_REQUIREMENT_APP_DOCKER, "dockerPull": "python:3.7-alpine"}],
+         "requirements": [_combine({"class": CWL_REQUIREMENT_CUDA},
+                                   {"custom": 1, "cudaVersionMin": "11.0", "cudaDeviceCountMin": 8})]},
+    ),
+    # cases for CUDA-only (no Docker), but using the non-namespaced requirement
+    (
+        {"requirements": [{"class": CWL_REQUIREMENT_CUDA_NAME}]},
+        {"requirements": [{"class": CWL_REQUIREMENT_CUDA}]},
+    ),
+    (
+        {"hints": [{"class": CWL_REQUIREMENT_CUDA_NAME}]},
+        {"hints": [{"class": CWL_REQUIREMENT_CUDA}]},
+    ),
+    (
+        {"requirements": [_combine({"class": CWL_REQUIREMENT_CUDA_NAME}, {"custom": 1, "cudaDeviceCountMin": 8})]},
+        {"requirements": [_combine({"class": CWL_REQUIREMENT_CUDA}, {"custom": 1, "cudaDeviceCountMin": 8})]},
+    ),
+    (
+        {"hints": [_combine({"class": CWL_REQUIREMENT_CUDA_NAME}, {"custom": 1, "cudaDeviceCountMin": 8})]},
+        {"hints": [_combine({"class": CWL_REQUIREMENT_CUDA}, {"custom": 1, "cudaDeviceCountMin": 8})]},
+    ),
 ])
 def test_update_package_compatibility(original, expected):
     # type: (CWL, CWL) -> None
@@ -390,7 +524,7 @@ def test_update_package_compatibility(original, expected):
     original = _combine(cwl_base, original)
     expected = _combine(cwl_base, expected)
     test_cwl = _update_package_compatibility(original)
-    assert_equal_requirements_any_order(test_cwl, expected)
+    assert_equal_requirements_any_order(test_cwl, expected, diff=True)
 
 
 def test_cwl_extension_requirements_no_error():

@@ -41,13 +41,23 @@ class OpenSearchField(Constants):
     LOCAL_FILE_SCHEME = "opensearchfile"  # must be a valid url scheme parsable by urlparse
 
 
-CWL_NAMESPACE_ID = "cwl"
+CWL_NAMESPACE = "cwl"
 CWL_NAMESPACE_URL = "https://w3id.org/cwl/cwl#"
-CWL_NAMESPACE = MappingProxyType({CWL_NAMESPACE_ID: CWL_NAMESPACE_URL})
+CWL_NAMESPACE_DEFINITION = MappingProxyType({CWL_NAMESPACE: CWL_NAMESPACE_URL})
+"""
+Namespace used to reference :term:`CWL` definitions provided the common specification.
+"""
 
-CWL_TOOL_NAMESPACE_ID = "cwltool"
-CWL_TOOL_NAMESPACE_URL = "http://commonwl.org/cwltool#"
-CWL_TOOL_NAMESPACE = MappingProxyType({CWL_TOOL_NAMESPACE_ID: CWL_TOOL_NAMESPACE_URL})
+CWL_NAMESPACE_CWLTOOL = "cwltool"
+CWL_NAMESPACE_CWLTOOL_URL = "http://commonwl.org/cwltool#"
+CWL_NAMESPACE_CWLTOOL_DEFINITION = MappingProxyType({CWL_NAMESPACE_CWLTOOL: CWL_NAMESPACE_CWLTOOL_URL})
+"""
+Namespace used to reference :term:`CWL` definitions provided by mod:`cwltool`.
+"""
+
+CWL_NAMESPACE_SCHEMA = "s"
+CWL_NAMESPACE_SCHEMA_URL = "https://schema.org/"
+CWL_NAMESPACE_SCHEMA_DEFINITION = MappingProxyType({CWL_NAMESPACE_SCHEMA: CWL_NAMESPACE_SCHEMA_URL})
 
 # FIXME: convert to 'Constants' class
 # CWL package (requirements/hints) corresponding to `ProcessType.APPLICATION`
@@ -68,9 +78,9 @@ CWL_REQUIREMENT_APP_WEAVER = frozenset([
 Set of :term:`CWL` requirements defined by `Weaver` for an :term:`Application Package` implementation.
 """
 
-CWL_NAMESPACE_WEAVER = {
-    "weaver": "http://crim.ca/weaver#"
-}
+CWL_NAMESPACE_WEAVER = "weaver"
+CWL_NAMESPACE_WEAVER_URL = "http://crim.ca/weaver#"
+CWL_NAMESPACE_WEAVER_DEFINITION = MappingProxyType({CWL_NAMESPACE_WEAVER: CWL_NAMESPACE_WEAVER_URL})
 """
 Namespace used to reference :term:`CWL` definitions provided by `Weaver`. 
 """
@@ -83,7 +93,7 @@ CWL_REQUIREMENT_APP_TYPES = frozenset([
     CWL_REQUIREMENT_APP_OGC_API,
     CWL_REQUIREMENT_APP_WPS1,
 ] + [
-    f"{list(CWL_NAMESPACE_WEAVER)[0]}:{_req}"
+    f"{CWL_NAMESPACE_WEAVER}:{_req}"
     for _req in CWL_REQUIREMENT_APP_WEAVER
 ])
 """
@@ -124,8 +134,9 @@ Parameters employed by default for updating :data:`CWL_REQUIREMENT_APP_DOCKER_GP
 
 # FIXME: convert to 'Constants' class
 # NOTE: depending on the 'cwlVersion' of the document, some items are extensions or native to the standard specification
-CWL_REQUIREMENT_CUDA = f"{CWL_TOOL_NAMESPACE_ID}:CUDARequirement"
-CWL_REQUIREMENT_CUDA_NAMESPACE = CWL_TOOL_NAMESPACE
+CWL_REQUIREMENT_CUDA_NAME = "CUDARequirement"
+CWL_REQUIREMENT_CUDA = f"{CWL_NAMESPACE_CWLTOOL}:{CWL_REQUIREMENT_CUDA_NAME}"
+CWL_REQUIREMENT_CUDA_NAMESPACE = CWL_NAMESPACE_CWLTOOL_DEFINITION
 CWL_REQUIREMENT_ENV_VAR = "EnvVarRequirement"
 CWL_REQUIREMENT_INIT_WORKDIR = "InitialWorkDirRequirement"
 CWL_REQUIREMENT_INLINE_JAVASCRIPT = "InlineJavascriptRequirement"
@@ -142,6 +153,7 @@ CWL_REQUIREMENT_WORK_REUSE = "WorkReuse"  # default is to reuse, employed to exp
 
 CWL_REQUIREMENT_FEATURES = frozenset([
     CWL_REQUIREMENT_CUDA,
+    CWL_REQUIREMENT_CUDA_NAME,  # extension import does not have namespace, but it requires it during execution
     CWL_REQUIREMENT_ENV_VAR,
     CWL_REQUIREMENT_INIT_WORKDIR,
     CWL_REQUIREMENT_INPLACE_UPDATE,
