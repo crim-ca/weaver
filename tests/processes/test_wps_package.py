@@ -546,7 +546,7 @@ BASE_TESTS_CUDA_REQUIREMENT = [
 @pytest.mark.parametrize(
     "original, expected",
     # tests with CUDA/Docker by themselves in requirements/hints
-    BASE_TESTS_CUDA_REQUIREMENT + 
+    BASE_TESTS_CUDA_REQUIREMENT +
     # same tests, but with additional requirements/hints to validate their remain in the result
     [
         (_add_requirement(_cuda_req, _extra_req), _add_requirement(_expect_req, _extra_req))  # type: ignore

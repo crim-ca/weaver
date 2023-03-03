@@ -82,7 +82,7 @@ CWL_NAMESPACE_WEAVER = "weaver"
 CWL_NAMESPACE_WEAVER_URL = "http://crim.ca/weaver#"
 CWL_NAMESPACE_WEAVER_DEFINITION = MappingProxyType({CWL_NAMESPACE_WEAVER: CWL_NAMESPACE_WEAVER_URL})
 """
-Namespace used to reference :term:`CWL` definitions provided by `Weaver`. 
+Namespace used to reference :term:`CWL` definitions provided by `Weaver`.
 """
 
 CWL_REQUIREMENT_APP_TYPES = frozenset([
