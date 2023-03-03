@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
 
 def evaluate_test_cases(test_cases):
-    # type: (List[Tuple[TestSchema, TestValue, TestExpect]]) -> None
+    # type: (Union[List[Tuple[TestSchema, TestValue, TestExpect]], Tuple[TestSchema, TestValue, TestExpect]]) -> None
     """
     Evaluate a list of tuple of (SchemaType, Test-Value, Expected-Result).
 
@@ -31,7 +31,11 @@ def evaluate_test_cases(test_cases):
     evaluating ``Test-Value``. Otherwise, the result from deserialization should equal exactly ``Expected-Result``.
     """
 
+    nested = isinstance(test_cases[0], (list, tuple))
+    single = (len(test_cases) == 1 and len(test_cases[0]) == 3) or (not nested and len(test_cases) == 3)
+    test_cases = [test_cases] if not nested else test_cases
     for i, (test_schema_ref, test_value, test_expect) in enumerate(test_cases):
+        test_name = "" if single else f"Test [{i}]: "
         if inspect.isclass(test_schema_ref):
             test_schema = test_schema_ref()
             test_schema_name = test_schema_ref.__name__
@@ -41,14 +45,14 @@ def evaluate_test_cases(test_cases):
         try:
             result = test_schema.deserialize(test_value)
             if test_expect is colander.Invalid:
-                pytest.fail(f"Test [{i}]: Expected invalid format from [{test_schema_name}] "
+                pytest.fail(f"{test_name}Expected invalid format from [{test_schema_name}] "
                             f"with: {test_value}, but received: {result}")
-            assert result == test_expect, f"Test [{i}]: Bad result from [{test_schema_name}] with: {test_value}"
+            assert result == test_expect, f"{test_name}Bad result from [{test_schema_name}] with: {test_value}"
         except colander.Invalid:
             if test_expect is colander.Invalid:
                 pass
             else:
-                pytest.fail(f"Test [{i}]: Expected valid format from [{test_schema_name}] "
+                pytest.fail(f"{test_name}Expected valid format from [{test_schema_name}] "
                             f"with: {test_value}, but invalid instead of: {test_expect}")
 
 
@@ -917,32 +921,47 @@ def test_dropable_variable_mapping():
     evaluate_test_cases(test_schemas)
 
 
-def test_media_type_pattern():
-    test_schema = sd.MediaType
-    test_cases = [
-        "application/atom+xml",
-        "application/EDI-X12",
-        "application/xml-dtd",
-        "application/zip",
-        "application/vnd.api+json",
-        "application/json; indent=4",
-        "video/mp4",
-        "plain/text;charset=UTF-8",
-        "plain/text; charset=UTF-8",
-        "plain/text;    charset=UTF-8",
-        "plain/text; charset=UTF-8; boundary=10"
-    ]
-    for test_value in test_cases:
-        assert test_schema().deserialize(test_value) == test_value
-    test_cases = [
-        "random",
-        "bad\\value",
-        "; missing=type"
-    ]
-    for test_value in test_cases:
-        try:
-            test_schema().deserialize(test_value)
-        except colander.Invalid:
-            pass
-        else:
-            pytest.fail(f"Expected valid format from [{test_schema.__name__}] with: '{test_value}'")
+@pytest.mark.parametrize("value, expect", [
+    ({"other": "123", "value": 123, "number": 456}, {"other": "123", "value": 123, "number": 456}),
+    ({"other": "123", "value": 123, "bad": "456"}, colander.Invalid),
+    ({"value": 123, "bad": "456"}, colander.Invalid),
+])
+def test_variable_with_const(value, expect):
+    # type: (TestValue, TestExpect) -> None
+
+    class VariableMapping(ce.ExtendedMappingSchema):
+        var = ce.ExtendedSchemaNode(ce.ExtendedInteger(strict=True), variable="{int}")
+        #other = ce.ExtendedSchemaNode(colander.String())
+
+    evaluate_test_cases((VariableMapping, value, expect))
+
+
+@pytest.mark.parametrize("test_value", [
+    "application/atom+xml",
+    "application/EDI-X12",
+    "application/xml-dtd",
+    "application/zip",
+    "application/vnd.api+json",
+    "application/json; indent=4",
+    "video/mp4",
+    "plain/text;charset=UTF-8",
+    "plain/text; charset=UTF-8",
+    "plain/text;    charset=UTF-8",
+    "plain/text; charset=UTF-8; boundary=10"
+])
+def test_media_type_pattern_valid(test_value):
+    assert sd.MediaType().deserialize(test_value) == test_value
+
+
+@pytest.mark.parametrize("test_value", [
+    "random",
+    "bad\\value",
+    "; missing=type"
+])
+def test_media_type_pattern_invalid(test_value):
+    try:
+        sd.MediaType().deserialize(test_value)
+    except colander.Invalid:
+        pass
+    else:
+        pytest.fail(f"Expected valid format from [{sd.MediaType.__name__}] with: '{test_value}'")

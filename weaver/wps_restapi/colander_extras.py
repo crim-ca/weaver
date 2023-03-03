@@ -1008,20 +1008,27 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
         try:
             # Substitute real keys with matched variables to run full deserialize so
             # that mapping can find nodes name against attribute names, then re-apply originals.
-            # We must do this as non-variable sub-schemas could be present and we must also
+            # We must do this as non-variable sub-schemas could be present, and we must also
             # validate them against full schema.
             if not has_const_child:
                 result = node.default or {}
             else:
                 for mapped in var_map.values():
+                    if not mapped:
+                        continue  # ignore missing for now, raise after as needed if required
                     # if multiple objects corresponding to a variable sub-schema where provided,
                     # we only give one as this is what is expected for normal-mapping deserialize
                     cstruct[mapped[0]["node"]] = cstruct.pop(mapped[0]["name"])
-                result = super(VariableSchemaNode, node).deserialize(cstruct)  # noqa
+                # temporarily bypass variable to avoid recursively calling this extension deserialization
+                # perform the 'normal' mapping deserialization to obtain explicit properties
+                mapping = ExtendedMappingSchema(name=node.name, missing=node.missing, default=node.default)
+                var_children = node._get_sub_variable(node.children)
+                mapping.children = [child for child in node.children if child not in var_children]
+                result = mapping.deserialize(cstruct)  # noqa
             for mapped in var_map.values():
                 # invalid if no variable match was found, unless optional
                 if mapped is None and node.missing is colander.required:
-                    raise KeyError
+                    raise colander.Invalid(node, value=cstruct)
                 for var_mapped in mapped:
                     result[var_mapped["name"]] = var_mapped["cstruct"]
         except colander.Invalid as invalid:

@@ -3,6 +3,13 @@ import uuid
 import colander
 import pytest
 
+from weaver.formats import IANA_NAMESPACE, IANA_NAMESPACE_URL, EDAM_NAMESPACE, EDAM_NAMESPACE_URL
+from weaver.processes.constants import (
+    CWL_NAMESPACE,
+    CWL_NAMESPACE_URL,
+    CWL_NAMESPACE_WEAVER,
+    CWL_NAMESPACE_WEAVER_URL
+)
 from weaver.wps_restapi import swagger_definitions as sd
 
 
@@ -53,3 +60,27 @@ def test_process_id_with_version_tag_get_valid():
             sd.ProcessIdentifierTag().deserialize(test_id)
     for test_id in test_id_version_valid:
         assert sd.ProcessIdentifierTag().deserialize(test_id) == test_id
+
+
+@pytest.mark.parametrize("test_value", [
+    {},
+    {IANA_NAMESPACE: IANA_NAMESPACE_URL},
+    {IANA_NAMESPACE: IANA_NAMESPACE_URL, EDAM_NAMESPACE: EDAM_NAMESPACE_URL},
+    {IANA_NAMESPACE: IANA_NAMESPACE_URL, CWL_NAMESPACE: CWL_NAMESPACE_URL},
+    {CWL_NAMESPACE: CWL_NAMESPACE_URL, CWL_NAMESPACE_WEAVER: CWL_NAMESPACE_WEAVER_URL},
+    {CWL_NAMESPACE: CWL_NAMESPACE_URL, "random": "https://random.com"},
+])
+def test_cwl_namespaces(test_value):
+    result = sd.CWLNamespaces().deserialize(test_value)
+    assert result == test_value
+
+
+@pytest.mark.parametrize("test_value", [
+    {CWL_NAMESPACE: "bad"},
+    {CWL_NAMESPACE: EDAM_NAMESPACE_URL},
+    {"random": "bad"},
+    {"random": 12345},
+])
+def test_cwl_namespaces_invalid_url(test_value):
+    with pytest.raises(colander.Invalid):
+        sd.CWLNamespaces().deserialize(test_value)
