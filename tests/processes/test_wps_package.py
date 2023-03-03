@@ -7,6 +7,7 @@ Unit tests of functions within :mod:`weaver.processes.wps_package`.
 import contextlib
 import copy
 import io
+import itertools
 import logging
 import os
 import re
@@ -30,6 +31,7 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_CUDA_DEFAULT_PARAMETERS,
     CWL_REQUIREMENT_CUDA_NAMESPACE,
     CWL_REQUIREMENT_PROCESS_GENERATOR,
+    CWL_REQUIREMENT_RESOURCE,
     CWL_REQUIREMENT_TIME_LIMIT
 )
 from weaver.processes.wps_package import WpsPackage, _load_package_content, _update_package_compatibility
@@ -272,6 +274,27 @@ def _combine(dict1, dict2):
     return dict1
 
 
+def _add_requirement(reqs1, reqs2):
+    # type: (CWL, CWL) -> CWL
+    reqs1 = copy.deepcopy(reqs1)
+    reqs2 = copy.deepcopy(reqs2)
+    for field in ["hints", "requirements"]:  # type: Literal["hints", "requirements"]
+        if field not in reqs2:
+            continue
+        reqs1.setdefault(field, {})
+        defs1 = reqs1[field]
+        defs2 = reqs2[field]
+        if isinstance(defs1, list):
+            if isinstance(defs2, dict):
+                defs2 = [_combine({"class": req}, val) for req, val in defs2.items()]
+            defs1.extend(defs2)
+        if isinstance(defs1, dict):
+            if isinstance(defs2, list):
+                defs2 = {_def.pop("class"): _def for _def in defs2}
+            defs1.update(defs2)
+    return reqs1
+
+
 def assert_equal_requirements_any_order(result, expected, diff=False):
     # type: (CWL, CWL, bool) -> None
     for field in ["hints", "requirements"]:  # type: Literal["hints", "requirements"]
@@ -284,11 +307,11 @@ def assert_equal_requirements_any_order(result, expected, diff=False):
             assert field not in result
 
 
-@pytest.mark.parametrize("original, expected", [
+BASE_TESTS_CUDA_REQUIREMENT = [
     (
         {"requirements": {CWL_REQUIREMENT_APP_DOCKER_GPU: {"dockerPull": "python:3.7-alpine"}}},
         {"requirements": {CWL_REQUIREMENT_APP_DOCKER: {"dockerPull": "python:3.7-alpine"},
-                          CWL_REQUIREMENT_CUDA: CWL_REQUIREMENT_CUDA_DEFAULT_PARAMETERS}},
+                          CWL_REQUIREMENT_CUDA: dict(CWL_REQUIREMENT_CUDA_DEFAULT_PARAMETERS)}},
     ),
     (
         {"requirements": {CWL_REQUIREMENT_APP_DOCKER_GPU: {"dockerPull": "python:3.7-alpine"},
@@ -299,7 +322,7 @@ def assert_equal_requirements_any_order(result, expected, diff=False):
     (
         {"requirements": [{"class": CWL_REQUIREMENT_APP_DOCKER_GPU, "dockerPull": "python:3.7-alpine"}]},
         {"requirements": [{"class": CWL_REQUIREMENT_APP_DOCKER, "dockerPull": "python:3.7-alpine"},
-                          _combine({"class": CWL_REQUIREMENT_CUDA}, CWL_REQUIREMENT_CUDA_DEFAULT_PARAMETERS)]},
+                          _combine({"class": CWL_REQUIREMENT_CUDA}, dict(CWL_REQUIREMENT_CUDA_DEFAULT_PARAMETERS))]},
     ),
     (
         {"requirements": [{"class": CWL_REQUIREMENT_APP_DOCKER_GPU, "dockerPull": "python:3.7-alpine"},
@@ -312,7 +335,7 @@ def assert_equal_requirements_any_order(result, expected, diff=False):
     (
         {"hints": {CWL_REQUIREMENT_APP_DOCKER_GPU: {"dockerPull": "python:3.7-alpine"}}},
         {"hints": {CWL_REQUIREMENT_APP_DOCKER: {"dockerPull": "python:3.7-alpine"},
-                   CWL_REQUIREMENT_CUDA: CWL_REQUIREMENT_CUDA_DEFAULT_PARAMETERS}},
+                   CWL_REQUIREMENT_CUDA: dict(CWL_REQUIREMENT_CUDA_DEFAULT_PARAMETERS)}},
     ),
     (
         {"hints": {CWL_REQUIREMENT_APP_DOCKER_GPU: {"dockerPull": "python:3.7-alpine"},
@@ -323,7 +346,7 @@ def assert_equal_requirements_any_order(result, expected, diff=False):
     (
         {"hints": [{"class": CWL_REQUIREMENT_APP_DOCKER_GPU, "dockerPull": "python:3.7-alpine"}]},
         {"hints": [{"class": CWL_REQUIREMENT_APP_DOCKER, "dockerPull": "python:3.7-alpine"},
-                   _combine({"class": CWL_REQUIREMENT_CUDA}, CWL_REQUIREMENT_CUDA_DEFAULT_PARAMETERS)]},
+                   _combine({"class": CWL_REQUIREMENT_CUDA}, dict(CWL_REQUIREMENT_CUDA_DEFAULT_PARAMETERS))]},
     ),
     (
         {"hints": [{"class": CWL_REQUIREMENT_APP_DOCKER_GPU, "dockerPull": "python:3.7-alpine"},
@@ -517,7 +540,25 @@ def assert_equal_requirements_any_order(result, expected, diff=False):
         {"hints": [_combine({"class": CWL_REQUIREMENT_CUDA_NAME}, {"custom": 1, "cudaDeviceCountMin": 8})]},
         {"hints": [_combine({"class": CWL_REQUIREMENT_CUDA}, {"custom": 1, "cudaDeviceCountMin": 8})]},
     ),
-])
+]
+
+
+@pytest.mark.parametrize(
+    "original, expected",
+    # tests with CUDA/Docker by themselves in requirements/hints
+    BASE_TESTS_CUDA_REQUIREMENT + 
+    # same tests, but with additional requirements/hints to validate their remain in the result
+    [
+        (_add_requirement(_cuda_req, _extra_req), _add_requirement(_expect_req, _extra_req))  # type: ignore
+        for _cuda_req, _expect_req in BASE_TESTS_CUDA_REQUIREMENT
+        for _extra_req in [
+            {"requirements": {CWL_REQUIREMENT_RESOURCE: {"coresMin": 2}}},
+            {"hints": {CWL_REQUIREMENT_RESOURCE: {"coresMin": 2}}},
+            {"hints": {CWL_REQUIREMENT_RESOURCE: {"coresMin": 2}},
+             "requirements": {CWL_REQUIREMENT_TIME_LIMIT: {"timelimit": 10}}},
+        ]
+    ]
+)
 def test_update_package_compatibility(original, expected):
     # type: (CWL, CWL) -> None
     cwl_base = {"cwlVersion": "v1.2", "class": "CommandLineTool"}
