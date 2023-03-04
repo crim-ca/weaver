@@ -76,6 +76,15 @@
 .. _ogc-exec-async-responses: https://docs.ogc.org/is/18-062r2/18-062r2.html#_response_7
 .. |ogc-api-proc-part2| replace:: OGC API - Processes - Part 2: Deploy, Replace, Undeploy
 .. _ogc-api-proc-part2: https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/deploy_replace_undeploy
+.. |ogc-proc-ext-billing| replace:: OGC API - Processes - Billing extension
+.. _ogc-proc-exc-billing-short: https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/billing
+.. |ogc-proc-ext-quotation| replace:: OGC API - Processes - Quotation extension
+.. _ogc-proc-exc-quotation-short: https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/quotation
+.. |quote-estimator| replace:: Quote Estimator
+.. _quote-estimator: ./schemas/quotation/quote-estimator.yaml
+.. |quote-estimation-result| replace:: Quote Estimation Result
+.. _quote-estimation-result: ./schemas/quotation/quote-estimation-result.yaml
+.. _ONNX: https://onnx.ai/
 .. |pywps| replace:: PyWPS
 .. _pywps: https://github.com/geopython/pywps/
 .. |pywps-status| replace:: Progress and Status Report

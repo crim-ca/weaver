@@ -20,7 +20,6 @@ mongodb.port = 27017
 mongodb.db_name = weaver
 
 # caching
-cache.regions = doc, request, result
 cache.type = memory
 cache.doc.expire = 86400
 cache.doc.enabled = true
@@ -28,6 +27,8 @@ cache.request.expire = 60
 cache.request.enabled = false
 cache.result.expire = 3600
 cache.result.enabled = false
+cache.quotation.expire = 3600
+cache.quotation.enabled = true
 
 # NOTE:
 #   For all below parameters, settings suffixed by `_url` are automatically generated from their corresponding `_path`
@@ -70,17 +71,21 @@ weaver.request_options =
 # --- Weaver Execution settings ---
 # maximum wait time allowed for Prefer header to run Job/Quote synchronously
 # over this limit, they will automatically fallback to asynchronous execution/estimation
-weaver.exec_sync_max_wait = 20
-weaver.quote_sync_max_wait = 20
+weaver.execute_sync_max_wait = 20
 
 # --- Weaver Quotation settings ---
 # enable support of quotation extension
 # https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/quotation
 weaver.quotation = true
+weaver.quotation_sync_max_wait = 20
 # parameters to accomplish quote estimation
 weaver.quotation_docker_image = registry.gitlab.com/crim.ca/clients/cubewerx/quote-estimator:0.2.0
 weaver.quotation_docker_username =
 weaver.quotation_docker_password =
+# currency conversion
+weaver.quotation_currency_default = USD
+weaver.quotation_currency_converter =
+weaver.quotation_currency_token =
 
 # --- Weaver CWL settings ---
 # NOTE: [experimental]
