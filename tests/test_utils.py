@@ -18,6 +18,7 @@ import mock
 import pytest
 import pytz
 import responses
+from beaker.cache import cache_region
 from mypy_boto3_s3.literals import RegionName
 from pyramid.httpexceptions import (
     HTTPConflict,
@@ -79,6 +80,7 @@ from weaver.utils import (
     resolve_s3_http_options,
     resolve_s3_reference,
     retry_on_condition,
+    setup_cache,  # WARNING: make sure to reset after use since state is applied globally, could break other tests
     str2bytes,
     validate_s3,
     xml_path_elements,
@@ -545,7 +547,7 @@ def test_request_extra_intervals():
             sleep_counter["called_count"] += 1
             sleep_counter["called_with"].append(delay)
 
-    with mock.patch("weaver.utils.get_settings", return_value={"cache.requests.enable": "false"}):
+    with mock.patch("weaver.utils.get_settings", return_value={"cache.request.enabled": "false"}):
         with mock.patch("requests.Session.request", side_effect=mock_request) as mocked_request:
             with mock.patch("weaver.utils.time.sleep", side_effect=mock_sleep):
                 intervals = [1e6, 3e6, 5e6]  # random values that shouldn't normally be used with sleep() (too big)
@@ -583,7 +585,7 @@ def test_request_extra_zero_values():
         sleep_counter["called_count"] += 1
         sleep_counter["called_with"].append(delay)
 
-    with mock.patch("weaver.utils.get_settings", return_value={"cache.requests.enable": "false"}):
+    with mock.patch("weaver.utils.get_settings", return_value={"cache.request.enabled": "false"}):
         with mock.patch("requests.Session.request", side_effect=mock_request) as mocked_request:
             with mock.patch("weaver.utils.time.sleep", side_effect=mock_sleep):
                 # if backoff is not correctly handled as explicit zero, the default backoff value would be used
@@ -596,6 +598,57 @@ def test_request_extra_zero_values():
     # proper detection of input backoff=0 makes all sleep calls equal to zero
     assert all(backoff == 0 for backoff in sleep_counter["called_with"])
     assert sleep_counter["called_count"] == 3  # first direct call doesn't have any sleep from retry
+
+
+@pytest.mark.parametrize("cache_enabled", [False, True])
+def test_request_extra_cache_requests_applied(cache_enabled):
+    def mock_request(*_, **__):
+        mocked_resp = Response()
+        mocked_resp.status_code = HTTPOk.code
+        return mocked_resp
+
+    try:
+        cache_settings = {"cache.request.enabled": str(cache_enabled)}
+        with mock.patch("weaver.utils.get_settings", return_value=cache_settings):
+            setup_cache(cache_settings)
+            with mock.patch("requests.Session.request", side_effect=mock_request) as mocked_request:
+                resp = request_extra("GET", "https://valid.com")
+                assert resp.status_code == HTTPOk.code
+                assert mocked_request.called
+                resp = request_extra("GET", "https://valid.com")
+                assert resp.status_code == HTTPOk.code
+                assert mocked_request.call_count == 1 if cache_enabled else 2
+    finally:
+        setup_cache({})  # ensure reset since globally applied
+
+
+@pytest.mark.parametrize("cache_enabled", [False, True])
+def test_request_extra_cache_non_default_func(cache_enabled):
+    test_region = "result"
+    test_called = [0]
+
+    @cache_region(test_region)
+    def mock_request(*args):
+        test_called[0] += 1
+        mocked_resp = Response()
+        mocked_resp.status_code = HTTPOk.code
+        return mocked_resp
+
+    try:
+        cache_settings = {f"cache.{test_region}.enabled": str(cache_enabled)}
+        with mock.patch("weaver.utils.get_settings", return_value=cache_settings):
+            setup_cache(cache_settings)
+            with mock.patch("requests.Session.request", side_effect=mock_request) as mocked_request:
+                resp = request_extra("GET", "https://valid.com", cache_request=mock_request)
+                assert resp.status_code == HTTPOk.code
+                assert test_called[0]
+                assert not mocked_request.called
+                resp = request_extra("GET", "https://valid.com", cache_request=mock_request)
+                assert resp.status_code == HTTPOk.code
+                assert test_called[0] == 1 if cache_enabled else 2
+                assert not mocked_request.called
+    finally:
+        setup_cache({})  # ensure reset since globally applied
 
 
 @pytest.mark.parametrize(

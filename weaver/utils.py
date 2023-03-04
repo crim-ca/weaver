@@ -138,6 +138,8 @@ if TYPE_CHECKING:
         "headers": NotRequired[AnyHeadersContainer],
         "cookies": NotRequired[AnyCookiesContainer],
     }, total=False)
+    RequestCachingKeywords = Dict[str, AnyValueType]
+    RequestCachingFunction = Callable[[AnyRequestMethod, str,  RequestCachingKeywords], Response]
 
     ResponseMetadata = TypedDict("ResponseMetadata", {
         "RequestId": str,
@@ -1462,8 +1464,8 @@ def get_ssl_verify_option(method, url, settings, request_options=None):
     return True
 
 
-def get_no_cache_option(request_headers, request_options):
-    # type: (HeadersType, SettingsType) -> bool
+def get_no_cache_option(request_headers, **cache_options):
+    # type: (HeadersType, **bool) -> bool
     """
     Obtains the No-Cache result from request headers and configured request options.
 
@@ -1471,13 +1473,14 @@ def get_no_cache_option(request_headers, request_options):
         - :meth:`Request.headers`
         - :func:`get_request_options`
 
-    :param request_headers: specific request headers that could indicate ``Cache-Control: no-cache``
-    :param request_options: specific request options that could define ``cache: True|False``
+    :param request_headers: specific request headers that could indicate ``Cache-Control: no-cache``.
+    :param cache_options: specific request options that could define ``cache[_enabled]: True|False``.
     :return: whether to disable cache or not
     """
     no_cache_header = str(get_header("Cache-Control", request_headers)).lower().replace(" ", "")
     no_cache = no_cache_header in ["no-cache", "max-age=0", "max-age=0,must-revalidate"]
-    no_cache = no_cache is True or request_options.get("cache", True) is False
+    cache_params = ["cache", "cache_enabled"]
+    no_cache = no_cache is True or any(cache_options.get(cache, True) is False for cache in cache_params)
     return no_cache
 
 
@@ -1620,7 +1623,7 @@ def retry_on_cache_error(func):
 
 
 def _request_call(method, url, kwargs):
-    # type: (str, str, Dict[str, AnyValueType]) -> Response
+    # type: (AnyRequestMethod, str, RequestCachingKeywords) -> Response
     """
     Request operation employed by :func:`request_extra` without caching.
     """
@@ -1634,7 +1637,7 @@ def _request_call(method, url, kwargs):
 
 @cache_region("request")
 def _request_cached(method, url, kwargs):
-    # type: (str, str, Dict[str, AnyValueType]) -> Response
+    # type: (AnyRequestMethod, str, RequestCachingKeywords) -> Response
     """
     Cached-enabled request operation employed by :func:`request_extra`.
     """
@@ -1642,18 +1645,20 @@ def _request_cached(method, url, kwargs):
 
 
 @retry_on_cache_error
-def request_extra(method,                       # type: AnyRequestMethod
-                  url,                          # type: str
-                  retries=None,                 # type: Optional[int]
-                  backoff=None,                 # type: Optional[Number]
-                  intervals=None,               # type: Optional[List[Number]]
-                  retry_after=True,             # type: bool
-                  allowed_codes=None,           # type: Optional[List[int]]
-                  only_server_errors=True,      # type: bool
-                  ssl_verify=None,              # type: Optional[bool]
-                  settings=None,                # type: Optional[AnySettingsContainer]
-                  **request_kwargs,             # type: Any  # RequestOptions
-                  ):                            # type: (...) -> AnyResponseType
+def request_extra(method,                           # type: AnyRequestMethod
+                  url,                              # type: str
+                  retries=None,                     # type: Optional[int]
+                  backoff=None,                     # type: Optional[Number]
+                  intervals=None,                   # type: Optional[List[Number]]
+                  retry_after=True,                 # type: bool
+                  allowed_codes=None,               # type: Optional[List[int]]
+                  only_server_errors=True,          # type: bool
+                  ssl_verify=None,                  # type: Optional[bool]
+                  cache_request=_request_cached,    # type: RequestCachingFunction
+                  cache_enabled=True,               # type: bool
+                  settings=None,                    # type: Optional[AnySettingsContainer]
+                  **request_kwargs,                 # type: Any  # RequestOptions
+                  ):                                # type: (...) -> AnyResponseType
     """
     Standard library :mod:`requests` with additional functional utilities.
 
@@ -1726,6 +1731,8 @@ def request_extra(method,                       # type: AnyRequestMethod
     :param retry_after: If enabled, honor ``Retry-After`` response header of provided by a failing request attempt.
     :param allowed_codes: HTTP status codes that are considered valid to stop retrying (default: any non-4xx/5xx code).
     :param ssl_verify: Explicit parameter to disable SSL verification (overrides any settings, default: True).
+    :param cache_request: Decorated function with :func:`cache_region` to perform the request if cache was not hit.
+    :param cache_enabled: Whether caching must be used for this request. Disable overrides request options and headers.
     :param settings: Additional settings from which to retrieve configuration details for requests.
     :param only_server_errors:
         Only HTTP status codes in the 5xx values will be considered for retrying the request (default: True).
@@ -1760,16 +1767,16 @@ def request_extra(method,                       # type: AnyRequestMethod
     # process request
     resp = None
     failures = []
-    no_cache = get_no_cache_option(request_kwargs.get("headers", {}), request_options)
+    no_cache = get_no_cache_option(request_kwargs.get("headers", {}), cache_enabled=cache_enabled, **request_options)
     # remove leftover options unknown to requests method in case of multiple entries
     # see 'requests.request' detailed signature for applicable args
     known_req_opts = set(inspect.signature(requests.Session.request).parameters)
     known_req_opts -= {"url", "method"}  # add as unknown to always remove them since they are passed by arguments
     for req_opt in set(request_kwargs) - known_req_opts:
         request_kwargs.pop(req_opt)
-    region = "request"
+    region = cache_request._arg_region  # noqa
     request_args = (method, url, request_kwargs)
-    caching_args = (_request_cached, region, *request_args)
+    caching_args = (cache_request, region, *request_args)
     for retry, delay in enumerate(request_delta):
         if retry:
             code = resp.status_code if resp else None
@@ -1783,12 +1790,13 @@ def request_extra(method,                       # type: AnyRequestMethod
             if no_cache:
                 resp = _request_call(*request_args)
             else:
-                resp = _request_cached(*request_args)
-            if allowed_codes and len(allowed_codes):
-                if resp.status_code in allowed_codes:
-                    return resp
-            elif resp.status_code < (500 if only_server_errors else 400):
-                invalidate_region(caching_args)
+                resp = cache_request(*request_args)
+            if (
+                (allowed_codes and resp.status_code in allowed_codes)
+                or resp.status_code < (500 if only_server_errors else 400)
+            ):
+                if resp.status_code >= 400:  # don't invalidate if successful, otherwise we never cache!
+                    invalidate_region(caching_args)
                 return resp
             invalidate_region(caching_args)
             reason = getattr(resp, "reason", type(resp).__name__)
