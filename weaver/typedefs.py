@@ -9,6 +9,7 @@ if TYPE_CHECKING:
     import typing
     import uuid
     from datetime import datetime
+    from decimal import Decimal
     from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Type, TypeVar, Union
 
     import psutil
@@ -453,6 +454,10 @@ if TYPE_CHECKING:
         "gpu": NotRequired[Number],
         "total": NotRequired[Number],
     }, total=False)
+    Price = TypedDict("Price", {
+        "amount": Decimal,
+        "currency": str,
+    }, total=True)
 
     # job execution statistics
     ApplicationStatistics = TypedDict("ApplicationStatistics", {

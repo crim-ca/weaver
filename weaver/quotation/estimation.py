@@ -3,14 +3,20 @@ import json
 import logging
 import tempfile
 import time
+
+import requests
 import yaml
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
 import colander
+import simplejson
+from beaker.cache import cache_region
 from pyramid_celery import celery_app as app
 
 from weaver.database import get_db
-from weaver.exceptions import QuoteEstimationError
+from weaver.exceptions import QuoteConversionError, QuoteEstimationError, QuoteException
+from weaver.formats import ContentType
 from weaver.owsexceptions import OWSInvalidParameterValue
 from weaver.processes.convert import normalize_ordered_io
 from weaver.processes.types import ProcessType
@@ -18,19 +24,42 @@ from weaver.processes.wps_package import get_package_workflow_steps, get_process
 from weaver.processes.utils import pull_docker
 from weaver.quotation.status import QuoteStatus
 from weaver.store.base import StoreProcesses, StoreQuotes
-from weaver.utils import fully_qualified_name, get_any_id, get_any_value, get_settings, request_extra, wait_secs
+from weaver.utils import (
+    fully_qualified_name,
+    get_any_id,
+    get_any_value,
+    get_header,
+    get_settings,
+    request_extra,
+    wait_secs
+)
 from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
     from typing import Optional
 
     from celery.app.task import Task
+    from requests import Response
 
     from weaver.datatype import DockerAuthentication, Process, Quote
     from weaver.quotation.status import AnyQuoteStatus
-    from weaver.typedefs import AnySettingsContainer, AnyUUID, JSON
+    from weaver.utils import RequestCachingKeywords
+    from weaver.typedefs import AnyRequestMethod, AnyRequestType, AnySettingsContainer, AnyUUID, JSON, Price
 
 LOGGER = logging.getLogger(__name__)
+
+# FIXME: define currency converter configs
+# - https://docs.openexchangerates.org/reference/convert
+# - https://currencylayer.com/documentation (see "Currency Conversion Endpoint" section)
+# - https://exchangeratesapi.io/documentation/ (see "Convert Endpoint" section)
+# - https://fixer.io/documentation (see "Convert Endpoint" section)
+# - scrapper:
+#   - https://www.thepythoncode.com/article/make-a-currency-converter-in-python
+#   - https://www.x-rates.com/table/?from=CAD&amount=1
+# - custom (by config)
+CONVERTER_CONFIG = {
+
+}
 
 
 def get_quote_estimator_config(process):
@@ -93,6 +122,51 @@ def prepare_quote_estimator_config(quote, process):
         estimator_inputs[input_id]
 
 
+def get_currency(request=None):
+    # type: (Optional[AnyRequestType]) -> str
+    settings = get_settings(request)
+    currency = get_header("X-Weaver-Currency", request.headers)
+    currency = sd.PriceCurrency(missing=None).get("currency").deserialize(currency)
+    currency = currency or settings.get("weaver.quotation_currency_default") or "USD"
+    return currency
+
+
+@cache_region("quotation")
+def request_convert_cost(method, url, kwargs):
+    # type: (AnyRequestMethod, str, RequestCachingKeywords) -> Response
+    return requests.request(method, url, **kwargs)
+
+
+def convert_exchange_rate(amount, convert_currency):
+    # type: (Decimal, str) -> Price
+    """
+    Convert the cost value using the requested currency.
+    """
+    default_currency = get_currency()
+    if not convert_currency:
+        return {"amount": amount, "currency": default_currency}
+
+    settings = get_settings()
+    converter_type = settings.get("weaver.quotation_currency_converter")
+    if converter_type not in CONVERTER_CONFIG:
+        LOGGER.warning("No converter specified in settings to obtain quote amount in requested currency.")
+        return {"amount": amount, "currency": default_currency}
+
+    try:
+        converter = CONVERTER_CONFIG[converter_type]
+        headers = {"Accept": ContentType.APP_JSON}
+        args = {"amount": str(amount), "to": convert_currency, "from": default_currency}
+        resp = request_extra("GET", converter["url"], cache_request=request_convert_cost, params=args, headers=headers)
+        if not resp.status_code == 200:
+            raise QuoteConversionError("Bad quote currency response from [%s].", converter["url"])
+        data = simplejson.loads(resp.text, use_decimal=True)
+        result = converter["parser"](data)
+        return {"amount": result, "currency": convert_currency}
+    except Exception as exc:
+        LOGGER.warning("Failed quote currency conversion. Using default [%s].", default_currency, exc_info=exc)
+    return {"amount": amount, "currency": default_currency}
+
+
 def estimate_process_quote(quote, process, settings=None):
     # type: (Quote, Process, Optional[AnySettingsContainer]) -> Quote
     """
@@ -131,21 +205,16 @@ def estimate_process_quote(quote, process, settings=None):
                 auto_remove=True,
                 remove=True,
             )
-        quote_result = json.loads(out_quote_json)
+        quote.results = simplejson.loads(out_quote_json, use_decimal=True)
+        quote.price = convert_exchange_rate(quote.amount, quote.currency)
+        quote.seconds = int(quote.results.get("duration", {}).get("estimate", 0))
+        quote.process = process
+    except QuoteException:
+        raise
     except Exception as exc:
         err = "Docker execution failed to retrieve quote estimation."
         LOGGER.error(err, exc_info=exc)
         raise QuoteEstimationError(err) from exc
-
-    # FIXME: convert currency
-    # to consider API limits, use some form of load-balancing between:
-    # - https://docs.openexchangerates.org/reference/convert
-    # - https://currencylayer.com/documentation ("Currency Conversion Endpoint" section)
-    quote.currency = "CAD"
-
-    quote.seconds = int(quote_result.get("duration", {}).get("estimate", 0))
-    quote.price = float(quote_result.get("total", 0))
-    quote.process = process
     return quote
 
 
@@ -197,7 +266,7 @@ def estimate_workflow_quote(quote, process, settings=None):
         raise QuoteEstimationError("Could not obtain intermediate quote estimations for all Workflow steps.")
 
     # FIXME: what if different currencies are defined (?)
-    currency = "CAD"
+    currency = "USD"
     params = {
         "price": 0,
         "currency": currency,

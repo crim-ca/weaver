@@ -17,7 +17,7 @@ Changes:
 - Add support to configure a quotation estimation algorithm for each respective `Process` with new requests
   using ``GET``, ``PUT``, ``DELETE`` methods on ``/processes/{processID}/estimator`` endpoint. The configured
   algorithm is provided by a reference `Docker` image defined by ``weaver.quotation_docker_[...]`` settings.
-  The algorithm itself expects an highly customisable configuration to estimate quotation parameters based on
+  The algorithm itself expects a highly customizable configuration to estimate quotation parameters based on
   conceptual categories, as defined by the |quote-estimator|_ schema optionally using versatile `ONNX`_ definitions.
   The `Docker` operation should return a JSON matching the |quote-estimation-result|_ schema, which is parsed and
   included in the produced `Quote` based on provided `Process` execution parameters.
@@ -28,10 +28,14 @@ Changes:
 - Add missing `OGC API - Processes` schema references with published definitions
   under ``https://schemas.opengis.net/ogcapi/processes/part1/1.0/`` when applicable.
 - Add ``links`` request query parameter to ``/processes`` and ``/providers/{providerID}/processes`` listing to
-  provide control over reporting of ``links`` for each `Process` summary item. By default ``link=true`` and
+  provide control over reporting of ``links`` for each `Process` summary item. By default, ``link=true`` and
   automatically disable it when ``detail=false`` is specified.
 - Add missing ``405`` response schema for all `OpenAPI` endpoints as handled by the API when the requested HTTP method
   is not applicable for the given path.
+- Renamed ``weaver.quote_sync_max_wait`` to ``weaver.quotation_sync_max_wait`` to better align with new configuration
+  settings for the |ogc-proc-ext-quotation-short| extension. Old value will still be checked for backward compatibility.
+- Renamed ``weaver.exec_sync_max_wait`` to ``weaver.execute_sync_max_wait`` to better align with the corresponding
+  parameter for quotation. Old value will still be checked for backward compatibility.
 
 .. |ogc-proc-ext-billing-short| replace:: Billing
 .. _ogc-proc-exc-billing-short: https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/billing
@@ -46,9 +50,11 @@ Changes:
 Fixes:
 ------
 - Fix schema meta fields (``title``, ``summary``, ``description``, etc.) not being rendered in `OpenAPI` output for
-  keyword schemas (``allOf````anyOf``, ``oneOf``, ``not``).
+  keyword schemas (``allOf``, ``anyOf``, ``oneOf``, ``not``).
 - Fix schema definitions not being rendered in `OpenAPI` into the requested order
   by ``_sort_first`` and ``_sort_after`` control attributes.
+- Fix request cache always invalidated when no explicit ``allowed_codes`` where provided in ``request_extra``, although
+  the request succeeded, causing caching optimization to never actually be used on following requests in this case.
 
 .. _changes_4.29.0:
 

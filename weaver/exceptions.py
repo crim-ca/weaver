@@ -329,6 +329,12 @@ class QuoteEstimationError(QuoteException, OWSNoApplicableCode, ValueError):
     """
 
 
+class QuoteConversionError(QuoteException, OWSNoApplicableCode, ValueError):
+    """
+    Error related to a quote that occurred during its rate conversion.
+    """
+
+
 class BillException(WeaverException):
     """
     Base exception related to a :class:`weaver.datatype.Bill`.

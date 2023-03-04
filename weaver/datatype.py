@@ -12,6 +12,7 @@ import traceback
 import uuid
 import warnings
 from datetime import datetime, timedelta
+from decimal import ConversionSyntax, Decimal
 from io import BytesIO
 from logging import ERROR, INFO, Logger, getLevelName, getLogger
 from secrets import compare_digest, token_hex
@@ -88,6 +89,7 @@ if TYPE_CHECKING:
         JSON,
         Link,
         Metadata,
+        Price,
         QuoteProcessParameters,
         QuoteProcessResults,
         Statistics
@@ -801,7 +803,9 @@ class Job(Base):
 
     @service.setter
     def service(self, service):
-        # type: (Optional[str]) -> None
+        # type: (Optional[AnyServiceRef]) -> None
+        if isinstance(service, Service):
+            service = service.id
         if not isinstance(service, str) or service is None:
             raise TypeError(f"Type 'str' is required for '{self.__name__}.service'")
         self["service"] = service
@@ -819,7 +823,9 @@ class Job(Base):
 
     @process.setter
     def process(self, process):
-        # type: (Optional[str]) -> None
+        # type: (Optional[AnyProcessRef]) -> None
+        if isinstance(process, Process):
+            process = process.id
         if not isinstance(process, str) or process is None:
             raise TypeError(f"Type 'str' is required for '{self.__name__}.process'")
         self["process"] = process
@@ -2835,36 +2841,49 @@ class Quote(Base):
         self["results"] = data
 
     @property
-    def price(self):
-        # type: () -> float  # FIXME: decimal?
+    def amount(self):
+        # type: () -> Decimal
         """
-        Price of the current quote.
+        amount of the current quote.
         """
-        return self.get("price", 0.0)
+        return Decimal(str(self.get("amount", "0.0")))
 
-    @price.setter
-    def price(self, price):
-        # type: (float) -> None
-        if not isinstance(price, float):
-            raise ValueError(f"Field '{self.__name__}.price' must be a floating point number.")
-        self["price"] = price
+    @amount.setter
+    def amount(self, amount):
+        # type: (Union[Decimal, float, str]) -> None
+        if not isinstance(amount, Decimal):
+            try:
+                amount = Decimal(str(amount))
+            except (ConversionSyntax, ValueError, TypeError):
+                raise ValueError(f"Field '{self.__name__}.amount' must be a floating point number.")
+        self["amount"] = amount
 
     @property
     def currency(self):
-        # type: () -> Optional[str]
+        # type: () -> str
         """
         Currency of the quote price.
         """
         currency = self.get("currency")
-        if not self.price:  # zero/undefined price valid to have no currency
-            return currency
-        return currency or "CAN"    # some default if not specified but price is defined
+        return currency or "USD"
 
     @currency.setter
     def currency(self, currency):
+        # type: (str) -> None
         if not isinstance(currency, str) or not re.match(r"^[A-Z]{3}$", currency):
             raise ValueError(f"Field '{self.__name__}.currency' must be an ISO-4217 currency string code.")
         self["currency"] = currency
+
+    @property
+    def price(self):
+        # type: () -> Price
+        return {"amount": self.amount, "currency": self.currency}
+
+    @price.setter
+    def price(self, price):
+        # type: (Price) -> None
+        self.amount = price["amount"]
+        self.currency = price["currency"]
 
     expire = LocalizedDateTimeProperty(doc="Quote expiration datetime.")
     created = LocalizedDateTimeProperty(doc="Quote creation datetime.", default_now=True)
@@ -2884,7 +2903,6 @@ class Quote(Base):
             "detail": self.detail,
             "status": self.status,
             "price": self.price,
-            "currency": self.currency,
             "user": self.user,
             "process": self.process,
             "steps": self.steps,

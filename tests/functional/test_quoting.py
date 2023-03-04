@@ -25,7 +25,7 @@ def mocked_estimate_process_quote(quote, process):  # noqa
     """
     quote.seconds = int(random.uniform(5, 60) * 60 + random.uniform(5, 60))  # nosec: B311
     quote.price = float(random.uniform(0, 100) * quote.seconds)              # nosec: B311
-    quote.currency = "CAD"
+    quote.currency = "USD"
     return quote
 
 

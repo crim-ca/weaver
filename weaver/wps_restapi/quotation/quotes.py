@@ -17,6 +17,7 @@ from weaver.processes.utils import get_process
 from weaver.processes.types import ProcessType
 from weaver.quotation.estimation import (
     execute_quote_estimator,
+    get_currency,
     get_quote_estimator_config,
     validate_quote_estimator_config
 )
@@ -68,15 +69,18 @@ def request_quote(request):
 
     quote_store = get_db(request).get_store(StoreQuotes)
     quote_user = request.authenticated_userid  # FIXME: consider other methods to provide the user
+    quote_currency = get_currency(request)
     quote_info = {
         "process": process.id,
         "processParameters": process_params,
-        "user": quote_user
+        "user": quote_user,
+        "currency": quote_currency,
     }
     quote = Quote(**quote_info)
     quote = quote_store.save_quote(quote)
-    max_wait = as_int(settings.get("weaver.quote_sync_max_wait"), default=20)
-    mode, wait, applied = parse_prefer_header_execute_mode(request.headers, process.jobControlOptions, max_wait)
+    quote_max_wait = settings.get("weaver.quotation_sync_max_wait", settings.get("weaver.quote_sync_max_wait"))
+    quote_max_wait = as_int(quote_max_wait, default=20)
+    mode, wait, applied = parse_prefer_header_execute_mode(request.headers, process.jobControlOptions, quote_max_wait)
 
     result = execute_quote_estimator.delay(quote.id)
     LOGGER.debug("Celery pending task [%s] for quote [%s].", result.id, quote.id)

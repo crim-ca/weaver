@@ -639,8 +639,9 @@ def submit_job_handler(payload,             # type: ProcessExecution
         job_ctl_opts = process.jobControlOptions
     else:
         job_ctl_opts = ExecuteControlOption.values()
-    max_wait = as_int(settings.get("weaver.exec_sync_max_wait"), default=20)
-    mode, wait, applied = parse_prefer_header_execute_mode(headers, job_ctl_opts, max_wait)
+    exec_max_wait = settings.get("weaver.execute_sync_max_wait", settings.get("weaver.exec_sync_max_wait"))
+    exec_max_wait = as_int(exec_max_wait, default=20)
+    mode, wait, applied = parse_prefer_header_execute_mode(headers, job_ctl_opts, exec_max_wait)
     get_header("prefer", headers, pop=True)  # don't care about value, just ensure removed with any header container
     if not applied:  # whatever returned is a default, consider 'mode' in body as alternative
         is_execute_async = ExecuteMode.get(json_body.get("mode")) != ExecuteMode.SYNC   # convert auto to async

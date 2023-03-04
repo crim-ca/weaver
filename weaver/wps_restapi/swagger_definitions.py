@@ -3631,10 +3631,31 @@ class PartialQuoteSchema(ExtendedMappingSchema):
     processID = ProcessIdentifierTag(description="Process identifier corresponding to the quote definition.")
 
 
-class Price(ExtendedSchemaNode):
-    schema_type = Money
-    # not official, but common (https://github.com/OAI/OpenAPI-Specification/issues/845#issuecomment-378139730)
-    format = "decimal"
+class PriceAmount(ExtendedSchemaNode):
+    schema_type = Money()
+    format = "decimal"  # https://github.com/OAI/OpenAPI-Specification/issues/845#issuecomment-378139730
+    description = "Monetary value of the price."
+    validator = Range(min=0)
+
+
+class PriceCurrency(ExtendedSchemaNode):
+    schema_type = String()
+    validator = Length(min=3, max=3)
+    description = "Currency code in ISO-4217 format."
+    default = "USD"  # most common online
+
+
+class PriceSchema(ExtendedMappingSchema):
+    amount = PriceAmount()
+    currency = PriceCurrency()
+
+    def __json__(self, value):
+        """
+        Handler for :mod:`pyramid` and :mod:`webob` if the object reaches the JSON serializer.
+
+        Combined with :mod:`simplejson` to automatically handle :class:`Decimal` conversion.
+        """
+        return super().deserialize(value)
 
 
 class QuoteProcessParameters(PermissiveMappingSchema, ExecuteInputOutputs):
@@ -3677,7 +3698,7 @@ class UserIdSchema(OneOfKeywordSchema):
 
 class StepQuotation(PartialQuoteSchema):
     detail = ExtendedSchemaNode(String(), description="Detail about quote processing.", missing=None)
-    price = Price(description="Estimated price for process execution.")
+    price = PriceSchema(description="Estimated price for process execution.")
     currency = ExtendedSchemaNode(String(), description="Currency code in ISO-4217 format.", missing=None)
     expire = ExtendedSchemaNode(DateTime(), description="Expiration date and time of the quote in ISO-8601 format.")
     created = ExtendedSchemaNode(DateTime(), description="Creation date and time of the quote in ISO-8601 format.")
@@ -3708,11 +3729,11 @@ class QuoteStepReferenceList(ExtendedSequenceSchema):
 
 class QuoteSummary(PartialQuoteSchema):
     steps = QuoteStepReferenceList()
-    total = Price(description="Total of the quote including step processes if applicable.")
+    total = PriceSchema(description="Total of the quote including step processes if applicable.")
 
 
 class QuoteSchema(Quotation):
-    total = Price(description="Total of the quote including step processes if applicable.")
+    total = PriceSchema(description="Total of the quote including step processes if applicable.")
 
 
 class QuotationList(ExtendedSequenceSchema):
@@ -3728,8 +3749,7 @@ class BillSchema(ExtendedMappingSchema):
     quoteID = UUID(description="Original quote ID that produced this bill.", missing=drop)
     title = ExtendedSchemaNode(String(), description="Name of the bill.")
     description = ExtendedSchemaNode(String(), missing=drop)
-    price = Price(description="Price associated to the bill.")
-    currency = ExtendedSchemaNode(String(), description="Currency code in ISO-4217 format.")
+    price = PriceSchema(description="Price associated to the bill.")
     created = ExtendedSchemaNode(DateTime(), description="Creation date and time of the bill in ISO-8601 format.")
     userID = ExtendedSchemaNode(Integer(), description="User id that requested the quote.")
 

@@ -1414,7 +1414,7 @@ def setup_cache(settings):
             cache_val = settings.get(key)
             settings.setdefault(cache_key, cache_val)
     # apply defaults to avoid missing items during runtime
-    settings.setdefault("cache.regions", "doc, request, result")
+    settings["cache.regions"] = "doc, request, result, quotation"
     settings.setdefault("cache.type", "memory")
     settings.setdefault("cache.doc.enable", "false")
     settings.setdefault("cache.doc.expired", "3600")
@@ -1422,6 +1422,8 @@ def setup_cache(settings):
     settings.setdefault("cache.request.expire", "60")
     settings.setdefault("cache.result.enabled", "false")
     settings.setdefault("cache.result.expire", "3600")
+    settings.setdefault("cache.quotation.enabled", "true")
+    settings.setdefault("cache.quotation.expire", "3600")  # consider API limits and rate-limiting, caching for 1h
     set_cache_regions_from_settings(settings)
 
 

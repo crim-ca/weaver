@@ -535,7 +535,7 @@ class ExtendedInteger(ExtendedNumber, colander.Integer):
         #    (e.g.: float("1.23").is_integer() -> False, but still not a float)
         #  - furthermore, True/False are considered 'int', so must double check for 'bool'
         if not isinstance(num, int) or isinstance(num, bool):
-            raise ValueError("Value is not a Integer number (Boolean, Float and String not allowed).")
+            raise ValueError("Value is not an Integer number (Boolean, Float and String not allowed).")
         return num
 
     def serialize(self, node, appstruct):
@@ -2383,7 +2383,7 @@ class DecimalTypeConverter(NumberTypeConverter):
 
 
 class MoneyTypeConverter(DecimalTypeConverter):
-    pattern = re.compile("^[0-9]+.[0-9]{2}$")
+    pattern = re.compile("^[0-9]+.[0-9]+$")
     convert_validator = ValidatorConversionDispatcher(
         convert_range_validator(colander.Range(min=0)),
         convert_regex_validator(colander.Regex(pattern, msg="Number must be formatted as currency decimal."))
