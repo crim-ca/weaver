@@ -1119,12 +1119,12 @@ def test_convert_input_values_schema_from_ogc():
             "long",
             "more"
         ],
-        "test15": [
+        "test14": [
             {"href": "https://www.somewebsite.com/dir1/", "type": "application/directory"},
             {"href": "https://www.somewebsite.com/dir2/", "type": "application/directory"},
             {"href": "https://www.somewebsite.com/dir3/", "type": "application/directory"}
         ],
-        "test16": [
+        "test15": [
             1,
             ["val1", "val2", "val3"],
             "short",
@@ -1155,13 +1155,13 @@ def test_convert_input_values_schema_from_ogc():
         {"id": "test13", "value": "short"},
         {"id": "test13", "value": "long"},
         {"id": "test13", "value": "more"},
-        {"id": "test15", "href": "https://www.somewebsite.com/dir1/", "type": "application/directory"},
-        {"id": "test15", "href": "https://www.somewebsite.com/dir2/", "type": "application/directory"},
-        {"id": "test15", "href": "https://www.somewebsite.com/dir3/", "type": "application/directory"},
-        {"id": "test16", "value": 1},
-        {"id": "test16", "value": ["val1", "val2", "val3"]},
-        {"id": "test16", "value": "short"},
-        {"id": "test16", "href": "https://www.somewebsite.com/dir1/", "type": "application/directory"}
+        {"id": "test14", "href": "https://www.somewebsite.com/dir1/", "type": "application/directory"},
+        {"id": "test14", "href": "https://www.somewebsite.com/dir2/", "type": "application/directory"},
+        {"id": "test14", "href": "https://www.somewebsite.com/dir3/", "type": "application/directory"},
+        {"id": "test15", "value": 1},
+        {"id": "test15", "value": ["val1", "val2", "val3"]},
+        {"id": "test15", "value": "short"},
+        {"id": "test15", "href": "https://www.somewebsite.com/dir1/", "type": "application/directory"}
     ]
     assert convert_input_values_schema(inputs_ogc, ProcessSchema.OGC) == inputs_ogc
     assert convert_input_values_schema(inputs_ogc, ProcessSchema.OLD) == inputs_old
