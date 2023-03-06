@@ -1033,6 +1033,17 @@ def test_convert_input_values_schema_from_old():
         {"id": "test12", "href": "/data/file1.txt", "format": {"mediaType": "text/plain"}},
         {"id": "test12", "href": "/data/file2.txt", "format": {"mediaType": "text/plain"}},
         {"id": "test12", "href": "/data/file3.txt", "format": {"mediaType": "text/plain"}},
+        {"id": "test13", "value": "short"},
+        {"id": "test13", "value": "long"},
+        {"id": "test13", "value": "more"},
+        {"id": "test14", "value": ["val1", "val2", "val3"]},
+        {"id": "test15", "href": "https://www.somewebsite.com/dir1/", "type": "application/directory"},
+        {"id": "test15", "href": "https://www.somewebsite.com/dir2/", "type": "application/directory"},
+        {"id": "test15", "href": "https://www.somewebsite.com/dir3/", "type": "application/directory"},
+        {"id": "test16", "value": 1},
+        {"id": "test16", "value": ["val1", "val2", "val3"]},
+        {"id": "test16", "value": "short"},
+        {"id": "test16", "href": "https://www.somewebsite.com/dir1/", "type": "application/directory"}
     ]
     inputs_ogc = {
         "test1": "data",
@@ -1053,8 +1064,31 @@ def test_convert_input_values_schema_from_old():
             {"href": "/data/file1.txt", "format": {"mediaType": "text/plain"}},
             {"href": "/data/file2.txt", "format": {"mediaType": "text/plain"}},
             {"href": "/data/file3.txt", "format": {"mediaType": "text/plain"}}
+        ],
+        "test13": [
+            "short",
+            "long",
+            "more"
+        ],
+        "test14": [
+            "val1",
+            "val2",
+            "val3",
+        ],
+        "test15": [
+            {"href": "https://www.somewebsite.com/dir1/", "type": "application/directory"},
+            {"href": "https://www.somewebsite.com/dir2/", "type": "application/directory"},
+            {"href": "https://www.somewebsite.com/dir3/", "type": "application/directory"}
+        ],
+        "test16": [
+            1,
+            ["val1", "val2", "val3"],
+            "short",
+            {"href": "https://www.somewebsite.com/dir1/",
+             "type": "application/directory"}
         ]
     }
+
     assert convert_input_values_schema(inputs_old, ProcessSchema.OLD) == inputs_old
     assert convert_input_values_schema(inputs_old, ProcessSchema.OGC) == inputs_ogc
 
@@ -1079,6 +1113,23 @@ def test_convert_input_values_schema_from_ogc():
             {"href": "/data/file1.txt", "format": {"mediaType": "text/plain"}},
             {"href": "/data/file2.txt", "format": {"mediaType": "text/plain"}},
             {"href": "/data/file3.txt", "format": {"mediaType": "text/plain"}}
+        ],
+        "test13": [
+            "short",
+            "long",
+            "more"
+        ],
+        "test15": [
+            {"href": "https://www.somewebsite.com/dir1/", "type": "application/directory"},
+            {"href": "https://www.somewebsite.com/dir2/", "type": "application/directory"},
+            {"href": "https://www.somewebsite.com/dir3/", "type": "application/directory"}
+        ],
+        "test16": [
+            1,
+            ["val1", "val2", "val3"],
+            "short",
+            {"href": "https://www.somewebsite.com/dir1/",
+             "type": "application/directory"}
         ]
     }
     inputs_old = [
@@ -1101,7 +1152,63 @@ def test_convert_input_values_schema_from_ogc():
         {"id": "test12", "href": "/data/file1.txt", "format": {"mediaType": "text/plain"}},
         {"id": "test12", "href": "/data/file2.txt", "format": {"mediaType": "text/plain"}},
         {"id": "test12", "href": "/data/file3.txt", "format": {"mediaType": "text/plain"}},
+        {"id": "test13", "value": "short"},
+        {"id": "test13", "value": "long"},
+        {"id": "test13", "value": "more"},
+        {"id": "test15", "href": "https://www.somewebsite.com/dir1/", "type": "application/directory"},
+        {"id": "test15", "href": "https://www.somewebsite.com/dir2/", "type": "application/directory"},
+        {"id": "test15", "href": "https://www.somewebsite.com/dir3/", "type": "application/directory"},
+        {"id": "test16", "value": 1},
+        {"id": "test16", "value": ["val1", "val2", "val3"]},
+        {"id": "test16", "value": "short"},
+        {"id": "test16", "href": "https://www.somewebsite.com/dir1/", "type": "application/directory"}
     ]
+    assert convert_input_values_schema(inputs_ogc, ProcessSchema.OGC) == inputs_ogc
+    assert convert_input_values_schema(inputs_ogc, ProcessSchema.OLD) == inputs_old
+
+
+@pytest.mark.xfail(reason="Expected to fail as conversion is probably not standard compliant")
+def test_convert_input_values_schema_from_old_xfail():
+    inputs_old = [
+        {
+            "id": "test1",
+            "href": ["https://www.somewebsite.com/dir1/",
+                     "https://www.somewebsite.com/dir2/",
+                     "https://www.somewebsite.com/dir3/"],
+            "type": "application/directory"
+        }
+    ]
+
+    inputs_ogc = {
+        "test1": {"href": ["https://www.somewebsite.com/dir1/",
+                           "https://www.somewebsite.com/dir2/",
+                           "https://www.somewebsite.com/dir3/"],
+                  "type": "application/directory"}
+    }
+
+    assert convert_input_values_schema(inputs_old, ProcessSchema.OLD) == inputs_old
+    assert convert_input_values_schema(inputs_old, ProcessSchema.OGC) == inputs_ogc
+
+
+@pytest.mark.xfail(reason="Expected to fail as conversion is probably not standard compliant")
+def test_convert_input_values_schema_from_ogc_xfail():
+    inputs_ogc = {
+        "test1": {"href": ["https://www.somewebsite.com/dir1/",
+                           "https://www.somewebsite.com/dir2/",
+                           "https://www.somewebsite.com/dir3/"],
+                  "type": "application/directory"}
+    }
+
+    inputs_old = [
+        {
+            "id": "test1",
+            "href": ["https://www.somewebsite.com/dir1/",
+                     "https://www.somewebsite.com/dir2/",
+                     "https://www.somewebsite.com/dir3/"],
+            "type": "application/directory"
+        }
+    ]
+
     assert convert_input_values_schema(inputs_ogc, ProcessSchema.OGC) == inputs_ogc
     assert convert_input_values_schema(inputs_ogc, ProcessSchema.OLD) == inputs_old
 
