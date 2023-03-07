@@ -36,6 +36,7 @@ Fixes:
 - Fix filtered warnings for expected cases during tests.
 - Fix a problem with ``convert_input_values_schema`` under the `OGC` schema, that caused the conversion to malfunction
   when the function built lists for repeated input IDs of more than two elements.
+- Fix `XML` security vulnerability from ``owslib<0.28.1``.
 
 .. _changes_4.28.0:
 
