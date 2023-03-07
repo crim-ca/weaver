@@ -1429,7 +1429,10 @@ def convert_input_values_schema(inputs, schema):
             else:
                 # when repeated input ID are found, they must be regrouped as list under that ID
                 input_prev = input_dict[input_id]
-                input_dict[input_id] = [input_prev, input_data]
+                if not isinstance(input_prev, list):
+                    input_prev = [input_prev]
+                input_prev.append(input_data)
+                input_dict[input_id] = input_prev
         return input_dict
     if schema == ProcessSchema.OLD:
         input_list = []
