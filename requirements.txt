@@ -64,7 +64,7 @@ mistune>=2.0.3,<2.1
 mypy_boto3_s3
 # esgf-compute-api (cwt) needs oauthlib but doesn't add it in their requirements
 oauthlib
-owslib==0.27.2
+owslib==0.28.1
 psutil
 # FIXME: pymongo>=4 breaks with kombu corresponding to pinned Celery
 # - https://github.com/crim-ca/weaver/issues/386
