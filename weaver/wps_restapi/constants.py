@@ -20,16 +20,6 @@ class ConformanceCategory(Constants):
     REQUIREMENT = "req"
 
 
-class JobInputsOutputsSchema(Constants):
-    """
-    Schema selector to represent a :term:`Job` output results.
-    """
-    OGC_STRICT = "ogc+strict"
-    OLD_STRICT = "old+strict"
-    OGC = "ogc"
-    OLD = "old"
-
-
 if TYPE_CHECKING:
     from weaver.typedefs import Literal
 
@@ -39,11 +29,4 @@ if TYPE_CHECKING:
         ConformanceCategory.PERMISSION,
         ConformanceCategory.RECOMMENDATION,
         ConformanceCategory.REQUIREMENT,
-    ]
-
-    JobInputsOutputsSchemaType = Literal[
-        JobInputsOutputsSchema.OGC_STRICT,
-        JobInputsOutputsSchema.OLD_STRICT,
-        JobInputsOutputsSchema.OGC,
-        JobInputsOutputsSchema.OLD
     ]

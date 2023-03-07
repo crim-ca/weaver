@@ -20,8 +20,13 @@ from weaver.formats import AcceptLanguage, ContentType, clean_mime_type_format
 from weaver.notify import encrypt_email, notify_job_complete
 from weaver.owsexceptions import OWSInvalidParameterValue, OWSNoApplicableCode
 from weaver.processes import wps_package
-from weaver.processes.constants import WPS_COMPLEX_DATA
-from weaver.processes.convert import get_field, normalize_ordered_io, ows2json_output_data
+from weaver.processes.constants import WPS_COMPLEX_DATA, JobInputsOutputsSchema
+from weaver.processes.convert import (
+    convert_input_values_schema,
+    convert_output_params_schema,
+    get_field,
+    ows2json_output_data
+)
 from weaver.processes.types import ProcessType
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.store.base import StoreJobs, StoreProcesses
@@ -726,8 +731,8 @@ def validate_process_io(process, payload):
     :returns: None
     :raises HTTPException: Corresponding error for detected invalid combination of inputs or outputs.
     """
-    payload_inputs = normalize_ordered_io(payload.get("inputs", {}), literal_value_key="value")
-    payload_outputs = normalize_ordered_io(payload.get("outputs", {}), literal_value_key="value")
+    payload_inputs = convert_input_values_schema(payload.get("inputs", {}), JobInputsOutputsSchema.OLD)
+    payload_outputs = convert_output_params_schema(payload.get("outputs", {}), JobInputsOutputsSchema.OLD)
 
     for io_type, io_payload, io_process in [
         ("inputs", payload_inputs, process.inputs),

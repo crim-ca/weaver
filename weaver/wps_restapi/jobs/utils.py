@@ -33,6 +33,7 @@ from weaver.exceptions import (
 from weaver.execute import ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import ContentType, get_format, repr_json
 from weaver.owsexceptions import OWSNoApplicableCode, OWSNotFound
+from weaver.processes.constants import JobInputsOutputsSchema
 from weaver.processes.convert import any2wps_literal_datatype, convert_output_params_schema, get_field
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
@@ -50,7 +51,6 @@ from weaver.utils import (
 from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_output_dir, get_wps_output_url, map_wps_output_location
 from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.constants import JobInputsOutputsSchema
 from weaver.wps_restapi.processes.utils import resolve_process_tag
 from weaver.wps_restapi.providers.utils import forbid_local_only
 
@@ -73,7 +73,7 @@ if TYPE_CHECKING:
         PyramidRequest,
         SettingsType
     )
-    from weaver.wps_restapi.constants import JobInputsOutputsSchemaType
+    from weaver.processes.constants import JobInputsOutputsSchemaType
 
 LOGGER = get_task_logger(__name__)
 

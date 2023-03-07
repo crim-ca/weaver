@@ -1,5 +1,4 @@
 import copy
-import json
 import logging
 import tempfile
 import time
@@ -18,7 +17,8 @@ from weaver.database import get_db
 from weaver.exceptions import QuoteConversionError, QuoteEstimationError, QuoteException
 from weaver.formats import ContentType
 from weaver.owsexceptions import OWSInvalidParameterValue
-from weaver.processes.convert import normalize_ordered_io
+from weaver.processes.constants import JobInputsOutputsSchema
+from weaver.processes.convert import convert_input_values_schema, convert_output_params_schema, normalize_ordered_io
 from weaver.processes.types import ProcessType
 from weaver.processes.wps_package import get_package_workflow_steps, get_process_location
 from weaver.processes.utils import pull_docker
@@ -109,17 +109,42 @@ def prepare_quote_estimator_config(quote, process):
     values directly. Weights are retrieved from the process configuration, but must be joined along inputs definition.
 
     .. seealso::
-        https://github.com/crim-ca/weaver/blob/master/schemas/quote-estimator.yaml
+        https://github.com/crim-ca/weaver/blob/master/weaver/schemas/quote-estimator.yaml
     """
-    quotation_inputs = normalize_ordered_io(quote.parameters)
+    process_input_types = {get_any_id(input_def): input_def["type"] for input_def in process.inputs}
+    quotation_inputs = convert_input_values_schema(quote.parameters.get("inputs", {}), JobInputsOutputsSchema.OGC)
     estimator_config = copy.deepcopy(process.estimator)
-    process.inputs
     estimator_inputs = estimator_config.get("inputs", {})
-    for input_param in quotation_inputs:
-        input_id = get_any_id(input_param)
-        input_val = get_any_value(input_param)
+    # Estimators are allowed to use different IDs than the process IDs, as long as they define a relevant mapping.
+    # Avoid checking all estimator mappings, simply provide all inputs, and let them pick-and-choose what they need.
+    for input_id, input_param in quotation_inputs.items():
+        input_key = get_any_value(input_param, key=True)
+        input_val = input_param[input_key]
         estimator_inputs.setdefault(input_id, {"weight": 1.0})
-        estimator_inputs[input_id]
+        input_type = process_input_types[input_id]
+        if input_type == "literal" and input_key in ["data", "value"]:
+            estimator_inputs[input_id]["value"] = input_val
+        elif input_type == "complex" and input_key == "href":
+            estimator_inputs[input_id]
+        else:  # pragma: no cover
+            raise NotImplementedError(
+                "Quote estimator input combination not supported: "
+                f"(type: {input_type}, key: {input_key}, id: {input_id})"
+            )
+
+
+        estimator_inputs[input_id] =
+
+    # FIXME: handle quotation outputs (?)
+    #   Quotation output are only pseudo-definitions for chaining applications in a Workflow
+    #   (i.e.: for providing the next process's quotation inputs).
+    #   There is no way to do this at the moment, as submitted execution/quotation outputs are "requested" outputs
+    #   (transmission mode, format, etc.) and not "expected" outputs (value/href).
+
+    # process_output_types = {get_any_id(i_def): i_def["type"] for i_def in process.outputs}
+    # quotation_outputs = convert_output_params_schema(quote.parameters.get("outputs", {}), JobInputsOutputsSchema.OGC)
+
+    return estimator_config
 
 
 def get_currency(request=None):

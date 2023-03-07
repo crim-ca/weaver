@@ -57,6 +57,7 @@ from weaver.processes.constants import (
     PACKAGE_ENUM_BASE,
     PACKAGE_TYPE_POSSIBLE_VALUES,
     WPS_LITERAL_DATA_TYPES,
+    JobInputsOutputsSchema,
     ProcessSchema
 )
 from weaver.quotation.status import QuoteStatus
@@ -90,7 +91,7 @@ from weaver.wps_restapi.colander_extras import (
     StringRange,
     XMLObject
 )
-from weaver.wps_restapi.constants import ConformanceCategory, JobInputsOutputsSchema
+from weaver.wps_restapi.constants import ConformanceCategory
 from weaver.wps_restapi.patches import ServiceOnlyExplicitGetHead as Service  # warning: don't use 'cornice.Service'
 
 if TYPE_CHECKING:
@@ -156,7 +157,7 @@ OGC_API_PROC_PART1_PARAMETERS = f"{OGC_API_PROC_PART1}/openapi/parameters"
 OGC_API_PROC_PART1_EXAMPLES = f"{OGC_API_PROC_PART1}/examples"
 
 WEAVER_SCHEMA_VERSION = "master"
-WEAVER_SCHEMA_URL = f"https://raw.githubusercontent.com/crim-ca/weaver/{WEAVER_SCHEMA_VERSION}/schemas"
+WEAVER_SCHEMA_URL = f"https://raw.githubusercontent.com/crim-ca/weaver/{WEAVER_SCHEMA_VERSION}/weaver/schemas"
 
 DATETIME_INTERVAL_CLOSED_SYMBOL = "/"
 DATETIME_INTERVAL_OPEN_START_SYMBOL = "../"

@@ -1,5 +1,5 @@
 ---
-$id: https://raw.githubusercontent.com/crim-ca/weaver/master/schemas/quotation/quote-estimator.yaml
+$id: "https://github.com/crim-ca/weaver/schemas/quotation/quote-estimator.yaml"
 $schema: http://json-schema.org/draft-07/schema#
 title: Parameters
 description: |

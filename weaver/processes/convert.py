@@ -10,7 +10,7 @@ from collections.abc import Hashable
 from copy import deepcopy
 from dataclasses import dataclass
 from tempfile import TemporaryDirectory
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, overload
 from urllib.parse import unquote, urlparse
 
 import colander
@@ -74,6 +74,7 @@ from weaver.processes.constants import (
     WPS_LITERAL_DATA_TYPES,
     WPS_OUTPUT,
     WPS_REFERENCE,
+    JobInputsOutputsSchema,
     ProcessSchema
 )
 from weaver.utils import (
@@ -94,7 +95,7 @@ from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional, Tuple, Type, Union
-    from typing_extensions import Literal, NotRequired, Required, TypedDict
+    from typing_extensions import Literal, NoReturn, NotRequired, Required, TypedDict
     from urllib.parse import ParseResult
 
     from pywps.app import WPSRequest
@@ -108,7 +109,7 @@ if TYPE_CHECKING:
     )
     from requests.models import Response
 
-    from weaver.processes.constants import ProcessSchemaType, WPS_DataType
+    from weaver.processes.constants import JobInputsOutputsSchemaType, ProcessSchemaType, WPS_DataType
     from weaver.typedefs import (
         AnySettingsContainer,
         AnyValueType,
@@ -122,7 +123,10 @@ if TYPE_CHECKING:
         CWL_Output_Type,
         ExecutionInputs,
         ExecutionInputsList,
+        ExecutionInputsMap,
         ExecutionOutputs,
+        ExecutionOutputsList,
+        ExecutionOutputsMap,
         JobValueFile,
         JSON,
         OpenAPISchema,
@@ -132,7 +136,6 @@ if TYPE_CHECKING:
         OpenAPISchemaProperty,
         OpenAPISchemaReference
     )
-    from weaver.wps_restapi.constants import JobInputsOutputsSchemaType
 
     # typing shortcuts
     # pylint: disable=C0103,invalid-name
@@ -1405,29 +1408,51 @@ def cwl2json_input_values(data, schema=ProcessSchema.OGC):
     return convert_input_values_schema(inputs, ProcessSchema.OLD)
 
 
+@overload
+def convert_input_values_schema(inputs, schema):
+    # type: (ExecutionInputs, Literal[JobInputsOutputsSchema.OGC]) -> ExecutionInputsMap
+    ...
+
+
+@overload
+def convert_input_values_schema(inputs, schema):
+    # type: (ExecutionInputs, Literal[JobInputsOutputsSchema.OLD]) -> ExecutionInputsList
+    ...
+
+
+@overload
+def convert_input_values_schema(inputs, schema):
+    # type: (ExecutionInputs, Literal[JobInputsOutputsSchema.WPS]) -> NoReturn
+    ...
+
+
 def convert_input_values_schema(inputs, schema):
     # type: (ExecutionInputs, JobInputsOutputsSchemaType) -> ExecutionInputs
     """
     Convert execution input values between equivalent formats.
+
+    .. seealso::
+        - :func:`convert_output_params_schema`
+        - :func:`normalize_ordered_io` for I/O definitions.
 
     :param inputs: Inputs to convert.
     :param schema: Desired schema.
     :return: Converted inputs.
     """
     if isinstance(schema, str):
-        schema = schema.upper()
+        schema = schema.lower().split("+", 1)[0]
     if (
-        (schema == ProcessSchema.OGC and isinstance(inputs, dict)) or
-        (schema == ProcessSchema.OLD and isinstance(inputs, list))
+        (schema == JobInputsOutputsSchema.OGC and isinstance(inputs, dict)) or
+        (schema == JobInputsOutputsSchema.OLD and isinstance(inputs, list))
     ):
         return inputs
     if (
-        (schema == ProcessSchema.OGC and not isinstance(inputs, list)) or
-        (schema == ProcessSchema.OLD and not isinstance(inputs, dict))
+        (schema == JobInputsOutputsSchema.OGC and not isinstance(inputs, list)) or
+        (schema == JobInputsOutputsSchema.OLD and not isinstance(inputs, dict))
     ):
         name = fully_qualified_name(inputs)
         raise ValueError(f"Unknown conversion method to schema [{schema}] for inputs of type [{name}]: {inputs}")
-    if schema == ProcessSchema.OGC:
+    if schema == JobInputsOutputsSchema.OGC:
         input_dict = {}
         for input_item in inputs:
             input_id = get_any_id(input_item, pop=True)
@@ -1446,7 +1471,7 @@ def convert_input_values_schema(inputs, schema):
                 input_prev.append(input_data)
                 input_dict[input_id] = input_prev
         return input_dict
-    if schema == ProcessSchema.OLD:
+    if schema == JobInputsOutputsSchema.OLD:
         input_list = []
         for input_id, input_value in inputs.items():
             # list must be flattened with repeating ID
@@ -1471,6 +1496,24 @@ def convert_input_values_schema(inputs, schema):
     raise NotImplementedError(f"Unknown conversion format of input values for schema: [{schema}]")
 
 
+@overload
+def convert_output_params_schema(inputs, schema):
+    # type: (ExecutionOutputs, Literal[JobInputsOutputsSchema.OGC]) -> ExecutionOutputsMap
+    ...
+
+
+@overload
+def convert_output_params_schema(inputs, schema):
+    # type: (ExecutionOutputs, Literal[JobInputsOutputsSchema.OLD]) -> ExecutionOutputsList
+    ...
+
+
+@overload
+def convert_output_params_schema(inputs, schema):
+    # type: (ExecutionOutputs, Literal[JobInputsOutputsSchema.WPS]) -> NoReturn
+    ...
+
+
 def convert_output_params_schema(outputs, schema):
     # type: (ExecutionOutputs, JobInputsOutputsSchemaType) -> ExecutionOutputs
     """
@@ -1480,30 +1523,34 @@ def convert_output_params_schema(outputs, schema):
         These outputs are not *values* (i.e.: *results*), but *submitted* :term:`Job` outputs for return definitions.
         Contents are transferred as-is without any consideration of ``value`` or ``href`` fields.
 
+    .. seealso::
+        - :func:`convert_input_values_schema`
+        - :func:`normalize_ordered_io` for I/O definitions.
+
     :param outputs: Outputs to convert.
     :param schema: Desired schema.
     :return: Converted outputs.
     """
     if isinstance(schema, str):
-        schema = schema.upper()
+        schema = schema.lower().split("+")[0]
     if (
-        (schema == ProcessSchema.OGC and isinstance(outputs, dict)) or
-        (schema == ProcessSchema.OLD and isinstance(outputs, list))
+        (schema == JobInputsOutputsSchema.OGC and isinstance(outputs, dict)) or
+        (schema == JobInputsOutputsSchema.OLD and isinstance(outputs, list))
     ):
         return outputs
     if (
-        (schema == ProcessSchema.OGC and not isinstance(outputs, list)) or
-        (schema == ProcessSchema.OLD and not isinstance(outputs, dict))
+        (schema == JobInputsOutputsSchema.OGC and not isinstance(outputs, list)) or
+        (schema == JobInputsOutputsSchema.OLD and not isinstance(outputs, dict))
     ):
         name = fully_qualified_name(outputs)
         raise ValueError(f"Unknown conversion method to schema [{schema}] for outputs of type [{name}]: {outputs}")
-    if schema == ProcessSchema.OGC:
+    if schema == JobInputsOutputsSchema.OGC:
         out_dict = {}
         for out in outputs:
             out_id = get_any_id(out, pop=True)
             out_dict[out_id] = out
         return out_dict
-    if schema == ProcessSchema.OLD:
+    if schema == JobInputsOutputsSchema.OLD:
         out_list = [{"id": out} for out in outputs]
         for out in out_list:
             out.update(outputs[out["id"]])
@@ -2952,8 +2999,8 @@ def is_equal_formats(format1, format2):
     return False
 
 
-def normalize_ordered_io(io_section, order_hints=None, literal_value_key="type", literal_value_types=(str, )):
-    # type: (JSON_IO_ListOrMap, Optional[JSON_IO_ListOrMap], Literal["type", "value"], Tuple[Type, ...]) -> List[JSON]
+def normalize_ordered_io(io_section, order_hints=None):
+    # type: (JSON_IO_ListOrMap, Optional[JSON_IO_ListOrMap]) -> List[JSON]
     """
     Reorders and converts I/O from any representation (:class:`dict` or :class:`list`) considering given ordering hints.
 
@@ -2976,16 +3023,15 @@ def normalize_ordered_io(io_section, order_hints=None, literal_value_key="type",
         Prior to Python 3.7 or CPython 3.5, preserved order is not guaranteed for *builtin* :class:`dict`.
         In this case the :paramref:`order_hints` is required to ensure same order.
 
-    When normalizing inputs into objects, any literal value detected within the normalized list will be converted into
-    consistent JSON objects. The objects will minimally contain the I/O ``id`` and the applicable literal value key.
+    This function is intended for parsing I/O from :term:`Process` descriptions, :term:`Application Package` and other
+    definitions that employ a ``"type"`` field. For submitted execution I/O values, refer to other relevant functions.
+
+    .. seealso::
+        - :func:`convert_input_values_schema`
+        - :func:`convert_output_params_schema`
 
     :param io_section: Definition contained under the ``inputs`` or ``outputs`` fields.
     :param order_hints: Optional/partial I/O definitions hinting an order to sort unsorted-dict I/O.
-    :param literal_value_key:
-        Key to employ when converting literal I/O values into a JSON definition.
-        For :term:`Process` descriptions, :term:`Application Package` and other definitions, ``"type"`` is
-        usually indented. For execution I/O
-    :param literal_value_types:
     :returns: I/O specified as list of dictionary definitions with preserved order (as good as possible).
     """
     if isinstance(io_section, list):
@@ -3015,8 +3061,8 @@ def normalize_ordered_io(io_section, order_hints=None, literal_value_key="type",
         # I/O value can be a literal type string or dictionary with more details at this point
         # make it always detailed dictionary to avoid problems for later parsing
         # this is also required to make the list, since all list items must have a matching type
-        if isinstance(io_value, literal_value_types):
-            io_list.append({literal_value_key: io_value})
+        if isinstance(io_value, str):
+            io_list.append({"type": io_value})
         else:
             io_list.append(io_value)
         io_list[-1]["id"] = io_id

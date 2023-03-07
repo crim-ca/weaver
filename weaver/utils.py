@@ -1078,7 +1078,10 @@ def get_file_header_datetime(dt):
     return dt_str
 
 
-def get_file_headers(path, download_headers=False, content_headers=False, content_type=None):
+def get_file_headers(path, download_headers=False, content_headers=False, content_type=None,
+                     settings=None,  # type: Optional[SettingsType]
+                     **option_kwargs,  # type: Any  # Union[SchemeOptions, RequestOptions]
+):
     # type: (str, bool, bool, Optional[str]) -> HeadersType
     """
     Obtain headers applicable for the provided file.
@@ -1089,24 +1092,42 @@ def get_file_headers(path, download_headers=False, content_headers=False, conten
     :param content_type: Explicit ``Content-Type`` to provide. Otherwise, use default guessed by file system.
     :return: Headers for the file.
     """
-    stat = os.stat(path)
+    options, kwargs = resolve_scheme_options(**option_kwargs)
+    configs = get_request_options("HEAD", path, settings)
+    options["http"].update(**configs)
+    if path.startswith("s3://") or path.startswith("https://s3."):
+        s3_params = resolve_s3_http_options(**options["http"], **kwargs)
+        s3_region = options["s3"].pop("region_name", None)
+        s3_client = boto3.client("s3", region_name=s3_region, **s3_params)  # type: S3Client
+        bucket_name, dir_key = path[5:].split("/", 1)
+        base_url = f"{s3_client.meta.endpoint_url.rstrip('/')}/"
+        # FIXME: implement S3 content-meta
+    if path.startswith("http://") or path.startswith("https://"):
+        # FIXME: implement HTTP content-meta
+        request_extra()
+    else:
+        stat = os.stat(path)
+        f_size = stat.st_size
+        f_created = stat.st_ctime
+        f_modified = stat.st_mtime
+
     headers = {}
     if content_headers:
         c_type, c_enc = guess_file_contents(path)
-        if c_type == ContentType.APP_OCTET_STREAM:  # default
+        if not content_type and c_type == ContentType.APP_OCTET_STREAM:  # default
             f_ext = os.path.splitext(path)[-1]
-            c_type = get_content_type(f_ext, charset="UTF-8", default=ContentType.APP_OCTET_STREAM)
+            content_type = get_content_type(f_ext, charset="UTF-8", default=ContentType.APP_OCTET_STREAM)
         headers.update({
-            "Content-Type": content_type or c_type,
+            "Content-Type": content_type,
             "Content-Encoding": c_enc or "",
-            "Content-Length": str(stat.st_size)
+            "Content-Length": str(f_size)
         })
         if download_headers:
             headers.update({
                 "Content-Disposition": f"attachment; filename=\"{os.path.basename(path)}\"",
             })
-    f_modified = get_file_header_datetime(datetime.fromtimestamp(stat.st_mtime))
-    f_created = get_file_header_datetime(datetime.fromtimestamp(stat.st_ctime))
+    f_modified = get_file_header_datetime(datetime.fromtimestamp(f_modified))
+    f_created = get_file_header_datetime(datetime.fromtimestamp(f_created))
     headers.update({
         "Date": f_created,
         "Last-Modified": f_modified

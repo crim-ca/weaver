@@ -42,9 +42,9 @@ Changes:
 .. |ogc-proc-ext-quotation-short| replace:: Quotation
 .. _ogc-proc-exc-quotation-short: https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/quotation
 .. |quote-estimator| replace:: Quote Estimator
-.. _quote-estimator: ./schemas/quotation/quote-estimator.yaml
+.. _quote-estimator: ./weaver/schemas/quotation/quote-estimator.yaml
 .. |quote-estimation-result| replace:: Quote Estimation Result
-.. _quote-estimation-result: ./schemas/quotation/quote-estimation-result.yaml
+.. _quote-estimation-result: ./weaver/schemas/quotation/quote-estimation-result.yaml
 .. _ONNX: https://onnx.ai/
 
 Fixes:
