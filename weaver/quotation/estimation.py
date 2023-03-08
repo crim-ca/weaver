@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 import colander
 import simplejson
 from beaker.cache import cache_region
+from bs4 import BeautifulSoup
 from pyramid_celery import celery_app as app
 
 from weaver.database import get_db
@@ -18,7 +19,7 @@ from weaver.exceptions import QuoteConversionError, QuoteEstimationError, QuoteE
 from weaver.formats import ContentType, OutputFormat
 from weaver.owsexceptions import OWSInvalidParameterValue
 from weaver.processes.constants import JobInputsOutputsSchema
-from weaver.processes.convert import convert_input_values_schema, convert_output_params_schema, normalize_ordered_io
+from weaver.processes.convert import convert_input_values_schema
 from weaver.processes.types import ProcessType
 from weaver.processes.wps_package import get_package_workflow_steps, get_process_location
 from weaver.processes.utils import pull_docker
@@ -31,13 +32,15 @@ from weaver.utils import (
     get_header,
     get_href_headers,
     get_settings,
+    Lazify,
     request_extra,
     wait_secs
 )
 from weaver.wps_restapi import swagger_definitions as sd
+from weaver.xml_util import HTML_TREE_BUILDER
 
 if TYPE_CHECKING:
-    from typing import Dict, List, Optional, Union
+    from typing import Any, Callable, Dict, List, Optional, Union
     from typing_extensions import TypedDict
 
     from celery.app.task import Task
@@ -70,18 +73,100 @@ if TYPE_CHECKING:
 
 LOGGER = logging.getLogger(__name__)
 
-# FIXME: define currency converter configs
-# - https://docs.openexchangerates.org/reference/convert
-# - https://currencylayer.com/documentation (see "Currency Conversion Endpoint" section)
-# - https://exchangeratesapi.io/documentation/ (see "Convert Endpoint" section)
-# - https://fixer.io/documentation (see "Convert Endpoint" section)
-# - scrapper:
-#   - https://www.thepythoncode.com/article/make-a-currency-converter-in-python
-#   - https://www.x-rates.com/table/?from=CAD&amount=1
-# - custom (by config)
-CONVERTER_CONFIG = {
 
-}
+class CurrencyConverter(object):
+    """
+    Generic definition of a currency converter.
+    """
+    url: str
+    name: str
+    token: str = ""
+    json: bool = True
+    parser: Callable[[Union[JSON, str]], Union[Number, str]]
+
+    def __init__(self, name, url, parser, **kwargs):
+        # type: (str, str, Callable[[Union[JSON, str]], Number], **Any) -> None
+        self.name = name
+        self.url = url
+        self.parser = parser
+        for key, val in kwargs.items():
+            if hasattr(CurrencyConverter, key):
+                setattr(self, key, val)
+
+    def convert(self, currency, from_currency, to_currency):
+        # type: (Union[Number, Decimal], str, str) -> Decimal
+        url = self.url.format(
+            **{
+                "from": from_currency.upper(),
+                "to": to_currency.upper(),
+                "value": currency,
+                "token": self.token,
+            }
+        )
+        headers = {"Accept": ContentType.APP_JSON}
+        resp = request_extra("GET", url, cache_request=request_convert_cost, headers=headers)
+        if not resp.status_code == 200:
+            raise QuoteConversionError(
+                f"Error quote currency response [{resp.status_code}] from [{self.name}] converter."
+            )
+        try:
+            if self.json:
+                data = simplejson.loads(resp.text, use_decimal=True)  # avoid approximation errors
+            else:
+                data = resp.text
+            result = self.parser(data)
+            result = Decimal(str(result))
+        except Exception as exc:
+            raise QuoteConversionError(
+                f"Error quote currency parsing [{exc!r}] from [{self.name}] converter."
+            )
+        return result
+
+    __call__ = convert
+
+
+CURRENCY_CONVERTERS = {cvt.name: cvt for cvt in [
+    # https://docs.openexchangerates.org/reference/convert
+    CurrencyConverter(
+        "openexchangerates",
+        url="https://openexchangerates.org/api/convert/{value}/{from}/{to}?app_id={token}",
+        parser=lambda _json: _json["response"],
+    ),
+    # https://currencylayer.com/documentation (see "Currency Conversion Endpoint" section)
+    CurrencyConverter(
+        "currencylayer",
+        url="https://api.currencylayer.com/convert?access_key={token}&from={from}&to={to}&amount={amount}",
+        parser=lambda _json: _json["result"],
+    ),
+    # https://exchangeratesapi.io/documentation/ (see "Convert Endpoint" section)
+    CurrencyConverter(
+        "exchangeratesapi",
+        url="https://api.exchangeratesapi.io/v1/convert?access_key={token}&from={from}&to={to}&amount={amount}",
+        parser=lambda _json: _json["result"],
+    ),
+    # https://fixer.io/documentation (see "Convert Endpoint" section)
+    CurrencyConverter(
+        "openexchangerates",
+        url="https://data.fixer.io/api/convert?access_key={token}&from={from}&to={to}&amount={amount}",
+        parser=lambda _json: _json["result"],
+    ),
+    # https://www.x-rates.com/calculator/?from=USD&to=EUR&amount=1
+    CurrencyConverter(
+        "scrapper",
+        url="https://www.x-rates.com/calculator/?from={from}&to={to}&amount={amount}",
+        json=False,
+        parser=lambda _text: BeautifulSoup(  # type: ignore
+            _text,
+            builder=HTML_TREE_BUILDER,
+        ).find_all("span", attrs={"class": "ccOutputRslt"})[0].text.split(" ", 1)[0]
+    ),
+    CurrencyConverter(
+        "custom",
+        url=None,  # type: ignore  # filled at runtime
+        json=False,
+        parser=lambda _json: _json["result"],
+    )
+]}  # type: Dict[str, CurrencyConverter]
 
 
 def get_quote_estimator_config(process):
@@ -177,7 +262,9 @@ def prepare_quote_estimator_config(quote, process):
     # process_output_types = {get_any_id(i_def): i_def["type"] for i_def in process.outputs}
     # quotation_outputs = convert_output_params_schema(quote.parameters.get("outputs", {}), JobInputsOutputsSchema.OGC)
 
-    LOGGER.debug("Resolved Estimator inputs for Quote [%s] of Process [%s]:\n%s", OutputFormat.)
+    LOGGER.debug("Resolved Estimator inputs for Quote [%s] of Process [%s]:\n%s",
+                 quote.id, process.id,
+                 Lazify(lambda: OutputFormat.convert(estimator_inputs, to=OutputFormat.YAML)))
     return estimator_config
 
 
@@ -207,19 +294,15 @@ def convert_exchange_rate(amount, convert_currency):
 
     settings = get_settings()
     converter_type = settings.get("weaver.quotation_currency_converter")
-    if converter_type not in CONVERTER_CONFIG:
+    if converter_type not in CURRENCY_CONVERTERS:
         LOGGER.warning("No converter specified in settings to obtain quote amount in requested currency.")
         return {"amount": amount, "currency": default_currency}
-
     try:
-        converter = CONVERTER_CONFIG[converter_type]
-        headers = {"Accept": ContentType.APP_JSON}
-        args = {"amount": str(amount), "to": convert_currency, "from": default_currency}
-        resp = request_extra("GET", converter["url"], cache_request=request_convert_cost, params=args, headers=headers)
-        if not resp.status_code == 200:
-            raise QuoteConversionError("Bad quote currency response from [%s].", converter["url"])
-        data = simplejson.loads(resp.text, use_decimal=True)
-        result = converter["parser"](data)
+        converter = CURRENCY_CONVERTERS[converter_type]
+        if converter_type == "custom":
+            converter.url = settings.get("weaver.quotation_currency_converter_url")
+        converter.token = settings.get("weaver.quotation_currency_converter_token")
+        result = converter(amount, default_currency, convert_currency)
         return {"amount": result, "currency": convert_currency}
     except Exception as exc:
         LOGGER.warning("Failed quote currency conversion. Using default [%s].", default_currency, exc_info=exc)

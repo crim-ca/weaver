@@ -19,6 +19,7 @@
 .. _aws_s3_access_points: https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-access-points.html
 .. |aws_s3_outposts| replace:: AWS S3 Outposts
 .. _aws_s3_outposts: https://docs.aws.amazon.com/AmazonS3/latest/userguide/S3onOutposts.html
+.. |currency-converter| replace:: *Currency Converter*
 .. |cwl| replace:: Common Workflow Language
 .. _cwl: `cwl-home`_
 .. |cwl-home| replace:: CWL Homepage
@@ -80,8 +81,9 @@
 .. _ogc-proc-exc-billing-short: https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/billing
 .. |ogc-proc-ext-quotation| replace:: OGC API - Processes - Quotation extension
 .. _ogc-proc-exc-quotation-short: https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/quotation
-.. |quote-estimator| replace:: Quote Estimator
-.. _quote-estimator: ./schemas/quotation/quote-estimator.yaml
+.. |quote-estimator| replace:: *Quote Estimator*
+.. |quote-estimation-config| replace:: Quote Estimator
+.. _quote-estimation-config: ./schemas/quotation/quote-estimator.yaml
 .. |quote-estimation-result| replace:: Quote Estimation Result
 .. _quote-estimation-result: ./schemas/quotation/quote-estimation-result.yaml
 .. _ONNX: https://onnx.ai/

@@ -166,7 +166,7 @@ class OutputFormat(Constants):
 
     @classmethod
     def convert(cls, data, to, item_root="item"):
-        # type: (JSON, Union[str, AnyOutputFormat], str) -> Union[str, JSON]
+        # type: (JSON, Union[AnyOutputFormat, str], str) -> Union[str, JSON]
         """
         Converts the input data from :term:`JSON` to another known format.
 

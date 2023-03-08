@@ -553,8 +553,9 @@ and all corresponding functionalities, including `API` endpoints, will be disabl
   |
   | Currency code in `ISO-4217 <https://www.iso.org/iso-4217-currency-codes.html>`_ format used by default.
   |
-  | It is up to the specified |quote-estimator|_ algorithm defined by ``weaver.quotation_docker_image`` to ensure
-    that the returned :term:`Quote` estimation cost makes sense according to the specified default currency.
+  | It is up to the specified |quote-estimator|_ algorithm defined by ``weaver.quotation_docker_image`` and
+    employed by the various :term:`Process` to ensure that the returned :term:`Quote` estimation cost makes
+    sense according to the specified default currency.
   |
   | See :ref:`quotation` for more details on the feature.
 
@@ -562,23 +563,42 @@ and all corresponding functionalities, including `API` endpoints, will be disabl
 
 - | ``weaver.quotation_currency_converter = <converter>`` [:class:`str`]
   |
-  | Reference currency converter to employ to retrieve conversion rates.
+  | Reference currency converter to employ for retrieving conversion rates.
   |
   | Valid values are:
   | - `openexchangerates <https://docs.openexchangerates.org/reference/convert>`_
   | - `currencylayer <https://currencylayer.com/documentation>`_
   | - `exchangeratesapi <https://exchangeratesapi.io/documentation/>`_
   | - `fixer <https://fixer.io/documentation>`_
-  | - ``<custom URL>``
+  | - `scrapper <https://www.x-rates.com/table/?from=USD&amount=1>`_
+  | - ``custom``
   |
   | In each case, requests will be attempted using ``weaver.quotation_currency_token`` to authenticate with the API.
     Request caching of 1 hour will be used by default to limit chances of rate-limiting, but converter-specific plans
     could block request at any moment depending on the amount of :ref:`quotation` requests accomplished.
     In such case, the conversion will not be performed and will remain in the default currency.
   |
-  | If a ``<custom URL>`` is provided, it will be used instead to perform a ``GET`` request.
-    The query parameter ``access_key`` with ``weaver.quotation_currency_token`` will be used for this request.
-    The specified API should also expect the query parameters ``from``, ``to`` and ``amount`` to perform conversion.
+  | If a ``custom`` URL is desired, the ``weaver.quotation_currency_custom_url`` parameter should also be provided.
+  |
+  | If none is provided, conversion rates will not be applied and currencies
+    will always use ``weaver.quotation_currency_default``.
+  |
+  | See :ref:`quotation` for more details on the feature.
+
+.. versionadded:: 4.30
+
+- | ``weaver.quotation_currency_custom_url = <URL>`` [:class:`str`]
+  |
+  | Reference ``custom`` currency converter URL pattern to employ for retrieving conversion rates.
+  |
+  | This applies only when using ``weaver.quotation_currency_converter = custom``
+  |
+  | The specified URL will be used to perform a ``GET`` request.
+    This URL should contain the relevant query or path parameters to perform the request.
+    Parameters can be specified using templating (``{<param>}``), with parameters
+    names ``token``, ``from``, ``to`` and ``amount`` to perform the conversion.
+    The query parameter ``token`` will be filled by ``weaver.quotation_currency_token``, while remaining values will
+    be provided based on the source and target currency conversion requirements.
     The response body should be in :term:`JSON` with minimally the conversion ``result`` field located at the root.
     The same caching policy will be applied as for the other API references.
   |
