@@ -149,7 +149,7 @@ if TYPE_CHECKING:
         "Content-Location": NotRequired[str],
         "Content-Disposition": NotRequired[str],
     }, total=False)
-    _OutputMethod: TypeAlias("OutputMethod")
+    _OutputMethod = "OutputMethod"  # type: TypeAlias
     AnyMetadataOutputMethod = Literal[
         _OutputMethod.META,
     ]
@@ -1091,15 +1091,22 @@ def get_href_headers(path,                      # type: str
 
     :param path: File to describe.
     :param download_headers:
-        If enabled, add the attachment filename for downloading the file.
-        If the reference corresponds to a directory, this parameter is ignored.
-    :param content_headers: If enabled, add ``Content-`` prefixed headers.
-    :param content_type: Explicit ``Content-Type`` to provide. Otherwise, use default guessed by file system.
-    :return: Headers for the file.
+        If enabled, add the ``Content-Disposition`` header with attachment filename for downloading the file.
+        If the reference is a directory, this parameter is ignored, since files must be retrieved individually.
+    :param location_headers:
+        If enabled, add the ``Content-Location`` header referring to the input location.
+    :param content_headers: If enabled, add other relevant ``Content-`` prefixed headers.
+    :param content_type:
+        Explicit ``Content-Type`` to provide.
+        Otherwise, use default guessed by file system (often ``application/octet-stream``).
+        If the reference is a directory, this parameter is ignored and ``application/directory`` will be enforced.
+    :param settings: Application settings to pass down to relevant utility functions.
+    :return: Headers for the reference.
     """
     href = path
     if not any(href.startswith(proto) for proto in ["http", "https", "s3"]):
         href = f"file://{os.path.abspath(path)}"
+    f_enc = None
 
     # handle directory
     if path.endswith("/"):
@@ -1121,14 +1128,18 @@ def get_href_headers(path,                      # type: str
             s3_client = boto3.client("s3", region_name=s3_region, **s3_params)  # type: S3Client
             s3_bucket, file_key = path[5:].split("/", 1)
             s3_file = s3_client.head_object(Bucket=s3_bucket, Key=file_key)
-            f_modified = s3_file["ResponseMetadata"]["HTTPHeaders"]["LastModified"]
-            f_type = s3_file["ResponseMetadata"]["HTTPHeaders"]["ContentType"]
+            f_type = content_type or s3_file["ResponseMetadata"]["HTTPHeaders"]["ContentType"]
             f_size = s3_file["ResponseMetadata"]["HTTPHeaders"]["Size"]
+            f_modified = s3_file["ResponseMetadata"]["HTTPHeaders"]["LastModified"]
 
         elif path.startswith("http://") or path.startswith("https://"):
-            # FIXME: implement HTTP content-meta
-            resp = request_extra("HEAD", path, **options["http"])
-
+            resp = request_extra("HEAD", href, **options["http"])
+            if not resp.status_code == 200:
+                raise ValueError(f"Could not obtain file reference metadata from [{href}]")
+            f_modified = resp.last_modified
+            f_type = content_type or resp.content_type
+            f_size = resp.content_length
+            f_enc = resp.content_encoding
 
         else:
             stat = os.stat(path)
@@ -1139,12 +1150,17 @@ def get_href_headers(path,                      # type: str
     headers = {"Content-Location": href} if location_headers else {}
     if content_headers:
         c_type, c_enc = guess_file_contents(href)
-        if not f_type and c_type == ContentType.APP_OCTET_STREAM:  # default
-            f_ext = os.path.splitext(path)[-1]
-            f_type = get_content_type(f_ext, charset="UTF-8", default=ContentType.APP_OCTET_STREAM)
+        if not f_type:
+            if c_type == ContentType.APP_OCTET_STREAM:  # default
+                f_ext = os.path.splitext(path)[-1]
+                f_type = get_content_type(f_ext, charset="UTF-8", default=ContentType.APP_OCTET_STREAM)
+            else:
+                f_type = c_type
+        if not f_enc:
+            f_enc = c_enc
         headers.update({
-            "Content-Type": content_type,
-            "Content-Encoding": c_enc or "",
+            "Content-Type": f_type,
+            "Content-Encoding": f_enc or "",
             "Content-Length": str(f_size),
         })
         if download_headers:
@@ -2644,6 +2660,7 @@ def fetch_files_url(file_references,                    # type: Iterable[str]
 
     :param file_references: Relative or full URL paths of the files to download.
     :param out_dir: Desired output location of downloaded files.
+    :param out_method: Method employed to handle the generation of the output.
     :param base_url:
         If full URL are specified, corresponding files will be retrieved using the appropriate scheme per file
         allowing flexible data sources. Otherwise, any relative locations use this base URL to resolve the full
@@ -2678,6 +2695,19 @@ def fetch_files_url(file_references,                    # type: Iterable[str]
     file_refs_relative = {os.path.join(base_url, path) for path in file_refs_relative}
     file_references = sorted(list(set(file_refs_relative) | set(file_refs_absolute)))
 
+    if out_method == OutputMethod.META:
+        return [
+            get_href_headers(
+                url,
+                download_headers=True,
+                location_headers=True,
+                content_headers=True,
+                settings=settings,
+                **option_kwargs
+            )
+            for url in file_references
+        ]
+
     # create directories in advance to avoid potential errors in case many workers try to generate the same one
     base_url = base_url.rstrip("/")
     sub_dirs = {os.path.split(path)[0] for path in file_references if "://" not in path or path.startswith(base_url)}
@@ -2709,7 +2739,8 @@ def fetch_files_url(file_references,                    # type: Iterable[str]
             _out_file = os.path.join(out_dir, os.path.split(_file_path)[-1])
         _out_dir = os.path.split(_out_file)[0]
         try:
-            return fetch_file(_file_path, _out_dir, settings=settings, callback=_abort_callback, **option_kwargs)
+            return fetch_file(_file_path, _out_dir, out_method=out_method,
+                              settings=settings, callback=_abort_callback, **option_kwargs)
         except Exception as exc:
             LOGGER.error("Error raised in download worker for [%s]: [%s]", _file_path, exc, exc_info=exc)
             task_kill_event.set()
@@ -2769,7 +2800,7 @@ def fetch_files_html(html_data,                         # type: str
                      **option_kwargs,                   # type: Any  # Union[SchemeOptions, RequestOptions]
                      ):                                 # type: (...) -> Iterator[AnyOutputResult]
     """
-    Retrives files from a directory listing provided as an index of plain HTML with file references.
+    Retrieves files from a directory listing provided as an index of plain HTML with file references.
 
     If the index itself provides directories that can be browsed down, the tree hierarchy will be downloaded
     recursively by following links. In such case, links are ignored if they cannot be resolved as a nested index pages.

@@ -15,7 +15,7 @@ from pyramid_celery import celery_app as app
 
 from weaver.database import get_db
 from weaver.exceptions import QuoteConversionError, QuoteEstimationError, QuoteException
-from weaver.formats import ContentType
+from weaver.formats import ContentType, OutputFormat
 from weaver.owsexceptions import OWSInvalidParameterValue
 from weaver.processes.constants import JobInputsOutputsSchema
 from weaver.processes.convert import convert_input_values_schema, convert_output_params_schema, normalize_ordered_io
@@ -29,6 +29,7 @@ from weaver.utils import (
     get_any_id,
     get_any_value,
     get_header,
+    get_href_headers,
     get_settings,
     request_extra,
     wait_secs
@@ -36,7 +37,8 @@ from weaver.utils import (
 from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
-    from typing import Optional
+    from typing import Dict, List, Optional, Union
+    from typing_extensions import TypedDict
 
     from celery.app.task import Task
     from requests import Response
@@ -44,7 +46,27 @@ if TYPE_CHECKING:
     from weaver.datatype import DockerAuthentication, Process, Quote
     from weaver.quotation.status import AnyQuoteStatus
     from weaver.utils import RequestCachingKeywords
-    from weaver.typedefs import AnyRequestMethod, AnyRequestType, AnySettingsContainer, AnyUUID, JSON, Price
+    from weaver.typedefs import (
+        AnyRequestMethod,
+        AnyRequestType,
+        AnySettingsContainer,
+        AnyUUID,
+        AnyValueType,
+        Number,
+        JSON,
+        Price
+    )
+
+    EstimatorInputLiteral = TypedDict("EstimatorInputLiteral", {
+        "value": Union[AnyValueType, List[AnyValueType]],
+        "weight": Number,
+    })
+    EstimatorInputComplex = TypedDict("EstimatorInputComplex", {
+        "size": Union[int, List[int]],
+        "weight": Number,
+    })
+    EstimatorInputs = Dict[str, Union[EstimatorInputLiteral, EstimatorInputComplex]]
+
 
 LOGGER = logging.getLogger(__name__)
 
@@ -114,36 +136,48 @@ def prepare_quote_estimator_config(quote, process):
     process_input_types = {get_any_id(input_def): input_def["type"] for input_def in process.inputs}
     quotation_inputs = convert_input_values_schema(quote.parameters.get("inputs", {}), JobInputsOutputsSchema.OGC)
     estimator_config = copy.deepcopy(process.estimator)
-    estimator_inputs = estimator_config.get("inputs", {})
+    estimator_inputs = estimator_config.get("inputs", {})  # type: EstimatorInputs
     # Estimators are allowed to use different IDs than the process IDs, as long as they define a relevant mapping.
     # Avoid checking all estimator mappings, simply provide all inputs, and let them pick-and-choose what they need.
     for input_id, input_param in quotation_inputs.items():
         input_key = get_any_value(input_param, key=True)
         input_val = input_param[input_key]
-        estimator_inputs.setdefault(input_id, {"weight": 1.0})
+        estimator_inputs.setdefault(input_id, {})  # type: ignore
+        estimator_inputs[input_id].setdefault("weight", 1.0)
         input_type = process_input_types[input_id]
         if input_type == "literal" and input_key in ["data", "value"]:
             estimator_inputs[input_id]["value"] = input_val
         elif input_type == "complex" and input_key == "href":
-            estimator_inputs[input_id]
+            input_array = isinstance(input_val, list)
+            input_info = [
+                get_href_headers(
+                    href,
+                    download_headers=False,
+                    location_headers=False,
+                    content_headers=True,
+                )
+                for href in (input_val if input_array else [input_val])
+            ]
+            input_size = [
+                get_header("Content-Length", info, default=0)
+                for info in input_info
+            ]
+            estimator_inputs[input_id]["size"] = input_size if input_array else input_size[0]
         else:  # pragma: no cover
             raise NotImplementedError(
                 "Quote estimator input combination not supported: "
                 f"(type: {input_type}, key: {input_key}, id: {input_id})"
             )
 
-
-        estimator_inputs[input_id] =
-
     # FIXME: handle quotation outputs (?)
     #   Quotation output are only pseudo-definitions for chaining applications in a Workflow
     #   (i.e.: for providing the next process's quotation inputs).
     #   There is no way to do this at the moment, as submitted execution/quotation outputs are "requested" outputs
     #   (transmission mode, format, etc.) and not "expected" outputs (value/href).
-
     # process_output_types = {get_any_id(i_def): i_def["type"] for i_def in process.outputs}
     # quotation_outputs = convert_output_params_schema(quote.parameters.get("outputs", {}), JobInputsOutputsSchema.OGC)
 
+    LOGGER.debug("Resolved Estimator inputs for Quote [%s] of Process [%s]:\n%s", OutputFormat.)
     return estimator_config
 
 
