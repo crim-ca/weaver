@@ -671,6 +671,13 @@ class ExtendedSchemaBase(colander.SchemaNode, metaclass=ExtendedSchemaMeta):
             self.missing = self.default  # setting value makes 'self.required' return False, but doesn't drop it
 
         try:
+            # if schema_type was defined with an instance instead of the class type,
+            # we must pass it by "typ" keyword to avoid an error in base class calling 'schema_type()'
+            # one case were using an instance is valid is for 'colander.Mapping(unknown="<handling-method>")'
+            schema_type_def = getattr(self, "schema_type", None)
+            if isinstance(schema_type_def, colander.SchemaType):
+                kwargs["typ"] = schema_type_def
+                kwargs["unknown"] = getattr(schema_type_def, "unknown", "ignore")
             super(ExtendedSchemaBase, self).__init__(*args, **kwargs)
             ExtendedSchemaBase._validate(self)
         except Exception as exc:
@@ -875,7 +882,7 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
         Using ``{const}`` instead would ensure that no override occurs as it is a syntax error
         to write ``{const} = RequiredDict(String())`` in the class definition, but this value
         can still be used to create the internal mapping to evaluate sub-schemas without name
-        clashes. As a plus, it also helps giving an indication that *any key* is accepted.
+        clashes. As a plus, it also helps indicating that *any key* is accepted.
 
     .. seealso::
         - :class:`ExtendedSchemaNode`
@@ -1013,12 +1020,35 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
             if not has_const_child:
                 result = node.default or {}
             else:
+                remapped = {}
+                var_value = None
                 for mapped in var_map.values():
                     if not mapped:
                         continue  # ignore missing for now, raise after as needed if required
-                    # if multiple objects corresponding to a variable sub-schema where provided,
-                    # we only give one as this is what is expected for normal-mapping deserialize
-                    cstruct[mapped[0]["node"]] = cstruct.pop(mapped[0]["name"])
+                    # Temporarily remove pre-validated/mapped variable schema nodes to validate constants.
+                    # If we happen to remove the same property twice, it means two variable schema node were
+                    # in use at the same time (valid), but they were not sufficiently strict to distinguish to
+                    # which one the property should be mapped (e.g.: two generic strings with no validators).
+                    for var_mapped in mapped:
+                        var_prop = var_mapped["name"]
+                        var_node = var_mapped["node"]
+                        try:
+                            var_value = cstruct.pop(var_prop)
+                            remapped[var_prop] = {"node": var_node, "value": var_value}
+                        except KeyError:
+                            var_prev = remapped[var_prop]["node"]
+                            raise colander.Invalid(
+                                node,
+                                msg=(
+                                    f"Two distinct variable schema nodes named ['{var_prev}', '{var_node}'] "
+                                    f"under '{_get_node_name(node)}' were simultaneously mapped as valid matches"
+                                    f"for field '{var_prop}' resolution. "
+                                    "Ambiguous children schema definitions cannot be resolved. "
+                                    "Consider defining more strict schema types, validators, keywords, "
+                                    "or by modifying the parent variable schema to resolve the ambiguity."
+                                ),
+                                value={var_prop: var_value},
+                            )
                 # temporarily bypass variable to avoid recursively calling this extension deserialization
                 # perform the 'normal' mapping deserialization to obtain explicit properties
                 mapping = ExtendedMappingSchema(name=node.name, missing=node.missing, default=node.default)
@@ -1032,7 +1062,11 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
                 for var_mapped in mapped:
                     result[var_mapped["name"]] = var_mapped["cstruct"]
         except colander.Invalid as invalid:
-            invalid_var.msg = f"Tried matching variable '{var_name}' sub-schemas but no match found."
+            if invalid.msg:
+                invalid_var.msg = invalid.msg
+                invalid_var.value = invalid.value
+            else:
+                invalid_var.msg = f"Tried matching variable '{var_name}' sub-schemas but no match found."
             invalid_var.add(invalid)
             raise invalid_var
         except KeyError:

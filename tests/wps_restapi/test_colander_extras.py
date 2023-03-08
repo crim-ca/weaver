@@ -4,6 +4,7 @@
 Tests for :mod:`weaver.wps_restapi.colander_extras` operations applied on :mod:`weaver.wps_restapi.swagger_definitions`
 objects.
 """
+import copy
 import inspect
 from typing import TYPE_CHECKING
 
@@ -19,7 +20,7 @@ if TYPE_CHECKING:
 
     TestSchema = Union[colander.SchemaNode, Type[colander.SchemaNode]]
     TestValue = JSON
-    TestExpect = Union[JSON, colander.Invalid]
+    TestExpect = Union[JSON, Type[colander.Invalid]]
 
 
 def evaluate_test_cases(test_cases):
@@ -43,7 +44,8 @@ def evaluate_test_cases(test_cases):
             test_schema = test_schema_ref
             test_schema_name = type(test_schema_ref).__name__
         try:
-            result = test_schema.deserialize(test_value)
+            test_sample = copy.deepcopy(test_value)  # in case deserialize modifies, don't break other tests reusing it
+            result = test_schema.deserialize(test_sample)
             if test_expect is colander.Invalid:
                 pytest.fail(f"{test_name}Expected invalid format from [{test_schema_name}] "
                             f"with: {test_value}, but received: {result}")
@@ -235,7 +237,7 @@ def test_oneof_dropable():
         (schema, "ok", "ok"),
         (schema, {}, {}),   # since mapping is permissive, empty is valid
         (schema, {"any": 123}, {"any": 123}),  # unknown field is also valid
-        # since OneOf[str,map], it is not possible to combine them
+        # since OneOf[str, map], it is not possible to combine them
     ])
 
     class Map1(ce.ExtendedMappingSchema):
@@ -524,7 +526,7 @@ def test_strict_bool():
 
 def test_strict_literal_convert():
     """
-    Test that literals are adequately interpreted and validated with respective representations..
+    Test that literals are adequately interpreted and validated with respective representations.
 
     Given a schema that allows multiple similar types that could be implicitly or explicitly converted from one to
     another with proper format, validate that such conversion do not occur to ensure explicit schema definitions.
@@ -922,18 +924,78 @@ def test_dropable_variable_mapping():
 
 
 @pytest.mark.parametrize("value, expect", [
-    ({"other": "123", "value": 123, "number": 456}, {"other": "123", "value": 123, "number": 456}),
-    ({"other": "123", "value": 123, "bad": "456"}, colander.Invalid),
-    ({"value": 123, "bad": "456"}, colander.Invalid),
+    ({"other": "123", "value": 123, "number": 456},
+     {"other": "123", "value": 123, "number": 456}),
+    ({"other": "123", "value": 123, "bad": "456"},
+     {"other": "123", "value": 123}),  # by default, unmapped are 'unknown=ignore'
+    ({"value": 123, "bad": "456"}, colander.Invalid),  # missing required 'other' (const)
 ])
 def test_variable_with_const(value, expect):
     # type: (TestValue, TestExpect) -> None
 
     class VariableMapping(ce.ExtendedMappingSchema):
-        var = ce.ExtendedSchemaNode(ce.ExtendedInteger(strict=True), variable="{int}")
-        #other = ce.ExtendedSchemaNode(colander.String())
+        var = ce.ExtendedSchemaNode(ce.ExtendedInteger(strict=True, allow_string=False), variable="{int}")
+        other = ce.ExtendedSchemaNode(colander.String())
 
     evaluate_test_cases((VariableMapping, value, expect))
+
+
+@pytest.mark.parametrize("value, expect", [
+    ({"other": "123", "value": 123, "number": 456}, {"other": "123", "value": 123, "number": 456}),
+    ({"other": "123", "value": 123, "bad": "456"}, colander.Invalid),  # since raise, unmapped 'bad' is invalid
+    ({"value": 123, "bad": "456"}, colander.Invalid),  # missing required 'other' (const)
+])
+def test_variable_with_const_strict(value, expect):
+    # type: (TestValue, TestExpect) -> None
+
+    # all below definitions are equivalent, but with different references/shortcuts
+
+    class VariableMappingRaise(ce.ExtendedMappingSchema):
+        schema_type = colander.Mapping(unknown="raise")
+        var = ce.ExtendedSchemaNode(ce.ExtendedInteger(strict=True, allow_string=False), variable="{int}")
+        other = ce.ExtendedSchemaNode(colander.String())
+
+    class VariableMappingAttr(ce.ExtendedMappingSchema):
+        unknown = "raise"
+        var = ce.ExtendedSchemaNode(ce.ExtendedInteger(strict=True, allow_string=False), variable="{int}")
+        other = ce.ExtendedSchemaNode(colander.String())
+
+    class VariableMappingStrict(ce.StrictMappingSchema):
+        var = ce.ExtendedSchemaNode(ce.ExtendedInteger(strict=True, allow_string=False), variable="{int}")
+        other = ce.ExtendedSchemaNode(colander.String())
+
+    evaluate_test_cases([
+        (VariableMappingRaise, value, expect),
+        (VariableMappingAttr, value, expect),
+        (VariableMappingStrict, value, expect),
+    ])
+
+
+@pytest.mark.parametrize("value, expect", [
+    ({"value-1": 123, "value-2": 1.2, "value-3": "3"}, {"value-1": 123, "value-2": 1.2, "value-3": "3"}),
+])
+def test_variable_multiple_valid(value, expect):
+    # type: (TestValue, TestExpect) -> None
+
+    class VariableMappingMulti(ce.ExtendedMappingSchema):
+        var1 = ce.ExtendedSchemaNode(ce.ExtendedInteger(strict=True, allow_string=False), variable="{var1}")
+        var2 = ce.ExtendedSchemaNode(ce.ExtendedFloat(strict=True, allow_string=False), variable="{var2}")
+        var3 = ce.ExtendedSchemaNode(ce.ExtendedString(), variable="{var3}")
+
+    evaluate_test_cases((VariableMappingMulti, value, expect))
+
+
+@pytest.mark.parametrize("value, expect", [
+    ({"value-1": "123", "value-2": "456"}, colander.Invalid),
+])
+def test_variable_multiple_ambiguous(value, expect):
+    # type: (TestValue, TestExpect) -> None
+
+    class VariableMappingMulti(ce.ExtendedMappingSchema):
+        var1 = ce.ExtendedSchemaNode(ce.ExtendedInteger(strict=True, allow_string=False), variable="{var1}")
+        var2 = ce.ExtendedSchemaNode(ce.ExtendedInteger(strict=True, allow_string=False), variable="{var2}")
+
+    evaluate_test_cases((VariableMappingMulti, value, expect))
 
 
 @pytest.mark.parametrize("test_value", [

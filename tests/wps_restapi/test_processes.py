@@ -56,6 +56,7 @@ from weaver.wps_restapi import swagger_definitions as sd
 if TYPE_CHECKING:
     from typing import List, Optional, Tuple
 
+    import _pytest  # noqa: W0212
     from pyramid.config import Configurator
 
     from weaver.processes.constants import ProcessSchemaType
