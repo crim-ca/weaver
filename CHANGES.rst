@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_4.29.0:
+
+`4.29.0 <https://github.com/crim-ca/weaver/tree/4.29.0>`_ (2023-03-07)
+========================================================================
+
+Changes:
+--------
 - Replace deprecated ``best_match`` methods for ``Accept`` and ``Accept-Language`` HTTP headers by their respective
   implementation with ``acceptable_offers`` and ``lookup`` methods better aligned with :rfc:`7231` specification.
 
@@ -34,6 +47,9 @@ Fixes:
   multiple directories for the same input source.
 - Fix deprecation warnings from :mod:`webob` and :mod:`owslib`.
 - Fix filtered warnings for expected cases during tests.
+- Fix a problem with ``convert_input_values_schema`` under the `OGC` schema, that caused the conversion to malfunction
+  when the function built lists for repeated input IDs of more than two elements.
+- Fix `XML` security vulnerability from ``owslib<0.28.1``.
 
 .. _changes_4.28.0:
 
