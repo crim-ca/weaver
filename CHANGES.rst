@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_4.29.0:
+
+`4.29.0 <https://github.com/crim-ca/weaver/tree/4.29.0>`_ (2023-03-07)
+========================================================================
+
+Changes:
+--------
 - Replace deprecated ``best_match`` methods for ``Accept`` and ``Accept-Language`` HTTP headers by their respective
   implementation with ``acceptable_offers`` and ``lookup`` methods better aligned with :rfc:`7231` specification.
 
