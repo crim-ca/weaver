@@ -41,8 +41,8 @@ from weaver.utils import (
     fully_qualified_name,
     get_any_id,
     get_any_value,
-    get_file_headers,
     get_header,
+    get_href_headers,
     get_sane_name,
     import_target,
     load_file,
@@ -1159,7 +1159,12 @@ class WeaverClient(object):
         if not os.path.isfile(file_path):
             return OperationResult(False, "Resolved local file reference does not exist.", {"file_path": file_path})
         LOGGER.debug("Processing file for vault upload: [%s]", file_path)
-        file_headers = get_file_headers(file_path, content_headers=True, content_type=content_type)
+        file_headers = get_href_headers(
+            file_path,
+            download_headers=False,
+            content_headers=True,
+            content_type=content_type,
+        )
         base = self._get_url(url)
         path = f"{base}/vault"
         files = {

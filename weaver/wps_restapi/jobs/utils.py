@@ -40,8 +40,8 @@ from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
 from weaver.utils import (
     get_any_id,
     get_any_value,
-    get_file_headers,
     get_header,
+    get_href_headers,
     get_path_kvp,
     get_sane_name,
     get_settings,
@@ -477,7 +477,7 @@ def get_job_results_response(job, container, headers=None):
         if out_type == "href":
             out_path = map_wps_output_location(out_data, container, exists=True, url=False)
             out_type = out_info.get("type")  # noqa
-            out_headers = get_file_headers(out_path, download_headers=True, content_headers=True, content_type=out_type)
+            out_headers = get_href_headers(out_path, download_headers=True, content_headers=True, content_type=out_type)
             resp = FileResponse(out_path)
             resp.headers.update(out_headers)
             resp.headers.update(headers)

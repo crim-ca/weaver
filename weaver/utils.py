@@ -86,7 +86,7 @@ if TYPE_CHECKING:
         Tuple,
         Union
     )
-    from typing_extensions import NotRequired, TypedDict, TypeGuard
+    from typing_extensions import NotRequired, TypeAlias, TypedDict, TypeGuard
 
     from mypy_boto3_s3.client import S3Client
 
@@ -141,39 +141,29 @@ if TYPE_CHECKING:
     RequestCachingKeywords = Dict[str, AnyValueType]
     RequestCachingFunction = Callable[[AnyRequestMethod, str,  RequestCachingKeywords], Response]
 
-    ResponseMetadata = TypedDict("ResponseMetadata", {
-        "RequestId": str,
-        "HTTPStatusCode": int,
-        "HTTPHeaders": HeadersType,
-        "RetryAttempts": int,
-    }, total=True)
-    S3FileContent = TypedDict("S3FileContent", {
-        "Key": str,
-        "LastModified": datetime,
-        "ETag": str,
-        "Size": int,
-        "StorageClass": Literal[
-            "STANDARD",
-            "REDUCED_REDUNDANCY",
-            "GLACIER",
-            "STANDARD_IA",
-            "ONEZONE_IA",
-            "INTELLIGENT_TIERING",
-            "DEEP_ARCHIVE",
-            "OUTPOSTS",
-            "GLACIER_IR"
-        ],
-    }, total=True)
-    S3DirectoryListingResponse = TypedDict("S3DirectoryListingResponse", {
-        "ResponseMetadata": ResponseMetadata,
-        "IsTruncated": bool,
-        "Contents": List[S3FileContent],
-        "Name": str,  # bucket
-        "Prefix": Optional[str],
-        "MaxKeys": int,
-        "KeyCount": int,
-        "EncodingType": Literal["url"],
-    }, total=True)
+    MetadataResult = TypedDict("MetadataResult", {
+        "Date": str,
+        "Last-Modified": str,
+        "Content-Type": NotRequired[str],
+        "Content-Length": NotRequired[str],
+        "Content-Location": NotRequired[str],
+        "Content-Disposition": NotRequired[str],
+    }, total=False)
+    _OutputMethod: TypeAlias("OutputMethod")
+    AnyMetadataOutputMethod = Literal[
+        _OutputMethod.META,
+    ]
+    DownloadResult = Path
+    AnyDownloadOutputMethod = Literal[
+        _OutputMethod.AUTO,
+        _OutputMethod.COPY,
+        _OutputMethod.LINK,
+        _OutputMethod.MOVE,
+    ]
+    AnyOutputMethod = Union[AnyMetadataOutputMethod, AnyDownloadOutputMethod]
+    AnyOutputResult = Union[MetadataResult, DownloadResult]
+
+    FilterType = TypeVar("FilterType")
 
     OriginalClass = TypeVar("OriginalClass")
     ExtenderMixin = TypeVar("ExtenderMixin")
@@ -439,6 +429,7 @@ def get_header(header_name,         # type: str
                header_container,    # type: AnyHeadersContainer
                default=None,        # type: Optional[str], Optional[Union[str, List[str]]], bool
                pop=False,           # type: bool
+               concat=False,        # type: bool
                ):                   # type: (...) -> Optional[Union[str, List[str]]]
     """
     Find the specified header within a header container.
@@ -446,14 +437,23 @@ def get_header(header_name,         # type: str
     Retrieves :paramref:`header_name` by fuzzy match (independently of upper/lower-case and underscore/dash) from
     various framework implementations of *Headers*.
 
-    :param header_name: header to find.
-    :param header_container: where to look for :paramref:`header_name`.
-    :param default: returned value if :paramref:`header_container` is invalid or :paramref:`header_name` is not found.
-    :param pop: remove the matched header(s) by name from the input container.
+    :param header_name: Header to find.
+    :param header_container: Where to look for :paramref:`header_name`.
+    :param default: Returned value if :paramref:`header_container` is invalid or :paramref:`header_name` is not found.
+    :param pop: Remove the matched header(s) by name from the input container.
+    :param concat:
+        Allow parts of the header name to be concatenated without hyphens/underscores.
+        This can be the case in some :term:`S3` responses.
+        Disabled by default to avoid unexpected mismatches, notably for shorter named headers.
+    :returns: Found header if applicable, or the default value.
     """
     def fuzzy_name(_name):
         # type: (str) -> str
         return _name.lower().replace("-", "_")
+
+    def concat_name(_name):
+        # type: (str) -> str
+        return _name.replace("-", " ").replace("_", " ").capitalize().replace(" ", "")
 
     if header_container is None:
         return default
@@ -464,7 +464,7 @@ def get_header(header_name,         # type: str
         headers = header_container.items()
     header_name = fuzzy_name(header_name)
     for i, (h, v) in enumerate(list(headers)):
-        if fuzzy_name(h) == header_name:
+        if fuzzy_name(h) == header_name or (concat and concat_name(h) == concat_name(header_name)):
             if pop:
                 if isinstance(header_container, dict):
                     del header_container[h]
@@ -1078,59 +1078,84 @@ def get_file_header_datetime(dt):
     return dt_str
 
 
-def get_file_headers(path, download_headers=False, content_headers=False, content_type=None,
-                     settings=None,  # type: Optional[SettingsType]
-                     **option_kwargs,  # type: Any  # Union[SchemeOptions, RequestOptions]
-):
-    # type: (str, bool, bool, Optional[str]) -> HeadersType
+def get_href_headers(path,                      # type: str
+                     download_headers=False,    # type: bool
+                     location_headers=True,     # type: bool
+                     content_headers=False,     # type: bool
+                     content_type=None,         # type: Optional[str]
+                     settings=None,             # type: Optional[SettingsType]
+                     **option_kwargs,           # type: Any  # Union[SchemeOptions, RequestOptions]
+                     ):                         # type: (...) -> MetadataResult
     """
-    Obtain headers applicable for the provided file.
+    Obtain headers applicable for the provided file or directory reference.
 
     :param path: File to describe.
-    :param download_headers: If enabled, add the attachment filename for downloading the file.
+    :param download_headers:
+        If enabled, add the attachment filename for downloading the file.
+        If the reference corresponds to a directory, this parameter is ignored.
     :param content_headers: If enabled, add ``Content-`` prefixed headers.
     :param content_type: Explicit ``Content-Type`` to provide. Otherwise, use default guessed by file system.
     :return: Headers for the file.
     """
-    options, kwargs = resolve_scheme_options(**option_kwargs)
-    configs = get_request_options("HEAD", path, settings)
-    options["http"].update(**configs)
-    if path.startswith("s3://") or path.startswith("https://s3."):
-        s3_params = resolve_s3_http_options(**options["http"], **kwargs)
-        s3_region = options["s3"].pop("region_name", None)
-        s3_client = boto3.client("s3", region_name=s3_region, **s3_params)  # type: S3Client
-        bucket_name, dir_key = path[5:].split("/", 1)
-        base_url = f"{s3_client.meta.endpoint_url.rstrip('/')}/"
-        # FIXME: implement S3 content-meta
-    if path.startswith("http://") or path.startswith("https://"):
-        # FIXME: implement HTTP content-meta
-        request_extra()
-    else:
-        stat = os.stat(path)
-        f_size = stat.st_size
-        f_created = stat.st_ctime
-        f_modified = stat.st_mtime
+    href = path
+    if not any(href.startswith(proto) for proto in ["http", "https", "s3"]):
+        href = f"file://{os.path.abspath(path)}"
 
-    headers = {}
+    # handle directory
+    if path.endswith("/"):
+        download_headers = False
+        listing = fetch_directory(href, out_dir="", out_method=OutputMethod.META, settings=settings, **option_kwargs)
+        f_modified = sorted([get_header("Last-Modified", meta, concat=True) for meta in listing])[-1]
+        f_size = sum(get_header("Size", meta) for meta in listing)
+        f_type = ContentType.APP_DIR
+
+    # handle single file
+    else:
+        options, kwargs = resolve_scheme_options(**option_kwargs)
+        configs = get_request_options("HEAD", href, settings)
+        options["http"].update(**configs)
+
+        if path.startswith("s3://") or path.startswith("https://s3."):
+            s3_params = resolve_s3_http_options(**options["http"], **kwargs)
+            s3_region = options["s3"].pop("region_name", None)
+            s3_client = boto3.client("s3", region_name=s3_region, **s3_params)  # type: S3Client
+            s3_bucket, file_key = path[5:].split("/", 1)
+            s3_file = s3_client.head_object(Bucket=s3_bucket, Key=file_key)
+            f_modified = s3_file["ResponseMetadata"]["HTTPHeaders"]["LastModified"]
+            f_type = s3_file["ResponseMetadata"]["HTTPHeaders"]["ContentType"]
+            f_size = s3_file["ResponseMetadata"]["HTTPHeaders"]["Size"]
+
+        elif path.startswith("http://") or path.startswith("https://"):
+            # FIXME: implement HTTP content-meta
+            resp = request_extra("HEAD", path, **options["http"])
+
+
+        else:
+            stat = os.stat(path)
+            f_type = content_type
+            f_size = stat.st_size
+            f_modified = datetime.fromtimestamp(stat.st_mtime)
+
+    headers = {"Content-Location": href} if location_headers else {}
     if content_headers:
-        c_type, c_enc = guess_file_contents(path)
-        if not content_type and c_type == ContentType.APP_OCTET_STREAM:  # default
+        c_type, c_enc = guess_file_contents(href)
+        if not f_type and c_type == ContentType.APP_OCTET_STREAM:  # default
             f_ext = os.path.splitext(path)[-1]
-            content_type = get_content_type(f_ext, charset="UTF-8", default=ContentType.APP_OCTET_STREAM)
+            f_type = get_content_type(f_ext, charset="UTF-8", default=ContentType.APP_OCTET_STREAM)
         headers.update({
             "Content-Type": content_type,
             "Content-Encoding": c_enc or "",
-            "Content-Length": str(f_size)
+            "Content-Length": str(f_size),
         })
         if download_headers:
             headers.update({
                 "Content-Disposition": f"attachment; filename=\"{os.path.basename(path)}\"",
             })
-    f_modified = get_file_header_datetime(datetime.fromtimestamp(f_modified))
-    f_created = get_file_header_datetime(datetime.fromtimestamp(f_created))
+    f_current = get_file_header_datetime(now())
+    f_modified = get_file_header_datetime(f_modified)
     headers.update({
-        "Date": f_created,
-        "Last-Modified": f_modified
+        "Date": f_current,
+        "Last-Modified": f_modified,
     })
     return headers
 
@@ -2101,10 +2126,10 @@ def resolve_s3_reference(s3_reference):
             )
         if s3_arn_match["type_name"] == "outpost":
             parts = s3_arn_match["path"].split("/", 4)
-            bucket_name = s3_arn_match["bucket"] + "/".join(parts[:3])
+            s3_bucket = s3_arn_match["bucket"] + "/".join(parts[:3])
             file_key = "/".join(parts[3:])
         elif s3_arn_match["type_name"] == "accesspoint":
-            bucket_name = s3_arn_match["bucket"]
+            s3_bucket = s3_arn_match["bucket"]
             file_key = s3_arn_match["path"]
         else:
             raise ValueError(
@@ -2114,7 +2139,7 @@ def resolve_s3_reference(s3_reference):
         s3_region = s3_arn_match["region"]
     else:
         s3_region = None  # default or predefined by caller
-        bucket_name, file_key = s3_ref.split("/", 1)
+        s3_bucket, file_key = s3_ref.split("/", 1)
     # files must always be relative without prefixed '/'
     # directory should always contain the trailing '/'
     if s3_reference.endswith("/"):
@@ -2122,7 +2147,7 @@ def resolve_s3_reference(s3_reference):
             file_key += "/"
     else:
         file_key = file_key.lstrip("/")
-    return bucket_name, file_key, s3_region
+    return s3_bucket, file_key, s3_region
 
 
 def resolve_s3_http_options(**request_kwargs):
@@ -2190,10 +2215,13 @@ class OutputMethod(ExtendedEnum):
     """
     Methodology employed to handle generation of a file or directory output that was fetched.
     """
+    # download operations
     AUTO = "auto"
     LINK = "link"
     MOVE = "move"
     COPY = "copy"
+    # metadata operations
+    META = "meta"
 
 
 def fetch_file(file_reference,                      # type: str
@@ -2253,13 +2281,13 @@ def fetch_file(file_reference,                      # type: str
         LOGGER.debug("Fetch file resolved as S3 bucket reference.")
         s3_params = resolve_s3_http_options(**options["http"], **kwargs)
         s3_region = options["s3"].pop("region_name", None)
-        bucket_name, file_key, s3_region_ref = resolve_s3_reference(file_reference)
+        s3_bucket, file_key, s3_region_ref = resolve_s3_reference(file_reference)
         if s3_region and s3_region_ref and s3_region != s3_region_ref:
             raise ValueError("Invalid AWS S3 reference. "
                              f"Input region name [{s3_region}] mismatches reference region [{s3_region_ref}].")
         s3_region = s3_region_ref or s3_region
         s3_client = boto3.client("s3", region_name=s3_region, **s3_params)  # type: S3Client
-        s3_client.download_file(bucket_name, file_key, file_path, Callback=callback)
+        s3_client.download_file(s3_bucket, file_key, file_path, Callback=callback)
     elif file_reference.startswith("http"):
         # pseudo-http URL referring to S3 bucket, try to redirect to above S3 handling method if applicable
         if file_reference.startswith("https://s3.") or urlparse(file_reference).hostname.endswith(".amazonaws.com"):
@@ -2289,7 +2317,7 @@ def fetch_file(file_reference,                      # type: str
 
 
 def adjust_file_local(file_reference, file_outdir, out_method):
-    # type: (str, str, OutputMethod) -> str
+    # type: (str, str, OutputMethod) -> AnyOutputResult
     """
     Adjusts the input file reference to the output location with the requested handling method.
 
@@ -2319,13 +2347,15 @@ def adjust_file_local(file_reference, file_outdir, out_method):
 
     :param file_reference: Original location of the file.
     :param file_outdir: Target directory of the file.
-    :param out_method: Method employed to handle the generation of the output file.
-    :returns: Output file location.
+    :param out_method: Method employed to handle the generation of the output.
+    :returns: Output file location or metadata.
     """
     file_loc = os.path.realpath(file_reference)
     file_name = os.path.basename(file_loc)  # resolve any different name to use the original
     file_name = get_secure_filename(file_name)
     file_path = os.path.join(file_outdir, file_name)
+    if out_method == OutputMethod.META:
+        return get_href_headers(file_loc, download_header=True, content_headers=True)
     if out_method == OutputMethod.MOVE and os.path.isfile(file_path):
         LOGGER.debug("Reference [%s] cannot be moved to path [%s] (already exists)", file_reference, file_path)
         raise OSError("Cannot move file, already in output directory!")
@@ -2353,17 +2383,22 @@ def adjust_file_local(file_reference, file_outdir, out_method):
     return file_path
 
 
-def filter_directory_forbidden(listing):
-    # type: (Iterable[str]) -> Iterator[str]
+def filter_directory_forbidden(listing, key=None):
+    # type: (Iterable[FilterType], Optional[Callable[[...], str]]) -> Iterator[FilterType]
     """
     Filters out items that should always be removed from directory listing results.
     """
+    if key is None:
+        def key(_):
+            return _
+
     is_in = frozenset({"..", "../", "./"})
     equal = frozenset({"."})  # because of file extensions, cannot check 'part in item'
     for item in listing:
-        if any(part in item for part in is_in):
+        path = key(item)
+        if any(part in path for part in is_in):
             continue
-        if any(part == item for part in equal):
+        if any(part == path for part in equal):
             continue
         yield item
 
@@ -2373,8 +2408,12 @@ class PathMatchingMethod(ExtendedEnum):
     REGEX = "regex"
 
 
-def filter_directory_patterns(listing, include, exclude, matcher):
-    # type: (Iterable[str], Optional[Iterable[str]], Optional[Iterable[str]], PathMatchingMethod) -> List[str]
+def filter_directory_patterns(listing,      # type: Iterable[FilterType]
+                              include,      # type: Optional[Iterable[str]]
+                              exclude,      # type: Optional[Iterable[str]]
+                              matcher,      # type: PathMatchingMethod
+                              key=None,     # type: Optional[Callable[[...], str]]
+                              ):            # type: (...) -> List[FilterType]
     """
     Filters a list of files according to a set of include/exclude patterns.
 
@@ -2398,8 +2437,13 @@ def filter_directory_patterns(listing, include, exclude, matcher):
     :param include: Any matching patterns for files that should be explicitly included.
     :param exclude: Any matching patterns for files that should be excluded unless included.
     :param matcher: Pattern matching method to evaluate if a file path matches include and exclude definitions.
+    :param key: Function to retrieve the file key (path) from objects containing it to be filtered.
     :return: Filtered files.
     """
+    if key is None:
+        def key(_):
+            return _
+
     listing_include = include or []
     listing_exclude = exclude or []
     if listing_include or listing_exclude:
@@ -2413,8 +2457,8 @@ def filter_directory_patterns(listing, include, exclude, matcher):
             raise ValueError(f"Unknown path pattern matching method: [{matcher}]")
         filtered = [
             item for item in listing if (
-                not any(is_match(re_excl, item) for re_excl in listing_exclude)
-                or any(is_match(re_incl, item) for re_incl in listing_include)
+                not any(is_match(re_excl, key(item)) for re_excl in listing_exclude)
+                or any(is_match(re_incl, key(item)) for re_incl in listing_include)
             )
         ]
         LOGGER.debug("Filtering directory listing\n"
@@ -2427,14 +2471,41 @@ def filter_directory_patterns(listing, include, exclude, matcher):
     return listing
 
 
-def download_files_s3(location,                         # type: str
-                      out_dir,                          # type: Path
-                      include=None,                     # type: Optional[List[str]]
-                      exclude=None,                     # type: Optional[List[str]]
-                      matcher=PathMatchingMethod.GLOB,  # type: PathMatchingMethod
-                      settings=None,                    # type: Optional[SettingsType]
-                      **option_kwargs,                  # type: Any  # Union[SchemeOptions, RequestOptions]
-                      ):                                # type: (...) -> List[str]
+@overload
+def fetch_files_s3(location,                            # type: str
+                   out_dir,                             # type: Path
+                   out_method,                          # type: AnyMetadataOutputMethod
+                   include=None,                        # type: Optional[List[str]]
+                   exclude=None,                        # type: Optional[List[str]]
+                   matcher=PathMatchingMethod.GLOB,     # type: PathMatchingMethod
+                   settings=None,                       # type: Optional[SettingsType]
+                   **option_kwargs,                     # type: Any  # Union[SchemeOptions, RequestOptions]
+                   ):                                   # type: (...) -> List[MetadataResult]
+    ...
+
+
+@overload
+def fetch_files_s3(location,                            # type: str
+                   out_dir,                             # type: Path
+                   out_method,                          # type: AnyDownloadOutputMethod
+                   include=None,                        # type: Optional[List[str]]
+                   exclude=None,                        # type: Optional[List[str]]
+                   matcher=PathMatchingMethod.GLOB,     # type: PathMatchingMethod
+                   settings=None,                       # type: Optional[SettingsType]
+                   **option_kwargs,                     # type: Any  # Union[SchemeOptions, RequestOptions]
+                   ):                                   # type: (...) -> List[DownloadResult]
+    ...
+
+
+def fetch_files_s3(location,                            # type: str
+                   out_dir,                             # type: Path
+                   out_method,                          # type: AnyOutputMethod
+                   include=None,                        # type: Optional[List[str]]
+                   exclude=None,                        # type: Optional[List[str]]
+                   matcher=PathMatchingMethod.GLOB,     # type: PathMatchingMethod
+                   settings=None,                       # type: Optional[SettingsType]
+                   **option_kwargs,                     # type: Any  # Union[SchemeOptions, RequestOptions]
+                   ):                                   # type: (...) -> List[AnyOutputResult]
     """
     Download all listed S3 files references under the output directory using the provided S3 bucket and client.
 
@@ -2446,6 +2517,7 @@ def download_files_s3(location,                         # type: str
 
     :param location: S3 bucket location (with ``s3://`` scheme) targeted to retrieve files.
     :param out_dir: Desired output location of downloaded files.
+    :param out_method: Method employed to handle the generation of the output.
     :param include: Any matching patterns for files that should be explicitly included.
     :param exclude: Any matching patterns for files that should be excluded unless included.
     :param matcher: Pattern matching method to evaluate if a file path matches include and exclude definitions.
@@ -2463,21 +2535,37 @@ def download_files_s3(location,                         # type: str
     s3_params = resolve_s3_http_options(**options["http"], **kwargs)
     s3_region = options["s3"].pop("region_name", None)
     s3_client = boto3.client("s3", region_name=s3_region, **s3_params)  # type: S3Client
-    bucket_name, dir_key = location[5:].split("/", 1)
+    s3_bucket, dir_key = location[5:].split("/", 1)
     base_url = f"{s3_client.meta.endpoint_url.rstrip('/')}/"
 
     # adjust patterns with full paths to ensure they still work with retrieved relative S3 keys
     include = [incl.replace(base_url, "", 1) if incl.startswith(base_url) else incl for incl in include or []]
     exclude = [excl.replace(base_url, "", 1) if excl.startswith(base_url) else excl for excl in exclude or []]
 
-    LOGGER.debug("Resolved S3 Bucket [%s] and Region [%s] for download of files.", bucket_name, s3_region or "default")
-    s3_dir_resp = s3_client.list_objects_v2(Bucket=bucket_name, Prefix=dir_key)
-    LOGGER.debug("Fetched S3 directory [%s] listing contents:\n%s", location, repr_json(s3_dir_resp))
-    s3_files = (file["Key"] for file in s3_dir_resp["Contents"])  # definitions with relative paths (like patterns)
-    s3_files = (path for path in s3_files if not path.endswith("/"))
-    s3_files = filter_directory_forbidden(s3_files)
-    s3_files = filter_directory_patterns(s3_files, include, exclude, matcher)
-    s3_files = list(s3_files)
+    LOGGER.debug("Resolved S3 Bucket [%s] and Region [%s] for download of files.", s3_bucket, s3_region or "default")
+    s3_paging = s3_client.get_paginator("list_objects_v2")
+    LOGGER.debug("Fetching S3 directory [%s] listing.", location)
+    s3_files = (  # definitions with relative paths (like patterns)
+        file
+        for s3_dir_resp in s3_paging.paginate(Bucket=s3_bucket, Prefix=dir_key)
+        for file in s3_dir_resp["Contents"]
+    )
+    s3_files = (file for file in s3_files if not file["Key"].endswith("/"))
+    s3_files = filter_directory_forbidden(s3_files, key=lambda _file: _file["Key"])
+    s3_files = filter_directory_patterns(s3_files, include, exclude, matcher, key=lambda _file: _file["Key"])
+
+    if out_method == OutputMethod.META:
+        # FIXME: extra metadata needed?
+        #   Key/Size/LastModified available from listing directly
+        #   ContentType needs head object additional request per item
+        # s3_meta = (s3_client.head_object(Bucket=s3_bucket, Key=file_key) for file_key in s3_files)
+        # s3_meta = (file_meta["ResponseMetadata"]["HTTPHeaders"] for file_meta in s3_meta)
+        for file_meta in s3_files:  # type: MetadataResult
+            file_key = file_meta.pop("Key")
+            file_meta["Content-Location"] = f"{base_url}{file_key}"
+        return list(s3_files)
+
+    s3_files = [file["Key"] for file in s3_files]
 
     # create directories in advance to avoid potential errors in case many workers try to generate the same one
     base_url = base_url.rstrip("/")
@@ -2514,7 +2602,7 @@ def download_files_s3(location,                         # type: str
         raise ValueError(f"No files specified for download from reference [{base_url}].")
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = (
-            executor.submit(_download_file, s3_client, bucket_name, file_key, out_dir)
+            executor.submit(_download_file, s3_client, s3_bucket, file_key, out_dir)
             for file_key in s3_files
         )
         for future in as_completed(futures):
@@ -2533,15 +2621,16 @@ def download_files_s3(location,                         # type: str
             )
 
 
-def download_files_url(file_references,                     # type: Iterable[str]
-                       out_dir,                             # type: Path
-                       base_url,                            # type: str
-                       include=None,                        # type: Optional[List[str]]
-                       exclude=None,                        # type: Optional[List[str]]
-                       matcher=PathMatchingMethod.GLOB,     # type: PathMatchingMethod
-                       settings=None,                       # type: Optional[SettingsType]
-                       **option_kwargs,                     # type: Any  # Union[SchemeOptions, RequestOptions]
-                       ):                                   # type: (...) -> Iterator[str]
+def fetch_files_url(file_references,                    # type: Iterable[str]
+                    out_dir,                            # type: Path
+                    out_method,                         # type: AnyOutputMethod 
+                    base_url,                           # type: str
+                    include=None,                       # type: Optional[List[str]]
+                    exclude=None,                       # type: Optional[List[str]]
+                    matcher=PathMatchingMethod.GLOB,    # type: PathMatchingMethod
+                    settings=None,                      # type: Optional[SettingsType]
+                    **option_kwargs,                    # type: Any  # Union[SchemeOptions, RequestOptions]
+                    ):                                  # type: (...) -> Iterator[AnyOutputResult]
     """
     Download all listed files references under the output directory.
 
@@ -2641,17 +2730,46 @@ def download_files_url(file_references,                     # type: Iterable[str
             yield future.result()
 
 
-def download_files_html(html_data,                          # type: str
-                        out_dir,                            # type: Path
-                        base_url,                           # type: str
-                        include=None,                       # type: Optional[List[str]]
-                        exclude=None,                       # type: Optional[List[str]]
-                        matcher=PathMatchingMethod.GLOB,    # type: PathMatchingMethod
-                        settings=None,                      # type: Optional[AnySettingsContainer]
-                        **option_kwargs,                    # type: Any  # Union[SchemeOptions, RequestOptions]
-                        ):                                  # type: (...) -> Iterator[str]
+@overload
+def fetch_files_html(html_data,                         # type: str
+                     out_dir,                           # type: Path
+                     out_method,                        # type: AnyMetadataOutputMethod
+                     base_url,                          # type: str
+                     include=None,                      # type: Optional[List[str]]
+                     exclude=None,                      # type: Optional[List[str]]
+                     matcher=PathMatchingMethod.GLOB,   # type: PathMatchingMethod
+                     settings=None,                     # type: Optional[AnySettingsContainer]
+                     **option_kwargs,                   # type: Any  # Union[SchemeOptions, RequestOptions]
+                     ):                                 # type: (...) -> Iterator[MetadataResult]
+    ...
+
+
+@overload
+def fetch_files_html(html_data,                         # type: str
+                     out_dir,                           # type: Path
+                     out_method,                        # type: AnyDownloadOutputMethod
+                     base_url,                          # type: str
+                     include=None,                      # type: Optional[List[str]]
+                     exclude=None,                      # type: Optional[List[str]]
+                     matcher=PathMatchingMethod.GLOB,   # type: PathMatchingMethod
+                     settings=None,                     # type: Optional[AnySettingsContainer]
+                     **option_kwargs,                   # type: Any  # Union[SchemeOptions, RequestOptions]
+                     ):                                 # type: (...) -> Iterator[DownloadResult]
+    ...
+
+
+def fetch_files_html(html_data,                         # type: str
+                     out_dir,                           # type: Path
+                     out_method,                        # type: AnyOutputMethod
+                     base_url,                          # type: str
+                     include=None,                      # type: Optional[List[str]]
+                     exclude=None,                      # type: Optional[List[str]]
+                     matcher=PathMatchingMethod.GLOB,   # type: PathMatchingMethod
+                     settings=None,                     # type: Optional[AnySettingsContainer]
+                     **option_kwargs,                   # type: Any  # Union[SchemeOptions, RequestOptions]
+                     ):                                 # type: (...) -> Iterator[AnyOutputResult]
     """
-    Downloads files retrieved from a directory listing provided as an index of plain HTML with file references.
+    Retrives files from a directory listing provided as an index of plain HTML with file references.
 
     If the index itself provides directories that can be browsed down, the tree hierarchy will be downloaded
     recursively by following links. In such case, links are ignored if they cannot be resolved as a nested index pages.
@@ -2664,10 +2782,11 @@ def download_files_html(html_data,                          # type: str
     - https://mirrors.edge.kernel.org/pub/ (listing within a formatted table with multiple other metadata fields)
 
     .. seealso::
-        :func:`download_files_url`
+        :func:`fetch_files_url`
 
     :param html_data: HTML data contents with files references to download.
-    :param out_dir: Desired output location of downloaded files.
+    :param out_dir: Desired output location of retrieved files.
+    :param out_method: Method employed to handle the generation of the output.
     :param base_url:
         If full URL are specified, corresponding files will be retrieved using the appropriate scheme per file
         allowing flexible data sources. Otherwise, any relative locations use this base URL to resolve the full
@@ -2708,11 +2827,33 @@ def download_files_html(html_data,                          # type: str
                     yield _sub_ref
 
     files = list(_list_refs(base_url, html_data))
-    return download_files_url(
-        files, out_dir, base_url,
+    return fetch_files_url(
+        files, out_dir, out_method, base_url,
         include=include, exclude=exclude, matcher=matcher,
         settings=settings, **option_kwargs
     )
+
+
+@overload
+def adjust_directory_local(location,                            # type: Path
+                           out_dir,                             # type: Path
+                           out_method,                          # type: AnyMetadataOutputMethod
+                           include=None,                        # type: Optional[List[str]]
+                           exclude=None,                        # type: Optional[List[str]]
+                           matcher=PathMatchingMethod.GLOB,     # type: PathMatchingMethod
+                           ):                                   # type: (...) -> List[MetadataResult]
+    ...
+
+
+@overload
+def adjust_directory_local(location,                            # type: Path
+                           out_dir,                             # type: Path
+                           out_method,                          # type: AnyDownloadOutputMethod
+                           include=None,                        # type: Optional[List[str]]
+                           exclude=None,                        # type: Optional[List[str]]
+                           matcher=PathMatchingMethod.GLOB,     # type: PathMatchingMethod
+                           ):                                   # type: (...) -> List[DownloadResult]
+    ...
 
 
 def adjust_directory_local(location,                            # type: Path
@@ -2721,7 +2862,7 @@ def adjust_directory_local(location,                            # type: Path
                            include=None,                        # type: Optional[List[str]]
                            exclude=None,                        # type: Optional[List[str]]
                            matcher=PathMatchingMethod.GLOB,     # type: PathMatchingMethod
-                           ):                                   # type: (...) -> List[Path]
+                           ):                                   # type: (...) -> List[AnyOutputResult]
     """
     Adjusts the input directory reference to the output location with the requested handling method.
 
@@ -2769,7 +2910,7 @@ def adjust_directory_local(location,                            # type: Path
 
     :param location: Local reference to the source directory.
     :param out_dir: Local reference to the output directory.
-    :param out_method: Method employed to handle the generation of the output directory.
+    :param out_method: Method employed to handle the generation of the output.
     :param include: Any matching patterns for files that should be explicitly included.
     :param exclude: Any matching patterns for files that should be excluded unless included.
     :param matcher: Pattern matching method to evaluate if a file path matches include and exclude definitions.
@@ -2800,6 +2941,9 @@ def adjust_directory_local(location,                            # type: Path
     extras = [os.path.join(out_dir, path) for path in extras]
     desired = [os.path.join(loc_dir, path) for path in filtered]
     filtered = list(sorted(os.path.join(out_dir, path) for path in filtered))
+
+    if out_method == OutputMethod.META:
+        return [get_href_headers(path, download_headers=True, content_headers=True) for path in filtered]
 
     if loc_dir == out_dir:
         if not extras:
@@ -2867,6 +3011,20 @@ def list_directory_recursive(directory, relative=False):
             yield file_name if relative else os.path.join(path, file_name)
 
 
+@overload
+def fetch_directory(location,                           # type: str
+                    out_dir,                            # type: Path
+                    *,                                  # force named keyword arguments after
+                    out_method=OutputMethod.AUTO,       # type: AnyMetadataOutputMethod
+                    include=None,                       # type: Optional[List[str]]
+                    exclude=None,                       # type: Optional[List[str]]
+                    matcher=PathMatchingMethod.GLOB,    # type: PathMatchingMethod
+                    settings=None,                      # type: Optional[AnySettingsContainer]
+                    **option_kwargs,                    # type: Any  # Union[SchemeOptions, RequestOptions]
+                    ):                                  # type: (...) -> List[MetadataResult]
+    ...
+
+
 def fetch_directory(location,                           # type: str
                     out_dir,                            # type: Path
                     *,                                  # force named keyword arguments after
@@ -2876,7 +3034,7 @@ def fetch_directory(location,                           # type: str
                     matcher=PathMatchingMethod.GLOB,    # type: PathMatchingMethod
                     settings=None,                      # type: Optional[AnySettingsContainer]
                     **option_kwargs,                    # type: Any  # Union[SchemeOptions, RequestOptions]
-                    ):                                  # type: (...) -> List[str]
+                    ):                                  # type: (...) -> List[AnyOutputResult]
     """
     Fetches all files that can be listed from a directory in local or remote location.
 
@@ -2884,9 +3042,9 @@ def fetch_directory(location,                           # type: str
         - :func:`fetch_reference`
         - :func:`resolve_scheme_options`
         - :func:`adjust_directory_local`
-        - :func:`download_files_html`
-        - :func:`download_files_s3`
-        - :func:`download_files_url`
+        - :func:`fetch_files_html`
+        - :func:`fetch_files_s3`
+        - :func:`fetch_files_url`
 
     .. note::
         When using include/exclude filters, items that do not match a valid entry from the real listing are ignored.
@@ -2913,36 +3071,37 @@ def fetch_directory(location,                           # type: str
     LOGGER.debug("Fetching directory reference: [%s] using options:\n%s", location, repr_json(option_kwargs))
     if location.startswith("s3://"):
         LOGGER.debug("Fetching listed files under directory resolved as S3 bucket reference.")
-        listing = download_files_s3(location, out_dir,
-                                    include=include, exclude=exclude, matcher=matcher, **option_kwargs)
+        listing = fetch_files_s3(location, out_dir, out_method,
+                                 include=include, exclude=exclude, matcher=matcher,
+                                 settings=settings, **option_kwargs)
     elif location.startswith("https://s3."):
         LOGGER.debug("Fetching listed files under directory resolved as HTTP-like S3 bucket reference.")
         s3_ref, s3_region = resolve_s3_from_http(location)
         option_kwargs["s3_region_name"] = s3_region
-        listing = download_files_s3(s3_ref, out_dir,
-                                    include=include, exclude=exclude,
-                                    settings=settings, **option_kwargs)
+        listing = fetch_files_s3(s3_ref, out_dir, out_method,
+                                 include=include, exclude=exclude,
+                                 settings=settings, **option_kwargs)
     elif location.startswith("http://") or location.startswith("https://"):
         # Next two lines are added to match behavior of `download_files_s3` and replicate input directory name
         # in output location
         loc_path = get_secure_directory_name(location_without_query)
         out_dir = os.path.join(out_dir, loc_path)
         LOGGER.debug("Fetch directory resolved as remote HTTP reference. Will attempt listing contents.")
-        resp = request_extra("GET", location)
+        resp = request_extra("GET", location, **option_kwargs)
         if resp.status_code != 200:
             LOGGER.error("Invalid response [%s] for directory listing from [%s]", resp.status_code, location)
             raise ValueError(f"Cannot parse directory location [{location}] from [{resp.status_code}] response.")
         ctype = get_header("Content-Type", resp.headers, default=ContentType.TEXT_HTML)
         if any(_type in ctype for _type in [ContentType.TEXT_HTML] + list(ContentType.ANY_XML)):
-            listing = download_files_html(resp.text, out_dir, location,
-                                          include=include, exclude=exclude, matcher=matcher,
-                                          settings=settings, **option_kwargs)
+            listing = fetch_files_html(resp.text, out_dir, out_method, location,
+                                       include=include, exclude=exclude, matcher=matcher,
+                                       settings=settings, **option_kwargs)
         elif ContentType.APP_JSON in ctype:
             body = resp.json()  # type: JSON
             if isinstance(body, list) and all(isinstance(file, str) for file in body):
-                listing = download_files_url(body, out_dir, location,
-                                             include=include, exclude=exclude, matcher=matcher,
-                                             settings=settings, **option_kwargs)
+                listing = fetch_files_url(body, out_dir, out_method, location,
+                                          include=include, exclude=exclude, matcher=matcher,
+                                          settings=settings, **option_kwargs)
             else:
                 LOGGER.error("Invalid JSON from [%s] is not a list of files:\n%s", location, repr_json(body))
                 raise ValueError(f"Cannot parse directory location [{location}] "
@@ -2955,7 +3114,7 @@ def fetch_directory(location,                           # type: str
                                          include=include, exclude=exclude, matcher=matcher)
     else:
         raise ValueError(f"Unknown scheme for directory location [{location}].")
-    listing = list(sorted(listing))
+    listing = list(sorted(listing, key=lambda _file: _file["Content-Location"] if out_method.META else _file))
     if LOGGER.isEnabledFor(logging.DEBUG):
         for item in listing:
             LOGGER.debug("Resolved file [%s] from [%s] directory listing.", item, location)
